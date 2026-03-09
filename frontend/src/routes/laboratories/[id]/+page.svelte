@@ -12,6 +12,7 @@
 	import { docTypeLabelsMap, oaLabelsMap, typeLabels } from '$lib/labels';
 
 	const labId = $derived($page.params.id);
+	let canGoBack = $state(false);
 	const validTabs = ['publications', 'persons', 'addresses'] as const;
 	type Tab = (typeof validTabs)[number];
 
@@ -141,6 +142,20 @@
 		return rorId.replace('https://ror.org/', '');
 	}
 
+	function syncUrl() {
+		const p = new URLSearchParams();
+		if (activeTab !== 'publications') p.set('tab', activeTab);
+		if (selectedYears.length) p.set('year', selectedYears.join(','));
+		const sf = Object.entries(sourceStates).map(([k, v]) => `${k}_${v}`).join(',');
+		if (sf) p.set('source_filter', sf);
+		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
+		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
+		if (pubSearch.trim()) p.set('search', pubSearch.trim());
+		if (pubPage > 1) p.set('page', String(pubPage));
+		const qs = p.toString();
+		history.replaceState(history.state, '', `${base}/laboratories/${labId}` + (qs ? '?' + qs : ''));
+	}
+
 	function buildPubFilterParams(): URLSearchParams {
 		const params = new URLSearchParams({ lab_id: labId });
 		if (selectedYears.length) params.set('year', selectedYears.join(','));
@@ -187,6 +202,7 @@
 
 	function onFilterChange() {
 		pubPage = 1;
+		syncUrl();
 		loadPublications();
 		loadPubFacets();
 	}
@@ -203,6 +219,7 @@
 		clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => {
 			pubPage = 1;
+			syncUrl();
 			loadPublications();
 		}, 400);
 	}
@@ -239,19 +256,38 @@
 	}
 
 	function switchTab(tab: Tab) {
+		// Update tab via goto (triggers $derived activeTab update)
 		const url = new URL($page.url);
 		if (tab === 'publications') {
 			url.searchParams.delete('tab');
 		} else {
 			url.searchParams.set('tab', tab);
 		}
-		goto(url.toString(), { replaceState: true, noScroll: true });
+		goto(url.toString(), { replaceState: true, noScroll: true }).then(() => syncUrl());
 		if (tab === 'publications' && !pubsLoaded) { loadPubFacets(); loadPublications(); }
 		if (tab === 'persons' && !personsLoaded) loadPersons();
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
 	}
 
 	onMount(async () => {
+		canGoBack = (window.navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
+
+		// Restore filters from URL
+		const urlParams = $page.url.searchParams;
+		if (urlParams.get('year')) selectedYears = urlParams.get('year')!.split(',');
+		if (urlParams.get('doc_type')) selectedDocTypes = urlParams.get('doc_type')!.split(',');
+		if (urlParams.get('oa_status')) selectedOa = urlParams.get('oa_status')!.split(',');
+		if (urlParams.get('source_filter')) {
+			const states: Record<string, string> = {};
+			for (const v of urlParams.get('source_filter')!.split(',')) {
+				const m = v.match(/^(\w+)_(yes|no)$/);
+				if (m) states[m[1]] = m[2];
+			}
+			sourceStates = states;
+		}
+		if (urlParams.get('search')) pubSearch = urlParams.get('search')!;
+		if (urlParams.get('page')) pubPage = Number(urlParams.get('page')) || 1;
+
 		try {
 			const profileData = await api<LabProfile>(`/api/laboratories/${labId}`);
 			lab = profileData.structure;
@@ -277,8 +313,10 @@
 	<title>{lab ? (lab.acronym || lab.name) : 'Laboratoire'} — Bibliométrie UCA</title>
 </svelte:head>
 
+{#if canGoBack}
 <!-- svelte-ignore a11y_invalid_attribute -->
 <a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
+{/if}
 
 {#if error}
 	<div class="lab-header">
@@ -422,7 +460,7 @@
 					{/if}
 				</tbody>
 			</table>
-			<Pagination page={pubPage} pages={pubPages} onchange={(p) => { pubPage = p; loadPublications(); window.scrollTo(0, 0); }} />
+			<Pagination page={pubPage} pages={pubPages} onchange={(p) => { pubPage = p; syncUrl(); loadPublications(); window.scrollTo(0, 0); }} />
 		</div>
 	{/if}
 

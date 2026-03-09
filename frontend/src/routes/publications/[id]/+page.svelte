@@ -7,6 +7,7 @@
 	import { typeLabels as baseTypeLabels } from '$lib/labels';
 
 	const pubId = $derived($page.params.id);
+	let canGoBack = $state(false);
 
 	// --- Types ---
 	interface PubDetail {
@@ -108,6 +109,7 @@
 	const oaSource = $derived(data?.sources.find(s => s.source === 'openalex'));
 
 	onMount(async () => {
+		canGoBack = (window.navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
 		try {
 			data = await api<PubResponse>(`/api/publications/${pubId}`);
 		} catch {
@@ -120,8 +122,10 @@
 	<title>{pub?.title ? pub.title.slice(0, 80) : 'Publication'} — Bibliométrie UCA</title>
 </svelte:head>
 
+{#if canGoBack}
 <!-- svelte-ignore a11y_invalid_attribute -->
 <a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
+{/if}
 
 {#if error}
 	<div class="pub-header"><div class="no-results">Publication introuvable</div></div>

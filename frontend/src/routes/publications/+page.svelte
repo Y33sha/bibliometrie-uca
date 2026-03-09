@@ -94,13 +94,32 @@
 	function toggleSortYear() {
 		currentSort = currentSort === 'year_desc' ? 'year_asc' : 'year_desc';
 		currentPage = 1;
+		syncUrl();
 		loadPublications();
 	}
 
 	function toggleSortTitle() {
 		currentSort = currentSort === 'title' ? 'title_desc' : 'title';
 		currentPage = 1;
+		syncUrl();
 		loadPublications();
+	}
+
+	function syncUrl() {
+		const p = new URLSearchParams();
+		if (selectedYears.length) p.set('year', selectedYears.join(','));
+		if (selectedLabs.length) p.set('lab_id', selectedLabs.join(','));
+		const sf = Object.entries(sourceStates).map(([k, v]) => `${k}_${v}`).join(',');
+		if (sf) p.set('source_filter', sf);
+		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
+		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
+		if (filterPublisherId) { p.set('publisher_id', filterPublisherId); if (filterPublisherName) p.set('publisher_name', filterPublisherName); }
+		if (filterJournalId) { p.set('journal_id', filterJournalId); if (filterJournalName) p.set('journal_name', filterJournalName); }
+		if (search.trim()) p.set('search', search.trim());
+		if (currentSort !== 'year_desc') p.set('sort', currentSort);
+		if (currentPage > 1) p.set('page', String(currentPage));
+		const qs = p.toString();
+		history.replaceState(history.state, '', base + '/publications' + (qs ? '?' + qs : ''));
 	}
 
 	function buildFilterParams(): URLSearchParams {
@@ -159,6 +178,7 @@
 
 	function onFilterChange() {
 		currentPage = 1;
+		syncUrl();
 		loadPublications();
 		loadFacets();
 	}
@@ -174,6 +194,7 @@
 			selectedLabs = newSelection;
 		}
 		currentPage = 1;
+		syncUrl();
 		loadPublications();
 		loadFacets();
 	}
@@ -190,12 +211,14 @@
 		clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => {
 			currentPage = 1;
+			syncUrl();
 			loadPublications();
 		}, 400);
 	}
 
 	function onPageChange(p: number) {
 		currentPage = p;
+		syncUrl();
 		loadPublications();
 		window.scrollTo(0, 0);
 	}
@@ -221,6 +244,9 @@
 			}
 			sourceStates = states;
 		}
+		if (urlParams.get('search')) search = urlParams.get('search')!;
+		if (urlParams.get('sort')) currentSort = urlParams.get('sort')!;
+		if (urlParams.get('page')) currentPage = Number(urlParams.get('page')) || 1;
 
 		await loadFacets();
 		loadPublications();
@@ -239,7 +265,6 @@
 			filterJournalId = null;
 			filterPublisherName = null;
 			filterJournalName = null;
-			history.replaceState(null, '', cleanFilterUrl);
 			onFilterChange();
 		}}>Supprimer le filtre</a>
 	</div>

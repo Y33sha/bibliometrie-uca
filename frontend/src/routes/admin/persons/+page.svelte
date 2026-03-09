@@ -129,6 +129,14 @@
 	/* Identifier add form state: personId → { open, id_type, id_value, error } */
 	let idForms: Record<number, { id_type: string; id_value: string; error: string }> = $state({});
 
+	/* Expanded linked authors (collapsed by default) */
+	let expandedAuthors: Record<number, boolean> = $state({});
+
+	/* Merge search state */
+	interface MergeSearch { query: string; results: { id: number; first_name: string; last_name: string; department_name: string | null; has_rh: boolean }[]; loading: boolean }
+	let mergeSearches: Record<number, MergeSearch> = $state({});
+	let mergeTimers: Record<number, ReturnType<typeof setTimeout>> = {};
+
 	/* ── Derived ── */
 
 	const unlinkedCount = $derived(
@@ -375,6 +383,49 @@
 		await loadTable();
 	}
 
+	/* ── Merge ── */
+
+	function openMergeSearch(personId: number) {
+		// Close all other merge searches
+		for (const id of Object.keys(mergeTimers)) {
+			clearTimeout(mergeTimers[Number(id)]);
+		}
+		mergeSearches = { [personId]: { query: '', results: [], loading: false } };
+	}
+
+	function closeMergeSearch(personId: number) {
+		const next = { ...mergeSearches };
+		delete next[personId];
+		mergeSearches = next;
+		if (mergeTimers[personId]) clearTimeout(mergeTimers[personId]);
+	}
+
+	function handleMergeSearchInput(personId: number, query: string) {
+		mergeSearches = { ...mergeSearches, [personId]: { ...mergeSearches[personId], query } };
+		if (mergeTimers[personId]) clearTimeout(mergeTimers[personId]);
+		if (query.trim().length < 2) {
+			mergeSearches = { ...mergeSearches, [personId]: { ...mergeSearches[personId], results: [], loading: false } };
+			return;
+		}
+		mergeTimers[personId] = setTimeout(async () => {
+			mergeSearches = { ...mergeSearches, [personId]: { ...mergeSearches[personId], loading: true } };
+			const results = await api<MergeSearch['results']>(`/api/persons/search?q=${encodeURIComponent(query.trim())}`);
+			// Exclude self from results
+			mergeSearches = { ...mergeSearches, [personId]: { ...mergeSearches[personId], results: results.filter(r => r.id !== personId), loading: false } };
+		}, 300);
+	}
+
+	async function mergeInto(targetId: number, sourceId: number) {
+		await fetch(`${base}/api/persons/${targetId}/merge`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ source_id: sourceId })
+		});
+		closeMergeSearch(targetId);
+		loadStats();
+		loadTable();
+	}
+
 	/* ── Helpers ── */
 
 	function formatPeriod(p: Person): string {
@@ -525,25 +576,65 @@
 						{/if}
 						<!-- Linked authors -->
 						{#if linked.length}
-							{#each linked as a}
-								<span class="linked-author">
-									<span class="tag tag-source">{a.source}</span>
-									<span class="tag tag-linked">{a.full_name}</span>
-									{#if a.orcid}
-										<span class="tag tag-id" title="ORCID">{a.orcid}</span>
-									{/if}
-									{#if a.idhal}
-										<span class="tag tag-id" title="idHAL">{a.idhal}</span>
-									{/if}
-									<button
-										class="btn-unlink"
-										title="D&eacute;tacher"
-										onclick={() => unlinkAuthor(p.id, a.source, a.id)}
-									>&times;</button>
-								</span>
-							{/each}
+							<button class="btn-toggle-authors" onclick={() => { expandedAuthors = { ...expandedAuthors, [p.id]: !expandedAuthors[p.id] }; }}>
+								{linked.length} auteur{linked.length > 1 ? 's' : ''} lié{linked.length > 1 ? 's' : ''}
+								<span class="toggle-arrow">{expandedAuthors[p.id] ? '\u25BE' : '\u25B8'}</span>
+							</button>
+							{#if expandedAuthors[p.id]}
+								<div class="linked-authors-list">
+									{#each linked as a}
+										<span class="linked-author">
+											<span class="tag tag-source">{a.source}</span>
+											<span class="tag tag-linked">{a.full_name}</span>
+											{#if a.orcid}
+												<span class="tag tag-id" title="ORCID">{a.orcid}</span>
+											{/if}
+											{#if a.idhal}
+												<span class="tag tag-id" title="idHAL">{a.idhal}</span>
+											{/if}
+											<button
+												class="btn-unlink"
+												title="Détacher"
+												onclick={() => unlinkAuthor(p.id, a.source, a.id)}
+											>&times;</button>
+										</span>
+									{/each}
+								</div>
+							{/if}
 						{:else if !p.identifiers?.length}
-							<span class="tag tag-unlinked">non rattach&eacute;e</span>
+							<span class="tag tag-unlinked">non rattachée</span>
+						{/if}
+						<!-- Merge search -->
+						{#if p.id in mergeSearches}
+							{@const ms = mergeSearches[p.id]}
+							<div class="merge-search">
+								<div class="merge-input-row">
+									<input
+										type="text"
+										placeholder="Nom de la personne à absorber…"
+										value={ms.query}
+										oninput={(e) => handleMergeSearchInput(p.id, (e.target as HTMLInputElement).value)}
+									/>
+									<button class="btn" onclick={() => closeMergeSearch(p.id)}>&times;</button>
+								</div>
+								{#if ms.loading}
+									<div class="merge-results"><span class="loading-text">Recherche…</span></div>
+								{:else if ms.results.length}
+									<div class="merge-results">
+										{#each ms.results as r}
+											<button class="merge-result" onclick={() => mergeInto(p.id, r.id)}>
+												<strong>{r.last_name}</strong> {r.first_name}
+												{#if r.department_name}<span class="merge-dept">{r.department_name}</span>{/if}
+												{#if r.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+											</button>
+										{/each}
+									</div>
+								{:else if ms.query.trim().length >= 2}
+									<div class="merge-results"><span class="loading-text">Aucun résultat</span></div>
+								{/if}
+							</div>
+						{:else}
+							<button class="btn btn-merge" onclick={() => openMergeSearch(p.id)}>Fusionner avec…</button>
 						{/if}
 						<!-- Add identifier button / form -->
 						{#if p.id in idForms}
@@ -758,7 +849,7 @@
 		background: var(--card);
 		border: 1px solid var(--border);
 		border-radius: 6px;
-		overflow: hidden;
+		overflow: visible;
 	}
 	.data-table th {
 		text-align: left;
@@ -821,12 +912,97 @@
 		font-size: 10px;
 	}
 
-	/* ── Linked author inline ── */
+	/* ── Linked authors toggle ── */
+	.btn-toggle-authors {
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-size: 11px;
+		color: var(--accent);
+		padding: 2px 4px;
+		font-family: inherit;
+		font-weight: 500;
+	}
+	.btn-toggle-authors:hover { text-decoration: underline; }
+	.toggle-arrow { font-size: 10px; margin-left: 2px; }
+	.linked-authors-list {
+		margin-top: 4px;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
 	.linked-author {
 		display: inline-flex;
 		align-items: center;
 		gap: 4px;
-		margin: 2px 4px;
+		margin: 1px 0;
+	}
+
+	/* ── Merge search ── */
+	.btn-merge {
+		padding: 2px 8px;
+		border: 1px dashed var(--border);
+		border-radius: 4px;
+		background: none;
+		font-size: 11px;
+		cursor: pointer;
+		color: var(--text-muted);
+		margin-top: 4px;
+		font-family: inherit;
+	}
+	.btn-merge:hover {
+		background: var(--warning-light);
+		border-style: solid;
+		color: var(--warning);
+		border-color: var(--warning);
+	}
+	.merge-search {
+		margin-top: 4px;
+		position: relative;
+	}
+	.merge-input-row {
+		display: flex;
+		gap: 4px;
+		align-items: center;
+	}
+	.merge-input-row input {
+		padding: 3px 6px;
+		border: 1px solid var(--warning);
+		border-radius: 3px;
+		font-size: 12px;
+		font-family: inherit;
+		width: 220px;
+	}
+	.merge-results {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		z-index: 10;
+		background: white;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+		min-width: 280px;
+		max-height: 200px;
+		overflow-y: auto;
+		padding: 4px 0;
+	}
+	.merge-result {
+		display: block;
+		width: 100%;
+		text-align: left;
+		padding: 6px 10px;
+		border: none;
+		background: none;
+		cursor: pointer;
+		font-size: 12px;
+		font-family: inherit;
+	}
+	.merge-result:hover { background: var(--warning-light); }
+	.merge-dept {
+		font-size: 11px;
+		color: var(--text-muted);
+		margin-left: 6px;
 	}
 
 	/* ── Buttons ── */

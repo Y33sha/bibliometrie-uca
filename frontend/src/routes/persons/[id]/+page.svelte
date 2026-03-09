@@ -9,6 +9,7 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 
 	const personId = $derived($page.params.id);
+	let canGoBack = $state(false);
 	const validTabs = ['publications', 'identities', 'addresses'] as const;
 	type Tab = (typeof validTabs)[number];
 
@@ -88,10 +89,10 @@
 
 	// Addresses tab
 	let addresses: Address[] = $state([]);
-	let showAllAddresses = $state(false);
+	let addrTotal = $state(0);
+	let addrPage = $state(1);
+	let addrPages = $state(1);
 	let addrLoaded = $state(false);
-
-	const COLLAPSE_LIMIT = 10;
 
 	const displayName = $derived(
 		profile
@@ -112,10 +113,6 @@
 		return Array.from(set);
 	});
 
-	const visibleAddresses = $derived(
-		showAllAddresses ? addresses : addresses.slice(0, COLLAPSE_LIMIT)
-	);
-
 	async function loadPublications() {
 		const params = new URLSearchParams({
 			page: String(pubPage),
@@ -131,8 +128,17 @@
 	}
 
 	async function loadAddresses() {
-		const data = await api<Address[]>(`/api/persons/${personId}/addresses`);
-		addresses = data;
+		const params = new URLSearchParams({
+			page: String(addrPage),
+			per_page: '50'
+		});
+		const data = await api<{
+			total: number; page: number; pages: number; addresses: Address[];
+		}>(`/api/persons/${personId}/addresses?${params}`);
+		addresses = data.addresses;
+		addrTotal = data.total;
+		addrPages = data.pages;
+		addrPage = data.page;
 		addrLoaded = true;
 	}
 
@@ -153,6 +159,7 @@
 	}
 
 	onMount(async () => {
+		canGoBack = (window.navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
 		try {
 			const profileData = await api<ProfileResponse>(`/api/persons/${personId}/profile`);
 			profile = profileData.person;
@@ -172,8 +179,10 @@
 	<title>{displayName || 'Personne'} — Bibliométrie UCA</title>
 </svelte:head>
 
+{#if canGoBack}
 <!-- svelte-ignore a11y_invalid_attribute -->
 <a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
+{/if}
 
 {#if error}
 	<div class="profile-header">
@@ -230,7 +239,7 @@
 		</button>
 		<button class="tab" class:active={activeTab === 'addresses'} onclick={() => switchTab('addresses')}>
 			Adresses
-			{#if addrLoaded}<span class="tab-count">{addresses.length}</span>{/if}
+			{#if addrLoaded}<span class="tab-count">{addrTotal}</span>{/if}
 		</button>
 	</div>
 
@@ -366,25 +375,29 @@
 			{:else if addresses.length === 0}
 				<div class="no-results">Aucune adresse</div>
 			{:else}
-				<ul class="address-list">
-					{#each visibleAddresses as a (a.id)}
-						<li class="address-item">
-							<div class="address-raw">{a.raw_text}</div>
-							{#if a.structures?.length}
-								<div class="address-structures">
-									{#each a.structures as s (s.id)}
-										<span class="struct-tag">{s.acronym || s.name}</span>
-									{/each}
-								</div>
-							{/if}
-						</li>
-					{/each}
-				</ul>
-				{#if !showAllAddresses && addresses.length > COLLAPSE_LIMIT}
-					<button class="toggle-btn" onclick={() => (showAllAddresses = true)}>
-						Afficher les {addresses.length - COLLAPSE_LIMIT} adresses restantes
-					</button>
-				{/if}
+				<table>
+					<thead>
+						<tr>
+							<th>Adresse</th>
+							<th style="width:160px">Structures</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each addresses as a (a.id)}
+							<tr>
+								<td class="addr-cell">{a.raw_text}</td>
+								<td>
+									{#if a.structures?.length}
+										{#each a.structures as s (s.id)}
+											<span class="struct-tag">{s.acronym || s.name}</span>
+										{/each}
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+				<Pagination page={addrPage} pages={addrPages} onchange={(p) => { addrPage = p; loadAddresses(); }} />
 			{/if}
 		</div>
 	{/if}
@@ -603,15 +616,7 @@
 	.type-label { font-size: 11px; color: var(--muted); }
 
 	/* Addresses tab */
-	.address-list { list-style: none; padding: 0; margin: 0; }
-	.address-item {
-		padding: 8px 0;
-		border-bottom: 1px solid #f0efec;
-		font-size: 13px;
-	}
-	.address-item:last-child { border-bottom: none; }
-	.address-raw { color: var(--muted); font-size: 12px; word-break: break-all; }
-	.address-structures { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+	.addr-cell { font-size: 12px; color: var(--muted); word-break: break-all; }
 	.struct-tag {
 		display: inline-block;
 		padding: 2px 7px;
@@ -620,19 +625,8 @@
 		font-size: 11px;
 		color: var(--accent);
 		font-weight: 500;
+		margin: 1px 2px;
 	}
-	.toggle-btn {
-		background: none;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		padding: 4px 10px;
-		font-size: 12px;
-		color: var(--accent);
-		cursor: pointer;
-		margin-top: 6px;
-		font-family: inherit;
-	}
-	.toggle-btn:hover { background: #e8f0f8; }
 
 	.no-results { text-align: center; padding: 40px; color: var(--muted); }
 	.loading { text-align: center; padding: 40px; color: var(--muted); }

@@ -3525,10 +3525,27 @@ async def person_profile(person_id: int):
 
 
 @app.get("/api/persons/{person_id}/addresses")
-async def person_addresses(person_id: int):
+async def person_addresses(
+    person_id: int,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+):
     """Adresses distinctes utilisées dans les authorships OpenAlex de cette personne."""
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        base_where = """a.id IN (
+                SELECT DISTINCT oaa.address_id
+                FROM openalex_authorship_addresses oaa
+                JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
+                JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+                WHERE oa.person_id = %s
+            )"""
+        cur.execute(f"SELECT COUNT(*) AS total FROM addresses a WHERE {base_where}", (person_id,))
+        total = cur.fetchone()["total"]
+        pages = max(1, (total + per_page - 1) // per_page)
+        page = min(page, pages)
+        offset = (page - 1) * per_page
+
+        cur.execute(f"""
             SELECT a.id, a.raw_text,
                    (SELECT jsonb_agg(jsonb_build_object(
                         'id', s.id, 'acronym', s.acronym, 'name', s.name))
@@ -3537,16 +3554,16 @@ async def person_addresses(person_id: int):
                     WHERE ast.address_id = a.id AND s.type != 'site'
                    ) AS structures
             FROM addresses a
-            WHERE a.id IN (
-                SELECT DISTINCT oaa.address_id
-                FROM openalex_authorship_addresses oaa
-                JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
-                JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-                WHERE oa.person_id = %s
-            )
+            WHERE {base_where}
             ORDER BY a.raw_text
-        """, (person_id,))
-        return cur.fetchall()
+            LIMIT %s OFFSET %s
+        """, (person_id, per_page, offset))
+        return {
+            "total": total,
+            "page": page,
+            "pages": pages,
+            "addresses": cur.fetchall(),
+        }
 
 
 @app.get("/api/persons/{person_id}/candidates")
@@ -3807,6 +3824,58 @@ async def toggle_reject_identifier(ident_id: int):
         if not row:
             raise HTTPException(status_code=404, detail="Identifiant introuvable")
         return {"id": row["id"], "rejected": row["rejected"]}
+
+
+@app.post("/api/persons/{person_id}/merge")
+async def merge_persons(person_id: int, body: dict):
+    """Fusionne une autre personne (source) dans celle-ci (target).
+
+    Transfère tous les auteurs liés, identifiants et authorships de source vers target,
+    puis supprime la personne source.
+    """
+    source_id = body.get("source_id")
+    if not source_id or source_id == person_id:
+        raise HTTPException(status_code=400, detail="source_id invalide")
+
+    with get_cursor() as (cur, conn):
+        # Vérifier que les deux personnes existent
+        cur.execute("SELECT id FROM persons WHERE id IN (%s, %s)", (person_id, source_id))
+        found = {row["id"] for row in cur.fetchall()}
+        if person_id not in found:
+            raise HTTPException(status_code=404, detail="Personne cible introuvable")
+        if source_id not in found:
+            raise HTTPException(status_code=404, detail="Personne source introuvable")
+
+        # 1. Transférer les auteurs HAL
+        cur.execute(
+            "UPDATE hal_authors SET person_id = %s WHERE person_id = %s",
+            (person_id, source_id),
+        )
+        # 2. Transférer les auteurs OpenAlex
+        cur.execute(
+            "UPDATE openalex_authors SET person_id = %s WHERE person_id = %s",
+            (person_id, source_id),
+        )
+        # 3. Transférer les authorships
+        cur.execute(
+            "UPDATE authorships SET person_id = %s WHERE person_id = %s",
+            (person_id, source_id),
+        )
+        # 4. Transférer les identifiants (ignorer les doublons)
+        cur.execute(
+            """INSERT INTO person_identifiers (person_id, id_type, id_value, source, rejected)
+               SELECT %s, id_type, id_value, source, rejected
+               FROM person_identifiers WHERE person_id = %s
+               ON CONFLICT (id_type, id_value) DO NOTHING""",
+            (person_id, source_id),
+        )
+        cur.execute("DELETE FROM person_identifiers WHERE person_id = %s", (source_id,))
+        # 5. Supprimer les entrées persons_rh de la source
+        cur.execute("DELETE FROM persons_rh WHERE person_id = %s", (source_id,))
+        # 6. Supprimer la personne source
+        cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))
+
+        return {"merged": True, "source_id": source_id, "target_id": person_id}
 
 
 # ----- SvelteKit SPA (doit rester en dernier, après toutes les routes API) -----

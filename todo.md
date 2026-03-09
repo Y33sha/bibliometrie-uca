@@ -47,8 +47,9 @@ En attente réponse équipe technique.
 * [x] admin/authorships: n'afficher que les publis avec authorship UCA
 * [x] organiser la page en onglets
 * [x] reconnaissance de noms moins stricte (noms composés, tirets, accents) pour la suggestion de matchings personnes-auteurs
+* [x] possibilité de fusionner
 * [ ] publications: indiquer si auteur correspondant / premier auteur
-* [ ] colonne labos: utiliser info collection HAL (actuellement colonne vide quand HAL seule source); voir comment ça marche sur la page publications
+* [ ] gestions des formes de noms?
 * [ ] ajouter IdRef?
 * [ ] ajouter quelques visus (%OA)
 * [ ] authorships OpenAlex pourries (ex. Pierre Mathieu): trouver un moyen de les déclarer inutilisables / ou cesser totalement d'utiliser les authorships OpenAlex? étudier les options
@@ -73,6 +74,7 @@ En attente réponse équipe technique.
 * [ ] ajouter filtre corresponding_is_uca?
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et  corriger + source theses.fr => corriger type
 * [ ] lien Publications -> Dashboard?
+* [ ] merge manuel + suggestion de candidats
 
 ## Pages supplémentaires, étudier pertinence
 * [ ] sujets
@@ -85,12 +87,13 @@ En attente réponse équipe technique.
 * [x] Export png graphiques
 * [x] Légende dans export png
 * [x] Filtres à facettes dynamiques avec comptage
-* [ ] Rendre les filtres sticky
+* [x] lien retour: seulement si historique existe
 * [ ] Toujours mémoriser filtres et les rétablir au rechargement
+* [ ] Rendre les filtres sticky
 * [ ] Rendre tous les tableaux triables
-* [ ] lien retour: set default (si accès direct URL) ou cacher?
 * [ ] sources: arrangées verticalement dans un dropdown
 * [ ] afficher todo et nouveautés?
+* [ ] interface pour afficher le staging (pour vérif)
 
 # Trucs pour plus tard
 * compte fractionnaire?

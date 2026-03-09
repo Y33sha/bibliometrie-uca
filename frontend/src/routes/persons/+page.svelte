@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 	import { base } from '$app/paths';
 	import { api } from '$lib/api';
 	import { titleCase } from '$lib/utils';
@@ -45,6 +46,19 @@
 	let selectedOrcid: string[] = $state([]);
 	let selectedIdhal: string[] = $state([]);
 	let selectedRh: string[] = $state(['yes']);
+
+	function syncUrl() {
+		const p = new URLSearchParams();
+		if (selectedDepts.length) p.set('department', selectedDepts.join(','));
+		if (selectedRoles.length) p.set('role', selectedRoles.join(','));
+		if (selectedOrcid.length === 1) p.set('has_orcid', selectedOrcid[0]);
+		if (selectedIdhal.length === 1) p.set('has_idhal', selectedIdhal[0]);
+		if (selectedRh.length === 1) p.set('has_rh', selectedRh[0]);
+		if (search.trim()) p.set('search', search.trim());
+		if (currentPage > 1) p.set('page', String(currentPage));
+		const qs = p.toString();
+		history.replaceState(history.state, '', base + '/persons' + (qs ? '?' + qs : ''));
+	}
 
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
@@ -101,6 +115,7 @@
 
 	function onFilterChange() {
 		currentPage = 1;
+		syncUrl();
 		loadData();
 		loadFacets();
 	}
@@ -109,11 +124,21 @@
 		clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => {
 			currentPage = 1;
+			syncUrl();
 			loadData();
 		}, 300);
 	}
 
 	onMount(async () => {
+		const urlParams = $page.url.searchParams;
+		if (urlParams.get('department')) selectedDepts = urlParams.get('department')!.split(',');
+		if (urlParams.get('role')) selectedRoles = urlParams.get('role')!.split(',');
+		if (urlParams.get('has_orcid')) selectedOrcid = [urlParams.get('has_orcid')!];
+		if (urlParams.get('has_idhal')) selectedIdhal = [urlParams.get('has_idhal')!];
+		if (urlParams.has('has_rh')) selectedRh = [urlParams.get('has_rh')!];
+		if (urlParams.get('search')) search = urlParams.get('search')!;
+		if (urlParams.get('page')) currentPage = Number(urlParams.get('page')) || 1;
+
 		await loadFacets();
 		loadData();
 	});
@@ -181,7 +206,7 @@
 	</tbody>
 </table>
 
-<Pagination page={currentPage} pages={totalPages} onchange={(p) => { currentPage = p; loadData(); }} />
+<Pagination page={currentPage} pages={totalPages} onchange={(p) => { currentPage = p; syncUrl(); loadData(); }} />
 
 <style>
 	h2 { font-size: 17px; font-weight: 600; margin: 0 0 14px; }
