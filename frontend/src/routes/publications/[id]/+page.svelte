@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { titleCase, sanitizeTitle } from '$lib/utils';
+	import { typeLabels as baseTypeLabels } from '$lib/labels';
 
 	const pubId = $derived($page.params.id);
 
@@ -84,11 +85,7 @@
 	const pub = $derived(data?.publication);
 	const hasTruthTable = $derived((data?.authorships.length ?? 0) > 0);
 
-	const typeLabels: Record<string, string> = {
-		article: 'Article', review: 'Review', conference_paper: 'Communication',
-		book: 'Ouvrage', book_chapter: 'Chapitre', thesis: 'Thèse',
-		preprint: 'Preprint', editorial: 'Éditorial', report: 'Rapport', other: 'Autre'
-	};
+	const typeLabels: Record<string, string> = { ...baseTypeLabels, conference_paper: 'Communication' };
 
 	const langLabels: Record<string, string> = {
 		en: 'anglais', fr: 'français', de: 'allemand', es: 'espagnol', it: 'italien', pt: 'portugais'

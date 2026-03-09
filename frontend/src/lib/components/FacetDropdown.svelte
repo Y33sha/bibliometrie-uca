@@ -4,6 +4,7 @@
 	export interface FacetOption {
 		value: string;
 		text: string;
+		count?: number;
 	}
 
 	interface Props {
@@ -140,7 +141,7 @@
 							checked={isChecked(opt.value)}
 							onchange={() => toggle(opt.value)}
 						/>
-						{opt.text}
+						{opt.text}{#if opt.count != null}<span class="facet-count">{opt.count}</span>{/if}
 					</label>
 				{/each}
 			</div>
@@ -230,5 +231,10 @@
 	.facet-options input[type='checkbox'] {
 		margin: 0;
 		flex-shrink: 0;
+	}
+	.facet-count {
+		font-size: 11px;
+		color: #888;
+		margin-left: 2px;
 	}
 </style>

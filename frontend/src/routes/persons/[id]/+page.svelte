@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { titleCase, formatDate, sanitizeTitle } from '$lib/utils';
+	import { typeLabels } from '$lib/labels';
 	import Pagination from '$lib/components/Pagination.svelte';
 
 	const personId = $derived($page.params.id);
@@ -114,12 +115,6 @@
 	const visibleAddresses = $derived(
 		showAllAddresses ? addresses : addresses.slice(0, COLLAPSE_LIMIT)
 	);
-
-	const typeLabels: Record<string, string> = {
-		article: 'Article', review: 'Review', conference_paper: 'Conf.',
-		book: 'Ouvrage', book_chapter: 'Chapitre', thesis: 'Thèse',
-		preprint: 'Preprint', editorial: 'Éditorial', report: 'Rapport', other: 'Autre'
-	};
 
 	async function loadPublications() {
 		const params = new URLSearchParams({

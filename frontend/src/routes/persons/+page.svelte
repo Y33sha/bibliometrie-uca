@@ -37,37 +37,60 @@
 
 	let deptOptions: FacetOption[] = $state([]);
 	let roleOptions: FacetOption[] = $state([]);
+	let orcidOptions: FacetOption[] = $state([]);
+	let idhalOptions: FacetOption[] = $state([]);
+	let rhOptions: FacetOption[] = $state([]);
 	let selectedDepts: string[] = $state([]);
 	let selectedRoles: string[] = $state([]);
 	let selectedOrcid: string[] = $state([]);
 	let selectedIdhal: string[] = $state([]);
 	let selectedRh: string[] = $state(['yes']);
 
-	const orcidOptions: FacetOption[] = [
-		{ value: 'yes', text: 'Avec ORCID' },
-		{ value: 'no', text: 'Sans ORCID' }
-	];
-	const idhalOptions: FacetOption[] = [
-		{ value: 'yes', text: 'Avec idHAL' },
-		{ value: 'no', text: 'Sans idHAL' }
-	];
-	const rhOptions: FacetOption[] = [
-		{ value: 'yes', text: 'Oui' },
-		{ value: 'no', text: 'Non' }
-	];
-
-	async function loadData() {
-		const params = new URLSearchParams({
-			page: String(currentPage),
-			per_page: String(perPage)
-		});
-		const q = search.trim();
-		if (q) params.set('search', q);
+	function buildFilterParams(): URLSearchParams {
+		const params = new URLSearchParams();
 		if (selectedDepts.length) params.set('department', selectedDepts.join(','));
 		if (selectedRoles.length) params.set('role', selectedRoles.join(','));
 		if (selectedOrcid.length === 1) params.set('has_orcid', selectedOrcid[0]);
 		if (selectedIdhal.length === 1) params.set('has_idhal', selectedIdhal[0]);
 		if (selectedRh.length === 1) params.set('has_rh', selectedRh[0]);
+		return params;
+	}
+
+	async function loadFacets() {
+		const params = buildFilterParams();
+		const data = await api<{
+			departments: { value: string; count: number }[];
+			roles: { value: string; count: number }[];
+			orcid: { yes: number; no: number };
+			idhal: { yes: number; no: number };
+			rh: { yes: number; no: number };
+		}>('/api/persons/facets?' + params);
+		deptOptions = data.departments.map((d) => ({
+			value: d.value, text: d.value, count: d.count
+		}));
+		roleOptions = data.roles.map((r) => ({
+			value: r.value, text: r.value, count: r.count
+		}));
+		orcidOptions = [
+			{ value: 'yes', text: 'Avec ORCID', count: data.orcid.yes },
+			{ value: 'no', text: 'Sans ORCID', count: data.orcid.no }
+		];
+		idhalOptions = [
+			{ value: 'yes', text: 'Avec idHAL', count: data.idhal.yes },
+			{ value: 'no', text: 'Sans idHAL', count: data.idhal.no }
+		];
+		rhOptions = [
+			{ value: 'yes', text: 'Oui', count: data.rh.yes },
+			{ value: 'no', text: 'Non', count: data.rh.no }
+		];
+	}
+
+	async function loadData() {
+		const params = buildFilterParams();
+		params.set('page', String(currentPage));
+		params.set('per_page', String(perPage));
+		const q = search.trim();
+		if (q) params.set('search', q);
 
 		const data = await api<DirectoryResponse>('/api/persons/directory?' + params);
 		total = data.total;
@@ -79,6 +102,7 @@
 	function onFilterChange() {
 		currentPage = 1;
 		loadData();
+		loadFacets();
 	}
 
 	function onSearchInput() {
@@ -90,18 +114,7 @@
 	}
 
 	onMount(async () => {
-		const [depts, roles] = await Promise.all([
-			api<{ department_name: string; count: number }[]>('/api/persons/departments'),
-			api<{ role_title: string; count: number }[]>('/api/persons/roles')
-		]);
-		deptOptions = depts.map((d) => ({
-			value: d.department_name,
-			text: `${d.department_name} (${d.count})`
-		}));
-		roleOptions = roles.map((r) => ({
-			value: r.role_title,
-			text: `${r.role_title} (${r.count})`
-		}));
+		await loadFacets();
 		loadData();
 	});
 </script>

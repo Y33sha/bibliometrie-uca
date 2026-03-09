@@ -7,11 +7,11 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
+	import { oaLabelsMap } from '$lib/labels';
 
 	Chart.register(...registerables, ChartDataLabels);
 
 	// --- Types ---
-	interface Lab { id: number; name: string; acronym: string | null; }
 	interface Summary { total_pubs: number; publisher_count: number; journal_count: number; }
 	interface YearData { pub_year: number; gold: number; hybrid: number; bronze: number; green: number; closed: number; unknown: number; }
 	interface OaRow { pub_count: number; gold: number; hybrid: number; bronze: number; green: number; closed: number; unknown: number; }
@@ -39,14 +39,7 @@
 	// Facet options
 	let yearOptions: FacetOption[] = $state([]);
 	let labOptions: FacetOption[] = $state([]);
-	const oaOptions: FacetOption[] = [
-		{ value: 'gold', text: 'Gold' },
-		{ value: 'hybrid', text: 'Hybrid' },
-		{ value: 'bronze', text: 'Bronze' },
-		{ value: 'green', text: 'Green' },
-		{ value: 'closed', text: 'Closed' },
-		{ value: 'unknown', text: 'Indéterminé' }
-	];
+	let oaOptions: FacetOption[] = $state([]);
 
 	let summary: Summary = $state({ total_pubs: 0, publisher_count: 0, journal_count: 0 });
 
@@ -157,7 +150,25 @@
 
 	// --- Data loading ---
 	async function refresh() {
-		await Promise.all([loadSummary(), loadTabContent()]);
+		await Promise.all([loadSummary(), loadTabContent(), loadFacets()]);
+	}
+
+	async function loadFacets() {
+		const p = chartParams();
+		const data = await api<{
+			years: { value: number; count: number }[];
+			labs: { value: number; label: string; count: number }[];
+			oa_statuses: { value: string; count: number }[];
+		}>('/api/pub-stats/facets?' + p);
+		yearOptions = data.years.map((y) => ({
+			value: String(y.value), text: String(y.value), count: y.count
+		}));
+		labOptions = data.labs.map((l) => ({
+			value: String(l.value), text: l.label, count: l.count
+		}));
+		oaOptions = data.oa_statuses.map((o) => ({
+			value: o.value, text: oaLabelsMap[o.value] || o.value, count: o.count
+		}));
 	}
 
 	async function loadSummary() {
@@ -232,14 +243,16 @@
 
 	function exportChartPng() {
 		if (!yearChart) return;
-		// Temporarily enable white background, re-render, export, then restore
+		// Temporarily enable white background + legend, re-render, export, then restore
 		chartWhiteBg = true;
+		yearChart.options.plugins!.legend = { display: true, position: 'bottom' as const };
 		yearChart.update('none');
 		const a = document.createElement('a');
 		a.href = yearChart.toBase64Image('image/png', 1);
 		a.download = 'chart.png';
 		a.click();
 		chartWhiteBg = false;
+		yearChart.options.plugins!.legend = { display: false };
 		yearChart.update('none');
 	}
 
@@ -331,13 +344,7 @@
 		if (u.get('page')) page = parseInt(u.get('page')!);
 		if (u.get('lab_page')) labPage = parseInt(u.get('lab_page')!);
 
-		// Load facet options
-		const [labData, yearData] = await Promise.all([
-			api<Lab[]>('/api/laboratories'),
-			api<number[]>('/api/pub-stats/years')
-		]);
-		yearOptions = yearData.map((y) => ({ value: String(y), text: String(y) }));
-		labOptions = labData.map((l) => ({ value: String(l.id), text: l.acronym || l.name }));
+		// Load data + facets (facets are loaded dynamically via refresh → loadFacets)
 		refresh();
 	});
 </script>
@@ -403,9 +410,9 @@
 		{/if}
 		<button class="tab-btn" class:active={tab === 'labs'} onclick={() => switchTab('labs')}>Laboratoires</button>
 	</div>
-	<FacetDropdown label="Toutes les années" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
-	<FacetDropdown label="Tous les labos" options={labOptions} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
-	<FacetDropdown label="Toutes voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
+	<FacetDropdown label="Années" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
+	<FacetDropdown label="Laboratoires" options={labOptions} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
+	<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
 	{#if tab === 'publishers' || tab === 'journals'}
 		<input type="text" placeholder="Rechercher..." bind:value={search} oninput={onSearchInput} />
 	{/if}

@@ -362,9 +362,61 @@ def apply_year_filter(conditions: list, params: list, years: list[int]):
     params.append(years)
 
 
+def apply_doc_type_filter(conditions: list, params: list, doc_types: list[str]):
+    """Ajoute le filtre type de document."""
+    if not doc_types:
+        return
+    conditions.append("p.doc_type::text = ANY(%s)")
+    params.append(doc_types)
+
+
+def apply_source_filter(conditions: list, source_values: list[str]):
+    """Ajoute les filtres de source (hal_yes, hal_no, oa_yes, oa_no)."""
+    for sv in source_values:
+        if sv == "hal_yes":
+            conditions.append(
+                "EXISTS (SELECT 1 FROM publication_sources ps"
+                " WHERE ps.publication_id = p.id AND ps.source = 'hal')"
+            )
+        elif sv == "hal_no":
+            conditions.append(
+                "NOT EXISTS (SELECT 1 FROM publication_sources ps"
+                " WHERE ps.publication_id = p.id AND ps.source = 'hal')"
+            )
+        elif sv == "oa_yes":
+            conditions.append(
+                "EXISTS (SELECT 1 FROM publication_sources ps"
+                " WHERE ps.publication_id = p.id AND ps.source = 'openalex')"
+            )
+        elif sv == "oa_no":
+            conditions.append(
+                "NOT EXISTS (SELECT 1 FROM publication_sources ps"
+                " WHERE ps.publication_id = p.id AND ps.source = 'openalex')"
+            )
+
+
+def apply_publisher_journal_filter(conditions: list, params: list,
+                                   publisher_id: int | None, journal_id: int | None):
+    """Ajoute les filtres éditeur et revue."""
+    if publisher_id:
+        conditions.append("""
+            EXISTS (SELECT 1 FROM journals j2
+                    WHERE j2.id = p.journal_id AND j2.publisher_id = %s)
+        """)
+        params.append(publisher_id)
+    if journal_id:
+        conditions.append("p.journal_id = %s")
+        params.append(journal_id)
+
+
 def parse_int_csv(s: str) -> list[int]:
     """Parse une chaîne CSV d'entiers (ex: '1,2,3')."""
     return [int(v) for v in s.split(',') if v.strip()] if s else []
+
+
+def parse_str_csv(s: str) -> list[str]:
+    """Parse une chaîne CSV de strings."""
+    return [v.strip() for v in s.split(',') if v.strip()] if s else []
 
 
 # ----- Pydantic models -----
@@ -764,6 +816,273 @@ async def available_years():
             ORDER BY pub_year DESC
         """)
         return [r["pub_year"] for r in cur.fetchall()]
+
+
+@app.get("/api/pub-stats/facets")
+async def stats_facets(
+    lab_id: str = Query(""),
+    year: str = Query(""),
+    publisher_id: int | None = Query(None),
+    journal_id: int | None = Query(None),
+    oa_status: str = Query(""),
+):
+    """Facettes dynamiques : retourne les années et labos disponibles
+    en tenant compte des filtres croisés (chaque facette exclut son propre filtre)."""
+    lab_ids = parse_int_csv(lab_id)
+    years = parse_int_csv(year)
+
+    with get_cursor() as (cur, conn):
+        cur.execute("SET LOCAL jit = off")
+
+        # Conditions de base (communes à toutes les facettes)
+        base_conditions = [
+            PUB_IS_UCA,
+            "p.doc_type IN ('article', 'review')",
+            "(j.oa_model IS DISTINCT FROM 'repository')",
+        ]
+
+        # --- Facette ANNÉES (exclut le filtre année, garde les autres) ---
+        year_conds = list(base_conditions)
+        year_params: list = []
+        apply_lab_filter(year_conds, year_params, lab_ids)
+        if publisher_id:
+            year_conds.append("j.publisher_id = %s")
+            year_params.append(publisher_id)
+        if journal_id:
+            year_conds.append("p.journal_id = %s")
+            year_params.append(journal_id)
+        apply_oa_filter(year_conds, year_params, oa_status)
+
+        cur.execute(f"""
+            SELECT p.pub_year, COUNT(DISTINCT p.id) AS count
+            FROM publications p
+            LEFT JOIN journals j ON j.id = p.journal_id
+            WHERE {" AND ".join(year_conds)}
+              AND p.pub_year IS NOT NULL
+            GROUP BY p.pub_year
+            ORDER BY p.pub_year DESC
+        """, year_params)
+        year_facets = [{"value": r["pub_year"], "count": r["count"]}
+                       for r in cur.fetchall()]
+
+        # --- Facette LABOS (exclut le filtre labo, garde les autres) ---
+        lab_conds = list(base_conditions)
+        lab_params: list = []
+        apply_year_filter(lab_conds, lab_params, years)
+        if publisher_id:
+            lab_conds.append("j.publisher_id = %s")
+            lab_params.append(publisher_id)
+        if journal_id:
+            lab_conds.append("p.journal_id = %s")
+            lab_params.append(journal_id)
+        apply_oa_filter(lab_conds, lab_params, oa_status)
+
+        cur.execute(f"""
+            WITH uca_pubs AS (
+                SELECT DISTINCT p.id
+                FROM publications p
+                LEFT JOIN journals j ON j.id = p.journal_id
+                WHERE {" AND ".join(lab_conds)}
+            ),
+            pub_structs AS (
+                SELECT hd.publication_id, unnest(has.structure_ids) AS struct_id
+                FROM hal_authorships has
+                JOIN hal_documents hd ON hd.id = has.hal_document_id
+                WHERE has.structure_ids IS NOT NULL
+                UNION
+                SELECT od.publication_id, unnest(oas.structure_ids) AS struct_id
+                FROM openalex_authorships oas
+                JOIN openalex_documents od ON od.id = oas.openalex_document_id
+                WHERE oas.structure_ids IS NOT NULL
+            )
+            SELECT s.id, COALESCE(s.acronym, s.name) AS label,
+                   COUNT(DISTINCT ps.publication_id) AS count
+            FROM pub_structs ps
+            JOIN uca_pubs up ON up.id = ps.publication_id
+            JOIN structures s ON s.id = ps.struct_id
+            WHERE s.type = 'labo'
+            GROUP BY s.id, s.acronym, s.name
+            ORDER BY count DESC
+        """, lab_params)
+        lab_facets = [{"value": r["id"], "label": r["label"], "count": r["count"]}
+                      for r in cur.fetchall()]
+
+        # --- Facette OA (exclut le filtre OA, garde les autres) ---
+        oa_conds = list(base_conditions)
+        oa_params: list = []
+        apply_year_filter(oa_conds, oa_params, years)
+        apply_lab_filter(oa_conds, oa_params, lab_ids)
+        if publisher_id:
+            oa_conds.append("j.publisher_id = %s")
+            oa_params.append(publisher_id)
+        if journal_id:
+            oa_conds.append("p.journal_id = %s")
+            oa_params.append(journal_id)
+
+        cur.execute(f"""
+            SELECT p.oa_status::text AS value, COUNT(DISTINCT p.id) AS count
+            FROM publications p
+            LEFT JOIN journals j ON j.id = p.journal_id
+            WHERE {" AND ".join(oa_conds)}
+              AND p.oa_status IS NOT NULL
+            GROUP BY p.oa_status
+            ORDER BY count DESC
+        """, oa_params)
+        oa_facets = [{"value": r["value"], "count": r["count"]}
+                     for r in cur.fetchall()]
+
+        return {"years": year_facets, "labs": lab_facets, "oa_statuses": oa_facets}
+
+
+@app.get("/api/publications/facets")
+async def publications_facets(
+    year: str = Query(""),
+    lab_id: str = Query(""),
+    doc_type: str = Query(""),
+    oa_status: str = Query(""),
+    source_filter: str = Query(""),
+    publisher_id: int | None = Query(None),
+    journal_id: int | None = Query(None),
+):
+    """Facettes dynamiques pour la page publications.
+    Chaque facette exclut son propre filtre mais applique tous les autres."""
+    years = parse_int_csv(year)
+    lab_ids = parse_int_csv(lab_id)
+    lab_id_parts = parse_str_csv(lab_id)
+    lab_none = "none" in lab_id_parts
+    lab_ids_clean = [int(v) for v in lab_id_parts if v != "none"] if lab_id_parts else []
+    doc_types = parse_str_csv(doc_type)
+    source_values = parse_str_csv(source_filter)
+
+    def base_conds_params():
+        """Conditions de base : publications UCA."""
+        return [PUB_IS_UCA], []
+
+    def add_all_except(conds, params, *, skip: str):
+        """Ajoute tous les filtres sauf celui indiqué par skip."""
+        if skip != "year":
+            apply_year_filter(conds, params, years)
+        if skip != "lab":
+            if lab_none and not lab_ids_clean:
+                conds.append("""
+                    NOT EXISTS (
+                        SELECT 1 FROM hal_documents hd
+                        JOIN hal_authorships has ON has.hal_document_id = hd.id
+                        WHERE hd.publication_id = p.id AND has.is_uca = TRUE
+                          AND has.structure_ids IS NOT NULL
+                          AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(has.structure_ids) AND s.type = 'labo')
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM openalex_documents od
+                        JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
+                        WHERE od.publication_id = p.id AND oas.is_uca = TRUE
+                          AND oas.structure_ids IS NOT NULL
+                          AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(oas.structure_ids) AND s.type = 'labo')
+                    )
+                """)
+            elif lab_ids_clean:
+                apply_lab_filter(conds, params, lab_ids_clean)
+        if skip != "doc_type":
+            apply_doc_type_filter(conds, params, doc_types)
+        if skip != "oa_status":
+            apply_oa_filter(conds, params, oa_status)
+        if skip != "source":
+            apply_source_filter(conds, source_values)
+        apply_publisher_journal_filter(conds, params, publisher_id, journal_id)
+
+    with get_cursor() as (cur, conn):
+        cur.execute("SET LOCAL jit = off")
+
+        # --- Facette ANNÉES ---
+        c, p = base_conds_params()
+        add_all_except(c, p, skip="year")
+        cur.execute(f"""
+            SELECT p.pub_year AS value, COUNT(*) AS count
+            FROM publications p
+            WHERE {" AND ".join(c)} AND p.pub_year IS NOT NULL
+            GROUP BY p.pub_year ORDER BY p.pub_year DESC
+        """, p)
+        year_facets = cur.fetchall()
+
+        # --- Facette LABOS ---
+        c, p = base_conds_params()
+        add_all_except(c, p, skip="lab")
+        cur.execute(f"""
+            WITH base_pubs AS (
+                SELECT p.id FROM publications p WHERE {" AND ".join(c)}
+            ),
+            pub_structs AS (
+                SELECT hd.publication_id, unnest(has.structure_ids) AS struct_id
+                FROM hal_authorships has
+                JOIN hal_documents hd ON hd.id = has.hal_document_id
+                WHERE has.structure_ids IS NOT NULL
+                UNION
+                SELECT od.publication_id, unnest(oas.structure_ids) AS struct_id
+                FROM openalex_authorships oas
+                JOIN openalex_documents od ON od.id = oas.openalex_document_id
+                WHERE oas.structure_ids IS NOT NULL
+            )
+            SELECT s.id AS value, COALESCE(s.acronym, s.name) AS label,
+                   COUNT(DISTINCT ps.publication_id) AS count
+            FROM pub_structs ps
+            JOIN base_pubs bp ON bp.id = ps.publication_id
+            JOIN structures s ON s.id = ps.struct_id
+            WHERE s.type = 'labo'
+            GROUP BY s.id, s.acronym, s.name
+            ORDER BY count DESC
+        """, p)
+        lab_facets = cur.fetchall()
+
+        # Compter les pubs sans labo
+        cur.execute(f"""
+            SELECT COUNT(*) AS count FROM publications p
+            WHERE {" AND ".join(c)}
+              AND NOT EXISTS (
+                  SELECT 1 FROM hal_documents hd
+                  JOIN hal_authorships has ON has.hal_document_id = hd.id
+                  WHERE hd.publication_id = p.id AND has.is_uca = TRUE
+                    AND has.structure_ids IS NOT NULL
+                    AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(has.structure_ids) AND s.type = 'labo')
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM openalex_documents od
+                  JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
+                  WHERE od.publication_id = p.id AND oas.is_uca = TRUE
+                    AND oas.structure_ids IS NOT NULL
+                    AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(oas.structure_ids) AND s.type = 'labo')
+              )
+        """, p)
+        no_lab_count = cur.fetchone()["count"]
+
+        # --- Facette DOC_TYPE ---
+        c, p = base_conds_params()
+        add_all_except(c, p, skip="doc_type")
+        cur.execute(f"""
+            SELECT p.doc_type::text AS value, COUNT(*) AS count
+            FROM publications p
+            WHERE {" AND ".join(c)} AND p.doc_type IS NOT NULL
+            GROUP BY p.doc_type ORDER BY count DESC
+        """, p)
+        doc_type_facets = cur.fetchall()
+
+        # --- Facette OA_STATUS ---
+        c, p = base_conds_params()
+        add_all_except(c, p, skip="oa_status")
+        cur.execute(f"""
+            SELECT p.oa_status::text AS value, COUNT(*) AS count
+            FROM publications p
+            WHERE {" AND ".join(c)} AND p.oa_status IS NOT NULL
+            GROUP BY p.oa_status ORDER BY count DESC
+        """, p)
+        oa_facets = cur.fetchall()
+
+        return {
+            "years": year_facets,
+            "labs": lab_facets,
+            "no_lab_count": no_lab_count,
+            "doc_types": doc_type_facets,
+            "oa_statuses": oa_facets,
+        }
 
 
 @app.get("/api/publications/years")
@@ -2509,6 +2828,153 @@ async def authorships_stats(lab_id: int = Query(0)):
         return cur.fetchone()
 
 
+@app.get("/api/authorships/facets")
+async def authorships_facets(
+    linked: str = Query(""),
+    has_orcid: str = Query(""),
+    has_idhal: str = Query(""),
+    lab_id: int = Query(0),
+):
+    """Facettes dynamiques pour la page authorships admin."""
+    lab_filter_hal = ""
+    lab_filter_oa = ""
+    cte_params: list = []
+    if lab_id:
+        lab_filter_hal = " AND has.structure_ids && %s::int[]"
+        lab_filter_oa = " AND oas.structure_ids && %s::int[]"
+        cte_params = [[lab_id], [lab_id]]
+
+    cte = f"""
+        WITH uca_authors AS (
+            SELECT ha.id, ha.person_id, ha.orcid, ha.idhal, 'hal' AS source,
+                   ha.full_name,
+                   (SELECT COUNT(DISTINCT hd.publication_id) FROM hal_authorships has2
+                    JOIN hal_documents hd ON hd.id = has2.hal_document_id
+                    WHERE has2.hal_author_id = ha.id AND has2.is_uca = TRUE) AS uca_pub_count
+            FROM hal_authors ha
+            WHERE EXISTS (
+                SELECT 1 FROM hal_authorships has
+                WHERE has.hal_author_id = ha.id AND has.is_uca = TRUE{lab_filter_hal}
+            )
+            UNION ALL
+            SELECT oa.id, oa.person_id, oa.orcid, NULL AS idhal, 'openalex' AS source,
+                   oa.full_name,
+                   (SELECT COUNT(DISTINCT od.publication_id) FROM openalex_authorships oas2
+                    JOIN openalex_documents od ON od.id = oas2.openalex_document_id
+                    WHERE oas2.openalex_author_id = oa.id AND oas2.is_uca = TRUE) AS uca_pub_count
+            FROM openalex_authors oa
+            WHERE EXISTS (
+                SELECT 1 FROM openalex_authorships oas
+                WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE{lab_filter_oa}
+            )
+        )
+    """
+
+    def build_where(*, skip: str) -> tuple[str, list]:
+        conds: list[str] = []
+        params: list = []
+        if skip != "linked":
+            if linked == "yes":
+                conds.append("ua.person_id IS NOT NULL")
+            elif linked == "no":
+                conds.append("ua.person_id IS NULL")
+        if skip != "has_orcid":
+            if has_orcid == "yes":
+                conds.append("ua.orcid IS NOT NULL")
+            elif has_orcid == "no":
+                conds.append("ua.orcid IS NULL")
+        if skip != "has_idhal":
+            if has_idhal == "yes":
+                conds.append("ua.idhal IS NOT NULL")
+            elif has_idhal == "no":
+                conds.append("ua.idhal IS NULL")
+        where = ("WHERE " + " AND ".join(conds)) if conds else ""
+        return where, params
+
+    with get_cursor() as (cur, conn):
+        # Linked
+        where, p = build_where(skip="linked")
+        cur.execute(f"""{cte}
+            SELECT
+                COUNT(*) FILTER (WHERE ua.person_id IS NOT NULL) AS yes,
+                COUNT(*) FILTER (WHERE ua.person_id IS NULL) AS no
+            FROM uca_authors ua {where}
+        """, cte_params + p)
+        linked_counts = cur.fetchone()
+
+        # ORCID
+        where, p = build_where(skip="has_orcid")
+        cur.execute(f"""{cte}
+            SELECT
+                COUNT(*) FILTER (WHERE ua.orcid IS NOT NULL) AS yes,
+                COUNT(*) FILTER (WHERE ua.orcid IS NULL) AS no
+            FROM uca_authors ua {where}
+        """, cte_params + p)
+        orcid_counts = cur.fetchone()
+
+        # idHAL
+        where, p = build_where(skip="has_idhal")
+        cur.execute(f"""{cte}
+            SELECT
+                COUNT(*) FILTER (WHERE ua.idhal IS NOT NULL) AS yes,
+                COUNT(*) FILTER (WHERE ua.idhal IS NULL) AS no
+            FROM uca_authors ua {where}
+        """, cte_params + p)
+        idhal_counts = cur.fetchone()
+
+        # Labs (cross-filtered, excluding lab filter itself)
+        where, p = build_where(skip="lab")
+        # For labs, we need a simplified CTE without lab filter
+        lab_cte = f"""
+            WITH uca_authors AS (
+                SELECT ha.id, ha.person_id, ha.orcid, ha.idhal, 'hal' AS source,
+                       ha.full_name
+                FROM hal_authors ha
+                WHERE EXISTS (
+                    SELECT 1 FROM hal_authorships has
+                    WHERE has.hal_author_id = ha.id AND has.is_uca = TRUE
+                )
+                UNION ALL
+                SELECT oa.id, oa.person_id, oa.orcid, NULL AS idhal, 'openalex' AS source,
+                       oa.full_name
+                FROM openalex_authors oa
+                WHERE EXISTS (
+                    SELECT 1 FROM openalex_authorships oas
+                    WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE
+                )
+            ),
+            author_structs AS (
+                SELECT ha.id AS author_id, 'hal' AS source, unnest(has.structure_ids) AS struct_id
+                FROM hal_authors ha
+                JOIN hal_authorships has ON has.hal_author_id = ha.id
+                WHERE has.is_uca = TRUE AND has.structure_ids IS NOT NULL
+                UNION
+                SELECT oa.id, 'openalex', unnest(oas.structure_ids)
+                FROM openalex_authors oa
+                JOIN openalex_authorships oas ON oas.openalex_author_id = oa.id
+                WHERE oas.is_uca = TRUE AND oas.structure_ids IS NOT NULL
+            )
+        """
+        cur.execute(f"""{lab_cte}
+            SELECT s.id AS value, COALESCE(s.acronym, s.name) AS label,
+                   COUNT(DISTINCT (ast.author_id, ast.source)) AS count
+            FROM author_structs ast
+            JOIN uca_authors ua ON ua.id = ast.author_id AND ua.source = ast.source
+            JOIN structures s ON s.id = ast.struct_id
+            {where} {"AND" if where else "WHERE"} s.type = 'labo'
+            GROUP BY s.id, s.acronym, s.name
+            ORDER BY count DESC
+        """, p)
+        lab_facets = cur.fetchall()
+
+        return {
+            "linked": {"yes": linked_counts["yes"], "no": linked_counts["no"]},
+            "orcid": {"yes": orcid_counts["yes"], "no": orcid_counts["no"]},
+            "idhal": {"yes": idhal_counts["yes"], "no": idhal_counts["no"]},
+            "labs": lab_facets,
+        }
+
+
 @app.get("/api/authorships")
 async def list_authorships(
     page: int = Query(1, ge=1),
@@ -2738,6 +3204,156 @@ async def list_persons(
             "per_page": per_page,
             "pages": (total + per_page - 1) // per_page,
             "persons": cur.fetchall(),
+        }
+
+
+@app.get("/api/persons/facets")
+async def persons_facets(
+    department: str = Query(""),
+    role: str = Query(""),
+    has_orcid: str = Query(""),
+    has_idhal: str = Query(""),
+    has_rh: str = Query(""),
+    linked: str = Query(""),
+):
+    """Facettes dynamiques pour la page personnes.
+    Chaque facette exclut son propre filtre."""
+    departments = parse_str_csv(department)
+    roles = parse_str_csv(role)
+
+    def base_filters(*, skip: str) -> tuple[list[str], list]:
+        conds: list[str] = []
+        params: list = []
+        if skip != "department" and departments:
+            conds.append("prh.department_name = ANY(%s)")
+            params.append(departments)
+        if skip != "role" and roles:
+            conds.append("prh.role_title = ANY(%s)")
+            params.append(roles)
+        if skip != "has_orcid":
+            if has_orcid == "yes":
+                conds.append("EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected)")
+            elif has_orcid == "no":
+                conds.append("NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected)")
+        if skip != "has_idhal":
+            if has_idhal == "yes":
+                conds.append("""(
+                    EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
+                    OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected)
+                )""")
+            elif has_idhal == "no":
+                conds.append("""(
+                    NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
+                    AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected)
+                )""")
+        if skip != "has_rh":
+            if has_rh == "yes":
+                conds.append("prh.id IS NOT NULL")
+            elif has_rh == "no":
+                conds.append("prh.id IS NULL")
+        if skip != "linked":
+            if linked == "yes":
+                conds.append("""(EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
+                    OR EXISTS (SELECT 1 FROM openalex_authors oa WHERE oa.person_id = p.id))""")
+            elif linked == "no":
+                conds.append("""NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
+                    AND NOT EXISTS (SELECT 1 FROM openalex_authors oa WHERE oa.person_id = p.id)""")
+        return conds, params
+
+    base_from = "persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id"
+
+    with get_cursor() as (cur, conn):
+        # --- Facette DÉPARTEMENTS ---
+        c, p = base_filters(skip="department")
+        where = ("WHERE " + " AND ".join(c)) if c else ""
+        cur.execute(f"""
+            SELECT prh.department_name AS value, COUNT(*) AS count
+            FROM {base_from}
+            {where} {"AND" if c else "WHERE"} prh.department_name IS NOT NULL
+            GROUP BY prh.department_name ORDER BY count DESC
+        """, p)
+        dept_facets = cur.fetchall()
+
+        # --- Facette RÔLES ---
+        c, p = base_filters(skip="role")
+        where = ("WHERE " + " AND ".join(c)) if c else ""
+        cur.execute(f"""
+            SELECT prh.role_title AS value, COUNT(*) AS count
+            FROM {base_from}
+            {where} {"AND" if c else "WHERE"} prh.role_title IS NOT NULL
+            GROUP BY prh.role_title ORDER BY count DESC
+        """, p)
+        role_facets = cur.fetchall()
+
+        # --- Facettes booléennes (orcid, idhal, rh) : comptages yes/no ---
+        c, p = base_filters(skip="has_orcid")
+        where = ("WHERE " + " AND ".join(c)) if c else ""
+        cur.execute(f"""
+            SELECT
+                COUNT(*) FILTER (WHERE EXISTS (
+                    SELECT 1 FROM person_identifiers pi
+                    WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected
+                )) AS yes,
+                COUNT(*) FILTER (WHERE NOT EXISTS (
+                    SELECT 1 FROM person_identifiers pi
+                    WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected
+                )) AS no
+            FROM {base_from} {where}
+        """, p)
+        orcid_counts = cur.fetchone()
+
+        c, p = base_filters(skip="has_idhal")
+        where = ("WHERE " + " AND ".join(c)) if c else ""
+        cur.execute(f"""
+            SELECT
+                COUNT(*) FILTER (WHERE
+                    EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
+                    OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected)
+                ) AS yes,
+                COUNT(*) FILTER (WHERE
+                    NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
+                    AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected)
+                ) AS no
+            FROM {base_from} {where}
+        """, p)
+        idhal_counts = cur.fetchone()
+
+        c, p = base_filters(skip="has_rh")
+        where = ("WHERE " + " AND ".join(c)) if c else ""
+        cur.execute(f"""
+            SELECT
+                COUNT(*) FILTER (WHERE prh.id IS NOT NULL) AS yes,
+                COUNT(*) FILTER (WHERE prh.id IS NULL) AS no
+            FROM {base_from} {where}
+        """, p)
+        rh_counts = cur.fetchone()
+
+        # --- Facette LINKED (admin uniquement) ---
+        linked_counts = None
+        if linked or True:  # toujours calculer pour que l'admin puisse l'utiliser
+            c, p = base_filters(skip="linked")
+            where = ("WHERE " + " AND ".join(c)) if c else ""
+            cur.execute(f"""
+                SELECT
+                    COUNT(*) FILTER (WHERE
+                        EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
+                        OR EXISTS (SELECT 1 FROM openalex_authors oa WHERE oa.person_id = p.id)
+                    ) AS yes,
+                    COUNT(*) FILTER (WHERE
+                        NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
+                        AND NOT EXISTS (SELECT 1 FROM openalex_authors oa WHERE oa.person_id = p.id)
+                    ) AS no
+                FROM {base_from} {where}
+            """, p)
+            linked_counts = cur.fetchone()
+
+        return {
+            "departments": dept_facets,
+            "roles": role_facets,
+            "orcid": {"yes": orcid_counts["yes"], "no": orcid_counts["no"]},
+            "idhal": {"yes": idhal_counts["yes"], "no": idhal_counts["no"]},
+            "rh": {"yes": rh_counts["yes"], "no": rh_counts["no"]},
+            "linked": {"yes": linked_counts["yes"], "no": linked_counts["no"]} if linked_counts else None,
         }
 
 

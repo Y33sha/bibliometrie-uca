@@ -46,13 +46,14 @@ En attente réponse équipe technique.
 * [x] ORCID fautifs liés à OpenAlex: possibilité de rejeter
 * [x] admin/authorships: n'afficher que les publis avec authorship UCA
 * [x] organiser la page en onglets
+* [x] reconnaissance de noms moins stricte (noms composés, tirets, accents) pour la suggestion de matchings personnes-auteurs
 * [ ] publications: indiquer si auteur correspondant / premier auteur
 * [ ] colonne labos: utiliser info collection HAL (actuellement colonne vide quand HAL seule source); voir comment ça marche sur la page publications
 * [ ] ajouter IdRef?
 * [ ] ajouter quelques visus (%OA)
 * [ ] authorships OpenAlex pourries (ex. Pierre Mathieu): trouver un moyen de les déclarer inutilisables / ou cesser totalement d'utiliser les authorships OpenAlex? étudier les options
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis
-* [ ] reconnaissance de noms moins stricte (noms composés, tirets, accents) pour la suggestion de matchings personnes-auteurs
+
 
 ## Structures
 * [x] créer page détails
@@ -68,8 +69,9 @@ En attente réponse équipe technique.
 * [x] filtre Source: 3 options par source (absent, présent, tous)
 * [x] dans les filtres: ajouter option "aucun labo"
 * [x] type "preprint": apparaît "autre" dans les extractions OpenAlex (https://openalex.org/works/W4407574839); voir ce qu'il en est dans les extractions HAL (le compte de préprints est zéro)
+* [ ] Open Access diamond?
 * [ ] ajouter filtre corresponding_is_uca?
-* [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et  corriger
+* [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et  corriger + source theses.fr => corriger type
 * [ ] lien Publications -> Dashboard?
 
 ## Pages supplémentaires, étudier pertinence
@@ -81,7 +83,9 @@ En attente réponse équipe technique.
 # Interface
 * [x] Export csv tableaux
 * [x] Export png graphiques
-* [ ] Légende dans export png
+* [x] Légende dans export png
+* [x] Filtres à facettes dynamiques avec comptage
+* [ ] Rendre les filtres sticky
 * [ ] Toujours mémoriser filtres et les rétablir au rechargement
 * [ ] Rendre tous les tableaux triables
 * [ ] lien retour: set default (si accès direct URL) ou cacher?

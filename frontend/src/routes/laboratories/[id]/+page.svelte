@@ -9,6 +9,7 @@
 	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
+	import { docTypeLabelsMap, oaLabelsMap, typeLabels } from '$lib/labels';
 
 	const labId = $derived($page.params.id);
 	const validTabs = ['publications', 'persons', 'addresses'] as const;
@@ -113,26 +114,8 @@
 	let selectedOa: string[] = $state([]);
 	let yearOptions: FacetOption[] = $state([]);
 
-	const docTypeOptions: FacetOption[] = [
-		{ value: 'article', text: 'Articles' },
-		{ value: 'review', text: 'Reviews' },
-		{ value: 'conference_paper', text: 'Conférences' },
-		{ value: 'book', text: 'Ouvrages' },
-		{ value: 'book_chapter', text: 'Chapitres' },
-		{ value: 'thesis', text: 'Thèses' },
-		{ value: 'preprint', text: 'Preprints' },
-		{ value: 'editorial', text: 'Éditoriaux' },
-		{ value: 'report', text: 'Rapports' },
-		{ value: 'other', text: 'Autres' }
-	];
-	const oaOptions: FacetOption[] = [
-		{ value: 'gold', text: 'Gold' },
-		{ value: 'hybrid', text: 'Hybrid' },
-		{ value: 'bronze', text: 'Bronze' },
-		{ value: 'green', text: 'Green' },
-		{ value: 'closed', text: 'Closed' },
-		{ value: 'unknown', text: 'Indéterminé' }
-	];
+	let docTypeOptions: FacetOption[] = $state([]);
+	let oaOptions: FacetOption[] = $state([]);
 
 	let pubsLoaded = $state(false);
 
@@ -154,37 +137,45 @@
 	const tutelles = $derived(parents.filter((p) => p.relation_type === 'est_tutelle_de'));
 	const partenaires = $derived(parents.filter((p) => p.relation_type === 'est_partenaire_de'));
 
-	const typeLabels: Record<string, string> = {
-		article: 'Article',
-		review: 'Review',
-		conference_paper: 'Conf.',
-		book: 'Ouvrage',
-		book_chapter: 'Chapitre',
-		thesis: 'Thèse',
-		preprint: 'Preprint',
-		editorial: 'Éditorial',
-		report: 'Rapport',
-		other: 'Autre'
-	};
-
 	function rorShortId(rorId: string): string {
 		return rorId.replace('https://ror.org/', '');
 	}
 
-	async function loadPublications() {
-		const params = new URLSearchParams({
-			page: String(pubPage),
-			per_page: String(pubPerPage),
-			lab_id: labId,
-			sort: 'year_desc'
-		});
-		const q = pubSearch.trim();
-		if (q) params.set('search', q);
+	function buildPubFilterParams(): URLSearchParams {
+		const params = new URLSearchParams({ lab_id: labId });
 		if (selectedYears.length) params.set('year', selectedYears.join(','));
 		const sf = Object.entries(sourceStates).map(([k, v]) => `${k}_${v}`).join(',');
 		if (sf) params.set('source_filter', sf);
 		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
+		return params;
+	}
+
+	async function loadPubFacets() {
+		const params = buildPubFilterParams();
+		const data = await api<{
+			years: { value: number; count: number }[];
+			doc_types: { value: string; count: number }[];
+			oa_statuses: { value: string; count: number }[];
+		}>('/api/publications/facets?' + params);
+		yearOptions = data.years.map((y) => ({
+			value: String(y.value), text: String(y.value), count: y.count
+		}));
+		docTypeOptions = data.doc_types.map((d) => ({
+			value: d.value, text: docTypeLabelsMap[d.value] || d.value, count: d.count
+		}));
+		oaOptions = data.oa_statuses.map((o) => ({
+			value: o.value, text: oaLabelsMap[o.value] || o.value, count: o.count
+		}));
+	}
+
+	async function loadPublications() {
+		const params = buildPubFilterParams();
+		params.set('page', String(pubPage));
+		params.set('per_page', String(pubPerPage));
+		params.set('sort', 'year_desc');
+		const q = pubSearch.trim();
+		if (q) params.set('search', q);
 
 		const data = await api<PubResponse>('/api/publications?' + params);
 		publications = data.publications;
@@ -197,17 +188,14 @@
 	function onFilterChange() {
 		pubPage = 1;
 		loadPublications();
+		loadPubFacets();
 	}
 
 	function exportCsvUrl(): string {
-		const params = new URLSearchParams({ lab_id: labId, sort: 'year_desc' });
+		const params = buildPubFilterParams();
+		params.set('sort', 'year_desc');
 		const q = pubSearch.trim();
 		if (q) params.set('search', q);
-		if (selectedYears.length) params.set('year', selectedYears.join(','));
-		const sf = Object.entries(sourceStates).map(([k, v]) => `${k}_${v}`).join(',');
-		if (sf) params.set('source_filter', sf);
-		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
-		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
 		return `${base}/api/publications/export.csv?${params}`;
 	}
 
@@ -258,29 +246,30 @@
 			url.searchParams.set('tab', tab);
 		}
 		goto(url.toString(), { replaceState: true, noScroll: true });
-		if (tab === 'publications' && !pubsLoaded) loadPublications();
+		if (tab === 'publications' && !pubsLoaded) { loadPubFacets(); loadPublications(); }
 		if (tab === 'persons' && !personsLoaded) loadPersons();
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
 	}
 
 	onMount(async () => {
 		try {
-			const [profileData, years] = await Promise.all([
-				api<LabProfile>(`/api/laboratories/${labId}`),
-				api<number[]>('/api/publications/years')
-			]);
+			const profileData = await api<LabProfile>(`/api/laboratories/${labId}`);
 			lab = profileData.structure;
 			parents = profileData.parents;
 			children = profileData.children;
-			yearOptions = years.map((y) => ({ value: String(y), text: String(y) }));
 		} catch {
 			error = true;
 			return;
 		}
 		// Load data for the active tab (from URL)
-		if (activeTab === 'persons') loadPersons();
-		else if (activeTab === 'addresses') loadAddresses();
-		else loadPublications();
+		if (activeTab === 'persons') {
+			loadPersons();
+		} else if (activeTab === 'addresses') {
+			loadAddresses();
+		} else {
+			loadPubFacets();
+			loadPublications();
+		}
 	});
 </script>
 
@@ -370,9 +359,9 @@
 		<div class="tab-content">
 			<div class="toolbar">
 				<input type="text" placeholder="Rechercher par titre..." bind:value={pubSearch} oninput={onSearchInput} />
-				<FacetDropdown label="Toutes les années" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
-				<FacetDropdown label="Tous types" options={docTypeOptions} bind:selected={selectedDocTypes} onchange={onFilterChange} />
-				<FacetDropdown label="Toutes voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
+				<FacetDropdown label="Années" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
+				<FacetDropdown label="Types" options={docTypeOptions} bind:selected={selectedDocTypes} onchange={onFilterChange} />
+				<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
 				<SourceFilterToggle bind:states={sourceStates} onchange={onFilterChange} />
 				<span class="count">{pubTotal} publication{pubTotal > 1 ? 's' : ''}</span>
 				<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>

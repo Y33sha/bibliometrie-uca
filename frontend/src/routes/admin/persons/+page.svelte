@@ -16,9 +16,6 @@
 		departments: number;
 	}
 
-	interface DepartmentOption { department_name: string; count: number; }
-	interface RoleOption { role_title: string; count: number; }
-
 	interface LinkedAuthor {
 		id: number;
 		source: string;
@@ -98,22 +95,22 @@
 
 	let deptOptions: FacetOption[] = $state([]);
 	let roleOptions: FacetOption[] = $state([]);
-	const linkedOptions: FacetOption[] = [
+	let linkedOptions: FacetOption[] = $state([
 		{ value: 'yes', text: 'Rattachées' },
 		{ value: 'no', text: 'Non rattachées' }
-	];
-	const orcidOptions: FacetOption[] = [
+	]);
+	let orcidOptions: FacetOption[] = $state([
 		{ value: 'yes', text: 'Avec ORCID' },
 		{ value: 'no', text: 'Sans ORCID' }
-	];
-	const idhalOptions: FacetOption[] = [
+	]);
+	let idhalOptions: FacetOption[] = $state([
 		{ value: 'yes', text: 'Avec idHAL' },
 		{ value: 'no', text: 'Sans idHAL' }
-	];
-	const rhOptions: FacetOption[] = [
+	]);
+	let rhOptions: FacetOption[] = $state([
 		{ value: 'yes', text: 'Oui' },
 		{ value: 'no', text: 'Non' }
-	];
+	]);
 
 	let currentPage = $state(1);
 	let totalPages = $state(0);
@@ -144,13 +141,51 @@
 		stats = await api<PersonStats>('/api/persons/stats');
 	}
 
-	async function loadFilters() {
-		const [depts, rls] = await Promise.all([
-			api<DepartmentOption[]>('/api/persons/departments'),
-			api<RoleOption[]>('/api/persons/roles')
-		]);
-		deptOptions = depts.map(d => ({ value: d.department_name, text: `${d.department_name} (${d.count})` }));
-		roleOptions = rls.map(r => ({ value: r.role_title, text: `${r.role_title} (${r.count})` }));
+	function buildFilterParams(): URLSearchParams {
+		const params = new URLSearchParams();
+		if (selectedDepts.length) params.set('department', selectedDepts.join(','));
+		if (selectedRoles.length) params.set('role', selectedRoles.join(','));
+		if (selectedLinked.length === 1) params.set('linked', selectedLinked[0]);
+		if (selectedOrcid.length === 1) params.set('has_orcid', selectedOrcid[0]);
+		if (selectedIdhal.length === 1) params.set('has_idhal', selectedIdhal[0]);
+		if (selectedRh.length === 1) params.set('has_rh', selectedRh[0]);
+		return params;
+	}
+
+	async function loadFacets() {
+		const params = buildFilterParams();
+		const data = await api<{
+			departments: { value: string; count: number }[];
+			roles: { value: string; count: number }[];
+			orcid: { yes: number; no: number };
+			idhal: { yes: number; no: number };
+			rh: { yes: number; no: number };
+			linked: { yes: number; no: number } | null;
+		}>('/api/persons/facets?' + params);
+		deptOptions = data.departments.map((d) => ({
+			value: d.value, text: d.value, count: d.count
+		}));
+		roleOptions = data.roles.map((r) => ({
+			value: r.value, text: r.value, count: r.count
+		}));
+		orcidOptions = [
+			{ value: 'yes', text: 'Avec ORCID', count: data.orcid.yes },
+			{ value: 'no', text: 'Sans ORCID', count: data.orcid.no }
+		];
+		idhalOptions = [
+			{ value: 'yes', text: 'Avec idHAL', count: data.idhal.yes },
+			{ value: 'no', text: 'Sans idHAL', count: data.idhal.no }
+		];
+		rhOptions = [
+			{ value: 'yes', text: 'Oui', count: data.rh.yes },
+			{ value: 'no', text: 'Non', count: data.rh.no }
+		];
+		if (data.linked) {
+			linkedOptions = [
+				{ value: 'yes', text: 'Rattachées', count: data.linked.yes },
+				{ value: 'no', text: 'Non rattachées', count: data.linked.no }
+			];
+		}
 	}
 
 	async function loadTable() {
@@ -220,6 +255,7 @@
 	function handleFilterChange() {
 		currentPage = 1;
 		loadTable();
+		loadFacets();
 	}
 
 	function handlePageChange(p: number) {
@@ -368,7 +404,7 @@
 	onMount(() => {
 		readUrlFilters();
 		loadStats();
-		loadFilters();
+		loadFacets();
 		loadTable();
 	});
 </script>

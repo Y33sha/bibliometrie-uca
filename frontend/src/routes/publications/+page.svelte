@@ -8,6 +8,7 @@
 	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
+	import { docTypeLabelsMap, oaLabelsMap, typeLabels } from '$lib/labels';
 
 	interface Publication {
 		id: number;
@@ -29,12 +30,6 @@
 		pages: number;
 		per_page: number;
 		publications: Publication[];
-	}
-
-	interface Lab {
-		id: number;
-		name: string;
-		acronym: string | null;
 	}
 
 	// --- State ---
@@ -86,33 +81,9 @@
 		return base + '/publications' + (qs ? '?' + qs : '');
 	});
 
-	// Static facet options
-	const docTypeOptions: FacetOption[] = [
-		{ value: 'article', text: 'Articles' },
-		{ value: 'review', text: 'Reviews' },
-		{ value: 'conference_paper', text: 'Conférences' },
-		{ value: 'book', text: 'Ouvrages' },
-		{ value: 'book_chapter', text: 'Chapitres' },
-		{ value: 'thesis', text: 'Thèses' },
-		{ value: 'preprint', text: 'Preprints' },
-		{ value: 'editorial', text: 'Éditoriaux' },
-		{ value: 'report', text: 'Rapports' },
-		{ value: 'other', text: 'Autres' }
-	];
-	const oaOptions: FacetOption[] = [
-		{ value: 'gold', text: 'Gold' },
-		{ value: 'hybrid', text: 'Hybrid' },
-		{ value: 'bronze', text: 'Bronze' },
-		{ value: 'green', text: 'Green' },
-		{ value: 'closed', text: 'Closed' },
-		{ value: 'unknown', text: 'Indéterminé' }
-	];
-
-	const typeLabels: Record<string, string> = {
-		article: 'Article', review: 'Review', conference_paper: 'Conf.',
-		book: 'Ouvrage', book_chapter: 'Chapitre', thesis: 'Thèse',
-		preprint: 'Preprint', editorial: 'Éditorial', report: 'Rapport', other: 'Autre'
-	};
+	// Facet options (dynamic)
+	let docTypeOptions: FacetOption[] = $state([]);
+	let oaOptions: FacetOption[] = $state([]);
 
 	// Sort display
 	const yearSortArrow = $derived(currentSort === 'year_asc' ? '↑' : '↓');
@@ -132,14 +103,8 @@
 		loadPublications();
 	}
 
-	async function loadPublications() {
-		const params = new URLSearchParams({
-			page: String(currentPage),
-			per_page: String(perPage),
-			sort: currentSort
-		});
-		const q = search.trim();
-		if (q) params.set('search', q);
+	function buildFilterParams(): URLSearchParams {
+		const params = new URLSearchParams();
 		if (selectedYears.length) params.set('year', selectedYears.join(','));
 		if (selectedLabs.length) params.set('lab_id', selectedLabs.join(','));
 		const sf = Object.entries(sourceStates).map(([k, v]) => `${k}_${v}`).join(',');
@@ -148,6 +113,42 @@
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
 		if (filterPublisherId) params.set('publisher_id', filterPublisherId);
 		if (filterJournalId) params.set('journal_id', filterJournalId);
+		return params;
+	}
+
+	async function loadFacets() {
+		const params = buildFilterParams();
+		const data = await api<{
+			years: { value: number; count: number }[];
+			labs: { value: number; label: string; count: number }[];
+			no_lab_count: number;
+			doc_types: { value: string; count: number }[];
+			oa_statuses: { value: string; count: number }[];
+		}>('/api/publications/facets?' + params);
+		yearOptions = data.years.map((y) => ({
+			value: String(y.value), text: String(y.value), count: y.count
+		}));
+		labOptions = [
+			{ value: 'none', text: '— Aucun labo —', count: data.no_lab_count },
+			...data.labs.map((l) => ({
+				value: String(l.value), text: l.label, count: l.count
+			}))
+		];
+		docTypeOptions = data.doc_types.map((d) => ({
+			value: d.value, text: docTypeLabelsMap[d.value] || d.value, count: d.count
+		}));
+		oaOptions = data.oa_statuses.map((o) => ({
+			value: o.value, text: oaLabelsMap[o.value] || o.value, count: o.count
+		}));
+	}
+
+	async function loadPublications() {
+		const params = buildFilterParams();
+		params.set('page', String(currentPage));
+		params.set('per_page', String(perPage));
+		params.set('sort', currentSort);
+		const q = search.trim();
+		if (q) params.set('search', q);
 
 		const data = await api<PubResponse>('/api/publications?' + params);
 		publications = data.publications;
@@ -159,35 +160,29 @@
 	function onFilterChange() {
 		currentPage = 1;
 		loadPublications();
+		loadFacets();
 	}
 
 	function onLabChange(newSelection: string[]) {
 		const hadNone = selectedLabs.includes('none');
 		const hasNone = newSelection.includes('none');
 		if (hasNone && !hadNone) {
-			// "Aucun" vient d'être coché → décocher les autres
 			selectedLabs = ['none'];
 		} else if (hasNone && newSelection.length > 1) {
-			// Un labo vient d'être coché alors que "Aucun" était actif → décocher "Aucun"
 			selectedLabs = newSelection.filter((v) => v !== 'none');
 		} else {
 			selectedLabs = newSelection;
 		}
-		onFilterChange();
+		currentPage = 1;
+		loadPublications();
+		loadFacets();
 	}
 
 	function exportCsvUrl(): string {
-		const params = new URLSearchParams({ sort: currentSort });
+		const params = buildFilterParams();
+		params.set('sort', currentSort);
 		const q = search.trim();
 		if (q) params.set('search', q);
-		if (selectedYears.length) params.set('year', selectedYears.join(','));
-		if (selectedLabs.length) params.set('lab_id', selectedLabs.join(','));
-		const sf = Object.entries(sourceStates).map(([k, v]) => `${k}_${v}`).join(',');
-		if (sf) params.set('source_filter', sf);
-		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
-		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
-		if (filterPublisherId) params.set('publisher_id', filterPublisherId);
-		if (filterJournalId) params.set('journal_id', filterJournalId);
 		return `${base}/api/publications/export.csv?${params}`;
 	}
 
@@ -217,6 +212,7 @@
 		if (urlParams.get('year')) selectedYears = urlParams.get('year')!.split(',');
 		if (urlParams.get('doc_type')) selectedDocTypes = urlParams.get('doc_type')!.split(',');
 		if (urlParams.get('oa_status')) selectedOa = urlParams.get('oa_status')!.split(',');
+		if (urlParams.get('lab_id')) selectedLabs = urlParams.get('lab_id')!.split(',');
 		if (urlParams.get('source_filter')) {
 			const states: Record<string, string> = {};
 			for (const v of urlParams.get('source_filter')!.split(',')) {
@@ -226,20 +222,7 @@
 			sourceStates = states;
 		}
 
-		// Load dynamic options
-		const [years, labs] = await Promise.all([
-			api<number[]>('/api/publications/years'),
-			api<Lab[]>('/api/laboratories')
-		]);
-		yearOptions = years.map((y) => ({ value: String(y), text: String(y) }));
-		labOptions = [
-			{ value: 'none', text: '— Aucun labo —' },
-			...labs.map((l) => ({ value: String(l.id), text: l.acronym || l.name }))
-		];
-
-		// Apply lab URL param after options are loaded
-		if (urlParams.get('lab_id')) selectedLabs = urlParams.get('lab_id')!.split(',');
-
+		await loadFacets();
 		loadPublications();
 	});
 </script>
@@ -250,16 +233,24 @@
 
 {#if hasExternalFilter}
 	<div class="filter-banner">
-		Filtre actif : {filterBannerText} — <a href={cleanFilterUrl}>Supprimer le filtre</a>
+		Filtre actif : {filterBannerText} — <a href={cleanFilterUrl} onclick={(e) => {
+			e.preventDefault();
+			filterPublisherId = null;
+			filterJournalId = null;
+			filterPublisherName = null;
+			filterJournalName = null;
+			history.replaceState(null, '', cleanFilterUrl);
+			onFilterChange();
+		}}>Supprimer le filtre</a>
 	</div>
 {/if}
 
 <div class="toolbar">
 	<input type="text" placeholder="Rechercher par titre..." bind:value={search} oninput={onSearchInput} />
-	<FacetDropdown label="Toutes les années" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
-	<FacetDropdown label="Tous les labos" options={labOptions} searchable bind:selected={selectedLabs} onchange={onLabChange} />
-	<FacetDropdown label="Tous types" options={docTypeOptions} bind:selected={selectedDocTypes} onchange={onFilterChange} />
-	<FacetDropdown label="Toutes voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
+	<FacetDropdown label="Années" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
+	<FacetDropdown label="Laboratoires" options={labOptions} searchable bind:selected={selectedLabs} onchange={onLabChange} />
+	<FacetDropdown label="Types" options={docTypeOptions} bind:selected={selectedDocTypes} onchange={onFilterChange} />
+	<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
 	<SourceFilterToggle bind:states={sourceStates} onchange={onFilterChange} />
 	<span class="count">{total} publication{total > 1 ? 's' : ''}</span>
 	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>

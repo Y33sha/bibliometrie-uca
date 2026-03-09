@@ -58,12 +58,6 @@
 		publications: Publication[];
 	}
 
-	interface Lab {
-		id: number;
-		name: string;
-		acronym: string | null;
-	}
-
 	interface LinkSearch {
 		query: string;
 		results: PersonRef[];
@@ -72,18 +66,18 @@
 
 	/* ── Filter options ── */
 
-	const linkedOptions: FacetOption[] = [
+	let linkedOptions: FacetOption[] = $state([
 		{ value: 'yes', text: 'Identité résolue' },
 		{ value: 'no', text: 'Non résolue' }
-	];
-	const orcidOptions: FacetOption[] = [
+	]);
+	let orcidOptions: FacetOption[] = $state([
 		{ value: 'yes', text: 'Avec ORCID' },
 		{ value: 'no', text: 'Sans ORCID' }
-	];
-	const idhalOptions: FacetOption[] = [
+	]);
+	let idhalOptions: FacetOption[] = $state([
 		{ value: 'yes', text: 'Avec idHAL' },
 		{ value: 'no', text: 'Sans idHAL' }
-	];
+	]);
 
 	/* ── State ── */
 
@@ -115,6 +109,40 @@
 	);
 
 	/* ── Data loading ── */
+
+	function buildFilterParams(): URLSearchParams {
+		const params = new URLSearchParams();
+		if (selectedLinked.length === 1) params.set('linked', selectedLinked[0]);
+		if (selectedOrcid.length === 1) params.set('has_orcid', selectedOrcid[0]);
+		if (selectedIdhal.length === 1) params.set('has_idhal', selectedIdhal[0]);
+		if (selectedLabs.length === 1) params.set('lab_id', selectedLabs[0]);
+		return params;
+	}
+
+	async function loadFacets() {
+		const params = buildFilterParams();
+		const data = await api<{
+			linked: { yes: number; no: number };
+			orcid: { yes: number; no: number };
+			idhal: { yes: number; no: number };
+			labs: { value: number; label: string; count: number }[];
+		}>('/api/authorships/facets?' + params);
+		linkedOptions = [
+			{ value: 'yes', text: 'Identité résolue', count: data.linked.yes },
+			{ value: 'no', text: 'Non résolue', count: data.linked.no }
+		];
+		orcidOptions = [
+			{ value: 'yes', text: 'Avec ORCID', count: data.orcid.yes },
+			{ value: 'no', text: 'Sans ORCID', count: data.orcid.no }
+		];
+		idhalOptions = [
+			{ value: 'yes', text: 'Avec idHAL', count: data.idhal.yes },
+			{ value: 'no', text: 'Sans idHAL', count: data.idhal.no }
+		];
+		labOptions = data.labs.map((l) => ({
+			value: String(l.value), text: l.label, count: l.count
+		}));
+	}
 
 	async function loadStats() {
 		const params = new URLSearchParams();
@@ -183,6 +211,7 @@
 		currentPage = 1;
 		loadStats();
 		loadTable();
+		loadFacets();
 	}
 
 	function handlePageChange(p: number) {
@@ -276,14 +305,7 @@
 
 	onMount(async () => {
 		readUrlFilters();
-
-		// Load lab options
-		const labs = await api<Lab[]>('/api/laboratories');
-		labOptions = labs.map((l) => ({
-			value: String(l.id),
-			text: l.acronym || l.name
-		}));
-
+		await loadFacets();
 		loadStats();
 		loadTable();
 	});
