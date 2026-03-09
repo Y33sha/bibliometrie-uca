@@ -13,6 +13,7 @@
 		first_name: string;
 		role_title: string | null;
 		department_name: string | null;
+		has_rh: boolean;
 		orcids: string[];
 		idhals: string[];
 	}
@@ -40,6 +41,7 @@
 	let selectedRoles: string[] = $state([]);
 	let selectedOrcid: string[] = $state([]);
 	let selectedIdhal: string[] = $state([]);
+	let selectedRh: string[] = $state(['yes']);
 
 	const orcidOptions: FacetOption[] = [
 		{ value: 'yes', text: 'Avec ORCID' },
@@ -48,6 +50,10 @@
 	const idhalOptions: FacetOption[] = [
 		{ value: 'yes', text: 'Avec idHAL' },
 		{ value: 'no', text: 'Sans idHAL' }
+	];
+	const rhOptions: FacetOption[] = [
+		{ value: 'yes', text: 'Oui' },
+		{ value: 'no', text: 'Non' }
 	];
 
 	async function loadData() {
@@ -61,6 +67,7 @@
 		if (selectedRoles.length) params.set('role', selectedRoles.join(','));
 		if (selectedOrcid.length === 1) params.set('has_orcid', selectedOrcid[0]);
 		if (selectedIdhal.length === 1) params.set('has_idhal', selectedIdhal[0]);
+		if (selectedRh.length === 1) params.set('has_rh', selectedRh[0]);
 
 		const data = await api<DirectoryResponse>('/api/persons/directory?' + params);
 		total = data.total;
@@ -112,6 +119,7 @@
 	<FacetDropdown label="Rôle" options={roleOptions} searchable bind:selected={selectedRoles} onchange={onFilterChange} />
 	<FacetDropdown label="ORCID" options={orcidOptions} bind:selected={selectedOrcid} onchange={onFilterChange} />
 	<FacetDropdown label="idHAL" options={idhalOptions} bind:selected={selectedIdhal} onchange={onFilterChange} />
+	<FacetDropdown label="Base RH" options={rhOptions} bind:selected={selectedRh} onchange={onFilterChange} />
 	<span class="count">{total} personne{total > 1 ? 's' : ''}</span>
 </div>
 
@@ -136,6 +144,7 @@
 							<span class="person-last">{titleCase(p.last_name)}</span>
 							{titleCase(p.first_name)}
 						</a>
+						{#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
 					</td>
 					<td>
 						{#if p.role_title}
@@ -244,4 +253,19 @@
 	}
 	.id-badge:hover { background: #d4e4f3; text-decoration: none; }
 	.no-results { text-align: center; padding: 40px; color: var(--muted); }
+	.rh-check {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 15px;
+		height: 15px;
+		border-radius: 50%;
+		background: var(--accent, #3b82f6);
+		color: white;
+		font-size: 10px;
+		font-weight: 700;
+		margin-left: 4px;
+		vertical-align: middle;
+		line-height: 1;
+	}
 </style>

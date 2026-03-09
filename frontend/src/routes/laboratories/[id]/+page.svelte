@@ -61,6 +61,7 @@
 		first_name: string;
 		role_title: string | null;
 		department_name: string | null;
+		has_rh: boolean;
 		pub_count: number;
 	}
 	interface PersonsResponse {
@@ -464,6 +465,7 @@
 									<a href="{base}/persons/{p.id}" class="person-link">
 										{p.first_name} <span class="person-last">{p.last_name}</span>
 									</a>
+									{#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
 								</td>
 								<td class="muted-cell">{p.role_title || ''}</td>
 								<td class="muted-cell">{p.department_name || ''}</td>
@@ -738,6 +740,21 @@
 	}
 	.person-link:hover { text-decoration: underline; }
 	.person-last { font-weight: 600; }
+	.rh-check {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 15px;
+		height: 15px;
+		border-radius: 50%;
+		background: var(--accent, #3b82f6);
+		color: white;
+		font-size: 10px;
+		font-weight: 700;
+		margin-left: 4px;
+		vertical-align: middle;
+		line-height: 1;
+	}
 	.muted-cell { font-size: 12px; color: var(--muted); }
 	.orphan-banner {
 		display: block;

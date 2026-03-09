@@ -18,6 +18,7 @@ import sys
 import os
 import time
 
+import hashlib
 import requests
 import psycopg2
 from psycopg2.extras import Json, execute_values
@@ -104,17 +105,36 @@ def get_existing_ids(conn) -> set:
         return {row[0] for row in cur.fetchall()}
 
 
+def compute_hash(raw_data: dict) -> str:
+    """Calcule le hash MD5 du JSON canonique (clés triées, compact)."""
+    canonical = json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
+
+
 def insert_batch(conn, batch: list[tuple]):
-    """Insère un batch de works dans staging_openalex."""
+    """Insère un batch de works dans staging_openalex.
+    Si le work existe et que le hash a changé, met à jour raw_data et remet processed = FALSE.
+    """
     query = """
-        INSERT INTO staging_openalex (openalex_id, doi, raw_data)
+        INSERT INTO staging_openalex (openalex_id, doi, raw_data, raw_hash)
         VALUES %s
-        ON CONFLICT (openalex_id) DO NOTHING
+        ON CONFLICT (openalex_id) DO UPDATE SET
+            raw_data = CASE
+                WHEN staging_openalex.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                    THEN EXCLUDED.raw_data
+                ELSE staging_openalex.raw_data
+            END,
+            raw_hash = COALESCE(EXCLUDED.raw_hash, staging_openalex.raw_hash),
+            processed = CASE
+                WHEN staging_openalex.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                    THEN FALSE
+                ELSE staging_openalex.processed
+            END
     """
     with conn.cursor() as cur:
         execute_values(
             cur, query, batch,
-            template="(%s, %s, %s::jsonb)"
+            template="(%s, %s, %s::jsonb, %s)"
         )
     conn.commit()
 
@@ -151,25 +171,26 @@ def extract_year(year: int, conn, existing_ids: set, dry_run: bool = False) -> i
 
         # Préparer le batch
         batch = []
+        new_count = 0
         for work in results:
             oa_id = extract_openalex_id(work)
-            if oa_id in existing_ids:
-                continue
-
             doi = extract_doi(work)
-            batch.append((oa_id, doi, Json(work)))
-            existing_ids.add(oa_id)
+            raw_hash = compute_hash(work)
+            batch.append((oa_id, doi, Json(work), raw_hash))
+            if oa_id not in existing_ids:
+                existing_ids.add(oa_id)
+                new_count += 1
 
-        # Insérer
+        # Insérer / mettre à jour
         if batch:
             insert_batch(conn, batch)
-            total_inserted += len(batch)
+            total_inserted += new_count
 
         total_fetched += len(results)
         logger.info(
             f"  Page {page_num} : {len(results)} works récupérés, "
-            f"{len(batch)} insérés "
-            f"({total_fetched}/{total_count} traités, {total_inserted} nouveaux)"
+            f"{new_count} nouveaux "
+            f"({total_fetched}/{total_count} traités, {total_inserted} nouveaux au total)"
         )
 
         # Pagination cursor

@@ -1989,7 +1989,8 @@ async def get_laboratory_persons(
                   AND oas.structure_ids && %s::int[]
             )
             SELECT p.id, p.last_name, p.first_name,
-                   p.role_title, p.department_name,
+                   prh.role_title, prh.department_name,
+                   (prh.id IS NOT NULL) AS has_rh,
                    (SELECT COUNT(DISTINCT pub.id)
                     FROM publications pub
                     WHERE EXISTS (
@@ -2009,6 +2010,7 @@ async def get_laboratory_persons(
                     )
                    ) AS pub_count
             FROM persons p
+            LEFT JOIN persons_rh prh ON prh.person_id = p.id
             JOIN author_persons ap ON ap.person_id = p.id
             ORDER BY p.last_name, p.first_name
             LIMIT %s OFFSET %s
@@ -2102,6 +2104,7 @@ async def persons_directory(
     role: str = Query(""),            # comma-separated
     has_orcid: str = Query(""),       # "yes" or "no"
     has_idhal: str = Query(""),       # "yes" or "no"
+    has_rh: str = Query(""),          # "yes" or "no"
 ):
     """Annuaire public des personnes UCA avec ORCID et idHAL."""
     offset = (page - 1) * per_page
@@ -2117,10 +2120,10 @@ async def persons_directory(
         s = f"%{search}%"
         params.extend([s, s])
     if departments:
-        conditions.append("p.department_name = ANY(%s)")
+        conditions.append("prh.department_name = ANY(%s)")
         params.append(departments)
     if roles:
-        conditions.append("p.role_title = ANY(%s)")
+        conditions.append("prh.role_title = ANY(%s)")
         params.append(roles)
     if has_orcid == "yes":
         conditions.append(
@@ -2138,17 +2141,22 @@ async def persons_directory(
             NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
             AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected)
         )""")
+    if has_rh == "yes":
+        conditions.append("prh.id IS NOT NULL")
+    elif has_rh == "no":
+        conditions.append("prh.id IS NULL")
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
     with get_cursor() as (cur, conn):
-        cur.execute(f"SELECT COUNT(*) FROM persons p {where}", params)
+        cur.execute(f"SELECT COUNT(*) FROM persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id {where}", params)
         total = cur.fetchone()["count"]
 
         cur.execute(f"""
             SELECT
                 p.id, p.last_name, p.first_name,
-                p.role_title, p.department_name,
+                prh.role_title, prh.department_name,
+                (prh.id IS NOT NULL) AS has_rh,
                 (SELECT json_agg(DISTINCT pi.id_value)
                  FROM person_identifiers pi
                  WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected
@@ -2161,6 +2169,7 @@ async def persons_directory(
                     WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected
                 ) sub) AS idhals
             FROM persons p
+            LEFT JOIN persons_rh prh ON prh.person_id = p.id
             {where}
             ORDER BY p.last_name, p.first_name
             LIMIT %s OFFSET %s
@@ -2585,9 +2594,12 @@ async def list_authorships(
                    ua.uca_pub_count,
                    (SELECT json_build_object(
                        'id', p.id, 'last_name', p.last_name,
-                       'first_name', p.first_name, 'department_name', p.department_name,
-                       'role_title', p.role_title
-                   ) FROM persons p WHERE p.id = ua.person_id) AS person
+                       'first_name', p.first_name, 'department_name', prh.department_name,
+                       'role_title', prh.role_title,
+                       'has_rh', (prh.id IS NOT NULL)
+                   ) FROM persons p
+                   LEFT JOIN persons_rh prh ON prh.person_id = p.id
+                   WHERE p.id = ua.person_id) AS person
             FROM uca_authors ua
             {where}
             ORDER BY ua.uca_pub_count DESC, ua.full_name
@@ -2613,10 +2625,11 @@ async def search_persons(q: str = Query("", min_length=2), limit: int = Query(10
     s = f"%{q}%"
     with get_cursor() as (cur, conn):
         cur.execute("""
-            SELECT id, last_name, first_name, department_name
-            FROM persons
-            WHERE last_name ILIKE %s OR first_name ILIKE %s
-            ORDER BY last_name, first_name
+            SELECT p.id, p.last_name, p.first_name, prh.department_name
+            FROM persons p
+            LEFT JOIN persons_rh prh ON prh.person_id = p.id
+            WHERE p.last_name ILIKE %s OR p.first_name ILIKE %s
+            ORDER BY p.last_name, p.first_name
             LIMIT %s
         """, (s, s, limit))
         return cur.fetchall()
@@ -2632,6 +2645,7 @@ async def list_persons(
     linked: str = Query(""),  # "yes", "no", ""
     has_orcid: str = Query(""),  # "yes", "no", ""
     has_idhal: str = Query(""),  # "yes", "no", ""
+    has_rh: str = Query(""),    # "yes", "no", ""
 ):
     """Liste des personnes avec filtres."""
     offset = (page - 1) * per_page
@@ -2641,15 +2655,15 @@ async def list_persons(
     if search:
         conditions.append("""(
             p.last_name ILIKE %s OR p.first_name ILIKE %s
-            OR p.email ILIKE %s OR p.department_name ILIKE %s
+            OR prh.email ILIKE %s OR prh.department_name ILIKE %s
         )""")
         s = f"%{search}%"
         params.extend([s, s, s, s])
     if department:
-        conditions.append("p.department_name = %s")
+        conditions.append("prh.department_name = %s")
         params.append(department)
     if role:
-        conditions.append("p.role_title = %s")
+        conditions.append("prh.role_title = %s")
         params.append(role)
     if linked == "yes":
         conditions.append("""(EXISTS (
@@ -2683,15 +2697,22 @@ async def list_persons(
             SELECT 1 FROM person_identifiers pi
             WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected
         )""")
+    if has_rh == "yes":
+        conditions.append("prh.id IS NOT NULL")
+    elif has_rh == "no":
+        conditions.append("prh.id IS NULL")
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
     with get_cursor() as (cur, conn):
-        cur.execute(f"SELECT COUNT(*) FROM persons p {where}", params)
+        cur.execute(f"SELECT COUNT(*) FROM persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id {where}", params)
         total = cur.fetchone()["count"]
 
         cur.execute(f"""
-            SELECT p.*,
+            SELECT p.id, p.last_name, p.first_name,
+                p.last_name_normalized, p.first_name_normalized,
+                prh.role_title, prh.department_name, prh.start_date, prh.end_date,
+                (prh.id IS NOT NULL) AS has_rh,
                 (SELECT json_agg(x) FROM (
                     SELECT ha.id, ha.full_name, ha.orcid, ha.idhal, 'hal' AS source
                     FROM hal_authors ha WHERE ha.person_id = p.id
@@ -2705,6 +2726,7 @@ async def list_persons(
                 )) FROM person_identifiers pi WHERE pi.person_id = p.id
                 ) AS identifiers
             FROM persons p
+            LEFT JOIN persons_rh prh ON prh.person_id = p.id
             {where}
             ORDER BY p.last_name, p.first_name
             LIMIT %s OFFSET %s
@@ -2725,7 +2747,7 @@ async def list_departments():
     with get_cursor() as (cur, conn):
         cur.execute("""
             SELECT department_name, COUNT(*) AS count
-            FROM persons
+            FROM persons_rh
             WHERE department_name IS NOT NULL
             GROUP BY department_name
             ORDER BY count DESC
@@ -2739,7 +2761,7 @@ async def list_roles():
     with get_cursor() as (cur, conn):
         cur.execute("""
             SELECT role_title, COUNT(*) AS count
-            FROM persons
+            FROM persons_rh
             WHERE role_title IS NOT NULL
             GROUP BY role_title
             ORDER BY count DESC
@@ -2762,7 +2784,7 @@ async def persons_stats():
                 + (SELECT COUNT(*) FROM openalex_authors WHERE person_id IS NOT NULL)
                 AS linked_authors,
                 (SELECT COUNT(DISTINCT department_name)
-                 FROM persons WHERE department_name IS NOT NULL) AS departments
+                 FROM persons_rh WHERE department_name IS NOT NULL) AS departments
             FROM persons p
         """)
         return cur.fetchone()
@@ -2808,7 +2830,10 @@ async def get_person(person_id: int):
     """Retourne une personne avec ses auteurs liés."""
     with get_cursor() as (cur, conn):
         cur.execute("""
-            SELECT p.*,
+            SELECT p.id, p.last_name, p.first_name,
+                p.last_name_normalized, p.first_name_normalized,
+                prh.role_title, prh.department_name, prh.start_date, prh.end_date,
+                (prh.id IS NOT NULL) AS has_rh,
                 (SELECT json_agg(x) FROM (
                     SELECT ha.id, ha.full_name, ha.orcid, ha.idhal, 'hal' AS source
                     FROM hal_authors ha WHERE ha.person_id = p.id
@@ -2817,10 +2842,12 @@ async def get_person(person_id: int):
                     FROM openalex_authors oa WHERE oa.person_id = p.id
                 ) x) AS linked_authors,
                 (SELECT json_agg(json_build_object(
-                    'id_type', pi.id_type, 'id_value', pi.id_value, 'source', pi.source
-                )) FROM person_identifiers pi WHERE pi.person_id = p.id AND NOT pi.rejected
+                    'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
+                    'source', pi.source, 'rejected', pi.rejected
+                )) FROM person_identifiers pi WHERE pi.person_id = p.id
                 ) AS identifiers
             FROM persons p
+            LEFT JOIN persons_rh prh ON prh.person_id = p.id
             WHERE p.id = %s
         """, (person_id,))
         person = cur.fetchone()
@@ -2835,9 +2862,12 @@ async def person_profile(person_id: int):
     with get_cursor() as (cur, conn):
         # Infos personne
         cur.execute("""
-            SELECT id, last_name, first_name, role_title, department_name,
-                   start_date, end_date
-            FROM persons WHERE id = %s
+            SELECT p.id, p.last_name, p.first_name,
+                   prh.role_title, prh.department_name,
+                   prh.start_date, prh.end_date
+            FROM persons p
+            LEFT JOIN persons_rh prh ON prh.person_id = p.id
+            WHERE p.id = %s
         """, (person_id,))
         person = cur.fetchone()
         if not person:

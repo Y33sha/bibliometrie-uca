@@ -23,6 +23,7 @@ import os
 import sys
 import time
 
+import hashlib
 import requests
 import psycopg2
 from psycopg2.extras import Json
@@ -136,23 +137,42 @@ def extract_doi(doc: dict) -> str | None:
     return None
 
 
+def compute_hash(raw_data: dict) -> str:
+    """Calcule le hash MD5 du JSON canonique (clés triées, compact)."""
+    canonical = json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
+
+
 def upsert_work(conn, hal_id: str, doi: str | None, raw_data: dict, collection: str):
     """
     Insère ou met à jour un work dans staging_hal.
-    Si le halId existe déjà, ajoute la collection à la liste.
+    Si le halId existe déjà : ajoute la collection, et si le contenu a changé
+    (hash différent), met à jour raw_data et remet processed = FALSE.
     """
+    raw_hash = compute_hash(raw_data)
     with conn.cursor() as cur:
         cur.execute("""
-            INSERT INTO staging_hal (halid, doi, raw_data, collection)
-            VALUES (%s, %s, %s::jsonb, %s)
+            INSERT INTO staging_hal (halid, doi, raw_data, collection, raw_hash)
+            VALUES (%s, %s, %s::jsonb, %s, %s)
             ON CONFLICT (halid) DO UPDATE SET
                 collection = CASE
                     WHEN staging_hal.collection IS NULL THEN EXCLUDED.collection
                     WHEN staging_hal.collection LIKE '%%' || EXCLUDED.collection || '%%'
                         THEN staging_hal.collection
                     ELSE staging_hal.collection || ',' || EXCLUDED.collection
+                END,
+                raw_data = CASE
+                    WHEN staging_hal.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                        THEN EXCLUDED.raw_data
+                    ELSE staging_hal.raw_data
+                END,
+                raw_hash = COALESCE(EXCLUDED.raw_hash, staging_hal.raw_hash),
+                processed = CASE
+                    WHEN staging_hal.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                        THEN FALSE
+                    ELSE staging_hal.processed
                 END
-        """, (hal_id, doi, Json(raw_data), collection))
+        """, (hal_id, doi, Json(raw_data), collection, raw_hash))
 
 
 def extract_collection(

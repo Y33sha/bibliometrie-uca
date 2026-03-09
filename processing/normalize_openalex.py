@@ -55,10 +55,12 @@ DOCTYPE_MAP = {
     "book-chapter": "book_chapter",
     "proceedings-article": "conference_paper",
     "posted-content": "preprint",
+    "preprint": "preprint",
     "dissertation": "thesis",
     "editorial": "editorial",
     "report": "report",
     "letter": "article",
+    "retraction": "other",
     "erratum": "other",
     "paratext": "other",
     "peer-review": "other",
@@ -66,6 +68,7 @@ DOCTYPE_MAP = {
     "dataset": "other",
     "grant": "other",
     "supplementary-materials": "other",
+    "software": "other",
     "other": "other",
 }
 
@@ -322,6 +325,11 @@ def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (doi) DO UPDATE SET
                 journal_id = COALESCE(publications.journal_id, EXCLUDED.journal_id),
+                doc_type = CASE
+                    WHEN publications.doc_type IN ('other', 'unknown') AND EXCLUDED.doc_type NOT IN ('other', 'unknown')
+                        THEN EXCLUDED.doc_type
+                    ELSE COALESCE(publications.doc_type, EXCLUDED.doc_type)
+                END,
                 oa_status = CASE
                     WHEN publications.oa_status = 'unknown' THEN EXCLUDED.oa_status
                     ELSE publications.oa_status
@@ -381,7 +389,8 @@ def insert_openalex_document(cur, work: dict, staging_id: int,
         ON CONFLICT (openalex_id) DO UPDATE SET
             publication_id = COALESCE(
                 openalex_documents.publication_id, EXCLUDED.publication_id
-            )
+            ),
+            doc_type = COALESCE(EXCLUDED.doc_type, openalex_documents.doc_type)
         RETURNING id
     """, (openalex_id, doi, title, pub_year, doc_type,
           publication_id, staging_id))

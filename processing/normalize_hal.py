@@ -63,6 +63,7 @@ DOCTYPE_MAP = {
     "THESE": "thesis",
     "HDR": "thesis",
     "PREPRINT": "preprint",
+    "PREPUBLICATION": "preprint",
     "UNDEFINED": "other",
     "OTHER": "other",
     "REPORT": "report",
@@ -255,7 +256,11 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
             cur.execute("""
                 UPDATE publications SET
                     journal_id = COALESCE(%s, publications.journal_id),
-                    doc_type = COALESCE(%s, publications.doc_type),
+                    doc_type = CASE
+                        WHEN publications.doc_type IN ('other', 'unknown') AND %s NOT IN ('other', 'unknown')
+                            THEN %s
+                        ELSE COALESCE(publications.doc_type, %s)
+                    END,
                     container_title = COALESCE(%s, publications.container_title),
                     oa_status = CASE
                         WHEN %s = 'green' AND publications.oa_status IN ('closed', 'unknown')
@@ -264,7 +269,7 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
                     END,
                     updated_at = now()
                 WHERE id = %s
-            """, (journal_id, doc_type, container_title, oa_status, row[0]))
+            """, (journal_id, doc_type, doc_type, doc_type, container_title, oa_status, row[0]))
             return row[0], False
 
     # 2. Chercher par titre normalisé + année + même journal
@@ -284,11 +289,15 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
                 UPDATE publications SET
                     doi = COALESCE(publications.doi, %s),
                     journal_id = COALESCE(%s, publications.journal_id),
-                    doc_type = COALESCE(%s, publications.doc_type),
+                    doc_type = CASE
+                        WHEN publications.doc_type IN ('other', 'unknown') AND %s NOT IN ('other', 'unknown')
+                            THEN %s
+                        ELSE COALESCE(publications.doc_type, %s)
+                    END,
                     container_title = COALESCE(%s, publications.container_title),
                     updated_at = now()
                 WHERE id = %s
-            """, (doi, journal_id, doc_type, container_title, row[0]))
+            """, (doi, journal_id, doc_type, doc_type, doc_type, container_title, row[0]))
             return row[0], False
 
     # 3. Nouvelle publication
@@ -346,6 +355,7 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
             publication_id = COALESCE(
                 hal_documents.publication_id, EXCLUDED.publication_id
             ),
+            doc_type = COALESCE(EXCLUDED.doc_type, hal_documents.doc_type),
             collections = (
                 SELECT array_agg(DISTINCT c ORDER BY c)
                 FROM unnest(

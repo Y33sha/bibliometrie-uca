@@ -444,10 +444,10 @@
 			/>
 			<select bind:value={typeFilter} onchange={() => loadList()}>
 				<option value="">Tous types</option>
-				<option value="universite">Universites</option>
+				<option value="universite">Universités</option>
 				<option value="onr">ONR</option>
 				<option value="chu">CHU</option>
-				<option value="ecole">Ecoles</option>
+				<option value="ecole">Écoles</option>
 				<option value="labo">Laboratoires</option>
 				<option value="site">Sites</option>
 				<option value="autre">Autres</option>
@@ -601,7 +601,7 @@
 						/>
 						<div class="picker-results">
 							{#if relationPickerResults.length === 0}
-								<div class="picker-item disabled">Aucun resultat</div>
+								<div class="picker-item disabled">Aucun résultat</div>
 							{:else}
 								{#each relationPickerResults as rs (rs.id)}
 									<button class="picker-item" onclick={() => pickStructure(rs.id)}>
@@ -736,7 +736,7 @@
 						/>
 						<div class="picker-results">
 							{#if ctxPickerResults.length === 0}
-								<div class="picker-item disabled">Aucun resultat</div>
+								<div class="picker-item disabled">Aucun résultat</div>
 							{:else}
 								{#each ctxPickerResults as cs (cs.id)}
 									<button class="picker-item" onclick={() => pickCtx(cs.id)}>
@@ -773,10 +773,10 @@
 			<label>Type</label>
 			<select bind:value={mType}>
 				<option value="labo">Laboratoire</option>
-				<option value="universite">Universite</option>
+				<option value="universite">Université</option>
 				<option value="onr">ONR</option>
 				<option value="chu">CHU</option>
-				<option value="ecole">Ecole</option>
+				<option value="ecole">École</option>
 				<option value="site">Site</option>
 				<option value="autre">Autre</option>
 			</select>

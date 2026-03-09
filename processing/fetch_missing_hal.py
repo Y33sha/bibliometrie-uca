@@ -16,6 +16,8 @@ Usage:
 """
 
 import argparse
+import hashlib
+import json
 import logging
 import os
 import re
@@ -135,12 +137,27 @@ def fetch_hal_document(hal_id: str) -> dict | None:
 
 
 def insert_staging_hal(cur, hal_id: str, doi: str | None, doc: dict):
-    """Insère un document dans staging_hal avec collection = NULL (hors périmètre)."""
+    """Insère un document dans staging_hal avec collection = NULL (hors périmètre).
+    Si le document existe et a changé (hash différent), met à jour et remet processed = FALSE.
+    """
+    canonical = json.dumps(doc, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    raw_hash = hashlib.md5(canonical.encode("utf-8")).hexdigest()
     cur.execute("""
-        INSERT INTO staging_hal (halid, doi, raw_data, collection, processed)
-        VALUES (%s, %s, %s::jsonb, NULL, FALSE)
-        ON CONFLICT (halid) DO NOTHING
-    """, (hal_id, doi, Json(doc)))
+        INSERT INTO staging_hal (halid, doi, raw_data, collection, processed, raw_hash)
+        VALUES (%s, %s, %s::jsonb, NULL, FALSE, %s)
+        ON CONFLICT (halid) DO UPDATE SET
+            raw_data = CASE
+                WHEN staging_hal.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                    THEN EXCLUDED.raw_data
+                ELSE staging_hal.raw_data
+            END,
+            raw_hash = COALESCE(EXCLUDED.raw_hash, staging_hal.raw_hash),
+            processed = CASE
+                WHEN staging_hal.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                    THEN FALSE
+                ELSE staging_hal.processed
+            END
+    """, (hal_id, doi, Json(doc), raw_hash))
 
 
 def main():

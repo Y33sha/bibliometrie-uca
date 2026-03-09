@@ -43,6 +43,7 @@
 		role_title?: string;
 		start_date?: string;
 		end_date?: string;
+		has_rh?: boolean;
 		linked_authors?: LinkedAuthor[];
 		identifiers?: PersonIdentifier[];
 	}
@@ -93,6 +94,7 @@
 	let selectedLinked: string[] = $state([]);
 	let selectedOrcid: string[] = $state([]);
 	let selectedIdhal: string[] = $state([]);
+	let selectedRh: string[] = $state([]);
 
 	let deptOptions: FacetOption[] = $state([]);
 	let roleOptions: FacetOption[] = $state([]);
@@ -107,6 +109,10 @@
 	const idhalOptions: FacetOption[] = [
 		{ value: 'yes', text: 'Avec idHAL' },
 		{ value: 'no', text: 'Sans idHAL' }
+	];
+	const rhOptions: FacetOption[] = [
+		{ value: 'yes', text: 'Oui' },
+		{ value: 'no', text: 'Non' }
 	];
 
 	let currentPage = $state(1);
@@ -159,6 +165,7 @@
 		if (selectedLinked.length === 1) params.set('linked', selectedLinked[0]);
 		if (selectedOrcid.length === 1) params.set('has_orcid', selectedOrcid[0]);
 		if (selectedIdhal.length === 1) params.set('has_idhal', selectedIdhal[0]);
+		if (selectedRh.length === 1) params.set('has_rh', selectedRh[0]);
 
 		const data = await api<PersonListResponse>('/api/persons?' + params);
 		persons = data.persons;
@@ -184,6 +191,7 @@
 		setOrDel('linked', selectedLinked.length === 1 ? selectedLinked[0] : '');
 		setOrDel('orcid', selectedOrcid.length === 1 ? selectedOrcid[0] : '');
 		setOrDel('idhal', selectedIdhal.length === 1 ? selectedIdhal[0] : '');
+		setOrDel('rh', selectedRh.length === 1 ? selectedRh[0] : '');
 		history.replaceState(null, '', url);
 	}
 
@@ -196,6 +204,7 @@
 		if (p.get('linked')) selectedLinked = [p.get('linked')!];
 		if (p.get('orcid')) selectedOrcid = [p.get('orcid')!];
 		if (p.get('idhal')) selectedIdhal = [p.get('idhal')!];
+		if (p.get('rh')) selectedRh = [p.get('rh')!];
 	}
 
 	/* ── Event handlers ── */
@@ -407,6 +416,7 @@
 	<FacetDropdown label="Rattachement" options={linkedOptions} bind:selected={selectedLinked} onchange={handleFilterChange} />
 	<FacetDropdown label="ORCID" options={orcidOptions} bind:selected={selectedOrcid} onchange={handleFilterChange} />
 	<FacetDropdown label="idHAL" options={idhalOptions} bind:selected={selectedIdhal} onchange={handleFilterChange} />
+	<FacetDropdown label="Base RH" options={rhOptions} bind:selected={selectedRh} onchange={handleFilterChange} />
 	<span class="count">{totalCount} personnes</span>
 </div>
 
@@ -442,7 +452,10 @@
 							{expanded ? '\u25BC' : '\u25B6'}
 						</button>
 					</td>
-					<td><strong>{p.last_name}</strong></td>
+					<td>
+						<strong>{p.last_name}</strong>
+						{#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+					</td>
 					<td>{p.first_name}</td>
 					<td>{p.department_name ?? ''}</td>
 					<td>
@@ -998,6 +1011,23 @@
 	.id-error {
 		font-size: 11px;
 		color: var(--danger);
+	}
+
+	/* ── RH checkmark ── */
+	.rh-check {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 15px;
+		height: 15px;
+		border-radius: 50%;
+		background: var(--accent, #3b82f6);
+		color: white;
+		font-size: 10px;
+		font-weight: 700;
+		margin-left: 4px;
+		vertical-align: middle;
+		line-height: 1;
 	}
 
 	/* ── Misc ── */

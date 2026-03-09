@@ -21,6 +21,7 @@
 		first_name: string;
 		last_name: string;
 		department_name?: string;
+		has_rh?: boolean;
 	}
 
 	interface Author {
@@ -387,6 +388,7 @@
 								<span class="tag tag-linked"
 									>{a.person.first_name} {a.person.last_name}</span
 								>
+								{#if a.person.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
 								{#if a.person.department_name}
 									<span class="dept">{a.person.department_name}</span>
 								{/if}
@@ -849,5 +851,20 @@
 		text-align: center;
 		padding: 40px;
 		color: var(--text-muted);
+	}
+	.rh-check {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 15px;
+		height: 15px;
+		border-radius: 50%;
+		background: var(--accent, #3b82f6);
+		color: white;
+		font-size: 10px;
+		font-weight: 700;
+		margin-left: 4px;
+		vertical-align: middle;
+		line-height: 1;
 	}
 </style>

@@ -233,11 +233,12 @@ def import_persons(conn, records: list[dict], dry_run: bool = False,
 
         # Vérifier doublon (même nom normalisé + même department + même role)
         cur.execute("""
-            SELECT id FROM persons
-            WHERE last_name_normalized = %s
-              AND first_name_normalized = %s
-              AND department_name IS NOT DISTINCT FROM %s
-              AND role_title IS NOT DISTINCT FROM %s
+            SELECT p.id FROM persons p
+            LEFT JOIN persons_rh prh ON prh.person_id = p.id
+            WHERE p.last_name_normalized = %s
+              AND p.first_name_normalized = %s
+              AND prh.department_name IS NOT DISTINCT FROM %s
+              AND prh.role_title IS NOT DISTINCT FROM %s
         """, (last_norm, first_norm, department, role))
         if cur.fetchone():
             duplicates += 1
@@ -245,11 +246,18 @@ def import_persons(conn, records: list[dict], dry_run: bool = False,
 
         cur.execute("""
             INSERT INTO persons
-                (last_name, first_name, email, last_name_normalized, first_name_normalized,
-                 role_title, department_name, start_date, end_date, hr_export_date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (last_name, first_name, email, last_norm, first_norm,
-              role, department, start, end, export_dt))
+                (last_name, first_name, last_name_normalized, first_name_normalized)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id
+        """, (last_name, first_name, last_norm, first_norm))
+        person_id = cur.fetchone()["id"]
+
+        cur.execute("""
+            INSERT INTO persons_rh
+                (person_id, email, role_title, department_name,
+                 start_date, end_date, hr_export_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (person_id, email, role, department, start, end, export_dt))
         inserted += 1
 
         if inserted % 500 == 0:

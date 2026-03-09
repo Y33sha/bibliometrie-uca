@@ -62,10 +62,10 @@
 	// ---- Constants ----
 
 	const TYPE_LABELS: Record<string, string> = {
-		universite: 'Universites',
+		universite: 'Universités',
 		onr: 'Organismes de recherche',
 		chu: 'CHU',
-		ecole: 'Ecoles',
+		ecole: 'Écoles',
 		labo: 'Laboratoires'
 	};
 	const ALLOWED_TYPES = Object.keys(TYPE_LABELS);
@@ -344,7 +344,7 @@
 	<!-- Batch action bar -->
 	{#if selectedCount > 0}
 		<div class="batch-bar">
-			<span>{selectedCount} selectionnee{selectedCount > 1 ? 's' : ''}</span>
+			<span>{selectedCount} sélectionnée{selectedCount > 1 ? 's' : ''}</span>
 			<div class="batch-actions">
 				<button onclick={() => batchReview(false)}>&#x2717; Rejeter</button>
 				<button onclick={() => batchReview(true)}>&#x2713; Confirmer</button>

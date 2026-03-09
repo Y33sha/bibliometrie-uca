@@ -66,8 +66,8 @@ En attente réponse équipe technique.
 * [x] idem page stats (revues): requête très lente
 * [x] créer page détails
 * [x] filtre Source: 3 options par source (absent, présent, tous)
-* [ ] dans les filtres: ajouter option "aucun labo"
-* [ ] type "preprint": apparaît "autre" dans les extractions OpenAlex (https://openalex.org/works/W4407574839); voir ce qu'il en est dans les extractions HAL (le compte de préprints est zéro)
+* [x] dans les filtres: ajouter option "aucun labo"
+* [x] type "preprint": apparaît "autre" dans les extractions OpenAlex (https://openalex.org/works/W4407574839); voir ce qu'il en est dans les extractions HAL (le compte de préprints est zéro)
 * [ ] ajouter filtre corresponding_is_uca?
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et  corriger
 * [ ] lien Publications -> Dashboard?
@@ -86,7 +86,7 @@ En attente réponse équipe technique.
 * [ ] Rendre tous les tableaux triables
 * [ ] lien retour: set default (si accès direct URL) ou cacher?
 * [ ] sources: arrangées verticalement dans un dropdown
-* [ ] afficher todo et nouveautés
+* [ ] afficher todo et nouveautés?
 
 # Trucs pour plus tard
 * compte fractionnaire?

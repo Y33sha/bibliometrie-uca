@@ -108,13 +108,13 @@
 	const helpText = $derived.by(() => {
 		if (currentTab === 'fn') {
 			return {
-				title: 'Faux negatifs',
-				body: 'Adresses marquees UCA manuellement mais non detectees par le script. Ajouter des formes de nom et relancer la detection.'
+				title: 'Faux négatifs',
+				body: 'Adresses marquées UCA manuellement mais non détectées par le script. Ajouter des formes de nom et relancer la détection.'
 			};
 		}
 		return {
 			title: 'Faux positifs',
-			body: 'Adresses detectees UCA par le script mais rejetees manuellement. La forme ayant matche est affichee \u2014 vous pouvez la supprimer ou lui ajouter un contexte contraignant, puis relancer la detection.'
+			body: 'Adresses détectées UCA par le script mais rejetées manuellement. La forme ayant matché est affichée \u2014 vous pouvez la supprimer ou lui ajouter un contexte contraignant, puis relancer la détection.'
 		};
 	});
 
@@ -323,11 +323,11 @@
 		</div>
 		<div class="stat-card">
 			<div class="value">{stats.total_reviewed}</div>
-			<div class="label">Adresses examinees</div>
+			<div class="label">Adresses examinées</div>
 		</div>
 		<div class="stat-card highlight-warning">
 			<div class="value val-warning">{stats.false_negatives}</div>
-			<div class="label">Faux negatifs</div>
+			<div class="label">Faux négatifs</div>
 		</div>
 		<div class="stat-card highlight-danger">
 			<div class="value val-danger">{stats.false_positives}</div>
@@ -353,7 +353,7 @@
 <div class="toolbar">
 	<div class="tab-group">
 		<button class="tab-btn" class:active={currentTab === 'fn'} onclick={() => switchTab('fn')}>
-			Faux negatifs
+			Faux négatifs
 		</button>
 		<button class="tab-btn" class:active={currentTab === 'fp'} onclick={() => switchTab('fp')}>
 			Faux positifs
@@ -373,18 +373,18 @@
 
 <!-- Table -->
 {#if addresses.length === 0}
-	<div class="empty">Aucune adresse trouvee &mdash; la detection est parfaite pour ce cas !</div>
+	<div class="empty">Aucune adresse trouvée &mdash; la détection est parfaite pour ce cas !</div>
 {:else}
 	<table class="data-table">
 		<thead>
 			<tr>
 				<th>Adresse</th>
 				<th class="num" style="width:60px">Publis</th>
-				<th style="width:200px">Labo(s) detectes</th>
+				<th style="width:200px">Labo(s) détectés</th>
 				{#if currentTab === 'fn'}
 					<th style="width:250px">Assigner un labo</th>
 				{:else}
-					<th style="width:280px">Forme ayant matche</th>
+					<th style="width:280px">Forme ayant matché</th>
 				{/if}
 			</tr>
 		</thead>
