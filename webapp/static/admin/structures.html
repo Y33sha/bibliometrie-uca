@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Structures — Bibliométrie UCA</title>
+    <style>
+        :root {
+            --bg: #f8f7f4; --card: #fff; --border: #e2e0db; --text: #2c2c2c;
+            --text-muted: #777; --accent: #3b6b9e; --accent-light: #e8f0f8;
+            --success: #2a7d4f; --success-light: #e6f4ec;
+            --danger: #c0392b; --danger-light: #fbeaea;
+            --warning: #d4a017; --warning-light: #fef8e8;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; font-size: 14px; line-height: 1.5; }
+
+        .layout { display: flex; gap: 16px; max-width: 1400px; margin: 0 auto; padding: 16px; min-height: calc(100vh - 46px); }
+        .list-panel { width: 380px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
+        .detail-panel { flex: 1; min-width: 0; }
+
+        .panel { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 14px; }
+        .panel h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+        .panel h3 { margin: 12px 0 6px; font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Toolbar */
+        .toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
+        .toolbar input, .toolbar select {
+            padding: 5px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; background: white;
+        }
+        .toolbar input { flex: 1; }
+
+        /* Structure list */
+        .struct-list { overflow-y: auto; max-height: calc(100vh - 180px); }
+        .struct-item {
+            padding: 8px 10px; border-bottom: 1px solid #f0efec; cursor: pointer; display: flex; align-items: center; gap: 8px;
+        }
+        .struct-item:hover { background: #fafaf8; }
+        .struct-item.active { background: var(--accent-light); border-left: 3px solid var(--accent); }
+        .struct-item .info { flex: 1; min-width: 0; }
+        .struct-item .name { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .struct-item .meta { font-size: 11px; color: var(--text-muted); }
+
+        .type-badge {
+            font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap;
+        }
+        .type-universite { background: #e8d4f0; color: #6b2e8a; }
+        .type-onr { background: #d4e8f0; color: #2e6b8a; }
+        .type-chu { background: #f0d4d4; color: #8a2e2e; }
+        .type-ecole { background: #f0e8d4; color: #8a6b2e; }
+        .type-labo { background: var(--accent-light); color: var(--accent); }
+        .type-site { background: var(--success-light); color: var(--success); }
+        .type-autre { background: #f0f0f0; color: #555; }
+
+        /* Detail */
+        .detail-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .detail-header h2 { flex: 1; margin: 0; font-size: 18px; }
+
+        .field-grid { display: grid; grid-template-columns: 100px 1fr; gap: 4px 10px; font-size: 13px; margin-bottom: 14px; }
+        .field-label { color: var(--text-muted); font-weight: 500; }
+        .field-value { word-break: break-all; }
+
+        /* Tags */
+        .tag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 2px 8px; border-radius: 10px; margin: 2px; background: #f0f0f0; }
+        .tag .remove { cursor: pointer; color: var(--danger); font-weight: bold; font-size: 14px; line-height: 1; }
+        .tag .remove:hover { color: #e74c3c; }
+        .tag.tutelle { background: #d4e8f0; color: #2e6b8a; }
+        .tag.partenaire { background: #f0e8d4; color: #8a6b2e; }
+
+        /* Forms table */
+        .forms-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .forms-table th { text-align: left; padding: 5px 8px; font-size: 11px; color: var(--text-muted); border-bottom: 2px solid var(--border); font-weight: 600; }
+        .forms-table td { padding: 5px 8px; border-bottom: 1px solid #f0efec; vertical-align: middle; }
+        .forms-table tr:hover td { background: #fafaf8; }
+        .forms-table .inactive { opacity: 0.45; }
+        .form-text { font-family: 'SF Mono', Consolas, monospace; font-size: 12px; }
+        .ctx-tag { font-size: 10px; padding: 1px 5px; border-radius: 6px; background: var(--warning-light); color: #8a6d10; display: inline-flex; align-items: center; gap: 3px; }
+        .ctx-remove { cursor: pointer; color: var(--danger); font-weight: bold; font-size: 12px; line-height: 1; }
+        .ctx-remove:hover { color: #e74c3c; }
+
+        .btn-add-tiny {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border);
+            background: white; color: var(--accent); font-size: 11px; font-weight: bold;
+            cursor: pointer; vertical-align: middle; line-height: 1; padding: 0;
+        }
+        .btn-add-tiny:hover { background: var(--accent); color: white; border-color: var(--accent); }
+
+        .ctx-picker { max-width: 380px; }
+
+        /* Buttons */
+        .btn { padding: 5px 12px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; cursor: pointer; background: white; font-family: inherit; }
+        .btn:hover { background: #f5f5f5; }
+        .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
+        .btn-primary:hover { background: #2d5a87; }
+        .btn-danger { color: var(--danger); border-color: var(--danger); }
+        .btn-danger:hover { background: var(--danger-light); }
+        .btn-sm { padding: 2px 7px; font-size: 11px; }
+        .btn-success { background: var(--success); color: white; border-color: var(--success); }
+
+        /* Add form row */
+        .add-row { display: flex; gap: 4px; margin-top: 6px; align-items: center; }
+        .add-row input, .add-row select { padding: 4px 6px; border: 1px solid var(--border); border-radius: 3px; font-size: 12px; }
+        .add-row input { flex: 1; }
+
+        /* Modal */
+        .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 200; align-items: center; justify-content: center; }
+        .modal-bg.show { display: flex; }
+        .modal { background: white; border-radius: 8px; padding: 20px; width: 420px; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,0.2); }
+        .modal h3 { margin: 0 0 14px; font-size: 16px; }
+        .modal label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin: 8px 0 3px; }
+        .modal input, .modal select { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; }
+        .modal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+        /* + button */
+        .btn-add {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border);
+            background: white; color: var(--accent); font-size: 14px; font-weight: bold;
+            cursor: pointer; margin-left: 6px; vertical-align: middle; line-height: 1; padding: 0;
+        }
+        .btn-add:hover { background: var(--accent); color: white; border-color: var(--accent); }
+
+        /* Picker */
+        .picker-container {
+            position: relative; margin: 8px 0; background: white;
+            border: 1px solid var(--accent); border-radius: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+            max-width: 380px; z-index: 50;
+        }
+        .picker-container input {
+            width: 100%; padding: 7px 10px; border: none; border-bottom: 1px solid var(--border);
+            border-radius: 5px 5px 0 0; font-size: 13px; outline: none;
+        }
+        .picker-results { max-height: 200px; overflow-y: auto; }
+        .picker-item {
+            padding: 6px 10px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+        }
+        .picker-item:hover { background: var(--accent-light); }
+        .picker-item.disabled { color: var(--text-muted); cursor: default; }
+    </style>
+    <script src="/static/admin/nav.js" defer></script>
+</head>
+<body>
+
+<div class="header"></div>
+
+<div class="layout">
+    <!-- LIST PANEL -->
+    <div class="list-panel">
+        <div class="toolbar">
+            <input type="text" id="search" placeholder="Rechercher…">
+            <select id="type-filter">
+                <option value="">Tous types</option>
+                <option value="universite">Universités</option>
+                <option value="onr">ONR</option>
+                <option value="chu">CHU</option>
+                <option value="ecole">Écoles</option>
+                <option value="labo">Laboratoires</option>
+                <option value="site">Sites</option>
+                <option value="autre">Autres</option>
+            </select>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:12px;color:var(--text-muted)" id="list-count"></span>
+            <button class="btn btn-primary btn-sm" onclick="openCreateModal()">+ Nouvelle</button>
+        </div>
+        <div class="panel struct-list" id="struct-list"></div>
+    </div>
+
+    <!-- DETAIL PANEL -->
+    <div class="detail-panel" id="detail">
+        <div class="panel detail-empty">Sélectionnez une structure pour voir le détail.</div>
+    </div>
+</div>
+
+<!-- CREATE MODAL -->
+<div class="modal-bg" id="create-modal">
+    <div class="modal">
+        <h3>Nouvelle structure</h3>
+        <label>Code (unique)</label>
+        <input id="m-code" placeholder="ex: lpc, chu_clermont, site_cezeaux">
+        <label>Nom complet</label>
+        <input id="m-name" placeholder="ex: Laboratoire de Physique de Clermont">
+        <label>Acronyme</label>
+        <input id="m-acronym" placeholder="ex: LPC">
+        <label>Type</label>
+        <select id="m-type">
+            <option value="labo">Laboratoire</option>
+            <option value="universite">Université</option>
+            <option value="onr">ONR</option>
+            <option value="chu">CHU</option>
+            <option value="ecole">École</option>
+            <option value="site">Site</option>
+            <option value="autre">Autre</option>
+        </select>
+        <label>ROR ID</label>
+        <input id="m-ror" placeholder="https://ror.org/...">
+        <label>Collection HAL</label>
+        <input id="m-hal" placeholder="ex: INSTITUT_PASCAL">
+        <div class="actions">
+            <button class="btn" onclick="closeCreateModal()">Annuler</button>
+            <button class="btn btn-primary" onclick="submitCreate()">Créer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let allStructures = [];
+let allStructuresCache = [];  // unfiltered, for picker
+let selectedId = null;
+
+async function api(url, opts) {
+    const res = await fetch(url, opts);
+    if (!res.ok) { const t = await res.text(); throw new Error(t); }
+    return res.json();
+}
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ===== LIST =====
+async function loadList() {
+    const params = new URLSearchParams();
+    const type = document.getElementById('type-filter').value;
+    const search = document.getElementById('search').value;
+    if (type) params.set('type', type);
+    if (search) params.set('search', search);
+
+    allStructures = await api('/api/structures?' + params);
+    renderList();
+}
+
+function renderList() {
+    const el = document.getElementById('struct-list');
+    document.getElementById('list-count').textContent = allStructures.length + ' structures';
+
+    if (!allStructures.length) {
+        el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">Aucune structure</div>';
+        return;
+    }
+
+    el.innerHTML = allStructures.map(s => {
+        const active = s.id === selectedId ? ' active' : '';
+        const acronym = s.acronym ? ` (${esc(s.acronym)})` : '';
+        return `<div class="struct-item${active}" onclick="selectStructure(${s.id})">
+            <span class="type-badge type-${s.type}">${s.type}</span>
+            <div class="info">
+                <div class="name">${esc(s.name)}${acronym}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ===== DETAIL =====
+async function selectStructure(id) {
+    selectedId = id;
+    renderList();  // update active state
+
+    const data = await api('/api/structures/' + id);
+    renderDetail(data);
+}
+
+function renderDetail(data) {
+    const s = data.structure;
+    const el = document.getElementById('detail');
+
+    // Fields
+    let fields = '';
+    const pairs = [
+        ['Code', s.code], ['Type', s.type], ['ROR', s.ror_id],
+        ['RNSR', s.rnsr_id], ['HAL', s.hal_collection],
+    ];
+    pairs.forEach(([l, v]) => {
+        if (v) fields += `<div class="field-label">${l}</div><div class="field-value">${esc(v)}</div>`;
+    });
+
+    // Collect all related structure IDs (any relation direction/type)
+    const relatedIds = new Set([
+        ...data.parents.map(p => p.id),
+        ...data.children.map(c => c.id),
+        s.id,
+    ]);
+
+    // Tutelles (parents avec est_tutelle_de)
+    const tutelles = data.parents.filter(p => p.relation_type === 'est_tutelle_de');
+    let tutellesHtml = tutelles.map(p => `<span class="tag tutelle">
+        <span style="cursor:pointer" onclick="selectStructure(${p.id})">${esc(p.acronym || p.name)}</span>
+        <span class="remove" onclick="deleteRelation(${p.relation_id})" title="Supprimer">×</span>
+    </span>`).join('');
+
+    // Est tutelle de (children avec est_tutelle_de)
+    const tutellesDe = data.children.filter(c => c.relation_type === 'est_tutelle_de');
+    let tutellesDeHtml = tutellesDe.map(c => `<span class="tag tutelle">
+        <span style="cursor:pointer" onclick="selectStructure(${c.id})">${esc(c.acronym || c.name)}</span>
+        <span class="remove" onclick="deleteRelation(${c.relation_id})" title="Supprimer">×</span>
+    </span>`).join('');
+
+    // Partenaires (les deux sens, relation commutative)
+    const partenaires = [
+        ...data.parents.filter(p => p.relation_type === 'est_partenaire_de').map(p => ({ ...p, id_struct: p.id })),
+        ...data.children.filter(c => c.relation_type === 'est_partenaire_de').map(c => ({ ...c, id_struct: c.id })),
+    ];
+    let partenairesHtml = partenaires.map(p => `<span class="tag partenaire">
+        <span style="cursor:pointer" onclick="selectStructure(${p.id_struct})">${esc(p.acronym || p.name)}</span>
+        <span class="remove" onclick="deleteRelation(${p.relation_id})" title="Supprimer">×</span>
+    </span>`).join('');
+
+    // Build a lookup for structure names (for context display)
+    const structLookup = {};
+    allStructuresCache.forEach(s => { structLookup[s.id] = s.acronym || s.code || s.name; });
+
+    // Store forms for context editing
+    window._formsData = {};
+    data.forms.forEach(f => { window._formsData[f.id] = f.requires_context_of || []; });
+
+    // Forms table
+    let formsHtml = '';
+    data.forms.forEach(f => {
+        const cls = f.is_active ? '' : ' class="inactive"';
+        const ctxArr = f.requires_context_of || [];
+        let ctx = '';
+        if (ctxArr.length) {
+            const tags = ctxArr.map(x => {
+                const label = x === 'tutelles' ? '🔗 tutelles' : (structLookup[x] || 'id:' + x);
+                const arg = typeof x === 'string' ? `'${x}'` : x;
+                return `<span class="ctx-tag">${esc(label)}<span class="ctx-remove" onclick="removeCtx(${f.id}, ${arg})">×</span></span>`;
+            }).join(' ');
+            ctx = tags + ` <button class="btn-add-tiny" onclick="openCtxPicker(${f.id})">+</button>`;
+        } else {
+            ctx = `<span style="color:var(--success);font-size:11px">suffisant</span> <button class="btn-add-tiny" onclick="openCtxPicker(${f.id})">+</button>`;
+        }
+        formsHtml += `<tr${cls}>
+            <td class="form-text">${esc(f.form_text)}${f.is_regex ? ' <span style="color:var(--warning);font-size:10px">regex</span>' : ''}</td>
+            <td>${ctx}</td>
+            <td style="white-space:nowrap">
+                ${f.is_active
+                    ? `<button class="btn btn-sm" onclick="toggleForm(${f.id}, false)" title="Désactiver">⏸</button>`
+                    : `<button class="btn btn-sm btn-success" onclick="toggleForm(${f.id}, true)" title="Réactiver">▶</button>`}
+                <button class="btn btn-sm btn-danger" onclick="deleteForm(${f.id})" title="Supprimer">×</button>
+            </td>
+        </tr>`;
+    });
+
+    el.innerHTML = `<div class="panel">
+        <div class="detail-header">
+            <h2>${esc(s.acronym ? s.acronym + ' — ' + s.name : s.name)}</h2>
+            <span class="type-badge type-${s.type}">${s.type}</span>
+            <button class="btn btn-danger btn-sm" onclick="deleteStructure(${s.id})">Supprimer</button>
+        </div>
+
+        <div class="field-grid">${fields}</div>
+
+        <h3>Tutelle${tutelles.length > 1 ? 's' : ''} <button class="btn-add" onclick="openPicker('est_tutelle_de','parent',${s.id})">+</button></h3>
+        <div>${tutellesHtml || '<span style="font-size:12px;color:var(--text-muted)">Aucune</span>'}</div>
+
+        <h3>Est tutelle de <button class="btn-add" onclick="openPicker('est_tutelle_de','child',${s.id})">+</button></h3>
+        <div>${tutellesDeHtml || '<span style="font-size:12px;color:var(--text-muted)">Aucun</span>'}</div>
+
+        <h3>Partenaire${partenaires.length > 1 ? 's' : ''} <button class="btn-add" onclick="openPicker('est_partenaire_de','parent',${s.id})">+</button></h3>
+        <div>${partenairesHtml || '<span style="font-size:12px;color:var(--text-muted)">Aucun</span>'}</div>
+
+        <div class="picker-container" id="relation-picker" style="display:none">
+            <input type="text" id="picker-search" placeholder="Rechercher une structure…" autocomplete="off">
+            <div id="picker-results" class="picker-results"></div>
+        </div>
+
+        <h3>Formes de noms (${data.forms.length})</h3>
+        <table class="forms-table">
+            <thead><tr><th>Forme</th><th>Contexte requis</th><th></th></tr></thead>
+            <tbody>${formsHtml || '<tr><td colspan="3" style="text-align:center;color:var(--text-muted)">Aucune forme</td></tr>'}</tbody>
+        </table>
+        <div class="add-row" style="margin-top:8px">
+            <input id="add-form-text" placeholder="Nouvelle forme…">
+            <label style="font-size:11px;display:flex;align-items:center;gap:3px;margin:0">
+                <input type="checkbox" id="add-form-regex"> regex
+            </label>
+            <button class="btn btn-sm btn-primary" onclick="addForm(${s.id})">Ajouter</button>
+        </div>
+        <div id="new-form-ctx" style="margin-top:4px;font-size:12px">
+            <span style="color:var(--text-muted)">Contexte :</span>
+            <span id="new-form-ctx-tags"></span>
+            <button class="btn-add-tiny" onclick="openCtxPicker(null)">+</button>
+            <span style="color:var(--text-muted);font-size:11px;margin-left:4px" id="new-form-ctx-hint">(suffisant)</span>
+        </div>
+
+        <div class="picker-container ctx-picker" id="ctx-picker" style="display:none">
+            <div style="padding:6px 10px;border-bottom:1px solid var(--border);display:flex;gap:4px;flex-wrap:wrap">
+                <button class="btn btn-sm" onclick="pickCtx('tutelles')">🔗 tutelles</button>
+                <button class="btn btn-sm" onclick="pickCtxClear()">✕ suffisant</button>
+            </div>
+            <input type="text" id="ctx-picker-search" placeholder="Rechercher une structure…" autocomplete="off">
+            <div id="ctx-picker-results" class="picker-results"></div>
+        </div>
+    </div>`;
+
+    // Store relatedIds for picker filtering
+    window._pickerExclude = relatedIds;
+    window._newFormCtx = [];
+}
+
+// ===== ACTIONS =====
+let pickerState = { relType: '', direction: '', structId: null };
+
+function openPicker(relType, direction, structId) {
+    pickerState = { relType, direction, structId };
+    const picker = document.getElementById('relation-picker');
+    picker.style.display = 'block';
+    const input = document.getElementById('picker-search');
+    input.value = '';
+    input.focus();
+    renderPickerResults('');
+}
+
+function closePicker() {
+    document.getElementById('relation-picker').style.display = 'none';
+}
+
+function renderPickerResults(query) {
+    const q = query.toLowerCase();
+    const exclude = window._pickerExclude || new Set();
+    const results = allStructuresCache.filter(s =>
+        !exclude.has(s.id) &&
+        (s.name.toLowerCase().includes(q) || (s.acronym || '').toLowerCase().includes(q) || s.code.toLowerCase().includes(q))
+    ).slice(0, 12);
+
+    const el = document.getElementById('picker-results');
+    if (!results.length) {
+        el.innerHTML = '<div class="picker-item disabled">Aucun résultat</div>';
+        return;
+    }
+    el.innerHTML = results.map(s =>
+        `<div class="picker-item" onclick="pickStructure(${s.id})">
+            <span class="type-badge type-${s.type}" style="font-size:9px;padding:0 5px">${s.type}</span>
+            ${esc(s.acronym ? s.acronym + ' — ' : '')}${esc(s.name)}
+        </div>`
+    ).join('');
+}
+
+async function pickStructure(otherId) {
+    const { relType, direction, structId } = pickerState;
+    const parentId = direction === 'parent' ? otherId : structId;
+    const childId = direction === 'parent' ? structId : otherId;
+    await api('/api/structure-relations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent_id: parentId, child_id: childId, relation_type: relType })
+    });
+    closePicker();
+    selectStructure(structId);
+    loadList();
+    refreshCache();
+}
+
+async function deleteRelation(relId) {
+    await api('/api/structure-relations/' + relId, { method: 'DELETE' });
+    selectStructure(selectedId);
+    loadList();
+    refreshCache();
+}
+
+async function addForm(structId) {
+    const text = document.getElementById('add-form-text').value.trim();
+    if (!text) return;
+    const isRegex = document.getElementById('add-form-regex').checked;
+    const ctx = window._newFormCtx && window._newFormCtx.length ? window._newFormCtx : null;
+
+    await api('/api/name-forms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ structure_id: structId, form_text: text, is_regex: isRegex, requires_context_of: ctx })
+    });
+    document.getElementById('add-form-text').value = '';
+    window._newFormCtx = [];
+    selectStructure(structId);
+    loadList();
+}
+
+// ===== CONTEXT PICKER =====
+let ctxPickerState = { formId: null, currentCtx: [] };
+
+function openCtxPicker(formId) {
+    const currentCtx = formId === null ? (window._newFormCtx || []) : (window._formsData[formId] || []);
+    ctxPickerState = { formId, currentCtx: [...currentCtx] };
+    const picker = document.getElementById('ctx-picker');
+    picker.style.display = 'block';
+    const input = document.getElementById('ctx-picker-search');
+    input.value = '';
+    input.focus();
+    renderCtxPickerResults('');
+}
+
+function closeCtxPicker() {
+    document.getElementById('ctx-picker').style.display = 'none';
+}
+
+function renderCtxPickerResults(query) {
+    const q = query.toLowerCase();
+    const existing = new Set(ctxPickerState.currentCtx.map(x => String(x)));
+    const results = allStructuresCache.filter(s =>
+        !existing.has(String(s.id)) &&
+        (s.name.toLowerCase().includes(q) || (s.acronym || '').toLowerCase().includes(q) || s.code.toLowerCase().includes(q))
+    ).slice(0, 10);
+
+    const el = document.getElementById('ctx-picker-results');
+    if (!results.length) {
+        el.innerHTML = '<div class="picker-item disabled">Aucun résultat</div>';
+        return;
+    }
+    el.innerHTML = results.map(s =>
+        `<div class="picker-item" onclick="pickCtx(${s.id})">
+            <span class="type-badge type-${s.type}" style="font-size:9px;padding:0 5px">${s.type}</span>
+            ${esc(s.acronym ? s.acronym + ' — ' : '')}${esc(s.name)}
+        </div>`
+    ).join('');
+}
+
+async function pickCtx(item) {
+    const { formId, currentCtx } = ctxPickerState;
+    // Avoid duplicates
+    if (!currentCtx.includes(item)) {
+        currentCtx.push(item);
+    }
+    closeCtxPicker();
+
+    if (formId === null) {
+        // Adding to new form context
+        window._newFormCtx = currentCtx;
+        renderNewFormCtxTags();
+    } else {
+        // Update existing form
+        await api('/api/name-forms/' + formId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requires_context_of: currentCtx })
+        });
+        selectStructure(selectedId);
+    }
+}
+
+async function pickCtxClear() {
+    const { formId } = ctxPickerState;
+    closeCtxPicker();
+
+    if (formId === null) {
+        window._newFormCtx = [];
+        renderNewFormCtxTags();
+    } else {
+        await api('/api/name-forms/' + formId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requires_context_of: [] })
+        });
+        selectStructure(selectedId);
+    }
+}
+
+async function removeCtx(formId, itemToRemove) {
+    const currentCtx = window._formsData[formId] || [];
+    const newCtx = currentCtx.filter(x => x !== itemToRemove);
+    await api('/api/name-forms/' + formId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requires_context_of: newCtx })
+    });
+    selectStructure(selectedId);
+}
+
+function renderNewFormCtxTags() {
+    const ctx = window._newFormCtx || [];
+    const el = document.getElementById('new-form-ctx-tags');
+    const hint = document.getElementById('new-form-ctx-hint');
+    if (!el) return;
+    if (!ctx.length) {
+        el.innerHTML = '';
+        hint.style.display = '';
+        return;
+    }
+    hint.style.display = 'none';
+    const structLookup = {};
+    allStructuresCache.forEach(s => { structLookup[s.id] = s.acronym || s.code || s.name; });
+    el.innerHTML = ctx.map(x => {
+        const label = x === 'tutelles' ? '🔗 tutelles' : (structLookup[x] || 'id:' + x);
+        return `<span class="ctx-tag">${esc(label)}<span class="ctx-remove" onclick="removeNewCtx(${typeof x === 'string' ? "'" + x + "'" : x})">×</span></span>`;
+    }).join(' ');
+}
+
+function removeNewCtx(item) {
+    window._newFormCtx = (window._newFormCtx || []).filter(x => x !== item);
+    renderNewFormCtxTags();
+}
+
+async function toggleForm(formId, active) {
+    await api('/api/name-forms/' + formId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: active })
+    });
+    selectStructure(selectedId);
+}
+
+async function deleteForm(formId) {
+    if (!confirm('Supprimer cette forme ?')) return;
+    try {
+        await api('/api/name-forms/' + formId, { method: 'DELETE' });
+    } catch (e) {
+        alert('Erreur suppression: ' + e.message);
+        return;
+    }
+    selectStructure(selectedId);
+    loadList();
+}
+
+async function deleteStructure(id) {
+    if (!confirm('Supprimer cette structure et toutes ses formes/relations ?')) return;
+    await api('/api/structures/' + id, { method: 'DELETE' });
+    selectedId = null;
+    document.getElementById('detail').innerHTML = '<div class="panel detail-empty">Structure supprimée.</div>';
+    loadList();
+    refreshCache();
+}
+
+// ===== CREATE MODAL =====
+function openCreateModal() {
+    document.getElementById('create-modal').classList.add('show');
+    document.getElementById('m-code').focus();
+}
+function closeCreateModal() {
+    document.getElementById('create-modal').classList.remove('show');
+}
+async function submitCreate() {
+    const data = {
+        code: document.getElementById('m-code').value.trim(),
+        name: document.getElementById('m-name').value.trim(),
+        acronym: document.getElementById('m-acronym').value.trim() || null,
+        type: document.getElementById('m-type').value,
+        ror_id: document.getElementById('m-ror').value.trim() || null,
+        hal_collection: document.getElementById('m-hal').value.trim() || null,
+    };
+    if (!data.code || !data.name) { alert('Code et nom requis'); return; }
+
+    try {
+        const created = await api('/api/structures', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        closeCreateModal();
+        await loadList();
+        refreshCache();
+        selectStructure(created.id);
+    } catch (e) {
+        alert('Erreur: ' + e.message);
+    }
+}
+
+// ===== INIT =====
+let searchTimeout;
+document.getElementById('search').addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(loadList, 300);
+});
+document.getElementById('type-filter').addEventListener('change', loadList);
+document.getElementById('create-modal').addEventListener('click', e => {
+    if (e.target.classList.contains('modal-bg')) closeCreateModal();
+});
+document.addEventListener('click', e => {
+    const picker = document.getElementById('relation-picker');
+    if (picker && picker.style.display !== 'none' &&
+        !picker.contains(e.target) && !e.target.classList.contains('btn-add')) {
+        closePicker();
+    }
+    const ctxPicker = document.getElementById('ctx-picker');
+    if (ctxPicker && ctxPicker.style.display !== 'none' &&
+        !ctxPicker.contains(e.target) && !e.target.classList.contains('btn-add-tiny')) {
+        closeCtxPicker();
+    }
+});
+document.addEventListener('input', e => {
+    if (e.target.id === 'picker-search') renderPickerResults(e.target.value);
+    if (e.target.id === 'ctx-picker-search') renderCtxPickerResults(e.target.value);
+});
+
+loadList();
+async function refreshCache() { allStructuresCache = await api('/api/structures'); }
+refreshCache();
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+# Données intermédiaires et extractions RH
+data/
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Config sensible (credentials, clés API)
+config/settings.py
+
+# Frontend (SvelteKit)
+frontend/node_modules/
+frontend/build/
+frontend/.svelte-kit/
+
+# Rapports d'analyse
+analysis/*.csv
+
+# Backups DB
+db/backup/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/

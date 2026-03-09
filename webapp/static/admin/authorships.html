@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auteurs UCA — Bibliométrie UCA</title>
+    <style>
+        :root {
+            --bg: #f8f7f4; --card: #ffffff; --border: #e2e0db;
+            --text: #2c2c2c; --text-muted: #777;
+            --accent: #3b6b9e; --accent-light: #e8f0f8;
+            --success: #2a7d4f; --success-light: #e6f4ec;
+            --danger: #c0392b; --danger-light: #fbeaea;
+            --warning: #d4a017; --warning-light: #fef8e8;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; font-size: 14px; line-height: 1.5; }
+        .header { background: #2c3e50; color: white; padding: 12px 24px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        .stats-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 12px 18px; text-align: center; flex: 1; min-width: 120px; }
+        .stat-card .value { font-size: 22px; font-weight: 700; line-height: 1.2; }
+        .stat-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-card.hl-success { border-left: 3px solid var(--success); }
+        .stat-card.hl-warning { border-left: 3px solid var(--warning); }
+        .stat-card.hl-accent { border-left: 3px solid var(--accent); }
+
+        .toolbar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+        .toolbar input, .toolbar select {
+            padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px;
+            font-size: 13px; background: white;
+        }
+        .toolbar input { width: 250px; }
+        .toolbar select { max-width: 180px; }
+        .toolbar .count { margin-left: auto; color: var(--text-muted); font-size: 12px; }
+
+        .data-table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        .data-table th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); border-bottom: 2px solid var(--border); background: #fafaf8; }
+        .data-table td { padding: 7px 10px; font-size: 13px; border-bottom: 1px solid #f0efec; vertical-align: top; }
+        .data-table tr:hover td { background: #fafaf8; }
+
+        .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; font-weight: 500; margin: 1px 2px; }
+        .tag-linked { background: var(--success-light); color: var(--success); }
+        .tag-unlinked { background: var(--warning-light); color: #8a6d10; }
+        .tag-id { background: var(--accent-light); color: var(--accent); font-family: 'SF Mono', monospace; font-size: 10px; }
+        .tag-source { background: #eee; color: #555; font-size: 10px; }
+
+        .person-link { display: inline-flex; align-items: center; gap: 4px; }
+
+        /* Detail panel */
+        .detail-row { background: #f5f7fa; }
+        .detail-row td { padding: 10px 20px; }
+        .detail-panel { font-size: 12px; }
+        .detail-panel h5 { margin: 0 0 4px; font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.3px; }
+        .sig-list { margin: 0 0 8px; padding: 0; list-style: none; }
+        .sig-list li { padding: 2px 0; border-bottom: 1px solid #f0efec; display: flex; gap: 6px; align-items: baseline; }
+        .sig-list li:last-child { border-bottom: none; }
+        .sig-source { font-size: 10px; color: white; background: #8899aa; border-radius: 3px; padding: 0 4px; flex-shrink: 0; }
+        .sig-text { word-break: break-word; color: #444; }
+        .pub-list { margin: 0; padding: 0; list-style: none; }
+        .pub-list li { padding: 3px 0; border-bottom: 1px solid #f0efec; }
+        .pub-list li:last-child { border-bottom: none; }
+        .pub-year { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-right: 4px; }
+        .pub-title { color: #333; }
+        .pub-uca { color: var(--success); font-size: 10px; font-weight: 600; }
+
+        .btn-expand { background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px 6px; color: var(--accent); }
+
+        .pagination { display: flex; justify-content: center; gap: 4px; margin: 12px 0; }
+        .pagination button { padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px; background: white; font-size: 12px; cursor: pointer; }
+        .pagination button:hover { background: var(--accent-light); }
+        .pagination button.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .pagination button:disabled { opacity: 0.4; cursor: default; }
+
+        .empty { text-align: center; padding: 40px; color: var(--text-muted); }
+    </style>
+    <script src="/static/admin/nav.js" defer></script>
+</head>
+<body>
+
+<div class="header"></div>
+
+<div class="container">
+    <div class="stats-row" id="stats-row"></div>
+
+    <div class="toolbar">
+        <input type="text" id="search" placeholder="Rechercher (nom, ORCID, idHAL)…">
+        <select id="filter-linked">
+            <option value="">Identité : tous</option>
+            <option value="yes">Identité résolue</option>
+            <option value="no">Non résolue</option>
+        </select>
+        <select id="filter-orcid">
+            <option value="">ORCID : tous</option>
+            <option value="yes">Avec ORCID</option>
+            <option value="no">Sans ORCID</option>
+        </select>
+        <select id="filter-idhal">
+            <option value="">idHAL : tous</option>
+            <option value="yes">Avec idHAL</option>
+            <option value="no">Sans idHAL</option>
+        </select>
+        <span class="count" id="result-count"></span>
+    </div>
+
+    <div id="table-container"></div>
+    <div id="pagination" class="pagination"></div>
+</div>
+
+<script>
+let currentPage = 1;
+let searchTimeout = null;
+
+async function api(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API error: ' + res.status);
+    return res.json();
+}
+
+function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadStats();
+    loadTable();
+    document.getElementById('search').addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => { currentPage = 1; loadTable(); }, 400);
+    });
+    for (const id of ['filter-linked', 'filter-orcid', 'filter-idhal']) {
+        document.getElementById(id).addEventListener('change', () => { currentPage = 1; loadTable(); });
+    }
+});
+
+async function loadStats() {
+    const s = await api('/api/authorships/stats');
+    const unlinked = s.total_uca_authors - s.linked_to_person;
+    document.getElementById('stats-row').innerHTML = `
+        <div class="stat-card">
+            <div class="value">${s.total_uca_authors}</div>
+            <div class="label">Auteurs UCA</div>
+        </div>
+        <div class="stat-card hl-success">
+            <div class="value" style="color:var(--success)">${s.linked_to_person}</div>
+            <div class="label">Identité résolue</div>
+        </div>
+        <div class="stat-card hl-warning">
+            <div class="value" style="color:var(--warning)">${unlinked}</div>
+            <div class="label">Non résolue</div>
+        </div>
+        <div class="stat-card hl-accent">
+            <div class="value" style="color:var(--accent)">${s.with_orcid}</div>
+            <div class="label">Avec ORCID</div>
+        </div>
+        <div class="stat-card hl-accent">
+            <div class="value" style="color:var(--accent)">${s.with_idhal}</div>
+            <div class="label">Avec idHAL</div>
+        </div>
+    `;
+}
+
+async function loadTable() {
+    const params = new URLSearchParams({ page: currentPage, per_page: 50 });
+    const search = document.getElementById('search').value;
+    const linked = document.getElementById('filter-linked').value;
+    const orcid = document.getElementById('filter-orcid').value;
+    const idhal = document.getElementById('filter-idhal').value;
+    if (search) params.set('search', search);
+    if (linked) params.set('linked', linked);
+    if (orcid) params.set('has_orcid', orcid);
+    if (idhal) params.set('has_idhal', idhal);
+
+    const data = await api('/api/authorships?' + params);
+    document.getElementById('result-count').textContent = data.total + ' auteurs';
+
+    const container = document.getElementById('table-container');
+    if (!data.authors.length) {
+        container.innerHTML = '<div class="empty">Aucun auteur trouvé.</div>';
+        document.getElementById('pagination').innerHTML = '';
+        return;
+    }
+
+    let html = '<table class="data-table"><thead><tr>'
+        + '<th></th><th>Nom</th><th>Identifiants</th><th>Sources</th>'
+        + '<th>Publis UCA</th><th>Identité</th>'
+        + '</tr></thead><tbody>';
+
+    data.authors.forEach(a => {
+        // Identifiants
+        let ids = '';
+        if (a.orcid) ids += '<span class="tag tag-id" title="ORCID">' + esc(a.orcid) + '</span>';
+        if (a.idhal) ids += '<span class="tag tag-id" title="idHAL">' + esc(a.idhal) + '</span>';
+        if (!a.orcid && !a.idhal) ids = '<span style="color:var(--text-muted);font-size:11px">aucun</span>';
+
+        // Sources
+        const sourceTag = '<span class="tag tag-source">' + esc(a.source) + '</span>';
+
+        // Personne liée
+        let personHtml;
+        if (a.person) {
+            const p = a.person;
+            personHtml = '<span class="person-link">'
+                + '<span class="tag tag-linked">' + esc(p.first_name) + ' ' + esc(p.last_name) + '</span>'
+                + (p.department_name ? '<span style="font-size:10px;color:var(--text-muted)">' + esc(p.department_name) + '</span>' : '')
+                + '</span>';
+        } else {
+            personHtml = '<span class="tag tag-unlinked">non résolue</span>';
+        }
+
+        html += '<tr>'
+            + '<td><button class="btn-expand" onclick="toggleDetail(\'' + a.source + '\',' + a.id + ', this)" title="Détails">▶</button></td>'
+            + '<td><strong>' + esc(a.full_name) + '</strong></td>'
+            + '<td>' + ids + '</td>'
+            + '<td>' + sourceTag + '</td>'
+            + '<td>' + a.uca_pub_count + '</td>'
+            + '<td>' + personHtml + '</td>'
+            + '</tr>';
+        html += '<tr class="detail-row" id="det-' + a.source + '-' + a.id + '" style="display:none"><td colspan="6"></td></tr>';
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+    renderPagination(data);
+}
+
+async function toggleDetail(source, authorId, btn) {
+    const row = document.getElementById('det-' + source + '-' + authorId);
+    if (row.style.display !== 'none') {
+        row.style.display = 'none';
+        btn.textContent = '▶';
+        return;
+    }
+    btn.textContent = '▼';
+    row.style.display = '';
+    const cell = row.querySelector('td');
+    cell.innerHTML = '<span style="color:var(--text-muted)">Chargement…</span>';
+
+    const data = await api('/api/authors/' + source + '/' + authorId + '/details');
+
+    let html = '<div class="detail-panel">';
+
+    if (data.signatures.length) {
+        html += '<h5>Signatures (' + data.signatures.length + ')</h5><ul class="sig-list">';
+        data.signatures.forEach(s => {
+            html += '<li><span class="sig-source">' + esc(s.source) + '</span>'
+                + '<span class="sig-text">' + esc(s.raw_affiliation) + '</span></li>';
+        });
+        html += '</ul>';
+    } else {
+        html += '<h5>Signatures</h5><div style="color:var(--text-muted);margin-bottom:8px">Aucune</div>';
+    }
+
+    if (data.publications.length) {
+        html += '<h5>Publications UCA récentes (' + data.publications.length + ')</h5><ul class="pub-list">';
+        data.publications.forEach(p => {
+            html += '<li>'
+                + '<span class="pub-year">' + (p.pub_year || '?') + '</span>'
+                + '<span class="pub-title">' + esc(p.title) + '</span>'
+                + (p.doi ? ' <a href="https://doi.org/' + esc(p.doi) + '" target="_blank" style="font-size:10px;color:var(--accent)">DOI</a>' : '')
+                + '</li>';
+        });
+        html += '</ul>';
+    }
+
+    html += '</div>';
+    cell.innerHTML = html;
+}
+
+function renderPagination(data) {
+    const container = document.getElementById('pagination');
+    if (data.pages <= 1) { container.innerHTML = ''; return; }
+    const cur = data.page;
+    let html = '<button ' + (cur <= 1 ? 'disabled' : '') + ' onclick="goPage(' + (cur-1) + ')">‹</button>';
+    const s = Math.max(1, cur - 3), e = Math.min(data.pages, cur + 3);
+    if (s > 1) html += '<button onclick="goPage(1)">1</button>';
+    if (s > 2) html += '<button disabled>…</button>';
+    for (let i = s; i <= e; i++)
+        html += '<button class="' + (i === cur ? 'active' : '') + '" onclick="goPage(' + i + ')">' + i + '</button>';
+    if (e < data.pages - 1) html += '<button disabled>…</button>';
+    if (e < data.pages) html += '<button onclick="goPage(' + data.pages + ')">' + data.pages + '</button>';
+    html += '<button ' + (cur >= data.pages ? 'disabled' : '') + ' onclick="goPage(' + (cur+1) + ')">›</button>';
+    container.innerHTML = html;
+}
+
+function goPage(p) { currentPage = p; loadTable(); window.scrollTo(0, 0); }
+</script>
+
+</body>
+</html>

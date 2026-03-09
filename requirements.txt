@@ -1,0 +1,5 @@
+# publisher-stats — dépendances Python
+requests>=2.31
+psycopg2-binary>=2.9
+fastapi>=0.100
+uvicorn>=0.23

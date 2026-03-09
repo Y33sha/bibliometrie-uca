@@ -1,0 +1,229 @@
+{
+  "universite": {
+    "formes_acceptees": [
+      "Université Clermont Auvergne",
+      "Clermont Auvergne University",
+      "University Clermont Auvergne",
+      "Clermont-Auvergne University",
+      "Université Clermont-Auvergne",
+      "University of Clermont Auvergne",
+      "Univ. Clermont Auvergne",
+      "Univ Clermont Auvergne",
+      "Universite Clermont Auvergne",
+      "Clermont Auvergne Univ",
+      "Université de Clermont Auvergne"
+    ],
+    "formes_obsoletes": [
+      "Université d'Auvergne",
+      "Université Blaise Pascal",
+      "Université de Clermont I",
+      "Université Clermont I",
+      "Université Clermont 1",
+      "Université Clermont 2",
+      "Université Clermont II",
+      "Clermont Université",
+      "Univ Auvergne",
+      "Univ Blaise Pascal",
+      "\\bUdA\\b",
+      "\\bUBP\\b",
+      "\\bUCA\\b",
+      "Auvergne Université"
+    ]
+  },
+  "inp": {
+    "formes_acceptees": [
+      "Clermont Auvergne INP",
+      "Clermont Auvergne Institut National Polytechnique"
+    ]
+  },
+  "chu": {
+    "indicateurs_chu": [
+      "\\bchu\\b",
+      "centre hospitalier universitaire",
+      "university hospital",
+      "center hosp univ",
+      "univ hosp",
+      "ctr hosp univ",
+      "center hospital université",
+      "center invest clinical",
+      "ctr hospitalier univ",
+      "centre d'investigation clinique",
+      "center rech nutr humaine",
+      "centre de recherche en nutrition humaine",
+      "crnh"
+    ],
+    "indicateurs_clermont": [
+      "clermont",
+      "estaing",
+      "montpied"
+    ],
+    "entites_chu_clermont": [
+      "centre jean perrin",
+      "center jean perrin",
+      "ctr jean perrin",
+      "crnh auvergne",
+      "cic 501",
+      "cic 1405",
+      "umr 501"
+    ]
+  },
+  "localisation": {
+    "code_postal_correct": "F-63000",
+    "ville": "Clermont-Ferrand",
+    "pays": "France",
+    "patterns": {
+      "postal_correct": "F-63000\\s+Clermont[-–—]\\s*Ferrand",
+      "postal_avec_virgule": "F-63000\\s*,\\s*Clermont[-–—]\\s*Ferrand",
+      "postal_partiel": "63000\\s+Clermont[-–—‐]?\\s*Ferrand"
+    }
+  },
+  "tutelles_courantes": {
+    "CNRS": {
+      "acronyme": "CNRS",
+      "nom_complet": "Centre National de la Recherche Scientifique",
+      "formes": {
+        "CNRS": {"accepte": true, "ambigu": false},
+        "Centre National de la Recherche Scientifique": {"accepte": true, "ambigu": false},
+        "Ctr Natl Rech Sci": {"accepte": true, "ambigu": false},
+        "Natl Ctr Sci Res": {"accepte": true, "ambigu": false},
+        "French National Centre for Scientific Research": {"accepte": true, "ambigu": false}
+      }
+    },
+    "INRAE": {
+      "acronyme": "INRAE",
+      "nom_complet": "Institut National de Recherche pour l'Agriculture, l'Alimentation et l'Environnement",
+      "formes": {
+        "INRAE": {"accepte": true, "ambigu": false},
+        "Institut National de Recherche pour l'Agriculture, l'Alimentation et l'Environnement": {"accepte": true, "ambigu": false},
+        "Inst Natl Rech Agr Alimentat & Environm": {"accepte": true, "ambigu": false},
+        "National Research Institute for Agriculture, Food and Environment": {"accepte": true, "ambigu": false}
+      }
+    },
+    "Inserm": {
+      "acronyme": "Inserm",
+      "nom_complet": "Institut National de la Santé et de la Recherche Médicale",
+      "formes": {
+        "Inserm": {"accepte": true, "ambigu": false},
+        "INSERM": {"accepte": true, "ambigu": false},
+        "Institut National de la Santé et de la Recherche Médicale": {"accepte": true, "ambigu": false},
+        "Institut National de la Sante et de la Recherche Medicale": {"accepte": true, "ambigu": false},
+        "Inst Natl Sante & Rech Med": {"accepte": true, "ambigu": false},
+        "French National Institute of Health and Medical Research": {"accepte": true, "ambigu": false}
+      }
+    },
+    "IRD": {
+      "acronyme": "IRD",
+      "nom_complet": "Institut de Recherche pour le Développement",
+      "formes": {
+        "IRD": {"accepte": true, "ambigu": false},
+        "Institut de Recherche pour le Développement": {"accepte": true, "ambigu": false},
+        "Institut de Recherche pour le Developpement": {"accepte": true, "ambigu": false},
+        "Inst Rech Dev": {"accepte": true, "ambigu": false}
+      }
+    },
+    "CNRS-INSU": {
+      "acronyme": "CNRS-INSU",
+      "nom_complet": "Centre National de la Recherche Scientifique - Institut National des Sciences de l'Univers",
+      "formes": {
+        "CNRS-INSU": {"accepte": true, "ambigu": false},
+        "INSU": {"accepte": true, "ambigu": true}
+      }
+    },
+    "AgroParisTech": {
+      "nom_complet": "AgroParisTech",
+      "formes": {
+        "AgroParisTech": {"accepte": true, "ambigu": false},
+        "Agro ParisTech": {"accepte": true, "ambigu": false}
+      }
+    },
+    "VetAgro Sup": {
+      "nom_complet": "VetAgro Sup",
+      "formes": {
+        "VetAgro Sup": {"accepte": true, "ambigu": false},
+        "VetAgroSup": {"accepte": true, "ambigu": false},
+        "Vet Agro Sup": {"accepte": true, "ambigu": false}
+      }
+    },
+    "École normale supérieure de Lyon": {
+      "acronyme": "ENS Lyon",
+      "nom_complet": "École normale supérieure de Lyon",
+      "formes": {
+        "École normale supérieure de Lyon": {"accepte": true, "ambigu": false},
+        "Ecole normale supérieure de Lyon": {"accepte": true, "ambigu": false},
+        "Ecole Normale Superieure de Lyon": {"accepte": true, "ambigu": false},
+        "ENS Lyon": {"accepte": true, "ambigu": false},
+        "ENS de Lyon": {"accepte": true, "ambigu": false}
+      }
+    },
+    "Université Jean Moulin Lyon 3": {
+      "nom_complet": "Université Jean Moulin Lyon 3",
+      "formes": {
+        "Université Jean Moulin Lyon 3": {"accepte": true, "ambigu": false},
+        "Universite Jean Moulin Lyon 3": {"accepte": true, "ambigu": false},
+        "Univ Jean Moulin Lyon 3": {"accepte": true, "ambigu": false},
+        "Jean Moulin Lyon 3": {"accepte": true, "ambigu": false},
+        "Université Lyon 3": {"accepte": true, "ambigu": false},
+        "University Jean Moulin Lyon 3": {"accepte": true, "ambigu": false}
+      }
+    },
+    "Université Lumière Lyon 2": {
+      "nom_complet": "Université Lumière Lyon 2",
+      "formes": {
+        "Université Lumière Lyon 2": {"accepte": true, "ambigu": false},
+        "Universite Lumiere Lyon 2": {"accepte": true, "ambigu": false},
+        "Univ Lumiere Lyon 2": {"accepte": true, "ambigu": false},
+        "Université Lyon 2": {"accepte": true, "ambigu": false},
+        "University Lumiere Lyon 2": {"accepte": true, "ambigu": false}
+      }
+    },
+    "ENS MSE": {
+      "acronyme": "EMSE",
+      "nom_complet": "Ecole Nationale Supérieure des Mines de Saint-Etienne",
+      "formes": {
+        "Ecole Nationale Supérieure des Mines de Saint-Etienne": {"accepte": true, "ambigu": false},
+        "Ecole Nationale Superieure des Mines de Saint-Etienne": {"accepte": true, "ambigu": false},
+        "Mines Saint-Etienne": {"accepte": true, "ambigu": false},
+        "Mines St-Etienne": {"accepte": true, "ambigu": false},
+        "Mines St Etienne": {"accepte": true, "ambigu": false},
+        "ENS MSE": {"accepte": true, "ambigu": false},
+        "EMSE": {"accepte": true, "ambigu": true},
+        "Ecole des Mines de Saint-Etienne": {"accepte": true, "ambigu": false},
+        "Ecole Mines St Etienne": {"accepte": true, "ambigu": false}
+      }
+    },
+    "ESC Clermont Business School": {
+      "nom_complet": "ESC Clermont Business School",
+      "formes": {
+        "ESC Clermont Business School": {"accepte": true, "ambigu": false},
+        "ESC Clermont": {"accepte": true, "ambigu": false},
+        "Clermont Business School": {"accepte": true, "ambigu": false}
+      }
+    },
+    "ENSACF": {
+      "acronyme": "ENSACF",
+      "nom_complet": "Ecole nationale supérieure d'architecture de Clermont-Ferrand",
+      "formes": {
+        "ENSACF": {"accepte": true, "ambigu": false},
+        "Ecole nationale supérieure d'architecture de Clermont-Ferrand": {"accepte": true, "ambigu": false},
+        "Ecole nationale superieure d'architecture de Clermont-Ferrand": {"accepte": true, "ambigu": false},
+        "Ecole Natl Super Architecture Clermont-Ferrand": {"accepte": true, "ambigu": false}
+      }
+    }
+  },
+  "partenaires_supplementaires": {
+    "CHU Clermont-Ferrand": "Centre Hospitalier Universitaire de Clermont-Ferrand",
+    "Centre Jean Perrin": "Centre Jean Perrin"
+  },
+  "commentaires": {
+    "_info": "Fichier de configuration pour la validation des signatures UCA",
+    "_version": "1.0",
+    "_date": "2026-01-31",
+    "_usage": [
+      "formes_acceptees : variantes officielles acceptées",
+      "formes_obsoletes : anciennes formes à détecter mais rejeter",
+      "indicateurs_generiques : patterns regex pour détection générique (attention aux \\b pour word boundaries)",
+      "tutelles_courantes : tutelles avec formes acceptées/rejetées (même modèle que les formes de labo)",
+      "partenaires_supplementaires : établissements partenaires non-tutelles"
+    ]
+  }
+}

@@ -1,0 +1,671 @@
+"""
+Normalisation des données OpenAlex : staging_openalex → tables v2.
+
+Usage:
+    python normalize_openalex.py              # traiter tous les works non traités
+    python normalize_openalex.py --limit 100  # traiter N works (pour test)
+    python normalize_openalex.py --reset      # remettre tous les works à processed=FALSE
+
+Tables peuplées :
+    publishers, journals, publications          (tables de vérité — partagées)
+    openalex_documents                          (lien staging ↔ publication)
+    openalex_authors                            (auteurs OpenAlex dédupliqués)
+    openalex_authorships                        (lien document × auteur)
+    openalex_institutions                       (institutions OpenAlex)
+
+Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
+"""
+
+import argparse
+import logging
+import os
+import re
+import sys
+import unicodedata
+
+import psycopg2
+from psycopg2.extras import Json
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from db.connection import get_connection
+
+# ----- Logging -----
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(
+            os.path.join(os.path.dirname(__file__), "normalize_openalex.log")
+        ),
+    ],
+)
+logger = logging.getLogger(__name__)
+
+
+# =============================================================
+# MAPPINGS
+# =============================================================
+
+# OpenAlex type → notre enum doc_type
+DOCTYPE_MAP = {
+    "article": "article",
+    "review": "review",
+    "book": "book",
+    "book-chapter": "book_chapter",
+    "proceedings-article": "conference_paper",
+    "posted-content": "preprint",
+    "dissertation": "thesis",
+    "editorial": "editorial",
+    "report": "report",
+    "letter": "article",
+    "erratum": "other",
+    "paratext": "other",
+    "peer-review": "other",
+    "standard": "other",
+    "dataset": "other",
+    "grant": "other",
+    "supplementary-materials": "other",
+    "other": "other",
+}
+
+# OpenAlex OA status → notre enum oa_type
+OA_MAP = {
+    "gold": "gold",
+    "hybrid": "hybrid",
+    "bronze": "bronze",
+    "green": "green",
+    "closed": "closed",
+}
+
+
+# =============================================================
+# UTILITAIRES
+# =============================================================
+
+def normalize_text(text: str) -> str:
+    """Normalise un texte pour comparaison/dédoublonnage."""
+    if not text:
+        return ""
+    text = text.lower().strip()
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^a-z0-9\s]", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def clean_doi(doi: str | None) -> str | None:
+    """Nettoie un DOI."""
+    if not doi:
+        return None
+    doi = doi.replace("https://doi.org/", "").strip()
+    return doi if doi else None
+
+
+def extract_short_id(url: str, prefix: str = "https://openalex.org/") -> str:
+    """Extrait l'ID court d'une URL OpenAlex."""
+    if url and url.startswith(prefix):
+        return url.replace(prefix, "")
+    return url or ""
+
+
+def is_hal_primary_location(work: dict) -> bool:
+    """Vérifie si la primary_location d'un work OpenAlex pointe vers HAL."""
+    location = work.get("primary_location") or {}
+    url = location.get("landing_page_url") or ""
+    source = location.get("source") or {}
+    source_url = source.get("homepage_url") or ""
+    source_type = source.get("type") or ""
+    if "hal.science" in url or "hal.archives-ouvertes.fr" in url:
+        return True
+    if source_type == "repository" and ("hal" in source_url.lower() or "hal" in (source.get("display_name") or "").lower()):
+        return True
+    return False
+
+
+def extract_hal_id_from_url(url: str) -> str | None:
+    """Extrait le halId depuis une URL HAL."""
+    if not url:
+        return None
+    match = re.search(r'((?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+)', url)
+    return match.group(1) if match else None
+
+
+def find_hal_publication_id(cur, work: dict) -> int | None:
+    """
+    Si le work OpenAlex pointe vers un document HAL existant,
+    retourne le publication_id associé (pour éviter les doublons).
+    """
+    location = work.get("primary_location") or {}
+    url = location.get("landing_page_url") or ""
+    hal_id = extract_hal_id_from_url(url)
+    if not hal_id:
+        return None
+
+    cur.execute(
+        "SELECT publication_id FROM hal_documents WHERE halid = %s",
+        (hal_id,)
+    )
+    row = cur.fetchone()
+    if row and row[0]:
+        return row[0]
+    return None
+
+
+def is_repository_source(work: dict) -> bool:
+    """Vérifie si la primary_location est un repository (SPIRE, Zenodo, etc.)."""
+    location = work.get("primary_location") or {}
+    source = location.get("source") or {}
+    return source.get("type") == "repository"
+
+
+# =============================================================
+# PUBLISHERS & JOURNALS (inchangés — tables de vérité partagées)
+# =============================================================
+
+def upsert_publisher(cur, work: dict) -> int | None:
+    """
+    Extrait et insère l'éditeur depuis primary_location.source.host_organization.
+    Retourne le publisher.id ou None.
+    """
+    location = work.get("primary_location") or {}
+    source = location.get("source") or {}
+
+    publisher_name = source.get("host_organization_name")
+    if not publisher_name:
+        return None
+
+    openalex_id = extract_short_id(source.get("host_organization") or "")
+    name_normalized = normalize_text(publisher_name)
+
+    cur.execute("""
+        INSERT INTO publishers (name, name_normalized, openalex_id)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (openalex_id) DO UPDATE SET
+            name = COALESCE(NULLIF(publishers.name, ''), EXCLUDED.name)
+        RETURNING id
+    """, (publisher_name, name_normalized, openalex_id or None))
+
+    row = cur.fetchone()
+    if row:
+        return row[0]
+
+    # Si pas d'openalex_id, chercher/insérer par nom normalisé
+    if not openalex_id:
+        cur.execute(
+            "SELECT id FROM publishers WHERE name_normalized = %s LIMIT 1",
+            (name_normalized,)
+        )
+        row = cur.fetchone()
+        if row:
+            return row[0]
+        cur.execute("""
+            INSERT INTO publishers (name, name_normalized)
+            VALUES (%s, %s)
+            RETURNING id
+        """, (publisher_name, name_normalized))
+        return cur.fetchone()[0]
+
+    return None
+
+
+def upsert_journal(cur, work: dict, publisher_id: int | None) -> int | None:
+    """
+    Extrait et insère la revue depuis primary_location.source.
+    Retourne le journal.id ou None.
+    """
+    location = work.get("primary_location") or {}
+    source = location.get("source") or {}
+
+    title = source.get("display_name")
+    if not title:
+        return None
+
+    openalex_id = extract_short_id(source.get("id") or "")
+    issn_l = source.get("issn_l")
+    issns = source.get("issn") or []
+    issn = None
+    eissn = None
+    for i in issns:
+        if i != issn_l:
+            if not issn:
+                issn = i
+            elif not eissn:
+                eissn = i
+
+    source_type = source.get("type")
+    oa_model = None
+    if source_type == "journal":
+        is_oa = source.get("is_oa", False)
+        oa_model = "full_oa" if is_oa else "subscription"
+    elif source_type == "repository":
+        oa_model = "repository"
+
+    title_normalized = normalize_text(title)
+
+    if openalex_id:
+        cur.execute("""
+            INSERT INTO journals (title, title_normalized, issn, eissn, issnl,
+                                  publisher_id, openalex_id, oa_model)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (openalex_id) DO UPDATE SET
+                title = COALESCE(NULLIF(journals.title, ''), EXCLUDED.title),
+                issnl = COALESCE(journals.issnl, EXCLUDED.issnl),
+                issn = COALESCE(journals.issn, EXCLUDED.issn),
+                eissn = COALESCE(journals.eissn, EXCLUDED.eissn),
+                publisher_id = COALESCE(journals.publisher_id, EXCLUDED.publisher_id),
+                oa_model = COALESCE(journals.oa_model, EXCLUDED.oa_model)
+            RETURNING id
+        """, (title, title_normalized, issn, eissn, issn_l,
+              publisher_id, openalex_id, oa_model))
+        return cur.fetchone()[0]
+
+    if issn_l:
+        cur.execute("SELECT id FROM journals WHERE issnl = %s LIMIT 1", (issn_l,))
+        row = cur.fetchone()
+        if row:
+            return row[0]
+
+    cur.execute("SELECT id FROM journals WHERE title_normalized = %s LIMIT 1",
+                (title_normalized,))
+    row = cur.fetchone()
+    if row:
+        return row[0]
+
+    cur.execute("""
+        INSERT INTO journals (title, title_normalized, issn, eissn, issnl,
+                              publisher_id, oa_model)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+    """, (title, title_normalized, issn, eissn, issn_l, publisher_id, oa_model))
+    return cur.fetchone()[0]
+
+
+# =============================================================
+# PUBLICATIONS (inchangé — table de vérité)
+# =============================================================
+
+def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
+    """
+    Insère la publication dans la table unifiée.
+    Retourne le publication.id.
+    """
+    doi = clean_doi(work.get("doi"))
+    title = work.get("title") or work.get("display_name") or ""
+    title_normalized = normalize_text(title)
+    pub_year = work.get("publication_year")
+
+    if not pub_year or not title:
+        return None
+
+    raw_type = work.get("type") or "other"
+    doc_type = DOCTYPE_MAP.get(raw_type, "other")
+
+    oa_info = work.get("open_access") or {}
+    raw_oa = oa_info.get("oa_status") or "closed"
+    oa_status = OA_MAP.get(raw_oa, "unknown")
+
+    language = work.get("language")
+
+    container_title = None
+    if not journal_id:
+        location = work.get("primary_location") or {}
+        source = location.get("source") or {}
+        container_title = source.get("display_name")
+
+    if doi:
+        cur.execute("""
+            INSERT INTO publications
+                (title, title_normalized, doc_type, pub_year, doi,
+                 oa_status, journal_id, container_title, language)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (doi) DO UPDATE SET
+                journal_id = COALESCE(publications.journal_id, EXCLUDED.journal_id),
+                oa_status = CASE
+                    WHEN publications.oa_status = 'unknown' THEN EXCLUDED.oa_status
+                    ELSE publications.oa_status
+                END,
+                updated_at = now()
+            RETURNING id
+        """, (title, title_normalized, doc_type, pub_year, doi,
+              oa_status, journal_id, container_title, language))
+        return cur.fetchone()[0]
+    else:
+        # Chercher par titre+année+même journal
+        # Uniquement pour les articles, et seulement si journal_id est connu
+        # (aucun NULL dans les critères de fusion)
+        if doc_type == "article" and journal_id:
+            cur.execute("""
+                SELECT id FROM publications
+                WHERE title_normalized = %s AND pub_year = %s
+                  AND journal_id = %s
+                LIMIT 1
+            """, (title_normalized, pub_year, journal_id))
+            row = cur.fetchone()
+            if row:
+                return row[0]
+
+        cur.execute("""
+            INSERT INTO publications
+                (title, title_normalized, doc_type, pub_year,
+                 oa_status, journal_id, container_title, language)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (title, title_normalized, doc_type, pub_year,
+              oa_status, journal_id, container_title, language))
+        return cur.fetchone()[0]
+
+
+# =============================================================
+# OPENALEX DOCUMENTS (nouveau — remplace publication_sources)
+# =============================================================
+
+def insert_openalex_document(cur, work: dict, staging_id: int,
+                             publication_id: int) -> int:
+    """
+    Crée/retrouve l'entrée openalex_documents.
+    Retourne openalex_document.id.
+    """
+    openalex_id = extract_short_id(work["id"])
+    doi = clean_doi(work.get("doi"))
+    title = work.get("title") or work.get("display_name") or ""
+    pub_year = work.get("publication_year")
+    doc_type = work.get("type")
+
+    cur.execute("""
+        INSERT INTO openalex_documents
+            (openalex_id, doi, title, pub_year, doc_type,
+             publication_id, staging_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (openalex_id) DO UPDATE SET
+            publication_id = COALESCE(
+                openalex_documents.publication_id, EXCLUDED.publication_id
+            )
+        RETURNING id
+    """, (openalex_id, doi, title, pub_year, doc_type,
+          publication_id, staging_id))
+    return cur.fetchone()[0]
+
+
+# =============================================================
+# OPENALEX AUTHORS (nouveau — remplace upsert dans authors)
+# =============================================================
+
+def upsert_openalex_author(cur, authorship: dict) -> int | None:
+    """
+    Insère/retrouve un auteur OpenAlex.
+    Déduplique par openalex_id (clé unique).
+    Retourne openalex_authors.id ou None.
+    """
+    author_data = authorship.get("author") or {}
+    display_name = author_data.get("display_name")
+    if not display_name:
+        return None
+
+    openalex_id = extract_short_id(author_data.get("id") or "")
+    if not openalex_id:
+        return None
+
+    orcid = author_data.get("orcid")
+    if orcid:
+        orcid = orcid.replace("https://orcid.org/", "").strip()
+        if not orcid:
+            orcid = None
+
+    # Séparer nom/prénom (heuristique : dernier mot = nom)
+    parts = display_name.strip().split()
+    if len(parts) >= 2:
+        first_name = " ".join(parts[:-1])
+        last_name = parts[-1]
+    else:
+        first_name = None
+        last_name = display_name
+
+    cur.execute("""
+        INSERT INTO openalex_authors
+            (openalex_id, full_name, last_name, first_name, orcid)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (openalex_id) DO UPDATE SET
+            orcid = COALESCE(openalex_authors.orcid, EXCLUDED.orcid),
+            full_name = EXCLUDED.full_name,
+            updated_at = now()
+        RETURNING id
+    """, (openalex_id, display_name, last_name, first_name, orcid))
+    return cur.fetchone()[0]
+
+
+# =============================================================
+# OPENALEX INSTITUTIONS (nouveau)
+# =============================================================
+
+def upsert_openalex_institution(cur, institution: dict) -> str | None:
+    """
+    Insère/retrouve une institution OpenAlex.
+    Retourne l'openalex_id court (ex: I123456) ou None.
+    """
+    inst_id_url = institution.get("id")
+    if not inst_id_url:
+        return None
+
+    openalex_id = extract_short_id(inst_id_url)
+    name = institution.get("display_name") or ""
+    ror_id = institution.get("ror")
+    country_code = institution.get("country_code")
+    inst_type = institution.get("type")
+
+    if not name:
+        return openalex_id
+
+    cur.execute("""
+        INSERT INTO openalex_institutions
+            (openalex_id, name, ror_id, country_code, type)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (openalex_id) DO UPDATE SET
+            name = COALESCE(NULLIF(openalex_institutions.name, ''), EXCLUDED.name),
+            ror_id = COALESCE(openalex_institutions.ror_id, EXCLUDED.ror_id),
+            updated_at = now()
+        RETURNING openalex_id
+    """, (openalex_id, name, ror_id, country_code, inst_type))
+    row = cur.fetchone()
+    return row[0] if row else openalex_id
+
+
+# =============================================================
+# OPENALEX AUTHORSHIPS (nouveau — remplace publication_authors)
+# =============================================================
+
+def process_authorships(cur, work: dict, oa_document_id: int):
+    """
+    Traite les authorships d'un work OpenAlex :
+    - Insère/retrouve chaque auteur dans openalex_authors
+    - Crée les liens openalex_authorships
+    - Extrait et insère les institutions dans openalex_institutions
+    - Stocke les openalex_institution_ids sur chaque authorship
+    """
+    authorships = work.get("authorships") or []
+
+    for position, authorship in enumerate(authorships):
+        oa_author_id = upsert_openalex_author(cur, authorship)
+        if not oa_author_id:
+            continue
+
+        # Affiliations brutes
+        raw_strings = authorship.get("raw_affiliation_strings") or []
+        if raw_strings:
+            raw_affil_text = " | ".join(raw_strings)
+        else:
+            institutions = authorship.get("institutions") or []
+            inst_names = [i.get("display_name") for i in institutions if i.get("display_name")]
+            raw_affil_text = " | ".join(inst_names) if inst_names else None
+
+        # Institutions OpenAlex
+        institution_ids = []
+        for inst in (authorship.get("institutions") or []):
+            inst_oa_id = upsert_openalex_institution(cur, inst)
+            if inst_oa_id:
+                institution_ids.append(inst_oa_id)
+
+        cur.execute("""
+            INSERT INTO openalex_authorships
+                (openalex_document_id, openalex_author_id, author_position,
+                 raw_affiliation, openalex_institution_ids)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (openalex_document_id, openalex_author_id) DO UPDATE SET
+                raw_affiliation = COALESCE(
+                    EXCLUDED.raw_affiliation,
+                    openalex_authorships.raw_affiliation
+                )
+        """, (oa_document_id, oa_author_id, position,
+              raw_affil_text, institution_ids or None))
+
+
+# =============================================================
+# BOUCLE PRINCIPALE
+# =============================================================
+
+def process_work(cur, staging_row: tuple) -> bool:
+    """
+    Traite un work du staging OpenAlex.
+    Retourne True si traité avec succès.
+    """
+    staging_id, openalex_id, doi, raw_data = staging_row
+    work = raw_data
+
+    try:
+        # Détecter si la primary_location pointe vers HAL ou un repository
+        hal_location = is_hal_primary_location(work)
+        repo_location = is_repository_source(work)
+
+        if hal_location:
+            publisher_id = None
+            journal_id = None
+        elif repo_location:
+            publisher_id = None
+            journal_id = None
+        else:
+            publisher_id = upsert_publisher(cur, work)
+            journal_id = upsert_journal(cur, work, publisher_id)
+
+        # Si primary_location pointe vers HAL, réutiliser la publication HAL
+        publication_id = None
+        if hal_location:
+            publication_id = find_hal_publication_id(cur, work)
+
+        # Publication (table de vérité) — fallback si pas trouvée via HAL
+        if not publication_id:
+            publication_id = insert_publication(cur, work, journal_id)
+        if not publication_id:
+            logger.warning(f"Impossible d'insérer {openalex_id} — titre ou année manquant")
+            return False
+
+        # Document OpenAlex (remplace l'ancienne publication_sources)
+        oa_document_id = insert_openalex_document(
+            cur, work, staging_id, publication_id
+        )
+
+        # Auteurs et authorships
+        process_authorships(cur, work, oa_document_id)
+
+        # Marquer comme traité
+        cur.execute(
+            "UPDATE staging_openalex SET processed = TRUE WHERE id = %s",
+            (staging_id,)
+        )
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Erreur sur {openalex_id}: {e}")
+        raise
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Normalisation OpenAlex → tables v2")
+    parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
+    parser.add_argument("--reset", action="store_true",
+                        help="Remettre tous les works à processed=FALSE")
+    parser.add_argument("--batch-size", type=int, default=500,
+                        help="Taille du commit batch (défaut: 500)")
+    args = parser.parse_args()
+
+    conn = get_connection()
+    conn.autocommit = False
+
+    try:
+        cur = conn.cursor()
+
+        if args.reset:
+            cur.execute("UPDATE staging_openalex SET processed = FALSE")
+            count = cur.rowcount
+            conn.commit()
+            logger.info(f"Reset : {count} works remis à processed=FALSE")
+            return
+
+        cur.execute("SELECT COUNT(*) FROM staging_openalex WHERE processed = FALSE")
+        total = cur.fetchone()[0]
+        logger.info(f"=== Normalisation OpenAlex : {total} works à traiter ===")
+
+        if total == 0:
+            logger.info("Rien à faire.")
+            return
+
+        limit = args.limit or total
+        limit = min(limit, total)
+        logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
+
+        cur.execute("""
+            SELECT id, openalex_id, doi, raw_data
+            FROM staging_openalex
+            WHERE processed = FALSE
+            ORDER BY id
+            LIMIT %s
+        """, (limit,))
+
+        rows = cur.fetchall()
+        processed = 0
+        errors = 0
+
+        for row in rows:
+            try:
+                success = process_work(cur, row)
+                if success:
+                    processed += 1
+                else:
+                    errors += 1
+            except Exception:
+                conn.rollback()
+                errors += 1
+                continue
+
+            if processed % args.batch_size == 0:
+                conn.commit()
+                logger.info(f"  {processed}/{limit} traités ({errors} erreurs)")
+
+        conn.commit()
+
+        # Stats finales
+        logger.info(f"\n=== Terminé ===")
+        logger.info(f"Traités avec succès : {processed}")
+        logger.info(f"Erreurs : {errors}")
+
+        for table in ["publications", "journals", "publishers",
+                       "openalex_documents", "openalex_authors",
+                       "openalex_authorships", "openalex_institutions"]:
+            cur.execute(f"SELECT COUNT(*) FROM {table}")
+            count = cur.fetchone()[0]
+            logger.info(f"  {table} : {count} enregistrements")
+
+    except KeyboardInterrupt:
+        conn.commit()
+        logger.warning("Interruption — données déjà traitées conservées.")
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Erreur fatale : {e}")
+        raise
+    finally:
+        conn.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,1334 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { base } from '$app/paths';
+	import { api } from '$lib/api';
+
+	/* ── Types ── */
+
+	interface Structure {
+		id: number;
+		code: string;
+		name: string;
+		acronym: string | null;
+		type: string;
+		ror_id: string | null;
+		rnsr_id: string | null;
+		hal_collection: string | null;
+	}
+
+	interface RelatedStructure {
+		id: number;
+		code: string;
+		name: string;
+		acronym: string | null;
+		type: string;
+		relation_id: number;
+		relation_type: string;
+	}
+
+	interface NameForm {
+		id: number;
+		form_text: string;
+		is_regex: boolean;
+		is_active: boolean;
+		requires_context_of: (number | string)[] | null;
+	}
+
+	interface StructureDetail {
+		structure: Structure;
+		parents: RelatedStructure[];
+		children: RelatedStructure[];
+		forms: NameForm[];
+	}
+
+	/* ── State ── */
+
+	let allStructures: Structure[] = $state([]);
+	let allStructuresCache: Structure[] = $state([]);
+	let selectedId: number | null = $state(null);
+
+	let search = $state('');
+	let typeFilter = $state('');
+	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	// Detail state
+	let detail: StructureDetail | null = $state(null);
+
+	// Relation picker state
+	let relationPickerOpen = $state(false);
+	let relationPickerSearch = $state('');
+	let pickerRelType = $state('');
+	let pickerDirection = $state('');
+	let pickerStructId: number | null = $state(null);
+	let relationPickerEl: HTMLDivElement | undefined = $state();
+
+	// Context picker state
+	let ctxPickerOpen = $state(false);
+	let ctxPickerSearch = $state('');
+	let ctxPickerFormId: number | null = $state(null);
+	let ctxPickerCurrentCtx: (number | string)[] = $state([]);
+	let ctxPickerEl: HTMLDivElement | undefined = $state();
+
+	// New form state
+	let addFormText = $state('');
+	let addFormRegex = $state(false);
+	let newFormCtx: (number | string)[] = $state([]);
+
+	// Create modal state
+	let createModalOpen = $state(false);
+	let mCode = $state('');
+	let mName = $state('');
+	let mAcronym = $state('');
+	let mType = $state('labo');
+	let mRor = $state('');
+	let mHal = $state('');
+
+	// Forms data lookup (for context editing)
+	let formsData: Record<number, (number | string)[]> = $state({});
+
+	// Related IDs set for picker exclusion
+	let pickerExclude: Set<number> = $state(new Set());
+
+	/* ── Derived ── */
+
+	const structLookup = $derived.by(() => {
+		const lookup: Record<number, string> = {};
+		for (const s of allStructuresCache) {
+			lookup[s.id] = s.acronym || s.code || s.name;
+		}
+		return lookup;
+	});
+
+	const relationPickerResults = $derived.by(() => {
+		const q = relationPickerSearch.toLowerCase();
+		return allStructuresCache
+			.filter(
+				(s) =>
+					!pickerExclude.has(s.id) &&
+					(s.name.toLowerCase().includes(q) ||
+						(s.acronym || '').toLowerCase().includes(q) ||
+						s.code.toLowerCase().includes(q))
+			)
+			.slice(0, 12);
+	});
+
+	const ctxPickerResults = $derived.by(() => {
+		const q = ctxPickerSearch.toLowerCase();
+		const existing = new Set(ctxPickerCurrentCtx.map((x) => String(x)));
+		return allStructuresCache
+			.filter(
+				(s) =>
+					!existing.has(String(s.id)) &&
+					(s.name.toLowerCase().includes(q) ||
+						(s.acronym || '').toLowerCase().includes(q) ||
+						s.code.toLowerCase().includes(q))
+			)
+			.slice(0, 10);
+	});
+
+	const tutelles = $derived(detail ? detail.parents.filter((p) => p.relation_type === 'est_tutelle_de') : []);
+	const tutellesDe = $derived(detail ? detail.children.filter((c) => c.relation_type === 'est_tutelle_de') : []);
+	const partenaires = $derived.by(() => {
+		if (!detail) return [];
+		return [
+			...detail.parents
+				.filter((p) => p.relation_type === 'est_partenaire_de')
+				.map((p) => ({ ...p, id_struct: p.id })),
+			...detail.children
+				.filter((c) => c.relation_type === 'est_partenaire_de')
+				.map((c) => ({ ...c, id_struct: c.id }))
+		];
+	});
+
+	const fields = $derived.by(() => {
+		if (!detail) return [];
+		const s = detail.structure;
+		const pairs: [string, string | null][] = [
+			['Code', s.code],
+			['Type', s.type],
+			['ROR', s.ror_id],
+			['RNSR', s.rnsr_id],
+			['HAL', s.hal_collection]
+		];
+		return pairs.filter(([, v]) => v);
+	});
+
+	/* ── Data loading ── */
+
+	async function loadList() {
+		const params = new URLSearchParams();
+		if (typeFilter) params.set('type', typeFilter);
+		if (search) params.set('search', search);
+		allStructures = await api<Structure[]>('/api/structures?' + params);
+	}
+
+	async function refreshCache() {
+		allStructuresCache = await api<Structure[]>('/api/structures');
+	}
+
+	async function selectStructure(id: number) {
+		selectedId = id;
+		const data = await api<StructureDetail>('/api/structures/' + id);
+		detail = data;
+
+		// Build forms data lookup
+		const fd: Record<number, (number | string)[]> = {};
+		for (const f of data.forms) {
+			fd[f.id] = f.requires_context_of || [];
+		}
+		formsData = fd;
+
+		// Build exclusion set for relation picker
+		const exclude = new Set<number>([
+			...data.parents.map((p) => p.id),
+			...data.children.map((c) => c.id),
+			data.structure.id
+		]);
+		pickerExclude = exclude;
+
+		// Reset pickers
+		relationPickerOpen = false;
+		ctxPickerOpen = false;
+		newFormCtx = [];
+	}
+
+	function handleSearch() {
+		if (searchTimeout) clearTimeout(searchTimeout);
+		searchTimeout = setTimeout(loadList, 300);
+	}
+
+	/* ── Relation picker ── */
+
+	function openPicker(relType: string, direction: string, structId: number) {
+		pickerRelType = relType;
+		pickerDirection = direction;
+		pickerStructId = structId;
+		relationPickerSearch = '';
+		relationPickerOpen = true;
+		ctxPickerOpen = false;
+	}
+
+	async function pickStructure(otherId: number) {
+		const parentId = pickerDirection === 'parent' ? otherId : pickerStructId!;
+		const childId = pickerDirection === 'parent' ? pickerStructId! : otherId;
+		await fetch(base + '/api/structure-relations', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				parent_id: parentId,
+				child_id: childId,
+				relation_type: pickerRelType
+			})
+		});
+		relationPickerOpen = false;
+		await selectStructure(pickerStructId!);
+		loadList();
+		refreshCache();
+	}
+
+	async function deleteRelation(relId: number) {
+		await fetch(base + '/api/structure-relations/' + relId, { method: 'DELETE' });
+		if (selectedId) await selectStructure(selectedId);
+		loadList();
+		refreshCache();
+	}
+
+	/* ── Forms ── */
+
+	async function addForm(structId: number) {
+		const text = addFormText.trim();
+		if (!text) return;
+		const ctx = newFormCtx.length ? newFormCtx : null;
+
+		await fetch(base + '/api/name-forms', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				structure_id: structId,
+				form_text: text,
+				is_regex: addFormRegex,
+				requires_context_of: ctx
+			})
+		});
+		addFormText = '';
+		addFormRegex = false;
+		newFormCtx = [];
+		await selectStructure(structId);
+		loadList();
+	}
+
+	async function toggleForm(formId: number, active: boolean) {
+		await fetch(base + '/api/name-forms/' + formId, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ is_active: active })
+		});
+		if (selectedId) await selectStructure(selectedId);
+	}
+
+	async function deleteForm(formId: number) {
+		if (!confirm('Supprimer cette forme ?')) return;
+		const res = await fetch(base + '/api/name-forms/' + formId, { method: 'DELETE' });
+		if (!res.ok) {
+			alert('Erreur suppression: ' + (await res.text()));
+			return;
+		}
+		if (selectedId) await selectStructure(selectedId);
+		loadList();
+	}
+
+	/* ── Context picker ── */
+
+	function openCtxPicker(formId: number | null) {
+		const currentCtx =
+			formId === null ? [...newFormCtx] : [...(formsData[formId] || [])];
+		ctxPickerFormId = formId;
+		ctxPickerCurrentCtx = currentCtx;
+		ctxPickerSearch = '';
+		ctxPickerOpen = true;
+		relationPickerOpen = false;
+	}
+
+	async function pickCtx(item: number | string) {
+		if (!ctxPickerCurrentCtx.includes(item)) {
+			ctxPickerCurrentCtx = [...ctxPickerCurrentCtx, item];
+		}
+		ctxPickerOpen = false;
+
+		if (ctxPickerFormId === null) {
+			newFormCtx = [...ctxPickerCurrentCtx];
+		} else {
+			await fetch(base + '/api/name-forms/' + ctxPickerFormId, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ requires_context_of: ctxPickerCurrentCtx })
+			});
+			if (selectedId) await selectStructure(selectedId);
+		}
+	}
+
+	async function pickCtxClear() {
+		ctxPickerOpen = false;
+
+		if (ctxPickerFormId === null) {
+			newFormCtx = [];
+		} else {
+			await fetch(base + '/api/name-forms/' + ctxPickerFormId, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ requires_context_of: [] })
+			});
+			if (selectedId) await selectStructure(selectedId);
+		}
+	}
+
+	async function removeCtx(formId: number, itemToRemove: number | string) {
+		const currentCtx = formsData[formId] || [];
+		const newCtx = currentCtx.filter((x) => x !== itemToRemove);
+		await fetch(base + '/api/name-forms/' + formId, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ requires_context_of: newCtx })
+		});
+		if (selectedId) await selectStructure(selectedId);
+	}
+
+	function removeNewCtx(item: number | string) {
+		newFormCtx = newFormCtx.filter((x) => x !== item);
+	}
+
+	function ctxLabel(x: number | string): string {
+		if (x === 'tutelles') return 'tutelles';
+		return structLookup[x as number] || 'id:' + x;
+	}
+
+	/* ── Delete structure ── */
+
+	async function deleteStructure(id: number) {
+		if (!confirm('Supprimer cette structure et toutes ses formes/relations ?')) return;
+		await fetch(base + '/api/structures/' + id, { method: 'DELETE' });
+		selectedId = null;
+		detail = null;
+		loadList();
+		refreshCache();
+	}
+
+	/* ── Create modal ── */
+
+	function openCreateModal() {
+		mCode = '';
+		mName = '';
+		mAcronym = '';
+		mType = 'labo';
+		mRor = '';
+		mHal = '';
+		createModalOpen = true;
+	}
+
+	async function submitCreate() {
+		const data = {
+			code: mCode.trim(),
+			name: mName.trim(),
+			acronym: mAcronym.trim() || null,
+			type: mType,
+			ror_id: mRor.trim() || null,
+			hal_collection: mHal.trim() || null
+		};
+		if (!data.code || !data.name) {
+			alert('Code et nom requis');
+			return;
+		}
+
+		try {
+			const res = await fetch(base + '/api/structures', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(data)
+			});
+			if (!res.ok) throw new Error(await res.text());
+			const created = await res.json();
+			createModalOpen = false;
+			await loadList();
+			refreshCache();
+			selectStructure(created.id);
+		} catch (e: any) {
+			alert('Erreur: ' + e.message);
+		}
+	}
+
+	/* ── Click-outside handling ── */
+
+	function handleDocumentClick(e: MouseEvent) {
+		const target = e.target as HTMLElement;
+		if (
+			relationPickerOpen &&
+			relationPickerEl &&
+			!relationPickerEl.contains(target) &&
+			!target.classList.contains('btn-add')
+		) {
+			relationPickerOpen = false;
+		}
+		if (
+			ctxPickerOpen &&
+			ctxPickerEl &&
+			!ctxPickerEl.contains(target) &&
+			!target.classList.contains('btn-add-tiny')
+		) {
+			ctxPickerOpen = false;
+		}
+	}
+
+	/* ── Lifecycle ── */
+
+	onMount(() => {
+		loadList();
+		refreshCache();
+		document.addEventListener('click', handleDocumentClick);
+		return () => document.removeEventListener('click', handleDocumentClick);
+	});
+</script>
+
+<svelte:head>
+	<title>Admin - Structures - Bibliometrie UCA</title>
+</svelte:head>
+
+<div class="layout">
+	<!-- LIST PANEL -->
+	<div class="list-panel">
+		<div class="toolbar">
+			<input
+				type="text"
+				placeholder="Rechercher..."
+				bind:value={search}
+				oninput={handleSearch}
+			/>
+			<select bind:value={typeFilter} onchange={() => loadList()}>
+				<option value="">Tous types</option>
+				<option value="universite">Universites</option>
+				<option value="onr">ONR</option>
+				<option value="chu">CHU</option>
+				<option value="ecole">Ecoles</option>
+				<option value="labo">Laboratoires</option>
+				<option value="site">Sites</option>
+				<option value="autre">Autres</option>
+			</select>
+		</div>
+		<div class="list-header">
+			<span class="list-count">{allStructures.length} structures</span>
+			<button class="btn btn-primary btn-sm" onclick={openCreateModal}>+ Nouvelle</button>
+		</div>
+		<div class="panel struct-list">
+			{#if allStructures.length === 0}
+				<div class="empty-list">Aucune structure</div>
+			{:else}
+				{#each allStructures as s (s.id)}
+					<button
+						class="struct-item"
+						class:active={s.id === selectedId}
+						onclick={() => selectStructure(s.id)}
+					>
+						<span class="type-badge type-{s.type}">{s.type}</span>
+						<div class="info">
+							<div class="name">
+								{s.name}{s.acronym ? ` (${s.acronym})` : ''}
+							</div>
+						</div>
+					</button>
+				{/each}
+			{/if}
+		</div>
+	</div>
+
+	<!-- DETAIL PANEL -->
+	<div class="detail-panel">
+		{#if !detail}
+			<div class="panel detail-empty">Selectionnez une structure pour voir le detail.</div>
+		{:else}
+			{@const s = detail.structure}
+			<div class="panel">
+				<!-- Header -->
+				<div class="detail-header">
+					<h2>{s.acronym ? s.acronym + ' \u2014 ' + s.name : s.name}</h2>
+					<span class="type-badge type-{s.type}">{s.type}</span>
+					<button class="btn btn-danger btn-sm" onclick={() => deleteStructure(s.id)}>
+						Supprimer
+					</button>
+				</div>
+
+				<!-- Field grid -->
+				<div class="field-grid">
+					{#each fields as [label, value]}
+						<div class="field-label">{label}</div>
+						<div class="field-value">{value}</div>
+					{/each}
+				</div>
+
+				<!-- Tutelles -->
+				<h3>
+					Tutelle{tutelles.length > 1 ? 's' : ''}
+					<button
+						class="btn-add"
+						onclick={() => openPicker('est_tutelle_de', 'parent', s.id)}
+					>+</button>
+				</h3>
+				<div>
+					{#if tutelles.length === 0}
+						<span class="none-text">Aucune</span>
+					{:else}
+						{#each tutelles as p (p.relation_id)}
+							<span class="tag tutelle">
+								<button class="tag-name" onclick={() => selectStructure(p.id)}>
+									{p.acronym || p.name}
+								</button>
+								<button
+									class="remove"
+									onclick={() => deleteRelation(p.relation_id)}
+									title="Supprimer"
+								>x</button>
+							</span>
+						{/each}
+					{/if}
+				</div>
+
+				<!-- Est tutelle de -->
+				<h3>
+					Est tutelle de
+					<button
+						class="btn-add"
+						onclick={() => openPicker('est_tutelle_de', 'child', s.id)}
+					>+</button>
+				</h3>
+				<div>
+					{#if tutellesDe.length === 0}
+						<span class="none-text">Aucun</span>
+					{:else}
+						{#each tutellesDe as c (c.relation_id)}
+							<span class="tag tutelle">
+								<button class="tag-name" onclick={() => selectStructure(c.id)}>
+									{c.acronym || c.name}
+								</button>
+								<button
+									class="remove"
+									onclick={() => deleteRelation(c.relation_id)}
+									title="Supprimer"
+								>x</button>
+							</span>
+						{/each}
+					{/if}
+				</div>
+
+				<!-- Partenaires -->
+				<h3>
+					Partenaire{partenaires.length > 1 ? 's' : ''}
+					<button
+						class="btn-add"
+						onclick={() => openPicker('est_partenaire_de', 'parent', s.id)}
+					>+</button>
+				</h3>
+				<div>
+					{#if partenaires.length === 0}
+						<span class="none-text">Aucun</span>
+					{:else}
+						{#each partenaires as p (p.relation_id)}
+							<span class="tag partenaire">
+								<button class="tag-name" onclick={() => selectStructure(p.id_struct)}>
+									{p.acronym || p.name}
+								</button>
+								<button
+									class="remove"
+									onclick={() => deleteRelation(p.relation_id)}
+									title="Supprimer"
+								>x</button>
+							</span>
+						{/each}
+					{/if}
+				</div>
+
+				<!-- Relation picker -->
+				{#if relationPickerOpen}
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div
+						class="picker-container"
+						bind:this={relationPickerEl}
+						onclick={(e) => e.stopPropagation()}
+					>
+						<input
+							type="text"
+							placeholder="Rechercher une structure..."
+							bind:value={relationPickerSearch}
+							autocomplete="off"
+						/>
+						<div class="picker-results">
+							{#if relationPickerResults.length === 0}
+								<div class="picker-item disabled">Aucun resultat</div>
+							{:else}
+								{#each relationPickerResults as rs (rs.id)}
+									<button class="picker-item" onclick={() => pickStructure(rs.id)}>
+										<span class="type-badge type-{rs.type}" style="font-size:9px;padding:0 5px">
+											{rs.type}
+										</span>
+										{rs.acronym ? rs.acronym + ' \u2014 ' : ''}{rs.name}
+									</button>
+								{/each}
+							{/if}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Forms table -->
+				<h3>Formes de noms ({detail.forms.length})</h3>
+				<table class="forms-table">
+					<thead>
+						<tr><th>Forme</th><th>Contexte requis</th><th></th></tr>
+					</thead>
+					<tbody>
+						{#if detail.forms.length === 0}
+							<tr>
+								<td colspan="3" style="text-align:center;color:var(--text-muted)">
+									Aucune forme
+								</td>
+							</tr>
+						{:else}
+							{#each detail.forms as f (f.id)}
+								<tr class:inactive={!f.is_active}>
+									<td class="form-text">
+										{f.form_text}
+										{#if f.is_regex}
+											<span class="regex-badge">regex</span>
+										{/if}
+									</td>
+									<td>
+										{#if f.requires_context_of?.length}
+											{#each f.requires_context_of as x}
+												<span class="ctx-tag">
+													{#if x === 'tutelles'}tutelles{:else}{ctxLabel(x)}{/if}
+													<button
+														class="ctx-remove"
+														onclick={() => removeCtx(f.id, x)}
+													>x</button>
+												</span>
+											{/each}
+											<button class="btn-add-tiny" onclick={() => openCtxPicker(f.id)}>
+												+
+											</button>
+										{:else}
+											<span class="sufficient-label">suffisant</span>
+											<button class="btn-add-tiny" onclick={() => openCtxPicker(f.id)}>
+												+
+											</button>
+										{/if}
+									</td>
+									<td style="white-space:nowrap">
+										{#if f.is_active}
+											<button
+												class="btn btn-sm"
+												onclick={() => toggleForm(f.id, false)}
+												title="Desactiver"
+											>&#x23F8;</button>
+										{:else}
+											<button
+												class="btn btn-sm btn-success"
+												onclick={() => toggleForm(f.id, true)}
+												title="Reactiver"
+											>&#x25B6;</button>
+										{/if}
+										<button
+											class="btn btn-sm btn-danger"
+											onclick={() => deleteForm(f.id)}
+											title="Supprimer"
+										>x</button>
+									</td>
+								</tr>
+							{/each}
+						{/if}
+					</tbody>
+				</table>
+
+				<!-- Add form row -->
+				<div class="add-row">
+					<input placeholder="Nouvelle forme..." bind:value={addFormText} />
+					<label class="regex-label">
+						<input type="checkbox" bind:checked={addFormRegex} /> regex
+					</label>
+					<button class="btn btn-sm btn-primary" onclick={() => addForm(s.id)}>
+						Ajouter
+					</button>
+				</div>
+
+				<!-- New form context tags -->
+				<div class="new-form-ctx">
+					<span class="ctx-label-text">Contexte :</span>
+					{#each newFormCtx as x}
+						<span class="ctx-tag">
+							{#if x === 'tutelles'}tutelles{:else}{ctxLabel(x)}{/if}
+							<button class="ctx-remove" onclick={() => removeNewCtx(x)}>x</button>
+						</span>
+					{/each}
+					<button class="btn-add-tiny" onclick={() => openCtxPicker(null)}>+</button>
+					{#if newFormCtx.length === 0}
+						<span class="ctx-hint">(suffisant)</span>
+					{/if}
+				</div>
+
+				<!-- Context picker -->
+				{#if ctxPickerOpen}
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div
+						class="picker-container ctx-picker"
+						bind:this={ctxPickerEl}
+						onclick={(e) => e.stopPropagation()}
+					>
+						<div class="ctx-picker-shortcuts">
+							<button class="btn btn-sm" onclick={() => pickCtx('tutelles')}>
+								tutelles
+							</button>
+							<button class="btn btn-sm" onclick={pickCtxClear}>
+								&#x2715; suffisant
+							</button>
+						</div>
+						<input
+							type="text"
+							placeholder="Rechercher une structure..."
+							bind:value={ctxPickerSearch}
+							autocomplete="off"
+						/>
+						<div class="picker-results">
+							{#if ctxPickerResults.length === 0}
+								<div class="picker-item disabled">Aucun resultat</div>
+							{:else}
+								{#each ctxPickerResults as cs (cs.id)}
+									<button class="picker-item" onclick={() => pickCtx(cs.id)}>
+										<span class="type-badge type-{cs.type}" style="font-size:9px;padding:0 5px">
+											{cs.type}
+										</span>
+										{cs.acronym ? cs.acronym + ' \u2014 ' : ''}{cs.name}
+									</button>
+								{/each}
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</div>
+		{/if}
+	</div>
+</div>
+
+<!-- CREATE MODAL -->
+{#if createModalOpen}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="modal-bg" onclick={() => (createModalOpen = false)}>
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="modal" onclick={(e) => e.stopPropagation()}>
+			<h3>Nouvelle structure</h3>
+			<label>Code (unique)</label>
+			<input placeholder="ex: lpc, chu_clermont, site_cezeaux" bind:value={mCode} />
+			<label>Nom complet</label>
+			<input placeholder="ex: Laboratoire de Physique de Clermont" bind:value={mName} />
+			<label>Acronyme</label>
+			<input placeholder="ex: LPC" bind:value={mAcronym} />
+			<label>Type</label>
+			<select bind:value={mType}>
+				<option value="labo">Laboratoire</option>
+				<option value="universite">Universite</option>
+				<option value="onr">ONR</option>
+				<option value="chu">CHU</option>
+				<option value="ecole">Ecole</option>
+				<option value="site">Site</option>
+				<option value="autre">Autre</option>
+			</select>
+			<label>ROR ID</label>
+			<input placeholder="https://ror.org/..." bind:value={mRor} />
+			<label>Collection HAL</label>
+			<input placeholder="ex: INSTITUT_PASCAL" bind:value={mHal} />
+			<div class="actions">
+				<button class="btn" onclick={() => (createModalOpen = false)}>Annuler</button>
+				<button class="btn btn-primary" onclick={submitCreate}>Creer</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<style>
+	/* ── Local CSS variables ── */
+	:root {
+		--success: #2a7d4f;
+		--success-light: #e6f4ec;
+		--danger: #c0392b;
+		--danger-light: #fbeaea;
+		--warning: #d4a017;
+		--warning-light: #fef8e8;
+		--accent-light: #e8f0f8;
+		--text-muted: #777;
+	}
+
+	/* ── Layout ── */
+	.layout {
+		display: flex;
+		gap: 16px;
+		min-height: calc(100vh - 120px);
+	}
+	.list-panel {
+		width: 380px;
+		flex-shrink: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.detail-panel {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.panel {
+		background: var(--card);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 14px;
+	}
+	.panel h2 {
+		margin: 0 0 10px;
+		font-size: 15px;
+		font-weight: 600;
+	}
+	.panel h3 {
+		margin: 12px 0 6px;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	/* ── Toolbar ── */
+	.toolbar {
+		display: flex;
+		gap: 6px;
+		margin-bottom: 8px;
+	}
+	.toolbar input,
+	.toolbar select {
+		padding: 5px 8px;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		font-size: 13px;
+		background: white;
+		font-family: inherit;
+	}
+	.toolbar input {
+		flex: 1;
+	}
+
+	/* ── List header ── */
+	.list-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 4px;
+	}
+	.list-count {
+		font-size: 12px;
+		color: var(--text-muted);
+	}
+
+	/* ── Structure list ── */
+	.struct-list {
+		overflow-y: auto;
+		max-height: calc(100vh - 240px);
+		padding: 0;
+	}
+	.empty-list {
+		padding: 20px;
+		text-align: center;
+		color: var(--text-muted);
+	}
+	.struct-item {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 8px 10px;
+		border: none;
+		border-bottom: 1px solid #f0efec;
+		cursor: pointer;
+		background: none;
+		text-align: left;
+		font-family: inherit;
+		font-size: inherit;
+		color: inherit;
+	}
+	.struct-item:hover {
+		background: #fafaf8;
+	}
+	.struct-item.active {
+		background: var(--accent-light);
+		border-left: 3px solid var(--accent);
+	}
+	.struct-item .info {
+		flex: 1;
+		min-width: 0;
+	}
+	.struct-item .name {
+		font-weight: 500;
+		font-size: 13px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	/* ── Type badges ── */
+	.type-badge {
+		font-size: 10px;
+		padding: 1px 6px;
+		border-radius: 8px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.3px;
+		white-space: nowrap;
+	}
+	:global(.type-universite) {
+		background: #e8d4f0;
+		color: #6b2e8a;
+	}
+	:global(.type-onr) {
+		background: #d4e8f0;
+		color: #2e6b8a;
+	}
+	:global(.type-chu) {
+		background: #f0d4d4;
+		color: #8a2e2e;
+	}
+	:global(.type-ecole) {
+		background: #f0e8d4;
+		color: #8a6b2e;
+	}
+	:global(.type-labo) {
+		background: var(--accent-light);
+		color: var(--accent);
+	}
+	:global(.type-site) {
+		background: var(--success-light);
+		color: var(--success);
+	}
+	:global(.type-autre) {
+		background: #f0f0f0;
+		color: #555;
+	}
+
+	/* ── Detail ── */
+	.detail-empty {
+		text-align: center;
+		padding: 60px 20px;
+		color: var(--text-muted);
+	}
+	.detail-header {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 14px;
+	}
+	.detail-header h2 {
+		flex: 1;
+		margin: 0;
+		font-size: 18px;
+	}
+
+	.field-grid {
+		display: grid;
+		grid-template-columns: 100px 1fr;
+		gap: 4px 10px;
+		font-size: 13px;
+		margin-bottom: 14px;
+	}
+	.field-label {
+		color: var(--text-muted);
+		font-weight: 500;
+	}
+	.field-value {
+		word-break: break-all;
+	}
+
+	/* ── Tags ── */
+	.tag {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		font-size: 12px;
+		padding: 2px 8px;
+		border-radius: 10px;
+		margin: 2px;
+		background: #f0f0f0;
+	}
+	.tag .tag-name {
+		cursor: pointer;
+		background: none;
+		border: none;
+		padding: 0;
+		font: inherit;
+		color: inherit;
+	}
+	.tag .tag-name:hover {
+		text-decoration: underline;
+	}
+	.tag .remove {
+		cursor: pointer;
+		color: var(--danger);
+		font-weight: bold;
+		font-size: 14px;
+		line-height: 1;
+		background: none;
+		border: none;
+		padding: 0;
+		font-family: inherit;
+	}
+	.tag .remove:hover {
+		color: #e74c3c;
+	}
+	.tag.tutelle {
+		background: #d4e8f0;
+		color: #2e6b8a;
+	}
+	.tag.partenaire {
+		background: #f0e8d4;
+		color: #8a6b2e;
+	}
+	.none-text {
+		font-size: 12px;
+		color: var(--text-muted);
+	}
+
+	/* ── Forms table ── */
+	.forms-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 13px;
+	}
+	.forms-table th {
+		text-align: left;
+		padding: 5px 8px;
+		font-size: 11px;
+		color: var(--text-muted);
+		border-bottom: 2px solid var(--border);
+		font-weight: 600;
+	}
+	.forms-table td {
+		padding: 5px 8px;
+		border-bottom: 1px solid #f0efec;
+		vertical-align: middle;
+	}
+	.forms-table tr:hover td {
+		background: #fafaf8;
+	}
+	.forms-table .inactive {
+		opacity: 0.45;
+	}
+	.form-text {
+		font-family: 'SF Mono', Consolas, monospace;
+		font-size: 12px;
+	}
+	.regex-badge {
+		color: var(--warning);
+		font-size: 10px;
+		font-family: inherit;
+	}
+	.ctx-tag {
+		font-size: 10px;
+		padding: 1px 5px;
+		border-radius: 6px;
+		background: var(--warning-light);
+		color: #8a6d10;
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+	}
+	.ctx-remove {
+		cursor: pointer;
+		color: var(--danger);
+		font-weight: bold;
+		font-size: 12px;
+		line-height: 1;
+		background: none;
+		border: none;
+		padding: 0;
+		font-family: inherit;
+	}
+	.ctx-remove:hover {
+		color: #e74c3c;
+	}
+	.sufficient-label {
+		color: var(--success);
+		font-size: 11px;
+	}
+
+	/* ── Buttons ── */
+	.btn {
+		padding: 5px 12px;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		font-size: 12px;
+		cursor: pointer;
+		background: white;
+		font-family: inherit;
+	}
+	.btn:hover {
+		background: #f5f5f5;
+	}
+	.btn-primary {
+		background: var(--accent);
+		color: white;
+		border-color: var(--accent);
+	}
+	.btn-primary:hover {
+		background: #2d5a87;
+	}
+	.btn-danger {
+		color: var(--danger);
+		border-color: var(--danger);
+	}
+	.btn-danger:hover {
+		background: var(--danger-light);
+	}
+	.btn-sm {
+		padding: 2px 7px;
+		font-size: 11px;
+	}
+	.btn-success {
+		background: var(--success);
+		color: white;
+		border-color: var(--success);
+	}
+
+	.btn-add {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		border: 1px solid var(--border);
+		background: white;
+		color: var(--accent);
+		font-size: 14px;
+		font-weight: bold;
+		cursor: pointer;
+		margin-left: 6px;
+		vertical-align: middle;
+		line-height: 1;
+		padding: 0;
+	}
+	.btn-add:hover {
+		background: var(--accent);
+		color: white;
+		border-color: var(--accent);
+	}
+	.btn-add-tiny {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		border: 1px solid var(--border);
+		background: white;
+		color: var(--accent);
+		font-size: 11px;
+		font-weight: bold;
+		cursor: pointer;
+		vertical-align: middle;
+		line-height: 1;
+		padding: 0;
+	}
+	.btn-add-tiny:hover {
+		background: var(--accent);
+		color: white;
+		border-color: var(--accent);
+	}
+
+	/* ── Add form row ── */
+	.add-row {
+		display: flex;
+		gap: 4px;
+		margin-top: 8px;
+		align-items: center;
+	}
+	.add-row input[type='text'],
+	.add-row input:not([type]) {
+		flex: 1;
+		padding: 4px 6px;
+		border: 1px solid var(--border);
+		border-radius: 3px;
+		font-size: 12px;
+		font-family: inherit;
+	}
+	.regex-label {
+		font-size: 11px;
+		display: flex;
+		align-items: center;
+		gap: 3px;
+		margin: 0;
+		cursor: pointer;
+	}
+
+	/* ── New form context ── */
+	.new-form-ctx {
+		margin-top: 4px;
+		font-size: 12px;
+	}
+	.ctx-label-text {
+		color: var(--text-muted);
+	}
+	.ctx-hint {
+		color: var(--text-muted);
+		font-size: 11px;
+		margin-left: 4px;
+	}
+
+	/* ── Picker ── */
+	.picker-container {
+		position: relative;
+		margin: 8px 0;
+		background: white;
+		border: 1px solid var(--accent);
+		border-radius: 5px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+		max-width: 380px;
+		z-index: 50;
+	}
+	.picker-container input {
+		width: 100%;
+		padding: 7px 10px;
+		border: none;
+		border-bottom: 1px solid var(--border);
+		border-radius: 5px 5px 0 0;
+		font-size: 13px;
+		outline: none;
+		font-family: inherit;
+	}
+	.picker-results {
+		max-height: 200px;
+		overflow-y: auto;
+	}
+	.picker-item {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		width: 100%;
+		padding: 6px 10px;
+		font-size: 13px;
+		cursor: pointer;
+		background: none;
+		border: none;
+		text-align: left;
+		font-family: inherit;
+		color: inherit;
+	}
+	.picker-item:hover {
+		background: var(--accent-light);
+	}
+	.picker-item.disabled {
+		color: var(--text-muted);
+		cursor: default;
+	}
+
+	.ctx-picker {
+		max-width: 380px;
+	}
+	.ctx-picker-shortcuts {
+		padding: 6px 10px;
+		border-bottom: 1px solid var(--border);
+		display: flex;
+		gap: 4px;
+		flex-wrap: wrap;
+	}
+
+	/* ── Modal ── */
+	.modal-bg {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.3);
+		z-index: 200;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.modal {
+		background: white;
+		border-radius: 8px;
+		padding: 20px;
+		width: 420px;
+		max-width: 90vw;
+		box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+	}
+	.modal h3 {
+		margin: 0 0 14px;
+		font-size: 16px;
+		color: var(--text);
+		text-transform: none;
+		letter-spacing: normal;
+	}
+	.modal label {
+		display: block;
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--text-muted);
+		margin: 8px 0 3px;
+	}
+	.modal input,
+	.modal select {
+		width: 100%;
+		padding: 6px 8px;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		font-size: 13px;
+		font-family: inherit;
+	}
+	.modal .actions {
+		display: flex;
+		gap: 8px;
+		justify-content: flex-end;
+		margin-top: 16px;
+	}
+</style>

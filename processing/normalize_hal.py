@@ -1,0 +1,709 @@
+"""
+Normalisation des données HAL : staging_hal → tables v2.
+
+Usage:
+    python normalize_hal.py              # traiter tous les works non traités
+    python normalize_hal.py --limit 100  # traiter N works (pour test)
+    python normalize_hal.py --reset      # remettre tous les works à processed=FALSE
+
+Tables peuplées :
+    publishers, journals, publications      (tables de vérité — partagées)
+    hal_documents                           (lien staging ↔ publication)
+    hal_authors                             (auteurs HAL dédupliqués par hal_person_id)
+    hal_authorships                         (lien document × auteur, avec hal_struct_ids)
+
+La résolution UCA (hal_authorships.structure_ids, is_uca) se fait en post-traitement
+via populate_uca_flags.sql, pas ici. Ce script ne fait que stocker les hal_struct_ids
+bruts extraits de authIdHasStructure_fs.
+
+Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
+"""
+
+import argparse
+import logging
+import os
+import re
+import sys
+import time
+import unicodedata
+
+import psycopg2
+from psycopg2.extras import Json
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config.settings import HAL
+from db.connection import get_connection
+
+# ----- Logging -----
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(
+            os.path.join(os.path.dirname(__file__), "normalize_hal.log")
+        ),
+    ],
+)
+logger = logging.getLogger(__name__)
+
+
+# =============================================================
+# MAPPINGS
+# =============================================================
+
+# HAL docType_s → notre enum doc_type
+DOCTYPE_MAP = {
+    "ART": "article",
+    "COMM": "conference_paper",
+    "POSTER": "conference_paper",
+    "OUV": "book",
+    "COUV": "book_chapter",
+    "DOUV": "book_chapter",
+    "THESE": "thesis",
+    "HDR": "thesis",
+    "PREPRINT": "preprint",
+    "UNDEFINED": "other",
+    "OTHER": "other",
+    "REPORT": "report",
+    "MEM": "thesis",
+    "LECTURE": "other",
+    "IMG": "other",
+    "VIDEO": "other",
+    "SON": "other",
+    "MAP": "other",
+    "SOFTWARE": "other",
+    "PATENT": "other",
+    "NOTE": "article",
+    "BLOG": "other",
+}
+
+
+# =============================================================
+# UTILITAIRES
+# =============================================================
+
+def normalize_text(text: str) -> str:
+    """Normalise un texte pour comparaison/dédoublonnage."""
+    if not text:
+        return ""
+    text = text.lower().strip()
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^a-z0-9\s]", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def clean_doi(doi: str | None) -> str | None:
+    """Nettoie un DOI."""
+    if not doi:
+        return None
+    doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").strip()
+    return doi if doi else None
+
+
+def as_str(value) -> str | None:
+    """Extrait une chaîne depuis un champ HAL qui peut être str, list ou None."""
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return value[0] if value else None
+    return str(value)
+
+
+def get_title(doc: dict) -> str:
+    """Extrait le titre depuis les données HAL."""
+    titles = doc.get("title_s")
+    if isinstance(titles, list) and titles:
+        return titles[0]
+    if isinstance(titles, str):
+        return titles
+    label = doc.get("label_s", "")
+    return label
+
+
+# =============================================================
+# PUBLISHERS & JOURNALS (inchangés — tables de vérité partagées)
+# =============================================================
+
+def upsert_publisher(cur, publisher_name: str) -> int | None:
+    """Insère/retrouve un éditeur par nom normalisé. Retourne publisher.id."""
+    if not publisher_name:
+        return None
+
+    name_normalized = normalize_text(publisher_name)
+    if not name_normalized:
+        return None
+
+    cur.execute(
+        "SELECT id FROM publishers WHERE name_normalized = %s LIMIT 1",
+        (name_normalized,)
+    )
+    row = cur.fetchone()
+    if row:
+        return row[0]
+
+    cur.execute("""
+        INSERT INTO publishers (name, name_normalized)
+        VALUES (%s, %s)
+        RETURNING id
+    """, (publisher_name, name_normalized))
+    return cur.fetchone()[0]
+
+
+def upsert_journal(cur, doc: dict, publisher_id: int | None) -> int | None:
+    """
+    Extrait et insère la revue depuis les champs HAL.
+    Retourne journal.id ou None.
+    """
+    title = as_str(doc.get("journalTitle_s"))
+    if not title:
+        return None
+
+    issn = as_str(doc.get("journalIssn_s"))
+    eissn = as_str(doc.get("journalEissn_s"))
+
+    title_normalized = normalize_text(title)
+
+    # Tenter de retrouver par ISSN d'abord
+    if issn:
+        cur.execute(
+            "SELECT id FROM journals WHERE issn = %s OR issnl = %s LIMIT 1",
+            (issn, issn)
+        )
+        row = cur.fetchone()
+        if row:
+            cur.execute("""
+                UPDATE journals SET
+                    eissn = COALESCE(journals.eissn, %s),
+                    publisher_id = COALESCE(journals.publisher_id, %s)
+                WHERE id = %s
+            """, (eissn, publisher_id, row[0]))
+            return row[0]
+
+    if eissn:
+        cur.execute(
+            "SELECT id FROM journals WHERE eissn = %s OR issnl = %s LIMIT 1",
+            (eissn, eissn)
+        )
+        row = cur.fetchone()
+        if row:
+            cur.execute("""
+                UPDATE journals SET
+                    issn = COALESCE(journals.issn, %s),
+                    publisher_id = COALESCE(journals.publisher_id, %s)
+                WHERE id = %s
+            """, (issn, publisher_id, row[0]))
+            return row[0]
+
+    # Fallback sur le nom normalisé
+    cur.execute(
+        "SELECT id FROM journals WHERE title_normalized = %s LIMIT 1",
+        (title_normalized,)
+    )
+    row = cur.fetchone()
+    if row:
+        return row[0]
+
+    # Nouvelle revue
+    cur.execute("""
+        INSERT INTO journals (title, title_normalized, issn, eissn, publisher_id)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING id
+    """, (title, title_normalized, issn, eissn, publisher_id))
+    return cur.fetchone()[0]
+
+
+# =============================================================
+# PUBLICATIONS (inchangé — table de vérité)
+# =============================================================
+
+def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
+                               allow_create: bool = True) -> tuple[int, bool]:
+    """
+    Cherche une publication existante (par DOI ou titre+année) ou en crée une.
+    Si allow_create=False, ne crée pas de nouvelle publication (retourne None, False).
+    Retourne (publication_id, is_new).
+    """
+    doi = clean_doi(as_str(doc.get("doiId_s")))
+    title = get_title(doc)
+    title_normalized = normalize_text(title)
+    pub_year = doc.get("producedDateY_i")
+
+    if not pub_year or not title:
+        return None, False
+
+    raw_type = doc.get("docType_s", "OTHER")
+    doc_type = DOCTYPE_MAP.get(raw_type, "other")
+
+    language_list = doc.get("language_s")
+    language = language_list[0] if isinstance(language_list, list) and language_list else None
+
+    oa_status = "green" if doc.get("openAccess_bool") else "closed"
+
+    container_title = None
+    if not journal_id:
+        container_title = as_str(doc.get("bookTitle_s")) or as_str(doc.get("conferenceTitle_s"))
+
+    # 1. Chercher par DOI (match inter-sources)
+    if doi:
+        cur.execute("SELECT id FROM publications WHERE doi = %s", (doi,))
+        row = cur.fetchone()
+        if row:
+            # Publication déjà connue (probablement via OpenAlex) → enrichir
+            cur.execute("""
+                UPDATE publications SET
+                    journal_id = COALESCE(%s, publications.journal_id),
+                    doc_type = COALESCE(%s, publications.doc_type),
+                    container_title = COALESCE(%s, publications.container_title),
+                    oa_status = CASE
+                        WHEN %s = 'green' AND publications.oa_status IN ('closed', 'unknown')
+                            THEN 'green'
+                        ELSE publications.oa_status
+                    END,
+                    updated_at = now()
+                WHERE id = %s
+            """, (journal_id, doc_type, container_title, oa_status, row[0]))
+            return row[0], False
+
+    # 2. Chercher par titre normalisé + année + même journal
+    #    Uniquement pour les articles, et seulement si journal_id est connu
+    #    (aucun NULL dans les critères de fusion)
+    row = None
+    if title_normalized and doc_type == "article" and journal_id:
+        cur.execute("""
+            SELECT id FROM publications
+            WHERE title_normalized = %s AND pub_year = %s
+              AND journal_id = %s
+            LIMIT 1
+        """, (title_normalized, pub_year, journal_id))
+        row = cur.fetchone()
+        if row:
+            cur.execute("""
+                UPDATE publications SET
+                    doi = COALESCE(publications.doi, %s),
+                    journal_id = COALESCE(%s, publications.journal_id),
+                    doc_type = COALESCE(%s, publications.doc_type),
+                    container_title = COALESCE(%s, publications.container_title),
+                    updated_at = now()
+                WHERE id = %s
+            """, (doi, journal_id, doc_type, container_title, row[0]))
+            return row[0], False
+
+    # 3. Nouvelle publication
+    if not allow_create:
+        return None, False
+
+    cur.execute("""
+        INSERT INTO publications
+            (title, title_normalized, doc_type, pub_year, doi,
+             oa_status, journal_id, container_title, language)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+    """, (title, title_normalized, doc_type, pub_year, doi,
+          oa_status, journal_id, container_title, language))
+    return cur.fetchone()[0], True
+
+
+# =============================================================
+# HAL DOCUMENTS (nouveau — remplace publication_sources)
+# =============================================================
+
+def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
+                        collection: str | None,
+                        publication_id: int | None) -> int:
+    """
+    Crée/retrouve l'entrée hal_documents.
+    Le champ collections agrège toutes les collections vues.
+    Retourne hal_document.id.
+    """
+    doi = clean_doi(as_str(doc.get("doiId_s")))
+    title = get_title(doc)
+    pub_year = doc.get("producedDateY_i")
+    doc_type = doc.get("docType_s")
+
+    # Collections : depuis le staging (peut être "COL1,COL2") +
+    # collCode_s du raw_data
+    collections = set()
+    if collection:
+        for c in collection.split(","):
+            c = c.strip()
+            if c:
+                collections.add(c)
+    coll_codes = doc.get("collCode_s") or []
+    if isinstance(coll_codes, list):
+        collections.update(coll_codes)
+
+    collections_array = sorted(collections) if collections else None
+
+    cur.execute("""
+        INSERT INTO hal_documents
+            (halid, doi, title, pub_year, doc_type,
+             collections, publication_id, staging_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (halid) DO UPDATE SET
+            publication_id = COALESCE(
+                hal_documents.publication_id, EXCLUDED.publication_id
+            ),
+            collections = (
+                SELECT array_agg(DISTINCT c ORDER BY c)
+                FROM unnest(
+                    COALESCE(hal_documents.collections, '{}') ||
+                    COALESCE(EXCLUDED.collections, '{}')
+                ) AS c
+            )
+        RETURNING id
+    """, (hal_id, doi, title, pub_year, doc_type,
+          collections_array, publication_id, staging_id))
+    return cur.fetchone()[0]
+
+
+# =============================================================
+# HAL AUTHORS (nouveau — remplace upsert dans authors)
+# =============================================================
+
+def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
+                      idhal: str | None) -> int | None:
+    """
+    Insère/retrouve un auteur HAL.
+    Déduplique par hal_person_id (clé unique) si disponible,
+    sinon par nom exact.
+    Retourne hal_authors.id ou None.
+    """
+    if not full_name:
+        return None
+
+    # Séparer nom/prénom (heuristique HAL : souvent "Prénom Nom")
+    parts = full_name.strip().split()
+    if len(parts) >= 2:
+        first_name = " ".join(parts[:-1])
+        last_name = parts[-1]
+    else:
+        first_name = None
+        last_name = full_name
+
+    # 1. Par hal_person_id (clé fiable) — 0 signifie non identifié
+    if hal_person_id and hal_person_id > 0:
+        cur.execute("""
+            INSERT INTO hal_authors
+                (hal_person_id, full_name, last_name, first_name, idhal)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (hal_person_id) DO UPDATE SET
+                idhal = COALESCE(hal_authors.idhal, EXCLUDED.idhal),
+                full_name = EXCLUDED.full_name,
+                updated_at = now()
+            RETURNING id
+        """, (hal_person_id, full_name, last_name, first_name, idhal))
+        return cur.fetchone()[0]
+
+    # 2. Pas de hal_person_id (vieux documents) → chercher par nom exact
+    cur.execute("""
+        SELECT id FROM hal_authors
+        WHERE hal_person_id IS NULL
+          AND full_name = %s
+          AND first_name IS NOT DISTINCT FROM %s
+        LIMIT 1
+    """, (full_name, first_name))
+    row = cur.fetchone()
+    if row:
+        if idhal:
+            cur.execute("""
+                UPDATE hal_authors SET
+                    idhal = COALESCE(hal_authors.idhal, %s),
+                    updated_at = now()
+                WHERE id = %s
+            """, (idhal, row[0]))
+        return row[0]
+
+    # 3. Nouveau
+    cur.execute("""
+        INSERT INTO hal_authors (full_name, last_name, first_name, idhal)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id
+    """, (full_name, last_name, first_name, idhal))
+    return cur.fetchone()[0]
+
+
+# =============================================================
+# HAL AUTHORSHIPS (nouveau — remplace publication_authors + resolve)
+# =============================================================
+
+def parse_author_structures(doc: dict) -> dict[int, set[int]]:
+    """
+    Parse authIdHasStructure_fs pour extraire le mapping
+    hal_person_id → {hal_struct_ids}.
+
+    Format : "formId-personId_FacetSep_Nom_JoinSep_structId_FacetSep_StructNom"
+    """
+    entries = doc.get("authIdHasStructure_fs") or []
+    person_structs: dict[int, set[int]] = {}
+
+    for entry in entries:
+        parts = entry.split("_JoinSep_")
+        if len(parts) != 2:
+            continue
+
+        # Gauche : "formId-personId_FacetSep_Nom"
+        left_parts = parts[0].split("_FacetSep_")
+        if not left_parts:
+            continue
+        form_person = left_parts[0]  # "49236-749496"
+        dash_parts = form_person.rsplit("-", 1)
+        if len(dash_parts) != 2:
+            continue
+        try:
+            person_id = int(dash_parts[1])
+        except ValueError:
+            continue
+
+        # Droite : "structId_FacetSep_StructNom"
+        right_parts = parts[1].split("_FacetSep_")
+        if not right_parts:
+            continue
+        try:
+            struct_id = int(right_parts[0])
+        except ValueError:
+            continue
+
+        person_structs.setdefault(person_id, set()).add(struct_id)
+
+    return person_structs
+
+
+def process_authors(cur, doc: dict, hal_document_id: int):
+    """
+    Traite les auteurs d'un document HAL :
+    - Parse les champs alignés pour extraire hal_person_id et idhal
+    - Parse authIdHasStructure_fs pour les affiliations
+    - Crée/retrouve chaque auteur dans hal_authors
+    - Crée les hal_authorships avec hal_struct_ids
+    """
+    names = doc.get("authFullName_s") or []
+
+    # authFullNameIdHal_fs : "Nom_FacetSep_idhal" — aligné par position
+    name_idhal = doc.get("authFullNameIdHal_fs") or []
+    idhal_by_pos = {}
+    for pos, entry in enumerate(name_idhal):
+        parts = entry.split("_FacetSep_")
+        if len(parts) == 2 and parts[1].strip():
+            idhal_by_pos[pos] = parts[1].strip()
+
+    # authFullNameId_fs : "Nom_FacetSep_personId" — aligné par position
+    name_id = doc.get("authFullNameId_fs") or []
+    hal_person_id_by_pos = {}
+    for pos, entry in enumerate(name_id):
+        parts = entry.split("_FacetSep_")
+        if len(parts) == 2 and parts[1].strip():
+            try:
+                pid = int(parts[1].strip())
+                if pid > 0:  # 0 = personne non identifiée par HAL
+                    hal_person_id_by_pos[pos] = pid
+            except ValueError:
+                pass
+
+    # authIdHasStructure_fs → {hal_person_id: set of hal_struct_ids}
+    person_struct_map = parse_author_structures(doc)
+
+    for position, name in enumerate(names):
+        idhal = idhal_by_pos.get(position)
+        hal_person_id = hal_person_id_by_pos.get(position)
+
+        hal_author_id = upsert_hal_author(cur, name, hal_person_id, idhal)
+        if not hal_author_id:
+            continue
+
+        # Structures affiliées à cet auteur sur ce document
+        hal_struct_ids = None
+        if hal_person_id and hal_person_id in person_struct_map:
+            hal_struct_ids = sorted(person_struct_map[hal_person_id])
+
+        cur.execute("""
+            INSERT INTO hal_authorships
+                (hal_document_id, hal_author_id, author_position, hal_struct_ids)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (hal_document_id, hal_author_id) DO UPDATE SET
+                hal_struct_ids = COALESCE(
+                    EXCLUDED.hal_struct_ids,
+                    hal_authorships.hal_struct_ids
+                )
+        """, (hal_document_id, hal_author_id, position,
+              hal_struct_ids))
+
+
+# =============================================================
+# BOUCLE PRINCIPALE
+# =============================================================
+
+def process_work(cur, staging_row: tuple) -> bool:
+    """Traite un work du staging HAL."""
+    staging_id, hal_id, doi, raw_data, collection = staging_row
+    doc = raw_data
+    timings = {}
+
+    try:
+        title = get_title(doc)
+        pub_year = doc.get("producedDateY_i")
+        if not title or not pub_year:
+            logger.warning(f"Impossible d'insérer {hal_id} — titre ou année manquant")
+            return False
+
+        t0 = time.perf_counter()
+        publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
+        publisher_id = upsert_publisher(cur, publisher_name)
+        timings["publisher"] = time.perf_counter() - t0
+
+        t0 = time.perf_counter()
+        journal_id = upsert_journal(cur, doc, publisher_id)
+        timings["journal"] = time.perf_counter() - t0
+
+        t0 = time.perf_counter()
+        # Hors périmètre UCA (collection = NULL, vient de fetch_missing_hal.py) :
+        # on enrichit les publications existantes mais on n'en crée pas de nouvelles
+        publication_id, is_new = find_or_insert_publication(
+            cur, doc, journal_id, allow_create=(collection is not None)
+        )
+        timings["publication"] = time.perf_counter() - t0
+
+        if not publication_id:
+            if not collection:
+                logger.debug(f"  {hal_id} hors périmètre, pas de publication existante → skip")
+                cur.execute(
+                    "UPDATE staging_hal SET processed = TRUE WHERE id = %s",
+                    (staging_id,)
+                )
+            else:
+                logger.warning(f"Impossible d'insérer {hal_id} — échec insertion publication")
+            return False
+
+        # Document HAL (remplace l'ancienne publication_sources)
+        t0 = time.perf_counter()
+        hal_document_id = insert_hal_document(
+            cur, doc, staging_id, hal_id, collection, publication_id
+        )
+        timings["hal_doc"] = time.perf_counter() - t0
+
+        # Auteurs et authorships (avec hal_struct_ids)
+        t0 = time.perf_counter()
+        process_authors(cur, doc, hal_document_id)
+        timings["authors"] = time.perf_counter() - t0
+
+        cur.execute(
+            "UPDATE staging_hal SET processed = TRUE WHERE id = %s",
+            (staging_id,)
+        )
+
+        total = sum(timings.values())
+        if total > 0.5:
+            breakdown = " | ".join(f"{k}:{v:.3f}s" for k, v in timings.items())
+            logger.info(f"  SLOW {hal_id} ({total:.3f}s) : {breakdown}")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Erreur sur {hal_id}: {e}")
+        raise
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Normalisation HAL → tables v2")
+    parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
+    parser.add_argument("--reset", action="store_true",
+                        help="Remettre tous les works à processed=FALSE")
+    parser.add_argument("--batch-size", type=int, default=500,
+                        help="Taille du commit batch (défaut: 500)")
+    args = parser.parse_args()
+
+    conn = get_connection()
+    conn.autocommit = False
+
+    try:
+        cur = conn.cursor()
+
+        if args.reset:
+            cur.execute("UPDATE staging_hal SET processed = FALSE")
+            count = cur.rowcount
+            conn.commit()
+            logger.info(f"Reset : {count} works remis à processed=FALSE")
+            return
+
+        cur.execute("SELECT COUNT(*) FROM staging_hal WHERE processed = FALSE")
+        total = cur.fetchone()[0]
+        logger.info(f"=== Normalisation HAL : {total} works à traiter ===")
+
+        if total == 0:
+            logger.info("Rien à faire.")
+            return
+
+        limit = args.limit or total
+        limit = min(limit, total)
+        logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
+
+        cur.execute("""
+            SELECT id, halid, doi, raw_data, collection
+            FROM staging_hal
+            WHERE processed = FALSE
+            ORDER BY id
+            LIMIT %s
+        """, (limit,))
+
+        rows = cur.fetchall()
+        processed = 0
+        errors = 0
+        skipped_hors_perimetre = 0
+
+        for row in rows:
+            try:
+                success = process_work(cur, row)
+                if success:
+                    processed += 1
+                elif row[4] is None:  # collection = NULL → hors périmètre skipé
+                    skipped_hors_perimetre += 1
+            except Exception:
+                conn.rollback()
+                errors += 1
+                continue
+
+            if processed % args.batch_size == 0:
+                conn.commit()
+                logger.info(
+                    f"  {processed}/{limit} traités "
+                    f"({errors} erreurs, {skipped_hors_perimetre} hors périmètre)"
+                )
+
+        conn.commit()
+
+        # Stats finales
+        logger.info(f"\n=== Terminé ===")
+        logger.info(f"Traités avec succès : {processed}")
+        logger.info(f"Hors périmètre (enrichissement seul) : {skipped_hors_perimetre}")
+        logger.info(f"Erreurs : {errors}")
+
+        for table in ["publications", "journals", "publishers",
+                       "hal_documents", "hal_authors", "hal_authorships"]:
+            cur.execute(f"SELECT COUNT(*) FROM {table}")
+            count = cur.fetchone()[0]
+            logger.info(f"  {table} : {count} enregistrements")
+
+        # Stats de recouvrement (publications dans les deux sources)
+        cur.execute("""
+            SELECT COUNT(*) FROM publications p
+            WHERE EXISTS (SELECT 1 FROM hal_documents hd WHERE hd.publication_id = p.id)
+              AND EXISTS (SELECT 1 FROM openalex_documents od WHERE od.publication_id = p.id)
+        """)
+        overlap = cur.fetchone()[0]
+        logger.info(f"\nPublications dans les deux sources : {overlap}")
+
+    except KeyboardInterrupt:
+        conn.commit()
+        logger.warning("Interruption — données déjà traitées conservées.")
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Erreur fatale : {e}")
+        raise
+    finally:
+        conn.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qualité détection — Bibliométrie UCA</title>
+    <style>
+        :root {
+            --bg: #f8f7f4;
+            --card: #ffffff;
+            --border: #e2e0db;
+            --text: #2c2c2c;
+            --text-muted: #777;
+            --accent: #3b6b9e;
+            --accent-light: #e8f0f8;
+            --success: #2a7d4f;
+            --success-light: #e6f4ec;
+            --danger: #c0392b;
+            --danger-light: #fbeaea;
+            --warning: #d4a017;
+            --warning-light: #fef8e8;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .header nav a {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            font-size: 13px;
+            margin-left: 16px;
+        }
+
+        .header nav a:hover {
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Stats cards */
+        .stats-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px 18px;
+            text-align: center;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .stat-card .value {
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .stat-card .label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-card.highlight-danger {
+            border-left: 3px solid var(--danger);
+        }
+
+        .stat-card.highlight-warning {
+            border-left: 3px solid var(--warning);
+        }
+
+        .stat-card.highlight-success {
+            border-left: 3px solid var(--success);
+        }
+
+        .val-danger {
+            color: var(--danger);
+        }
+
+        .val-warning {
+            color: var(--warning);
+        }
+
+        .val-success {
+            color: var(--success);
+        }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .tab-group {
+            display: flex;
+            gap: 0;
+            margin-right: 12px;
+        }
+
+        .tab-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            background: white;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .tab-btn:first-child {
+            border-radius: 4px 0 0 4px;
+        }
+
+        .tab-btn:last-child {
+            border-radius: 0 4px 4px 0;
+        }
+
+        .tab-btn:not(:first-child) {
+            border-left: none;
+        }
+
+        .tab-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .toolbar input[type="text"] {
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 13px;
+            background: white;
+            width: 280px;
+        }
+
+        .toolbar .count {
+            margin-left: auto;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        /* Help text */
+        .help-text {
+            background: var(--accent-light);
+            border: 1px solid #c4d8ed;
+            border-radius: 5px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #2c3e50;
+            line-height: 1.5;
+        }
+
+        /* Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 8px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border-bottom: 2px solid var(--border);
+            background: #fafaf8;
+        }
+
+        .data-table td {
+            padding: 7px 10px;
+            font-size: 13px;
+            border-bottom: 1px solid #f0efec;
+            vertical-align: top;
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tr:hover td {
+            background: #fafaf8;
+        }
+
+        .num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .addr-text {
+            font-family: 'SF Mono', 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            word-break: break-word;
+            max-width: 600px;
+        }
+
+        /* Tags */
+        .lab-tag {
+            display: inline-block;
+            font-size: 11px;
+            padding: 1px 7px;
+            border-radius: 10px;
+            font-weight: 500;
+            margin: 1px 2px;
+        }
+
+        .lab-tag.auto {
+            background: var(--warning-light);
+            color: #8a6d10;
+        }
+
+        .lab-tag.manual {
+            background: var(--success-light);
+            color: var(--success);
+        }
+
+        /* Lab assign row */
+        .assign-row {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            margin-top: 4px;
+        }
+
+        .assign-row select {
+            padding: 3px 6px;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            font-size: 12px;
+            background: white;
+            max-width: 200px;
+        }
+
+        .assign-btn {
+            padding: 3px 8px;
+            border: 1px solid var(--success);
+            border-radius: 3px;
+            background: var(--success-light);
+            color: var(--success);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .assign-btn:hover {
+            background: var(--success);
+            color: white;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin: 12px 0;
+        }
+
+        .pagination button {
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: white;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .pagination button:hover {
+            background: var(--accent-light);
+        }
+
+        .pagination button.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        /* Matched form info */
+        .form-info {
+            font-size: 11px;
+            margin-top: 4px;
+            padding: 4px 8px;
+            background: #fef8e8;
+            border: 1px solid #f0e4b8;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .form-info .form-text {
+            font-family: 'SF Mono', 'Consolas', monospace;
+            font-weight: 600;
+            color: #8a6d10;
+        }
+
+        .form-info .form-struct {
+            color: var(--text-muted);
+        }
+
+        .form-action {
+            padding: 1px 6px;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            background: white;
+            font-size: 10px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .form-action:hover {
+            background: var(--accent-light);
+        }
+
+        .form-action.danger {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .form-action.danger:hover {
+            background: var(--danger-light);
+        }
+
+        /* Rerun button */
+        .rerun-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            background: white;
+            color: var(--accent);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .rerun-btn:hover {
+            background: var(--accent);
+            color: white;
+        }
+
+        .rerun-btn:disabled {
+            opacity: 0.5;
+            cursor: wait;
+        }
+
+        /* Context picker for forms */
+        .ctx-picker-inline {
+            position: absolute;
+            z-index: 100;
+            background: white;
+            border: 1px solid var(--accent);
+            border-radius: 5px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            width: 320px;
+        }
+
+        .ctx-picker-inline input {
+            width: 100%;
+            padding: 6px 10px;
+            border: none;
+            border-bottom: 1px solid var(--border);
+            border-radius: 5px 5px 0 0;
+            font-size: 12px;
+            outline: none;
+        }
+
+        .ctx-picker-inline .picker-results {
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .ctx-picker-inline .picker-item {
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .ctx-picker-inline .picker-item:hover {
+            background: var(--accent-light);
+        }
+
+        .ctx-picker-inline .picker-shortcuts {
+            padding: 4px 8px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 4px;
+        }
+
+        .ctx-picker-inline .picker-shortcuts button {
+            padding: 2px 8px;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            background: white;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .ctx-picker-inline .picker-shortcuts button:hover {
+            background: var(--accent-light);
+        }
+    </style>
+    <script src="/static/admin/nav.js" defer></script>
+</head>
+
+<body>
+
+    <div class="header"></div>
+
+    <div class="container">
+        <div class="stats-row" id="stats-row"></div>
+
+        <div id="help-text" class="help-text"></div>
+
+        <div class="toolbar">
+            <div class="tab-group">
+                <button class="tab-btn active" id="tab-fn" onclick="switchTab('fn')">Faux négatifs</button>
+                <button class="tab-btn" id="tab-fp" onclick="switchTab('fp')">Faux positifs</button>
+            </div>
+            <input type="text" id="search-input" placeholder="Rechercher dans les adresses…">
+            <span class="count" id="result-count"></span>
+            <button class="rerun-btn" id="rerun-btn" onclick="launchRerun()">▶ Relancer la détection</button>
+        </div>
+
+        <div id="table-container"></div>
+        <div id="pagination" class="pagination"></div>
+    </div>
+
+    <script>
+        let currentTab = 'fn';  // fn = false negatives, fp = false positives
+        let currentPage = 1;
+        let currentSearch = '';
+        let searchTimeout = null;
+        let allLabs = [];
+        let allStructures = [];
+
+        async function api(url, opts) {
+            const res = await fetch(url, opts);
+            if (!res.ok) throw new Error('API error: ' + res.status);
+            return res.json();
+        }
+
+        function esc(s) {
+            if (!s) return '';
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        // ===== INIT =====
+        document.addEventListener('DOMContentLoaded', async () => {
+            allLabs = await api('/api/laboratories');
+            allStructures = await api('/api/structures');
+            loadStats();
+            loadTable();
+
+            document.getElementById('search-input').addEventListener('input', e => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    currentSearch = e.target.value;
+                    currentPage = 1;
+                    loadTable();
+                }, 400);
+            });
+        });
+
+        // ===== TABS =====
+        function switchTab(tab) {
+            currentTab = tab;
+            currentPage = 1;
+            currentSearch = '';
+            document.getElementById('search-input').value = '';
+            document.getElementById('tab-fn').classList.toggle('active', tab === 'fn');
+            document.getElementById('tab-fp').classList.toggle('active', tab === 'fp');
+            updateHelp();
+            loadTable();
+        }
+
+        function updateHelp() {
+            const el = document.getElementById('help-text');
+            if (currentTab === 'fn') {
+                el.innerHTML = '<strong>Faux négatifs</strong> — Adresses marquées UCA manuellement mais <em>non détectées</em> par le script. '
+                    + 'Ajouter des formes de nom et relancer la détection.';
+            } else {
+                el.innerHTML = '<strong>Faux positifs</strong> — Adresses détectées UCA par le script mais <em>rejetées</em> manuellement. '
+                    + 'La forme ayant matché est affichée — vous pouvez la supprimer ou lui ajouter un contexte contraignant, puis relancer la détection.';
+            }
+        }
+
+        // ===== STATS =====
+        async function loadStats() {
+            const s = await api('/api/feedback/stats');
+            const rate = s.detection_rate !== null ? s.detection_rate + '%' : '—';
+            document.getElementById('stats-row').innerHTML = `
+        <div class="stat-card highlight-success">
+            <div class="value val-success">${rate}</div>
+            <div class="label">Taux de concordance</div>
+        </div>
+        <div class="stat-card">
+            <div class="value">${s.total_reviewed}</div>
+            <div class="label">Adresses examinées</div>
+        </div>
+        <div class="stat-card highlight-warning">
+            <div class="value val-warning">${s.false_negatives}</div>
+            <div class="label">Faux négatifs</div>
+        </div>
+        <div class="stat-card highlight-danger">
+            <div class="value val-danger">${s.false_positives}</div>
+            <div class="label">Faux positifs</div>
+        </div>
+        <div class="stat-card">
+            <div class="value">${s.concordant_valid}</div>
+            <div class="label">Vrais positifs</div>
+        </div>
+        <div class="stat-card">
+            <div class="value">${s.pending}</div>
+            <div class="label">En attente</div>
+        </div>
+    `;
+        }
+
+        // ===== TABLE =====
+        async function loadTable() {
+            updateHelp();
+            const endpoint = currentTab === 'fn' ? '/api/feedback/false-negatives' : '/api/feedback/false-positives';
+            const params = new URLSearchParams({ page: currentPage, per_page: 50 });
+            if (currentSearch) params.set('search', currentSearch);
+
+            const data = await api(endpoint + '?' + params);
+            document.getElementById('result-count').textContent = data.total + ' adresses';
+
+            const container = document.getElementById('table-container');
+
+            if (!data.addresses.length) {
+                container.innerHTML = '<div class="empty">Aucune adresse trouvée — la détection est parfaite pour ce cas !</div>';
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+
+            let html = '<table class="data-table"><thead><tr>'
+                + '<th>Adresse</th>'
+                + '<th class="num" style="width:60px">Publis</th>'
+                + '<th style="width:200px">Labo(s) détectés</th>'
+                + (currentTab === 'fn' ? '<th style="width:250px">Assigner un labo</th>' : '<th style="width:280px">Forme ayant matché</th>')
+                + '</tr></thead><tbody>';
+
+            data.addresses.forEach(a => {
+                const labs = a.labs || [];
+                const labTags = labs.map(l => {
+                    const label = l.acronym || l.name;
+                    return '<span class="lab-tag auto" title="' + esc(l.name) + '">' + esc(label) + '</span>';
+                }).join(' ');
+
+                let actionCell = '';
+                if (currentTab === 'fn') {
+                    const assignedIds = labs.map(l => l.structure_id);
+                    const options = allLabs
+                        .filter(l => !assignedIds.includes(l.id))
+                        .map(l => '<option value="' + l.id + '">' + esc(l.acronym || l.name) + '</option>')
+                        .join('');
+                    actionCell = '<td>'
+                        + '<div class="assign-row">'
+                        + '<select id="lab-sel-' + a.id + '"><option value="">Choisir…</option>' + options + '</select>'
+                        + '<button class="assign-btn" onclick="assignLab(' + a.id + ')">Assigner</button>'
+                        + '</div></td>';
+                } else {
+                    // False positives: show matched forms with actions
+                    const forms = a.matched_forms || [];
+                    const seen = new Set();
+                    const formHtml = forms.filter(f => {
+                        if (seen.has(f.form_id)) return false;
+                        seen.add(f.form_id);
+                        return true;
+                    }).map(f => {
+                        const ctx = f.requires_context_of && f.requires_context_of.length
+                            ? ' <span style="color:var(--text-muted)">(ctx: ' + f.requires_context_of.map(x => x === 'tutelles' ? '🔗tut.' : x).join(', ') + ')</span>'
+                            : '';
+                        return '<div class="form-info">'
+                            + '<span class="form-struct">' + esc(f.structure_name) + ' →</span> '
+                            + '<span class="form-text">' + esc(f.form_text) + '</span>'
+                            + ctx
+                            + ' <button class="form-action" onclick="openFormCtxPicker(' + f.form_id + ', event)" title="Ajouter un contexte contraignant">+ ctx</button>'
+                            + ' <button class="form-action danger" onclick="deleteFormFromFeedback(' + f.form_id + ')" title="Supprimer cette forme">suppr.</button>'
+                            + '</div>';
+                    }).join('');
+                    actionCell = '<td>' + (formHtml || '<span style="color:var(--text-muted);font-size:11px">forme inconnue</span>') + '</td>';
+                }
+
+                html += '<tr>'
+                    + '<td class="addr-text">' + esc(a.raw_text) + '</td>'
+                    + '<td class="num">' + a.pub_count + '</td>'
+                    + '<td>' + (labTags || '<span style="color:var(--text-muted);font-size:12px">aucun</span>') + '</td>'
+                    + actionCell
+                    + '</tr>';
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+            renderPagination(data);
+        }
+
+        // ===== ASSIGN STRUCTURE =====
+        async function assignLab(addressId) {
+            const sel = document.getElementById('lab-sel-' + addressId);
+            const structId = sel.value;
+            if (!structId) return;
+
+            await api('/api/addresses/' + addressId + '/assign-structure', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ structure_id: parseInt(structId) }),
+            });
+
+            // Reload both stats and table
+            loadStats();
+            loadTable();
+        }
+
+        // ===== PAGINATION =====
+        function renderPagination(data) {
+            const container = document.getElementById('pagination');
+            if (data.pages <= 1) { container.innerHTML = ''; return; }
+
+            const cur = data.page;
+            let html = '<button ' + (cur <= 1 ? 'disabled' : '') + ' onclick="goPage(' + (cur - 1) + ')">‹</button>';
+            const s = Math.max(1, cur - 3), e = Math.min(data.pages, cur + 3);
+            if (s > 1) html += '<button onclick="goPage(1)">1</button>';
+            if (s > 2) html += '<button disabled>…</button>';
+            for (let i = s; i <= e; i++)
+                html += '<button class="' + (i === cur ? 'active' : '') + '" onclick="goPage(' + i + ')">' + i + '</button>';
+            if (e < data.pages - 1) html += '<button disabled>…</button>';
+            if (e < data.pages) html += '<button onclick="goPage(' + data.pages + ')">' + data.pages + '</button>';
+            html += '<button ' + (cur >= data.pages ? 'disabled' : '') + ' onclick="goPage(' + (cur + 1) + ')">›</button>';
+            container.innerHTML = html;
+        }
+
+        function goPage(p) {
+            currentPage = p;
+            loadTable();
+            window.scrollTo(0, 0);
+        }
+
+        // ===== FORM ACTIONS (false positives) =====
+        async function deleteFormFromFeedback(formId) {
+            if (!confirm('Supprimer cette forme de nom ? Cela affectera la détection après relance.')) return;
+            try {
+                await api('/api/name-forms/' + formId, { method: 'DELETE' });
+                loadTable();
+            } catch (e) {
+                alert('Erreur: ' + e.message);
+            }
+        }
+
+        // Context picker for adding context to a form
+        let formCtxPicker = { formId: null };
+
+        function openFormCtxPicker(formId, event) {
+            event.stopPropagation();
+            formCtxPicker.formId = formId;
+            // Remove existing picker
+            closeFormCtxPicker();
+
+            const picker = document.createElement('div');
+            picker.className = 'ctx-picker-inline';
+            picker.id = 'form-ctx-picker';
+            picker.innerHTML = '<div class="picker-shortcuts">'
+                + '<button onclick="addCtxToForm(\'tutelles\')">🔗 tutelles</button>'
+                + '</div>'
+                + '<input type="text" placeholder="Rechercher une structure…" oninput="renderFormCtxResults(this.value)">'
+                + '<div class="picker-results" id="form-ctx-results"></div>';
+
+            // Position near the button
+            const btn = event.target;
+            const rect = btn.getBoundingClientRect();
+            picker.style.position = 'fixed';
+            picker.style.top = (rect.bottom + 4) + 'px';
+            picker.style.left = Math.min(rect.left, window.innerWidth - 340) + 'px';
+            document.body.appendChild(picker);
+            picker.querySelector('input').focus();
+            renderFormCtxResults('');
+        }
+
+        function closeFormCtxPicker() {
+            const el = document.getElementById('form-ctx-picker');
+            if (el) el.remove();
+        }
+
+        function renderFormCtxResults(query) {
+            const q = query.toLowerCase();
+            const results = allStructures.filter(s =>
+                s.name.toLowerCase().includes(q) || (s.acronym || '').toLowerCase().includes(q) || s.code.toLowerCase().includes(q)
+            ).slice(0, 8);
+            const el = document.getElementById('form-ctx-results');
+            if (!el) return;
+            el.innerHTML = results.map(s =>
+                '<div class="picker-item" onclick="addCtxToForm(' + s.id + ')">'
+                + '<span style="font-size:9px;color:var(--text-muted)">' + esc(s.type) + '</span> '
+                + esc(s.acronym ? s.acronym + ' — ' : '') + esc(s.name)
+                + '</div>'
+            ).join('') || '<div class="picker-item" style="color:var(--text-muted)">Aucun résultat</div>';
+        }
+
+        async function addCtxToForm(item) {
+            const formId = formCtxPicker.formId;
+            closeFormCtxPicker();
+            if (!formId) return;
+
+            try {
+                // Get current form to read existing context
+                const formData = await api('/api/name-forms/' + formId);
+                const ctx = formData.requires_context_of || [];
+                if (!ctx.includes(item)) ctx.push(item);
+
+                await api('/api/name-forms/' + formId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ requires_context_of: ctx })
+                });
+                loadTable();
+            } catch (e) {
+                alert('Erreur: ' + e.message);
+            }
+        }
+
+        // Close picker on outside click
+        document.addEventListener('click', e => {
+            const picker = document.getElementById('form-ctx-picker');
+            if (picker && !picker.contains(e.target) && !e.target.classList.contains('form-action')) {
+                closeFormCtxPicker();
+            }
+        });
+
+        // ===== RERUN =====
+        async function launchRerun() {
+            const btn = document.getElementById('rerun-btn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Détection en cours…';
+
+            try {
+                const result = await api('/api/feedback/rerun', { method: 'POST' });
+                if (result.success) {
+                    btn.textContent = '✓ Terminé';
+                    loadStats();
+                    loadTable();
+                    setTimeout(() => {
+                        btn.textContent = '▶ Relancer la détection';
+                        btn.disabled = false;
+                    }, 3000);
+                } else {
+                    alert('Erreur:\n' + result.summary.join('\n'));
+                    btn.textContent = '▶ Relancer la détection';
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                alert('Erreur: ' + e.message);
+                btn.textContent = '▶ Relancer la détection';
+                btn.disabled = false;
+            }
+        }
+    </script>
+
+</body>
+
+</html>

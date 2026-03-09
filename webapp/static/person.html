@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personne — Bibliométrie UCA</title>
+    <style>
+        :root {
+            --bg: #f8f7f4;
+            --card: #ffffff;
+            --border: #e2e0db;
+            --text: #2c2c2c;
+            --text-muted: #777;
+            --accent: #3b6b9e;
+            --accent-light: #e8f0f8;
+            --success: #2a7d4f;
+            --success-light: #e6f4ec;
+            --gold: #d4a017;
+            --hybrid: #8e6bbf;
+            --green: #2a7d4f;
+            --bronze: #b8733e;
+            --closed: #999;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .header { background: #2c3e50; color: white; padding: 12px 24px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 16px 24px; }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 12px;
+            font-size: 13px;
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .back-link:hover { text-decoration: underline; }
+
+        /* Profile header */
+        .profile-header {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+        }
+        .profile-name {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0 0 6px;
+        }
+        .profile-last { font-variant: small-caps; }
+        .profile-meta {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .role-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #f0efec;
+            border-radius: 3px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Sections */
+        .section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin: 0 0 10px;
+            color: var(--text);
+        }
+
+        /* Identifiers */
+        .identifiers {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .id-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+        .id-label {
+            font-weight: 500;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+        .id-badge {
+            display: inline-block;
+            padding: 2px 7px;
+            background: var(--accent-light);
+            border-radius: 3px;
+            font-size: 11px;
+            color: var(--accent);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .id-badge:hover { background: #d4e4f3; text-decoration: none; }
+
+        /* Authors table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        thead th {
+            background: #f5f4f1;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        tbody tr { border-bottom: 1px solid #f0efec; }
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: #fafaf8; }
+        td {
+            padding: 7px 10px;
+            font-size: 13px;
+            vertical-align: middle;
+        }
+        td a { color: var(--accent); text-decoration: none; }
+        td a:hover { text-decoration: underline; }
+
+        .source-tag-label {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .source-hal-label { background: #e8f0f8; color: #3b6b9e; }
+        .source-oa-label { background: #fef3e0; color: #b8733e; }
+
+        /* Addresses */
+        .address-list { list-style: none; padding: 0; margin: 0; }
+        .address-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #f0efec;
+            font-size: 13px;
+        }
+        .address-item:last-child { border-bottom: none; }
+        .address-raw {
+            color: var(--text-muted);
+            font-size: 12px;
+            word-break: break-all;
+        }
+        .address-structures {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+        .struct-tag {
+            display: inline-block;
+            padding: 2px 7px;
+            background: var(--accent-light);
+            border-radius: 3px;
+            font-size: 11px;
+            color: var(--accent);
+            font-weight: 500;
+        }
+        .toggle-btn {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 12px;
+            color: var(--accent);
+            cursor: pointer;
+            margin-top: 6px;
+        }
+        .toggle-btn:hover { background: var(--accent-light); }
+
+        /* Publications table (same as publications.html) */
+        .pub-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .pub-table th {
+            background: #f5f4f1;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+        .pub-table td {
+            padding: 7px 10px;
+            border-bottom: 1px solid #f0efec;
+            font-size: 13px;
+            vertical-align: top;
+        }
+        .pub-table tr:hover td { background: #fafaf8; }
+        .pub-title { font-weight: 500; color: var(--text); max-width: 500px; }
+
+        .source-tag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            text-decoration: none;
+            margin-right: 3px;
+            vertical-align: middle;
+            transition: transform 0.1s;
+        }
+        .source-tag:hover { transform: scale(1.15); }
+        .source-tag img, .source-tag svg { width: 14px; height: 14px; display: block; }
+        .source-hal { background: #e8f0f8; }
+        .source-hal:hover { background: #d0e3f4; }
+        .source-oa { background: #fef3e0; }
+        .source-oa:hover { background: #fde8c8; }
+        .source-doi { background: #f0f0f0; }
+        .source-doi:hover { background: #e0e0e0; }
+        .links-cell { white-space: nowrap; }
+
+        .lab-tag {
+            display: inline-block;
+            font-size: 11px;
+            padding: 1px 7px;
+            border-radius: 10px;
+            background: var(--accent-light);
+            color: var(--accent);
+            font-weight: 500;
+        }
+        .oa-tag {
+            display: inline-block;
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        .oa-gold { background: #fef3e0; color: var(--gold); }
+        .oa-hybrid { background: #f3eef9; color: var(--hybrid); }
+        .oa-green { background: var(--success-light); color: var(--green); }
+        .oa-bronze { background: #fdf0e6; color: var(--bronze); }
+        .oa-closed { background: #e0e0e0; color: #555; }
+        .oa-unknown { background: #f5f5f5; color: #bbb; }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            align-items: center;
+            margin: 16px 0;
+        }
+        .pagination button {
+            padding: 5px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--card);
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .pagination button:hover { background: #f0f0f0; }
+        .pagination button:disabled { opacity: 0.4; cursor: default; }
+        .pagination button.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        .pagination span { font-size: 13px; color: var(--text-muted); }
+
+        .no-results { text-align: center; padding: 40px; color: var(--text-muted); }
+        .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="header"></div>
+    <div class="container">
+        <a href="/persons" class="back-link">&larr; Personnes</a>
+
+        <!-- Profile header -->
+        <div class="profile-header" id="profile-header">
+            <div class="loading">Chargement...</div>
+        </div>
+
+        <!-- Identifiers -->
+        <div class="section" id="section-identifiers" style="display:none">
+            <div class="section-title">Identifiants</div>
+            <div class="identifiers" id="identifiers"></div>
+        </div>
+
+        <!-- Linked identities -->
+        <div class="section" id="section-authors" style="display:none">
+            <div class="section-title">Identit&eacute;s li&eacute;es</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Nom complet</th>
+                        <th>ORCID / idHAL</th>
+                        <th>Identifiant source</th>
+                        <th>Publis UCA</th>
+                    </tr>
+                </thead>
+                <tbody id="authors-tbody"></tbody>
+            </table>
+        </div>
+
+        <!-- Addresses -->
+        <div class="section" id="section-addresses" style="display:none">
+            <div class="section-title">Adresses (authorships OpenAlex)</div>
+            <ul class="address-list" id="address-list"></ul>
+        </div>
+
+        <!-- Publications -->
+        <div class="section" id="section-publications">
+            <div class="section-title">Publications <span id="pub-count" style="font-weight:400;color:var(--text-muted);font-size:12px"></span></div>
+            <table class="pub-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px">An.</th>
+                        <th>Titre</th>
+                        <th>Revue</th>
+                        <th style="width:80px">Labo(s)</th>
+                        <th style="width:80px">Liens</th>
+                        <th style="width:50px">OA</th>
+                        <th style="width:80px">Type</th>
+                    </tr>
+                </thead>
+                <tbody id="pub-tbody"></tbody>
+            </table>
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <script src="/static/nav.js" defer></script>
+    <script>
+    (function() {
+        const personId = window.location.pathname.split('/').pop();
+        let pubPage = 1;
+        const pubPerPage = 50;
+
+        function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        function titleCase(s) {
+            if (!s) return '';
+            return s.split(/(\s+|-)/g).map(w =>
+                /^[\s-]+$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+            ).join('');
+        }
+
+        function formatDate(d) {
+            if (!d) return null;
+            const parts = d.split('-');
+            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            return d;
+        }
+
+        // ===== Load profile + identifiers + authors =====
+        fetch(`/api/persons/${personId}/profile`)
+            .then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); })
+            .then(data => {
+                renderProfile(data.person);
+                renderIdentifiers(data.person, data.identifiers);
+                renderAuthors(data.authors);
+            })
+            .catch(() => {
+                document.getElementById('profile-header').innerHTML =
+                    '<div class="no-results">Personne introuvable</div>';
+            });
+
+        function renderProfile(p) {
+            const plainName = `${titleCase(p.first_name)} ${titleCase(p.last_name)}`;
+            document.title = `${plainName} — Bibliométrie UCA`;
+
+            const nameHtml = `${esc(titleCase(p.first_name))} <span class="profile-last">${esc(titleCase(p.last_name))}</span>`;
+
+            let meta = [];
+            if (p.role_title) meta.push(`<span class="role-badge">${esc(p.role_title)}</span>`);
+            if (p.department_name) meta.push(esc(p.department_name));
+
+            let dates = '';
+            if (p.start_date || p.end_date) {
+                const from = p.start_date ? formatDate(p.start_date) : '?';
+                const to = p.end_date ? formatDate(p.end_date) : 'en poste';
+                dates = `Du ${from} — ${to}`;
+            }
+            if (dates) meta.push(dates);
+
+            document.getElementById('profile-header').innerHTML = `
+                <h1 class="profile-name">${nameHtml}</h1>
+                <div class="profile-meta">${meta.join('<span style="color:#ddd">|</span>')}</div>
+            `;
+        }
+
+        function renderIdentifiers(person, identifiers) {
+            const container = document.getElementById('identifiers');
+            const items = [];
+
+            // ORCID from person_identifiers
+            const orcids = identifiers.filter(i => i.id_type === 'orcid');
+            orcids.forEach(o => {
+                items.push(`<div class="id-item">
+                    <span class="id-label">ORCID</span>
+                    <a href="https://orcid.org/${esc(o.id_value)}" target="_blank" class="id-badge">${esc(o.id_value)}</a>
+                </div>`);
+            });
+
+            // idHAL: will come from linked authors, but also check identifiers
+            const idhals = new Set();
+            // idHAL not in person_identifiers, will be filled from authors below
+            // For now we leave them to renderAuthors which fills them
+
+            if (!items.length) return; // will be updated by authors if idhals exist
+            document.getElementById('section-identifiers').style.display = '';
+            container.innerHTML = items.join('');
+        }
+
+        function renderAuthors(authors) {
+            if (!authors.length) return;
+            document.getElementById('section-authors').style.display = '';
+
+            // Also fill identifiers section with idHAL if found
+            const identifiersEl = document.getElementById('identifiers');
+            const idhals = new Set();
+            authors.forEach(a => {
+                if (a.idhal) idhals.add(a.idhal);
+            });
+            if (idhals.size) {
+                document.getElementById('section-identifiers').style.display = '';
+                idhals.forEach(idh => {
+                    identifiersEl.innerHTML += `<div class="id-item">
+                        <span class="id-label">idHAL</span>
+                        <a href="https://hal.science/search/index/?q=%2A&authIdHal_s=${esc(idh)}" target="_blank" class="id-badge">${esc(idh)}</a>
+                    </div>`;
+                });
+            }
+
+            document.getElementById('authors-tbody').innerHTML = authors.map(a => {
+                const sourceLabel = a.source === 'hal'
+                    ? '<span class="source-tag-label source-hal-label">HAL</span>'
+                    : '<span class="source-tag-label source-oa-label">OpenAlex</span>';
+
+                // Column "ORCID / idHAL"
+                let idsCol = '';
+                if (a.orcid) {
+                    idsCol += `<a href="https://orcid.org/${esc(a.orcid)}" target="_blank" class="id-badge">${esc(a.orcid)}</a> `;
+                }
+                if (a.idhal) {
+                    idsCol += `<a href="https://hal.science/search/index/?q=%2A&authIdHal_s=${esc(a.idhal)}" target="_blank" class="id-badge">${esc(a.idhal)}</a>`;
+                }
+
+                // Column "Identifiant source" — hal_person_id or openalex_id
+                let sourceIdCol = '';
+                if (a.source === 'hal' && a.hal_person_id) {
+                    sourceIdCol = `<span class="id-badge">${a.hal_person_id}</span>`;
+                } else if (a.source === 'openalex' && a.openalex_id) {
+                    sourceIdCol = `<a href="https://openalex.org/${esc(a.openalex_id)}" target="_blank" class="id-badge">${esc(a.openalex_id)}</a>`;
+                }
+
+                return `<tr>
+                    <td>${sourceLabel}</td>
+                    <td>${esc(a.full_name)}</td>
+                    <td>${idsCol}</td>
+                    <td>${sourceIdCol}</td>
+                    <td>${a.uca_pub_count}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        // ===== Load addresses =====
+        fetch(`/api/persons/${personId}/addresses`)
+            .then(r => r.json())
+            .then(addresses => {
+                if (!addresses.length) return;
+                document.getElementById('section-addresses').style.display = '';
+                renderAddresses(addresses);
+            });
+
+        function renderAddresses(addresses) {
+            const list = document.getElementById('address-list');
+            const COLLAPSE_LIMIT = 10;
+            const showAll = addresses.length <= COLLAPSE_LIMIT;
+
+            list.innerHTML = addresses.map((a, i) => {
+                const structs = (a.structures || []).map(s =>
+                    `<span class="struct-tag">${esc(s.acronym || s.name)}</span>`
+                ).join('');
+
+                const hidden = !showAll && i >= COLLAPSE_LIMIT ? ' style="display:none" data-extra' : '';
+                return `<li class="address-item"${hidden}>
+                    <div class="address-raw">${esc(a.raw_text)}</div>
+                    ${structs ? `<div class="address-structures">${structs}</div>` : ''}
+                </li>`;
+            }).join('');
+
+            if (!showAll) {
+                const btn = document.createElement('button');
+                btn.className = 'toggle-btn';
+                btn.textContent = `Afficher les ${addresses.length - COLLAPSE_LIMIT} adresses restantes`;
+                btn.addEventListener('click', () => {
+                    list.querySelectorAll('[data-extra]').forEach(el => el.style.display = '');
+                    btn.remove();
+                });
+                list.after(btn);
+            }
+        }
+
+        // ===== Load publications =====
+        loadPublications();
+
+        function loadPublications() {
+            const params = new URLSearchParams({
+                page: pubPage,
+                per_page: pubPerPage,
+                person_id: personId,
+                sort: 'year_desc',
+            });
+
+            fetch('/api/publications?' + params)
+                .then(r => r.json())
+                .then(data => {
+                    renderPublications(data);
+                    renderPagination(data);
+                });
+        }
+
+        function renderPublications(data) {
+            const countEl = document.getElementById('pub-count');
+            countEl.textContent = `(${data.total} publication${data.total > 1 ? 's' : ''})`;
+
+            const tbody = document.getElementById('pub-tbody');
+            if (!data.publications.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="no-results">Aucune publication</td></tr>';
+                return;
+            }
+
+            const typeLabels = {
+                article: 'Article', review: 'Review', conference_paper: 'Conf.',
+                book: 'Ouvrage', book_chapter: 'Chapitre', thesis: 'Th\u00e8se',
+                preprint: 'Preprint', editorial: '\u00c9ditorial', report: 'Rapport', other: 'Autre'
+            };
+
+            tbody.innerHTML = data.publications.map(p => {
+                let links = '';
+                if (p.hal_id) {
+                    links += `<a href="https://hal.science/${esc(p.hal_id)}" target="_blank" class="source-tag source-hal" title="HAL: ${esc(p.hal_id)}"><img src="https://hal.science/favicon.ico" alt="HAL"></a>`;
+                }
+                if (p.openalex_id) {
+                    links += `<a href="https://openalex.org/${esc(p.openalex_id)}" target="_blank" class="source-tag source-oa" title="OpenAlex: ${esc(p.openalex_id)}"><img src="https://raw.githubusercontent.com/ourresearch/openalex-gui/refs/heads/master/public/favicon.png" alt="OA"></a>`;
+                }
+                if (p.doi) {
+                    links += `<a href="https://doi.org/${esc(p.doi)}" target="_blank" class="source-tag source-doi" title="${esc(p.doi)}"><svg viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`;
+                }
+
+                const titleHtml = `<span class="pub-title">${esc(p.title)}</span>`;
+                const labsHtml = p.labs ? p.labs.split(', ').map(l => `<span class="lab-tag">${esc(l)}</span>`).join(' ') : '';
+                const oaClass = p.oa_status ? `oa-${p.oa_status}` : '';
+                const oaHtml = p.oa_status && p.oa_status !== 'unknown'
+                    ? `<span class="oa-tag ${oaClass}">${p.oa_status}</span>` : '';
+                const typeHtml = `<span style="font-size:11px;color:var(--text-muted)">${typeLabels[p.doc_type] || p.doc_type || ''}</span>`;
+
+                return `<tr>
+                    <td>${p.pub_year || ''}</td>
+                    <td>${titleHtml}</td>
+                    <td style="font-size:12px;color:var(--text-muted)">${esc(p.journal || '')}</td>
+                    <td>${labsHtml}</td>
+                    <td class="links-cell">${links}</td>
+                    <td>${oaHtml}</td>
+                    <td>${typeHtml}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function renderPagination(data) {
+            const container = document.getElementById('pagination');
+            if (data.pages <= 1) { container.innerHTML = ''; return; }
+
+            let html = '';
+            html += `<button ${data.page <= 1 ? 'disabled' : ''} data-page="${data.page - 1}">&larr;</button>`;
+
+            const start = Math.max(1, data.page - 3);
+            const end = Math.min(data.pages, data.page + 3);
+
+            if (start > 1) {
+                html += `<button data-page="1">1</button>`;
+                if (start > 2) html += `<span>&hellip;</span>`;
+            }
+            for (let i = start; i <= end; i++) {
+                html += `<button class="${i === data.page ? 'active' : ''}" data-page="${i}">${i}</button>`;
+            }
+            if (end < data.pages) {
+                if (end < data.pages - 1) html += `<span>&hellip;</span>`;
+                html += `<button data-page="${data.pages}">${data.pages}</button>`;
+            }
+
+            html += `<button ${data.page >= data.pages ? 'disabled' : ''} data-page="${data.page + 1}">&rarr;</button>`;
+            html += `<span style="margin-left:8px">Page ${data.page}/${data.pages}</span>`;
+
+            container.innerHTML = html;
+            container.querySelectorAll('button[data-page]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    pubPage = parseInt(btn.dataset.page);
+                    loadPublications();
+                });
+            });
+        }
+    })();
+    </script>
+</body>
+</html>

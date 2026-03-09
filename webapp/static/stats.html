@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statistiques — Bibliométrie UCA</title>
+    <style>
+        :root {
+            --bg: #f8f7f4;
+            --card: #ffffff;
+            --border: #e2e0db;
+            --text: #2c2c2c;
+            --text-muted: #777;
+            --accent: #3b6b9e;
+            --accent-light: #e8f0f8;
+            --gold: #d4a017;
+            --hybrid: #8e6bbf;
+            --green: #2a7d4f;
+            --bronze: #b8733e;
+            --closed: #555;
+            --unknown: #bbb;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header h1 { font-size: 16px; font-weight: 600; margin: 0; }
+        .header nav a {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            font-size: 13px;
+            margin-left: 16px;
+        }
+        .header nav a:hover { color: white; }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Summary row */
+        .summary-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .summary-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 16px;
+            text-align: center;
+        }
+        .summary-card .value {
+            font-size: 20px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .summary-card .label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .pub-link {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 14px;
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .pub-link:hover { opacity: 0.9; }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .toolbar select, .toolbar input[type="text"] {
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 13px;
+            background: white;
+        }
+        .toolbar input[type="text"] { width: 220px; }
+        .tab-group {
+            display: flex;
+            gap: 0;
+            margin-right: 12px;
+        }
+        .tab-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            background: white;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .tab-btn:first-child { border-radius: 4px 0 0 4px; }
+        .tab-btn:last-child { border-radius: 0 4px 4px 0; }
+        .tab-btn:not(:first-child) { border-left: none; }
+        .tab-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        .toolbar .count {
+            margin-left: auto;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        /* Chart */
+        .chart-area {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 16px;
+            position: relative;
+            height: 320px;
+        }
+
+        /* Tables */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+        .data-table th {
+            text-align: left;
+            padding: 8px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border-bottom: 2px solid var(--border);
+            background: #fafaf8;
+        }
+        .data-table td {
+            padding: 7px 10px;
+            font-size: 13px;
+            border-bottom: 1px solid #f0efec;
+        }
+        .data-table tr:last-child td { border-bottom: none; }
+        .data-table tr:hover td { background: #fafaf8; }
+        .name-cell {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .name-cell a {
+            color: var(--accent);
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .name-cell a:hover { text-decoration: underline; }
+        .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .num-small { font-size: 12px; color: var(--text-muted); }
+
+        .oa-bar {
+            display: flex;
+            height: 6px;
+            border-radius: 3px;
+            overflow: hidden;
+            min-width: 80px;
+        }
+        .oa-bar span { height: 100%; }
+        .oa-bar .gold { background: var(--gold); }
+        .oa-bar .hybrid { background: var(--hybrid); }
+        .oa-bar .bronze { background: var(--bronze); }
+        .oa-bar .green { background: var(--green); }
+        .oa-bar .closed { background: var(--closed); }
+        .oa-bar .unknown { background: var(--unknown); }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin: 8px 0 16px;
+        }
+        .pagination button {
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: white;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .pagination button:hover { background: var(--accent-light); }
+        .pagination button.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        .pagination button:disabled { opacity: 0.4; cursor: default; }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 8px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .legend-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            margin-right: 3px;
+            vertical-align: middle;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        .breadcrumb a {
+            color: var(--accent);
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .breadcrumb .sep { margin: 0 6px; color: #ccc; }
+
+        /* Section title */
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 20px 0 8px;
+        }
+    </style>
+    <script src="/static/nav.js" defer></script>
+</head>
+<body>
+
+<div class="header"></div>
+
+<div class="container">
+    <div class="summary-row" id="summary"></div>
+
+    <div class="toolbar">
+        <div class="tab-group" id="tab-group">
+            <button class="tab-btn active" onclick="goTo('publishers')">Éditeurs</button>
+            <button class="tab-btn" onclick="goTo('journals')">Revues</button>
+        </div>
+        <select id="lab-filter">
+            <option value="">Tous les labos</option>
+        </select>
+        <select id="year-filter">
+            <option value="">Toutes les années</option>
+        </select>
+        <select id="oa-filter">
+            <option value="">Toutes voies OA</option>
+            <option value="oa">Open Access (toutes)</option>
+            <option value="gold">Gold</option>
+            <option value="hybrid">Hybrid</option>
+            <option value="bronze">Bronze</option>
+            <option value="green">Green</option>
+            <option value="closed">Closed</option>
+            <option value="unknown">Indéterminé</option>
+        </select>
+        <input type="text" id="search-input" placeholder="Rechercher…">
+        <span class="count" id="result-count"></span>
+    </div>
+
+    <div id="breadcrumb" class="breadcrumb" style="display:none;"></div>
+
+    <div class="legend">
+        <span><span class="legend-dot" style="background:var(--gold)"></span>Gold</span>
+        <span><span class="legend-dot" style="background:var(--hybrid)"></span>Hybrid</span>
+        <span><span class="legend-dot" style="background:var(--bronze)"></span>Bronze</span>
+        <span><span class="legend-dot" style="background:var(--green)"></span>Green</span>
+        <span><span class="legend-dot" style="background:var(--closed)"></span>Closed</span>
+        <span><span class="legend-dot" style="background:var(--unknown)"></span>Indéterminé</span>
+    </div>
+    <div class="chart-area"><canvas id="yearChart"></canvas></div>
+
+    <div id="tables-container"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>
+// ===== STATE =====
+let state = {
+    view: 'publishers',   // publishers | journals | publisher_detail | journal_detail
+    labId: '',
+    year: '',
+    oaStatus: '',
+    search: '',
+    publisherId: null,
+    publisherName: '',
+    journalId: null,
+    journalName: '',
+    page: 1,
+    labPage: 1,
+};
+let searchTimeout = null;
+let yearChart = null;
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+    loadLabs();
+    loadYears();
+    refresh();
+
+    document.getElementById('lab-filter').addEventListener('change', e => {
+        state.labId = e.target.value;
+        state.page = 1; state.labPage = 1;
+        refresh();
+    });
+    document.getElementById('year-filter').addEventListener('change', e => {
+        state.year = e.target.value;
+        state.page = 1; state.labPage = 1;
+        refresh();
+    });
+    document.getElementById('oa-filter').addEventListener('change', e => {
+        state.oaStatus = e.target.value;
+        state.page = 1; state.labPage = 1;
+        refresh();
+    });
+    document.getElementById('search-input').addEventListener('input', e => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            state.search = e.target.value;
+            state.page = 1;
+            loadTables();
+        }, 400);
+    });
+});
+
+// ===== NAVIGATION =====
+function goTo(view, opts) {
+    opts = opts || {};
+    state.view = view;
+    state.page = 1;
+    state.labPage = 1;
+    state.search = '';
+    document.getElementById('search-input').value = '';
+
+    if (view === 'publishers' || view === 'journals') {
+        state.publisherId = null; state.publisherName = '';
+        state.journalId = null;   state.journalName = '';
+    } else if (view === 'publisher_detail') {
+        state.publisherId = opts.id;  state.publisherName = opts.name;
+        state.journalId = null;       state.journalName = '';
+    } else if (view === 'journal_detail') {
+        state.journalId = opts.id;    state.journalName = opts.name;
+    }
+    refresh();
+}
+
+function refresh() {
+    updateTabs();
+    updateBreadcrumb();
+    loadSummary();
+    loadChart();
+    loadTables();
+}
+
+// ===== PARAMS HELPERS =====
+function chartParams() {
+    // For chart & summary: use publisher/journal from state
+    const p = new URLSearchParams();
+    if (state.labId)       p.set('lab_id', state.labId);
+    if (state.year)        p.set('year', state.year);
+    if (state.oaStatus)    p.set('oa_status', state.oaStatus);
+    if (state.publisherId) p.set('publisher_id', state.publisherId);
+    if (state.journalId)   p.set('journal_id', state.journalId);
+    return p;
+}
+
+function pubsUrl() {
+    const p = new URLSearchParams();
+    if (state.labId)       p.set('lab_id', state.labId);
+    if (state.year)        p.set('year', state.year);
+    if (state.oaStatus)    p.set('oa_status', state.oaStatus);
+    if (state.publisherId) { p.set('publisher_id', state.publisherId); p.set('publisher_name', state.publisherName); }
+    if (state.journalId)   { p.set('journal_id', state.journalId); p.set('journal_name', state.journalName); }
+    p.set('doc_type', 'article,review');
+    return '/publications?' + p.toString();
+}
+
+// ===== UI UPDATES =====
+function updateTabs() {
+    const group = document.getElementById('tab-group');
+    const isTop = (state.view === 'publishers' || state.view === 'journals');
+    group.style.display = isTop ? 'flex' : 'none';
+    if (isTop) {
+        group.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        group.querySelectorAll('.tab-btn')[state.view === 'publishers' ? 0 : 1].classList.add('active');
+    }
+}
+
+function updateBreadcrumb() {
+    const bc = document.getElementById('breadcrumb');
+    if (state.view === 'publishers' || state.view === 'journals') {
+        bc.style.display = 'none'; return;
+    }
+    bc.style.display = 'block';
+    let html = '<a onclick="goTo(\'publishers\')">Éditeurs</a>';
+    if (state.publisherId) {
+        html += '<span class="sep">›</span>';
+        if (state.view === 'publisher_detail') {
+            html += esc(state.publisherName);
+        } else {
+            html += '<a onclick="goTo(\'publisher_detail\',{id:' + state.publisherId + ',name:\'' + escJs(state.publisherName) + '\'})">' + esc(state.publisherName) + '</a>';
+        }
+    }
+    if (state.journalId) {
+        html += '<span class="sep">›</span>' + esc(state.journalName);
+    }
+    bc.innerHTML = html;
+}
+
+// ===== DATA LOADING =====
+async function api(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API error: ' + res.status);
+    return res.json();
+}
+
+async function loadLabs() {
+    const labs = await api('/api/laboratories');
+    const sel = document.getElementById('lab-filter');
+    labs.forEach(l => {
+        const o = document.createElement('option');
+        o.value = l.id; o.textContent = l.name;
+        sel.appendChild(o);
+    });
+}
+
+async function loadYears() {
+    const years = await api('/api/pub-stats/years');
+    const sel = document.getElementById('year-filter');
+    years.forEach(y => {
+        const o = document.createElement('option');
+        o.value = y; o.textContent = y;
+        sel.appendChild(o);
+    });
+}
+
+async function loadSummary() {
+    const p = chartParams();
+    const s = await api('/api/pub-stats/summary?' + p);
+
+    let cards = '<div class="summary-card"><div class="value">' + s.total_pubs + '</div><div class="label">Articles</div></div>';
+    if (!state.journalId) {
+        if (!state.publisherId) {
+            cards += '<div class="summary-card"><div class="value">' + s.publisher_count + '</div><div class="label">Éditeurs</div></div>';
+        }
+        cards += '<div class="summary-card"><div class="value">' + s.journal_count + '</div><div class="label">Revues</div></div>';
+    }
+    cards += '<a class="pub-link" href="' + pubsUrl() + '">Voir les publications →</a>';
+    document.getElementById('summary').innerHTML = cards;
+}
+
+async function loadChart() {
+    const p = chartParams();
+    const data = await api('/api/pub-stats/by-year?' + p);
+    const ctx = document.getElementById('yearChart').getContext('2d');
+    if (yearChart) yearChart.destroy();
+    if (!data.length) { yearChart = null; return; }
+
+    const labels = data.map(d => d.pub_year);
+    const cs = getComputedStyle(document.documentElement);
+    Chart.register(ChartDataLabels);
+
+    yearChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Gold',        data: data.map(d => d.gold),    backgroundColor: cs.getPropertyValue('--gold').trim(),    barPercentage: 0.5, categoryPercentage: 0.7 },
+                { label: 'Hybrid',      data: data.map(d => d.hybrid),  backgroundColor: cs.getPropertyValue('--hybrid').trim(),  barPercentage: 0.5, categoryPercentage: 0.7 },
+                { label: 'Bronze',      data: data.map(d => d.bronze),  backgroundColor: cs.getPropertyValue('--bronze').trim(),  barPercentage: 0.5, categoryPercentage: 0.7 },
+                { label: 'Green',       data: data.map(d => d.green),   backgroundColor: cs.getPropertyValue('--green').trim(),   barPercentage: 0.5, categoryPercentage: 0.7 },
+                { label: 'Closed',      data: data.map(d => d.closed),  backgroundColor: cs.getPropertyValue('--closed').trim(),  barPercentage: 0.5, categoryPercentage: 0.7 },
+                { label: 'Indéterminé', data: data.map(d => d.unknown), backgroundColor: cs.getPropertyValue('--unknown').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    callbacks: { footer: function(items) { return 'Total : ' + items.reduce(function(a,i){return a+i.raw}, 0); } },
+                },
+                datalabels: {
+                    color: '#fff',
+                    font: { size: 11, weight: 'bold' },
+                    formatter: function(val, ctx) {
+                        var total = ctx.chart.data.datasets.reduce(function(s,ds){return s+(ds.data[ctx.dataIndex]||0)}, 0);
+                        var pct = total ? (val / total * 100) : 0;
+                        return pct >= 10 ? Math.round(pct) + '%' : '';
+                    },
+                    anchor: 'center',
+                    align: 'center',
+                },
+            },
+            scales: {
+                x: { stacked: true, grid: { display: false }, ticks: { font: { size: 12 } } },
+                y: { stacked: true, beginAtZero: true, ticks: { font: { size: 11 }, precision: 0 } },
+            },
+        },
+    });
+}
+
+async function loadTables() {
+    var container = document.getElementById('tables-container');
+    var html = '';
+    switch (state.view) {
+        case 'publishers':       html = await renderPublishersTable(); break;
+        case 'journals':         html = await renderJournalsTable(null); break;
+        case 'publisher_detail': html = await renderPublisherDetail(); break;
+        case 'journal_detail':   html = await renderJournalDetail(); break;
+    }
+    container.innerHTML = html;
+}
+
+// ===== SHARED RENDERERS =====
+
+function oaBar(r) {
+    var t = r.pub_count || 1;
+    return '<div class="oa-bar">'
+        + '<span class="gold" style="width:' + (r.gold/t*100) + '%"></span>'
+        + '<span class="hybrid" style="width:' + (r.hybrid/t*100) + '%"></span>'
+        + '<span class="bronze" style="width:' + (r.bronze/t*100) + '%"></span>'
+        + '<span class="green" style="width:' + (r.green/t*100) + '%"></span>'
+        + '<span class="closed" style="width:' + (r.closed/t*100) + '%"></span>'
+        + '<span class="unknown" style="width:' + (r.unknown/t*100) + '%"></span>'
+        + '</div>';
+}
+
+function oaCols(r) {
+    return '<td class="num num-small">' + r.gold + '</td>'
+         + '<td class="num num-small">' + r.hybrid + '</td>'
+         + '<td class="num num-small">' + r.bronze + '</td>'
+         + '<td class="num num-small">' + r.green + '</td>'
+         + '<td class="num num-small">' + r.closed + '</td>'
+         + '<td class="num num-small">' + r.unknown + '</td>';
+}
+
+var OA_HEADERS = '<th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>'
+               + '<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>';
+
+function renderPagination(data, fnName) {
+    if (data.pages <= 1) return '';
+    var cur = data.page;
+    var h = '<div class="pagination">';
+    h += '<button ' + (cur <= 1 ? 'disabled' : '') + ' onclick="' + fnName + '(' + (cur-1) + ')">‹</button>';
+    var s = Math.max(1, cur - 3), e = Math.min(data.pages, cur + 3);
+    if (s > 1) h += '<button onclick="' + fnName + '(1)">1</button>';
+    if (s > 2) h += '<button disabled>…</button>';
+    for (var i = s; i <= e; i++)
+        h += '<button class="' + (i===cur?'active':'') + '" onclick="' + fnName + '(' + i + ')">' + i + '</button>';
+    if (e < data.pages - 1) h += '<button disabled>…</button>';
+    if (e < data.pages) h += '<button onclick="' + fnName + '(' + data.pages + ')">' + data.pages + '</button>';
+    h += '<button ' + (cur >= data.pages ? 'disabled' : '') + ' onclick="' + fnName + '(' + (cur+1) + ')">›</button>';
+    h += '</div>';
+    return h;
+}
+
+// ===== TABLE: Publishers =====
+async function renderPublishersTable() {
+    var p = chartParams();
+    p.set('page', state.page); p.set('per_page', 50);
+    if (state.search) p.set('search', state.search);
+    var data = await api('/api/pub-stats/publishers?' + p);
+    document.getElementById('result-count').textContent = data.total + ' éditeurs';
+
+    if (!data.publishers.length)
+        return '<table class="data-table"><tbody><tr><td class="loading">Aucun résultat</td></tr></tbody></table>';
+
+    var html = '<table class="data-table"><thead><tr>'
+        + '<th>Éditeur</th><th class="num">Articles</th><th class="num">Revues</th>'
+        + '<th style="min-width:100px">OA</th>' + OA_HEADERS + '</tr></thead><tbody>';
+
+    data.publishers.forEach(function(r) {
+        html += '<tr>'
+            + '<td class="name-cell"><a onclick="goTo(\'publisher_detail\',{id:' + r.publisher_id + ',name:\'' + escJs(r.publisher_name) + '\'})">' + esc(r.publisher_name) + '</a></td>'
+            + '<td class="num">' + r.pub_count + '</td>'
+            + '<td class="num num-small">' + r.journal_count + '</td>'
+            + '<td>' + oaBar(r) + '</td>' + oaCols(r) + '</tr>';
+    });
+    html += '</tbody></table>';
+    html += renderPagination(data, 'goToPage');
+    return html;
+}
+
+// ===== TABLE: Journals =====
+async function renderJournalsTable(overridePublisherId) {
+    var p = chartParams();
+    if (overridePublisherId) p.set('publisher_id', overridePublisherId);
+    p.set('page', state.page); p.set('per_page', 50);
+    if (state.search) p.set('search', state.search);
+    var data = await api('/api/pub-stats/journals?' + p);
+
+    if (state.view === 'journals')
+        document.getElementById('result-count').textContent = data.total + ' revues';
+
+    if (!data.journals.length)
+        return '<table class="data-table"><tbody><tr><td class="loading">Aucun résultat</td></tr></tbody></table>';
+
+    var showPub = !state.publisherId;
+    var html = '<table class="data-table"><thead><tr>'
+        + '<th>Revue</th>' + (showPub ? '<th>Éditeur</th>' : '')
+        + '<th class="num">Articles</th><th style="min-width:100px">OA</th>' + OA_HEADERS + '</tr></thead><tbody>';
+
+    data.journals.forEach(function(r) {
+        html += '<tr>'
+            + '<td class="name-cell"><a onclick="goTo(\'journal_detail\',{id:' + r.journal_id + ',name:\'' + escJs(r.journal_title) + '\'})">' + esc(r.journal_title) + '</a></td>'
+            + (showPub ? '<td class="name-cell num-small">' + esc(r.publisher_name || '') + '</td>' : '')
+            + '<td class="num">' + r.pub_count + '</td>'
+            + '<td>' + oaBar(r) + '</td>' + oaCols(r) + '</tr>';
+    });
+    html += '</tbody></table>';
+    html += renderPagination(data, 'goToPage');
+    return html;
+}
+
+// ===== TABLE: Labs =====
+async function renderLabsTable() {
+    var p = chartParams();
+    p.set('page', state.labPage); p.set('per_page', 50);
+    var data = await api('/api/pub-stats/labs?' + p);
+
+    if (!data.labs.length) return '';
+
+    var html = '<div class="section-title">Laboratoires</div>'
+        + '<table class="data-table"><thead><tr>'
+        + '<th>Laboratoire</th><th class="num">Articles</th>'
+        + '<th style="min-width:100px">OA</th>' + OA_HEADERS + '</tr></thead><tbody>';
+
+    data.labs.forEach(function(r) {
+        var name = r.lab_acronym && r.lab_acronym !== r.lab_name
+            ? r.lab_acronym + ' — ' + r.lab_name : (r.lab_acronym || r.lab_name);
+        html += '<tr>'
+            + '<td class="name-cell" title="' + esc(r.lab_name) + '">' + esc(name) + '</td>'
+            + '<td class="num">' + r.pub_count + '</td>'
+            + '<td>' + oaBar(r) + '</td>' + oaCols(r) + '</tr>';
+    });
+    html += '</tbody></table>';
+    html += renderPagination(data, 'goToLabPage');
+    return html;
+}
+
+// ===== COMPOSITE VIEWS =====
+async function renderPublisherDetail() {
+    document.getElementById('result-count').textContent = '';
+    var journalsHtml = await renderJournalsTable(state.publisherId);
+    var labsHtml = await renderLabsTable();
+    return '<div class="section-title">Revues</div>' + journalsHtml + labsHtml;
+}
+
+async function renderJournalDetail() {
+    document.getElementById('result-count').textContent = '';
+    var labsHtml = await renderLabsTable();
+    return labsHtml || '<div class="loading">Aucun laboratoire associé</div>';
+}
+
+// ===== PAGINATION =====
+function goToPage(p) {
+    state.page = p;
+    loadTables();
+    window.scrollTo(0, 0);
+}
+function goToLabPage(p) {
+    state.labPage = p;
+    loadTables();
+}
+
+// ===== HELPERS =====
+function esc(s) {
+    if (!s) return '';
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+function escJs(s) {
+    return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+</script>
+
+</body>
+</html>

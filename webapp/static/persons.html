@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personnes — Bibliométrie UCA</title>
+    <style>
+        :root {
+            --bg: #f8f7f4;
+            --card: #ffffff;
+            --border: #e2e0db;
+            --text: #2c2c2c;
+            --text-muted: #777;
+            --accent: #3b6b9e;
+            --accent-light: #e8f0f8;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 12px 24px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 16px 24px;
+        }
+
+        h2 { font-size: 17px; font-weight: 600; margin: 0 0 14px; }
+        .subtitle { font-size: 13px; color: var(--text-muted); margin: -10px 0 16px; }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+        .toolbar input[type="text"] {
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 13px;
+            width: 240px;
+        }
+        .toolbar .count {
+            margin-left: auto;
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        /* ----- Facet dropdown ----- */
+        .facet { position: relative; display: inline-block; }
+        .facet-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--card);
+            font-size: 13px;
+            cursor: pointer;
+            color: var(--text);
+            white-space: nowrap;
+        }
+        .facet-btn:hover { border-color: #ccc; }
+        .facet-btn.has-selection {
+            border-color: var(--accent);
+            background: var(--accent-light);
+        }
+        .facet-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            border-radius: 9px;
+            background: var(--accent);
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .facet-arrow { font-size: 10px; color: var(--text-muted); margin-left: 2px; }
+        .facet-panel {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            min-width: 200px;
+            max-height: 320px;
+            overflow-y: auto;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+            z-index: 100;
+            padding: 6px 0;
+        }
+        .facet-panel.open { display: block; }
+        .facet-panel .facet-search {
+            display: block;
+            width: calc(100% - 12px);
+            margin: 2px 6px 6px;
+            padding: 5px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .facet-panel label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .facet-panel label:hover { background: #f5f5f2; }
+        .facet-panel input[type="checkbox"] { margin: 0; flex-shrink: 0; }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        thead th {
+            background: #f5f4f1;
+            padding: 9px 12px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        tbody tr { border-bottom: 1px solid #f0efec; }
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: #fafaf8; }
+        td {
+            padding: 10px 12px;
+            font-size: 13px;
+            vertical-align: middle;
+        }
+        td a { color: var(--accent); text-decoration: none; }
+        td a:hover { text-decoration: underline; }
+
+        .person-name { font-weight: 500; }
+        .person-last { font-variant: small-caps; }
+        .role-tag {
+            display: inline-block;
+            padding: 2px 7px;
+            background: #f0efec;
+            border-radius: 3px;
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        .id-badge {
+            display: inline-block;
+            padding: 2px 7px;
+            background: var(--accent-light);
+            border-radius: 3px;
+            font-size: 11px;
+            color: var(--accent);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .id-badge:hover { background: #d4e4f3; text-decoration: none; }
+        .id-badge + .id-badge { margin-top: 3px; }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 14px;
+            font-size: 13px;
+        }
+        .pagination button {
+            padding: 5px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--card);
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .pagination button:disabled { opacity: 0.4; cursor: default; }
+        .pagination button:not(:disabled):hover { background: var(--accent-light); }
+        .pagination .page-info { color: var(--text-muted); }
+
+        .no-results { text-align: center; padding: 40px; color: var(--text-muted); }
+    </style>
+</head>
+
+<body>
+    <div class="header"></div>
+    <div class="container">
+        <h2>Personnes UCA</h2>
+        <p class="subtitle">Enseignants-chercheurs de l'Universit&eacute; Clermont Auvergne</p>
+
+        <div class="toolbar">
+            <input type="text" id="search" placeholder="Rechercher par nom...">
+            <div id="facet-dept-slot"></div>
+            <div id="facet-role-slot"></div>
+            <div id="facet-orcid-slot"></div>
+            <div id="facet-idhal-slot"></div>
+            <span class="count" id="count"></span>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>R&ocirc;le</th>
+                    <th>D&eacute;partement</th>
+                    <th>ORCID</th>
+                    <th>idHAL</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+
+        <div class="pagination" id="pagination"></div>
+    </div>
+
+    <script src="/static/nav.js" defer></script>
+    <script>
+    (function () {
+        let currentPage = 1;
+        let totalPages = 1;
+        let total = 0;
+        const perPage = 50;
+        const facets = {};
+
+        const tbody = document.getElementById('tbody');
+        const countEl = document.getElementById('count');
+        const searchEl = document.getElementById('search');
+        const paginationEl = document.getElementById('pagination');
+
+        function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        function titleCase(s) {
+            if (!s) return '';
+            return s.split(/(\s+|-)/g).map(w =>
+                /^[\s-]+$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+            ).join('');
+        }
+
+        // ========== Facet dropdown component (from publications.html) ==========
+        function createFacetDropdown({ id, label, options, searchable, onChange }) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'facet';
+            wrapper.dataset.facetId = id;
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'facet-btn';
+            btn.innerHTML = `<span class="facet-label">${esc(label)}</span><span class="facet-arrow">&#9662;</span>`;
+
+            const panel = document.createElement('div');
+            panel.className = 'facet-panel';
+
+            let searchInput = null;
+            if (searchable) {
+                searchInput = document.createElement('input');
+                searchInput.type = 'text';
+                searchInput.className = 'facet-search';
+                searchInput.placeholder = 'Filtrer\u2026';
+                panel.appendChild(searchInput);
+                searchInput.addEventListener('input', () => {
+                    const q = searchInput.value.toLowerCase();
+                    panel.querySelectorAll('label').forEach(lbl => {
+                        lbl.style.display = lbl.textContent.toLowerCase().includes(q) ? '' : 'none';
+                    });
+                });
+            }
+
+            const optContainer = document.createElement('div');
+            panel.appendChild(optContainer);
+            wrapper.appendChild(btn);
+            wrapper.appendChild(panel);
+
+            let selected = new Set();
+            let currentOptions = [];
+
+            function renderOptions(opts) {
+                currentOptions = opts;
+                optContainer.innerHTML = '';
+
+                const allLbl = document.createElement('label');
+                allLbl.style.fontWeight = '500';
+                const allCb = document.createElement('input');
+                allCb.type = 'checkbox';
+                allCb.checked = selected.size === 0;
+                allCb.dataset.allToggle = '1';
+                allCb.addEventListener('change', () => {
+                    if (allCb.checked) {
+                        selected.clear();
+                        optContainer.querySelectorAll('input[type="checkbox"]:not([data-all-toggle])').forEach(cb => cb.checked = true);
+                    } else {
+                        selected.clear();
+                        optContainer.querySelectorAll('input[type="checkbox"]:not([data-all-toggle])').forEach(cb => cb.checked = false);
+                    }
+                    updateBtn();
+                    if (onChange) onChange();
+                });
+                allLbl.appendChild(allCb);
+                allLbl.appendChild(document.createTextNode('Tous'));
+                optContainer.appendChild(allLbl);
+
+                opts.forEach(opt => {
+                    const lbl = document.createElement('label');
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.value = opt.value;
+                    cb.checked = selected.size === 0 || selected.has(opt.value);
+                    cb.addEventListener('change', () => {
+                        if (cb.checked) {
+                            selected.add(opt.value);
+                            if (selected.size === currentOptions.length) {
+                                selected.clear();
+                                allCb.checked = true;
+                            }
+                        } else {
+                            if (selected.size === 0) {
+                                currentOptions.forEach(o => { if (o.value !== opt.value) selected.add(o.value); });
+                                optContainer.querySelectorAll('input[type="checkbox"]:not([data-all-toggle])').forEach(c => {
+                                    c.checked = selected.has(c.value);
+                                });
+                            } else {
+                                selected.delete(opt.value);
+                            }
+                            allCb.checked = false;
+                        }
+                        updateBtn();
+                        if (onChange) onChange();
+                    });
+                    lbl.appendChild(cb);
+                    lbl.appendChild(document.createTextNode(opt.text));
+                    optContainer.appendChild(lbl);
+                });
+                updateBtn();
+            }
+
+            function updateBtn() {
+                const n = selected.size;
+                if (n === 0) {
+                    btn.innerHTML = `<span class="facet-label">${esc(label)}</span><span class="facet-arrow">&#9662;</span>`;
+                    btn.classList.remove('has-selection');
+                } else {
+                    btn.innerHTML = `<span class="facet-label">${esc(label)}</span><span class="facet-badge">${n}</span><span class="facet-arrow">&#9662;</span>`;
+                    btn.classList.add('has-selection');
+                }
+            }
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = panel.classList.contains('open');
+                document.querySelectorAll('.facet-panel.open').forEach(p => p.classList.remove('open'));
+                if (!isOpen) {
+                    panel.classList.add('open');
+                    if (searchInput) { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); searchInput.focus(); }
+                }
+            });
+            panel.addEventListener('click', e => e.stopPropagation());
+
+            if (options && options.length) renderOptions(options);
+
+            wrapper.getSelected = () => Array.from(selected);
+            wrapper.setOptions = (opts) => renderOptions(opts);
+
+            return wrapper;
+        }
+
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.facet-panel.open').forEach(p => p.classList.remove('open'));
+        });
+
+        // ========== Init ==========
+        const onFilterChange = () => { currentPage = 1; loadData(); };
+
+        facets.dept = createFacetDropdown({ id: 'dept', label: 'D\u00e9partement', options: [], searchable: true, onChange: onFilterChange });
+        facets.role = createFacetDropdown({ id: 'role', label: 'R\u00f4le', options: [], searchable: true, onChange: onFilterChange });
+        facets.orcid = createFacetDropdown({
+            id: 'orcid', label: 'ORCID',
+            options: [
+                { value: 'yes', text: 'Avec ORCID' },
+                { value: 'no', text: 'Sans ORCID' },
+            ],
+            onChange: onFilterChange,
+        });
+        facets.idhal = createFacetDropdown({
+            id: 'idhal', label: 'idHAL',
+            options: [
+                { value: 'yes', text: 'Avec idHAL' },
+                { value: 'no', text: 'Sans idHAL' },
+            ],
+            onChange: onFilterChange,
+        });
+
+        document.getElementById('facet-dept-slot').appendChild(facets.dept);
+        document.getElementById('facet-role-slot').appendChild(facets.role);
+        document.getElementById('facet-orcid-slot').appendChild(facets.orcid);
+        document.getElementById('facet-idhal-slot').appendChild(facets.idhal);
+
+        // Load filter options
+        fetch('/api/persons/departments')
+            .then(r => r.json())
+            .then(depts => {
+                facets.dept.setOptions(depts.map(d => ({
+                    value: d.department_name,
+                    text: d.department_name + ' (' + d.count + ')'
+                })));
+            });
+        fetch('/api/persons/roles')
+            .then(r => r.json())
+            .then(roles => {
+                facets.role.setOptions(roles.map(r => ({
+                    value: r.role_title,
+                    text: r.role_title + ' (' + r.count + ')'
+                })));
+            });
+
+        let debounceTimer;
+        searchEl.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => { currentPage = 1; loadData(); }, 300);
+        });
+
+        function loadData() {
+            const params = new URLSearchParams({
+                page: currentPage,
+                per_page: perPage,
+            });
+            const q = searchEl.value.trim();
+            if (q) params.set('search', q);
+
+            const depts = facets.dept.getSelected();
+            if (depts.length) params.set('department', depts.join(','));
+
+            const roles = facets.role.getSelected();
+            if (roles.length) params.set('role', roles.join(','));
+
+            const orcid = facets.orcid.getSelected();
+            if (orcid.length === 1) params.set('has_orcid', orcid[0]);
+
+            const idhal = facets.idhal.getSelected();
+            if (idhal.length === 1) params.set('has_idhal', idhal[0]);
+
+            fetch('/api/persons/directory?' + params)
+                .then(r => r.json())
+                .then(data => {
+                    total = data.total;
+                    totalPages = data.pages;
+                    currentPage = data.page;
+                    render(data.persons);
+                    renderPagination();
+                });
+        }
+
+        function render(persons) {
+            countEl.textContent = total + ' personne' + (total > 1 ? 's' : '');
+
+            if (!persons.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="no-results">Aucune personne trouv\u00e9e</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = persons.map(p => {
+                const name = `<a href="/persons/${p.id}" class="person-name"><span class="person-last">${esc(titleCase(p.last_name))}</span> ${esc(titleCase(p.first_name))}</a>`;
+
+                const role = p.role_title
+                    ? `<span class="role-tag">${esc(p.role_title)}</span>`
+                    : '';
+
+                const dept = esc(p.department_name || '');
+
+                const orcidCol = (p.orcids || []).map(oid =>
+                    `<a href="https://orcid.org/${esc(oid)}" target="_blank" class="id-badge">${esc(oid)}</a>`
+                ).join(' ');
+
+                const idhalCol = (p.idhals || []).map(idh =>
+                    `<a href="https://hal.science/search/index/?q=%2A&authIdHal_s=${esc(idh)}" target="_blank" class="id-badge">${esc(idh)}</a>`
+                ).join(' ');
+
+                return `<tr>
+                    <td>${name}</td>
+                    <td>${role}</td>
+                    <td>${dept}</td>
+                    <td>${orcidCol}</td>
+                    <td>${idhalCol}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function renderPagination() {
+            if (totalPages <= 1) { paginationEl.innerHTML = ''; return; }
+            paginationEl.innerHTML = `
+                <button id="prev" ${currentPage <= 1 ? 'disabled' : ''}>&#8592; Pr&eacute;c.</button>
+                <span class="page-info">Page ${currentPage} / ${totalPages}</span>
+                <button id="next" ${currentPage >= totalPages ? 'disabled' : ''}>Suiv. &#8594;</button>
+            `;
+            document.getElementById('prev').addEventListener('click', () => { if (currentPage > 1) { currentPage--; loadData(); } });
+            document.getElementById('next').addEventListener('click', () => { if (currentPage < totalPages) { currentPage++; loadData(); } });
+        }
+
+        loadData();
+    })();
+    </script>
+</body>
+
+</html>

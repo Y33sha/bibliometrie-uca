@@ -1,0 +1,494 @@
+# Bibliométrie UCA — Documentation technique
+
+## Présentation
+
+Application d'analyse bibliométrique pour l'**Université Clermont Auvergne** (UCA). Elle collecte les publications scientifiques 2022-2025 depuis les APIs HAL et OpenAlex, les déduplique, résout les affiliations par structure (laboratoires, tutelles, partenaires), et fournit des tableaux de bord pour l'analyse par éditeur, revue, statut Open Access, et labo.
+
+**Stack** : Python 3, PostgreSQL, FastAPI, HTML/JS vanilla.
+
+---
+
+## Arborescence du projet
+
+```
+publisher-stats/
+├── analysis/                    # Scripts d'analyse ad hoc
+├── config/
+│   └── settings.py              # Connexions API, années, collections HAL
+├── data/                        # Fichiers de données (exports RH, etc.)
+├── db/
+│   ├── connection.py            # get_connection() centralisé
+│   ├── seed_structures.py       # Peuplement structures, relations, formes de noms
+│   └── migration_*.sql          # Migrations séquentielles
+├── extraction/
+│   ├── openalex/extract_openalex.py   # API OpenAlex → staging_openalex
+│   └── hal/extract_hal.py             # API HAL → staging_hal
+├── processing/
+│   ├── normalize_openalex.py    # staging → openalex_documents/authors/authorships
+│   ├── normalize_hal.py         # staging → hal_documents/authors/authorships
+│   ├── fetch_missing_hal.py     # Récupère les HAL manquants découverts via OpenAlex
+│   ├── populate_addresses.py    # Extrait les adresses depuis openalex_authorships
+│   ├── resolve_addresses.py     # Résout adresses → structures (via name_forms)
+│   ├── populate_uca_flags.sql   # Calcule is_uca et structure_ids
+│   ├── populate_hal_struct_ids.py  # Extrait/matche les structures HAL
+│   ├── enrich_hal_structures.py # Enrichit hal_structures depuis l'API ref/structure
+│   └── enrich_oa_unpaywall.py   # Enrichit le statut OA via Unpaywall
+├── webapp/
+│   ├── app.py                   # Serveur FastAPI (API + routes HTML)
+│   └── static/                  # Pages HTML (index, stats, publications, persons, etc.)
+└── requirements.txt
+```
+
+---
+
+## Schéma de la base de données
+
+### Architecture
+
+Le schéma repose sur la **séparation stricte des sources**. Chaque source (HAL, OpenAlex, futur WoS) a ses propres tables pour les documents, auteurs et authorships. Les entités canoniques (tables de vérité) sont construites par déduplication et mapping, jamais par insertion directe depuis les sources.
+
+Voir `ARCHITECTURE.md` pour les principes détaillés et `schema_target_v2.sql` pour le DDL complet.
+
+### Types énumérés
+
+| Enum | Valeurs |
+|------|---------|
+| `source_type` | `hal`, `openalex`, `wos` |
+| `doc_type` | `article`, `conference_paper`, `book`, `book_chapter`, `thesis`, `preprint`, `review`, `editorial`, `report`, `other` |
+| `oa_type` | `gold`, `hybrid`, `bronze`, `green`, `closed`, `unknown` |
+| `structure_type` | `universite`, `onr`, `chu`, `ecole`, `labo`, `equipe`, `site`, `autre` |
+
+### Tables de vérité
+
+#### `structures` — Référentiel institutionnel
+Toutes les structures : UCA, laboratoires, tutelles (CNRS, INRAE…), partenaires (CHU, INP, VetAgro Sup…).
+- `code` : identifiant court stable (`uca`, `cnrs`, `lpc`, `ip`).
+- `type` : `universite`, `onr`, `chu`, `ecole`, `labo`, `equipe`, `site`, `autre`.
+- `ror_id`, `rnsr_id` : identifiants externes (optionnels).
+- `hal_collection` : collection HAL associée (labos uniquement).
+
+#### `structure_relations` — Hiérarchie et tutelles
+Relations entre structures (ex : UCA est tutelle de l'Institut Pascal).
+- `relation_type` : `TEXT` libre (ex : `est_tutelle_de`).
+
+#### `name_forms` — Formes de noms des structures
+Formes textuelles utilisées pour détecter les structures dans les adresses d'affiliation.
+- `form_text` / `form_normalized` : forme brute et normalisée.
+- `is_regex` : si TRUE, `form_text` est une expression régulière.
+- `requires_context_of` : JSONB, optionnel. Si présent, la forme ne matche que si une forme d'une des structures contextuelles est aussi détectée dans l'adresse (ex : la forme courte « IP » ne matche que si une tutelle comme « CNRS » est aussi présente).
+
+#### `persons` — Référentiel des individus
+Alimenté par les exports RH. Ne contient aucun identifiant bibliométrique directement.
+- `structure_id` : rattachement institutionnel principal (FK → `structures`).
+- `start_date`, `end_date` : période de rattachement.
+
+#### `person_identifiers` — Identifiants certifiants
+ORCID, idHAL, ResearcherID, etc. Chaque identifiant (`id_type` + `id_value`) pointe vers une seule personne (UNIQUE). Une personne peut avoir plusieurs identifiants.
+- `source` : provenance (`hr`, `hal`, `openalex`, `manual`).
+
+#### `publishers` / `journals` — Référentiel bibliographique
+Non dupliqué par source — une seule entrée par éditeur/revue. Alignement par `openalex_id` ou ISSN-L.
+
+#### `publications` — Publications unifiées
+Table centrale. Chaque ligne = 1 publication unique, potentiellement issue de plusieurs sources.
+- `doi` : pivot principal de dédoublonnage (contrainte UNIQUE).
+- `title_normalized` : fallback pour les publications sans DOI.
+- `oa_status` : statut OA résolu (peut venir d'OpenAlex, d'Unpaywall, ou de HAL).
+
+#### `authorships` — Table de vérité personne × publication
+Construite par résolution depuis les authorships source. Relie personnes, publications et structures.
+- `person_id` : peut être NULL si la personne n'est pas encore identifiée.
+- `structure_ids INT[]` : structures UCA résolues (un auteur peut être affilié à plusieurs structures sur une même publication).
+- `is_uca` : TRUE si affilié UCA sur cette publication.
+- `source_hal`, `source_openalex`, `source_wos`, `source_manual` : booléens traçant les sources.
+- `excluded` : lien erroné (homonyme, etc.).
+- Contrainte d'unicité sur `(publication_id, person_id)`.
+
+### Tables source — HAL
+
+#### `staging_hal`
+Import brut de l'API HAL. `raw_data` (JSONB) contient la réponse API complète. `collection` est la collection d'origine de la requête. `processed` passe à TRUE après normalisation. Le staging n'est jamais modifié après import.
+
+#### `hal_structures`
+Référentiel des structures HAL, peuplé depuis l'API `ref/structure`.
+- `hal_struct_id` : identifiant numérique HAL (UNIQUE, pas PK).
+- `parent_ids` : hiérarchie (tableau d'entiers).
+- `structure_id` (FK → `structures`) : mapping vers le référentiel.
+
+#### `hal_authors`
+Un enregistrement = un identifiant auteur dans HAL.
+- `hal_person_id` : numérique HAL (UNIQUE mais nullable).
+- `idhal`, `orcid` : données source observées.
+- `person_id` : FK vers `persons` (NULL si non résolu ou non fiable).
+- `is_reliable` : FALSE si cet identifiant recouvre plusieurs personnes réelles.
+
+#### `hal_documents`
+Un enregistrement = un document HAL.
+- `halid` : identifiant HAL (UNIQUE).
+- `collections TEXT[]` : collections HAL contenant ce document.
+- `publication_id` : FK vers la publication canonique.
+
+#### `hal_authorships`
+Relation document × auteur dans HAL.
+- `hal_struct_ids INT[]` : identifiants hal_struct_id affiliés (données brutes).
+- `structure_ids INT[]` : structures UCA résolues (via `hal_structures.structure_id`).
+- `is_uca` : TRUE si `structure_ids` contient au moins une structure du périmètre UCA.
+
+### Tables source — OpenAlex
+
+Architecture identique à HAL, adaptée aux spécificités d'OpenAlex.
+
+#### `openalex_institutions`
+Pendant de `hal_structures`. `ror_id` permet l'alignement automatique avec `structures.ror_id`.
+
+#### `openalex_authors`
+Un enregistrement = un auteur OpenAlex, identifié par `openalex_id` (UNIQUE). `is_reliable` important car OpenAlex fusionne parfois des homonymes.
+
+#### `openalex_documents`
+Même logique que `hal_documents`. Pas de champ `collections` (concept HAL).
+
+#### `openalex_authorships`
+- `raw_affiliation` : affiliation brute (source des adresses).
+- `openalex_institution_ids TEXT[]` : institutions OpenAlex détectées.
+- `structure_ids INT[]` / `is_uca` : résolution UCA (via les adresses et `address_structures`).
+
+### Adresses d'affiliation (source-agnostique)
+
+#### `addresses`
+Chaque adresse brute unique rencontrée. Le champ `review_status` est un vestige obsolète ; la source de vérité pour la validation est désormais `address_structures.is_confirmed`.
+
+#### `address_structures`
+Lien adresse → structure détectée, avec traçabilité.
+- `matched_form_id` : IS NOT NULL = détection automatique (via `resolve_addresses.py`). IS NULL = assignation manuelle.
+- `is_confirmed` (BOOLEAN, DEFAULT NULL) : statut de revue par structure. `TRUE` = lien confirmé, `FALSE` = lien rejeté, `NULL` = non examiné. Chaque lien adresse↔structure est confirmé/rejeté indépendamment.
+
+#### `openalex_authorship_addresses`
+Table de liaison authorship OpenAlex ↔ adresse. Chaque source qui fournit des adresses a sa propre table de liaison (WoS à créer quand disponible).
+
+### Vue `publication_sources`
+Vue (pas table) qui consolide les liens publication → source en combinant les FK `publication_id` de `hal_documents` et `openalex_documents`.
+
+### Tables de staging
+Zones de transit brutes. Chaque source a sa propre table.
+- `staging_openalex` : clé unique `openalex_id`.
+- `staging_hal` : clé unique `halid`, champ `collection`.
+- `staging_wos` : prévu mais pas encore utilisé.
+- `processed` : flag pour le traitement incrémental.
+
+---
+
+## Workflow complet
+
+### Étape 0 — Données de référence
+
+```bash
+python3 db/seed_structures.py       # Peuple structures, relations, formes de noms
+```
+
+Peuple la table `structures` (UCA, labos, tutelles, partenaires), `structure_relations` (hiérarchie et tutelles), et `name_forms` (formes de noms pour la détection automatique). Idempotent.
+
+### Étape 1 — Extraction
+
+```bash
+python3 extraction/openalex/extract_openalex.py    # API OpenAlex → staging_openalex
+python3 extraction/hal/extract_hal.py              # API HAL → staging_hal
+```
+
+**OpenAlex** : interroge l'API par année avec le filtre `authorships.institutions.lineage` sur l'ID UCA (`i198244214`). Résultats bruts en JSONB. ~20 000 works.
+
+**HAL** : deux passes. D'abord par collection labo pour tagger chaque work avec sa/ses collection(s), puis via le portail global `clermont-univ` pour attraper les works qui ne sont dans aucune collection. ~22 000 works.
+
+Les deux scripts sont idempotents : les doublons (même `openalex_id` ou `halid`) sont ignorés.
+
+### Étape 2 — Normalisation
+
+```bash
+python3 processing/normalize_openalex.py    # ⬅ en premier
+python3 processing/normalize_hal.py
+```
+
+**Ordre important** : OpenAlex d'abord car ses métadonnées journal/éditeur sont plus structurées. HAL enrichit ensuite sans écraser les champs déjà corrects.
+
+**normalize_openalex.py** produit :
+- `publishers` / `journals` : éditeurs et revues (tables de vérité partagées).
+- `publications` : dédoublonnage par DOI, puis titre normalisé + année.
+- `openalex_documents` : un par work, lié à `publications` et `staging_openalex`.
+- `openalex_authors` : un par auteur OpenAlex, dédupliqué par `openalex_id`.
+- `openalex_institutions` : institutions extraites des authorships.
+- `openalex_authorships` : un par document × auteur, avec `raw_affiliation` et `openalex_institution_ids[]`.
+
+**normalize_hal.py** produit :
+- `publishers` / `journals` / `publications` : enrichissement (DOI manquants, collections, doc_type, journal). HAL a priorité sur le doc_type et le journal quand la primary_location OpenAlex pointe vers HAL.
+- `hal_documents` : un par halid, avec `collections[]` agrégées.
+- `hal_authors` : un par `hal_person_id`, avec idhal extrait de `authFullNameIdHal_fs`.
+- `hal_authorships` : un par document × auteur, avec `hal_struct_ids[]` bruts (pas encore résolus en `structure_ids`).
+
+**Détection des primary_location HAL** : quand un work OpenAlex a sa primary_location pointant vers HAL, les métadonnées journal/éditeur d'OpenAlex sont ignorées (souvent fausses — ex : repository SPIRE affiché comme source).
+
+**Exclusion des repositories** : les sources de type `repository` dans OpenAlex (SPIRE, Zenodo, arXiv…) ne génèrent pas d'entrées dans `journals` et `publishers`.
+
+**Résolution des conflits (normalisation HAL)** :
+- `journal_id` : HAL a priorité.
+- `doc_type` : HAL a priorité (écrase le type OA souvent incorrect quand primary_location = HAL).
+- `oa_status` : `unknown` ou `closed` peut passer à `green` si HAL a un fichier en texte intégral.
+
+### Étape 2b — Récupération des HAL manquants (optionnel)
+
+```bash
+python3 processing/fetch_missing_hal.py --stats     # statistiques
+python3 processing/fetch_missing_hal.py --dry-run   # lister sans télécharger
+python3 processing/fetch_missing_hal.py              # télécharger et insérer en staging
+python3 processing/normalize_hal.py                  # puis renormaliser
+```
+
+Certains works OpenAlex pointent vers un halId qui n'est pas dans notre staging (ni portail UCA, ni collection labo). Ce script les récupère via l'API HAL et les insère dans `staging_hal` avec `collection = NULL` (hors périmètre UCA).
+
+### Étape 2c — Enrichissement structures HAL
+
+```bash
+python3 processing/populate_hal_struct_ids.py extract   # extrait les structures depuis le staging
+python3 processing/enrich_hal_structures.py             # enrichit depuis l'API ref/structure
+python3 processing/enrich_hal_structures.py --crawl     # remonte l'arbre des parents
+python3 processing/populate_hal_struct_ids.py match      # matche hal_structures → structures
+python3 processing/populate_hal_struct_ids.py apply      # écrit structure_id sur hal_structures
+```
+
+### Étape 3 — Adresses et affiliations
+
+```bash
+python3 processing/populate_addresses.py      # Extrait les adresses distinctes
+python3 processing/resolve_addresses.py       # Résout adresses → structures
+```
+
+#### 3a. `populate_addresses.py`
+- Parcourt les `raw_affiliation` de `openalex_authorships`.
+- Split les chaînes composites (séparateur ` | `).
+- Déduplique par `raw_text` → table `addresses`.
+- Crée les liens `openalex_authorship_addresses`.
+
+#### 3b. `resolve_addresses.py`
+- Pour chaque adresse sans détection automatique, cherche les formes de noms actives dans `name_forms`.
+- Si match → insère dans `address_structures` avec `matched_form_id` pour traçabilité.
+- Les formes ayant un `requires_context_of` ne matchent que si une forme d'une structure contexte (typiquement une tutelle) est aussi détectée dans l'adresse.
+- Options : `--reset` (supprime les affiliations auto), `--rerun` (reset + relance complète), `--stats`.
+
+### Étape 3c — Calcul des flags UCA
+
+```bash
+psql -f processing/populate_uca_flags.sql
+```
+
+Calcule `is_uca` et `structure_ids` en 4 étapes :
+1. **HAL** : mappe `hal_authorships.hal_struct_ids[]` → `structure_ids[]` via `hal_structures.structure_id`.
+2. **HAL** : recalcule `is_uca` selon le périmètre UCA (structures enfants de l'UCA via `structure_relations`).
+3. **OpenAlex** : calcule `is_uca` et `structure_ids` via la chaîne `openalex_authorship_addresses` → `address_structures` → périmètre UCA.
+4. **Authorships (vérité)** : propage depuis HAL et OpenAlex par matching `(publication_id, person_id)`, en fusionnant les `structure_ids` des deux sources.
+
+### Étape 4 — Enrichissement OA (optionnel)
+
+```bash
+python3 processing/enrich_oa_unpaywall.py    # Résout les statuts OA inconnus via Unpaywall
+```
+
+Pour les publications ayant un DOI mais un statut OA `unknown`, interroge l'API Unpaywall (gratuite, ~8 req/s). Met à jour `publications.oa_status`.
+
+### Étape 5 — Revue manuelle
+
+Via l'interface web. L'opératrice examine les liens adresse→structure :
+- Filtre par statut (`is_confirmed` : à examiner / confirmé / rejeté).
+- Filtre par structure, par texte (contient / ne contient pas).
+- Confirme ou rejette chaque lien adresse↔structure indépendamment (`is_confirmed = TRUE/FALSE/NULL`).
+- Actions en lot possibles (sélection multiple + action batch).
+- Assignation manuelle de structures à une adresse (page feedback).
+
+La propagation vers `openalex_authorships.is_uca` et `authorships.is_uca` est **partiellement automatique** : chaque action de review déclenche un recalcul temps réel des flags UCA pour les authorships **OpenAlex** affectés (via `propagate_uca_for_addresses()`). Les authorships **HAL** ne sont pas recalculés en temps réel — voir la section "Points d'attention".
+
+---
+
+## Interface web
+
+### Pages
+
+| URL | Description |
+|-----|-------------|
+| `/` | Revue des adresses — validation manuelle UCA / non-UCA |
+| `/stats` | Dashboard statistiques — navigation éditeurs → revues → labos, graphiques OA par année |
+| `/publications` | Liste des publications — filtres par année, labo, source, type, voie OA, éditeur, revue |
+| `/persons` | Gestion des personnes RH — liaison avec les auteurs HAL/OpenAlex |
+| `/authorships` | Signatures — auteurs source avec détail des authorships et résolution |
+| `/feedback` | Boucle de rétroaction — faux positifs/négatifs de la détection de formes |
+
+### API endpoints principaux
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/addresses` | Liste paginée des adresses (filtres: status, search, search_mode, lab_id, uca_filter) |
+| `POST /api/addresses/{id}/review` | Confirmer/rejeter un lien adresse↔structure (`is_confirmed`) — propage is_uca OpenAlex en temps réel |
+| `POST /api/addresses/batch-review` | Action batch sur plusieurs adresses — propage is_uca OpenAlex en temps réel |
+| `POST /api/addresses/{id}/assign-structure` | Assignation manuelle d'une structure — propage is_uca |
+| `DELETE /api/addresses/{id}/assign-structure` | Supprime une assignation manuelle — propage is_uca |
+| `GET /api/addresses/{id}/publications` | Publications liées à une adresse |
+| `GET /api/publications` | Liste paginée (filtres: search, year, lab_id, publisher_id, journal_id, oa_status, source_filter, doc_type, sort) |
+| `GET /api/pub-stats/publishers` | Stats par éditeur avec ventilation OA |
+| `GET /api/pub-stats/journals` | Stats par revue avec ventilation OA |
+| `GET /api/pub-stats/by-year` | Publications par année avec ventilation OA |
+| `GET /api/pub-stats/summary` | Résumé global |
+| `GET /api/pub-stats/labs` | Stats par laboratoire avec ventilation OA |
+| `GET /api/persons` | Liste des personnes avec stats de liaison |
+| `GET /api/persons/{id}/candidates` | Auteurs candidats pour liaison |
+| `POST /api/persons/{id}/link` | Lier un auteur source à une personne |
+| `DELETE /api/persons/{id}/link/{source}/{author_id}` | Délier un auteur |
+| `GET /api/authorships` | Signatures (auteurs HAL + OpenAlex unifiés) |
+| `GET /api/authors/{source}/{id}/details` | Détail d'un auteur source (authorships, structures) |
+| `GET /api/laboratories` | Liste des labos (structures de type labo) |
+| `GET /api/feedback/stats` | Statistiques de qualité de la détection automatique |
+| `POST /api/feedback/rerun` | Relance resolve_addresses --rerun |
+
+### Serveur
+
+```bash
+pm2 start "uvicorn webapp.app:app --host 0.0.0.0 --port 8042" --name publisher-stats-api
+pm2 restart publisher-stats-api
+```
+
+---
+
+## Configuration
+
+### `config/settings.py`
+
+- `DB` : connexion PostgreSQL (dbname, user, host, port).
+- `OPENALEX` : email (polite pool), institution_id, années, débit.
+- `HAL` : portail global, collections par labo, années, débit.
+
+---
+
+## Chiffres clés (base complète)
+
+| Indicateur | Volume |
+|------------|--------|
+| Publications staging OpenAlex | ~20 500 |
+| Publications staging HAL | ~22 000 |
+| Publications unifiées | ~32 000 |
+| Chevauchement HAL/OpenAlex | ~31% |
+| Adresses distinctes | ~30 000 |
+| Structures | ~150 (labos UCA + tutelles + partenaires) |
+
+---
+
+## Maintenance
+
+### Backup quotidien
+
+Script cron : `~/scripts/pg_backup.sh` (planifié à 12h30).
+Garde les 10 derniers dumps par base, rotation par nombre.
+
+```bash
+# Restauration
+gunzip -c ~/backups/pg/publisher_stats_YYYY-MM-DD_HHMM.sql.gz | psql publisher_stats
+```
+
+### Ajout d'une nouvelle année
+
+1. Ajouter l'année dans `settings.py` (OPENALEX.years et HAL.years).
+2. Relancer les extractions.
+3. Relancer la normalisation (traitement incrémental via `processed = FALSE`).
+4. Relancer populate_addresses + resolve_addresses + populate_uca_flags.
+
+### Ajout d'un nouveau labo
+
+1. Ajouter l'entrée dans `seed_structures.py` (structure, relations, formes de noms).
+2. Ajouter la collection HAL dans `settings.py`.
+3. `python3 db/seed_structures.py` (idempotent).
+4. Relancer `resolve_addresses.py --rerun` + `populate_uca_flags.sql`.
+
+---
+
+## Points d'attention
+
+### Propagation `is_uca` : temps réel vs batch
+
+La propagation du flag `is_uca` sur les authorships fonctionne différemment selon la source :
+
+| Source | Mécanisme | Déclencheur |
+|--------|-----------|-------------|
+| **OpenAlex** | Temps réel (`propagate_uca_for_addresses()` dans `app.py`) | Chaque review, batch-review, assign-structure, delete-structure |
+| **HAL** | Batch uniquement (`populate_uca_flags.sql`) | Exécution manuelle |
+| **Authorships (vérité)** | Batch uniquement (`populate_uca_flags.sql`, étape 4) | Exécution manuelle |
+
+**Conséquence** : après une session de review d'adresses, les compteurs de la page Authorships reflètent immédiatement les changements OpenAlex, mais les authorships HAL restent inchangés jusqu'au prochain `psql -f processing/populate_uca_flags.sql`. La table de vérité `authorships` (qui fusionne HAL + OpenAlex) n'est elle aussi mise à jour que par le batch.
+
+### Modification du périmètre UCA
+
+Le périmètre UCA est défini par les relations `est_tutelle_de` dans `structure_relations` (structures enfants de `structures.code = 'uca'`). Si ce périmètre change (ajout ou retrait d'un laboratoire, d'une tutelle, etc.) :
+
+1. **Relancer** `psql -f processing/populate_uca_flags.sql` — recalcule `is_uca` pour HAL, OpenAlex et authorships.
+2. **Relancer** `resolve_addresses.py --rerun` si de nouvelles formes de noms ont été ajoutées.
+3. Les reviews existantes (`address_structures.is_confirmed`) ne sont **pas** invalidées automatiquement — un lien confirmé pour une structure retirée du périmètre reste confirmé dans la table, mais ne contribue plus au calcul `is_uca`.
+
+### `addresses.review_status` — champ obsolète
+
+Le champ `addresses.review_status` (valeurs : `'pending'`, `'valid'`, `'false_positive'`) est un vestige de la v1. **Aucun code ne le lit ni ne l'écrit**. La source de vérité est `address_structures.is_confirmed` (par structure). La colonne peut être supprimée sans impact :
+
+```sql
+ALTER TABLE addresses DROP COLUMN review_status;
+```
+
+### `resolve_addresses.py` — comportement de l'ON CONFLICT
+
+Quand `resolve_addresses.py` détecte un lien adresse→structure qui existe déjà dans `address_structures`, la clause ON CONFLICT **ne fait rien** si le lien a été confirmé (`is_confirmed IS NOT NULL`) ou s'il a déjà un `matched_form_id`. Cela empêche l'auto-détection d'écraser une décision manuelle. En revanche, un lien non examiné sans détection automatique sera mis à jour avec le `matched_form_id` trouvé.
+
+### Authorships HAL sans identifiant fiable
+
+Certains `hal_authors` ont `is_reliable = FALSE` (un même identifiant HAL couvre plusieurs personnes réelles — cas d'homonymes non désambiguïsés côté HAL). Ces auteurs ne sont **pas** liés automatiquement à une personne. Ils apparaissent dans la page Authorships mais sans `person_id`, et leur résolution nécessite une intervention manuelle via la page Personnes.
+
+### Truncation des authorships OpenAlex
+
+L'API OpenAlex tronque la liste des auteurs à 100 par publication. Les mega-papers (>100 auteurs) ont donc une liste incomplète. Les authorships manquants ne sont ni dans `openalex_authorships` ni dans `authorships`. Un re-fetch individuel de ces publications est prévu (voir TODO §2).
+
+### Publications HAL sans publication canonique
+
+Certaines `hal_documents` ont `publication_id IS NULL` malgré un DOI présent. Cela peut arriver si le DOI n'a pas été trouvé dans `publications` au moment de la normalisation (ordre de traitement, DOI mal formaté, etc.). Ces publications HAL existent dans la base mais ne sont pas visibles dans les pages qui requêtent `publications`. Voir TODO §3.
+
+---
+
+## Axes de développement
+
+### Axe 1 — Intégration Web of Science (priorité moyenne)
+
+WoS est la troisième source bibliographique majeure. Le schéma v2 prévoit déjà `staging_wos` et le pattern est établi : créer `wos_documents`, `wos_authors`, `wos_authorships`, `wos_institutions` sur le même modèle que HAL/OpenAlex.
+
+### Axe 2 — Enrichissement du référentiel personnes
+
+- Récupération ORCID via l'API pour les personnes sans identifiant.
+- Lien avec le référentiel IdRef (ABES) pour les auteurs de thèses et HDR.
+- Détection de doublons (même ORCID sur plusieurs personnes, ou l'inverse).
+- Fusion semi-automatique avec suggestion basée sur la similarité de noms + co-publications.
+
+### Axe 3 — Vue publication détaillée
+
+Page de détail par publication : auteurs avec positions et affiliations, adresses avec structures résolues, collections HAL, comparaison des métadonnées HAL vs OpenAlex côte à côte.
+
+### Autres évolutions envisagées
+
+- **Revues prédatrices** : intégration des listes Beall's/DOAJ pour le flag `is_predatory`.
+- **Estimation APC** : croisement avec les données OpenAPC.
+- **Contrôle des signatures institutionnelles** : vérification de conformité (présence des tutelles requises, formes normalisées) avec reporting par labo.
+- **Fusion de publications** : déduplication manuelle des publications sans DOI commun.
+- **Export** : génération de rapports Excel/CSV par labo, par année, par éditeur.
+
+---
+
+## TODO
+
+1. Publis HAL > 2000 auteurs : `python3 processing/normalize_hal.py --max-authors 5000` (mega-papers actuellement skippés).
+2. Re-fetch publis OpenAlex avec exactement 100 authorships (truncation API) : re-fetch individuellement pour obtenir la liste complète.
+3. Vérifier publis HAL avec DOI non reliées à une publication :
+```sql
+SELECT hd.halid, hd.doi, hd.title, hd.pub_year
+FROM hal_documents hd
+WHERE hd.publication_id IS NULL
+  AND hd.doi IS NOT NULL
+ORDER BY hd.pub_year DESC;
+```
+4. Mettre de l'ordre dans le dossier processing (scripts obsolètes à supprimer).

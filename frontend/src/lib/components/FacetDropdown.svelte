@@ -1,0 +1,234 @@
+<script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
+
+	export interface FacetOption {
+		value: string;
+		text: string;
+	}
+
+	interface Props {
+		label: string;
+		options: FacetOption[];
+		searchable?: boolean;
+		selected?: string[];
+		onchange?: (selected: string[]) => void;
+	}
+
+	let { label, options, searchable = false, selected = $bindable([]), onchange }: Props = $props();
+
+	let open = $state(false);
+	let filterText = $state('');
+	let allMode = $state(true);
+
+	// Sync allMode when selected is set externally (e.g. from URL params)
+	$effect(() => {
+		if (selected.length > 0 && allMode) {
+			allMode = false;
+		}
+	});
+
+	const instanceId = Symbol();
+
+	const filteredOptions = $derived(
+		filterText
+			? options.filter((o) => o.text.toLowerCase().includes(filterText.toLowerCase()))
+			: options
+	);
+
+	const isAllSelected = $derived(allMode && selected.length === 0);
+
+	function toggleAll() {
+		if (allMode) {
+			// Uncheck "Tous" → uncheck everything visually
+			allMode = false;
+			selected = [];
+			// No onchange: filter doesn't change (empty = no filter)
+		} else {
+			// Check "Tous" → back to all
+			const hadFilter = selected.length > 0;
+			allMode = true;
+			selected = [];
+			if (hadFilter) onchange?.(selected);
+		}
+	}
+
+	function toggle(value: string) {
+		if (allMode) {
+			// Was in "all" mode → uncheck this one = select everything except it
+			allMode = false;
+			selected = options.filter((o) => o.value !== value).map((o) => o.value);
+		} else if (selected.includes(value)) {
+			selected = selected.filter((v) => v !== value);
+			// Don't auto-switch to allMode when empty
+		} else {
+			selected = [...selected, value];
+			if (selected.length === options.length) {
+				allMode = true;
+				selected = [];
+			}
+		}
+		onchange?.(selected);
+	}
+
+	function isChecked(value: string): boolean {
+		return allMode || selected.includes(value);
+	}
+
+	function handleClickOutside() {
+		open = false;
+	}
+
+	function handleFacetClose(e: Event) {
+		if ((e as CustomEvent).detail !== instanceId) {
+			open = false;
+		}
+	}
+
+	onMount(() => {
+		window.addEventListener('facet-close', handleFacetClose);
+	});
+	onDestroy(() => {
+		window.removeEventListener('facet-close', handleFacetClose);
+	});
+</script>
+
+<svelte:window onclick={handleClickOutside} />
+
+<div class="facet">
+	<button
+		type="button"
+		class="facet-btn"
+		class:has-selection={selected.length > 0}
+		onclick={(e) => {
+			e.stopPropagation();
+			if (open) {
+				open = false;
+				return;
+			}
+			window.dispatchEvent(new CustomEvent('facet-close', { detail: instanceId }));
+			open = true;
+			filterText = '';
+		}}
+	>
+		<span class="facet-label">{label}</span>
+		{#if selected.length > 0}
+			<span class="facet-badge">{selected.length}</span>
+		{/if}
+		<span class="facet-arrow">&#9662;</span>
+	</button>
+
+	{#if open}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="facet-panel" onclick={(e) => e.stopPropagation()}>
+			{#if searchable}
+				<input
+					type="text"
+					class="facet-search"
+					placeholder="Filtrer..."
+					bind:value={filterText}
+				/>
+			{/if}
+			<div class="facet-options">
+				<label>
+					<input type="checkbox" checked={isAllSelected} onchange={toggleAll} />
+					<span style="font-weight:500">Tous</span>
+				</label>
+				{#each filteredOptions as opt (opt.value)}
+					<label>
+						<input
+							type="checkbox"
+							checked={isChecked(opt.value)}
+							onchange={() => toggle(opt.value)}
+						/>
+						{opt.text}
+					</label>
+				{/each}
+			</div>
+		</div>
+	{/if}
+</div>
+
+<style>
+	.facet {
+		position: relative;
+		display: inline-block;
+	}
+	.facet-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 6px 10px;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: var(--card);
+		font-size: 13px;
+		cursor: pointer;
+		color: var(--text);
+		white-space: nowrap;
+		font-family: inherit;
+	}
+	.facet-btn:hover {
+		border-color: #ccc;
+	}
+	.facet-btn.has-selection {
+		border-color: var(--accent);
+		background: #e8f0f8;
+	}
+	.facet-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 18px;
+		height: 18px;
+		padding: 0 5px;
+		border-radius: 9px;
+		background: var(--accent);
+		color: white;
+		font-size: 11px;
+		font-weight: 600;
+	}
+	.facet-arrow {
+		font-size: 10px;
+		color: var(--muted);
+		margin-left: 2px;
+	}
+	.facet-panel {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		min-width: 200px;
+		max-height: 320px;
+		overflow-y: auto;
+		background: var(--card);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+		z-index: 100;
+		padding: 6px 0;
+	}
+	.facet-search {
+		display: block;
+		width: calc(100% - 12px);
+		margin: 2px 6px 6px;
+		padding: 5px 8px;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		font-size: 12px;
+	}
+	.facet-options label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 4px 12px;
+		font-size: 13px;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.facet-options label:hover {
+		background: #f5f5f2;
+	}
+	.facet-options input[type='checkbox'] {
+		margin: 0;
+		flex-shrink: 0;
+	}
+</style>
