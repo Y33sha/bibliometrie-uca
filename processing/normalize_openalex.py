@@ -75,6 +75,7 @@ DOCTYPE_MAP = {
 # OpenAlex OA status → notre enum oa_type
 OA_MAP = {
     "gold": "gold",
+    "diamond": "diamond",
     "hybrid": "hybrid",
     "bronze": "bronze",
     "green": "green",
@@ -332,6 +333,7 @@ def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
                 END,
                 oa_status = CASE
                     WHEN publications.oa_status = 'unknown' THEN EXCLUDED.oa_status
+                    WHEN EXCLUDED.oa_status = 'diamond' THEN 'diamond'
                     ELSE publications.oa_status
                 END,
                 updated_at = now()

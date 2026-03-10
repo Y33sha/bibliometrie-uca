@@ -28,6 +28,7 @@ export const typeLabels: Record<string, string> = {
 
 /** Labels pour les voies OA. */
 export const oaLabelsMap: Record<string, string> = {
+	diamond: 'Diamond',
 	gold: 'Gold',
 	hybrid: 'Hybrid',
 	bronze: 'Bronze',

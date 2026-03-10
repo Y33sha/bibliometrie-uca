@@ -5,8 +5,11 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { titleCase, formatDate, sanitizeTitle } from '$lib/utils';
-	import { typeLabels } from '$lib/labels';
+	import { typeLabels, docTypeLabelsMap, oaLabelsMap } from '$lib/labels';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
+	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
+	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
 
 	const personId = $derived($page.params.id);
 	let canGoBack = $state(false);
@@ -59,6 +62,7 @@
 		hal_id: string | null;
 		openalex_id: string | null;
 		labs: string | null;
+		is_corresponding: boolean | null;
 	}
 	interface PubResponse {
 		total: number;
@@ -87,6 +91,17 @@
 	let pubPages = $state(1);
 	const pubPerPage = 50;
 
+	// Facet state
+	let selectedYears: string[] = $state([]);
+	let selectedDocTypes: string[] = $state([]);
+	let selectedOa: string[] = $state([]);
+	let selectedCorr: string[] = $state([]);
+	let sourceStates: Record<string, string> = $state({});
+	let yearOptions: FacetOption[] = $state([]);
+	let docTypeOptions: FacetOption[] = $state([]);
+	let oaOptions: FacetOption[] = $state([]);
+	let corrOptions: FacetOption[] = $state([]);
+
 	// Addresses tab
 	let addresses: Address[] = $state([]);
 	let addrTotal = $state(0);
@@ -113,18 +128,58 @@
 		return Array.from(set);
 	});
 
+	function buildFilterParams(): URLSearchParams {
+		const params = new URLSearchParams();
+		params.set('person_id', personId ?? '');
+		if (selectedYears.length) params.set('year', selectedYears.join(','));
+		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
+		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
+		if (selectedCorr.length) params.set('is_corresponding', selectedCorr.join(','));
+		const sf = Object.entries(sourceStates).map(([k, v]) => `${k}_${v}`).join(',');
+		if (sf) params.set('source_filter', sf);
+		return params;
+	}
+
+	async function loadFacets() {
+		const params = buildFilterParams();
+		const data = await api<{
+			years: { value: number; count: number }[];
+			doc_types: { value: string; count: number }[];
+			oa_statuses: { value: string; count: number }[];
+			corresponding: { value: string; count: number }[];
+		}>('/api/publications/facets?' + params);
+		yearOptions = data.years.map((y) => ({
+			value: String(y.value), text: String(y.value), count: y.count
+		}));
+		docTypeOptions = data.doc_types.map((d) => ({
+			value: d.value, text: docTypeLabelsMap[d.value] || d.value, count: d.count
+		}));
+		oaOptions = data.oa_statuses.map((o) => ({
+			value: o.value, text: oaLabelsMap[o.value] || o.value, count: o.count
+		}));
+		if (data.corresponding?.length) {
+			corrOptions = data.corresponding.map((c) => ({
+				value: c.value, text: c.value === 'yes' ? 'Oui' : 'Non', count: c.count
+			}));
+		}
+	}
+
 	async function loadPublications() {
-		const params = new URLSearchParams({
-			page: String(pubPage),
-			per_page: String(pubPerPage),
-			person_id: personId,
-			sort: 'year_desc'
-		});
+		const params = buildFilterParams();
+		params.set('page', String(pubPage));
+		params.set('per_page', String(pubPerPage));
+		params.set('sort', 'year_desc');
 		const data = await api<PubResponse>('/api/publications?' + params);
 		publications = data.publications;
 		pubTotal = data.total;
 		pubPages = data.pages;
 		pubPage = data.page;
+	}
+
+	function onFilterChange() {
+		pubPage = 1;
+		loadPublications();
+		loadFacets();
 	}
 
 	async function loadAddresses() {
@@ -143,7 +198,9 @@
 	}
 
 	function exportCsvUrl(): string {
-		return `${base}/api/publications/export.csv?person_id=${personId}&sort=year_desc`;
+		const params = buildFilterParams();
+		params.set('sort', 'year_desc');
+		return `${base}/api/publications/export.csv?${params}`;
 	}
 
 	function switchTab(tab: Tab) {
@@ -154,7 +211,7 @@
 			url.searchParams.set('tab', tab);
 		}
 		goto(url.toString(), { replaceState: true, noScroll: true });
-		if (tab === 'publications' && publications.length === 0 && pubTotal === 0) loadPublications();
+		if (tab === 'publications' && publications.length === 0 && pubTotal === 0) { loadFacets(); loadPublications(); }
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
 	}
 
@@ -171,7 +228,7 @@
 		}
 		// Load data for active tab
 		if (activeTab === 'addresses') loadAddresses();
-		else if (activeTab === 'publications') loadPublications();
+		else if (activeTab === 'publications') { loadFacets(); loadPublications(); }
 	});
 </script>
 
@@ -247,34 +304,55 @@
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
 			<div class="toolbar">
+				<FacetDropdown label="Années" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
+				<FacetDropdown label="Types" options={docTypeOptions} bind:selected={selectedDocTypes} onchange={onFilterChange} />
+				<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
+				{#if corrOptions.length}
+					<FacetDropdown label="Corresp." options={corrOptions} bind:selected={selectedCorr} onchange={onFilterChange} />
+				{/if}
+				<SourceFilterToggle bind:states={sourceStates} onchange={onFilterChange} />
 				<span class="count">{pubTotal} publication{pubTotal > 1 ? 's' : ''}</span>
 				<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 			</div>
 			<table class="pub-table">
 				<thead>
 					<tr>
-						<th style="width:40px">An.</th>
 						<th>Titre</th>
 						<th>Revue</th>
-						<th style="width:80px">Labo(s)</th>
-						<th style="width:80px">Liens</th>
-						<th style="width:50px">OA</th>
 						<th style="width:80px">Type</th>
+						<th style="width:40px">An.</th>
+						<th style="width:80px">Labo(s)</th>
+						<th style="width:30px" title="Auteur correspondant">&#9993;</th>
+						<th style="width:50px">OA</th>
+						<th style="width:80px">Liens</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#if publications.length === 0}
-						<tr><td colspan="7" class="no-results">Aucune publication</td></tr>
+						<tr><td colspan="8" class="no-results">Aucune publication</td></tr>
 					{:else}
 						{#each publications as p (p.id)}
 							<tr>
-								<td>{p.pub_year || ''}</td>
 								<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
 								<td class="journal-cell">{p.journal || ''}</td>
+								<td>
+									<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
+								</td>
+								<td>{p.pub_year || ''}</td>
 								<td>
 									{#each (p.labs || '').split(', ').filter(Boolean) as lab}
 										<span class="lab-tag">{lab}</span>
 									{/each}
+								</td>
+								<td class="corr-cell">
+									{#if p.is_corresponding}
+										<span title="Auteur correspondant">&#10003;</span>
+									{/if}
+								</td>
+								<td>
+									{#if p.oa_status && p.oa_status !== 'unknown'}
+										<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
+									{/if}
 								</td>
 								<td class="links-cell">
 									{#if p.hal_id}
@@ -298,14 +376,6 @@
 									{:else}
 										<span class="source-tag source-placeholder"></span>
 									{/if}
-								</td>
-								<td>
-									{#if p.oa_status && p.oa_status !== 'unknown'}
-										<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
-									{/if}
-								</td>
-								<td>
-									<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
 								</td>
 							</tr>
 						{/each}
@@ -407,7 +477,7 @@
 	.back-link {
 		display: inline-block;
 		margin-bottom: 12px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		color: var(--accent);
 		text-decoration: none;
 	}
@@ -421,7 +491,7 @@
 		margin-bottom: 0;
 	}
 	.profile-name {
-		font-size: 20px;
+		font-size: 1.45rem;
 		font-weight: 600;
 		margin: 0 0 6px;
 	}
@@ -431,7 +501,7 @@
 		gap: 16px;
 		align-items: center;
 		flex-wrap: wrap;
-		font-size: 13px;
+		font-size: 0.95rem;
 		color: var(--muted);
 	}
 	.role-badge {
@@ -439,17 +509,17 @@
 		padding: 2px 8px;
 		background: #f0efec;
 		border-radius: 3px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 	}
-	.id-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-	.id-label { font-weight: 500; color: var(--muted); font-size: 12px; }
+	.id-item { display: flex; align-items: center; gap: 6px; font-size: 0.95rem; }
+	.id-label { font-weight: 500; color: var(--muted); font-size: 0.85rem; }
 	.id-badge {
 		display: inline-block;
 		padding: 2px 7px;
 		background: #e8f0f8;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--accent);
 		text-decoration: none;
 		white-space: nowrap;
@@ -473,7 +543,7 @@
 		padding: 10px 16px;
 		border: none;
 		background: #f5f4f1;
-		font-size: 13px;
+		font-size: 0.95rem;
 		font-weight: 500;
 		color: var(--muted);
 		cursor: pointer;
@@ -489,7 +559,7 @@
 		box-shadow: inset 0 -2px 0 var(--accent);
 	}
 	.tab-count {
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 400;
 		color: var(--muted);
 		margin-left: 4px;
@@ -508,7 +578,7 @@
 		background: #f5f4f1;
 		padding: 8px 10px;
 		text-align: left;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-weight: 600;
 		color: var(--muted);
 		border-bottom: 2px solid var(--border);
@@ -519,7 +589,7 @@
 	.tab-content tbody tr:hover { background: #fafaf8; }
 	.tab-content td {
 		padding: 7px 10px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		vertical-align: middle;
 	}
 	.tab-content td a { color: var(--accent); text-decoration: none; }
@@ -529,7 +599,7 @@
 		display: inline-block;
 		padding: 2px 7px;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 600;
 	}
 	.source-hal-label { background: #e8f0f8; color: #3b6b9e; }
@@ -543,7 +613,7 @@
 		margin-bottom: 10px;
 	}
 	.count {
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 	}
 	.export-btn {
@@ -551,7 +621,7 @@
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		background: var(--card);
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 		text-decoration: none;
 		cursor: pointer;
@@ -567,7 +637,7 @@
 		text-decoration: none; display: inline-block;
 	}
 	.pub-title:hover { color: var(--accent); text-decoration: underline; }
-	.journal-cell { font-size: 12px; color: var(--muted); }
+	.journal-cell { font-size: 0.85rem; color: var(--muted); }
 
 	.source-tag {
 		display: inline-flex;
@@ -594,7 +664,7 @@
 
 	.lab-tag {
 		display: inline-block;
-		font-size: 11px;
+		font-size: 0.8rem;
 		padding: 1px 7px;
 		border-radius: 10px;
 		background: #e8f0f8;
@@ -603,26 +673,28 @@
 	}
 	.oa-tag {
 		display: inline-block;
-		font-size: 10px;
+		font-size: 0.7rem;
 		padding: 1px 6px;
 		border-radius: 8px;
 		font-weight: 600;
 	}
 	:global(.oa-gold) { background: #fef3e0; color: #d4a017; }
+	:global(.oa-diamond) { background: #e0f2f7; color: #0288a8; }
 	:global(.oa-hybrid) { background: #f3eef9; color: #8e6bbf; }
 	:global(.oa-green) { background: #e6f4ec; color: #2a7d4f; }
 	:global(.oa-bronze) { background: #fdf0e6; color: #b8733e; }
 	:global(.oa-closed) { background: #e0e0e0; color: #555; }
-	.type-label { font-size: 11px; color: var(--muted); }
+	.type-label { font-size: 0.8rem; color: var(--muted); }
+	.corr-cell { text-align: center; color: var(--accent); font-size: 0.85rem; }
 
 	/* Addresses tab */
-	.addr-cell { font-size: 12px; color: var(--muted); word-break: break-all; }
+	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }
 	.struct-tag {
 		display: inline-block;
 		padding: 2px 7px;
 		background: #e8f0f8;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--accent);
 		font-weight: 500;
 		margin: 1px 2px;

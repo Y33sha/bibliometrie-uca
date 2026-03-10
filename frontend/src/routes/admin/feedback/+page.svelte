@@ -509,7 +509,7 @@
 	}
 
 	h2 {
-		font-size: 17px;
+		font-size: 1.2rem;
 		font-weight: 600;
 		margin: 0 0 16px;
 	}
@@ -533,13 +533,13 @@
 	}
 
 	.stat-card .value {
-		font-size: 22px;
+		font-size: 1.55rem;
 		font-weight: 700;
 		line-height: 1.2;
 	}
 
 	.stat-card .label {
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--muted);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
@@ -576,7 +576,7 @@
 		border-radius: 5px;
 		padding: 10px 14px;
 		margin-bottom: 16px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		color: #2c3e50;
 		line-height: 1.5;
 	}
@@ -600,7 +600,7 @@
 		padding: 6px 14px;
 		border: 1px solid var(--border);
 		background: white;
-		font-size: 13px;
+		font-size: 0.95rem;
 		cursor: pointer;
 		font-family: inherit;
 	}
@@ -627,7 +627,7 @@
 		padding: 6px 10px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		background: white;
 		width: 280px;
 	}
@@ -635,7 +635,7 @@
 	.count {
 		margin-left: auto;
 		color: var(--muted);
-		font-size: 12px;
+		font-size: 0.85rem;
 	}
 
 	.rerun-btn {
@@ -644,7 +644,7 @@
 		border-radius: 4px;
 		background: white;
 		color: var(--accent);
-		font-size: 13px;
+		font-size: 0.95rem;
 		font-weight: 600;
 		cursor: pointer;
 		font-family: inherit;
@@ -673,7 +673,7 @@
 	.data-table th {
 		text-align: left;
 		padding: 8px 10px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
@@ -684,7 +684,7 @@
 
 	.data-table td {
 		padding: 7px 10px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		border-bottom: 1px solid #f0efec;
 		vertical-align: top;
 	}
@@ -704,7 +704,7 @@
 
 	.addr-text {
 		font-family: 'SF Mono', 'Consolas', monospace;
-		font-size: 12px;
+		font-size: 0.85rem;
 		line-height: 1.4;
 		word-break: break-word;
 		max-width: 600px;
@@ -718,13 +718,13 @@
 
 	.muted-small {
 		color: var(--muted);
-		font-size: 11px;
+		font-size: 0.8rem;
 	}
 
 	/* Lab tags */
 	.lab-tag {
 		display: inline-block;
-		font-size: 11px;
+		font-size: 0.8rem;
 		padding: 1px 7px;
 		border-radius: 10px;
 		font-weight: 500;
@@ -748,7 +748,7 @@
 		padding: 3px 6px;
 		border: 1px solid var(--border);
 		border-radius: 3px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		background: white;
 		max-width: 200px;
 	}
@@ -759,7 +759,7 @@
 		border-radius: 3px;
 		background: var(--success-light);
 		color: var(--success);
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 600;
 		cursor: pointer;
 		font-family: inherit;
@@ -772,7 +772,7 @@
 
 	/* Form info (FP tab) */
 	.form-info {
-		font-size: 11px;
+		font-size: 0.8rem;
 		margin-top: 4px;
 		padding: 4px 8px;
 		background: #fef8e8;
@@ -803,7 +803,7 @@
 		border: 1px solid var(--border);
 		border-radius: 3px;
 		background: white;
-		font-size: 10px;
+		font-size: 0.7rem;
 		cursor: pointer;
 		font-weight: 500;
 		font-family: inherit;
@@ -839,7 +839,7 @@
 		border: none;
 		border-bottom: 1px solid var(--border);
 		border-radius: 0;
-		font-size: 12px;
+		font-size: 0.85rem;
 		outline: none;
 	}
 
@@ -853,7 +853,7 @@
 		align-items: center;
 		gap: 4px;
 		padding: 5px 10px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		cursor: pointer;
 		background: none;
 		border: none;
@@ -867,13 +867,13 @@
 	}
 
 	.picker-type {
-		font-size: 9px;
+		font-size: 0.65rem;
 		color: var(--muted);
 	}
 
 	.picker-item-empty {
 		padding: 5px 10px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 	}
 
@@ -889,7 +889,7 @@
 		border: 1px solid var(--border);
 		border-radius: 3px;
 		background: white;
-		font-size: 11px;
+		font-size: 0.8rem;
 		cursor: pointer;
 		font-family: inherit;
 	}

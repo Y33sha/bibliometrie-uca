@@ -168,6 +168,7 @@ def merge_publications(cur, items, dry_run=False):
                         ELSE dest.doi END,
                     journal_id = COALESCE(dest.journal_id, src.journal_id),
                     oa_status = CASE
+                        WHEN src.oa_status = 'diamond' THEN 'diamond'
                         WHEN dest.oa_status IN ('unknown', 'closed') AND src.oa_status NOT IN ('unknown', 'closed')
                         THEN src.oa_status ELSE dest.oa_status END,
                     language = COALESCE(dest.language, src.language),

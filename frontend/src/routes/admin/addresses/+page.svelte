@@ -482,7 +482,7 @@
 		display: flex;
 		gap: 12px;
 		margin-bottom: 10px;
-		font-size: 12px;
+		font-size: 0.85rem;
 	}
 	.stat-badge {
 		padding: 3px 10px;
@@ -515,7 +515,7 @@
 		padding: 6px 10px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		background: white;
 		font-family: inherit;
 	}
@@ -525,7 +525,7 @@
 	.count {
 		margin-left: auto;
 		color: var(--muted);
-		font-size: 12px;
+		font-size: 0.85rem;
 	}
 	.toolbar-sep {
 		width: 1px;
@@ -539,7 +539,7 @@
 		color: var(--accent);
 	}
 	.select-all-label {
-		font-size: 12px;
+		font-size: 0.85rem;
 		display: flex;
 		align-items: center;
 		gap: 4px;
@@ -583,19 +583,19 @@
 	}
 
 	.addr-text {
-		font-size: 13px;
+		font-size: 0.95rem;
 		word-break: break-word;
 	}
 	.addr-meta {
 		display: flex;
 		gap: 10px;
 		margin-top: 4px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--muted);
 	}
 	.lab-tag {
 		display: inline-block;
-		font-size: 11px;
+		font-size: 0.8rem;
 		padding: 1px 7px;
 		border-radius: 10px;
 		background: var(--warning-light);
@@ -604,7 +604,7 @@
 	}
 	.pub-count-tag {
 		display: inline-block;
-		font-size: 11px;
+		font-size: 0.8rem;
 		padding: 1px 7px;
 		border-radius: 10px;
 		background: var(--accent-light);
@@ -628,7 +628,7 @@
 		color: var(--muted);
 	}
 	.detail-title {
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 600;
 		color: var(--muted);
 		margin: 8px 0 4px 0;
@@ -639,7 +639,7 @@
 	.pub-row {
 		padding: 5px 0;
 		border-bottom: 1px solid #f0f0ee;
-		font-size: 12px;
+		font-size: 0.85rem;
 	}
 	.pub-row:last-child {
 		border-bottom: none;
@@ -649,7 +649,7 @@
 		color: var(--text);
 	}
 	.pub-meta-inline {
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--muted);
 		margin-top: 2px;
 	}
@@ -668,7 +668,7 @@
 		border-radius: 4px;
 		border: 1px solid var(--border);
 		background: white;
-		font-size: 12px;
+		font-size: 0.85rem;
 		cursor: pointer;
 		transition: all 0.15s;
 		font-family: inherit;
@@ -719,7 +719,7 @@
 		border: 1px solid rgba(255, 255, 255, 0.3);
 		background: transparent;
 		color: white;
-		font-size: 12px;
+		font-size: 0.85rem;
 		cursor: pointer;
 		font-family: inherit;
 	}

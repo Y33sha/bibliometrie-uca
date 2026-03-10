@@ -6,8 +6,8 @@
 * [ ] estimer APC par structure (gold+hybride avec auteur correspondant sauf Elsevier)
 
 ## Web of Science
-En attente réponse équipe technique.
-* [ ] Relancer import: python3 extraction/wos/extract_wos.py --year 2023
+API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuellement.
+* [x] Import staging : scrape_wos.py --parse-only (fichiers dans extraction/wos/downloads/)
 * [ ] Normalisation, peuplement des tables structures, auteurs, authorships, gestion des adresses, etc.
 
 ## OpenAlex
@@ -24,6 +24,10 @@ En attente réponse équipe technique.
 
 ## ORCID
 * [ ] moissoner crossref via ORCID pour trouver publis absentes de HAL, OpenAlex et WoS?
+* [ ] exploitation de l'API ORCID pour moissonner par affiliation?
+
+## Unpaywall
+* [ ] Finir l'audit Unpaywall vs OpenAlex
 
 ## Workflow
 * [ ] nouveaux imports: comment prendre en compte fusions de comptes auteurs ayant eu lieu entre-temps (par ex. sur HAL)? / + ré-importer et écraser publis déjà présentes et modifiées entre-temps (stocker hash puis comparer?)
@@ -48,17 +52,20 @@ En attente réponse équipe technique.
 * [x] organiser la page en onglets
 * [x] reconnaissance de noms moins stricte (noms composés, tirets, accents) pour la suggestion de matchings personnes-auteurs
 * [x] possibilité de fusionner
-* [ ] publications: indiquer si auteur correspondant / premier auteur
-* [ ] gestions des formes de noms?
+* [x] publications: indiquer si auteur correspondant / premier auteur
+* [ ] gestion des formes de noms?
+* [x] déduplication automatisée par labo (merge_lab_duplicates.py — homonymes + interversions nom/prénom)
 * [ ] ajouter IdRef?
 * [ ] ajouter quelques visus (%OA)
 * [ ] authorships OpenAlex pourries (ex. Pierre Mathieu): trouver un moyen de les déclarer inutilisables / ou cesser totalement d'utiliser les authorships OpenAlex? étudier les options
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis
-
+* [ ] permettre confirmation orcid
+* [ ] afficher quand compte HAL relié ou non à l'ORCID
 
 ## Structures
-* [x] créer page détails
+* [x] créer page détails (laboratories/[id])
 * [x] authorships orphelines: interface pour les visualiser et les rattacher à des personnes
+* [x] filtres à facettes dynamiques avec comptage sur la page labo
 * [ ] onglet dashboard
 * [ ] signatures: afficher nombre de publis + dates; trier par publis décroissantes; idem sur page personne
 * [ ] afficher identifiants (AuréHAL, OpenAlex, WoS) avec liens
@@ -66,20 +73,21 @@ En attente réponse équipe technique.
 ## Publications
 * [x] diagnostiquer le lag (tester requêtes)
 * [x] idem page stats (revues): requête très lente
-* [x] créer page détails
+* [x] créer page détails (publications/[id])
 * [x] filtre Source: 3 options par source (absent, présent, tous)
 * [x] dans les filtres: ajouter option "aucun labo"
 * [x] type "preprint": apparaît "autre" dans les extractions OpenAlex (https://openalex.org/works/W4407574839); voir ce qu'il en est dans les extractions HAL (le compte de préprints est zéro)
-* [ ] Open Access diamond?
+* [x] Open Access diamond?
 * [ ] ajouter filtre corresponding_is_uca?
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et  corriger + source theses.fr => corriger type
 * [ ] lien Publications -> Dashboard?
 * [ ] merge manuel + suggestion de candidats
+* [ ] pb des auteurs openalex liés à une personne mais non listés dans les auteurs d'une publi: http://172.22.130.105/bibliometrie/publications/12380
 
 ## Pages supplémentaires, étudier pertinence
 * [ ] sujets
 * [ ] éditeurs
-* [ ] revues
+* [ ] revues (avec liens doaj; apc)
 
 
 # Interface

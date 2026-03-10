@@ -359,7 +359,7 @@
 	.back-link {
 		display: inline-block;
 		margin-bottom: 12px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		color: var(--accent);
 		text-decoration: none;
 	}
@@ -374,7 +374,7 @@
 		margin-bottom: 16px;
 	}
 	.pub-title-main {
-		font-size: 18px;
+		font-size: 1.3rem;
 		font-weight: 600;
 		margin: 0 0 10px;
 		line-height: 1.4;
@@ -391,7 +391,7 @@
 		padding: 2px 8px;
 		background: #f0efec;
 		border-radius: 3px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 		font-weight: 500;
 	}
@@ -400,12 +400,13 @@
 
 	.oa-tag {
 		display: inline-block;
-		font-size: 11px;
+		font-size: 0.8rem;
 		padding: 2px 8px;
 		border-radius: 8px;
 		font-weight: 600;
 	}
 	:global(.oa-gold) { background: #fef3e0; color: #d4a017; }
+	:global(.oa-diamond) { background: #e0f2f7; color: #0288a8; }
 	:global(.oa-hybrid) { background: #f3eef9; color: #8e6bbf; }
 	:global(.oa-green) { background: #e6f4ec; color: #2a7d4f; }
 	:global(.oa-bronze) { background: #fdf0e6; color: #b8733e; }
@@ -416,18 +417,18 @@
 		gap: 10px;
 		align-items: center;
 		flex-wrap: wrap;
-		font-size: 13px;
+		font-size: 0.95rem;
 		margin-bottom: 8px;
 	}
 	.journal-name { font-weight: 500; color: var(--text); }
-	.issn { font-size: 12px; color: var(--muted); }
-	.publisher-name { font-size: 12px; color: var(--muted); }
+	.issn { font-size: 0.85rem; color: var(--muted); }
+	.publisher-name { font-size: 0.85rem; color: var(--muted); }
 	.predatory-badge {
 		display: inline-block;
 		padding: 2px 8px;
 		background: #fde8e8;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 600;
 		color: #c0392b;
 	}
@@ -435,10 +436,10 @@
 		display: flex;
 		gap: 6px;
 		align-items: center;
-		font-size: 13px;
+		font-size: 0.95rem;
 		margin-bottom: 8px;
 	}
-	.doi-label { font-weight: 500; color: var(--muted); font-size: 12px; }
+	.doi-label { font-weight: 500; color: var(--muted); font-size: 0.85rem; }
 	.pub-doi a { color: var(--accent); text-decoration: none; }
 	.pub-doi a:hover { text-decoration: underline; }
 
@@ -454,7 +455,7 @@
 		gap: 5px;
 		padding: 3px 10px;
 		border-radius: 4px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		text-decoration: none;
 		font-weight: 500;
 	}
@@ -469,7 +470,7 @@
 		gap: 6px;
 		align-items: center;
 		flex-wrap: wrap;
-		font-size: 12px;
+		font-size: 0.85rem;
 		margin-top: 6px;
 	}
 	.collections-label { color: var(--muted); font-weight: 500; }
@@ -478,7 +479,7 @@
 		padding: 1px 6px;
 		background: #f0efec;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--muted);
 	}
 
@@ -487,7 +488,7 @@
 		margin-bottom: 16px;
 	}
 	.section-title {
-		font-size: 15px;
+		font-size: 1.05rem;
 		font-weight: 600;
 		margin: 0 0 8px;
 	}
@@ -505,7 +506,7 @@
 		background: #f5f4f1;
 		padding: 8px 10px;
 		text-align: left;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-weight: 600;
 		color: var(--muted);
 		border-bottom: 2px solid var(--border);
@@ -516,11 +517,11 @@
 	.auth-table tbody tr:hover { background: #fafaf8; }
 	.auth-table td {
 		padding: 6px 10px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		vertical-align: middle;
 	}
 
-	.pos-cell { text-align: center; color: var(--muted); font-size: 12px; }
+	.pos-cell { text-align: center; color: var(--muted); font-size: 0.85rem; }
 	.center-cell { text-align: center; }
 
 	.author-link { color: var(--accent); text-decoration: none; }
@@ -531,7 +532,7 @@
 		padding: 1px 6px;
 		background: #e8f0f8;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--accent);
 		font-weight: 500;
 		margin-right: 3px;
@@ -539,7 +540,7 @@
 	}
 	a.struct-tag:hover { background: #d0e3f4; }
 
-	.uca-dot { color: #2a7d4f; font-size: 10px; }
+	.uca-dot { color: #2a7d4f; font-size: 0.7rem; }
 	.uca-row { background: #f8fcf9; }
 
 	.sources-cell { white-space: nowrap; }
@@ -547,7 +548,7 @@
 		display: inline-block;
 		padding: 1px 5px;
 		border-radius: 3px;
-		font-size: 10px;
+		font-size: 0.7rem;
 		font-weight: 600;
 		margin-right: 2px;
 	}
@@ -558,7 +559,7 @@
 	.excluded-text { text-decoration: line-through; }
 
 	.affiliation-cell {
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--muted);
 		max-width: 400px;
 		word-break: break-word;
@@ -574,7 +575,7 @@
 	}
 	.source-details summary {
 		padding: 10px 14px;
-		font-size: 14px;
+		font-size: 1rem;
 		font-weight: 500;
 		cursor: pointer;
 		background: #f5f4f1;

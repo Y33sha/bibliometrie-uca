@@ -125,6 +125,7 @@
 	let personsTotal = $state(0);
 	let personsPage = $state(1);
 	let personsPages = $state(1);
+	let personsSort = $state('name');
 	let orphanStats = $state({ hal: 0, openalex: 0, total: 0 });
 	let personsLoaded = $state(false);
 
@@ -152,6 +153,7 @@
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (pubSearch.trim()) p.set('search', pubSearch.trim());
 		if (pubPage > 1) p.set('page', String(pubPage));
+		if (personsSort !== 'name') p.set('psort', personsSort);
 		const qs = p.toString();
 		history.replaceState(history.state, '', `${base}/laboratories/${labId}` + (qs ? '?' + qs : ''));
 	}
@@ -224,10 +226,26 @@
 		}, 400);
 	}
 
+	function togglePersonsSort(col: string) {
+		if (personsSort === col) personsSort = '-' + col;
+		else if (personsSort === '-' + col) personsSort = col;
+		else personsSort = col;
+		personsPage = 1;
+		loadPersons();
+		syncUrl();
+	}
+
+	function sortIndicator(col: string): string {
+		if (personsSort === col) return ' \u25B2';
+		if (personsSort === '-' + col) return ' \u25BC';
+		return '';
+	}
+
 	async function loadPersons() {
 		const params = new URLSearchParams({
 			page: String(personsPage),
-			per_page: '50'
+			per_page: '50',
+			sort: personsSort
 		});
 		const data = await api<PersonsResponse>(
 			`/api/laboratories/${labId}/persons?${params}`
@@ -287,6 +305,7 @@
 		}
 		if (urlParams.get('search')) pubSearch = urlParams.get('search')!;
 		if (urlParams.get('page')) pubPage = Number(urlParams.get('page')) || 1;
+		if (urlParams.get('psort')) personsSort = urlParams.get('psort')!;
 
 		try {
 			const profileData = await api<LabProfile>(`/api/laboratories/${labId}`);
@@ -407,12 +426,12 @@
 			<table class="pub-table">
 				<thead>
 					<tr>
-						<th style="width:40px">An.</th>
 						<th>Titre</th>
 						<th>Revue</th>
-						<th style="width:80px">Liens</th>
-						<th style="width:50px">OA</th>
 						<th style="width:80px">Type</th>
+						<th style="width:40px">An.</th>
+						<th style="width:50px">OA</th>
+						<th style="width:80px">Liens</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -421,9 +440,17 @@
 					{:else}
 						{#each publications as p (p.id)}
 							<tr>
-								<td>{p.pub_year || ''}</td>
 								<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
 								<td class="journal-cell">{p.journal || ''}</td>
+								<td>
+									<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
+								</td>
+								<td>{p.pub_year || ''}</td>
+								<td>
+									{#if p.oa_status && p.oa_status !== 'unknown'}
+										<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
+									{/if}
+								</td>
 								<td class="links-cell">
 									{#if p.hal_id}
 										<a href="https://hal.science/{p.hal_id}" target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
@@ -447,14 +474,6 @@
 										<span class="source-tag source-placeholder"></span>
 									{/if}
 								</td>
-								<td>
-									{#if p.oa_status && p.oa_status !== 'unknown'}
-										<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
-									{/if}
-								</td>
-								<td>
-									<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
-								</td>
 							</tr>
 						{/each}
 					{/if}
@@ -476,10 +495,10 @@
 			<table>
 				<thead>
 					<tr>
-						<th>Nom</th>
-						<th>Fonction</th>
-						<th>Département</th>
-						<th style="width:80px">Publications</th>
+						<th class="sortable" onclick={() => togglePersonsSort('name')}>Nom{sortIndicator('name')}</th>
+						<th class="sortable" onclick={() => togglePersonsSort('role')}>Fonction{sortIndicator('role')}</th>
+						<th class="sortable" onclick={() => togglePersonsSort('dept')}>Département{sortIndicator('dept')}</th>
+						<th class="sortable" style="width:80px" onclick={() => togglePersonsSort('pubs')}>Publications{sortIndicator('pubs')}</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -544,7 +563,7 @@
 	.back-link {
 		display: inline-block;
 		margin-bottom: 12px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		color: var(--accent);
 		text-decoration: none;
 	}
@@ -559,12 +578,12 @@
 		margin-bottom: 0;
 	}
 	.lab-name {
-		font-size: 18px;
+		font-size: 1.3rem;
 		font-weight: 600;
 		margin: 0 0 10px;
 	}
 	.lab-acronym {
-		font-size: 15px;
+		font-size: 1.05rem;
 		color: var(--muted);
 		font-weight: 400;
 	}
@@ -578,10 +597,10 @@
 		align-items: center;
 		gap: 6px;
 		flex-wrap: wrap;
-		font-size: 13px;
+		font-size: 0.95rem;
 	}
 	.meta-label {
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 600;
 		color: var(--muted);
 		text-transform: uppercase;
@@ -591,7 +610,7 @@
 		display: inline-block;
 		padding: 2px 7px;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		white-space: nowrap;
 	}
 	.tutelle-tag { background: #e8f0f8; color: var(--accent); }
@@ -601,7 +620,7 @@
 		padding: 2px 7px;
 		background: #e8f0f8;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--accent);
 		text-decoration: none;
 		white-space: nowrap;
@@ -626,7 +645,7 @@
 		padding: 10px 16px;
 		border: none;
 		background: #f5f4f1;
-		font-size: 13px;
+		font-size: 0.95rem;
 		font-weight: 500;
 		color: var(--muted);
 		cursor: pointer;
@@ -642,7 +661,7 @@
 		box-shadow: inset 0 -2px 0 var(--accent);
 	}
 	.tab-count {
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 400;
 		color: var(--muted);
 		margin-left: 4px;
@@ -664,12 +683,12 @@
 		padding: 6px 10px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		width: 220px;
 	}
 	.count {
 		margin-left: auto;
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 	}
 	.export-btn {
@@ -677,7 +696,7 @@
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		background: var(--card);
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 		text-decoration: none;
 		cursor: pointer;
@@ -701,18 +720,25 @@
 		background: #f5f4f1;
 		padding: 8px 10px;
 		text-align: left;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-weight: 600;
 		color: var(--muted);
 		border-bottom: 2px solid var(--border);
 		white-space: nowrap;
+	}
+	.tab-content thead th.sortable {
+		cursor: pointer;
+		user-select: none;
+	}
+	.tab-content thead th.sortable:hover {
+		color: var(--accent);
 	}
 	.tab-content tbody tr { border-bottom: 1px solid #f0efec; }
 	.tab-content tbody tr:last-child { border-bottom: none; }
 	.tab-content tbody tr:hover { background: #fafaf8; }
 	.tab-content td {
 		padding: 7px 10px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		vertical-align: top;
 	}
 
@@ -722,7 +748,7 @@
 		text-decoration: none; display: inline-block;
 	}
 	.pub-title:hover { color: var(--accent); text-decoration: underline; }
-	.journal-cell { font-size: 12px; color: var(--muted); }
+	.journal-cell { font-size: 0.85rem; color: var(--muted); }
 	.source-tag {
 		display: inline-flex;
 		align-items: center;
@@ -747,17 +773,18 @@
 	.links-cell { white-space: nowrap; }
 	.oa-tag {
 		display: inline-block;
-		font-size: 10px;
+		font-size: 0.7rem;
 		padding: 1px 6px;
 		border-radius: 8px;
 		font-weight: 600;
 	}
 	:global(.oa-gold) { background: #fef3e0; color: #d4a017; }
+	:global(.oa-diamond) { background: #e0f2f7; color: #0288a8; }
 	:global(.oa-hybrid) { background: #f3eef9; color: #8e6bbf; }
 	:global(.oa-green) { background: #e6f4ec; color: #2a7d4f; }
 	:global(.oa-bronze) { background: #fdf0e6; color: #b8733e; }
 	:global(.oa-closed) { background: #e0e0e0; color: #555; }
-	.type-label { font-size: 11px; color: var(--muted); }
+	.type-label { font-size: 0.8rem; color: var(--muted); }
 
 	/* Persons tab */
 	.person-link {
@@ -776,13 +803,13 @@
 		border-radius: 50%;
 		background: var(--accent, #3b82f6);
 		color: white;
-		font-size: 10px;
+		font-size: 0.7rem;
 		font-weight: 700;
 		margin-left: 4px;
 		vertical-align: middle;
 		line-height: 1;
 	}
-	.muted-cell { font-size: 12px; color: var(--muted); }
+	.muted-cell { font-size: 0.85rem; color: var(--muted); }
 	.orphan-banner {
 		display: block;
 		background: #fef3e0;
@@ -790,7 +817,7 @@
 		border-radius: 5px;
 		padding: 8px 14px;
 		margin-bottom: 12px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		color: #8a6d1b;
 		text-decoration: none;
 	}
@@ -798,13 +825,13 @@
 		background: #fdecc8;
 	}
 	.orphan-detail {
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: #a08530;
 	}
 
 	/* Addresses tab */
 	.addr-cell {
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 		word-break: break-all;
 	}
@@ -812,7 +839,7 @@
 		display: inline-block;
 		padding: 2px 7px;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 500;
 	}
 	.status-tag.confirmed { background: #e6f4ec; color: #2a7d4f; }

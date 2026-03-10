@@ -35,7 +35,9 @@ def normalize_name(name):
     """Normalise un nom pour comparaison."""
     if not name:
         return ""
-    text = unicodedata.normalize("NFKD", name.lower().strip())
+    # Remplacer les tirets Unicode (U+2010 à U+2015) par un tiret ASCII
+    text = re.sub(r"[\u2010\u2011\u2012\u2013\u2014\u2015]", "-", name)
+    text = unicodedata.normalize("NFKD", text.lower().strip())
     text = text.encode("ascii", "ignore").decode("ascii")
     text = re.sub(r"[^a-z\s-]", "", text)
     return re.sub(r"\s+", " ", text).strip()
@@ -536,12 +538,8 @@ def run(apply=False):
 
         if matched_person:
             if apply:
-                if a["source"] == "hal":
-                    cur.execute("UPDATE hal_authors SET person_id = %s, updated_at = now() WHERE id = %s",
-                                (matched_person, a["id"]))
-                else:
-                    cur.execute("UPDATE openalex_authors SET person_id = %s, updated_at = now() WHERE id = %s",
-                                (matched_person, a["id"]))
+                link_authors_to_person(cur, matched_person, [a])
+                add_identifiers(cur, matched_person, [a])
             p3b_linked += 1
         elif matched_person is None and candidates:
             # On a trouvé des candidats par nom mais aucune co-publication, ou ambiguïté

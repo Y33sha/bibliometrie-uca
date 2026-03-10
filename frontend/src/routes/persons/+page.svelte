@@ -209,8 +209,8 @@
 <Pagination page={currentPage} pages={totalPages} onchange={(p) => { currentPage = p; syncUrl(); loadData(); }} />
 
 <style>
-	h2 { font-size: 17px; font-weight: 600; margin: 0 0 14px; }
-	.subtitle { font-size: 13px; color: var(--muted); margin: -10px 0 16px; }
+	h2 { font-size: 1.2rem; font-weight: 600; margin: 0 0 14px; }
+	.subtitle { font-size: 0.95rem; color: var(--muted); margin: -10px 0 16px; }
 
 	.toolbar {
 		display: flex;
@@ -227,12 +227,12 @@
 		padding: 6px 10px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		width: 240px;
 	}
 	.count {
 		margin-left: auto;
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 		white-space: nowrap;
 	}
@@ -249,7 +249,7 @@
 		background: #f5f4f1;
 		padding: 9px 12px;
 		text-align: left;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-weight: 600;
 		color: var(--muted);
 		text-transform: uppercase;
@@ -262,7 +262,7 @@
 	tbody tr:hover { background: #fafaf8; }
 	td {
 		padding: 10px 12px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		vertical-align: middle;
 	}
 	td a { color: var(--accent); text-decoration: none; }
@@ -275,7 +275,7 @@
 		padding: 2px 7px;
 		background: #f0efec;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--muted);
 		white-space: nowrap;
 	}
@@ -284,7 +284,7 @@
 		padding: 2px 7px;
 		background: #e8f0f8;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--accent);
 		text-decoration: none;
 		white-space: nowrap;
@@ -300,7 +300,7 @@
 		border-radius: 50%;
 		background: var(--accent, #3b82f6);
 		color: white;
-		font-size: 10px;
+		font-size: 0.7rem;
 		font-weight: 700;
 		margin-left: 4px;
 		vertical-align: middle;

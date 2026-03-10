@@ -605,7 +605,7 @@
 							{:else}
 								{#each relationPickerResults as rs (rs.id)}
 									<button class="picker-item" onclick={() => pickStructure(rs.id)}>
-										<span class="type-badge type-{rs.type}" style="font-size:9px;padding:0 5px">
+										<span class="type-badge type-{rs.type}" style="font-size: 0.65rem;padding:0 5px">
 											{rs.type}
 										</span>
 										{rs.acronym ? rs.acronym + ' \u2014 ' : ''}{rs.name}
@@ -740,7 +740,7 @@
 							{:else}
 								{#each ctxPickerResults as cs (cs.id)}
 									<button class="picker-item" onclick={() => pickCtx(cs.id)}>
-										<span class="type-badge type-{cs.type}" style="font-size:9px;padding:0 5px">
+										<span class="type-badge type-{cs.type}" style="font-size: 0.65rem;padding:0 5px">
 											{cs.type}
 										</span>
 										{cs.acronym ? cs.acronym + ' \u2014 ' : ''}{cs.name}
@@ -831,12 +831,12 @@
 	}
 	.panel h2 {
 		margin: 0 0 10px;
-		font-size: 15px;
+		font-size: 1.05rem;
 		font-weight: 600;
 	}
 	.panel h3 {
 		margin: 12px 0 6px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		font-weight: 600;
 		color: var(--text-muted);
 		text-transform: uppercase;
@@ -854,7 +854,7 @@
 		padding: 5px 8px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		background: white;
 		font-family: inherit;
 	}
@@ -870,7 +870,7 @@
 		margin-bottom: 4px;
 	}
 	.list-count {
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--text-muted);
 	}
 
@@ -913,7 +913,7 @@
 	}
 	.struct-item .name {
 		font-weight: 500;
-		font-size: 13px;
+		font-size: 0.95rem;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -921,7 +921,7 @@
 
 	/* ── Type badges ── */
 	.type-badge {
-		font-size: 10px;
+		font-size: 0.7rem;
 		padding: 1px 6px;
 		border-radius: 8px;
 		font-weight: 600;
@@ -973,14 +973,14 @@
 	.detail-header h2 {
 		flex: 1;
 		margin: 0;
-		font-size: 18px;
+		font-size: 1.3rem;
 	}
 
 	.field-grid {
 		display: grid;
 		grid-template-columns: 100px 1fr;
 		gap: 4px 10px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		margin-bottom: 14px;
 	}
 	.field-label {
@@ -996,7 +996,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 4px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		padding: 2px 8px;
 		border-radius: 10px;
 		margin: 2px;
@@ -1017,7 +1017,7 @@
 		cursor: pointer;
 		color: var(--danger);
 		font-weight: bold;
-		font-size: 14px;
+		font-size: 1rem;
 		line-height: 1;
 		background: none;
 		border: none;
@@ -1036,7 +1036,7 @@
 		color: #8a6b2e;
 	}
 	.none-text {
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--text-muted);
 	}
 
@@ -1044,12 +1044,12 @@
 	.forms-table {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 13px;
+		font-size: 0.95rem;
 	}
 	.forms-table th {
 		text-align: left;
 		padding: 5px 8px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--text-muted);
 		border-bottom: 2px solid var(--border);
 		font-weight: 600;
@@ -1067,15 +1067,15 @@
 	}
 	.form-text {
 		font-family: 'SF Mono', Consolas, monospace;
-		font-size: 12px;
+		font-size: 0.85rem;
 	}
 	.regex-badge {
 		color: var(--warning);
-		font-size: 10px;
+		font-size: 0.7rem;
 		font-family: inherit;
 	}
 	.ctx-tag {
-		font-size: 10px;
+		font-size: 0.7rem;
 		padding: 1px 5px;
 		border-radius: 6px;
 		background: var(--warning-light);
@@ -1088,7 +1088,7 @@
 		cursor: pointer;
 		color: var(--danger);
 		font-weight: bold;
-		font-size: 12px;
+		font-size: 0.85rem;
 		line-height: 1;
 		background: none;
 		border: none;
@@ -1100,7 +1100,7 @@
 	}
 	.sufficient-label {
 		color: var(--success);
-		font-size: 11px;
+		font-size: 0.8rem;
 	}
 
 	/* ── Buttons ── */
@@ -1108,7 +1108,7 @@
 		padding: 5px 12px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		cursor: pointer;
 		background: white;
 		font-family: inherit;
@@ -1133,7 +1133,7 @@
 	}
 	.btn-sm {
 		padding: 2px 7px;
-		font-size: 11px;
+		font-size: 0.8rem;
 	}
 	.btn-success {
 		background: var(--success);
@@ -1151,7 +1151,7 @@
 		border: 1px solid var(--border);
 		background: white;
 		color: var(--accent);
-		font-size: 14px;
+		font-size: 1rem;
 		font-weight: bold;
 		cursor: pointer;
 		margin-left: 6px;
@@ -1174,7 +1174,7 @@
 		border: 1px solid var(--border);
 		background: white;
 		color: var(--accent);
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: bold;
 		cursor: pointer;
 		vertical-align: middle;
@@ -1200,11 +1200,11 @@
 		padding: 4px 6px;
 		border: 1px solid var(--border);
 		border-radius: 3px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-family: inherit;
 	}
 	.regex-label {
-		font-size: 11px;
+		font-size: 0.8rem;
 		display: flex;
 		align-items: center;
 		gap: 3px;
@@ -1215,14 +1215,14 @@
 	/* ── New form context ── */
 	.new-form-ctx {
 		margin-top: 4px;
-		font-size: 12px;
+		font-size: 0.85rem;
 	}
 	.ctx-label-text {
 		color: var(--text-muted);
 	}
 	.ctx-hint {
 		color: var(--text-muted);
-		font-size: 11px;
+		font-size: 0.8rem;
 		margin-left: 4px;
 	}
 
@@ -1243,7 +1243,7 @@
 		border: none;
 		border-bottom: 1px solid var(--border);
 		border-radius: 5px 5px 0 0;
-		font-size: 13px;
+		font-size: 0.95rem;
 		outline: none;
 		font-family: inherit;
 	}
@@ -1257,7 +1257,7 @@
 		gap: 6px;
 		width: 100%;
 		padding: 6px 10px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		cursor: pointer;
 		background: none;
 		border: none;
@@ -1304,14 +1304,14 @@
 	}
 	.modal h3 {
 		margin: 0 0 14px;
-		font-size: 16px;
+		font-size: 1.15rem;
 		color: var(--text);
 		text-transform: none;
 		letter-spacing: normal;
 	}
 	.modal label {
 		display: block;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-weight: 600;
 		color: var(--text-muted);
 		margin: 8px 0 3px;
@@ -1322,7 +1322,7 @@
 		padding: 6px 8px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		font-family: inherit;
 	}
 	.modal .actions {

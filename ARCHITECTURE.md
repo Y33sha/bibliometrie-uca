@@ -3,7 +3,7 @@
 ## Vue d'ensemble
 
 Le système gère les publications scientifiques de l'Université Clermont Auvergne en
-intégrant plusieurs sources de données (HAL, OpenAlex, potentiellement Web of Science).
+intégrant plusieurs sources de données (HAL, OpenAlex, Web of Science).
 
 Principe fondamental : **les données source ne se mélangent jamais**. Chaque source
 a ses propres tables ; les entités canoniques (publications, personnes, structures,
@@ -98,9 +98,18 @@ Tables associées :
 
 ### `persons`
 
-Référentiel des individus, alimenté par les exports RH. Une ligne = une personne
-physique. Ne contient aucun identifiant bibliométrique directement — ceux-ci sont
-dans `person_identifiers`.
+Référentiel des individus. Une ligne = une personne physique. Alimenté par les
+exports RH (données dans la table satellite `persons_rh`) et par le script
+`create_persons_from_authorships.py` (création automatique depuis les authorships
+en 5 passes). Ne contient aucun identifiant bibliométrique directement — ceux-ci
+sont dans `person_identifiers`.
+
+### `persons_rh`
+
+Table satellite liée à `persons` (FK `person_id`, ON DELETE CASCADE). Contient les
+données issues des exports RH : `department_name`, `role_title`, `structure_id`,
+`start_date`, `end_date`. Une personne sans entrée dans `persons_rh` n'a pas de
+données RH (créée automatiquement depuis les authorships).
 
 ### `person_identifiers`
 
@@ -271,6 +280,7 @@ déjà dans les tables source, il n'y a pas besoin d'une table physique.
 ```
 extract_hal.py → staging_hal
 extract_openalex.py → staging_openalex
+extract_wos.py → staging_wos  (ou scrape_wos.py --parse-only pour fichiers manuels)
 ```
 
 ### 2. Enrichissement structures
@@ -328,8 +338,8 @@ publications manquantes.
 
 ## Inventaire des tables
 
-### Vérité (9)
-`structures`, `structure_relations`, `name_forms`, `persons`,
+### Vérité (10)
+`structures`, `structure_relations`, `name_forms`, `persons`, `persons_rh`,
 `person_identifiers`, `publishers`, `journals`, `publications`, `authorships`
 
 ### Source HAL (5)
@@ -342,7 +352,7 @@ publications manquantes.
 ### Adresses (3)
 `addresses`, `address_structures`, `openalex_authorship_addresses`
 
-### Autre (1)
+### Source WoS (1, staging uniquement — normalisation à venir)
 `staging_wos`
 
 ### Vues (1)

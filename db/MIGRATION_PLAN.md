@@ -1,5 +1,8 @@
 # Plan de migration — Schéma v1 → v2
 
+> **Note** : ce plan a été exécuté avec succès (migrations 014 à 020+).
+> Ce document est conservé comme référence historique.
+
 ## Vue d'ensemble
 
 La migration se fait en 3 phases :

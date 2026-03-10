@@ -395,6 +395,46 @@ def apply_source_filter(conditions: list, source_values: list[str]):
             )
 
 
+def apply_person_filter(conditions: list, params: list, person_id: int):
+    """Ajoute le filtre personne (toutes ses publications via source tables)."""
+    conditions.append("""
+        (
+            EXISTS (SELECT 1 FROM hal_documents hd
+                    JOIN hal_authorships has ON has.hal_document_id = hd.id
+                    JOIN hal_authors ha ON ha.id = has.hal_author_id
+                    WHERE hd.publication_id = p.id AND ha.person_id = %s)
+            OR
+            EXISTS (SELECT 1 FROM openalex_documents od
+                    JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
+                    JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+                    WHERE od.publication_id = p.id AND oa.person_id = %s)
+        )
+    """)
+    params.append(person_id)
+    params.append(person_id)
+
+
+def apply_corresponding_filter(conditions: list, params: list,
+                                person_id: int, corr_filter: str):
+    """Filtre sur is_corresponding pour une personne donnée."""
+    if not corr_filter or not person_id:
+        return
+    if corr_filter == "yes":
+        conditions.append("""
+            EXISTS (SELECT 1 FROM authorships a
+                    WHERE a.publication_id = p.id AND a.person_id = %s
+                      AND a.is_corresponding = TRUE AND NOT a.excluded)
+        """)
+        params.append(person_id)
+    elif corr_filter == "no":
+        conditions.append("""
+            NOT EXISTS (SELECT 1 FROM authorships a
+                        WHERE a.publication_id = p.id AND a.person_id = %s
+                          AND a.is_corresponding = TRUE AND NOT a.excluded)
+        """)
+        params.append(person_id)
+
+
 def apply_publisher_journal_filter(conditions: list, params: list,
                                    publisher_id: int | None, journal_id: int | None):
     """Ajoute les filtres éditeur et revue."""
@@ -467,7 +507,7 @@ async def publisher_stats(
         apply_oa_filter(conditions, params, oa_status)
 
         if search:
-            conditions.append("pub.name ILIKE %s")
+            conditions.append("unaccent(pub.name) ILIKE unaccent(%s)")
             params.append(f"%{search}%")
 
         where = " AND ".join(conditions)
@@ -488,6 +528,7 @@ async def publisher_stats(
                 COUNT(DISTINCT p.id) AS pub_count,
                 COUNT(DISTINCT j.id) AS journal_count,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
+                COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
@@ -544,7 +585,7 @@ async def journal_stats(
             params.append(publisher_id)
 
         if search:
-            conditions.append("j.title ILIKE %s")
+            conditions.append("unaccent(j.title) ILIKE unaccent(%s)")
             params.append(f"%{search}%")
 
         apply_oa_filter(conditions, params, oa_status)
@@ -570,6 +611,7 @@ async def journal_stats(
                 j.apc_amount,
                 COUNT(DISTINCT p.id) AS pub_count,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
+                COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
@@ -634,6 +676,7 @@ async def stats_by_year(
                 p.pub_year,
                 COUNT(DISTINCT p.id) AS pub_count,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
+                COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
@@ -781,6 +824,7 @@ async def stats_labs(
                 s.name AS lab_name,
                 COUNT(DISTINCT p.id) AS pub_count,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
+                COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
@@ -943,6 +987,8 @@ async def publications_facets(
     source_filter: str = Query(""),
     publisher_id: int | None = Query(None),
     journal_id: int | None = Query(None),
+    person_id: int | None = Query(None),
+    is_corresponding: str = Query(""),
 ):
     """Facettes dynamiques pour la page publications.
     Chaque facette exclut son propre filtre mais applique tous les autres."""
@@ -955,13 +1001,19 @@ async def publications_facets(
     source_values = parse_str_csv(source_filter)
 
     def base_conds_params():
-        """Conditions de base : publications UCA."""
+        """Conditions de base : publications UCA ou personne."""
+        if person_id:
+            c, p = [], []
+            apply_person_filter(c, p, person_id)
+            return c, p
         return [PUB_IS_UCA], []
 
     def add_all_except(conds, params, *, skip: str):
         """Ajoute tous les filtres sauf celui indiqué par skip."""
         if skip != "year":
             apply_year_filter(conds, params, years)
+        if skip != "corresponding" and person_id:
+            apply_corresponding_filter(conds, params, person_id, is_corresponding)
         if skip != "lab":
             if lab_none and not lab_ids_clean:
                 conds.append("""
@@ -1076,12 +1128,40 @@ async def publications_facets(
         """, p)
         oa_facets = cur.fetchall()
 
+        # --- Facette CORRESPONDING (seulement si person_id) ---
+        corr_facets = []
+        if person_id:
+            c, p = base_conds_params()
+            add_all_except(c, p, skip="corresponding")
+            where = " AND ".join(c)
+            cur.execute(f"""
+                SELECT
+                    COUNT(*) FILTER (WHERE EXISTS (
+                        SELECT 1 FROM authorships a
+                        WHERE a.publication_id = p.id AND a.person_id = %s
+                          AND a.is_corresponding = TRUE AND NOT a.excluded
+                    )) AS yes_count,
+                    COUNT(*) FILTER (WHERE NOT EXISTS (
+                        SELECT 1 FROM authorships a
+                        WHERE a.publication_id = p.id AND a.person_id = %s
+                          AND a.is_corresponding = TRUE AND NOT a.excluded
+                    )) AS no_count
+                FROM publications p
+                WHERE {where}
+            """, p + [person_id, person_id])
+            row = cur.fetchone()
+            corr_facets = [
+                {"value": "yes", "count": row["yes_count"]},
+                {"value": "no", "count": row["no_count"]},
+            ]
+
         return {
             "years": year_facets,
             "labs": lab_facets,
             "no_lab_count": no_lab_count,
             "doc_types": doc_type_facets,
             "oa_statuses": oa_facets,
+            "corresponding": corr_facets,
         }
 
 
@@ -1151,7 +1231,7 @@ async def export_publications_csv(
             params = []
 
         if search:
-            conditions.append("p.title ILIKE %s")
+            conditions.append("unaccent(p.title) ILIKE unaccent(%s)")
             params.append(f"%{search}%")
         if years:
             conditions.append("p.pub_year = ANY(%s)")
@@ -1441,6 +1521,7 @@ async def list_publications(
     doc_type: str = Query(""),         # comma-separated values
     sort: str = Query("year_desc"),    # year_desc, year_asc, title
     person_id: int | None = Query(None),
+    is_corresponding: str = Query(""),  # yes, no
 ):
     """Liste les publications avec sources, labos, journal."""
     offset = (page - 1) * per_page
@@ -1489,7 +1570,7 @@ async def list_publications(
             params = []
 
         if search:
-            conditions.append("p.title ILIKE %s")
+            conditions.append("unaccent(p.title) ILIKE unaccent(%s)")
             params.append(f"%{search}%")
 
         if years:
@@ -1597,6 +1678,10 @@ async def list_publications(
             conditions.append("p.oa_status::text = ANY(%s)")
             params.append(list(set(expanded)))
 
+        # Corresponding author filter
+        if person_id:
+            apply_corresponding_filter(conditions, params, person_id, is_corresponding)
+
         where_clause = " AND ".join(conditions) if conditions else "TRUE"
 
         order_map = {
@@ -1623,6 +1708,11 @@ async def list_publications(
                  WHERE ps.publication_id = p.id AND ps.source = 'hal' LIMIT 1) AS hal_id,
                 (SELECT ps.source_id FROM publication_sources ps
                  WHERE ps.publication_id = p.id AND ps.source = 'openalex' LIMIT 1) AS openalex_id,
+                -- Corresponding author (only meaningful with person_id filter)
+                (SELECT a.is_corresponding FROM authorships a
+                 WHERE a.publication_id = p.id AND a.person_id = %s
+                   AND NOT a.excluded
+                 LIMIT 1) AS is_corresponding,
                 -- Labs (aggregated from HAL + OpenAlex sources)
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
@@ -1647,7 +1737,7 @@ async def list_publications(
             WHERE {where_clause}
             ORDER BY {order}
             LIMIT %s OFFSET %s
-        """, params + [per_page, offset])
+        """, [person_id] + params + [per_page, offset])
 
         publications = []
         for row in cur.fetchall():
@@ -1663,6 +1753,7 @@ async def list_publications(
                 "hal_id": row["hal_id"],
                 "openalex_id": row["openalex_id"],
                 "labs": row["labs"],
+                "is_corresponding": row["is_corresponding"],
             })
 
         return {
@@ -1713,9 +1804,9 @@ async def list_addresses(
 
         if search:
             if search_mode == "not_contains":
-                conditions.append("a.raw_text NOT ILIKE %s")
+                conditions.append("unaccent(a.raw_text) NOT ILIKE unaccent(%s)")
             else:
-                conditions.append("a.raw_text ILIKE %s")
+                conditions.append("unaccent(a.raw_text) ILIKE unaccent(%s)")
             params.append(f"%{search}%")
 
         where_clause = " AND ".join(conditions)
@@ -1969,7 +2060,7 @@ async def feedback_false_negatives(
         params = []
 
         if search:
-            conditions.append("a.raw_text ILIKE %s")
+            conditions.append("unaccent(a.raw_text) ILIKE unaccent(%s)")
             params.append(f"%{search}%")
 
         where = " AND ".join(conditions)
@@ -2059,7 +2150,7 @@ async def feedback_false_positives(
         params = []
 
         if search:
-            conditions.append("a.raw_text ILIKE %s")
+            conditions.append("unaccent(a.raw_text) ILIKE unaccent(%s)")
             params.append(f"%{search}%")
 
         where = " AND ".join(conditions)
@@ -2259,11 +2350,27 @@ async def get_laboratory(lab_id: int):
         }
 
 
+def _persons_sort_clause(sort: str) -> str:
+    """Return an ORDER BY clause for the lab persons query."""
+    SORT_MAP = {
+        "name": "p.last_name ASC, p.first_name ASC",
+        "-name": "p.last_name DESC, p.first_name DESC",
+        "pubs": "pub_count ASC, p.last_name ASC",
+        "-pubs": "pub_count DESC, p.last_name ASC",
+        "dept": "prh.department_name ASC NULLS LAST, p.last_name ASC",
+        "-dept": "prh.department_name DESC NULLS LAST, p.last_name ASC",
+        "role": "prh.role_title ASC NULLS LAST, p.last_name ASC",
+        "-role": "prh.role_title DESC NULLS LAST, p.last_name ASC",
+    }
+    return SORT_MAP.get(sort, SORT_MAP["name"])
+
+
 @app.get("/api/laboratories/{lab_id}/persons")
 async def get_laboratory_persons(
     lab_id: int,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
+    sort: str = Query("name"),  # name, -name, pubs, -pubs, dept, -dept, role, -role
 ):
     """Personnes et authorships orphelines liées à un labo."""
     offset = (page - 1) * per_page
@@ -2291,7 +2398,8 @@ async def get_laboratory_persons(
         """, (lab_arr, lab_arr))
         total_persons = cur.fetchone()["count"]
 
-        cur.execute("""
+        order_clause = _persons_sort_clause(sort)
+        cur.execute(f"""
             WITH author_persons AS (
                 SELECT DISTINCT ha.person_id
                 FROM hal_authors ha
@@ -2331,7 +2439,7 @@ async def get_laboratory_persons(
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             JOIN author_persons ap ON ap.person_id = p.id
-            ORDER BY p.last_name, p.first_name
+            ORDER BY {order_clause}
             LIMIT %s OFFSET %s
         """, (lab_arr, lab_arr, lab_arr, lab_arr, per_page, offset))
         persons = cur.fetchall()
@@ -2435,7 +2543,7 @@ async def persons_directory(
     params = []
 
     if search:
-        conditions.append("(p.last_name ILIKE %s OR p.first_name ILIKE %s)")
+        conditions.append("(unaccent(p.last_name) ILIKE unaccent(%s) OR unaccent(p.first_name) ILIKE unaccent(%s))")
         s = f"%{search}%"
         params.extend([s, s])
     if departments:
@@ -2582,7 +2690,7 @@ async def list_structures(
             conditions.append("s.type::text = %s")
             params.append(type)
         if search:
-            conditions.append("(s.name ILIKE %s OR s.acronym ILIKE %s OR s.code ILIKE %s)")
+            conditions.append("(unaccent(s.name) ILIKE unaccent(%s) OR s.acronym ILIKE %s OR s.code ILIKE %s)")
             params.extend([f"%{search}%"] * 3)
 
         where = " AND ".join(conditions) if conditions else "TRUE"
@@ -3002,7 +3110,7 @@ async def list_authorships(
     params: list = []
 
     if search:
-        cte_conditions.append("(ua.full_name ILIKE %s OR ua.orcid ILIKE %s OR ua.idhal ILIKE %s)")
+        cte_conditions.append("(unaccent(ua.full_name) ILIKE unaccent(%s) OR ua.orcid ILIKE %s OR ua.idhal ILIKE %s)")
         s = f"%{search}%"
         params.extend([s, s, s])
     if linked == "yes":
@@ -3088,16 +3196,27 @@ async def list_authorships(
 @app.get("/api/persons/search")
 async def search_persons(q: str = Query("", min_length=2), limit: int = Query(10, ge=1, le=30)):
     """Recherche rapide de personnes (autocomplete)."""
-    s = f"%{q}%"
+    words = q.strip().split()
+    if not words:
+        return []
+    # Each word must match in last_name OR first_name
+    conditions = []
+    params: list = []
+    for w in words:
+        s = f"%{w}%"
+        conditions.append("(unaccent(p.last_name) ILIKE unaccent(%s) OR unaccent(p.first_name) ILIKE unaccent(%s))")
+        params.extend([s, s])
+    params.append(limit)
     with get_cursor() as (cur, conn):
-        cur.execute("""
-            SELECT p.id, p.last_name, p.first_name, prh.department_name
+        cur.execute(f"""
+            SELECT p.id, p.last_name, p.first_name, prh.department_name,
+                   (prh.id IS NOT NULL) AS has_rh
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
-            WHERE p.last_name ILIKE %s OR p.first_name ILIKE %s
+            WHERE {" AND ".join(conditions)}
             ORDER BY p.last_name, p.first_name
             LIMIT %s
-        """, (s, s, limit))
+        """, params)
         return cur.fetchall()
 
 
@@ -3120,8 +3239,8 @@ async def list_persons(
 
     if search:
         conditions.append("""(
-            p.last_name ILIKE %s OR p.first_name ILIKE %s
-            OR prh.email ILIKE %s OR prh.department_name ILIKE %s
+            unaccent(p.last_name) ILIKE unaccent(%s) OR unaccent(p.first_name) ILIKE unaccent(%s)
+            OR prh.email ILIKE %s OR unaccent(prh.department_name) ILIKE unaccent(%s)
         )""")
         s = f"%{search}%"
         params.extend([s, s, s, s])
@@ -3856,20 +3975,32 @@ async def merge_persons(person_id: int, body: dict):
             "UPDATE openalex_authors SET person_id = %s WHERE person_id = %s",
             (person_id, source_id),
         )
-        # 3. Transférer les authorships
+        # 3. Transférer les authorships (supprimer les doublons publication)
+        cur.execute(
+            """DELETE FROM authorships
+               WHERE person_id = %s
+                 AND publication_id IN (
+                     SELECT publication_id FROM authorships WHERE person_id = %s
+                 )""",
+            (source_id, person_id),
+        )
         cur.execute(
             "UPDATE authorships SET person_id = %s WHERE person_id = %s",
             (person_id, source_id),
         )
-        # 4. Transférer les identifiants (ignorer les doublons)
+        # 4. Transférer les identifiants (supprimer les doublons source, puis UPDATE)
         cur.execute(
-            """INSERT INTO person_identifiers (person_id, id_type, id_value, source, rejected)
-               SELECT %s, id_type, id_value, source, rejected
-               FROM person_identifiers WHERE person_id = %s
-               ON CONFLICT (id_type, id_value) DO NOTHING""",
+            """DELETE FROM person_identifiers
+               WHERE person_id = %s
+                 AND (id_type, id_value) IN (
+                     SELECT id_type, id_value FROM person_identifiers WHERE person_id = %s
+                 )""",
+            (source_id, person_id),
+        )
+        cur.execute(
+            "UPDATE person_identifiers SET person_id = %s WHERE person_id = %s",
             (person_id, source_id),
         )
-        cur.execute("DELETE FROM person_identifiers WHERE person_id = %s", (source_id,))
         # 5. Supprimer les entrées persons_rh de la source
         cur.execute("DELETE FROM persons_rh WHERE person_id = %s", (source_id,))
         # 6. Supprimer la personne source

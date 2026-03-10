@@ -56,11 +56,14 @@
 		border-radius: 4px;
 		background: var(--card);
 		cursor: pointer;
-		font-size: 13px;
+		font-size: 0.95rem;
 		font-family: inherit;
 	}
-	button:hover:not(:disabled) {
+	button:hover:not(:disabled):not(.active) {
 		background: #f0f0f0;
+	}
+	button.active:hover {
+		background: color-mix(in srgb, var(--accent) 85%, black);
 	}
 	button:disabled {
 		opacity: 0.4;
@@ -72,7 +75,7 @@
 		border-color: var(--accent);
 	}
 	.page-info {
-		font-size: 13px;
+		font-size: 0.95rem;
 		color: var(--muted);
 		margin-left: 8px;
 	}
