@@ -71,8 +71,8 @@ export function sanitizeTitle(s: string | null | undefined): string {
 export function titleCase(s: string | null | undefined): string {
 	if (!s) return '';
 	return s
-		.split(/(\s+|-)/g)
-		.map((w) => (/^[\s-]+$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+		.split(/(\s+|[-\u2010\u2011\u2012\u2013\u2014])/g)
+		.map((w) => (/^[\s\-\u2010-\u2014]+$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
 		.join('');
 }
 

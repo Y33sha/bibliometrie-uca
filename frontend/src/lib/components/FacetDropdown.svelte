@@ -162,7 +162,7 @@
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		background: var(--card);
-		font-size: 13px;
+		font-size: 0.95rem;
 		cursor: pointer;
 		color: var(--text);
 		white-space: nowrap;
@@ -185,11 +185,11 @@
 		border-radius: 9px;
 		background: var(--accent);
 		color: white;
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 600;
 	}
 	.facet-arrow {
-		font-size: 10px;
+		font-size: 0.7rem;
 		color: var(--muted);
 		margin-left: 2px;
 	}
@@ -214,14 +214,14 @@
 		padding: 5px 8px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 12px;
+		font-size: 0.85rem;
 	}
 	.facet-options label {
 		display: flex;
 		align-items: center;
 		gap: 6px;
 		padding: 4px 12px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		cursor: pointer;
 		white-space: nowrap;
 	}
@@ -233,7 +233,7 @@
 		flex-shrink: 0;
 	}
 	.facet-count {
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: #888;
 		margin-left: 2px;
 	}

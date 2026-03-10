@@ -284,17 +284,17 @@
 <table class="pub-table">
 	<thead>
 		<tr>
-			<th style="width:40px" class="sortable" class:active={yearSortActive} onclick={toggleSortYear}>
-				An. <span class="sort-arrow">{yearSortArrow}</span>
-			</th>
 			<th class="sortable" class:active={titleSortActive} onclick={toggleSortTitle}>
 				Titre <span class="sort-arrow">{titleSortArrow}</span>
 			</th>
 			<th>Revue</th>
-			<th style="width:80px">Labo(s)</th>
-			<th style="width:80px">Liens</th>
-			<th style="width:50px">OA</th>
 			<th style="width:80px">Type</th>
+			<th style="width:40px" class="sortable" class:active={yearSortActive} onclick={toggleSortYear}>
+				An. <span class="sort-arrow">{yearSortArrow}</span>
+			</th>
+			<th style="width:80px">Labo(s)</th>
+			<th style="width:50px">OA</th>
+			<th style="width:80px">Liens</th>
 		</tr>
 	</thead>
 	<tbody>
@@ -303,13 +303,21 @@
 		{:else}
 			{#each publications as p (p.id)}
 				<tr>
-					<td>{p.pub_year || ''}</td>
 					<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
 					<td class="journal-cell">{p.journal || ''}</td>
+					<td>
+						<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
+					</td>
+					<td>{p.pub_year || ''}</td>
 					<td>
 						{#each (p.labs || '').split(', ').filter(Boolean) as lab}
 							<span class="lab-tag">{lab}</span>
 						{/each}
+					</td>
+					<td>
+						{#if p.oa_status && p.oa_status !== 'unknown'}
+							<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
+						{/if}
 					</td>
 					<td class="links-cell">
 						{#if p.hal_id}
@@ -338,14 +346,6 @@
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 					</td>
-					<td>
-						{#if p.oa_status && p.oa_status !== 'unknown'}
-							<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
-						{/if}
-					</td>
-					<td>
-						<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
-					</td>
 				</tr>
 			{/each}
 		{/if}
@@ -361,7 +361,7 @@
 		border-radius: 5px;
 		padding: 8px 14px;
 		margin-bottom: 12px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		color: #2c3e50;
 	}
 	.filter-banner a { color: var(--accent); }
@@ -381,12 +381,12 @@
 		padding: 6px 10px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		width: 280px;
 	}
 	.count {
 		margin-left: auto;
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 	}
 	.export-btn {
@@ -394,7 +394,7 @@
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		background: var(--card);
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 		text-decoration: none;
 		cursor: pointer;
@@ -417,7 +417,7 @@
 		background: #f5f4f1;
 		padding: 8px 10px;
 		text-align: left;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-weight: 600;
 		color: var(--muted);
 		border-bottom: 2px solid var(--border);
@@ -426,7 +426,7 @@
 	.pub-table td {
 		padding: 7px 10px;
 		border-bottom: 1px solid #f0efec;
-		font-size: 13px;
+		font-size: 0.95rem;
 		vertical-align: top;
 	}
 	.pub-table tr:hover td { background: #fafaf8; }
@@ -436,7 +436,7 @@
 		user-select: none;
 	}
 	.sortable:hover { color: var(--accent); }
-	.sort-arrow { font-size: 11px; opacity: 0.3; }
+	.sort-arrow { font-size: 0.8rem; opacity: 0.3; }
 	.sortable.active .sort-arrow { opacity: 1; color: var(--accent); }
 
 	.pub-title {
@@ -444,7 +444,7 @@
 		text-decoration: none; display: inline-block;
 	}
 	.pub-title:hover { color: var(--accent); text-decoration: underline; }
-	.journal-cell { font-size: 12px; color: var(--muted); }
+	.journal-cell { font-size: 0.85rem; color: var(--muted); }
 
 	.source-tag {
 		display: inline-flex;
@@ -471,7 +471,7 @@
 
 	.lab-tag {
 		display: inline-block;
-		font-size: 11px;
+		font-size: 0.8rem;
 		padding: 1px 7px;
 		border-radius: 10px;
 		background: #e8f0f8;
@@ -481,17 +481,18 @@
 
 	.oa-tag {
 		display: inline-block;
-		font-size: 10px;
+		font-size: 0.7rem;
 		padding: 1px 6px;
 		border-radius: 8px;
 		font-weight: 600;
 	}
 	:global(.oa-gold) { background: #fef3e0; color: #d4a017; }
+	:global(.oa-diamond) { background: #e0f2f7; color: #0288a8; }
 	:global(.oa-hybrid) { background: #f3eef9; color: #8e6bbf; }
 	:global(.oa-green) { background: #e6f4ec; color: #2a7d4f; }
 	:global(.oa-bronze) { background: #fdf0e6; color: #b8733e; }
 	:global(.oa-closed) { background: #e0e0e0; color: #555; }
 
-	.type-label { font-size: 11px; color: var(--muted); }
+	.type-label { font-size: 0.8rem; color: var(--muted); }
 	.no-results { text-align: center; padding: 40px; color: var(--muted); }
 </style>

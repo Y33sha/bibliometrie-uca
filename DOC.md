@@ -2,9 +2,9 @@
 
 ## Présentation
 
-Application d'analyse bibliométrique pour l'**Université Clermont Auvergne** (UCA). Elle collecte les publications scientifiques 2022-2025 depuis les APIs HAL et OpenAlex, les déduplique, résout les affiliations par structure (laboratoires, tutelles, partenaires), et fournit des tableaux de bord pour l'analyse par éditeur, revue, statut Open Access, et labo.
+Application d'analyse bibliométrique pour l'**Université Clermont Auvergne** (UCA). Elle collecte les publications scientifiques 2022-2026 depuis les APIs HAL, OpenAlex et Web of Science, les déduplique, résout les affiliations par structure (laboratoires, tutelles, partenaires), et fournit des tableaux de bord pour l'analyse par éditeur, revue, statut Open Access, et labo.
 
-**Stack** : Python 3, PostgreSQL, FastAPI, HTML/JS vanilla.
+**Stack** : Python 3, PostgreSQL, FastAPI (backend), SvelteKit avec Svelte 5 (frontend).
 
 ---
 
@@ -14,15 +14,18 @@ Application d'analyse bibliométrique pour l'**Université Clermont Auvergne** (
 publisher-stats/
 ├── analysis/                    # Scripts d'analyse ad hoc
 ├── config/
-│   └── settings.py              # Connexions API, années, collections HAL
+│   └── settings.py              # Connexions API, années, collections HAL, WoS
 ├── data/                        # Fichiers de données (exports RH, etc.)
 ├── db/
 │   ├── connection.py            # get_connection() centralisé
 │   ├── seed_structures.py       # Peuplement structures, relations, formes de noms
-│   └── migration_*.sql          # Migrations séquentielles
+│   └── migrations/              # Migrations séquentielles (001 à 020+)
 ├── extraction/
 │   ├── openalex/extract_openalex.py   # API OpenAlex → staging_openalex
-│   └── hal/extract_hal.py             # API HAL → staging_hal
+│   ├── hal/extract_hal.py             # API HAL → staging_hal
+│   └── wos/
+│       ├── extract_wos.py             # API WoS Expanded → staging_wos
+│       └── scrape_wos.py              # Parsing fichiers WoS tab-delimited → staging_wos
 ├── processing/
 │   ├── normalize_openalex.py    # staging → openalex_documents/authors/authorships
 │   ├── normalize_hal.py         # staging → hal_documents/authors/authorships
@@ -32,10 +35,13 @@ publisher-stats/
 │   ├── populate_uca_flags.sql   # Calcule is_uca et structure_ids
 │   ├── populate_hal_struct_ids.py  # Extrait/matche les structures HAL
 │   ├── enrich_hal_structures.py # Enrichit hal_structures depuis l'API ref/structure
-│   └── enrich_oa_unpaywall.py   # Enrichit le statut OA via Unpaywall
+│   ├── enrich_oa_unpaywall.py   # Enrichit le statut OA via Unpaywall
+│   ├── create_persons_from_authorships.py  # Création automatique des personnes (5 passes)
+│   └── merge_lab_duplicates.py  # Fusion interactive des homonymes par labo
+├── frontend/                    # Application SvelteKit (Svelte 5)
+│   └── src/routes/              # Pages : publications, persons, laboratories, admin, stats
 ├── webapp/
-│   ├── app.py                   # Serveur FastAPI (API + routes HTML)
-│   └── static/                  # Pages HTML (index, stats, publications, persons, etc.)
+│   └── app.py                   # Serveur FastAPI (API + SPA statique)
 └── requirements.txt
 ```
 
@@ -78,9 +84,16 @@ Formes textuelles utilisées pour détecter les structures dans les adresses d'a
 - `requires_context_of` : JSONB, optionnel. Si présent, la forme ne matche que si une forme d'une des structures contextuelles est aussi détectée dans l'adresse (ex : la forme courte « IP » ne matche que si une tutelle comme « CNRS » est aussi présente).
 
 #### `persons` — Référentiel des individus
-Alimenté par les exports RH. Ne contient aucun identifiant bibliométrique directement.
+Alimenté par les exports RH et par le script `create_persons_from_authorships.py` (création automatique depuis les authorships). Ne contient aucun identifiant bibliométrique directement.
+- `last_name`, `first_name` : nom affiché.
+- `last_name_normalized`, `first_name_normalized` : formes normalisées pour la déduplication.
+
+#### `persons_rh` — Données RH (table satellite)
+Données issues des exports RH, liées à `persons` via `person_id`.
 - `structure_id` : rattachement institutionnel principal (FK → `structures`).
+- `department_name`, `role_title` : informations administratives.
 - `start_date`, `end_date` : période de rattachement.
+- Cascade ON DELETE depuis `persons`.
 
 #### `person_identifiers` — Identifiants certifiants
 ORCID, idHAL, ResearcherID, etc. Chaque identifiant (`id_type` + `id_value`) pointe vers une seule personne (UNIQUE). Une personne peut avoir plusieurs identifiants.
@@ -172,7 +185,7 @@ Vue (pas table) qui consolide les liens publication → source en combinant les 
 Zones de transit brutes. Chaque source a sa propre table.
 - `staging_openalex` : clé unique `openalex_id`.
 - `staging_hal` : clé unique `halid`, champ `collection`.
-- `staging_wos` : prévu mais pas encore utilisé.
+- `staging_wos` : clé unique `ut` (WoS UID), champs `doi` et `raw_data` (JSONB). Peuplé par l'API WoS Expanded (`extract_wos.py`) ou par parsing de fichiers tab-delimited téléchargés manuellement (`scrape_wos.py --parse-only`).
 - `processed` : flag pour le traitement incrémental.
 
 ---
@@ -192,13 +205,17 @@ Peuple la table `structures` (UCA, labos, tutelles, partenaires), `structure_rel
 ```bash
 python3 extraction/openalex/extract_openalex.py    # API OpenAlex → staging_openalex
 python3 extraction/hal/extract_hal.py              # API HAL → staging_hal
+python3 extraction/wos/extract_wos.py              # API WoS → staging_wos (si API disponible)
+python3 extraction/wos/scrape_wos.py --parse-only  # Ou : parsing de fichiers WoS téléchargés manuellement
 ```
 
 **OpenAlex** : interroge l'API par année avec le filtre `authorships.institutions.lineage` sur l'ID UCA (`i198244214`). Résultats bruts en JSONB. ~20 000 works.
 
 **HAL** : deux passes. D'abord par collection labo pour tagger chaque work avec sa/ses collection(s), puis via le portail global `clermont-univ` pour attraper les works qui ne sont dans aucune collection. ~22 000 works.
 
-Les deux scripts sont idempotents : les doublons (même `openalex_id` ou `halid`) sont ignorés.
+**WoS** : interroge l'API WoS Expanded par année avec le champ OG (Organization-Enhanced). Alternative : télécharger les fichiers Full Record tab-delimited depuis l'interface web WoS, puis les parser avec `scrape_wos.py --parse-only`.
+
+Les scripts sont idempotents : les doublons (même `openalex_id`, `halid` ou `ut`) sont ignorés.
 
 ### Étape 2 — Normalisation
 
@@ -284,6 +301,15 @@ Calcule `is_uca` et `structure_ids` en 4 étapes :
 3. **OpenAlex** : calcule `is_uca` et `structure_ids` via la chaîne `openalex_authorship_addresses` → `address_structures` → périmètre UCA.
 4. **Authorships (vérité)** : propage depuis HAL et OpenAlex par matching `(publication_id, person_id)`, en fusionnant les `structure_ids` des deux sources.
 
+### Étape 3d — Création des personnes et authorships
+
+```bash
+python3 processing/create_persons_from_authorships.py   # Création automatique (5 passes)
+python3 processing/merge_lab_duplicates.py --apply       # Fusion des homonymes par labo
+```
+
+Le script `create_persons_from_authorships.py` crée les entrées `persons` depuis les authorships non encore rattachés, en 5 passes (ORCID, idHAL, matching par nom exact, matching par nom normalisé, création de nouvelles personnes). Le script `merge_lab_duplicates.py` détecte et fusionne interactivement les doublons (homonymes et interversions nom/prénom) au sein de chaque laboratoire.
+
 ### Étape 4 — Enrichissement OA (optionnel)
 
 ```bash
@@ -305,18 +331,31 @@ La propagation vers `openalex_authorships.is_uca` et `authorships.is_uca` est **
 
 ---
 
-## Interface web
+## Interface web (SvelteKit)
 
-### Pages
+Le frontend est une SPA SvelteKit (Svelte 5 avec runes) servie en statique par FastAPI.
+
+### Pages publiques
 
 | URL | Description |
 |-----|-------------|
-| `/` | Revue des adresses — validation manuelle UCA / non-UCA |
 | `/stats` | Dashboard statistiques — navigation éditeurs → revues → labos, graphiques OA par année |
-| `/publications` | Liste des publications — filtres par année, labo, source, type, voie OA, éditeur, revue |
-| `/persons` | Gestion des personnes RH — liaison avec les auteurs HAL/OpenAlex |
-| `/authorships` | Signatures — auteurs source avec détail des authorships et résolution |
-| `/feedback` | Boucle de rétroaction — faux positifs/négatifs de la détection de formes |
+| `/publications` | Liste des publications — filtres à facettes dynamiques (année, labo, source, type, voie OA, éditeur, revue) |
+| `/publications/{id}` | Détail d'une publication — métadonnées, sources, auteurs (table de vérité + sources HAL/OpenAlex) |
+| `/persons` | Annuaire des personnes — stats de liaison, filtres |
+| `/persons/{id}` | Détail d'une personne — publications avec filtres à facettes, identifiants, auteurs liés |
+| `/laboratories` | Liste des laboratoires avec statistiques |
+| `/laboratories/{id}` | Détail d'un laboratoire — publications, personnes, statistiques OA |
+
+### Pages admin (authentification requise)
+
+| URL | Description |
+|-----|-------------|
+| `/admin/persons` | Gestion des personnes — liaison auteurs, fusion, identifiants |
+| `/admin/authorships` | Signatures — auteurs source avec détail des authorships et résolution |
+| `/admin/addresses` | Revue des adresses — validation manuelle UCA / non-UCA |
+| `/admin/feedback` | Boucle de rétroaction — faux positifs/négatifs de la détection de formes |
+| `/admin/structures` | Gestion des structures et formes de noms |
 
 ### API endpoints principaux
 
@@ -347,7 +386,12 @@ La propagation vers `openalex_authorships.is_uca` et `authorships.is_uca` est **
 ### Serveur
 
 ```bash
-pm2 start "uvicorn webapp.app:app --host 0.0.0.0 --port 8042" --name publisher-stats-api
+# Développement
+python3 webapp/app.py                              # http://localhost:8003
+cd frontend && npm run build                       # build SvelteKit → frontend/build/
+
+# Production
+pm2 start "uvicorn webapp.app:app --host 0.0.0.0 --port 8003" --name publisher-stats-api
 pm2 restart publisher-stats-api
 ```
 
@@ -454,28 +498,21 @@ Certaines `hal_documents` ont `publication_id IS NULL` malgré un DOI présent. 
 
 ## Axes de développement
 
-### Axe 1 — Intégration Web of Science (priorité moyenne)
+### Axe 1 — Normalisation Web of Science
 
-WoS est la troisième source bibliographique majeure. Le schéma v2 prévoit déjà `staging_wos` et le pattern est établi : créer `wos_documents`, `wos_authors`, `wos_authorships`, `wos_institutions` sur le même modèle que HAL/OpenAlex.
+Le staging WoS est peuplé (`staging_wos`). Reste à créer les tables normalisées (`wos_documents`, `wos_authors`, `wos_authorships`, `wos_institutions`) sur le même modèle que HAL/OpenAlex, et à intégrer les données WoS dans les publications canoniques.
 
 ### Axe 2 — Enrichissement du référentiel personnes
 
-- Récupération ORCID via l'API pour les personnes sans identifiant.
 - Lien avec le référentiel IdRef (ABES) pour les auteurs de thèses et HDR.
-- Détection de doublons (même ORCID sur plusieurs personnes, ou l'inverse).
-- Fusion semi-automatique avec suggestion basée sur la similarité de noms + co-publications.
-
-### Axe 3 — Vue publication détaillée
-
-Page de détail par publication : auteurs avec positions et affiliations, adresses avec structures résolues, collections HAL, comparaison des métadonnées HAL vs OpenAlex côte à côte.
+- Détection de doublons améliorée.
 
 ### Autres évolutions envisagées
 
-- **Revues prédatrices** : intégration des listes Beall's/DOAJ pour le flag `is_predatory`.
-- **Estimation APC** : croisement avec les données OpenAPC.
+- **Estimation APC** : croisement avec les données OpenAPC et DPCG.
 - **Contrôle des signatures institutionnelles** : vérification de conformité (présence des tutelles requises, formes normalisées) avec reporting par labo.
 - **Fusion de publications** : déduplication manuelle des publications sans DOI commun.
-- **Export** : génération de rapports Excel/CSV par labo, par année, par éditeur.
+- **Filtre auteur correspondant UCA** : sur les pages Publications, Laboratoire et Statistiques.
 
 ---
 

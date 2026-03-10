@@ -544,12 +544,12 @@
 		min-width: 120px;
 	}
 	.stat-card .value {
-		font-size: 22px;
+		font-size: 1.55rem;
 		font-weight: 700;
 		line-height: 1.2;
 	}
 	.stat-card .label {
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
@@ -589,7 +589,7 @@
 		padding: 6px 10px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		background: white;
 		font-family: inherit;
 		width: 250px;
@@ -597,7 +597,7 @@
 	.count {
 		margin-left: auto;
 		color: var(--text-muted);
-		font-size: 12px;
+		font-size: 0.85rem;
 	}
 
 	/* ── Table ── */
@@ -612,7 +612,7 @@
 	.data-table th {
 		text-align: left;
 		padding: 8px 10px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
@@ -622,7 +622,7 @@
 	}
 	.data-table td {
 		padding: 7px 10px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		border-bottom: 1px solid #f0efec;
 		vertical-align: top;
 	}
@@ -633,7 +633,7 @@
 	/* ── Tags ── */
 	.tag {
 		display: inline-block;
-		font-size: 11px;
+		font-size: 0.8rem;
 		padding: 1px 7px;
 		border-radius: 10px;
 		font-weight: 500;
@@ -652,16 +652,16 @@
 		color: var(--accent);
 		font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo,
 			monospace;
-		font-size: 10px;
+		font-size: 0.7rem;
 	}
 	.tag-source {
 		background: #eee;
 		color: #555;
-		font-size: 10px;
+		font-size: 0.7rem;
 	}
 	.no-id {
 		color: var(--text-muted);
-		font-size: 11px;
+		font-size: 0.8rem;
 	}
 
 	/* ── Person link ── */
@@ -671,13 +671,13 @@
 		gap: 4px;
 	}
 	.dept {
-		font-size: 10px;
+		font-size: 0.7rem;
 		color: var(--text-muted);
 	}
 	.btn-unlink {
 		border: 1px solid var(--danger);
 		color: var(--danger);
-		font-size: 10px;
+		font-size: 0.7rem;
 		background: none;
 		border-radius: 4px;
 		cursor: pointer;
@@ -696,7 +696,7 @@
 		border: 1px dashed var(--border);
 		border-radius: 4px;
 		background: none;
-		font-size: 11px;
+		font-size: 0.8rem;
 		cursor: pointer;
 		color: var(--accent);
 		font-family: inherit;
@@ -718,7 +718,7 @@
 		padding: 3px 6px;
 		border: 1px solid var(--accent);
 		border-radius: 3px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-family: inherit;
 		width: 180px;
 	}
@@ -728,7 +728,7 @@
 		border-radius: 3px;
 		cursor: pointer;
 		padding: 2px 6px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--text-muted);
 		font-family: inherit;
 	}
@@ -751,7 +751,7 @@
 	}
 	.search-results .loading-text {
 		padding: 6px 10px;
-		font-size: 11px;
+		font-size: 0.8rem;
 	}
 	.search-result {
 		display: block;
@@ -761,7 +761,7 @@
 		border: none;
 		background: none;
 		cursor: pointer;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-family: inherit;
 		border-bottom: 1px solid #f0efec;
 	}
@@ -777,7 +777,7 @@
 		background: none;
 		border: none;
 		cursor: pointer;
-		font-size: 14px;
+		font-size: 1rem;
 		padding: 2px 6px;
 		color: var(--accent);
 		font-family: inherit;
@@ -794,11 +794,11 @@
 		background: #f5f7fa;
 	}
 	.detail-panel {
-		font-size: 12px;
+		font-size: 0.85rem;
 	}
 	.detail-panel h5 {
 		margin: 0 0 4px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--accent);
 		text-transform: uppercase;
 		letter-spacing: 0.3px;
@@ -821,7 +821,7 @@
 		border-bottom: none;
 	}
 	.sig-source {
-		font-size: 10px;
+		font-size: 0.7rem;
 		color: white;
 		background: #8899aa;
 		border-radius: 3px;
@@ -847,7 +847,7 @@
 		border-bottom: none;
 	}
 	.pub-year {
-		font-size: 10px;
+		font-size: 0.7rem;
 		color: var(--text-muted);
 		font-weight: 600;
 		margin-right: 4px;
@@ -856,7 +856,7 @@
 		color: #333;
 	}
 	.pub-doi {
-		font-size: 10px;
+		font-size: 0.7rem;
 		color: var(--accent);
 		text-decoration: none;
 		margin-left: 4px;
@@ -883,7 +883,7 @@
 		border-radius: 50%;
 		background: var(--accent, #3b82f6);
 		color: white;
-		font-size: 10px;
+		font-size: 0.7rem;
 		font-weight: 700;
 		margin-left: 4px;
 		vertical-align: middle;

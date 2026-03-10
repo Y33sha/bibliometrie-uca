@@ -149,12 +149,12 @@
 
 <style>
 	h2 {
-		font-size: 17px;
+		font-size: 1.2rem;
 		font-weight: 600;
 		margin: 0 0 14px;
 	}
 	.subtitle {
-		font-size: 13px;
+		font-size: 0.95rem;
 		color: var(--muted);
 		margin: -10px 0 16px;
 	}
@@ -172,12 +172,12 @@
 		padding: 6px 10px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		width: 260px;
 	}
 	.count {
 		margin-left: auto;
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 	}
 	table {
@@ -192,7 +192,7 @@
 		background: #f5f4f1;
 		padding: 9px 12px;
 		text-align: left;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-weight: 600;
 		color: var(--muted);
 		text-transform: uppercase;
@@ -206,7 +206,7 @@
 		color: var(--text);
 	}
 	.sort-arrow {
-		font-size: 10px;
+		font-size: 0.7rem;
 		margin-left: 3px;
 		color: #bbb;
 	}
@@ -224,7 +224,7 @@
 	}
 	td {
 		padding: 10px 12px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		vertical-align: middle;
 	}
 	td a {
@@ -246,7 +246,7 @@
 		font-weight: 500;
 	}
 	.lab-acronym {
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 		margin-left: 6px;
 	}
@@ -260,7 +260,7 @@
 		padding: 2px 7px;
 		background: #f0efec;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--muted);
 		white-space: nowrap;
 	}
@@ -269,7 +269,7 @@
 		padding: 2px 7px;
 		background: #e8f0f8;
 		border-radius: 3px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--accent);
 		text-decoration: none;
 		white-space: nowrap;

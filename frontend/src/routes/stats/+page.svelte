@@ -13,8 +13,8 @@
 
 	// --- Types ---
 	interface Summary { total_pubs: number; publisher_count: number; journal_count: number; }
-	interface YearData { pub_year: number; gold: number; hybrid: number; bronze: number; green: number; closed: number; unknown: number; }
-	interface OaRow { pub_count: number; gold: number; hybrid: number; bronze: number; green: number; closed: number; unknown: number; }
+	interface YearData { pub_year: number; gold: number; diamond: number; hybrid: number; bronze: number; green: number; closed: number; unknown: number; }
+	interface OaRow { pub_count: number; gold: number; diamond: number; hybrid: number; bronze: number; green: number; closed: number; unknown: number; }
 	interface PublisherRow extends OaRow { publisher_id: number; publisher_name: string; journal_count: number; }
 	interface JournalRow extends OaRow { journal_id: number; journal_title: string; publisher_name: string | null; }
 	interface LabRow extends OaRow { lab_id: number; lab_name: string; lab_acronym: string | null; }
@@ -197,11 +197,11 @@
 		const cs = getComputedStyle(document.documentElement);
 		yearChart = new Chart(chartCanvas, {
 			type: 'bar',
-			devicePixelRatio: window.devicePixelRatio || 2,
 			plugins: [whiteBgPlugin],
 			data: {
 				labels: data.map((d) => d.pub_year),
 				datasets: [
+					{ label: 'Diamond', data: data.map((d) => d.diamond), backgroundColor: cs.getPropertyValue('--diamond').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
 					{ label: 'Gold', data: data.map((d) => d.gold), backgroundColor: cs.getPropertyValue('--gold').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
 					{ label: 'Hybrid', data: data.map((d) => d.hybrid), backgroundColor: cs.getPropertyValue('--hybrid').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
 					{ label: 'Bronze', data: data.map((d) => d.bronze), backgroundColor: cs.getPropertyValue('--bronze').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
@@ -216,24 +216,44 @@
 				plugins: {
 					legend: { display: false },
 					tooltip: {
-						mode: 'index' as const,
-						callbacks: { footer: (items) => 'Total : ' + items.reduce((a, i) => a + (i.raw as number), 0) }
+						bodyFont: { size: 14 },
+						callbacks: {
+							label: (ctx) => {
+								const val = ctx.raw as number;
+								const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
+								const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
+								return `${ctx.dataset.label} : ${val} (${pct}%)`;
+							},
+							afterBody: (items) => {
+								const total = items[0].chart.data.datasets.reduce((s, ds) => s + ((ds.data[items[0].dataIndex] as number) || 0), 0);
+								return `Total : ${total}`;
+							}
+						}
 					},
 					datalabels: {
 						color: '#fff',
-						font: { size: 11, weight: 'bold' },
+						font: { size: 13, weight: 'bold' },
 						formatter: (val: number, ctx) => {
 							const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
 							const pct = total ? (val / total) * 100 : 0;
 							return pct >= 10 ? Math.round(pct) + '%' : '';
 						},
 						anchor: 'center' as const,
-						align: 'center' as const
+						align: 'center' as const,
+						listeners: {}
 					}
 				},
+				interaction: {
+					mode: 'point' as const,
+					intersect: true
+				},
+				hover: {
+					mode: 'point' as const,
+					intersect: true
+				},
 				scales: {
-					x: { stacked: true, grid: { display: false }, ticks: { font: { size: 12 } } },
-					y: { stacked: true, beginAtZero: true, ticks: { font: { size: 11 }, precision: 0 } }
+					x: { stacked: true, grid: { display: false }, ticks: { font: { size: 14 } } },
+					y: { stacked: true, beginAtZero: true, ticks: { font: { size: 13 }, precision: 0 } }
 				}
 			}
 		});
@@ -429,6 +449,7 @@
 <!-- Tab: Open Access (chart) -->
 {#if tab === 'oa'}
 	<div class="legend">
+		<span><span class="legend-dot" style="background:var(--diamond)"></span>Diamond</span>
 		<span><span class="legend-dot" style="background:var(--gold)"></span>Gold</span>
 		<span><span class="legend-dot" style="background:var(--hybrid)"></span>Hybrid</span>
 		<span><span class="legend-dot" style="background:var(--bronze)"></span>Bronze</span>
@@ -451,7 +472,7 @@
 				<th class="num">Articles</th>
 				<th class="num">Revues</th>
 				<th style="min-width:100px">OA</th>
-				<th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
+				<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
 				<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>
 			</tr>
 		</thead>
@@ -466,6 +487,7 @@
 					<td class="num num-small">{r.journal_count}</td>
 					<td>
 						<div class="oa-bar">
+							<span class="diamond" style="width:{oaPercent(r.diamond, r.pub_count)}"></span>
 							<span class="gold" style="width:{oaPercent(r.gold, r.pub_count)}"></span>
 							<span class="hybrid" style="width:{oaPercent(r.hybrid, r.pub_count)}"></span>
 							<span class="bronze" style="width:{oaPercent(r.bronze, r.pub_count)}"></span>
@@ -474,6 +496,7 @@
 							<span class="unknown" style="width:{oaPercent(r.unknown, r.pub_count)}"></span>
 						</div>
 					</td>
+					<td class="num num-small">{r.diamond}</td>
 					<td class="num num-small">{r.gold}</td>
 					<td class="num num-small">{r.hybrid}</td>
 					<td class="num num-small">{r.bronze}</td>
@@ -496,7 +519,7 @@
 				{#if !publisherId}<th>Éditeur</th>{/if}
 				<th class="num">Articles</th>
 				<th style="min-width:100px">OA</th>
-				<th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
+				<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
 				<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>
 			</tr>
 		</thead>
@@ -513,6 +536,7 @@
 					<td class="num">{r.pub_count}</td>
 					<td>
 						<div class="oa-bar">
+							<span class="diamond" style="width:{oaPercent(r.diamond, r.pub_count)}"></span>
 							<span class="gold" style="width:{oaPercent(r.gold, r.pub_count)}"></span>
 							<span class="hybrid" style="width:{oaPercent(r.hybrid, r.pub_count)}"></span>
 							<span class="bronze" style="width:{oaPercent(r.bronze, r.pub_count)}"></span>
@@ -521,6 +545,7 @@
 							<span class="unknown" style="width:{oaPercent(r.unknown, r.pub_count)}"></span>
 						</div>
 					</td>
+					<td class="num num-small">{r.diamond}</td>
 					<td class="num num-small">{r.gold}</td>
 					<td class="num num-small">{r.hybrid}</td>
 					<td class="num num-small">{r.bronze}</td>
@@ -543,7 +568,7 @@
 					<th>Laboratoire</th>
 					<th class="num">Articles</th>
 					<th style="min-width:100px">OA</th>
-					<th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
+					<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
 					<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>
 				</tr>
 			</thead>
@@ -556,6 +581,7 @@
 						<td class="num">{r.pub_count}</td>
 						<td>
 							<div class="oa-bar">
+								<span class="diamond" style="width:{oaPercent(r.diamond, r.pub_count)}"></span>
 								<span class="gold" style="width:{oaPercent(r.gold, r.pub_count)}"></span>
 								<span class="hybrid" style="width:{oaPercent(r.hybrid, r.pub_count)}"></span>
 								<span class="bronze" style="width:{oaPercent(r.bronze, r.pub_count)}"></span>
@@ -564,6 +590,7 @@
 								<span class="unknown" style="width:{oaPercent(r.unknown, r.pub_count)}"></span>
 							</div>
 						</td>
+						<td class="num num-small">{r.diamond}</td>
 						<td class="num num-small">{r.gold}</td>
 						<td class="num num-small">{r.hybrid}</td>
 						<td class="num num-small">{r.bronze}</td>
@@ -595,9 +622,9 @@
 		padding: 10px 16px;
 		text-align: center;
 	}
-	.summary-card .value { font-size: 20px; font-weight: 700; line-height: 1.2; }
+	.summary-card .value { font-size: 1.45rem; font-weight: 700; line-height: 1.2; }
 	.summary-card .label {
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--muted);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
@@ -612,7 +639,7 @@
 		color: white;
 		text-decoration: none;
 		border-radius: 5px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		font-weight: 500;
 	}
 	.pub-link:hover { opacity: 0.9; }
@@ -628,7 +655,7 @@
 		padding: 6px 10px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		background: white;
 		width: 220px;
 	}
@@ -637,7 +664,7 @@
 		padding: 6px 14px;
 		border: 1px solid var(--border);
 		background: white;
-		font-size: 13px;
+		font-size: 0.95rem;
 		cursor: pointer;
 		font-family: inherit;
 	}
@@ -645,9 +672,9 @@
 	.tab-btn:last-child { border-radius: 0 4px 4px 0; }
 	.tab-btn:not(:first-child) { border-left: none; }
 	.tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
-	.count { margin-left: auto; color: var(--muted); font-size: 12px; }
+	.count { margin-left: auto; color: var(--muted); font-size: 0.85rem; }
 
-	.breadcrumb { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+	.breadcrumb { font-size: 0.95rem; color: var(--muted); margin-bottom: 12px; }
 	.breadcrumb a { color: var(--accent); text-decoration: none; cursor: pointer; }
 	.breadcrumb a:hover { text-decoration: underline; }
 	.breadcrumb .sep { margin: 0 6px; color: #ccc; }
@@ -657,7 +684,7 @@
 		gap: 12px;
 		justify-content: center;
 		margin-bottom: 8px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--muted);
 	}
 	.legend-dot {
@@ -676,7 +703,7 @@
 		padding: 16px;
 		margin-bottom: 16px;
 		position: relative;
-		height: 480px;
+		height: 550px;
 	}
 	.chart-export {
 		position: absolute;
@@ -686,7 +713,7 @@
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		background: var(--card);
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 		cursor: pointer;
 		font-family: inherit;
@@ -713,7 +740,7 @@
 	.data-table th {
 		text-align: left;
 		padding: 8px 10px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
@@ -723,7 +750,7 @@
 	}
 	.data-table td {
 		padding: 7px 10px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		border-bottom: 1px solid #f0efec;
 	}
 	.data-table tr:last-child td { border-bottom: none; }
@@ -738,7 +765,7 @@
 	.name-cell a { color: var(--accent); text-decoration: none; cursor: pointer; }
 	.name-cell a:hover { text-decoration: underline; }
 	.num { text-align: right; font-variant-numeric: tabular-nums; }
-	.num-small { font-size: 12px; color: var(--muted); }
+	.num-small { font-size: 0.85rem; color: var(--muted); }
 
 	.oa-bar {
 		display: flex;
@@ -748,6 +775,7 @@
 		min-width: 80px;
 	}
 	.oa-bar span { height: 100%; }
+	.oa-bar .diamond { background: var(--diamond); }
 	.oa-bar .gold { background: var(--gold); }
 	.oa-bar .hybrid { background: var(--hybrid); }
 	.oa-bar .bronze { background: var(--bronze); }

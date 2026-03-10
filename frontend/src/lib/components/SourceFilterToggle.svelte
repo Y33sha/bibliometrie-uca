@@ -72,7 +72,7 @@
 		gap: 4px;
 	}
 	.source-filter-label {
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--muted);
 		margin-right: 2px;
 	}
@@ -83,7 +83,7 @@
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		background: var(--card);
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-weight: 500;
 		cursor: pointer;
 		color: var(--muted);

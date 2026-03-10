@@ -796,12 +796,12 @@
 		min-width: 120px;
 	}
 	.stat-card .value {
-		font-size: 22px;
+		font-size: 1.55rem;
 		font-weight: 700;
 		line-height: 1.2;
 	}
 	.stat-card .label {
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
@@ -831,7 +831,7 @@
 		padding: 6px 10px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		background: white;
 		font-family: inherit;
 		width: 250px;
@@ -839,7 +839,7 @@
 	.count {
 		margin-left: auto;
 		color: var(--text-muted);
-		font-size: 12px;
+		font-size: 0.85rem;
 	}
 
 	/* ── Table ── */
@@ -854,7 +854,7 @@
 	.data-table th {
 		text-align: left;
 		padding: 8px 10px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
@@ -864,7 +864,7 @@
 	}
 	.data-table td {
 		padding: 7px 10px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		border-bottom: 1px solid #f0efec;
 		vertical-align: top;
 	}
@@ -872,14 +872,14 @@
 		background: #fafaf8;
 	}
 	.period-cell {
-		font-size: 12px;
+		font-size: 0.85rem;
 		color: var(--text-muted);
 	}
 
 	/* ── Tags ── */
 	.tag {
 		display: inline-block;
-		font-size: 11px;
+		font-size: 0.8rem;
 		padding: 1px 7px;
 		border-radius: 10px;
 		font-weight: 500;
@@ -901,15 +901,15 @@
 		background: var(--accent-light);
 		color: var(--accent);
 		font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
-		font-size: 10px;
+		font-size: 0.7rem;
 	}
 	.tag-source {
 		background: #eee;
 		color: #555;
-		font-size: 10px;
+		font-size: 0.7rem;
 	}
 	.tag-small {
-		font-size: 10px;
+		font-size: 0.7rem;
 	}
 
 	/* ── Linked authors toggle ── */
@@ -917,14 +917,14 @@
 		background: none;
 		border: none;
 		cursor: pointer;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--accent);
 		padding: 2px 4px;
 		font-family: inherit;
 		font-weight: 500;
 	}
 	.btn-toggle-authors:hover { text-decoration: underline; }
-	.toggle-arrow { font-size: 10px; margin-left: 2px; }
+	.toggle-arrow { font-size: 0.7rem; margin-left: 2px; }
 	.linked-authors-list {
 		margin-top: 4px;
 		display: flex;
@@ -944,7 +944,7 @@
 		border: 1px dashed var(--border);
 		border-radius: 4px;
 		background: none;
-		font-size: 11px;
+		font-size: 0.8rem;
 		cursor: pointer;
 		color: var(--text-muted);
 		margin-top: 4px;
@@ -969,7 +969,7 @@
 		padding: 3px 6px;
 		border: 1px solid var(--warning);
 		border-radius: 3px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-family: inherit;
 		width: 220px;
 	}
@@ -995,12 +995,12 @@
 		border: none;
 		background: none;
 		cursor: pointer;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-family: inherit;
 	}
 	.merge-result:hover { background: var(--warning-light); }
 	.merge-dept {
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--text-muted);
 		margin-left: 6px;
 	}
@@ -1010,7 +1010,7 @@
 		background: none;
 		border: none;
 		cursor: pointer;
-		font-size: 14px;
+		font-size: 1rem;
 		padding: 2px 6px;
 		color: var(--accent);
 		font-family: inherit;
@@ -1020,7 +1020,7 @@
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		background: white;
-		font-size: 12px;
+		font-size: 0.85rem;
 		cursor: pointer;
 		font-family: inherit;
 	}
@@ -1038,7 +1038,7 @@
 	.btn-unlink {
 		border: 1px solid var(--danger);
 		color: var(--danger);
-		font-size: 10px;
+		font-size: 0.7rem;
 		background: none;
 		border-radius: 4px;
 		cursor: pointer;
@@ -1053,7 +1053,7 @@
 		background: none;
 		border: none;
 		cursor: pointer;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--accent);
 		padding: 2px 4px;
 		text-decoration: underline;
@@ -1071,11 +1071,11 @@
 		background: #f5f7fa;
 	}
 	.candidates-panel {
-		font-size: 12px;
+		font-size: 0.85rem;
 	}
 	.candidates-panel h4 {
 		margin: 0 0 8px;
-		font-size: 13px;
+		font-size: 0.95rem;
 		color: var(--accent);
 	}
 	.candidate-card {
@@ -1101,7 +1101,7 @@
 	}
 	.candidate-card .meta {
 		color: var(--text-muted);
-		font-size: 11px;
+		font-size: 0.8rem;
 	}
 
 	/* ── Author detail sub-panel ── */
@@ -1111,11 +1111,11 @@
 		background: #f8f9fb;
 		border: 1px solid #e8eaed;
 		border-radius: 4px;
-		font-size: 12px;
+		font-size: 0.85rem;
 	}
 	.author-detail h5 {
 		margin: 0 0 4px;
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--accent);
 		text-transform: uppercase;
 		letter-spacing: 0.3px;
@@ -1135,7 +1135,7 @@
 		border-bottom: none;
 	}
 	.pub-year {
-		font-size: 10px;
+		font-size: 0.7rem;
 		color: var(--text-muted);
 		font-weight: 600;
 		margin-right: 4px;
@@ -1145,11 +1145,11 @@
 	}
 	.pub-uca {
 		color: var(--success);
-		font-size: 10px;
+		font-size: 0.7rem;
 		font-weight: 600;
 	}
 	.pub-doi {
-		font-size: 10px;
+		font-size: 0.7rem;
 		color: var(--accent);
 		text-decoration: none;
 		margin-left: 4px;
@@ -1178,7 +1178,7 @@
 		background: none;
 		border: none;
 		cursor: pointer;
-		font-size: 12px;
+		font-size: 0.85rem;
 		padding: 0 2px;
 		color: var(--text-muted);
 		font-family: inherit;
@@ -1189,7 +1189,7 @@
 		border: 1px dashed var(--border);
 		border-radius: 4px;
 		background: none;
-		font-size: 11px;
+		font-size: 0.8rem;
 		cursor: pointer;
 		color: var(--accent);
 		margin-top: 4px;
@@ -1211,7 +1211,7 @@
 		padding: 3px 6px;
 		border: 1px solid var(--border);
 		border-radius: 3px;
-		font-size: 12px;
+		font-size: 0.85rem;
 		font-family: inherit;
 	}
 	.id-form select {
@@ -1221,7 +1221,7 @@
 		width: 180px;
 	}
 	.id-error {
-		font-size: 11px;
+		font-size: 0.8rem;
 		color: var(--danger);
 	}
 
@@ -1235,7 +1235,7 @@
 		border-radius: 50%;
 		background: var(--accent, #3b82f6);
 		color: white;
-		font-size: 10px;
+		font-size: 0.7rem;
 		font-weight: 700;
 		margin-left: 4px;
 		vertical-align: middle;

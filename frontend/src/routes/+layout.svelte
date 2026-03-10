@@ -69,12 +69,12 @@
 
 <style>
 	:global(html) {
-		zoom: 1.15;
+		font-size: 16px;
 	}
 	:global(body) {
 		margin: 0;
 		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		font-size: 14px;
+		font-size: 1rem;
 		line-height: 1.5;
 		color: var(--text);
 		background: var(--bg);
@@ -87,6 +87,7 @@
 		--accent: #3b6b9e;
 		--border: #e5e5e0;
 		--gold: #d4a017;
+		--diamond: #0288a8;
 		--hybrid: #8e6bbf;
 		--bronze: #b8733e;
 		--green: #2a7d4f;
@@ -106,12 +107,12 @@
 		height: 46px;
 	}
 	.site-title {
-		font-size: 16px;
+		font-size: 1.15rem;
 		font-weight: 600;
 		margin: 0;
 	}
 	.site-title-admin {
-		font-size: 11px;
+		font-size: 0.8rem;
 		font-weight: 400;
 		color: rgba(255, 255, 255, 0.5);
 		margin-left: 6px;
@@ -127,7 +128,7 @@
 	.nav-link {
 		color: rgba(255, 255, 255, 0.7);
 		text-decoration: none;
-		font-size: 13px;
+		font-size: 0.95rem;
 		padding: 0 14px;
 		height: 46px;
 		display: flex;
@@ -147,7 +148,7 @@
 	}
 	.nav-switch-link {
 		color: rgba(255, 255, 255, 0.4);
-		font-size: 12px;
+		font-size: 0.85rem;
 		margin-left: 12px;
 		border-left: 1px solid rgba(255, 255, 255, 0.15);
 	}
@@ -179,7 +180,7 @@
 		padding: 9px 16px;
 		color: rgba(255, 255, 255, 0.8);
 		text-decoration: none;
-		font-size: 13px;
+		font-size: 0.95rem;
 	}
 	.nav-dropdown-menu a:hover {
 		background: rgba(255, 255, 255, 0.1);
