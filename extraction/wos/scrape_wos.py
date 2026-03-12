@@ -88,6 +88,8 @@ def parse_wos_tsv(filepath: str) -> list[dict]:
     """
     import csv
 
+    csv.field_size_limit(1_000_000)
+
     records = []
     with open(filepath, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f, delimiter="\t")

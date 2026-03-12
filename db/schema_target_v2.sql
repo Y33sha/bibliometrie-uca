@@ -224,10 +224,10 @@ CREATE TABLE authorships (
     structure_id    INT REFERENCES structures(id) ON DELETE SET NULL,  -- structure UCA (NULL si non UCA ou non résolu)
     author_position SMALLINT,
     is_uca          BOOLEAN DEFAULT FALSE,
-    -- Traçabilité : quelles sources ont contribué à cet authorship
-    source_hal      BOOLEAN DEFAULT FALSE,
-    source_openalex BOOLEAN DEFAULT FALSE,
-    source_wos      BOOLEAN DEFAULT FALSE,
+    -- Traçabilité : FK vers les authorships sources
+    hal_authorship_id     INT REFERENCES hal_authorships(id) ON DELETE SET NULL,
+    openalex_authorship_id INT REFERENCES openalex_authorships(id) ON DELETE SET NULL,
+    wos_authorship_id     INT REFERENCES wos_authorships(id) ON DELETE SET NULL,
     source_manual   BOOLEAN DEFAULT FALSE,       -- ajout manuel (non présent dans les sources)
     -- Curation
     excluded        BOOLEAN DEFAULT FALSE,
@@ -310,6 +310,7 @@ CREATE INDEX idx_hal_struct_alias_ids ON hal_structures USING GIN (alias_ids);
 CREATE TABLE hal_authors (
     id              SERIAL PRIMARY KEY,
     hal_person_id   INT UNIQUE,
+    hal_form_id     INT,                         -- identifiant de forme HAL (déduplique les auteurs sans compte)
     full_name       TEXT NOT NULL,
     last_name       TEXT,
     first_name      TEXT,
@@ -323,6 +324,7 @@ CREATE TABLE hal_authors (
     updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE UNIQUE INDEX idx_hal_authors_form_id ON hal_authors (hal_form_id) WHERE hal_form_id IS NOT NULL;
 CREATE INDEX idx_hal_authors_person ON hal_authors (person_id) WHERE person_id IS NOT NULL;
 CREATE INDEX idx_hal_authors_idhal ON hal_authors (idhal) WHERE idhal IS NOT NULL;
 CREATE INDEX idx_hal_authors_orcid ON hal_authors (orcid) WHERE orcid IS NOT NULL;
@@ -518,13 +520,13 @@ CREATE TABLE openalex_authorship_addresses (
     UNIQUE (openalex_authorship_id, address_id)
 );
 
--- Quand WoS sera disponible :
--- CREATE TABLE wos_authorship_addresses (
---     id                  SERIAL PRIMARY KEY,
---     wos_authorship_id   INT NOT NULL REFERENCES wos_authorships(id) ON DELETE CASCADE,
---     address_id          INT NOT NULL REFERENCES addresses(id) ON DELETE CASCADE,
---     UNIQUE (wos_authorship_id, address_id)
--- );
+-- Liaison authorship WoS ↔ adresses
+CREATE TABLE wos_authorship_addresses (
+    id                  SERIAL PRIMARY KEY,
+    wos_authorship_id   INT NOT NULL REFERENCES wos_authorships(id) ON DELETE CASCADE,
+    address_id          INT NOT NULL REFERENCES addresses(id) ON DELETE CASCADE,
+    UNIQUE (wos_authorship_id, address_id)
+);
 
 
 -- #############################################################

@@ -8,8 +8,8 @@ La personne cible (celle qui absorbe les autres) est celle avec le plus de
 publications, ou celle qui a des données RH.
 
 Usage:
-    python merge_lab_duplicates.py          # dry-run interactif
-    python merge_lab_duplicates.py --apply  # appliquer les fusions confirmées
+    python merge_lab_duplicates.py              # appliquer les fusions confirmées
+    python merge_lab_duplicates.py --dry-run    # dry-run interactif
 """
 
 import argparse
@@ -146,7 +146,7 @@ def get_person_details(cur, person_ids):
                 ) _pubs) AS pub_count,
                (SELECT array_agg(DISTINCT pi.id_type || ':' || pi.id_value)
                 FROM person_identifiers pi
-                WHERE pi.person_id = p.id AND NOT pi.rejected) AS identifiers,
+                WHERE pi.person_id = p.id AND pi.status != 'rejected') AS identifiers,
                (SELECT COUNT(*) FROM hal_authors ha WHERE ha.person_id = p.id) AS hal_authors,
                (SELECT COUNT(*) FROM openalex_authors oa WHERE oa.person_id = p.id) AS oa_authors
         FROM persons p
@@ -230,7 +230,7 @@ def display_person(p, is_target=False):
           f"{ids}{marker}")
 
 
-def run(apply=False):
+def run(dry_run=False):
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -329,7 +329,7 @@ def run(apply=False):
             else:
                 for target, sources in merge_plan:
                     for source in sources:
-                        if apply:
+                        if not dry_run:
                             do_merge(cur, target["id"], source["id"])
                             logger.info(f"  Fusionné #{source['id']} → #{target['id']} "
                                         f"({source['last_name']} {source['first_name']})")
@@ -337,7 +337,7 @@ def run(apply=False):
                             logger.info(f"  [dry-run] Fusionnerait #{source['id']} → #{target['id']} "
                                         f"({source['last_name']} {source['first_name']})")
                         total_merged += 1
-                if apply:
+                if not dry_run:
                     conn.commit()
 
         # ── Passe 2 : interversions nom/prénom ──
@@ -402,7 +402,7 @@ def run(apply=False):
                 else:
                     for target, sources in swap_plan:
                         for source in sources:
-                            if apply:
+                            if not dry_run:
                                 do_merge(cur, target["id"], source["id"])
                                 logger.info(f"  Fusionné (interversion) #{source['id']} → #{target['id']} "
                                             f"({source['last_name']} {source['first_name']})")
@@ -410,7 +410,7 @@ def run(apply=False):
                                 logger.info(f"  [dry-run] Fusionnerait (interversion) #{source['id']} → #{target['id']} "
                                             f"({source['last_name']} {source['first_name']})")
                             total_merged += 1
-                    if apply:
+                    if not dry_run:
                         conn.commit()
 
     # Résumé
@@ -418,8 +418,8 @@ def run(apply=False):
     print(c("  RÉSUMÉ", "bold"))
     print(f"  Fusions effectuées : {total_merged}")
     print(f"  Groupes ignorés   : {total_skipped}")
-    if not apply and total_merged > 0:
-        print(c("  (dry-run — relancer avec --apply pour appliquer)", "yellow"))
+    if dry_run and total_merged > 0:
+        print(c("  (dry-run — aucune modification effectuée)", "yellow"))
     print(f"{'='*70}\n")
 
     cur.close()
@@ -428,6 +428,6 @@ def run(apply=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fusionner les personnes homonymes par labo")
-    parser.add_argument("--apply", action="store_true", help="Appliquer les fusions (sinon dry-run)")
+    parser.add_argument("--dry-run", action="store_true", help="Simuler sans modifier la base")
     args = parser.parse_args()
-    run(apply=args.apply)
+    run(dry_run=args.dry_run)

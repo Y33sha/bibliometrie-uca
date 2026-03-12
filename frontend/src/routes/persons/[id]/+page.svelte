@@ -30,6 +30,7 @@
 		id_type: string;
 		id_value: string;
 		source: string;
+		status: 'pending' | 'confirmed' | 'rejected';
 	}
 	interface Author {
 		id: number;
@@ -61,6 +62,7 @@
 		journal: string | null;
 		hal_id: string | null;
 		openalex_id: string | null;
+		wos_id: string | null;
 		labs: string | null;
 		is_corresponding: boolean | null;
 	}
@@ -117,14 +119,14 @@
 
 	const allOrcids = $derived(() => {
 		const set = new Set<string>();
-		identifiers.filter((i) => i.id_type === 'orcid').forEach((i) => set.add(i.id_value));
+		identifiers.filter((i) => i.id_type === 'orcid' && i.status !== 'rejected').forEach((i) => set.add(i.id_value));
 		return Array.from(set);
 	});
 
 	const allIdhals = $derived(() => {
 		const set = new Set<string>();
 		authors.forEach((a) => { if (a.idhal) set.add(a.idhal); });
-		identifiers.filter((i) => i.id_type === 'idhal').forEach((i) => set.add(i.id_value));
+		identifiers.filter((i) => i.id_type === 'idhal' && i.status !== 'rejected').forEach((i) => set.add(i.id_value));
 		return Array.from(set);
 	});
 
@@ -369,6 +371,13 @@
 									{:else}
 										<span class="source-tag source-placeholder"></span>
 									{/if}
+									{#if p.wos_id}
+										<a href="https://www.webofscience.com/wos/woscc/full-record/{p.wos_id}" target="_blank" rel="noopener" class="source-tag source-wos" title="WoS: {p.wos_id}">
+											<img src="https://www.webofscience.com/favicon.ico" alt="WoS" />
+										</a>
+									{:else}
+										<span class="source-tag source-placeholder"></span>
+									{/if}
 									{#if p.doi}
 										<a href="https://doi.org/{p.doi}" target="_blank" rel="noopener" class="source-tag source-doi" title={p.doi}>
 											<svg viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -604,6 +613,7 @@
 	}
 	.source-hal-label { background: #e8f0f8; color: #3b6b9e; }
 	.source-oa-label { background: #fef3e0; color: #b8733e; }
+	.source-wos-label { background: #e8e0f8; color: #5a3d8a; }
 
 	/* Publications tab */
 	.toolbar {
@@ -657,6 +667,9 @@
 	.source-hal:hover { background: #d0e3f4; }
 	.source-oa { background: #fef3e0; }
 	.source-oa:hover { background: #fde8c8; }
+	.source-wos { background: #e8e0f8; }
+	.source-wos:hover { background: #d8c8f4; }
+	.wos-label { font-size: 11px; font-weight: 700; color: #5a3d8a; line-height: 14px; }
 	.source-doi { background: #f0f0f0; }
 	.source-doi:hover { background: #e0e0e0; }
 	.source-placeholder { visibility: hidden; }

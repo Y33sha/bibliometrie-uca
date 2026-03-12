@@ -17,10 +17,11 @@
 	}
 
 	interface LabDetected {
-		id: number;
+		structure_id: number;
 		name: string;
 		acronym: string | null;
-		structure_id: number;
+		is_detected: boolean;
+		is_confirmed: boolean | null;
 	}
 
 	interface MatchedForm {
@@ -45,13 +46,6 @@
 		addresses: FeedbackAddress[];
 	}
 
-	interface Lab {
-		id: number;
-		code: string;
-		name: string;
-		acronym: string | null;
-	}
-
 	interface Structure {
 		id: number;
 		code: string;
@@ -60,19 +54,57 @@
 		type: string;
 	}
 
+	interface GroupedStructures {
+		[type: string]: Structure[];
+	}
+
 	interface NameForm {
 		id: number;
 		requires_context_of: (string | number)[];
 	}
 
-	interface RerunResult {
-		success: boolean;
-		summary: string[];
+	// ---------- Constants ----------
+
+	const TYPE_LABELS: Record<string, string> = {
+		universite: 'Universités',
+		onr: 'Organismes de recherche',
+		chu: 'CHU',
+		ecole: 'Écoles',
+		labo: 'Laboratoires'
+	};
+	const ALLOWED_TYPES = Object.keys(TYPE_LABELS);
+
+	// ---------- URL params helpers ----------
+
+	function readUrlParams(): { tab: Tab; search: string; p: number; structureId: number | null } {
+		const sp = new URLSearchParams(window.location.search);
+		const tab = sp.get('tab') === 'fp' ? 'fp' : 'fn';
+		return {
+			tab,
+			search: sp.get('search') || '',
+			p: parseInt(sp.get('page') || '1') || 1,
+			structureId: sp.has('structure_id') ? parseInt(sp.get('structure_id')!) || null : null,
+		};
+	}
+
+	function syncUrl(): void {
+		const sp = new URLSearchParams();
+		if (currentStructureId) sp.set('structure_id', String(currentStructureId));
+		if (currentTab !== 'fn') sp.set('tab', currentTab);
+		if (search) sp.set('search', search);
+		if (currentPage > 1) sp.set('page', String(currentPage));
+		const qs = sp.toString();
+		const newUrl = window.location.pathname + (qs ? '?' + qs : '');
+		history.replaceState({}, '', newUrl);
 	}
 
 	// ---------- State ----------
 
 	type Tab = 'fn' | 'fp';
+
+	let currentStructureId = $state<number | null>(null);
+	let structures = $state<GroupedStructures>({});
+	let allStructures = $state<Structure[]>([]);
 
 	let stats: FeedbackStats | null = $state(null);
 	let currentTab: Tab = $state('fn');
@@ -82,12 +114,8 @@
 	let addresses: FeedbackAddress[] = $state([]);
 	let search = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = $state(null);
-	let allLabs: Lab[] = $state([]);
-	let allStructures: Structure[] = $state([]);
-	let rerunState: 'idle' | 'running' | 'done' = $state('idle');
-
-	// Lab assignment: per-address selected structure id
-	let assignSelections: Record<number, string> = $state({});
+	let rerunState: 'idle' | 'running' | 'done' | 'error' = $state('idle');
+	let rerunLines: string[] = $state([]);
 
 	// Context picker state
 	let ctxPicker: { formId: number; x: number; y: number } | null = $state(null);
@@ -109,33 +137,66 @@
 		if (currentTab === 'fn') {
 			return {
 				title: 'Faux négatifs',
-				body: 'Adresses marquées UCA manuellement mais non détectées par le script. Ajouter des formes de nom et relancer la détection.'
+				body: 'Adresses reliées manuellement à cette structure mais non détectées par le script. Ajouter des formes de nom et relancer la détection.'
 			};
 		}
 		return {
 			title: 'Faux positifs',
-			body: 'Adresses détectées UCA par le script mais rejetées manuellement. La forme ayant matché est affichée \u2014 vous pouvez la supprimer ou lui ajouter un contexte contraignant, puis relancer la détection.'
+			body: 'Adresses détectées par le script pour cette structure mais rejetées manuellement. La forme ayant matché est affichée \u2014 vous pouvez la supprimer ou lui ajouter un contexte contraignant, puis relancer la détection.'
 		};
 	});
 
 	const rerunLabel = $derived(
 		rerunState === 'running'
-			? '\u23F3 Detection en cours\u2026'
+			? '\u23F3 En cours\u2026'
 			: rerunState === 'done'
-				? '\u2713 Termine'
-				: '\u25B6 Relancer la detection'
+				? '\u2713 Terminé'
+				: rerunState === 'error'
+					? '\u25B6 Réessayer la détection'
+					: '\u25B6 Relancer la détection'
 	);
 
 	// ---------- Data loading ----------
 
+	async function loadStructures(): Promise<void> {
+		const all = await api<Structure[]>('/api/structures');
+		allStructures = all;
+		const grouped: GroupedStructures = {};
+		let ucaId: number | null = null;
+
+		for (const s of all) {
+			if (!ALLOWED_TYPES.includes(s.type)) continue;
+			if (s.code === 'uca') ucaId = s.id;
+			if (!grouped[s.type]) grouped[s.type] = [];
+			grouped[s.type].push(s);
+		}
+
+		structures = grouped;
+
+		if (ucaId) {
+			currentStructureId = ucaId;
+		} else {
+			for (const type of ALLOWED_TYPES) {
+				if (grouped[type]?.length) {
+					currentStructureId = grouped[type][0].id;
+					break;
+				}
+			}
+		}
+	}
+
 	async function loadStats() {
-		stats = await api<FeedbackStats>('/api/feedback/stats');
+		if (!currentStructureId) return;
+		stats = await api<FeedbackStats>(`/api/feedback/stats?structure_id=${currentStructureId}`);
 	}
 
 	async function loadTable() {
+		if (!currentStructureId) return;
+		syncUrl();
 		const endpoint =
 			currentTab === 'fn' ? '/api/feedback/false-negatives' : '/api/feedback/false-positives';
 		const params = new URLSearchParams({
+			structure_id: String(currentStructureId),
 			page: String(currentPage),
 			per_page: '50'
 		});
@@ -169,38 +230,24 @@
 		window.scrollTo(0, 0);
 	}
 
-	// ---------- Assign structure (FN) ----------
-
-	async function assignLab(addressId: number) {
-		const structId = assignSelections[addressId];
-		if (!structId) return;
-
-		await fetch(base + '/api/addresses/' + addressId + '/assign-structure', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ structure_id: parseInt(structId) })
-		});
-
+	function onStructureChange(e: Event) {
+		currentStructureId = parseInt((e.target as HTMLSelectElement).value);
+		currentPage = 1;
 		loadStats();
 		loadTable();
-	}
-
-	function labOptions(address: FeedbackAddress): Lab[] {
-		const assignedIds = (address.labs || []).map((l) => l.structure_id);
-		return allLabs.filter((l) => !assignedIds.includes(l.id));
 	}
 
 	// ---------- Form actions (FP) ----------
 
 	async function deleteForm(formId: number) {
-		if (!confirm('Supprimer cette forme de nom ? Cela affectera la detection apres relance.'))
+		if (!confirm('Supprimer cette forme de nom ? Cela affectera la détection après relance.'))
 			return;
 		try {
 			await fetch(base + '/api/name-forms/' + formId, { method: 'DELETE' });
 			loadTable();
 		} catch (e: unknown) {
 			const msg = e instanceof Error ? e.message : String(e);
-			alert('Erreur: ' + msg);
+			alert('Erreur : ' + msg);
 		}
 	}
 
@@ -238,7 +285,7 @@
 			loadTable();
 		} catch (e: unknown) {
 			const msg = e instanceof Error ? e.message : String(e);
-			alert('Erreur: ' + msg);
+			alert('Erreur : ' + msg);
 		}
 	}
 
@@ -253,31 +300,45 @@
 
 	// ---------- Rerun ----------
 
-	async function launchRerun() {
+	function launchRerun() {
 		rerunState = 'running';
-		try {
-			const res = await fetch(base + '/api/feedback/rerun', { method: 'POST' });
-			if (!res.ok) throw new Error('API error: ' + res.status);
-			const result: RerunResult = await res.json();
-			if (result.success) {
+		rerunLines = [];
+
+		const evtSource = new EventSource(base + '/api/feedback/rerun');
+
+		evtSource.onmessage = (event) => {
+			const text: string = event.data;
+
+			if (text === '[DONE]') {
+				evtSource.close();
 				rerunState = 'done';
 				loadStats();
 				loadTable();
 				setTimeout(() => {
 					rerunState = 'idle';
-				}, 3000);
-			} else {
-				alert('Erreur:\n' + result.summary.join('\n'));
-				rerunState = 'idle';
+					rerunLines = [];
+				}, 5000);
+				return;
 			}
-		} catch (e: unknown) {
-			const msg = e instanceof Error ? e.message : String(e);
-			alert('Erreur: ' + msg);
-			rerunState = 'idle';
-		}
+
+			if (text.startsWith('[ERROR]')) {
+				evtSource.close();
+				rerunLines = [...rerunLines, text];
+				rerunState = 'error';
+				return;
+			}
+
+			rerunLines = [...rerunLines, text];
+		};
+
+		evtSource.onerror = () => {
+			evtSource.close();
+			rerunLines = [...rerunLines, '[ERROR] Connexion perdue'];
+			rerunState = 'error';
+		};
 	}
 
-	// ---------- Unique forms helper ----------
+	// ---------- Helpers ----------
 
 	function uniqueForms(forms: MatchedForm[]): MatchedForm[] {
 		const seen = new Set<number>();
@@ -286,6 +347,21 @@
 			seen.add(f.form_id);
 			return true;
 		});
+	}
+
+	function structTagClass(l: LabDetected): string {
+		if (l.is_confirmed === true) return 'struct-tag struct-confirmed';
+		if (l.is_confirmed === false) return 'struct-tag struct-rejected';
+		if (l.is_detected) return 'struct-tag struct-detected';
+		return 'struct-tag struct-manual';
+	}
+
+	function structTagTitle(l: LabDetected): string {
+		const name = l.name;
+		if (l.is_confirmed === true) return `${name} (confirmé)`;
+		if (l.is_confirmed === false) return `${name} (rejeté)`;
+		if (l.is_detected) return `${name} (détecté auto)`;
+		return `${name} (ajouté manuellement)`;
 	}
 
 	function formatCtx(ctx: (string | number)[]): string {
@@ -297,20 +373,26 @@
 	// ---------- Init ----------
 
 	onMount(async () => {
-		allLabs = await api<Lab[]>('/api/laboratories');
-		allStructures = await api<Structure[]>('/api/structures');
+		const url = readUrlParams();
+		currentTab = url.tab;
+		search = url.search;
+		currentPage = url.p;
+
+		await loadStructures();
+		if (url.structureId) currentStructureId = url.structureId;
 		loadStats();
 		loadTable();
 	});
 </script>
 
 <svelte:head>
-	<title>Admin - Qualite detection - Bibliometrie UCA</title>
+	<title>Admin - Qualité détection - Bibliométrie UCA</title>
 </svelte:head>
 
 <svelte:window onclick={handleOutsideClick} />
 
-<h2>Qualite de la detection</h2>
+<div class="page-feedback">
+<h2>Qualité de la détection</h2>
 
 <!-- Stats row -->
 {#if stats}
@@ -351,6 +433,24 @@
 
 <!-- Toolbar -->
 <div class="toolbar">
+	<select
+		class="structure-filter"
+		value={currentStructureId ?? ''}
+		onchange={onStructureChange}
+	>
+		{#each ALLOWED_TYPES as type}
+			{#if structures[type]?.length}
+				<optgroup label={TYPE_LABELS[type]}>
+					{#each structures[type] as s (s.id)}
+						<option value={s.id}>{s.acronym || s.name}</option>
+					{/each}
+				</optgroup>
+			{/if}
+		{/each}
+	</select>
+
+	<div class="toolbar-sep"></div>
+
 	<div class="tab-group">
 		<button class="tab-btn" class:active={currentTab === 'fn'} onclick={() => switchTab('fn')}>
 			Faux négatifs
@@ -361,15 +461,35 @@
 	</div>
 	<input
 		type="text"
-		placeholder="Rechercher dans les adresses\u2026"
+		placeholder="Rechercher dans les adresses..."
 		bind:value={search}
 		oninput={onSearchInput}
 	/>
 	<span class="count">{total} adresses</span>
-	<button class="rerun-btn" disabled={rerunState !== 'idle'} onclick={launchRerun}>
+	<button class="rerun-btn" disabled={rerunState === 'running' || rerunState === 'done'} onclick={launchRerun}>
 		{rerunLabel}
 	</button>
 </div>
+
+<!-- Rerun progress -->
+{#if rerunLines.length > 0}
+	<div class="rerun-log" class:rerun-error={rerunState === 'error'} class:rerun-done={rerunState === 'done'}>
+		<div class="rerun-log-header">
+			{#if rerunState === 'running'}
+				<span class="rerun-spinner"></span> Détection en cours…
+			{:else if rerunState === 'done'}
+				Détection terminée
+			{:else}
+				Erreur lors de la détection
+			{/if}
+		</div>
+		<div class="rerun-log-body">
+			{#each rerunLines.slice(-8) as line}
+				<div class="rerun-log-line">{line}</div>
+			{/each}
+		</div>
+	</div>
+{/if}
 
 <!-- Table -->
 {#if addresses.length === 0}
@@ -380,10 +500,8 @@
 			<tr>
 				<th>Adresse</th>
 				<th class="num" style="width:60px">Publis</th>
-				<th style="width:200px">Labo(s) détectés</th>
-				{#if currentTab === 'fn'}
-					<th style="width:250px">Assigner un labo</th>
-				{:else}
+				<th style="width:200px">Structures liées</th>
+				{#if currentTab === 'fp'}
 					<th style="width:280px">Forme ayant matché</th>
 				{/if}
 			</tr>
@@ -391,38 +509,21 @@
 		<tbody>
 			{#each addresses as a (a.id)}
 				<tr>
-					<td class="addr-text">{a.raw_text}</td>
+					<td class="addr-text">{@html esc(a.raw_text)}</td>
 					<td class="num">{a.pub_count}</td>
 					<td>
 						{#if a.labs && a.labs.length > 0}
 							{#each a.labs as l}
-								<span class="lab-tag auto" title={l.name}>
+								<span class={structTagClass(l)} title={structTagTitle(l)}>
 									{l.acronym || l.name}
 								</span>
 							{/each}
 						{:else}
-							<span class="muted-small">aucun</span>
+							<span class="muted-small">aucune</span>
 						{/if}
 					</td>
 
-					{#if currentTab === 'fn'}
-						<!-- FN: assign structure -->
-						<td>
-							<div class="assign-row">
-								<select bind:value={assignSelections[a.id]}>
-									<option value="">Choisir\u2026</option>
-									{#each labOptions(a) as lab}
-										<option value={String(lab.id)}>
-											{lab.acronym || lab.name}
-										</option>
-									{/each}
-								</select>
-								<button class="assign-btn" onclick={() => assignLab(a.id)}>
-									Assigner
-								</button>
-							</div>
-						</td>
-					{:else}
+					{#if currentTab === 'fp'}
 						<!-- FP: matched forms -->
 						<td>
 							{#if a.matched_forms && a.matched_forms.length > 0}
@@ -464,7 +565,7 @@
 	<Pagination page={currentPage} {pages} onchange={onPageChange} />
 {/if}
 
-<!-- Context picker (fixed position, rendered at body level) -->
+<!-- Context picker -->
 {#if ctxPicker}
 	<div
 		class="ctx-picker-inline"
@@ -479,7 +580,7 @@
 		</div>
 		<input
 			type="text"
-			placeholder="Rechercher une structure\u2026"
+			placeholder="Rechercher une structure..."
 			bind:value={ctxSearch}
 		/>
 		<div class="picker-results">
@@ -490,15 +591,15 @@
 				</button>
 			{/each}
 			{#if ctxFilteredStructures.length === 0}
-				<div class="picker-item-empty">Aucun resultat</div>
+				<div class="picker-item-empty">Aucun résultat</div>
 			{/if}
 		</div>
 	</div>
 {/if}
+</div>
 
 <style>
-	/* -- Local CSS variables -- */
-	:root {
+	.page-feedback {
 		--danger: #c0392b;
 		--danger-light: #fbeaea;
 		--success: #2a7d4f;
@@ -548,23 +649,18 @@
 	.stat-card.highlight-danger {
 		border-left: 3px solid var(--danger);
 	}
-
 	.stat-card.highlight-warning {
 		border-left: 3px solid var(--warning);
 	}
-
 	.stat-card.highlight-success {
 		border-left: 3px solid var(--success);
 	}
-
 	.val-danger {
 		color: var(--danger);
 	}
-
 	.val-warning {
 		color: var(--warning);
 	}
-
 	.val-success {
 		color: var(--success);
 	}
@@ -590,10 +686,28 @@
 		flex-wrap: wrap;
 	}
 
+	.structure-filter {
+		padding: 6px 10px;
+		border: 1px solid var(--accent);
+		border-radius: 4px;
+		font-size: 0.95rem;
+		font-weight: 600;
+		color: var(--accent);
+		background: white;
+		font-family: inherit;
+	}
+
+	.toolbar-sep {
+		width: 1px;
+		height: 24px;
+		background: var(--border);
+		margin: 0 4px;
+	}
+
 	.tab-group {
 		display: flex;
 		gap: 0;
-		margin-right: 12px;
+		margin-right: 4px;
 	}
 
 	.tab-btn {
@@ -604,19 +718,15 @@
 		cursor: pointer;
 		font-family: inherit;
 	}
-
 	.tab-btn:first-child {
 		border-radius: 4px 0 0 4px;
 	}
-
 	.tab-btn:last-child {
 		border-radius: 0 4px 4px 0;
 	}
-
 	.tab-btn:not(:first-child) {
 		border-left: none;
 	}
-
 	.tab-btn.active {
 		background: var(--accent);
 		color: white;
@@ -629,7 +739,8 @@
 		border-radius: 4px;
 		font-size: 0.95rem;
 		background: white;
-		width: 280px;
+		width: 250px;
+		font-family: inherit;
 	}
 
 	.count {
@@ -649,12 +760,10 @@
 		cursor: pointer;
 		font-family: inherit;
 	}
-
 	.rerun-btn:hover:not(:disabled) {
 		background: var(--accent);
 		color: white;
 	}
-
 	.rerun-btn:disabled {
 		opacity: 0.5;
 		cursor: wait;
@@ -669,7 +778,6 @@
 		border-radius: 6px;
 		overflow: hidden;
 	}
-
 	.data-table th {
 		text-align: left;
 		padding: 8px 10px;
@@ -681,27 +789,22 @@
 		border-bottom: 2px solid var(--border);
 		background: #fafaf8;
 	}
-
 	.data-table td {
 		padding: 7px 10px;
 		font-size: 0.95rem;
 		border-bottom: 1px solid #f0efec;
 		vertical-align: top;
 	}
-
 	.data-table tr:last-child td {
 		border-bottom: none;
 	}
-
 	.data-table tr:hover td {
 		background: #fafaf8;
 	}
-
 	.num {
 		text-align: right;
 		font-variant-numeric: tabular-nums;
 	}
-
 	.addr-text {
 		font-family: 'SF Mono', 'Consolas', monospace;
 		font-size: 0.85rem;
@@ -709,20 +812,76 @@
 		word-break: break-word;
 		max-width: 600px;
 	}
-
 	.empty {
 		text-align: center;
 		padding: 40px;
 		color: var(--muted);
 	}
-
 	.muted-small {
 		color: var(--muted);
 		font-size: 0.8rem;
 	}
 
-	/* Lab tags */
-	.lab-tag {
+	/* Rerun log */
+	.rerun-log {
+		background: #1e1e2e;
+		color: #cdd6f4;
+		border-radius: 6px;
+		margin-bottom: 16px;
+		font-family: 'SF Mono', 'Consolas', monospace;
+		font-size: 0.82rem;
+		overflow: hidden;
+		border: 1px solid #313244;
+	}
+	.rerun-log.rerun-error {
+		border-color: var(--danger);
+	}
+	.rerun-log.rerun-done {
+		border-color: var(--success);
+	}
+	.rerun-log-header {
+		padding: 8px 12px;
+		background: #313244;
+		font-weight: 600;
+		font-size: 0.85rem;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.rerun-error .rerun-log-header {
+		background: #45292a;
+		color: #f38ba8;
+	}
+	.rerun-done .rerun-log-header {
+		background: #1e3a2a;
+		color: #a6e3a1;
+	}
+	.rerun-log-body {
+		padding: 8px 12px;
+		max-height: 200px;
+		overflow-y: auto;
+	}
+	.rerun-log-line {
+		padding: 1px 0;
+		white-space: pre-wrap;
+		word-break: break-word;
+		line-height: 1.5;
+	}
+	.rerun-spinner {
+		display: inline-block;
+		width: 12px;
+		height: 12px;
+		border: 2px solid #585b70;
+		border-top-color: #89b4fa;
+		border-radius: 50%;
+		animation: rerun-spin 0.8s linear infinite;
+	}
+	@keyframes rerun-spin {
+		to { transform: rotate(360deg); }
+	}
+
+	/* Structure tags */
+	.struct-tag {
 		display: inline-block;
 		font-size: 0.8rem;
 		padding: 1px 7px;
@@ -730,44 +889,23 @@
 		font-weight: 500;
 		margin: 1px 2px;
 	}
-
-	.lab-tag.auto {
+	.struct-confirmed {
+		background: #e6f4ec;
+		color: #2a7d4f;
+	}
+	.struct-detected {
 		background: var(--warning-light);
 		color: #8a6d10;
 	}
-
-	/* Assign row */
-	.assign-row {
-		display: flex;
-		gap: 4px;
-		align-items: center;
-		margin-top: 4px;
+	.struct-manual {
+		background: #e8f0f8;
+		color: #2c5e8a;
+		border: 1px dashed #a0c0e0;
 	}
-
-	.assign-row select {
-		padding: 3px 6px;
-		border: 1px solid var(--border);
-		border-radius: 3px;
-		font-size: 0.85rem;
-		background: white;
-		max-width: 200px;
-	}
-
-	.assign-btn {
-		padding: 3px 8px;
-		border: 1px solid var(--success);
-		border-radius: 3px;
-		background: var(--success-light);
-		color: var(--success);
-		font-size: 0.8rem;
-		font-weight: 600;
-		cursor: pointer;
-		font-family: inherit;
-	}
-
-	.assign-btn:hover {
-		background: var(--success);
-		color: white;
+	.struct-rejected {
+		background: #f5f5f5;
+		color: #999;
+		text-decoration: line-through;
 	}
 
 	/* Form info (FP tab) */
@@ -783,21 +921,17 @@
 		gap: 6px;
 		flex-wrap: wrap;
 	}
-
 	.form-struct {
 		color: var(--muted);
 	}
-
 	.form-text {
 		font-family: 'SF Mono', 'Consolas', monospace;
 		font-weight: 600;
 		color: #8a6d10;
 	}
-
 	.form-ctx {
 		color: var(--muted);
 	}
-
 	.form-action {
 		padding: 1px 6px;
 		border: 1px solid var(--border);
@@ -808,16 +942,13 @@
 		font-weight: 500;
 		font-family: inherit;
 	}
-
 	.form-action:hover {
 		background: var(--accent-light);
 	}
-
 	.form-action.danger {
 		border-color: var(--danger);
 		color: var(--danger);
 	}
-
 	.form-action.danger:hover {
 		background: var(--danger-light);
 	}
@@ -832,7 +963,6 @@
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 		width: 320px;
 	}
-
 	.ctx-picker-inline input {
 		width: 100%;
 		padding: 6px 10px;
@@ -842,12 +972,10 @@
 		font-size: 0.85rem;
 		outline: none;
 	}
-
 	.picker-results {
 		max-height: 180px;
 		overflow-y: auto;
 	}
-
 	.picker-item {
 		display: flex;
 		align-items: center;
@@ -861,29 +989,24 @@
 		text-align: left;
 		font-family: inherit;
 	}
-
 	.picker-item:hover {
 		background: var(--accent-light);
 	}
-
 	.picker-type {
 		font-size: 0.65rem;
 		color: var(--muted);
 	}
-
 	.picker-item-empty {
 		padding: 5px 10px;
 		font-size: 0.85rem;
 		color: var(--muted);
 	}
-
 	.picker-shortcuts {
 		padding: 4px 8px;
 		border-bottom: 1px solid var(--border);
 		display: flex;
 		gap: 4px;
 	}
-
 	.picker-shortcuts button {
 		padding: 2px 8px;
 		border: 1px solid var(--border);
@@ -893,7 +1016,6 @@
 		cursor: pointer;
 		font-family: inherit;
 	}
-
 	.picker-shortcuts button:hover {
 		background: var(--accent-light);
 	}

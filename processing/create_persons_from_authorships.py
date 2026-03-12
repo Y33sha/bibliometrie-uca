@@ -11,8 +11,8 @@ Passe 3b : Cross-link — rattache les auteurs non-UCA homonymes sur les mêmes
 Passe 4  : Propagation vers authorships (table de vérité) — populate_uca_flags étape 4
 
 Usage:
-    python create_persons_from_authorships.py              # dry-run
-    python create_persons_from_authorships.py --apply       # exécuter
+    python create_persons_from_authorships.py              # exécuter
+    python create_persons_from_authorships.py --dry-run    # dry-run
 """
 
 import argparse
@@ -75,7 +75,22 @@ def get_unlinked_uca_authors(cur):
     """)
     oa_authors = cur.fetchall()
 
-    return hal_authors + oa_authors
+    # WoS authors
+    cur.execute("""
+        SELECT wa.id, 'wos' AS source, wa.full_name, wa.last_name, wa.first_name,
+               wa.orcid, NULL::text AS idhal,
+               array_agg(DISTINCT wd.publication_id) FILTER (WHERE wd.publication_id IS NOT NULL) AS pub_ids,
+               COUNT(DISTINCT wd.publication_id) FILTER (WHERE wd.publication_id IS NOT NULL) AS pub_count
+        FROM wos_authors wa
+        JOIN wos_authorships was ON was.wos_author_id = wa.id
+        JOIN wos_documents wd ON wd.id = was.wos_document_id
+        WHERE wa.person_id IS NULL
+          AND was.is_uca = TRUE
+        GROUP BY wa.id
+    """)
+    wos_authors = cur.fetchall()
+
+    return hal_authors + oa_authors + wos_authors
 
 
 def pick_best_name(authors):
@@ -102,8 +117,11 @@ def link_authors_to_person(cur, person_id, authors):
         if a["source"] == "hal":
             cur.execute("UPDATE hal_authors SET person_id = %s, updated_at = now() WHERE id = %s",
                         (person_id, a["id"]))
-        else:
+        elif a["source"] == "openalex":
             cur.execute("UPDATE openalex_authors SET person_id = %s, updated_at = now() WHERE id = %s",
+                        (person_id, a["id"]))
+        elif a["source"] == "wos":
+            cur.execute("UPDATE wos_authors SET person_id = %s, updated_at = now() WHERE id = %s",
                         (person_id, a["id"]))
 
 
@@ -133,7 +151,11 @@ def add_identifiers(cur, person_id, authors):
 
 
 def propagate_to_authorships(cur):
-    """Étape 4 : propager person_id vers la table authorships (table de vérité)."""
+    """Étape 4 : propager person_id vers la table authorships (table de vérité).
+
+    structure_ids = périmètre large (UCA + labos tutellés + partenaires)
+    is_uca = TRUE si au moins une structure du périmètre restreint (UCA + labos tutellés)
+    """
 
     # Reset
     cur.execute("UPDATE authorships SET is_uca = FALSE, structure_ids = NULL")
@@ -149,29 +171,27 @@ def propagate_to_authorships(cur):
             JOIN structures s ON s.id = sr.parent_id
             WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
         ),
-        hal_uca AS (
+        hal_data AS (
             SELECT hd.publication_id,
                    ha.person_id,
-                   array_agg(DISTINCT sid) FILTER (
-                       WHERE sid IN (SELECT id FROM uca_perimeter)
-                   ) AS uca_struct_ids
+                   array_agg(DISTINCT sid) AS all_struct_ids,
+                   bool_or(sid IN (SELECT id FROM uca_perimeter)) AS has_uca
             FROM hal_authorships has
             JOIN hal_documents hd ON hd.id = has.hal_document_id
             JOIN hal_authors ha ON ha.id = has.hal_author_id,
             LATERAL unnest(has.structure_ids) AS sid
-            WHERE has.is_uca = TRUE
-              AND has.structure_ids IS NOT NULL
+            WHERE has.structure_ids IS NOT NULL
               AND hd.publication_id IS NOT NULL
               AND ha.person_id IS NOT NULL
             GROUP BY hd.publication_id, ha.person_id
         )
         UPDATE authorships a
-        SET structure_ids = hu.uca_struct_ids,
-            is_uca = TRUE,
+        SET structure_ids = hd.all_struct_ids,
+            is_uca = hd.has_uca,
             updated_at = now()
-        FROM hal_uca hu
-        WHERE a.publication_id = hu.publication_id
-          AND a.person_id = hu.person_id
+        FROM hal_data hd
+        WHERE a.publication_id = hd.publication_id
+          AND a.person_id = hd.person_id
           AND a.person_id IS NOT NULL
     """)
     hal_count = cur.rowcount
@@ -179,32 +199,61 @@ def propagate_to_authorships(cur):
 
     # 4b. Depuis OpenAlex
     cur.execute("""
-        WITH oa_uca AS (
+        WITH oa_data AS (
             SELECT od.publication_id,
                    oa.person_id,
-                   oas.structure_ids AS uca_struct_ids
+                   oas.structure_ids AS struct_ids,
+                   oas.is_uca AS src_is_uca
             FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
             JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-            WHERE oas.is_uca = TRUE
-              AND oas.structure_ids IS NOT NULL
+            WHERE oas.structure_ids IS NOT NULL
               AND od.publication_id IS NOT NULL
               AND oa.person_id IS NOT NULL
         )
         UPDATE authorships a
         SET structure_ids = (
                 SELECT array_agg(DISTINCT x)
-                FROM unnest(COALESCE(a.structure_ids, '{}') || ou.uca_struct_ids) AS x
+                FROM unnest(COALESCE(a.structure_ids, '{}') || od.struct_ids) AS x
             ),
-            is_uca = TRUE,
+            is_uca = a.is_uca OR od.src_is_uca,
             updated_at = now()
-        FROM oa_uca ou
-        WHERE a.publication_id = ou.publication_id
-          AND a.person_id = ou.person_id
+        FROM oa_data od
+        WHERE a.publication_id = od.publication_id
+          AND a.person_id = od.person_id
           AND a.person_id IS NOT NULL
     """)
     oa_count = cur.rowcount
     logger.info(f"  {oa_count} authorships mises à jour depuis OpenAlex")
+
+    # 4c. Depuis WoS
+    cur.execute("""
+        WITH wos_data AS (
+            SELECT wd.publication_id,
+                   wa.person_id,
+                   was.structure_ids AS struct_ids,
+                   was.is_uca AS src_is_uca
+            FROM wos_authorships was
+            JOIN wos_documents wd ON wd.id = was.wos_document_id
+            JOIN wos_authors wa ON wa.id = was.wos_author_id
+            WHERE was.structure_ids IS NOT NULL
+              AND wd.publication_id IS NOT NULL
+              AND wa.person_id IS NOT NULL
+        )
+        UPDATE authorships a
+        SET structure_ids = (
+                SELECT array_agg(DISTINCT x)
+                FROM unnest(COALESCE(a.structure_ids, '{}') || wd.struct_ids) AS x
+            ),
+            is_uca = a.is_uca OR wd.src_is_uca,
+            updated_at = now()
+        FROM wos_data wd
+        WHERE a.publication_id = wd.publication_id
+          AND a.person_id = wd.person_id
+          AND a.person_id IS NOT NULL
+    """)
+    wos_count = cur.rowcount
+    logger.info(f"  {wos_count} authorships mises à jour depuis WoS")
 
     # Stats finales
     cur.execute("SELECT COUNT(*) FROM authorships WHERE is_uca = TRUE")
@@ -219,7 +268,7 @@ def check_existing_person_by_orcid(cur, orcid):
     """Vérifie si une personne existe déjà avec cet ORCID."""
     cur.execute("""
         SELECT person_id FROM person_identifiers
-        WHERE id_type = 'orcid' AND id_value = %s AND NOT rejected
+        WHERE id_type = 'orcid' AND id_value = %s AND status != 'rejected'
         LIMIT 1
     """, (orcid,))
     row = cur.fetchone()
@@ -246,6 +295,12 @@ def get_existing_persons_by_name(cur):
             JOIN openalex_authorships oas ON oas.openalex_author_id = oa.id
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
             WHERE oa.person_id IS NOT NULL AND od.publication_id IS NOT NULL
+            UNION
+            SELECT wa.person_id, wd.publication_id AS pub_id
+            FROM wos_authors wa
+            JOIN wos_authorships was ON was.wos_author_id = wa.id
+            JOIN wos_documents wd ON wd.id = was.wos_document_id
+            WHERE wa.person_id IS NOT NULL AND wd.publication_id IS NOT NULL
         ) author_pubs ON author_pubs.person_id = p.id
         WHERE p.last_name_normalized IS NOT NULL
           AND p.last_name_normalized != ''
@@ -256,7 +311,7 @@ def get_existing_persons_by_name(cur):
     return cur.fetchall()
 
 
-def run(apply=False):
+def run(dry_run=False):
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -286,7 +341,7 @@ def run(apply=False):
 
         if existing_pid:
             # Rattacher à la personne existante
-            if apply:
+            if not dry_run:
                 link_authors_to_person(cur, existing_pid, group)
                 add_identifiers(cur, existing_pid, group)
             p1_linked_existing += 1
@@ -294,7 +349,7 @@ def run(apply=False):
         else:
             # Créer une nouvelle personne
             last, first = pick_best_name(group)
-            if apply:
+            if not dry_run:
                 pid = create_person(cur, last, first)
                 link_authors_to_person(cur, pid, group)
                 add_identifiers(cur, pid, group)
@@ -358,7 +413,7 @@ def run(apply=False):
                 matched_person = ep["person_id"]
 
         if matched_person:
-            if apply:
+            if not dry_run:
                 link_authors_to_person(cur, matched_person, [a])
                 add_identifiers(cur, matched_person, [a])
             linked_ids.add((a["source"], a["id"]))
@@ -436,7 +491,7 @@ def run(apply=False):
                 continue
 
             last, first = pick_best_name(comp_authors)
-            if apply:
+            if not dry_run:
                 pid = create_person(cur, last, first)
                 link_authors_to_person(cur, pid, comp_authors)
                 add_identifiers(cur, pid, comp_authors)
@@ -457,7 +512,7 @@ def run(apply=False):
     for a in singletons:
         last = a["last_name"] or a["full_name"] or "?"
         first = a["first_name"] or ""
-        if apply:
+        if not dry_run:
             pid = create_person(cur, last, first)
             link_authors_to_person(cur, pid, [a])
             add_identifiers(cur, pid, [a])
@@ -508,7 +563,20 @@ def run(apply=False):
     """)
     unlinked_oa = cur.fetchall()
 
-    all_unlinked = unlinked_hal + unlinked_oa
+    cur.execute("""
+        SELECT wa.id, 'wos' AS source, wa.last_name, wa.first_name,
+               array_agg(DISTINCT wd.publication_id) FILTER (WHERE wd.publication_id IS NOT NULL) AS pub_ids
+        FROM wos_authors wa
+        JOIN wos_authorships was ON was.wos_author_id = wa.id
+        JOIN wos_documents wd ON wd.id = was.wos_document_id
+        WHERE wa.person_id IS NULL
+          AND wa.last_name IS NOT NULL AND wa.last_name != ''
+          AND wa.first_name IS NOT NULL AND wa.first_name != ''
+        GROUP BY wa.id
+    """)
+    unlinked_wos = cur.fetchall()
+
+    all_unlinked = unlinked_hal + unlinked_oa + unlinked_wos
     logger.info(f"  {len(all_unlinked)} auteurs non rattachés à examiner")
 
     p3b_linked = 0
@@ -537,7 +605,7 @@ def run(apply=False):
                 matched_person = ep["person_id"]
 
         if matched_person:
-            if apply:
+            if not dry_run:
                 link_authors_to_person(cur, matched_person, [a])
                 add_identifiers(cur, matched_person, [a])
             p3b_linked += 1
@@ -559,15 +627,14 @@ def run(apply=False):
     logger.info(f"  Auteurs rattachés    : {total_linked}")
 
     # ── Passe 4 : propagation vers authorships ──
-    if apply:
+    if dry_run:
+        conn.rollback()
+        logger.info(f"\n  (dry-run — rien n'a été modifié)")
+    else:
         logger.info("\n=== Passe 4 : propagation vers authorships ===")
         propagate_to_authorships(cur)
         conn.commit()
         logger.info("\n  ✓ Appliqué (personnes + propagation authorships).")
-    else:
-        conn.rollback()
-        logger.info(f"\n  (dry-run — rien n'a été modifié)")
-        logger.info(f"  Avec --apply, la passe 4 propagera automatiquement vers authorships.")
 
     cur.close()
     conn.close()
@@ -575,6 +642,6 @@ def run(apply=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Créer des personnes depuis les authorships UCA")
-    parser.add_argument("--apply", action="store_true", help="Appliquer les changements (sinon dry-run)")
+    parser.add_argument("--dry-run", action="store_true", help="Simuler sans modifier la base")
     args = parser.parse_args()
-    run(apply=args.apply)
+    run(dry_run=args.dry_run)

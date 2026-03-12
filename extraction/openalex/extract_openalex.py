@@ -46,9 +46,12 @@ BASE_URL = "https://api.openalex.org/works"
 
 def build_params(year: int, cursor: str = "*") -> dict:
     """Construit les paramètres de requête pour l'API OpenAlex."""
+    # Support liste d'IDs institution (OR via pipe)
+    ids = OPENALEX.get("institution_ids") or [OPENALEX.get("institution_id")]
+    lineage_filter = "|".join(ids)
     params = {
         "filter": (
-            f"authorships.institutions.lineage:{OPENALEX['institution_id']},"
+            f"authorships.institutions.lineage:{lineage_filter},"
             f"publication_year:{year}"
         ),
         # Champs à récupérer — on prend large pour le staging,
@@ -217,7 +220,8 @@ def main():
     years = [args.year] if args.year else OPENALEX["years"]
 
     logger.info(f"=== Extraction OpenAlex démarrée ===")
-    logger.info(f"Institution OpenAlex : {OPENALEX['institution_id']} (lineage)")
+    ids = OPENALEX.get("institution_ids") or [OPENALEX.get("institution_id")]
+    logger.info(f"Institutions OpenAlex : {', '.join(ids)} (lineage OR)")
     logger.info(f"Années : {years}")
 
     conn = get_connection()

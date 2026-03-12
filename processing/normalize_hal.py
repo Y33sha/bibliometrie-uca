@@ -25,7 +25,6 @@ import os
 import re
 import sys
 import time
-import unicodedata
 
 import psycopg2
 from psycopg2.extras import Json
@@ -33,6 +32,7 @@ from psycopg2.extras import Json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import HAL
 from db.connection import get_connection
+from utils.normalize import normalize_text
 
 # ----- Logging -----
 logging.basicConfig(
@@ -83,17 +83,6 @@ DOCTYPE_MAP = {
 # =============================================================
 # UTILITAIRES
 # =============================================================
-
-def normalize_text(text: str) -> str:
-    """Normalise un texte pour comparaison/dédoublonnage."""
-    if not text:
-        return ""
-    text = text.lower().strip()
-    text = unicodedata.normalize("NFKD", text)
-    text = text.encode("ascii", "ignore").decode("ascii")
-    text = re.sub(r"[^a-z0-9\s]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
 
 
 def clean_doi(doi: str | None) -> str | None:
@@ -257,7 +246,7 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
                 UPDATE publications SET
                     journal_id = COALESCE(%s, publications.journal_id),
                     doc_type = CASE
-                        WHEN publications.doc_type IN ('other', 'unknown') AND %s NOT IN ('other', 'unknown')
+                        WHEN publications.doc_type = 'other' AND %s != 'other'
                             THEN %s
                         ELSE COALESCE(publications.doc_type, %s)
                     END,
@@ -290,7 +279,7 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
                     doi = COALESCE(publications.doi, %s),
                     journal_id = COALESCE(%s, publications.journal_id),
                     doc_type = CASE
-                        WHEN publications.doc_type IN ('other', 'unknown') AND %s NOT IN ('other', 'unknown')
+                        WHEN publications.doc_type = 'other' AND %s != 'other'
                             THEN %s
                         ELSE COALESCE(publications.doc_type, %s)
                     END,
@@ -355,6 +344,7 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
             publication_id = COALESCE(
                 hal_documents.publication_id, EXCLUDED.publication_id
             ),
+            doi = COALESCE(hal_documents.doi, EXCLUDED.doi),
             doc_type = COALESCE(EXCLUDED.doc_type, hal_documents.doc_type),
             collections = (
                 SELECT array_agg(DISTINCT c ORDER BY c)
@@ -374,11 +364,14 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
 # =============================================================
 
 def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
-                      idhal: str | None) -> int | None:
+                      idhal: str | None, hal_form_id: int | None = None
+                      ) -> int | None:
     """
     Insère/retrouve un auteur HAL.
-    Déduplique par hal_person_id (clé unique) si disponible,
-    sinon par nom exact.
+    Déduplique par :
+      1. hal_person_id (clé unique, auteurs avec compte HAL)
+      2. hal_form_id (clé unique partielle, auteurs sans compte HAL)
+      3. nom exact (dernier recours)
     Retourne hal_authors.id ou None.
     """
     if not full_name:
@@ -394,6 +387,7 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
         last_name = full_name
 
     # 1. Par hal_person_id (clé fiable) — 0 signifie non identifié
+    #    hal_form_id est réservé aux auteurs sans compte HAL → ignoré ici
     if hal_person_id and hal_person_id > 0:
         cur.execute("""
             INSERT INTO hal_authors
@@ -407,10 +401,38 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
         """, (hal_person_id, full_name, last_name, first_name, idhal))
         return cur.fetchone()[0]
 
-    # 2. Pas de hal_person_id (vieux documents) → chercher par nom exact
+    # 2. Par hal_form_id (auteurs sans compte HAL mais avec form_id)
+    if hal_form_id:
+        cur.execute("""
+            SELECT id FROM hal_authors
+            WHERE hal_form_id = %s
+            LIMIT 1
+        """, (hal_form_id,))
+        row = cur.fetchone()
+        if row:
+            cur.execute("""
+                UPDATE hal_authors SET
+                    idhal = COALESCE(hal_authors.idhal, %s),
+                    full_name = %s,
+                    updated_at = now()
+                WHERE id = %s
+            """, (idhal, full_name, row[0]))
+            return row[0]
+
+        # Nouveau avec form_id
+        cur.execute("""
+            INSERT INTO hal_authors
+                (full_name, last_name, first_name, idhal, hal_form_id)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+        """, (full_name, last_name, first_name, idhal, hal_form_id))
+        return cur.fetchone()[0]
+
+    # 3. Pas de hal_person_id ni form_id → chercher par nom exact
     cur.execute("""
         SELECT id FROM hal_authors
         WHERE hal_person_id IS NULL
+          AND hal_form_id IS NULL
           AND full_name = %s
           AND first_name IS NOT DISTINCT FROM %s
         LIMIT 1
@@ -426,7 +448,7 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
             """, (idhal, row[0]))
         return row[0]
 
-    # 3. Nouveau
+    # 4. Nouveau sans identifiant
     cur.execute("""
         INSERT INTO hal_authors (full_name, last_name, first_name, idhal)
         VALUES (%s, %s, %s, %s)
@@ -442,12 +464,16 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
 def parse_author_structures(doc: dict) -> dict[int, set[int]]:
     """
     Parse authIdHasStructure_fs pour extraire le mapping
-    hal_person_id → {hal_struct_ids}.
+    form_id → {hal_struct_ids}.
 
     Format : "formId-personId_FacetSep_Nom_JoinSep_structId_FacetSep_StructNom"
+
+    On utilise le form_id (et non le person_id) comme clé, car le form_id
+    est toujours présent, y compris pour les auteurs sans compte HAL
+    (personId = 0).
     """
     entries = doc.get("authIdHasStructure_fs") or []
-    person_structs: dict[int, set[int]] = {}
+    form_structs: dict[int, set[int]] = {}
 
     for entry in entries:
         parts = entry.split("_JoinSep_")
@@ -463,7 +489,7 @@ def parse_author_structures(doc: dict) -> dict[int, set[int]]:
         if len(dash_parts) != 2:
             continue
         try:
-            person_id = int(dash_parts[1])
+            form_id = int(dash_parts[0])
         except ValueError:
             continue
 
@@ -476,57 +502,87 @@ def parse_author_structures(doc: dict) -> dict[int, set[int]]:
         except ValueError:
             continue
 
-        person_structs.setdefault(person_id, set()).add(struct_id)
+        form_structs.setdefault(form_id, set()).add(struct_id)
 
-    return person_structs
+    return form_structs
 
 
 def process_authors(cur, doc: dict, hal_document_id: int):
     """
     Traite les auteurs d'un document HAL :
-    - Parse les champs alignés pour extraire hal_person_id et idhal
-    - Parse authIdHasStructure_fs pour les affiliations
+    - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
+    - Parse authIdHasStructure_fs pour les affiliations (clé = form_id)
     - Crée/retrouve chaque auteur dans hal_authors
     - Crée les hal_authorships avec hal_struct_ids
     """
     names = doc.get("authFullName_s") or []
 
-    # authFullNameIdHal_fs : "Nom_FacetSep_idhal" — aligné par position
-    name_idhal = doc.get("authFullNameIdHal_fs") or []
-    idhal_by_pos = {}
-    for pos, entry in enumerate(name_idhal):
-        parts = entry.split("_FacetSep_")
-        if len(parts) == 2 and parts[1].strip():
-            idhal_by_pos[pos] = parts[1].strip()
-
-    # authFullNameId_fs : "Nom_FacetSep_personId" — aligné par position
-    name_id = doc.get("authFullNameId_fs") or []
+    # authFullNameFormIDPersonIDIDHal_fs :
+    #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position
+    # C'est le champ le plus complet : on en extrait form_id, person_id et idhal
+    composite = doc.get("authFullNameFormIDPersonIDIDHal_fs") or []
+    form_id_by_pos = {}
     hal_person_id_by_pos = {}
-    for pos, entry in enumerate(name_id):
-        parts = entry.split("_FacetSep_")
-        if len(parts) == 2 and parts[1].strip():
-            try:
-                pid = int(parts[1].strip())
-                if pid > 0:  # 0 = personne non identifiée par HAL
-                    hal_person_id_by_pos[pos] = pid
-            except ValueError:
-                pass
+    idhal_by_pos = {}
 
-    # authIdHasStructure_fs → {hal_person_id: set of hal_struct_ids}
-    person_struct_map = parse_author_structures(doc)
+    for pos, entry in enumerate(composite):
+        parts = entry.split("_FacetSep_")
+        if len(parts) >= 2:
+            # parts[1] = "formId-personId"
+            dash_parts = parts[1].rsplit("-", 1)
+            if len(dash_parts) == 2:
+                try:
+                    form_id = int(dash_parts[0])
+                    form_id_by_pos[pos] = form_id
+                except ValueError:
+                    pass
+                try:
+                    pid = int(dash_parts[1])
+                    if pid > 0:  # 0 = personne non identifiée par HAL
+                        hal_person_id_by_pos[pos] = pid
+                except ValueError:
+                    pass
+        if len(parts) >= 3 and parts[2].strip():
+            idhal_by_pos[pos] = parts[2].strip()
+
+    # Fallback : si authFullNameFormIDPersonIDIDHal_fs est absent,
+    # on utilise les champs séparés (anciens documents)
+    if not composite:
+        name_idhal = doc.get("authFullNameIdHal_fs") or []
+        for pos, entry in enumerate(name_idhal):
+            parts = entry.split("_FacetSep_")
+            if len(parts) == 2 and parts[1].strip():
+                idhal_by_pos[pos] = parts[1].strip()
+
+        name_id = doc.get("authFullNameId_fs") or []
+        for pos, entry in enumerate(name_id):
+            parts = entry.split("_FacetSep_")
+            if len(parts) == 2 and parts[1].strip():
+                try:
+                    pid = int(parts[1].strip())
+                    if pid > 0:
+                        hal_person_id_by_pos[pos] = pid
+                except ValueError:
+                    pass
+
+    # authIdHasStructure_fs → {form_id: set of hal_struct_ids}
+    form_struct_map = parse_author_structures(doc)
 
     for position, name in enumerate(names):
         idhal = idhal_by_pos.get(position)
         hal_person_id = hal_person_id_by_pos.get(position)
+        form_id = form_id_by_pos.get(position)
 
-        hal_author_id = upsert_hal_author(cur, name, hal_person_id, idhal)
+        hal_author_id = upsert_hal_author(
+            cur, name, hal_person_id, idhal, form_id
+        )
         if not hal_author_id:
             continue
 
-        # Structures affiliées à cet auteur sur ce document
+        # Structures affiliées à cet auteur sur ce document (par form_id)
         hal_struct_ids = None
-        if hal_person_id and hal_person_id in person_struct_map:
-            hal_struct_ids = sorted(person_struct_map[hal_person_id])
+        if form_id and form_id in form_struct_map:
+            hal_struct_ids = sorted(form_struct_map[form_id])
 
         cur.execute("""
             INSERT INTO hal_authorships

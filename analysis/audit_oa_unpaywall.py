@@ -2,10 +2,8 @@
 Audit : compare le statut OA en base (principalement OpenAlex) avec Unpaywall.
 
 Usage:
-    python analysis/audit_oa_unpaywall.py [--limit N] [--apply]
-
-Sans --apply : génère un rapport CSV (analysis/oa_audit_report.csv) et un résumé.
-Avec --apply : écrase les statuts OA en base par ceux d'Unpaywall.
+    python analysis/audit_oa_unpaywall.py [--limit N]
+    python analysis/audit_oa_unpaywall.py --dry-run    # rapport CSV sans modifier la base
 """
 
 import sys, os, time, argparse, csv
@@ -49,8 +47,8 @@ def fetch_unpaywall(doi: str) -> str | None:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=0, help="Limiter le nombre de DOI")
-    parser.add_argument("--apply", action="store_true",
-                        help="Écraser les statuts OA en base par Unpaywall")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Rapport CSV uniquement, sans modifier la base")
     args = parser.parse_args()
 
     conn = psycopg2.connect(**DB)
@@ -103,7 +101,7 @@ def main():
                 matches += 1
             else:
                 divergences += 1
-                if args.apply:
+                if not args.dry_run:
                     cur.execute(
                         "UPDATE publications SET oa_status = %s::oa_type, "
                         "updated_at = now() WHERE id = %s",
@@ -118,7 +116,7 @@ def main():
                 "ok" if is_match else "DIFF",
             ])
 
-    if args.apply:
+    if not args.dry_run:
         conn.commit()
 
     conn.close()
@@ -128,7 +126,7 @@ def main():
     print(f"  Identiques       : {matches:>6d}  ({100*matches/total:.1f}%)")
     print(f"  Divergences      : {divergences:>6d}  ({100*divergences/total:.1f}%)")
     print(f"  Non trouvés      : {not_found:>6d}  ({100*not_found/total:.1f}%)")
-    if args.apply:
+    if not args.dry_run:
         print(f"  Mis à jour       : {updates:>6d}")
     print(f"\nRapport CSV : {report_path}")
 

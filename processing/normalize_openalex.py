@@ -21,13 +21,13 @@ import logging
 import os
 import re
 import sys
-import unicodedata
 
 import psycopg2
 from psycopg2.extras import Json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.normalize import normalize_text
 
 # ----- Logging -----
 logging.basicConfig(
@@ -86,17 +86,6 @@ OA_MAP = {
 # =============================================================
 # UTILITAIRES
 # =============================================================
-
-def normalize_text(text: str) -> str:
-    """Normalise un texte pour comparaison/dédoublonnage."""
-    if not text:
-        return ""
-    text = text.lower().strip()
-    text = unicodedata.normalize("NFKD", text)
-    text = text.encode("ascii", "ignore").decode("ascii")
-    text = re.sub(r"[^a-z0-9\s]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
 
 
 def clean_doi(doi: str | None) -> str | None:
@@ -327,7 +316,7 @@ def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
             ON CONFLICT (doi) DO UPDATE SET
                 journal_id = COALESCE(publications.journal_id, EXCLUDED.journal_id),
                 doc_type = CASE
-                    WHEN publications.doc_type IN ('other', 'unknown') AND EXCLUDED.doc_type NOT IN ('other', 'unknown')
+                    WHEN publications.doc_type = 'other' AND EXCLUDED.doc_type <> 'other'
                         THEN EXCLUDED.doc_type
                     ELSE COALESCE(publications.doc_type, EXCLUDED.doc_type)
                 END,

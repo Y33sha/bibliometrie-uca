@@ -249,17 +249,12 @@ def main():
                 cur.execute("""
                     UPDATE authorships a
                     SET publication_id = %s, updated_at = now()
-                    FROM hal_authorships has
-                    WHERE has.hal_document_id = %s
-                      AND has.hal_author_id IS NOT NULL
-                      AND a.publication_id = %s
-                      AND a.source_hal = TRUE
-                      AND a.person_id IN (
-                          SELECT ha.person_id FROM hal_authorships has2
-                          JOIN hal_authors ha ON ha.id = has2.hal_author_id
-                          WHERE has2.hal_document_id = %s AND ha.person_id IS NOT NULL
-                      )
-                """, (new_pub_id, hd_id, pub_id, hd_id))
+                    WHERE a.hal_authorship_id IN (
+                        SELECT has.id FROM hal_authorships has
+                        WHERE has.hal_document_id = %s
+                    )
+                    AND a.publication_id = %s
+                """, (new_pub_id, hd_id, pub_id))
 
             # Déplacer les openalex_documents dont le DOI match un hal_doc du groupe
             group_dois = [d["doc"]["doi"] for d in g if d["doc"]["doi"]]
@@ -275,17 +270,12 @@ def main():
                     cur.execute("""
                         UPDATE authorships a
                         SET publication_id = %s, updated_at = now()
-                        FROM openalex_authorships oas
-                        WHERE oas.openalex_document_id = %s
-                          AND oas.openalex_author_id IS NOT NULL
-                          AND a.publication_id = %s
-                          AND a.source_openalex = TRUE
-                          AND a.person_id IN (
-                              SELECT oa.person_id FROM openalex_authorships oas2
-                              JOIN openalex_authors oa ON oa.id = oas2.openalex_author_id
-                              WHERE oas2.openalex_document_id = %s AND oa.person_id IS NOT NULL
-                          )
-                    """, (new_pub_id, oa_row["id"], pub_id, oa_row["id"]))
+                        WHERE a.openalex_authorship_id IN (
+                            SELECT oas.id FROM openalex_authorships oas
+                            WHERE oas.openalex_document_id = %s
+                        )
+                        AND a.publication_id = %s
+                    """, (new_pub_id, oa_row["id"], pub_id))
 
             halids = [d["doc"]["halid"] for d in g]
             oa_moved = [r["openalex_id"] for r in moved_oa] if group_dois else []

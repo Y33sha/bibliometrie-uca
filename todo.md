@@ -11,12 +11,12 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [ ] Normalisation, peuplement des tables structures, auteurs, authorships, gestion des adresses, etc.
 
 ## OpenAlex
-* [ ] inclure publis affiliées CHU et INP dans le script d'import OpenAlex
+* [x] inclure publis affiliées CHU et INP dans le script d'import OpenAlex
 * [ ] re-fetch individuel des docts OpenAlex plafonnés à 100 authorships dans l'import automatique
 * [ ] re-fetch à partir des DOI HAL
 
 ## HAL
-* [ ] inclure collections HAL CHU-CLERMONTFERRAND et CLERMONT-AUVERGNE-INP
+* [x] inclure collections HAL CHU-CLERMONTFERRAND et CLERMONT-AUVERGNE-INP
 * [ ] fetch documents HAL référencés par OpenAlex mais absents des collections UCA
 * [ ] documents > 2000 auteurs: relancer le script pour peupler la table authorships
 * [ ] problème des documents où l'affiliation de l'authorship n'est pas résolue: cf https://hal.science/hal-04987032
@@ -37,30 +37,25 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 # Développement
 
 ## Signatures
-* [ ] problème des liens inexistants: il faudrait pouvoir requêter toutes les adresses pour trouver les faux négatifs (ex.: "CNRS-IRD-UCA")
 * [ ] page feedback: à mettre à jour pour tenir compte de la migration (script "relancer la détection": cassé, à réparer)
-* [ ] "sélectionner tout => confirmer" : vérifier que la migration n'a pas cassé la fonctionnalité
-* [ ] affichage des structures liées à une adresse: modifier la couleur selon statut "confirmé" (vert), à confirmer (jaune), rejeté (rouge et rayé)
-* [ ] validation des adresses: à mettre en place si pertinent
+* [ ] interface de repérage: filtres sur la base des autres structures reconnues
+* [ ] validation des adresses (forme correcte): à mettre en place si pertinent
 * [ ] publis sans adresses (HAL) => scraper les sites éditeurs pour trouver adresses?
+* [ ] supprimer formes de noms redondantes
 
 ## Personnes
-* [x] moissonner ORCID liés aux comptes HAL (processing/harvest_hal_orcids.py — 12125 ORCID récupérés)
-* [x] possibilité d'ajout manuel d'ORCID
-* [x] ORCID fautifs liés à OpenAlex: possibilité de rejeter
-* [x] admin/authorships: n'afficher que les publis avec authorship UCA
-* [x] organiser la page en onglets
-* [x] reconnaissance de noms moins stricte (noms composés, tirets, accents) pour la suggestion de matchings personnes-auteurs
-* [x] possibilité de fusionner
-* [x] publications: indiquer si auteur correspondant / premier auteur
-* [ ] gestion des formes de noms?
+* [x] moissonner ORCID liés aux comptes HAL (processing/harvest_hal_orcids.py — 12125 ORCID récupérés) => quelle place dans le pipeline?
 * [x] déduplication automatisée par labo (merge_lab_duplicates.py — homonymes + interversions nom/prénom)
+* [x] publications: indiquer si auteur correspondant / premier auteur
+* [x] permettre confirmation orcid
+* [ ] gestion des formes de noms?
+* [ ] correction des noms
 * [ ] ajouter IdRef?
 * [ ] ajouter quelques visus (%OA)
 * [ ] authorships OpenAlex pourries (ex. Pierre Mathieu): trouver un moyen de les déclarer inutilisables / ou cesser totalement d'utiliser les authorships OpenAlex? étudier les options
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis
-* [ ] permettre confirmation orcid
 * [ ] afficher quand compte HAL relié ou non à l'ORCID
+
 
 ## Structures
 * [x] créer page détails (laboratories/[id])
@@ -83,6 +78,7 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [ ] lien Publications -> Dashboard?
 * [ ] merge manuel + suggestion de candidats
 * [ ] pb des auteurs openalex liés à une personne mais non listés dans les auteurs d'une publi: http://172.22.130.105/bibliometrie/publications/12380
+* [ ] preprints en accès gold?
 
 ## Pages supplémentaires, étudier pertinence
 * [ ] sujets

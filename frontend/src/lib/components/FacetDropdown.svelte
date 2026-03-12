@@ -12,10 +12,11 @@
 		options: FacetOption[];
 		searchable?: boolean;
 		selected?: string[];
+		allLabel?: string;
 		onchange?: (selected: string[]) => void;
 	}
 
-	let { label, options, searchable = false, selected = $bindable([]), onchange }: Props = $props();
+	let { label, options, searchable = false, selected = $bindable([]), allLabel = 'Tous', onchange }: Props = $props();
 
 	let open = $state(false);
 	let filterText = $state('');
@@ -132,7 +133,7 @@
 			<div class="facet-options">
 				<label>
 					<input type="checkbox" checked={isAllSelected} onchange={toggleAll} />
-					<span style="font-weight:500">Tous</span>
+					<span style="font-weight:500">{allLabel}</span>
 				</label>
 				{#each filteredOptions as opt (opt.value)}
 					<label>

@@ -1,13 +1,15 @@
 """
-Peuple la table addresses à partir des raw_affiliation dans openalex_authorships.
+Peuple la table addresses à partir des raw_affiliation dans les authorships source.
 
 - Split les chaînes composites (séparateur " | ")
 - Déduplique les adresses
-- Crée les liens openalex_authorship_addresses
+- Crée les liens source_authorship_addresses
 
 Usage:
-    python populate_addresses.py              # tout traiter
-    python populate_addresses.py --stats      # stats uniquement
+    python populate_addresses.py                        # traiter toutes les sources
+    python populate_addresses.py --source openalex      # OpenAlex uniquement
+    python populate_addresses.py --source wos           # WoS uniquement
+    python populate_addresses.py --stats                # stats uniquement
 """
 
 import argparse
@@ -35,6 +37,20 @@ logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 5000
 
+# Configuration par source
+SOURCES = {
+    "openalex": {
+        "authorship_table": "openalex_authorships",
+        "link_table": "openalex_authorship_addresses",
+        "fk_column": "openalex_authorship_id",
+    },
+    "wos": {
+        "authorship_table": "wos_authorships",
+        "link_table": "wos_authorship_addresses",
+        "fk_column": "wos_authorship_id",
+    },
+}
+
 
 def normalize_text(text: str) -> str:
     """Normalise une adresse pour la déduplication."""
@@ -51,48 +67,46 @@ def show_stats(cur):
     total_addr = cur.fetchone()[0]
     cur.execute("SELECT COUNT(DISTINCT address_id) FROM address_structures WHERE is_confirmed IS NOT NULL")
     reviewed = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM openalex_authorship_addresses")
-    links = cur.fetchone()[0]
     cur.execute("SELECT COUNT(*) FROM address_structures")
     affils = cur.fetchone()[0]
 
     logger.info(f"\n--- Statistiques addresses ---")
     logger.info(f"  Adresses distinctes              : {total_addr}")
     logger.info(f"  Revues (non pending)             : {reviewed}")
-    logger.info(f"  Liens authorship↔address         : {links}")
     logger.info(f"  Affiliations (address_structures) : {affils}")
 
+    for name, cfg in SOURCES.items():
+        cur.execute(f"SELECT COUNT(*) FROM {cfg['link_table']}")
+        links = cur.fetchone()[0]
+        logger.info(f"  Liens {name:10s} ↔ address    : {links}")
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--stats", action="store_true")
-    args = parser.parse_args()
 
-    conn = get_connection()
-    conn.autocommit = False
-    cur = conn.cursor()
-
-    if args.stats:
-        show_stats(cur)
-        conn.close()
-        return
+def process_source(conn, cur, source_name: str):
+    """Traite une source : extraction, insertion, liaison."""
+    cfg = SOURCES[source_name]
+    table = cfg["authorship_table"]
+    link_table = cfg["link_table"]
+    fk_col = cfg["fk_column"]
 
     t_start = time.perf_counter()
 
-    # ─── Étape 1 : extraire les raw_affiliation depuis openalex_authorships ───
-    logger.info("Extraction des raw_affiliation depuis openalex_authorships...")
+    # ─── Étape 1 : extraire les raw_affiliation ───
+    logger.info(f"[{source_name}] Extraction des raw_affiliation depuis {table}...")
 
-    cur.execute("""
+    cur.execute(f"""
         SELECT id, raw_affiliation
-        FROM openalex_authorships
+        FROM {table}
         WHERE raw_affiliation IS NOT NULL
           AND raw_affiliation != ''
     """)
     rows = cur.fetchall()
-    logger.info(f"  {len(rows)} lignes openalex_authorships avec affiliation")
+    logger.info(f"  {len(rows)} lignes avec affiliation")
+
+    if not rows:
+        logger.info(f"  Rien à traiter pour {source_name}")
+        return
 
     # Collecter toutes les adresses individuelles et leurs liens
-    # addr_text → set of openalex_authorship_ids
     addr_to_as_ids: dict[str, set[int]] = {}
     for as_id, raw in rows:
         parts = raw.split(" | ")
@@ -107,11 +121,10 @@ def main():
     logger.info(f"  {len(addr_to_as_ids)} adresses distinctes après split")
 
     # ─── Étape 2 : insérer les adresses dans la table ───
-    logger.info("Insertion des adresses...")
+    logger.info(f"[{source_name}] Insertion des adresses...")
 
     inserted = 0
     existing = 0
-    # Cache addr_text → address_id
     addr_id_cache: dict[str, int] = {}
 
     addr_items = list(addr_to_as_ids.items())
@@ -153,8 +166,8 @@ def main():
 
     logger.info(f"  Insérées : {inserted}, déjà existantes : {existing}")
 
-    # ─── Étape 3 : créer les liens openalex_authorship_addresses ───
-    logger.info("Création des liens openalex_authorship ↔ address...")
+    # ─── Étape 3 : créer les liens authorship ↔ address ───
+    logger.info(f"[{source_name}] Création des liens {link_table}...")
 
     total_links = 0
     link_batch = []
@@ -168,7 +181,7 @@ def main():
             link_batch.append((as_id, addr_id))
 
             if len(link_batch) >= BATCH_SIZE:
-                _insert_links(cur, link_batch)
+                _insert_links(cur, link_batch, link_table, fk_col)
                 total_links += len(link_batch)
                 link_batch = []
                 conn.commit()
@@ -176,31 +189,81 @@ def main():
                     logger.info(f"  {total_links} liens créés...")
 
     if link_batch:
-        _insert_links(cur, link_batch)
+        _insert_links(cur, link_batch, link_table, fk_col)
         total_links += len(link_batch)
         conn.commit()
 
     elapsed = time.perf_counter() - t_start
-    logger.info(f"\n=== Terminé en {elapsed:.1f}s ===")
+    logger.info(f"[{source_name}] Terminé en {elapsed:.1f}s")
     logger.info(f"  Adresses : {inserted} nouvelles, {existing} existantes")
     logger.info(f"  Liens    : {total_links}")
 
-    show_stats(cur)
-    conn.close()
 
-
-def _insert_links(cur, batch):
+def _insert_links(cur, batch, link_table, fk_col):
     """Insert batch de liens en ignorant les doublons."""
     from psycopg2.extras import execute_values
     execute_values(
         cur,
-        """
-        INSERT INTO openalex_authorship_addresses (openalex_authorship_id, address_id)
+        f"""
+        INSERT INTO {link_table} ({fk_col}, address_id)
         VALUES %s
-        ON CONFLICT (openalex_authorship_id, address_id) DO NOTHING
+        ON CONFLICT ({fk_col}, address_id) DO NOTHING
         """,
         batch,
     )
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--stats", action="store_true")
+    parser.add_argument("--source", choices=list(SOURCES.keys()),
+                        help="Source spécifique (sinon toutes)")
+    args = parser.parse_args()
+
+    conn = get_connection()
+    conn.autocommit = False
+    cur = conn.cursor()
+
+    if args.stats:
+        show_stats(cur)
+        conn.close()
+        return
+
+    sources = [args.source] if args.source else list(SOURCES.keys())
+
+    for source_name in sources:
+        process_source(conn, cur, source_name)
+
+    # Recalculer pub_count matérialisé
+    logger.info("Recalcul des pub_count...")
+    cur.execute("""
+        UPDATE addresses a
+        SET pub_count = COALESCE(sub.cnt, 0)
+        FROM (
+            SELECT address_id, COUNT(DISTINCT publication_id) AS cnt
+            FROM (
+                SELECT oaa.address_id, od.publication_id
+                FROM openalex_authorship_addresses oaa
+                JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
+                JOIN openalex_documents od ON od.id = oas.openalex_document_id
+                WHERE od.publication_id IS NOT NULL
+                UNION
+                SELECT waa.address_id, wd.publication_id
+                FROM wos_authorship_addresses waa
+                JOIN wos_authorships was ON was.id = waa.wos_authorship_id
+                JOIN wos_documents wd ON wd.id = was.wos_document_id
+                WHERE wd.publication_id IS NOT NULL
+            ) t
+            GROUP BY address_id
+        ) sub
+        WHERE a.id = sub.address_id AND a.pub_count IS DISTINCT FROM sub.cnt
+    """)
+    conn.commit()
+    logger.info(f"  {cur.rowcount} pub_count mis à jour")
+
+    logger.info("\n=== Résumé final ===")
+    show_stats(cur)
+    conn.close()
 
 
 if __name__ == "__main__":

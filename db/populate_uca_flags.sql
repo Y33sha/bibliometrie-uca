@@ -2,9 +2,14 @@
 -- Peuplement is_uca et structure_ids
 -- =============================================================
 -- À exécuter APRÈS migration_016.
--- Ces requêtes seront intégrées dans les scripts de traitement
--- (normalize_hal.py, resolve_addresses.py, etc.) pour être
--- reproductibles à chaque nouvelle extraction.
+--
+-- Deux périmètres :
+--   • uca_perimeter (restreint) : UCA + labos tutellés → sert pour is_uca
+--   • uca_perimeter_wide (large) : restreint + partenaires (CHU, INP…)
+--     → sert pour structure_ids
+--
+-- is_uca = TRUE  ↔  au moins une structure du périmètre restreint détectée
+-- structure_ids   ↔  toutes les structures du périmètre large détectées
 -- =============================================================
 
 
@@ -31,7 +36,6 @@ WHERE has.id = mapped.id;
 -- Vérification :
 -- SELECT COUNT(*) FROM hal_authorships WHERE structure_ids IS NOT NULL;
 -- SELECT COUNT(*) FROM hal_authorships WHERE is_uca = TRUE;
--- → structure_ids devrait couvrir une bonne partie des is_uca = TRUE
 
 
 -- #############################################################
@@ -66,17 +70,18 @@ WHERE has.structure_ids IS NOT NULL
 
 
 -- #############################################################
--- ÉTAPE 3 : OpenAlex — calculer is_uca via la chaîne d'adresses
+-- ÉTAPE 3 : OpenAlex — calculer is_uca + structure_ids
 -- #############################################################
 -- Chemin : openalex_authorships
 --        → openalex_authorship_addresses
 --        → addresses
 --        → address_structures
---        → structures dans le périmètre UCA
+--        → structures dans le périmètre
 
--- D'abord remettre à FALSE
-UPDATE openalex_authorships SET is_uca = FALSE;
+-- D'abord remettre à zéro
+UPDATE openalex_authorships SET is_uca = FALSE, structure_ids = NULL;
 
+-- is_uca via périmètre restreint
 WITH uca_perimeter AS (
     SELECT s.id FROM structures s WHERE s.code = 'uca'
     UNION
@@ -94,7 +99,7 @@ WHERE EXISTS (
       AND ast.structure_id IN (SELECT id FROM uca_perimeter)
 );
 
--- Optionnel : remplir aussi structure_ids pour OpenAlex
+-- structure_ids via périmètre large (restreint + partenaires)
 WITH uca_perimeter AS (
     SELECT s.id FROM structures s WHERE s.code = 'uca'
     UNION
@@ -102,12 +107,19 @@ WITH uca_perimeter AS (
     JOIN structures s ON s.id = sr.parent_id
     WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
 ),
+uca_perimeter_wide AS (
+    SELECT id FROM uca_perimeter
+    UNION
+    SELECT sr.parent_id FROM structure_relations sr
+    JOIN structures s ON s.id = sr.child_id
+    WHERE s.code = 'uca' AND sr.relation_type = 'est_partenaire_de'
+),
 oas_structs AS (
     SELECT oaa.openalex_authorship_id,
            array_agg(DISTINCT ast.structure_id) AS struct_ids
     FROM openalex_authorship_addresses oaa
     JOIN address_structures ast ON ast.address_id = oaa.address_id
-    WHERE ast.structure_id IN (SELECT id FROM uca_perimeter)
+    WHERE ast.structure_id IN (SELECT id FROM uca_perimeter_wide)
     GROUP BY oaa.openalex_authorship_id
 )
 UPDATE openalex_authorships oas
@@ -121,10 +133,76 @@ WHERE oas.id = os.openalex_authorship_id;
 
 
 -- #############################################################
+-- ÉTAPE 3b : WoS — calculer is_uca + structure_ids
+-- #############################################################
+-- Chemin : wos_authorships
+--        → wos_authorship_addresses
+--        → addresses
+--        → address_structures
+--        → structures dans le périmètre
+
+-- D'abord remettre à zéro
+UPDATE wos_authorships SET is_uca = FALSE, structure_ids = NULL;
+
+-- is_uca via périmètre restreint
+WITH uca_perimeter AS (
+    SELECT s.id FROM structures s WHERE s.code = 'uca'
+    UNION
+    SELECT sr.child_id FROM structure_relations sr
+    JOIN structures s ON s.id = sr.parent_id
+    WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
+)
+UPDATE wos_authorships was
+SET is_uca = TRUE
+WHERE EXISTS (
+    SELECT 1
+    FROM wos_authorship_addresses waa
+    JOIN address_structures ast ON ast.address_id = waa.address_id
+    WHERE waa.wos_authorship_id = was.id
+      AND ast.structure_id IN (SELECT id FROM uca_perimeter)
+);
+
+-- structure_ids via périmètre large
+WITH uca_perimeter AS (
+    SELECT s.id FROM structures s WHERE s.code = 'uca'
+    UNION
+    SELECT sr.child_id FROM structure_relations sr
+    JOIN structures s ON s.id = sr.parent_id
+    WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
+),
+uca_perimeter_wide AS (
+    SELECT id FROM uca_perimeter
+    UNION
+    SELECT sr.parent_id FROM structure_relations sr
+    JOIN structures s ON s.id = sr.child_id
+    WHERE s.code = 'uca' AND sr.relation_type = 'est_partenaire_de'
+),
+was_structs AS (
+    SELECT waa.wos_authorship_id,
+           array_agg(DISTINCT ast.structure_id) AS struct_ids
+    FROM wos_authorship_addresses waa
+    JOIN address_structures ast ON ast.address_id = waa.address_id
+    WHERE ast.structure_id IN (SELECT id FROM uca_perimeter_wide)
+    GROUP BY waa.wos_authorship_id
+)
+UPDATE wos_authorships was
+SET structure_ids = ws.struct_ids
+FROM was_structs ws
+WHERE was.id = ws.wos_authorship_id;
+
+-- Vérification :
+-- SELECT COUNT(*) FROM wos_authorships WHERE is_uca = TRUE;
+-- SELECT COUNT(*) FROM wos_authorships WHERE structure_ids IS NOT NULL;
+
+
+-- #############################################################
 -- ÉTAPE 4 : Propager vers authorships (table de vérité)
 -- #############################################################
 -- Le matching se fait par (publication_id, person_id).
 -- Seuls les authorships avec person_id résolu sont traités.
+--
+-- structure_ids = périmètre large (toutes structures pertinentes)
+-- is_uca = TRUE si au moins une structure du périmètre restreint
 
 -- D'abord reset
 UPDATE authorships SET is_uca = FALSE, structure_ids = NULL;
@@ -137,55 +215,86 @@ WITH uca_perimeter AS (
     JOIN structures s ON s.id = sr.parent_id
     WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
 ),
-hal_uca AS (
+hal_data AS (
     SELECT hd.publication_id,
            ha.person_id,
-           array_agg(DISTINCT sid) FILTER (
-               WHERE sid IN (SELECT id FROM uca_perimeter)
-           ) AS uca_struct_ids
+           array_agg(DISTINCT sid) AS all_struct_ids,
+           bool_or(sid IN (SELECT id FROM uca_perimeter)) AS has_uca
     FROM hal_authorships has
     JOIN hal_documents hd ON hd.id = has.hal_document_id
     JOIN hal_authors ha ON ha.id = has.hal_author_id,
     LATERAL unnest(has.structure_ids) AS sid
-    WHERE has.is_uca = TRUE
-      AND has.structure_ids IS NOT NULL
+    WHERE has.structure_ids IS NOT NULL
       AND hd.publication_id IS NOT NULL
       AND ha.person_id IS NOT NULL
     GROUP BY hd.publication_id, ha.person_id
 )
 UPDATE authorships a
-SET structure_ids = hu.uca_struct_ids,
-    is_uca = TRUE,
+SET structure_ids = hd.all_struct_ids,
+    is_uca = hd.has_uca,
     updated_at = now()
-FROM hal_uca hu
-WHERE a.publication_id = hu.publication_id
-  AND a.person_id = hu.person_id
+FROM hal_data hd
+WHERE a.publication_id = hd.publication_id
+  AND a.person_id = hd.person_id
   AND a.person_id IS NOT NULL;
 
 -- 4b. Depuis OpenAlex
 -- Merge les structure_ids OpenAlex avec ceux déjà présents (HAL)
-WITH oa_uca AS (
+WITH uca_perimeter AS (
+    SELECT s.id FROM structures s WHERE s.code = 'uca'
+    UNION
+    SELECT sr.child_id FROM structure_relations sr
+    JOIN structures s ON s.id = sr.parent_id
+    WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
+),
+oa_data AS (
     SELECT od.publication_id,
            oa.person_id,
-           oas.structure_ids AS uca_struct_ids
+           oas.structure_ids AS struct_ids,
+           oas.is_uca AS src_is_uca
     FROM openalex_authorships oas
     JOIN openalex_documents od ON od.id = oas.openalex_document_id
     JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-    WHERE oas.is_uca = TRUE
-      AND oas.structure_ids IS NOT NULL
+    WHERE oas.structure_ids IS NOT NULL
       AND od.publication_id IS NOT NULL
       AND oa.person_id IS NOT NULL
 )
 UPDATE authorships a
 SET structure_ids = (
         SELECT array_agg(DISTINCT x)
-        FROM unnest(COALESCE(a.structure_ids, '{}') || ou.uca_struct_ids) AS x
+        FROM unnest(COALESCE(a.structure_ids, '{}') || od.struct_ids) AS x
     ),
-    is_uca = TRUE,
+    is_uca = a.is_uca OR od.src_is_uca,
     updated_at = now()
-FROM oa_uca ou
-WHERE a.publication_id = ou.publication_id
-  AND a.person_id = ou.person_id
+FROM oa_data od
+WHERE a.publication_id = od.publication_id
+  AND a.person_id = od.person_id
+  AND a.person_id IS NOT NULL;
+
+-- 4c. Depuis WoS
+-- Merge les structure_ids WoS avec ceux déjà présents (HAL + OpenAlex)
+WITH wos_data AS (
+    SELECT wd.publication_id,
+           wa.person_id,
+           was.structure_ids AS struct_ids,
+           was.is_uca AS src_is_uca
+    FROM wos_authorships was
+    JOIN wos_documents wd ON wd.id = was.wos_document_id
+    JOIN wos_authors wa ON wa.id = was.wos_author_id
+    WHERE was.structure_ids IS NOT NULL
+      AND wd.publication_id IS NOT NULL
+      AND wa.person_id IS NOT NULL
+)
+UPDATE authorships a
+SET structure_ids = (
+        SELECT array_agg(DISTINCT x)
+        FROM unnest(COALESCE(a.structure_ids, '{}') || wd.struct_ids) AS x
+    ),
+    is_uca = a.is_uca OR wd.src_is_uca,
+    updated_at = now()
+FROM wos_data wd
+WHERE a.publication_id = wd.publication_id
+  AND a.person_id = wd.person_id
   AND a.person_id IS NOT NULL;
 
 -- Vérification finale :

@@ -21,6 +21,7 @@
 		publisher_name: string | null;
 		hal_id: string | null;
 		openalex_id: string | null;
+		wos_id: string | null;
 		labs: string | null;
 	}
 
@@ -84,6 +85,7 @@
 	// Facet options (dynamic)
 	let docTypeOptions: FacetOption[] = $state([]);
 	let oaOptions: FacetOption[] = $state([]);
+	let sourceCounts: Record<string, number> = $state({});
 
 	// Sort display
 	const yearSortArrow = $derived(currentSort === 'year_asc' ? '↑' : '↓');
@@ -143,6 +145,7 @@
 			no_lab_count: number;
 			doc_types: { value: string; count: number }[];
 			oa_statuses: { value: string; count: number }[];
+			source_counts: Record<string, number>;
 		}>('/api/publications/facets?' + params);
 		yearOptions = data.years.map((y) => ({
 			value: String(y.value), text: String(y.value), count: y.count
@@ -159,6 +162,7 @@
 		oaOptions = data.oa_statuses.map((o) => ({
 			value: o.value, text: oaLabelsMap[o.value] || o.value, count: o.count
 		}));
+		sourceCounts = data.source_counts || {};
 	}
 
 	async function loadPublications() {
@@ -276,7 +280,7 @@
 	<FacetDropdown label="Laboratoires" options={labOptions} searchable bind:selected={selectedLabs} onchange={onLabChange} />
 	<FacetDropdown label="Types" options={docTypeOptions} bind:selected={selectedDocTypes} onchange={onFilterChange} />
 	<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
-	<SourceFilterToggle bind:states={sourceStates} onchange={onFilterChange} />
+	<SourceFilterToggle bind:states={sourceStates} counts={sourceCounts} onchange={onFilterChange} />
 	<span class="count">{total} publication{total > 1 ? 's' : ''}</span>
 	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 </div>
@@ -330,6 +334,13 @@
 						{#if p.openalex_id}
 							<a href="https://openalex.org/{p.openalex_id}" target="_blank" rel="noopener" class="source-tag source-oa" title="OpenAlex: {p.openalex_id}">
 								<img src="https://raw.githubusercontent.com/ourresearch/openalex-gui/refs/heads/master/public/favicon.png" alt="OA" />
+							</a>
+						{:else}
+							<span class="source-tag source-placeholder"></span>
+						{/if}
+						{#if p.wos_id}
+							<a href="https://www.webofscience.com/wos/woscc/full-record/{p.wos_id}" target="_blank" rel="noopener" class="source-tag source-wos" title="WoS: {p.wos_id}">
+								<img src="https://www.webofscience.com/favicon.ico" alt="WoS" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
@@ -464,6 +475,9 @@
 	.source-hal:hover { background: #d0e3f4; }
 	.source-oa { background: #fef3e0; }
 	.source-oa:hover { background: #fde8c8; }
+	.source-wos { background: #e8e0f8; }
+	.source-wos:hover { background: #d8c8f4; }
+	.wos-label { font-size: 11px; font-weight: 700; color: #5a3d8a; line-height: 14px; }
 	.source-doi { background: #f0f0f0; }
 	.source-doi:hover { background: #e0e0e0; }
 	.source-placeholder { visibility: hidden; }

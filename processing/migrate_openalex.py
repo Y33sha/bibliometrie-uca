@@ -20,15 +20,14 @@ Usage:
 import argparse
 import logging
 import os
-import re
 import sys
 import time
-import unicodedata
 
 import psycopg2
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.normalize import normalize_text
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,16 +45,6 @@ logger = logging.getLogger(__name__)
 # =============================================================
 # UTILITAIRES
 # =============================================================
-
-def normalize_text(text: str) -> str:
-    if not text:
-        return ""
-    text = text.lower().strip()
-    text = unicodedata.normalize("NFKD", text)
-    text = text.encode("ascii", "ignore").decode("ascii")
-    text = re.sub(r"[^a-z0-9\s]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
 
 
 def clean_doi(doi: str | None) -> str | None:

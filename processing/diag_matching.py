@@ -4,21 +4,11 @@ Diagnostic : teste le matching sur quelques adresses connues.
 Usage: python processing/diag_matching.py
 """
 
-import os, sys, re, unicodedata
+import os, sys, re
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-
-
-def normalize(text):
-    if not text:
-        return ""
-    text = text.lower().strip()
-    text = unicodedata.normalize("NFKD", text)
-    text = text.encode("ascii", "ignore").decode("ascii")
-    text = re.sub(r"[^a-z0-9\s]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+from utils.normalize import normalize_text as normalize
 
 
 def match_form(form_text, form_normalized, is_regex, text_norm):

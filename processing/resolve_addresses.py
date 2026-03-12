@@ -23,10 +23,10 @@ import os
 import re
 import sys
 import time
-import unicodedata
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.normalize import normalize_text as normalize
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,22 +42,6 @@ logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 1000
 
-
-# ─── Normalisation ───────────────────────────────────────────────
-
-def normalize(text):
-    """Normalise pour le matching : minuscules, sans accents, sans ponctuation.
-
-    DOIT être identique à la normalisation utilisée dans seed_structures.py
-    pour form_normalized."""
-    if not text:
-        return ""
-    text = text.lower().strip()
-    text = unicodedata.normalize("NFKD", text)
-    text = text.encode("ascii", "ignore").decode("ascii")
-    text = re.sub(r"[^a-z0-9\s]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
 
 
 # ─── Chargement des données ──────────────────────────────────────
@@ -311,13 +295,9 @@ def main():
     logger.info(f"  {len(tutelles_map)} structures avec tutelles")
     logger.info(f"  {len(uca_perimeter)} structures dans le périmètre UCA")
 
-    # Adresses sans détection auto
+    # Toutes les adresses (l'upsert ne touche pas aux liens déjà confirmés/rejetés)
     cur.execute("""
         SELECT a.id, a.raw_text FROM addresses a
-        WHERE NOT EXISTS (
-            SELECT 1 FROM address_structures ast
-            WHERE ast.address_id = a.id AND ast.matched_form_id IS NOT NULL
-        )
         ORDER BY a.id
     """)
     rows = cur.fetchall()
@@ -343,6 +323,8 @@ def process_addresses(cur, conn, rows, forms, forms_by_structure, tutelles_map,
     uca_count = 0
     affil_count = 0
 
+    removed_count = 0
+
     for addr_id, raw_text in rows:
         text_norm = normalize(raw_text)
         matches = resolve_address(text_norm, forms, forms_by_structure, tutelles_map)
@@ -351,7 +333,38 @@ def process_addresses(cur, conn, rows, forms, forms_by_structure, tutelles_map,
         if is_uca:
             uca_count += 1
 
-        # Insérer les structures détectées
+        detected_structure_ids = {sid for sid, _ in matches}
+
+        # Liens auto-détectés obsolètes (structure plus détectée par le script)
+        if detected_structure_ids:
+            obsolete_condition = """
+                address_id = %s
+                AND matched_form_id IS NOT NULL
+                AND structure_id != ALL(%s)
+            """
+            obsolete_params = (addr_id, list(detected_structure_ids))
+        else:
+            obsolete_condition = """
+                address_id = %s
+                AND matched_form_id IS NOT NULL
+            """
+            obsolete_params = (addr_id,)
+
+        # Non confirmés : supprimer
+        cur.execute(f"""
+            DELETE FROM address_structures
+            WHERE {obsolete_condition} AND is_confirmed IS NULL
+        """, obsolete_params)
+        removed_count += cur.rowcount
+
+        # Confirmés/rejetés : retirer le flag de détection auto
+        cur.execute(f"""
+            UPDATE address_structures
+            SET matched_form_id = NULL
+            WHERE {obsolete_condition} AND is_confirmed IS NOT NULL
+        """, obsolete_params)
+
+        # Insérer/mettre à jour les structures détectées
         for structure_id, form_id in matches:
             affil_count += 1
             cur.execute("""
@@ -360,8 +373,6 @@ def process_addresses(cur, conn, rows, forms, forms_by_structure, tutelles_map,
                 VALUES (%s, %s, %s)
                 ON CONFLICT (address_id, structure_id)
                     DO UPDATE SET matched_form_id = EXCLUDED.matched_form_id
-                    WHERE address_structures.matched_form_id IS NULL
-                      AND address_structures.is_confirmed IS NULL
             """, (addr_id, structure_id, form_id))
 
         processed += 1
@@ -371,7 +382,8 @@ def process_addresses(cur, conn, rows, forms, forms_by_structure, tutelles_map,
             rate = processed / elapsed
             logger.info(
                 f"  {processed}/{total} "
-                f"({uca_count} UCA, {affil_count} affiliations) "
+                f"({uca_count} UCA, {affil_count} affiliations, "
+                f"{removed_count} obsolètes supprimés) "
                 f"— {rate:.0f} addr/s"
             )
 
@@ -380,9 +392,10 @@ def process_addresses(cur, conn, rows, forms, forms_by_structure, tutelles_map,
     elapsed = time.perf_counter() - t_start
     if total > 0:
         logger.info(f"\n=== Terminé en {elapsed:.1f}s ===")
-        logger.info(f"  Adresses traitées : {processed}")
-        logger.info(f"  UCA               : {uca_count} ({100*uca_count/processed:.1f}%)")
-        logger.info(f"  Affiliations      : {affil_count}")
+        logger.info(f"  Adresses traitées    : {processed}")
+        logger.info(f"  UCA                  : {uca_count} ({100*uca_count/processed:.1f}%)")
+        logger.info(f"  Affiliations créées  : {affil_count}")
+        logger.info(f"  Obsolètes supprimés  : {removed_count}")
 
     return uca_count, affil_count
 

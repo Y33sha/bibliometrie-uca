@@ -16,25 +16,15 @@ import argparse
 import logging
 import os
 import sys
-import unicodedata
-import re
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from psycopg2.extras import RealDictCursor
+from utils.normalize import normalize_text as normalize
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-
-def normalize(name):
-    """Normalise un nom pour comparaison souple."""
-    if not name:
-        return ""
-    text = unicodedata.normalize("NFKD", name.lower().strip())
-    text = text.encode("ascii", "ignore").decode("ascii")
-    text = re.sub(r"[^a-z0-9\s]", "", text)
-    return re.sub(r"\s+", " ", text).strip()
 
 
 # =================================================================
@@ -112,7 +102,7 @@ def do_match(conn):
     # Nos structures
     cur.execute("""
         SELECT s.id, s.code, s.name, s.acronym, s.type::text,
-               s.hal_collection, s.laboratory_id,
+               s.hal_collection,
                EXISTS (SELECT 1 FROM hal_structures hs WHERE hs.structure_id = s.id) AS has_hal_link
         FROM structures s
         ORDER BY s.type, s.name

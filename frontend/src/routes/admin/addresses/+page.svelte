@@ -16,6 +16,8 @@
 	}
 
 	interface Stats {
+		total: number;
+		detected: number;
 		pending: number;
 		rejected: number;
 		confirmed: number;
@@ -24,6 +26,8 @@
 	interface AddressStructure {
 		acronym: string | null;
 		name: string;
+		is_confirmed: boolean | null;
+		is_detected: boolean;
 	}
 
 	interface Address {
@@ -31,6 +35,7 @@
 		raw_text: string;
 		pub_count: number;
 		is_confirmed: boolean | null;
+		is_detected: boolean;
 		structures: AddressStructure[];
 	}
 
@@ -39,6 +44,7 @@
 		pages: number;
 		page: number;
 		addresses: Address[];
+		requires_search?: boolean;
 	}
 
 	interface Publication {
@@ -48,7 +54,7 @@
 		author_name: string | null;
 		journal_title: string | null;
 		doi: string | null;
-		openalex_id: string | null;
+		source_id: string | null;
 	}
 
 	interface PublicationsResponse {
@@ -70,20 +76,49 @@
 	};
 	const ALLOWED_TYPES = Object.keys(TYPE_LABELS);
 
+	// ---- URL params helpers ----
+
+	function readUrlParams(): { detected: string; validation: string; search: string; searchMode: string; p: number; structureId: number | null } {
+		const sp = new URLSearchParams(window.location.search);
+		return {
+			detected: sp.get('detected') || 'yes',
+			validation: sp.get('validation') || 'pending',
+			search: sp.get('search') || '',
+			searchMode: sp.get('search_mode') || 'contains',
+			p: parseInt(sp.get('page') || '1') || 1,
+			structureId: sp.has('structure_id') ? parseInt(sp.get('structure_id')!) || null : null,
+		};
+	}
+
+	function syncUrl(): void {
+		const sp = new URLSearchParams();
+		if (currentStructureId) sp.set('structure_id', String(currentStructureId));
+		if (currentDetected !== 'yes') sp.set('detected', currentDetected);
+		if (currentValidation !== 'pending') sp.set('validation', currentValidation);
+		if (currentSearch) sp.set('search', currentSearch);
+		if (currentSearchMode !== 'contains') sp.set('search_mode', currentSearchMode);
+		if (currentPage > 1) sp.set('page', String(currentPage));
+		const qs = sp.toString();
+		const newUrl = window.location.pathname + (qs ? '?' + qs : '');
+		history.replaceState({}, '', newUrl);
+	}
+
 	// ---- Reactive state ----
 
 	let currentPage = $state(1);
-	let currentStatus = $state('pending');
+	let currentDetected = $state('yes');
+	let currentValidation = $state('pending');
 	let currentSearch = $state('');
 	let currentSearchMode = $state('contains');
 	let currentStructureId = $state<number | null>(null);
 
 	let structures = $state<GroupedStructures>({});
-	let stats = $state<Stats>({ pending: 0, rejected: 0, confirmed: 0 });
+	let stats = $state<Stats>({ total: 0, detected: 0, pending: 0, rejected: 0, confirmed: 0 });
 	let addresses = $state<Address[]>([]);
 	let totalAddresses = $state(0);
 	let totalPages = $state(0);
 	let loading = $state(true);
+	let requiresSearch = $state(false);
 
 	let selectedIds = $state<Set<number>>(new Set());
 	let selectAll = $state(false);
@@ -120,7 +155,6 @@
 		if (ucaId) {
 			currentStructureId = ucaId;
 		} else {
-			// Pick the first available structure
 			for (const type of ALLOWED_TYPES) {
 				if (grouped[type]?.length) {
 					currentStructureId = grouped[type][0].id;
@@ -137,21 +171,25 @@
 	}
 
 	async function loadAddresses(): Promise<void> {
+		syncUrl();
 		loading = true;
 		const params = new URLSearchParams({
 			page: String(currentPage),
 			per_page: '200',
-			status: currentStatus,
+			detected: currentDetected,
+			validation: currentValidation,
 			search: currentSearch,
 			search_mode: currentSearchMode
 		});
 		if (currentStructureId) params.set('structure_id', String(currentStructureId));
 
 		const data = await api<AddressesResponse>(`/api/addresses?${params}`);
+		requiresSearch = data.requires_search ?? false;
 		addresses = data.addresses;
 		totalAddresses = data.total;
 		totalPages = data.pages;
 		selectAll = false;
+		selectedIds = new Set();
 		loading = false;
 	}
 
@@ -176,13 +214,31 @@
 	}
 
 	async function reviewAddr(addrId: number, isConfirmed: boolean | null): Promise<void> {
-		await fetch(`${base}/api/addresses/${addrId}/review`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ structure_id: currentStructureId, is_confirmed: isConfirmed })
-		});
-		loadStats();
-		loadAddresses();
+		try {
+			const resp = await fetch(`${base}/api/addresses/${addrId}/review`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ structure_id: currentStructureId, is_confirmed: isConfirmed })
+			});
+			if (!resp.ok) {
+				const err = await resp.json().catch(() => ({}));
+				alert(`Erreur ${resp.status} : ${err.detail || resp.statusText}`);
+				return;
+			}
+			const result = await resp.json();
+
+			// Mise à jour locale : mettre à jour puis retirer si ne correspond plus au filtre
+			const updated = { ...addresses.find((a) => a.id === addrId)!, is_confirmed: result.is_confirmed, is_detected: result.is_detected, structures: result.structures };
+			const keep = matchesFilter(updated);
+			addresses = keep
+				? addresses.map((a) => (a.id === addrId ? updated : a))
+				: addresses.filter((a) => a.id !== addrId);
+			if (!keep) totalAddresses--;
+			loadStats();
+		} catch (e: unknown) {
+			const msg = e instanceof Error ? e.message : String(e);
+			alert('Erreur réseau : ' + msg);
+		}
 	}
 
 	async function batchReview(isConfirmed: boolean | null): Promise<void> {
@@ -243,8 +299,7 @@
 		}
 	}
 
-	function onStatusChange(e: Event): void {
-		currentStatus = (e.target as HTMLSelectElement).value;
+	function onFilterChange(): void {
 		currentPage = 1;
 		loadAddresses();
 	}
@@ -262,16 +317,40 @@
 		mainPanel?.scrollTo(0, 0);
 	}
 
+	function matchesFilter(addr: Address): boolean {
+		if (currentDetected === 'yes' && !addr.is_detected) return false;
+		if (currentDetected === 'no' && addr.is_detected) return false;
+		if (currentValidation === 'pending' && addr.is_confirmed !== null) return false;
+		if (currentValidation === 'confirmed' && addr.is_confirmed !== true) return false;
+		if (currentValidation === 'rejected' && addr.is_confirmed !== false) return false;
+		return true;
+	}
+
 	function cardClass(addr: Address): string {
 		if (addr.is_confirmed === false) return 'addr-card reviewed-rejected';
 		if (addr.is_confirmed === true) return 'addr-card reviewed-confirmed';
 		return 'addr-card';
 	}
 
+	function structTagClass(s: AddressStructure): string {
+		if (s.is_confirmed === true) return 'struct-tag struct-confirmed';
+		if (s.is_confirmed === false) return 'struct-tag struct-rejected';
+		return 'struct-tag struct-pending';
+	}
+
 	// ---- Init ----
 
 	onMount(() => {
+		const url = readUrlParams();
+		currentDetected = url.detected;
+		currentValidation = url.validation;
+		currentSearch = url.search;
+		currentSearchMode = url.searchMode;
+		currentPage = url.p;
+
 		loadStructures().then(() => {
+			// Si l'URL contenait un structure_id valide, l'utiliser
+			if (url.structureId) currentStructureId = url.structureId;
 			loadStats();
 			loadAddresses();
 		});
@@ -279,11 +358,11 @@
 </script>
 
 <svelte:head>
-	<title>Admin - Adresses - Bibliometrie UCA</title>
+	<title>Admin - Adresses - Bibliométrie UCA</title>
 </svelte:head>
 
 <div class="page-addresses">
-	<!-- Toolbar: structure filter, search, status -->
+	<!-- Toolbar: structure filter, search, filters -->
 	<div class="toolbar">
 		<select
 			class="structure-filter"
@@ -303,15 +382,6 @@
 
 		<div class="toolbar-sep"></div>
 
-		<label class="select-all-label">
-			<input
-				type="checkbox"
-				checked={selectAll}
-				onchange={(e) => toggleSelectAll((e.target as HTMLInputElement).checked)}
-			/>
-			Tout
-		</label>
-
 		<select value={currentSearchMode} onchange={onSearchModeChange}>
 			<option value="contains">contient</option>
 			<option value="not_contains">ne contient pas</option>
@@ -321,14 +391,27 @@
 			type="text"
 			class="search-input"
 			placeholder="Rechercher dans les adresses..."
+			value={currentSearch}
 			oninput={onSearchInput}
 		/>
 
-		<select value={currentStatus} onchange={onStatusChange}>
-			<option value="pending">A examiner</option>
-			<option value="confirmed">Confirmes</option>
-			<option value="rejected">Rejetes</option>
-			<option value="all">Tous</option>
+		<select
+			value={currentDetected}
+			onchange={(e) => { currentDetected = (e.target as HTMLSelectElement).value; onFilterChange(); }}
+		>
+			<option value="all">Détection : tous</option>
+			<option value="yes">Détecté</option>
+			<option value="no">Non détecté</option>
+		</select>
+
+		<select
+			value={currentValidation}
+			onchange={(e) => { currentValidation = (e.target as HTMLSelectElement).value; onFilterChange(); }}
+		>
+			<option value="all">Validation : tous</option>
+			<option value="pending">Non validé</option>
+			<option value="confirmed">Relié</option>
+			<option value="rejected">Rejeté</option>
 		</select>
 
 		<span class="count">{resultCountText}</span>
@@ -336,9 +419,11 @@
 
 	<!-- Stats bar -->
 	<div class="stats-bar">
-		<span class="stat-badge stat-pending">A examiner : {stats.pending}</span>
-		<span class="stat-badge stat-rejected">Rejetes : {stats.rejected}</span>
-		<span class="stat-badge stat-confirmed">Confirmes : {stats.confirmed}</span>
+		<span class="stat-badge stat-total">{stats.total.toLocaleString('fr-FR')} adresses</span>
+		<span class="stat-badge stat-detected">Détectées : {stats.detected}</span>
+		<span class="stat-badge stat-pending">Non validées : {stats.pending}</span>
+		<span class="stat-badge stat-confirmed">Reliées : {stats.confirmed}</span>
+		<span class="stat-badge stat-rejected">Rejetées : {stats.rejected}</span>
 	</div>
 
 	<!-- Batch action bar -->
@@ -347,7 +432,7 @@
 			<span>{selectedCount} sélectionnée{selectedCount > 1 ? 's' : ''}</span>
 			<div class="batch-actions">
 				<button onclick={() => batchReview(false)}>&#x2717; Rejeter</button>
-				<button onclick={() => batchReview(true)}>&#x2713; Confirmer</button>
+				<button onclick={() => batchReview(true)}>&#x2713; Relier</button>
 				<button onclick={() => batchReview(null)}>&#x21BA; Reset</button>
 				<button onclick={clearSelection}>Annuler</button>
 			</div>
@@ -358,9 +443,21 @@
 	<div class="main-panel" bind:this={mainPanel}>
 		{#if loading}
 			<div class="loading-msg">Chargement...</div>
+		{:else if requiresSearch}
+			<div class="loading-msg">Saisissez un terme de recherche pour afficher les résultats.</div>
 		{:else if addresses.length === 0}
-			<div class="loading-msg">Aucune adresse trouvee.</div>
+			<div class="loading-msg">Aucune adresse trouvée.</div>
 		{:else}
+			<div class="select-all-row">
+				<label class="select-all-label">
+					<input
+						type="checkbox"
+						checked={selectAll}
+						onchange={(e) => toggleSelectAll((e.target as HTMLInputElement).checked)}
+					/>
+					Tout sélectionner
+				</label>
+			</div>
 			{#each addresses as addr (addr.id)}
 				<div class={cardClass(addr)}>
 					<div
@@ -388,7 +485,7 @@
 									>{addr.pub_count} publi{addr.pub_count > 1 ? 's' : ''}</span
 								>
 								{#each addr.structures || [] as s}
-									<span class="lab-tag">{@html esc(s.acronym || s.name)}</span>
+									<span class={structTagClass(s)}>{@html esc(s.acronym || s.name)}</span>
 								{/each}
 							</div>
 						</div>
@@ -405,7 +502,7 @@
 							>
 							<button
 								class="btn btn-confirm"
-								title="Confirmer le lien"
+								title="Relier à la structure"
 								onclick={() => reviewAddr(addr.id, true)}>&#x2713;</button
 							>
 							<button
@@ -421,7 +518,7 @@
 							{#if pubsLoading}
 								<div class="detail-loading">Chargement...</div>
 							{:else if publications.length === 0}
-								<div class="detail-loading">Aucune publication liee.</div>
+								<div class="detail-loading">Aucune publication liée.</div>
 							{:else}
 								<div class="detail-title">
 									Publications ({publications.length})
@@ -441,13 +538,6 @@
 													href="https://doi.org/{encodeURIComponent(p.doi)}"
 													target="_blank"
 													rel="noopener noreferrer">DOI</a
-												>
-											{/if}
-											{#if p.openalex_id}
-												<a
-													href="https://openalex.org/{encodeURIComponent(p.openalex_id)}"
-													target="_blank"
-													rel="noopener noreferrer">OpenAlex</a
 												>
 											{/if}
 										</div>
@@ -488,6 +578,14 @@
 		padding: 3px 10px;
 		border-radius: 12px;
 		font-weight: 500;
+	}
+	.stat-total {
+		background: #f0f0ee;
+		color: #666;
+	}
+	.stat-detected {
+		background: var(--accent-light);
+		color: var(--accent);
 	}
 	.stat-pending {
 		background: var(--warning-light);
@@ -538,18 +636,22 @@
 		border-color: var(--accent) !important;
 		color: var(--accent);
 	}
+	.select-all-row {
+		padding: 4px 12px;
+	}
 	.select-all-label {
 		font-size: 0.85rem;
 		display: flex;
 		align-items: center;
 		gap: 4px;
 		cursor: pointer;
+		color: var(--muted);
 	}
 
 	/* Main panel */
 	.main-panel {
 		overflow-y: auto;
-		max-height: calc(100vh - 220px);
+		max-height: calc(100vh - 240px);
 	}
 
 	/* Address cards */
@@ -588,19 +690,11 @@
 	}
 	.addr-meta {
 		display: flex;
-		gap: 10px;
+		gap: 6px;
 		margin-top: 4px;
 		font-size: 0.8rem;
 		color: var(--muted);
-	}
-	.lab-tag {
-		display: inline-block;
-		font-size: 0.8rem;
-		padding: 1px 7px;
-		border-radius: 10px;
-		background: var(--warning-light);
-		color: var(--warning);
-		font-weight: 500;
+		flex-wrap: wrap;
 	}
 	.pub-count-tag {
 		display: inline-block;
@@ -610,6 +704,26 @@
 		background: var(--accent-light);
 		color: var(--accent);
 		font-weight: 500;
+	}
+	.struct-tag {
+		display: inline-block;
+		font-size: 0.8rem;
+		padding: 1px 7px;
+		border-radius: 10px;
+		font-weight: 500;
+	}
+	.struct-confirmed {
+		background: var(--success-light);
+		color: var(--success);
+	}
+	.struct-pending {
+		background: var(--warning-light);
+		color: var(--warning);
+	}
+	.struct-rejected {
+		background: #f0f0ee;
+		color: #999;
+		text-decoration: line-through;
 	}
 
 	.addr-actions {

@@ -16,9 +16,7 @@ import csv
 import io
 import logging
 import os
-import re
 import sys
-import unicodedata
 from datetime import datetime
 
 import psycopg2
@@ -26,6 +24,7 @@ from psycopg2.extras import execute_values
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.normalize import normalize_name
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,21 +32,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
-# =============================================================
-# NORMALISATION
-# =============================================================
-
-def normalize_name(name: str) -> str:
-    """Normalise un nom/prénom pour matching : minuscules, sans accents, sans tirets."""
-    if not name:
-        return ""
-    text = name.lower().strip()
-    text = unicodedata.normalize("NFKD", text)
-    text = text.encode("ascii", "ignore").decode("ascii")
-    text = re.sub(r"[^a-z\s]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
 
 
 def parse_date(val) -> str | None:
