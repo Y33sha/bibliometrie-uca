@@ -68,8 +68,12 @@ def find_duplicates(cur):
                            AND a1.person_id < a2.person_id
         JOIN persons p1 ON p1.id = a1.person_id
         JOIN persons p2 ON p2.id = a2.person_id
+        LEFT JOIN persons_rh prh1 ON prh1.person_id = p1.id
+        LEFT JOIN persons_rh prh2 ON prh2.person_id = p2.id
         WHERE a1.author_position IS NOT NULL
           AND NOT a1.excluded AND NOT a2.excluded
+          -- JAMAIS fusionner deux personnes ayant chacune une fiche RH distincte
+          AND NOT (prh1.id IS NOT NULL AND prh2.id IS NOT NULL)
     """)
 
     pairs = {}  # (target, source) -> info
@@ -111,6 +115,17 @@ def resolve_target(merged_into, pid):
 def merge_person(cur, target_id, source_id):
     """Fusionne source dans target (même logique que l'API /merge)."""
 
+    # Garde-fou : ne JAMAIS fusionner si les deux ont une fiche RH
+    cur.execute("""
+        SELECT COUNT(*) AS n FROM persons_rh
+        WHERE person_id IN (%s, %s)
+    """, (target_id, source_id))
+    if cur.fetchone()["n"] >= 2:
+        raise RuntimeError(
+            f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
+            f"ont chacune une fiche RH distincte."
+        )
+
     # 1. Transférer les auteurs HAL
     cur.execute("UPDATE hal_authors SET person_id = %s WHERE person_id = %s",
                 (target_id, source_id))
@@ -145,8 +160,12 @@ def merge_person(cur, target_id, source_id):
     cur.execute("UPDATE person_identifiers SET person_id = %s WHERE person_id = %s",
                 (target_id, source_id))
 
-    # 6. Supprimer persons_rh de la source
-    cur.execute("DELETE FROM persons_rh WHERE person_id = %s", (source_id,))
+    # 6. Transférer persons_rh de la source vers la cible (si la cible n'en a pas)
+    cur.execute("""
+        UPDATE persons_rh SET person_id = %s
+        WHERE person_id = %s
+          AND NOT EXISTS (SELECT 1 FROM persons_rh WHERE person_id = %s)
+    """, (target_id, source_id, target_id))
 
     # 7. Supprimer la personne source
     cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))

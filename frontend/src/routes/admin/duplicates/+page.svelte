@@ -154,6 +154,26 @@
 				<span class="label">Titre normalisé :</span> {a.title_normalized}
 			</div>
 
+			<!-- Actions -->
+			<div class="pair-actions">
+				<button class="btn-merge" onclick={() => mergePair(a.id, b.id)} disabled={acting}
+					title="Garder la publication de gauche, absorber celle de droite">
+					&larr; Garder gauche
+				</button>
+				<button class="btn-distinct" onclick={() => markDistinct(a.id, b.id)} disabled={acting}
+					title="Ces deux publications sont bien distinctes">
+					Marquer distincts
+				</button>
+				<button class="btn-skip" onclick={skip} disabled={acting}
+					title="Passer cette paire pour y revenir plus tard">
+					Passer &rsaquo;
+				</button>
+				<button class="btn-merge" onclick={() => mergePair(b.id, a.id)} disabled={acting}
+					title="Garder la publication de droite, absorber celle de gauche">
+					Garder droite &rarr;
+				</button>
+			</div>
+
 			<!-- Deux colonnes -->
 			<div class="pair-columns">
 				{#each [a, b] as pub}
@@ -170,7 +190,7 @@
 							{#if pub.language}<span class="pub-lang">{pub.language}</span>{/if}
 						</div>
 						<div class="pub-title">
-							<a href="{base}/publications/{pub.id}">{pub.title}</a>
+							<a href="{base}/publications/{pub.id}">{@html pub.title}</a>
 						</div>
 						{#if pub.doi}
 							<div class="pub-doi">DOI: {pub.doi}</div>
@@ -206,25 +226,6 @@
 				{/each}
 			</div>
 
-			<!-- Actions -->
-			<div class="pair-actions">
-				<button class="btn-merge" onclick={() => mergePair(a.id, b.id)} disabled={acting}
-					title="Garder la publication de gauche, absorber celle de droite">
-					&larr; Garder gauche
-				</button>
-				<button class="btn-distinct" onclick={() => markDistinct(a.id, b.id)} disabled={acting}
-					title="Ces deux publications sont bien distinctes">
-					Marquer distincts
-				</button>
-				<button class="btn-skip" onclick={skip} disabled={acting}
-					title="Passer cette paire pour y revenir plus tard">
-					Passer &rsaquo;
-				</button>
-				<button class="btn-merge" onclick={() => mergePair(b.id, a.id)} disabled={acting}
-					title="Garder la publication de droite, absorber celle de gauche">
-					Garder droite &rarr;
-				</button>
-			</div>
 		</div>
 	{/if}
 </div>
@@ -382,7 +383,7 @@
 		display: flex;
 		gap: 8px;
 		padding: 12px 16px;
-		border-top: 1px solid var(--border, #e0e0e0);
+		border-bottom: 1px solid var(--border, #e0e0e0);
 		background: #fafafa;
 		justify-content: center;
 	}

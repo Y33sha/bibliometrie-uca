@@ -63,7 +63,7 @@ DOCTYPE_MAP = {
     "retraction": "other",
     "erratum": "other",
     "paratext": "other",
-    "peer-review": "other",
+    "peer-review": "peer_review",
     "standard": "other",
     "dataset": "other",
     "grant": "other",

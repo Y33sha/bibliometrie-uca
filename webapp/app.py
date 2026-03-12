@@ -4377,6 +4377,17 @@ async def merge_persons(person_id: int, body: dict):
         if source_id not in found:
             raise HTTPException(status_code=404, detail="Personne source introuvable")
 
+        # Garde-fou : ne JAMAIS fusionner si les deux ont une fiche RH distincte
+        cur.execute("""
+            SELECT COUNT(*) AS n FROM persons_rh
+            WHERE person_id IN (%s, %s)
+        """, (person_id, source_id))
+        if cur.fetchone()["n"] >= 2:
+            raise HTTPException(
+                status_code=409,
+                detail="Fusion interdite : les deux personnes ont chacune une fiche RH distincte"
+            )
+
         # 1. Transférer les auteurs HAL
         cur.execute(
             "UPDATE hal_authors SET person_id = %s WHERE person_id = %s",
@@ -4418,12 +4429,197 @@ async def merge_persons(person_id: int, body: dict):
             "UPDATE person_identifiers SET person_id = %s WHERE person_id = %s",
             (person_id, source_id),
         )
-        # 5. Supprimer les entrées persons_rh de la source
-        cur.execute("DELETE FROM persons_rh WHERE person_id = %s", (source_id,))
+        # 5. Transférer persons_rh de la source vers la cible (si la cible n'en a pas)
+        cur.execute("""
+            UPDATE persons_rh SET person_id = %s
+            WHERE person_id = %s
+              AND NOT EXISTS (SELECT 1 FROM persons_rh WHERE person_id = %s)
+        """, (person_id, source_id, person_id))
         # 6. Supprimer la personne source
         cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))
 
         return {"merged": True, "source_id": source_id, "target_id": person_id}
+
+
+# ----- API: Doublons personnes -----
+
+def _person_name_tokens(ln_norm: str, fn_norm: str) -> set[str]:
+    """Tokens triés du nom complet normalisé (last + first)."""
+    return set((ln_norm + " " + fn_norm).split()) - {""}
+
+
+def _tokens_match(t1: set[str], t2: set[str]) -> bool:
+    """Vérifie si les tokens matchent (égaux ou l'un contenu dans l'autre)."""
+    if not t1 or not t2:
+        return False
+    return t1 == t2 or t1 <= t2 or t2 <= t1
+
+
+PERSON_DUP_SQL = """
+    SELECT p1.id AS id_a, p2.id AS id_b,
+           p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
+           p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
+    FROM persons p1
+    JOIN persons p2 ON p1.id < p2.id
+      AND p1.last_name_normalized = p2.last_name_normalized
+      AND p1.last_name_normalized <> ''
+      AND LENGTH(p1.first_name_normalized) >= 1
+      AND LENGTH(p2.first_name_normalized) >= 1
+      AND LEFT(p1.first_name_normalized, 1) = LEFT(p2.first_name_normalized, 1)
+      AND (
+          p1.first_name_normalized = p2.first_name_normalized
+          OR LENGTH(p1.first_name_normalized) = 1
+          OR LENGTH(p2.first_name_normalized) = 1
+          OR p1.first_name_normalized LIKE p2.first_name_normalized || ' %%'
+          OR p2.first_name_normalized LIKE p1.first_name_normalized || ' %%'
+      )
+    WHERE NOT EXISTS (
+        SELECT 1 FROM distinct_persons dp
+        WHERE dp.person_id_a = LEAST(p1.id, p2.id) AND dp.person_id_b = GREATEST(p1.id, p2.id)
+    )
+    -- JAMAIS suggérer la fusion de deux personnes ayant chacune une fiche RH
+    AND NOT (
+        EXISTS (SELECT 1 FROM persons_rh WHERE person_id = p1.id)
+        AND EXISTS (SELECT 1 FROM persons_rh WHERE person_id = p2.id)
+    )
+
+    UNION ALL
+
+    SELECT p1.id AS id_a, p2.id AS id_b,
+           p1.last_name_normalized, p1.first_name_normalized,
+           p2.last_name_normalized, p2.first_name_normalized
+    FROM persons p1
+    JOIN persons p2 ON p1.id < p2.id
+      AND p1.last_name_normalized = p2.first_name_normalized
+      AND p1.first_name_normalized = p2.last_name_normalized
+      AND p1.last_name_normalized <> ''
+      AND p1.first_name_normalized <> ''
+      AND p1.last_name_normalized <> p1.first_name_normalized
+    WHERE NOT EXISTS (
+        SELECT 1 FROM distinct_persons dp
+        WHERE dp.person_id_a = LEAST(p1.id, p2.id) AND dp.person_id_b = GREATEST(p1.id, p2.id)
+    )
+    -- JAMAIS suggérer la fusion de deux personnes ayant chacune une fiche RH
+    AND NOT (
+        EXISTS (SELECT 1 FROM persons_rh WHERE person_id = p1.id)
+        AND EXISTS (SELECT 1 FROM persons_rh WHERE person_id = p2.id)
+    )
+"""
+
+
+def _get_person_dedup_detail(cur, person_id):
+    """Détail d'une personne pour la page de déduplication."""
+    cur.execute("""
+        SELECT p.id, p.last_name, p.first_name,
+               p.last_name_normalized, p.first_name_normalized,
+               prh.role_title, prh.department_name,
+               (prh.id IS NOT NULL) AS has_rh
+        FROM persons p
+        LEFT JOIN persons_rh prh ON prh.person_id = p.id
+        WHERE p.id = %s
+    """, (person_id,))
+    person = cur.fetchone()
+    if not person:
+        return None
+
+    cur.execute("""
+        SELECT id, id_type, id_value, source, status::text
+        FROM person_identifiers WHERE person_id = %s
+        ORDER BY id_type, id_value
+    """, (person_id,))
+    identifiers = [dict(r) for r in cur.fetchall()]
+
+    cur.execute("""
+        SELECT pub.id, pub.title, pub.pub_year, pub.doi, pub.doc_type::text,
+               ARRAY_REMOVE(ARRAY[
+                   CASE WHEN EXISTS(SELECT 1 FROM hal_documents WHERE publication_id = pub.id) THEN 'HAL' END,
+                   CASE WHEN EXISTS(SELECT 1 FROM openalex_documents WHERE publication_id = pub.id) THEN 'OpenAlex' END,
+                   CASE WHEN EXISTS(SELECT 1 FROM wos_documents WHERE publication_id = pub.id) THEN 'WoS' END
+               ], NULL) AS sources
+        FROM authorships a
+        JOIN publications pub ON pub.id = a.publication_id
+        WHERE a.person_id = %s AND NOT a.excluded
+        ORDER BY pub.pub_year DESC NULLS LAST, pub.id DESC
+    """, (person_id,))
+    publications = [dict(r) for r in cur.fetchall()]
+
+    return {
+        "id": person["id"],
+        "last_name": person["last_name"],
+        "first_name": person["first_name"],
+        "last_name_normalized": person["last_name_normalized"],
+        "first_name_normalized": person["first_name_normalized"],
+        "has_rh": person["has_rh"],
+        "role_title": person["role_title"],
+        "department_name": person["department_name"],
+        "identifiers": identifiers,
+        "publications": publications,
+        "pub_count": len(publications),
+    }
+
+
+@app.get("/api/admin/person-duplicates/next")
+async def next_person_duplicate(offset: int = Query(0, ge=0)):
+    """Renvoie la paire candidate de personnes à la position offset."""
+    with get_cursor() as (cur, conn):
+        # Compteur approximatif (SQL pré-filtre)
+        cur.execute(f"SELECT COUNT(*) AS total FROM ({PERSON_DUP_SQL}) sub")
+        total = cur.fetchone()["total"]
+
+        # Parcourir par batch pour trouver la Nième paire valide (après filtre Python)
+        valid_count = 0
+        sql_offset = 0
+        batch_size = 100
+        found = None
+
+        while found is None:
+            cur.execute(
+                f"{PERSON_DUP_SQL} LIMIT %s OFFSET %s",
+                (batch_size, sql_offset)
+            )
+            rows = cur.fetchall()
+            if not rows:
+                break
+
+            for row in rows:
+                t1 = _person_name_tokens(row["ln1"], row["fn1"])
+                t2 = _person_name_tokens(row["ln2"], row["fn2"])
+                if _tokens_match(t1, t2):
+                    if valid_count == offset:
+                        found = row
+                        break
+                    valid_count += 1
+
+            sql_offset += batch_size
+
+        if not found:
+            return {"total": total, "offset": offset, "pair": None}
+
+        return {
+            "total": total,
+            "offset": offset,
+            "pair": {
+                "person_a": _get_person_dedup_detail(cur, found["id_a"]),
+                "person_b": _get_person_dedup_detail(cur, found["id_b"]),
+            },
+        }
+
+
+@app.post("/api/admin/person-duplicates/mark-distinct")
+async def mark_persons_distinct(body: dict):
+    """Marque deux personnes comme distinctes (non-doublon)."""
+    a = body.get("person_id_a")
+    b = body.get("person_id_b")
+    if not a or not b or a == b:
+        raise HTTPException(status_code=400, detail="person_id_a et person_id_b requis et différents")
+
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            INSERT INTO distinct_persons (person_id_a, person_id_b)
+            VALUES (LEAST(%s, %s), GREATEST(%s, %s))
+            ON CONFLICT DO NOTHING
+        """, (a, b, a, b))
+        return {"ok": True}
 
 
 # ----- SvelteKit SPA (doit rester en dernier, après toutes les routes API) -----

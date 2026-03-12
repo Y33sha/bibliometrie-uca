@@ -21,6 +21,7 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [ ] documents > 2000 auteurs: relancer le script pour peupler la table authorships
 * [ ] problème des documents où l'affiliation de l'authorship n'est pas résolue: cf https://hal.science/hal-04987032
 * [ ] retraitement pour les authorships sans auteur_id (prendre strings?)
+* [ ] revue Openalex 'HAL (Le Centre pour la Communication Scientifique Directe)' => parfois absents de HAL! Auditer docts source OpenAlex, ref HAL, HAL non trouvé => supprimer
 
 ## ORCID
 * [ ] moissoner crossref via ORCID pour trouver publis absentes de HAL, OpenAlex et WoS?
@@ -55,6 +56,7 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [ ] authorships OpenAlex pourries (ex. Pierre Mathieu): trouver un moyen de les déclarer inutilisables / ou cesser totalement d'utiliser les authorships OpenAlex? étudier les options
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis
 * [ ] afficher quand compte HAL relié ou non à l'ORCID
+* [ ] rendre personnes RH infusionnables
 
 
 ## Structures
@@ -92,10 +94,11 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [x] Légende dans export png
 * [x] Filtres à facettes dynamiques avec comptage
 * [x] lien retour: seulement si historique existe
+* [x] sources: arrangées verticalement dans un dropdown
 * [ ] Toujours mémoriser filtres et les rétablir au rechargement
 * [ ] Rendre les filtres sticky
 * [ ] Rendre tous les tableaux triables
-* [ ] sources: arrangées verticalement dans un dropdown
+* [ ] labo: filtres personnes
 * [ ] afficher todo et nouveautés?
 * [ ] interface pour afficher le staging (pour vérif)
 
