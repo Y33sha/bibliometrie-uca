@@ -53,7 +53,7 @@
 		if (selectedRoles.length) p.set('role', selectedRoles.join(','));
 		if (selectedOrcid.length === 1) p.set('has_orcid', selectedOrcid[0]);
 		if (selectedIdhal.length === 1) p.set('has_idhal', selectedIdhal[0]);
-		if (selectedRh.length === 1) p.set('has_rh', selectedRh[0]);
+		p.set('has_rh', selectedRh.length === 1 ? selectedRh[0] : 'all');
 		if (search.trim()) p.set('search', search.trim());
 		if (currentPage > 1) p.set('page', String(currentPage));
 		const qs = p.toString();
@@ -135,7 +135,10 @@
 		if (urlParams.get('role')) selectedRoles = urlParams.get('role')!.split(',');
 		if (urlParams.get('has_orcid')) selectedOrcid = [urlParams.get('has_orcid')!];
 		if (urlParams.get('has_idhal')) selectedIdhal = [urlParams.get('has_idhal')!];
-		if (urlParams.has('has_rh')) selectedRh = [urlParams.get('has_rh')!];
+		if (urlParams.has('has_rh')) {
+			const rh = urlParams.get('has_rh')!;
+			selectedRh = rh === 'all' ? [] : [rh];
+		}
 		if (urlParams.get('search')) search = urlParams.get('search')!;
 		if (urlParams.get('page')) currentPage = Number(urlParams.get('page')) || 1;
 

@@ -18,7 +18,6 @@ import hashlib
 import hmac
 import time
 import subprocess
-import unicodedata
 from contextlib import contextmanager
 
 from fastapi import FastAPI, Query, HTTPException, Request, Response, Depends, Cookie
@@ -31,6 +30,7 @@ from psycopg2.extras import RealDictCursor
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import DB, ADMIN_USER, ADMIN_SALT, ADMIN_HASH, SESSION_SECRET
+from utils.normalize import normalize_text
 
 app = FastAPI(title="Bibliométrie UCA")
 
@@ -158,16 +158,6 @@ def get_cursor():
         conn.close()
 
 
-def normalize_text(text: str) -> str:
-    if not text:
-        return ""
-    text = text.lower().strip()
-    text = unicodedata.normalize("NFKD", text)
-    text = text.encode("ascii", "ignore").decode("ascii")
-    text = re.sub(r"[^a-z0-9\s]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
-
 
 OA_OPEN_STATUSES = ('gold', 'hybrid', 'bronze', 'green')
 
@@ -180,11 +170,15 @@ PUB_IS_UCA = """(
     EXISTS (SELECT 1 FROM openalex_documents od
             JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
             WHERE od.publication_id = p.id AND oas.is_uca = TRUE)
+    OR
+    EXISTS (SELECT 1 FROM wos_documents wd
+            JOIN wos_authorships was ON was.wos_document_id = wd.id
+            WHERE wd.publication_id = p.id AND was.is_uca = TRUE)
 )"""
 
 
 def propagate_uca_for_addresses(cur, address_ids: list[int]):
-    """Recalcule is_uca sur openalex_authorships et authorships
+    """Recalcule is_uca sur openalex/wos_authorships et authorships
     pour tous les authorships liés aux adresses données.
 
     Appelé après chaque review/assign/unassign d'adresse pour
@@ -193,17 +187,7 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
     if not address_ids:
         return
 
-    # 1. Trouver les openalex_authorships affectés
-    cur.execute("""
-        SELECT DISTINCT oaa.openalex_authorship_id
-        FROM openalex_authorship_addresses oaa
-        WHERE oaa.address_id = ANY(%s)
-    """, (address_ids,))
-    oas_ids = [r["openalex_authorship_id"] for r in cur.fetchall()]
-    if not oas_ids:
-        return
-
-    # 2. Périmètre UCA
+    # 1. Périmètre UCA
     cur.execute("""
         SELECT s.id FROM structures s WHERE s.code = 'uca'
         UNION
@@ -215,35 +199,80 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
     if not uca_ids:
         return
 
-    # 3. Recalculer is_uca et structure_ids pour chaque authorship affecté
-    # Un authorship est UCA s'il a au moins une adresse liée à une structure UCA
-    # ET que l'adresse n'est pas un faux positif
+    # 2a. Trouver les openalex_authorships affectés
     cur.execute("""
-        WITH affected AS (
-            SELECT unnest(%s::int[]) AS oas_id
-        ),
-        uca_per_authorship AS (
-            SELECT oaa.openalex_authorship_id AS oas_id,
-                   array_agg(DISTINCT ast.structure_id) AS struct_ids
+        SELECT DISTINCT oaa.openalex_authorship_id
+        FROM openalex_authorship_addresses oaa
+        WHERE oaa.address_id = ANY(%s)
+    """, (address_ids,))
+    oas_ids = [r["openalex_authorship_id"] for r in cur.fetchall()]
+
+    # 2b. Trouver les wos_authorships affectés
+    cur.execute("""
+        SELECT DISTINCT waa.wos_authorship_id
+        FROM wos_authorship_addresses waa
+        WHERE waa.address_id = ANY(%s)
+    """, (address_ids,))
+    was_ids = [r["wos_authorship_id"] for r in cur.fetchall()]
+
+    if not oas_ids and not was_ids:
+        return
+
+    # 3a. Recalculer is_uca sur openalex_authorships
+    if oas_ids:
+        cur.execute("""
+            WITH affected AS (
+                SELECT unnest(%s::int[]) AS oas_id
+            ),
+            uca_per_authorship AS (
+                SELECT oaa.openalex_authorship_id AS oas_id,
+                       array_agg(DISTINCT ast.structure_id) AS struct_ids
+                FROM affected af
+                JOIN openalex_authorship_addresses oaa ON oaa.openalex_authorship_id = af.oas_id
+                JOIN address_structures ast ON ast.address_id = oaa.address_id
+                WHERE ast.structure_id = ANY(%s)
+                  AND ast.is_confirmed IS DISTINCT FROM FALSE
+                GROUP BY oaa.openalex_authorship_id
+            )
+            UPDATE openalex_authorships oas
+            SET is_uca = (upa.struct_ids IS NOT NULL),
+                structure_ids = upa.struct_ids
             FROM affected af
-            JOIN openalex_authorship_addresses oaa ON oaa.openalex_authorship_id = af.oas_id
-            JOIN address_structures ast ON ast.address_id = oaa.address_id
-            WHERE ast.structure_id = ANY(%s)
-              AND ast.is_confirmed IS DISTINCT FROM FALSE
-            GROUP BY oaa.openalex_authorship_id
-        )
-        UPDATE openalex_authorships oas
-        SET is_uca = (upa.struct_ids IS NOT NULL),
-            structure_ids = upa.struct_ids
-        FROM affected af
-        LEFT JOIN uca_per_authorship upa ON upa.oas_id = af.oas_id
-        WHERE oas.id = af.oas_id
-    """, (oas_ids, uca_ids))
+            LEFT JOIN uca_per_authorship upa ON upa.oas_id = af.oas_id
+            WHERE oas.id = af.oas_id
+        """, (oas_ids, uca_ids))
+
+    # 3b. Recalculer is_uca sur wos_authorships
+    if was_ids:
+        cur.execute("""
+            WITH affected AS (
+                SELECT unnest(%s::int[]) AS was_id
+            ),
+            uca_per_authorship AS (
+                SELECT waa.wos_authorship_id AS was_id,
+                       array_agg(DISTINCT ast.structure_id) AS struct_ids
+                FROM affected af
+                JOIN wos_authorship_addresses waa ON waa.wos_authorship_id = af.was_id
+                JOIN address_structures ast ON ast.address_id = waa.address_id
+                WHERE ast.structure_id = ANY(%s)
+                  AND ast.is_confirmed IS DISTINCT FROM FALSE
+                GROUP BY waa.wos_authorship_id
+            )
+            UPDATE wos_authorships was
+            SET is_uca = (upa.struct_ids IS NOT NULL),
+                structure_ids = upa.struct_ids
+            FROM affected af
+            LEFT JOIN uca_per_authorship upa ON upa.was_id = af.was_id
+            WHERE was.id = af.was_id
+        """, (was_ids, uca_ids))
 
     # 4. Propager vers authorships (vérité) pour les person_id résolus
-    # Recalcule depuis les DEUX sources (HAL peut maintenir is_uca même si OA perd)
+    # Recalcule depuis les 3 sources (HAL, OpenAlex, WoS) :
+    # une paire (publication_id, person_id) est UCA si AU MOINS une source la marque UCA
+    affected_source_ids = (oas_ids or []) + (was_ids or [])
     cur.execute("""
         WITH affected_pubs AS (
+            -- Paires (pub, person) affectées via OpenAlex
             SELECT DISTINCT od.publication_id, oa.person_id
             FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
@@ -251,8 +280,17 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
             WHERE oas.id = ANY(%s)
               AND od.publication_id IS NOT NULL
               AND oa.person_id IS NOT NULL
+            UNION
+            -- Paires (pub, person) affectées via WoS
+            SELECT DISTINCT wd.publication_id, wa.person_id
+            FROM wos_authorships was
+            JOIN wos_documents wd ON wd.id = was.wos_document_id
+            JOIN wos_authors wa ON wa.id = was.wos_author_id
+            WHERE was.id = ANY(%s)
+              AND wd.publication_id IS NOT NULL
+              AND wa.person_id IS NOT NULL
         ),
-        -- Recalculer is_uca depuis HAL pour ces mêmes (pub, person)
+        -- Recalculer is_uca depuis HAL
         hal_uca AS (
             SELECT hd.publication_id, ha.person_id,
                    array_agg(DISTINCT sid) AS struct_ids
@@ -265,7 +303,7 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
             WHERE has.is_uca = TRUE AND has.structure_ids IS NOT NULL
             GROUP BY hd.publication_id, ha.person_id
         ),
-        -- Recalculer is_uca depuis OpenAlex pour ces mêmes (pub, person)
+        -- Recalculer is_uca depuis OpenAlex
         oa_uca AS (
             SELECT od.publication_id, oa.person_id,
                    oas.structure_ids AS struct_ids
@@ -276,15 +314,32 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
                 AND oa.person_id = ap.person_id
             WHERE oas.is_uca = TRUE AND oas.structure_ids IS NOT NULL
         ),
+        -- Recalculer is_uca depuis WoS
+        wos_uca AS (
+            SELECT wd.publication_id, wa.person_id,
+                   was.structure_ids AS struct_ids
+            FROM affected_pubs ap
+            JOIN wos_documents wd ON wd.publication_id = ap.publication_id
+            JOIN wos_authorships was ON was.wos_document_id = wd.id
+            JOIN wos_authors wa ON wa.id = was.wos_author_id
+                AND wa.person_id = ap.person_id
+            WHERE was.is_uca = TRUE AND was.structure_ids IS NOT NULL
+        ),
         merged AS (
             SELECT ap.publication_id, ap.person_id,
-                   COALESCE(hu.struct_ids, '{}') || COALESCE(ou.struct_ids, '{}') AS all_structs,
-                   (hu.struct_ids IS NOT NULL OR ou.struct_ids IS NOT NULL) AS any_uca
+                   COALESCE(hu.struct_ids, '{}')
+                       || COALESCE(ou.struct_ids, '{}')
+                       || COALESCE(wu.struct_ids, '{}') AS all_structs,
+                   (hu.struct_ids IS NOT NULL
+                    OR ou.struct_ids IS NOT NULL
+                    OR wu.struct_ids IS NOT NULL) AS any_uca
             FROM affected_pubs ap
             LEFT JOIN hal_uca hu ON hu.publication_id = ap.publication_id
                 AND hu.person_id = ap.person_id
             LEFT JOIN oa_uca ou ON ou.publication_id = ap.publication_id
                 AND ou.person_id = ap.person_id
+            LEFT JOIN wos_uca wu ON wu.publication_id = ap.publication_id
+                AND wu.person_id = ap.person_id
         )
         UPDATE authorships a
         SET is_uca = m.any_uca,
@@ -297,7 +352,7 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
         WHERE a.publication_id = m.publication_id
           AND a.person_id = m.person_id
           AND a.person_id IS NOT NULL
-    """, (oas_ids,))
+    """, (oas_ids or [], was_ids or []))
 
 
 def apply_oa_filter(conditions: list, params: list, oa_status: str | None):
@@ -348,8 +403,17 @@ def apply_lab_filter(conditions: list, params: list, lab_ids: list[int]):
                   AND oas.is_uca = TRUE
                   AND oas.structure_ids && %s::int[]
             )
+            OR
+            EXISTS (
+                SELECT 1 FROM wos_documents wd
+                JOIN wos_authorships was ON was.wos_document_id = wd.id
+                WHERE wd.publication_id = p.id
+                  AND was.is_uca = TRUE
+                  AND was.structure_ids && %s::int[]
+            )
         )
     """)
+    params.append(lab_ids)
     params.append(lab_ids)
     params.append(lab_ids)
 
@@ -371,28 +435,25 @@ def apply_doc_type_filter(conditions: list, params: list, doc_types: list[str]):
 
 
 def apply_source_filter(conditions: list, source_values: list[str]):
-    """Ajoute les filtres de source (hal_yes, hal_no, oa_yes, oa_no)."""
+    """Ajoute les filtres de source (hal_yes, hal_no, oa_yes, oa_no, wos_yes, wos_no)."""
+    SOURCE_MAP = {
+        "hal": "hal",
+        "oa": "openalex",
+        "wos": "wos",
+    }
     for sv in source_values:
-        if sv == "hal_yes":
-            conditions.append(
-                "EXISTS (SELECT 1 FROM publication_sources ps"
-                " WHERE ps.publication_id = p.id AND ps.source = 'hal')"
-            )
-        elif sv == "hal_no":
-            conditions.append(
-                "NOT EXISTS (SELECT 1 FROM publication_sources ps"
-                " WHERE ps.publication_id = p.id AND ps.source = 'hal')"
-            )
-        elif sv == "oa_yes":
-            conditions.append(
-                "EXISTS (SELECT 1 FROM publication_sources ps"
-                " WHERE ps.publication_id = p.id AND ps.source = 'openalex')"
-            )
-        elif sv == "oa_no":
-            conditions.append(
-                "NOT EXISTS (SELECT 1 FROM publication_sources ps"
-                " WHERE ps.publication_id = p.id AND ps.source = 'openalex')"
-            )
+        parts = sv.rsplit("_", 1)
+        if len(parts) != 2:
+            continue
+        prefix, mode = parts
+        source = SOURCE_MAP.get(prefix)
+        if not source or mode not in ("yes", "no"):
+            continue
+        op = "EXISTS" if mode == "yes" else "NOT EXISTS"
+        conditions.append(
+            f"{op} (SELECT 1 FROM publication_sources ps"
+            f" WHERE ps.publication_id = p.id AND ps.source = '{source}')"
+        )
 
 
 def apply_person_filter(conditions: list, params: list, person_id: int):
@@ -1155,6 +1216,29 @@ async def publications_facets(
                 {"value": "no", "count": row["no_count"]},
             ]
 
+        # --- Facette SOURCES ---
+        c, p = base_conds_params()
+        add_all_except(c, p, skip="source")
+        where = " AND ".join(c)
+        cur.execute(f"""
+            SELECT
+                COUNT(*) FILTER (WHERE EXISTS (
+                    SELECT 1 FROM publication_sources ps
+                    WHERE ps.publication_id = p.id AND ps.source = 'hal'
+                )) AS hal_count,
+                COUNT(*) FILTER (WHERE EXISTS (
+                    SELECT 1 FROM publication_sources ps
+                    WHERE ps.publication_id = p.id AND ps.source = 'openalex'
+                )) AS oa_count,
+                COUNT(*) FILTER (WHERE EXISTS (
+                    SELECT 1 FROM publication_sources ps
+                    WHERE ps.publication_id = p.id AND ps.source = 'wos'
+                )) AS wos_count
+            FROM publications p
+            WHERE {where}
+        """, p)
+        source_counts = cur.fetchone()
+
         return {
             "years": year_facets,
             "labs": lab_facets,
@@ -1162,6 +1246,11 @@ async def publications_facets(
             "doc_types": doc_type_facets,
             "oa_statuses": oa_facets,
             "corresponding": corr_facets,
+            "source_counts": {
+                "hal": source_counts["hal_count"],
+                "oa": source_counts["oa_count"],
+                "wos": source_counts["wos_count"],
+            },
         }
 
 
@@ -1349,6 +1438,8 @@ async def export_publications_csv(
                  WHERE ps.publication_id = p.id AND ps.source = 'hal' LIMIT 1) AS hal_id,
                 (SELECT ps.source_id FROM publication_sources ps
                  WHERE ps.publication_id = p.id AND ps.source = 'openalex' LIMIT 1) AS openalex_id,
+                (SELECT ps.source_id FROM publication_sources ps
+                 WHERE ps.publication_id = p.id AND ps.source = 'wos' LIMIT 1) AS wos_id,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM (
@@ -1363,6 +1454,12 @@ async def export_publications_csv(
                      JOIN openalex_documents od3 ON od3.id = oas3.openalex_document_id
                      WHERE od3.publication_id = p.id AND oas3.is_uca = TRUE
                        AND oas3.structure_ids IS NOT NULL
+                     UNION
+                     SELECT unnest(was3.structure_ids) AS struct_id
+                     FROM wos_authorships was3
+                     JOIN wos_documents wd3 ON wd3.id = was3.wos_document_id
+                     WHERE wd3.publication_id = p.id AND was3.is_uca = TRUE
+                       AND was3.structure_ids IS NOT NULL
                  ) src
                  JOIN structures s ON s.id = src.struct_id AND s.type = 'labo'
                 ) AS labs
@@ -1377,11 +1474,12 @@ async def export_publications_csv(
         writer = csv.writer(buf)
         writer.writerow([
             "Année", "Titre", "DOI", "Revue", "Éditeur",
-            "Laboratoires", "Type", "Voie OA", "HAL", "OpenAlex",
+            "Laboratoires", "Type", "Voie OA", "HAL", "OpenAlex", "WoS",
         ])
         for row in cur.fetchall():
             hal_url = f"https://hal.science/{row['hal_id']}" if row["hal_id"] else ""
             oa_url = f"https://openalex.org/{row['openalex_id']}" if row["openalex_id"] else ""
+            wos_url = f"https://www.webofscience.com/wos/woscc/full-record/{row['wos_id']}" if row["wos_id"] else ""
             writer.writerow([
                 row["pub_year"] or "",
                 row["title"] or "",
@@ -1393,6 +1491,7 @@ async def export_publications_csv(
                 row["oa_status"] or "",
                 hal_url,
                 oa_url,
+                wos_url,
             ])
 
     output = buf.getvalue()
@@ -1433,13 +1532,19 @@ async def get_publication(pub_id: int):
             UNION ALL
             SELECT 'openalex', od.openalex_id, od.doi, NULL
             FROM openalex_documents od WHERE od.publication_id = %s
-        """, (pub_id, pub_id))
+            UNION ALL
+            SELECT 'wos', wd.ut, wd.doi, NULL
+            FROM wos_documents wd WHERE wd.publication_id = %s
+        """, (pub_id, pub_id, pub_id))
         sources = cur.fetchall()
 
         # c) Authorships — truth table
         cur.execute("""
             SELECT a.author_position, a.is_uca, a.is_corresponding,
-                   a.structure_ids, a.source_hal, a.source_openalex,
+                   a.structure_ids,
+                   (a.hal_authorship_id IS NOT NULL) AS source_hal,
+                   (a.openalex_authorship_id IS NOT NULL) AS source_openalex,
+                   (a.wos_authorship_id IS NOT NULL) AS source_wos,
                    pe.id AS person_id, pe.last_name, pe.first_name
             FROM authorships a
             JOIN persons pe ON pe.id = a.person_id
@@ -1472,6 +1577,18 @@ async def get_publication(pub_id: int):
         """, (pub_id,))
         oa_authorships = cur.fetchall()
 
+        # e2) WoS authorships
+        cur.execute("""
+            SELECT was.author_position, wa.full_name, wa.person_id,
+                   was.is_uca, was.structure_ids, was.raw_affiliation, was.excluded
+            FROM wos_authorships was
+            JOIN wos_authors wa ON wa.id = was.wos_author_id
+            JOIN wos_documents wd ON wd.id = was.wos_document_id
+            WHERE wd.publication_id = %s
+            ORDER BY was.author_position
+        """, (pub_id,))
+        wos_authorships = cur.fetchall()
+
         # f) Resolve all structure_ids → names
         all_struct_ids = set()
         for row in authorships:
@@ -1481,6 +1598,9 @@ async def get_publication(pub_id: int):
             if row["structure_ids"]:
                 all_struct_ids.update(row["structure_ids"])
         for row in oa_authorships:
+            if row["structure_ids"]:
+                all_struct_ids.update(row["structure_ids"])
+        for row in wos_authorships:
             if row["structure_ids"]:
                 all_struct_ids.update(row["structure_ids"])
 
@@ -1501,6 +1621,7 @@ async def get_publication(pub_id: int):
             "authorships": [dict(a) for a in authorships],
             "hal_authorships": [dict(a) for a in hal_authorships],
             "openalex_authorships": [dict(a) for a in oa_authorships],
+            "wos_authorships": [dict(a) for a in wos_authorships],
             "structures": structures,
         }
 
@@ -1645,27 +1766,7 @@ async def list_publications(
 
         # Source filter: per-source presence/absence (AND logic)
         if source_values:
-            for sv in source_values:
-                if sv == "hal_yes":
-                    conditions.append(
-                        "EXISTS (SELECT 1 FROM publication_sources ps"
-                        " WHERE ps.publication_id = p.id AND ps.source = 'hal')"
-                    )
-                elif sv == "hal_no":
-                    conditions.append(
-                        "NOT EXISTS (SELECT 1 FROM publication_sources ps"
-                        " WHERE ps.publication_id = p.id AND ps.source = 'hal')"
-                    )
-                elif sv == "oa_yes":
-                    conditions.append(
-                        "EXISTS (SELECT 1 FROM publication_sources ps"
-                        " WHERE ps.publication_id = p.id AND ps.source = 'openalex')"
-                    )
-                elif sv == "oa_no":
-                    conditions.append(
-                        "NOT EXISTS (SELECT 1 FROM publication_sources ps"
-                        " WHERE ps.publication_id = p.id AND ps.source = 'openalex')"
-                    )
+            apply_source_filter(conditions, source_values)
 
         # OA filter: expand 'oa' shortcut, then use ANY
         if oa_values:
@@ -1703,11 +1804,13 @@ async def list_publications(
                 p.oa_status::text,
                 j.title AS journal_title,
                 pub.name AS publisher_name,
-                -- Sources: HAL and OpenAlex IDs
+                -- Sources: HAL, OpenAlex and WoS IDs
                 (SELECT ps.source_id FROM publication_sources ps
                  WHERE ps.publication_id = p.id AND ps.source = 'hal' LIMIT 1) AS hal_id,
                 (SELECT ps.source_id FROM publication_sources ps
                  WHERE ps.publication_id = p.id AND ps.source = 'openalex' LIMIT 1) AS openalex_id,
+                (SELECT ps.source_id FROM publication_sources ps
+                 WHERE ps.publication_id = p.id AND ps.source = 'wos' LIMIT 1) AS wos_id,
                 -- Corresponding author (only meaningful with person_id filter)
                 (SELECT a.is_corresponding FROM authorships a
                  WHERE a.publication_id = p.id AND a.person_id = %s
@@ -1728,6 +1831,12 @@ async def list_publications(
                      JOIN openalex_documents od3 ON od3.id = oas3.openalex_document_id
                      WHERE od3.publication_id = p.id AND oas3.is_uca = TRUE
                        AND oas3.structure_ids IS NOT NULL
+                     UNION
+                     SELECT unnest(was3.structure_ids) AS struct_id
+                     FROM wos_authorships was3
+                     JOIN wos_documents wd3 ON wd3.id = was3.wos_document_id
+                     WHERE wd3.publication_id = p.id AND was3.is_uca = TRUE
+                       AND was3.structure_ids IS NOT NULL
                  ) src
                  JOIN structures s ON s.id = src.struct_id AND s.type = 'labo'
                 ) AS labs
@@ -1752,6 +1861,7 @@ async def list_publications(
                 "publisher": row["publisher_name"],
                 "hal_id": row["hal_id"],
                 "openalex_id": row["openalex_id"],
+                "wos_id": row["wos_id"],
                 "labs": row["labs"],
                 "is_corresponding": row["is_corresponding"],
             })
@@ -1766,6 +1876,189 @@ async def list_publications(
 
 
 
+# ----- API: Doublons publications -----
+
+@app.get("/api/admin/duplicates/next")
+async def next_duplicate_candidate(
+    min_title_len: int = Query(30, ge=10),
+    offset: int = Query(0, ge=0),
+):
+    """Renvoie la paire candidate à la position offset."""
+    with get_cursor() as (cur, conn):
+        candidate_where = """
+            FROM publications p1
+            JOIN publications p2
+              ON p1.title_normalized = p2.title_normalized AND p1.id < p2.id
+            WHERE LENGTH(p1.title_normalized) > %s
+              AND NOT (p1.doi IS NOT NULL AND p2.doi IS NOT NULL AND LOWER(p1.doi) <> LOWER(p2.doi))
+              AND NOT (
+                  (p1.doc_type IN ('article', 'review') AND p2.doc_type = 'conference_paper')
+                  OR (p2.doc_type IN ('article', 'review') AND p1.doc_type = 'conference_paper'))
+              AND NOT (EXISTS (SELECT 1 FROM hal_documents WHERE publication_id = p1.id)
+                       AND EXISTS (SELECT 1 FROM hal_documents WHERE publication_id = p2.id))
+              AND NOT (EXISTS (SELECT 1 FROM openalex_documents WHERE publication_id = p1.id)
+                       AND EXISTS (SELECT 1 FROM openalex_documents WHERE publication_id = p2.id))
+              AND NOT (EXISTS (SELECT 1 FROM wos_documents WHERE publication_id = p1.id)
+                       AND EXISTS (SELECT 1 FROM wos_documents WHERE publication_id = p2.id))
+              AND NOT EXISTS (
+                  SELECT 1 FROM distinct_publications dp
+                  WHERE dp.pub_id_a = LEAST(p1.id, p2.id) AND dp.pub_id_b = GREATEST(p1.id, p2.id))
+        """
+
+        # Compteur total
+        cur.execute(f"SELECT COUNT(*) AS total FROM (SELECT p1.id {candidate_where}) sub",
+                    (min_title_len,))
+        total = cur.fetchone()["total"]
+
+        # Paire à la position offset
+        cur.execute(f"SELECT p1.id AS id_a, p2.id AS id_b {candidate_where} LIMIT 1 OFFSET %s",
+                    (min_title_len, offset))
+        row = cur.fetchone()
+
+        if not row:
+            return {"total": total, "offset": offset, "pair": None}
+
+        def get_pub_detail(pub_id):
+            cur.execute("""
+                SELECT p.id, p.title, p.title_normalized, p.doi, p.pub_year,
+                       p.doc_type::text, p.container_title, p.oa_status::text,
+                       p.language, p.journal_id,
+                       j.title AS journal_title, j.issn, j.eissn
+                FROM publications p
+                LEFT JOIN journals j ON j.id = p.journal_id
+                WHERE p.id = %s
+            """, (pub_id,))
+            pub = cur.fetchone()
+            if not pub:
+                return None
+
+            sources = []
+            cur.execute("SELECT halid AS source_id FROM hal_documents WHERE publication_id = %s", (pub_id,))
+            for r in cur.fetchall():
+                sources.append({"source": "hal", "source_id": r["source_id"]})
+            cur.execute("SELECT openalex_id AS source_id FROM openalex_documents WHERE publication_id = %s", (pub_id,))
+            for r in cur.fetchall():
+                sources.append({"source": "openalex", "source_id": r["source_id"]})
+            cur.execute("SELECT ut AS source_id FROM wos_documents WHERE publication_id = %s", (pub_id,))
+            for r in cur.fetchall():
+                sources.append({"source": "wos", "source_id": r["source_id"]})
+
+            cur.execute("""
+                SELECT a.author_position, a.is_uca, a.person_id,
+                       p2.last_name, p2.first_name
+                FROM authorships a
+                LEFT JOIN persons p2 ON p2.id = a.person_id
+                WHERE a.publication_id = %s AND NOT a.excluded
+                ORDER BY a.author_position NULLS LAST
+            """, (pub_id,))
+            authors = [dict(r) for r in cur.fetchall()]
+
+            return {
+                "id": pub["id"], "title": pub["title"],
+                "title_normalized": pub["title_normalized"],
+                "doi": pub["doi"], "pub_year": pub["pub_year"],
+                "doc_type": pub["doc_type"],
+                "container_title": pub["container_title"],
+                "oa_status": pub["oa_status"], "language": pub["language"],
+                "journal": {"id": pub["journal_id"], "title": pub["journal_title"],
+                            "issn": pub["issn"], "eissn": pub["eissn"]}
+                           if pub["journal_id"] else None,
+                "sources": sources,
+                "authors": authors,
+            }
+
+        return {
+            "total": total,
+            "offset": offset,
+            "pair": {
+                "pub_a": get_pub_detail(row["id_a"]),
+                "pub_b": get_pub_detail(row["id_b"]),
+            },
+        }
+
+
+@app.post("/api/admin/duplicates/merge")
+async def merge_duplicate_publications(body: dict):
+    """Fusionne source_id dans target_id."""
+    target_id = body.get("target_id")
+    source_id = body.get("source_id")
+    if not target_id or not source_id or target_id == source_id:
+        raise HTTPException(status_code=400, detail="target_id et source_id requis et différents")
+
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id, doi, journal_id, oa_status::text, language, container_title FROM publications WHERE id IN (%s, %s)", (target_id, source_id))
+        pubs = {r["id"]: r for r in cur.fetchall()}
+        if target_id not in pubs or source_id not in pubs:
+            raise HTTPException(status_code=404, detail="Publication introuvable")
+
+        cur.execute("SAVEPOINT merge_dup")
+        try:
+            for tbl in ("hal_documents", "openalex_documents", "wos_documents"):
+                cur.execute(f"UPDATE {tbl} SET publication_id = %s WHERE publication_id = %s",
+                            (target_id, source_id))
+
+            cur.execute("""
+                DELETE FROM authorships
+                WHERE publication_id = %s
+                  AND person_id IN (
+                      SELECT person_id FROM authorships WHERE publication_id = %s
+                  )
+            """, (source_id, target_id))
+
+            cur.execute("UPDATE authorships SET publication_id = %s WHERE publication_id = %s",
+                        (target_id, source_id))
+
+            cur.execute("""
+                UPDATE publications dest SET
+                    doi = CASE
+                        WHEN dest.doi IS NOT NULL THEN dest.doi
+                        WHEN src.doi IS NOT NULL AND NOT EXISTS (
+                            SELECT 1 FROM publications p2
+                            WHERE LOWER(p2.doi) = LOWER(src.doi) AND p2.id <> dest.id
+                        ) THEN LOWER(src.doi)
+                        ELSE dest.doi END,
+                    journal_id = COALESCE(dest.journal_id, src.journal_id),
+                    oa_status = CASE
+                        WHEN src.oa_status = 'diamond' THEN 'diamond'
+                        WHEN dest.oa_status IN ('unknown', 'closed') AND src.oa_status NOT IN ('unknown', 'closed')
+                        THEN src.oa_status ELSE dest.oa_status END,
+                    language = COALESCE(dest.language, src.language),
+                    container_title = COALESCE(dest.container_title, src.container_title),
+                    updated_at = now()
+                FROM publications src
+                WHERE dest.id = %s AND src.id = %s
+            """, (target_id, source_id))
+
+            cur.execute("DELETE FROM distinct_publications WHERE pub_id_a = %s OR pub_id_b = %s OR pub_id_a = %s OR pub_id_b = %s",
+                        (source_id, source_id, source_id, source_id))
+
+            cur.execute("DELETE FROM publications WHERE id = %s", (source_id,))
+
+            cur.execute("RELEASE SAVEPOINT merge_dup")
+        except Exception as e:
+            cur.execute("ROLLBACK TO SAVEPOINT merge_dup")
+            raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}")
+
+        return {"ok": True, "target_id": target_id, "source_id": source_id}
+
+
+@app.post("/api/admin/duplicates/mark-distinct")
+async def mark_publications_distinct(body: dict):
+    """Marque deux publications comme distinctes (non-doublon)."""
+    a = body.get("pub_id_a")
+    b = body.get("pub_id_b")
+    if not a or not b or a == b:
+        raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b requis et différents")
+
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            INSERT INTO distinct_publications (pub_id_a, pub_id_b)
+            VALUES (LEAST(%s, %s), GREATEST(%s, %s))
+            ON CONFLICT DO NOTHING
+        """, (a, b, a, b))
+        return {"ok": True}
+
+
 # ----- API: Adresses -----
 
 @app.get("/api/addresses")
@@ -1773,12 +2066,21 @@ async def list_addresses(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     structure_id: int | None = Query(None),  # structure de travail (défaut = UCA)
-    status: str = Query("pending"),  # pending, confirmed, rejected, all
+    detected: str = Query("yes"),  # all, yes, no
+    validation: str = Query("pending"),  # all, pending, confirmed, rejected
     search: str = Query(""),
     search_mode: str = Query("contains"),  # contains, not_contains
 ):
-    """Liste les adresses liées à une structure, filtrées par is_confirmed."""
+    """Liste les adresses avec filtres détection/validation pour une structure."""
     offset = (page - 1) * per_page
+
+    # Mode "non détecté" ou "tous" sans filtre texte → trop large, exiger une recherche
+    if detected in ("no", "all") and not search and validation in ("all", "pending"):
+        return {
+            "total": 0, "page": 1, "per_page": per_page, "pages": 0,
+            "addresses": [],
+            "requires_search": True,
+        }
 
     with get_cursor() as (cur, conn):
         # Résoudre la structure de travail (défaut = UCA)
@@ -1787,20 +2089,28 @@ async def list_addresses(
             row = cur.fetchone()
             structure_id = row["id"] if row else 0
 
-        conditions = [
-            "ast_filter.address_id = a.id",
-            "ast_filter.structure_id = %s",
-        ]
-        params = [structure_id]
+        # Quand detected != "no", on peut utiliser un JOIN (plus rapide)
+        use_inner_join = detected == "yes"
 
-        # Filtre statut basé sur is_confirmed pour la structure sélectionnée
-        if status == "pending":
-            conditions.append("ast_filter.is_confirmed IS NULL")
-        elif status == "confirmed":
+        conditions: list[str] = []
+        params: list = [structure_id]  # %s n°1 = structure_id pour le JOIN
+
+        # Filtre détection (existence d'un lien auto-détecté)
+        if detected == "yes":
+            conditions.append("ast_filter.matched_form_id IS NOT NULL")
+        elif detected == "no":
+            conditions.append("(ast_filter.id IS NULL OR ast_filter.matched_form_id IS NULL)")
+
+        # Filtre validation manuelle
+        if validation == "pending":
+            if use_inner_join:
+                conditions.append("ast_filter.is_confirmed IS NULL")
+            else:
+                conditions.append("(ast_filter.id IS NULL OR ast_filter.is_confirmed IS NULL)")
+        elif validation == "confirmed":
             conditions.append("ast_filter.is_confirmed = TRUE")
-        elif status == "rejected":
+        elif validation == "rejected":
             conditions.append("ast_filter.is_confirmed = FALSE")
-        # status == "all" → pas de filtre sur is_confirmed
 
         if search:
             if search_mode == "not_contains":
@@ -1809,52 +2119,50 @@ async def list_addresses(
                 conditions.append("unaccent(a.raw_text) ILIKE unaccent(%s)")
             params.append(f"%{search}%")
 
-        where_clause = " AND ".join(conditions)
+        where_clause = (" AND " + " AND ".join(conditions)) if conditions else ""
+        join_type = "JOIN" if use_inner_join else "LEFT JOIN"
+
+        from_clause = f"""
+            FROM addresses a
+            {join_type} address_structures ast_filter
+                ON ast_filter.address_id = a.id AND ast_filter.structure_id = %s
+            WHERE TRUE {where_clause}
+        """
 
         # Count
-        cur.execute(f"""
-            SELECT COUNT(*) AS total
-            FROM addresses a
-            JOIN address_structures ast_filter ON {where_clause}
-        """, params)
+        cur.execute(f"SELECT COUNT(*) AS total {from_clause}", params)
         total = cur.fetchone()["total"]
 
-        # Fetch with pub count, aggregated structures, is_confirmed for selected structure
+        # Fetch paginé — pub_count pré-calculé dans la colonne
         cur.execute(f"""
-            SELECT
-                a.id,
-                a.raw_text,
-                ast_filter.is_confirmed,
-                (SELECT json_agg(json_build_object(
-                            'id', s.id,
-                            'name', s.name,
-                            'acronym', s.acronym
-                        ) ORDER BY COALESCE(s.acronym, s.name))
-                 FROM address_structures ast2
-                 JOIN structures s ON s.id = ast2.structure_id
-                 WHERE ast2.address_id = a.id AND s.type != 'site'
-                ) AS structures,
-                (SELECT COUNT(DISTINCT od.publication_id)
-                 FROM openalex_authorship_addresses oaa
-                 JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
-                 JOIN openalex_documents od ON od.id = oas.openalex_document_id
-                 WHERE oaa.address_id = a.id AND od.publication_id IS NOT NULL
-                ) AS pub_count
-            FROM addresses a
-            JOIN address_structures ast_filter ON {where_clause}
-            ORDER BY pub_count DESC, a.id
+            SELECT a.id, a.raw_text, a.pub_count,
+                   ast_filter.is_confirmed,
+                   (ast_filter.matched_form_id IS NOT NULL) AS is_detected,
+                   (SELECT json_agg(json_build_object(
+                               'id', s.id,
+                               'name', s.name,
+                               'acronym', s.acronym,
+                               'is_confirmed', ast2.is_confirmed,
+                               'is_detected', (ast2.matched_form_id IS NOT NULL)
+                           ) ORDER BY COALESCE(s.acronym, s.name))
+                    FROM address_structures ast2
+                    JOIN structures s ON s.id = ast2.structure_id
+                    WHERE ast2.address_id = a.id AND s.type != 'site'
+                   ) AS structures
+            {from_clause}
+            ORDER BY a.pub_count DESC, a.id
             LIMIT %s OFFSET %s
         """, params + [per_page, offset])
 
         rows = cur.fetchall()
         addresses = []
         for row in rows:
-            structs = row["structures"] or []
             addresses.append({
                 "id": row["id"],
                 "raw_text": row["raw_text"],
                 "is_confirmed": row["is_confirmed"],
-                "structures": structs,
+                "is_detected": row["is_detected"] or False,
+                "structures": row["structures"] or [],
                 "pub_count": row["pub_count"],
             })
 
@@ -1884,19 +2192,30 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)):
                 p.doi,
                 p.doc_type::text AS doc_type,
                 j.title AS journal_title,
-                oa.full_name AS author_name,
-                od.openalex_id
-            FROM openalex_authorship_addresses oaa
-            JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
-            JOIN openalex_documents od ON od.id = oas.openalex_document_id
-            JOIN publications p ON p.id = od.publication_id
-            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+                sub.author_name,
+                sub.source_id
+            FROM (
+                SELECT od.publication_id, oa.full_name AS author_name,
+                       od.openalex_id AS source_id
+                FROM openalex_authorship_addresses oaa
+                JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
+                JOIN openalex_documents od ON od.id = oas.openalex_document_id
+                JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+                WHERE oaa.address_id = %s AND od.publication_id IS NOT NULL
+                UNION
+                SELECT wd.publication_id, wa.full_name AS author_name,
+                       wd.ut AS source_id
+                FROM wos_authorship_addresses waa
+                JOIN wos_authorships was ON was.id = waa.wos_authorship_id
+                JOIN wos_documents wd ON wd.id = was.wos_document_id
+                JOIN wos_authors wa ON wa.id = was.wos_author_id
+                WHERE waa.address_id = %s AND wd.publication_id IS NOT NULL
+            ) sub
+            JOIN publications p ON p.id = sub.publication_id
             LEFT JOIN journals j ON j.id = p.journal_id
-            WHERE oaa.address_id = %s
-              AND od.publication_id IS NOT NULL
             ORDER BY p.id, p.pub_year DESC
             LIMIT %s
-        """, (addr_id, limit))
+        """, (addr_id, addr_id, limit))
 
         return {
             "address_id": addr_id,
@@ -1909,33 +2228,84 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)):
 
 @app.post("/api/addresses/{addr_id}/review")
 async def review_address(addr_id: int, action: ReviewAction):
-    """Confirme, rejette ou reset le lien adresse↔structure."""
+    """Confirme, rejette ou reset le lien adresse↔structure (upsert)."""
     with get_cursor() as (cur, conn):
-        cur.execute(
-            "SELECT id FROM address_structures WHERE address_id = %s AND structure_id = %s",
-            (addr_id, action.structure_id),
-        )
-        if not cur.fetchone():
-            raise HTTPException(status_code=404, detail="Lien adresse-structure introuvable")
-
-        cur.execute(
-            "UPDATE address_structures SET is_confirmed = %s WHERE address_id = %s AND structure_id = %s",
-            (action.is_confirmed, addr_id, action.structure_id),
-        )
+        if action.is_confirmed is None:
+            # Reset : supprimer le lien manuel (sans matched_form_id) ou remettre is_confirmed à NULL
+            cur.execute("""
+                DELETE FROM address_structures
+                WHERE address_id = %s AND structure_id = %s AND matched_form_id IS NULL
+            """, (addr_id, action.structure_id))
+            cur.execute("""
+                UPDATE address_structures SET is_confirmed = NULL
+                WHERE address_id = %s AND structure_id = %s
+            """, (addr_id, action.structure_id))
+        else:
+            # Upsert : crée le lien s'il n'existe pas (lien manuel)
+            cur.execute("""
+                INSERT INTO address_structures (address_id, structure_id, is_confirmed)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (address_id, structure_id) DO UPDATE SET is_confirmed = EXCLUDED.is_confirmed
+            """, (addr_id, action.structure_id, action.is_confirmed))
 
         propagate_uca_for_addresses(cur, [addr_id])
-        return {"id": addr_id, "structure_id": action.structure_id, "is_confirmed": action.is_confirmed}
+
+        # Retourner les structures à jour pour mise à jour locale côté client
+        cur.execute("""
+            SELECT json_agg(json_build_object(
+                       'id', s.id,
+                       'name', s.name,
+                       'acronym', s.acronym,
+                       'is_confirmed', ast2.is_confirmed,
+                       'is_detected', (ast2.matched_form_id IS NOT NULL)
+                   ) ORDER BY COALESCE(s.acronym, s.name))
+            FROM address_structures ast2
+            JOIN structures s ON s.id = ast2.structure_id
+            WHERE ast2.address_id = %s AND s.type != 'site'
+        """, (addr_id,))
+        row = cur.fetchone()
+        structures = row["json_agg"] if row and row["json_agg"] else []
+
+        # is_confirmed et is_detected relatifs à la structure filtrée
+        cur.execute("""
+            SELECT is_confirmed, (matched_form_id IS NOT NULL) AS is_detected
+            FROM address_structures
+            WHERE address_id = %s AND structure_id = %s
+        """, (addr_id, action.structure_id))
+        link = cur.fetchone()
+
+        return {
+            "id": addr_id,
+            "is_confirmed": link["is_confirmed"] if link else None,
+            "is_detected": link["is_detected"] if link else False,
+            "structures": structures,
+        }
 
 
 @app.post("/api/addresses/batch-review")
 async def batch_review(data: BatchReviewAction):
     """Confirme, rejette ou reset le lien adresse↔structure pour un lot d'adresses."""
     with get_cursor() as (cur, conn):
-        cur.execute(
-            "UPDATE address_structures SET is_confirmed = %s WHERE address_id = ANY(%s) AND structure_id = %s",
-            (data.is_confirmed, data.address_ids, data.structure_id),
-        )
-        updated = cur.rowcount
+        if data.is_confirmed is None:
+            # Reset : supprimer les liens manuels, remettre les auto-détectés à NULL
+            cur.execute("""
+                DELETE FROM address_structures
+                WHERE address_id = ANY(%s) AND structure_id = %s AND matched_form_id IS NULL
+            """, (data.address_ids, data.structure_id))
+            cur.execute("""
+                UPDATE address_structures SET is_confirmed = NULL
+                WHERE address_id = ANY(%s) AND structure_id = %s
+            """, (data.address_ids, data.structure_id))
+            updated = cur.rowcount
+        else:
+            # Upsert pour chaque adresse
+            from psycopg2.extras import execute_values
+            execute_values(cur, """
+                INSERT INTO address_structures (address_id, structure_id, is_confirmed)
+                VALUES %s
+                ON CONFLICT (address_id, structure_id) DO UPDATE SET is_confirmed = EXCLUDED.is_confirmed
+            """, [(aid, data.structure_id, data.is_confirmed) for aid in data.address_ids])
+            updated = len(data.address_ids)
 
         propagate_uca_for_addresses(cur, data.address_ids)
         return {"updated": updated}
@@ -1948,116 +2318,53 @@ class AssignStructureAction(BaseModel):
 
 
 @app.get("/api/feedback/stats")
-async def feedback_stats():
-    """Statistiques de qualité de la détection automatique (script resolve_addresses)."""
+async def feedback_stats(structure_id: int = Query(...)):
+    """Statistiques de qualité de la détection pour une structure donnée."""
     with get_cursor() as (cur, conn):
-        # "Détectée UCA par le script" = a une address_structures auto
-        # pointant vers une structure dans le périmètre UCA
         cur.execute("""
-            WITH uca_perimeter AS (
-                SELECT s.id FROM structures s WHERE s.code = 'uca'
-                UNION
-                SELECT sr.child_id FROM structure_relations sr
-                JOIN structures s ON s.id = sr.parent_id
-                WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
-            ),
-            addr_flags AS (
-                SELECT
-                    a.id,
-                    EXISTS (
-                        SELECT 1 FROM address_structures ast
-                        JOIN uca_perimeter up ON up.id = ast.structure_id
-                        WHERE ast.address_id = a.id AND ast.is_confirmed = TRUE
-                    ) AS manual_valid,
-                    EXISTS (
-                        SELECT 1 FROM address_structures ast
-                        JOIN uca_perimeter up ON up.id = ast.structure_id
-                        WHERE ast.address_id = a.id AND ast.is_confirmed = FALSE
-                    ) AS manual_rejected,
-                    EXISTS (
-                        SELECT 1 FROM address_structures ast
-                        JOIN uca_perimeter up ON up.id = ast.structure_id
-                        WHERE ast.address_id = a.id AND ast.matched_form_id IS NOT NULL
-                    ) AS script_detected
-                FROM addresses a
-                WHERE EXISTS (
-                    SELECT 1 FROM address_structures ast
-                    JOIN uca_perimeter up ON up.id = ast.structure_id
-                    WHERE ast.address_id = a.id
-                      AND (ast.is_confirmed IS NOT NULL OR ast.matched_form_id IS NOT NULL)
-                )
-            )
             SELECT
-                COUNT(*) FILTER (WHERE manual_valid OR manual_rejected) AS total_reviewed,
-                COUNT(*) FILTER (WHERE script_detected) AS script_detected,
-                COUNT(*) FILTER (WHERE manual_valid) AS manual_valid,
-                COUNT(*) FILTER (WHERE manual_rejected) AS manual_rejected,
-                COUNT(*) FILTER (
-                    WHERE manual_valid AND NOT script_detected
-                ) AS false_negatives,
-                COUNT(*) FILTER (
-                    WHERE manual_rejected AND script_detected
-                ) AS false_positives,
-                COUNT(*) FILTER (
-                    WHERE manual_valid AND script_detected
-                ) AS concordant_valid,
-                COUNT(*) FILTER (
-                    WHERE manual_rejected AND NOT script_detected
-                ) AS concordant_rejected,
-                COUNT(*) FILTER (
-                    WHERE NOT manual_valid AND NOT manual_rejected AND script_detected
-                ) AS pending
-            FROM addr_flags
-        """)
+                COUNT(*) FILTER (WHERE is_confirmed IS NOT NULL) AS total_reviewed,
+                COUNT(*) FILTER (WHERE is_confirmed = TRUE AND matched_form_id IS NOT NULL) AS concordant_valid,
+                COUNT(*) FILTER (WHERE is_confirmed = FALSE AND matched_form_id IS NULL) AS concordant_rejected,
+                COUNT(*) FILTER (WHERE is_confirmed = TRUE AND matched_form_id IS NULL) AS false_negatives,
+                COUNT(*) FILTER (WHERE is_confirmed = FALSE AND matched_form_id IS NOT NULL) AS false_positives,
+                COUNT(*) FILTER (WHERE is_confirmed IS NULL AND matched_form_id IS NOT NULL) AS pending
+            FROM address_structures
+            WHERE structure_id = %s
+        """, (structure_id,))
         row = cur.fetchone()
 
         reviewed = (row["concordant_valid"] or 0) + (row["concordant_rejected"] or 0) + \
                    (row["false_negatives"] or 0) + (row["false_positives"] or 0)
         concordant = (row["concordant_valid"] or 0) + (row["concordant_rejected"] or 0)
-        row["detection_rate"] = round(concordant / reviewed * 100, 1) if reviewed else None
-        row["total_discordant"] = (row["false_negatives"] or 0) + (row["false_positives"] or 0)
 
-        return row
+        return {
+            "total_reviewed": reviewed,
+            "detection_rate": round(concordant / reviewed * 100, 1) if reviewed else None,
+            "false_negatives": row["false_negatives"] or 0,
+            "false_positives": row["false_positives"] or 0,
+            "concordant_valid": row["concordant_valid"] or 0,
+            "pending": row["pending"] or 0,
+        }
 
 
 @app.get("/api/feedback/false-negatives")
 async def feedback_false_negatives(
+    structure_id: int = Query(...),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
 ):
-    """Adresses marquées UCA manuellement mais non détectées par le script (resolve_addresses).
-    Chaque adresse représente potentiellement une forme de nom manquante."""
+    """Adresses confirmées manuellement pour cette structure mais non détectées par le script."""
     offset = (page - 1) * per_page
 
     with get_cursor() as (cur, conn):
-        # Critère : confirmée UCA manuellement (is_confirmed = TRUE pour une structure UCA)
-        # ET aucune détection auto pointant vers le périmètre UCA
         conditions = [
-            """EXISTS (
-                SELECT 1 FROM address_structures ast
-                JOIN (
-                    SELECT s.id FROM structures s WHERE s.code = 'uca'
-                    UNION
-                    SELECT sr.child_id FROM structure_relations sr
-                    JOIN structures s ON s.id = sr.parent_id
-                    WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
-                ) uca ON uca.id = ast.structure_id
-                WHERE ast.address_id = a.id AND ast.is_confirmed = TRUE
-            )""",
-            """NOT EXISTS (
-                SELECT 1 FROM address_structures ast
-                JOIN (
-                    SELECT s.id FROM structures s WHERE s.code = 'uca'
-                    UNION
-                    SELECT sr.child_id FROM structure_relations sr
-                    JOIN structures s ON s.id = sr.parent_id
-                    WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
-                ) uca ON uca.id = ast.structure_id
-                WHERE ast.address_id = a.id AND ast.matched_form_id IS NOT NULL
-            )""",
+            "ast.structure_id = %s",
+            "ast.is_confirmed = TRUE",
+            "ast.matched_form_id IS NULL",
         ]
-        params = []
+        params: list = [structure_id]
 
         if search:
             conditions.append("unaccent(a.raw_text) ILIKE unaccent(%s)")
@@ -2066,38 +2373,29 @@ async def feedback_false_negatives(
         where = " AND ".join(conditions)
 
         cur.execute(f"""
-            SELECT COUNT(*) FROM addresses a WHERE {where}
+            SELECT COUNT(*)
+            FROM address_structures ast
+            JOIN addresses a ON a.id = ast.address_id
+            WHERE {where}
         """, params)
         total = cur.fetchone()["count"]
 
         cur.execute(f"""
             SELECT
-                a.id,
-                a.raw_text,
-                (
-                    SELECT COUNT(DISTINCT od.publication_id)
-                    FROM openalex_authorship_addresses oaa
-                    JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
-                    JOIN openalex_documents od ON od.id = oas.openalex_document_id
-                    WHERE oaa.address_id = a.id AND od.publication_id IS NOT NULL
-                ) AS pub_count,
-                (
-                    SELECT json_agg(json_build_object(
-                        'structure_id', s.id, 'acronym', s.acronym, 'name', s.name
-                    ))
-                    FROM address_structures ast
-                    JOIN structures s ON s.id = ast.structure_id
-                    WHERE ast.address_id = a.id AND s.type != 'site'
+                a.id, a.raw_text, a.pub_count,
+                (SELECT json_agg(json_build_object(
+                    'structure_id', s.id, 'acronym', s.acronym, 'name', s.name,
+                    'is_detected', (ast2.matched_form_id IS NOT NULL),
+                    'is_confirmed', ast2.is_confirmed
+                ))
+                FROM address_structures ast2
+                JOIN structures s ON s.id = ast2.structure_id
+                WHERE ast2.address_id = a.id AND s.type != 'site'
                 ) AS labs
-            FROM addresses a
+            FROM address_structures ast
+            JOIN addresses a ON a.id = ast.address_id
             WHERE {where}
-            ORDER BY (
-                SELECT COUNT(DISTINCT od.publication_id)
-                FROM openalex_authorship_addresses oaa
-                JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
-                JOIN openalex_documents od ON od.id = oas.openalex_document_id
-                WHERE oaa.address_id = a.id AND od.publication_id IS NOT NULL
-            ) DESC
+            ORDER BY a.pub_count DESC, a.id
             LIMIT %s OFFSET %s
         """, params + [per_page, offset])
 
@@ -2112,42 +2410,21 @@ async def feedback_false_negatives(
 
 @app.get("/api/feedback/false-positives")
 async def feedback_false_positives(
+    structure_id: int = Query(...),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
 ):
-    """Adresses détectées UCA par le script (resolve_addresses) mais rejetées manuellement.
-    Le labo auto-détecté indique quelle forme de nom est trop permissive."""
+    """Adresses détectées pour cette structure mais rejetées manuellement."""
     offset = (page - 1) * per_page
 
     with get_cursor() as (cur, conn):
-        # Critère : rejetée manuellement (is_confirmed = FALSE pour une structure UCA)
-        # ET au moins une détection auto pointant vers le périmètre UCA
         conditions = [
-            """EXISTS (
-                SELECT 1 FROM address_structures ast
-                JOIN (
-                    SELECT s.id FROM structures s WHERE s.code = 'uca'
-                    UNION
-                    SELECT sr.child_id FROM structure_relations sr
-                    JOIN structures s ON s.id = sr.parent_id
-                    WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
-                ) uca ON uca.id = ast.structure_id
-                WHERE ast.address_id = a.id AND ast.is_confirmed = FALSE
-            )""",
-            """EXISTS (
-                SELECT 1 FROM address_structures ast
-                JOIN (
-                    SELECT s.id FROM structures s WHERE s.code = 'uca'
-                    UNION
-                    SELECT sr.child_id FROM structure_relations sr
-                    JOIN structures s ON s.id = sr.parent_id
-                    WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
-                ) uca ON uca.id = ast.structure_id
-                WHERE ast.address_id = a.id AND ast.matched_form_id IS NOT NULL
-            )""",
+            "ast.structure_id = %s",
+            "ast.is_confirmed = FALSE",
+            "ast.matched_form_id IS NOT NULL",
         ]
-        params = []
+        params: list = [structure_id]
 
         if search:
             conditions.append("unaccent(a.raw_text) ILIKE unaccent(%s)")
@@ -2156,60 +2433,44 @@ async def feedback_false_positives(
         where = " AND ".join(conditions)
 
         cur.execute(f"""
-            SELECT COUNT(*) FROM addresses a WHERE {where}
+            SELECT COUNT(*)
+            FROM address_structures ast
+            JOIN addresses a ON a.id = ast.address_id
+            WHERE {where}
         """, params)
         total = cur.fetchone()["count"]
 
         cur.execute(f"""
             SELECT
-                a.id,
-                a.raw_text,
-                (
-                    SELECT COUNT(DISTINCT od.publication_id)
-                    FROM openalex_authorship_addresses oaa
-                    JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
-                    JOIN openalex_documents od ON od.id = oas.openalex_document_id
-                    WHERE oaa.address_id = a.id AND od.publication_id IS NOT NULL
-                ) AS pub_count,
-                (
-                    SELECT json_agg(json_build_object(
-                        'structure_id', s.id, 'acronym', s.acronym, 'name', s.name
-                    ))
-                    FROM address_structures ast
-                    JOIN structures s ON s.id = ast.structure_id
-                    WHERE ast.address_id = a.id AND s.type != 'site'
+                a.id, a.raw_text, a.pub_count,
+                (SELECT json_agg(json_build_object(
+                    'structure_id', s.id, 'acronym', s.acronym, 'name', s.name,
+                    'is_detected', (ast2.matched_form_id IS NOT NULL),
+                    'is_confirmed', ast2.is_confirmed
+                ))
+                FROM address_structures ast2
+                JOIN structures s ON s.id = ast2.structure_id
+                WHERE ast2.address_id = a.id AND s.type != 'site'
                 ) AS labs,
-                (
-                    SELECT json_agg(json_build_object(
-                        'form_id', nf.id,
-                        'form_text', nf.form_text,
-                        'requires_context_of', nf.requires_context_of,
-                        'structure_code', s.code,
-                        'structure_name', COALESCE(s.acronym, s.name)
-                    ))
-                    FROM address_structures ast
-                    JOIN name_forms nf ON nf.id = ast.matched_form_id
-                    JOIN structures s ON s.id = nf.structure_id
-                    JOIN (
-                        SELECT s2.id FROM structures s2 WHERE s2.code = 'uca'
-                        UNION
-                        SELECT sr2.child_id FROM structure_relations sr2
-                        JOIN structures s2 ON s2.id = sr2.parent_id
-                        WHERE s2.code = 'uca' AND sr2.relation_type = 'est_tutelle_de'
-                    ) uca ON uca.id = ast.structure_id
-                    WHERE ast.address_id = a.id AND ast.matched_form_id IS NOT NULL
+                (SELECT json_agg(json_build_object(
+                    'form_id', nf.id,
+                    'form_text', nf.form_text,
+                    'requires_context_of', nf.requires_context_of,
+                    'structure_name', COALESCE(s.acronym, s.name)
+                ))
+                FROM address_structures ast2
+                JOIN name_forms nf ON nf.id = ast2.matched_form_id
+                JOIN structures s ON s.id = nf.structure_id
+                WHERE ast2.address_id = a.id
+                  AND ast2.structure_id = %s
+                  AND ast2.matched_form_id IS NOT NULL
                 ) AS matched_forms
-            FROM addresses a
+            FROM address_structures ast
+            JOIN addresses a ON a.id = ast.address_id
             WHERE {where}
-            ORDER BY (
-                SELECT COUNT(DISTINCT od.publication_id)
-                FROM openalex_authorship_addresses oaa
-                JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
-                JOIN openalex_documents od ON od.id = oas.openalex_document_id
-                WHERE oaa.address_id = a.id AND od.publication_id IS NOT NULL
-            ) DESC
+            ORDER BY a.pub_count DESC, a.id
             LIMIT %s OFFSET %s
-        """, params + [per_page, offset])
+        """, params + [structure_id, per_page, offset])
 
         return {
             "total": total,
@@ -2244,27 +2505,40 @@ async def assign_structure(addr_id: int, action: AssignStructureAction):
         return {"id": addr_id, "structure_id": action.structure_id, "status": "assigned"}
 
 
-@app.post("/api/feedback/rerun")
+@app.get("/api/feedback/rerun")
 async def feedback_rerun():
-    """Lance resolve_addresses --rerun."""
+    """Lance resolve_addresses en SSE (détection complète sur toutes les adresses)."""
+    import asyncio
+
     script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                           "processing", "resolve_addresses.py")
     if not os.path.exists(script):
         raise HTTPException(status_code=500, detail="Script resolve_addresses.py introuvable")
 
-    try:
-        result = subprocess.run(
-            [sys.executable, script, "--rerun"],
-            capture_output=True, text=True, timeout=300,
+    async def event_stream():
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-u", script,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
         )
-        lines = (result.stdout + result.stderr).strip().split("\n")
-        summary = [l for l in lines if any(k in l for k in ["Terminé", "UCA", "Affiliat", "Reset"])]
-        return {
-            "success": result.returncode == 0,
-            "summary": summary[-5:] if summary else lines[-5:],
-        }
-    except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=504, detail="Timeout (>5min)")
+        try:
+            while True:
+                line = await asyncio.wait_for(proc.stdout.readline(), timeout=600)
+                if not line:
+                    break
+                text = line.decode("utf-8", errors="replace").rstrip()
+                if text:
+                    yield f"data: {text}\n\n"
+            returncode = await proc.wait()
+            if returncode == 0:
+                yield "data: [DONE]\n\n"
+            else:
+                yield f"data: [ERROR] Code retour {returncode}\n\n"
+        except asyncio.TimeoutError:
+            proc.kill()
+            yield "data: [ERROR] Timeout (>10min)\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.delete("/api/addresses/{addr_id}/assign-structure")
@@ -2554,19 +2828,19 @@ async def persons_directory(
         params.append(roles)
     if has_orcid == "yes":
         conditions.append(
-            "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected)")
+            "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')")
     elif has_orcid == "no":
         conditions.append(
-            "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected)")
+            "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')")
     if has_idhal == "yes":
         conditions.append("""(
             EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
-            OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected)
+            OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
         )""")
     elif has_idhal == "no":
         conditions.append("""(
             NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
-            AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected)
+            AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
         )""")
     if has_rh == "yes":
         conditions.append("prh.id IS NOT NULL")
@@ -2586,14 +2860,14 @@ async def persons_directory(
                 (prh.id IS NOT NULL) AS has_rh,
                 (SELECT json_agg(DISTINCT pi.id_value)
                  FROM person_identifiers pi
-                 WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected
+                 WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
                 ) AS orcids,
                 (SELECT json_agg(DISTINCT v) FROM (
                     SELECT ha.idhal AS v FROM hal_authors ha
                     WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL
                     UNION
                     SELECT pi.id_value FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected
+                    WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
                 ) sub) AS idhals
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
@@ -2615,7 +2889,7 @@ async def persons_directory(
 
 @app.get("/api/stats")
 async def get_stats(structure_id: int | None = Query(None)):
-    """Compteurs de liens adresse↔structure par état de confirmation."""
+    """Compteurs d'adresses par détection/validation pour une structure."""
     with get_cursor() as (cur, conn):
         # Résoudre la structure (défaut = UCA)
         if structure_id is None:
@@ -2623,15 +2897,27 @@ async def get_stats(structure_id: int | None = Query(None)):
             row = cur.fetchone()
             structure_id = row["id"] if row else 0
 
+        cur.execute("SELECT COUNT(*) AS total FROM addresses")
+        total = cur.fetchone()["total"]
+
         cur.execute("""
             SELECT
+                COUNT(*) FILTER (WHERE ast.matched_form_id IS NOT NULL) AS detected,
                 COUNT(*) FILTER (WHERE ast.is_confirmed IS NULL) AS pending,
                 COUNT(*) FILTER (WHERE ast.is_confirmed = FALSE) AS rejected,
                 COUNT(*) FILTER (WHERE ast.is_confirmed = TRUE) AS confirmed
             FROM address_structures ast
             WHERE ast.structure_id = %s
         """, (structure_id,))
-        return cur.fetchone()
+        row = cur.fetchone()
+
+        return {
+            "total": total,
+            "detected": row["detected"],
+            "pending": row["pending"],
+            "rejected": row["rejected"],
+            "confirmed": row["confirmed"],
+        }
 
 
 # ----- API: Structures CRUD -----
@@ -2903,11 +3189,13 @@ async def authorships_stats(lab_id: int = Query(0)):
     """Statistiques auteurs UCA."""
     lab_filter_hal = ""
     lab_filter_oa = ""
+    lab_filter_wos = ""
     params: list = []
     if lab_id:
         lab_filter_hal = " AND has.structure_ids && %s::int[]"
         lab_filter_oa = " AND oas.structure_ids && %s::int[]"
-        params = [[lab_id], [lab_id]]
+        lab_filter_wos = " AND was.structure_ids && %s::int[]"
+        params = [[lab_id], [lab_id], [lab_id]]
 
     with get_cursor() as (cur, conn):
         cur.execute(f"""
@@ -2924,6 +3212,13 @@ async def authorships_stats(lab_id: int = Query(0)):
                 WHERE EXISTS (
                     SELECT 1 FROM openalex_authorships oas
                     WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE{lab_filter_oa}
+                )
+                UNION ALL
+                SELECT wa.id, wa.person_id, wa.orcid, NULL AS idhal, 'wos' AS source
+                FROM wos_authors wa
+                WHERE EXISTS (
+                    SELECT 1 FROM wos_authorships was
+                    WHERE was.wos_author_id = wa.id AND was.is_uca = TRUE{lab_filter_wos}
                 )
             )
             SELECT
@@ -2946,11 +3241,13 @@ async def authorships_facets(
     """Facettes dynamiques pour la page authorships admin."""
     lab_filter_hal = ""
     lab_filter_oa = ""
+    lab_filter_wos = ""
     cte_params: list = []
     if lab_id:
         lab_filter_hal = " AND has.structure_ids && %s::int[]"
         lab_filter_oa = " AND oas.structure_ids && %s::int[]"
-        cte_params = [[lab_id], [lab_id]]
+        lab_filter_wos = " AND was.structure_ids && %s::int[]"
+        cte_params = [[lab_id], [lab_id], [lab_id]]
 
     cte = f"""
         WITH uca_authors AS (
@@ -2974,6 +3271,17 @@ async def authorships_facets(
             WHERE EXISTS (
                 SELECT 1 FROM openalex_authorships oas
                 WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE{lab_filter_oa}
+            )
+            UNION ALL
+            SELECT wa.id, wa.person_id, wa.orcid, NULL AS idhal, 'wos' AS source,
+                   wa.full_name,
+                   (SELECT COUNT(DISTINCT wd.publication_id) FROM wos_authorships was2
+                    JOIN wos_documents wd ON wd.id = was2.wos_document_id
+                    WHERE was2.wos_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count
+            FROM wos_authors wa
+            WHERE EXISTS (
+                SELECT 1 FROM wos_authorships was
+                WHERE was.wos_author_id = wa.id AND was.is_uca = TRUE{lab_filter_wos}
             )
         )
     """
@@ -3050,6 +3358,14 @@ async def authorships_facets(
                     SELECT 1 FROM openalex_authorships oas
                     WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE
                 )
+                UNION ALL
+                SELECT wa.id, wa.person_id, wa.orcid, NULL AS idhal, 'wos' AS source,
+                       wa.full_name
+                FROM wos_authors wa
+                WHERE EXISTS (
+                    SELECT 1 FROM wos_authorships was
+                    WHERE was.wos_author_id = wa.id AND was.is_uca = TRUE
+                )
             ),
             author_structs AS (
                 SELECT ha.id AS author_id, 'hal' AS source, unnest(has.structure_ids) AS struct_id
@@ -3061,6 +3377,11 @@ async def authorships_facets(
                 FROM openalex_authors oa
                 JOIN openalex_authorships oas ON oas.openalex_author_id = oa.id
                 WHERE oas.is_uca = TRUE AND oas.structure_ids IS NOT NULL
+                UNION
+                SELECT wa.id, 'wos', unnest(was.structure_ids)
+                FROM wos_authors wa
+                JOIN wos_authorships was ON was.wos_author_id = wa.id
+                WHERE was.is_uca = TRUE AND was.structure_ids IS NOT NULL
             )
         """
         cur.execute(f"""{lab_cte}
@@ -3099,11 +3420,13 @@ async def list_authorships(
     # Filtre labo (injecté dans le CTE)
     lab_filter_hal = ""
     lab_filter_oa = ""
+    lab_filter_wos = ""
     cte_params: list = []
     if lab_id:
         lab_filter_hal = " AND has.structure_ids && %s::int[]"
         lab_filter_oa = " AND oas.structure_ids && %s::int[]"
-        cte_params = [[lab_id], [lab_id]]
+        lab_filter_wos = " AND was.structure_ids && %s::int[]"
+        cte_params = [[lab_id], [lab_id], [lab_id]]
 
     # Filtres appliqués sur le résultat du CTE
     cte_conditions = []
@@ -3151,6 +3474,17 @@ async def list_authorships(
                 WHERE EXISTS (
                     SELECT 1 FROM openalex_authorships oas
                     WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE{lab_filter_oa}
+                )
+                UNION ALL
+                SELECT wa.id, 'wos' AS source, wa.full_name, wa.last_name, wa.first_name,
+                       wa.orcid, NULL::text AS idhal, NULL::text AS openalex_id, wa.person_id,
+                       (SELECT COUNT(DISTINCT was2.wos_document_id)
+                        FROM wos_authorships was2
+                        WHERE was2.wos_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count
+                FROM wos_authors wa
+                WHERE EXISTS (
+                    SELECT 1 FROM wos_authorships was
+                    WHERE was.wos_author_id = wa.id AND was.is_uca = TRUE{lab_filter_wos}
                 )
             )
         """
@@ -3265,22 +3599,22 @@ async def list_persons(
     if has_orcid == "yes":
         conditions.append("""EXISTS (
             SELECT 1 FROM person_identifiers pi
-            WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected
+            WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
         )""")
     elif has_orcid == "no":
         conditions.append("""NOT EXISTS (
             SELECT 1 FROM person_identifiers pi
-            WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected
+            WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
         )""")
     if has_idhal == "yes":
         conditions.append("""EXISTS (
             SELECT 1 FROM person_identifiers pi
-            WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected
+            WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
         )""")
     elif has_idhal == "no":
         conditions.append("""NOT EXISTS (
             SELECT 1 FROM person_identifiers pi
-            WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected
+            WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
         )""")
     if has_rh == "yes":
         conditions.append("prh.id IS NOT NULL")
@@ -3304,11 +3638,14 @@ async def list_persons(
                     UNION ALL
                     SELECT oa.id, oa.full_name, oa.orcid, NULL AS idhal, 'openalex' AS source
                     FROM openalex_authors oa WHERE oa.person_id = p.id
+                    UNION ALL
+                    SELECT wa.id, wa.full_name, wa.orcid, NULL AS idhal, 'wos' AS source
+                    FROM wos_authors wa WHERE wa.person_id = p.id
                 ) x) AS linked_authors,
                 (SELECT json_agg(json_build_object(
                     'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
-                    'source', pi.source, 'rejected', pi.rejected
-                )) FROM person_identifiers pi WHERE pi.person_id = p.id
+                    'source', pi.source, 'status', pi.status
+                ) ORDER BY pi.id_type, pi.id_value) FROM person_identifiers pi WHERE pi.person_id = p.id
                 ) AS identifiers
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
@@ -3351,19 +3688,19 @@ async def persons_facets(
             params.append(roles)
         if skip != "has_orcid":
             if has_orcid == "yes":
-                conds.append("EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected)")
+                conds.append("EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')")
             elif has_orcid == "no":
-                conds.append("NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected)")
+                conds.append("NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')")
         if skip != "has_idhal":
             if has_idhal == "yes":
                 conds.append("""(
                     EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
-                    OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected)
+                    OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
                 )""")
             elif has_idhal == "no":
                 conds.append("""(
                     NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
-                    AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected)
+                    AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
                 )""")
         if skip != "has_rh":
             if has_rh == "yes":
@@ -3411,11 +3748,11 @@ async def persons_facets(
             SELECT
                 COUNT(*) FILTER (WHERE EXISTS (
                     SELECT 1 FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected
+                    WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
                 )) AS yes,
                 COUNT(*) FILTER (WHERE NOT EXISTS (
                     SELECT 1 FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND NOT pi.rejected
+                    WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
                 )) AS no
             FROM {base_from} {where}
         """, p)
@@ -3427,11 +3764,11 @@ async def persons_facets(
             SELECT
                 COUNT(*) FILTER (WHERE
                     EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
-                    OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected)
+                    OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
                 ) AS yes,
                 COUNT(*) FILTER (WHERE
                     NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
-                    AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND NOT pi.rejected)
+                    AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
                 ) AS no
             FROM {base_from} {where}
         """, p)
@@ -3514,9 +3851,11 @@ async def persons_stats():
                 COUNT(DISTINCT p.id) FILTER (
                     WHERE EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
                        OR EXISTS (SELECT 1 FROM openalex_authors oa WHERE oa.person_id = p.id)
+                       OR EXISTS (SELECT 1 FROM wos_authors wa WHERE wa.person_id = p.id)
                 ) AS linked_persons,
                 (SELECT COUNT(*) FROM hal_authors WHERE person_id IS NOT NULL)
                 + (SELECT COUNT(*) FROM openalex_authors WHERE person_id IS NOT NULL)
+                + (SELECT COUNT(*) FROM wos_authors WHERE person_id IS NOT NULL)
                 AS linked_authors,
                 (SELECT COUNT(DISTINCT department_name)
                  FROM persons_rh WHERE department_name IS NOT NULL) AS departments
@@ -3553,8 +3892,20 @@ async def author_details(source: str, author_id: int, max_pubs: int = Query(10, 
                 ORDER BY COALESCE(p.pub_year, od.pub_year) DESC
                 LIMIT %s
             """, (author_id, max_pubs))
+        elif source == "wos":
+            cur.execute("""
+                SELECT p.id, p.title, p.pub_year, p.doi,
+                       was.is_uca,
+                       'wos' AS source
+                FROM wos_authorships was
+                JOIN wos_documents wd ON wd.id = was.wos_document_id
+                LEFT JOIN publications p ON p.id = wd.publication_id
+                WHERE was.wos_author_id = %s AND was.is_uca = TRUE
+                ORDER BY COALESCE(p.pub_year, wd.pub_year) DESC
+                LIMIT %s
+            """, (author_id, max_pubs))
         else:
-            raise HTTPException(status_code=400, detail="Source must be 'hal' or 'openalex'")
+            raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
 
         publications = cur.fetchall()
         return {"signatures": [], "publications": publications}
@@ -3575,11 +3926,14 @@ async def get_person(person_id: int):
                     UNION ALL
                     SELECT oa.id, oa.full_name, oa.orcid, NULL AS idhal, 'openalex' AS source
                     FROM openalex_authors oa WHERE oa.person_id = p.id
+                    UNION ALL
+                    SELECT wa.id, wa.full_name, wa.orcid, NULL AS idhal, 'wos' AS source
+                    FROM wos_authors wa WHERE wa.person_id = p.id
                 ) x) AS linked_authors,
                 (SELECT json_agg(json_build_object(
                     'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
-                    'source', pi.source, 'rejected', pi.rejected
-                )) FROM person_identifiers pi WHERE pi.person_id = p.id
+                    'source', pi.source, 'status', pi.status
+                ) ORDER BY pi.id_type, pi.id_value) FROM person_identifiers pi WHERE pi.person_id = p.id
                 ) AS identifiers
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
@@ -3610,7 +3964,7 @@ async def person_profile(person_id: int):
 
         # Identifiants
         cur.execute("""
-            SELECT id, id_type, id_value, source, rejected
+            SELECT id, id_type, id_value, source, status
             FROM person_identifiers WHERE person_id = %s
         """, (person_id,))
         identifiers = cur.fetchall()
@@ -3636,10 +3990,20 @@ async def person_profile(person_id: int):
         """, (person_id,))
         oa_authors = cur.fetchall()
 
+        # Auteurs liés WoS + compte publis UCA
+        cur.execute("""
+            SELECT wa.id, 'wos' AS source, wa.full_name, wa.orcid,
+                   NULL::text AS idhal, NULL::text AS openalex_id,
+                   (SELECT COUNT(*) FROM wos_authorships was2
+                    WHERE was2.wos_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count
+            FROM wos_authors wa WHERE wa.person_id = %s
+        """, (person_id,))
+        wos_authors = cur.fetchall()
+
         return {
             "person": person,
             "identifiers": identifiers,
-            "authors": hal_authors + oa_authors,
+            "authors": hal_authors + oa_authors + wos_authors,
         }
 
 
@@ -3723,11 +4087,17 @@ async def person_author_candidates(person_id: int, limit: int = Query(10, ge=1, 
         if person_orcid:
             orcid_cond_hal = "OR ha.orcid = %s"
             orcid_cond_oa = "OR oa.orcid = %s"
+            orcid_cond_wos = "OR wa.orcid = %s"
             orcid_params = [person_orcid]
         else:
             orcid_cond_hal = ""
             orcid_cond_oa = ""
+            orcid_cond_wos = ""
             orcid_params = []
+
+        word_conditions_wos = " AND ".join(
+            "lower(unaccent(wa.full_name)) LIKE %s" for _ in full_words
+        )
 
         cur.execute(f"""
             WITH candidates AS (
@@ -3752,12 +4122,23 @@ async def person_author_candidates(person_id: int, limit: int = Query(10, ge=1, 
                 WHERE ({word_conditions_oa} {orcid_cond_oa})
                   AND EXISTS (SELECT 1 FROM openalex_authorships oas
                               WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE)
+                UNION ALL
+                SELECT wa.id, 'wos' AS source, wa.full_name, wa.last_name, wa.first_name,
+                       wa.orcid, NULL::text AS idhal, NULL::text AS openalex_id, wa.person_id,
+                       (SELECT COUNT(*) FROM wos_authorships was2
+                        WHERE was2.wos_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count,
+                       (SELECT COUNT(*) FROM wos_authorships was2
+                        WHERE was2.wos_author_id = wa.id) AS pub_count
+                FROM wos_authors wa
+                WHERE ({word_conditions_wos} {orcid_cond_wos})
+                  AND EXISTS (SELECT 1 FROM wos_authorships was
+                              WHERE was.wos_author_id = wa.id AND was.is_uca = TRUE)
             )
             SELECT * FROM candidates
             WHERE uca_pub_count > 0
             ORDER BY uca_pub_count DESC, pub_count DESC
             LIMIT %s
-        """, word_params + orcid_params + word_params + orcid_params + [limit])
+        """, word_params + orcid_params + word_params + orcid_params + word_params + orcid_params + [limit])
 
         return cur.fetchall()
 
@@ -3787,12 +4168,11 @@ async def link_person_to_author(person_id: int, data: LinkPersonAuthor):
             # Propager vers authorships (vérité)
             cur.execute("""
                 UPDATE authorships ash SET person_id = %s, updated_at = now()
-                FROM hal_authorships has
-                JOIN hal_documents hd ON hd.id = has.hal_document_id
-                WHERE has.hal_author_id = %s
-                  AND hd.publication_id = ash.publication_id
-                  AND ash.source_hal = TRUE
-                  AND ash.person_id IS NULL
+                WHERE ash.hal_authorship_id IN (
+                    SELECT has.id FROM hal_authorships has
+                    WHERE has.hal_author_id = %s
+                )
+                AND ash.person_id IS NULL
             """, (person_id, data.author_id))
             # Propager identifiants vers person_identifiers
             if ha["idhal"]:
@@ -3819,12 +4199,11 @@ async def link_person_to_author(person_id: int, data: LinkPersonAuthor):
             """, (person_id, data.author_id))
             cur.execute("""
                 UPDATE authorships ash SET person_id = %s, updated_at = now()
-                FROM openalex_authorships oas
-                JOIN openalex_documents od ON od.id = oas.openalex_document_id
-                WHERE oas.openalex_author_id = %s
-                  AND od.publication_id = ash.publication_id
-                  AND ash.source_openalex = TRUE
-                  AND ash.person_id IS NULL
+                WHERE ash.openalex_authorship_id IN (
+                    SELECT oas.id FROM openalex_authorships oas
+                    WHERE oas.openalex_author_id = %s
+                )
+                AND ash.person_id IS NULL
             """, (person_id, data.author_id))
             # Propager ORCID vers person_identifiers
             if oa["orcid"]:
@@ -3833,8 +4212,33 @@ async def link_person_to_author(person_id: int, data: LinkPersonAuthor):
                     VALUES (%s, 'orcid', %s, 'openalex')
                     ON CONFLICT (id_type, id_value) DO NOTHING
                 """, (person_id, oa["orcid"]))
+        elif data.source == "wos":
+            cur.execute("SELECT id, orcid FROM wos_authors WHERE id = %s",
+                        (data.author_id,))
+            wa = cur.fetchone()
+            if not wa:
+                raise HTTPException(status_code=404, detail="WoS author not found")
+            cur.execute("""
+                UPDATE wos_authors SET person_id = %s, updated_at = now()
+                WHERE id = %s
+            """, (person_id, data.author_id))
+            cur.execute("""
+                UPDATE authorships ash SET person_id = %s, updated_at = now()
+                WHERE ash.wos_authorship_id IN (
+                    SELECT was.id FROM wos_authorships was
+                    WHERE was.wos_author_id = %s
+                )
+                AND ash.person_id IS NULL
+            """, (person_id, data.author_id))
+            # Propager ORCID vers person_identifiers
+            if wa["orcid"]:
+                cur.execute("""
+                    INSERT INTO person_identifiers (person_id, id_type, id_value, source)
+                    VALUES (%s, 'orcid', %s, 'wos')
+                    ON CONFLICT (id_type, id_value) DO NOTHING
+                """, (person_id, wa["orcid"]))
         else:
-            raise HTTPException(status_code=400, detail="Source must be 'hal' or 'openalex'")
+            raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
 
         return {"linked": True, "person_id": person_id,
                 "author_id": data.author_id, "source": data.source}
@@ -3854,8 +4258,13 @@ async def unlink_person_from_author(person_id: int, source: str, author_id: int)
                 UPDATE openalex_authors SET person_id = NULL, updated_at = now()
                 WHERE id = %s AND person_id = %s
             """, (author_id, person_id))
+        elif source == "wos":
+            cur.execute("""
+                UPDATE wos_authors SET person_id = NULL, updated_at = now()
+                WHERE id = %s AND person_id = %s
+            """, (author_id, person_id))
         else:
-            raise HTTPException(status_code=400, detail="Source must be 'hal' or 'openalex'")
+            raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
 
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Link not found")
@@ -3931,18 +4340,21 @@ async def remove_person_identifier(person_id: int, id_type: str, id_value: str):
         return {"removed": True}
 
 
-@app.patch("/api/person-identifiers/{ident_id}/reject")
-async def toggle_reject_identifier(ident_id: int):
-    """Bascule le flag rejected d'un identifiant."""
+@app.patch("/api/person-identifiers/{ident_id}/status")
+async def update_identifier_status(ident_id: int, body: dict):
+    """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
+    new_status = body.get("status")
+    if new_status not in ("pending", "confirmed", "rejected"):
+        raise HTTPException(status_code=400, detail="Statut invalide")
     with get_cursor() as (cur, conn):
         cur.execute("""
-            UPDATE person_identifiers SET rejected = NOT rejected
-            WHERE id = %s RETURNING id, rejected
-        """, (ident_id,))
+            UPDATE person_identifiers SET status = %s::identifier_status
+            WHERE id = %s RETURNING id, status
+        """, (new_status, ident_id))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Identifiant introuvable")
-        return {"id": row["id"], "rejected": row["rejected"]}
+        return {"id": row["id"], "status": row["status"]}
 
 
 @app.post("/api/persons/{person_id}/merge")
@@ -3973,6 +4385,11 @@ async def merge_persons(person_id: int, body: dict):
         # 2. Transférer les auteurs OpenAlex
         cur.execute(
             "UPDATE openalex_authors SET person_id = %s WHERE person_id = %s",
+            (person_id, source_id),
+        )
+        # 2b. Transférer les auteurs WoS
+        cur.execute(
+            "UPDATE wos_authors SET person_id = %s WHERE person_id = %s",
             (person_id, source_id),
         )
         # 3. Transférer les authorships (supprimer les doublons publication)

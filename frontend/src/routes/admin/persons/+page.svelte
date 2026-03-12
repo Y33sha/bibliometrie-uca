@@ -29,7 +29,7 @@
 		id_type: string;
 		id_value: string;
 		source: string;
-		rejected: boolean;
+		status: 'pending' | 'confirmed' | 'rejected';
 	}
 
 	interface Person {
@@ -378,8 +378,12 @@
 		await loadTable();
 	}
 
-	async function toggleRejectIdentifier(identId: number) {
-		await fetch(`${base}/api/person-identifiers/${identId}/reject`, { method: 'PATCH' });
+	async function setIdentifierStatus(identId: number, status: string) {
+		await fetch(`${base}/api/person-identifiers/${identId}/status`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ status })
+		});
 		await loadTable();
 	}
 
@@ -556,20 +560,22 @@
 						{#if p.identifiers?.length}
 							<div class="identifiers-row">
 								{#each p.identifiers as ident}
-									<span class="identifier-tag" class:rejected={ident.rejected}>
-										<span class="tag tag-id" title="{ident.id_type} ({ident.source}){ident.rejected ? ' — rejeté' : ''}">
+									<span class="identifier-tag" class:rejected={ident.status === 'rejected'} class:confirmed={ident.status === 'confirmed'}>
+										<span class="tag tag-id" title="{ident.id_type} ({ident.source}) — {ident.status === 'rejected' ? 'rejeté' : ident.status === 'confirmed' ? 'confirmé' : 'en attente'}">
 											{ident.id_type === 'orcid' ? 'ORCID' : ident.id_type === 'idhal' ? 'idHAL' : ident.id_type}: {ident.id_value}
 										</span>
 										<button
-											class="btn-reject"
-											title={ident.rejected ? 'Restaurer' : 'Rejeter cet identifiant'}
-											onclick={() => toggleRejectIdentifier(ident.id)}
-										>{ident.rejected ? '↩' : '⊘'}</button>
+											class="btn-status"
+											class:active={ident.status === 'confirmed'}
+											title={ident.status === 'confirmed' ? 'Retirer la confirmation' : 'Confirmer'}
+											onclick={() => setIdentifierStatus(ident.id, ident.status === 'confirmed' ? 'pending' : 'confirmed')}
+										>&#x2713;</button>
 										<button
-											class="btn-unlink"
-											title="Supprimer définitivement"
-											onclick={() => removeIdentifier(p.id, ident.id_type, ident.id_value)}
-										>&times;</button>
+											class="btn-status btn-reject"
+											class:active={ident.status === 'rejected'}
+											title={ident.status === 'rejected' ? 'Retirer le rejet' : 'Rejeter'}
+											onclick={() => setIdentifierStatus(ident.id, ident.status === 'rejected' ? 'pending' : 'rejected')}
+										>&#x2717;</button>
 									</span>
 								{/each}
 							</div>
@@ -1174,6 +1180,27 @@
 		opacity: 0.45;
 		text-decoration: line-through;
 	}
+	.identifier-tag.confirmed .tag-id {
+		background: #d4edda;
+		color: #155724;
+	}
+	.identifier-tag.rejected .tag-id {
+		background: #f8d7da;
+		color: #721c24;
+	}
+	.btn-status {
+		background: none;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		cursor: pointer;
+		font-size: 0.75rem;
+		padding: 0 3px;
+		line-height: 1.2;
+		color: #999;
+	}
+	.btn-status:hover { background: #f0f0f0; }
+	.btn-status.active { color: #28a745; border-color: #28a745; font-weight: bold; }
+	.btn-status.btn-reject.active { color: #dc3545; border-color: #dc3545; }
 	.btn-reject {
 		background: none;
 		border: none;

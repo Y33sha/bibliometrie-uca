@@ -48,6 +48,7 @@
 			<a href="{base}/admin/structures" class="nav-link" class:active={isActive('/admin/structures')}>Structures</a>
 			<a href="{base}/admin/authorships" class="nav-link" class:active={isActive('/admin/authorships')}>Authorships</a>
 			<a href="{base}/admin/persons" class="nav-link" class:active={isActive('/admin/persons')}>Personnes</a>
+			<a href="{base}/admin/duplicates" class="nav-link" class:active={isActive('/admin/duplicates')}>Doublons</a>
 			<a href="{base}/stats" class="nav-link nav-switch-link">Public</a>
 			<button class="nav-link nav-switch-link" onclick={logout}>Déconnexion</button>
 		</nav>

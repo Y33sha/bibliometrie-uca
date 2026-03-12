@@ -1,11 +1,12 @@
 """
 Enrichissement du statut Open Access via l'API Unpaywall.
 
-Pour les publications ayant un DOI mais un statut OA 'unknown',
-interroge Unpaywall (gratuit, pas de clé API, juste un email).
+Pour les publications ayant un DOI, interroge Unpaywall et met à jour
+le statut OA. Écrase les valeurs existantes, SAUF : ne remplace jamais
+'diamond' par 'gold' (Unpaywall ne connaît pas le diamond OA).
 
 Usage:
-    python enrich_oa_unpaywall.py              # traiter toutes les publis unknown
+    python enrich_oa_unpaywall.py              # traiter toutes les publis avec DOI
     python enrich_oa_unpaywall.py --limit 500  # traiter N publis (pour test)
     python enrich_oa_unpaywall.py --dry-run    # afficher sans modifier
 
@@ -80,10 +81,10 @@ def main():
     conn = get_connection()
     cur = conn.cursor()
 
-    # Trouver les publis avec DOI et statut unknown
+    # Trouver les publis avec DOI (toutes, pas seulement unknown)
     query = """
-        SELECT id, doi FROM publications
-        WHERE oa_status = 'unknown' AND doi IS NOT NULL
+        SELECT id, doi, oa_status::text FROM publications
+        WHERE doi IS NOT NULL
         ORDER BY pub_year DESC, id
     """
     if args.limit:
@@ -92,27 +93,40 @@ def main():
     cur.execute(query)
     pubs = cur.fetchall()
     total = len(pubs)
-    log.info(f"{total} publications avec DOI et statut OA indéterminé")
+    log.info(f"{total} publications avec DOI à vérifier sur Unpaywall")
 
     if not total:
         conn.close()
         return
 
     updated = 0
+    skipped = 0
     not_found = 0
     errors = 0
 
-    for i, (pub_id, doi) in enumerate(pubs):
+    for i, (pub_id, doi, current_status) in enumerate(pubs):
         if i > 0 and i % BATCH_SIZE == 0:
             if not args.dry_run:
                 conn.commit()
-            log.info(f"  {i}/{total} — {updated} mis à jour, {not_found} non trouvés")
+            log.info(f"  {i}/{total} — {updated} mis à jour, {skipped} inchangés, {not_found} non trouvés")
 
         status = fetch_oa_status(doi)
 
         if status:
+            # Ne pas écraser diamond par gold (Unpaywall ne connaît pas diamond)
+            if current_status == "diamond" and status == "gold":
+                skipped += 1
+                time.sleep(REQUEST_DELAY)
+                continue
+
+            # Ne pas mettre à jour si le statut est identique
+            if status == current_status:
+                skipped += 1
+                time.sleep(REQUEST_DELAY)
+                continue
+
             if args.dry_run:
-                log.info(f"  [DRY] {doi} → {status}")
+                log.info(f"  [DRY] {doi} : {current_status} → {status}")
             else:
                 cur.execute(
                     "UPDATE publications SET oa_status = %s::oa_type, updated_at = now() WHERE id = %s",
@@ -129,7 +143,7 @@ def main():
     if not args.dry_run:
         conn.commit()
 
-    log.info(f"Terminé : {updated} mis à jour, {not_found} non trouvés sur Unpaywall, {errors} erreurs")
+    log.info(f"Terminé : {updated} mis à jour, {skipped} inchangés, {not_found} non trouvés sur Unpaywall, {errors} erreurs")
     conn.close()
 
 

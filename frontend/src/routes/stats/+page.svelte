@@ -58,6 +58,7 @@
 	let chartCanvas: HTMLCanvasElement;
 	let yearChart: Chart | null = null;
 	let debounceTimer: ReturnType<typeof setTimeout>;
+	let initialYearsApplied = false;
 
 	const pubsUrl = $derived.by(() => {
 		const p = new URLSearchParams();
@@ -364,7 +365,15 @@
 		if (u.get('page')) page = parseInt(u.get('page')!);
 		if (u.get('lab_page')) labPage = parseInt(u.get('lab_page')!);
 
-		// Load data + facets (facets are loaded dynamically via refresh → loadFacets)
+		// Load facets first, then apply default years if needed, then full refresh
+		await loadFacets();
+		if (!initialYearsApplied && selectedYears.length === 0 && yearOptions.length > 0) {
+			// Pré-sélectionner les 5 dernières années
+			const sorted = yearOptions.map((o) => o.value).sort().reverse();
+			selectedYears = sorted.slice(0, 5);
+			syncUrl();
+		}
+		initialYearsApplied = true;
 		refresh();
 	});
 </script>
@@ -430,7 +439,7 @@
 		{/if}
 		<button class="tab-btn" class:active={tab === 'labs'} onclick={() => switchTab('labs')}>Laboratoires</button>
 	</div>
-	<FacetDropdown label="Années" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
+	<FacetDropdown label="Années" allLabel="Toutes" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
 	<FacetDropdown label="Laboratoires" options={labOptions} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
 	<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
 	{#if tab === 'publishers' || tab === 'journals'}

@@ -12,24 +12,11 @@ import json
 import sys
 import os
 import time
-import unicodedata
-import re
 import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-
-
-def normalize(name):
-    """Normalise pour comparaison souple."""
-    if not name:
-        return ""
-    text = name.lower().strip()
-    text = unicodedata.normalize("NFKD", text)
-    text = text.encode("ascii", "ignore").decode("ascii")
-    text = re.sub(r"[^a-z\s]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+from utils.normalize import normalize_name as normalize
 
 
 def fetch_hal_author(hal_author_id):

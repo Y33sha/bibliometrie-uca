@@ -47,16 +47,9 @@
 		structure_ids: number[] | null;
 		source_hal: boolean;
 		source_openalex: boolean;
+		source_wos: boolean;
 	}
-	interface HalAuthorship {
-		author_position: number;
-		full_name: string;
-		person_id: number | null;
-		is_uca: boolean;
-		structure_ids: number[] | null;
-		excluded: boolean;
-	}
-	interface OaAuthorship {
+	interface SourceAuthorship {
 		author_position: number;
 		full_name: string;
 		person_id: number | null;
@@ -74,9 +67,19 @@
 		publication: PubDetail;
 		sources: Source[];
 		authorships: Authorship[];
-		hal_authorships: HalAuthorship[];
-		openalex_authorships: OaAuthorship[];
+		hal_authorships: SourceAuthorship[];
+		openalex_authorships: SourceAuthorship[];
+		wos_authorships: SourceAuthorship[];
 		structures: Record<string, StructInfo>;
+	}
+
+	// --- Source comparison ---
+	interface SourceRow {
+		position: number;
+		hal: SourceAuthorship | null;
+		oa: SourceAuthorship | null;
+		wos: SourceAuthorship | null;
+		conflict: boolean;
 	}
 
 	// --- State ---
@@ -105,8 +108,66 @@
 		return `${titleCase(first)} ${titleCase(last)}`;
 	}
 
+	function structsTooltip(a: SourceAuthorship): string {
+		const parts: string[] = [];
+		if (a.structure_ids) {
+			parts.push(a.structure_ids.map(sid => structLabel(sid)).join(', '));
+		}
+		if (a.raw_affiliation) {
+			parts.push(a.raw_affiliation);
+		}
+		return parts.join('\n') || '';
+	}
+
 	const halSource = $derived(data?.sources.find(s => s.source === 'hal'));
 	const oaSource = $derived(data?.sources.find(s => s.source === 'openalex'));
+	const wosSource = $derived(data?.sources.find(s => s.source === 'wos'));
+
+	// Nombre de sources présentes
+	const sourceCount = $derived(
+		(data?.hal_authorships.length ? 1 : 0) +
+		(data?.openalex_authorships.length ? 1 : 0) +
+		(data?.wos_authorships.length ? 1 : 0)
+	);
+
+	// Grille alignée par position
+	const sourceRows = $derived.by(() => {
+		if (!data) return [];
+		const halMap = new Map<number, SourceAuthorship>();
+		const oaMap = new Map<number, SourceAuthorship>();
+		const wosMap = new Map<number, SourceAuthorship>();
+		for (const a of data.hal_authorships) if (!a.excluded) halMap.set(a.author_position, a);
+		for (const a of data.openalex_authorships) if (!a.excluded) oaMap.set(a.author_position, a);
+		for (const a of data.wos_authorships) if (!a.excluded) wosMap.set(a.author_position, a);
+
+		const allPos = new Set([...halMap.keys(), ...oaMap.keys(), ...wosMap.keys()]);
+		const rows: SourceRow[] = [];
+		for (const pos of [...allPos].sort((a, b) => a - b)) {
+			const hal = halMap.get(pos) ?? null;
+			const oa = oaMap.get(pos) ?? null;
+			const wos = wosMap.get(pos) ?? null;
+			const entries = [hal, oa, wos].filter((x): x is SourceAuthorship => x !== null);
+
+			let conflict = false;
+			// Conflit : auteur UCA dans une source mais absent d'une autre source présente
+			const ucaEntries = entries.filter(e => e.is_uca);
+			if (ucaEntries.length > 0) {
+				if (hal === null && data.hal_authorships.length > 0 && ucaEntries.length > 0) conflict = true;
+				if (oa === null && data.openalex_authorships.length > 0 && ucaEntries.length > 0) conflict = true;
+				if (wos === null && data.wos_authorships.length > 0 && ucaEntries.length > 0) conflict = true;
+			}
+			// Conflit : deux personnes résolues différentes
+			const personIds = entries.filter(e => e.person_id !== null).map(e => e.person_id!);
+			if (new Set(personIds).size > 1) conflict = true;
+			// Conflit : auteur UCA résolu aligné avec auteur non résolu
+			if (ucaEntries.some(e => e.person_id !== null) && entries.some(e => e.person_id === null)) conflict = true;
+
+			rows.push({ position: pos, hal, oa, wos, conflict });
+		}
+		return rows;
+	});
+
+	const hasSourceConflict = $derived(sourceRows.some(r => r.conflict));
 
 	onMount(async () => {
 		canGoBack = (window.navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
@@ -192,6 +253,11 @@
 					OpenAlex : {oaSource.source_id}
 				</a>
 			{/if}
+			{#if wosSource}
+				<a href="https://www.webofscience.com/wos/woscc/full-record/{wosSource.source_id}" target="_blank" rel="noopener" class="source-link source-wos-link">
+					WoS : {wosSource.source_id}
+				</a>
+			{/if}
 		</div>
 
 		<!-- HAL Collections -->
@@ -220,7 +286,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.authorships as a (a.author_position)}
+					{#each data.authorships as a, i (i)}
 						<tr class:uca-row={a.is_uca}>
 							<td class="pos-cell">{(a.author_position ?? 0) + 1}</td>
 							<td>
@@ -251,6 +317,9 @@
 								{#if a.source_openalex}
 									<span class="source-tag-label source-oa-label">OA</span>
 								{/if}
+								{#if a.source_wos}
+									<span class="source-tag-label source-wos-label">W</span>
+								{/if}
 							</td>
 						</tr>
 					{/each}
@@ -259,99 +328,88 @@
 		</div>
 	{/if}
 
-	<!-- Source details -->
-	{#if data.hal_authorships.length > 0}
-		<details class="source-details" open={!hasTruthTable}>
-			<summary>Auteurs HAL ({data.hal_authorships.length})</summary>
-			<table class="auth-table">
-				<thead>
-					<tr>
-						<th style="width:30px">#</th>
-						<th>Auteur</th>
-						<th style="width:40px">UCA</th>
-						<th>Structures</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.hal_authorships as a (a.author_position)}
-						<tr class:excluded-row={a.excluded} class:uca-row={a.is_uca && !a.excluded}>
-							<td class="pos-cell">{(a.author_position ?? 0) + 1}</td>
-							<td>
-								{#if a.person_id}
-									<a href="{base}/persons/{a.person_id}" class="author-link">{a.full_name}</a>
-								{:else}
-									<span class:excluded-text={a.excluded}>{a.full_name}</span>
-								{/if}
-							</td>
-							<td class="center-cell">
-								{#if a.is_uca}
-									<span class="uca-dot" title="UCA">●</span>
-								{/if}
-							</td>
-							<td>
-								{#if a.structure_ids}
-									{#each a.structure_ids as sid}
-										{#if structIsLabo(sid)}
-											<a href="{base}/laboratories/{sid}" class="struct-tag">{structLabel(sid)}</a>
-										{:else}
-											<span class="struct-tag">{structLabel(sid)}</span>
-										{/if}
-									{/each}
-								{/if}
-							</td>
+	<!-- Source comparison -->
+	{#if sourceCount > 1}
+		<details class="source-details">
+			<summary class:source-conflict={hasSourceConflict} class:source-ok={!hasSourceConflict}>
+				{#if hasSourceConflict}
+					<span class="status-icon conflict-icon">!</span> Conflit entre sources
+				{:else}
+					<span class="status-icon ok-icon">&#10003;</span> Sources cohérentes
+				{/if}
+				<span class="source-summary-count">
+					({sourceRows.length} auteurs &mdash;
+					{#if halSource}H{/if}{#if oaSource}{halSource ? '/' : ''}OA{/if}{#if wosSource}{halSource || oaSource ? '/' : ''}W{/if})
+				</span>
+			</summary>
+			<div class="source-grid-wrap">
+				<table class="source-grid">
+					<thead>
+						<tr>
+							{#if halSource}
+								<th class="sg-pos">#</th>
+								<th class="sg-name">HAL</th>
+							{/if}
+							{#if oaSource}
+								<th class="sg-pos">#</th>
+								<th class="sg-name">OpenAlex</th>
+							{/if}
+							{#if wosSource}
+								<th class="sg-pos">#</th>
+								<th class="sg-name">WoS</th>
+							{/if}
 						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</details>
-	{/if}
-
-	{#if data.openalex_authorships.length > 0}
-		<details class="source-details" open={!hasTruthTable}>
-			<summary>Auteurs OpenAlex ({data.openalex_authorships.length})</summary>
-			<table class="auth-table">
-				<thead>
-					<tr>
-						<th style="width:30px">#</th>
-						<th>Auteur</th>
-						<th style="width:40px">UCA</th>
-						<th>Structures</th>
-						<th>Affiliation brute</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.openalex_authorships as a (a.author_position)}
-						<tr class:excluded-row={a.excluded} class:uca-row={a.is_uca && !a.excluded}>
-							<td class="pos-cell">{(a.author_position ?? 0) + 1}</td>
-							<td>
-								{#if a.person_id}
-									<a href="{base}/persons/{a.person_id}" class="author-link">{a.full_name}</a>
-								{:else}
-									<span class:excluded-text={a.excluded}>{a.full_name}</span>
-								{/if}
-							</td>
-							<td class="center-cell">
-								{#if a.is_uca}
-									<span class="uca-dot" title="UCA">●</span>
-								{/if}
-							</td>
-							<td>
-								{#if a.structure_ids}
-									{#each a.structure_ids as sid}
-										{#if structIsLabo(sid)}
-											<a href="{base}/laboratories/{sid}" class="struct-tag">{structLabel(sid)}</a>
-										{:else}
-											<span class="struct-tag">{structLabel(sid)}</span>
+					</thead>
+					<tbody>
+						{#each sourceRows as row, i (row.position)}
+							<tr class:conflict-row={row.conflict}>
+								{#if halSource}
+									<td class="sg-pos-cell">{#if row.hal}{row.position + 1}{/if}</td>
+									<td class="sg-name-cell">
+										{#if row.hal}
+											<span class="sg-author" class:sg-uca={row.hal.is_uca}>
+												{row.hal.full_name}
+											</span>
+											{#if structsTooltip(row.hal)}
+												<span class="info-icon" title={structsTooltip(row.hal)}>&#9432;</span>
+											{/if}
 										{/if}
-									{/each}
+									</td>
 								{/if}
-							</td>
-							<td class="affiliation-cell">{a.raw_affiliation || ''}</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+								{#if oaSource}
+									<td class="sg-pos-cell">{#if row.oa}{row.position + 1}{/if}</td>
+									<td class="sg-name-cell">
+										{#if row.oa}
+											<span class="sg-author" class:sg-uca={row.oa.is_uca}>
+												{row.oa.full_name}
+											</span>
+											{#if structsTooltip(row.oa)}
+												<span class="info-icon" title={structsTooltip(row.oa)}>&#9432;</span>
+											{/if}
+										{/if}
+									</td>
+								{/if}
+								{#if wosSource}
+									<td class="sg-pos-cell">{#if row.wos}{row.position + 1}{/if}</td>
+									<td class="sg-name-cell">
+										{#if row.wos}
+											<span class="sg-author" class:sg-uca={row.wos.is_uca}>
+												{row.wos.full_name}
+											</span>
+											{#if structsTooltip(row.wos)}
+												<span class="info-icon" title={structsTooltip(row.wos)}>&#9432;</span>
+											{/if}
+										{/if}
+									</td>
+								{/if}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
 		</details>
+	{:else if sourceCount === 1}
+		<p class="single-source">Source : {#if halSource}HAL{:else if oaSource}OpenAlex{:else}WoS{/if}</p>
 	{/if}
 {/if}
 
@@ -554,18 +612,9 @@
 	}
 	.source-hal-label { background: #e8f0f8; color: #3b6b9e; }
 	.source-oa-label { background: #fef3e0; color: #b8733e; }
+	.source-wos-label { background: #f0e8f5; color: #6b4c8a; }
 
-	.excluded-row { opacity: 0.5; }
-	.excluded-text { text-decoration: line-through; }
-
-	.affiliation-cell {
-		font-size: 0.8rem;
-		color: var(--muted);
-		max-width: 400px;
-		word-break: break-word;
-	}
-
-	/* Source details */
+	/* Source details / comparison */
 	.source-details {
 		margin-bottom: 16px;
 		background: var(--card);
@@ -574,8 +623,11 @@
 		overflow: hidden;
 	}
 	.source-details summary {
+		display: flex;
+		align-items: center;
+		gap: 8px;
 		padding: 10px 14px;
-		font-size: 1rem;
+		font-size: 0.95rem;
 		font-weight: 500;
 		cursor: pointer;
 		background: #f5f4f1;
@@ -584,10 +636,86 @@
 	}
 	.source-details summary:hover { background: #eae9e5; }
 	.source-details[open] > summary { margin-bottom: 0; }
-	.source-details .auth-table {
-		border: none;
-		border-radius: 0;
+
+	.source-ok { color: #2a7d4f; }
+	.source-conflict { color: #c0392b; }
+
+	.status-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		font-size: 0.75rem;
+		font-weight: 700;
 	}
+	.ok-icon { background: #e6f4ec; color: #2a7d4f; }
+	.conflict-icon { background: #fde8e8; color: #c0392b; }
+
+	.source-summary-count {
+		font-size: 0.85rem;
+		color: var(--muted);
+		font-weight: 400;
+	}
+
+	.source-wos-link { background: #f0e8f5; color: #6b4c8a; }
+	.source-wos-link:hover { background: #e4d8f0; }
+
+	/* Source grid */
+	.source-grid-wrap { overflow-x: auto; }
+	.source-grid {
+		width: 100%;
+		border-collapse: collapse;
+	}
+	.source-grid thead th {
+		background: #f5f4f1;
+		padding: 6px 10px;
+		text-align: left;
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--muted);
+		border-bottom: 2px solid var(--border);
+		white-space: nowrap;
+	}
+	.source-grid tbody tr { border-bottom: 1px solid #f0efec; }
+	.source-grid tbody tr:last-child { border-bottom: none; }
+
+	.single-source {
+		font-size: 0.9rem;
+		color: var(--muted, #666);
+		margin: 12px 0;
+	}
+
+	.sg-pos { width: 28px; text-align: center; }
+	.sg-name { min-width: 120px; }
+
+	.sg-pos-cell {
+		text-align: center;
+		color: var(--muted);
+		font-size: 0.8rem;
+		padding: 4px 6px;
+		vertical-align: middle;
+	}
+	.sg-name-cell {
+		padding: 4px 10px;
+		font-size: 0.88rem;
+		vertical-align: middle;
+		white-space: nowrap;
+	}
+	.sg-author { }
+	.sg-uca { font-weight: 600; color: #2a7d4f; }
+
+	.conflict-row { background: #fff8f0; }
+	.conflict-row:hover { background: #fef0e0; }
+
+	.info-icon {
+		cursor: help;
+		color: var(--muted);
+		font-size: 0.8rem;
+		margin-left: 4px;
+	}
+	.info-icon:hover { color: var(--accent); }
 
 	.no-results { text-align: center; padding: 40px; color: var(--muted); }
 	.loading { text-align: center; padding: 40px; color: var(--muted); }

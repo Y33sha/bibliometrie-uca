@@ -71,13 +71,6 @@ QUERIES = [
         WHERE person_id IS NOT NULL AND idhal IS NOT NULL
         ON CONFLICT (id_type, id_value) DO NOTHING
     """),
-    ("openalex_id depuis legacy_authors", """
-        INSERT INTO person_identifiers (person_id, id_type, id_value, source)
-        SELECT DISTINCT person_id, 'openalex', openalex_id, 'legacy'
-        FROM legacy_authors
-        WHERE person_id IS NOT NULL AND openalex_id IS NOT NULL
-        ON CONFLICT (id_type, id_value) DO NOTHING
-    """),
 ]
 
 

@@ -22,22 +22,13 @@ import unicodedata
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.normalize import normalize_text as normalize
 
 
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config")
 LABOS_JSON = os.path.join(CONFIG_DIR, "labos.json")
 CONFIG_JSON = os.path.join(CONFIG_DIR, "config_validation.json")
 
-
-def normalize(text):
-    if not text:
-        return ""
-    text = text.lower().strip()
-    text = unicodedata.normalize("NFKD", text)
-    text = text.encode("ascii", "ignore").decode("ascii")
-    text = re.sub(r"[^a-z0-9\s]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
 
 
 def make_code(name, acronym=None):
@@ -80,7 +71,7 @@ def upsert_relation(cur, parent_id, child_id, rel_type):
 
 def insert_form(cur, structure_id, form_text, is_regex=False, requires_context_of=None,
                 notes=None):
-    form_normalized = normalize(form_text)
+    form_normalized = form_text if is_regex else normalize(form_text)
     ctx_json = json.dumps(requires_context_of) if requires_context_of else None
     cur.execute("""
         INSERT INTO name_forms (structure_id, form_text, form_normalized, is_regex,
