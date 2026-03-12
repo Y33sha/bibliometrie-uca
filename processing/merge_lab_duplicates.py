@@ -180,6 +180,18 @@ def pick_target(persons):
 
 def do_merge(cur, target_id, source_id):
     """Fusionne source dans target."""
+
+    # Garde-fou : ne JAMAIS fusionner si les deux ont une fiche RH
+    cur.execute("""
+        SELECT COUNT(*) AS n FROM persons_rh
+        WHERE person_id IN (%s, %s)
+    """, (target_id, source_id))
+    if cur.fetchone()["n"] >= 2:
+        raise RuntimeError(
+            f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
+            f"ont chacune une fiche RH distincte."
+        )
+
     # 1. Transférer les auteurs HAL
     cur.execute("UPDATE hal_authors SET person_id = %s WHERE person_id = %s",
                 (target_id, source_id))
@@ -208,8 +220,12 @@ def do_merge(cur, target_id, source_id):
         "UPDATE person_identifiers SET person_id = %s WHERE person_id = %s",
         (target_id, source_id)
     )
-    # 5. Supprimer persons_rh source
-    cur.execute("DELETE FROM persons_rh WHERE person_id = %s", (source_id,))
+    # 5. Transférer persons_rh de la source vers la cible (si la cible n'en a pas)
+    cur.execute("""
+        UPDATE persons_rh SET person_id = %s
+        WHERE person_id = %s
+          AND NOT EXISTS (SELECT 1 FROM persons_rh WHERE person_id = %s)
+    """, (target_id, source_id, target_id))
     # 6. Supprimer la personne source
     cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))
 
@@ -275,6 +291,16 @@ def run(dry_run=False):
             persons = get_person_details(cur, person_ids)
             if len(persons) < 2:
                 continue  # déjà fusionnés entre-temps
+
+            # Vérifier si plusieurs personnes ont une fiche RH distincte → fusion interdite
+            rh_persons = [p for p in persons if p["has_rh"]]
+            if len(rh_persons) >= 2:
+                print(c(f"\n  ⛔ Groupe {i+1}: {len(rh_persons)} personnes avec fiche RH — fusion interdite", "red"))
+                for p in persons:
+                    display_person(p)
+                print(c("    → Ignoré (fiches RH distinctes).", "dim"))
+                total_skipped += 1
+                continue
 
             # Vérifier les conflits d'ORCID
             orcids = set()
@@ -350,6 +376,16 @@ def run(dry_run=False):
                 pair_ids = [row["id1"], row["id2"]]
                 persons = get_person_details(cur, pair_ids)
                 if len(persons) < 2:
+                    continue
+
+                # Vérifier si les deux personnes ont une fiche RH → fusion interdite
+                rh_persons = [p for p in persons if p["has_rh"]]
+                if len(rh_persons) >= 2:
+                    print(c(f"\n  ⛔ Interversion — {len(rh_persons)} personnes avec fiche RH — fusion interdite", "red"))
+                    for p in persons:
+                        display_person(p)
+                    print(c("    → Ignoré (fiches RH distinctes).", "dim"))
+                    total_skipped += 1
                     continue
 
                 # Vérifier conflit ORCID
