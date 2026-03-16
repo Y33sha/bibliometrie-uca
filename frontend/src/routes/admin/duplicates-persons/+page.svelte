@@ -17,6 +17,11 @@
 		doc_type: string | null;
 		sources: string[];
 	}
+	interface Lab {
+		id: number;
+		acronym: string | null;
+		name: string;
+	}
 	interface PersonDetail {
 		id: number;
 		last_name: string;
@@ -29,42 +34,72 @@
 		identifiers: Identifier[];
 		publications: Publication[];
 		pub_count: number;
+		labs: Lab[];
+	}
+	interface ConflictPub {
+		id: number;
+		title: string;
+		pub_year: number | null;
+		doc_type: string | null;
+		position: number;
 	}
 	interface NextResponse {
-		total: number;
-		offset: number;
-		pair: { person_a: PersonDetail; person_b: PersonDetail } | null;
+		pair: { person_a: PersonDetail; person_b: PersonDetail; conflict_pubs?: ConflictPub[] } | null;
 	}
 
-	let total = $state(0);
-	let offset = $state(0);
-	let pair = $state<{ person_a: PersonDetail; person_b: PersonDetail } | null>(null);
+	type Mode = 'name' | 'conflict';
+	let mode: Mode = $state('name');
+	let total = $state<number | null>(null);
+	let pair = $state<{ person_a: PersonDetail; person_b: PersonDetail; conflict_pubs?: ConflictPub[] } | null>(null);
 	let loading = $state(false);
 	let acting = $state(false);
 	let mergedCount = $state(0);
 	let distinctCount = $state(0);
-	let skippedCount = $state(0);
+	let skippedPairs = $state<Set<string>>(new Set());
 	let error = $state('');
 
-	async function loadAt(pos: number) {
+	function skipParam(): string {
+		return [...skippedPairs].join(',');
+	}
+
+	async function loadTotal() {
+		try {
+			const endpoint = mode === 'conflict'
+				? '/api/admin/person-duplicates/conflicts/count'
+				: '/api/admin/person-duplicates/count';
+			const data = await api<{ total: number }>(endpoint);
+			total = data.total;
+		} catch {}
+	}
+
+	async function loadNext() {
 		loading = true;
 		error = '';
 		try {
-			const data = await api<NextResponse>(`/api/admin/person-duplicates/next?offset=${pos}`);
-			total = data.total;
-			offset = data.offset;
+			const skip = skipParam();
+			const endpoint = mode === 'conflict'
+				? '/api/admin/person-duplicates/conflicts/next'
+				: '/api/admin/person-duplicates/next';
+			const url = `${endpoint}${skip ? `?skip=${skip}` : ''}`;
+			const data = await api<NextResponse>(url);
 			pair = data.pair;
-			if (!pair && total > 0 && pos > 0) {
-				const data2 = await api<NextResponse>(`/api/admin/person-duplicates/next?offset=0`);
-				total = data2.total;
-				offset = data2.offset;
-				pair = data2.pair;
-			}
 		} catch (e: any) {
 			error = e.message || 'Erreur de chargement';
 			console.error(e);
 		}
 		loading = false;
+	}
+
+	function switchMode(m: Mode) {
+		if (m === mode) return;
+		mode = m;
+		total = null;
+		pair = null;
+		skippedPairs = new Set();
+		mergedCount = 0;
+		distinctCount = 0;
+		loadTotal();
+		loadNext();
 	}
 
 	async function mergePair(targetId: number, sourceId: number) {
@@ -80,7 +115,7 @@
 				throw new Error(detail.detail || `Erreur ${res.status}`);
 			}
 			mergedCount++;
-			await loadAt(offset);
+			await loadNext();
 		} catch (e: any) {
 			error = e.message || 'Erreur de fusion';
 			console.error(e);
@@ -97,7 +132,7 @@
 				body: JSON.stringify({ person_id_a: idA, person_id_b: idB }),
 			});
 			distinctCount++;
-			await loadAt(offset);
+			await loadNext();
 		} catch (e: any) {
 			error = e.message || 'Erreur';
 			console.error(e);
@@ -106,8 +141,12 @@
 	}
 
 	function skip() {
-		skippedCount++;
-		loadAt(offset + 1);
+		if (!pair) return;
+		const a = pair.person_a.id;
+		const b = pair.person_b.id;
+		const key = `${Math.min(a, b)}-${Math.max(a, b)}`;
+		skippedPairs = new Set([...skippedPairs, key]);
+		loadNext();
 	}
 
 	function statusClass(status: string): string {
@@ -123,7 +162,10 @@
 		return '';
 	}
 
-	$effect(() => { loadAt(0); });
+	$effect(() => {
+		loadTotal();
+		loadNext();
+	});
 </script>
 
 <svelte:head><title>Doublons personnes — Admin</title></svelte:head>
@@ -131,15 +173,20 @@
 <div class="container">
 	<h1>Doublons de personnes</h1>
 
+	<div class="mode-toggle">
+		<button class="mode-btn" class:active={mode === 'name'} onclick={() => switchMode('name')}>Par nom</button>
+		<button class="mode-btn" class:active={mode === 'conflict'} onclick={() => switchMode('conflict')}>Par conflit de sources</button>
+	</div>
+
 	<div class="stats-bar">
-		<span class="stat stat-position">{total > 0 ? offset + 1 : 0} / {total}</span>
+		<span class="stat stat-position">{total !== null ? `${total} paires candidates` : 'Comptage...'}</span>
 		{#if mergedCount}<span class="stat stat-merged">{mergedCount} fusionnée{mergedCount !== 1 ? 's' : ''}</span>{/if}
 		{#if distinctCount}<span class="stat stat-distinct">{distinctCount} distincte{distinctCount !== 1 ? 's' : ''}</span>{/if}
-		{#if skippedCount}<span class="stat stat-skipped">{skippedCount} passée{skippedCount !== 1 ? 's' : ''}</span>{/if}
-		<div class="nav-buttons">
-			<button class="btn-nav" onclick={() => loadAt(Math.max(0, offset - 1))} disabled={loading || offset === 0}>&lsaquo;</button>
-			<button class="btn-nav" onclick={() => loadAt(offset + 1)} disabled={loading || !pair}>&rsaquo;</button>
-		</div>
+		{#if skippedPairs.size > 0}<span class="stat stat-skipped">{skippedPairs.size} passée{skippedPairs.size !== 1 ? 's' : ''}</span>{/if}
+		{#if skippedPairs.size > 0}
+			<button class="btn-nav" onclick={() => { skippedPairs = new Set(); loadNext(); }}
+				title="Revenir aux paires passées">&#x21BA; Reprendre</button>
+		{/if}
 	</div>
 
 	{#if error}
@@ -185,10 +232,33 @@
 				</button>
 			</div>
 
+
+			{#if pair.conflict_pubs?.length}
+				<div class="conflict-pubs">
+					<h4>Publications en conflit ({pair.conflict_pubs.length})</h4>
+					{#each pair.conflict_pubs as cp}
+						<div class="conflict-pub-item">
+							<span class="conflict-pos" title="Position de l'auteur">pos. {(cp.position ?? 0) + 1}</span>
+							<a href="{base}/publications/{cp.id}" class="pub-link">{@html cp.title}</a>
+							<span class="pub-meta-mini">{cp.pub_year ?? '?'}{#if cp.doc_type} · {cp.doc_type}{/if}</span>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
 			<!-- Deux colonnes -->
 			<div class="pair-columns">
 				{#each [a, b] as person}
 					<div class="pub-col">
+						<!-- Laboratoires -->
+						{#if person.labs.length > 0}
+							<div class="person-labs">
+								{#each person.labs as lab}
+									<span class="lab-badge" title={lab.name}>{lab.acronym ?? lab.name}</span>
+								{/each}
+							</div>
+						{/if}
+
 						<!-- Nom -->
 						<div class="person-name">
 							<span class="person-label">Nom :</span> <span class="last-name">{person.last_name}</span>
@@ -253,6 +323,58 @@
 	.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
 	h1 { font-size: 1.5rem; margin-bottom: 16px; }
 
+	.mode-toggle {
+		display: flex;
+		gap: 0;
+		margin-bottom: 16px;
+	}
+	.mode-btn {
+		padding: 6px 16px;
+		border: 1px solid var(--border, #ccc);
+		background: var(--card, #fff);
+		font-size: 0.9rem;
+		cursor: pointer;
+		font-family: inherit;
+		color: var(--muted, #666);
+	}
+	.mode-btn:first-child { border-radius: 4px 0 0 4px; }
+	.mode-btn:last-child { border-radius: 0 4px 4px 0; border-left: none; }
+	.mode-btn.active {
+		background: var(--accent, #3b6b9e);
+		color: white;
+		border-color: var(--accent, #3b6b9e);
+		font-weight: 600;
+	}
+
+	.conflict-pubs {
+		background: #fff8f0;
+		border: 1px solid #f0dcc0;
+		border-radius: 6px;
+		padding: 10px 14px;
+		margin-bottom: 12px;
+	}
+	.conflict-pubs h4 {
+		font-size: 0.9rem;
+		margin: 0 0 6px;
+		color: #b8733e;
+	}
+	.conflict-pub-item {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		padding: 2px 0;
+		font-size: 0.85rem;
+	}
+	.conflict-pos {
+		flex-shrink: 0;
+		font-size: 0.75rem;
+		padding: 1px 6px;
+		background: #f0dcc0;
+		border-radius: 3px;
+		color: #8a5e2c;
+		font-weight: 600;
+	}
+
 	.stats-bar {
 		display: flex;
 		gap: 12px;
@@ -297,6 +419,22 @@
 
 	.pair-columns { display: grid; grid-template-columns: 1fr 1fr; }
 	.pub-col { padding: 14px 16px; }
+
+	.person-labs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+		margin-bottom: 6px;
+	}
+	.lab-badge {
+		display: inline-block;
+		padding: 2px 8px;
+		border-radius: 10px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		background: #e8eef4;
+		color: #3b6b9e;
+	}
 	.pub-col:first-child { border-right: 1px solid var(--border, #e0e0e0); }
 
 	.person-name {

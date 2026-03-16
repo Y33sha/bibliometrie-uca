@@ -1567,7 +1567,9 @@ async def get_publication(pub_id: int):
 
         # e) OpenAlex authorships
         cur.execute("""
-            SELECT oas.author_position, oa.full_name, oa.person_id,
+            SELECT oas.author_position,
+                   COALESCE(oas.raw_author_name, oa.full_name) AS full_name,
+                   oa.person_id,
                    oas.is_uca, oas.structure_ids, oas.raw_affiliation, oas.excluded
             FROM openalex_authorships oas
             JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
@@ -1811,11 +1813,15 @@ async def list_publications(
                  WHERE ps.publication_id = p.id AND ps.source = 'openalex' LIMIT 1) AS openalex_id,
                 (SELECT ps.source_id FROM publication_sources ps
                  WHERE ps.publication_id = p.id AND ps.source = 'wos' LIMIT 1) AS wos_id,
-                -- Corresponding author (only meaningful with person_id filter)
+                -- Corresponding author + authorship id (only meaningful with person_id filter)
                 (SELECT a.is_corresponding FROM authorships a
                  WHERE a.publication_id = p.id AND a.person_id = %s
                    AND NOT a.excluded
                  LIMIT 1) AS is_corresponding,
+                (SELECT a.id FROM authorships a
+                 WHERE a.publication_id = p.id AND a.person_id = %s
+                   AND NOT a.excluded
+                 LIMIT 1) AS authorship_id,
                 -- Labs (aggregated from HAL + OpenAlex sources)
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
@@ -1846,7 +1852,7 @@ async def list_publications(
             WHERE {where_clause}
             ORDER BY {order}
             LIMIT %s OFFSET %s
-        """, [person_id] + params + [per_page, offset])
+        """, [person_id, person_id] + params + [per_page, offset])
 
         publications = []
         for row in cur.fetchall():
@@ -1864,6 +1870,7 @@ async def list_publications(
                 "wos_id": row["wos_id"],
                 "labs": row["labs"],
                 "is_corresponding": row["is_corresponding"],
+                "authorship_id": row["authorship_id"],
             })
 
         return {
@@ -1945,9 +1952,20 @@ async def next_duplicate_candidate(
 
             cur.execute("""
                 SELECT a.author_position, a.is_uca, a.person_id,
-                       p2.last_name, p2.first_name
+                       COALESCE(p2.last_name,
+                                ha.last_name, oa.last_name, wa.last_name) AS last_name,
+                       COALESCE(p2.first_name,
+                                ha.first_name, oa.first_name, wa.first_name) AS first_name,
+                       COALESCE(p2.last_name || ' ' || p2.first_name,
+                                ha.full_name, oas.raw_author_name, oa.full_name, wa.full_name) AS full_name
                 FROM authorships a
                 LEFT JOIN persons p2 ON p2.id = a.person_id
+                LEFT JOIN hal_authorships has2 ON has2.id = a.hal_authorship_id
+                LEFT JOIN hal_authors ha ON ha.id = has2.hal_author_id
+                LEFT JOIN openalex_authorships oas ON oas.id = a.openalex_authorship_id
+                LEFT JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+                LEFT JOIN wos_authorships was2 ON was2.id = a.wos_authorship_id
+                LEFT JOIN wos_authors wa ON wa.id = was2.wos_author_id
                 WHERE a.publication_id = %s AND NOT a.excluded
                 ORDER BY a.author_position NULLS LAST
             """, (pub_id,))
@@ -2195,7 +2213,8 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)):
                 sub.author_name,
                 sub.source_id
             FROM (
-                SELECT od.publication_id, oa.full_name AS author_name,
+                SELECT od.publication_id,
+                       COALESCE(oas.raw_author_name, oa.full_name) AS author_name,
                        od.openalex_id AS source_id
                 FROM openalex_authorship_addresses oaa
                 JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
@@ -2858,16 +2877,18 @@ async def persons_directory(
                 p.id, p.last_name, p.first_name,
                 prh.role_title, prh.department_name,
                 (prh.id IS NOT NULL) AS has_rh,
-                (SELECT json_agg(DISTINCT pi.id_value)
+                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
                  FROM person_identifiers pi
                  WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
                 ) AS orcids,
-                (SELECT json_agg(DISTINCT v) FROM (
-                    SELECT ha.idhal AS v FROM hal_authors ha
-                    WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL
-                    UNION
-                    SELECT pi.id_value FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
+                (SELECT json_agg(json_build_object('value', sub.v, 'confirmed', sub.confirmed)) FROM (
+                    SELECT DISTINCT ON (v) v, confirmed FROM (
+                        SELECT ha.idhal AS v, false AS confirmed FROM hal_authors ha
+                        WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL
+                        UNION ALL
+                        SELECT pi.id_value, (pi.status = 'confirmed') FROM person_identifiers pi
+                        WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
+                    ) raw ORDER BY v, confirmed DESC
                 ) sub) AS idhals
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
@@ -4357,6 +4378,20 @@ async def update_identifier_status(ident_id: int, body: dict):
         return {"id": row["id"], "status": row["status"]}
 
 
+@app.patch("/api/authorships/{authorship_id}/exclude")
+async def toggle_authorship_excluded(authorship_id: int):
+    """Marque un authorship comme exclu (lien personne-publication rejeté)."""
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            UPDATE authorships SET excluded = TRUE, updated_at = now()
+            WHERE id = %s RETURNING id, excluded
+        """, (authorship_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Authorship introuvable")
+        return {"id": row["id"], "excluded": row["excluded"]}
+
+
 @app.post("/api/persons/{person_id}/merge")
 async def merge_persons(person_id: int, body: dict):
     """Fusionne une autre personne (source) dans celle-ci (target).
@@ -4444,67 +4479,121 @@ async def merge_persons(person_id: int, body: dict):
 # ----- API: Doublons personnes -----
 
 def _person_name_tokens(ln_norm: str, fn_norm: str) -> set[str]:
-    """Tokens triés du nom complet normalisé (last + first)."""
-    return set((ln_norm + " " + fn_norm).split()) - {""}
+    """Tokens du nom complet normalisé (last + first), tirets éclatés en espaces."""
+    return set((ln_norm + " " + fn_norm).replace("-", " ").split()) - {""}
 
 
 def _tokens_match(t1: set[str], t2: set[str]) -> bool:
-    """Vérifie si les tokens matchent (égaux ou l'un contenu dans l'autre)."""
+    """Vérifie si les tokens matchent.
+
+    Chaque token de l'ensemble le plus petit doit trouver un correspondant
+    dans l'ensemble le plus grand : soit identique, soit initiale (1 lettre)
+    correspondant au début d'un token de l'autre ensemble.
+    """
     if not t1 or not t2:
         return False
-    return t1 == t2 or t1 <= t2 or t2 <= t1
+    small, big = (t1, t2) if len(t1) <= len(t2) else (t2, t1)
+    for s in small:
+        if s in big:
+            continue
+        if len(s) == 1:
+            # s est une initiale — cherche un token dans big commençant par s
+            if any(b.startswith(s) for b in big):
+                continue
+        # Cherche si s correspond à l'expansion d'une initiale dans big
+        if any(len(b) == 1 and s.startswith(b) for b in big):
+            continue
+        return False
+    return True
 
 
-PERSON_DUP_SQL = """
-    SELECT p1.id AS id_a, p2.id AS id_b,
-           p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
-           p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
-    FROM persons p1
-    JOIN persons p2 ON p1.id < p2.id
-      AND p1.last_name_normalized = p2.last_name_normalized
-      AND p1.last_name_normalized <> ''
-      AND LENGTH(p1.first_name_normalized) >= 1
-      AND LENGTH(p2.first_name_normalized) >= 1
-      AND LEFT(p1.first_name_normalized, 1) = LEFT(p2.first_name_normalized, 1)
-      AND (
-          p1.first_name_normalized = p2.first_name_normalized
-          OR LENGTH(p1.first_name_normalized) = 1
-          OR LENGTH(p2.first_name_normalized) = 1
-          OR p1.first_name_normalized LIKE p2.first_name_normalized || ' %%'
-          OR p2.first_name_normalized LIKE p1.first_name_normalized || ' %%'
-      )
+_DUP_NOT_EXISTS = """
     WHERE NOT EXISTS (
         SELECT 1 FROM distinct_persons dp
         WHERE dp.person_id_a = LEAST(p1.id, p2.id) AND dp.person_id_b = GREATEST(p1.id, p2.id)
     )
-    -- JAMAIS suggérer la fusion de deux personnes ayant chacune une fiche RH
-    AND NOT (
-        EXISTS (SELECT 1 FROM persons_rh WHERE person_id = p1.id)
-        AND EXISTS (SELECT 1 FROM persons_rh WHERE person_id = p2.id)
-    )
-
-    UNION ALL
-
-    SELECT p1.id AS id_a, p2.id AS id_b,
-           p1.last_name_normalized, p1.first_name_normalized,
-           p2.last_name_normalized, p2.first_name_normalized
-    FROM persons p1
-    JOIN persons p2 ON p1.id < p2.id
-      AND p1.last_name_normalized = p2.first_name_normalized
-      AND p1.first_name_normalized = p2.last_name_normalized
-      AND p1.last_name_normalized <> ''
-      AND p1.first_name_normalized <> ''
-      AND p1.last_name_normalized <> p1.first_name_normalized
-    WHERE NOT EXISTS (
-        SELECT 1 FROM distinct_persons dp
-        WHERE dp.person_id_a = LEAST(p1.id, p2.id) AND dp.person_id_b = GREATEST(p1.id, p2.id)
-    )
-    -- JAMAIS suggérer la fusion de deux personnes ayant chacune une fiche RH
     AND NOT (
         EXISTS (SELECT 1 FROM persons_rh WHERE person_id = p1.id)
         AND EXISTS (SELECT 1 FROM persons_rh WHERE person_id = p2.id)
     )
 """
+
+# Requêtes de doublons personnes par priorité (exécutées séquentiellement)
+PERSON_DUP_QUERIES = [
+    # Priorité 1a : même nom, initiale vs prénom complet
+    f"""SELECT p1.id AS id_a, p2.id AS id_b,
+               p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
+               p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
+        FROM persons p1
+        JOIN persons p2 ON p1.id < p2.id
+          AND p1.last_name_normalized = p2.last_name_normalized
+          AND p1.last_name_normalized <> ''
+          AND LEFT(p1.first_name_normalized, 1) = LEFT(p2.first_name_normalized, 1)
+          AND (LENGTH(p1.first_name_normalized) = 1 OR LENGTH(p2.first_name_normalized) = 1)
+          AND LENGTH(p1.first_name_normalized) >= 1
+          AND LENGTH(p2.first_name_normalized) >= 1
+        {_DUP_NOT_EXISTS}
+        ORDER BY p1.id, p2.id""",
+
+    # Priorité 1b : nom composé vs nom simple
+    f"""SELECT p1.id AS id_a, p2.id AS id_b,
+               p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
+               p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
+        FROM persons p1
+        JOIN persons p2 ON p1.id < p2.id
+          AND REPLACE(p1.last_name_normalized, '-', ' ') <> REPLACE(p2.last_name_normalized, '-', ' ')
+          AND p1.last_name_normalized <> ''
+          AND p2.last_name_normalized <> ''
+          AND (
+              REPLACE(p2.last_name_normalized, '-', ' ') LIKE REPLACE(p1.last_name_normalized, '-', ' ') || ' %%'
+              OR REPLACE(p1.last_name_normalized, '-', ' ') LIKE REPLACE(p2.last_name_normalized, '-', ' ') || ' %%'
+          )
+          AND LENGTH(p1.first_name_normalized) >= 1
+          AND LENGTH(p2.first_name_normalized) >= 1
+          AND LEFT(p1.first_name_normalized, 1) = LEFT(p2.first_name_normalized, 1)
+          AND (
+              p1.first_name_normalized = p2.first_name_normalized
+              OR LENGTH(p1.first_name_normalized) = 1
+              OR LENGTH(p2.first_name_normalized) = 1
+              OR p1.first_name_normalized LIKE p2.first_name_normalized || ' %%'
+              OR p2.first_name_normalized LIKE p1.first_name_normalized || ' %%'
+          )
+        {_DUP_NOT_EXISTS}
+        ORDER BY p1.id, p2.id""",
+
+    # Priorité 1c : inversion nom/prénom
+    f"""SELECT p1.id AS id_a, p2.id AS id_b,
+               p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
+               p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
+        FROM persons p1
+        JOIN persons p2 ON p1.id < p2.id
+          AND p1.last_name_normalized = p2.first_name_normalized
+          AND p1.first_name_normalized = p2.last_name_normalized
+          AND p1.last_name_normalized <> ''
+          AND p1.first_name_normalized <> ''
+          AND p1.last_name_normalized <> p1.first_name_normalized
+        {_DUP_NOT_EXISTS}
+        ORDER BY p1.id, p2.id""",
+
+    # Priorité 2 : même nom, prénoms compatibles (pas initiale)
+    f"""SELECT p1.id AS id_a, p2.id AS id_b,
+               p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
+               p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
+        FROM persons p1
+        JOIN persons p2 ON p1.id < p2.id
+          AND p1.last_name_normalized = p2.last_name_normalized
+          AND p1.last_name_normalized <> ''
+          AND LENGTH(p1.first_name_normalized) > 1
+          AND LENGTH(p2.first_name_normalized) > 1
+          AND LEFT(p1.first_name_normalized, 1) = LEFT(p2.first_name_normalized, 1)
+          AND (
+              p1.first_name_normalized = p2.first_name_normalized
+              OR p1.first_name_normalized LIKE p2.first_name_normalized || ' %%'
+              OR p2.first_name_normalized LIKE p1.first_name_normalized || ' %%'
+          )
+        {_DUP_NOT_EXISTS}
+        ORDER BY p1.id, p2.id""",
+]
 
 
 def _get_person_dedup_detail(cur, person_id):
@@ -4543,6 +4632,25 @@ def _get_person_dedup_detail(cur, person_id):
     """, (person_id,))
     publications = [dict(r) for r in cur.fetchall()]
 
+    # Laboratoires associés (via authorships sources)
+    cur.execute("""
+        SELECT DISTINCT s.id, s.acronym, s.name
+        FROM structures s
+        WHERE s.type = 'labo' AND s.id IN (
+            SELECT UNNEST(has2.structure_ids)
+            FROM hal_authors ha2
+            JOIN hal_authorships has2 ON has2.hal_author_id = ha2.id
+            WHERE ha2.person_id = %s AND has2.structure_ids IS NOT NULL
+            UNION ALL
+            SELECT UNNEST(oas2.structure_ids)
+            FROM openalex_authors oa2
+            JOIN openalex_authorships oas2 ON oas2.openalex_author_id = oa2.id
+            WHERE oa2.person_id = %s AND oas2.structure_ids IS NOT NULL
+        )
+        ORDER BY s.acronym NULLS LAST, s.name
+    """, (person_id, person_id))
+    labs = [{"id": r["id"], "acronym": r["acronym"], "name": r["name"]} for r in cur.fetchall()]
+
     return {
         "id": person["id"],
         "last_name": person["last_name"],
@@ -4555,54 +4663,82 @@ def _get_person_dedup_detail(cur, person_id):
         "identifiers": identifiers,
         "publications": publications,
         "pub_count": len(publications),
+        "labs": labs,
     }
 
 
-@app.get("/api/admin/person-duplicates/next")
-async def next_person_duplicate(offset: int = Query(0, ge=0)):
-    """Renvoie la paire candidate de personnes à la position offset."""
-    with get_cursor() as (cur, conn):
-        # Compteur approximatif (SQL pré-filtre)
-        cur.execute(f"SELECT COUNT(*) AS total FROM ({PERSON_DUP_SQL}) sub")
-        total = cur.fetchone()["total"]
+def _parse_skip_pairs(skip: str) -> set[tuple[int, int]]:
+    """Parse 'idA-idB,idA-idB,...' en set de tuples."""
+    result: set[tuple[int, int]] = set()
+    if skip:
+        for s in skip.split(","):
+            parts = s.strip().split("-")
+            if len(parts) == 2:
+                try:
+                    result.add((int(parts[0]), int(parts[1])))
+                except ValueError:
+                    pass
+    return result
 
-        # Parcourir par batch pour trouver la Nième paire valide (après filtre Python)
-        valid_count = 0
-        sql_offset = 0
-        batch_size = 100
-        found = None
 
-        while found is None:
-            cur.execute(
-                f"{PERSON_DUP_SQL} LIMIT %s OFFSET %s",
-                (batch_size, sql_offset)
-            )
-            rows = cur.fetchall()
-            if not rows:
-                break
-
-            for row in rows:
-                t1 = _person_name_tokens(row["ln1"], row["fn1"])
-                t2 = _person_name_tokens(row["ln2"], row["fn2"])
-                if _tokens_match(t1, t2):
-                    if valid_count == offset:
-                        found = row
+def _scan_dup_query(cur, sql, skip_pairs=None, stop_at_first=False):
+    """Parcourt une requête de doublons avec curseur serveur.
+    Retourne (found_row_or_None, count_of_valid_pairs).
+    """
+    cur.execute("DECLARE _dup_cur NO SCROLL CURSOR FOR " + sql)
+    found = None
+    count = 0
+    while True:
+        cur.execute("FETCH 500 FROM _dup_cur")
+        rows = cur.fetchall()
+        if not rows:
+            break
+        for row in rows:
+            t1 = _person_name_tokens(row["ln1"], row["fn1"])
+            t2 = _person_name_tokens(row["ln2"], row["fn2"])
+            if not _tokens_match(t1, t2):
+                continue
+            count += 1
+            if found is None and skip_pairs is not None:
+                pair_key = (row["id_a"], row["id_b"])
+                if pair_key not in skip_pairs:
+                    found = row
+                    if stop_at_first:
                         break
-                    valid_count += 1
+        if stop_at_first and found:
+            break
+    cur.execute("CLOSE _dup_cur")
+    return found, count
 
-            sql_offset += batch_size
 
-        if not found:
-            return {"total": total, "offset": offset, "pair": None}
+@app.get("/api/admin/person-duplicates/count")
+async def count_person_duplicates():
+    """Comptage des paires candidates (scan complet, appelé une seule fois)."""
+    with get_cursor() as (cur, conn):
+        total = 0
+        for sql in PERSON_DUP_QUERIES:
+            _, cnt = _scan_dup_query(cur, sql)
+            total += cnt
+        return {"total": total}
 
-        return {
-            "total": total,
-            "offset": offset,
-            "pair": {
-                "person_a": _get_person_dedup_detail(cur, found["id_a"]),
-                "person_b": _get_person_dedup_detail(cur, found["id_b"]),
-            },
-        }
+
+@app.get("/api/admin/person-duplicates/next")
+async def next_person_duplicate(skip: str = Query("", alias="skip")):
+    """Renvoie la première paire candidate non passée (par priorité)."""
+    skip_pairs = _parse_skip_pairs(skip)
+
+    with get_cursor() as (cur, conn):
+        for sql in PERSON_DUP_QUERIES:
+            found, _ = _scan_dup_query(cur, sql, skip_pairs, stop_at_first=True)
+            if found:
+                return {
+                    "pair": {
+                        "person_a": _get_person_dedup_detail(cur, found["id_a"]),
+                        "person_b": _get_person_dedup_detail(cur, found["id_b"]),
+                    },
+                }
+
+        return {"pair": None}
 
 
 @app.post("/api/admin/person-duplicates/mark-distinct")
@@ -4620,6 +4756,120 @@ async def mark_persons_distinct(body: dict):
             ON CONFLICT DO NOTHING
         """, (a, b, a, b))
         return {"ok": True}
+
+
+MAX_AUTHORS_CONFLICT = 50  # Exclure les mega-authorships (physique des particules, etc.)
+
+CONFLICT_PAIRS_SQL = """
+WITH pub_author_counts AS (
+    SELECT publication_id, MAX(cnt) AS max_authors FROM (
+        SELECT hd.publication_id, COUNT(*) AS cnt
+        FROM hal_documents hd JOIN hal_authorships has ON has.hal_document_id = hd.id
+        WHERE NOT has.excluded GROUP BY hd.publication_id
+        UNION ALL
+        SELECT od.publication_id, COUNT(*)
+        FROM openalex_documents od JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
+        WHERE NOT oas.excluded GROUP BY od.publication_id
+        UNION ALL
+        SELECT wd.publication_id, COUNT(*)
+        FROM wos_documents wd JOIN wos_authorships was ON was.wos_document_id = wd.id
+        WHERE NOT was.excluded GROUP BY wd.publication_id
+    ) sub GROUP BY publication_id
+),
+author_positions AS (
+    SELECT DISTINCT hd.publication_id, has.author_position, ha.person_id
+    FROM hal_documents hd
+    JOIN hal_authorships has ON has.hal_document_id = hd.id
+    JOIN hal_authors ha ON ha.id = has.hal_author_id
+    JOIN pub_author_counts pac ON pac.publication_id = hd.publication_id
+    WHERE ha.person_id IS NOT NULL AND NOT has.excluded
+      AND pac.max_authors <= {max_authors}
+    UNION
+    SELECT DISTINCT od.publication_id, oas.author_position, oa.person_id
+    FROM openalex_documents od
+    JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
+    JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+    JOIN pub_author_counts pac ON pac.publication_id = od.publication_id
+    WHERE oa.person_id IS NOT NULL AND NOT oas.excluded
+      AND pac.max_authors <= {max_authors}
+    UNION
+    SELECT DISTINCT wd.publication_id, was.author_position, wa.person_id
+    FROM wos_documents wd
+    JOIN wos_authorships was ON was.wos_document_id = wd.id
+    JOIN wos_authors wa ON wa.id = was.wos_author_id
+    JOIN pub_author_counts pac ON pac.publication_id = wd.publication_id
+    WHERE wa.person_id IS NOT NULL AND NOT was.excluded
+      AND pac.max_authors <= {max_authors}
+)
+SELECT LEAST(a1.person_id, a2.person_id) AS id_a,
+       GREATEST(a1.person_id, a2.person_id) AS id_b,
+       json_agg(DISTINCT jsonb_build_object(
+           'pub_id', a1.publication_id,
+           'position', a1.author_position
+       )) AS conflicts
+FROM author_positions a1
+JOIN author_positions a2
+  ON a1.publication_id = a2.publication_id
+ AND a1.author_position = a2.author_position
+ AND a1.person_id < a2.person_id
+WHERE NOT EXISTS (
+    SELECT 1 FROM distinct_persons dp
+    WHERE dp.person_id_a = LEAST(a1.person_id, a2.person_id)
+      AND dp.person_id_b = GREATEST(a1.person_id, a2.person_id)
+)
+GROUP BY LEAST(a1.person_id, a2.person_id), GREATEST(a1.person_id, a2.person_id)
+ORDER BY COUNT(*) DESC, LEAST(a1.person_id, a2.person_id)
+""".format(max_authors=MAX_AUTHORS_CONFLICT)
+
+
+@app.get("/api/admin/person-duplicates/conflicts/count")
+async def count_person_conflict_pairs():
+    """Nombre de paires de personnes en conflit sur des publications."""
+    with get_cursor() as (cur, conn):
+        cur.execute(f"SELECT COUNT(*) AS total FROM ({CONFLICT_PAIRS_SQL}) sub")
+        return {"total": cur.fetchone()["total"]}
+
+
+@app.get("/api/admin/person-duplicates/conflicts/next")
+async def next_person_conflict(skip: str = Query("", alias="skip")):
+    """Renvoie la première paire en conflit non passée, avec les publications concernées."""
+    skip_pairs = _parse_skip_pairs(skip)
+
+    with get_cursor() as (cur, conn):
+        cur.execute(CONFLICT_PAIRS_SQL)
+        for row in cur:
+            pair = (row["id_a"], row["id_b"])
+            if pair in skip_pairs or (pair[1], pair[0]) in skip_pairs:
+                continue
+
+            # Enrichir les publications conflictuelles
+            conflict_pubs = []
+            for c in row["conflicts"]:
+                pub_id = c["pub_id"]
+                cur2 = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cur2.execute("""
+                    SELECT id, title, pub_year, doc_type::text FROM publications WHERE id = %s
+                """, (pub_id,))
+                pub = cur2.fetchone()
+                if pub:
+                    conflict_pubs.append({
+                        "id": pub["id"],
+                        "title": pub["title"],
+                        "pub_year": pub["pub_year"],
+                        "doc_type": pub["doc_type"],
+                        "position": c["position"],
+                    })
+                cur2.close()
+
+            return {
+                "pair": {
+                    "person_a": _get_person_dedup_detail(cur, row["id_a"]),
+                    "person_b": _get_person_dedup_detail(cur, row["id_b"]),
+                    "conflict_pubs": conflict_pubs,
+                },
+            }
+
+        return {"pair": None}
 
 
 # ----- SvelteKit SPA (doit rester en dernier, après toutes les routes API) -----

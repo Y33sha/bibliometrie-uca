@@ -246,7 +246,9 @@ CREATE TABLE openalex_authorships (
     openalex_institution_ids text[],
     is_uca boolean DEFAULT false,
     excluded boolean DEFAULT false,
-    structure_ids integer[]
+    structure_ids integer[],
+    raw_author_name text,
+    raw_orcid text
 );
 
 CREATE TABLE openalex_documents (

@@ -12,7 +12,10 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 
 ## OpenAlex
 * [x] inclure publis affiliées CHU et INP dans le script d'import OpenAlex
-* [ ] re-fetch individuel des docts OpenAlex plafonnés à 100 authorships dans l'import automatique
+* [x] stocker `raw_author_name` et `raw_orcid` par authorship (colonnes ajoutées dans `openalex_authorships`, backfill 373k lignes depuis JSON staging, 248k avec ORCID)
+* [x] affichage: utiliser `raw_author_name` au lieu de `openalex_authors.display_name` sur les pages publication et doublons (COALESCE avec fallback)
+* [ ] **migrer la résolution de personnes sur `raw_author_name`** — les entités auteurs OpenAlex (`openalex_authors`) sont non fiables (ex. Luc Scholtès mappé sur Luc Defebvre). `create_persons_from_authorships.py` doit se baser sur `raw_author_name` + `raw_orcid` au lieu de `openalex_authors.full_name`/`orcid`. Chantier important : revoir les 5 passes du script
+* [ ] re-fetch individuel des docts OpenAlex plafonnés à 100 authorships (auteurs UCA au-delà de la pos. 100 sont perdus)
 * [ ] re-fetch à partir des DOI HAL
 
 ## HAL
@@ -34,11 +37,19 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [ ] nouveaux imports: comment prendre en compte fusions de comptes auteurs ayant eu lieu entre-temps (par ex. sur HAL)? / + ré-importer et écraser publis déjà présentes et modifiées entre-temps (stocker hash puis comparer?)
 * [ ] automatiser imports réguliers (1/semaine?)
 
+## Pipeline de normalisation (ordre d'exécution)
+1. `processing/normalize_hal.py` — normalisation HAL (staging → hal_documents + publications)
+2. `processing/normalize_openalex.py` — normalisation OpenAlex (staging → openalex_documents + publications). Détecte les landing_page_url HAL pour éviter les doublons, mais seulement si HAL a déjà été normalisé. Capture `raw_author_name` et `raw_orcid` par authorship.
+3. `processing/merge_hal_openalex_pubs.py` — rattrapage : fusionne les publications OpenAlex dont la landing_page_url pointe vers un document HAL existant mais qui n'avait pas été détecté à l'étape 2 (ex. import OpenAlex antérieur à l'import HAL). **À exécuter systématiquement après les étapes 1-2.**
+4. `db/populate_uca_flags.sql` — flags UCA (étapes 1-3b sur sources)
+5. `processing/create_persons_from_authorships.py` — création personnes + propagation UCA (étape 4)
+6. `processing/rebuild_authorships.py` — INSERT authorships manquants + FK
+7. `db/populate_uca_flags.sql` — re-propagation étape 4 pour les nouvelles lignes de l'étape 6
+
 
 # Développement
 
 ## Signatures
-* [ ] page feedback: à mettre à jour pour tenir compte de la migration (script "relancer la détection": cassé, à réparer)
 * [ ] interface de repérage: filtres sur la base des autres structures reconnues
 * [ ] validation des adresses (forme correcte): à mettre en place si pertinent
 * [ ] publis sans adresses (HAL) => scraper les sites éditeurs pour trouver adresses?
@@ -49,15 +60,21 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [x] déduplication automatisée par labo (merge_lab_duplicates.py — homonymes + interversions nom/prénom)
 * [x] publications: indiquer si auteur correspondant / premier auteur
 * [x] permettre confirmation orcid
+* [x] rendre personnes RH infusionnables
+* [x] interface de déduplication des personnes (par nom + par conflit de sources)
+* [x] ORCID/idHAL confirmés manuellement: affichés en vert sur les pages publiques
+* [x] recalcul des noms normalisés (tirets résiduels corrigés — 1069 personnes)
 * [ ] gestion des formes de noms?
 * [ ] correction des noms
 * [ ] ajouter IdRef?
 * [ ] ajouter quelques visus (%OA)
-* [ ] authorships OpenAlex pourries (ex. Pierre Mathieu): trouver un moyen de les déclarer inutilisables / ou cesser totalement d'utiliser les authorships OpenAlex? étudier les options
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis
 * [ ] afficher quand compte HAL relié ou non à l'ORCID
-* [ ] rendre personnes RH infusionnables
 
+## Mega-authorships et alignement inter-sources
+* [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap)
+* [ ] OpenAlex cap 100 authorships: re-fetch individuel via API pour récupérer les auteurs UCA au-delà de la position 100
+* [ ] en attendant, le mode "conflit de sources" dans la dédup personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`)
 
 ## Structures
 * [x] créer page détails (laboratories/[id])
@@ -75,12 +92,17 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [x] dans les filtres: ajouter option "aucun labo"
 * [x] type "preprint": apparaît "autre" dans les extractions OpenAlex (https://openalex.org/works/W4407574839); voir ce qu'il en est dans les extractions HAL (le compte de préprints est zéro)
 * [x] Open Access diamond?
+* [x] déduplication publications par titre normalisé (interface one-at-a-time, skip/nav)
+* [x] source unique: afficher liste complète des auteurs avec affiliations
+* [x] numérotation auteurs dans doublons: position réelle de la source
+* [x] tous les auteurs affichés dans doublons (même sans person_id), avec nom depuis les sources
 * [ ] ajouter filtre corresponding_is_uca?
-* [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et  corriger + source theses.fr => corriger type
+* [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
 * [ ] lien Publications -> Dashboard?
-* [ ] merge manuel + suggestion de candidats
 * [ ] pb des auteurs openalex liés à une personne mais non listés dans les auteurs d'une publi: http://172.22.130.105/bibliometrie/publications/12380
 * [ ] preprints en accès gold?
+* [ ] type peer-review: mapper les publis OpenAlex de type peer-review (actuellement mappé à "autre")
+* [ ] authorship supprimée: publi apparaît toujours (julie gardette)
 
 ## Pages supplémentaires, étudier pertinence
 * [ ] sujets
