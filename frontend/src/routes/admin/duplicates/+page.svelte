@@ -14,7 +14,7 @@
 		language: string | null;
 		journal: { id: number; title: string; issn: string | null; eissn: string | null } | null;
 		sources: { source: string; source_id: string }[];
-		authors: { author_position: number | null; is_uca: boolean; person_id: number | null; last_name: string | null; first_name: string | null }[];
+		authors: { author_position: number | null; is_uca: boolean; person_id: number | null; last_name: string | null; first_name: string | null; full_name: string | null }[];
 	}
 	interface NextResponse {
 		total: number;
@@ -206,16 +206,20 @@
 						<div class="pub-oa">OA : {pub.oa_status ?? '?'}</div>
 
 						<h4>Auteurs ({pub.authors.length})</h4>
-						<ol class="author-list">
+						<div class="author-list">
 							{#each pub.authors as au}
-								<li class:uca={au.is_uca}>
-									{au.first_name ?? ''} {au.last_name ?? '?'}
+								<div class="author-item" class:uca={au.is_uca}>
+									<span class="author-pos">{(au.author_position ?? 0) + 1}.</span>
 									{#if au.person_id}
-										<a href="{base}/persons/{au.person_id}" class="person-link">#{au.person_id}</a>
+										<a href="{base}/persons/{au.person_id}" class="person-link-name">
+											{au.first_name ?? ''} {au.last_name ?? '?'}
+										</a>
+									{:else}
+										<span>{au.full_name ?? au.first_name ?? ''} {au.last_name ?? '?'}</span>
 									{/if}
-								</li>
+								</div>
 							{/each}
-						</ol>
+						</div>
 
 						<div class="source-ids">
 							{#each pub.sources as src}
@@ -362,15 +366,26 @@
 	}
 	.author-list {
 		margin: 0 0 8px 0;
-		padding-left: 20px;
 		font-size: 0.85rem;
 	}
-	.author-list li.uca { font-weight: 600; }
-	.person-link {
-		font-size: 0.75rem;
-		color: var(--accent, #3b6b9e);
-		margin-left: 4px;
+	.author-item {
+		padding: 1px 0;
 	}
+	.author-item.uca { font-weight: 600; }
+	.author-pos {
+		display: inline-block;
+		width: 24px;
+		text-align: right;
+		margin-right: 4px;
+		color: var(--muted, #999);
+		font-size: 0.8rem;
+	}
+	.person-link-name {
+		color: var(--accent, #3b6b9e);
+		text-decoration: none;
+		font-size: 0.85rem;
+	}
+	.person-link-name:hover { text-decoration: underline; }
 	.source-ids { margin-top: 6px; }
 	.source-detail {
 		display: block;

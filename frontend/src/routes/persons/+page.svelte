@@ -195,12 +195,12 @@
 					<td>{p.department_name || ''}</td>
 					<td>
 						{#each p.orcids || [] as oid}
-							<a href="https://orcid.org/{oid}" target="_blank" rel="noopener" class="id-badge">{oid}</a>
+							<a href="https://orcid.org/{oid.value ?? oid}" target="_blank" rel="noopener" class="id-badge" class:id-confirmed={oid.confirmed}>{oid.value ?? oid}</a>
 						{/each}
 					</td>
 					<td>
 						{#each p.idhals || [] as idh}
-							<a href="https://hal.science/search/index/?q=%2A&authIdHal_s={idh}" target="_blank" rel="noopener" class="id-badge">{idh}</a>
+							<a href="https://hal.science/search/index/?q=%2A&authIdHal_s={idh.value ?? idh}" target="_blank" rel="noopener" class="id-badge" class:id-confirmed={idh.confirmed}>{idh.value ?? idh}</a>
 						{/each}
 					</td>
 				</tr>
@@ -293,6 +293,8 @@
 		white-space: nowrap;
 	}
 	.id-badge:hover { background: #d4e4f3; text-decoration: none; }
+	.id-confirmed { background: #e6f4ec; color: #2a7d4f; }
+	.id-confirmed:hover { background: #d0eadb; }
 	.no-results { text-align: center; padding: 40px; color: var(--muted); }
 	.rh-check {
 		display: inline-flex;

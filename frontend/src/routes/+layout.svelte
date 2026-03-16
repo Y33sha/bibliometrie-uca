@@ -10,14 +10,18 @@
 	const isAddresses = $derived(
 		$page.url.pathname === base + '/admin/addresses' || $page.url.pathname === base + '/admin/feedback'
 	);
+	const isDuplicates = $derived(
+		$page.url.pathname === base + '/admin/duplicates' || $page.url.pathname === base + '/admin/duplicates-persons'
+	);
 
 	let dropdownOpen = $state(false);
+	let dupDropdownOpen = $state(false);
 
 	function isActive(path: string): boolean {
 		const current = $page.url.pathname;
 		const full = base + path;
 		if (current === full) return true;
-		if (path !== '/' && current.startsWith(full)) return true;
+		if (path !== '/' && current.startsWith(full + '/')) return true;
 		return false;
 	}
 
@@ -47,8 +51,20 @@
 			</div>
 			<a href="{base}/admin/structures" class="nav-link" class:active={isActive('/admin/structures')}>Structures</a>
 			<a href="{base}/admin/persons" class="nav-link" class:active={isActive('/admin/persons')}>Personnes</a>
-			<a href="{base}/admin/duplicates" class="nav-link" class:active={isActive('/admin/duplicates')}>Doublons publis</a>
-			<a href="{base}/admin/duplicates-persons" class="nav-link" class:active={isActive('/admin/duplicates-persons')}>Doublons personnes</a>
+			<div
+				class="nav-dropdown"
+				class:active={isDuplicates}
+				onmouseenter={() => (dupDropdownOpen = true)}
+				onmouseleave={() => (dupDropdownOpen = false)}
+			>
+				<button class="nav-link" class:active={isDuplicates}>Dédoublonnage &#x25BE;</button>
+				{#if dupDropdownOpen}
+					<div class="nav-dropdown-menu">
+						<a href="{base}/admin/duplicates" class:active={isActive('/admin/duplicates')}>Publications</a>
+						<a href="{base}/admin/duplicates-persons" class:active={isActive('/admin/duplicates-persons')}>Personnes</a>
+					</div>
+				{/if}
+			</div>
 			<a href="{base}/stats" class="nav-link nav-switch-link">Public</a>
 			<button class="nav-link nav-switch-link" onclick={logout}>Déconnexion</button>
 		</nav>

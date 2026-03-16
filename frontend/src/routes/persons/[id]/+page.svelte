@@ -65,6 +65,7 @@
 		wos_id: string | null;
 		labs: string | null;
 		is_corresponding: boolean | null;
+		authorship_id: number | null;
 	}
 	interface PubResponse {
 		total: number;
@@ -78,6 +79,7 @@
 	let identifiers: Identifier[] = $state([]);
 	let authors: Author[] = $state([]);
 	let error = $state(false);
+	let isAdmin = $state(false);
 
 	const activeTab: Tab = $derived(
 		(() => {
@@ -118,16 +120,20 @@
 	);
 
 	const allOrcids = $derived(() => {
-		const set = new Set<string>();
-		identifiers.filter((i) => i.id_type === 'orcid' && i.status !== 'rejected').forEach((i) => set.add(i.id_value));
-		return Array.from(set);
+		const map = new Map<string, boolean>();
+		identifiers.filter((i) => i.id_type === 'orcid' && i.status !== 'rejected').forEach((i) => {
+			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed');
+		});
+		return Array.from(map, ([value, confirmed]) => ({ value, confirmed }));
 	});
 
 	const allIdhals = $derived(() => {
-		const set = new Set<string>();
-		authors.forEach((a) => { if (a.idhal) set.add(a.idhal); });
-		identifiers.filter((i) => i.id_type === 'idhal' && i.status !== 'rejected').forEach((i) => set.add(i.id_value));
-		return Array.from(set);
+		const map = new Map<string, boolean>();
+		authors.forEach((a) => { if (a.idhal && !map.has(a.idhal)) map.set(a.idhal, false); });
+		identifiers.filter((i) => i.id_type === 'idhal' && i.status !== 'rejected').forEach((i) => {
+			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed');
+		});
+		return Array.from(map, ([value, confirmed]) => ({ value, confirmed }));
 	});
 
 	function buildFilterParams(): URLSearchParams {
@@ -137,7 +143,7 @@
 		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
 		if (selectedCorr.length) params.set('is_corresponding', selectedCorr.join(','));
-		const sf = Object.entries(sourceStates).map(([k, v]) => `${k}_${v}`).join(',');
+		const sf = Object.entries(sourceStates).filter(([, v]) => v === 'yes' || v === 'no').map(([k, v]) => `${k}_${v}`).join(',');
 		if (sf) params.set('source_filter', sf);
 		return params;
 	}
@@ -178,7 +184,8 @@
 		pubPage = data.page;
 	}
 
-	function onFilterChange() {
+	function onFilterChange(newStates?: Record<string, string>) {
+		if (newStates !== undefined) sourceStates = newStates;
 		pubPage = 1;
 		loadPublications();
 		loadFacets();
@@ -205,6 +212,13 @@
 		return `${base}/api/publications/export.csv?${params}`;
 	}
 
+	async function excludeAuthorship(authorshipId: number, pubId: number) {
+		if (!confirm('Exclure ce lien auteur–publication ? Il ne sera pas recréé automatiquement.')) return;
+		await fetch(base + `/api/authorships/${authorshipId}/exclude`, { method: 'PATCH' });
+		publications = publications.filter(p => p.id !== pubId);
+		pubTotal--;
+	}
+
 	function switchTab(tab: Tab) {
 		const url = new URL($page.url);
 		if (tab === 'publications') {
@@ -219,6 +233,8 @@
 
 	onMount(async () => {
 		canGoBack = (window.navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
+		// Check admin status (non-blocking)
+		fetch(base + '/api/auth/check').then(r => r.json()).then(d => { isAdmin = !!d.authenticated; }).catch(() => {});
 		try {
 			const profileData = await api<ProfileResponse>(`/api/persons/${personId}/profile`);
 			profile = profileData.person;
@@ -272,15 +288,17 @@
 				</span>
 			{/if}
 			{#each allOrcids() as oid}
-				<span class="id-item">
+				<span class="id-item" class:id-confirmed={oid.confirmed}>
 					<span class="id-label">ORCID</span>
-					<a href="https://orcid.org/{oid}" target="_blank" rel="noopener" class="id-badge">{oid}</a>
+					<a href="https://orcid.org/{oid.value}" target="_blank" rel="noopener" class="id-badge">{oid.value}</a>
+					{#if oid.confirmed}<span class="confirmed-check" title="Vérifié manuellement">&#10003;</span>{/if}
 				</span>
 			{/each}
 			{#each allIdhals() as idh}
-				<span class="id-item">
+				<span class="id-item" class:id-confirmed={idh.confirmed}>
 					<span class="id-label">idHAL</span>
-					<a href="https://hal.science/search/index/?q=%2A&authIdHal_s={idh}" target="_blank" rel="noopener" class="id-badge">{idh}</a>
+					<a href="https://hal.science/search/index/?q=%2A&authIdHal_s={idh.value}" target="_blank" rel="noopener" class="id-badge">{idh.value}</a>
+					{#if idh.confirmed}<span class="confirmed-check" title="Vérifié manuellement">&#10003;</span>{/if}
 				</span>
 			{/each}
 		</div>
@@ -319,6 +337,7 @@
 			<table class="pub-table">
 				<thead>
 					<tr>
+						{#if isAdmin}<th style="width:28px"></th>{/if}
 						<th>Titre</th>
 						<th>Revue</th>
 						<th style="width:80px">Type</th>
@@ -331,10 +350,18 @@
 				</thead>
 				<tbody>
 					{#if publications.length === 0}
-						<tr><td colspan="8" class="no-results">Aucune publication</td></tr>
+						<tr><td colspan={isAdmin ? 9 : 8} class="no-results">Aucune publication</td></tr>
 					{:else}
 						{#each publications as p (p.id)}
 							<tr>
+								{#if isAdmin}
+									<td class="exclude-cell">
+										{#if p.authorship_id}
+											<button class="exclude-btn" title="Exclure ce lien auteur–publication"
+												onclick={() => excludeAuthorship(p.authorship_id!, p.id)}>✕</button>
+										{/if}
+									</td>
+								{/if}
 								<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
 								<td class="journal-cell">{p.journal || ''}</td>
 								<td>
@@ -534,6 +561,15 @@
 		white-space: nowrap;
 	}
 	.id-badge:hover { background: #d4e4f3; text-decoration: none; }
+	.id-confirmed .id-label { background: #e6f4ec; color: #2a7d4f; }
+	.id-confirmed .id-badge { background: #e6f4ec; color: #2a7d4f; }
+	.id-confirmed .id-badge:hover { background: #d0eadb; }
+	.confirmed-check {
+		color: #2a7d4f;
+		font-size: 0.8rem;
+		font-weight: 700;
+		margin-left: 2px;
+	}
 
 	/* Tabs */
 	.tabs {
@@ -712,6 +748,14 @@
 		font-weight: 500;
 		margin: 1px 2px;
 	}
+
+	.exclude-cell { padding: 0 2px !important; text-align: center; vertical-align: middle; }
+	.exclude-btn {
+		background: none; border: none; cursor: pointer;
+		color: #ccc; font-size: 0.85rem; padding: 2px 4px;
+		border-radius: 3px; line-height: 1; transition: color 0.15s, background 0.15s;
+	}
+	.exclude-btn:hover { color: #c0392b; background: #fdeaea; }
 
 	.no-results { text-align: center; padding: 40px; color: var(--muted); }
 	.loading { text-align: center; padding: 40px; color: var(--muted); }

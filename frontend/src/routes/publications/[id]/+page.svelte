@@ -409,7 +409,50 @@
 			</div>
 		</details>
 	{:else if sourceCount === 1}
-		<p class="single-source">Source : {#if halSource}HAL{:else if oaSource}OpenAlex{:else}WoS{/if}</p>
+		{@const singleRows = halSource ? data!.hal_authorships : oaSource ? data!.openalex_authorships : data!.wos_authorships}
+		{@const singleLabel = halSource ? 'HAL' : oaSource ? 'OpenAlex' : 'WoS'}
+		<div class="section">
+			<h2 class="section-title">Auteurs — source {singleLabel} ({singleRows.filter(a => !a.excluded).length})</h2>
+			<table class="auth-table">
+				<thead>
+					<tr>
+						<th style="width:30px">#</th>
+						<th>Auteur</th>
+						<th>Affiliations</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each singleRows.filter(a => !a.excluded) as a}
+						<tr class:uca-row={a.is_uca}>
+							<td class="pos-cell">{(a.author_position ?? 0) + 1}</td>
+							<td>
+								{#if a.person_id}
+									<a href="{base}/persons/{a.person_id}" class="author-link">
+										{a.full_name}
+									</a>
+								{:else}
+									<span>{a.full_name}</span>
+								{/if}
+							</td>
+							<td>
+								{#if a.structure_ids}
+									{#each a.structure_ids as sid}
+										{#if structIsLabo(sid)}
+											<a href="{base}/laboratories/{sid}" class="struct-tag">{structLabel(sid)}</a>
+										{:else}
+											<span class="struct-tag">{structLabel(sid)}</span>
+										{/if}
+									{/each}
+								{/if}
+								{#if a.raw_affiliation}
+									<span class="raw-affil">{a.raw_affiliation}</span>
+								{/if}
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	{/if}
 {/if}
 
@@ -681,10 +724,10 @@
 	.source-grid tbody tr { border-bottom: 1px solid #f0efec; }
 	.source-grid tbody tr:last-child { border-bottom: none; }
 
-	.single-source {
-		font-size: 0.9rem;
-		color: var(--muted, #666);
-		margin: 12px 0;
+	.raw-affil {
+		font-size: 0.8rem;
+		color: var(--muted);
+		font-style: italic;
 	}
 
 	.sg-pos { width: 28px; text-align: center; }

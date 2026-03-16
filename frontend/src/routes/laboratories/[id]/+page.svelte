@@ -162,7 +162,7 @@
 	function buildPubFilterParams(): URLSearchParams {
 		const params = new URLSearchParams({ lab_id: labId });
 		if (selectedYears.length) params.set('year', selectedYears.join(','));
-		const sf = Object.entries(sourceStates).map(([k, v]) => `${k}_${v}`).join(',');
+		const sf = Object.entries(sourceStates).filter(([, v]) => v === 'yes' || v === 'no').map(([k, v]) => `${k}_${v}`).join(',');
 		if (sf) params.set('source_filter', sf);
 		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
@@ -203,7 +203,8 @@
 		pubsLoaded = true;
 	}
 
-	function onFilterChange() {
+	function onFilterChange(newStates?: Record<string, string>) {
+		if (newStates !== undefined) sourceStates = newStates;
 		pubPage = 1;
 		syncUrl();
 		loadPublications();
