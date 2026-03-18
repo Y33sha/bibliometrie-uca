@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { base } from '$app/paths';
+	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 
 	interface PubDetail {
 		id: number;
@@ -22,15 +24,23 @@
 		pair: { pub_a: PubDetail; pub_b: PubDetail } | null;
 	}
 
+	// Restore state from URL
+	const params = new URLSearchParams($page.url.search);
 	let total = $state(0);
-	let offset = $state(0);
+	let offset = $state(parseInt(params.get('offset') ?? '0') || 0);
 	let pair = $state<{ pub_a: PubDetail; pub_b: PubDetail } | null>(null);
 	let loading = $state(false);
 	let acting = $state(false);
 	let mergedCount = $state(0);
 	let distinctCount = $state(0);
-	let skippedCount = $state(0);
 	let error = $state('');
+
+	function syncUrl() {
+		const p = new URLSearchParams();
+		if (offset > 0) p.set('offset', String(offset));
+		const qs = p.toString();
+		history.replaceState(history.state, '', `${base}/admin/duplicates${qs ? '?' + qs : ''}`);
+	}
 
 	async function loadAt(pos: number) {
 		loading = true;
@@ -48,6 +58,7 @@
 				offset = data2.offset;
 				pair = data2.pair;
 			}
+			syncUrl();
 		} catch (e: any) {
 			error = e.message || 'Erreur de chargement';
 			console.error(e);
@@ -91,11 +102,6 @@
 		acting = false;
 	}
 
-	function skip() {
-		skippedCount++;
-		loadAt(offset + 1);
-	}
-
 	function sourceBadgeClass(src: string): string {
 		if (src === 'hal') return 'badge-hal';
 		if (src === 'openalex') return 'badge-oa';
@@ -115,7 +121,7 @@
 		return '#';
 	}
 
-	$effect(() => { loadAt(0); });
+	onMount(() => { loadAt(offset); });
 </script>
 
 <svelte:head><title>Doublons publications — Admin</title></svelte:head>
@@ -124,16 +130,15 @@
 	<h1>Doublons de publications</h1>
 
 	<div class="stats-bar">
-		<span class="stat stat-position">{total > 0 ? offset + 1 : 0} / {total}</span>
-		{#if mergedCount}<span class="stat stat-merged">{mergedCount} fusionnée{mergedCount !== 1 ? 's' : ''}</span>{/if}
-		{#if distinctCount}<span class="stat stat-distinct">{distinctCount} distincte{distinctCount !== 1 ? 's' : ''}</span>{/if}
-		{#if skippedCount}<span class="stat stat-skipped">{skippedCount} passée{skippedCount !== 1 ? 's' : ''}</span>{/if}
-		<div class="nav-buttons">
+		<div class="nav-group">
 			<button class="btn-nav" onclick={() => loadAt(Math.max(0, offset - 1))} disabled={loading || offset === 0}
 				title="Paire précédente">&lsaquo;</button>
+			<span class="stat stat-position">{total > 0 ? offset + 1 : 0} / {total}</span>
 			<button class="btn-nav" onclick={() => loadAt(offset + 1)} disabled={loading || !pair}
 				title="Paire suivante">&rsaquo;</button>
 		</div>
+		{#if mergedCount}<span class="stat stat-merged">{mergedCount} fusionnée{mergedCount !== 1 ? 's' : ''}</span>{/if}
+		{#if distinctCount}<span class="stat stat-distinct">{distinctCount} distincte{distinctCount !== 1 ? 's' : ''}</span>{/if}
 	</div>
 
 	{#if error}
@@ -164,7 +169,7 @@
 					title="Ces deux publications sont bien distinctes">
 					Marquer distincts
 				</button>
-				<button class="btn-skip" onclick={skip} disabled={acting}
+				<button class="btn-skip" onclick={() => loadAt(offset + 1)} disabled={acting}
 					title="Passer cette paire pour y revenir plus tard">
 					Passer &rsaquo;
 				</button>
@@ -262,10 +267,10 @@
 	.stat-merged { background: #d4edda; color: #155724; }
 	.stat-distinct { background: #fff3cd; color: #856404; }
 	.stat-skipped { background: #e8e8e8; color: #666; }
-	.nav-buttons {
+	.nav-group {
 		display: flex;
 		gap: 4px;
-		margin-left: auto;
+		align-items: center;
 	}
 	.btn-nav {
 		padding: 4px 10px;

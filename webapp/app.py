@@ -273,13 +273,12 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
     cur.execute("""
         WITH affected_pubs AS (
             -- Paires (pub, person) affectées via OpenAlex
-            SELECT DISTINCT od.publication_id, oa.person_id
+            SELECT DISTINCT od.publication_id, oas.person_id
             FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
-            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
             WHERE oas.id = ANY(%s)
               AND od.publication_id IS NOT NULL
-              AND oa.person_id IS NOT NULL
+              AND oas.person_id IS NOT NULL
             UNION
             -- Paires (pub, person) affectées via WoS
             SELECT DISTINCT wd.publication_id, wa.person_id
@@ -305,13 +304,12 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
         ),
         -- Recalculer is_uca depuis OpenAlex
         oa_uca AS (
-            SELECT od.publication_id, oa.person_id,
+            SELECT od.publication_id, oas.person_id,
                    oas.structure_ids AS struct_ids
             FROM affected_pubs ap
             JOIN openalex_documents od ON od.publication_id = ap.publication_id
             JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-                AND oa.person_id = ap.person_id
+                AND oas.person_id = ap.person_id
             WHERE oas.is_uca = TRUE AND oas.structure_ids IS NOT NULL
         ),
         -- Recalculer is_uca depuis WoS
@@ -467,8 +465,7 @@ def apply_person_filter(conditions: list, params: list, person_id: int):
             OR
             EXISTS (SELECT 1 FROM openalex_documents od
                     JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-                    JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-                    WHERE od.publication_id = p.id AND oa.person_id = %s)
+                    WHERE od.publication_id = p.id AND oas.person_id = %s)
         )
     """)
     params.append(person_id)
@@ -1304,8 +1301,7 @@ async def export_publications_csv(
                     OR
                     EXISTS (SELECT 1 FROM openalex_documents od
                             JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-                            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-                            WHERE od.publication_id = p.id AND oa.person_id = %s)
+                            WHERE od.publication_id = p.id AND oas.person_id = %s)
                 )
             """]
             params: list = [person_id, person_id]
@@ -1569,7 +1565,7 @@ async def get_publication(pub_id: int):
         cur.execute("""
             SELECT oas.author_position,
                    COALESCE(oas.raw_author_name, oa.full_name) AS full_name,
-                   oa.person_id,
+                   oas.person_id,
                    oas.is_uca, oas.structure_ids, oas.raw_affiliation, oas.excluded
             FROM openalex_authorships oas
             JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
@@ -1675,8 +1671,7 @@ async def list_publications(
                     OR
                     EXISTS (SELECT 1 FROM openalex_documents od
                             JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-                            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-                            WHERE od.publication_id = p.id AND oa.person_id = %s)
+                            WHERE od.publication_id = p.id AND oas.person_id = %s)
                 )
             """]
             params = [person_id, person_id]
@@ -2680,10 +2675,9 @@ async def get_laboratory_persons(
                   AND has.is_uca = TRUE
                   AND has.structure_ids && %s::int[]
                 UNION
-                SELECT DISTINCT oa.person_id
-                FROM openalex_authors oa
-                JOIN openalex_authorships oas ON oas.openalex_author_id = oa.id
-                WHERE oa.person_id IS NOT NULL
+                SELECT DISTINCT oas.person_id
+                FROM openalex_authorships oas
+                WHERE oas.person_id IS NOT NULL
                   AND oas.is_uca = TRUE
                   AND oas.structure_ids && %s::int[]
             )
@@ -2701,10 +2695,9 @@ async def get_laboratory_persons(
                   AND has.is_uca = TRUE
                   AND has.structure_ids && %s::int[]
                 UNION
-                SELECT DISTINCT oa.person_id
-                FROM openalex_authors oa
-                JOIN openalex_authorships oas ON oas.openalex_author_id = oa.id
-                WHERE oa.person_id IS NOT NULL
+                SELECT DISTINCT oas.person_id
+                FROM openalex_authorships oas
+                WHERE oas.person_id IS NOT NULL
                   AND oas.is_uca = TRUE
                   AND oas.structure_ids && %s::int[]
             )
@@ -2723,9 +2716,8 @@ async def get_laboratory_persons(
                     ) OR EXISTS (
                         SELECT 1 FROM openalex_documents od
                         JOIN openalex_authorships oas2 ON oas2.openalex_document_id = od.id
-                        JOIN openalex_authors oa2 ON oa2.id = oas2.openalex_author_id
                         WHERE od.publication_id = pub.id
-                          AND oa2.person_id = p.id
+                          AND oas2.person_id = p.id
                           AND oas2.structure_ids && %s::int[]
                     )
                    ) AS pub_count
@@ -2752,10 +2744,9 @@ async def get_laboratory_persons(
 
         cur.execute("""
             SELECT COUNT(*) FROM (
-                SELECT DISTINCT oa.id
-                FROM openalex_authors oa
-                JOIN openalex_authorships oas ON oas.openalex_author_id = oa.id
-                WHERE oa.person_id IS NULL
+                SELECT DISTINCT oas.openalex_author_id
+                FROM openalex_authorships oas
+                WHERE oas.person_id IS NULL
                   AND oas.is_uca = TRUE
                   AND oas.structure_ids && %s::int[]
             ) sub
@@ -3609,13 +3600,13 @@ async def list_persons(
         conditions.append("""(EXISTS (
             SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id
         ) OR EXISTS (
-            SELECT 1 FROM openalex_authors oa WHERE oa.person_id = p.id
+            SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id
         ))""")
     elif linked == "no":
         conditions.append("""NOT EXISTS (
             SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id
         ) AND NOT EXISTS (
-            SELECT 1 FROM openalex_authors oa WHERE oa.person_id = p.id
+            SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id
         )""")
     if has_orcid == "yes":
         conditions.append("""EXISTS (
@@ -3731,10 +3722,10 @@ async def persons_facets(
         if skip != "linked":
             if linked == "yes":
                 conds.append("""(EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
-                    OR EXISTS (SELECT 1 FROM openalex_authors oa WHERE oa.person_id = p.id))""")
+                    OR EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id))""")
             elif linked == "no":
                 conds.append("""NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
-                    AND NOT EXISTS (SELECT 1 FROM openalex_authors oa WHERE oa.person_id = p.id)""")
+                    AND NOT EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id)""")
         return conds, params
 
     base_from = "persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id"
@@ -3814,11 +3805,11 @@ async def persons_facets(
                 SELECT
                     COUNT(*) FILTER (WHERE
                         EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
-                        OR EXISTS (SELECT 1 FROM openalex_authors oa WHERE oa.person_id = p.id)
+                        OR EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id)
                     ) AS yes,
                     COUNT(*) FILTER (WHERE
                         NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
-                        AND NOT EXISTS (SELECT 1 FROM openalex_authors oa WHERE oa.person_id = p.id)
+                        AND NOT EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id)
                     ) AS no
                 FROM {base_from} {where}
             """, p)
@@ -3871,11 +3862,11 @@ async def persons_stats():
                 COUNT(*) AS total_persons,
                 COUNT(DISTINCT p.id) FILTER (
                     WHERE EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
-                       OR EXISTS (SELECT 1 FROM openalex_authors oa WHERE oa.person_id = p.id)
+                       OR EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id)
                        OR EXISTS (SELECT 1 FROM wos_authors wa WHERE wa.person_id = p.id)
                 ) AS linked_persons,
                 (SELECT COUNT(*) FROM hal_authors WHERE person_id IS NOT NULL)
-                + (SELECT COUNT(*) FROM openalex_authors WHERE person_id IS NOT NULL)
+                + (SELECT COUNT(DISTINCT person_id) FROM openalex_authorships WHERE person_id IS NOT NULL)
                 + (SELECT COUNT(*) FROM wos_authors WHERE person_id IS NOT NULL)
                 AS linked_authors,
                 (SELECT COUNT(DISTINCT department_name)
@@ -4007,7 +3998,8 @@ async def person_profile(person_id: int):
                    NULL::text AS idhal, oa.openalex_id,
                    (SELECT COUNT(*) FROM openalex_authorships oas2
                     WHERE oas2.openalex_author_id = oa.id AND oas2.is_uca = TRUE) AS uca_pub_count
-            FROM openalex_authors oa WHERE oa.person_id = %s
+            FROM openalex_authors oa
+            WHERE oa.id IN (SELECT DISTINCT oas.openalex_author_id FROM openalex_authorships oas WHERE oas.person_id = %s)
         """, (person_id,))
         oa_authors = cur.fetchall()
 
@@ -4040,8 +4032,7 @@ async def person_addresses(
                 SELECT DISTINCT oaa.address_id
                 FROM openalex_authorship_addresses oaa
                 JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
-                JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-                WHERE oa.person_id = %s
+                WHERE oas.person_id = %s
             )"""
         cur.execute(f"SELECT COUNT(*) AS total FROM addresses a WHERE {base_where}", (person_id,))
         total = cur.fetchone()["total"]
@@ -4215,8 +4206,8 @@ async def link_person_to_author(person_id: int, data: LinkPersonAuthor):
             if not oa:
                 raise HTTPException(status_code=404, detail="OpenAlex author not found")
             cur.execute("""
-                UPDATE openalex_authors SET person_id = %s, updated_at = now()
-                WHERE id = %s
+                UPDATE openalex_authorships SET person_id = %s
+                WHERE openalex_author_id = %s
             """, (person_id, data.author_id))
             cur.execute("""
                 UPDATE authorships ash SET person_id = %s, updated_at = now()
@@ -4276,9 +4267,9 @@ async def unlink_person_from_author(person_id: int, source: str, author_id: int)
             """, (author_id, person_id))
         elif source == "openalex":
             cur.execute("""
-                UPDATE openalex_authors SET person_id = NULL, updated_at = now()
-                WHERE id = %s AND person_id = %s
-            """, (author_id, person_id))
+                UPDATE openalex_authorships SET person_id = NULL
+                WHERE openalex_author_id = %s
+            """, (author_id,))
         elif source == "wos":
             cur.execute("""
                 UPDATE wos_authors SET person_id = NULL, updated_at = now()
@@ -4430,7 +4421,7 @@ async def merge_persons(person_id: int, body: dict):
         )
         # 2. Transférer les auteurs OpenAlex
         cur.execute(
-            "UPDATE openalex_authors SET person_id = %s WHERE person_id = %s",
+            "UPDATE openalex_authorships SET person_id = %s WHERE person_id = %s",
             (person_id, source_id),
         )
         # 2b. Transférer les auteurs WoS
@@ -4681,13 +4672,15 @@ def _parse_skip_pairs(skip: str) -> set[tuple[int, int]]:
     return result
 
 
-def _scan_dup_query(cur, sql, skip_pairs=None, stop_at_first=False):
+def _scan_dup_query(cur, sql, skip_pairs=None, stop_at_first=False, skip_n=0):
     """Parcourt une requête de doublons avec curseur serveur.
     Retourne (found_row_or_None, count_of_valid_pairs).
+    skip_n: nombre de paires valides à sauter avant de retourner la première.
     """
     cur.execute("DECLARE _dup_cur NO SCROLL CURSOR FOR " + sql)
     found = None
     count = 0
+    skipped = 0
     while True:
         cur.execute("FETCH 500 FROM _dup_cur")
         rows = cur.fetchall()
@@ -4699,16 +4692,23 @@ def _scan_dup_query(cur, sql, skip_pairs=None, stop_at_first=False):
             if not _tokens_match(t1, t2):
                 continue
             count += 1
-            if found is None and skip_pairs is not None:
-                pair_key = (row["id_a"], row["id_b"])
-                if pair_key not in skip_pairs:
-                    found = row
-                    if stop_at_first:
-                        break
+            if found is None:
+                # Legacy skip pairs
+                if skip_pairs is not None:
+                    pair_key = (row["id_a"], row["id_b"])
+                    if pair_key in skip_pairs:
+                        continue
+                # Offset-based skip
+                if skipped < skip_n:
+                    skipped += 1
+                    continue
+                found = row
+                if stop_at_first:
+                    break
         if stop_at_first and found:
             break
     cur.execute("CLOSE _dup_cur")
-    return found, count
+    return found, count, skipped
 
 
 @app.get("/api/admin/person-duplicates/count")
@@ -4717,19 +4717,24 @@ async def count_person_duplicates():
     with get_cursor() as (cur, conn):
         total = 0
         for sql in PERSON_DUP_QUERIES:
-            _, cnt = _scan_dup_query(cur, sql)
+            _, cnt, _ = _scan_dup_query(cur, sql)
             total += cnt
         return {"total": total}
 
 
 @app.get("/api/admin/person-duplicates/next")
-async def next_person_duplicate(skip: str = Query("", alias="skip")):
-    """Renvoie la première paire candidate non passée (par priorité)."""
-    skip_pairs = _parse_skip_pairs(skip)
+async def next_person_duplicate(
+    skip: str = Query("", alias="skip"),
+    offset: int = Query(0, ge=0),
+):
+    """Renvoie la paire candidate à la position offset."""
+    # Support legacy skip pairs (pour compatibilité)
+    skip_pairs = _parse_skip_pairs(skip) if skip else None
 
     with get_cursor() as (cur, conn):
+        remaining_skip = offset
         for sql in PERSON_DUP_QUERIES:
-            found, _ = _scan_dup_query(cur, sql, skip_pairs, stop_at_first=True)
+            found, cnt, actual_skipped = _scan_dup_query(cur, sql, skip_pairs, stop_at_first=True, skip_n=remaining_skip)
             if found:
                 return {
                     "pair": {
@@ -4737,6 +4742,8 @@ async def next_person_duplicate(skip: str = Query("", alias="skip")):
                         "person_b": _get_person_dedup_detail(cur, found["id_b"]),
                     },
                 }
+            # Décrémenter l'offset des paires effectivement skippées dans cette requête
+            remaining_skip -= actual_skipped
 
         return {"pair": None}
 
@@ -4785,12 +4792,11 @@ author_positions AS (
     WHERE ha.person_id IS NOT NULL AND NOT has.excluded
       AND pac.max_authors <= {max_authors}
     UNION
-    SELECT DISTINCT od.publication_id, oas.author_position, oa.person_id
+    SELECT DISTINCT od.publication_id, oas.author_position, oas.person_id
     FROM openalex_documents od
     JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-    JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
     JOIN pub_author_counts pac ON pac.publication_id = od.publication_id
-    WHERE oa.person_id IS NOT NULL AND NOT oas.excluded
+    WHERE oas.person_id IS NOT NULL AND NOT oas.excluded
       AND pac.max_authors <= {max_authors}
     UNION
     SELECT DISTINCT wd.publication_id, was.author_position, wa.person_id
@@ -4831,15 +4837,22 @@ async def count_person_conflict_pairs():
 
 
 @app.get("/api/admin/person-duplicates/conflicts/next")
-async def next_person_conflict(skip: str = Query("", alias="skip")):
-    """Renvoie la première paire en conflit non passée, avec les publications concernées."""
-    skip_pairs = _parse_skip_pairs(skip)
+async def next_person_conflict(
+    skip: str = Query("", alias="skip"),
+    offset: int = Query(0, ge=0),
+):
+    """Renvoie la paire en conflit à la position offset."""
+    skip_pairs = _parse_skip_pairs(skip) if skip else set()
 
     with get_cursor() as (cur, conn):
         cur.execute(CONFLICT_PAIRS_SQL)
+        skipped = 0
         for row in cur:
             pair = (row["id_a"], row["id_b"])
             if pair in skip_pairs or (pair[1], pair[0]) in skip_pairs:
+                continue
+            if skipped < offset:
+                skipped += 1
                 continue
 
             # Enrichir les publications conflictuelles

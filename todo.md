@@ -8,15 +8,17 @@
 ## Web of Science
 API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuellement.
 * [x] Import staging : scrape_wos.py --parse-only (fichiers dans extraction/wos/downloads/)
-* [ ] Normalisation, peuplement des tables structures, auteurs, authorships, gestion des adresses, etc.
+* [x] Normalisation, peuplement des tables structures, auteurs, authorships, gestion des adresses, etc.
 
 ## OpenAlex
 * [x] inclure publis affiliées CHU et INP dans le script d'import OpenAlex
 * [x] stocker `raw_author_name` et `raw_orcid` par authorship (colonnes ajoutées dans `openalex_authorships`, backfill 373k lignes depuis JSON staging, 248k avec ORCID)
 * [x] affichage: utiliser `raw_author_name` au lieu de `openalex_authors.display_name` sur les pages publication et doublons (COALESCE avec fallback)
-* [ ] **migrer la résolution de personnes sur `raw_author_name`** — les entités auteurs OpenAlex (`openalex_authors`) sont non fiables (ex. Luc Scholtès mappé sur Luc Defebvre). `create_persons_from_authorships.py` doit se baser sur `raw_author_name` + `raw_orcid` au lieu de `openalex_authors.full_name`/`orcid`. Chantier important : revoir les 5 passes du script
+* [x] **migrer `person_id` sur `openalex_authorships`** — colonne ajoutée, backfillée (71k lignes), tous les scripts et l'API lisent/écrivent dessus. Chaque authorship a son propre `person_id`, indépendant de l'entité OA. `create_persons_from_authorships.py` utilise `raw_author_name`/`raw_orcid`. `fix_oa_person_conflicts.py` corrige chirurgicalement par authorship.
+* [ ] **supprimer les dual-writes** — actuellement les scripts et l'API écrivent `person_id` sur `openalex_authorships` ET `openalex_authors` (transition). À terme, retirer les écritures sur `openalex_authors.person_id` (fichiers: `create_persons_from_authorships.py`, `rebuild_authorships.py`, `merge_duplicate_persons.py`, `merge_lab_duplicates.py`, `webapp/app.py` link/unlink/merge endpoints)
 * [ ] re-fetch individuel des docts OpenAlex plafonnés à 100 authorships (auteurs UCA au-delà de la pos. 100 sont perdus)
 * [ ] re-fetch à partir des DOI HAL
+* [ ] importer orcid des openalex authors seulement quand display_name = raw_author_name (et pas d'initiale)
 
 ## HAL
 * [x] inclure collections HAL CHU-CLERMONTFERRAND et CLERMONT-AUVERGNE-INP
@@ -32,6 +34,8 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 
 ## Unpaywall
 * [ ] Finir l'audit Unpaywall vs OpenAlex
+* [ ] utiliser unpaywall pour interroger type doc?
+pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 
 ## Workflow
 * [ ] nouveaux imports: comment prendre en compte fusions de comptes auteurs ayant eu lieu entre-temps (par ex. sur HAL)? / + ré-importer et écraser publis déjà présentes et modifiées entre-temps (stocker hash puis comparer?)
@@ -42,7 +46,7 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 2. `processing/normalize_openalex.py` — normalisation OpenAlex (staging → openalex_documents + publications). Détecte les landing_page_url HAL pour éviter les doublons, mais seulement si HAL a déjà été normalisé. Capture `raw_author_name` et `raw_orcid` par authorship.
 3. `processing/merge_hal_openalex_pubs.py` — rattrapage : fusionne les publications OpenAlex dont la landing_page_url pointe vers un document HAL existant mais qui n'avait pas été détecté à l'étape 2 (ex. import OpenAlex antérieur à l'import HAL). **À exécuter systématiquement après les étapes 1-2.**
 4. `db/populate_uca_flags.sql` — flags UCA (étapes 1-3b sur sources)
-5. `processing/create_persons_from_authorships.py` — création personnes + propagation UCA (étape 4)
+5. `processing/create_persons_from_authorships.py` — Phase A: création personnes HAL/WoS (ORCID, nom+co-publi, singletons, cross-link). Phase B: résolution OA par `raw_author_name` (ORCID, nom+co-publi, nom seul, création). Les entités `openalex_authors` ne participent PAS à la résolution. Propagation UCA (étape 4).
 6. `processing/rebuild_authorships.py` — INSERT authorships manquants + FK
 7. `db/populate_uca_flags.sql` — re-propagation étape 4 pour les nouvelles lignes de l'étape 6
 

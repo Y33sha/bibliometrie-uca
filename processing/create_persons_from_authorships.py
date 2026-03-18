@@ -1,14 +1,20 @@
 """
 Crée des entités Personnes à partir des authorships UCA non rattachées.
 
-Passe 1  : Regroupement par ORCID (même ORCID → même personne)
-Passe 1b : Rattachement aux personnes existantes par nom strict + co-publication
-Passe 2  : Regroupement par nom strict + co-publication entre auteurs restants
-            (même publi + même nom → même personne, sauf si ORCIDs différents)
-Passe 3  : Singletons (authorship UCA isolée → une personne)
-Passe 3b : Cross-link — rattache les auteurs non-UCA homonymes sur les mêmes
-            publications que les personnes déjà liées (comble les trous inter-sources)
-Passe 4  : Propagation vers authorships (table de vérité) — populate_uca_flags étape 4
+Phase A (HAL + WoS) :
+  Passe 1  : Regroupement par ORCID (même ORCID → même personne)
+  Passe 1b : Rattachement aux personnes existantes par nom strict + co-publication
+  Passe 2  : Regroupement par nom strict + co-publication entre auteurs restants
+  Passe 3  : Singletons (authorship UCA isolée → une personne)
+  Passe 3b : Cross-link HAL↔WoS (auteurs non-UCA homonymes sur mêmes publications)
+
+Phase B (OpenAlex) :
+  Résolution par raw_author_name : ORCID, puis nom+co-publi, puis nom seul, puis création
+
+Passe 4  : Propagation vers authorships (table de vérité)
+
+Les entités openalex_authors ne participent PAS à la résolution de personnes.
+Seuls raw_author_name et raw_orcid de openalex_authorships sont utilisés.
 
 Usage:
     python create_persons_from_authorships.py              # exécuter
@@ -19,33 +25,48 @@ import argparse
 import logging
 import os
 import sys
-import unicodedata
-import re
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from psycopg2.extras import RealDictCursor
+from utils.normalize import normalize_name
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def normalize_name(name):
-    """Normalise un nom pour comparaison."""
-    if not name:
-        return ""
-    # Remplacer les tirets Unicode (U+2010 à U+2015) par un tiret ASCII
-    text = re.sub(r"[\u2010\u2011\u2012\u2013\u2014\u2015]", "-", name)
-    text = unicodedata.normalize("NFKD", text.lower().strip())
-    text = text.encode("ascii", "ignore").decode("ascii")
-    text = re.sub(r"[^a-z\s-]", "", text)
-    return re.sub(r"\s+", " ", text).strip()
+def parse_raw_author_name(raw_name):
+    """Parse un raw_author_name en (last_name, first_name)."""
+    if not raw_name:
+        return "", ""
+    raw = raw_name.strip()
+    if "," in raw:
+        parts = raw.split(",", 1)
+        return parts[0].strip(), parts[1].strip()
+    words = raw.split()
+    if len(words) >= 2:
+        return words[-1], " ".join(words[:-1])
+    return raw, ""
 
 
-def get_unlinked_uca_authors(cur):
-    """Récupère tous les auteurs UCA non rattachés à une personne."""
-    # HAL authors
+def name_keys_for_oa(a):
+    """Retourne les clés (last_norm, first_norm) à essayer pour un authorship OA.
+    Tente l'ordre normal, puis l'ordre inversé si le raw_name contient une virgule.
+    """
+    ln = normalize_name(a["last_name"])
+    fn = normalize_name(a["first_name"])
+    keys = []
+    if ln and fn:
+        keys.append((ln, fn))
+    # Si le raw_name contient une virgule, tester l'inversion
+    if a.get("full_name") and "," in a["full_name"] and ln and fn:
+        keys.append((fn, ln))
+    return keys
+
+
+def get_unlinked_hal_wos_authors(cur):
+    """Récupère les auteurs HAL + WoS UCA non rattachés."""
     cur.execute("""
         SELECT ha.id, 'hal' AS source, ha.full_name, ha.last_name, ha.first_name,
                ha.orcid, ha.idhal,
@@ -60,22 +81,6 @@ def get_unlinked_uca_authors(cur):
     """)
     hal_authors = cur.fetchall()
 
-    # OpenAlex authors
-    cur.execute("""
-        SELECT oa.id, 'openalex' AS source, oa.full_name, oa.last_name, oa.first_name,
-               oa.orcid, NULL::text AS idhal,
-               array_agg(DISTINCT od.publication_id) FILTER (WHERE od.publication_id IS NOT NULL) AS pub_ids,
-               COUNT(DISTINCT od.publication_id) FILTER (WHERE od.publication_id IS NOT NULL) AS pub_count
-        FROM openalex_authors oa
-        JOIN openalex_authorships oas ON oas.openalex_author_id = oa.id
-        JOIN openalex_documents od ON od.id = oas.openalex_document_id
-        WHERE oa.person_id IS NULL
-          AND oas.is_uca = TRUE
-        GROUP BY oa.id
-    """)
-    oa_authors = cur.fetchall()
-
-    # WoS authors
     cur.execute("""
         SELECT wa.id, 'wos' AS source, wa.full_name, wa.last_name, wa.first_name,
                wa.orcid, NULL::text AS idhal,
@@ -90,7 +95,31 @@ def get_unlinked_uca_authors(cur):
     """)
     wos_authors = cur.fetchall()
 
-    return hal_authors + oa_authors + wos_authors
+    return hal_authors + wos_authors
+
+
+def get_unlinked_oa_authorships(cur):
+    """Récupère les authorships OpenAlex UCA non rattachées (raw_author_name)."""
+    cur.execute("""
+        SELECT oas.id, 'openalex' AS source,
+               oas.raw_author_name AS full_name,
+               oas.raw_orcid AS orcid,
+               NULL::text AS idhal,
+               od.publication_id AS pub_id
+        FROM openalex_authorships oas
+        JOIN openalex_documents od ON od.id = oas.openalex_document_id
+        WHERE oas.person_id IS NULL
+          AND oas.is_uca = TRUE
+          AND oas.raw_author_name IS NOT NULL
+          AND od.publication_id IS NOT NULL
+    """)
+    rows = cur.fetchall()
+    # Enrichir avec last_name/first_name parsés
+    for r in rows:
+        r["last_name"], r["first_name"] = parse_raw_author_name(r["full_name"])
+        r["pub_ids"] = [r["pub_id"]] if r["pub_id"] else []
+        r["pub_count"] = 1 if r["pub_id"] else 0
+    return rows
 
 
 def pick_best_name(authors):
@@ -118,7 +147,7 @@ def link_authors_to_person(cur, person_id, authors):
             cur.execute("UPDATE hal_authors SET person_id = %s, updated_at = now() WHERE id = %s",
                         (person_id, a["id"]))
         elif a["source"] == "openalex":
-            cur.execute("UPDATE openalex_authors SET person_id = %s, updated_at = now() WHERE id = %s",
+            cur.execute("UPDATE openalex_authorships SET person_id = %s WHERE id = %s",
                         (person_id, a["id"]))
         elif a["source"] == "wos":
             cur.execute("UPDATE wos_authors SET person_id = %s, updated_at = now() WHERE id = %s",
@@ -151,13 +180,8 @@ def add_identifiers(cur, person_id, authors):
 
 
 def propagate_to_authorships(cur):
-    """Étape 4 : propager person_id vers la table authorships (table de vérité).
+    """Étape 4 : propager person_id vers la table authorships (table de vérité)."""
 
-    structure_ids = périmètre large (UCA + labos tutellés + partenaires)
-    is_uca = TRUE si au moins une structure du périmètre restreint (UCA + labos tutellés)
-    """
-
-    # Reset
     cur.execute("UPDATE authorships SET is_uca = FALSE, structure_ids = NULL")
     reset_count = cur.rowcount
     logger.info(f"  Reset {reset_count} authorships")
@@ -201,15 +225,14 @@ def propagate_to_authorships(cur):
     cur.execute("""
         WITH oa_data AS (
             SELECT od.publication_id,
-                   oa.person_id,
+                   oas.person_id,
                    oas.structure_ids AS struct_ids,
                    oas.is_uca AS src_is_uca
             FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
-            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
             WHERE oas.structure_ids IS NOT NULL
               AND od.publication_id IS NOT NULL
-              AND oa.person_id IS NOT NULL
+              AND oas.person_id IS NOT NULL
         )
         UPDATE authorships a
         SET structure_ids = (
@@ -255,13 +278,9 @@ def propagate_to_authorships(cur):
     wos_count = cur.rowcount
     logger.info(f"  {wos_count} authorships mises à jour depuis WoS")
 
-    # Stats finales
     cur.execute("SELECT COUNT(*) FROM authorships WHERE is_uca = TRUE")
     total_uca = cur.fetchone()["count"]
-    cur.execute("SELECT COUNT(*) FROM authorships WHERE structure_ids IS NOT NULL")
-    total_structs = cur.fetchone()["count"]
     logger.info(f"  Total authorships is_uca=TRUE : {total_uca}")
-    logger.info(f"  Total authorships avec structure_ids : {total_structs}")
 
 
 def check_existing_person_by_orcid(cur, orcid):
@@ -277,7 +296,6 @@ def check_existing_person_by_orcid(cur, orcid):
 
 def get_existing_persons_by_name(cur):
     """Récupère les personnes existantes avec leurs noms normalisés et leurs publication_ids."""
-    # Personnes existantes avec leurs publications (via hal_authors et openalex_authors déjà liés)
     cur.execute("""
         SELECT p.id AS person_id,
                p.last_name_normalized, p.first_name_normalized,
@@ -290,11 +308,10 @@ def get_existing_persons_by_name(cur):
             JOIN hal_documents hd ON hd.id = has.hal_document_id
             WHERE ha.person_id IS NOT NULL AND hd.publication_id IS NOT NULL
             UNION
-            SELECT oa.person_id, od.publication_id AS pub_id
-            FROM openalex_authors oa
-            JOIN openalex_authorships oas ON oas.openalex_author_id = oa.id
+            SELECT oas.person_id, od.publication_id AS pub_id
+            FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
-            WHERE oa.person_id IS NOT NULL AND od.publication_id IS NOT NULL
+            WHERE oas.person_id IS NOT NULL AND od.publication_id IS NOT NULL
             UNION
             SELECT wa.person_id, wd.publication_id AS pub_id
             FROM wos_authors wa
@@ -311,16 +328,15 @@ def get_existing_persons_by_name(cur):
     return cur.fetchall()
 
 
-def run(dry_run=False):
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+def run_phase_a(cur, dry_run=False):
+    """Phase A : HAL + WoS — création et liaison de personnes."""
 
-    logger.info("Récupération des auteurs UCA non rattachés…")
-    authors = get_unlinked_uca_authors(cur)
-    logger.info(f"  {len(authors)} auteurs UCA non rattachés")
+    logger.info("=== PHASE A : HAL + WoS ===")
+    authors = get_unlinked_hal_wos_authors(cur)
+    logger.info(f"  {len(authors)} auteurs HAL/WoS UCA non rattachés")
 
     # ── Passe 1 : regroupement par ORCID ──
-    logger.info("\n=== Passe 1 : regroupement par ORCID ===")
+    logger.info("\n--- Passe 1 : regroupement par ORCID ---")
 
     by_orcid = defaultdict(list)
     no_orcid = []
@@ -333,21 +349,18 @@ def run(dry_run=False):
     p1_created = 0
     p1_linked_existing = 0
     p1_authors_linked = 0
-    linked_ids = set()  # track author (source, id) that got linked
+    linked_ids = set()
 
     for orcid, group in by_orcid.items():
-        # Vérifier si une personne existe déjà avec cet ORCID
         existing_pid = check_existing_person_by_orcid(cur, orcid)
 
         if existing_pid:
-            # Rattacher à la personne existante
             if not dry_run:
                 link_authors_to_person(cur, existing_pid, group)
                 add_identifiers(cur, existing_pid, group)
             p1_linked_existing += 1
             p1_authors_linked += len(group)
         else:
-            # Créer une nouvelle personne
             last, first = pick_best_name(group)
             if not dry_run:
                 pid = create_person(cur, last, first)
@@ -359,21 +372,12 @@ def run(dry_run=False):
         for a in group:
             linked_ids.add((a["source"], a["id"]))
 
-    logger.info(f"  {len(by_orcid)} ORCIDs distincts")
-    logger.info(f"  {p1_linked_existing} rattachés à des personnes existantes")
-    logger.info(f"  {p1_created} nouvelles personnes créées")
-    logger.info(f"  {p1_authors_linked} auteurs rattachés")
+    logger.info(f"  {len(by_orcid)} ORCIDs distincts, {p1_created} créées, {p1_linked_existing} rattachées")
 
-    # ── Passe 1b : rattachement aux personnes existantes par nom + co-publication ──
-    logger.info("\n=== Passe 1b : rattachement aux personnes existantes (nom + co-publication) ===")
+    # ── Passe 1b : rattachement par nom + co-publication ──
+    logger.info("\n--- Passe 1b : nom + co-publication vers personnes existantes ---")
 
-    remaining_1b = [a for a in no_orcid if (a["source"], a["id"]) not in linked_ids]
-    logger.info(f"  {len(remaining_1b)} auteurs restants sans ORCID")
-
-    # Charger les personnes existantes avec leurs publications
     existing_persons = get_existing_persons_by_name(cur)
-
-    # Index par (last_norm, first_norm) → liste de {person_id, pub_ids}
     existing_by_name = defaultdict(list)
     for ep in existing_persons:
         if ep["last_name_normalized"] and ep["first_name_normalized"]:
@@ -384,9 +388,7 @@ def run(dry_run=False):
             })
 
     p1b_linked = 0
-    p1b_authors_linked = 0
-
-    for a in remaining_1b:
+    for a in no_orcid:
         if (a["source"], a["id"]) in linked_ids:
             continue
         last_norm = normalize_name(a["last_name"])
@@ -394,20 +396,15 @@ def run(dry_run=False):
         if not last_norm or not first_norm:
             continue
 
-        candidates = existing_by_name.get((last_norm, first_norm), [])
-        if not candidates:
-            continue
-
         author_pubs = set(a["pub_ids"]) if a["pub_ids"] else set()
         if not author_pubs:
             continue
 
-        # Chercher une personne existante qui partage au moins une publication
+        candidates = existing_by_name.get((last_norm, first_norm), [])
         matched_person = None
         for ep in candidates:
-            if author_pubs & ep["pub_ids"]:  # intersection non vide
+            if author_pubs & ep["pub_ids"]:
                 if matched_person is not None and matched_person != ep["person_id"]:
-                    # Ambiguïté : plusieurs personnes existantes matchent → ne pas rattacher
                     matched_person = None
                     break
                 matched_person = ep["person_id"]
@@ -417,45 +414,34 @@ def run(dry_run=False):
                 link_authors_to_person(cur, matched_person, [a])
                 add_identifiers(cur, matched_person, [a])
             linked_ids.add((a["source"], a["id"]))
-            p1b_authors_linked += 1
+            p1b_linked += 1
 
-    # Compter les personnes distinctes rattachées
-    logger.info(f"  {p1b_authors_linked} auteurs rattachés à des personnes existantes")
+    logger.info(f"  {p1b_linked} auteurs rattachés")
 
-    # ── Passe 2 : nom strict + co-publication (entre auteurs non rattachés) ──
-    logger.info("\n=== Passe 2 : nom strict + co-publication ===")
+    # ── Passe 2 : nom strict + co-publication entre non-rattachés ──
+    logger.info("\n--- Passe 2 : co-publication entre non-rattachés ---")
 
     remaining = [a for a in no_orcid if (a["source"], a["id"]) not in linked_ids]
-    logger.info(f"  {len(remaining)} auteurs restants sans ORCID")
-
-    # Grouper par nom normalisé
     by_name = defaultdict(list)
     for a in remaining:
         last_norm = normalize_name(a["last_name"])
         first_norm = normalize_name(a["first_name"])
         if last_norm and first_norm:
             by_name[(last_norm, first_norm)].append(a)
-        else:
-            # Pas de nom exploitable — sera traité en passe 3
-            pass
 
     p2_created = 0
     p2_authors_linked = 0
 
     for name_key, group in by_name.items():
         if len(group) == 1:
-            # Un seul auteur avec ce nom → passe 3 (singleton)
             continue
 
-        # Chercher les sous-groupes par co-publication (composantes connexes)
-        # Deux auteurs sont dans le même groupe s'ils partagent au moins une publication
         pub_to_authors = defaultdict(set)
         for i, a in enumerate(group):
             if a["pub_ids"]:
                 for pub_id in a["pub_ids"]:
                     pub_to_authors[pub_id].add(i)
 
-        # Union-Find pour grouper les auteurs connectés
         parent = list(range(len(group)))
 
         def find(x):
@@ -474,7 +460,6 @@ def run(dry_run=False):
             for i in range(1, len(indices)):
                 union(indices[0], indices[i])
 
-        # Extraire les composantes connexes (seulement celles avec > 1 auteur)
         components = defaultdict(list)
         for i, a in enumerate(group):
             components[find(i)].append(a)
@@ -482,12 +467,8 @@ def run(dry_run=False):
         for comp_authors in components.values():
             if len(comp_authors) <= 1:
                 continue
-
-            # Vérification : pas d'ORCIDs conflictuels (normalement pas d'ORCID ici,
-            # mais sécurité au cas où)
             orcids = set(a["orcid"] for a in comp_authors if a.get("orcid"))
             if len(orcids) > 1:
-                logger.warning(f"  ⚠ Conflit ORCID pour {name_key}: {orcids} — ignoré")
                 continue
 
             last, first = pick_best_name(comp_authors)
@@ -500,15 +481,13 @@ def run(dry_run=False):
             for a in comp_authors:
                 linked_ids.add((a["source"], a["id"]))
 
-    logger.info(f"  {p2_created} nouvelles personnes créées")
-    logger.info(f"  {p2_authors_linked} auteurs rattachés")
+    logger.info(f"  {p2_created} personnes créées, {p2_authors_linked} auteurs rattachés")
 
     # ── Passe 3 : singletons ──
-    logger.info("\n=== Passe 3 : singletons ===")
+    logger.info("\n--- Passe 3 : singletons ---")
 
     singletons = [a for a in authors if (a["source"], a["id"]) not in linked_ids]
     p3_created = 0
-
     for a in singletons:
         last = a["last_name"] or a["full_name"] or "?"
         first = a["first_name"] or ""
@@ -518,15 +497,12 @@ def run(dry_run=False):
             add_identifiers(cur, pid, [a])
         p3_created += 1
 
-    logger.info(f"  {p3_created} personnes créées (singletons)")
+    logger.info(f"  {p3_created} personnes créées")
 
-    # ── Passe 3b : cross-link (auteurs non rattachés homonymes sur mêmes publications) ──
-    logger.info("\n=== Passe 3b : cross-link inter-sources ===")
+    # ── Passe 3b : cross-link HAL↔WoS ──
+    logger.info("\n--- Passe 3b : cross-link HAL↔WoS ---")
 
-    # Charger les personnes liées avec leurs publications et noms normalisés
     existing_persons_3b = get_existing_persons_by_name(cur)
-
-    # Index par (last_norm, first_norm) → liste de {person_id, pub_ids}
     existing_by_name_3b = defaultdict(list)
     for ep in existing_persons_3b:
         if ep["last_name_normalized"] and ep["first_name_normalized"]:
@@ -536,7 +512,6 @@ def run(dry_run=False):
                 "pub_ids": set(ep["pub_ids"]) if ep["pub_ids"] else set(),
             })
 
-    # Charger TOUS les auteurs non rattachés (pas seulement UCA)
     cur.execute("""
         SELECT ha.id, 'hal' AS source, ha.last_name, ha.first_name,
                array_agg(DISTINCT hd.publication_id) FILTER (WHERE hd.publication_id IS NOT NULL) AS pub_ids
@@ -551,19 +526,6 @@ def run(dry_run=False):
     unlinked_hal = cur.fetchall()
 
     cur.execute("""
-        SELECT oa.id, 'openalex' AS source, oa.last_name, oa.first_name,
-               array_agg(DISTINCT od.publication_id) FILTER (WHERE od.publication_id IS NOT NULL) AS pub_ids
-        FROM openalex_authors oa
-        JOIN openalex_authorships oas ON oas.openalex_author_id = oa.id
-        JOIN openalex_documents od ON od.id = oas.openalex_document_id
-        WHERE oa.person_id IS NULL
-          AND oa.last_name IS NOT NULL AND oa.last_name != ''
-          AND oa.first_name IS NOT NULL AND oa.first_name != ''
-        GROUP BY oa.id
-    """)
-    unlinked_oa = cur.fetchall()
-
-    cur.execute("""
         SELECT wa.id, 'wos' AS source, wa.last_name, wa.first_name,
                array_agg(DISTINCT wd.publication_id) FILTER (WHERE wd.publication_id IS NOT NULL) AS pub_ids
         FROM wos_authors wa
@@ -576,24 +538,16 @@ def run(dry_run=False):
     """)
     unlinked_wos = cur.fetchall()
 
-    all_unlinked = unlinked_hal + unlinked_oa + unlinked_wos
-    logger.info(f"  {len(all_unlinked)} auteurs non rattachés à examiner")
-
     p3b_linked = 0
-    p3b_skipped_ambiguous = 0
-
-    for a in all_unlinked:
+    for a in unlinked_hal + unlinked_wos:
         last_norm = normalize_name(a["last_name"])
         first_norm = normalize_name(a["first_name"])
         if not last_norm or not first_norm:
             continue
 
         candidates = existing_by_name_3b.get((last_norm, first_norm), [])
-        if not candidates:
-            continue
-
         author_pubs = set(a["pub_ids"]) if a["pub_ids"] else set()
-        if not author_pubs:
+        if not author_pubs or not candidates:
             continue
 
         matched_person = None
@@ -607,26 +561,175 @@ def run(dry_run=False):
         if matched_person:
             if not dry_run:
                 link_authors_to_person(cur, matched_person, [a])
-                add_identifiers(cur, matched_person, [a])
             p3b_linked += 1
-        elif matched_person is None and candidates:
-            # On a trouvé des candidats par nom mais aucune co-publication, ou ambiguïté
-            # Ne compter comme ambigu que si on a eu un break (= plusieurs personnes)
-            # Ici matched_person est None et il y avait des candidats avec co-publi → ambigu
-            pass
 
     logger.info(f"  {p3b_linked} auteurs cross-linkés")
 
-    # ── Résumé ──
-    total_created = p1_created + p2_created + p3_created
-    total_linked = p1_authors_linked + p1b_authors_linked + p2_authors_linked + p3_created + p3b_linked
-    logger.info(f"\n=== Résumé ===")
-    logger.info(f"  Personnes créées     : {total_created}")
-    logger.info(f"  Rattachées existantes: {p1_linked_existing} (ORCID) + {p1b_authors_linked} (nom+co-publi)")
-    logger.info(f"  Cross-linkés (3b)    : {p3b_linked}")
-    logger.info(f"  Auteurs rattachés    : {total_linked}")
+    return {
+        "created": p1_created + p2_created + p3_created,
+        "linked": p1_authors_linked + p1b_linked + p2_authors_linked + p3_created + p3b_linked,
+    }
 
-    # ── Passe 4 : propagation vers authorships ──
+
+def run_phase_b(cur, dry_run=False):
+    """Phase B : OpenAlex — résolution par raw_author_name."""
+
+    logger.info("\n=== PHASE B : OpenAlex (raw_author_name) ===")
+
+    oa_authorships = get_unlinked_oa_authorships(cur)
+    logger.info(f"  {len(oa_authorships)} authorships OA UCA non rattachées")
+
+    if not oa_authorships:
+        return {"created": 0, "linked": 0}
+
+    # Charger les personnes existantes (inclut celles créées en phase A)
+    existing_persons = get_existing_persons_by_name(cur)
+    existing_by_name = defaultdict(list)
+    for ep in existing_persons:
+        if ep["last_name_normalized"] and ep["first_name_normalized"]:
+            key = (ep["last_name_normalized"], ep["first_name_normalized"])
+            existing_by_name[key].append({
+                "person_id": ep["person_id"],
+                "pub_ids": set(ep["pub_ids"]) if ep["pub_ids"] else set(),
+            })
+
+    oa_linked_copub = 0
+    oa_linked_name = 0
+    linked_oa_ids = set()
+
+    # Charger les personnes existantes (créées par phase A)
+    existing_persons = get_existing_persons_by_name(cur)
+    existing_by_name = defaultdict(list)
+    for ep in existing_persons:
+        if ep["last_name_normalized"] and ep["first_name_normalized"]:
+            key = (ep["last_name_normalized"], ep["first_name_normalized"])
+            existing_by_name[key].append({
+                "person_id": ep["person_id"],
+                "pub_ids": set(ep["pub_ids"]) if ep["pub_ids"] else set(),
+            })
+
+    # Sous-passe B1 : nom + co-publication
+    logger.info("\n--- B1 : nom + co-publication ---")
+    remaining = oa_authorships
+
+    for a in remaining:
+        keys = name_keys_for_oa(a)
+        if not keys:
+            continue
+
+        author_pubs = set(a["pub_ids"]) if a["pub_ids"] else set()
+        if not author_pubs:
+            continue
+
+        matched_person = None
+        matched_candidates = None
+        for key in keys:
+            candidates = existing_by_name.get(key, [])
+            for ep in candidates:
+                if author_pubs & ep["pub_ids"]:
+                    if matched_person is not None and matched_person != ep["person_id"]:
+                        matched_person = None
+                        matched_candidates = None
+                        break
+                    matched_person = ep["person_id"]
+                    matched_candidates = candidates
+            if matched_person:
+                break
+
+        if matched_person and matched_candidates:
+            if not dry_run:
+                link_authors_to_person(cur, matched_person, [a])
+            linked_oa_ids.add(a["id"])
+            oa_linked_copub += 1
+            for ep in matched_candidates:
+                if ep["person_id"] == matched_person:
+                    ep["pub_ids"].update(author_pubs)
+
+    logger.info(f"  {oa_linked_copub} liées par nom + co-publication")
+
+    # Sous-passe B2 : nom seul (candidat unique OU tous la même personne)
+    logger.info("\n--- B2 : nom seul ---")
+    remaining2 = [a for a in remaining if a["id"] not in linked_oa_ids]
+
+    for a in remaining2:
+        last_norm = normalize_name(a["last_name"])
+        first_norm = normalize_name(a["first_name"])
+        if not last_norm or not first_norm:
+            continue
+
+        candidates = existing_by_name.get((last_norm, first_norm), [])
+        if not candidates:
+            continue
+        # Si tous les candidats pointent vers la même personne → match
+        distinct_pids = set(ep["person_id"] for ep in candidates)
+        if len(distinct_pids) == 1:
+            matched_person = distinct_pids.pop()
+            if not dry_run:
+                link_authors_to_person(cur, matched_person, [a])
+            linked_oa_ids.add(a["id"])
+            oa_linked_name += 1
+            candidates[0]["pub_ids"].update(set(a["pub_ids"]) if a["pub_ids"] else set())
+
+    logger.info(f"  {oa_linked_name} liées par nom seul")
+
+    # Sous-passe B3 : création de nouvelles personnes
+    # Grouper par (last_norm, first_norm) → une seule personne par nom distinct
+    # Si une personne existe déjà avec ce nom → rattacher, pas créer
+    logger.info("\n--- B4 : création de nouvelles personnes ---")
+    # Recharger les personnes existantes (inclut celles liées en B1-B3)
+    existing_persons = get_existing_persons_by_name(cur)
+    existing_by_name_b4 = defaultdict(list)
+    for ep in existing_persons:
+        if ep["last_name_normalized"] and ep["first_name_normalized"]:
+            key = (ep["last_name_normalized"], ep["first_name_normalized"])
+            existing_by_name_b4[key].append(ep["person_id"])
+
+    remaining3 = [a for a in oa_authorships if a["id"] not in linked_oa_ids]
+    b4_by_name = defaultdict(list)
+    for a in remaining3:
+        last_norm = normalize_name(a["last_name"])
+        first_norm = normalize_name(a["first_name"])
+        b4_by_name[(last_norm, first_norm or "")].append(a)
+
+    b4_created = 0
+    b4_linked_existing = 0
+    b4_linked = 0
+    for (ln, fn), group in b4_by_name.items():
+        # Chercher une personne existante avec ce nom
+        existing_pids = set(existing_by_name_b4.get((ln, fn), []))
+        if len(existing_pids) == 1:
+            pid = existing_pids.pop()
+            if not dry_run:
+                link_authors_to_person(cur, pid, group)
+            b4_linked_existing += len(group)
+        else:
+            last = group[0]["last_name"] or group[0]["full_name"] or "?"
+            first = group[0]["first_name"] or ""
+            if not dry_run:
+                pid = create_person(cur, last, first)
+                link_authors_to_person(cur, pid, group)
+                add_identifiers(cur, pid, group)
+            b4_created += 1
+        b4_linked += len(group)
+
+    logger.info(f"  {b4_created} personnes créées, {b4_linked_existing} rattachées à existantes, pour {b4_linked} authorships")
+
+    total_created = b4_created
+    total_linked = oa_linked_copub + oa_linked_name + b4_linked
+    return {"created": total_created, "linked": total_linked}
+
+
+def run(dry_run=False):
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    stats_a = run_phase_a(cur, dry_run)
+    stats_b = run_phase_b(cur, dry_run)
+
+    logger.info(f"\n=== Résumé ===")
+    logger.info(f"  Phase A (HAL/WoS) : {stats_a['created']} personnes créées, {stats_a['linked']} auteurs rattachés")
+    logger.info(f"  Phase B (OpenAlex) : {stats_b['created']} personnes créées, {stats_b['linked']} auteurs rattachés")
+
     if dry_run:
         conn.rollback()
         logger.info(f"\n  (dry-run — rien n'a été modifié)")
@@ -634,7 +737,7 @@ def run(dry_run=False):
         logger.info("\n=== Passe 4 : propagation vers authorships ===")
         propagate_to_authorships(cur)
         conn.commit()
-        logger.info("\n  ✓ Appliqué (personnes + propagation authorships).")
+        logger.info("\n  ✓ Appliqué.")
 
     cur.close()
     conn.close()

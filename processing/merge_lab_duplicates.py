@@ -195,8 +195,8 @@ def do_merge(cur, target_id, source_id):
     # 1. Transférer les auteurs HAL
     cur.execute("UPDATE hal_authors SET person_id = %s WHERE person_id = %s",
                 (target_id, source_id))
-    # 2. Transférer les auteurs OpenAlex
-    cur.execute("UPDATE openalex_authors SET person_id = %s WHERE person_id = %s",
+    # 2. Transférer les authorships OpenAlex
+    cur.execute("UPDATE openalex_authorships SET person_id = %s WHERE person_id = %s",
                 (target_id, source_id))
     # 3. Transférer les authorships (supprimer doublons)
     cur.execute("""

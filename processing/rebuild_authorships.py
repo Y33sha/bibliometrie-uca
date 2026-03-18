@@ -49,11 +49,10 @@ def rebuild(cur):
 
             UNION
 
-            SELECT DISTINCT od.publication_id, oa.person_id
+            SELECT DISTINCT od.publication_id, oas.person_id
             FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
-            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-            WHERE od.publication_id IS NOT NULL AND oa.person_id IS NOT NULL
+            WHERE od.publication_id IS NOT NULL AND oas.person_id IS NOT NULL
 
             UNION
 
@@ -104,14 +103,13 @@ def rebuild(cur):
         UPDATE authorships a
         SET openalex_authorship_id = sub.oas_id
         FROM (
-            SELECT DISTINCT ON (od.publication_id, oa.person_id)
-                   od.publication_id, oa.person_id, oas.id AS oas_id
+            SELECT DISTINCT ON (od.publication_id, oas.person_id)
+                   od.publication_id, oas.person_id, oas.id AS oas_id
             FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
-            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
             WHERE od.publication_id IS NOT NULL
-              AND oa.person_id IS NOT NULL
-            ORDER BY od.publication_id, oa.person_id, oas.id
+              AND oas.person_id IS NOT NULL
+            ORDER BY od.publication_id, oas.person_id, oas.id
         ) sub
         WHERE a.publication_id = sub.publication_id
           AND a.person_id = sub.person_id
