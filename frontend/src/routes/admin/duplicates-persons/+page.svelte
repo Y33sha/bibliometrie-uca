@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { base } from '$app/paths';
+	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 
 	interface Identifier {
 		id: number;
@@ -48,18 +50,25 @@
 	}
 
 	type Mode = 'name' | 'conflict';
-	let mode: Mode = $state('name');
+
+	// Restore state from URL
+	const urlParams = new URLSearchParams($page.url.search);
+	let mode: Mode = $state((urlParams.get('mode') === 'conflict' ? 'conflict' : 'name') as Mode);
 	let total = $state<number | null>(null);
+	let offset = $state(parseInt(urlParams.get('offset') ?? '0') || 0);
 	let pair = $state<{ person_a: PersonDetail; person_b: PersonDetail; conflict_pubs?: ConflictPub[] } | null>(null);
 	let loading = $state(false);
 	let acting = $state(false);
 	let mergedCount = $state(0);
 	let distinctCount = $state(0);
-	let skippedPairs = $state<Set<string>>(new Set());
 	let error = $state('');
 
-	function skipParam(): string {
-		return [...skippedPairs].join(',');
+	function syncUrl() {
+		const p = new URLSearchParams();
+		if (mode !== 'name') p.set('mode', mode);
+		if (offset > 0) p.set('offset', String(offset));
+		const qs = p.toString();
+		history.replaceState(history.state, '', `${base}/admin/duplicates-persons${qs ? '?' + qs : ''}`);
 	}
 
 	async function loadTotal() {
@@ -72,22 +81,28 @@
 		} catch {}
 	}
 
-	async function loadNext() {
+	async function loadAt(pos: number) {
 		loading = true;
 		error = '';
 		try {
-			const skip = skipParam();
 			const endpoint = mode === 'conflict'
 				? '/api/admin/person-duplicates/conflicts/next'
 				: '/api/admin/person-duplicates/next';
-			const url = `${endpoint}${skip ? `?skip=${skip}` : ''}`;
-			const data = await api<NextResponse>(url);
+			const data = await api<NextResponse>(`${endpoint}?offset=${pos}`);
 			pair = data.pair;
+			offset = pos;
+			// Si on dépasse la fin, revenir au début
+			if (!pair && total && pos > 0) {
+				offset = 0;
+				const data2 = await api<NextResponse>(`${endpoint}?offset=0`);
+				pair = data2.pair;
+			}
 		} catch (e: any) {
 			error = e.message || 'Erreur de chargement';
 			console.error(e);
 		}
 		loading = false;
+		syncUrl();
 	}
 
 	function switchMode(m: Mode) {
@@ -95,11 +110,11 @@
 		mode = m;
 		total = null;
 		pair = null;
-		skippedPairs = new Set();
+		offset = 0;
 		mergedCount = 0;
 		distinctCount = 0;
-		loadTotal();
-		loadNext();
+		syncUrl();
+		loadAt(0).then(() => loadTotal());
 	}
 
 	async function mergePair(targetId: number, sourceId: number) {
@@ -115,7 +130,8 @@
 				throw new Error(detail.detail || `Erreur ${res.status}`);
 			}
 			mergedCount++;
-			await loadNext();
+			// Après fusion, la paire disparaît : même offset = paire suivante
+			await loadAt(offset);
 		} catch (e: any) {
 			error = e.message || 'Erreur de fusion';
 			console.error(e);
@@ -132,21 +148,13 @@
 				body: JSON.stringify({ person_id_a: idA, person_id_b: idB }),
 			});
 			distinctCount++;
-			await loadNext();
+			// Après marquage, la paire disparaît : même offset = paire suivante
+			await loadAt(offset);
 		} catch (e: any) {
 			error = e.message || 'Erreur';
 			console.error(e);
 		}
 		acting = false;
-	}
-
-	function skip() {
-		if (!pair) return;
-		const a = pair.person_a.id;
-		const b = pair.person_b.id;
-		const key = `${Math.min(a, b)}-${Math.max(a, b)}`;
-		skippedPairs = new Set([...skippedPairs, key]);
-		loadNext();
 	}
 
 	function statusClass(status: string): string {
@@ -162,9 +170,9 @@
 		return '';
 	}
 
-	$effect(() => {
+	onMount(async () => {
+		await loadAt(offset);
 		loadTotal();
-		loadNext();
 	});
 </script>
 
@@ -179,14 +187,17 @@
 	</div>
 
 	<div class="stats-bar">
-		<span class="stat stat-position">{total !== null ? `${total} paires candidates` : 'Comptage...'}</span>
+		<div class="nav-group">
+			<button class="btn-nav" onclick={() => loadAt(Math.max(0, offset - 1))} disabled={loading || offset === 0}
+				title="Paire précédente">&lsaquo;</button>
+			<span class="stat stat-position">
+				{total !== null ? `${offset + 1} / ${total}` : '...'}
+			</span>
+			<button class="btn-nav" onclick={() => loadAt(offset + 1)} disabled={loading || !pair}
+				title="Paire suivante">&rsaquo;</button>
+		</div>
 		{#if mergedCount}<span class="stat stat-merged">{mergedCount} fusionnée{mergedCount !== 1 ? 's' : ''}</span>{/if}
 		{#if distinctCount}<span class="stat stat-distinct">{distinctCount} distincte{distinctCount !== 1 ? 's' : ''}</span>{/if}
-		{#if skippedPairs.size > 0}<span class="stat stat-skipped">{skippedPairs.size} passée{skippedPairs.size !== 1 ? 's' : ''}</span>{/if}
-		{#if skippedPairs.size > 0}
-			<button class="btn-nav" onclick={() => { skippedPairs = new Set(); loadNext(); }}
-				title="Revenir aux paires passées">&#x21BA; Reprendre</button>
-		{/if}
 	</div>
 
 	{#if error}
@@ -222,7 +233,7 @@
 					title="Ces deux personnes sont bien distinctes">
 					Marquer distincts
 				</button>
-				<button class="btn-skip" onclick={skip} disabled={acting}
+				<button class="btn-skip" onclick={() => loadAt(offset + 1)} disabled={acting}
 					title="Passer cette paire pour y revenir plus tard">
 					Passer &rsaquo;
 				</button>
@@ -393,6 +404,7 @@
 	.stat-distinct { background: #fff3cd; color: #856404; }
 	.stat-skipped { background: #e8e8e8; color: #666; }
 	.nav-buttons { display: flex; gap: 4px; margin-left: auto; }
+	.nav-group { display: flex; gap: 4px; align-items: center; }
 	.btn-nav {
 		padding: 4px 10px; border: 1px solid var(--border, #ccc);
 		border-radius: 4px; background: var(--card, #fff);

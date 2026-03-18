@@ -249,15 +249,14 @@ WITH uca_perimeter AS (
 ),
 oa_data AS (
     SELECT od.publication_id,
-           oa.person_id,
+           oas.person_id,
            oas.structure_ids AS struct_ids,
            oas.is_uca AS src_is_uca
     FROM openalex_authorships oas
     JOIN openalex_documents od ON od.id = oas.openalex_document_id
-    JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
     WHERE oas.structure_ids IS NOT NULL
       AND od.publication_id IS NOT NULL
-      AND oa.person_id IS NOT NULL
+      AND oas.person_id IS NOT NULL
 )
 UPDATE authorships a
 SET structure_ids = (

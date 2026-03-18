@@ -367,9 +367,15 @@
 									<td class="sg-pos-cell">{#if row.hal}{row.position + 1}{/if}</td>
 									<td class="sg-name-cell">
 										{#if row.hal}
-											<span class="sg-author" class:sg-uca={row.hal.is_uca}>
-												{row.hal.full_name}
-											</span>
+											{#if row.hal.person_id}
+												<a href="{base}/persons/{row.hal.person_id}" class="sg-author-link" class:sg-uca={row.hal.is_uca}>
+													{row.hal.full_name}
+												</a>
+											{:else}
+												<span class="sg-author" class:sg-uca={row.hal.is_uca}>
+													{row.hal.full_name}
+												</span>
+											{/if}
 											{#if structsTooltip(row.hal)}
 												<span class="info-icon" title={structsTooltip(row.hal)}>&#9432;</span>
 											{/if}
@@ -380,9 +386,15 @@
 									<td class="sg-pos-cell">{#if row.oa}{row.position + 1}{/if}</td>
 									<td class="sg-name-cell">
 										{#if row.oa}
-											<span class="sg-author" class:sg-uca={row.oa.is_uca}>
-												{row.oa.full_name}
-											</span>
+											{#if row.oa.person_id}
+												<a href="{base}/persons/{row.oa.person_id}" class="sg-author-link" class:sg-uca={row.oa.is_uca}>
+													{row.oa.full_name}
+												</a>
+											{:else}
+												<span class="sg-author" class:sg-uca={row.oa.is_uca}>
+													{row.oa.full_name}
+												</span>
+											{/if}
 											{#if structsTooltip(row.oa)}
 												<span class="info-icon" title={structsTooltip(row.oa)}>&#9432;</span>
 											{/if}
@@ -393,9 +405,15 @@
 									<td class="sg-pos-cell">{#if row.wos}{row.position + 1}{/if}</td>
 									<td class="sg-name-cell">
 										{#if row.wos}
-											<span class="sg-author" class:sg-uca={row.wos.is_uca}>
-												{row.wos.full_name}
-											</span>
+											{#if row.wos.person_id}
+												<a href="{base}/persons/{row.wos.person_id}" class="sg-author-link" class:sg-uca={row.wos.is_uca}>
+													{row.wos.full_name}
+												</a>
+											{:else}
+												<span class="sg-author" class:sg-uca={row.wos.is_uca}>
+													{row.wos.full_name}
+												</span>
+											{/if}
 											{#if structsTooltip(row.wos)}
 												<span class="info-icon" title={structsTooltip(row.wos)}>&#9432;</span>
 											{/if}
@@ -747,6 +765,8 @@
 		white-space: nowrap;
 	}
 	.sg-author { }
+	.sg-author-link { text-decoration: none; color: var(--text); }
+	.sg-author-link:hover { text-decoration: underline; }
 	.sg-uca { font-weight: 600; color: #2a7d4f; }
 
 	.conflict-row { background: #fff8f0; }
