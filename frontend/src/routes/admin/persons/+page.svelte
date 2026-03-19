@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
 	import { api } from '$lib/api';
-	import { sanitizeTitle } from '$lib/utils';
+	import { sanitizeTitle, titleCase } from '$lib/utils';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -117,6 +117,7 @@
 	let totalCount = $state(0);
 	let persons: Person[] = $state([]);
 	let loading = $state(false);
+	let sortField = $state('name');  // 'name' | '-name' | 'pubs' | '-pubs'
 
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -202,13 +203,14 @@
 			page: String(currentPage),
 			per_page: '50'
 		});
-		if (search) params.set('search', search);
+		if (search.trim()) params.set('search', search.trim());
 		if (selectedDepts.length === 1) params.set('department', selectedDepts[0]);
 		if (selectedRoles.length === 1) params.set('role', selectedRoles[0]);
 		if (selectedLinked.length === 1) params.set('linked', selectedLinked[0]);
 		if (selectedOrcid.length === 1) params.set('has_orcid', selectedOrcid[0]);
 		if (selectedIdhal.length === 1) params.set('has_idhal', selectedIdhal[0]);
 		if (selectedRh.length === 1) params.set('has_rh', selectedRh[0]);
+		params.set('sort', sortField);
 
 		const data = await api<PersonListResponse>('/api/persons?' + params);
 		persons = data.persons;
@@ -217,6 +219,20 @@
 		currentPage = data.page;
 		loading = false;
 		updateUrl();
+	}
+
+	function toggleSort(field: string) {
+		if (sortField === field) sortField = '-' + field;
+		else if (sortField === '-' + field) sortField = field;
+		else sortField = field;
+		currentPage = 1;
+		loadTable();
+	}
+
+	function sortIndicator(field: string): string {
+		if (sortField === field) return ' \u25B2';
+		if (sortField === '-' + field) return ' \u25BC';
+		return '';
 	}
 
 	/* ── URL state ── */
@@ -519,11 +535,8 @@
 		<thead>
 			<tr>
 				<th></th>
-				<th>Nom</th>
-				<th>Pr&eacute;nom</th>
-				<th>D&eacute;partement</th>
-				<th>R&ocirc;le</th>
-				<th>P&eacute;riode</th>
+				<th class="sortable" onclick={() => toggleSort('name')}>Nom{sortIndicator('name')}</th>
+				<th class="sortable" onclick={() => toggleSort('pubs')}>Publications{sortIndicator('pubs')}</th>
 				<th>Auteur(s) li&eacute;s</th>
 			</tr>
 		</thead>
@@ -544,17 +557,13 @@
 						</button>
 					</td>
 					<td>
-						<strong>{p.last_name}</strong>
+						<a href="{base}/persons/{p.id}" class="person-name">
+							<span class="person-last">{titleCase(p.last_name)}</span>
+							{titleCase(p.first_name)}
+						</a>
 						{#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
 					</td>
-					<td>{p.first_name}</td>
-					<td>{p.department_name ?? ''}</td>
-					<td>
-						{#if p.role_title}
-							<span class="tag tag-role">{p.role_title}</span>
-						{/if}
-					</td>
-					<td class="period-cell">{formatPeriod(p)}</td>
+					<td>{p.pub_count ?? 0} {#if p.uca_pub_count}<span class="uca-count">({p.uca_pub_count} UCA)</span>{/if}</td>
 					<td>
 						<!-- Identifiers -->
 						{#if p.identifiers?.length}
@@ -1253,6 +1262,12 @@
 	}
 
 	/* ── RH checkmark ── */
+	.sortable { cursor: pointer; user-select: none; }
+	.sortable:hover { color: #2563eb; }
+	.person-name { font-weight: 500; color: inherit; text-decoration: none; }
+	.person-name:hover { color: #2563eb; text-decoration: underline; }
+	.person-last { font-weight: 600; }
+	.uca-count { font-size: 0.85em; color: var(--muted); }
 	.rh-check {
 		display: inline-flex;
 		align-items: center;

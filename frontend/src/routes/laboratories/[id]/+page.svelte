@@ -2,9 +2,11 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { api } from '$lib/api';
 	import { sanitizeTitle } from '$lib/utils';
+	import { Chart, registerables } from 'chart.js';
+	Chart.register(...registerables);
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -13,7 +15,7 @@
 
 	const labId = $derived($page.params.id);
 	let canGoBack = $state(false);
-	const validTabs = ['publications', 'persons', 'addresses'] as const;
+	const validTabs = ['dashboard', 'publications', 'persons', 'addresses'] as const;
 	type Tab = (typeof validTabs)[number];
 
 	// --- Types ---
@@ -51,6 +53,7 @@
 		openalex_id: string | null;
 		wos_id: string | null;
 		labs: string | null;
+		apc: { amount: number; institution: string | null; lab_id: number | null; lab_acronym: string | null; budget_structure_id: number | null }[] | null;
 	}
 	interface PubResponse {
 		total: number;
@@ -96,7 +99,7 @@
 	const activeTab: Tab = $derived(
 		(() => {
 			const t = $page.url.searchParams.get('tab') as Tab | null;
-			return t && validTabs.includes(t) ? t : 'publications';
+			return t && validTabs.includes(t) ? t : 'dashboard';
 		})()
 	);
 
@@ -112,12 +115,15 @@
 	let debounceTimer: ReturnType<typeof setTimeout>;
 	let selectedYears: string[] = $state([]);
 	let sourceStates: Record<string, string> = $state({});
+	let sourceCounts: Record<string, number> = $state({});
 	let selectedDocTypes: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
+	let selectedApc: string[] = $state([]);
 	let yearOptions: FacetOption[] = $state([]);
 
 	let docTypeOptions: FacetOption[] = $state([]);
 	let oaOptions: FacetOption[] = $state([]);
+	let apcOptions: FacetOption[] = $state([]);
 
 	let pubsLoaded = $state(false);
 
@@ -127,7 +133,15 @@
 	let personsPage = $state(1);
 	let personsPages = $state(1);
 	let personsSort = $state('name');
-	let orphanStats = $state({ hal: 0, openalex: 0, total: 0 });
+	let personsSearch = $state('');
+	let personsSearchTimer: ReturnType<typeof setTimeout>;
+	let selectedRh: string[] = $state(['yes']);
+	let selectedOrcid: string[] = $state([]);
+	let selectedIdhal: string[] = $state([]);
+	let rhOptions: FacetOption[] = $state([{ value: 'yes', text: 'Oui' }, { value: 'no', text: 'Non' }]);
+	let orcidOptions: FacetOption[] = $state([{ value: 'yes', text: 'Avec' }, { value: 'no', text: 'Sans' }]);
+	let idhalOptions: FacetOption[] = $state([{ value: 'yes', text: 'Avec' }, { value: 'no', text: 'Sans' }]);
+	let orphanStats = $state({ total: 0 });
 	let personsLoaded = $state(false);
 
 	// Addresses tab
@@ -136,6 +150,15 @@
 	let addrPage = $state(1);
 	let addrPages = $state(1);
 	let addrLoaded = $state(false);
+
+	// Dashboard tab
+	let dashboardLoaded = $state(false);
+	let dashPubsByYear: { year: number; count: number }[] = $state([]);
+	let dashOa: { open_access: number; closed: number; unknown: number; total: number } = $state({ open_access: 0, closed: 0, unknown: 0, total: 0 });
+	let barCanvas: HTMLCanvasElement;
+	let pieCanvas: HTMLCanvasElement;
+	let barChart: Chart | null = null;
+	let pieChart: Chart | null = null;
 
 	const tutelles = $derived(parents.filter((p) => p.relation_type === 'est_tutelle_de'));
 	const partenaires = $derived(parents.filter((p) => p.relation_type === 'est_partenaire_de'));
@@ -152,6 +175,7 @@
 		if (sf) p.set('source_filter', sf);
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
+		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		if (pubSearch.trim()) p.set('search', pubSearch.trim());
 		if (pubPage > 1) p.set('page', String(pubPage));
 		if (personsSort !== 'name') p.set('psort', personsSort);
@@ -166,6 +190,7 @@
 		if (sf) params.set('source_filter', sf);
 		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
+		if (selectedApc.length) params.set('has_apc', selectedApc.join(','));
 		return params;
 	}
 
@@ -175,6 +200,8 @@
 			years: { value: number; count: number }[];
 			doc_types: { value: string; count: number }[];
 			oa_statuses: { value: string; count: number }[];
+			source_counts: Record<string, number>;
+			apc: { value: string; text: string; count: number }[];
 		}>('/api/publications/facets?' + params);
 		yearOptions = data.years.map((y) => ({
 			value: String(y.value), text: String(y.value), count: y.count
@@ -185,6 +212,10 @@
 		oaOptions = data.oa_statuses.map((o) => ({
 			value: o.value, text: oaLabelsMap[o.value] || o.value, count: o.count
 		}));
+		sourceCounts = data.source_counts || {};
+		if (data.apc) {
+			apcOptions = data.apc.map(a => ({ value: a.value, text: a.text, count: a.count }));
+		}
 	}
 
 	async function loadPublications() {
@@ -203,8 +234,7 @@
 		pubsLoaded = true;
 	}
 
-	function onFilterChange(newStates?: Record<string, string>) {
-		if (newStates !== undefined) sourceStates = newStates;
+	function onFilterChange() {
 		pubPage = 1;
 		syncUrl();
 		loadPublications();
@@ -249,6 +279,10 @@
 			per_page: '50',
 			sort: personsSort
 		});
+		if (personsSearch.trim()) params.set('search', personsSearch.trim());
+		params.set('has_rh', selectedRh.length === 1 ? selectedRh[0] : 'all');
+		if (selectedOrcid.length === 1) params.set('has_orcid', selectedOrcid[0]);
+		if (selectedIdhal.length === 1) params.set('has_idhal', selectedIdhal[0]);
 		const data = await api<PersonsResponse>(
 			`/api/laboratories/${labId}/persons?${params}`
 		);
@@ -257,6 +291,20 @@
 		personsPages = data.pages;
 		personsPage = data.page;
 		orphanStats = data.orphan_authorships;
+		if (data.facets) {
+			rhOptions = [
+				{ value: 'yes', text: 'Oui', count: data.facets.rh.yes },
+				{ value: 'no', text: 'Non', count: data.facets.rh.no }
+			];
+			orcidOptions = [
+				{ value: 'yes', text: 'Avec', count: data.facets.orcid.yes },
+				{ value: 'no', text: 'Sans', count: data.facets.orcid.no }
+			];
+			idhalOptions = [
+				{ value: 'yes', text: 'Avec', count: data.facets.idhal.yes },
+				{ value: 'no', text: 'Sans', count: data.facets.idhal.no }
+			];
+		}
 		personsLoaded = true;
 	}
 
@@ -275,15 +323,81 @@
 		addrLoaded = true;
 	}
 
+	async function loadDashboard() {
+		const data = await api<{
+			pubs_by_year: { year: number; count: number }[];
+			oa: { open_access: number; closed: number; unknown: number; total: number };
+		}>(`/api/laboratories/${labId}/dashboard`);
+		dashPubsByYear = data.pubs_by_year;
+		dashOa = data.oa;
+		dashboardLoaded = true;
+		await tick();
+		renderDashCharts();
+	}
+
+	function renderDashCharts() {
+		if (barChart) barChart.destroy();
+		if (pieChart) pieChart.destroy();
+
+		const cs = getComputedStyle(document.documentElement);
+
+		// Bar chart: publications par an
+		if (barCanvas) {
+			barChart = new Chart(barCanvas, {
+				type: 'bar',
+				data: {
+					labels: dashPubsByYear.map(d => String(d.year)),
+					datasets: [{
+						label: 'Publications',
+						data: dashPubsByYear.map(d => d.count),
+						backgroundColor: cs.getPropertyValue('--accent')?.trim() || '#3b6b9e',
+						borderRadius: 3,
+					}]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					plugins: { legend: { display: false } },
+					scales: {
+						y: { beginAtZero: true, ticks: { precision: 0 } },
+						x: { grid: { display: false } }
+					}
+				}
+			});
+		}
+
+		// Pie chart: OA
+		if (pieCanvas && dashOa.total > 0) {
+			pieChart = new Chart(pieCanvas, {
+				type: 'doughnut',
+				data: {
+					labels: ['Open Access', 'Closed', 'Indéterminé'],
+					datasets: [{
+						data: [dashOa.open_access, dashOa.closed, dashOa.unknown],
+						backgroundColor: ['#2a7d4f', '#c0392b', '#ccc'],
+					}]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					plugins: {
+						legend: { position: 'bottom' },
+					}
+				}
+			});
+		}
+	}
+
 	function switchTab(tab: Tab) {
 		// Update tab via goto (triggers $derived activeTab update)
 		const url = new URL($page.url);
-		if (tab === 'publications') {
+		if (tab === 'dashboard') {
 			url.searchParams.delete('tab');
 		} else {
 			url.searchParams.set('tab', tab);
 		}
 		goto(url.toString(), { replaceState: true, noScroll: true }).then(() => syncUrl());
+		if (tab === 'dashboard') loadDashboard();
 		if (tab === 'publications' && !pubsLoaded) { loadPubFacets(); loadPublications(); }
 		if (tab === 'persons' && !personsLoaded) loadPersons();
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
@@ -297,6 +411,7 @@
 		if (urlParams.get('year')) selectedYears = urlParams.get('year')!.split(',');
 		if (urlParams.get('doc_type')) selectedDocTypes = urlParams.get('doc_type')!.split(',');
 		if (urlParams.get('oa_status')) selectedOa = urlParams.get('oa_status')!.split(',');
+		if (urlParams.get('has_apc')) selectedApc = urlParams.get('has_apc')!.split(',');
 		if (urlParams.get('source_filter')) {
 			const states: Record<string, string> = {};
 			for (const v of urlParams.get('source_filter')!.split(',')) {
@@ -319,13 +434,15 @@
 			return;
 		}
 		// Load data for the active tab (from URL)
-		if (activeTab === 'persons') {
+		if (activeTab === 'dashboard') {
+			loadDashboard();
+		} else if (activeTab === 'publications') {
+			loadPubFacets();
+			loadPublications();
+		} else if (activeTab === 'persons') {
 			loadPersons();
 		} else if (activeTab === 'addresses') {
 			loadAddresses();
-		} else {
-			loadPubFacets();
-			loadPublications();
 		}
 	});
 </script>
@@ -399,6 +516,9 @@
 
 	<!-- Tabs -->
 	<div class="tabs">
+		<button class="tab" class:active={activeTab === 'dashboard'} onclick={() => switchTab('dashboard')}>
+			Dashboard
+		</button>
 		<button class="tab" class:active={activeTab === 'publications'} onclick={() => switchTab('publications')}>
 			Publications
 			{#if pubTotal}<span class="tab-count">{pubTotal}</span>{/if}
@@ -413,6 +533,36 @@
 		</button>
 	</div>
 
+	<!-- Tab: Dashboard -->
+	{#if activeTab === 'dashboard'}
+		<div class="tab-content">
+			{#if !dashboardLoaded}
+				<div class="loading">Chargement...</div>
+			{:else}
+				<div class="dash-grid">
+					<div class="dash-card">
+						<h3>Publications par année</h3>
+						<div class="chart-wrap">
+							<canvas bind:this={barCanvas}></canvas>
+						</div>
+					</div>
+					<div class="dash-card">
+						<h3>Open Access</h3>
+						<div class="chart-wrap">
+							<canvas bind:this={pieCanvas}></canvas>
+						</div>
+						{#if dashOa.total > 0}
+							<div class="oa-summary">
+								{Math.round(dashOa.open_access / dashOa.total * 100)} % Open Access
+								({dashOa.open_access.toLocaleString('fr-FR')} / {dashOa.total.toLocaleString('fr-FR')})
+							</div>
+						{/if}
+					</div>
+				</div>
+			{/if}
+		</div>
+	{/if}
+
 	<!-- Tab: Publications -->
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
@@ -421,7 +571,8 @@
 				<FacetDropdown label="Années" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
 				<FacetDropdown label="Types" options={docTypeOptions} bind:selected={selectedDocTypes} onchange={onFilterChange} />
 				<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
-				<SourceFilterToggle bind:states={sourceStates} onchange={onFilterChange} />
+				<FacetDropdown label="APC" options={apcOptions} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
+				<SourceFilterToggle bind:states={sourceStates} counts={sourceCounts} onchange={onFilterChange} />
 				<span class="count">{pubTotal} publication{pubTotal > 1 ? 's' : ''}</span>
 				<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 			</div>
@@ -432,13 +583,14 @@
 						<th>Revue</th>
 						<th style="width:80px">Type</th>
 						<th style="width:40px">An.</th>
+						<th style="width:60px">APC</th>
 						<th style="width:50px">OA</th>
 						<th style="width:80px">Liens</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#if publications.length === 0}
-						<tr><td colspan="6" class="no-results">Aucune publication</td></tr>
+						<tr><td colspan="7" class="no-results">Aucune publication</td></tr>
 					{:else}
 						{#each publications as p (p.id)}
 							<tr>
@@ -448,6 +600,21 @@
 									<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
 								</td>
 								<td>{p.pub_year || ''}</td>
+								<td class="apc-cell">
+									{#if p.apc}
+										{@const thisLabApc = p.apc.filter(a => a.lab_id === lab?.id)}
+										{@const otherApc = p.apc.filter(a => a.lab_id !== lab?.id)}
+										{#if thisLabApc.length > 0}
+											<span class="apc-tag" title={thisLabApc.map(a => `${a.amount?.toLocaleString('fr-FR')} €`).join('\n')}>
+												{Math.round(thisLabApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+											</span>
+										{:else if otherApc.length > 0}
+											<span class="apc-tag apc-other" title={otherApc.map(a => `sur budget ${a.lab_acronym || a.institution || '?'}`).join('\n')}>
+												{Math.round(otherApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+											</span>
+										{/if}
+									{/if}
+								</td>
 								<td>
 									{#if p.oa_status && p.oa_status !== 'unknown'}
 										<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
@@ -498,13 +665,20 @@
 			{#if orphanStats.total > 0}
 				<a href="{base}/admin/authorships?lab={labId}&linked=no" class="orphan-banner">
 					{orphanStats.total} authorship{orphanStats.total > 1 ? 's' : ''} non relié{orphanStats.total > 1 ? 'es' : 'e'} à une personne
-					<span class="orphan-detail">(HAL : {orphanStats.hal}, OpenAlex : {orphanStats.openalex})</span>
 				</a>
 			{/if}
+			<div class="toolbar">
+				<input type="text" placeholder="Rechercher..." bind:value={personsSearch} oninput={() => { clearTimeout(personsSearchTimer); personsSearchTimer = setTimeout(() => { personsPage = 1; loadPersons(); }, 300); }} />
+				<FacetDropdown label="Base RH" options={rhOptions} bind:selected={selectedRh} onchange={() => { personsPage = 1; loadPersons(); }} />
+				<FacetDropdown label="ORCID" options={orcidOptions} bind:selected={selectedOrcid} onchange={() => { personsPage = 1; loadPersons(); }} />
+				<FacetDropdown label="idHAL" options={idhalOptions} bind:selected={selectedIdhal} onchange={() => { personsPage = 1; loadPersons(); }} />
+				<span class="count">{personsTotal} personne{personsTotal > 1 ? 's' : ''}</span>
+			</div>
 			<table>
 				<thead>
 					<tr>
 						<th class="sortable" onclick={() => togglePersonsSort('name')}>Nom{sortIndicator('name')}</th>
+						<th>ORCID</th>
 						<th class="sortable" onclick={() => togglePersonsSort('role')}>Fonction{sortIndicator('role')}</th>
 						<th class="sortable" onclick={() => togglePersonsSort('dept')}>Département{sortIndicator('dept')}</th>
 						<th class="sortable" style="width:80px" onclick={() => togglePersonsSort('pubs')}>Publications{sortIndicator('pubs')}</th>
@@ -512,7 +686,7 @@
 				</thead>
 				<tbody>
 					{#if persons.length === 0}
-						<tr><td colspan="4" class="no-results">Aucune personne trouvée</td></tr>
+						<tr><td colspan="5" class="no-results">Aucune personne trouvée</td></tr>
 					{:else}
 						{#each persons as p (p.id)}
 							<tr>
@@ -522,6 +696,7 @@
 									</a>
 									{#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
 								</td>
+								<td>{#each p.orcids || [] as oid}<a href="https://orcid.org/{oid.value}" target="_blank" rel="noopener" class="id-badge" class:id-confirmed={oid.confirmed}>{oid.value}</a>{/each}</td>
 								<td class="muted-cell">{p.role_title || ''}</td>
 								<td class="muted-cell">{p.department_name || ''}</td>
 								<td>{p.pub_count}</td>
@@ -716,6 +891,34 @@
 		color: var(--accent);
 	}
 
+	/* Dashboard */
+	.dash-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 16px;
+	}
+	.dash-card {
+		background: var(--card);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 16px;
+	}
+	.dash-card h3 {
+		font-size: 0.95rem;
+		font-weight: 600;
+		margin: 0 0 12px;
+	}
+	.chart-wrap {
+		position: relative;
+		height: 280px;
+	}
+	.oa-summary {
+		text-align: center;
+		font-size: 0.9rem;
+		color: var(--muted);
+		margin-top: 8px;
+	}
+
 	/* Shared table styles */
 	.tab-content table {
 		width: 100%;
@@ -783,6 +986,14 @@
 	.source-doi:hover { background: #e0e0e0; }
 	.source-placeholder { visibility: hidden; }
 	.links-cell { white-space: nowrap; }
+	.apc-cell { text-align: right; white-space: nowrap; }
+	.apc-tag {
+		display: inline-block; font-size: 0.75rem; padding: 1px 5px;
+		border-radius: 3px; background: #e8f5e9; color: #2e7d32;
+		font-weight: 500; cursor: default;
+	}
+	.apc-other { background: #f0f0f0; color: #888; }
+
 	.oa-tag {
 		display: inline-block;
 		font-size: 0.7rem;
@@ -822,6 +1033,14 @@
 		line-height: 1;
 	}
 	.muted-cell { font-size: 0.85rem; color: var(--muted); }
+	.id-badge {
+		display: inline-block; padding: 2px 7px; background: #e8f0f8;
+		border-radius: 3px; font-size: 0.8rem; color: var(--accent);
+		text-decoration: none; white-space: nowrap;
+	}
+	.id-badge:hover { background: #d4e4f3; text-decoration: none; }
+	.id-confirmed { background: #e6f4ec; color: #2a7d4f; }
+	.id-confirmed:hover { background: #d0eadb; }
 	.orphan-banner {
 		display: block;
 		background: #fef3e0;

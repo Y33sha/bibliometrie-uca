@@ -21,6 +21,7 @@ import unicodedata
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.merge_persons import merge_person
 
 logging.basicConfig(
     level=logging.INFO,
@@ -111,64 +112,6 @@ def resolve_target(merged_into, pid):
         pid = merged_into[pid]
     return pid
 
-
-def merge_person(cur, target_id, source_id):
-    """Fusionne source dans target (même logique que l'API /merge)."""
-
-    # Garde-fou : ne JAMAIS fusionner si les deux ont une fiche RH
-    cur.execute("""
-        SELECT COUNT(*) AS n FROM persons_rh
-        WHERE person_id IN (%s, %s)
-    """, (target_id, source_id))
-    if cur.fetchone()["n"] >= 2:
-        raise RuntimeError(
-            f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
-            f"ont chacune une fiche RH distincte."
-        )
-
-    # 1. Transférer les auteurs HAL
-    cur.execute("UPDATE hal_authors SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
-
-    # 2. Transférer les authorships OpenAlex
-    cur.execute("UPDATE openalex_authorships SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
-
-    # 3. Transférer les auteurs WoS
-    cur.execute("UPDATE wos_authors SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
-
-    # 4. Transférer les authorships (supprimer les doublons publication)
-    cur.execute("""
-        DELETE FROM authorships
-        WHERE person_id = %s
-          AND publication_id IN (
-              SELECT publication_id FROM authorships WHERE person_id = %s
-          )
-    """, (source_id, target_id))
-    cur.execute("UPDATE authorships SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
-
-    # 5. Transférer les identifiants (supprimer doublons)
-    cur.execute("""
-        DELETE FROM person_identifiers
-        WHERE person_id = %s
-          AND (id_type, id_value) IN (
-              SELECT id_type, id_value FROM person_identifiers WHERE person_id = %s
-          )
-    """, (source_id, target_id))
-    cur.execute("UPDATE person_identifiers SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
-
-    # 6. Transférer persons_rh de la source vers la cible (si la cible n'en a pas)
-    cur.execute("""
-        UPDATE persons_rh SET person_id = %s
-        WHERE person_id = %s
-          AND NOT EXISTS (SELECT 1 FROM persons_rh WHERE person_id = %s)
-    """, (target_id, source_id, target_id))
-
-    # 7. Supprimer la personne source
-    cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))
 
 
 def main():

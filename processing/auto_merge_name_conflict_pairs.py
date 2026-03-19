@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from psycopg2.extras import RealDictCursor
 from utils.normalize import normalize_name
+from utils.merge_persons import merge_person
 
 
 PAIRS_SQL = """
@@ -80,45 +81,7 @@ ORDER BY nc.id_a, nc.id_b
 """
 
 
-def do_merge(cur, target_id, source_id):
-    """Fusionne source_id dans target_id."""
-    # HAL authors
-    cur.execute("UPDATE hal_authors SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
-    # OpenAlex authorships
-    cur.execute("UPDATE openalex_authorships SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
-    # WoS authors
-    cur.execute("UPDATE wos_authors SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
-    # Authorships consolidées : supprimer doublons, puis transférer
-    cur.execute("""
-        DELETE FROM authorships
-        WHERE person_id = %s
-          AND publication_id IN (
-              SELECT publication_id FROM authorships WHERE person_id = %s
-          )
-    """, (source_id, target_id))
-    cur.execute("UPDATE authorships SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
-    # Identifiants : transférer (ignorer doublons)
-    cur.execute("""
-        DELETE FROM person_identifiers
-        WHERE person_id = %s
-          AND (id_type, id_value) IN (
-              SELECT id_type, id_value FROM person_identifiers WHERE person_id = %s
-          )
-    """, (source_id, target_id))
-    cur.execute("UPDATE person_identifiers SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
-    # persons_rh : transférer si target n'en a pas
-    cur.execute("""
-        UPDATE persons_rh SET person_id = %s
-        WHERE person_id = %s
-          AND NOT EXISTS (SELECT 1 FROM persons_rh WHERE person_id = %s)
-    """, (target_id, source_id, target_id))
-    # Supprimer la personne source
-    cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))
+do_merge = merge_person
 
 
 def choose_target(pair):

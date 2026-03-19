@@ -64,6 +64,7 @@
 		openalex_id: string | null;
 		wos_id: string | null;
 		labs: string | null;
+		apc: { amount: number; institution: string | null; lab_id: number | null; lab_acronym: string | null; budget_structure_id: number | null }[] | null;
 		is_corresponding: boolean | null;
 		authorship_id: number | null;
 	}
@@ -101,6 +102,7 @@
 	let selectedOa: string[] = $state([]);
 	let selectedCorr: string[] = $state([]);
 	let sourceStates: Record<string, string> = $state({});
+	let sourceCounts: Record<string, number> = $state({});
 	let yearOptions: FacetOption[] = $state([]);
 	let docTypeOptions: FacetOption[] = $state([]);
 	let oaOptions: FacetOption[] = $state([]);
@@ -155,6 +157,7 @@
 			doc_types: { value: string; count: number }[];
 			oa_statuses: { value: string; count: number }[];
 			corresponding: { value: string; count: number }[];
+			source_counts: Record<string, number>;
 		}>('/api/publications/facets?' + params);
 		yearOptions = data.years.map((y) => ({
 			value: String(y.value), text: String(y.value), count: y.count
@@ -170,6 +173,7 @@
 				value: c.value, text: c.value === 'yes' ? 'Oui' : 'Non', count: c.count
 			}));
 		}
+		sourceCounts = data.source_counts || {};
 	}
 
 	async function loadPublications() {
@@ -184,8 +188,7 @@
 		pubPage = data.page;
 	}
 
-	function onFilterChange(newStates?: Record<string, string>) {
-		if (newStates !== undefined) sourceStates = newStates;
+	function onFilterChange() {
 		pubPage = 1;
 		loadPublications();
 		loadFacets();
@@ -330,7 +333,8 @@
 				{#if corrOptions.length}
 					<FacetDropdown label="Corresp." options={corrOptions} bind:selected={selectedCorr} onchange={onFilterChange} />
 				{/if}
-				<SourceFilterToggle bind:states={sourceStates} onchange={onFilterChange} />
+				<SourceFilterToggle bind:states={sourceStates} counts={sourceCounts} onchange={onFilterChange} />
+				<span class="toolbar-spacer"></span>
 				<span class="count">{pubTotal} publication{pubTotal > 1 ? 's' : ''}</span>
 				<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 			</div>
@@ -344,13 +348,14 @@
 						<th style="width:40px">An.</th>
 						<th style="width:80px">Labo(s)</th>
 						<th style="width:30px" title="Auteur correspondant">&#9993;</th>
+						<th style="width:60px">APC</th>
 						<th style="width:50px">OA</th>
 						<th style="width:80px">Liens</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#if publications.length === 0}
-						<tr><td colspan={isAdmin ? 9 : 8} class="no-results">Aucune publication</td></tr>
+						<tr><td colspan={isAdmin ? 10 : 9} class="no-results">Aucune publication</td></tr>
 					{:else}
 						{#each publications as p (p.id)}
 							<tr>
@@ -376,6 +381,21 @@
 								<td class="corr-cell">
 									{#if p.is_corresponding}
 										<span title="Auteur correspondant">&#10003;</span>
+									{/if}
+								</td>
+								<td class="apc-cell">
+									{#if p.apc}
+										{@const ucaApc = p.apc.filter(a => a.budget_structure_id === 169)}
+										{#if ucaApc.length > 0}
+											<span class="apc-tag" class:apc-other={!p.is_corresponding}
+												title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || 'UCA'})`).join('\n') + (!p.is_corresponding ? '\nAuteur non correspondant' : '')}>
+												{Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+											</span>
+										{:else}
+											<span class="apc-tag apc-other" title={p.apc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.institution || '?'})`).join('\n')}>
+												{Math.round(p.apc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+											</span>
+										{/if}
 									{/if}
 								</td>
 								<td>
@@ -561,7 +581,6 @@
 		white-space: nowrap;
 	}
 	.id-badge:hover { background: #d4e4f3; text-decoration: none; }
-	.id-confirmed .id-label { background: #e6f4ec; color: #2a7d4f; }
 	.id-confirmed .id-badge { background: #e6f4ec; color: #2a7d4f; }
 	.id-confirmed .id-badge:hover { background: #d0eadb; }
 	.confirmed-check {
@@ -657,7 +676,9 @@
 		align-items: center;
 		gap: 8px;
 		margin-bottom: 10px;
+		flex-wrap: wrap;
 	}
+	.toolbar-spacer { flex: 1; }
 	.count {
 		font-size: 0.85rem;
 		color: var(--muted);
@@ -720,6 +741,14 @@
 		color: var(--accent);
 		font-weight: 500;
 	}
+	.apc-cell { text-align: right; white-space: nowrap; }
+	.apc-tag {
+		display: inline-block; font-size: 0.75rem; padding: 1px 5px;
+		border-radius: 3px; background: #e8f5e9; color: #2e7d32;
+		font-weight: 500; cursor: default;
+	}
+	.apc-other { background: #f0f0f0; color: #888; }
+
 	.oa-tag {
 		display: inline-block;
 		font-size: 0.7rem;
