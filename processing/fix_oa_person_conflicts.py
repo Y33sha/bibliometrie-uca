@@ -181,10 +181,24 @@ def main():
               AND NOT EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)
         )
         DELETE FROM persons WHERE id IN (SELECT id FROM orphans)
+        RETURNING id
     """)
-    orphans = cur.rowcount
-    if orphans:
-        print(f"{orphans} personnes orphelines supprimées")
+    orphan_ids = [r["id"] for r in cur.fetchall()]
+    if orphan_ids:
+        # Retirer les orphelins de person_name_forms
+        cur.execute("""
+            UPDATE person_name_forms
+            SET person_ids = (
+                    SELECT array_agg(v ORDER BY v)
+                    FROM unnest(person_ids) AS v
+                    WHERE v != ALL(%s)
+                ),
+                updated_at = now()
+            WHERE person_ids && %s
+        """, (orphan_ids, orphan_ids))
+        # Supprimer les entrées devenues vides
+        cur.execute("DELETE FROM person_name_forms WHERE person_ids = '{}' OR person_ids IS NULL")
+        print(f"{len(orphan_ids)} personnes orphelines supprimées")
 
     conn.commit()
     conn.close()

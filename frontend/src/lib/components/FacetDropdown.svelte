@@ -13,10 +13,13 @@
 		searchable?: boolean;
 		selected?: string[];
 		allLabel?: string;
+		tooltip?: string;
 		onchange?: (selected: string[]) => void;
 	}
 
-	let { label, options, searchable = false, selected = $bindable([]), allLabel = 'Tous', onchange }: Props = $props();
+	let { label, options, searchable = false, selected = $bindable([]), allLabel = 'Tous', tooltip, onchange }: Props = $props();
+	let showTooltip = $state(false);
+	let tooltipTimer: ReturnType<typeof setTimeout>;
 
 	let open = $state(false);
 	let filterText = $state('');
@@ -103,6 +106,7 @@
 		class:has-selection={selected.length > 0}
 		onclick={(e) => {
 			e.stopPropagation();
+			showTooltip = false;
 			if (open) {
 				open = false;
 				return;
@@ -111,6 +115,8 @@
 			open = true;
 			filterText = '';
 		}}
+		onmouseenter={() => { if (tooltip && !open) showTooltip = true; }}
+		onmouseleave={() => { showTooltip = false; }}
 	>
 		<span class="facet-label">{label}</span>
 		{#if selected.length > 0}
@@ -118,6 +124,9 @@
 		{/if}
 		<span class="facet-arrow">&#9662;</span>
 	</button>
+	{#if showTooltip && tooltip}
+		<div class="facet-tooltip">{@html tooltip}</div>
+	{/if}
 
 	{#if open}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -194,6 +203,32 @@
 		color: var(--muted);
 		margin-left: 2px;
 	}
+	.facet-tooltip {
+		position: absolute;
+		bottom: calc(100% + 6px);
+		left: 50%;
+		transform: translateX(-50%);
+		background: #333;
+		color: #fff;
+		font-size: 0.78rem;
+		line-height: 1.4;
+		padding: 6px 10px;
+		border-radius: 5px;
+		white-space: nowrap;
+		z-index: 200;
+		pointer-events: none;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+	}
+	.facet-tooltip::after {
+		content: '';
+		position: absolute;
+		top: 100%;
+		left: 50%;
+		transform: translateX(-50%);
+		border: 5px solid transparent;
+		border-top-color: #333;
+	}
+
 	.facet-panel {
 		position: absolute;
 		top: calc(100% + 4px);

@@ -23,6 +23,7 @@
 		openalex_id: string | null;
 		wos_id: string | null;
 		labs: string | null;
+		apc: { amount: number; institution: string | null; lab_id: number | null; lab_acronym: string | null; budget_structure_id: number | null }[] | null;
 	}
 
 	interface PubResponse {
@@ -50,10 +51,12 @@
 	let sourceStates: Record<string, string> = $state({});
 	let selectedDocTypes: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
+	let selectedApc: string[] = $state([]);
 
 	// Facet options (dynamic)
 	let yearOptions: FacetOption[] = $state([]);
 	let labOptions: FacetOption[] = $state([]);
+	let apcOptions: FacetOption[] = $state([]);
 
 	// Filter from stats page (publisher/journal)
 	let filterPublisherId: string | null = $state(null);
@@ -115,6 +118,7 @@
 		if (sf) p.set('source_filter', sf);
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
+		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		if (filterPublisherId) { p.set('publisher_id', filterPublisherId); if (filterPublisherName) p.set('publisher_name', filterPublisherName); }
 		if (filterJournalId) { p.set('journal_id', filterJournalId); if (filterJournalName) p.set('journal_name', filterJournalName); }
 		if (search.trim()) p.set('search', search.trim());
@@ -132,6 +136,7 @@
 		if (sf) params.set('source_filter', sf);
 		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
+		if (selectedApc.length) params.set('has_apc', selectedApc.join(','));
 		if (filterPublisherId) params.set('publisher_id', filterPublisherId);
 		if (filterJournalId) params.set('journal_id', filterJournalId);
 		return params;
@@ -146,6 +151,7 @@
 			doc_types: { value: string; count: number }[];
 			oa_statuses: { value: string; count: number }[];
 			source_counts: Record<string, number>;
+			apc: { value: string; text: string; count: number }[];
 		}>('/api/publications/facets?' + params);
 		yearOptions = data.years.map((y) => ({
 			value: String(y.value), text: String(y.value), count: y.count
@@ -163,6 +169,9 @@
 			value: o.value, text: oaLabelsMap[o.value] || o.value, count: o.count
 		}));
 		sourceCounts = data.source_counts || {};
+		if (data.apc) {
+			apcOptions = data.apc.map(a => ({ value: a.value, text: a.text, count: a.count }));
+		}
 	}
 
 	async function loadPublications() {
@@ -239,6 +248,7 @@
 		if (urlParams.get('year')) selectedYears = urlParams.get('year')!.split(',');
 		if (urlParams.get('doc_type')) selectedDocTypes = urlParams.get('doc_type')!.split(',');
 		if (urlParams.get('oa_status')) selectedOa = urlParams.get('oa_status')!.split(',');
+		if (urlParams.get('has_apc')) selectedApc = urlParams.get('has_apc')!.split(',');
 		if (urlParams.get('lab_id')) selectedLabs = urlParams.get('lab_id')!.split(',');
 		if (urlParams.get('source_filter')) {
 			const states: Record<string, string> = {};
@@ -280,6 +290,7 @@
 	<FacetDropdown label="Laboratoires" options={labOptions} searchable bind:selected={selectedLabs} onchange={onLabChange} />
 	<FacetDropdown label="Types" options={docTypeOptions} bind:selected={selectedDocTypes} onchange={onFilterChange} />
 	<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
+	<FacetDropdown label="APC" options={apcOptions} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
 	<SourceFilterToggle bind:states={sourceStates} counts={sourceCounts} onchange={onFilterChange} />
 	<span class="count">{total} publication{total > 1 ? 's' : ''}</span>
 	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
@@ -297,13 +308,14 @@
 				An. <span class="sort-arrow">{yearSortArrow}</span>
 			</th>
 			<th style="width:80px">Labo(s)</th>
+			<th style="width:60px">APC</th>
 			<th style="width:50px">OA</th>
 			<th style="width:80px">Liens</th>
 		</tr>
 	</thead>
 	<tbody>
 		{#if publications.length === 0}
-			<tr><td colspan="7" class="no-results">Aucune publication trouvée</td></tr>
+			<tr><td colspan="8" class="no-results">Aucune publication trouvée</td></tr>
 		{:else}
 			{#each publications as p (p.id)}
 				<tr>
@@ -317,6 +329,20 @@
 						{#each (p.labs || '').split(', ').filter(Boolean) as lab}
 							<span class="lab-tag">{lab}</span>
 						{/each}
+					</td>
+					<td class="apc-cell">
+						{#if p.apc}
+							{@const ucaApc = p.apc.filter(a => a.budget_structure_id === 169)}
+							{#if ucaApc.length > 0}
+								<span class="apc-tag" title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || 'UCA'})`).join('\n')}>
+									{Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+								</span>
+							{:else}
+								<span class="apc-tag apc-other" title={p.apc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.institution || '?'})`).join('\n')}>
+									{Math.round(p.apc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+								</span>
+							{/if}
+						{/if}
 					</td>
 					<td>
 						{#if p.oa_status && p.oa_status !== 'unknown'}
@@ -492,6 +518,19 @@
 		color: var(--accent);
 		font-weight: 500;
 	}
+
+	.apc-cell { text-align: right; white-space: nowrap; }
+	.apc-tag {
+		display: inline-block;
+		font-size: 0.75rem;
+		padding: 1px 5px;
+		border-radius: 3px;
+		background: #e8f5e9;
+		color: #2e7d32;
+		font-weight: 500;
+		cursor: default;
+	}
+	.apc-other { background: #f0f0f0; color: #888; }
 
 	.oa-tag {
 		display: inline-block;

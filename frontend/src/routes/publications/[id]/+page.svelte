@@ -5,6 +5,7 @@
 	import { api } from '$lib/api';
 	import { titleCase, sanitizeTitle } from '$lib/utils';
 	import { typeLabels as baseTypeLabels } from '$lib/labels';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	const pubId = $derived($page.params.id);
 	let canGoBack = $state(false);
@@ -50,6 +51,7 @@
 		source_wos: boolean;
 	}
 	interface SourceAuthorship {
+		id: number;
 		author_position: number;
 		full_name: string;
 		person_id: number | null;
@@ -85,6 +87,7 @@
 	// --- State ---
 	let data: PubResponse | null = $state(null);
 	let error = $state(false);
+	let isAdmin = $state(false);
 
 	const pub = $derived(data?.publication);
 	const hasTruthTable = $derived((data?.authorships.length ?? 0) > 0);
@@ -106,6 +109,17 @@
 
 	function personName(last: string, first: string): string {
 		return `${titleCase(first)} ${titleCase(last)}`;
+	}
+
+	async function toggleExclude(source: string, a: SourceAuthorship) {
+		const newExcluded = !a.excluded;
+		await fetch(`${base}/api/source-authorships/${source}/${a.id}/exclude`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ excluded: newExcluded })
+		});
+		// Recharger la page
+		await loadData();
 	}
 
 	function structsTooltip(a: SourceAuthorship): string {
@@ -136,9 +150,9 @@
 		const halMap = new Map<number, SourceAuthorship>();
 		const oaMap = new Map<number, SourceAuthorship>();
 		const wosMap = new Map<number, SourceAuthorship>();
-		for (const a of data.hal_authorships) if (!a.excluded) halMap.set(a.author_position, a);
-		for (const a of data.openalex_authorships) if (!a.excluded) oaMap.set(a.author_position, a);
-		for (const a of data.wos_authorships) if (!a.excluded) wosMap.set(a.author_position, a);
+		for (const a of data.hal_authorships) halMap.set(a.author_position, a);
+		for (const a of data.openalex_authorships) oaMap.set(a.author_position, a);
+		for (const a of data.wos_authorships) wosMap.set(a.author_position, a);
 
 		const allPos = new Set([...halMap.keys(), ...oaMap.keys(), ...wosMap.keys()]);
 		const rows: SourceRow[] = [];
@@ -147,20 +161,21 @@
 			const oa = oaMap.get(pos) ?? null;
 			const wos = wosMap.get(pos) ?? null;
 			const entries = [hal, oa, wos].filter((x): x is SourceAuthorship => x !== null);
+			const activeEntries = entries.filter(e => !e.excluded);
 
 			let conflict = false;
 			// Conflit : auteur UCA dans une source mais absent d'une autre source présente
-			const ucaEntries = entries.filter(e => e.is_uca);
+			const ucaEntries = activeEntries.filter(e => e.is_uca);
 			if (ucaEntries.length > 0) {
-				if (hal === null && data.hal_authorships.length > 0 && ucaEntries.length > 0) conflict = true;
-				if (oa === null && data.openalex_authorships.length > 0 && ucaEntries.length > 0) conflict = true;
-				if (wos === null && data.wos_authorships.length > 0 && ucaEntries.length > 0) conflict = true;
+				if ((hal === null || hal.excluded) && data.hal_authorships.some(a => !a.excluded) && ucaEntries.length > 0) conflict = true;
+				if ((oa === null || oa.excluded) && data.openalex_authorships.some(a => !a.excluded) && ucaEntries.length > 0) conflict = true;
+				if ((wos === null || wos.excluded) && data.wos_authorships.some(a => !a.excluded) && ucaEntries.length > 0) conflict = true;
 			}
 			// Conflit : deux personnes résolues différentes
-			const personIds = entries.filter(e => e.person_id !== null).map(e => e.person_id!);
+			const personIds = activeEntries.filter(e => e.person_id !== null).map(e => e.person_id!);
 			if (new Set(personIds).size > 1) conflict = true;
 			// Conflit : auteur UCA résolu aligné avec auteur non résolu
-			if (ucaEntries.some(e => e.person_id !== null) && entries.some(e => e.person_id === null)) conflict = true;
+			if (ucaEntries.some(e => e.person_id !== null) && activeEntries.some(e => e.person_id === null)) conflict = true;
 
 			rows.push({ position: pos, hal, oa, wos, conflict });
 		}
@@ -169,10 +184,15 @@
 
 	const hasSourceConflict = $derived(sourceRows.some(r => r.conflict));
 
+	async function loadData() {
+		data = await api<PubResponse>(`/api/publications/${pubId}`);
+	}
+
 	onMount(async () => {
 		canGoBack = (window.navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
+		fetch(base + '/api/auth/check').then(r => r.json()).then(d => { isAdmin = !!d.authenticated; }).catch(() => {});
 		try {
-			data = await api<PubResponse>(`/api/publications/${pubId}`);
+			await loadData();
 		} catch {
 			error = true;
 		}
@@ -365,8 +385,9 @@
 							<tr class:conflict-row={row.conflict}>
 								{#if halSource}
 									<td class="sg-pos-cell">{#if row.hal}{row.position + 1}{/if}</td>
-									<td class="sg-name-cell">
+									<td class="sg-name-cell" class:sg-excluded={row.hal?.excluded}>
 										{#if row.hal}
+											{#if isAdmin}<button class="exclude-btn" title={row.hal.excluded ? 'Rétablir' : 'Marquer comme faux'} onclick={() => toggleExclude('hal', row.hal!)}>{row.hal.excluded ? '↩' : '×'}</button>{/if}
 											{#if row.hal.person_id}
 												<a href="{base}/persons/{row.hal.person_id}" class="sg-author-link" class:sg-uca={row.hal.is_uca}>
 													{row.hal.full_name}
@@ -377,15 +398,16 @@
 												</span>
 											{/if}
 											{#if structsTooltip(row.hal)}
-												<span class="info-icon" title={structsTooltip(row.hal)}>&#9432;</span>
+												<Tooltip text={structsTooltip(row.hal)}><span class="info-icon">&#9432;</span></Tooltip>
 											{/if}
 										{/if}
 									</td>
 								{/if}
 								{#if oaSource}
 									<td class="sg-pos-cell">{#if row.oa}{row.position + 1}{/if}</td>
-									<td class="sg-name-cell">
+									<td class="sg-name-cell" class:sg-excluded={row.oa?.excluded}>
 										{#if row.oa}
+											{#if isAdmin}<button class="exclude-btn" title={row.oa.excluded ? 'Rétablir' : 'Marquer comme faux'} onclick={() => toggleExclude('openalex', row.oa!)}>{row.oa.excluded ? '↩' : '×'}</button>{/if}
 											{#if row.oa.person_id}
 												<a href="{base}/persons/{row.oa.person_id}" class="sg-author-link" class:sg-uca={row.oa.is_uca}>
 													{row.oa.full_name}
@@ -396,15 +418,16 @@
 												</span>
 											{/if}
 											{#if structsTooltip(row.oa)}
-												<span class="info-icon" title={structsTooltip(row.oa)}>&#9432;</span>
+												<Tooltip text={structsTooltip(row.oa)}><span class="info-icon">&#9432;</span></Tooltip>
 											{/if}
 										{/if}
 									</td>
 								{/if}
 								{#if wosSource}
 									<td class="sg-pos-cell">{#if row.wos}{row.position + 1}{/if}</td>
-									<td class="sg-name-cell">
+									<td class="sg-name-cell" class:sg-excluded={row.wos?.excluded}>
 										{#if row.wos}
+											{#if isAdmin}<button class="exclude-btn" title={row.wos.excluded ? 'Rétablir' : 'Marquer comme faux'} onclick={() => toggleExclude('wos', row.wos!)}>{row.wos.excluded ? '↩' : '×'}</button>{/if}
 											{#if row.wos.person_id}
 												<a href="{base}/persons/{row.wos.person_id}" class="sg-author-link" class:sg-uca={row.wos.is_uca}>
 													{row.wos.full_name}
@@ -415,7 +438,7 @@
 												</span>
 											{/if}
 											{#if structsTooltip(row.wos)}
-												<span class="info-icon" title={structsTooltip(row.wos)}>&#9432;</span>
+												<Tooltip text={structsTooltip(row.wos)}><span class="info-icon">&#9432;</span></Tooltip>
 											{/if}
 										{/if}
 									</td>
@@ -427,6 +450,7 @@
 			</div>
 		</details>
 	{:else if sourceCount === 1}
+		{@const singleSource = halSource ? 'hal' : oaSource ? 'openalex' : 'wos'}
 		{@const singleRows = halSource ? data!.hal_authorships : oaSource ? data!.openalex_authorships : data!.wos_authorships}
 		{@const singleLabel = halSource ? 'HAL' : oaSource ? 'OpenAlex' : 'WoS'}
 		<div class="section">
@@ -440,10 +464,11 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each singleRows.filter(a => !a.excluded) as a}
-						<tr class:uca-row={a.is_uca}>
+					{#each singleRows as a}
+						<tr class:uca-row={a.is_uca && !a.excluded} class:sg-excluded={a.excluded}>
 							<td class="pos-cell">{(a.author_position ?? 0) + 1}</td>
 							<td>
+								{#if isAdmin}<button class="exclude-btn" title={a.excluded ? 'Rétablir' : 'Marquer comme faux'} onclick={() => toggleExclude(singleSource, a)}>{a.excluded ? '↩' : '×'}</button>{/if}
 								{#if a.person_id}
 									<a href="{base}/persons/{a.person_id}" class="author-link">
 										{a.full_name}
@@ -768,6 +793,13 @@
 	.sg-author-link { text-decoration: none; color: var(--text); }
 	.sg-author-link:hover { text-decoration: underline; }
 	.sg-uca { font-weight: 600; color: #2a7d4f; }
+	.sg-excluded { opacity: 0.4; }
+	.sg-excluded a, .sg-excluded span { text-decoration: line-through; }
+	.exclude-btn {
+		background: none; border: none; cursor: pointer; padding: 0 4px 0 0;
+		font-size: 0.85rem; line-height: 1; color: #999; vertical-align: middle;
+	}
+	.exclude-btn:hover { color: #c0392b; }
 
 	.conflict-row { background: #fff8f0; }
 	.conflict-row:hover { background: #fef0e0; }

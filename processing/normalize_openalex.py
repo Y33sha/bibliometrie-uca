@@ -110,7 +110,7 @@ def is_hal_primary_location(work: dict) -> bool:
     source = location.get("source") or {}
     source_url = source.get("homepage_url") or ""
     source_type = source.get("type") or ""
-    if "hal.science" in url or "hal.archives-ouvertes.fr" in url:
+    if re.search(r'/(?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+', url):
         return True
     if source_type == "repository" and ("hal" in source_url.lower() or "hal" in (source.get("display_name") or "").lower()):
         return True
@@ -121,7 +121,7 @@ def extract_hal_id_from_url(url: str) -> str | None:
     """Extrait le halId depuis une URL HAL."""
     if not url:
         return None
-    match = re.search(r'((?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+)', url)
+    match = re.search(r'((?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+)(?:v\d+)?', url)
     return match.group(1) if match else None
 
 

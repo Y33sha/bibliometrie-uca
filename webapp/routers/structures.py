@@ -1,0 +1,235 @@
+"""Auto-extracted router."""
+
+from fastapi import APIRouter, Query, HTTPException, Depends
+from webapp.deps import get_cursor, require_admin
+from webapp.models import (StructureCreate, StructureUpdate, RelationCreate,
+    NameFormCreate, NameFormUpdate)
+
+router = APIRouter()
+
+
+
+
+
+
+@router.get("/api/structures")
+async def list_structures(
+    type: str | None = Query(None),
+    search: str = Query(""),
+):
+    with get_cursor() as (cur, conn):
+        conditions = []
+        params = []
+
+        if type:
+            conditions.append("s.type::text = %s")
+            params.append(type)
+        if search:
+            conditions.append("(unaccent(s.name) ILIKE unaccent(%s) OR s.acronym ILIKE %s OR s.code ILIKE %s)")
+            params.extend([f"%{search}%"] * 3)
+
+        where = " AND ".join(conditions) if conditions else "TRUE"
+
+        cur.execute(f"""
+            SELECT s.id, s.code, s.name, s.acronym, s.type::text
+            FROM structures s
+            WHERE {where}
+            ORDER BY s.type, s.name
+        """, params)
+        return cur.fetchall()
+
+
+@router.get("/api/structures/{structure_id}")
+async def get_structure(structure_id: int):
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT * FROM structures WHERE id = %s", (structure_id,))
+        structure = cur.fetchone()
+        if not structure:
+            raise HTTPException(status_code=404, detail="Structure not found")
+
+        # Relations : ses tutelles (parents)
+        cur.execute("""
+            SELECT sr.id AS relation_id, sr.relation_type::text,
+                   sp.id, sp.code, sp.name, sp.acronym, sp.type::text AS struct_type
+            FROM structure_relations sr
+            JOIN structures sp ON sp.id = sr.parent_id
+            WHERE sr.child_id = %s
+            ORDER BY sr.relation_type, sp.name
+        """, (structure_id,))
+        parents = cur.fetchall()
+
+        # Relations : ses enfants
+        cur.execute("""
+            SELECT sr.id AS relation_id, sr.relation_type::text,
+                   sc.id, sc.code, sc.name, sc.acronym, sc.type::text AS struct_type
+            FROM structure_relations sr
+            JOIN structures sc ON sc.id = sr.child_id
+            WHERE sr.parent_id = %s
+            ORDER BY sr.relation_type, sc.name
+        """, (structure_id,))
+        children = cur.fetchall()
+
+        # Formes de noms
+        cur.execute("""
+            SELECT * FROM name_forms
+            WHERE structure_id = %s
+            ORDER BY is_active DESC, form_text
+        """, (structure_id,))
+        forms = cur.fetchall()
+
+        return {
+            "structure": structure,
+            "parents": parents,
+            "children": children,
+            "forms": forms,
+        }
+
+
+@router.post("/api/structures")
+async def create_structure(data: StructureCreate):
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            INSERT INTO structures (code, name, acronym, type, ror_id, rnsr_id, hal_collection)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING *
+        """, (data.code, data.name, data.acronym, data.type,
+              data.ror_id, data.rnsr_id, data.hal_collection))
+        return cur.fetchone()
+
+
+@router.put("/api/structures/{structure_id}")
+async def update_structure(structure_id: int, data: StructureUpdate):
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id FROM structures WHERE id = %s", (structure_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Structure not found")
+
+        updates = []
+        params = []
+        for field_name in ("name", "acronym", "type", "ror_id", "rnsr_id", "hal_collection"):
+            val = getattr(data, field_name, None)
+            if val is not None:
+                updates.append(f"{field_name} = %s")
+                params.append(val)
+
+        if not updates:
+            raise HTTPException(status_code=400, detail="Nothing to update")
+
+        params.append(structure_id)
+        cur.execute(f"""
+            UPDATE structures SET {', '.join(updates)} WHERE id = %s RETURNING *
+        """, params)
+        return cur.fetchone()
+
+
+@router.delete("/api/structures/{structure_id}")
+async def delete_structure(structure_id: int):
+    with get_cursor() as (cur, conn):
+        cur.execute("DELETE FROM structures WHERE id = %s", (structure_id,))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Structure not found")
+        return {"deleted": True}
+
+
+@router.post("/api/structure-relations")
+async def create_relation(data: RelationCreate):
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            INSERT INTO structure_relations (parent_id, child_id, relation_type)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (parent_id, child_id, relation_type) DO NOTHING
+            RETURNING *
+        """, (data.parent_id, data.child_id, data.relation_type))
+        row = cur.fetchone()
+        if not row:
+            return {"status": "already_exists"}
+        return row
+
+
+@router.delete("/api/structure-relations/{relation_id}")
+async def delete_relation(relation_id: int):
+    with get_cursor() as (cur, conn):
+        cur.execute("DELETE FROM structure_relations WHERE id = %s", (relation_id,))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Relation not found")
+        return {"deleted": True}
+
+
+@router.get("/api/name-forms/{form_id}")
+async def get_name_form(form_id: int):
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT * FROM name_forms WHERE id = %s", (form_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Form not found")
+        return row
+
+
+@router.post("/api/name-forms")
+async def create_name_form(data: NameFormCreate):
+    import json as _json
+    with get_cursor() as (cur, conn):
+        form_normalized = normalize_text(data.form_text)
+        ctx_json = _json.dumps(data.requires_context_of) if data.requires_context_of else None
+        cur.execute("""
+            INSERT INTO name_forms (structure_id, form_text, form_normalized, is_regex,
+                                    requires_context_of, notes)
+            VALUES (%s, %s, %s, %s, %s::jsonb, %s)
+            RETURNING *
+        """, (data.structure_id, data.form_text, form_normalized, data.is_regex,
+              ctx_json, data.notes))
+        return cur.fetchone()
+
+
+@router.put("/api/name-forms/{form_id}")
+async def update_name_form(form_id: int, data: NameFormUpdate):
+    import json as _json
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id FROM name_forms WHERE id = %s", (form_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Name form not found")
+
+        updates = []
+        params = []
+
+        if data.form_text is not None:
+            updates.append("form_text = %s")
+            params.append(data.form_text)
+            updates.append("form_normalized = %s")
+            params.append(normalize_text(data.form_text))
+        if data.is_regex is not None:
+            updates.append("is_regex = %s")
+            params.append(data.is_regex)
+        if data.requires_context_of is not None:
+            updates.append("requires_context_of = %s::jsonb")
+            params.append(_json.dumps(data.requires_context_of) if data.requires_context_of else None)
+        if data.is_active is not None:
+            updates.append("is_active = %s")
+            params.append(data.is_active)
+        if data.notes is not None:
+            updates.append("notes = %s")
+            params.append(data.notes)
+
+        if not updates:
+            raise HTTPException(status_code=400, detail="Nothing to update")
+
+        params.append(form_id)
+        cur.execute(f"""
+            UPDATE name_forms SET {', '.join(updates)} WHERE id = %s RETURNING *
+        """, params)
+        return cur.fetchone()
+
+
+@router.delete("/api/name-forms/{form_id}")
+async def delete_name_form(form_id: int):
+    with get_cursor() as (cur, conn):
+        cur.execute("DELETE FROM name_forms WHERE id = %s", (form_id,))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Name form not found")
+        return {"deleted": True}
+
+
+# =============================================================
+# AUTHORSHIPS (auteurs UCA)
+# =============================================================
+

@@ -14,7 +14,7 @@
 	// --- Types ---
 	interface Summary { total_pubs: number; publisher_count: number; journal_count: number; }
 	interface YearData { pub_year: number; gold: number; diamond: number; hybrid: number; bronze: number; green: number; closed: number; unknown: number; }
-	interface OaRow { pub_count: number; gold: number; diamond: number; hybrid: number; bronze: number; green: number; closed: number; unknown: number; }
+	interface OaRow { pub_count: number; apc_uca: number; gold: number; diamond: number; hybrid: number; bronze: number; green: number; closed: number; unknown: number; }
 	interface PublisherRow extends OaRow { publisher_id: number; publisher_name: string; journal_count: number; }
 	interface JournalRow extends OaRow { journal_id: number; journal_title: string; publisher_name: string | null; }
 	interface LabRow extends OaRow { lab_id: number; lab_name: string; lab_acronym: string | null; }
@@ -28,6 +28,7 @@
 	let selectedYears: string[] = $state([]);
 	let selectedLabs: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
+	let selectedApc: string[] = $state([]);
 	let search = $state('');
 	let publisherId: number | null = $state(null);
 	let publisherName = $state('');
@@ -40,6 +41,7 @@
 	let yearOptions: FacetOption[] = $state([]);
 	let labOptions: FacetOption[] = $state([]);
 	let oaOptions: FacetOption[] = $state([]);
+	let apcOptions: FacetOption[] = $state([]);
 
 	let summary: Summary = $state({ total_pubs: 0, publisher_count: 0, journal_count: 0 });
 
@@ -65,6 +67,7 @@
 		if (selectedLabs.length) p.set('lab_id', selectedLabs.join(','));
 		if (selectedYears.length) p.set('year', selectedYears.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
+		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		if (publisherId) { p.set('publisher_id', String(publisherId)); p.set('publisher_name', publisherName); }
 		if (journalId) { p.set('journal_id', String(journalId)); p.set('journal_name', journalName); }
 		p.set('doc_type', 'article,review');
@@ -77,6 +80,7 @@
 		if (selectedLabs.length) p.set('lab_id', selectedLabs.join(','));
 		if (selectedYears.length) p.set('year', selectedYears.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
+		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		if (publisherId) p.set('publisher_id', String(publisherId));
 		if (journalId) p.set('journal_id', String(journalId));
 		return p;
@@ -90,6 +94,7 @@
 		if (selectedYears.length) p.set('year', selectedYears.join(','));
 		if (selectedLabs.length) p.set('lab_id', selectedLabs.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
+		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		if (publisherId) { p.set('publisher_id', String(publisherId)); p.set('publisher_name', publisherName); }
 		if (journalId) { p.set('journal_id', String(journalId)); p.set('journal_name', journalName); }
 		if (search) p.set('search', search);
@@ -160,6 +165,7 @@
 			years: { value: number; count: number }[];
 			labs: { value: number; label: string; count: number }[];
 			oa_statuses: { value: string; count: number }[];
+			apc: { value: string; text: string; count: number }[];
 		}>('/api/pub-stats/facets?' + p);
 		yearOptions = data.years.map((y) => ({
 			value: String(y.value), text: String(y.value), count: y.count
@@ -170,6 +176,9 @@
 		oaOptions = data.oa_statuses.map((o) => ({
 			value: o.value, text: oaLabelsMap[o.value] || o.value, count: o.count
 		}));
+		if (data.apc) {
+			apcOptions = data.apc.map(a => ({ value: a.value, text: a.text, count: a.count }));
+		}
 	}
 
 	async function loadSummary() {
@@ -442,6 +451,7 @@
 	<FacetDropdown label="Années" allLabel="Toutes" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
 	<FacetDropdown label="Laboratoires" options={labOptions} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
 	<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
+	<FacetDropdown label="APC" options={apcOptions} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
 	{#if tab === 'publishers' || tab === 'journals'}
 		<input type="text" placeholder="Rechercher..." bind:value={search} oninput={onSearchInput} />
 	{/if}
@@ -478,8 +488,9 @@
 		<thead>
 			<tr>
 				<th>Éditeur</th>
-				<th class="num">Articles</th>
 				<th class="num">Revues</th>
+				<th class="num">Articles</th>
+				<th class="num">APC UCA</th>
 				<th style="min-width:100px">OA</th>
 				<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
 				<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>
@@ -492,8 +503,9 @@
 						<!-- svelte-ignore a11y_missing_attribute -->
 						<a onclick={() => goTo('publisher_detail', { id: r.publisher_id, name: r.publisher_name })}>{r.publisher_name}</a>
 					</td>
-					<td class="num">{r.pub_count}</td>
 					<td class="num num-small">{r.journal_count}</td>
+					<td class="num">{r.pub_count}</td>
+					<td class="num apc-cell">{r.apc_uca > 0 ? Math.round(r.apc_uca).toLocaleString('fr-FR') + ' €' : ''}</td>
 					<td>
 						<div class="oa-bar">
 							<span class="diamond" style="width:{oaPercent(r.diamond, r.pub_count)}"></span>
@@ -527,6 +539,7 @@
 				<th>Revue</th>
 				{#if !publisherId}<th>Éditeur</th>{/if}
 				<th class="num">Articles</th>
+				<th class="num">APC UCA</th>
 				<th style="min-width:100px">OA</th>
 				<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
 				<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>
@@ -543,6 +556,7 @@
 						<td class="name-cell num-small">{r.publisher_name || ''}</td>
 					{/if}
 					<td class="num">{r.pub_count}</td>
+					<td class="num apc-cell">{r.apc_uca > 0 ? Math.round(r.apc_uca).toLocaleString('fr-FR') + ' €' : ''}</td>
 					<td>
 						<div class="oa-bar">
 							<span class="diamond" style="width:{oaPercent(r.diamond, r.pub_count)}"></span>
@@ -576,6 +590,7 @@
 				<tr>
 					<th>Laboratoire</th>
 					<th class="num">Articles</th>
+					<th class="num">APC UCA</th>
 					<th style="min-width:100px">OA</th>
 					<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
 					<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>
@@ -588,6 +603,7 @@
 							<a href="{base}/laboratories/{r.lab_id}">{labDisplayName(r)}</a>
 						</td>
 						<td class="num">{r.pub_count}</td>
+						<td class="num apc-cell">{r.apc_uca > 0 ? Math.round(r.apc_uca).toLocaleString('fr-FR') + ' €' : ''}</td>
 						<td>
 							<div class="oa-bar">
 								<span class="diamond" style="width:{oaPercent(r.diamond, r.pub_count)}"></span>
@@ -775,6 +791,7 @@
 	.name-cell a:hover { text-decoration: underline; }
 	.num { text-align: right; font-variant-numeric: tabular-nums; }
 	.num-small { font-size: 0.85rem; color: var(--muted); }
+	.apc-cell { font-size: 0.85rem; color: #2e7d32; white-space: nowrap; }
 
 	.oa-bar {
 		display: flex;

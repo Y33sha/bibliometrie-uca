@@ -68,7 +68,7 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [x] interface de déduplication des personnes (par nom + par conflit de sources)
 * [x] ORCID/idHAL confirmés manuellement: affichés en vert sur les pages publiques
 * [x] recalcul des noms normalisés (tirets résiduels corrigés — 1069 personnes)
-* [ ] gestion des formes de noms?
+* [x] gestion des formes de noms?
 * [ ] correction des noms
 * [ ] ajouter IdRef?
 * [ ] ajouter quelques visus (%OA)
