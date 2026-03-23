@@ -575,13 +575,13 @@ async def get_publication(pub_id: int):
 
         # b) Sources
         cur.execute("""
-            SELECT 'hal' AS source, hd.halid AS source_id, hd.doi, hd.collections
+            SELECT 'hal' AS source, hd.halid AS source_id, hd.doi, hd.collections, hd.countries
             FROM hal_documents hd WHERE hd.publication_id = %s
             UNION ALL
-            SELECT 'openalex', od.openalex_id, od.doi, NULL
+            SELECT 'openalex', od.openalex_id, od.doi, NULL, od.countries
             FROM openalex_documents od WHERE od.publication_id = %s
             UNION ALL
-            SELECT 'wos', wd.ut, wd.doi, NULL
+            SELECT 'wos', wd.ut, wd.doi, NULL, wd.countries
             FROM wos_documents wd WHERE wd.publication_id = %s
         """, (pub_id, pub_id, pub_id))
         sources = cur.fetchall()
@@ -604,7 +604,7 @@ async def get_publication(pub_id: int):
         # d) HAL authorships
         cur.execute("""
             SELECT has.id, has.author_position, ha.full_name, ha.person_id,
-                   has.is_uca, has.structure_ids, has.excluded
+                   has.is_uca, has.structure_ids, has.excluded, has.countries
             FROM hal_authorships has
             JOIN hal_authors ha ON ha.id = has.hal_author_id
             JOIN hal_documents hd ON hd.id = has.hal_document_id
@@ -618,7 +618,7 @@ async def get_publication(pub_id: int):
             SELECT oas.id, oas.author_position,
                    COALESCE(oas.raw_author_name, oa.full_name) AS full_name,
                    oas.person_id,
-                   oas.is_uca, oas.structure_ids, oas.raw_affiliation, oas.excluded
+                   oas.is_uca, oas.structure_ids, oas.raw_affiliation, oas.excluded, oas.countries
             FROM openalex_authorships oas
             JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
@@ -630,7 +630,7 @@ async def get_publication(pub_id: int):
         # e2) WoS authorships
         cur.execute("""
             SELECT was.id, was.author_position, wa.full_name, wa.person_id,
-                   was.is_uca, was.structure_ids, was.raw_affiliation, was.excluded
+                   was.is_uca, was.structure_ids, was.raw_affiliation, was.excluded, was.countries
             FROM wos_authorships was
             JOIN wos_authors wa ON wa.id = was.wos_author_id
             JOIN wos_documents wd ON wd.id = was.wos_document_id

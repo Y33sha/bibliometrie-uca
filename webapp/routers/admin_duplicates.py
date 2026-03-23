@@ -163,6 +163,11 @@ async def merge_duplicate_publications(body: dict):
                         THEN src.oa_status ELSE dest.oa_status END,
                     language = COALESCE(dest.language, src.language),
                     container_title = COALESCE(dest.container_title, src.container_title),
+                    countries = CASE
+                        WHEN dest.countries IS NULL THEN src.countries
+                        WHEN src.countries IS NULL THEN dest.countries
+                        ELSE (SELECT array_agg(DISTINCT c ORDER BY c) FROM unnest(dest.countries || src.countries) AS c)
+                        END,
                     updated_at = now()
                 FROM publications src
                 WHERE dest.id = %s AND src.id = %s

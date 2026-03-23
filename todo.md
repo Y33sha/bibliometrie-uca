@@ -11,7 +11,6 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [x] Normalisation, peuplement des tables structures, auteurs, authorships, gestion des adresses, etc.
 
 ## OpenAlex
-* [x] inclure publis affiliées CHU et INP dans le script d'import OpenAlex
 * [x] stocker `raw_author_name` et `raw_orcid` par authorship (colonnes ajoutées dans `openalex_authorships`, backfill 373k lignes depuis JSON staging, 248k avec ORCID)
 * [x] affichage: utiliser `raw_author_name` au lieu de `openalex_authors.display_name` sur les pages publication et doublons (COALESCE avec fallback)
 * [x] **migrer `person_id` sur `openalex_authorships`** — colonne ajoutée, backfillée (71k lignes), tous les scripts et l'API lisent/écrivent dessus. Chaque authorship a son propre `person_id`, indépendant de l'entité OA. `create_persons_from_authorships.py` utilise `raw_author_name`/`raw_orcid`. `fix_oa_person_conflicts.py` corrige chirurgicalement par authorship.
@@ -27,6 +26,7 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [ ] problème des documents où l'affiliation de l'authorship n'est pas résolue: cf https://hal.science/hal-04987032
 * [ ] retraitement pour les authorships sans auteur_id (prendre strings?)
 * [ ] revue Openalex 'HAL (Le Centre pour la Communication Scientifique Directe)' => parfois absents de HAL! Auditer docts source OpenAlex, ref HAL, HAL non trouvé => supprimer
+* [ ] https://hal.science/hal-03874894 => lien OA vers autre archive ouverte: en tenir compte pour le statut green
 
 ## ORCID
 * [ ] moissoner crossref via ORCID pour trouver publis absentes de HAL, OpenAlex et WoS?

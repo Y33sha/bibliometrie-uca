@@ -85,6 +85,9 @@ async def persons_directory(
                     SELECT DISTINCT ON (v) v, confirmed FROM (
                         SELECT ha.idhal AS v, false AS confirmed FROM hal_authors ha
                         WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL
+                          AND NOT EXISTS (SELECT 1 FROM person_identifiers pi2
+                              WHERE pi2.person_id = p.id AND pi2.id_type = 'idhal'
+                                AND pi2.id_value = ha.idhal AND pi2.status = 'rejected')
                         UNION ALL
                         SELECT pi.id_value, (pi.status = 'confirmed') FROM person_identifiers pi
                         WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'

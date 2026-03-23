@@ -260,6 +260,211 @@ async def batch_review(data: BatchReviewAction):
         return {"updated": updated}
 
 
+# ----- API: Countries -----
+
+
+@router.get("/api/countries")
+async def list_countries():
+    """Liste des pays."""
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT code, name FROM countries ORDER BY name")
+        return cur.fetchall()
+
+
+@router.get("/api/addresses/countries")
+async def addresses_countries(
+    search: str = Query(""),
+    has_country: str = Query(""),  # "yes", "no", ""
+    country_code: str = Query(""),
+    suggested_country: str = Query(""),  # filtre par pays suggéré
+    suggest: bool = Query(False),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=200),
+):
+    """Liste des adresses pour l'attribution de pays."""
+    offset = (page - 1) * per_page
+    conditions = []
+    params: list = []
+
+    if search:
+        conditions.append("unaccent(a.raw_text) ILIKE unaccent(%s)")
+        params.append(f"%{search}%")
+    if has_country == "yes":
+        conditions.append("a.countries IS NOT NULL")
+    elif has_country == "no":
+        conditions.append("a.countries IS NULL")
+    if country_code:
+        conditions.append("%s = ANY(a.countries)")
+        params.append(country_code)
+    if suggested_country:
+        conditions.append("%s = ANY(a.suggested_countries)")
+        params.append(suggested_country)
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    cur_params = list(params)
+    with get_cursor() as (cur, conn):
+        cur.execute(f"SELECT COUNT(*) FROM addresses a {where}", cur_params)
+        total = cur.fetchone()["count"]
+
+        cur.execute(f"""
+            SELECT a.id, a.raw_text, a.countries, a.suggested_countries, a.pub_count
+            FROM addresses a
+            {where}
+            ORDER BY a.pub_count DESC, a.raw_text
+            LIMIT %s OFFSET %s
+        """, cur_params + [per_page, offset])
+        addresses = [dict(r) for r in cur.fetchall()]
+
+        # Nettoyer suggested_countries pour le frontend
+        for a in addresses:
+            sc = a.pop("suggested_countries", None)
+            if suggest and not a["countries"] and sc:
+                a["suggested_countries"] = [{"code": c.strip(), "count": 1} for c in sc]
+            else:
+                a["suggested_countries"] = []
+
+        result = {
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": (total + per_page - 1) // per_page or 1,
+            "addresses": addresses,
+        }
+
+        # Facettes: distribution des pays suggérés sur tout le filtre (sans suggested_country)
+        if suggest and not suggested_country:
+            sug_where = where
+            sug_params = list(cur_params)
+            # Ajouter filtre: seulement les adresses avec suggestions
+            extra = "a.suggested_countries IS NOT NULL"
+            if sug_where:
+                sug_where += f" AND {extra}"
+            else:
+                sug_where = f"WHERE {extra}"
+            cur.execute(f"""
+                SELECT c AS code, COUNT(*) AS cnt
+                FROM addresses a, unnest(a.suggested_countries) AS c
+                {sug_where}
+                GROUP BY c ORDER BY cnt DESC LIMIT 20
+            """, sug_params)
+            result["suggestion_facets"] = [
+                {"code": r["code"].strip(), "count": r["cnt"]}
+                for r in cur.fetchall()
+            ]
+
+        return result
+
+
+@router.get("/api/addresses/suggest-countries")
+async def suggest_countries(
+    search: str = Query(""),
+    _=Depends(require_admin),
+):
+    """Pour un filtre de recherche, renvoie la distribution des pays
+    des adresses qui matchent ET qui ont déjà un pays assigné.
+    Sert à suggérer un pays pour les adresses sans pays du même filtre."""
+    with get_cursor() as (cur, conn):
+        where_clause = ""
+        params: list = []
+        if search.strip():
+            where_clause = "WHERE unaccent(a.raw_text) ILIKE unaccent(%s)"
+            params = [f"%{search.strip()}%"]
+
+        # Distribution des pays parmi les adresses matchantes qui en ont
+        cur.execute(f"""
+            SELECT c, COUNT(*) AS cnt
+            FROM addresses a, unnest(a.countries) AS c
+            {where_clause.replace('WHERE', 'WHERE a.countries IS NOT NULL AND') if where_clause else 'WHERE a.countries IS NOT NULL'}
+            GROUP BY c ORDER BY cnt DESC
+        """, params)
+        suggestions = [{"code": r["c"].strip(), "count": r["cnt"]} for r in cur.fetchall()]
+
+        # Nombre d'adresses sans pays dans le même filtre
+        no_country_where = where_clause.replace('WHERE', 'WHERE countries IS NULL AND') if where_clause else 'WHERE countries IS NULL'
+        cur.execute(f"SELECT COUNT(*) FROM addresses a {no_country_where}",
+                    params)
+        without_country = cur.fetchone()["count"]
+
+        return {"suggestions": suggestions, "without_country": without_country}
+
+
+@router.post("/api/addresses/{addr_id}/country")
+async def set_address_country(addr_id: int, body: dict, _=Depends(require_admin)):
+    """Attribue des pays à une adresse."""
+    countries = body.get("countries")  # list of codes, or None to clear
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id FROM addresses WHERE id = %s", (addr_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Adresse introuvable")
+        if countries:
+            for c in countries:
+                cur.execute("SELECT code FROM countries WHERE code = %s", (c,))
+                if not cur.fetchone():
+                    raise HTTPException(status_code=400, detail=f"Code pays inconnu: {c}")
+        cur.execute("UPDATE addresses SET countries = %s WHERE id = %s",
+                    (countries if countries else None, addr_id))
+        return {"ok": True}
+
+
+@router.post("/api/addresses/batch-country")
+async def batch_set_country(body: dict, _=Depends(require_admin)):
+    """Ajoute un pays à des adresses — par IDs ou par filtre.
+
+    body.country_code: code pays à ajouter
+    body.address_ids: liste d'IDs (sélection manuelle)
+    body.search: filtre texte (appliqué à toutes les adresses matching)
+    body.has_country: "yes" ou "no" (filtre additionnel)
+    """
+    country_code = body.get("country_code")
+    address_ids = body.get("address_ids")
+    filter_search = body.get("search", "")
+    filter_has_country = body.get("has_country", "")
+
+    if not country_code:
+        raise HTTPException(status_code=400, detail="country_code requis")
+
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT code FROM countries WHERE code = %s", (country_code,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=400, detail=f"Code pays inconnu: {country_code}")
+
+        if address_ids:
+            # Mode sélection manuelle
+            cur.execute("""
+                UPDATE addresses
+                SET countries = CASE
+                    WHEN countries IS NULL THEN ARRAY[%s]::char(2)[]
+                    WHEN %s = ANY(countries) THEN countries
+                    ELSE array_append(countries, %s::char(2))
+                END
+                WHERE id = ANY(%s)
+            """, (country_code, country_code, country_code, address_ids))
+        else:
+            # Mode filtre — applique à toutes les adresses du filtre
+            conditions = []
+            params: list = []
+            if filter_search:
+                conditions.append("unaccent(raw_text) ILIKE unaccent(%s)")
+                params.append(f"%{filter_search}%")
+            if filter_has_country == "yes":
+                conditions.append("countries IS NOT NULL")
+            elif filter_has_country == "no":
+                conditions.append("countries IS NULL")
+            where = " AND ".join(conditions) if conditions else "TRUE"
+            cur.execute(f"""
+                UPDATE addresses
+                SET countries = CASE
+                    WHEN countries IS NULL THEN ARRAY[%s]::char(2)[]
+                    WHEN %s = ANY(countries) THEN countries
+                    ELSE array_append(countries, %s::char(2))
+                END
+                WHERE {where}
+            """, [country_code, country_code, country_code] + params)
+
+        return {"updated": cur.rowcount}
+
+
 # ----- API: Feedback / boucle de rétroaction -----
 
 
