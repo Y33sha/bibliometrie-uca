@@ -8,7 +8,7 @@
 
 	const isAdmin = $derived($page.url.pathname.startsWith(base + '/admin'));
 	const isAddresses = $derived(
-		$page.url.pathname === base + '/admin/addresses' || $page.url.pathname === base + '/admin/feedback'
+		$page.url.pathname === base + '/admin/addresses' || $page.url.pathname === base + '/admin/feedback' || $page.url.pathname === base + '/admin/countries'
 	);
 	const isDuplicates = $derived(
 		$page.url.pathname === base + '/admin/duplicates' || $page.url.pathname === base + '/admin/duplicates-persons'
@@ -46,6 +46,7 @@
 					<div class="nav-dropdown-menu">
 						<a href="{base}/admin/addresses" class:active={isActive('/admin/addresses')}>Repérage</a>
 						<a href="{base}/admin/feedback" class:active={isActive('/admin/feedback')}>Qualité</a>
+						<a href="{base}/admin/countries" class:active={isActive('/admin/countries')}>Pays</a>
 					</div>
 				{/if}
 			</div>

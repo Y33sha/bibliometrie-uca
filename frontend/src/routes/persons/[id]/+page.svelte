@@ -130,8 +130,11 @@
 	});
 
 	const allIdhals = $derived(() => {
+		const rejected = new Set(
+			identifiers.filter((i) => i.id_type === 'idhal' && i.status === 'rejected').map((i) => i.id_value)
+		);
 		const map = new Map<string, boolean>();
-		authors.forEach((a) => { if (a.idhal && !map.has(a.idhal)) map.set(a.idhal, false); });
+		authors.forEach((a) => { if (a.idhal && !rejected.has(a.idhal) && !map.has(a.idhal)) map.set(a.idhal, false); });
 		identifiers.filter((i) => i.id_type === 'idhal' && i.status !== 'rejected').forEach((i) => {
 			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed');
 		});

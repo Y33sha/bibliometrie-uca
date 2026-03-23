@@ -37,6 +37,7 @@
 		source_id: string;
 		doi: string | null;
 		collections: string[] | null;
+		countries: string[] | null;
 	}
 	interface Authorship {
 		author_position: number;
@@ -59,6 +60,7 @@
 		structure_ids: number[] | null;
 		raw_affiliation: string | null;
 		excluded: boolean;
+		countries: string[] | null;
 	}
 	interface StructInfo {
 		acronym: string | null;
@@ -381,6 +383,21 @@
 						</tr>
 					</thead>
 					<tbody>
+						<!-- Ligne pays -->
+						<tr class="countries-row">
+							{#if halSource}
+								<td class="sg-pos-cell"></td>
+								<td class="sg-name-cell countries-cell">{(halSource.countries || []).map(c => c.toUpperCase()).join(' ')}</td>
+							{/if}
+							{#if oaSource}
+								<td class="sg-pos-cell"></td>
+								<td class="sg-name-cell countries-cell">{(oaSource.countries || []).map(c => c.toUpperCase()).join(' ')}</td>
+							{/if}
+							{#if wosSource}
+								<td class="sg-pos-cell"></td>
+								<td class="sg-name-cell countries-cell">{(wosSource.countries || []).map(c => c.toUpperCase()).join(' ')}</td>
+							{/if}
+						</tr>
 						{#each sourceRows as row, i (row.position)}
 							<tr class:conflict-row={row.conflict}>
 								{#if halSource}
@@ -399,6 +416,9 @@
 											{/if}
 											{#if structsTooltip(row.hal)}
 												<Tooltip text={structsTooltip(row.hal)}><span class="info-icon">&#9432;</span></Tooltip>
+											{/if}
+											{#if row.hal.countries}
+												<span class="author-countries">{row.hal.countries.map(c => c.toUpperCase()).join(' ')}</span>
 											{/if}
 										{/if}
 									</td>
@@ -420,6 +440,9 @@
 											{#if structsTooltip(row.oa)}
 												<Tooltip text={structsTooltip(row.oa)}><span class="info-icon">&#9432;</span></Tooltip>
 											{/if}
+											{#if row.oa.countries}
+												<span class="author-countries">{row.oa.countries.map(c => c.toUpperCase()).join(' ')}</span>
+											{/if}
 										{/if}
 									</td>
 								{/if}
@@ -439,6 +462,9 @@
 											{/if}
 											{#if structsTooltip(row.wos)}
 												<Tooltip text={structsTooltip(row.wos)}><span class="info-icon">&#9432;</span></Tooltip>
+											{/if}
+											{#if row.wos.countries}
+												<span class="author-countries">{row.wos.countries.map(c => c.toUpperCase()).join(' ')}</span>
 											{/if}
 										{/if}
 									</td>
@@ -788,6 +814,19 @@
 		font-size: 0.88rem;
 		vertical-align: middle;
 		white-space: nowrap;
+	}
+	.countries-row { border-bottom: 2px solid var(--border) !important; }
+	.countries-cell {
+		font-size: 0.75rem;
+		color: var(--muted);
+		letter-spacing: 1px;
+		padding: 3px 10px !important;
+	}
+	.author-countries {
+		font-size: 0.7rem;
+		color: #888;
+		margin-left: 4px;
+		letter-spacing: 0.5px;
 	}
 	.sg-author { }
 	.sg-author-link { text-decoration: none; color: var(--text); }
