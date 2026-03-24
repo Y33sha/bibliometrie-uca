@@ -99,7 +99,7 @@ def get_unlinked_hal_wos_authors(cur):
 
 
 def get_unlinked_oa_authorships(cur):
-    """Récupère les authorships OpenAlex UCA non rattachées (raw_author_name)."""
+    """Récupère les authorships OpenAlex non rattachées (périmètre UCA + CHU + INP)."""
     cur.execute("""
         SELECT oas.id, 'openalex' AS source,
                oas.raw_author_name AS full_name,
@@ -109,7 +109,7 @@ def get_unlinked_oa_authorships(cur):
         FROM openalex_authorships oas
         JOIN openalex_documents od ON od.id = oas.openalex_document_id
         WHERE oas.person_id IS NULL
-          AND oas.is_uca = TRUE
+          AND (oas.is_uca = TRUE OR oas.structure_ids && ARRAY[169, 172, 186])
           AND oas.raw_author_name IS NOT NULL
           AND od.publication_id IS NOT NULL
     """)
@@ -608,9 +608,37 @@ def run_phase_b(cur, dry_run=False):
                 "pub_ids": set(ep["pub_ids"]) if ep["pub_ids"] else set(),
             })
 
+    # Sous-passe B0 : lookup dans person_name_forms
+    logger.info("\n--- B0 : person_name_forms ---")
+    cur.execute("""
+        SELECT name_form, person_ids FROM person_name_forms
+        WHERE array_length(person_ids, 1) = 1
+    """)
+    name_form_map = {}
+    for r in cur.fetchall():
+        name_form_map[r["name_form"].strip()] = r["person_ids"][0]
+
+    oa_linked_nameform = 0
+    for a in oa_authorships:
+        last_norm = normalize_name(a["last_name"])
+        first_norm = normalize_name(a["first_name"])
+        if not last_norm:
+            continue
+        # Essayer les deux ordres possibles
+        for form in [f"{first_norm} {last_norm}", f"{last_norm} {first_norm}"]:
+            pid = name_form_map.get(form)
+            if pid:
+                if not dry_run:
+                    link_authors_to_person(cur, pid, [a])
+                linked_oa_ids.add(a["id"])
+                oa_linked_nameform += 1
+                break
+
+    logger.info(f"  {oa_linked_nameform} liées par person_name_forms")
+
     # Sous-passe B1 : nom + co-publication
     logger.info("\n--- B1 : nom + co-publication ---")
-    remaining = oa_authorships
+    remaining = [a for a in oa_authorships if a["id"] not in linked_oa_ids]
 
     for a in remaining:
         keys = name_keys_for_oa(a)

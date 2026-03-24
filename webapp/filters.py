@@ -107,20 +107,10 @@ def apply_source_filter(conditions: list, source_values: list[str]):
 
 
 def apply_person_filter(conditions: list, params: list, person_id: int):
-    """Ajoute le filtre personne (toutes ses publications via source tables)."""
-    conditions.append("""
-        (
-            EXISTS (SELECT 1 FROM hal_documents hd
-                    JOIN hal_authorships has ON has.hal_document_id = hd.id
-                    JOIN hal_authors ha ON ha.id = has.hal_author_id
-                    WHERE hd.publication_id = p.id AND ha.person_id = %s)
-            OR
-            EXISTS (SELECT 1 FROM openalex_documents od
-                    JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-                    WHERE od.publication_id = p.id AND oas.person_id = %s)
-        )
-    """)
-    params.append(person_id)
+    """Ajoute le filtre personne via la table de vérité."""
+    conditions.append(
+        "EXISTS (SELECT 1 FROM authorships a WHERE a.publication_id = p.id AND a.person_id = %s AND NOT a.excluded)"
+    )
     params.append(person_id)
 
 

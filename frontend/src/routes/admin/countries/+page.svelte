@@ -41,9 +41,20 @@
 		{ value: 'yes', text: 'Avec pays' },
 		{ value: 'no', text: 'Sans pays' },
 	];
-	const countryOptions = $derived(
-		countries.map(c => ({ value: c.code, text: `${c.name} (${c.code.toUpperCase()})` }))
-	);
+	let countryFacets: { code: string; count: number }[] = $state([]);
+	const countryOptions = $derived.by(() => {
+		if (countryFacets.length > 0) {
+			const xx = countryFacets.find(f => f.code === 'xx');
+			const rest = countryFacets.filter(f => f.code !== 'xx');
+			const sorted = [...(xx ? [xx] : []), ...rest];
+			return sorted.map(f => ({
+				value: f.code,
+				text: `${countryMap[f.code] || f.code.toUpperCase()} (${f.code.toUpperCase()})`,
+				count: f.count
+			}));
+		}
+		return countries.map(c => ({ value: c.code, text: `${c.name} (${c.code.toUpperCase()})` }));
+	});
 
 	async function loadCountries() {
 		countries = await api<Country[]>('/api/countries');
@@ -58,13 +69,16 @@
 		if (selectedCountry.length === 1) params.set('country_code', selectedCountry[0]);
 		if (suggestMode) params.set('suggest', 'true');
 		if (selectedSugCountry.length === 1) params.set('suggested_country', selectedSugCountry[0]);
-		const data = await api<{ total: number; page: number; pages: number; addresses: Address[]; suggestion_facets?: { code: string; count: number }[] }>(
+		const data = await api<{ total: number; page: number; pages: number; addresses: Address[]; suggestion_facets?: { code: string; count: number }[]; country_facets?: { code: string; count: number }[] }>(
 			'/api/addresses/countries?' + params
 		);
 		addresses = data.addresses;
 		total = data.total;
 		pages = data.pages;
 		page = data.page;
+		if (data.country_facets) {
+			countryFacets = data.country_facets;
+		}
 		if (data.suggestion_facets) {
 			sugFacetOptions = data.suggestion_facets.map(f => ({
 				value: f.code,
@@ -78,6 +92,10 @@
 	function onFilterChange() {
 		page = 1;
 		selectedIds = new Set();
+		// Synchroniser le select pays avec la facette pays suggéré
+		if (selectedSugCountry.length === 1) {
+			batchCountry = selectedSugCountry[0];
+		}
 		loadAddresses();
 	}
 
@@ -99,8 +117,12 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ countries: newList })
 		});
-		addr.countries = newList;
-		addresses = [...addresses];
+		if (selectedHasCountry.includes('no') || suggestMode) {
+			loadAddresses();
+		} else {
+			addr.countries = newList;
+			addresses = [...addresses];
+		}
 	}
 
 	async function removeCountry(addrId: number, code: string) {
@@ -138,13 +160,18 @@
 		suggestMode = !suggestMode;
 		selectedSugCountry = [];
 		sugFacetOptions = [];
+		if (suggestMode) {
+			selectedHasCountry = ['no'];
+			selectedCountry = [];
+		} else {
+			selectedHasCountry = [];
+		}
+		page = 1;
 		loadAddresses();
 	}
 
 	async function acceptSuggestion(addrId: number, code: string) {
 		await addCountry(addrId, code);
-		// Recharger pour mettre à jour les suggestions
-		loadAddresses();
 	}
 
 	async function batchAddCountry(applyToAll = false) {
@@ -155,6 +182,8 @@
 		if (applyToAll) {
 			if (search.trim()) body.search = search.trim();
 			if (selectedHasCountry.length === 1) body.has_country = selectedHasCountry[0];
+			if (selectedCountry.length === 1) body.country_code = selectedCountry[0];
+			if (selectedSugCountry.length === 1) body.suggested_country = selectedSugCountry[0];
 		} else {
 			body.address_ids = [...selectedIds];
 		}
@@ -166,6 +195,7 @@
 		const data = await resp.json();
 		batchResult = `${data.updated} adresse${data.updated > 1 ? 's' : ''} mise${data.updated > 1 ? 's' : ''} à jour`;
 		selectedIds = new Set();
+		if (applyToAll) selectedSugCountry = [];
 		batchApplying = false;
 		loadAddresses();
 		setTimeout(() => { batchResult = ''; }, 3000);
@@ -185,12 +215,13 @@
 
 <div class="toolbar">
 	<input type="text" placeholder="Rechercher dans les adresses..." bind:value={search} oninput={onSearchInput} />
-	<FacetDropdown label="Pays" options={hasCountryOptions} bind:selected={selectedHasCountry} onchange={onFilterChange} />
-	<FacetDropdown label="Filtrer pays" options={countryOptions} searchable bind:selected={selectedCountry} onchange={onFilterChange} />
 	<button class="btn-suggest" class:active={suggestMode} onclick={toggleSuggest}>
 		{suggestMode ? 'Suggestions actives' : 'Activer suggestions'}
 	</button>
-	{#if suggestMode && sugFacetOptions.length > 0}
+	{#if !suggestMode}
+		<FacetDropdown label="Pays" options={hasCountryOptions} bind:selected={selectedHasCountry} onchange={onFilterChange} />
+		<FacetDropdown label="Filtrer pays" options={countryOptions} searchable bind:selected={selectedCountry} onchange={onFilterChange} />
+	{:else if sugFacetOptions.length > 0}
 		<FacetDropdown label="Pays suggéré" options={sugFacetOptions} bind:selected={selectedSugCountry} onchange={onFilterChange} />
 	{/if}
 	<span class="toolbar-spacer"></span>

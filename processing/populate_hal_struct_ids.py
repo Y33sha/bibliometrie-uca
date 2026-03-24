@@ -101,11 +101,11 @@ def do_match(conn):
 
     # Nos structures
     cur.execute("""
-        SELECT s.id, s.code, s.name, s.acronym, s.type::text,
+        SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text,
                s.hal_collection,
                EXISTS (SELECT 1 FROM hal_structures hs WHERE hs.structure_id = s.id) AS has_hal_link
         FROM structures s
-        ORDER BY s.type, s.name
+        ORDER BY s.structure_type, s.name
     """)
     our_structs = cur.fetchall()
 

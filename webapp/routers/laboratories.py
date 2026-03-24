@@ -14,7 +14,7 @@ async def list_laboratories():
             SELECT s.id, s.code, s.name, s.acronym,
                    s.ror_id, s.hal_collection,
                    (SELECT json_agg(json_build_object(
-                       'id', sp.id, 'name', sp.name, 'acronym', sp.acronym, 'type', sp.type::text
+                       'id', sp.id, 'name', sp.name, 'acronym', sp.acronym, 'type', sp.structure_type::text
                    ) ORDER BY sp.name)
                     FROM structure_relations sr
                     JOIN structures sp ON sp.id = sr.parent_id
@@ -23,7 +23,7 @@ async def list_laboratories():
                       AND sp.code != 'uca'
                    ) AS tutelles
             FROM structures s
-            WHERE s.type = 'labo'
+            WHERE s.structure_type = 'labo'
               AND EXISTS (
                   SELECT 1 FROM structure_relations sr
                   JOIN structures uca ON uca.id = sr.parent_id AND uca.code = 'uca'
@@ -39,7 +39,7 @@ async def get_laboratory(lab_id: int):
     """Profil public d'un laboratoire."""
     with get_cursor() as (cur, conn):
         cur.execute("""
-            SELECT s.id, s.code, s.name, s.acronym, s.type::text AS type,
+            SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text AS type,
                    s.ror_id, s.rnsr_id, s.hal_collection
             FROM structures s
             WHERE s.id = %s
@@ -49,7 +49,7 @@ async def get_laboratory(lab_id: int):
             raise HTTPException(404, "Laboratory not found")
 
         cur.execute("""
-            SELECT sp.id, sp.name, sp.acronym, sp.type::text AS type,
+            SELECT sp.id, sp.name, sp.acronym, sp.structure_type::text AS type,
                    sr.relation_type
             FROM structure_relations sr
             JOIN structures sp ON sp.id = sr.parent_id
@@ -59,7 +59,7 @@ async def get_laboratory(lab_id: int):
         parents = cur.fetchall()
 
         cur.execute("""
-            SELECT sc.id, sc.name, sc.acronym, sc.type::text AS type,
+            SELECT sc.id, sc.name, sc.acronym, sc.structure_type::text AS type,
                    sr.relation_type
             FROM structure_relations sr
             JOIN structures sc ON sc.id = sr.child_id

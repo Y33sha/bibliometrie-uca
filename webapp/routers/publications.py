@@ -60,14 +60,14 @@ async def publications_facets(
                         JOIN hal_authorships has ON has.hal_document_id = hd.id
                         WHERE hd.publication_id = p.id AND has.is_uca = TRUE
                           AND has.structure_ids IS NOT NULL
-                          AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(has.structure_ids) AND s.type = 'labo')
+                          AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(has.structure_ids) AND s.structure_type = 'labo')
                     )
                     AND NOT EXISTS (
                         SELECT 1 FROM openalex_documents od
                         JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
                         WHERE od.publication_id = p.id AND oas.is_uca = TRUE
                           AND oas.structure_ids IS NOT NULL
-                          AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(oas.structure_ids) AND s.type = 'labo')
+                          AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(oas.structure_ids) AND s.structure_type = 'labo')
                     )
                 """)
             elif lab_ids_clean:
@@ -129,7 +129,7 @@ async def publications_facets(
             CROSS JOIN LATERAL unnest(a.structure_ids) AS struct_id
             JOIN structures s ON s.id = struct_id
             WHERE {where_sql(c)}
-              AND s.type = 'labo'
+              AND s.structure_type = 'labo'
             GROUP BY s.id, s.acronym, s.name
             ORDER BY count DESC
         """, p)
@@ -144,14 +144,14 @@ async def publications_facets(
                   JOIN hal_authorships has ON has.hal_document_id = hd.id
                   WHERE hd.publication_id = p.id AND has.is_uca = TRUE
                     AND has.structure_ids IS NOT NULL
-                    AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(has.structure_ids) AND s.type = 'labo')
+                    AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(has.structure_ids) AND s.structure_type = 'labo')
               )
               AND NOT EXISTS (
                   SELECT 1 FROM openalex_documents od
                   JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
                   WHERE od.publication_id = p.id AND oas.is_uca = TRUE
                     AND oas.structure_ids IS NOT NULL
-                    AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(oas.structure_ids) AND s.type = 'labo')
+                    AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(oas.structure_ids) AND s.structure_type = 'labo')
               )
         """, p)
         no_lab_count = cur.fetchone()["count"]
@@ -401,7 +401,7 @@ async def export_publications_csv(
                       AND has.structure_ids IS NOT NULL
                       AND EXISTS (
                           SELECT 1 FROM structures s
-                          WHERE s.id = ANY(has.structure_ids) AND s.type = 'labo'
+                          WHERE s.id = ANY(has.structure_ids) AND s.structure_type = 'labo'
                       )
                 )
                 AND NOT EXISTS (
@@ -412,7 +412,7 @@ async def export_publications_csv(
                       AND oas.structure_ids IS NOT NULL
                       AND EXISTS (
                           SELECT 1 FROM structures s
-                          WHERE s.id = ANY(oas.structure_ids) AND s.type = 'labo'
+                          WHERE s.id = ANY(oas.structure_ids) AND s.structure_type = 'labo'
                       )
                 )
             """)
@@ -507,7 +507,7 @@ async def export_publications_csv(
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
                  CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
-                 JOIN structures s ON s.id = struct_id AND s.type = 'labo'
+                 JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
                  WHERE a3.publication_id = p.id AND a3.is_uca = TRUE
                    AND a3.structure_ids IS NOT NULL
                 ) AS labs
@@ -573,15 +573,27 @@ async def get_publication(pub_id: int):
         if not pub:
             raise HTTPException(status_code=404, detail="Publication not found")
 
-        # b) Sources
+        # b) Sources — HAL: countries du document; OA/WoS: countries depuis adresses
         cur.execute("""
             SELECT 'hal' AS source, hd.halid AS source_id, hd.doi, hd.collections, hd.countries
             FROM hal_documents hd WHERE hd.publication_id = %s
             UNION ALL
-            SELECT 'openalex', od.openalex_id, od.doi, NULL, od.countries
+            SELECT 'openalex', od.openalex_id, od.doi, NULL,
+                   (SELECT array_agg(DISTINCT c ORDER BY c)
+                    FROM openalex_authorships oas2
+                    JOIN openalex_authorship_addresses oaa ON oaa.openalex_authorship_id = oas2.id
+                    JOIN addresses addr ON addr.id = oaa.address_id,
+                         unnest(addr.countries) AS c
+                    WHERE oas2.openalex_document_id = od.id AND addr.countries IS NOT NULL)
             FROM openalex_documents od WHERE od.publication_id = %s
             UNION ALL
-            SELECT 'wos', wd.ut, wd.doi, NULL, wd.countries
+            SELECT 'wos', wd.ut, wd.doi, NULL,
+                   (SELECT array_agg(DISTINCT c ORDER BY c)
+                    FROM wos_authorships was2
+                    JOIN wos_authorship_addresses waa ON waa.wos_authorship_id = was2.id
+                    JOIN addresses addr ON addr.id = waa.address_id,
+                         unnest(addr.countries) AS c
+                    WHERE was2.wos_document_id = wd.id AND addr.countries IS NOT NULL)
             FROM wos_documents wd WHERE wd.publication_id = %s
         """, (pub_id, pub_id, pub_id))
         sources = cur.fetchall()
@@ -613,12 +625,19 @@ async def get_publication(pub_id: int):
         """, (pub_id,))
         hal_authorships = cur.fetchall()
 
-        # e) OpenAlex authorships
+        # e) OpenAlex authorships — pays depuis les adresses
         cur.execute("""
             SELECT oas.id, oas.author_position,
                    COALESCE(oas.raw_author_name, oa.full_name) AS full_name,
                    oas.person_id,
-                   oas.is_uca, oas.structure_ids, oas.raw_affiliation, oas.excluded, oas.countries
+                   oas.is_uca, oas.structure_ids, oas.raw_affiliation, oas.excluded,
+                   (SELECT array_agg(DISTINCT c ORDER BY c)
+                    FROM openalex_authorship_addresses oaa
+                    JOIN addresses addr ON addr.id = oaa.address_id,
+                         unnest(addr.countries) AS c
+                    WHERE oaa.openalex_authorship_id = oas.id
+                      AND addr.countries IS NOT NULL
+                   ) AS countries
             FROM openalex_authorships oas
             JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
@@ -627,10 +646,17 @@ async def get_publication(pub_id: int):
         """, (pub_id,))
         oa_authorships = cur.fetchall()
 
-        # e2) WoS authorships
+        # e2) WoS authorships — pays depuis les adresses
         cur.execute("""
             SELECT was.id, was.author_position, wa.full_name, wa.person_id,
-                   was.is_uca, was.structure_ids, was.raw_affiliation, was.excluded, was.countries
+                   was.is_uca, was.structure_ids, was.raw_affiliation, was.excluded,
+                   (SELECT array_agg(DISTINCT c ORDER BY c)
+                    FROM wos_authorship_addresses waa
+                    JOIN addresses addr ON addr.id = waa.address_id,
+                         unnest(addr.countries) AS c
+                    WHERE waa.wos_authorship_id = was.id
+                      AND addr.countries IS NOT NULL
+                   ) AS countries
             FROM wos_authorships was
             JOIN wos_authors wa ON wa.id = was.wos_author_id
             JOIN wos_documents wd ON wd.id = was.wos_document_id
@@ -657,7 +683,7 @@ async def get_publication(pub_id: int):
         structures = {}
         if all_struct_ids:
             cur.execute("""
-                SELECT id, acronym, name, type FROM structures
+                SELECT id, acronym, name, structure_type AS type FROM structures
                 WHERE id = ANY(%s)
             """, (list(all_struct_ids),))
             for s in cur.fetchall():
@@ -820,7 +846,7 @@ async def list_publications(
                       AND has.structure_ids IS NOT NULL
                       AND EXISTS (
                           SELECT 1 FROM structures s
-                          WHERE s.id = ANY(has.structure_ids) AND s.type = 'labo'
+                          WHERE s.id = ANY(has.structure_ids) AND s.structure_type = 'labo'
                       )
                 )
                 AND NOT EXISTS (
@@ -831,7 +857,7 @@ async def list_publications(
                       AND oas.structure_ids IS NOT NULL
                       AND EXISTS (
                           SELECT 1 FROM structures s
-                          WHERE s.id = ANY(oas.structure_ids) AND s.type = 'labo'
+                          WHERE s.id = ANY(oas.structure_ids) AND s.structure_type = 'labo'
                       )
                 )
             """)
@@ -958,7 +984,7 @@ async def list_publications(
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
                  CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
-                 JOIN structures s ON s.id = struct_id AND s.type = 'labo'
+                 JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
                  WHERE a3.publication_id = p.id AND a3.is_uca = TRUE
                    AND a3.structure_ids IS NOT NULL
                 ) AS labs,

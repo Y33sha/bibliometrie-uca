@@ -27,6 +27,9 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [ ] retraitement pour les authorships sans auteur_id (prendre strings?)
 * [ ] revue Openalex 'HAL (Le Centre pour la Communication Scientifique Directe)' => parfois absents de HAL! Auditer docts source OpenAlex, ref HAL, HAL non trouvé => supprimer
 * [ ] https://hal.science/hal-03874894 => lien OA vers autre archive ouverte: en tenir compte pour le statut green
+* [ ] DOI identique mais type différent: ne pas fusionner (ouvrages + chapitres, conf + posters, etc.)
+* [ ] conserver le type poster
+* [ ] trous dans la numérotation des auteurs: diagnostiquer et résoudre
 
 ## ORCID
 * [ ] moissoner crossref via ORCID pour trouver publis absentes de HAL, OpenAlex et WoS?
@@ -105,8 +108,9 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] lien Publications -> Dashboard?
 * [ ] pb des auteurs openalex liés à une personne mais non listés dans les auteurs d'une publi: http://172.22.130.105/bibliometrie/publications/12380
 * [ ] preprints en accès gold?
-* [ ] type peer-review: mapper les publis OpenAlex de type peer-review (actuellement mappé à "autre")
+* [ ] type peer-review
 * [ ] authorship supprimée: publi apparaît toujours (julie gardette)
+* [ ] source theConversation: pas closed, et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
 
 ## Pages supplémentaires, étudier pertinence
 * [ ] sujets

@@ -632,3 +632,16 @@ ORDER BY hd.pub_year DESC;
 4. Mettre de l'ordre dans le dossier processing (scripts obsolètes à supprimer).
 5. **Simplifier le pipeline** : `rebuild_authorships.py` devrait intégrer la propagation `is_uca`/`structure_ids` pour éviter de devoir relancer `populate_uca_flags.sql` deux fois. Idéalement un seul script « reconstruit tout » après la création des personnes.
 6. Import croisé HAL : script similaire à `cross_import_openalex.py` pour récupérer sur HAL les DOI OpenAlex/WoS absents.
+
+
+
+
+
+## Pipeline de normalisation (ordre d'exécution)
+1. `processing/normalize_hal.py` — normalisation HAL (staging → hal_documents + publications)
+2. `processing/normalize_openalex.py` — normalisation OpenAlex (staging → openalex_documents + publications). Détecte les landing_page_url HAL pour éviter les doublons, mais seulement si HAL a déjà été normalisé. Capture `raw_author_name` et `raw_orcid` par authorship.
+3. `processing/merge_hal_openalex_pubs.py` — rattrapage : fusionne les publications OpenAlex dont la landing_page_url pointe vers un document HAL existant mais qui n'avait pas été détecté à l'étape 2 (ex. import OpenAlex antérieur à l'import HAL). **À exécuter systématiquement après les étapes 1-2.**
+4. `db/populate_uca_flags.sql` — flags UCA (étapes 1-3b sur sources)
+5. `processing/create_persons_from_authorships.py` — Phase A: création personnes HAL/WoS (ORCID, nom+co-publi, singletons, cross-link). Phase B: résolution OA par `raw_author_name` (ORCID, nom+co-publi, nom seul, création). Les entités `openalex_authors` ne participent PAS à la résolution. Propagation UCA (étape 4).
+6. `processing/rebuild_authorships.py` — INSERT authorships manquants + FK
+7. `db/populate_uca_flags.sql` — re-propagation étape 4 pour les nouvelles lignes de l'étape 6

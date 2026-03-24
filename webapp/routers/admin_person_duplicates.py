@@ -172,7 +172,7 @@ def _get_person_dedup_detail(cur, person_id):
     cur.execute("""
         SELECT DISTINCT s.id, s.acronym, s.name
         FROM structures s
-        WHERE s.type = 'labo' AND s.id IN (
+        WHERE s.structure_type = 'labo' AND s.id IN (
             SELECT UNNEST(has2.structure_ids)
             FROM hal_authors ha2
             JOIN hal_authorships has2 ON has2.hal_author_id = ha2.id

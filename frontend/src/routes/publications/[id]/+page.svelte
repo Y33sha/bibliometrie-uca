@@ -479,14 +479,19 @@
 		{@const singleSource = halSource ? 'hal' : oaSource ? 'openalex' : 'wos'}
 		{@const singleRows = halSource ? data!.hal_authorships : oaSource ? data!.openalex_authorships : data!.wos_authorships}
 		{@const singleLabel = halSource ? 'HAL' : oaSource ? 'OpenAlex' : 'WoS'}
+		{@const singleSourceData = halSource || oaSource || wosSource}
 		<div class="section">
 			<h2 class="section-title">Auteurs — source {singleLabel} ({singleRows.filter(a => !a.excluded).length})</h2>
+			{#if singleSourceData?.countries?.length}
+				<div class="countries-cell" style="margin-bottom: 8px;">Pays : {singleSourceData.countries.map(c => c.toUpperCase()).join(' ')}</div>
+			{/if}
 			<table class="auth-table">
 				<thead>
 					<tr>
 						<th style="width:30px">#</th>
 						<th>Auteur</th>
 						<th>Affiliations</th>
+						<th style="width:50px">Pays</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -515,6 +520,11 @@
 								{/if}
 								{#if a.raw_affiliation}
 									<span class="raw-affil">{a.raw_affiliation}</span>
+								{/if}
+							</td>
+							<td>
+								{#if a.countries}
+									<span class="author-countries">{a.countries.map(c => c.toUpperCase()).join(' ')}</span>
 								{/if}
 							</td>
 						</tr>

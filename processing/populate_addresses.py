@@ -53,12 +53,17 @@ SOURCES = {
 
 
 def normalize_text(text: str) -> str:
-    """Normalise une adresse pour la déduplication."""
+    """Normalise une adresse : minuscules, sans accents, sans ponctuation."""
     if not text:
         return ""
+    # Décomposition Unicode → suppression des diacritiques
     text = unicodedata.normalize("NFKD", text)
+    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
+    text = text.lower()
+    # Ponctuation → espaces
+    text = re.sub(r"[.,;:()\[\]{}\"\'/\-–—]", " ", text)
+    # Espaces multiples → un seul
     text = re.sub(r"\s+", " ", text)
-    text = re.sub(r"[-–—]", "-", text)
     return text.strip()
 
 

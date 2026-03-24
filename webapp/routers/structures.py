@@ -22,7 +22,7 @@ async def list_structures(
         params = []
 
         if type:
-            conditions.append("s.type::text = %s")
+            conditions.append("s.structure_type::text = %s")
             params.append(type)
         if search:
             conditions.append("(unaccent(s.name) ILIKE unaccent(%s) OR s.acronym ILIKE %s OR s.code ILIKE %s)")
@@ -31,10 +31,10 @@ async def list_structures(
         where = " AND ".join(conditions) if conditions else "TRUE"
 
         cur.execute(f"""
-            SELECT s.id, s.code, s.name, s.acronym, s.type::text
+            SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text
             FROM structures s
             WHERE {where}
-            ORDER BY s.type, s.name
+            ORDER BY s.structure_type, s.name
         """, params)
         return cur.fetchall()
 
@@ -50,7 +50,7 @@ async def get_structure(structure_id: int):
         # Relations : ses tutelles (parents)
         cur.execute("""
             SELECT sr.id AS relation_id, sr.relation_type::text,
-                   sp.id, sp.code, sp.name, sp.acronym, sp.type::text AS struct_type
+                   sp.id, sp.code, sp.name, sp.acronym, sp.structure_type::text AS struct_type
             FROM structure_relations sr
             JOIN structures sp ON sp.id = sr.parent_id
             WHERE sr.child_id = %s
@@ -61,7 +61,7 @@ async def get_structure(structure_id: int):
         # Relations : ses enfants
         cur.execute("""
             SELECT sr.id AS relation_id, sr.relation_type::text,
-                   sc.id, sc.code, sc.name, sc.acronym, sc.type::text AS struct_type
+                   sc.id, sc.code, sc.name, sc.acronym, sc.structure_type::text AS struct_type
             FROM structure_relations sr
             JOIN structures sc ON sc.id = sr.child_id
             WHERE sr.parent_id = %s
@@ -89,7 +89,7 @@ async def get_structure(structure_id: int):
 async def create_structure(data: StructureCreate):
     with get_cursor() as (cur, conn):
         cur.execute("""
-            INSERT INTO structures (code, name, acronym, type, ror_id, rnsr_id, hal_collection)
+            INSERT INTO structures (code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING *
         """, (data.code, data.name, data.acronym, data.type,
@@ -106,10 +106,12 @@ async def update_structure(structure_id: int, data: StructureUpdate):
 
         updates = []
         params = []
-        for field_name in ("name", "acronym", "type", "ror_id", "rnsr_id", "hal_collection"):
+        field_map = {"name": "name", "acronym": "acronym", "type": "structure_type",
+                     "ror_id": "ror_id", "rnsr_id": "rnsr_id", "hal_collection": "hal_collection"}
+        for field_name, col_name in field_map.items():
             val = getattr(data, field_name, None)
             if val is not None:
-                updates.append(f"{field_name} = %s")
+                updates.append(f"{col_name} = %s")
                 params.append(val)
 
         if not updates:

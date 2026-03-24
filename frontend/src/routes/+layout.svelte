@@ -13,9 +13,13 @@
 	const isDuplicates = $derived(
 		$page.url.pathname === base + '/admin/duplicates' || $page.url.pathname === base + '/admin/duplicates-persons'
 	);
+	const isHalProblems = $derived(
+		$page.url.pathname.startsWith(base + '/hal-problems')
+	);
 
 	let dropdownOpen = $state(false);
 	let dupDropdownOpen = $state(false);
+	let halDropdownOpen = $state(false);
 
 	function isActive(path: string): boolean {
 		const current = $page.url.pathname;
@@ -76,6 +80,22 @@
 			<a href="{base}/publications" class="nav-link" class:active={isActive('/publications')}>Publications</a>
 			<a href="{base}/laboratories" class="nav-link" class:active={isActive('/laboratories')}>Laboratoires</a>
 			<a href="{base}/persons" class="nav-link" class:active={isActive('/persons')}>Personnes</a>
+			<div
+				class="nav-dropdown"
+				class:active={isHalProblems}
+				onmouseenter={() => (halDropdownOpen = true)}
+				onmouseleave={() => (halDropdownOpen = false)}
+			>
+				<button class="nav-link" class:active={isHalProblems}>Problèmes HAL &#x25BE;</button>
+				{#if halDropdownOpen}
+					<div class="nav-dropdown-menu">
+						<a href="{base}/hal-problems/duplicate-accounts" class:active={isActive('/hal-problems/duplicate-accounts')}>Doublons comptes</a>
+						<a href="{base}/hal-problems/duplicate-pubs" class:active={isActive('/hal-problems/duplicate-pubs')}>Doublons publis</a>
+						<a href="{base}/hal-problems/missing-collections" class:active={isActive('/hal-problems/missing-collections')}>Manques collections</a>
+						<a href="{base}/hal-problems/affiliation-conflicts" class:active={isActive('/hal-problems/affiliation-conflicts')}>Affiliations suspectes</a>
+					</div>
+				{/if}
+			</div>
 			<a href="{base}/admin/addresses" class="nav-link nav-switch-link">Admin</a>
 		</nav>
 	{/if}

@@ -629,7 +629,7 @@ async def person_addresses(
                         'id', s.id, 'acronym', s.acronym, 'name', s.name))
                     FROM address_structures ast
                     JOIN structures s ON s.id = ast.structure_id
-                    WHERE ast.address_id = a.id AND s.type != 'site'
+                    WHERE ast.address_id = a.id AND s.structure_type != 'site'
                    ) AS structures
             FROM addresses a
             WHERE {base_where}
@@ -1142,7 +1142,7 @@ def _get_person_dedup_detail(cur, person_id):
     cur.execute("""
         SELECT DISTINCT s.id, s.acronym, s.name
         FROM structures s
-        WHERE s.type = 'labo' AND s.id IN (
+        WHERE s.structure_type = 'labo' AND s.id IN (
             SELECT UNNEST(has2.structure_ids)
             FROM hal_authors ha2
             JOIN hal_authorships has2 ON has2.hal_author_id = ha2.id
@@ -1224,5 +1224,321 @@ def _scan_dup_query(cur, sql, skip_pairs=None, stop_at_first=False, skip_n=0):
             break
     cur.execute("CLOSE _dup_cur")
     return found, count, skipped
+
+
+# ----- HAL problems: duplicate accounts -----
+
+@router.get("/api/hal-problems/duplicate-accounts")
+async def hal_duplicate_accounts(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=200),
+):
+    """Personnes liées à 2+ comptes HAL distincts."""
+    offset = (page - 1) * per_page
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            SELECT COUNT(*) FROM (
+                SELECT person_id
+                FROM hal_authors
+                WHERE person_id IS NOT NULL AND hal_person_id IS NOT NULL
+                GROUP BY person_id
+                HAVING COUNT(DISTINCT hal_person_id) >= 2
+            ) sub
+        """)
+        total = cur.fetchone()["count"]
+
+        cur.execute("""
+            SELECT p.id AS person_id, p.last_name, p.first_name,
+                   (prh.id IS NOT NULL) AS has_rh,
+                   (SELECT json_agg(json_build_object(
+                       'hal_person_id', ha.hal_person_id,
+                       'full_name', ha.full_name,
+                       'idhal', ha.idhal,
+                       'orcid', ha.orcid,
+                       'pub_count', (SELECT COUNT(*) FROM hal_authorships has2
+                                     WHERE has2.hal_author_id = ha.id)
+                   ) ORDER BY ha.hal_person_id)
+                    FROM hal_authors ha
+                    WHERE ha.person_id = p.id AND ha.hal_person_id IS NOT NULL
+                   ) AS hal_accounts
+            FROM persons p
+            LEFT JOIN persons_rh prh ON prh.person_id = p.id
+            WHERE p.id IN (
+                SELECT person_id
+                FROM hal_authors
+                WHERE person_id IS NOT NULL AND hal_person_id IS NOT NULL
+                GROUP BY person_id
+                HAVING COUNT(DISTINCT hal_person_id) >= 2
+            )
+            ORDER BY p.last_name, p.first_name
+            LIMIT %s OFFSET %s
+        """, (per_page, offset))
+        persons = [dict(r) for r in cur.fetchall()]
+
+        return {
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": (total + per_page - 1) // per_page or 1,
+            "persons": persons,
+        }
+
+
+# ----- HAL problems: duplicate publications -----
+
+def _hal_pub_detail(cur, pub_id):
+    """Détail d'une publication pour la page doublons HAL."""
+    cur.execute("""
+        SELECT p.id, p.title, p.pub_year, p.doc_type::text, p.doi, p.container_title
+        FROM publications p WHERE p.id = %s
+    """, (pub_id,))
+    pub = cur.fetchone()
+    if not pub:
+        return None
+    cur.execute("""
+        SELECT hd.halid, hd.collections, hd.doc_type AS hal_doc_type, hd.pub_year AS hal_pub_year, hd.title AS hal_title,
+               (SELECT COUNT(*) FROM hal_authorships has2 WHERE has2.hal_document_id = hd.id AND NOT has2.excluded) AS author_count
+        FROM hal_documents hd WHERE hd.publication_id = %s
+    """, (pub_id,))
+    hal_docs = [dict(r) for r in cur.fetchall()]
+    return {**dict(pub), "hal_docs": hal_docs}
+
+
+@router.get("/api/hal-problems/duplicate-pubs-doi")
+async def hal_duplicate_pubs_by_doi(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=200),
+):
+    """Dépôts HAL avec DOI identique rattachés à la même publication."""
+    offset = (page - 1) * per_page
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            SELECT COUNT(*) FROM (
+                SELECT hd.publication_id, LOWER(hd.doi)
+                FROM hal_documents hd
+                WHERE hd.doi IS NOT NULL AND hd.doi != ''
+                GROUP BY hd.publication_id, LOWER(hd.doi)
+                HAVING COUNT(*) >= 2
+            ) sub
+        """)
+        total = cur.fetchone()["count"]
+
+        cur.execute("""
+            SELECT LOWER(hd.doi) AS doi,
+                   hd.publication_id AS pub_id,
+                   array_agg(hd.halid ORDER BY hd.halid) AS halids
+            FROM hal_documents hd
+            WHERE hd.doi IS NOT NULL AND hd.doi != ''
+            GROUP BY hd.publication_id, LOWER(hd.doi)
+            HAVING COUNT(*) >= 2
+            ORDER BY LOWER(hd.doi)
+            LIMIT %s OFFSET %s
+        """, (per_page, offset))
+        rows = cur.fetchall()
+
+        pairs = []
+        for r in rows:
+            pub = _hal_pub_detail(cur, r["pub_id"])
+            if pub:
+                pairs.append({"doi": r["doi"], "halids": r["halids"], "publication": pub})
+
+        return {
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": (total + per_page - 1) // per_page or 1,
+            "pairs": pairs,
+        }
+
+
+@router.get("/api/hal-problems/duplicate-pubs-meta")
+async def hal_duplicate_pubs_by_metadata(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=200),
+):
+    """Doublons possibles: dépôts HAL avec métadonnées identiques."""
+    offset = (page - 1) * per_page
+    with get_cursor() as (cur, conn):
+        dup_query = """
+            FROM publications p1
+            JOIN publications p2 ON p1.title_normalized = p2.title_normalized AND p1.id < p2.id
+            JOIN hal_documents hd1 ON hd1.publication_id = p1.id
+            JOIN hal_documents hd2 ON hd2.publication_id = p2.id
+            WHERE LENGTH(p1.title_normalized) > 30
+              AND p1.pub_year = p2.pub_year
+              AND p1.doc_type = p2.doc_type
+              AND NOT (p1.doi IS NOT NULL AND p2.doi IS NOT NULL AND LOWER(p1.doi) <> LOWER(p2.doi))
+              AND ABS(
+                  (SELECT COUNT(*) FROM hal_authorships ha1 WHERE ha1.hal_document_id = hd1.id AND NOT ha1.excluded)
+                  - (SELECT COUNT(*) FROM hal_authorships ha2 WHERE ha2.hal_document_id = hd2.id AND NOT ha2.excluded)
+              ) <= 2
+              AND NOT EXISTS (SELECT 1 FROM distinct_publications dp
+                              WHERE dp.pub_id_a = LEAST(p1.id, p2.id) AND dp.pub_id_b = GREATEST(p1.id, p2.id))
+        """
+
+        cur.execute(f"SELECT COUNT(*) {dup_query}")
+        total = cur.fetchone()["count"]
+
+        cur.execute(f"""
+            SELECT p1.id AS id_a, p2.id AS id_b
+            {dup_query}
+            ORDER BY p1.id
+            LIMIT %s OFFSET %s
+        """, (per_page, offset))
+        rows = cur.fetchall()
+
+        pairs = []
+        for r in rows:
+            pub_a = _hal_pub_detail(cur, r["id_a"])
+            pub_b = _hal_pub_detail(cur, r["id_b"])
+            if pub_a and pub_b:
+                pairs.append({"pub_a": pub_a, "pub_b": pub_b})
+
+        return {
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": (total + per_page - 1) // per_page or 1,
+            "pairs": pairs,
+        }
+
+
+# ----- HAL problems: missing collections -----
+
+@router.get("/api/hal-problems/missing-collections")
+async def hal_missing_collections(
+    lab_id: int = Query(...),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=200),
+):
+    """Publications affiliées à un labo sur OA/WoS, présentes dans HAL,
+    mais absentes de la collection HAL du labo."""
+    offset = (page - 1) * per_page
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT acronym, hal_collection FROM structures WHERE id = %s", (lab_id,))
+        lab = cur.fetchone()
+        if not lab or not lab["hal_collection"]:
+            raise HTTPException(status_code=400, detail="Labo sans collection HAL")
+
+        col = lab["hal_collection"]
+        lab_arr = [lab_id]
+
+        base_where = """
+            FROM publications p
+            JOIN authorships a ON a.publication_id = p.id AND a.structure_ids && %s::int[]
+            WHERE EXISTS (SELECT 1 FROM hal_documents hd WHERE hd.publication_id = p.id)
+              AND NOT EXISTS (SELECT 1 FROM hal_documents hd
+                              WHERE hd.publication_id = p.id AND %s = ANY(hd.collections))
+        """
+        params = [lab_arr, col]
+
+        cur.execute(f"SELECT COUNT(DISTINCT p.id) {base_where}", params)
+        total = cur.fetchone()["count"]
+
+        cur.execute(f"""
+            SELECT DISTINCT p.id, p.title, p.pub_year, p.doc_type::text, p.doi,
+                   (SELECT array_agg(hd.halid) FROM hal_documents hd WHERE hd.publication_id = p.id) AS halids,
+                   NOT EXISTS (SELECT 1 FROM hal_documents hd
+                               WHERE hd.publication_id = p.id AND 'PRES_CLERMONT' = ANY(hd.collections)) AS hors_uca
+            {base_where}
+            ORDER BY p.pub_year DESC NULLS LAST, p.id DESC
+            LIMIT %s OFFSET %s
+        """, params + [per_page, offset])
+        pubs = [dict(r) for r in cur.fetchall()]
+
+        return {
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": (total + per_page - 1) // per_page or 1,
+            "lab_acronym": lab["acronym"],
+            "hal_collection": col,
+            "publications": pubs,
+        }
+
+
+@router.get("/api/hal-problems/missing-collections/labs")
+async def hal_missing_collections_labs():
+    """Liste des labos avec collection HAL."""
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            SELECT s.id, s.acronym, s.name, s.hal_collection
+            FROM structures s
+            WHERE s.hal_collection IS NOT NULL AND s.structure_type = 'labo'
+            ORDER BY s.acronym
+        """)
+        return [dict(r) for r in cur.fetchall()]
+
+
+# ----- HAL problems: affiliation conflicts -----
+
+SHS_LAB_CODES = (
+    'cmh', 'clerma', 'cerdi', 'chec', 'celis', 'phier', 'ihrim', 'lapsco',
+    'comsoc', 'umr_territoires', 'umr_ressources', 'acte', 'lrl', 'lescores', 'msh',
+)
+
+def _affiliation_pub_row(r):
+    return {
+        "id": r["id"], "title": r["title"], "pub_year": r["pub_year"],
+        "doc_type": r["doc_type"], "doi": r["doi"],
+        "halids": r["halids"], "labs": r["labs"],
+    }
+
+
+@router.get("/api/hal-problems/affiliation-conflicts")
+async def hal_affiliation_conflicts(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=200),
+):
+    """Publications affiliées UCA dans HAL mais pas dans OA/WoS."""
+    offset = (page - 1) * per_page
+    with get_cursor() as (cur, conn):
+        cur.execute("SET LOCAL jit = off")
+        base_where = """
+            FROM authorships a
+            JOIN publications p ON p.id = a.publication_id
+            WHERE a.is_uca = TRUE
+              AND a.hal_authorship_id IS NOT NULL
+              AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(a.structure_ids) AND s.structure_type = 'labo')
+              AND (
+                  -- Même position dans OA: adresse présente mais pas UCA
+                  EXISTS (
+                      SELECT 1 FROM openalex_authorships oas
+                      JOIN openalex_documents od ON od.id = oas.openalex_document_id
+                      WHERE od.publication_id = p.id
+                        AND oas.author_position = a.author_position
+                        AND oas.is_uca = FALSE
+                        AND oas.raw_affiliation IS NOT NULL AND oas.raw_affiliation != ''
+                  )
+                  OR EXISTS (
+                      SELECT 1 FROM wos_authorships was
+                      JOIN wos_documents wd ON wd.id = was.wos_document_id
+                      WHERE wd.publication_id = p.id
+                        AND was.author_position = a.author_position
+                        AND was.is_uca = FALSE
+                        AND was.raw_affiliation IS NOT NULL AND was.raw_affiliation != ''
+                  )
+              )
+        """
+
+        cur.execute(f"SELECT COUNT(DISTINCT p.id) {base_where}")
+        total = cur.fetchone()["count"]
+
+        cur.execute(f"""
+            SELECT DISTINCT p.id, p.title, p.pub_year, p.doc_type::text, p.doi,
+                   (SELECT array_agg(hd.halid) FROM hal_documents hd WHERE hd.publication_id = p.id) AS halids,
+                   (SELECT string_agg(DISTINCT s.acronym, ', ' ORDER BY s.acronym)
+                    FROM structures s WHERE s.id = ANY(a.structure_ids) AND s.structure_type = 'labo') AS labs
+            {base_where}
+            ORDER BY p.pub_year DESC NULLS LAST, p.id DESC
+            LIMIT %s OFFSET %s
+        """, (per_page, offset))
+        pubs = [_affiliation_pub_row(r) for r in cur.fetchall()]
+
+        return {
+            "total": total, "page": page, "per_page": per_page,
+            "pages": (total + per_page - 1) // per_page or 1,
+            "publications": pubs,
+        }
 
 

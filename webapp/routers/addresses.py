@@ -95,7 +95,7 @@ async def list_addresses(
                            ) ORDER BY COALESCE(s.acronym, s.name))
                     FROM address_structures ast2
                     JOIN structures s ON s.id = ast2.structure_id
-                    WHERE ast2.address_id = a.id AND s.type != 'site'
+                    WHERE ast2.address_id = a.id AND s.structure_type != 'site'
                    ) AS structures
             {from_clause}
             ORDER BY a.pub_count DESC, a.id
@@ -210,7 +210,7 @@ async def review_address(addr_id: int, action: ReviewAction):
                    ) ORDER BY COALESCE(s.acronym, s.name))
             FROM address_structures ast2
             JOIN structures s ON s.id = ast2.structure_id
-            WHERE ast2.address_id = %s AND s.type != 'site'
+            WHERE ast2.address_id = %s AND s.structure_type != 'site'
         """, (addr_id,))
         row = cur.fetchone()
         structures = row["json_agg"] if row and row["json_agg"] else []
@@ -267,7 +267,7 @@ async def batch_review(data: BatchReviewAction):
 async def list_countries():
     """Liste des pays."""
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT code, name FROM countries ORDER BY name")
+        cur.execute("SELECT code, name FROM countries ORDER BY (code = 'xx') DESC, name")
         return cur.fetchall()
 
 
@@ -353,6 +353,32 @@ async def addresses_countries(
                 for r in cur.fetchall()
             ]
 
+        # Facette pays (excluant le filtre country_code, incluant les autres)
+        cf_conditions = []
+        cf_params: list = []
+        if search:
+            cf_conditions.append("unaccent(a.raw_text) ILIKE unaccent(%s)")
+            cf_params.append(f"%{search}%")
+        if has_country == "yes":
+            cf_conditions.append("a.countries IS NOT NULL")
+        elif has_country == "no":
+            cf_conditions.append("a.countries IS NULL")
+        if suggested_country:
+            cf_conditions.append("%s = ANY(a.suggested_countries)")
+            cf_params.append(suggested_country)
+        cf_conditions.append("a.countries IS NOT NULL")
+        cf_where = "WHERE " + " AND ".join(cf_conditions)
+        cur.execute(f"""
+            SELECT c AS code, COUNT(*) AS cnt
+            FROM addresses a, unnest(a.countries) AS c
+            {cf_where}
+            GROUP BY c ORDER BY cnt DESC
+        """, cf_params)
+        result["country_facets"] = [
+            {"code": r["code"].strip(), "count": r["cnt"]}
+            for r in cur.fetchall()
+        ]
+
         return result
 
 
@@ -404,6 +430,17 @@ async def set_address_country(addr_id: int, body: dict, _=Depends(require_admin)
                     raise HTTPException(status_code=400, detail=f"Code pays inconnu: {c}")
         cur.execute("UPDATE addresses SET countries = %s WHERE id = %s",
                     (countries if countries else None, addr_id))
+        # Propager aux adresses partageant le même normalized_text
+        if countries:
+            cur.execute("""
+                UPDATE addresses a2
+                SET countries = %s
+                FROM addresses a1
+                WHERE a1.id = %s
+                  AND a2.normalized_text = a1.normalized_text
+                  AND a2.id <> a1.id
+                  AND LENGTH(a2.normalized_text) >= 5
+            """, (countries, addr_id))
         return {"ok": True}
 
 
@@ -420,6 +457,8 @@ async def batch_set_country(body: dict, _=Depends(require_admin)):
     address_ids = body.get("address_ids")
     filter_search = body.get("search", "")
     filter_has_country = body.get("has_country", "")
+    filter_country = body.get("country_code_filter", "")  # filtre pays existant
+    filter_suggested = body.get("suggested_country", "")
 
     if not country_code:
         raise HTTPException(status_code=400, detail="country_code requis")
@@ -451,6 +490,12 @@ async def batch_set_country(body: dict, _=Depends(require_admin)):
                 conditions.append("countries IS NOT NULL")
             elif filter_has_country == "no":
                 conditions.append("countries IS NULL")
+            if filter_country:
+                conditions.append("%s = ANY(countries)")
+                params.append(filter_country)
+            if filter_suggested:
+                conditions.append("%s = ANY(suggested_countries)")
+                params.append(filter_suggested)
             where = " AND ".join(conditions) if conditions else "TRUE"
             cur.execute(f"""
                 UPDATE addresses
@@ -461,8 +506,22 @@ async def batch_set_country(body: dict, _=Depends(require_admin)):
                 END
                 WHERE {where}
             """, [country_code, country_code, country_code] + params)
+        updated = cur.rowcount
 
-        return {"updated": cur.rowcount}
+        # Propager aux adresses partageant le même normalized_text
+        cur.execute("""
+            UPDATE addresses a2
+            SET countries = a1.countries
+            FROM addresses a1
+            WHERE a1.countries IS NOT NULL
+              AND a2.normalized_text = a1.normalized_text
+              AND a2.countries IS DISTINCT FROM a1.countries
+              AND LENGTH(a2.normalized_text) >= 5
+              AND a2.id <> a1.id
+        """)
+        propagated = cur.rowcount
+
+        return {"updated": updated, "propagated": propagated}
 
 
 # ----- API: Feedback / boucle de rétroaction -----

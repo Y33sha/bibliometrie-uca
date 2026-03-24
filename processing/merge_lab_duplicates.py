@@ -54,7 +54,7 @@ LAB_PERSONS_CTE = """
               AND has.structure_ids IS NOT NULL
         ) h ON s.id = ANY(h.structure_ids)
         JOIN persons p ON p.id = h.person_id
-        WHERE s.type = 'labo'
+        WHERE s.structure_type = 'labo'
         UNION
         SELECT DISTINCT s.id, s.name, p.id,
                p.last_name_normalized, p.first_name_normalized
@@ -67,7 +67,7 @@ LAB_PERSONS_CTE = """
               AND oas.structure_ids IS NOT NULL
         ) o ON s.id = ANY(o.structure_ids)
         JOIN persons p ON p.id = o.person_id
-        WHERE s.type = 'labo'
+        WHERE s.structure_type = 'labo'
     )
 """
 
