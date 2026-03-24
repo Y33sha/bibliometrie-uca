@@ -37,7 +37,7 @@ if row:
     uca_id = row[0]
 else:
     print("  ⚠ STRUCTURE UCA INTROUVABLE !")
-    cur.execute("SELECT id, code, name FROM structures WHERE type = 'universite'")
+    cur.execute("SELECT id, code, name FROM structures WHERE structure_type = 'universite'")
     for r in cur.fetchall():
         print(f"    → {r}")
     sys.exit(1)
@@ -88,7 +88,7 @@ if not test_addrs:
 
 cur.execute("""
     SELECT nf.id, nf.form_text, nf.form_normalized, nf.is_regex, nf.requires_context_of,
-           nf.structure_id, s.code, s.type::text
+           nf.structure_id, s.code, s.structure_type::text
     FROM name_forms nf
     JOIN structures s ON s.id = nf.structure_id
     WHERE nf.is_active = TRUE

@@ -51,7 +51,7 @@ def load_forms(cur):
     cur.execute("""
         SELECT nf.id, nf.structure_id, nf.form_text, nf.form_normalized,
                nf.is_regex, nf.requires_context_of,
-               s.code AS struct_code, s.type::text AS struct_type
+               s.code AS struct_code, s.structure_type::text AS struct_type
         FROM name_forms nf
         JOIN structures s ON s.id = nf.structure_id
         WHERE nf.is_active = TRUE
@@ -239,7 +239,7 @@ def show_stats(cur):
 
     cur.execute("""
         SELECT COALESCE(s.acronym, s.name, '?') AS label,
-               s.type::text AS stype,
+               s.structure_type::text AS stype,
                COUNT(*) AS nb
         FROM address_structures ast
         JOIN structures s ON s.id = ast.structure_id

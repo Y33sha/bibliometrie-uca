@@ -465,8 +465,10 @@
 								<td>
 									{#if a.source === 'hal'}
 										<span class="source-tag-label source-hal-label">HAL</span>
-									{:else}
+									{:else if a.source === 'openalex'}
 										<span class="source-tag-label source-oa-label">OpenAlex</span>
+									{:else if a.source === 'wos'}
+										<span class="source-tag-label source-wos-label">WoS</span>
 									{/if}
 								</td>
 								<td>{a.full_name}</td>

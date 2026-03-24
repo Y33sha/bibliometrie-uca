@@ -212,7 +212,7 @@ async def authorships_facets(
             FROM author_structs ast
             JOIN uca_authors ua ON ua.id = ast.author_id AND ua.source = ast.source
             JOIN structures s ON s.id = ast.struct_id
-            {where} {"AND" if where else "WHERE"} s.type = 'labo'
+            {where} {"AND" if where else "WHERE"} s.structure_type = 'labo'
             GROUP BY s.id, s.acronym, s.name
             ORDER BY count DESC
         """, p)

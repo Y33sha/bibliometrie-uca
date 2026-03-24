@@ -382,7 +382,7 @@ async def stats_labs(
             FROM publications p
             LEFT JOIN journals j ON j.id = p.journal_id
             JOIN pub_structs ps_structs ON ps_structs.publication_id = p.id
-            JOIN structures s ON s.id = ANY(ps_structs.struct_ids) AND s.type = 'labo'
+            JOIN structures s ON s.id = ANY(ps_structs.struct_ids) AND s.structure_type = 'labo'
             WHERE {where}
         """, params)
         total = cur.fetchone()["total"]
@@ -405,7 +405,7 @@ async def stats_labs(
             FROM publications p
             LEFT JOIN journals j ON j.id = p.journal_id
             JOIN pub_structs ps_structs ON ps_structs.publication_id = p.id
-            JOIN structures s ON s.id = ANY(ps_structs.struct_ids) AND s.type = 'labo'
+            JOIN structures s ON s.id = ANY(ps_structs.struct_ids) AND s.structure_type = 'labo'
             LEFT JOIN apc_payments ap_lab ON ap_lab.publication_id = p.id AND ap_lab.lab_structure_id = s.id
             WHERE {where}
             GROUP BY s.id, s.acronym, s.name
@@ -507,7 +507,7 @@ async def stats_facets(
             CROSS JOIN LATERAL unnest(a.structure_ids) AS struct_id
             JOIN structures s ON s.id = struct_id
             WHERE {" AND ".join(lab_conds)}
-              AND s.type = 'labo'
+              AND s.structure_type = 'labo'
             GROUP BY s.id, s.acronym, s.name
             ORDER BY count DESC
         """, lab_params)

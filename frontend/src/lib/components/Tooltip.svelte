@@ -48,7 +48,9 @@
 		line-height: 1.4;
 		padding: 6px 10px;
 		border-radius: 5px;
-		white-space: nowrap;
+		max-width: 500px;
+		white-space: normal;
+		word-wrap: break-word;
 		z-index: 9999;
 		pointer-events: none;
 		box-shadow: 0 2px 8px rgba(0,0,0,0.2);

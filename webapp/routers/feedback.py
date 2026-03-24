@@ -82,7 +82,7 @@ async def feedback_false_negatives(
                 ))
                 FROM address_structures ast2
                 JOIN structures s ON s.id = ast2.structure_id
-                WHERE ast2.address_id = a.id AND s.type != 'site'
+                WHERE ast2.address_id = a.id AND s.structure_type != 'site'
                 ) AS labs
             FROM address_structures ast
             JOIN addresses a ON a.id = ast.address_id
@@ -142,7 +142,7 @@ async def feedback_false_positives(
                 ))
                 FROM address_structures ast2
                 JOIN structures s ON s.id = ast2.structure_id
-                WHERE ast2.address_id = a.id AND s.type != 'site'
+                WHERE ast2.address_id = a.id AND s.structure_type != 'site'
                 ) AS labs,
                 (SELECT json_agg(json_build_object(
                     'form_id', nf.id,
