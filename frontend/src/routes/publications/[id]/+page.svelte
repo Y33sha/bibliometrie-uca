@@ -126,13 +126,13 @@
 
 	function structsTooltip(a: SourceAuthorship): string {
 		const parts: string[] = [];
-		if (a.structure_ids) {
-			parts.push(a.structure_ids.map(sid => structLabel(sid)).join(', '));
-		}
 		if (a.raw_affiliation) {
-			parts.push(a.raw_affiliation);
+			parts.push(`<em>${a.raw_affiliation}</em>`);
 		}
-		return parts.join('\n') || '';
+		if (a.structure_ids?.length) {
+			parts.push(`Structures identifiées : ${a.structure_ids.map(sid => structLabel(sid)).join(', ')}`);
+		}
+		return parts.join('<br>') || '';
 	}
 
 	const halSource = $derived(data?.sources.find(s => s.source === 'hal'));
@@ -839,9 +839,9 @@
 		letter-spacing: 0.5px;
 	}
 	.sg-author { }
-	.sg-author-link { text-decoration: none; color: var(--text); }
+	.sg-author-link { text-decoration: none; color: var(--accent); }
 	.sg-author-link:hover { text-decoration: underline; }
-	.sg-uca { font-weight: 600; color: #2a7d4f; }
+	.sg-uca { font-weight: 600; }
 	.sg-excluded { opacity: 0.4; }
 	.sg-excluded a, .sg-excluded span { text-decoration: line-through; }
 	.exclude-btn {

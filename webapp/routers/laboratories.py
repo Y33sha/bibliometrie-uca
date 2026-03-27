@@ -324,6 +324,39 @@ async def get_laboratory_dashboard(lab_id: int):
         """, (lab_arr,))
         oa = cur.fetchone()
 
+        # Collaborations internationales (articles seulement)
+        cur.execute("""
+            SELECT
+                COUNT(DISTINCT p.id) AS total_articles,
+                COUNT(DISTINCT p.id) FILTER (
+                    WHERE p.countries IS NOT NULL
+                      AND EXISTS (SELECT 1 FROM unnest(p.countries) c WHERE c <> 'fr')
+                ) AS international
+            FROM publications p
+            JOIN authorships a ON a.publication_id = p.id
+            WHERE a.is_uca = TRUE
+              AND a.structure_ids && %s::int[]
+              AND p.doc_type = 'article'
+        """, (lab_arr,))
+        collab = cur.fetchone()
+
+        # Top 5 pays (hors FR, articles seulement)
+        cur.execute("""
+            SELECT co.code, co.name, COUNT(DISTINCT p.id) AS count
+            FROM publications p
+            JOIN authorships a ON a.publication_id = p.id,
+                 unnest(p.countries) AS cc
+            JOIN countries co ON co.code = cc
+            WHERE a.is_uca = TRUE
+              AND a.structure_ids && %s::int[]
+              AND p.doc_type = 'article'
+              AND cc <> 'fr'
+            GROUP BY co.code, co.name
+            ORDER BY count DESC
+            LIMIT 5
+        """, (lab_arr,))
+        top_countries = [{"code": r["code"].strip(), "name": r["name"], "count": r["count"]} for r in cur.fetchall()]
+
         return {
             "pubs_by_year": pubs_by_year,
             "oa": {
@@ -332,4 +365,10 @@ async def get_laboratory_dashboard(lab_id: int):
                 "unknown": oa["unknown"],
                 "total": oa["total"],
             },
+            "collab": {
+                "total_articles": collab["total_articles"],
+                "international": collab["international"],
+                "domestic": collab["total_articles"] - collab["international"],
+            },
+            "top_countries": top_countries,
         }

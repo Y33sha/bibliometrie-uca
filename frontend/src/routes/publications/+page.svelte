@@ -52,11 +52,13 @@
 	let selectedDocTypes: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
 	let selectedApc: string[] = $state([]);
+	let selectedCountries: string[] = $state([]);
 
 	// Facet options (dynamic)
 	let yearOptions: FacetOption[] = $state([]);
 	let labOptions: FacetOption[] = $state([]);
 	let apcOptions: FacetOption[] = $state([]);
+	let countryOptions: FacetOption[] = $state([]);
 
 	// Filter from stats page (publisher/journal)
 	let filterPublisherId: string | null = $state(null);
@@ -137,6 +139,7 @@
 		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) params.set('has_apc', selectedApc.join(','));
+		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
 		if (filterPublisherId) params.set('publisher_id', filterPublisherId);
 		if (filterJournalId) params.set('journal_id', filterJournalId);
 		return params;
@@ -152,6 +155,7 @@
 			oa_statuses: { value: string; count: number }[];
 			source_counts: Record<string, number>;
 			apc: { value: string; text: string; count: number }[];
+			countries: { value: string; text: string; count: number }[];
 		}>('/api/publications/facets?' + params);
 		yearOptions = data.years.map((y) => ({
 			value: String(y.value), text: String(y.value), count: y.count
@@ -171,6 +175,9 @@
 		sourceCounts = data.source_counts || {};
 		if (data.apc) {
 			apcOptions = data.apc.map(a => ({ value: a.value, text: a.text, count: a.count }));
+		}
+		if (data.countries) {
+			countryOptions = data.countries.map(c => ({ value: c.value, text: `${c.text} (${c.value.toUpperCase()})`, count: c.count }));
 		}
 	}
 
@@ -291,6 +298,7 @@
 	<FacetDropdown label="Types" options={docTypeOptions} bind:selected={selectedDocTypes} onchange={onFilterChange} />
 	<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
 	<FacetDropdown label="APC" options={apcOptions} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
+	<FacetDropdown label="Pays" options={countryOptions} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
 	<SourceFilterToggle bind:states={sourceStates} counts={sourceCounts} onchange={onFilterChange} />
 	<span class="count">{total} publication{total > 1 ? 's' : ''}</span>
 	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>

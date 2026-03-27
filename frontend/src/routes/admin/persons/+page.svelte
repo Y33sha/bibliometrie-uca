@@ -403,6 +403,29 @@
 		await loadTable();
 	}
 
+	/* ── Reassign identifier ── */
+	let reassignState: Record<number, string> = $state({});
+
+	async function reassignIdentifier(identId: number) {
+		const targetIdStr = reassignState[identId]?.trim();
+		if (!targetIdStr) return;
+		const targetPersonId = parseInt(targetIdStr);
+		if (isNaN(targetPersonId)) return;
+		const resp = await fetch(`${base}/api/person-identifiers/${identId}/reassign`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ person_id: targetPersonId })
+		});
+		if (resp.ok) {
+			delete reassignState[identId];
+			reassignState = reassignState;
+			await loadTable();
+		} else {
+			const err = await resp.json().catch(() => null);
+			alert(err?.detail || 'Erreur');
+		}
+	}
+
 	/* ── Merge ── */
 
 	function openMergeSearch(personId: number) {
@@ -534,28 +557,18 @@
 	<table class="data-table">
 		<thead>
 			<tr>
-				<th></th>
 				<th class="sortable" onclick={() => toggleSort('name')}>Nom{sortIndicator('name')}</th>
-				<th class="sortable" onclick={() => toggleSort('pubs')}>Publications{sortIndicator('pubs')}</th>
-				<th>Auteur(s) li&eacute;s</th>
+				<th class="sortable" onclick={() => toggleSort('pubs')}>Publis{sortIndicator('pubs')}</th>
+				<th class="sortable" onclick={() => toggleSort('uca_pubs')}>UCA{sortIndicator('uca_pubs')}</th>
+				<th>Identifiants</th>
+				<th>Auteurs liés</th>
+				<th>Actions</th>
 			</tr>
 		</thead>
 		<tbody>
 			{#each persons as p (p.id)}
 				{@const linked = p.linked_authors ?? []}
-				{@const expanded = p.id in expandedPersons}
-				{@const candidatesData = expandedPersons[p.id]}
-				<!-- Main row -->
 				<tr>
-					<td>
-						<button
-							class="btn-expand"
-							title="Chercher des auteurs candidats"
-							onclick={() => toggleCandidates(p.id)}
-						>
-							{expanded ? '\u25BC' : '\u25B6'}
-						</button>
-					</td>
 					<td>
 						<a href="{base}/persons/{p.id}" class="person-name">
 							<span class="person-last">{titleCase(p.last_name)}</span>
@@ -563,9 +576,10 @@
 						</a>
 						{#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
 					</td>
-					<td>{p.pub_count ?? 0} {#if p.uca_pub_count}<span class="uca-count">({p.uca_pub_count} UCA)</span>{/if}</td>
+					<td>{p.pub_count ?? 0}</td>
+					<td>{p.uca_pub_count ?? 0}</td>
+					<!-- Identifiants -->
 					<td>
-						<!-- Identifiers -->
 						{#if p.identifiers?.length}
 							<div class="identifiers-row">
 								{#each p.identifiers as ident}
@@ -589,7 +603,44 @@
 								{/each}
 							</div>
 						{/if}
-						<!-- Linked authors -->
+						{#if p.id in idForms}
+							{@const form = idForms[p.id]}
+							<div class="id-form">
+								<select
+									value={form.id_type}
+									onchange={(e) => {
+										idForms = { ...idForms, [p.id]: { ...form, id_type: (e.target as HTMLSelectElement).value, error: '' } };
+									}}
+								>
+									<option value="orcid">ORCID</option>
+									<option value="idhal">idHAL</option>
+									<option value="idref">IdRef</option>
+								</select>
+								<input
+									type="text"
+									placeholder={form.id_type === 'orcid' ? '0000-0000-0000-0000' : form.id_type === 'idhal' ? 'identifiant-hal' : 'identifiant idref'}
+									value={form.id_value}
+									oninput={(e) => {
+										idForms = { ...idForms, [p.id]: { ...form, id_value: (e.target as HTMLInputElement).value, error: '' } };
+									}}
+									onkeydown={(e) => { if (e.key === 'Enter') addIdentifier(p.id); }}
+								/>
+								<button class="btn btn-link" onclick={() => addIdentifier(p.id)}>OK</button>
+								<button class="btn" onclick={() => toggleIdForm(p.id)}>&times;</button>
+								{#if form.error}
+									<span class="id-error">{form.error}</span>
+								{/if}
+							</div>
+						{:else}
+							<button
+								class="btn btn-add-id"
+								title="Ajouter un identifiant"
+								onclick={() => toggleIdForm(p.id)}
+							>+ Identifiant</button>
+						{/if}
+					</td>
+					<!-- Auteurs liés -->
+					<td>
 						{#if linked.length}
 							<button class="btn-toggle-authors" onclick={() => { expandedAuthors = { ...expandedAuthors, [p.id]: !expandedAuthors[p.id] }; }}>
 								{linked.length} auteur{linked.length > 1 ? 's' : ''} lié{linked.length > 1 ? 's' : ''}
@@ -601,12 +652,6 @@
 										<span class="linked-author">
 											<span class="tag tag-source">{a.source}</span>
 											<span class="tag tag-linked">{a.full_name}</span>
-											{#if a.orcid}
-												<span class="tag tag-id" title="ORCID">{a.orcid}</span>
-											{/if}
-											{#if a.idhal}
-												<span class="tag tag-id" title="idHAL">{a.idhal}</span>
-											{/if}
 											<button
 												class="btn-unlink"
 												title="Détacher"
@@ -616,17 +661,19 @@
 									{/each}
 								</div>
 							{/if}
-						{:else if !p.identifiers?.length}
-							<span class="tag tag-unlinked">non rattachée</span>
+						{:else}
+							<span class="tag tag-unlinked">aucun</span>
 						{/if}
-						<!-- Merge search -->
+					</td>
+					<!-- Actions -->
+					<td>
 						{#if p.id in mergeSearches}
 							{@const ms = mergeSearches[p.id]}
 							<div class="merge-search">
 								<div class="merge-input-row">
 									<input
 										type="text"
-										placeholder="Nom de la personne à absorber…"
+										placeholder="Nom à absorber…"
 										value={ms.query}
 										oninput={(e) => handleMergeSearchInput(p.id, (e.target as HTMLInputElement).value)}
 									/>
@@ -649,131 +696,10 @@
 								{/if}
 							</div>
 						{:else}
-							<button class="btn btn-merge" onclick={() => openMergeSearch(p.id)}>Fusionner avec…</button>
-						{/if}
-						<!-- Add identifier button / form -->
-						{#if p.id in idForms}
-							{@const form = idForms[p.id]}
-							<div class="id-form">
-								<select
-									value={form.id_type}
-									onchange={(e) => {
-										idForms = { ...idForms, [p.id]: { ...form, id_type: (e.target as HTMLSelectElement).value, error: '' } };
-									}}
-								>
-									<option value="orcid">ORCID</option>
-									<option value="idhal">idHAL</option>
-								</select>
-								<input
-									type="text"
-									placeholder={form.id_type === 'orcid' ? '0000-0000-0000-0000' : 'identifiant-hal'}
-									value={form.id_value}
-									oninput={(e) => {
-										idForms = { ...idForms, [p.id]: { ...form, id_value: (e.target as HTMLInputElement).value, error: '' } };
-									}}
-									onkeydown={(e) => { if (e.key === 'Enter') addIdentifier(p.id); }}
-								/>
-								<button class="btn btn-link" onclick={() => addIdentifier(p.id)}>OK</button>
-								<button class="btn" onclick={() => toggleIdForm(p.id)}>&times;</button>
-								{#if form.error}
-									<span class="id-error">{form.error}</span>
-								{/if}
-							</div>
-						{:else}
-							<button
-								class="btn btn-add-id"
-								title="Ajouter un identifiant"
-								onclick={() => toggleIdForm(p.id)}
-							>+ Identifiant</button>
+							<button class="btn btn-merge" onclick={() => openMergeSearch(p.id)}>Fusionner…</button>
 						{/if}
 					</td>
 				</tr>
-				<!-- Candidates row -->
-				{#if expanded}
-					<tr class="candidates-row">
-						<td colspan="7">
-							{#if candidatesData === 'loading'}
-								<div class="loading-text">Recherche d'auteurs candidats…</div>
-							{:else if candidatesData && candidatesData.length === 0}
-								<div class="candidates-panel">
-									<h4>Auteurs candidats</h4>
-									<div class="loading-text">Aucun auteur trouv&eacute; avec un nom similaire.</div>
-								</div>
-							{:else if candidatesData}
-								<div class="candidates-panel">
-									<h4>Auteurs candidats ({candidatesData.length})</h4>
-									{#each candidatesData as c}
-										{@const dKey = detailKey(c.source, c.id)}
-										{@const detailData = expandedDetails[dKey]}
-										{@const detailOpen = dKey in expandedDetails}
-										<div class="candidate-card">
-											<div class="candidate-header">
-												<div class="info">
-													<span class="tag tag-source">{c.source}</span>
-													<span class="name">{c.full_name}</span>
-													{#if candidateIds(c).length}
-														<span class="meta">{candidateIds(c).join(' \u00b7 ')}</span>
-													{/if}
-													<div class="meta">
-														{c.pub_count} publis
-														{#if c.uca_pub_count > 0}
-															dont <strong>{c.uca_pub_count} UCA</strong>
-														{/if}
-													</div>
-												</div>
-												<button
-													class="btn-detail"
-													onclick={() => toggleAuthorDetail(c.source, c.id)}
-												>
-													signatures &amp; publis {detailOpen ? '\u25BE' : '\u25B8'}
-												</button>
-												{#if isAlreadyLinked(c)}
-													<span class="tag tag-linked tag-small">d&eacute;j&agrave; li&eacute; (personne #{c.person_id})</span>
-												{:else}
-													<button
-														class="btn btn-link"
-														onclick={() => linkAuthor(p.id, c.source, c.id)}
-													>Rattacher</button>
-												{/if}
-											</div>
-											<!-- Author detail sub-panel -->
-											{#if detailOpen}
-												<div class="author-detail">
-													{#if detailData === 'loading'}
-														<span class="loading-text">Chargement…</span>
-													{:else if detailData}
-														{#if detailData.publications.length}
-															<h5>Publications r&eacute;centes ({detailData.publications.length})</h5>
-															<ul class="pub-list">
-																{#each detailData.publications as pub}
-																	<li>
-																		<span class="pub-year">{pub.pub_year ?? '?'}</span>
-																		{#if pub.is_uca}
-																			<span class="pub-uca">UCA</span>
-																		{/if}
-																		<span class="pub-title">{@html sanitizeTitle(pub.title)}</span>
-																		{#if pub.doi}
-																			<a
-																				href="https://doi.org/{pub.doi}"
-																				target="_blank"
-																				rel="noopener noreferrer"
-																				class="pub-doi"
-																			>DOI</a>
-																		{/if}
-																	</li>
-																{/each}
-															</ul>
-														{/if}
-													{/if}
-												</div>
-											{/if}
-										</div>
-									{/each}
-								</div>
-							{/if}
-						</td>
-					</tr>
-				{/if}
 			{/each}
 		</tbody>
 	</table>
@@ -1154,6 +1080,13 @@
 		color: var(--text-muted);
 		font-weight: 600;
 		margin-right: 4px;
+	}
+	.btn-reassign { color: var(--accent); }
+	.reassign-inline {
+		display: inline-flex; gap: 4px; align-items: center; margin-left: 4px;
+	}
+	.reassign-input {
+		width: 80px; padding: 2px 6px; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 3px;
 	}
 	.pub-title {
 		color: #333;

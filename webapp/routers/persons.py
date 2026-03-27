@@ -224,8 +224,11 @@ async def list_persons(
                     SELECT ha.id, ha.full_name, ha.orcid, ha.idhal, 'hal' AS source
                     FROM hal_authors ha WHERE ha.person_id = p.id
                     UNION ALL
-                    SELECT oa.id, oa.full_name, oa.orcid, NULL AS idhal, 'openalex' AS source
-                    FROM openalex_authors oa WHERE oa.person_id = p.id
+                    SELECT MIN(oas.openalex_author_id) AS id, COALESCE(oas.raw_author_name, oa.full_name) AS full_name, NULL AS orcid, NULL AS idhal, 'openalex' AS source
+                    FROM openalex_authorships oas
+                    JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+                    WHERE oas.person_id = p.id
+                    GROUP BY COALESCE(oas.raw_author_name, oa.full_name)
                     UNION ALL
                     SELECT wa.id, wa.full_name, wa.orcid, NULL AS idhal, 'wos' AS source
                     FROM wos_authors wa WHERE wa.person_id = p.id
@@ -240,11 +243,13 @@ async def list_persons(
             {where}
             ORDER BY {
                 {
-                    "name": "p.last_name ASC, p.first_name ASC",
-                    "-name": "p.last_name DESC, p.first_name DESC",
-                    "pubs": "pub_count ASC, p.last_name ASC",
-                    "-pubs": "pub_count DESC, p.last_name ASC",
-                }.get(sort, "p.last_name ASC, p.first_name ASC")
+                    "name": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
+                    "-name": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
+                    "pubs": "pub_count ASC, LOWER(p.last_name) ASC",
+                    "-pubs": "pub_count DESC, LOWER(p.last_name) ASC",
+                    "uca_pubs": "uca_pub_count ASC, LOWER(p.last_name) ASC",
+                    "-uca_pubs": "uca_pub_count DESC, LOWER(p.last_name) ASC",
+                }.get(sort, "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC")
             }
             LIMIT %s OFFSET %s
         """, params + [per_page, offset])
@@ -519,8 +524,11 @@ async def get_person(person_id: int):
                     SELECT ha.id, ha.full_name, ha.orcid, ha.idhal, 'hal' AS source
                     FROM hal_authors ha WHERE ha.person_id = p.id
                     UNION ALL
-                    SELECT oa.id, oa.full_name, oa.orcid, NULL AS idhal, 'openalex' AS source
-                    FROM openalex_authors oa WHERE oa.person_id = p.id
+                    SELECT MIN(oas.openalex_author_id) AS id, COALESCE(oas.raw_author_name, oa.full_name) AS full_name, NULL AS orcid, NULL AS idhal, 'openalex' AS source
+                    FROM openalex_authorships oas
+                    JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+                    WHERE oas.person_id = p.id
+                    GROUP BY COALESCE(oas.raw_author_name, oa.full_name)
                     UNION ALL
                     SELECT wa.id, wa.full_name, wa.orcid, NULL AS idhal, 'wos' AS source
                     FROM wos_authors wa WHERE wa.person_id = p.id
@@ -575,14 +583,17 @@ async def person_profile(person_id: int):
         """, (person_id,))
         hal_authors = cur.fetchall()
 
-        # Auteurs liés OpenAlex + compte publis UCA
+        # Auteurs liés OpenAlex : formes de noms distinctes (raw_author_name)
         cur.execute("""
-            SELECT oa.id, 'openalex' AS source, oa.full_name, oa.orcid,
-                   NULL::text AS idhal, oa.openalex_id,
-                   (SELECT COUNT(*) FROM openalex_authorships oas2
-                    WHERE oas2.openalex_author_id = oa.id AND oas2.is_uca = TRUE) AS uca_pub_count
-            FROM openalex_authors oa
-            WHERE oa.id IN (SELECT DISTINCT oas.openalex_author_id FROM openalex_authorships oas WHERE oas.person_id = %s)
+            SELECT MIN(oas.id) AS id,
+                   COALESCE(oas.raw_author_name, oa.full_name) AS full_name,
+                   'openalex' AS source,
+                   NULL::text AS orcid, NULL::text AS idhal, NULL::text AS openalex_id,
+                   COUNT(*) FILTER (WHERE oas.is_uca = TRUE) AS uca_pub_count
+            FROM openalex_authorships oas
+            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+            WHERE oas.person_id = %s
+            GROUP BY COALESCE(oas.raw_author_name, oa.full_name)
         """, (person_id,))
         oa_authors = cur.fetchall()
 
@@ -844,21 +855,43 @@ async def unlink_person_from_author(person_id: int, source: str, author_id: int)
                 UPDATE hal_authors SET person_id = NULL, updated_at = now()
                 WHERE id = %s AND person_id = %s
             """, (author_id, person_id))
+            # Détacher les authorships consolidées liées via hal_authorship_id
+            cur.execute("""
+                UPDATE authorships a SET person_id = NULL
+                FROM hal_authorships has2
+                WHERE a.hal_authorship_id = has2.id
+                  AND has2.hal_author_id = %s
+                  AND a.person_id = %s
+            """, (author_id, person_id))
         elif source == "openalex":
             cur.execute("""
                 UPDATE openalex_authorships SET person_id = NULL
-                WHERE openalex_author_id = %s
-            """, (author_id,))
+                WHERE openalex_author_id = %s AND person_id = %s
+            """, (author_id, person_id))
+            # Détacher les authorships consolidées liées via openalex_authorship_id
+            cur.execute("""
+                UPDATE authorships a SET person_id = NULL
+                FROM openalex_authorships oas
+                WHERE a.openalex_authorship_id = oas.id
+                  AND oas.openalex_author_id = %s
+                  AND a.person_id = %s
+            """, (author_id, person_id))
         elif source == "wos":
             cur.execute("""
                 UPDATE wos_authors SET person_id = NULL, updated_at = now()
                 WHERE id = %s AND person_id = %s
             """, (author_id, person_id))
+            # Détacher les authorships consolidées liées via wos_authorship_id
+            cur.execute("""
+                UPDATE authorships a SET person_id = NULL
+                FROM wos_authorships was
+                WHERE a.wos_authorship_id = was.id
+                  AND was.wos_author_id = %s
+                  AND a.person_id = %s
+            """, (author_id, person_id))
         else:
             raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
 
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Link not found")
         return {"unlinked": True}
 
 
@@ -870,8 +903,8 @@ ORCID_RE = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
 @router.post("/api/persons/{person_id}/identifier")
 async def add_person_identifier(person_id: int, data: AddIdentifier):
     """Ajoute manuellement un identifiant (ORCID ou idHAL) à une personne."""
-    if data.id_type not in ("orcid", "idhal"):
-        raise HTTPException(status_code=400, detail="id_type doit être 'orcid' ou 'idhal'")
+    if data.id_type not in ("orcid", "idhal", "idref"):
+        raise HTTPException(status_code=400, detail="id_type doit être 'orcid', 'idhal' ou 'idref'")
 
     id_value = data.id_value.strip()
 
@@ -892,15 +925,23 @@ async def add_person_identifier(person_id: int, data: AddIdentifier):
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Personne introuvable")
 
-        # Vérifier si déjà attribué à une autre personne
+        # Vérifier si déjà attribué
         cur.execute(
-            "SELECT person_id FROM person_identifiers WHERE id_type = %s AND id_value = %s",
+            "SELECT id, person_id, status::text FROM person_identifiers WHERE id_type = %s AND id_value = %s",
             (data.id_type, id_value)
         )
         existing = cur.fetchone()
         if existing:
             if existing["person_id"] == person_id:
                 return {"added": False, "reason": "already_exists"}
+            if existing["status"] == "rejected":
+                # Réattribuer l'identifiant rejeté à cette personne
+                cur.execute("""
+                    UPDATE person_identifiers
+                    SET person_id = %s, status = 'pending'::identifier_status, source = 'manual'
+                    WHERE id = %s
+                """, (person_id, existing["id"]))
+                return {"added": True, "reassigned": True, "id_type": data.id_type, "id_value": id_value}
             raise HTTPException(
                 status_code=409,
                 detail=f"Cet identifiant est déjà attribué à la personne #{existing['person_id']}"
@@ -942,6 +983,28 @@ async def update_identifier_status(ident_id: int, body: dict):
         if not row:
             raise HTTPException(status_code=404, detail="Identifiant introuvable")
         return {"id": row["id"], "status": row["status"]}
+
+
+@router.patch("/api/person-identifiers/{ident_id}/reassign")
+async def reassign_identifier(ident_id: int, body: dict):
+    """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
+    target_person_id = body.get("person_id")
+    if not target_person_id:
+        raise HTTPException(status_code=400, detail="person_id requis")
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id, status FROM person_identifiers WHERE id = %s", (ident_id,))
+        ident = cur.fetchone()
+        if not ident:
+            raise HTTPException(status_code=404, detail="Identifiant introuvable")
+        cur.execute("SELECT id FROM persons WHERE id = %s", (target_person_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Personne cible introuvable")
+        cur.execute("""
+            UPDATE person_identifiers
+            SET person_id = %s, status = 'pending'::identifier_status
+            WHERE id = %s
+        """, (target_person_id, ident_id))
+        return {"id": ident_id, "person_id": target_person_id, "status": "pending"}
 
 
 @router.patch("/api/authorships/{authorship_id}/exclude")
@@ -1270,7 +1333,7 @@ async def hal_duplicate_accounts(
                 GROUP BY person_id
                 HAVING COUNT(DISTINCT hal_person_id) >= 2
             )
-            ORDER BY p.last_name, p.first_name
+            ORDER BY LOWER(p.last_name), LOWER(p.first_name)
             LIMIT %s OFFSET %s
         """, (per_page, offset))
         persons = [dict(r) for r in cur.fetchall()]

@@ -611,12 +611,13 @@ def run_phase_b(cur, dry_run=False):
     # Sous-passe B0 : lookup dans person_name_forms
     logger.info("\n--- B0 : person_name_forms ---")
     cur.execute("""
-        SELECT name_form, person_ids FROM person_name_forms
+        SELECT name_form_normalized, person_ids FROM person_name_forms
         WHERE array_length(person_ids, 1) = 1
+          AND name_form_normalized IS NOT NULL
     """)
     name_form_map = {}
     for r in cur.fetchall():
-        name_form_map[r["name_form"].strip()] = r["person_ids"][0]
+        name_form_map[r["name_form_normalized"]] = r["person_ids"][0]
 
     oa_linked_nameform = 0
     for a in oa_authorships:

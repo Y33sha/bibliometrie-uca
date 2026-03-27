@@ -1,20 +1,23 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
-	import { base } from '$app/paths';
-	import type { Snippet } from 'svelte';
+	import { page } from "$app/stores";
+	import { goto } from "$app/navigation";
+	import { base } from "$app/paths";
+	import type { Snippet } from "svelte";
 
 	let { children }: { children: Snippet } = $props();
 
-	const isAdmin = $derived($page.url.pathname.startsWith(base + '/admin'));
+	const isAdmin = $derived($page.url.pathname.startsWith(base + "/admin"));
 	const isAddresses = $derived(
-		$page.url.pathname === base + '/admin/addresses' || $page.url.pathname === base + '/admin/feedback' || $page.url.pathname === base + '/admin/countries'
+		$page.url.pathname === base + "/admin/addresses" ||
+			$page.url.pathname === base + "/admin/feedback" ||
+			$page.url.pathname === base + "/admin/countries",
 	);
 	const isDuplicates = $derived(
-		$page.url.pathname === base + '/admin/duplicates' || $page.url.pathname === base + '/admin/duplicates-persons'
+		$page.url.pathname === base + "/admin/duplicates" ||
+			$page.url.pathname === base + "/admin/duplicates-persons",
 	);
 	const isHalProblems = $derived(
-		$page.url.pathname.startsWith(base + '/hal-problems')
+		$page.url.pathname.startsWith(base + "/hal-problems"),
 	);
 
 	let dropdownOpen = $state(false);
@@ -25,19 +28,21 @@
 		const current = $page.url.pathname;
 		const full = base + path;
 		if (current === full) return true;
-		if (path !== '/' && current.startsWith(full + '/')) return true;
+		if (path !== "/" && current.startsWith(full + "/")) return true;
 		return false;
 	}
 
 	async function logout() {
-		await fetch(base + '/api/auth/logout', { method: 'POST' });
-		goto(base + '/login');
+		await fetch(base + "/api/auth/logout", { method: "POST" });
+		goto(base + "/login");
 	}
 </script>
 
 <div class="site-header">
 	{#if isAdmin}
-		<h1 class="site-title">Bibliométrie UCA <span class="site-title-admin">Admin</span></h1>
+		<h1 class="site-title">
+			Bibliométrie UCA <span class="site-title-admin">Admin</span>
+		</h1>
 		<nav class="site-nav">
 			<div
 				class="nav-dropdown"
@@ -45,58 +50,131 @@
 				onmouseenter={() => (dropdownOpen = true)}
 				onmouseleave={() => (dropdownOpen = false)}
 			>
-				<button class="nav-link" class:active={isAddresses}>Adresses &#x25BE;</button>
+				<button class="nav-link" class:active={isAddresses}
+					>Adresses &#x25BE;</button
+				>
 				{#if dropdownOpen}
 					<div class="nav-dropdown-menu">
-						<a href="{base}/admin/addresses" class:active={isActive('/admin/addresses')}>Repérage</a>
-						<a href="{base}/admin/feedback" class:active={isActive('/admin/feedback')}>Qualité</a>
-						<a href="{base}/admin/countries" class:active={isActive('/admin/countries')}>Pays</a>
+						<a
+							href="{base}/admin/addresses"
+							class:active={isActive("/admin/addresses")}
+							>Repérage</a
+						>
+						<a
+							href="{base}/admin/feedback"
+							class:active={isActive("/admin/feedback")}
+							>Qualité</a
+						>
+						<a
+							href="{base}/admin/countries"
+							class:active={isActive("/admin/countries")}>Pays</a
+						>
 					</div>
 				{/if}
 			</div>
-			<a href="{base}/admin/structures" class="nav-link" class:active={isActive('/admin/structures')}>Structures</a>
-			<a href="{base}/admin/persons" class="nav-link" class:active={isActive('/admin/persons')}>Personnes</a>
+			<a
+				href="{base}/admin/structures"
+				class="nav-link"
+				class:active={isActive("/admin/structures")}>Structures</a
+			>
+			<a
+				href="{base}/admin/persons"
+				class="nav-link"
+				class:active={isActive("/admin/persons")}>Personnes</a
+			>
 			<div
 				class="nav-dropdown"
 				class:active={isDuplicates}
 				onmouseenter={() => (dupDropdownOpen = true)}
 				onmouseleave={() => (dupDropdownOpen = false)}
 			>
-				<button class="nav-link" class:active={isDuplicates}>Dédoublonnage &#x25BE;</button>
+				<button class="nav-link" class:active={isDuplicates}
+					>Dédoublonnage &#x25BE;</button
+				>
 				{#if dupDropdownOpen}
 					<div class="nav-dropdown-menu">
-						<a href="{base}/admin/duplicates" class:active={isActive('/admin/duplicates')}>Publications</a>
-						<a href="{base}/admin/duplicates-persons" class:active={isActive('/admin/duplicates-persons')}>Personnes</a>
+						<a
+							href="{base}/admin/duplicates"
+							class:active={isActive("/admin/duplicates")}
+							>Publications</a
+						>
+						<a
+							href="{base}/admin/duplicates-persons"
+							class:active={isActive("/admin/duplicates-persons")}
+							>Personnes</a
+						>
 					</div>
 				{/if}
 			</div>
 			<a href="{base}/stats" class="nav-link nav-switch-link">Public</a>
-			<button class="nav-link nav-switch-link" onclick={logout}>Déconnexion</button>
+			<button class="nav-link nav-switch-link" onclick={logout}
+				>Déconnexion</button
+			>
 		</nav>
 	{:else}
 		<h1 class="site-title">Bibliométrie UCA</h1>
 		<nav class="site-nav">
-			<a href="{base}/stats" class="nav-link" class:active={isActive('/stats')}>Statistiques</a>
-			<a href="{base}/publications" class="nav-link" class:active={isActive('/publications')}>Publications</a>
-			<a href="{base}/laboratories" class="nav-link" class:active={isActive('/laboratories')}>Laboratoires</a>
-			<a href="{base}/persons" class="nav-link" class:active={isActive('/persons')}>Personnes</a>
+			<a
+				href="{base}/stats"
+				class="nav-link"
+				class:active={isActive("/stats")}>Statistiques</a
+			>
+			<a
+				href="{base}/publications"
+				class="nav-link"
+				class:active={isActive("/publications")}>Publications</a
+			>
+			<a
+				href="{base}/laboratories"
+				class="nav-link"
+				class:active={isActive("/laboratories")}>Laboratoires</a
+			>
+			<a
+				href="{base}/persons"
+				class="nav-link"
+				class:active={isActive("/persons")}>Personnes</a
+			>
 			<div
 				class="nav-dropdown"
 				class:active={isHalProblems}
 				onmouseenter={() => (halDropdownOpen = true)}
 				onmouseleave={() => (halDropdownOpen = false)}
 			>
-				<button class="nav-link" class:active={isHalProblems}>Problèmes HAL &#x25BE;</button>
+				<button class="nav-link" class:active={isHalProblems}
+					>Problèmes HAL &#x25BE;</button
+				>
 				{#if halDropdownOpen}
 					<div class="nav-dropdown-menu">
-						<a href="{base}/hal-problems/duplicate-accounts" class:active={isActive('/hal-problems/duplicate-accounts')}>Doublons comptes</a>
-						<a href="{base}/hal-problems/duplicate-pubs" class:active={isActive('/hal-problems/duplicate-pubs')}>Doublons publis</a>
-						<a href="{base}/hal-problems/missing-collections" class:active={isActive('/hal-problems/missing-collections')}>Manques collections</a>
-						<a href="{base}/hal-problems/affiliation-conflicts" class:active={isActive('/hal-problems/affiliation-conflicts')}>Affiliations suspectes</a>
+						<a
+							href="{base}/hal-problems/duplicate-accounts"
+							class:active={isActive(
+								"/hal-problems/duplicate-accounts",
+							)}>Doublons auteurs</a
+						>
+						<a
+							href="{base}/hal-problems/duplicate-pubs"
+							class:active={isActive(
+								"/hal-problems/duplicate-pubs",
+							)}>Doublons publis</a
+						>
+						<a
+							href="{base}/hal-problems/missing-collections"
+							class:active={isActive(
+								"/hal-problems/missing-collections",
+							)}>Manques collections</a
+						>
+						<a
+							href="{base}/hal-problems/affiliation-conflicts"
+							class:active={isActive(
+								"/hal-problems/affiliation-conflicts",
+							)}>Affiliations suspectes</a
+						>
 					</div>
 				{/if}
 			</div>
-			<a href="{base}/admin/addresses" class="nav-link nav-switch-link">Admin</a>
+			<a href="{base}/admin/addresses" class="nav-link nav-switch-link"
+				>Admin</a
+			>
 		</nav>
 	{/if}
 </div>
@@ -111,7 +189,8 @@
 	}
 	:global(body) {
 		margin: 0;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+			sans-serif;
 		font-size: 1rem;
 		line-height: 1.5;
 		color: var(--text);

@@ -6,7 +6,8 @@
 	import { api } from '$lib/api';
 	import { sanitizeTitle } from '$lib/utils';
 	import { Chart, registerables } from 'chart.js';
-	Chart.register(...registerables);
+	import ChartDataLabels from 'chartjs-plugin-datalabels';
+	Chart.register(...registerables, ChartDataLabels);
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -119,11 +120,13 @@
 	let selectedDocTypes: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
 	let selectedApc: string[] = $state([]);
+	let selectedCountries: string[] = $state([]);
 	let yearOptions: FacetOption[] = $state([]);
 
 	let docTypeOptions: FacetOption[] = $state([]);
 	let oaOptions: FacetOption[] = $state([]);
 	let apcOptions: FacetOption[] = $state([]);
+	let countryOptions: FacetOption[] = $state([]);
 
 	let pubsLoaded = $state(false);
 
@@ -155,10 +158,16 @@
 	let dashboardLoaded = $state(false);
 	let dashPubsByYear: { year: number; count: number }[] = $state([]);
 	let dashOa: { open_access: number; closed: number; unknown: number; total: number } = $state({ open_access: 0, closed: 0, unknown: 0, total: 0 });
+	let dashCollab: { total_articles: number; international: number; domestic: number } = $state({ total_articles: 0, international: 0, domestic: 0 });
+	let dashTopCountries: { code: string; name: string; count: number }[] = $state([]);
 	let barCanvas: HTMLCanvasElement;
 	let pieCanvas: HTMLCanvasElement;
+	let collabCanvas: HTMLCanvasElement;
+	let countriesCanvas: HTMLCanvasElement;
 	let barChart: Chart | null = null;
 	let pieChart: Chart | null = null;
+	let collabChart: Chart | null = null;
+	let countriesChart: Chart | null = null;
 
 	const tutelles = $derived(parents.filter((p) => p.relation_type === 'est_tutelle_de'));
 	const partenaires = $derived(parents.filter((p) => p.relation_type === 'est_partenaire_de'));
@@ -176,6 +185,7 @@
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
+		if (selectedCountries.length) p.set('country', selectedCountries.join(','));
 		if (pubSearch.trim()) p.set('search', pubSearch.trim());
 		if (pubPage > 1) p.set('page', String(pubPage));
 		if (personsSort !== 'name') p.set('psort', personsSort);
@@ -191,6 +201,7 @@
 		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) params.set('has_apc', selectedApc.join(','));
+		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
 		return params;
 	}
 
@@ -202,6 +213,7 @@
 			oa_statuses: { value: string; count: number }[];
 			source_counts: Record<string, number>;
 			apc: { value: string; text: string; count: number }[];
+			countries: { value: string; count: number }[];
 		}>('/api/publications/facets?' + params);
 		yearOptions = data.years.map((y) => ({
 			value: String(y.value), text: String(y.value), count: y.count
@@ -215,6 +227,9 @@
 		sourceCounts = data.source_counts || {};
 		if (data.apc) {
 			apcOptions = data.apc.map(a => ({ value: a.value, text: a.text, count: a.count }));
+		}
+		if (data.countries) {
+			countryOptions = data.countries.map(c => ({ value: c.value, text: `${c.text} (${c.value.toUpperCase()})`, count: c.count }));
 		}
 	}
 
@@ -327,9 +342,13 @@
 		const data = await api<{
 			pubs_by_year: { year: number; count: number }[];
 			oa: { open_access: number; closed: number; unknown: number; total: number };
+			collab: { total_articles: number; international: number; domestic: number };
+			top_countries: { code: string; name: string; count: number }[];
 		}>(`/api/laboratories/${labId}/dashboard`);
 		dashPubsByYear = data.pubs_by_year;
 		dashOa = data.oa;
+		dashCollab = data.collab;
+		dashTopCountries = data.top_countries;
 		dashboardLoaded = true;
 		await tick();
 		renderDashCharts();
@@ -338,6 +357,8 @@
 	function renderDashCharts() {
 		if (barChart) barChart.destroy();
 		if (pieChart) pieChart.destroy();
+		if (collabChart) collabChart.destroy();
+		if (countriesChart) countriesChart.destroy();
 
 		const cs = getComputedStyle(document.documentElement);
 
@@ -357,7 +378,10 @@
 				options: {
 					responsive: true,
 					maintainAspectRatio: false,
-					plugins: { legend: { display: false } },
+					plugins: {
+						legend: { display: false },
+						datalabels: { color: '#fff', font: { weight: 'bold', size: 12 } }
+					},
 					scales: {
 						y: { beginAtZero: true, ticks: { precision: 0 } },
 						x: { grid: { display: false } }
@@ -382,6 +406,74 @@
 					maintainAspectRatio: false,
 					plugins: {
 						legend: { position: 'bottom' },
+						datalabels: {
+							color: '#fff',
+							font: { weight: 'bold', size: 13 },
+							formatter: (value: number, ctx: any) => {
+								const total = ctx.dataset.data.reduce((a: number, b: number) => a + b, 0);
+								const pct = total > 0 ? Math.round(value / total * 100) : 0;
+								return pct > 3 ? `${pct}%` : '';
+							}
+						}
+					}
+				}
+			});
+		}
+
+		// Doughnut: collaborations internationales (articles)
+		if (collabCanvas && dashCollab.total_articles > 0) {
+			collabChart = new Chart(collabCanvas, {
+				type: 'doughnut',
+				data: {
+					labels: ['International', 'Domestique'],
+					datasets: [{
+						data: [dashCollab.international, dashCollab.domestic],
+						backgroundColor: ['#3b6b9e', '#e0e0e0'],
+					}]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					plugins: {
+						legend: { position: 'bottom' },
+						datalabels: {
+							color: '#fff',
+							font: { weight: 'bold', size: 13 },
+							formatter: (value: number, ctx: any) => {
+								const total = ctx.dataset.data.reduce((a: number, b: number) => a + b, 0);
+								const pct = total > 0 ? Math.round(value / total * 100) : 0;
+								return pct > 3 ? `${pct}%` : '';
+							}
+						}
+					}
+				}
+			});
+		}
+
+		// Bar: top 5 pays (hors FR)
+		if (countriesCanvas && dashTopCountries.length > 0) {
+			countriesChart = new Chart(countriesCanvas, {
+				type: 'bar',
+				data: {
+					labels: dashTopCountries.map(c => `${c.name}`),
+					datasets: [{
+						label: 'Articles',
+						data: dashTopCountries.map(c => c.count),
+						backgroundColor: '#e8a838',
+						borderRadius: 3,
+					}]
+				},
+				options: {
+					indexAxis: 'y',
+					responsive: true,
+					maintainAspectRatio: false,
+					plugins: {
+						legend: { display: false },
+						datalabels: { color: '#fff', font: { weight: 'bold', size: 12 } }
+					},
+					scales: {
+						x: { beginAtZero: true, ticks: { precision: 0 } },
+						y: { grid: { display: false } }
 					}
 				}
 			});
@@ -558,6 +650,24 @@
 							</div>
 						{/if}
 					</div>
+					<div class="dash-card">
+						<h3>Collaborations internationales (articles)</h3>
+						<div class="chart-wrap">
+							<canvas bind:this={collabCanvas}></canvas>
+						</div>
+						{#if dashCollab.total_articles > 0}
+							<div class="oa-summary">
+								{Math.round(dashCollab.international / dashCollab.total_articles * 100)} % international
+								({dashCollab.international.toLocaleString('fr-FR')} / {dashCollab.total_articles.toLocaleString('fr-FR')} articles)
+							</div>
+						{/if}
+					</div>
+					<div class="dash-card">
+						<h3>Top 5 pays partenaires (articles)</h3>
+						<div class="chart-wrap">
+							<canvas bind:this={countriesCanvas}></canvas>
+						</div>
+					</div>
 				</div>
 			{/if}
 		</div>
@@ -572,6 +682,7 @@
 				<FacetDropdown label="Types" options={docTypeOptions} bind:selected={selectedDocTypes} onchange={onFilterChange} />
 				<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
 				<FacetDropdown label="APC" options={apcOptions} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
+				<FacetDropdown label="Pays" options={countryOptions} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
 				<SourceFilterToggle bind:states={sourceStates} counts={sourceCounts} onchange={onFilterChange} />
 				<span class="count">{pubTotal} publication{pubTotal > 1 ? 's' : ''}</span>
 				<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
@@ -663,9 +774,9 @@
 	{#if activeTab === 'persons'}
 		<div class="tab-content">
 			{#if orphanStats.total > 0}
-				<a href="{base}/admin/authorships?lab={labId}&linked=no" class="orphan-banner">
+				<div class="orphan-banner">
 					{orphanStats.total} authorship{orphanStats.total > 1 ? 's' : ''} non relié{orphanStats.total > 1 ? 'es' : 'e'} à une personne
-				</a>
+				</div>
 			{/if}
 			<div class="toolbar">
 				<input type="text" placeholder="Rechercher..." bind:value={personsSearch} oninput={() => { clearTimeout(personsSearchTimer); personsSearchTimer = setTimeout(() => { personsPage = 1; loadPersons(); }, 300); }} />

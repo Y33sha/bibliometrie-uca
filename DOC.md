@@ -313,7 +313,7 @@ python3 processing/resolve_addresses.py       # Résout adresses → structures
 - Options : `--source openalex`, `--source wos`, ou les deux par défaut.
 
 #### 3b. `resolve_addresses.py`
-- Pour chaque adresse sans détection automatique, cherche les formes de noms actives dans `name_forms`.
+- Pour chaque adresse sans détection automatique, cherche les formes de noms dans `name_forms`.
 - Si match → insère dans `address_structures` avec `matched_form_id` pour traçabilité.
 - Les formes ayant un `requires_context_of` ne matchent que si une forme d'une structure contexte (typiquement une tutelle) est aussi détectée dans l'adresse.
 - Options : `--reset` (supprime les affiliations auto), `--rerun` (reset + relance complète), `--stats`.
@@ -640,8 +640,12 @@ ORDER BY hd.pub_year DESC;
 ## Pipeline de normalisation (ordre d'exécution)
 1. `processing/normalize_hal.py` — normalisation HAL (staging → hal_documents + publications)
 2. `processing/normalize_openalex.py` — normalisation OpenAlex (staging → openalex_documents + publications). Détecte les landing_page_url HAL pour éviter les doublons, mais seulement si HAL a déjà été normalisé. Capture `raw_author_name` et `raw_orcid` par authorship.
-3. `processing/merge_hal_openalex_pubs.py` — rattrapage : fusionne les publications OpenAlex dont la landing_page_url pointe vers un document HAL existant mais qui n'avait pas été détecté à l'étape 2 (ex. import OpenAlex antérieur à l'import HAL). **À exécuter systématiquement après les étapes 1-2.**
-4. `db/populate_uca_flags.sql` — flags UCA (étapes 1-3b sur sources)
-5. `processing/create_persons_from_authorships.py` — Phase A: création personnes HAL/WoS (ORCID, nom+co-publi, singletons, cross-link). Phase B: résolution OA par `raw_author_name` (ORCID, nom+co-publi, nom seul, création). Les entités `openalex_authors` ne participent PAS à la résolution. Propagation UCA (étape 4).
-6. `processing/rebuild_authorships.py` — INSERT authorships manquants + FK
-7. `db/populate_uca_flags.sql` — re-propagation étape 4 pour les nouvelles lignes de l'étape 6
+3. `processing/normalize_wos.py` — normalisation WoS (staging → wos_documents + publications)
+4. `processing/backfill_wos_addresses.py` — parse les adresses WoS (format API) et les lie aux authorships WoS
+5. `processing/merge_hal_openalex_pubs.py` — rattrapage : fusionne les publications OpenAlex dont la landing_page_url pointe vers un document HAL existant mais qui n'avait pas été détecté à l'étape 2 (ex. import OpenAlex antérieur à l'import HAL). **À exécuter systématiquement après les étapes 1-3.**
+6. `processing/resolve_addresses.py` — repérage des structures UCA dans les nouvelles adresses
+7. `db/refresh_publication_countries.sql` — recalcule `publications.countries` à partir des 3 sources (HAL, OpenAlex, WoS)
+8. `db/populate_uca_flags.sql` — flags UCA (étapes 1-3b sur sources)
+9. `processing/create_persons_from_authorships.py` — Phase A: création personnes HAL/WoS (ORCID, nom+co-publi, singletons, cross-link). Phase B: résolution OA par `raw_author_name` via `person_name_forms` (lookup normalisé), puis création si absent. Les entités `openalex_authors` ne participent PAS à la résolution. Propagation UCA (étape 4).
+10. `processing/rebuild_authorships.py` — INSERT authorships manquants + FK
+11. `db/populate_uca_flags.sql` — re-propagation étape 4 pour les nouvelles lignes de l'étape 10

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { base } from '$app/paths';
 	import { api } from '$lib/api';
 
@@ -421,10 +421,15 @@
 	/* ── Lifecycle ── */
 
 	onMount(() => {
+		document.querySelector('.container')?.classList.add('full-width');
 		loadList();
 		refreshCache();
 		document.addEventListener('click', handleDocumentClick);
 		return () => document.removeEventListener('click', handleDocumentClick);
+	});
+
+	onDestroy(() => {
+		document.querySelector('.container')?.classList.remove('full-width');
 	});
 </script>
 
@@ -660,19 +665,6 @@
 										{/if}
 									</td>
 									<td style="white-space:nowrap">
-										{#if f.is_active}
-											<button
-												class="btn btn-sm"
-												onclick={() => toggleForm(f.id, false)}
-												title="Desactiver"
-											>&#x23F8;</button>
-										{:else}
-											<button
-												class="btn btn-sm btn-success"
-												onclick={() => toggleForm(f.id, true)}
-												title="Reactiver"
-											>&#x25B6;</button>
-										{/if}
 										<button
 											class="btn btn-sm btn-danger"
 											onclick={() => deleteForm(f.id)}
@@ -805,22 +797,32 @@
 		--text-muted: #777;
 	}
 
+	/* Sortir du conteneur pour utiliser toute la largeur */
+	:global(.container.full-width) {
+		max-width: none;
+		padding: 0 !important;
+	}
+
 	/* ── Layout ── */
 	.layout {
 		display: flex;
-		gap: 16px;
+		gap: 0;
 		min-height: calc(100vh - 120px);
 	}
 	.list-panel {
-		width: 380px;
+		width: 550px;
 		flex-shrink: 0;
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
+		padding: 16px;
+		border-right: 1px solid var(--border);
+		background: #fafaf8;
 	}
 	.detail-panel {
 		flex: 1;
 		min-width: 0;
+		padding: 16px 24px;
 	}
 
 	.panel {
