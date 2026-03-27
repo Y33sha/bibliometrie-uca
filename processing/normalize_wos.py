@@ -635,30 +635,38 @@ def upsert_publication(cur, rec: dict, journal_id: int | None) -> int | None:
     container_title = rec.get("journal_title") if not journal_id else None
 
     if doi:
-        cur.execute("""
-            INSERT INTO publications
-                (title, title_normalized, doc_type, pub_year, doi,
-                 oa_status, journal_id, container_title, language)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (doi) DO UPDATE SET
-                journal_id = COALESCE(publications.journal_id, EXCLUDED.journal_id),
-                doc_type = CASE
-                    WHEN publications.doc_type = 'other'
-                         AND EXCLUDED.doc_type <> 'other'
-                        THEN EXCLUDED.doc_type
-                    ELSE COALESCE(publications.doc_type, EXCLUDED.doc_type)
-                END,
-                oa_status = CASE
-                    WHEN publications.oa_status = 'unknown' THEN EXCLUDED.oa_status
-                    WHEN EXCLUDED.oa_status = 'diamond' THEN 'diamond'::oa_type
-                    ELSE publications.oa_status
-                END,
-                container_title = COALESCE(publications.container_title, EXCLUDED.container_title),
-                updated_at = now()
-            RETURNING id
-        """, (title, title_normalized, doc_type, pub_year, doi,
-              oa_status, journal_id, container_title, language))
-        return cur.fetchone()[0]
+        # L'index unique est sur LOWER(doi), ON CONFLICT (doi) ne matche pas
+        cur.execute("SELECT id FROM publications WHERE LOWER(doi) = LOWER(%s)", (doi,))
+        existing = cur.fetchone()
+        if existing:
+            cur.execute("""
+                UPDATE publications SET
+                    journal_id = COALESCE(journal_id, %s),
+                    doc_type = CASE
+                        WHEN doc_type = 'other' AND %s <> 'other' THEN %s::doc_type
+                        ELSE COALESCE(doc_type, %s::doc_type)
+                    END,
+                    oa_status = CASE
+                        WHEN oa_status = 'unknown' THEN %s::oa_type
+                        WHEN %s = 'diamond' THEN 'diamond'::oa_type
+                        ELSE oa_status
+                    END,
+                    container_title = COALESCE(container_title, %s),
+                    updated_at = now()
+                WHERE id = %s
+            """, (journal_id, doc_type, doc_type, doc_type,
+                  oa_status, oa_status, container_title, existing[0]))
+            return existing[0]
+        else:
+            cur.execute("""
+                INSERT INTO publications
+                    (title, title_normalized, doc_type, pub_year, doi,
+                     oa_status, journal_id, container_title, language)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (title, title_normalized, doc_type, pub_year, doi,
+                  oa_status, journal_id, container_title, language))
+            return cur.fetchone()[0]
     else:
         # Sans DOI : chercher par titre+année+journal (articles uniquement)
         if doc_type == "article" and journal_id:

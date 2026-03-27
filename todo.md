@@ -1,9 +1,15 @@
+pg_dump -U lalecoz -d publisher_stats -F c -f bibliometrie.dump
+* [ ] automatiser les dumps
+
 # Sources de données
+
+* [ ] autres sources: ArXiv, Pubmed, ScannR?
 
 ## APC
 * [x] trouver APC par revue
-* [ ] intégrer données APC DPCG
+* [x] intégrer données APC DPCG
 * [ ] estimer APC par structure (gold+hybride avec auteur correspondant sauf Elsevier)
+* [ ] exploiter OpenAPC
 
 ## Web of Science
 API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuellement.
@@ -11,13 +17,9 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [x] Normalisation, peuplement des tables structures, auteurs, authorships, gestion des adresses, etc.
 
 ## OpenAlex
-* [x] stocker `raw_author_name` et `raw_orcid` par authorship (colonnes ajoutées dans `openalex_authorships`, backfill 373k lignes depuis JSON staging, 248k avec ORCID)
-* [x] affichage: utiliser `raw_author_name` au lieu de `openalex_authors.display_name` sur les pages publication et doublons (COALESCE avec fallback)
-* [x] **migrer `person_id` sur `openalex_authorships`** — colonne ajoutée, backfillée (71k lignes), tous les scripts et l'API lisent/écrivent dessus. Chaque authorship a son propre `person_id`, indépendant de l'entité OA. `create_persons_from_authorships.py` utilise `raw_author_name`/`raw_orcid`. `fix_oa_person_conflicts.py` corrige chirurgicalement par authorship.
-* [ ] **supprimer les dual-writes** — actuellement les scripts et l'API écrivent `person_id` sur `openalex_authorships` ET `openalex_authors` (transition). À terme, retirer les écritures sur `openalex_authors.person_id` (fichiers: `create_persons_from_authorships.py`, `rebuild_authorships.py`, `merge_duplicate_persons.py`, `merge_lab_duplicates.py`, `webapp/app.py` link/unlink/merge endpoints)
 * [ ] re-fetch individuel des docts OpenAlex plafonnés à 100 authorships (auteurs UCA au-delà de la pos. 100 sont perdus)
-* [ ] re-fetch à partir des DOI HAL
 * [ ] importer orcid des openalex authors seulement quand display_name = raw_author_name (et pas d'initiale)
+* [ ] type peer_review: les auteurs qui apparaissent sont ceux de l'article
 
 ## HAL
 * [x] inclure collections HAL CHU-CLERMONTFERRAND et CLERMONT-AUVERGNE-INP
@@ -44,16 +46,6 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] nouveaux imports: comment prendre en compte fusions de comptes auteurs ayant eu lieu entre-temps (par ex. sur HAL)? / + ré-importer et écraser publis déjà présentes et modifiées entre-temps (stocker hash puis comparer?)
 * [ ] automatiser imports réguliers (1/semaine?)
 
-## Pipeline de normalisation (ordre d'exécution)
-1. `processing/normalize_hal.py` — normalisation HAL (staging → hal_documents + publications)
-2. `processing/normalize_openalex.py` — normalisation OpenAlex (staging → openalex_documents + publications). Détecte les landing_page_url HAL pour éviter les doublons, mais seulement si HAL a déjà été normalisé. Capture `raw_author_name` et `raw_orcid` par authorship.
-3. `processing/merge_hal_openalex_pubs.py` — rattrapage : fusionne les publications OpenAlex dont la landing_page_url pointe vers un document HAL existant mais qui n'avait pas été détecté à l'étape 2 (ex. import OpenAlex antérieur à l'import HAL). **À exécuter systématiquement après les étapes 1-2.**
-4. `db/populate_uca_flags.sql` — flags UCA (étapes 1-3b sur sources)
-5. `processing/create_persons_from_authorships.py` — Phase A: création personnes HAL/WoS (ORCID, nom+co-publi, singletons, cross-link). Phase B: résolution OA par `raw_author_name` (ORCID, nom+co-publi, nom seul, création). Les entités `openalex_authors` ne participent PAS à la résolution. Propagation UCA (étape 4).
-6. `processing/rebuild_authorships.py` — INSERT authorships manquants + FK
-7. `db/populate_uca_flags.sql` — re-propagation étape 4 pour les nouvelles lignes de l'étape 6
-
-
 # Développement
 
 ## Signatures
@@ -61,6 +53,7 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] validation des adresses (forme correcte): à mettre en place si pertinent
 * [ ] publis sans adresses (HAL) => scraper les sites éditeurs pour trouver adresses?
 * [ ] supprimer formes de noms redondantes
+* [ ] supprimer review_status
 
 ## Personnes
 * [x] moissonner ORCID liés aux comptes HAL (processing/harvest_hal_orcids.py — 12125 ORCID récupérés) => quelle place dans le pipeline?
@@ -71,9 +64,8 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [x] interface de déduplication des personnes (par nom + par conflit de sources)
 * [x] ORCID/idHAL confirmés manuellement: affichés en vert sur les pages publiques
 * [x] recalcul des noms normalisés (tirets résiduels corrigés — 1069 personnes)
-* [x] gestion des formes de noms?
-* [ ] correction des noms
-* [ ] ajouter IdRef?
+* [ ] correction des noms; création de personnes, interface de gestion des formes de noms
+* [ ] ajouter IdRef? => fait pour comptes HAL; chercher les autres
 * [ ] ajouter quelques visus (%OA)
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis
 * [ ] afficher quand compte HAL relié ou non à l'ORCID
@@ -90,6 +82,7 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] onglet dashboard
 * [ ] signatures: afficher nombre de publis + dates; trier par publis décroissantes; idem sur page personne
 * [ ] afficher identifiants (AuréHAL, OpenAlex, WoS) avec liens
+* [ ] ajout de formes de nom ne marche pas (erreur 500)
 
 ## Publications
 * [x] diagnostiquer le lag (tester requêtes)
@@ -108,9 +101,12 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] lien Publications -> Dashboard?
 * [ ] pb des auteurs openalex liés à une personne mais non listés dans les auteurs d'une publi: http://172.22.130.105/bibliometrie/publications/12380
 * [ ] preprints en accès gold?
-* [ ] type peer-review
 * [ ] authorship supprimée: publi apparaît toujours (julie gardette)
 * [ ] source theConversation: pas closed, et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
+### Types de documents
+* [ ] gérer le document type "correction" sur wos, "erratum" sur OA (actuellement, apparaît comme article)
+* [ ] type peer-review
+* [ ] HAL compte-rendu => "autre"
 
 ## Pages supplémentaires, étudier pertinence
 * [ ] sujets

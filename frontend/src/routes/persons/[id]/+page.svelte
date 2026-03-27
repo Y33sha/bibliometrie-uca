@@ -101,12 +101,14 @@
 	let selectedDocTypes: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
 	let selectedCorr: string[] = $state([]);
+	let selectedCountries: string[] = $state([]);
 	let sourceStates: Record<string, string> = $state({});
 	let sourceCounts: Record<string, number> = $state({});
 	let yearOptions: FacetOption[] = $state([]);
 	let docTypeOptions: FacetOption[] = $state([]);
 	let oaOptions: FacetOption[] = $state([]);
 	let corrOptions: FacetOption[] = $state([]);
+	let countryOptions: FacetOption[] = $state([]);
 
 	// Addresses tab
 	let addresses: Address[] = $state([]);
@@ -141,6 +143,14 @@
 		return Array.from(map, ([value, confirmed]) => ({ value, confirmed }));
 	});
 
+	const allIdrefs = $derived(() => {
+		const map = new Map<string, boolean>();
+		identifiers.filter((i) => i.id_type === 'idref' && i.status !== 'rejected').forEach((i) => {
+			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed');
+		});
+		return Array.from(map, ([value, confirmed]) => ({ value, confirmed }));
+	});
+
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
 		params.set('person_id', personId ?? '');
@@ -148,6 +158,7 @@
 		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
 		if (selectedCorr.length) params.set('is_corresponding', selectedCorr.join(','));
+		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
 		const sf = Object.entries(sourceStates).filter(([, v]) => v === 'yes' || v === 'no').map(([k, v]) => `${k}_${v}`).join(',');
 		if (sf) params.set('source_filter', sf);
 		return params;
@@ -161,6 +172,7 @@
 			oa_statuses: { value: string; count: number }[];
 			corresponding: { value: string; count: number }[];
 			source_counts: Record<string, number>;
+			countries: { value: string; count: number }[];
 		}>('/api/publications/facets?' + params);
 		yearOptions = data.years.map((y) => ({
 			value: String(y.value), text: String(y.value), count: y.count
@@ -177,6 +189,9 @@
 			}));
 		}
 		sourceCounts = data.source_counts || {};
+		if (data.countries) {
+			countryOptions = data.countries.map(c => ({ value: c.value, text: `${c.text} (${c.value.toUpperCase()})`, count: c.count }));
+		}
 	}
 
 	async function loadPublications() {
@@ -307,6 +322,13 @@
 					{#if idh.confirmed}<span class="confirmed-check" title="Vérifié manuellement">&#10003;</span>{/if}
 				</span>
 			{/each}
+			{#each allIdrefs() as idr}
+				<span class="id-item" class:id-confirmed={idr.confirmed}>
+					<span class="id-label">IdRef</span>
+					<a href="https://www.idref.fr/{idr.value}" target="_blank" rel="noopener" class="id-badge">{idr.value}</a>
+					{#if idr.confirmed}<span class="confirmed-check" title="Vérifié manuellement">&#10003;</span>{/if}
+				</span>
+			{/each}
 		</div>
 	</div>
 
@@ -336,6 +358,7 @@
 				{#if corrOptions.length}
 					<FacetDropdown label="Corresp." options={corrOptions} bind:selected={selectedCorr} onchange={onFilterChange} />
 				{/if}
+				<FacetDropdown label="Pays" options={countryOptions} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
 				<SourceFilterToggle bind:states={sourceStates} counts={sourceCounts} onchange={onFilterChange} />
 				<span class="toolbar-spacer"></span>
 				<span class="count">{pubTotal} publication{pubTotal > 1 ? 's' : ''}</span>

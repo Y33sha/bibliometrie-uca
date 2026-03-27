@@ -24,6 +24,7 @@ async def publications_facets(
     person_id: int | None = Query(None),
     is_corresponding: str = Query(""),
     has_apc: str = Query(""),
+    country: str = Query(""),
 ):
     """Facettes dynamiques pour la page publications.
     Chaque facette exclut son propre filtre mais applique tous les autres."""
@@ -34,6 +35,7 @@ async def publications_facets(
     lab_ids_clean = [int(v) for v in lab_id_parts if v != "none"] if lab_id_parts else []
     doc_types = parse_str_csv(doc_type)
     source_values = parse_str_csv(source_filter)
+    country_values = parse_str_csv(country)
 
     def base_conds_params():
         """Conditions de base : publications UCA ou personne.
@@ -100,6 +102,9 @@ async def publications_facets(
             elif len(apc_parts) > 1:
                 conds.append("(" + " OR ".join(apc_parts) + ")")
         apply_publisher_journal_filter(conds, params, publisher_id, journal_id)
+        if skip != "country" and country_values:
+            conds.append("p.countries && %s::text[]")
+            params.append(country_values)
 
     def where_sql(conds: list) -> str:
         return " AND ".join(conds) if conds else "TRUE"
@@ -198,7 +203,7 @@ async def publications_facets(
                     )) AS no_count
                 FROM publications p
                 WHERE {where}
-            """, p + [person_id, person_id])
+            """, [person_id, person_id] + p)
             row = cur.fetchone()
             corr_facets = [
                 {"value": "yes", "count": row["yes_count"]},
@@ -300,6 +305,23 @@ async def publications_facets(
                 {"value": "none", "text": "Sans APC", "count": r["apc_none"]},
             ]
 
+        # Country facet
+        c, p = base_conds_params()
+        add_all_except(c, p, skip="country")
+        w = where_sql(c)
+        cur.execute(f"""
+            SELECT co.code, co.name, COUNT(*) AS count
+            FROM (
+                SELECT unnest(p.countries) AS cc
+                FROM publications p
+                WHERE {w} AND p.countries IS NOT NULL
+            ) sub
+            JOIN countries co ON co.code = sub.cc
+            GROUP BY co.code, co.name
+            ORDER BY count DESC
+        """, p)
+        country_facets = [{"value": r["code"].strip(), "text": r["name"], "count": r["count"]} for r in cur.fetchall()]
+
         return {
             "years": year_facets,
             "labs": lab_facets,
@@ -313,6 +335,7 @@ async def publications_facets(
                 "wos": source_counts["wos_count"],
             },
             "apc": apc_facets,
+            "countries": country_facets,
         }
 
 
@@ -785,6 +808,7 @@ async def list_publications(
     person_id: int | None = Query(None),
     is_corresponding: str = Query(""),  # yes, no
     has_apc: str = Query(""),  # yes, no
+    country: str = Query(""),  # comma-separated country codes
 ):
     """Liste les publications avec sources, labos, journal."""
     offset = (page - 1) * per_page
@@ -797,6 +821,7 @@ async def list_publications(
     lab_ids = [int(v) for v in lab_id_parts if v != "none"] if lab_id_parts else []
     oa_values = [v.strip() for v in oa_status.split(',') if v.strip()] if oa_status else []
     source_values = [v.strip() for v in source_filter.split(',') if v.strip()] if source_filter else []
+    country_values = [v.strip() for v in country.split(',') if v.strip()] if country else []
 
     with get_cursor() as (cur, conn):
         # Disable JIT — these queries are too small to benefit, and
@@ -941,6 +966,11 @@ async def list_publications(
                 conditions.append(parts[0])
             elif len(parts) > 1:
                 conditions.append("(" + " OR ".join(parts) + ")")
+
+        # Country filter
+        if country_values:
+            conditions.append("p.countries && %s::text[]")
+            params.append(country_values)
 
         where_clause = " AND ".join(conditions) if conditions else "TRUE"
 

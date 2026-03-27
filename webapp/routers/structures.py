@@ -31,7 +31,7 @@ async def list_structures(
         where = " AND ".join(conditions) if conditions else "TRUE"
 
         cur.execute(f"""
-            SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text
+            SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text AS type
             FROM structures s
             WHERE {where}
             ORDER BY s.structure_type, s.name

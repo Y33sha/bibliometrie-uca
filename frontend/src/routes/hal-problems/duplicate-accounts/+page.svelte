@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { base } from '$app/paths';
-	import { page as pageStore } from '$app/stores';
-	import { onMount } from 'svelte';
-	import { api } from '$lib/api';
-	import { titleCase } from '$lib/utils';
-	import Pagination from '$lib/components/Pagination.svelte';
+	import { base } from "$app/paths";
+	import { page as pageStore } from "$app/stores";
+	import { onMount } from "svelte";
+	import { api } from "$lib/api";
+	import { titleCase } from "$lib/utils";
+	import Pagination from "$lib/components/Pagination.svelte";
 
 	interface HalAccount {
 		hal_person_id: number;
@@ -35,14 +35,20 @@
 
 	function syncUrl() {
 		const p = new URLSearchParams();
-		if (page > 1) p.set('page', String(page));
+		if (page > 1) p.set("page", String(page));
 		const qs = p.toString();
-		history.replaceState(history.state, '', `${base}/hal-problems/duplicate-accounts` + (qs ? '?' + qs : ''));
+		history.replaceState(
+			history.state,
+			"",
+			`${base}/hal-problems/duplicate-accounts` + (qs ? "?" + qs : ""),
+		);
 	}
 
 	async function load() {
 		loading = true;
-		const data = await api<Response>(`/api/hal-problems/duplicate-accounts?page=${page}&per_page=50`);
+		const data = await api<Response>(
+			`/api/hal-problems/duplicate-accounts?page=${page}&per_page=50`,
+		);
 		persons = data.persons;
 		total = data.total;
 		pages = data.pages;
@@ -53,7 +59,7 @@
 
 	onMount(() => {
 		const urlParams = new URLSearchParams($pageStore.url.search);
-		if (urlParams.get('page')) page = parseInt(urlParams.get('page')!);
+		if (urlParams.get("page")) page = parseInt(urlParams.get("page")!);
 		load();
 	});
 </script>
@@ -65,11 +71,12 @@
 <h1>Doublons de comptes HAL</h1>
 
 <div class="info-box">
-	Personnes liées à au moins deux comptes HAL distincts. Soit doublons de comptes, soit publications attribuées à un compte homonyme.
+	Personnes liées à au moins deux personId distincts. Soit doublons d'auteurs,
+	soit publications attribuées à un auteur homonyme.
 </div>
 
 <div class="toolbar">
-	<span class="count">{total} personne{total > 1 ? 's' : ''}</span>
+	<span class="count">{total} personne{total > 1 ? "s" : ""}</span>
 </div>
 
 {#if loading}
@@ -88,24 +95,43 @@
 			{#each persons as p}
 				<tr>
 					<td>
-						<a href="{base}/persons/{p.person_id}" class="person-link">
-							{titleCase(p.first_name)} {titleCase(p.last_name)}
+						<a
+							href="{base}/persons/{p.person_id}"
+							class="person-link"
+						>
+							{titleCase(p.first_name)}
+							{titleCase(p.last_name)}
 						</a>
-						{#if p.has_rh}<span class="rh-check" title="Fichier RH">&#10003;</span>{/if}
+						{#if p.has_rh}<span class="rh-check" title="Fichier RH"
+								>&#10003;</span
+							>{/if}
 					</td>
 					<td class="hal-accounts">
 						{#each p.hal_accounts as ha}
 							<div class="hal-account">
-								<a href="https://hal.science/search/index/?qa%5BauthIdHal_i%5D%5B%5D={ha.hal_person_id}" target="_blank" rel="noopener" class="hal-id">
+								<a
+									href="https://hal.science/search/index/?qa%5BauthIdHal_i%5D%5B%5D={ha.hal_person_id}"
+									target="_blank"
+									rel="noopener"
+									class="hal-id"
+								>
 									{ha.hal_person_id}
 								</a>
 								<span class="hal-name">{ha.full_name}</span>
-								<span class="hal-pubs">{ha.pub_count} publi{ha.pub_count > 1 ? 's' : ''}</span>
+								<span class="hal-pubs"
+									>{ha.pub_count} publi{ha.pub_count > 1
+										? "s"
+										: ""}</span
+								>
 								{#if ha.idhal}
-									<span class="hal-idhal">idHAL: {ha.idhal}</span>
+									<span class="hal-idhal"
+										>idHAL: {ha.idhal}</span
+									>
 								{/if}
 								{#if ha.orcid}
-									<span class="hal-orcid">ORCID: {ha.orcid}</span>
+									<span class="hal-orcid"
+										>ORCID: {ha.orcid}</span
+									>
 								{/if}
 							</div>
 						{/each}
@@ -115,7 +141,15 @@
 		</tbody>
 	</table>
 
-	<Pagination {page} {pages} onchange={(p) => { page = p; load(); window.scrollTo(0, 0); }} />
+	<Pagination
+		{page}
+		{pages}
+		onchange={(p) => {
+			page = p;
+			load();
+			window.scrollTo(0, 0);
+		}}
+	/>
 {/if}
 
 <style>
@@ -136,7 +170,10 @@
 		margin-bottom: 12px;
 		flex-wrap: wrap;
 	}
-	.count { font-size: 0.9rem; color: var(--muted); }
+	.count {
+		font-size: 0.9rem;
+		color: var(--muted);
+	}
 
 	.pub-table {
 		width: 100%;
@@ -155,15 +192,37 @@
 		color: var(--muted);
 		border-bottom: 2px solid var(--border);
 	}
-	.pub-table tbody tr { border-bottom: 1px solid #f0efec; }
-	.pub-table tbody tr:hover { background: #fafaf8; }
-	.pub-table td { padding: 8px 12px; font-size: 0.9rem; vertical-align: top; }
+	.pub-table tbody tr {
+		border-bottom: 1px solid #f0efec;
+	}
+	.pub-table tbody tr:hover {
+		background: #fafaf8;
+	}
+	.pub-table td {
+		padding: 8px 12px;
+		font-size: 0.9rem;
+		vertical-align: top;
+	}
 
-	.person-link { color: var(--accent); text-decoration: none; font-weight: 500; }
-	.person-link:hover { text-decoration: underline; }
-	.rh-check { color: #3b82f6; font-size: 0.8rem; margin-left: 4px; }
+	.person-link {
+		color: var(--accent);
+		text-decoration: none;
+		font-weight: 500;
+	}
+	.person-link:hover {
+		text-decoration: underline;
+	}
+	.rh-check {
+		color: #3b82f6;
+		font-size: 0.8rem;
+		margin-left: 4px;
+	}
 
-	.hal-accounts { display: flex; flex-direction: column; gap: 4px; }
+	.hal-accounts {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
 	.hal-account {
 		display: flex;
 		align-items: center;
@@ -177,8 +236,12 @@
 		font-family: monospace;
 		font-size: 0.8rem;
 	}
-	.hal-id:hover { text-decoration: underline; }
-	.hal-name { font-weight: 500; }
+	.hal-id:hover {
+		text-decoration: underline;
+	}
+	.hal-name {
+		font-weight: 500;
+	}
 	.hal-pubs {
 		font-size: 0.8rem;
 		color: var(--muted);
@@ -186,10 +249,16 @@
 		padding: 1px 6px;
 		border-radius: 3px;
 	}
-	.hal-idhal, .hal-orcid {
+	.hal-idhal,
+	.hal-orcid {
 		font-size: 0.8rem;
 		color: var(--muted);
 	}
 
-	.loading, .no-results { text-align: center; padding: 40px; color: var(--muted); }
+	.loading,
+	.no-results {
+		text-align: center;
+		padding: 40px;
+		color: var(--muted);
+	}
 </style>
