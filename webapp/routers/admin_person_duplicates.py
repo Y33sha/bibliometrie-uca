@@ -2,6 +2,7 @@
 
 import os
 import sys
+import psycopg2.extras
 from fastapi import APIRouter, Query, HTTPException
 from webapp.deps import get_cursor
 from webapp.filters import parse_str_csv
@@ -174,14 +175,12 @@ def _get_person_dedup_detail(cur, person_id):
         FROM structures s
         WHERE s.structure_type = 'labo' AND s.id IN (
             SELECT UNNEST(has2.structure_ids)
-            FROM hal_authors ha2
-            JOIN hal_authorships has2 ON has2.hal_author_id = ha2.id
-            WHERE ha2.person_id = %s AND has2.structure_ids IS NOT NULL
+            FROM hal_authorships has2
+            WHERE has2.person_id = %s AND has2.structure_ids IS NOT NULL
             UNION ALL
             SELECT UNNEST(oas2.structure_ids)
-            FROM openalex_authors oa2
-            JOIN openalex_authorships oas2 ON oas2.openalex_author_id = oa2.id
-            WHERE oa2.person_id = %s AND oas2.structure_ids IS NOT NULL
+            FROM openalex_authorships oas2
+            WHERE oas2.person_id = %s AND oas2.structure_ids IS NOT NULL
         )
         ORDER BY s.acronym NULLS LAST, s.name
     """, (person_id, person_id))
@@ -329,12 +328,11 @@ WITH pub_author_counts AS (
     ) sub GROUP BY publication_id
 ),
 author_positions AS (
-    SELECT DISTINCT hd.publication_id, has.author_position, ha.person_id
+    SELECT DISTINCT hd.publication_id, has.author_position, has.person_id
     FROM hal_documents hd
     JOIN hal_authorships has ON has.hal_document_id = hd.id
-    JOIN hal_authors ha ON ha.id = has.hal_author_id
     JOIN pub_author_counts pac ON pac.publication_id = hd.publication_id
-    WHERE ha.person_id IS NOT NULL AND NOT has.excluded
+    WHERE has.person_id IS NOT NULL AND NOT has.excluded
       AND pac.max_authors <= {max_authors}
     UNION
     SELECT DISTINCT od.publication_id, oas.author_position, oas.person_id
@@ -344,12 +342,11 @@ author_positions AS (
     WHERE oas.person_id IS NOT NULL AND NOT oas.excluded
       AND pac.max_authors <= {max_authors}
     UNION
-    SELECT DISTINCT wd.publication_id, was.author_position, wa.person_id
+    SELECT DISTINCT wd.publication_id, was.author_position, was.person_id
     FROM wos_documents wd
     JOIN wos_authorships was ON was.wos_document_id = wd.id
-    JOIN wos_authors wa ON wa.id = was.wos_author_id
     JOIN pub_author_counts pac ON pac.publication_id = wd.publication_id
-    WHERE wa.person_id IS NOT NULL AND NOT was.excluded
+    WHERE was.person_id IS NOT NULL AND NOT was.excluded
       AND pac.max_authors <= {max_authors}
 )
 SELECT LEAST(a1.person_id, a2.person_id) AS id_a,

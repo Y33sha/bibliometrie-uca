@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query, HTTPException, Depends
 from webapp.deps import get_cursor, require_admin
 from webapp.models import (StructureCreate, StructureUpdate, RelationCreate,
     NameFormCreate, NameFormUpdate)
+from utils.normalize import normalize_text
 
 router = APIRouter()
 

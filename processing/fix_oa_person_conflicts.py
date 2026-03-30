@@ -60,29 +60,27 @@ def main():
         WITH {ALIGNED_PUBS_CTE},
         hal_fixes AS (
             SELECT oas.id AS oas_id, oas.person_id AS wrong_pid,
-                   ha.person_id AS correct_pid, oas.raw_author_name
+                   has2.person_id AS correct_pid, oas.raw_author_name
             FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
             JOIN aligned_hal_oa a ON a.publication_id = od.publication_id
             JOIN hal_documents hd ON hd.publication_id = od.publication_id
             JOIN hal_authorships has2 ON has2.hal_document_id = hd.id
                 AND has2.author_position = oas.author_position
-            JOIN hal_authors ha ON ha.id = has2.hal_author_id
-            WHERE ha.person_id IS NOT NULL
-              AND oas.person_id IS DISTINCT FROM ha.person_id
+            WHERE has2.person_id IS NOT NULL
+              AND oas.person_id IS DISTINCT FROM has2.person_id
         ),
         wos_fixes AS (
             SELECT oas.id AS oas_id, oas.person_id AS wrong_pid,
-                   wa.person_id AS correct_pid, oas.raw_author_name
+                   was.person_id AS correct_pid, oas.raw_author_name
             FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
             JOIN aligned_wos_oa a ON a.publication_id = od.publication_id
             JOIN wos_documents wd ON wd.publication_id = od.publication_id
             JOIN wos_authorships was ON was.wos_document_id = wd.id
                 AND was.author_position = oas.author_position
-            JOIN wos_authors wa ON wa.id = was.wos_author_id
-            WHERE wa.person_id IS NOT NULL
-              AND oas.person_id IS DISTINCT FROM wa.person_id
+            WHERE was.person_id IS NOT NULL
+              AND oas.person_id IS DISTINCT FROM was.person_id
               AND NOT EXISTS (SELECT 1 FROM hal_fixes hf WHERE hf.oas_id = oas.id)
         )
         SELECT f.oas_id, MIN(f.wrong_pid) AS wrong_pid,
@@ -174,9 +172,9 @@ def main():
     cur.execute("""
         WITH orphans AS (
             SELECT p.id FROM persons p
-            WHERE NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
+            WHERE NOT EXISTS (SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id)
               AND NOT EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id)
-              AND NOT EXISTS (SELECT 1 FROM wos_authors wa WHERE wa.person_id = p.id)
+              AND NOT EXISTS (SELECT 1 FROM wos_authorships was WHERE was.person_id = p.id)
               AND NOT EXISTS (SELECT 1 FROM persons_rh prh WHERE prh.person_id = p.id)
               AND NOT EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)
         )

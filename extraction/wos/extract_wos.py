@@ -16,6 +16,7 @@ Query:  OG=(Universite Clermont Auvergne OR CHU Clermont Ferrand
 """
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -159,17 +160,33 @@ def get_existing_uts(conn) -> set:
         return {row[0] for row in cur.fetchall()}
 
 
+def compute_hash(raw_data) -> str:
+    """Calcule le hash MD5 du JSON canonique."""
+    canonical = json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
+
+
 def insert_batch(conn, batch: list[tuple]):
-    """Insère un batch de records dans staging_wos."""
+    """Insère un batch de records dans staging_wos.
+    Si le record existe et le hash a changé, met à jour raw_data et remet processed = FALSE.
+    """
     query = """
-        INSERT INTO staging_wos (ut, doi, raw_data)
+        INSERT INTO staging_wos (ut, doi, raw_data, raw_hash)
         VALUES %s
-        ON CONFLICT (ut) DO NOTHING
+        ON CONFLICT (ut) DO UPDATE SET
+            raw_data = CASE
+                WHEN staging_wos.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN EXCLUDED.raw_data ELSE staging_wos.raw_data END,
+            raw_hash = COALESCE(EXCLUDED.raw_hash, staging_wos.raw_hash),
+            processed = CASE
+                WHEN staging_wos.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN FALSE ELSE staging_wos.processed END,
+            last_seen_at = now()
     """
     with conn.cursor() as cur:
         execute_values(
             cur, query, batch,
-            template="(%s, %s, %s::jsonb)"
+            template="(%s, %s, %s::jsonb, %s)"
         )
     conn.commit()
 
@@ -223,11 +240,9 @@ def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> i
         batch = []
         for rec in records:
             ut = extract_ut(rec)
-            if ut in existing_uts:
-                continue
-
             doi = extract_doi(rec)
-            batch.append((ut, doi, Json(rec)))
+            h = compute_hash(rec)
+            batch.append((ut, doi, Json(rec), h))
             existing_uts.add(ut)
 
         # Insérer

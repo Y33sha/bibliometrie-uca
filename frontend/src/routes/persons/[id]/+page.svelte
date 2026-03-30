@@ -173,7 +173,7 @@
 			corresponding: { value: string; count: number }[];
 			source_counts: Record<string, number>;
 			countries: { value: string; count: number }[];
-		}>('/api/publications/facets?' + params);
+		}>('/api/publications/facets?' + params, { key: 'person-detail-facets' });
 		yearOptions = data.years.map((y) => ({
 			value: String(y.value), text: String(y.value), count: y.count
 		}));
@@ -199,7 +199,7 @@
 		params.set('page', String(pubPage));
 		params.set('per_page', String(pubPerPage));
 		params.set('sort', 'year_desc');
-		const data = await api<PubResponse>('/api/publications?' + params);
+		const data = await api<PubResponse>('/api/publications?' + params, { key: 'person-detail-pubs' });
 		publications = data.publications;
 		pubTotal = data.total;
 		pubPages = data.pages;
@@ -219,7 +219,7 @@
 		});
 		const data = await api<{
 			total: number; page: number; pages: number; addresses: Address[];
-		}>(`/api/persons/${personId}/addresses?${params}`);
+		}>(`/api/persons/${personId}/addresses?${params}`, { key: 'person-detail-addresses' });
 		addresses = data.addresses;
 		addrTotal = data.total;
 		addrPages = data.pages;

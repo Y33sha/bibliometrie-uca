@@ -11,6 +11,8 @@ Usage:
 """
 
 import argparse
+import hashlib
+import json
 import logging
 import os
 import sys
@@ -230,11 +232,21 @@ def main():
                 skipped_total += 1
                 continue
 
+            raw_json = json.dumps(rec, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+            h = hashlib.md5(raw_json.encode("utf-8")).hexdigest()
             cur.execute("""
-                INSERT INTO staging_wos (ut, doi, raw_data)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (ut) DO NOTHING
-            """, (ut, doi, Json(rec)))
+                INSERT INTO staging_wos (ut, doi, raw_data, raw_hash)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (ut) DO UPDATE SET
+                    raw_data = CASE
+                        WHEN staging_wos.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                        THEN EXCLUDED.raw_data ELSE staging_wos.raw_data END,
+                    raw_hash = COALESCE(EXCLUDED.raw_hash, staging_wos.raw_hash),
+                    processed = CASE
+                        WHEN staging_wos.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                        THEN FALSE ELSE staging_wos.processed END,
+                    last_seen_at = now()
+            """, (ut, doi, Json(rec), h))
             if cur.rowcount:
                 inserted_total += 1
             else:

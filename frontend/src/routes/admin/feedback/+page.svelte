@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
+	import { replaceState } from '$app/navigation';
 	import { api } from '$lib/api';
 	import { esc } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -95,7 +96,7 @@
 		if (currentPage > 1) sp.set('page', String(currentPage));
 		const qs = sp.toString();
 		const newUrl = window.location.pathname + (qs ? '?' + qs : '');
-		history.replaceState({}, '', newUrl);
+		replaceState(newUrl, {});
 	}
 
 	// ---------- State ----------
@@ -187,7 +188,7 @@
 
 	async function loadStats() {
 		if (!currentStructureId) return;
-		stats = await api<FeedbackStats>(`/api/feedback/stats?structure_id=${currentStructureId}`);
+		stats = await api<FeedbackStats>(`/api/feedback/stats?structure_id=${currentStructureId}`, { key: 'feedback-stats' });
 	}
 
 	async function loadTable() {
@@ -202,7 +203,7 @@
 		});
 		if (search) params.set('search', search);
 
-		const data = await api<FeedbackPage>(endpoint + '?' + params);
+		const data = await api<FeedbackPage>(endpoint + '?' + params, { key: 'feedback-table' });
 		addresses = data.addresses;
 		total = data.total;
 		pages = data.pages;

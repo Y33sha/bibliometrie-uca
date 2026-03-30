@@ -831,6 +831,9 @@
 		color: var(--muted);
 		letter-spacing: 1px;
 		padding: 3px 10px !important;
+		word-wrap: break-word;
+		overflow-wrap: break-word;
+		max-width: 200px;
 	}
 	.author-countries {
 		font-size: 0.7rem;

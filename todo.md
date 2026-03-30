@@ -11,11 +11,6 @@ pg_dump -U lalecoz -d publisher_stats -F c -f bibliometrie.dump
 * [ ] estimer APC par structure (gold+hybride avec auteur correspondant sauf Elsevier)
 * [ ] exploiter OpenAPC
 
-## Web of Science
-API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuellement.
-* [x] Import staging : scrape_wos.py --parse-only (fichiers dans extraction/wos/downloads/)
-* [x] Normalisation, peuplement des tables structures, auteurs, authorships, gestion des adresses, etc.
-
 ## OpenAlex
 * [ ] re-fetch individuel des docts OpenAlex plafonnés à 100 authorships (auteurs UCA au-delà de la pos. 100 sont perdus)
 * [ ] importer orcid des openalex authors seulement quand display_name = raw_author_name (et pas d'initiale)
@@ -30,8 +25,8 @@ API Expanded non fiable. Import via fichiers tab-delimited téléchargés manuel
 * [ ] revue Openalex 'HAL (Le Centre pour la Communication Scientifique Directe)' => parfois absents de HAL! Auditer docts source OpenAlex, ref HAL, HAL non trouvé => supprimer
 * [ ] https://hal.science/hal-03874894 => lien OA vers autre archive ouverte: en tenir compte pour le statut green
 * [ ] DOI identique mais type différent: ne pas fusionner (ouvrages + chapitres, conf + posters, etc.)
-* [ ] conserver le type poster
 * [ ] trous dans la numérotation des auteurs: diagnostiquer et résoudre
+* [ ] fichiers sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?)
 
 ## ORCID
 * [ ] moissoner crossref via ORCID pour trouver publis absentes de HAL, OpenAlex et WoS?
@@ -48,12 +43,11 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 
 # Développement
 
-## Signatures
+## Adresses
 * [ ] interface de repérage: filtres sur la base des autres structures reconnues
 * [ ] validation des adresses (forme correcte): à mettre en place si pertinent
 * [ ] publis sans adresses (HAL) => scraper les sites éditeurs pour trouver adresses?
 * [ ] supprimer formes de noms redondantes
-* [ ] supprimer review_status
 
 ## Personnes
 * [x] moissonner ORCID liés aux comptes HAL (processing/harvest_hal_orcids.py — 12125 ORCID récupérés) => quelle place dans le pipeline?
@@ -85,17 +79,6 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] ajout de formes de nom ne marche pas (erreur 500)
 
 ## Publications
-* [x] diagnostiquer le lag (tester requêtes)
-* [x] idem page stats (revues): requête très lente
-* [x] créer page détails (publications/[id])
-* [x] filtre Source: 3 options par source (absent, présent, tous)
-* [x] dans les filtres: ajouter option "aucun labo"
-* [x] type "preprint": apparaît "autre" dans les extractions OpenAlex (https://openalex.org/works/W4407574839); voir ce qu'il en est dans les extractions HAL (le compte de préprints est zéro)
-* [x] Open Access diamond?
-* [x] déduplication publications par titre normalisé (interface one-at-a-time, skip/nav)
-* [x] source unique: afficher liste complète des auteurs avec affiliations
-* [x] numérotation auteurs dans doublons: position réelle de la source
-* [x] tous les auteurs affichés dans doublons (même sans person_id), avec nom depuis les sources
 * [ ] ajouter filtre corresponding_is_uca?
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
 * [ ] lien Publications -> Dashboard?
@@ -104,9 +87,11 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] authorship supprimée: publi apparaît toujours (julie gardette)
 * [ ] source theConversation: pas closed, et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
 ### Types de documents
-* [ ] gérer le document type "correction" sur wos, "erratum" sur OA (actuellement, apparaît comme article)
-* [ ] type peer-review
+* [ ] gérer le document type "correction" sur wos, "erratum" sur OA (actuellement, apparaît comme article) (Corrigendum to ...)
+* [ ] type peer-review?
 * [ ] HAL compte-rendu => "autre"
+* [ ] type review (compte-rendu): parfois utilisé pour des revues de la littérature, alors que ça devrait être des articles (?); auditer
+* [ ] posters
 
 ## Pages supplémentaires, étudier pertinence
 * [ ] sujets
@@ -115,18 +100,11 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 
 
 # Interface
-* [x] Export csv tableaux
-* [x] Export png graphiques
-* [x] Légende dans export png
-* [x] Filtres à facettes dynamiques avec comptage
-* [x] lien retour: seulement si historique existe
-* [x] sources: arrangées verticalement dans un dropdown
 * [ ] Toujours mémoriser filtres et les rétablir au rechargement
 * [ ] Rendre les filtres sticky
 * [ ] Rendre tous les tableaux triables
-* [ ] labo: filtres personnes
 * [ ] afficher todo et nouveautés?
-* [ ] interface pour afficher le staging (pour vérif)
+* [ ] interface pour afficher le staging json (pour vérif)
 
 # Trucs pour plus tard
 * compte fractionnaire?

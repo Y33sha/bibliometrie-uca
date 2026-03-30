@@ -38,8 +38,8 @@ publisher-stats/
 │   ├── populate_hal_struct_ids.py  # Extrait/matche les structures HAL
 │   ├── enrich_hal_structures.py # Enrichit hal_structures depuis l'API ref/structure
 │   ├── enrich_oa_unpaywall.py   # Enrichit le statut OA via Unpaywall
-│   ├── create_persons_from_authorships.py  # Création automatique des personnes (5 passes)
-│   ├── rebuild_authorships.py   # Reconstruit la table authorships (vérité) depuis les sources
+│   ├── create_persons_from_source_authorships.py  # Création automatique des personnes (5 passes)
+│   ├── build_authorships.py   # Reconstruit la table authorships (vérité) depuis les sources
 │   └── merge_lab_duplicates.py  # Fusion interactive des homonymes par labo
 ├── frontend/                    # Application SvelteKit (Svelte 5)
 │   └── src/routes/              # Pages : publications, persons, laboratories, admin, stats
@@ -89,7 +89,7 @@ Formes textuelles utilisées pour détecter les structures dans les adresses d'a
 - `requires_context_of` : JSONB, optionnel. Si présent, la forme ne matche que si une forme d'une des structures contextuelles est aussi détectée dans l'adresse (ex : la forme courte « IP » ne matche que si une tutelle comme « CNRS » est aussi présente).
 
 #### `persons` — Référentiel des individus
-Alimenté par les exports RH et par le script `create_persons_from_authorships.py` (création automatique depuis les authorships). Ne contient aucun identifiant bibliométrique directement.
+Alimenté par les exports RH et par le script `create_persons_from_source_authorships.py` (création automatique depuis les authorships). Ne contient aucun identifiant bibliométrique directement.
 - `last_name`, `first_name` : nom affiché.
 - `last_name_normalized`, `first_name_normalized` : formes normalisées pour la déduplication.
 
@@ -114,16 +114,16 @@ Table centrale. Chaque ligne = 1 publication unique, potentiellement issue de pl
 - `oa_status` : statut OA résolu (peut venir d'OpenAlex, d'Unpaywall, ou de HAL).
 
 #### `authorships` — Table de vérité personne × publication
-Construite par `rebuild_authorships.py` depuis les authorships source. Relie personnes, publications et structures.
+Construite par `build_authorships.py` depuis les authorships source. Relie personnes, publications et structures.
 - `person_id` : peut être NULL si la personne n'est pas encore identifiée.
 - `structure_ids INT[]` : structures du périmètre large (UCA + labos tutellés + partenaires).
 - `is_uca` : TRUE si au moins une structure du périmètre restreint (UCA + labos tutellés).
-- `hal_authorship_id`, `openalex_authorship_id`, `wos_authorship_id` : FK vers les authorships source (peuplés par `rebuild_authorships.py`).
+- `hal_authorship_id`, `openalex_authorship_id`, `wos_authorship_id` : FK vers les authorships source (peuplés par `build_authorships.py`).
 - `author_position`, `is_corresponding` : propagés depuis les sources.
 - `excluded` : lien erroné (homonyme, etc.).
 - Contrainte d'unicité sur `(publication_id, person_id)`.
 
-**Important** : `rebuild_authorships.py` crée les lignes (INSERT des paires `publication_id, person_id`) et peuple les FK/métadonnées. Les flags `is_uca` et `structure_ids` sont ensuite peuplés par `create_persons_from_authorships.py` (étape 4 de propagation) ou par `populate_uca_flags.sql` (étape 4).
+**Important** : `build_authorships.py` crée les lignes, peuple les FK/métadonnées, ET propage `is_uca`/`structure_ids` depuis les authorships sources (union des 3 sources). C'est le seul point de propagation UCA vers la table de vérité.
 
 ### Tables source — HAL
 
@@ -138,9 +138,9 @@ Référentiel des structures HAL, peuplé depuis l'API `ref/structure`.
 
 #### `hal_authors`
 Un enregistrement = un identifiant auteur dans HAL.
-- `hal_person_id` : numérique HAL (UNIQUE mais nullable).
+- `hal_person_id` : numérique HAL (UNIQUE mais nullable). Les auteurs sans `hal_person_id` sont identifiés uniquement par une forme de nom (`hal_form_id`).
 - `idhal`, `orcid` : données source observées.
-- `person_id` : FK vers `persons` (NULL si non résolu ou non fiable).
+- `person_id` : FK vers `persons`. **Utilisé uniquement pour les auteurs avec `hal_person_id`** (comptes HAL garantissant l'unicité). Les auteurs sans `hal_person_id` n'ont jamais de `person_id` sur cette table — la liaison se fait au niveau des `hal_authorships`.
 - `is_reliable` : FALSE si cet identifiant recouvre plusieurs personnes réelles.
 
 #### `hal_documents`
@@ -151,6 +151,7 @@ Un enregistrement = un document HAL.
 
 #### `hal_authorships`
 Relation document × auteur dans HAL.
+- `person_id` : FK vers `persons`. Source de vérité pour la liaison personne ↔ authorship HAL.
 - `hal_struct_ids INT[]` : identifiants hal_struct_id affiliés (données brutes).
 - `structure_ids INT[]` : structures UCA résolues (via `hal_structures.structure_id`).
 - `is_uca` : TRUE si `structure_ids` contient au moins une structure du périmètre UCA.
@@ -163,13 +164,16 @@ Architecture identique à HAL, adaptée aux spécificités d'OpenAlex.
 Pendant de `hal_structures`. `ror_id` permet l'alignement automatique avec `structures.ror_id`.
 
 #### `openalex_authors`
-Un enregistrement = un auteur OpenAlex, identifié par `openalex_id` (UNIQUE). `is_reliable` important car OpenAlex fusionne parfois des homonymes.
+Un enregistrement = un auteur OpenAlex, identifié par `openalex_id` (UNIQUE). Entités non fiables (OpenAlex fusionne parfois des homonymes). Pas de `person_id` — la liaison se fait au niveau des `openalex_authorships`. Conservées comme données source de référence.
 
 #### `openalex_documents`
 Même logique que `hal_documents`. Pas de champ `collections` (concept HAL).
+- `countries` : calculé depuis les adresses résolues (pas depuis le staging OA, dont les pays dérivés de l'algo OpenAlex sont souvent fautifs). Non utilisé pour le calcul de `publications.countries` — ce dernier est recalculé directement depuis les adresses.
 
 #### `openalex_authorships`
+- `person_id` : FK vers `persons`. Source de vérité pour la liaison personne ↔ authorship OpenAlex.
 - `raw_affiliation` : affiliation brute (source des adresses).
+- `raw_author_name`, `raw_orcid` : nom et ORCID observés (utilisés pour la résolution de personnes à la place des entités `openalex_authors`).
 - `openalex_institution_ids TEXT[]` : institutions OpenAlex détectées.
 - `structure_ids INT[]` / `is_uca` : résolution UCA (via les adresses et `address_structures`).
 
@@ -178,13 +182,14 @@ Même logique que `hal_documents`. Pas de champ `collections` (concept HAL).
 Architecture identique à HAL et OpenAlex, adaptée aux spécificités du Web of Science.
 
 #### `wos_authors`
-Un enregistrement = un auteur WoS, identifié par `wos_id` (ResearcherID, si disponible). `orcid` extrait des données brutes. `person_id` : FK vers `persons`.
+Un enregistrement = un auteur WoS, entité algorithmique identifiée par `wos_id` (ResearcherID, si disponible). `orcid` extrait des données brutes. Pas de `person_id` — la liaison se fait au niveau des `wos_authorships`.
 
 #### `wos_documents`
 Un enregistrement = un document WoS, identifié par `ut` (WoS UID, UNIQUE). `publication_id` : FK vers la publication canonique.
 
 #### `wos_authorships`
 Relation document × auteur dans WoS.
+- `person_id` : FK vers `persons`. Source de vérité pour la liaison personne ↔ authorship WoS.
 - `raw_affiliation` : affiliation brute.
 - `structure_ids INT[]` / `is_uca` : résolution UCA (via les adresses et `address_structures`).
 - `is_corresponding` : TRUE si auteur correspondant.
@@ -334,40 +339,42 @@ Détail des étapes :
 2. **HAL is_uca** : flag les authorships ayant au moins une structure du périmètre restreint.
 3. **OpenAlex** : calcule `is_uca` (périmètre restreint) et `structure_ids` (périmètre large) via `openalex_authorship_addresses` → `address_structures`.
 3b. **WoS** : idem via `wos_authorship_addresses` → `address_structures`.
-4. **Propagation vers authorships (vérité)** : propage depuis les 3 sources par matching `(publication_id, person_id)`, en fusionnant les `structure_ids`. **Requiert que les `person_id` soient déjà résolus** (étape 3d).
-
-> **Note** : l'étape 4 est aussi exécutée par `create_persons_from_authorships.py` et par `rebuild_authorships.py` n'exécute pas cette étape. Voir « Pipeline complet » ci-dessous.
+Le script `populate_uca_flags.sql` ne touche pas la table `authorships` (vérité). La propagation vers la vérité est assurée par `build_authorships.py` (voir étape 3e).
 
 ### Étape 3d — Création des personnes
 
 ```bash
-python3 processing/create_persons_from_authorships.py   # Création automatique (5 passes + propagation)
-python3 processing/merge_lab_duplicates.py               # Fusion des homonymes par labo
+python3 processing/create_persons_from_source_authorships.py   # Création automatique
+python3 processing/populate_person_name_forms.py               # Formes de noms
+python3 processing/merge_lab_duplicates.py                     # Fusion homonymes (interactif)
 ```
 
-Le script `create_persons_from_authorships.py` crée les entrées `persons` depuis les authorships UCA non encore rattachés, en 5 passes :
-1. Regroupement par ORCID
-1b. Rattachement aux personnes existantes par nom strict + co-publication
-2. Regroupement par nom strict + co-publication entre auteurs restants
-3. Singletons (authorship UCA isolée → une personne)
-3b. Cross-link — rattache les auteurs non-UCA homonymes sur les mêmes publications
+Le script `create_persons_from_source_authorships.py` crée les entrées `persons` depuis les authorships sources UCA non rattachées. Algorithme **source-agnostique** en 6 passes :
 
-Puis **étape 4** : propage `is_uca` et `structure_ids` vers la table `authorships` (même logique que `populate_uca_flags.sql` étape 4).
+0. **Comptes HAL** : les `hal_authors` avec `hal_person_id` (comptes HAL uniques) → création ou mapping personne + propagation à toutes les authorships du compte. Seule passe spécifique à une source.
+1. **Lookup `person_name_forms`** : cherche le nom normalisé dans les formes existantes. Si match unique → rattacher.
+2. **Nom compatible + co-publication** : cherche dans les personnes existantes un nom compatible (initiale, composé, inversion) ET une publication en commun. Si match unique → rattacher.
+3. **Nom seul** : si une seule personne existante porte exactement ce nom → rattacher.
+4. **Groupement orphelins** : groupe les authorships restantes par nom + co-publication (union-find). Avant de créer : vérifie s'il existe une personne compatible avec co-publication → fusionne. Sinon → crée une personne.
+5. **Singletons** : même vérification avant création pour les authorships isolées.
 
-Le script `merge_lab_duplicates.py` détecte et fusionne interactivement les doublons (homonymes et interversions nom/prénom) au sein de chaque laboratoire.
+Compatibilité de noms : même nom de famille (ou composé vs simple), même initiale de prénom (ou préfixe, ex. "Jean" vs "Jean-Luc"), inversion nom/prénom.
 
-### Étape 3e — Reconstruction de la table authorships
+Le script `populate_person_name_forms.py` enregistre les formes de noms observées dans les authorships sources, liées aux personnes correspondantes.
+
+Le script `merge_lab_duplicates.py` détecte et fusionne interactivement les doublons (homonymes et interversions nom/prénom) au sein de chaque laboratoire. Exécution manuelle.
+
+### Étape 3e — Construction de la table authorships
 
 ```bash
-python3 processing/rebuild_authorships.py```
+python3 processing/build_authorships.py
+```
 
-Reconstruit la table de vérité `authorships` :
+Construit la table de vérité `authorships` :
 1. **INSERT** des paires `(publication_id, person_id)` manquantes depuis les 3 sources.
 2. **FK** : peuple `hal_authorship_id`, `openalex_authorship_id`, `wos_authorship_id`.
-3. **author_position** : prend la première valeur non-null (HAL > OpenAlex > WoS).
-4. **is_corresponding** : depuis WoS.
-
-**Ne propage pas `is_uca` ni `structure_ids`**. Après un rebuild, relancer `populate_uca_flags.sql` ou `create_persons_from_authorships.py` pour recalculer les flags.
+3. **author_position** et **is_corresponding** : propagés depuis les sources.
+4. **is_uca** et **structure_ids** : propagés par union des 3 authorships sources. C'est le seul point de propagation UCA vers la table de vérité.
 
 ### Pipeline complet (récapitulatif)
 
@@ -387,13 +394,10 @@ L'ordre des opérations est crucial. Le pipeline complet depuis zéro :
 11. populate_addresses.py             # Extraction adresses (OpenAlex + WoS)
 12. resolve_addresses.py              # Résolution adresses → structures
 13. populate_uca_flags.sql            # Flags UCA sur authorships source (étapes 1-3b)
-14. create_persons_from_authorships.py  # Personnes + propagation (étape 4)
-15. rebuild_authorships.py    # INSERT authorships manquants + FK
-16. populate_uca_flags.sql            # Re-propagation étape 4 (les nouveaux authorships)
-17. enrich_oa_unpaywall.py            # Statut OA via Unpaywall (écrase sauf diamond)
+14. create_persons_from_source_authorships.py  # Création/matching personnes
+15. build_authorships.py              # Construction authorships vérité + propagation UCA
+16. enrich_oa_unpaywall.py            # Statut OA via Unpaywall (écrase sauf diamond)
 ```
-
-> **Problème connu** : les étapes 14 et 16 font toutes les deux la propagation étape 4, mais sur des ensembles différents. L'étape 14 propage uniquement les authorships qui existaient déjà. L'étape 15 crée de nouveaux authorships (notamment pour les publications WoS-only). L'étape 16 repropage pour couvrir ces nouveaux authorships. **Ce pipeline est à simplifier** — idéalement, `rebuild_authorships.py` devrait intégrer la propagation `is_uca`.
 
 ### Étape 4 — Enrichissement OA (optionnel)
 
@@ -523,7 +527,7 @@ gunzip -c ~/backups/pg/publisher_stats_YYYY-MM-DD_HHMM.sql.gz | psql publisher_s
 1. Ajouter l'année dans `settings.py` (OPENALEX.years, HAL.years et WOS.years).
 2. Relancer les extractions (3 sources).
 3. Relancer la normalisation (traitement incrémental via `processed = FALSE`).
-4. Relancer le pipeline complet : populate_addresses → resolve_addresses → populate_uca_flags → create_persons → rebuild_authorships → populate_uca_flags.
+4. Relancer le pipeline : `python3 run_pipeline.py --from addresses`
 
 ### Ajout d'un nouveau labo
 
@@ -545,9 +549,21 @@ La propagation du flag `is_uca` sur les authorships fonctionne différemment sel
 | **OpenAlex** | Temps réel (`propagate_uca_for_addresses()` dans `app.py`) | Chaque review, batch-review, assign-structure, delete-structure |
 | **WoS** | Temps réel (même mécanisme) | Idem |
 | **HAL** | Batch uniquement (`populate_uca_flags.sql`) | Exécution manuelle |
-| **Authorships (vérité)** | Batch uniquement (`populate_uca_flags.sql` étape 4, ou `create_persons_from_authorships.py` étape 4) | Exécution manuelle |
+| **Authorships (vérité)** | Batch uniquement (`build_authorships.py` étape 4) | Exécution manuelle |
 
-**Conséquence** : après une session de review d'adresses, les compteurs de la page Authorships reflètent immédiatement les changements OpenAlex/WoS, mais les authorships HAL restent inchangés jusqu'au prochain `psql -d publisher_stats -f db/populate_uca_flags.sql`. La table de vérité `authorships` n'est mise à jour que par le batch.
+**Conséquence** : après une session de review d'adresses, les compteurs de la page Authorships reflètent immédiatement les changements OpenAlex/WoS, mais les authorships HAL restent inchangés jusqu'au prochain `psql -d publisher_stats -f db/populate_uca_flags.sql`. La table de vérité `authorships` n'est mise à jour que par `build_authorships.py`.
+
+### Propagation des pays
+
+Quand on attribue un pays à une adresse (unitaire ou batch), la propagation vers les documents et publications se fait **automatiquement en tâche de fond** (via FastAPI `BackgroundTasks`). La chaîne :
+
+1. `addresses.countries` est mis à jour (+ propagation aux adresses de même `normalized_text`)
+2. En background : recalcul de `openalex_documents.countries` et `wos_documents.countries` pour les documents liés
+3. Puis recalcul de `publications.countries` (union des 3 sources) pour les publications touchées
+
+Les pays HAL (`hal_documents.countries`) ne sont pas concernés par les adresses — ils viennent de `hal_structures.country`.
+
+Le script `refresh_publication_countries.sql` reste disponible pour un recalcul complet (après import batch), mais n'est plus nécessaire après chaque modification manuelle d'adresse.
 
 ### Modification du périmètre UCA
 
@@ -629,8 +645,8 @@ WHERE hd.publication_id IS NULL
   AND hd.doi IS NOT NULL
 ORDER BY hd.pub_year DESC;
 ```
-4. Mettre de l'ordre dans le dossier processing (scripts obsolètes à supprimer).
-5. **Simplifier le pipeline** : `rebuild_authorships.py` devrait intégrer la propagation `is_uca`/`structure_ids` pour éviter de devoir relancer `populate_uca_flags.sql` deux fois. Idéalement un seul script « reconstruit tout » après la création des personnes.
+4. ~~Mettre de l'ordre dans le dossier processing~~ — **Fait** : scripts obsolètes archivés dans `archive/`.
+5. ~~Simplifier le pipeline~~ — **Fait** : `build_authorships.py` intègre la propagation UCA. Un seul script après la création des personnes.
 6. Import croisé HAL : script similaire à `cross_import_openalex.py` pour récupérer sur HAL les DOI OpenAlex/WoS absents.
 
 
@@ -638,14 +654,22 @@ ORDER BY hd.pub_year DESC;
 
 
 ## Pipeline de normalisation (ordre d'exécution)
+
+Orchestrateur : `python3 run_pipeline.py` (voir `--help` pour les options `--from`, `--only`, `--mode`).
+
 1. `processing/normalize_hal.py` — normalisation HAL (staging → hal_documents + publications)
-2. `processing/normalize_openalex.py` — normalisation OpenAlex (staging → openalex_documents + publications). Détecte les landing_page_url HAL pour éviter les doublons, mais seulement si HAL a déjà été normalisé. Capture `raw_author_name` et `raw_orcid` par authorship.
+2. `processing/normalize_openalex.py` — normalisation OpenAlex (staging → openalex_documents + publications). Détecte les landing_page_url HAL pour éviter les doublons. Capture `raw_author_name` et `raw_orcid` par authorship.
 3. `processing/normalize_wos.py` — normalisation WoS (staging → wos_documents + publications)
 4. `processing/backfill_wos_addresses.py` — parse les adresses WoS (format API) et les lie aux authorships WoS
-5. `processing/merge_hal_openalex_pubs.py` — rattrapage : fusionne les publications OpenAlex dont la landing_page_url pointe vers un document HAL existant mais qui n'avait pas été détecté à l'étape 2 (ex. import OpenAlex antérieur à l'import HAL). **À exécuter systématiquement après les étapes 1-3.**
+5. `processing/merge_hal_openalex_pubs.py` — rattrapage : fusionne les publications OpenAlex dont la landing_page_url pointe vers un document HAL existant mais qui n'avait pas été détecté à l'étape 2. **À exécuter systématiquement après les étapes 1-3.**
 6. `processing/resolve_addresses.py` — repérage des structures UCA dans les nouvelles adresses
 7. `db/refresh_publication_countries.sql` — recalcule `publications.countries` à partir des 3 sources (HAL, OpenAlex, WoS)
-8. `db/populate_uca_flags.sql` — flags UCA (étapes 1-3b sur sources)
-9. `processing/create_persons_from_authorships.py` — Phase A: création personnes HAL/WoS (ORCID, nom+co-publi, singletons, cross-link). Phase B: résolution OA par `raw_author_name` via `person_name_forms` (lookup normalisé), puis création si absent. Les entités `openalex_authors` ne participent PAS à la résolution. Propagation UCA (étape 4).
-10. `processing/rebuild_authorships.py` — INSERT authorships manquants + FK
-11. `db/populate_uca_flags.sql` — re-propagation étape 4 pour les nouvelles lignes de l'étape 10
+8. `db/populate_uca_flags.sql` — flags UCA (étapes 1-3b sur authorships source)
+9. `processing/create_persons_from_source_authorships.py` — Phase A : création personnes HAL/WoS (ORCID, nom+co-publi, singletons, cross-link). Phase B : résolution OA par `raw_author_name` via `person_name_forms` (lookup normalisé, périmètre UCA strict), puis création si absent. Les entités `openalex_authors` ne participent PAS à la résolution.
+10. `processing/populate_person_name_forms.py` — peuplement/mise à jour des formes de noms des personnes
+11. `processing/build_authorships.py` — construction authorships vérité (INSERT + FK + author_position + is_corresponding + propagation is_uca/structure_ids par union des 3 sources)
+
+### Détection des changements et disparitions
+
+- **Hash** : chaque record staging a un `raw_hash` (MD5 du JSON canonique). Si le contenu change côté source, le hash diffère → `processed = FALSE` → re-normalisation au prochain run. Implémenté pour les 3 sources (HAL, OpenAlex, WoS).
+- **last_seen_at** : chaque record staging a un `last_seen_at` mis à jour à chaque import (même si le contenu n'a pas changé). Les documents non revus depuis le dernier import complet sont suspects d'avoir disparu côté source. Pas de suppression automatique pour l'instant.

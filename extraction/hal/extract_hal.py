@@ -171,7 +171,8 @@ def upsert_work(conn, hal_id: str, doi: str | None, raw_data: dict, collection: 
                     WHEN staging_hal.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                         THEN FALSE
                     ELSE staging_hal.processed
-                END
+                END,
+                last_seen_at = now()
         """, (hal_id, doi, Json(raw_data), collection, raw_hash))
 
 

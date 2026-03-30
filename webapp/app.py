@@ -9,9 +9,10 @@ Puis ouvrir http://localhost:8003
 """
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
 
-from webapp.deps import _verify_token, SPAStaticFiles, BUILD_DIR
+from webapp.deps import _verify_token
 
 from webapp.routers import (
     auth, pub_stats, publications, admin_duplicates,
@@ -21,6 +22,15 @@ from webapp.routers import (
 
 app = FastAPI(title="Bibliométrie UCA")
 
+# ----- CORS (frontend SvelteKit sur port séparé) -----
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5176", "http://127.0.0.1:5176"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ----- Middleware -----
 
@@ -65,11 +75,6 @@ app.include_router(structures.router)
 app.include_router(authorships.router)
 app.include_router(persons.router)
 app.include_router(admin_person_duplicates.router)
-
-
-# ----- SvelteKit SPA (doit rester en dernier, après toutes les routes API) -----
-
-app.mount("/bibliometrie", SPAStaticFiles(directory=BUILD_DIR, html=True), name="sveltekit")
 
 
 if __name__ == "__main__":

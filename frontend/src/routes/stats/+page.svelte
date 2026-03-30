@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { base } from '$app/paths';
+	import { replaceState } from '$app/navigation';
 	import { api } from '$lib/api';
 	import { Chart, registerables } from 'chart.js';
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
@@ -101,7 +102,7 @@
 		if (page > 1) p.set('page', String(page));
 		if (labPage > 1) p.set('lab_page', String(labPage));
 		const qs = p.toString();
-		history.replaceState(history.state, '', base + '/stats' + (qs ? '?' + qs : ''));
+		replaceState(base + '/stats' + (qs ? '?' + qs : ''), {});
 	}
 
 	// --- Navigation ---

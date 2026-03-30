@@ -70,7 +70,7 @@
 		if (suggestMode) params.set('suggest', 'true');
 		if (selectedSugCountry.length === 1) params.set('suggested_country', selectedSugCountry[0]);
 		const data = await api<{ total: number; page: number; pages: number; addresses: Address[]; suggestion_facets?: { code: string; count: number }[]; country_facets?: { code: string; count: number }[] }>(
-			'/api/addresses/countries?' + params
+			'/api/addresses/countries?' + params, { key: 'countries-addr-list' }
 		);
 		addresses = data.addresses;
 		total = data.total;

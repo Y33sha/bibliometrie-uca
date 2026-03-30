@@ -172,13 +172,13 @@ async def list_persons(
         params.append(role)
     if linked == "yes":
         conditions.append("""(EXISTS (
-            SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id
+            SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id
         ) OR EXISTS (
             SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id
         ))""")
     elif linked == "no":
         conditions.append("""NOT EXISTS (
-            SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id
+            SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id
         ) AND NOT EXISTS (
             SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id
         )""")
@@ -213,31 +213,14 @@ async def list_persons(
         cur.execute(f"SELECT COUNT(*) FROM persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id {where}", params)
         total = cur.fetchone()["count"]
 
+        # Requête principale : données personne + counts (rapide)
         cur.execute(f"""
             SELECT p.id, p.last_name, p.first_name,
                 p.last_name_normalized, p.first_name_normalized,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh,
                 (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id) AS pub_count,
-                (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id AND a.is_uca = TRUE) AS uca_pub_count,
-                (SELECT json_agg(x) FROM (
-                    SELECT ha.id, ha.full_name, ha.orcid, ha.idhal, 'hal' AS source
-                    FROM hal_authors ha WHERE ha.person_id = p.id
-                    UNION ALL
-                    SELECT MIN(oas.openalex_author_id) AS id, COALESCE(oas.raw_author_name, oa.full_name) AS full_name, NULL AS orcid, NULL AS idhal, 'openalex' AS source
-                    FROM openalex_authorships oas
-                    JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-                    WHERE oas.person_id = p.id
-                    GROUP BY COALESCE(oas.raw_author_name, oa.full_name)
-                    UNION ALL
-                    SELECT wa.id, wa.full_name, wa.orcid, NULL AS idhal, 'wos' AS source
-                    FROM wos_authors wa WHERE wa.person_id = p.id
-                ) x) AS linked_authors,
-                (SELECT json_agg(json_build_object(
-                    'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
-                    'source', pi.source, 'status', pi.status
-                ) ORDER BY pi.id_type, pi.id_value) FROM person_identifiers pi WHERE pi.person_id = p.id
-                ) AS identifiers
+                (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id AND a.is_uca = TRUE) AS uca_pub_count
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             {where}
@@ -253,13 +236,55 @@ async def list_persons(
             }
             LIMIT %s OFFSET %s
         """, params + [per_page, offset])
+        persons_rows = cur.fetchall()
+        person_ids = [p["id"] for p in persons_rows]
+
+        # Identifiants : une seule requête pour les 50 personnes
+        identifiers_map: dict = {}
+        if person_ids:
+            cur.execute("""
+                SELECT pi.person_id,
+                       json_agg(json_build_object(
+                           'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
+                           'source', pi.source, 'status', pi.status
+                       ) ORDER BY pi.id_type, pi.id_value) AS identifiers
+                FROM person_identifiers pi
+                WHERE pi.person_id = ANY(%s)
+                GROUP BY pi.person_id
+            """, (person_ids,))
+            for r in cur.fetchall():
+                identifiers_map[r["person_id"]] = r["identifiers"]
+
+        # Formes de noms avec sources : depuis person_name_forms
+        name_forms_map: dict = {}
+        if person_ids:
+            cur.execute("""
+                SELECT pid AS person_id,
+                       json_agg(json_build_object(
+                           'name_form', pnf.name_form,
+                           'sources', pnf.sources
+                       ) ORDER BY pnf.name_form) AS name_forms
+                FROM person_name_forms pnf,
+                     LATERAL unnest(pnf.person_ids) AS pid
+                WHERE pid = ANY(%s)
+                  AND pnf.sources IS NOT NULL
+                  AND NOT (pnf.sources = ARRAY['persons']::text[])
+                GROUP BY pid
+            """, (person_ids,))
+            for r in cur.fetchall():
+                name_forms_map[r["person_id"]] = r["name_forms"]
+
+        # Assembler
+        for p in persons_rows:
+            p["identifiers"] = identifiers_map.get(p["id"])
+            p["name_forms"] = name_forms_map.get(p["id"])
 
         return {
             "total": total,
             "page": page,
             "per_page": per_page,
             "pages": (total + per_page - 1) // per_page,
-            "persons": cur.fetchall(),
+            "persons": persons_rows,
         }
 
 
@@ -309,10 +334,10 @@ async def persons_facets(
                 conds.append("prh.id IS NULL")
         if skip != "linked":
             if linked == "yes":
-                conds.append("""(EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
+                conds.append("""(EXISTS (SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id)
                     OR EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id))""")
             elif linked == "no":
-                conds.append("""NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
+                conds.append("""NOT EXISTS (SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id)
                     AND NOT EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id)""")
         return conds, params
 
@@ -392,11 +417,11 @@ async def persons_facets(
             cur.execute(f"""
                 SELECT
                     COUNT(*) FILTER (WHERE
-                        EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
+                        EXISTS (SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id)
                         OR EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id)
                     ) AS yes,
                     COUNT(*) FILTER (WHERE
-                        NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
+                        NOT EXISTS (SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id)
                         AND NOT EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id)
                     ) AS no
                 FROM {base_from} {where}
@@ -447,19 +472,11 @@ async def persons_stats():
     with get_cursor() as (cur, conn):
         cur.execute("""
             SELECT
-                COUNT(*) AS total_persons,
-                COUNT(DISTINCT p.id) FILTER (
-                    WHERE EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id)
-                       OR EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id)
-                       OR EXISTS (SELECT 1 FROM wos_authors wa WHERE wa.person_id = p.id)
-                ) AS linked_persons,
-                (SELECT COUNT(*) FROM hal_authors WHERE person_id IS NOT NULL)
-                + (SELECT COUNT(DISTINCT person_id) FROM openalex_authorships WHERE person_id IS NOT NULL)
-                + (SELECT COUNT(*) FROM wos_authors WHERE person_id IS NOT NULL)
-                AS linked_authors,
+                (SELECT COUNT(*) FROM persons) AS total_persons,
+                (SELECT COUNT(DISTINCT person_id) FROM authorships WHERE person_id IS NOT NULL) AS linked_persons,
+                (SELECT COUNT(*) FROM authorships WHERE person_id IS NOT NULL) AS linked_authors,
                 (SELECT COUNT(DISTINCT department_name)
                  FROM persons_rh WHERE department_name IS NOT NULL) AS departments
-            FROM persons p
         """)
         return cur.fetchone()
 
@@ -521,8 +538,10 @@ async def get_person(person_id: int):
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh,
                 (SELECT json_agg(x) FROM (
-                    SELECT ha.id, ha.full_name, ha.orcid, ha.idhal, 'hal' AS source
-                    FROM hal_authors ha WHERE ha.person_id = p.id
+                    SELECT DISTINCT ha.id, ha.full_name, ha.orcid, ha.idhal, 'hal' AS source
+                    FROM hal_authors ha
+                    JOIN hal_authorships has ON has.hal_author_id = ha.id
+                    WHERE has.person_id = p.id
                     UNION ALL
                     SELECT MIN(oas.openalex_author_id) AS id, COALESCE(oas.raw_author_name, oa.full_name) AS full_name, NULL AS orcid, NULL AS idhal, 'openalex' AS source
                     FROM openalex_authorships oas
@@ -531,7 +550,10 @@ async def get_person(person_id: int):
                     GROUP BY COALESCE(oas.raw_author_name, oa.full_name)
                     UNION ALL
                     SELECT wa.id, wa.full_name, wa.orcid, NULL AS idhal, 'wos' AS source
-                    FROM wos_authors wa WHERE wa.person_id = p.id
+                    FROM wos_authors wa
+                    JOIN wos_authorships was ON was.wos_author_id = wa.id
+                    WHERE was.person_id = p.id
+                    GROUP BY wa.id
                 ) x) AS linked_authors,
                 (SELECT json_agg(json_build_object(
                     'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
@@ -574,12 +596,14 @@ async def person_profile(person_id: int):
 
         # Auteurs liés HAL + compte publis UCA
         cur.execute("""
-            SELECT ha.id, 'hal' AS source, ha.full_name, ha.orcid, ha.idhal,
+            SELECT DISTINCT ha.id, 'hal' AS source, ha.full_name, ha.orcid, ha.idhal,
                    ha.hal_person_id,
                    NULL::text AS openalex_id,
                    (SELECT COUNT(*) FROM hal_authorships has2
                     WHERE has2.hal_author_id = ha.id AND has2.is_uca = TRUE) AS uca_pub_count
-            FROM hal_authors ha WHERE ha.person_id = %s
+            FROM hal_authors ha
+            JOIN hal_authorships has ON has.hal_author_id = ha.id
+            WHERE has.person_id = %s
         """, (person_id,))
         hal_authors = cur.fetchall()
 
@@ -603,7 +627,10 @@ async def person_profile(person_id: int):
                    NULL::text AS idhal, NULL::text AS openalex_id,
                    (SELECT COUNT(*) FROM wos_authorships was2
                     WHERE was2.wos_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count
-            FROM wos_authors wa WHERE wa.person_id = %s
+            FROM wos_authors wa
+            JOIN wos_authorships was ON was.wos_author_id = wa.id
+            WHERE was.person_id = %s
+            GROUP BY wa.id
         """, (person_id,))
         wos_authors = cur.fetchall()
 
@@ -708,7 +735,9 @@ async def person_author_candidates(person_id: int, limit: int = Query(10, ge=1, 
         cur.execute(f"""
             WITH candidates AS (
                 SELECT ha.id, 'hal' AS source, ha.full_name, ha.last_name, ha.first_name,
-                       ha.orcid, ha.idhal, NULL::text AS openalex_id, ha.person_id,
+                       ha.orcid, ha.idhal, NULL::text AS openalex_id,
+                       (SELECT has3.person_id FROM hal_authorships has3
+                        WHERE has3.hal_author_id = ha.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
                        (SELECT COUNT(*) FROM hal_authorships has2
                         WHERE has2.hal_author_id = ha.id AND has2.is_uca = TRUE) AS uca_pub_count,
                        (SELECT COUNT(*) FROM hal_authorships has2
@@ -730,7 +759,9 @@ async def person_author_candidates(person_id: int, limit: int = Query(10, ge=1, 
                               WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE)
                 UNION ALL
                 SELECT wa.id, 'wos' AS source, wa.full_name, wa.last_name, wa.first_name,
-                       wa.orcid, NULL::text AS idhal, NULL::text AS openalex_id, wa.person_id,
+                       wa.orcid, NULL::text AS idhal, NULL::text AS openalex_id,
+                       (SELECT was3.person_id FROM wos_authorships was3
+                        WHERE was3.wos_author_id = wa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
                        (SELECT COUNT(*) FROM wos_authorships was2
                         WHERE was2.wos_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count,
                        (SELECT COUNT(*) FROM wos_authorships was2
@@ -758,15 +789,22 @@ async def link_person_to_author(person_id: int, data: LinkPersonAuthor):
             raise HTTPException(status_code=404, detail="Person not found")
 
         if data.source == "hal":
-            cur.execute("SELECT id, idhal, orcid FROM hal_authors WHERE id = %s",
+            cur.execute("SELECT id, idhal, orcid, hal_person_id FROM hal_authors WHERE id = %s",
                         (data.author_id,))
             ha = cur.fetchone()
             if not ha:
                 raise HTTPException(status_code=404, detail="HAL author not found")
+            # Écrire sur hal_authorships (source de vérité)
             cur.execute("""
-                UPDATE hal_authors SET person_id = %s, updated_at = now()
-                WHERE id = %s
+                UPDATE hal_authorships SET person_id = %s
+                WHERE hal_author_id = %s
             """, (person_id, data.author_id))
+            # Aussi écrire sur hal_authors si c'est un compte HAL (hal_person_id non null)
+            if ha["hal_person_id"]:
+                cur.execute("""
+                    UPDATE hal_authors SET person_id = %s, updated_at = now()
+                    WHERE id = %s
+                """, (person_id, data.author_id))
             # Propager vers authorships (vérité)
             cur.execute("""
                 UPDATE authorships ash SET person_id = %s, updated_at = now()
@@ -821,8 +859,8 @@ async def link_person_to_author(person_id: int, data: LinkPersonAuthor):
             if not wa:
                 raise HTTPException(status_code=404, detail="WoS author not found")
             cur.execute("""
-                UPDATE wos_authors SET person_id = %s, updated_at = now()
-                WHERE id = %s
+                UPDATE wos_authorships SET person_id = %s
+                WHERE wos_author_id = %s
             """, (person_id, data.author_id))
             cur.execute("""
                 UPDATE authorships ash SET person_id = %s, updated_at = now()
@@ -851,6 +889,12 @@ async def unlink_person_from_author(person_id: int, source: str, author_id: int)
     """Détache un auteur source d'une personne."""
     with get_cursor() as (cur, conn):
         if source == "hal":
+            # Détacher de hal_authorships (source de vérité)
+            cur.execute("""
+                UPDATE hal_authorships SET person_id = NULL
+                WHERE hal_author_id = %s AND person_id = %s
+            """, (author_id, person_id))
+            # Aussi détacher de hal_authors (comptes HAL)
             cur.execute("""
                 UPDATE hal_authors SET person_id = NULL, updated_at = now()
                 WHERE id = %s AND person_id = %s
@@ -878,8 +922,8 @@ async def unlink_person_from_author(person_id: int, source: str, author_id: int)
             """, (author_id, person_id))
         elif source == "wos":
             cur.execute("""
-                UPDATE wos_authors SET person_id = NULL, updated_at = now()
-                WHERE id = %s AND person_id = %s
+                UPDATE wos_authorships SET person_id = NULL
+                WHERE wos_author_id = %s AND person_id = %s
             """, (author_id, person_id))
             # Détacher les authorships consolidées liées via wos_authorship_id
             cur.execute("""
@@ -1021,6 +1065,27 @@ async def toggle_authorship_excluded(authorship_id: int):
         return {"id": row["id"], "excluded": row["excluded"]}
 
 
+@router.patch("/api/persons/{person_id}/name")
+async def update_person_name(person_id: int, body: dict):
+    """Modifie le nom/prénom d'une personne."""
+    last_name = body.get("last_name", "").strip()
+    first_name = body.get("first_name", "").strip()
+    if not last_name:
+        raise HTTPException(status_code=400, detail="Le nom est requis")
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id FROM persons WHERE id = %s", (person_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Personne introuvable")
+        cur.execute("""
+            UPDATE persons SET last_name = %s, first_name = %s,
+                   last_name_normalized = unaccent(lower(trim(%s))),
+                   first_name_normalized = unaccent(lower(trim(%s))),
+                   updated_at = now()
+            WHERE id = %s
+        """, (last_name, first_name, last_name, first_name, person_id))
+        return {"ok": True}
+
+
 @router.post("/api/persons/{person_id}/merge")
 async def merge_persons(person_id: int, body: dict):
     """Fusionne une autre personne (source) dans celle-ci (target)."""
@@ -1043,6 +1108,124 @@ async def merge_persons(person_id: int, body: dict):
             raise HTTPException(status_code=409, detail=str(e))
 
         return {"merged": True, "source_id": source_id, "target_id": person_id}
+
+
+# ----- API: Formes de noms / détachement authorships -----
+
+
+@router.get("/api/persons/{person_id}/name-form-authorships")
+async def name_form_authorships(person_id: int, name_form: str = Query(...)):
+    """Liste les authorships sources liées à une personne pour une forme de nom donnée.
+    name_form est la forme normalisée (lowercase, unaccent) depuis person_name_forms."""
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            SELECT 'hal' AS source, has.id AS authorship_id,
+                   p.id AS pub_id, p.title, p.pub_year, p.doi
+            FROM hal_authorships has
+            JOIN hal_authors ha ON ha.id = has.hal_author_id
+            JOIN hal_documents hd ON hd.id = has.hal_document_id
+            JOIN publications p ON p.id = hd.publication_id
+            WHERE has.person_id = %s AND unaccent(lower(trim(ha.full_name))) = %s
+            UNION ALL
+            SELECT 'openalex', oas.id,
+                   p.id, p.title, p.pub_year, p.doi
+            FROM openalex_authorships oas
+            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+            JOIN openalex_documents od ON od.id = oas.openalex_document_id
+            JOIN publications p ON p.id = od.publication_id
+            WHERE oas.person_id = %s AND unaccent(lower(trim(COALESCE(oas.raw_author_name, oa.full_name)))) = %s
+            UNION ALL
+            SELECT 'wos', was.id,
+                   p.id, p.title, p.pub_year, p.doi
+            FROM wos_authorships was
+            JOIN wos_authors wa ON wa.id = was.wos_author_id
+            JOIN wos_documents wd ON wd.id = was.wos_document_id
+            JOIN publications p ON p.id = wd.publication_id
+            WHERE was.person_id = %s AND unaccent(lower(trim(wa.full_name))) = %s
+            ORDER BY pub_year DESC, title
+        """, (person_id, name_form, person_id, name_form, person_id, name_form))
+        return cur.fetchall()
+
+
+@router.post("/api/persons/{person_id}/detach-authorships")
+async def detach_authorships(person_id: int, body: dict):
+    """Détache des authorships sources d'une personne et nettoie les formes de noms.
+
+    body.authorships: [{ source: 'hal'|'openalex'|'wos', authorship_id: int }, ...]
+    body.name_form: str — forme de nom à supprimer si toutes ses authorships sont détachées
+    """
+    authorships = body.get("authorships", [])
+    name_form = body.get("name_form", "")
+
+    with get_cursor() as (cur, conn):
+        for a in authorships:
+            src = a["source"]
+            aid = a["authorship_id"]
+            if src == "hal":
+                cur.execute("UPDATE hal_authorships SET person_id = NULL WHERE id = %s AND person_id = %s",
+                            (aid, person_id))
+            elif src == "openalex":
+                cur.execute("UPDATE openalex_authorships SET person_id = NULL WHERE id = %s AND person_id = %s",
+                            (aid, person_id))
+            elif src == "wos":
+                cur.execute("UPDATE wos_authorships SET person_id = NULL WHERE id = %s AND person_id = %s",
+                            (aid, person_id))
+
+        # Supprimer les authorships vérité orphelines
+        cur.execute("""
+            DELETE FROM authorships a
+            WHERE a.person_id = %s
+              AND NOT EXISTS (SELECT 1 FROM hal_authorships has
+                              JOIN hal_documents hd ON hd.id = has.hal_document_id
+                              WHERE has.person_id = %s AND hd.publication_id = a.publication_id)
+              AND NOT EXISTS (SELECT 1 FROM openalex_authorships oas
+                              JOIN openalex_documents od ON od.id = oas.openalex_document_id
+                              WHERE oas.person_id = %s AND od.publication_id = a.publication_id)
+              AND NOT EXISTS (SELECT 1 FROM wos_authorships was
+                              JOIN wos_documents wd ON wd.id = was.wos_document_id
+                              WHERE was.person_id = %s AND wd.publication_id = a.publication_id)
+        """, (person_id, person_id, person_id, person_id))
+        deleted_authorships = cur.rowcount
+
+        # Nettoyer la forme de nom si plus aucune authorship ne la porte
+        cleaned_form = False
+        if name_form:
+            cur.execute("""
+                SELECT COUNT(*) FROM (
+                    SELECT 1 FROM hal_authorships has
+                    JOIN hal_authors ha ON ha.id = has.hal_author_id
+                    WHERE has.person_id = %s AND unaccent(lower(trim(ha.full_name))) = %s
+                    UNION ALL
+                    SELECT 1 FROM openalex_authorships oas
+                    JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+                    WHERE oas.person_id = %s AND unaccent(lower(trim(COALESCE(oas.raw_author_name, oa.full_name)))) = %s
+                    UNION ALL
+                    SELECT 1 FROM wos_authorships was
+                    JOIN wos_authors wa ON wa.id = was.wos_author_id
+                    WHERE was.person_id = %s AND unaccent(lower(trim(wa.full_name))) = %s
+                ) remaining
+            """, (person_id, name_form, person_id, name_form, person_id, name_form))
+            remaining = cur.fetchone()["count"]
+            if remaining == 0:
+                norm = name_form  # déjà normalisé
+                if norm:
+                    cur.execute("""
+                        UPDATE person_name_forms
+                        SET person_ids = array_remove(person_ids, %s)
+                        WHERE name_form = %s
+                    """, (person_id, norm))
+                    # Supprimer la forme si person_ids est vide
+                    cur.execute("""
+                        DELETE FROM person_name_forms
+                        WHERE name_form = %s AND person_ids = '{}'
+                    """, (norm,))
+                    cleaned_form = True
+
+        return {
+            "detached": len(authorships),
+            "deleted_authorships": deleted_authorships,
+            "cleaned_form": cleaned_form,
+        }
 
 
 # ----- API: Doublons personnes -----
@@ -1207,14 +1390,12 @@ def _get_person_dedup_detail(cur, person_id):
         FROM structures s
         WHERE s.structure_type = 'labo' AND s.id IN (
             SELECT UNNEST(has2.structure_ids)
-            FROM hal_authors ha2
-            JOIN hal_authorships has2 ON has2.hal_author_id = ha2.id
-            WHERE ha2.person_id = %s AND has2.structure_ids IS NOT NULL
+            FROM hal_authorships has2
+            WHERE has2.person_id = %s AND has2.structure_ids IS NOT NULL
             UNION ALL
             SELECT UNNEST(oas2.structure_ids)
-            FROM openalex_authors oa2
-            JOIN openalex_authorships oas2 ON oas2.openalex_author_id = oa2.id
-            WHERE oa2.person_id = %s AND oas2.structure_ids IS NOT NULL
+            FROM openalex_authorships oas2
+            WHERE oas2.person_id = %s AND oas2.structure_ids IS NOT NULL
         )
         ORDER BY s.acronym NULLS LAST, s.name
     """, (person_id, person_id))

@@ -100,25 +100,23 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
               AND od.publication_id IS NOT NULL
               AND oas.person_id IS NOT NULL
             UNION
-            SELECT DISTINCT wd.publication_id, wa.person_id
+            SELECT DISTINCT wd.publication_id, was.person_id
             FROM wos_authorships was
             JOIN wos_documents wd ON wd.id = was.wos_document_id
-            JOIN wos_authors wa ON wa.id = was.wos_author_id
             WHERE was.id = ANY(%s)
               AND wd.publication_id IS NOT NULL
-              AND wa.person_id IS NOT NULL
+              AND was.person_id IS NOT NULL
         ),
         hal_uca AS (
-            SELECT hd.publication_id, ha.person_id,
+            SELECT hd.publication_id, has.person_id,
                    array_agg(DISTINCT sid) AS struct_ids
             FROM affected_pubs ap
             JOIN hal_documents hd ON hd.publication_id = ap.publication_id
             JOIN hal_authorships has ON has.hal_document_id = hd.id
-            JOIN hal_authors ha ON ha.id = has.hal_author_id
-                AND ha.person_id = ap.person_id,
+                AND has.person_id = ap.person_id,
             LATERAL unnest(has.structure_ids) AS sid
             WHERE has.is_uca = TRUE AND has.structure_ids IS NOT NULL
-            GROUP BY hd.publication_id, ha.person_id
+            GROUP BY hd.publication_id, has.person_id
         ),
         oa_uca AS (
             SELECT od.publication_id, oas.person_id,
@@ -130,13 +128,12 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
             WHERE oas.is_uca = TRUE AND oas.structure_ids IS NOT NULL
         ),
         wos_uca AS (
-            SELECT wd.publication_id, wa.person_id,
+            SELECT wd.publication_id, was.person_id,
                    was.structure_ids AS struct_ids
             FROM affected_pubs ap
             JOIN wos_documents wd ON wd.publication_id = ap.publication_id
             JOIN wos_authorships was ON was.wos_document_id = wd.id
-            JOIN wos_authors wa ON wa.id = was.wos_author_id
-                AND wa.person_id = ap.person_id
+                AND was.person_id = ap.person_id
             WHERE was.is_uca = TRUE AND was.structure_ids IS NOT NULL
         ),
         merged AS (

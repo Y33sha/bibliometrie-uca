@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { base } from '$app/paths';
+	import { replaceState } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 
@@ -39,7 +40,7 @@
 		const p = new URLSearchParams();
 		if (offset > 0) p.set('offset', String(offset));
 		const qs = p.toString();
-		history.replaceState(history.state, '', `${base}/admin/duplicates${qs ? '?' + qs : ''}`);
+		replaceState(`${base}/admin/duplicates${qs ? '?' + qs : ''}`, {});
 	}
 
 	async function loadAt(pos: number) {

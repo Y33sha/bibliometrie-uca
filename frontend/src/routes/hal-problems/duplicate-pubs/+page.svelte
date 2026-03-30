@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { base } from '$app/paths';
+	import { replaceState } from '$app/navigation';
 	import { page as pageStore } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
@@ -70,7 +71,7 @@
 		if (doiPage > 1) p.set('doi_page', String(doiPage));
 		if (metaPage > 1) p.set('meta_page', String(metaPage));
 		const qs = p.toString();
-		history.replaceState(history.state, '', `${base}/hal-problems/duplicate-pubs` + (qs ? '?' + qs : ''));
+		replaceState(`${base}/hal-problems/duplicate-pubs` + (qs ? '?' + qs : ''), {});
 	}
 
 	function switchTab(tab: 'doi' | 'meta') {

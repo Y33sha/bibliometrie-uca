@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { base } from '$app/paths';
+	import { replaceState } from '$app/navigation';
 	import { page as pageStore } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
@@ -40,7 +41,7 @@
 		if (selectedLabId) p.set('lab_id', String(selectedLabId));
 		if (page > 1) p.set('page', String(page));
 		const qs = p.toString();
-		history.replaceState(history.state, '', `${base}/hal-problems/missing-collections` + (qs ? '?' + qs : ''));
+		replaceState(`${base}/hal-problems/missing-collections` + (qs ? '?' + qs : ''), {});
 	}
 
 	async function loadLabs() {

@@ -217,17 +217,16 @@ WITH uca_perimeter AS (
 ),
 hal_data AS (
     SELECT hd.publication_id,
-           ha.person_id,
+           has.person_id,
            array_agg(DISTINCT sid) AS all_struct_ids,
            bool_or(sid IN (SELECT id FROM uca_perimeter)) AS has_uca
     FROM hal_authorships has
-    JOIN hal_documents hd ON hd.id = has.hal_document_id
-    JOIN hal_authors ha ON ha.id = has.hal_author_id,
+    JOIN hal_documents hd ON hd.id = has.hal_document_id,
     LATERAL unnest(has.structure_ids) AS sid
     WHERE has.structure_ids IS NOT NULL
       AND hd.publication_id IS NOT NULL
-      AND ha.person_id IS NOT NULL
-    GROUP BY hd.publication_id, ha.person_id
+      AND has.person_id IS NOT NULL
+    GROUP BY hd.publication_id, has.person_id
 )
 UPDATE authorships a
 SET structure_ids = hd.all_struct_ids,
@@ -274,15 +273,14 @@ WHERE a.publication_id = od.publication_id
 -- Merge les structure_ids WoS avec ceux déjà présents (HAL + OpenAlex)
 WITH wos_data AS (
     SELECT wd.publication_id,
-           wa.person_id,
+           was.person_id,
            was.structure_ids AS struct_ids,
            was.is_uca AS src_is_uca
     FROM wos_authorships was
     JOIN wos_documents wd ON wd.id = was.wos_document_id
-    JOIN wos_authors wa ON wa.id = was.wos_author_id
     WHERE was.structure_ids IS NOT NULL
       AND wd.publication_id IS NOT NULL
-      AND wa.person_id IS NOT NULL
+      AND was.person_id IS NOT NULL
 )
 UPDATE authorships a
 SET structure_ids = (

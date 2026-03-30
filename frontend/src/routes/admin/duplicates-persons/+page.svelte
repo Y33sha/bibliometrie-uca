@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { base } from '$app/paths';
+	import { replaceState } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 
@@ -68,7 +69,7 @@
 		if (mode !== 'name') p.set('mode', mode);
 		if (offset > 0) p.set('offset', String(offset));
 		const qs = p.toString();
-		history.replaceState(history.state, '', `${base}/admin/duplicates-persons${qs ? '?' + qs : ''}`);
+		replaceState(`${base}/admin/duplicates-persons${qs ? '?' + qs : ''}`, {});
 	}
 
 	async function loadTotal() {

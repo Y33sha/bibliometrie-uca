@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
+	import { goto, replaceState } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api } from '$lib/api';
@@ -190,7 +190,7 @@
 		if (pubPage > 1) p.set('page', String(pubPage));
 		if (personsSort !== 'name') p.set('psort', personsSort);
 		const qs = p.toString();
-		history.replaceState(history.state, '', `${base}/laboratories/${labId}` + (qs ? '?' + qs : ''));
+		replaceState(`${base}/laboratories/${labId}` + (qs ? '?' + qs : ''), {});
 	}
 
 	function buildPubFilterParams(): URLSearchParams {
@@ -214,7 +214,7 @@
 			source_counts: Record<string, number>;
 			apc: { value: string; text: string; count: number }[];
 			countries: { value: string; count: number }[];
-		}>('/api/publications/facets?' + params);
+		}>('/api/publications/facets?' + params, { key: 'lab-pub-facets' });
 		yearOptions = data.years.map((y) => ({
 			value: String(y.value), text: String(y.value), count: y.count
 		}));
@@ -241,7 +241,7 @@
 		const q = pubSearch.trim();
 		if (q) params.set('search', q);
 
-		const data = await api<PubResponse>('/api/publications?' + params);
+		const data = await api<PubResponse>('/api/publications?' + params, { key: 'lab-pubs' });
 		publications = data.publications;
 		pubTotal = data.total;
 		pubPages = data.pages;
@@ -299,7 +299,7 @@
 		if (selectedOrcid.length === 1) params.set('has_orcid', selectedOrcid[0]);
 		if (selectedIdhal.length === 1) params.set('has_idhal', selectedIdhal[0]);
 		const data = await api<PersonsResponse>(
-			`/api/laboratories/${labId}/persons?${params}`
+			`/api/laboratories/${labId}/persons?${params}`, { key: 'lab-persons' }
 		);
 		persons = data.persons;
 		personsTotal = data.total_persons;
@@ -329,7 +329,7 @@
 			per_page: '50'
 		});
 		const data = await api<AddressesResponse>(
-			`/api/laboratories/${labId}/addresses?${params}`
+			`/api/laboratories/${labId}/addresses?${params}`, { key: 'lab-addresses' }
 		);
 		addresses = data.addresses;
 		addrTotal = data.total;
@@ -344,7 +344,7 @@
 			oa: { open_access: number; closed: number; unknown: number; total: number };
 			collab: { total_articles: number; international: number; domestic: number };
 			top_countries: { code: string; name: string; count: number }[];
-		}>(`/api/laboratories/${labId}/dashboard`);
+		}>(`/api/laboratories/${labId}/dashboard`, { key: 'lab-dashboard' });
 		dashPubsByYear = data.pubs_by_year;
 		dashOa = data.oa;
 		dashCollab = data.collab;
