@@ -3,10 +3,12 @@
 
 OA_OPEN_STATUSES = ('gold', 'hybrid', 'bronze', 'green')
 
-# Filtre SQL : la publication a au moins un authorship UCA (source HAL ou OpenAlex)
+# Filtre SQL : la publication a au moins un authorship UCA.
+# Exclut les peer_review (reviews anonymes, auteurs = auteurs de l'article reviewé, pas du review).
 PUB_IS_UCA = """(
     EXISTS (SELECT 1 FROM authorships a
             WHERE a.publication_id = p.id AND a.is_uca = TRUE)
+    AND p.doc_type != 'peer_review'
 )"""
 
 
@@ -33,38 +35,17 @@ def apply_oa_filter(conditions: list, params: list, oa_status: str | None):
 
 
 def apply_lab_filter(conditions: list, params: list, lab_ids: list[int]):
-    """Ajoute le filtre laboratoire via EXISTS sur les authorships."""
+    """Ajoute le filtre laboratoire via la table de vérité authorships."""
     if not lab_ids:
         return
     conditions.append("""
-        (
-            EXISTS (
-                SELECT 1 FROM hal_documents hd
-                JOIN hal_authorships has ON has.hal_document_id = hd.id
-                WHERE hd.publication_id = p.id
-                  AND has.is_uca = TRUE
-                  AND has.structure_ids && %s::int[]
-            )
-            OR
-            EXISTS (
-                SELECT 1 FROM openalex_documents od
-                JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-                WHERE od.publication_id = p.id
-                  AND oas.is_uca = TRUE
-                  AND oas.structure_ids && %s::int[]
-            )
-            OR
-            EXISTS (
-                SELECT 1 FROM wos_documents wd
-                JOIN wos_authorships was ON was.wos_document_id = wd.id
-                WHERE wd.publication_id = p.id
-                  AND was.is_uca = TRUE
-                  AND was.structure_ids && %s::int[]
-            )
+        EXISTS (
+            SELECT 1 FROM authorships a
+            WHERE a.publication_id = p.id
+              AND a.structure_ids && %s::int[]
+              AND NOT a.excluded
         )
     """)
-    params.append(lab_ids)
-    params.append(lab_ids)
     params.append(lab_ids)
 
 

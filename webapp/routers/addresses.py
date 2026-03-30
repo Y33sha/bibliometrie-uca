@@ -1,11 +1,136 @@
 """Auto-extracted router."""
 
-from fastapi import APIRouter, Query, HTTPException, Depends
+import logging
+from fastapi import APIRouter, Query, HTTPException, Depends, BackgroundTasks
 from webapp.deps import get_cursor, require_admin
 from webapp.uca import propagate_uca_for_addresses
 from webapp.models import ReviewAction, BatchReviewAction, AssignStructureAction
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def propagate_countries_for_addresses(cur, address_ids: list[int]):
+    """Propage les pays des adresses modifiées vers les documents sources et publications.
+
+    Chaîne : addresses.countries → *_documents.countries → publications.countries
+    """
+    if not address_ids:
+        return
+
+    # 1. Recalculer countries des openalex_documents concernés
+    cur.execute("""
+        UPDATE openalex_documents od
+        SET countries = sub.new_countries
+        FROM (
+            SELECT oas.openalex_document_id AS doc_id,
+                   (SELECT array_agg(DISTINCT c ORDER BY c)
+                    FROM openalex_authorship_addresses oaa2
+                    JOIN addresses a2 ON a2.id = oaa2.address_id
+                    JOIN openalex_authorships oas2 ON oas2.id = oaa2.openalex_authorship_id,
+                    LATERAL unnest(a2.countries) AS c
+                    WHERE oas2.openalex_document_id = oas.openalex_document_id
+                      AND a2.countries IS NOT NULL
+                   ) AS new_countries
+            FROM openalex_authorship_addresses oaa
+            JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
+            WHERE oaa.address_id = ANY(%s)
+            GROUP BY oas.openalex_document_id
+        ) sub
+        WHERE od.id = sub.doc_id
+          AND od.countries IS DISTINCT FROM sub.new_countries
+    """, (address_ids,))
+    oa_docs = cur.rowcount
+
+    # 2. Recalculer countries des wos_documents concernés
+    cur.execute("""
+        UPDATE wos_documents wd
+        SET countries = sub.new_countries
+        FROM (
+            SELECT was.wos_document_id AS doc_id,
+                   (SELECT array_agg(DISTINCT c ORDER BY c)
+                    FROM wos_authorship_addresses waa2
+                    JOIN addresses a2 ON a2.id = waa2.address_id
+                    JOIN wos_authorships was2 ON was2.id = waa2.wos_authorship_id,
+                    LATERAL unnest(a2.countries) AS c
+                    WHERE was2.wos_document_id = was.wos_document_id
+                      AND a2.countries IS NOT NULL
+                   ) AS new_countries
+            FROM wos_authorship_addresses waa
+            JOIN wos_authorships was ON was.id = waa.wos_authorship_id
+            WHERE waa.address_id = ANY(%s)
+            GROUP BY was.wos_document_id
+        ) sub
+        WHERE wd.id = sub.doc_id
+          AND wd.countries IS DISTINCT FROM sub.new_countries
+    """, (address_ids,))
+    wos_docs = cur.rowcount
+
+    # 3. Recalculer publications.countries pour les publications touchées
+    #    Même logique que refresh_publication_countries.sql : HAL (structures) + adresses (OA + WoS)
+    #    On n'utilise PAS openalex_documents.countries (données staging OA non fiables)
+    cur.execute("""
+        WITH affected_pubs AS (
+            SELECT DISTINCT od.publication_id
+            FROM openalex_authorship_addresses oaa
+            JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
+            JOIN openalex_documents od ON od.id = oas.openalex_document_id
+            WHERE oaa.address_id = ANY(%s) AND od.publication_id IS NOT NULL
+            UNION
+            SELECT DISTINCT wd.publication_id
+            FROM wos_authorship_addresses waa
+            JOIN wos_authorships was ON was.id = waa.wos_authorship_id
+            JOIN wos_documents wd ON wd.id = was.wos_document_id
+            WHERE waa.address_id = ANY(%s) AND wd.publication_id IS NOT NULL
+        )
+        UPDATE publications p
+        SET countries = sub.all_countries
+        FROM (
+            SELECT ap.publication_id,
+                   (SELECT array_agg(DISTINCT c ORDER BY c)
+                    FROM (
+                        SELECT unnest(hd.countries) AS c
+                        FROM hal_documents hd
+                        WHERE hd.publication_id = ap.publication_id AND hd.countries IS NOT NULL
+                        UNION ALL
+                        SELECT unnest(a.countries) AS c
+                        FROM openalex_authorship_addresses oaa
+                        JOIN addresses a ON a.id = oaa.address_id
+                        JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
+                        JOIN openalex_documents od ON od.id = oas.openalex_document_id
+                        WHERE od.publication_id = ap.publication_id AND a.countries IS NOT NULL
+                        UNION ALL
+                        SELECT unnest(a.countries) AS c
+                        FROM wos_authorship_addresses waa
+                        JOIN addresses a ON a.id = waa.address_id
+                        JOIN wos_authorships was ON was.id = waa.wos_authorship_id
+                        JOIN wos_documents wd ON wd.id = was.wos_document_id
+                        WHERE wd.publication_id = ap.publication_id AND a.countries IS NOT NULL
+                    ) src
+                   ) AS all_countries
+            FROM affected_pubs ap
+        ) sub
+        WHERE p.id = sub.publication_id
+          AND p.countries IS DISTINCT FROM sub.all_countries
+    """, (address_ids, address_ids))
+    pubs = cur.rowcount
+
+    if oa_docs or wos_docs or pubs:
+        logger.info(f"Propagation pays : {oa_docs} docs OA, {wos_docs} docs WoS, {pubs} publications")
+
+
+def _bg_propagate_countries(address_ids: list[int]):
+    """Propagation pays en tâche de fond (connexion séparée)."""
+    from db.connection import get_connection
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        propagate_countries_for_addresses(cur, address_ids)
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception:
+        logger.exception("Erreur propagation pays en background")
 
 
 
@@ -416,7 +541,7 @@ async def suggest_countries(
 
 
 @router.post("/api/addresses/{addr_id}/country")
-async def set_address_country(addr_id: int, body: dict, _=Depends(require_admin)):
+async def set_address_country(addr_id: int, body: dict, bg: BackgroundTasks, _=Depends(require_admin)):
     """Attribue des pays à une adresse."""
     countries = body.get("countries")  # list of codes, or None to clear
     with get_cursor() as (cur, conn):
@@ -431,6 +556,7 @@ async def set_address_country(addr_id: int, body: dict, _=Depends(require_admin)
         cur.execute("UPDATE addresses SET countries = %s WHERE id = %s",
                     (countries if countries else None, addr_id))
         # Propager aux adresses partageant le même normalized_text
+        propagated_ids = [addr_id]
         if countries:
             cur.execute("""
                 UPDATE addresses a2
@@ -440,12 +566,16 @@ async def set_address_country(addr_id: int, body: dict, _=Depends(require_admin)
                   AND a2.normalized_text = a1.normalized_text
                   AND a2.id <> a1.id
                   AND LENGTH(a2.normalized_text) >= 5
+                RETURNING a2.id
             """, (countries, addr_id))
-        return {"ok": True}
+            propagated_ids.extend(r["id"] for r in cur.fetchall())
+    # Propager les pays vers documents et publications en background
+    bg.add_task(_bg_propagate_countries, propagated_ids)
+    return {"ok": True}
 
 
 @router.post("/api/addresses/batch-country")
-async def batch_set_country(body: dict, _=Depends(require_admin)):
+async def batch_set_country(body: dict, bg: BackgroundTasks, _=Depends(require_admin)):
     """Ajoute un pays à des adresses — par IDs ou par filtre.
 
     body.country_code: code pays à ajouter
@@ -478,7 +608,9 @@ async def batch_set_country(body: dict, _=Depends(require_admin)):
                     ELSE array_append(countries, %s::char(2))
                 END
                 WHERE id = ANY(%s)
+                RETURNING id
             """, (country_code, country_code, country_code, address_ids))
+            modified_ids = [r["id"] for r in cur.fetchall()]
         else:
             # Mode filtre — applique à toutes les adresses du filtre
             conditions = []
@@ -505,8 +637,10 @@ async def batch_set_country(body: dict, _=Depends(require_admin)):
                     ELSE array_append(countries, %s::char(2))
                 END
                 WHERE {where}
+                RETURNING id
             """, [country_code, country_code, country_code] + params)
-        updated = cur.rowcount
+            modified_ids = [r["id"] for r in cur.fetchall()]
+        updated = len(modified_ids)
 
         # Propager aux adresses partageant le même normalized_text
         cur.execute("""
@@ -518,10 +652,16 @@ async def batch_set_country(body: dict, _=Depends(require_admin)):
               AND a2.countries IS DISTINCT FROM a1.countries
               AND LENGTH(a2.normalized_text) >= 5
               AND a2.id <> a1.id
+            RETURNING a2.id
         """)
-        propagated = cur.rowcount
+        propagated_rows = cur.fetchall()
+        propagated = len(propagated_rows)
+        all_ids = modified_ids + [r["id"] for r in propagated_rows]
 
-        return {"updated": updated, "propagated": propagated}
+    # Propager les pays vers documents et publications en background
+    bg.add_task(_bg_propagate_countries, all_ids)
+
+    return {"updated": updated, "propagated": propagated}
 
 
 # ----- API: Feedback / boucle de rétroaction -----

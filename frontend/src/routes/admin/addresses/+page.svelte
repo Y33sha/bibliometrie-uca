@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
+	import { replaceState } from '$app/navigation';
 	import { api } from '$lib/api';
 	import { esc, sanitizeTitle } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -100,7 +101,7 @@
 		if (currentPage > 1) sp.set('page', String(currentPage));
 		const qs = sp.toString();
 		const newUrl = window.location.pathname + (qs ? '?' + qs : '');
-		history.replaceState({}, '', newUrl);
+		replaceState(newUrl, {});
 	}
 
 	// ---- Reactive state ----
@@ -167,7 +168,7 @@
 	async function loadStats(): Promise<void> {
 		const params = new URLSearchParams();
 		if (currentStructureId) params.set('structure_id', String(currentStructureId));
-		stats = await api<Stats>(`/api/stats?${params}`);
+		stats = await api<Stats>(`/api/stats?${params}`, { key: 'addr-stats' });
 	}
 
 	async function loadAddresses(): Promise<void> {
@@ -183,7 +184,7 @@
 		});
 		if (currentStructureId) params.set('structure_id', String(currentStructureId));
 
-		const data = await api<AddressesResponse>(`/api/addresses?${params}`);
+		const data = await api<AddressesResponse>(`/api/addresses?${params}`, { key: 'addr-list' });
 		requiresSearch = data.requires_search ?? false;
 		addresses = data.addresses;
 		totalAddresses = data.total;
@@ -391,6 +392,7 @@
 			type="text"
 			class="search-input"
 			placeholder="Rechercher dans les adresses..."
+			autocomplete="off"
 			value={currentSearch}
 			oninput={onSearchInput}
 		/>

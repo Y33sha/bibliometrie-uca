@@ -21,6 +21,7 @@ Les records parsés sont insérés dans staging_wos (même table que l'API).
 
 import argparse
 import glob
+import hashlib
 import json
 import logging
 import os
@@ -468,7 +469,9 @@ def insert_records(records: list[dict], dry_run: bool = False) -> int:
                 ut = rec["ut"]
                 if not ut or ut in existing:
                     continue
-                batch.append((ut, rec["doi"], Json(rec["raw"])))
+                raw_json = json.dumps(rec["raw"], sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+                h = hashlib.md5(raw_json.encode("utf-8")).hexdigest()
+                batch.append((ut, rec["doi"], Json(rec["raw"]), h))
                 existing.add(ut)
 
             if not batch:
@@ -477,10 +480,19 @@ def insert_records(records: list[dict], dry_run: bool = False) -> int:
 
             execute_values(
                 cur,
-                """INSERT INTO staging_wos (ut, doi, raw_data)
-                   VALUES %s ON CONFLICT (ut) DO NOTHING""",
+                """INSERT INTO staging_wos (ut, doi, raw_data, raw_hash)
+                   VALUES %s
+                   ON CONFLICT (ut) DO UPDATE SET
+                       raw_data = CASE
+                           WHEN staging_wos.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                           THEN EXCLUDED.raw_data ELSE staging_wos.raw_data END,
+                       raw_hash = COALESCE(EXCLUDED.raw_hash, staging_wos.raw_hash),
+                       processed = CASE
+                           WHEN staging_wos.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                           THEN FALSE ELSE staging_wos.processed END,
+                       last_seen_at = now()""",
                 batch,
-                template="(%s, %s, %s::jsonb)",
+                template="(%s, %s, %s::jsonb, %s)",
             )
             conn.commit()
             logger.info(f"{len(batch)} records insérés dans staging_wos")

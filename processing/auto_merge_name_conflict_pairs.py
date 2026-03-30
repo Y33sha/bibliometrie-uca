@@ -43,28 +43,26 @@ WITH name_candidates AS (
 ),
 conflict_pairs AS (
     SELECT DISTINCT
-        LEAST(oas.person_id, ha.person_id) AS id_a,
-        GREATEST(oas.person_id, ha.person_id) AS id_b
+        LEAST(oas.person_id, has2.person_id) AS id_a,
+        GREATEST(oas.person_id, has2.person_id) AS id_b
     FROM openalex_authorships oas
     JOIN openalex_documents od ON od.id = oas.openalex_document_id
     JOIN hal_documents hd ON hd.publication_id = od.publication_id
     JOIN hal_authorships has2 ON has2.hal_document_id = hd.id
         AND has2.author_position = oas.author_position
-    JOIN hal_authors ha ON ha.id = has2.hal_author_id
-    WHERE oas.person_id IS NOT NULL AND ha.person_id IS NOT NULL
-      AND oas.person_id <> ha.person_id
+    WHERE oas.person_id IS NOT NULL AND has2.person_id IS NOT NULL
+      AND oas.person_id <> has2.person_id
     UNION
     SELECT DISTINCT
-        LEAST(oas.person_id, wa.person_id),
-        GREATEST(oas.person_id, wa.person_id)
+        LEAST(oas.person_id, was.person_id),
+        GREATEST(oas.person_id, was.person_id)
     FROM openalex_authorships oas
     JOIN openalex_documents od ON od.id = oas.openalex_document_id
     JOIN wos_documents wd ON wd.publication_id = od.publication_id
     JOIN wos_authorships was ON was.wos_document_id = wd.id
         AND was.author_position = oas.author_position
-    JOIN wos_authors wa ON wa.id = was.wos_author_id
-    WHERE oas.person_id IS NOT NULL AND wa.person_id IS NOT NULL
-      AND oas.person_id <> wa.person_id
+    WHERE oas.person_id IS NOT NULL AND was.person_id IS NOT NULL
+      AND oas.person_id <> was.person_id
 )
 SELECT nc.id_a, nc.id_b,
        pa.last_name AS ln_a, pa.first_name AS fn_a,

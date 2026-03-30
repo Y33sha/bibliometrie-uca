@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { base } from "$app/paths";
+	import { replaceState } from "$app/navigation";
 	import { page as pageStore } from "$app/stores";
 	import { onMount } from "svelte";
 	import { api } from "$lib/api";
@@ -37,11 +38,7 @@
 		const p = new URLSearchParams();
 		if (page > 1) p.set("page", String(page));
 		const qs = p.toString();
-		history.replaceState(
-			history.state,
-			"",
-			`${base}/hal-problems/duplicate-accounts` + (qs ? "?" + qs : ""),
-		);
+		replaceState(`${base}/hal-problems/duplicate-accounts` + (qs ? "?" + qs : ""), {});
 	}
 
 	async function load() {

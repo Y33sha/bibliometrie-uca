@@ -1,11 +1,11 @@
 """
-Peuplement initial de person_name_forms à partir des sources existantes.
+Peuplement de person_name_forms à partir des sources existantes.
 
 Sources :
-1. persons.last_name + persons.first_name
-2. hal_authors.full_name (via person_id)
-3. wos_authors.full_name (via person_id)
-4. openalex_authorships.raw_author_name (via person_id)
+1. persons.last_name + persons.first_name (source: 'persons')
+2. hal_authors.full_name via hal_authorships.person_id (source: 'hal')
+3. wos_authors.full_name via wos_authorships.person_id (source: 'wos')
+4. openalex_authorships.raw_author_name via person_id (source: 'openalex')
 """
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -19,11 +19,10 @@ log = logging.getLogger(__name__)
 def populate(conn):
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    # Collecter toutes les paires (forme brute, person_id)
-    # On normalise en SQL avec unaccent(lower(trim(...)))
-    pairs = []  # (raw_text, person_id)
+    # Collecter les triplets (forme brute, person_id, source)
+    triples = []  # (raw_text, person_id, source)
 
-    # 1. persons table : "Prénom Nom" et "Nom Prénom"
+    # 1. persons table : "Prénom Nom", "Nom Prénom", "Nom, Prénom"
     log.info("Source 1 : persons (prénom nom + nom prénom)")
     cur.execute("""
         SELECT id,
@@ -36,34 +35,35 @@ def populate(conn):
         fn = (r["first_name"] or "").strip()
         ln = r["last_name"].strip()
         if fn:
-            pairs.append((f"{fn} {ln}", r["id"]))
-            pairs.append((f"{ln} {fn}", r["id"]))
-            # Forme "Nom, Prénom"
-            pairs.append((f"{ln}, {fn}", r["id"]))
+            triples.append((f"{fn} {ln}", r["id"], "persons"))
+            triples.append((f"{ln} {fn}", r["id"], "persons"))
+            triples.append((f"{ln}, {fn}", r["id"], "persons"))
         else:
-            pairs.append((ln, r["id"]))
+            triples.append((ln, r["id"], "persons"))
 
-    # 2. hal_authors.full_name
+    # 2. hal_authors.full_name (via hal_authorships.person_id)
     log.info("Source 2 : hal_authors.full_name")
     cur.execute("""
-        SELECT DISTINCT ha.full_name, ha.person_id
-        FROM hal_authors ha
-        WHERE ha.person_id IS NOT NULL
+        SELECT DISTINCT ha.full_name, has.person_id
+        FROM hal_authorships has
+        JOIN hal_authors ha ON ha.id = has.hal_author_id
+        WHERE has.person_id IS NOT NULL
           AND ha.full_name IS NOT NULL AND ha.full_name != ''
     """)
     for r in cur.fetchall():
-        pairs.append((r["full_name"], r["person_id"]))
+        triples.append((r["full_name"], r["person_id"], "hal"))
 
     # 3. wos_authors.full_name
     log.info("Source 3 : wos_authors.full_name")
     cur.execute("""
-        SELECT DISTINCT wa.full_name, wa.person_id
+        SELECT DISTINCT wa.full_name, was.person_id
         FROM wos_authors wa
-        WHERE wa.person_id IS NOT NULL
+        JOIN wos_authorships was ON was.wos_author_id = wa.id
+        WHERE was.person_id IS NOT NULL
           AND wa.full_name IS NOT NULL AND wa.full_name != ''
     """)
     for r in cur.fetchall():
-        pairs.append((r["full_name"], r["person_id"]))
+        triples.append((r["full_name"], r["person_id"], "wos"))
 
     # 4. openalex_authorships.raw_author_name
     log.info("Source 4 : openalex_authorships.raw_author_name")
@@ -74,32 +74,26 @@ def populate(conn):
           AND oas.raw_author_name IS NOT NULL AND oas.raw_author_name != ''
     """)
     for r in cur.fetchall():
-        pairs.append((r["raw_author_name"], r["person_id"]))
+        triples.append((r["raw_author_name"], r["person_id"], "openalex"))
 
-    log.info(f"  {len(pairs)} paires (forme, person_id) collectées")
+    log.info(f"  {len(triples)} triplets (forme, person_id, source) collectés")
 
-    # Normaliser et regrouper par forme
-    # La normalisation se fait en Python pour matcher ce qu'on fera en SQL : unaccent(lower(trim(...)))
-    # On envoie les formes brutes et laisse PostgreSQL normaliser
-    form_to_pids = defaultdict(set)
-
-    # On normalise en SQL pour être cohérent
+    # Normaliser via PostgreSQL et regrouper
     log.info("Normalisation et regroupement...")
-    # Batch : envoyer toutes les formes brutes et récupérer la version normalisée
-    cur.execute("CREATE TEMP TABLE _raw_forms (raw_text TEXT, person_id INT)")
-    # Insert par batch
+    cur.execute("CREATE TEMP TABLE _raw_forms (raw_text TEXT, person_id INT, source TEXT)")
     batch = []
-    for raw, pid in pairs:
-        batch.append((raw.strip(), pid))
+    for raw, pid, src in triples:
+        batch.append((raw.strip(), pid, src))
         if len(batch) >= 5000:
-            cur.executemany("INSERT INTO _raw_forms VALUES (%s, %s)", batch)
+            cur.executemany("INSERT INTO _raw_forms VALUES (%s, %s, %s)", batch)
             batch = []
     if batch:
-        cur.executemany("INSERT INTO _raw_forms VALUES (%s, %s)", batch)
+        cur.executemany("INSERT INTO _raw_forms VALUES (%s, %s, %s)", batch)
 
     cur.execute("""
         SELECT unaccent(lower(trim(raw_text))) AS name_form,
-               array_agg(DISTINCT person_id ORDER BY person_id) AS person_ids
+               array_agg(DISTINCT person_id ORDER BY person_id) AS person_ids,
+               array_agg(DISTINCT source ORDER BY source) AS sources
         FROM _raw_forms
         WHERE trim(raw_text) != ''
         GROUP BY unaccent(lower(trim(raw_text)))
@@ -117,22 +111,24 @@ def populate(conn):
     for r in rows:
         if not r["name_form"]:
             continue
-        batch.append((r["name_form"], r["person_ids"]))
+        batch.append((r["name_form"], r["person_ids"], r["sources"]))
         if len(batch) >= 2000:
             cur.executemany("""
-                INSERT INTO person_name_forms (name_form, person_ids)
-                VALUES (%s, %s)
+                INSERT INTO person_name_forms (name_form, person_ids, sources)
+                VALUES (%s, %s, %s)
                 ON CONFLICT (name_form) DO UPDATE SET
                     person_ids = EXCLUDED.person_ids,
+                    sources = EXCLUDED.sources,
                     updated_at = now()
             """, batch)
             batch = []
     if batch:
         cur.executemany("""
-            INSERT INTO person_name_forms (name_form, person_ids)
-            VALUES (%s, %s)
+            INSERT INTO person_name_forms (name_form, person_ids, sources)
+            VALUES (%s, %s, %s)
             ON CONFLICT (name_form) DO UPDATE SET
                 person_ids = EXCLUDED.person_ids,
+                sources = EXCLUDED.sources,
                 updated_at = now()
         """, batch)
 

@@ -29,7 +29,6 @@ async def publications_facets(
     """Facettes dynamiques pour la page publications.
     Chaque facette exclut son propre filtre mais applique tous les autres."""
     years = parse_int_csv(year)
-    lab_ids = parse_int_csv(lab_id)
     lab_id_parts = parse_str_csv(lab_id)
     lab_none = "none" in lab_id_parts
     lab_ids_clean = [int(v) for v in lab_id_parts if v != "none"] if lab_id_parts else []
@@ -38,14 +37,11 @@ async def publications_facets(
     country_values = parse_str_csv(country)
 
     def base_conds_params():
-        """Conditions de base : publications UCA ou personne.
-        Si un filtre labo est actif, pas besoin de PUB_IS_UCA (le labo implique UCA)."""
+        """Conditions de base : publications UCA ou personne."""
         if person_id:
             c, p = [], []
             apply_person_filter(c, p, person_id)
             return c, p
-        if lab_ids_clean or lab_none:
-            return [], []
         return [PUB_IS_UCA], []
 
     def add_all_except(conds, params, *, skip: str):
@@ -58,18 +54,11 @@ async def publications_facets(
             if lab_none and not lab_ids_clean:
                 conds.append("""
                     NOT EXISTS (
-                        SELECT 1 FROM hal_documents hd
-                        JOIN hal_authorships has ON has.hal_document_id = hd.id
-                        WHERE hd.publication_id = p.id AND has.is_uca = TRUE
-                          AND has.structure_ids IS NOT NULL
-                          AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(has.structure_ids) AND s.structure_type = 'labo')
-                    )
-                    AND NOT EXISTS (
-                        SELECT 1 FROM openalex_documents od
-                        JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-                        WHERE od.publication_id = p.id AND oas.is_uca = TRUE
-                          AND oas.structure_ids IS NOT NULL
-                          AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(oas.structure_ids) AND s.structure_type = 'labo')
+                        SELECT 1 FROM authorships a
+                        JOIN structures s ON s.id = ANY(a.structure_ids)
+                        WHERE a.publication_id = p.id
+                          AND NOT a.excluded
+                          AND s.structure_type = 'labo'
                     )
                 """)
             elif lab_ids_clean:
@@ -140,23 +129,16 @@ async def publications_facets(
         """, p)
         lab_facets = cur.fetchall()
 
-        # Compter les pubs sans labo
+        # Compter les pubs sans labo (via la table de vérité)
         cur.execute(f"""
             SELECT COUNT(*) AS count FROM publications p
             WHERE {where_sql(c)}
               AND NOT EXISTS (
-                  SELECT 1 FROM hal_documents hd
-                  JOIN hal_authorships has ON has.hal_document_id = hd.id
-                  WHERE hd.publication_id = p.id AND has.is_uca = TRUE
-                    AND has.structure_ids IS NOT NULL
-                    AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(has.structure_ids) AND s.structure_type = 'labo')
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM openalex_documents od
-                  JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-                  WHERE od.publication_id = p.id AND oas.is_uca = TRUE
-                    AND oas.structure_ids IS NOT NULL
-                    AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(oas.structure_ids) AND s.structure_type = 'labo')
+                  SELECT 1 FROM authorships a
+                  JOIN structures s ON s.id = ANY(a.structure_ids)
+                  WHERE a.publication_id = p.id
+                    AND NOT a.excluded
+                    AND s.structure_type = 'labo'
               )
         """, p)
         no_lab_count = cur.fetchone()["count"]
@@ -384,8 +366,7 @@ async def export_publications_csv(
                 (
                     EXISTS (SELECT 1 FROM hal_documents hd
                             JOIN hal_authorships has ON has.hal_document_id = hd.id
-                            JOIN hal_authors ha ON ha.id = has.hal_author_id
-                            WHERE hd.publication_id = p.id AND ha.person_id = %s
+                            WHERE hd.publication_id = p.id AND has.person_id = %s
                               AND has.excluded = FALSE)
                     OR
                     EXISTS (SELECT 1 FROM openalex_documents od
@@ -417,50 +398,15 @@ async def export_publications_csv(
         if lab_none and not lab_ids:
             conditions.append("""
                 NOT EXISTS (
-                    SELECT 1 FROM hal_documents hd
-                    JOIN hal_authorships has ON has.hal_document_id = hd.id
-                    WHERE hd.publication_id = p.id
-                      AND has.is_uca = TRUE
-                      AND has.structure_ids IS NOT NULL
-                      AND EXISTS (
-                          SELECT 1 FROM structures s
-                          WHERE s.id = ANY(has.structure_ids) AND s.structure_type = 'labo'
-                      )
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM openalex_documents od
-                    JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-                    WHERE od.publication_id = p.id
-                      AND oas.is_uca = TRUE
-                      AND oas.structure_ids IS NOT NULL
-                      AND EXISTS (
-                          SELECT 1 FROM structures s
-                          WHERE s.id = ANY(oas.structure_ids) AND s.structure_type = 'labo'
-                      )
+                    SELECT 1 FROM authorships a
+                    JOIN structures s ON s.id = ANY(a.structure_ids)
+                    WHERE a.publication_id = p.id
+                      AND NOT a.excluded
+                      AND s.structure_type = 'labo'
                 )
             """)
         elif lab_ids:
-            conditions.append("""
-                (
-                    EXISTS (
-                        SELECT 1 FROM hal_documents hd
-                        JOIN hal_authorships has ON has.hal_document_id = hd.id
-                        WHERE hd.publication_id = p.id
-                          AND has.is_uca = TRUE
-                          AND has.structure_ids && %s::int[]
-                    )
-                    OR
-                    EXISTS (
-                        SELECT 1 FROM openalex_documents od
-                        JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-                        WHERE od.publication_id = p.id
-                          AND oas.is_uca = TRUE
-                          AND oas.structure_ids && %s::int[]
-                    )
-                )
-            """)
-            params.append(lab_ids)
-            params.append(lab_ids)
+            apply_lab_filter(conditions, params, lab_ids)
         if publisher_id:
             conditions.append("""
                 EXISTS (
@@ -638,7 +584,7 @@ async def get_publication(pub_id: int):
 
         # d) HAL authorships
         cur.execute("""
-            SELECT has.id, has.author_position, ha.full_name, ha.person_id,
+            SELECT has.id, has.author_position, ha.full_name, has.person_id,
                    has.is_uca, has.structure_ids, has.excluded, has.countries
             FROM hal_authorships has
             JOIN hal_authors ha ON ha.id = has.hal_author_id
@@ -671,7 +617,7 @@ async def get_publication(pub_id: int):
 
         # e2) WoS authorships — pays depuis les adresses
         cur.execute("""
-            SELECT was.id, was.author_position, wa.full_name, wa.person_id,
+            SELECT was.id, was.author_position, wa.full_name, was.person_id,
                    was.is_uca, was.structure_ids, was.raw_affiliation, was.excluded,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
                     FROM wos_authorship_addresses waa
@@ -864,50 +810,15 @@ async def list_publications(
             # Aucun labo : publications UCA sans structure de type labo
             conditions.append("""
                 NOT EXISTS (
-                    SELECT 1 FROM hal_documents hd
-                    JOIN hal_authorships has ON has.hal_document_id = hd.id
-                    WHERE hd.publication_id = p.id
-                      AND has.is_uca = TRUE
-                      AND has.structure_ids IS NOT NULL
-                      AND EXISTS (
-                          SELECT 1 FROM structures s
-                          WHERE s.id = ANY(has.structure_ids) AND s.structure_type = 'labo'
-                      )
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM openalex_documents od
-                    JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-                    WHERE od.publication_id = p.id
-                      AND oas.is_uca = TRUE
-                      AND oas.structure_ids IS NOT NULL
-                      AND EXISTS (
-                          SELECT 1 FROM structures s
-                          WHERE s.id = ANY(oas.structure_ids) AND s.structure_type = 'labo'
-                      )
+                    SELECT 1 FROM authorships a
+                    JOIN structures s ON s.id = ANY(a.structure_ids)
+                    WHERE a.publication_id = p.id
+                      AND NOT a.excluded
+                      AND s.structure_type = 'labo'
                 )
             """)
         elif lab_ids:
-            conditions.append("""
-                (
-                    EXISTS (
-                        SELECT 1 FROM hal_documents hd
-                        JOIN hal_authorships has ON has.hal_document_id = hd.id
-                        WHERE hd.publication_id = p.id
-                          AND has.is_uca = TRUE
-                          AND has.structure_ids && %s::int[]
-                    )
-                    OR
-                    EXISTS (
-                        SELECT 1 FROM openalex_documents od
-                        JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-                        WHERE od.publication_id = p.id
-                          AND oas.is_uca = TRUE
-                          AND oas.structure_ids && %s::int[]
-                    )
-                )
-            """)
-            params.append(lab_ids)
-            params.append(lab_ids)
+            apply_lab_filter(conditions, params, lab_ids)
 
         if publisher_id:
             conditions.append("""

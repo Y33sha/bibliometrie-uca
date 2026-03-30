@@ -90,15 +90,13 @@ def phase_uca_flags(**kw):
 
 def phase_persons(**kw):
     """Phase 6 : Création/mapping personnes + formes de noms."""
-    run_python("processing/create_persons_from_authorships.py")
+    run_python("processing/create_persons_from_source_authorships.py")
     run_python("processing/populate_person_name_forms.py")
 
 
 def phase_authorships(**kw):
-    """Phase 7 : Reconstruction authorships (vérité) + re-propagation UCA."""
-    run_python("processing/rebuild_authorships.py")
-    # Re-propagation UCA pour les authorships nouvellement créés
-    run_sql("db/populate_uca_flags.sql")
+    """Phase 7 : Construction authorships (vérité) + propagation UCA."""
+    run_python("processing/build_authorships.py")
 
 
 def phase_countries(**kw):

@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
+	import { replaceState } from '$app/navigation';
 	import { api } from '$lib/api';
 	import { titleCase } from '$lib/utils';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
@@ -57,7 +58,7 @@
 		if (search.trim()) p.set('search', search.trim());
 		if (currentPage > 1) p.set('page', String(currentPage));
 		const qs = p.toString();
-		history.replaceState(history.state, '', base + '/persons' + (qs ? '?' + qs : ''));
+		replaceState(base + '/persons' + (qs ? '?' + qs : ''), {});
 	}
 
 	function buildFilterParams(): URLSearchParams {
@@ -78,7 +79,7 @@
 			orcid: { yes: number; no: number };
 			idhal: { yes: number; no: number };
 			rh: { yes: number; no: number };
-		}>('/api/persons/facets?' + params);
+		}>('/api/persons/facets?' + params, { key: 'persons-dir-facets' });
 		deptOptions = data.departments.map((d) => ({
 			value: d.value, text: d.value, count: d.count
 		}));
@@ -106,7 +107,7 @@
 		const q = search.trim();
 		if (q) params.set('search', q);
 
-		const data = await api<DirectoryResponse>('/api/persons/directory?' + params);
+		const data = await api<DirectoryResponse>('/api/persons/directory?' + params, { key: 'persons-dir-list' });
 		total = data.total;
 		totalPages = data.pages;
 		currentPage = data.page;

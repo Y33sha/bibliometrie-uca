@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
+	import { replaceState } from '$app/navigation';
 	import { api } from '$lib/api';
 	import { sanitizeTitle, titleCase } from '$lib/utils';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
@@ -130,8 +131,12 @@
 	/* Identifier add form state: personId → { open, id_type, id_value, error } */
 	let idForms: Record<number, { id_type: string; id_value: string; error: string }> = $state({});
 
-	/* Expanded linked authors (collapsed by default) */
-	let expandedAuthors: Record<number, boolean> = $state({});
+	/* Edit name modal state */
+	let editNameModal: { personId: number; lastName: string; firstName: string } | null = $state(null);
+
+	/* Detach modal state */
+	interface DetachAuthorship { source: string; authorship_id: number; pub_id: number; title: string; pub_year: number | null; doi: string | null; checked: boolean }
+	let detachModal: { personId: number; nameForm: string; authorships: DetachAuthorship[]; loading: boolean } | null = $state(null);
 
 	/* Merge search state */
 	interface MergeSearch { query: string; results: { id: number; first_name: string; last_name: string; department_name: string | null; has_rh: boolean }[]; loading: boolean }
@@ -147,7 +152,7 @@
 	/* ── Data loading ── */
 
 	async function loadStats() {
-		stats = await api<PersonStats>('/api/persons/stats');
+		stats = await api<PersonStats>('/api/persons/stats', { key: 'persons-stats' });
 	}
 
 	function buildFilterParams(): URLSearchParams {
@@ -170,7 +175,7 @@
 			idhal: { yes: number; no: number };
 			rh: { yes: number; no: number };
 			linked: { yes: number; no: number } | null;
-		}>('/api/persons/facets?' + params);
+		}>('/api/persons/facets?' + params, { key: 'persons-facets' });
 		deptOptions = data.departments.map((d) => ({
 			value: d.value, text: d.value, count: d.count
 		}));
@@ -212,7 +217,7 @@
 		if (selectedRh.length === 1) params.set('has_rh', selectedRh[0]);
 		params.set('sort', sortField);
 
-		const data = await api<PersonListResponse>('/api/persons?' + params);
+		const data = await api<PersonListResponse>('/api/persons?' + params, { key: 'persons-list' });
 		persons = data.persons;
 		totalCount = data.total;
 		totalPages = data.pages;
@@ -251,7 +256,7 @@
 		setOrDel('orcid', selectedOrcid.length === 1 ? selectedOrcid[0] : '');
 		setOrDel('idhal', selectedIdhal.length === 1 ? selectedIdhal[0] : '');
 		setOrDel('rh', selectedRh.length === 1 ? selectedRh[0] : '');
-		history.replaceState(null, '', url);
+		replaceState(url, {});
 	}
 
 	function readUrlFilters() {
@@ -426,6 +431,53 @@
 		}
 	}
 
+	/* ── Edit name ── */
+
+	async function savePersonName() {
+		if (!editNameModal) return;
+		const resp = await fetch(`${base}/api/persons/${editNameModal.personId}/name`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ last_name: editNameModal.lastName, first_name: editNameModal.firstName })
+		});
+		if (!resp.ok) {
+			const err = await resp.json().catch(() => ({ detail: `Erreur ${resp.status}` }));
+			alert(err.detail || `Erreur ${resp.status}`);
+			return;
+		}
+		editNameModal = null;
+		loadTable();
+	}
+
+	/* ── Detach modal ── */
+
+	async function openDetachModal(personId: number, nameForm: string) {
+		detachModal = { personId, nameForm, authorships: [], loading: true };
+		const rows = await api<any[]>(`/api/persons/${personId}/name-form-authorships?name_form=${encodeURIComponent(nameForm)}`);
+		detachModal = {
+			personId, nameForm, loading: false,
+			authorships: rows.map(r => ({ ...r, checked: true }))
+		};
+	}
+
+	async function confirmDetach() {
+		if (!detachModal) return;
+		const toDetach = detachModal.authorships.filter(a => a.checked);
+		if (toDetach.length === 0) { detachModal = null; return; }
+
+		await fetch(`${base}/api/persons/${detachModal.personId}/detach-authorships`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				authorships: toDetach.map(a => ({ source: a.source, authorship_id: a.authorship_id })),
+				name_form: detachModal.nameForm,
+			})
+		});
+		detachModal = null;
+		loadStats();
+		loadTable();
+	}
+
 	/* ── Merge ── */
 
 	function openMergeSearch(personId: number) {
@@ -557,11 +609,11 @@
 	<table class="data-table">
 		<thead>
 			<tr>
-				<th class="sortable" onclick={() => toggleSort('name')}>Nom{sortIndicator('name')}</th>
+				<th class="sortable col-name" onclick={() => toggleSort('name')}>Nom{sortIndicator('name')}</th>
 				<th class="sortable" onclick={() => toggleSort('pubs')}>Publis{sortIndicator('pubs')}</th>
 				<th class="sortable" onclick={() => toggleSort('uca_pubs')}>UCA{sortIndicator('uca_pubs')}</th>
 				<th>Identifiants</th>
-				<th>Auteurs liés</th>
+				<th>Formes de noms</th>
 				<th>Actions</th>
 			</tr>
 		</thead>
@@ -569,7 +621,10 @@
 			{#each persons as p (p.id)}
 				{@const linked = p.linked_authors ?? []}
 				<tr>
-					<td>
+					<td class="td-name">
+						<button class="btn-edit-name" title="Modifier le nom"
+							onclick={() => { editNameModal = { personId: p.id, lastName: p.last_name, firstName: p.first_name }; }}
+						><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
 						<a href="{base}/persons/{p.id}" class="person-name">
 							<span class="person-last">{titleCase(p.last_name)}</span>
 							{titleCase(p.first_name)}
@@ -639,30 +694,18 @@
 							>+ Identifiant</button>
 						{/if}
 					</td>
-					<!-- Auteurs liés -->
+					<!-- Formes de noms -->
 					<td>
-						{#if linked.length}
-							<button class="btn-toggle-authors" onclick={() => { expandedAuthors = { ...expandedAuthors, [p.id]: !expandedAuthors[p.id] }; }}>
-								{linked.length} auteur{linked.length > 1 ? 's' : ''} lié{linked.length > 1 ? 's' : ''}
-								<span class="toggle-arrow">{expandedAuthors[p.id] ? '\u25BE' : '\u25B8'}</span>
-							</button>
-							{#if expandedAuthors[p.id]}
-								<div class="linked-authors-list">
-									{#each linked as a}
-										<span class="linked-author">
-											<span class="tag tag-source">{a.source}</span>
-											<span class="tag tag-linked">{a.full_name}</span>
-											<button
-												class="btn-unlink"
-												title="Détacher"
-												onclick={() => unlinkAuthor(p.id, a.source, a.id)}
-											>&times;</button>
-										</span>
-									{/each}
-								</div>
-							{/if}
+						{#if p.name_forms?.length}
+							<div class="name-forms-list">
+								{#each p.name_forms as nf}
+									<button class="name-form-tag" onclick={() => openDetachModal(p.id, nf.name_form)}>
+										{nf.name_form}
+									</button>
+								{/each}
+							</div>
 						{:else}
-							<span class="tag tag-unlinked">aucun</span>
+							<span class="tag tag-unlinked">aucune</span>
 						{/if}
 					</td>
 					<!-- Actions -->
@@ -705,6 +748,67 @@
 	</table>
 
 	<Pagination page={currentPage} pages={totalPages} onchange={handlePageChange} />
+{/if}
+
+<!-- Modal de détachement -->
+{#if detachModal}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="modal-overlay" onclick={() => { detachModal = null; }}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
+			<h3>Forme de nom : « {detachModal.nameForm} »</h3>
+			{#if detachModal.loading}
+				<p>Chargement…</p>
+			{:else if detachModal.authorships.length === 0}
+				<p>Aucune authorship liée.</p>
+			{:else}
+				<p>Cochez les authorships à détacher de cette personne :</p>
+				<div class="detach-list">
+					{#each detachModal.authorships as a, i}
+						<label class="detach-item">
+							<input type="checkbox" bind:checked={detachModal.authorships[i].checked} />
+							<span class="detach-source tag tag-source">{a.source === 'openalex' ? 'OA' : a.source === 'hal' ? 'HAL' : 'WoS'}</span>
+							<span class="detach-year">{a.pub_year ?? '?'}</span>
+							<span class="detach-title">{a.title}</span>
+						</label>
+					{/each}
+				</div>
+				<div class="modal-actions">
+					<button class="btn" onclick={() => { detachModal = null; }}>Annuler</button>
+					<button class="btn btn-danger" onclick={confirmDetach}>
+						Détacher {detachModal.authorships.filter(a => a.checked).length} authorship{detachModal.authorships.filter(a => a.checked).length > 1 ? 's' : ''}
+					</button>
+				</div>
+			{/if}
+		</div>
+	</div>
+{/if}
+
+<!-- Modal édition nom -->
+{#if editNameModal}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="modal-overlay" onclick={() => { editNameModal = null; }}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="modal-content modal-small" onclick={(e) => e.stopPropagation()}>
+			<h3>Modifier le nom</h3>
+			<div class="edit-name-form">
+				<label>
+					Nom
+					<input type="text" bind:value={editNameModal.lastName}
+						onkeydown={(e) => { if (e.key === 'Enter') savePersonName(); }} />
+				</label>
+				<label>
+					Prénom
+					<input type="text" bind:value={editNameModal.firstName}
+						onkeydown={(e) => { if (e.key === 'Enter') savePersonName(); }} />
+				</label>
+			</div>
+			<div class="modal-actions">
+				<button class="btn" onclick={() => { editNameModal = null; }}>Annuler</button>
+				<button class="btn btn-primary" onclick={savePersonName}>Enregistrer</button>
+			</div>
+		</div>
+	</div>
 {/if}
 
 <style>
@@ -1197,7 +1301,9 @@
 	/* ── RH checkmark ── */
 	.sortable { cursor: pointer; user-select: none; }
 	.sortable:hover { color: #2563eb; }
-	.person-name { font-weight: 500; color: inherit; text-decoration: none; }
+	.col-name { min-width: 200px; }
+	.td-name { position: relative; padding-left: 30px !important; }
+	.person-name { font-weight: 500; color: inherit; text-decoration: none; white-space: nowrap; }
 	.person-name:hover { color: #2563eb; text-decoration: underline; }
 	.person-last { font-weight: 600; }
 	.uca-count { font-size: 0.85em; color: var(--muted); }
@@ -1226,4 +1332,54 @@
 		padding: 40px;
 		color: var(--text-muted);
 	}
+
+	/* ── Name forms ── */
+	.name-forms-list { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+	.name-form-tag {
+		display: inline-flex; align-items: center; gap: 3px;
+		background: #f0f4f8; border: 1px solid #d0d8e0; border-radius: 3px;
+		padding: 1px 6px; font-size: 0.78rem; cursor: pointer;
+		transition: background 0.15s; text-align: left;
+	}
+	.name-form-tag:hover { background: #e0e8f0; border-color: #a0b0c0; }
+	.nf-sources { color: #888; font-size: 0.7rem; }
+
+	/* ── Modal ── */
+	.modal-overlay {
+		position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+		display: flex; align-items: center; justify-content: center;
+		z-index: 9999;
+	}
+	.modal-content {
+		background: white; border-radius: 8px; padding: 24px;
+		max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto;
+		box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+	}
+	.modal-content h3 { margin: 0 0 12px; font-size: 1.05rem; }
+	.detach-list { display: flex; flex-direction: column; gap: 4px; margin: 12px 0; }
+	.detach-item {
+		display: flex; align-items: center; gap: 8px;
+		padding: 4px 8px; border-radius: 4px; cursor: pointer;
+	}
+	.detach-item:hover { background: #f5f5f5; }
+	.detach-source { flex-shrink: 0; }
+	.detach-year { color: #888; font-size: 0.8rem; min-width: 30px; }
+	.detach-title { font-size: 0.85rem; }
+	.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+	.btn-danger { background: #d32f2f; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; }
+	.btn-danger:hover { background: #b71c1c; }
+	.btn-primary { background: var(--accent, #1976d2); color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; }
+	.btn-primary:hover { opacity: 0.9; }
+
+	/* ── Edit name ── */
+	.btn-edit-name {
+		background: none; border: none; cursor: pointer; padding: 2px;
+		color: #bbb; opacity: 0.4; transition: opacity 0.15s, color 0.15s;
+		position: absolute; left: 8px; top: 8px;
+	}
+	.btn-edit-name:hover { color: var(--accent, #1976d2); opacity: 1; }
+	.modal-small { max-width: 400px; }
+	.edit-name-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+	.edit-name-form label { display: flex; flex-direction: column; gap: 3px; font-size: 0.85rem; font-weight: 500; }
+	.edit-name-form input { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
 </style>

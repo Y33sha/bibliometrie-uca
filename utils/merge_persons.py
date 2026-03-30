@@ -23,16 +23,20 @@ def merge_person(cur, target_id, source_id):
             f"ont chacune une fiche RH distincte."
         )
 
-    # 1. Transférer les auteurs HAL
+    # 1. Transférer les auteurs HAL (comptes avec hal_person_id)
     cur.execute("UPDATE hal_authors SET person_id = %s WHERE person_id = %s",
+                (target_id, source_id))
+
+    # 1b. Transférer les hal_authorships (source de vérité pour person_id)
+    cur.execute("UPDATE hal_authorships SET person_id = %s WHERE person_id = %s",
                 (target_id, source_id))
 
     # 2. Transférer les authorships OpenAlex
     cur.execute("UPDATE openalex_authorships SET person_id = %s WHERE person_id = %s",
                 (target_id, source_id))
 
-    # 3. Transférer les auteurs WoS
-    cur.execute("UPDATE wos_authors SET person_id = %s WHERE person_id = %s",
+    # 3. Transférer les authorships WoS
+    cur.execute("UPDATE wos_authorships SET person_id = %s WHERE person_id = %s",
                 (target_id, source_id))
 
     # 4. Transférer les authorships consolidées (supprimer les doublons publication)

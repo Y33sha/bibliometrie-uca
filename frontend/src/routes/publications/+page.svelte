@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
+	import { replaceState } from '$app/navigation';
 	import { api } from '$lib/api';
 	import { sanitizeTitle } from '$lib/utils';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
@@ -127,7 +128,7 @@
 		if (currentSort !== 'year_desc') p.set('sort', currentSort);
 		if (currentPage > 1) p.set('page', String(currentPage));
 		const qs = p.toString();
-		history.replaceState(history.state, '', base + '/publications' + (qs ? '?' + qs : ''));
+		replaceState(base + '/publications' + (qs ? '?' + qs : ''), {});
 	}
 
 	function buildFilterParams(): URLSearchParams {
@@ -156,7 +157,7 @@
 			source_counts: Record<string, number>;
 			apc: { value: string; text: string; count: number }[];
 			countries: { value: string; text: string; count: number }[];
-		}>('/api/publications/facets?' + params);
+		}>('/api/publications/facets?' + params, { key: 'pub-facets' });
 		yearOptions = data.years.map((y) => ({
 			value: String(y.value), text: String(y.value), count: y.count
 		}));
@@ -189,7 +190,7 @@
 		const q = search.trim();
 		if (q) params.set('search', q);
 
-		const data = await api<PubResponse>('/api/publications?' + params);
+		const data = await api<PubResponse>('/api/publications?' + params, { key: 'pub-list' });
 		publications = data.publications;
 		total = data.total;
 		totalPages = data.pages;

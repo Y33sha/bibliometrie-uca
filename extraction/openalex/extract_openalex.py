@@ -132,7 +132,8 @@ def insert_batch(conn, batch: list[tuple]):
                 WHEN staging_openalex.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                     THEN FALSE
                 ELSE staging_openalex.processed
-            END
+            END,
+            last_seen_at = now()
     """
     with conn.cursor() as cur:
         execute_values(

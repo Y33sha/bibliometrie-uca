@@ -240,7 +240,7 @@
 		if (!text) return;
 		const ctx = newFormCtx.length ? newFormCtx : null;
 
-		await fetch(base + '/api/name-forms', {
+		const resp = await fetch(base + '/api/name-forms', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
@@ -250,6 +250,11 @@
 				requires_context_of: ctx
 			})
 		});
+		if (!resp.ok) {
+			const err = await resp.json().catch(() => ({ detail: `Erreur ${resp.status}` }));
+			alert(err.detail || `Erreur ${resp.status}`);
+			return;
+		}
 		addFormText = '';
 		addFormRegex = false;
 		newFormCtx = [];
