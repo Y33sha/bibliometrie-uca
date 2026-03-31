@@ -32,7 +32,7 @@ async def persons_directory(
     departments = [v.strip() for v in department.split(',') if v.strip()] if department else []
     roles = [v.strip() for v in role.split(',') if v.strip()] if role else []
 
-    conditions = []
+    conditions = ["p.rejected = FALSE"]
     params = []
 
     if search:
@@ -119,7 +119,7 @@ async def search_persons(q: str = Query("", min_length=2), limit: int = Query(10
     if not words:
         return []
     # Each word must match in last_name OR first_name
-    conditions = []
+    conditions = ["p.rejected = FALSE"]
     params: list = []
     for w in words:
         s = f"%{w}%"
@@ -171,17 +171,9 @@ async def list_persons(
         conditions.append("prh.role_title = %s")
         params.append(role)
     if linked == "yes":
-        conditions.append("""(EXISTS (
-            SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id
-        ) OR EXISTS (
-            SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id
-        ))""")
+        conditions.append("EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)")
     elif linked == "no":
-        conditions.append("""NOT EXISTS (
-            SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id
-        ) AND NOT EXISTS (
-            SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id
-        )""")
+        conditions.append("NOT EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)")
     if has_orcid == "yes":
         conditions.append("""EXISTS (
             SELECT 1 FROM person_identifiers pi
@@ -218,7 +210,7 @@ async def list_persons(
             SELECT p.id, p.last_name, p.first_name,
                 p.last_name_normalized, p.first_name_normalized,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
-                (prh.id IS NOT NULL) AS has_rh,
+                (prh.id IS NOT NULL) AS has_rh, p.rejected,
                 (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id) AS pub_count,
                 (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id AND a.is_uca = TRUE) AS uca_pub_count
             FROM persons p
@@ -262,7 +254,8 @@ async def list_persons(
                 SELECT pid AS person_id,
                        json_agg(json_build_object(
                            'name_form', pnf.name_form,
-                           'sources', pnf.sources
+                           'sources', pnf.sources,
+                           'ambiguous', (array_length(pnf.person_ids, 1) > 1)
                        ) ORDER BY pnf.name_form) AS name_forms
                 FROM person_name_forms pnf,
                      LATERAL unnest(pnf.person_ids) AS pid
@@ -334,11 +327,9 @@ async def persons_facets(
                 conds.append("prh.id IS NULL")
         if skip != "linked":
             if linked == "yes":
-                conds.append("""(EXISTS (SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id)
-                    OR EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id))""")
+                conds.append("EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)")
             elif linked == "no":
-                conds.append("""NOT EXISTS (SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id)
-                    AND NOT EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id)""")
+                conds.append("NOT EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)")
         return conds, params
 
     base_from = "persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id"
@@ -417,12 +408,10 @@ async def persons_facets(
             cur.execute(f"""
                 SELECT
                     COUNT(*) FILTER (WHERE
-                        EXISTS (SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id)
-                        OR EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id)
+                        EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)
                     ) AS yes,
                     COUNT(*) FILTER (WHERE
-                        NOT EXISTS (SELECT 1 FROM hal_authorships has WHERE has.person_id = p.id)
-                        AND NOT EXISTS (SELECT 1 FROM openalex_authorships oas WHERE oas.person_id = p.id)
+                        NOT EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)
                     ) AS no
                 FROM {base_from} {where}
             """, p)
@@ -1065,6 +1054,18 @@ async def toggle_authorship_excluded(authorship_id: int):
         return {"id": row["id"], "excluded": row["excluded"]}
 
 
+@router.patch("/api/persons/{person_id}/reject")
+async def reject_person(person_id: int, body: dict):
+    """Marque/démarque une personne comme rejetée (fausse entité)."""
+    rejected = body.get("rejected", True)
+    with get_cursor() as (cur, conn):
+        cur.execute("UPDATE persons SET rejected = %s, updated_at = now() WHERE id = %s",
+                    (rejected, person_id))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Personne introuvable")
+        return {"ok": True}
+
+
 @router.patch("/api/persons/{person_id}/name")
 async def update_person_name(person_id: int, body: dict):
     """Modifie le nom/prénom d'une personne."""
@@ -1083,6 +1084,18 @@ async def update_person_name(person_id: int, body: dict):
                    updated_at = now()
             WHERE id = %s
         """, (last_name, first_name, last_name, first_name, person_id))
+        # Ajouter les nouvelles formes de nom
+        for form in [f"{first_name} {last_name}", f"{last_name} {first_name}", f"{last_name}, {first_name}"] if first_name else [last_name]:
+            cur.execute("""
+                INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids, sources)
+                VALUES (unaccent(lower(trim(%s))), unaccent(lower(trim(%s))), ARRAY[%s], ARRAY['persons'])
+                ON CONFLICT (name_form) DO UPDATE SET
+                    person_ids = (
+                        SELECT array_agg(DISTINCT x ORDER BY x)
+                        FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
+                    ),
+                    updated_at = now()
+            """, (form, form, person_id, person_id))
         return {"ok": True}
 
 
@@ -1108,6 +1121,280 @@ async def merge_persons(person_id: int, body: dict):
             raise HTTPException(status_code=409, detail=str(e))
 
         return {"merged": True, "source_id": source_id, "target_id": person_id}
+
+
+# ----- API: Authorships orphelines -----
+
+
+@router.get("/api/orphan-authorships/count")
+async def orphan_authorships_count():
+    """Nombre d'authorships UCA sans person_id."""
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            SELECT
+                (SELECT COUNT(*) FROM hal_authorships has WHERE has.person_id IS NULL AND has.is_uca = TRUE) +
+                (SELECT COUNT(*) FROM openalex_authorships oas WHERE oas.person_id IS NULL AND oas.is_uca = TRUE) +
+                (SELECT COUNT(*) FROM wos_authorships was WHERE was.person_id IS NULL AND was.is_uca = TRUE)
+                AS total
+        """)
+        return cur.fetchone()
+
+
+@router.get("/api/orphan-authorships")
+async def list_orphan_authorships(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=200),
+    search: str = Query(""),
+):
+    """Liste les authorships UCA sans person_id, avec publication et nom d'auteur."""
+    offset = (page - 1) * per_page
+    search_cond_hal = ""
+    search_cond_oa = ""
+    search_cond_wos = ""
+    params: list = []
+    if search.strip():
+        params.append(f"%{search.strip()}%")
+        search_cond_hal = "AND unaccent(lower(ha.full_name)) LIKE unaccent(lower(%s))"
+        search_cond_oa = "AND unaccent(lower(oas.raw_author_name)) LIKE unaccent(lower(%s))"
+        search_cond_wos = "AND unaccent(lower(wa.full_name)) LIKE unaccent(lower(%s))"
+
+    with get_cursor() as (cur, conn):
+        # Count
+        cur.execute(f"""
+            SELECT COUNT(*) FROM (
+                SELECT ha.full_name
+                FROM hal_authorships has
+                JOIN hal_authors ha ON ha.id = has.hal_author_id
+                WHERE has.person_id IS NULL AND has.is_uca = TRUE {search_cond_hal}
+                UNION ALL
+                SELECT oas.raw_author_name
+                FROM openalex_authorships oas
+                WHERE oas.person_id IS NULL AND oas.is_uca = TRUE
+                  AND oas.raw_author_name IS NOT NULL {search_cond_oa}
+                UNION ALL
+                SELECT wa.full_name
+                FROM wos_authorships was
+                JOIN wos_authors wa ON wa.id = was.wos_author_id
+                WHERE was.person_id IS NULL AND was.is_uca = TRUE {search_cond_wos}
+            ) sub
+        """, params * 3)
+        total = cur.fetchone()["count"]
+
+        # List
+        cur.execute(f"""
+            SELECT * FROM (
+                SELECT 'hal' AS source, has.id AS authorship_id,
+                       ha.full_name, hd.publication_id,
+                       p.title AS pub_title, p.pub_year
+                FROM hal_authorships has
+                JOIN hal_authors ha ON ha.id = has.hal_author_id
+                JOIN hal_documents hd ON hd.id = has.hal_document_id
+                JOIN publications p ON p.id = hd.publication_id
+                WHERE has.person_id IS NULL AND has.is_uca = TRUE {search_cond_hal}
+                UNION ALL
+                SELECT 'openalex', oas.id,
+                       oas.raw_author_name,
+                       od.publication_id,
+                       p.title, p.pub_year
+                FROM openalex_authorships oas
+                JOIN openalex_documents od ON od.id = oas.openalex_document_id
+                JOIN publications p ON p.id = od.publication_id
+                WHERE oas.person_id IS NULL AND oas.is_uca = TRUE
+                  AND oas.raw_author_name IS NOT NULL {search_cond_oa}
+                UNION ALL
+                SELECT 'wos', was.id,
+                       wa.full_name, wd.publication_id,
+                       p.title, p.pub_year
+                FROM wos_authorships was
+                JOIN wos_authors wa ON wa.id = was.wos_author_id
+                JOIN wos_documents wd ON wd.id = was.wos_document_id
+                JOIN publications p ON p.id = wd.publication_id
+                WHERE was.person_id IS NULL AND was.is_uca = TRUE {search_cond_wos}
+            ) all_orphans
+            ORDER BY full_name, pub_year DESC
+            LIMIT %s OFFSET %s
+        """, params * 3 + [per_page, offset])
+        rows = cur.fetchall()
+
+        return {
+            "total": total,
+            "page": page,
+            "pages": (total + per_page - 1) // per_page or 1,
+            "authorships": rows,
+        }
+
+
+def _add_name_form(cur, person_id, full_name, source):
+    """Ajoute une forme de nom dans person_name_forms."""
+    name_form = full_name.strip()
+    if not name_form:
+        return
+    cur.execute("""
+        INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids, sources)
+        VALUES (unaccent(lower(trim(%s))), unaccent(lower(trim(%s))), ARRAY[%s], ARRAY[%s])
+        ON CONFLICT (name_form) DO UPDATE SET
+            person_ids = (
+                SELECT array_agg(DISTINCT x ORDER BY x)
+                FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
+            ),
+            sources = (
+                SELECT array_agg(DISTINCT x ORDER BY x)
+                FROM unnest(person_name_forms.sources || ARRAY[%s]) AS x
+            ),
+            updated_at = now()
+    """, (name_form, name_form, person_id, source, person_id, source))
+
+
+def _ensure_truth_authorship(cur, person_id, source, authorship_id):
+    """Crée l'authorship vérité si elle n'existe pas, et met à jour la FK source."""
+    # Trouver la publication_id
+    if source == "hal":
+        cur.execute("""SELECT hd.publication_id FROM hal_authorships has
+                       JOIN hal_documents hd ON hd.id = has.hal_document_id
+                       WHERE has.id = %s""", (authorship_id,))
+    elif source == "openalex":
+        cur.execute("""SELECT od.publication_id FROM openalex_authorships oas
+                       JOIN openalex_documents od ON od.id = oas.openalex_document_id
+                       WHERE oas.id = %s""", (authorship_id,))
+    elif source == "wos":
+        cur.execute("""SELECT wd.publication_id FROM wos_authorships was
+                       JOIN wos_documents wd ON wd.id = was.wos_document_id
+                       WHERE was.id = %s""", (authorship_id,))
+    else:
+        return
+    row = cur.fetchone()
+    if not row or not row["publication_id"]:
+        return
+    pub_id = row["publication_id"]
+
+    # INSERT si pas déjà existant
+    cur.execute("""
+        INSERT INTO authorships (publication_id, person_id)
+        VALUES (%s, %s)
+        ON CONFLICT (publication_id, person_id) DO NOTHING
+    """, (pub_id, person_id))
+
+    # Mettre à jour la FK source
+    fk_col = {"hal": "hal_authorship_id", "openalex": "openalex_authorship_id", "wos": "wos_authorship_id"}[source]
+    cur.execute(f"""
+        UPDATE authorships SET {fk_col} = %s, updated_at = now()
+        WHERE publication_id = %s AND person_id = %s AND {fk_col} IS NULL
+    """, (authorship_id, pub_id, person_id))
+
+
+@router.post("/api/orphan-authorships/assign")
+async def assign_orphan_authorship(body: dict):
+    """Attribue une authorship orpheline à une personne existante ou nouvelle."""
+    source = body.get("source")
+    authorship_id = body.get("authorship_id")
+    person_id = body.get("person_id")
+    create_person_name = body.get("create_person")  # { last_name, first_name }
+
+    if not source or not authorship_id:
+        raise HTTPException(status_code=400, detail="source et authorship_id requis")
+
+    with get_cursor() as (cur, conn):
+        if create_person_name:
+            ln = create_person_name.get("last_name", "").strip()
+            fn = create_person_name.get("first_name", "").strip()
+            if not ln:
+                raise HTTPException(status_code=400, detail="Nom requis")
+            cur.execute("""
+                INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized)
+                VALUES (%s, %s, unaccent(lower(trim(%s))), unaccent(lower(trim(%s))))
+                RETURNING id
+            """, (ln, fn, ln, fn))
+            person_id = cur.fetchone()["id"]
+            # Ajouter les formes de nom de la nouvelle personne
+            for form in [f"{fn} {ln}", f"{ln} {fn}", f"{ln}, {fn}"] if fn else [ln]:
+                cur.execute("""
+                    INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids, sources)
+                    VALUES (unaccent(lower(trim(%s))), unaccent(lower(trim(%s))), ARRAY[%s], ARRAY['persons'])
+                    ON CONFLICT (name_form) DO UPDATE SET
+                        person_ids = (
+                            SELECT array_agg(DISTINCT x ORDER BY x)
+                            FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
+                        ),
+                        updated_at = now()
+                """, (form, form, person_id, person_id))
+        elif not person_id:
+            raise HTTPException(status_code=400, detail="person_id ou create_person requis")
+
+        # Vérifier que la personne existe
+        cur.execute("SELECT id FROM persons WHERE id = %s", (person_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Personne introuvable")
+
+        # Attribuer et récupérer le nom + statut excluded
+        if source == "hal":
+            cur.execute("""UPDATE hal_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
+                           RETURNING excluded,
+                               (SELECT ha.full_name FROM hal_authors ha WHERE ha.id = hal_author_id) AS full_name""",
+                        (person_id, authorship_id))
+        elif source == "openalex":
+            cur.execute("""UPDATE openalex_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
+                           RETURNING excluded, raw_author_name AS full_name""",
+                        (person_id, authorship_id))
+        elif source == "wos":
+            cur.execute("""UPDATE wos_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
+                           RETURNING excluded,
+                               (SELECT wa.full_name FROM wos_authors wa WHERE wa.id = wos_author_id) AS full_name""",
+                        (person_id, authorship_id))
+        else:
+            raise HTTPException(status_code=400, detail=f"Source inconnue: {source}")
+
+        row = cur.fetchone()
+        # Ajouter la forme de nom seulement si l'authorship n'est pas rejetée
+        if row and row["full_name"] and not row.get("excluded"):
+            _add_name_form(cur, person_id, row["full_name"], source)
+
+        # Créer/mettre à jour l'authorship vérité
+        _ensure_truth_authorship(cur, person_id, source, authorship_id)
+
+        return {"ok": True, "person_id": person_id}
+
+
+@router.post("/api/orphan-authorships/batch-assign")
+async def batch_assign_orphan_authorships(body: dict):
+    """Attribue plusieurs authorships orphelines à une même personne."""
+    authorships = body.get("authorships", [])  # [{ source, authorship_id }, ...]
+    person_id = body.get("person_id")
+    if not authorships or not person_id:
+        raise HTTPException(status_code=400, detail="authorships et person_id requis")
+
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id FROM persons WHERE id = %s", (person_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Personne introuvable")
+
+        count = 0
+        for a in authorships:
+            src = a["source"]
+            aid = a["authorship_id"]
+            if src == "hal":
+                cur.execute("""UPDATE hal_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
+                               RETURNING excluded,
+                                   (SELECT ha.full_name FROM hal_authors ha WHERE ha.id = hal_author_id) AS full_name""",
+                            (person_id, aid))
+            elif src == "openalex":
+                cur.execute("""UPDATE openalex_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
+                               RETURNING excluded, raw_author_name AS full_name""",
+                            (person_id, aid))
+            elif src == "wos":
+                cur.execute("""UPDATE wos_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
+                               RETURNING excluded,
+                                   (SELECT wa.full_name FROM wos_authors wa WHERE wa.id = wos_author_id) AS full_name""",
+                            (person_id, aid))
+            else:
+                continue
+            row = cur.fetchone()
+            if row:
+                count += 1
+                if row["full_name"] and not row.get("excluded"):
+                    _add_name_form(cur, person_id, row["full_name"], src)
+                _ensure_truth_authorship(cur, person_id, src, aid)
+
+        return {"ok": True, "assigned": count}
 
 
 # ----- API: Formes de noms / détachement authorships -----

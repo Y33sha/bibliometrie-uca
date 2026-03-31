@@ -42,6 +42,7 @@
 		start_date?: string;
 		end_date?: string;
 		has_rh?: boolean;
+		rejected?: boolean;
 		linked_authors?: LinkedAuthor[];
 		identifiers?: PersonIdentifier[];
 	}
@@ -85,6 +86,15 @@
 	/* ── State ── */
 
 	let stats: PersonStats | null = $state(null);
+	let orphanCount = $state(0);
+	let showOrphans = $state(false);
+	let orphanSearch = $state('');
+	let orphanPage = $state(1);
+	let orphanPages = $state(1);
+	let orphanTotal = $state(0);
+	let orphans: any[] = $state([]);
+	let orphanAssignSearch: Record<number, { query: string; results: any[]; loading: boolean }> = $state({});
+	let orphanTimers: Record<number, ReturnType<typeof setTimeout>> = {};
 
 	let search = $state('');
 	let selectedDepts: string[] = $state([]);
@@ -132,7 +142,7 @@
 	let idForms: Record<number, { id_type: string; id_value: string; error: string }> = $state({});
 
 	/* Edit name modal state */
-	let editNameModal: { personId: number; lastName: string; firstName: string } | null = $state(null);
+	let editNameModal: { personId: number; lastName: string; firstName: string; rejected: boolean } | null = $state(null);
 
 	/* Detach modal state */
 	interface DetachAuthorship { source: string; authorship_id: number; pub_id: number; title: string; pub_year: number | null; doi: string | null; checked: boolean }
@@ -431,6 +441,73 @@
 		}
 	}
 
+	/* ── Orphans ── */
+
+	async function loadOrphanCount() {
+		const data = await api<{ total: number }>('/api/orphan-authorships/count');
+		orphanCount = data.total;
+	}
+
+	async function loadOrphans() {
+		const params = new URLSearchParams({ page: String(orphanPage), per_page: '50' });
+		if (orphanSearch.trim()) params.set('search', orphanSearch.trim());
+		const data = await api<{ total: number; page: number; pages: number; authorships: any[] }>(
+			'/api/orphan-authorships?' + params, { key: 'orphans' }
+		);
+		orphans = data.authorships;
+		orphanTotal = data.total;
+		orphanPages = data.pages;
+		orphanPage = data.page;
+	}
+
+	function openOrphanAssign(idx: number) {
+		orphanAssignSearch = { [idx]: { query: '', results: [], loading: false } };
+	}
+
+	function handleOrphanSearchInput(idx: number, query: string) {
+		orphanAssignSearch = { ...orphanAssignSearch, [idx]: { ...orphanAssignSearch[idx], query } };
+		if (orphanTimers[idx]) clearTimeout(orphanTimers[idx]);
+		if (query.trim().length < 2) {
+			orphanAssignSearch = { ...orphanAssignSearch, [idx]: { ...orphanAssignSearch[idx], results: [], loading: false } };
+			return;
+		}
+		orphanTimers[idx] = setTimeout(async () => {
+			orphanAssignSearch = { ...orphanAssignSearch, [idx]: { ...orphanAssignSearch[idx], loading: true } };
+			const results = await api<any[]>(`/api/persons/search?q=${encodeURIComponent(query.trim())}`);
+			orphanAssignSearch = { ...orphanAssignSearch, [idx]: { ...orphanAssignSearch[idx], results, loading: false } };
+		}, 300);
+	}
+
+	async function assignOrphan(orphan: any, personId: number) {
+		await fetch(`${base}/api/orphan-authorships/assign`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ source: orphan.source, authorship_id: orphan.authorship_id, person_id: personId })
+		});
+		orphanAssignSearch = {};
+		loadOrphans();
+		loadOrphanCount();
+	}
+
+	async function createAndAssignOrphan(orphan: any) {
+		const parts = orphan.full_name.includes(',')
+			? orphan.full_name.split(',').map((s: string) => s.trim())
+			: [orphan.full_name.split(' ').slice(-1)[0], orphan.full_name.split(' ').slice(0, -1).join(' ')];
+		const lastName = parts[0] || orphan.full_name;
+		const firstName = parts[1] || '';
+		await fetch(`${base}/api/orphan-authorships/assign`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				source: orphan.source, authorship_id: orphan.authorship_id,
+				create_person: { last_name: lastName, first_name: firstName }
+			})
+		});
+		orphanAssignSearch = {};
+		loadOrphans();
+		loadOrphanCount();
+	}
+
 	/* ── Edit name ── */
 
 	async function savePersonName() {
@@ -445,6 +522,16 @@
 			alert(err.detail || `Erreur ${resp.status}`);
 			return;
 		}
+		editNameModal = null;
+		loadTable();
+	}
+
+	async function toggleRejectPerson(personId: number, rejected: boolean) {
+		await fetch(`${base}/api/persons/${personId}/reject`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ rejected })
+		});
 		editNameModal = null;
 		loadTable();
 	}
@@ -549,41 +636,15 @@
 
 	onMount(() => {
 		readUrlFilters();
-		loadStats();
 		loadFacets();
 		loadTable();
+		loadOrphanCount();
 	});
 </script>
 
 <svelte:head>
 	<title>Admin - Personnes - Bibliom&eacute;trie UCA</title>
 </svelte:head>
-
-<!-- Stats row -->
-{#if stats}
-	<div class="stats-row">
-		<div class="stat-card">
-			<div class="value">{stats.total_persons}</div>
-			<div class="label">Personnes</div>
-		</div>
-		<div class="stat-card hl-success">
-			<div class="value value-success">{stats.linked_persons}</div>
-			<div class="label">Rattach&eacute;es</div>
-		</div>
-		<div class="stat-card hl-warning">
-			<div class="value value-warning">{unlinkedCount}</div>
-			<div class="label">Non rattach&eacute;es</div>
-		</div>
-		<div class="stat-card">
-			<div class="value">{stats.linked_authors}</div>
-			<div class="label">Auteurs li&eacute;s</div>
-		</div>
-		<div class="stat-card">
-			<div class="value">{stats.departments}</div>
-			<div class="label">D&eacute;partements</div>
-		</div>
-	</div>
-{/if}
 
 <!-- Toolbar -->
 <div class="toolbar">
@@ -601,6 +662,12 @@
 	<FacetDropdown label="Base RH" options={rhOptions} bind:selected={selectedRh} onchange={handleFilterChange} />
 	<span class="count">{totalCount} personnes</span>
 </div>
+
+{#if orphanCount > 0}
+	<a href="{base}/admin/orphan-authorships" class="orphan-link">
+		{orphanCount} authorship{orphanCount > 1 ? 's' : ''} UCA orpheline{orphanCount > 1 ? 's' : ''} (non reliée{orphanCount > 1 ? 's' : ''} à une personne)
+	</a>
+{/if}
 
 <!-- Table -->
 {#if persons.length === 0 && !loading}
@@ -620,10 +687,10 @@
 		<tbody>
 			{#each persons as p (p.id)}
 				{@const linked = p.linked_authors ?? []}
-				<tr>
+				<tr class:rejected={p.rejected}>
 					<td class="td-name">
 						<button class="btn-edit-name" title="Modifier le nom"
-							onclick={() => { editNameModal = { personId: p.id, lastName: p.last_name, firstName: p.first_name }; }}
+							onclick={() => { editNameModal = { personId: p.id, lastName: p.last_name, firstName: p.first_name, rejected: p.rejected ?? false }; }}
 						><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
 						<a href="{base}/persons/{p.id}" class="person-name">
 							<span class="person-last">{titleCase(p.last_name)}</span>
@@ -699,7 +766,7 @@
 						{#if p.name_forms?.length}
 							<div class="name-forms-list">
 								{#each p.name_forms as nf}
-									<button class="name-form-tag" onclick={() => openDetachModal(p.id, nf.name_form)}>
+									<button class="name-form-tag" class:ambiguous={nf.ambiguous} onclick={() => openDetachModal(p.id, nf.name_form)}>
 										{nf.name_form}
 									</button>
 								{/each}
@@ -804,6 +871,12 @@
 				</label>
 			</div>
 			<div class="modal-actions">
+				{#if editNameModal.rejected}
+					<button class="btn btn-restore" onclick={() => toggleRejectPerson(editNameModal!.personId, false)}>Restaurer</button>
+				{:else}
+					<button class="btn btn-danger" onclick={() => toggleRejectPerson(editNameModal!.personId, true)}>Rejeter (fausse entité)</button>
+				{/if}
+				<span style="flex:1"></span>
 				<button class="btn" onclick={() => { editNameModal = null; }}>Annuler</button>
 				<button class="btn btn-primary" onclick={savePersonName}>Enregistrer</button>
 			</div>
@@ -1303,7 +1376,7 @@
 	.sortable:hover { color: #2563eb; }
 	.col-name { min-width: 200px; }
 	.td-name { position: relative; padding-left: 30px !important; }
-	.person-name { font-weight: 500; color: inherit; text-decoration: none; white-space: nowrap; }
+	.person-name { font-weight: 500; color: inherit; text-decoration: none; }
 	.person-name:hover { color: #2563eb; text-decoration: underline; }
 	.person-last { font-weight: 600; }
 	.uca-count { font-size: 0.85em; color: var(--muted); }
@@ -1342,6 +1415,8 @@
 		transition: background 0.15s; text-align: left;
 	}
 	.name-form-tag:hover { background: #e0e8f0; border-color: #a0b0c0; }
+	.name-form-tag.ambiguous { background: #fff3e0; border-color: #e0c080; color: #8a6d3b; }
+	.name-form-tag.ambiguous:hover { background: #ffe8cc; border-color: #d0a050; }
 	.nf-sources { color: #888; font-size: 0.7rem; }
 
 	/* ── Modal ── */
@@ -1368,8 +1443,8 @@
 	.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 	.btn-danger { background: #d32f2f; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; }
 	.btn-danger:hover { background: #b71c1c; }
-	.btn-primary { background: var(--accent, #1976d2); color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; }
-	.btn-primary:hover { opacity: 0.9; }
+	.btn-primary { background: #4caf50; color: white !important; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; transition: background 0.15s; }
+	.btn-primary:hover { background: #2e7d32; }
 
 	/* ── Edit name ── */
 	.btn-edit-name {
@@ -1382,4 +1457,30 @@
 	.edit-name-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 	.edit-name-form label { display: flex; flex-direction: column; gap: 3px; font-size: 0.85rem; font-weight: 500; }
 	.edit-name-form input { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+	.btn-restore { background: #4caf50; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; }
+	.btn-restore:hover { background: #388e3c; }
+
+	/* ── Rejected persons ── */
+	tr.rejected { opacity: 0.45; }
+	tr.rejected:hover { opacity: 0.7; }
+	tr.rejected .person-name { text-decoration: line-through; }
+
+	/* ── Orphans ── */
+	.orphan-link {
+		display: block; width: 100%; padding: 10px 16px; margin-bottom: 12px;
+		background: #fff3e0; border: 1px solid #ffcc80; border-radius: 6px;
+		color: #e65100; font-size: 0.9rem; font-weight: 500; cursor: pointer;
+		text-align: left; transition: background 0.15s;
+	}
+	.orphan-link:hover { background: #ffe0b2; }
+	.orphan-panel { margin-bottom: 16px; }
+	.orphan-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+	.orphan-header h2 { margin: 0; font-size: 1.1rem; }
+	.orphan-toolbar { margin-bottom: 10px; }
+	.orphan-toolbar input { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; width: 300px; }
+	.orphan-assign { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-start; }
+	.orphan-assign input { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; width: 180px; }
+	.orphan-results { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+	.pub-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
+	.pub-link:hover { text-decoration: underline; }
 </style>

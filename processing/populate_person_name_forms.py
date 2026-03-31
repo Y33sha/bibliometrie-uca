@@ -47,7 +47,7 @@ def populate(conn):
         SELECT DISTINCT ha.full_name, has.person_id
         FROM hal_authorships has
         JOIN hal_authors ha ON ha.id = has.hal_author_id
-        WHERE has.person_id IS NOT NULL
+        WHERE has.person_id IS NOT NULL AND NOT has.excluded
           AND ha.full_name IS NOT NULL AND ha.full_name != ''
     """)
     for r in cur.fetchall():
@@ -59,7 +59,7 @@ def populate(conn):
         SELECT DISTINCT wa.full_name, was.person_id
         FROM wos_authors wa
         JOIN wos_authorships was ON was.wos_author_id = wa.id
-        WHERE was.person_id IS NOT NULL
+        WHERE was.person_id IS NOT NULL AND NOT was.excluded
           AND wa.full_name IS NOT NULL AND wa.full_name != ''
     """)
     for r in cur.fetchall():
@@ -70,7 +70,7 @@ def populate(conn):
     cur.execute("""
         SELECT DISTINCT oas.raw_author_name, oas.person_id
         FROM openalex_authorships oas
-        WHERE oas.person_id IS NOT NULL
+        WHERE oas.person_id IS NOT NULL AND NOT oas.excluded
           AND oas.raw_author_name IS NOT NULL AND oas.raw_author_name != ''
     """)
     for r in cur.fetchall():
