@@ -70,13 +70,7 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] en attendant, le mode "conflit de sources" dans la dédup personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`)
 
 ## Structures
-* [x] créer page détails (laboratories/[id])
-* [x] authorships orphelines: interface pour les visualiser et les rattacher à des personnes
-* [x] filtres à facettes dynamiques avec comptage sur la page labo
-* [ ] onglet dashboard
 * [ ] signatures: afficher nombre de publis + dates; trier par publis décroissantes; idem sur page personne
-* [ ] afficher identifiants (AuréHAL, OpenAlex, WoS) avec liens
-* [ ] ajout de formes de nom ne marche pas (erreur 500)
 
 ## Publications
 * [ ] ajouter filtre corresponding_is_uca?
@@ -86,6 +80,9 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] preprints en accès gold?
 * [ ] authorship supprimée: publi apparaît toujours (julie gardette)
 * [ ] source theConversation: pas closed, et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
+* [ ] si source erronée: rejeter authorship source + recalculer affiliations de l'authorship à partir des sources non rejetées
+* [ ] quid des changements d'authorships quand réimport avec hash différent? supprimer avant de recréer?
+* [ ] afficher les abstracts?
 ### Types de documents
 * [ ] gérer le document type "correction" sur wos, "erratum" sur OA (actuellement, apparaît comme article) (Corrigendum to ...)
 * [ ] type peer-review?

@@ -37,12 +37,12 @@ async def publications_facets(
     country_values = parse_str_csv(country)
 
     def base_conds_params():
-        """Conditions de base : publications UCA ou personne."""
+        """Conditions de base : publications UCA ou personne. Exclut toujours peer_review."""
         if person_id:
-            c, p = [], []
+            c, p = ["p.doc_type != 'peer_review'"], []
             apply_person_filter(c, p, person_id)
             return c, p
-        return [PUB_IS_UCA], []
+        return [PUB_IS_UCA], []  # PUB_IS_UCA exclut déjà peer_review
 
     def add_all_except(conds, params, *, skip: str):
         """Ajoute tous les filtres sauf celui indiqué par skip."""
@@ -385,6 +385,9 @@ async def export_publications_csv(
         else:
             conditions = [PUB_IS_UCA]
             params = []
+
+        # Exclure les peer_review
+        conditions.append("p.doc_type != 'peer_review'")
 
         if search:
             conditions.append("unaccent(p.title) ILIKE unaccent(%s)")
@@ -793,6 +796,9 @@ async def list_publications(
         else:
             conditions = [PUB_IS_UCA]
             params = []
+
+        # Exclure les peer_review (auteurs = ceux de l'article reviewé, pas du review)
+        conditions.append("p.doc_type != 'peer_review'")
 
         if search:
             conditions.append("unaccent(p.title) ILIKE unaccent(%s)")

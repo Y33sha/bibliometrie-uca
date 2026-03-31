@@ -4,9 +4,10 @@
 OA_OPEN_STATUSES = ('gold', 'hybrid', 'bronze', 'green')
 
 # Filtre SQL : la publication a au moins un authorship UCA.
-# Exclut les peer_review (reviews anonymes, auteurs = auteurs de l'article reviewé, pas du review).
+# Exclut les peer_review et les personnes rejetées (fausses entités).
 PUB_IS_UCA = """(
     EXISTS (SELECT 1 FROM authorships a
+            JOIN persons pe ON pe.id = a.person_id AND pe.rejected = FALSE
             WHERE a.publication_id = p.id AND a.is_uca = TRUE)
     AND p.doc_type != 'peer_review'
 )"""
