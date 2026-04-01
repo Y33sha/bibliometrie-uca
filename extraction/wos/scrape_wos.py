@@ -50,7 +50,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "scrape_wos.log")
+            os.path.join(os.path.dirname(__file__), "logs", "scrape_wos.log")
         ),
     ],
 )

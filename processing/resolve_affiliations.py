@@ -34,7 +34,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "resolve_affiliations.log")
+            os.path.join(os.path.dirname(__file__), "logs", "resolve_affiliations.log")
         ),
     ],
 )

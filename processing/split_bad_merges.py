@@ -16,6 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from config.settings import DB
+from utils.normalize import normalize_text as _normalize_text
+from services.publications import find_or_create as find_or_create_publication
+from services.authorships import move_authorships_for_source
 
 HAL_DOCTYPE_MAP = {
     "ART": "article", "COMM": "conference_paper", "POSTER": "conference_paper",
@@ -216,24 +219,13 @@ def main():
                 if jr:
                     journal_id = jr["id"]
 
-            # Vérifier si un DOI existe déjà (ne pas créer de doublon)
-            new_pub_id = None
-            if doi:
-                cur.execute("SELECT id FROM publications WHERE lower(doi) = lower(%s)", (doi,))
-                existing = cur.fetchone()
-                if existing:
-                    new_pub_id = existing["id"]
-
-            if not new_pub_id:
-                cur.execute("""
-                    INSERT INTO publications
-                        (title, title_normalized, doc_type, pub_year, doi,
-                         oa_status, journal_id, container_title)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id
-                """, (title, title_norm, doc_type, pub_year, doi,
-                      oa_status, journal_id, container_title))
-                new_pub_id = cur.fetchone()["id"]
+            # Trouver ou créer la publication via le service
+            new_pub_id, is_new = find_or_create_publication(
+                cur, title=title, title_normalized=_normalize_text(title),
+                pub_year=pub_year, doc_type=doc_type, doi=doi,
+                oa_status=oa_status, journal_id=journal_id,
+                container_title=container_title)
+            if is_new:
                 total_new_pubs += 1
 
             # Rattacher les hal_documents du groupe à la nouvelle pub
@@ -244,17 +236,15 @@ def main():
                     (new_pub_id, hd_id)
                 )
 
-            # Rattacher les authorships liées
+            # Rattacher les authorships liées via le service
             for hd_id in hd_ids:
                 cur.execute("""
-                    UPDATE authorships a
-                    SET publication_id = %s, updated_at = now()
-                    WHERE a.hal_authorship_id IN (
-                        SELECT has.id FROM hal_authorships has
-                        WHERE has.hal_document_id = %s
-                    )
-                    AND a.publication_id = %s
-                """, (new_pub_id, hd_id, pub_id))
+                    SELECT has.id FROM hal_authorships has
+                    WHERE has.hal_document_id = %s
+                """, (hd_id,))
+                has_ids = [r["id"] for r in cur.fetchall()]
+                if has_ids:
+                    move_authorships_for_source(cur, "hal", has_ids, pub_id, new_pub_id)
 
             # Déplacer les openalex_documents dont le DOI match un hal_doc du groupe
             group_dois = [d["doc"]["doi"] for d in g if d["doc"]["doi"]]
@@ -268,14 +258,12 @@ def main():
                 # Déplacer aussi les authorships OA correspondantes
                 for oa_row in moved_oa:
                     cur.execute("""
-                        UPDATE authorships a
-                        SET publication_id = %s, updated_at = now()
-                        WHERE a.openalex_authorship_id IN (
-                            SELECT oas.id FROM openalex_authorships oas
-                            WHERE oas.openalex_document_id = %s
-                        )
-                        AND a.publication_id = %s
-                    """, (new_pub_id, oa_row["id"], pub_id))
+                        SELECT oas.id FROM openalex_authorships oas
+                        WHERE oas.openalex_document_id = %s
+                    """, (oa_row["id"],))
+                    oas_ids = [r["id"] for r in cur.fetchall()]
+                    if oas_ids:
+                        move_authorships_for_source(cur, "openalex", oas_ids, pub_id, new_pub_id)
 
             halids = [d["doc"]["halid"] for d in g]
             oa_moved = [r["openalex_id"] for r in moved_oa] if group_dois else []

@@ -2,9 +2,12 @@
 
 import io
 import csv
+import sys, os
 from fastapi import APIRouter, Query, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from webapp.deps import get_cursor
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from services.authorships import detach_source as _detach_source
 from webapp.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, parse_int_csv, parse_str_csv,
     apply_lab_filter, apply_year_filter, apply_doc_type_filter, apply_source_filter,
     apply_oa_filter, apply_person_filter, apply_corresponding_filter,
@@ -705,36 +708,10 @@ async def exclude_source_authorship(source: str, authorship_id: int, body: dict 
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Authorship source introuvable")
 
-        # 2. Si on exclut : vérifier si l'authorship consolidée est encore attestée
+        # 2. Si on exclut : détacher la FK source de l'authorship consolidée
+        #    (et supprimer l'authorship si plus aucune source ne l'atteste)
         if excluded:
-            # Trouver l'authorship consolidée liée
-            cur.execute(
-                f"SELECT id, publication_id, person_id FROM authorships WHERE {fk_col} = %s",
-                (authorship_id,),
-            )
-            auth_row = cur.fetchone()
-            if auth_row:
-                # Détacher le FK source de l'authorship consolidée
-                cur.execute(
-                    f"UPDATE authorships SET {fk_col} = NULL WHERE id = %s",
-                    (auth_row["id"],),
-                )
-                # Vérifier s'il reste d'autres sources non exclues
-                still_attested = False
-                for src, (tbl, fk) in VALID_SOURCE_TABLES.items():
-                    if fk == fk_col:
-                        continue
-                    cur.execute(
-                        f"SELECT 1 FROM authorships WHERE id = %s AND {fk} IS NOT NULL",
-                        (auth_row["id"],),
-                    )
-                    if cur.fetchone():
-                        still_attested = True
-                        break
-
-                if not still_attested:
-                    # Aucune source restante → supprimer l'authorship consolidée
-                    cur.execute("DELETE FROM authorships WHERE id = %s", (auth_row["id"],))
+            _detach_source(cur, authorship_id, source)
 
         return {"ok": True, "excluded": excluded}
 

@@ -1,8 +1,160 @@
-"""UCA flag propagation for addresses."""
+"""
+Service Authorships vérité — accès en écriture à la table `authorships`.
+
+Opérations unitaires sur les authorships consolidées. Le script batch
+`build_authorships.py` reste le constructeur principal (reconstruction
+complète), et `webapp/uca.py` gère le recalcul UCA incrémental.
+
+Ce service encapsule les opérations ponctuelles utilisées par les routeurs
+et les scripts de correction.
+"""
+
+# Config par source : table source, FK dans authorships, table documents, FK document
+_SOURCE_CONFIG = {
+    "hal": {
+        "authorship_table": "hal_authorships",
+        "truth_fk": "hal_authorship_id",
+        "doc_table": "hal_documents",
+        "doc_fk": "hal_document_id",
+    },
+    "openalex": {
+        "authorship_table": "openalex_authorships",
+        "truth_fk": "openalex_authorship_id",
+        "doc_table": "openalex_documents",
+        "doc_fk": "openalex_document_id",
+    },
+    "wos": {
+        "authorship_table": "wos_authorships",
+        "truth_fk": "wos_authorship_id",
+        "doc_table": "wos_documents",
+        "doc_fk": "wos_document_id",
+    },
+}
+
+ALL_TRUTH_FKS = [cfg["truth_fk"] for cfg in _SOURCE_CONFIG.values()]
+
+
+def exclude_authorship(cur, authorship_id: int) -> dict | None:
+    """Marque une authorship vérité comme exclue.
+    Retourne la row mise à jour ou None si introuvable.
+    """
+    cur.execute("""
+        UPDATE authorships SET excluded = TRUE, updated_at = now()
+        WHERE id = %s RETURNING id, excluded
+    """, (authorship_id,))
+    return cur.fetchone()
+
+
+def detach_source(cur, authorship_id: int, source: str):
+    """Détache une FK source d'une authorship vérité.
+    Si plus aucune source ne l'atteste, supprime l'authorship.
+
+    Retourne True si l'authorship a été supprimée, False sinon.
+    """
+    cfg = _SOURCE_CONFIG.get(source)
+    if not cfg:
+        raise ValueError(f"Source inconnue : {source}")
+
+    fk_col = cfg["truth_fk"]
+
+    # Détacher la FK source
+    cur.execute(f"""
+        UPDATE authorships SET {fk_col} = NULL, updated_at = now()
+        WHERE {fk_col} = %s
+        RETURNING id
+    """, (authorship_id,))
+    row = cur.fetchone()
+    if not row:
+        return False
+
+    truth_id = row["id"]
+
+    # Vérifier s'il reste d'autres sources
+    checks = " AND ".join(f"{fk} IS NULL" for fk in ALL_TRUTH_FKS)
+    cur.execute(f"""
+        SELECT 1 FROM authorships WHERE id = %s AND {checks}
+    """, (truth_id,))
+
+    if cur.fetchone():
+        # Plus aucune source → supprimer
+        cur.execute("DELETE FROM authorships WHERE id = %s", (truth_id,))
+        return True
+
+    return False
+
+
+def delete_orphan_authorships(cur, person_id: int) -> int:
+    """Supprime les authorships vérité d'une personne qui ne sont plus attestées
+    par aucune authorship source.
+    Retourne le nombre d'authorships supprimées.
+    """
+    cur.execute("""
+        DELETE FROM authorships a
+        WHERE a.person_id = %s
+          AND NOT EXISTS (SELECT 1 FROM hal_authorships has
+                          JOIN hal_documents hd ON hd.id = has.hal_document_id
+                          WHERE has.person_id = %s AND hd.publication_id = a.publication_id)
+          AND NOT EXISTS (SELECT 1 FROM openalex_authorships oas
+                          JOIN openalex_documents od ON od.id = oas.openalex_document_id
+                          WHERE oas.person_id = %s AND od.publication_id = a.publication_id)
+          AND NOT EXISTS (SELECT 1 FROM wos_authorships was
+                          JOIN wos_documents wd ON wd.id = was.wos_document_id
+                          WHERE was.person_id = %s AND wd.publication_id = a.publication_id)
+    """, (person_id, person_id, person_id, person_id))
+    return cur.rowcount
+
+
+def move_authorships_for_source(cur, source: str, source_authorship_ids: list[int],
+                                from_pub_id: int, to_pub_id: int):
+    """Déplace des authorships vérité d'une publication à une autre,
+    pour les authorships liées aux source_authorship_ids donnés.
+    Utilisé par split_bad_merges.
+    """
+    cfg = _SOURCE_CONFIG.get(source)
+    if not cfg:
+        raise ValueError(f"Source inconnue : {source}")
+
+    fk_col = cfg["truth_fk"]
+    for said in source_authorship_ids:
+        cur.execute(f"""
+            UPDATE authorships a
+            SET publication_id = %s, updated_at = now()
+            WHERE a.{fk_col} = %s AND a.publication_id = %s
+        """, (to_pub_id, said, from_pub_id))
+
+
+def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int]):
+    """Propage le person_id des authorships sources vers les authorships vérité.
+    Évite les doublons (publication_id, person_id).
+    Utilisé par fix_oa_person_conflicts.
+    """
+    cfg = _SOURCE_CONFIG.get(source)
+    if not cfg:
+        raise ValueError(f"Source inconnue : {source}")
+
+    fk_col = cfg["truth_fk"]
+    auth_tbl = cfg["authorship_table"]
+
+    cur.execute(f"""
+        UPDATE authorships a
+        SET person_id = src.person_id, updated_at = now()
+        FROM {auth_tbl} src
+        WHERE a.{fk_col} = src.id
+          AND a.person_id IS DISTINCT FROM src.person_id
+          AND src.person_id IS NOT NULL
+          AND src.id = ANY(%s)
+          AND NOT EXISTS (
+              SELECT 1 FROM authorships a2
+              WHERE a2.publication_id = a.publication_id
+                AND a2.person_id = src.person_id
+                AND a2.id <> a.id
+          )
+    """, (source_authorship_ids,))
+    return cur.rowcount
 
 
 def propagate_uca_for_addresses(cur, address_ids: list[int]):
-    """Recalcule is_uca sur openalex/wos_authorships et authorships
+    """Recalcule is_uca sur openalex/wos_authorships et authorships vérité
     pour tous les authorships liés aux adresses données.
 
     Appelé après chaque review/assign/unassign d'adresse pour
@@ -12,14 +164,8 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
         return
 
     # 1. Périmètre UCA
-    cur.execute("""
-        SELECT s.id FROM structures s WHERE s.code = 'uca'
-        UNION
-        SELECT sr.child_id FROM structure_relations sr
-        JOIN structures s ON s.id = sr.parent_id
-        WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
-    """)
-    uca_ids = [r["id"] for r in cur.fetchall()]
+    from utils.uca_perimeter import get_uca_structure_ids_list
+    uca_ids = get_uca_structure_ids_list(cur)
     if not uca_ids:
         return
 

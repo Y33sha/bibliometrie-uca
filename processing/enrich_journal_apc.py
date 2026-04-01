@@ -18,6 +18,7 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from services.journals import update_journal_apc, reset_journal_apc
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,7 +26,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "enrich_journal_apc.log")
+            os.path.join(os.path.dirname(__file__), "logs", "enrich_journal_apc.log")
         ),
     ],
 )
@@ -132,13 +133,9 @@ def main():
 
     try:
         if args.reset:
-            cur.execute("""
-                UPDATE journals
-                SET apc_amount = NULL, apc_currency = 'EUR', is_in_doaj = FALSE
-                WHERE openalex_id IS NOT NULL
-            """)
+            count = reset_journal_apc(cur)
             conn.commit()
-            logger.info(f"Reset : {cur.rowcount} revues réinitialisées.")
+            logger.info(f"Reset : {count} revues réinitialisées.")
 
         # Sélectionner les revues avec openalex_id et sans APC renseigné
         query = """
@@ -184,19 +181,10 @@ def main():
                 apc_amount, apc_currency = extract_apc(source)
 
                 if not args.dry_run:
-                    if apc_amount is not None:
-                        cur.execute("""
-                            UPDATE journals
-                            SET apc_amount = %s, apc_currency = %s, is_in_doaj = %s
-                            WHERE id = %s
-                        """, (apc_amount, apc_currency, is_in_doaj, journal_id))
-                    else:
-                        # Pas d'APC mais on met à jour is_in_doaj quand même
-                        cur.execute("""
-                            UPDATE journals
-                            SET is_in_doaj = %s
-                            WHERE id = %s
-                        """, (is_in_doaj, journal_id))
+                    update_journal_apc(cur, journal_id,
+                                       apc_amount=apc_amount,
+                                       apc_currency=apc_currency,
+                                       is_in_doaj=is_in_doaj)
 
                 updated += 1
                 if is_in_doaj:

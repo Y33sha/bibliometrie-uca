@@ -34,7 +34,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "extract_openalex.log")
+            os.path.join(os.path.dirname(__file__), "logs", "extract_openalex.log")
         ),
     ],
 )

@@ -11,7 +11,21 @@ from webapp.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, persons_sort_clause,
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.normalize import normalize_text
-from utils.merge_persons import merge_person as _merge_person
+from services.authorships import (
+    exclude_authorship as _exclude_authorship,
+    delete_orphan_authorships as _delete_orphan_authorships,
+)
+from services.persons import (
+    merge_person as _merge_person,
+    link_authorship as _link_authorship,
+    unlink_authorship as _unlink_authorship,
+    link_author_to_person as _link_author_to_person,
+    unlink_author_from_person as _unlink_author_from_person,
+    assign_orphan_authorship as _assign_orphan,
+    add_identifier as _add_identifier,
+    add_name_form as _add_name_form,
+    create_person as _create_person,
+)
 
 router = APIRouter()
 
@@ -777,97 +791,12 @@ async def link_person_to_author(person_id: int, data: LinkPersonAuthor):
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Person not found")
 
-        if data.source == "hal":
-            cur.execute("SELECT id, idhal, orcid, hal_person_id FROM hal_authors WHERE id = %s",
-                        (data.author_id,))
-            ha = cur.fetchone()
-            if not ha:
-                raise HTTPException(status_code=404, detail="HAL author not found")
-            # Écrire sur hal_authorships (source de vérité)
-            cur.execute("""
-                UPDATE hal_authorships SET person_id = %s
-                WHERE hal_author_id = %s
-            """, (person_id, data.author_id))
-            # Aussi écrire sur hal_authors si c'est un compte HAL (hal_person_id non null)
-            if ha["hal_person_id"]:
-                cur.execute("""
-                    UPDATE hal_authors SET person_id = %s, updated_at = now()
-                    WHERE id = %s
-                """, (person_id, data.author_id))
-            # Propager vers authorships (vérité)
-            cur.execute("""
-                UPDATE authorships ash SET person_id = %s, updated_at = now()
-                WHERE ash.hal_authorship_id IN (
-                    SELECT has.id FROM hal_authorships has
-                    WHERE has.hal_author_id = %s
-                )
-                AND ash.person_id IS NULL
-            """, (person_id, data.author_id))
-            # Propager identifiants vers person_identifiers
-            if ha["idhal"]:
-                cur.execute("""
-                    INSERT INTO person_identifiers (person_id, id_type, id_value, source)
-                    VALUES (%s, 'idhal', %s, 'hal')
-                    ON CONFLICT (id_type, id_value) DO NOTHING
-                """, (person_id, ha["idhal"]))
-            if ha["orcid"]:
-                cur.execute("""
-                    INSERT INTO person_identifiers (person_id, id_type, id_value, source)
-                    VALUES (%s, 'orcid', %s, 'hal')
-                    ON CONFLICT (id_type, id_value) DO NOTHING
-                """, (person_id, ha["orcid"]))
-        elif data.source == "openalex":
-            cur.execute("SELECT id, orcid FROM openalex_authors WHERE id = %s",
-                        (data.author_id,))
-            oa = cur.fetchone()
-            if not oa:
-                raise HTTPException(status_code=404, detail="OpenAlex author not found")
-            cur.execute("""
-                UPDATE openalex_authorships SET person_id = %s
-                WHERE openalex_author_id = %s
-            """, (person_id, data.author_id))
-            cur.execute("""
-                UPDATE authorships ash SET person_id = %s, updated_at = now()
-                WHERE ash.openalex_authorship_id IN (
-                    SELECT oas.id FROM openalex_authorships oas
-                    WHERE oas.openalex_author_id = %s
-                )
-                AND ash.person_id IS NULL
-            """, (person_id, data.author_id))
-            # Propager ORCID vers person_identifiers
-            if oa["orcid"]:
-                cur.execute("""
-                    INSERT INTO person_identifiers (person_id, id_type, id_value, source)
-                    VALUES (%s, 'orcid', %s, 'openalex')
-                    ON CONFLICT (id_type, id_value) DO NOTHING
-                """, (person_id, oa["orcid"]))
-        elif data.source == "wos":
-            cur.execute("SELECT id, orcid FROM wos_authors WHERE id = %s",
-                        (data.author_id,))
-            wa = cur.fetchone()
-            if not wa:
-                raise HTTPException(status_code=404, detail="WoS author not found")
-            cur.execute("""
-                UPDATE wos_authorships SET person_id = %s
-                WHERE wos_author_id = %s
-            """, (person_id, data.author_id))
-            cur.execute("""
-                UPDATE authorships ash SET person_id = %s, updated_at = now()
-                WHERE ash.wos_authorship_id IN (
-                    SELECT was.id FROM wos_authorships was
-                    WHERE was.wos_author_id = %s
-                )
-                AND ash.person_id IS NULL
-            """, (person_id, data.author_id))
-            # Propager ORCID vers person_identifiers
-            if wa["orcid"]:
-                cur.execute("""
-                    INSERT INTO person_identifiers (person_id, id_type, id_value, source)
-                    VALUES (%s, 'orcid', %s, 'wos')
-                    ON CONFLICT (id_type, id_value) DO NOTHING
-                """, (person_id, wa["orcid"]))
-        else:
+        if data.source not in ("hal", "openalex", "wos"):
             raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
+
+        author = _link_author_to_person(cur, person_id, data.source, data.author_id)
+        if not author:
+            raise HTTPException(status_code=404, detail=f"{data.source} author not found")
 
         return {"linked": True, "person_id": person_id,
                 "author_id": data.author_id, "source": data.source}
@@ -877,54 +806,10 @@ async def link_person_to_author(person_id: int, data: LinkPersonAuthor):
 async def unlink_person_from_author(person_id: int, source: str, author_id: int):
     """Détache un auteur source d'une personne."""
     with get_cursor() as (cur, conn):
-        if source == "hal":
-            # Détacher de hal_authorships (source de vérité)
-            cur.execute("""
-                UPDATE hal_authorships SET person_id = NULL
-                WHERE hal_author_id = %s AND person_id = %s
-            """, (author_id, person_id))
-            # Aussi détacher de hal_authors (comptes HAL)
-            cur.execute("""
-                UPDATE hal_authors SET person_id = NULL, updated_at = now()
-                WHERE id = %s AND person_id = %s
-            """, (author_id, person_id))
-            # Détacher les authorships consolidées liées via hal_authorship_id
-            cur.execute("""
-                UPDATE authorships a SET person_id = NULL
-                FROM hal_authorships has2
-                WHERE a.hal_authorship_id = has2.id
-                  AND has2.hal_author_id = %s
-                  AND a.person_id = %s
-            """, (author_id, person_id))
-        elif source == "openalex":
-            cur.execute("""
-                UPDATE openalex_authorships SET person_id = NULL
-                WHERE openalex_author_id = %s AND person_id = %s
-            """, (author_id, person_id))
-            # Détacher les authorships consolidées liées via openalex_authorship_id
-            cur.execute("""
-                UPDATE authorships a SET person_id = NULL
-                FROM openalex_authorships oas
-                WHERE a.openalex_authorship_id = oas.id
-                  AND oas.openalex_author_id = %s
-                  AND a.person_id = %s
-            """, (author_id, person_id))
-        elif source == "wos":
-            cur.execute("""
-                UPDATE wos_authorships SET person_id = NULL
-                WHERE wos_author_id = %s AND person_id = %s
-            """, (author_id, person_id))
-            # Détacher les authorships consolidées liées via wos_authorship_id
-            cur.execute("""
-                UPDATE authorships a SET person_id = NULL
-                FROM wos_authorships was
-                WHERE a.wos_authorship_id = was.id
-                  AND was.wos_author_id = %s
-                  AND a.person_id = %s
-            """, (author_id, person_id))
-        else:
+        if source not in ("hal", "openalex", "wos"):
             raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
 
+        _unlink_author_from_person(cur, person_id, source, author_id)
         return {"unlinked": True}
 
 
@@ -1044,11 +929,7 @@ async def reassign_identifier(ident_id: int, body: dict):
 async def toggle_authorship_excluded(authorship_id: int):
     """Marque un authorship comme exclu (lien personne-publication rejeté)."""
     with get_cursor() as (cur, conn):
-        cur.execute("""
-            UPDATE authorships SET excluded = TRUE, updated_at = now()
-            WHERE id = %s RETURNING id, excluded
-        """, (authorship_id,))
-        row = cur.fetchone()
+        row = _exclude_authorship(cur, authorship_id)
         if not row:
             raise HTTPException(status_code=404, detail="Authorship introuvable")
         return {"id": row["id"], "excluded": row["excluded"]}
@@ -1086,7 +967,7 @@ async def update_person_name(person_id: int, body: dict):
         """, (last_name, first_name, last_name, first_name, person_id))
         # Ajouter les nouvelles formes de nom
         for form in [f"{first_name} {last_name}", f"{last_name} {first_name}"] if first_name else [last_name]:
-            _add_name_form(cur, person_id, form, "persons")
+            _add_name_form(cur, person_id, form, source="persons")
         return {"ok": True}
 
 
@@ -1215,70 +1096,12 @@ async def list_orphan_authorships(
         }
 
 
-def _add_name_form(cur, person_id, full_name, source):
-    """Ajoute une forme de nom dans person_name_forms (normalisée sans ponctuation)."""
-    name_form = full_name.strip()
-    if not name_form:
-        return
-    cur.execute("""
-        INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids, sources)
-        VALUES (
-            regexp_replace(unaccent(lower(trim(%s))), '[.,;:]+', '', 'g'),
-            regexp_replace(unaccent(lower(trim(%s))), '[.,;:]+', '', 'g'),
-            ARRAY[%s], ARRAY[%s]
-        )
-        ON CONFLICT (name_form) DO UPDATE SET
-            person_ids = (
-                SELECT array_agg(DISTINCT x ORDER BY x)
-                FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
-            ),
-            sources = (
-                SELECT array_agg(DISTINCT x ORDER BY x)
-                FROM unnest(person_name_forms.sources || ARRAY[%s]) AS x
-            ),
-            updated_at = now()
-    """, (name_form, name_form, person_id, source, person_id, source))
 
-
-def _ensure_truth_authorship(cur, person_id, source, authorship_id):
-    """Crée l'authorship vérité si elle n'existe pas, et met à jour la FK source."""
-    # Trouver la publication_id
-    if source == "hal":
-        cur.execute("""SELECT hd.publication_id FROM hal_authorships has
-                       JOIN hal_documents hd ON hd.id = has.hal_document_id
-                       WHERE has.id = %s""", (authorship_id,))
-    elif source == "openalex":
-        cur.execute("""SELECT od.publication_id FROM openalex_authorships oas
-                       JOIN openalex_documents od ON od.id = oas.openalex_document_id
-                       WHERE oas.id = %s""", (authorship_id,))
-    elif source == "wos":
-        cur.execute("""SELECT wd.publication_id FROM wos_authorships was
-                       JOIN wos_documents wd ON wd.id = was.wos_document_id
-                       WHERE was.id = %s""", (authorship_id,))
-    else:
-        return
-    row = cur.fetchone()
-    if not row or not row["publication_id"]:
-        return
-    pub_id = row["publication_id"]
-
-    # INSERT si pas déjà existant
-    cur.execute("""
-        INSERT INTO authorships (publication_id, person_id)
-        VALUES (%s, %s)
-        ON CONFLICT (publication_id, person_id) DO NOTHING
-    """, (pub_id, person_id))
-
-    # Mettre à jour la FK source
-    fk_col = {"hal": "hal_authorship_id", "openalex": "openalex_authorship_id", "wos": "wos_authorship_id"}[source]
-    cur.execute(f"""
-        UPDATE authorships SET {fk_col} = %s, updated_at = now()
-        WHERE publication_id = %s AND person_id = %s AND {fk_col} IS NULL
-    """, (authorship_id, pub_id, person_id))
+# _add_name_form et _ensure_truth_authorship sont dans services.persons
 
 
 @router.post("/api/orphan-authorships/assign")
-async def assign_orphan_authorship(body: dict):
+async def assign_orphan_authorship_endpoint(body: dict):
     """Attribue une authorship orpheline à une personne existante ou nouvelle."""
     source = body.get("source")
     authorship_id = body.get("authorship_id")
@@ -1287,6 +1110,8 @@ async def assign_orphan_authorship(body: dict):
 
     if not source or not authorship_id:
         raise HTTPException(status_code=400, detail="source et authorship_id requis")
+    if source not in ("hal", "openalex", "wos"):
+        raise HTTPException(status_code=400, detail=f"Source inconnue: {source}")
 
     with get_cursor() as (cur, conn):
         if create_person_name:
@@ -1294,15 +1119,10 @@ async def assign_orphan_authorship(body: dict):
             fn = create_person_name.get("first_name", "").strip()
             if not ln:
                 raise HTTPException(status_code=400, detail="Nom requis")
-            cur.execute("""
-                INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized)
-                VALUES (%s, %s, unaccent(lower(trim(%s))), unaccent(lower(trim(%s))))
-                RETURNING id
-            """, (ln, fn, ln, fn))
-            person_id = cur.fetchone()["id"]
+            person_id = _create_person(cur, ln, fn)
             # Ajouter les formes de nom de la nouvelle personne
             for form in [f"{fn} {ln}", f"{ln} {fn}"] if fn else [ln]:
-                _add_name_form(cur, person_id, form, "persons")
+                _add_name_form(cur, person_id, form)
         elif not person_id:
             raise HTTPException(status_code=400, detail="person_id ou create_person requis")
 
@@ -1311,31 +1131,7 @@ async def assign_orphan_authorship(body: dict):
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Personne introuvable")
 
-        # Attribuer et récupérer le nom + statut excluded
-        if source == "hal":
-            cur.execute("""UPDATE hal_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
-                           RETURNING excluded,
-                               (SELECT ha.full_name FROM hal_authors ha WHERE ha.id = hal_author_id) AS full_name""",
-                        (person_id, authorship_id))
-        elif source == "openalex":
-            cur.execute("""UPDATE openalex_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
-                           RETURNING excluded, raw_author_name AS full_name""",
-                        (person_id, authorship_id))
-        elif source == "wos":
-            cur.execute("""UPDATE wos_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
-                           RETURNING excluded,
-                               (SELECT wa.full_name FROM wos_authors wa WHERE wa.id = wos_author_id) AS full_name""",
-                        (person_id, authorship_id))
-        else:
-            raise HTTPException(status_code=400, detail=f"Source inconnue: {source}")
-
-        row = cur.fetchone()
-        # Ajouter la forme de nom seulement si l'authorship n'est pas rejetée
-        if row and row["full_name"] and not row.get("excluded"):
-            _add_name_form(cur, person_id, row["full_name"], source)
-
-        # Créer/mettre à jour l'authorship vérité
-        _ensure_truth_authorship(cur, person_id, source, authorship_id)
+        _assign_orphan(cur, person_id, source, authorship_id)
 
         return {"ok": True, "person_id": person_id}
 
@@ -1355,30 +1151,11 @@ async def batch_assign_orphan_authorships(body: dict):
 
         count = 0
         for a in authorships:
-            src = a["source"]
-            aid = a["authorship_id"]
-            if src == "hal":
-                cur.execute("""UPDATE hal_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
-                               RETURNING excluded,
-                                   (SELECT ha.full_name FROM hal_authors ha WHERE ha.id = hal_author_id) AS full_name""",
-                            (person_id, aid))
-            elif src == "openalex":
-                cur.execute("""UPDATE openalex_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
-                               RETURNING excluded, raw_author_name AS full_name""",
-                            (person_id, aid))
-            elif src == "wos":
-                cur.execute("""UPDATE wos_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
-                               RETURNING excluded,
-                                   (SELECT wa.full_name FROM wos_authors wa WHERE wa.id = wos_author_id) AS full_name""",
-                            (person_id, aid))
-            else:
+            src = a.get("source")
+            if src not in ("hal", "openalex", "wos"):
                 continue
-            row = cur.fetchone()
-            if row:
+            if _assign_orphan(cur, person_id, src, a["authorship_id"]):
                 count += 1
-                if row["full_name"] and not row.get("excluded"):
-                    _add_name_form(cur, person_id, row["full_name"], src)
-                _ensure_truth_authorship(cur, person_id, src, aid)
 
         return {"ok": True, "assigned": count}
 
@@ -1451,33 +1228,10 @@ async def detach_authorships(person_id: int, body: dict):
 
     with get_cursor() as (cur, conn):
         for a in authorships:
-            src = a["source"]
-            aid = a["authorship_id"]
-            if src == "hal":
-                cur.execute("UPDATE hal_authorships SET person_id = NULL WHERE id = %s AND person_id = %s",
-                            (aid, person_id))
-            elif src == "openalex":
-                cur.execute("UPDATE openalex_authorships SET person_id = NULL WHERE id = %s AND person_id = %s",
-                            (aid, person_id))
-            elif src == "wos":
-                cur.execute("UPDATE wos_authorships SET person_id = NULL WHERE id = %s AND person_id = %s",
-                            (aid, person_id))
+            _unlink_authorship(cur, person_id, a["source"], a["authorship_id"])
 
         # Supprimer les authorships vérité orphelines
-        cur.execute("""
-            DELETE FROM authorships a
-            WHERE a.person_id = %s
-              AND NOT EXISTS (SELECT 1 FROM hal_authorships has
-                              JOIN hal_documents hd ON hd.id = has.hal_document_id
-                              WHERE has.person_id = %s AND hd.publication_id = a.publication_id)
-              AND NOT EXISTS (SELECT 1 FROM openalex_authorships oas
-                              JOIN openalex_documents od ON od.id = oas.openalex_document_id
-                              WHERE oas.person_id = %s AND od.publication_id = a.publication_id)
-              AND NOT EXISTS (SELECT 1 FROM wos_authorships was
-                              JOIN wos_documents wd ON wd.id = was.wos_document_id
-                              WHERE was.person_id = %s AND wd.publication_id = a.publication_id)
-        """, (person_id, person_id, person_id, person_id))
-        deleted_authorships = cur.rowcount
+        deleted_authorships = _delete_orphan_authorships(cur, person_id)
 
         # Nettoyer la forme de nom si plus aucune authorship ne la porte
         cleaned_form = False

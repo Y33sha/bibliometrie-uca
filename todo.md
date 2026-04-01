@@ -46,15 +46,9 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 
 ## Personnes
 * [x] moissonner ORCID liés aux comptes HAL (processing/harvest_hal_orcids.py — 12125 ORCID récupérés) => quelle place dans le pipeline?
-* [x] déduplication automatisée par labo (merge_lab_duplicates.py — homonymes + interversions nom/prénom)
 * [x] publications: indiquer si auteur correspondant / premier auteur
-* [x] permettre confirmation orcid
-* [x] rendre personnes RH infusionnables
-* [x] interface de déduplication des personnes (par nom + par conflit de sources)
-* [x] ORCID/idHAL confirmés manuellement: affichés en vert sur les pages publiques
-* [x] recalcul des noms normalisés (tirets résiduels corrigés — 1069 personnes)
 * [ ] correction des noms; création de personnes, interface de gestion des formes de noms
-* [ ] ajouter IdRef? => fait pour comptes HAL; chercher les autres
+* [ ] ajouter IdRef? => fait pour comptes HAL; chercher les autres; + add_identifiers_from_authorships ne tient compte que d'orcid et idhal
 * [ ] ajouter quelques visus (%OA)
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis
 * [ ] afficher quand compte HAL relié ou non à l'ORCID
@@ -80,6 +74,8 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] quid des changements d'authorships quand réimport avec hash différent? supprimer avant de recréer?
 * [ ] afficher les abstracts?
 * [ ] dédoublonner DOI figshare (.v1)
+* [ ] fonction pour casser affiliations UCA d'une publication (authorships vérité => déclarer fausses les affiliations au niveau des sources pour éviter qu'elles soient reconstruites)
+
 ### Types de documents
 * [ ] gérer le document type "correction" sur wos, "erratum" sur OA (actuellement, apparaît comme article) (Corrigendum to ...)
 * [ ] type peer-review?
@@ -101,10 +97,9 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 
 # Trucs pour plus tard
 * compte fractionnaire?
-* collaborations nationales et internationales?
-
+* collaborations nationales et internationales: identification structures
 
 ## Bizarreries à élucider
 * openalex répète des auteurs : publi 77832
 * claire richard: pourquoi 0 publi UCA sur page admin?
-* formes de noms personnes: enlever ponctuation
+* publi 103567: structures identifiées sur HAL: UCA, Inserm: pourquoi?

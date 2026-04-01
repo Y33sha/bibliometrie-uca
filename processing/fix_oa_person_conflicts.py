@@ -14,8 +14,12 @@ Pass 1 : copier person_id depuis HAL/WoS (publications alignées uniquement)
 Pass 2 : fausses entités OA sans HAL/WoS — raw_name ≠ entité, raw_name = nom HAL
 """
 
+import sys, os
 import psycopg2
 from psycopg2.extras import RealDictCursor
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.authorships import sync_person_id_from_source
 
 DB = "dbname=publisher_stats user=lalecoz"
 
@@ -126,22 +130,9 @@ def main():
         print(f"openalex_authorships corrigées : {updated}")
 
         # Propager aux authorships consolidées (éviter doublons)
-        cur.execute("""
-            UPDATE authorships a
-            SET person_id = oas.person_id
-            FROM openalex_authorships oas
-            WHERE a.openalex_authorship_id = oas.id
-              AND a.person_id IS DISTINCT FROM oas.person_id
-              AND oas.person_id IS NOT NULL
-              AND oas.id = ANY(%s)
-              AND NOT EXISTS (
-                  SELECT 1 FROM authorships a2
-                  WHERE a2.publication_id = a.publication_id
-                    AND a2.person_id = oas.person_id
-                    AND a2.id <> a.id
-              )
-        """, ([f['oas_id'] for f in fixes],))
-        print(f"authorships consolidées corrigées : {cur.rowcount}")
+        oas_ids = [f['oas_id'] for f in fixes]
+        synced = sync_person_id_from_source(cur, "openalex", oas_ids)
+        print(f"authorships consolidées corrigées : {synced}")
     else:
         print("Rien à faire.")
 
