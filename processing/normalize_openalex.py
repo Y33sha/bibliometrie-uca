@@ -313,7 +313,7 @@ def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
                 (title, title_normalized, doc_type, pub_year, doi,
                  oa_status, journal_id, container_title, language)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (doi) DO UPDATE SET
+            ON CONFLICT ((lower(doi))) WHERE doi IS NOT NULL DO UPDATE SET
                 journal_id = COALESCE(publications.journal_id, EXCLUDED.journal_id),
                 doc_type = CASE
                     WHEN publications.doc_type = 'other' AND EXCLUDED.doc_type <> 'other'

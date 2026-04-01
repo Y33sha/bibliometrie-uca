@@ -86,10 +86,11 @@ FIELDS = [
 ]
 
 
-def build_query(collection_code: str = None, portal: str = None) -> str:
+def build_query(collection_code: str = None, portal: str = None, years: list = None) -> str:
     """Construit la requête HAL (paramètre q)."""
-    year_min = min(HAL["years"])
-    year_max = max(HAL["years"])
+    yrs = years or HAL["years"]
+    year_min = min(yrs)
+    year_max = max(yrs)
     q = f"producedDateY_i:[{year_min} TO {year_max}]"
     return q
 
@@ -181,6 +182,7 @@ def extract_collection(
     collection_label: str,
     conn,
     existing_ids: set,
+    years: list = None,
     dry_run: bool = False,
 ) -> tuple[int, int]:
     """
@@ -188,7 +190,7 @@ def extract_collection(
     Retourne (nb_total, nb_nouveaux).
     """
     url = build_url()
-    query = build_query()
+    query = build_query(years=years)
 
     # Premier appel pour le count
     first_page = fetch_page(url, query, collection_code=collection_code, start=0)
@@ -237,6 +239,7 @@ def extract_portal(
     conn,
     existing_ids: set,
     dry_run: bool = False,
+    years: list = None,
 ) -> tuple[int, int]:
     """
     Extrait tous les works du portail global.
@@ -244,7 +247,7 @@ def extract_portal(
     """
     portal = HAL["portal"]
     url = build_url(portal=portal)
-    query = build_query()
+    query = build_query(years=years)
 
     # Premier appel pour le count
     first_page = fetch_page(url, query, start=0)
@@ -315,13 +318,15 @@ def main():
                         help="Extraire uniquement le portail global")
     parser.add_argument("--dry-run", action="store_true",
                         help="Compter sans insérer")
+    parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
     args = parser.parse_args()
 
     do_collections = not args.portal_only
     do_portal = not args.collections_only
+    years = [args.year] if args.year else HAL["years"]
 
     logger.info("=== Extraction HAL démarrée ===")
-    logger.info(f"Années : {HAL['years']}")
+    logger.info(f"Années : {years}")
     logger.info(f"Collections : {do_collections} | Portail : {do_portal}")
 
     conn = get_connection()
@@ -336,7 +341,7 @@ def main():
             logger.info(f"\n--- Extraction par collection ({len(HAL['collections'])} labos) ---")
             for code, label in HAL["collections"].items():
                 total, new = extract_collection(
-                    code, label, conn, existing_ids, dry_run=args.dry_run
+                    code, label, conn, existing_ids, years=years, dry_run=args.dry_run
                 )
                 grand_total_new += new
                 if not args.dry_run and new > 0:
@@ -345,7 +350,7 @@ def main():
         # --- Passe 2 : portail global ---
         if do_portal:
             logger.info(f"\n--- Extraction portail global ({HAL['portal']}) ---")
-            total, new = extract_portal(conn, existing_ids, dry_run=args.dry_run)
+            total, new = extract_portal(conn, existing_ids, dry_run=args.dry_run, years=years)
             grand_total_new += new
             if not args.dry_run:
                 logger.info(f"    → {new} nouveaux (non couverts par les collections)")

@@ -1,14 +1,12 @@
 pg_dump -U lalecoz -d publisher_stats -F c -f bibliometrie.dump
-* [ ] automatiser les dumps
+* [ ] programmation cron pour les dumps de sauvegarde
+* [ ] programmation cron pour les imports
 
 # Sources de données
 
 * [ ] autres sources: ArXiv, Pubmed, ScannR?
 
 ## APC
-* [x] trouver APC par revue
-* [x] intégrer données APC DPCG
-* [ ] estimer APC par structure (gold+hybride avec auteur correspondant sauf Elsevier)
 * [ ] exploiter OpenAPC
 
 ## OpenAlex
@@ -17,11 +15,8 @@ pg_dump -U lalecoz -d publisher_stats -F c -f bibliometrie.dump
 * [ ] type peer_review: les auteurs qui apparaissent sont ceux de l'article
 
 ## HAL
-* [x] inclure collections HAL CHU-CLERMONTFERRAND et CLERMONT-AUVERGNE-INP
-* [ ] fetch documents HAL référencés par OpenAlex mais absents des collections UCA
-* [ ] documents > 2000 auteurs: relancer le script pour peupler la table authorships
+* [x] fetch documents HAL référencés par OpenAlex mais absents des collections UCA
 * [ ] problème des documents où l'affiliation de l'authorship n'est pas résolue: cf https://hal.science/hal-04987032
-* [ ] retraitement pour les authorships sans auteur_id (prendre strings?)
 * [ ] revue Openalex 'HAL (Le Centre pour la Communication Scientifique Directe)' => parfois absents de HAL! Auditer docts source OpenAlex, ref HAL, HAL non trouvé => supprimer
 * [ ] https://hal.science/hal-03874894 => lien OA vers autre archive ouverte: en tenir compte pour le statut green
 * [ ] DOI identique mais type différent: ne pas fusionner (ouvrages + chapitres, conf + posters, etc.)
@@ -63,6 +58,7 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] ajouter quelques visus (%OA)
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis
 * [ ] afficher quand compte HAL relié ou non à l'ORCID
+* [ ] dans l'onglet "identités", mettre une condition "excluded = false" pour éviter de faire apparaître des comptes HAL erronés
 
 ## Mega-authorships et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap)
@@ -83,6 +79,7 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] si source erronée: rejeter authorship source + recalculer affiliations de l'authorship à partir des sources non rejetées
 * [ ] quid des changements d'authorships quand réimport avec hash différent? supprimer avant de recréer?
 * [ ] afficher les abstracts?
+* [ ] dédoublonner DOI figshare (.v1)
 ### Types de documents
 * [ ] gérer le document type "correction" sur wos, "erratum" sur OA (actuellement, apparaît comme article) (Corrigendum to ...)
 * [ ] type peer-review?
@@ -100,9 +97,14 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] Toujours mémoriser filtres et les rétablir au rechargement
 * [ ] Rendre les filtres sticky
 * [ ] Rendre tous les tableaux triables
-* [ ] afficher todo et nouveautés?
 * [ ] interface pour afficher le staging json (pour vérif)
 
 # Trucs pour plus tard
 * compte fractionnaire?
 * collaborations nationales et internationales?
+
+
+## Bizarreries à élucider
+* openalex répète des auteurs : publi 77832
+* claire richard: pourquoi 0 publi UCA sur page admin?
+* formes de noms personnes: enlever ponctuation
