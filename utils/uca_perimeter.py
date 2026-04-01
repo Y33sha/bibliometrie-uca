@@ -4,7 +4,7 @@ Le périmètre restreint (is_uca) inclut :
 - UCA elle-même
 - Les structures dont UCA est tutelle (est_tutelle_de)
 
-N'inclut PAS les partenaires (CHU, INP…) ni les tutelles nationales.
+N'inclut PAS les partenaires (CHU, INP…) ni les co-tutelles.
 """
 
 

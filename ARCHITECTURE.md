@@ -138,7 +138,7 @@ Note : `person_id` sur les `*_authorships` est écrit par `services/persons.py`
 
 | Table | Propriétaire | Violations actuelles |
 |-------|-------------|---------------------|
-| `authorships` | `services/authorships.py` + `build_authorships.py` (batch) | `webapp/uca.py` (recalcul UCA batch — toléré) |
+| `authorships` | `services/authorships.py` + `build_authorships.py` (batch) | — |
 
 ### Adresses
 

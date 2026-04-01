@@ -196,7 +196,7 @@ def _parse_tsv_authors(raw: dict) -> list[dict]:
 
     # C1 = affiliations : "[Author1; Author2] Address; [Author3] Address2"
     c1_str = raw.get("C1", "")
-    author_affiliations = _parse_c1_field(c1_str, af_names)
+    author_affiliations, author_addresses = _parse_c1_field(c1_str, af_names)
 
     authors = []
     for i, full_name in enumerate(af_names):
@@ -241,36 +241,37 @@ def _parse_tsv_authors(raw: dict) -> list[dict]:
             "daisng_id": None,
             "is_corresponding": is_corresponding,
             "raw_affiliation": raw_affiliation,
+            "addresses": author_addresses.get(i, []),
         })
 
     return authors
 
 
-def _parse_c1_field(c1_str: str, author_names: list[str]) -> dict[int, str]:
-    """Parse le champ C1 WoS et retourne un dict {position_auteur: affiliation}.
+def _parse_c1_field(c1_str: str, author_names: list[str]) -> tuple[dict[int, str], dict[int, list[str]]]:
+    """Parse le champ C1 WoS.
+
+    Retourne :
+    - dict {position_auteur: affiliation concaténée} (pour raw_affiliation)
+    - dict {position_auteur: [adresses individuelles]} (pour wos_authorship_addresses)
 
     Format C1 :
         [Author1; Author2] Address1; [Author3] Address2
     """
     if not c1_str:
-        return {}
+        return {}, {}
 
     # Normaliser les noms d'auteurs pour le matching
     name_to_idx = {}
     for i, name in enumerate(author_names):
-        # Le C1 utilise souvent le format AF (full names)
         name_to_idx[name.strip().lower()] = i
-        # Aussi avec juste le nom de famille
         if "," in name:
             last = name.split(",", 1)[0].strip().lower()
-            # Ne pas écraser si plusieurs auteurs ont le même nom de famille
             if last not in name_to_idx:
                 name_to_idx[last] = i
 
-    result: dict[int, str] = {}
+    concat_result: dict[int, str] = {}
+    list_result: dict[int, list[str]] = {}
 
-    # Séparer les blocs [auteurs] adresse
-    # Pattern: [Name1; Name2] Address text
     blocks = re.findall(r'\[([^\]]+)\]\s*([^[]*)', c1_str)
 
     for author_block, address in blocks:
@@ -283,17 +284,17 @@ def _parse_c1_field(c1_str: str, author_names: list[str]) -> dict[int, str]:
             name_lower = name.strip().lower()
             idx = name_to_idx.get(name_lower)
             if idx is None:
-                # Essayer matching par nom de famille
                 if "," in name:
                     last = name.split(",", 1)[0].strip().lower()
                     idx = name_to_idx.get(last)
             if idx is not None:
-                if idx in result:
-                    result[idx] += " | " + address
+                if idx in concat_result:
+                    concat_result[idx] += " | " + address
                 else:
-                    result[idx] = address
+                    concat_result[idx] = address
+                list_result.setdefault(idx, []).append(address)
 
-    return result
+    return concat_result, list_result
 
 
 def extract_from_tsv(raw: dict, staging_doi: str | None) -> dict:
@@ -395,9 +396,11 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
         # Affiliations via addr_no
         addr_nos = name_obj.get("addr_no")
         raw_affiliation = None
+        individual_addresses = []
         if addr_nos:
             addr_no_list = str(addr_nos).split()
             affils = [addr_map[a] for a in addr_no_list if a in addr_map]
+            individual_addresses = [a.strip() for a in affils if a.strip()]
             if affils:
                 raw_affiliation = " | ".join(affils)
 
@@ -411,6 +414,7 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
             "daisng_id": daisng_id,
             "is_corresponding": is_corresponding,
             "raw_affiliation": raw_affiliation,
+            "addresses": individual_addresses,
         })
 
     return authors
@@ -662,8 +666,21 @@ def upsert_wos_author(cur, author: dict) -> int | None:
 # WOS AUTHORSHIPS
 # =============================================================
 
+def _get_or_create_address(cur, raw_text: str) -> int:
+    """Retourne l'id de l'adresse, en la créant si nécessaire."""
+    normalized = normalize_text(raw_text)
+    cur.execute("SELECT id FROM addresses WHERE raw_text = %s", (raw_text,))
+    row = cur.fetchone()
+    if row:
+        return row[0]
+    cur.execute(
+        "INSERT INTO addresses (raw_text, normalized_text) VALUES (%s, %s) RETURNING id",
+        (raw_text, normalized))
+    return cur.fetchone()[0]
+
+
 def process_authorships(cur, rec: dict, wos_document_id: int):
-    """Traite les authorships d'un record WoS."""
+    """Traite les authorships d'un record WoS + crée les liens adresses."""
     for author in rec.get("authors", []):
         wos_author_id = upsert_wos_author(cur, author)
         if not wos_author_id:
@@ -680,8 +697,19 @@ def process_authorships(cur, rec: dict, wos_document_id: int):
                     wos_authorships.raw_affiliation
                 ),
                 is_corresponding = EXCLUDED.is_corresponding OR wos_authorships.is_corresponding
+            RETURNING id
         """, (wos_document_id, wos_author_id, author["position"],
               author["is_corresponding"], author.get("raw_affiliation")))
+        was_id = cur.fetchone()[0]
+
+        # Créer les liens adresses individuelles
+        for addr_text in author.get("addresses", []):
+            addr_id = _get_or_create_address(cur, addr_text)
+            cur.execute("""
+                INSERT INTO wos_authorship_addresses (wos_authorship_id, address_id)
+                VALUES (%s, %s)
+                ON CONFLICT (wos_authorship_id, address_id) DO NOTHING
+            """, (was_id, addr_id))
 
 
 # =============================================================
