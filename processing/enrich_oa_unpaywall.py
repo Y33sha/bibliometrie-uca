@@ -23,6 +23,7 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from services.publications import update_oa_status
 
 logging.basicConfig(
     level=logging.INFO,
@@ -128,10 +129,7 @@ def main():
             if args.dry_run:
                 log.info(f"  [DRY] {doi} : {current_status} → {status}")
             else:
-                cur.execute(
-                    "UPDATE publications SET oa_status = %s::oa_type, updated_at = now() WHERE id = %s",
-                    (status, pub_id),
-                )
+                update_oa_status(cur, pub_id, status)
             updated += 1
         elif status is None:
             not_found += 1

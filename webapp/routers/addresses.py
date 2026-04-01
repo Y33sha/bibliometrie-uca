@@ -3,7 +3,7 @@
 import logging
 from fastapi import APIRouter, Query, HTTPException, Depends, BackgroundTasks
 from webapp.deps import get_cursor, require_admin
-from webapp.uca import propagate_uca_for_addresses
+from services.authorships import propagate_uca_for_addresses
 from webapp.models import ReviewAction, BatchReviewAction, AssignStructureAction
 
 router = APIRouter()

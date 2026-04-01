@@ -31,6 +31,8 @@ from psycopg2.extras import Json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from utils.normalize import normalize_text
+from services.publications import find_or_create as find_or_create_publication
+from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
 logging.basicConfig(
@@ -39,7 +41,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "normalize_wos.log")
+            os.path.join(os.path.dirname(__file__), "logs", "normalize_wos.log")
         ),
     ],
 )
@@ -518,176 +520,45 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
 
 
 # =============================================================
-# PUBLISHERS & JOURNALS (tables de vérité partagées)
+# PUBLISHERS & JOURNALS (via services/journals.py)
 # =============================================================
 
 def upsert_publisher(cur, publisher_name: str | None) -> int | None:
-    """Insère/retrouve un éditeur par nom normalisé. Retourne publisher.id."""
-    if not publisher_name:
-        return None
-
-    name_normalized = normalize_text(publisher_name)
-    if not name_normalized:
-        return None
-
-    cur.execute(
-        "SELECT id FROM publishers WHERE name_normalized = %s LIMIT 1",
-        (name_normalized,)
-    )
-    row = cur.fetchone()
-    if row:
-        return row[0]
-
-    cur.execute("""
-        INSERT INTO publishers (name, name_normalized)
-        VALUES (%s, %s)
-        RETURNING id
-    """, (publisher_name.strip(), name_normalized))
-    return cur.fetchone()[0]
+    """Trouve ou crée un éditeur. Délègue au service journals."""
+    return find_or_create_publisher(cur, publisher_name)
 
 
 def upsert_journal(cur, rec: dict, publisher_id: int | None) -> int | None:
-    """Insère/retrouve une revue. Retourne journal.id."""
+    """Trouve ou crée une revue depuis les données WoS."""
     title = rec.get("journal_title")
     if not title:
         return None
-
-    issn = rec.get("issn")
-    eissn = rec.get("eissn")
-    title_normalized = normalize_text(title)
-
-    # Chercher par ISSN d'abord
-    if issn:
-        cur.execute("SELECT id FROM journals WHERE issn = %s LIMIT 1", (issn,))
-        row = cur.fetchone()
-        if row:
-            # Enrichir eissn et publisher_id si manquants
-            cur.execute("""
-                UPDATE journals SET
-                    eissn = COALESCE(journals.eissn, %s),
-                    publisher_id = COALESCE(journals.publisher_id, %s)
-                WHERE id = %s
-            """, (eissn, publisher_id, row[0]))
-            return row[0]
-
-    # Chercher par eISSN
-    if eissn:
-        cur.execute("SELECT id FROM journals WHERE eissn = %s LIMIT 1", (eissn,))
-        row = cur.fetchone()
-        if row:
-            cur.execute("""
-                UPDATE journals SET
-                    issn = COALESCE(journals.issn, %s),
-                    publisher_id = COALESCE(journals.publisher_id, %s)
-                WHERE id = %s
-            """, (issn, publisher_id, row[0]))
-            return row[0]
-
-    # Chercher par ISSN-L (WoS n'a pas d'ISSN-L mais l'ISSN peut matcher)
-    if issn:
-        cur.execute("SELECT id FROM journals WHERE issnl = %s LIMIT 1", (issn,))
-        row = cur.fetchone()
-        if row:
-            return row[0]
-
-    # Chercher par titre normalisé
-    cur.execute(
-        "SELECT id FROM journals WHERE title_normalized = %s LIMIT 1",
-        (title_normalized,)
-    )
-    row = cur.fetchone()
-    if row:
-        cur.execute("""
-            UPDATE journals SET
-                issn = COALESCE(journals.issn, %s),
-                eissn = COALESCE(journals.eissn, %s),
-                publisher_id = COALESCE(journals.publisher_id, %s)
-            WHERE id = %s
-        """, (issn, eissn, publisher_id, row[0]))
-        return row[0]
-
-    # Créer
-    cur.execute("""
-        INSERT INTO journals (title, title_normalized, issn, eissn, publisher_id)
-        VALUES (%s, %s, %s, %s, %s)
-        RETURNING id
-    """, (title.strip(), title_normalized, issn, eissn, publisher_id))
-    return cur.fetchone()[0]
+    return find_or_create_journal(
+        cur, title,
+        issn=rec.get("issn"), eissn=rec.get("eissn"),
+        publisher_id=publisher_id)
 
 
 # =============================================================
-# PUBLICATIONS (table de vérité)
+# PUBLICATIONS (via services/publications.py)
 # =============================================================
 
 def upsert_publication(cur, rec: dict, journal_id: int | None) -> int | None:
-    """Insère/retrouve la publication canonique. Retourne publication.id."""
-    doi = rec["doi"]
+    """Insère/retrouve la publication canonique. Délègue au service publications."""
     title = rec["title"]
-    title_normalized = normalize_text(title)
     pub_year = rec["pub_year"]
-    doc_type = rec["doc_type"]
-    oa_status = rec["oa_status"]
-    language = rec.get("language")
 
     if not pub_year or not title or title == "(sans titre)":
         return None
 
     container_title = rec.get("journal_title") if not journal_id else None
 
-    if doi:
-        # L'index unique est sur LOWER(doi), ON CONFLICT (doi) ne matche pas
-        cur.execute("SELECT id FROM publications WHERE LOWER(doi) = LOWER(%s)", (doi,))
-        existing = cur.fetchone()
-        if existing:
-            cur.execute("""
-                UPDATE publications SET
-                    journal_id = COALESCE(journal_id, %s),
-                    doc_type = CASE
-                        WHEN doc_type = 'other' AND %s <> 'other' THEN %s::doc_type
-                        ELSE COALESCE(doc_type, %s::doc_type)
-                    END,
-                    oa_status = CASE
-                        WHEN oa_status = 'unknown' THEN %s::oa_type
-                        WHEN %s = 'diamond' THEN 'diamond'::oa_type
-                        ELSE oa_status
-                    END,
-                    container_title = COALESCE(container_title, %s),
-                    updated_at = now()
-                WHERE id = %s
-            """, (journal_id, doc_type, doc_type, doc_type,
-                  oa_status, oa_status, container_title, existing[0]))
-            return existing[0]
-        else:
-            cur.execute("""
-                INSERT INTO publications
-                    (title, title_normalized, doc_type, pub_year, doi,
-                     oa_status, journal_id, container_title, language)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
-            """, (title, title_normalized, doc_type, pub_year, doi,
-                  oa_status, journal_id, container_title, language))
-            return cur.fetchone()[0]
-    else:
-        # Sans DOI : chercher par titre+année+journal (articles uniquement)
-        if doc_type == "article" and journal_id:
-            cur.execute("""
-                SELECT id FROM publications
-                WHERE title_normalized = %s AND pub_year = %s AND journal_id = %s
-                LIMIT 1
-            """, (title_normalized, pub_year, journal_id))
-            row = cur.fetchone()
-            if row:
-                return row[0]
-
-        cur.execute("""
-            INSERT INTO publications
-                (title, title_normalized, doc_type, pub_year,
-                 oa_status, journal_id, container_title, language)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id
-        """, (title, title_normalized, doc_type, pub_year,
-              oa_status, journal_id, container_title, language))
-        return cur.fetchone()[0]
+    pub_id, _created = find_or_create_publication(
+        cur, title=title, title_normalized=normalize_text(title),
+        pub_year=pub_year, doc_type=rec["doc_type"], doi=rec["doi"],
+        oa_status=rec["oa_status"], journal_id=journal_id,
+        container_title=container_title, language=rec.get("language"))
+    return pub_id
 
 
 # =============================================================

@@ -15,6 +15,7 @@ from psycopg2.extras import RealDictCursor
 
 sys.path.insert(0, ".")
 from config.settings import DB
+from services.persons import add_identifier
 
 HAL_AUTHOR_API = "https://api.archives-ouvertes.fr/ref/author/"
 
@@ -73,11 +74,7 @@ def main():
                 cur.execute("UPDATE hal_authors SET idref = %s WHERE id = %s",
                             (idref, a["ha_id"]))
                 # Stocker dans person_identifiers
-                cur.execute("""
-                    INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
-                    VALUES (%s, 'idref', %s, 'hal', 'pending')
-                    ON CONFLICT (id_type, id_value) DO NOTHING
-                """, (a["person_id"], idref))
+                add_identifier(cur, a["person_id"], "idref", idref, source="hal")
             print(f"  {a['full_name']}: {idref}")
 
         if (i + 1) % 100 == 0:

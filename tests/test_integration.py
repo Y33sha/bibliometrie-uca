@@ -5,6 +5,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 import pytest
 from utils.merge_persons import merge_person
+from services.publications import find_or_create, find_by_doi
 
 
 # ── Helpers ──
@@ -25,7 +26,8 @@ def create_persons_rh(db, person_id, **kwargs):
 
 
 def create_journal(db, title="Test Journal"):
-    db.execute("INSERT INTO journals (title) VALUES (%s) RETURNING id", (title,))
+    db.execute("INSERT INTO journals (title, title_normalized) VALUES (%s, lower(%s)) RETURNING id",
+               (title, title))
     return db.fetchone()["id"]
 
 
@@ -53,6 +55,75 @@ class TestDoiCaseInsensitive:
         db.execute("SELECT id FROM publications WHERE lower(doi) = lower(%s)",
                    ("10.1103/physrevc.111.024905",))
         assert db.fetchone() is not None
+
+
+# ── Service publications ──
+
+class TestPublicationService:
+    def test_create_new(self, db):
+        pub_id, is_new = find_or_create(
+            db, title="Test Article", title_normalized="test article",
+            pub_year=2024, doc_type="article", doi="10.1234/test")
+        assert pub_id is not None
+        assert is_new is True
+
+    def test_find_by_doi_case_insensitive(self, db):
+        pub_id1, _ = find_or_create(
+            db, title="Pub A", title_normalized="pub a",
+            pub_year=2024, doi="10.1103/PhysRevC.111.024905")
+        pub_id2, is_new = find_or_create(
+            db, title="Pub A variant", title_normalized="pub a variant",
+            pub_year=2024, doi="10.1103/physrevc.111.024905")
+        assert pub_id2 == pub_id1
+        assert is_new is False
+
+    def test_find_by_title_year_journal(self, db):
+        journal_id = create_journal(db, "Nature")
+        pub_id1, _ = find_or_create(
+            db, title="My Article", title_normalized="my article",
+            pub_year=2024, doc_type="article", journal_id=journal_id)
+        pub_id2, is_new = find_or_create(
+            db, title="My Article", title_normalized="my article",
+            pub_year=2024, doc_type="article", journal_id=journal_id)
+        assert pub_id2 == pub_id1
+        assert is_new is False
+
+    def test_no_title_match_without_journal(self, db):
+        """Sans journal_id, pas de dédup par titre — deux publications créées."""
+        pub_id1, _ = find_or_create(
+            db, title="My Article", title_normalized="my article",
+            pub_year=2024, doc_type="article")
+        pub_id2, is_new = find_or_create(
+            db, title="My Article", title_normalized="my article",
+            pub_year=2024, doc_type="article")
+        assert pub_id2 != pub_id1
+        assert is_new is True
+
+    def test_enrich_on_doi_match(self, db):
+        """Quand on retrouve par DOI, les métadonnées manquantes sont enrichies."""
+        journal_id = create_journal(db, "Science")
+        pub_id, _ = find_or_create(
+            db, title="Pub", title_normalized="pub",
+            pub_year=2024, doi="10.5555/enrich-test",
+            oa_status="unknown")
+        # Deuxième appel avec plus d'info
+        pub_id2, is_new = find_or_create(
+            db, title="Pub", title_normalized="pub",
+            pub_year=2024, doi="10.5555/enrich-test",
+            oa_status="gold", journal_id=journal_id)
+        assert pub_id2 == pub_id
+        assert is_new is False
+        db.execute("SELECT oa_status, journal_id FROM publications WHERE id = %s", (pub_id,))
+        row = db.fetchone()
+        assert row["journal_id"] == journal_id
+        assert row["oa_status"] == "gold"
+
+    def test_allow_create_false(self, db):
+        pub_id, is_new = find_or_create(
+            db, title="Ghost", title_normalized="ghost",
+            pub_year=2024, allow_create=False)
+        assert pub_id is None
+        assert is_new is False
 
 
 # ── Merge persons ──

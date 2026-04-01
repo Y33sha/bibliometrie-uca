@@ -33,6 +33,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import HAL
 from db.connection import get_connection
 from utils.normalize import normalize_text
+from services.publications import find_or_create as find_or_create_publication
+from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
 logging.basicConfig(
@@ -41,7 +43,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "normalize_hal.log")
+            os.path.join(os.path.dirname(__file__), "logs", "normalize_hal.log")
         ),
     ],
 )
@@ -114,111 +116,35 @@ def get_title(doc: dict) -> str:
 
 
 # =============================================================
-# PUBLISHERS & JOURNALS (inchangés — tables de vérité partagées)
+# PUBLISHERS & JOURNALS (via services/journals.py)
 # =============================================================
 
 def upsert_publisher(cur, publisher_name: str) -> int | None:
-    """Insère/retrouve un éditeur par nom normalisé. Retourne publisher.id."""
-    if not publisher_name:
-        return None
-
-    name_normalized = normalize_text(publisher_name)
-    if not name_normalized:
-        return None
-
-    cur.execute(
-        "SELECT id FROM publishers WHERE name_normalized = %s LIMIT 1",
-        (name_normalized,)
-    )
-    row = cur.fetchone()
-    if row:
-        return row[0]
-
-    cur.execute("""
-        INSERT INTO publishers (name, name_normalized)
-        VALUES (%s, %s)
-        RETURNING id
-    """, (publisher_name, name_normalized))
-    return cur.fetchone()[0]
+    """Trouve ou crée un éditeur. Délègue au service journals."""
+    return find_or_create_publisher(cur, publisher_name)
 
 
 def upsert_journal(cur, doc: dict, publisher_id: int | None) -> int | None:
-    """
-    Extrait et insère la revue depuis les champs HAL.
-    Retourne journal.id ou None.
-    """
+    """Extrait et trouve/crée la revue depuis les champs HAL."""
     title = as_str(doc.get("journalTitle_s"))
     if not title:
         return None
-
-    issn = as_str(doc.get("journalIssn_s"))
-    eissn = as_str(doc.get("journalEissn_s"))
-
-    title_normalized = normalize_text(title)
-
-    # Tenter de retrouver par ISSN d'abord
-    if issn:
-        cur.execute(
-            "SELECT id FROM journals WHERE issn = %s OR issnl = %s LIMIT 1",
-            (issn, issn)
-        )
-        row = cur.fetchone()
-        if row:
-            cur.execute("""
-                UPDATE journals SET
-                    eissn = COALESCE(journals.eissn, %s),
-                    publisher_id = COALESCE(journals.publisher_id, %s)
-                WHERE id = %s
-            """, (eissn, publisher_id, row[0]))
-            return row[0]
-
-    if eissn:
-        cur.execute(
-            "SELECT id FROM journals WHERE eissn = %s OR issnl = %s LIMIT 1",
-            (eissn, eissn)
-        )
-        row = cur.fetchone()
-        if row:
-            cur.execute("""
-                UPDATE journals SET
-                    issn = COALESCE(journals.issn, %s),
-                    publisher_id = COALESCE(journals.publisher_id, %s)
-                WHERE id = %s
-            """, (issn, publisher_id, row[0]))
-            return row[0]
-
-    # Fallback sur le nom normalisé
-    cur.execute(
-        "SELECT id FROM journals WHERE title_normalized = %s LIMIT 1",
-        (title_normalized,)
-    )
-    row = cur.fetchone()
-    if row:
-        return row[0]
-
-    # Nouvelle revue
-    cur.execute("""
-        INSERT INTO journals (title, title_normalized, issn, eissn, publisher_id)
-        VALUES (%s, %s, %s, %s, %s)
-        RETURNING id
-    """, (title, title_normalized, issn, eissn, publisher_id))
-    return cur.fetchone()[0]
+    return find_or_create_journal(
+        cur, title,
+        issn=as_str(doc.get("journalIssn_s")),
+        eissn=as_str(doc.get("journalEissn_s")),
+        publisher_id=publisher_id)
 
 
 # =============================================================
-# PUBLICATIONS (inchangé — table de vérité)
+# PUBLICATIONS (via services/publications.py)
 # =============================================================
 
 def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
                                allow_create: bool = True) -> tuple[int, bool]:
-    """
-    Cherche une publication existante (par DOI ou titre+année) ou en crée une.
-    Si allow_create=False, ne crée pas de nouvelle publication (retourne None, False).
-    Retourne (publication_id, is_new).
-    """
+    """Cherche ou crée une publication. Délègue au service publications."""
     doi = clean_doi(as_str(doc.get("doiId_s")))
     title = get_title(doc)
-    title_normalized = normalize_text(title)
     pub_year = doc.get("producedDateY_i")
 
     if not pub_year or not title:
@@ -236,72 +162,12 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
     if not journal_id:
         container_title = as_str(doc.get("bookTitle_s")) or as_str(doc.get("conferenceTitle_s"))
 
-    # 1. Chercher par DOI (match inter-sources)
-    if doi:
-        cur.execute("SELECT id FROM publications WHERE lower(doi) = lower(%s)", (doi,))
-        row = cur.fetchone()
-        if row:
-            # Publication déjà connue (probablement via OpenAlex) → enrichir
-            cur.execute("""
-                UPDATE publications SET
-                    journal_id = COALESCE(%s, publications.journal_id),
-                    doc_type = CASE
-                        WHEN publications.doc_type = 'other' AND %s != 'other'
-                            THEN %s
-                        ELSE COALESCE(publications.doc_type, %s)
-                    END,
-                    container_title = COALESCE(%s, publications.container_title),
-                    oa_status = CASE
-                        WHEN %s = 'green' AND publications.oa_status IN ('closed', 'unknown')
-                            THEN 'green'
-                        ELSE publications.oa_status
-                    END,
-                    updated_at = now()
-                WHERE id = %s
-            """, (journal_id, doc_type, doc_type, doc_type, container_title, oa_status, row[0]))
-            return row[0], False
-
-    # 2. Chercher par titre normalisé + année + même journal
-    #    Uniquement pour les articles, et seulement si journal_id est connu
-    #    (aucun NULL dans les critères de fusion)
-    row = None
-    if title_normalized and doc_type == "article" and journal_id:
-        cur.execute("""
-            SELECT id FROM publications
-            WHERE title_normalized = %s AND pub_year = %s
-              AND journal_id = %s
-            LIMIT 1
-        """, (title_normalized, pub_year, journal_id))
-        row = cur.fetchone()
-        if row:
-            cur.execute("""
-                UPDATE publications SET
-                    doi = COALESCE(publications.doi, %s),
-                    journal_id = COALESCE(%s, publications.journal_id),
-                    doc_type = CASE
-                        WHEN publications.doc_type = 'other' AND %s != 'other'
-                            THEN %s
-                        ELSE COALESCE(publications.doc_type, %s)
-                    END,
-                    container_title = COALESCE(%s, publications.container_title),
-                    updated_at = now()
-                WHERE id = %s
-            """, (doi, journal_id, doc_type, doc_type, doc_type, container_title, row[0]))
-            return row[0], False
-
-    # 3. Nouvelle publication
-    if not allow_create:
-        return None, False
-
-    cur.execute("""
-        INSERT INTO publications
-            (title, title_normalized, doc_type, pub_year, doi,
-             oa_status, journal_id, container_title, language)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-    """, (title, title_normalized, doc_type, pub_year, doi,
-          oa_status, journal_id, container_title, language))
-    return cur.fetchone()[0], True
+    return find_or_create_publication(
+        cur, title=title, title_normalized=normalize_text(title),
+        pub_year=pub_year, doc_type=doc_type, doi=doi,
+        oa_status=oa_status, journal_id=journal_id,
+        container_title=container_title, language=language,
+        allow_create=allow_create)
 
 
 # =============================================================

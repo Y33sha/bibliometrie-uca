@@ -27,6 +27,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from utils.normalize import normalize_text as normalize
+from utils.uca_perimeter import get_uca_structure_ids
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,7 +35,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "resolve_addresses.log")
+            os.path.join(os.path.dirname(__file__), "logs", "resolve_addresses.log")
         ),
     ],
 )
@@ -77,33 +78,8 @@ def load_tutelles(cur):
 
 
 def load_uca_perimeter(cur):
-    """Construit l'ensemble des structure_ids dans le périmètre UCA.
-
-    Inclut :
-    - UCA elle-même
-    - Les structures dont UCA est tutelle (labos UCA)
-
-    N'inclut PAS les partenaires (CHU, INP…) ni les tutelles nationales
-    (CNRS, Inserm…) car leurs publications ne sont pas forcément UCA.
-    """
-    cur.execute("SELECT id FROM structures WHERE code = 'uca'")
-    row = cur.fetchone()
-    if not row:
-        logger.warning("Structure UCA introuvable ! Le flag is_uca sera toujours FALSE.")
-        return set()
-
-    uca_id = row[0]
-    perimeter = {uca_id}
-
-    # Structures dont UCA est tutelle (parent=UCA → child=labo)
-    cur.execute("""
-        SELECT child_id FROM structure_relations
-        WHERE parent_id = %s AND relation_type = 'est_tutelle_de'
-    """, (uca_id,))
-    for r in cur.fetchall():
-        perimeter.add(r[0])
-
-    return perimeter
+    """Construit l'ensemble des structure_ids dans le périmètre UCA."""
+    return get_uca_structure_ids(cur)
 
 
 # ─── Matching ────────────────────────────────────────────────────

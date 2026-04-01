@@ -29,6 +29,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from psycopg2.extras import RealDictCursor
 from utils.normalize import normalize_name
+from services.persons import (
+    create_person, link_authorships as link_to_person,
+    add_identifiers_from_authorships as add_identifiers,
+    add_name_form,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -107,79 +112,8 @@ def pick_best_name(authorships):
     return best["last_name"] or "", best["first_name"] or ""
 
 
-def create_person(cur, last_name, first_name):
-    """Crée une personne et retourne son id."""
-    last_norm = normalize_name(last_name)
-    first_norm = normalize_name(first_name)
-    cur.execute("""
-        INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized)
-        VALUES (%s, %s, %s, %s)
-        RETURNING id
-    """, (last_name, first_name, last_norm, first_norm))
-    return cur.fetchone()["id"]
-
-
-def link_to_person(cur, person_id, authorships):
-    """Rattache des authorships à une personne (écrit sur les tables sources)."""
-    for a in authorships:
-        src = a["source"]
-        if src == "hal":
-            cur.execute("UPDATE hal_authorships SET person_id = %s WHERE id = %s",
-                        (person_id, a["authorship_id"]))
-            # Dual-write pour les comptes HAL
-            if a.get("hal_author_id") and a.get("has_hal_person_id"):
-                cur.execute("""UPDATE hal_authors SET person_id = %s, updated_at = now()
-                               WHERE id = %s AND hal_person_id IS NOT NULL""",
-                            (person_id, a["hal_author_id"]))
-        elif src == "openalex":
-            cur.execute("UPDATE openalex_authorships SET person_id = %s WHERE id = %s",
-                        (person_id, a["authorship_id"]))
-        elif src == "wos":
-            cur.execute("UPDATE wos_authorships SET person_id = %s WHERE id = %s",
-                        (person_id, a["authorship_id"]))
-
-
-def add_identifiers(cur, person_id, authorships):
-    """Ajoute les identifiants (ORCID, idHAL) d'un groupe d'authorships à la personne."""
-    orcids = set()
-    idhals = set()
-    for a in authorships:
-        if a.get("orcid"):
-            orcids.add(a["orcid"])
-        if a.get("idhal"):
-            idhals.add(a["idhal"])
-
-    for orcid in orcids:
-        cur.execute("""
-            INSERT INTO person_identifiers (person_id, id_type, id_value, source)
-            VALUES (%s, 'orcid', %s, 'auto')
-            ON CONFLICT (id_type, id_value) DO NOTHING
-        """, (person_id, orcid))
-
-    for idhal in idhals:
-        cur.execute("""
-            INSERT INTO person_identifiers (person_id, id_type, id_value, source)
-            VALUES (%s, 'idhal', %s, 'auto')
-            ON CONFLICT (id_type, id_value) DO NOTHING
-        """, (person_id, idhal))
-
-
-def add_name_form(cur, person_id, full_name):
-    """Ajoute une forme de nom à person_name_forms si elle n'existe pas déjà."""
-    if not full_name or not full_name.strip():
-        return
-    norm = normalize_name(full_name)
-    if not norm:
-        return
-    cur.execute("""
-        INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids)
-        VALUES (%s, %s, ARRAY[%s])
-        ON CONFLICT (name_form_normalized) WHERE name_form_normalized IS NOT NULL DO UPDATE
-        SET person_ids = (
-            SELECT array_agg(DISTINCT x)
-            FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
-        )
-    """, (full_name.strip(), norm, person_id, person_id))
+# create_person, link_to_person, add_identifiers, add_name_form
+# sont importés depuis services.persons
 
 
 # ---------------------------------------------------------------------------

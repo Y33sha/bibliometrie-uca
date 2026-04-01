@@ -25,6 +25,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from psycopg2.extras import RealDictCursor
+from services.publications import merge_publications
 
 logging.basicConfig(
     level=logging.INFO,
@@ -124,66 +125,7 @@ def merge_publications(cur, items, dry_run=False):
 
         try:
             cur.execute("SAVEPOINT merge_pub")
-
-            # Reassign openalex_document to HAL's publication
-            cur.execute(
-                "UPDATE openalex_documents SET publication_id = %s WHERE id = %s",
-                (hal_pub_id, oa_doc_id)
-            )
-
-            # Reassign authorships from OA pub to HAL pub
-            # First delete duplicates that would violate unique constraint
-            cur.execute("""
-                DELETE FROM authorships
-                WHERE publication_id = %s
-                  AND person_id IN (
-                      SELECT person_id FROM authorships WHERE publication_id = %s
-                  )
-            """, (oa_pub_id, hal_pub_id))
-            cur.execute(
-                "UPDATE authorships SET publication_id = %s WHERE publication_id = %s",
-                (hal_pub_id, oa_pub_id)
-            )
-
-            # Reassign any other OA docs or HAL docs that may reference the OA pub
-            cur.execute(
-                "UPDATE openalex_documents SET publication_id = %s WHERE publication_id = %s",
-                (hal_pub_id, oa_pub_id)
-            )
-            cur.execute(
-                "UPDATE hal_documents SET publication_id = %s WHERE publication_id = %s",
-                (hal_pub_id, oa_pub_id)
-            )
-
-            # Enrich the kept publication with OA metadata if missing
-            # Use a safe DOI update that won't conflict with existing DOIs
-            cur.execute("""
-                UPDATE publications dest SET
-                    doi = CASE
-                        WHEN dest.doi IS NOT NULL THEN dest.doi
-                        WHEN src.doi IS NOT NULL AND NOT EXISTS (
-                            SELECT 1 FROM publications p2
-                            WHERE p2.doi = src.doi AND p2.id <> dest.id
-                        ) THEN src.doi
-                        ELSE dest.doi END,
-                    journal_id = COALESCE(dest.journal_id, src.journal_id),
-                    oa_status = CASE
-                        WHEN src.oa_status = 'diamond' THEN 'diamond'
-                        WHEN dest.oa_status IN ('unknown', 'closed') AND src.oa_status NOT IN ('unknown', 'closed')
-                        THEN src.oa_status ELSE dest.oa_status END,
-                    language = COALESCE(dest.language, src.language),
-                    container_title = COALESCE(dest.container_title, src.container_title),
-                    updated_at = now()
-                FROM publications src
-                WHERE dest.id = %s AND src.id = %s
-            """, (hal_pub_id, oa_pub_id))
-
-            # Delete the orphaned OA-only publication (no more references)
-            cur.execute(
-                "DELETE FROM publications WHERE id = %s",
-                (oa_pub_id,)
-            )
-
+            merge_publications(cur, hal_pub_id, oa_pub_id)
             cur.execute("RELEASE SAVEPOINT merge_pub")
             merged += 1
 

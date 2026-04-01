@@ -19,6 +19,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.uca_perimeter import get_uca_structure_ids_list
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,7 +27,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "build_authorships.log")
+            os.path.join(os.path.dirname(__file__), "logs", "build_authorships.log")
         ),
     ],
 )
@@ -172,19 +173,13 @@ def build(cur):
     logger.info(f"  Reset {reset_count} authorships")
 
     # 4a. Depuis HAL (exclut peer_review : auteurs = ceux de l'article reviewé, pas du review)
+    uca_ids = get_uca_structure_ids_list(cur)
     cur.execute("""
-        WITH uca_perimeter AS (
-            SELECT s.id FROM structures s WHERE s.code = 'uca'
-            UNION
-            SELECT sr.child_id FROM structure_relations sr
-            JOIN structures s ON s.id = sr.parent_id
-            WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
-        ),
-        hal_data AS (
+        WITH hal_data AS (
             SELECT hd.publication_id,
                    has.person_id,
                    array_agg(DISTINCT sid) AS all_struct_ids,
-                   bool_or(sid IN (SELECT id FROM uca_perimeter)) AS has_uca
+                   bool_or(sid = ANY(%s)) AS has_uca
             FROM hal_authorships has
             JOIN hal_documents hd ON hd.id = has.hal_document_id
             JOIN publications pub ON pub.id = hd.publication_id,
@@ -202,7 +197,7 @@ def build(cur):
         FROM hal_data hd
         WHERE a.publication_id = hd.publication_id
           AND a.person_id = hd.person_id
-    """)
+    """, (uca_ids,))
     hal_uca = cur.rowcount
     logger.info(f"  {hal_uca} authorships mises à jour depuis HAL")
 

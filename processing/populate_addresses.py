@@ -29,7 +29,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "populate_addresses.log")
+            os.path.join(os.path.dirname(__file__), "logs", "populate_addresses.log")
         ),
     ],
 )

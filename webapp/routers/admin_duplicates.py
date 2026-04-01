@@ -1,7 +1,10 @@
 """Auto-extracted router."""
 
+import sys, os
 from fastapi import APIRouter, Query, HTTPException
 from webapp.deps import get_cursor
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from services.publications import merge_publications
 
 router = APIRouter()
 
@@ -132,52 +135,7 @@ async def merge_duplicate_publications(body: dict):
 
         cur.execute("SAVEPOINT merge_dup")
         try:
-            for tbl in ("hal_documents", "openalex_documents", "wos_documents"):
-                cur.execute(f"UPDATE {tbl} SET publication_id = %s WHERE publication_id = %s",
-                            (target_id, source_id))
-
-            cur.execute("""
-                DELETE FROM authorships
-                WHERE publication_id = %s
-                  AND person_id IN (
-                      SELECT person_id FROM authorships WHERE publication_id = %s
-                  )
-            """, (source_id, target_id))
-
-            cur.execute("UPDATE authorships SET publication_id = %s WHERE publication_id = %s",
-                        (target_id, source_id))
-
-            cur.execute("""
-                UPDATE publications dest SET
-                    doi = CASE
-                        WHEN dest.doi IS NOT NULL THEN dest.doi
-                        WHEN src.doi IS NOT NULL AND NOT EXISTS (
-                            SELECT 1 FROM publications p2
-                            WHERE LOWER(p2.doi) = LOWER(src.doi) AND p2.id <> dest.id
-                        ) THEN LOWER(src.doi)
-                        ELSE dest.doi END,
-                    journal_id = COALESCE(dest.journal_id, src.journal_id),
-                    oa_status = CASE
-                        WHEN src.oa_status = 'diamond' THEN 'diamond'
-                        WHEN dest.oa_status IN ('unknown', 'closed') AND src.oa_status NOT IN ('unknown', 'closed')
-                        THEN src.oa_status ELSE dest.oa_status END,
-                    language = COALESCE(dest.language, src.language),
-                    container_title = COALESCE(dest.container_title, src.container_title),
-                    countries = CASE
-                        WHEN dest.countries IS NULL THEN src.countries
-                        WHEN src.countries IS NULL THEN dest.countries
-                        ELSE (SELECT array_agg(DISTINCT c ORDER BY c) FROM unnest(dest.countries || src.countries) AS c)
-                        END,
-                    updated_at = now()
-                FROM publications src
-                WHERE dest.id = %s AND src.id = %s
-            """, (target_id, source_id))
-
-            cur.execute("DELETE FROM distinct_publications WHERE pub_id_a = %s OR pub_id_b = %s OR pub_id_a = %s OR pub_id_b = %s",
-                        (source_id, source_id, source_id, source_id))
-
-            cur.execute("DELETE FROM publications WHERE id = %s", (source_id,))
-
+            merge_publications(cur, target_id, source_id)
             cur.execute("RELEASE SAVEPOINT merge_dup")
         except Exception as e:
             cur.execute("ROLLBACK TO SAVEPOINT merge_dup")

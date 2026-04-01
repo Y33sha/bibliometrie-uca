@@ -32,6 +32,7 @@ import requests
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from config.settings import HAL
+from services.persons import add_identifier
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,7 +40,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "harvest_hal_orcids.log")
+            os.path.join(os.path.dirname(__file__), "logs", "harvest_hal_orcids.log")
         ),
     ],
 )
@@ -152,13 +153,14 @@ def main():
 
                     # 2. Insérer dans person_identifiers (si person_id résolu)
                     cur.execute("""
-                        INSERT INTO person_identifiers (person_id, id_type, id_value, source)
-                        SELECT person_id, 'orcid', %s, 'hal'
-                        FROM hal_authors
+                        SELECT person_id FROM hal_authors
                         WHERE hal_person_id = %s AND person_id IS NOT NULL
-                        ON CONFLICT (id_type, id_value) DO NOTHING
-                    """, (orcid, pid))
-                    total_pi_inserted += cur.rowcount
+                        LIMIT 1
+                    """, (pid,))
+                    ha_row = cur.fetchone()
+                    if ha_row:
+                        add_identifier(cur, ha_row[0], "orcid", orcid, source="hal")
+                        total_pi_inserted += 1
 
                 conn.commit()
 

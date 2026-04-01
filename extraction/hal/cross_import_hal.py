@@ -38,7 +38,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "cross_import_hal.log")
+            os.path.join(os.path.dirname(__file__), "logs", "cross_import_hal.log")
         ),
     ],
 )

@@ -28,6 +28,8 @@ from psycopg2.extras import Json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from utils.normalize import normalize_text
+from services.publications import find_or_create as find_or_create_publication
+from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
 logging.basicConfig(
@@ -36,7 +38,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "normalize_openalex.log")
+            os.path.join(os.path.dirname(__file__), "logs", "normalize_openalex.log")
         ),
     ],
 )
@@ -154,63 +156,25 @@ def is_repository_source(work: dict) -> bool:
 
 
 # =============================================================
-# PUBLISHERS & JOURNALS (inchangés — tables de vérité partagées)
+# PUBLISHERS & JOURNALS (via services/journals.py)
 # =============================================================
 
 def upsert_publisher(cur, work: dict) -> int | None:
-    """
-    Extrait et insère l'éditeur depuis primary_location.source.host_organization.
-    Retourne le publisher.id ou None.
-    """
+    """Extrait et trouve/crée l'éditeur depuis le work OpenAlex."""
     location = work.get("primary_location") or {}
     source = location.get("source") or {}
-
     publisher_name = source.get("host_organization_name")
     if not publisher_name:
         return None
-
     openalex_id = extract_short_id(source.get("host_organization") or "")
-    name_normalized = normalize_text(publisher_name)
-
-    cur.execute("""
-        INSERT INTO publishers (name, name_normalized, openalex_id)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (openalex_id) DO UPDATE SET
-            name = COALESCE(NULLIF(publishers.name, ''), EXCLUDED.name)
-        RETURNING id
-    """, (publisher_name, name_normalized, openalex_id or None))
-
-    row = cur.fetchone()
-    if row:
-        return row[0]
-
-    # Si pas d'openalex_id, chercher/insérer par nom normalisé
-    if not openalex_id:
-        cur.execute(
-            "SELECT id FROM publishers WHERE name_normalized = %s LIMIT 1",
-            (name_normalized,)
-        )
-        row = cur.fetchone()
-        if row:
-            return row[0]
-        cur.execute("""
-            INSERT INTO publishers (name, name_normalized)
-            VALUES (%s, %s)
-            RETURNING id
-        """, (publisher_name, name_normalized))
-        return cur.fetchone()[0]
-
-    return None
+    return find_or_create_publisher(cur, publisher_name,
+                                    openalex_id=openalex_id or None)
 
 
 def upsert_journal(cur, work: dict, publisher_id: int | None) -> int | None:
-    """
-    Extrait et insère la revue depuis primary_location.source.
-    Retourne le journal.id ou None.
-    """
+    """Extrait et trouve/crée la revue depuis le work OpenAlex."""
     location = work.get("primary_location") or {}
     source = location.get("source") or {}
-
     title = source.get("display_name")
     if not title:
         return None
@@ -230,49 +194,14 @@ def upsert_journal(cur, work: dict, publisher_id: int | None) -> int | None:
     source_type = source.get("type")
     oa_model = None
     if source_type == "journal":
-        is_oa = source.get("is_oa", False)
-        oa_model = "full_oa" if is_oa else "subscription"
+        oa_model = "full_oa" if source.get("is_oa", False) else "subscription"
     elif source_type == "repository":
         oa_model = "repository"
 
-    title_normalized = normalize_text(title)
-
-    if openalex_id:
-        cur.execute("""
-            INSERT INTO journals (title, title_normalized, issn, eissn, issnl,
-                                  publisher_id, openalex_id, oa_model)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (openalex_id) DO UPDATE SET
-                title = COALESCE(NULLIF(journals.title, ''), EXCLUDED.title),
-                issnl = COALESCE(journals.issnl, EXCLUDED.issnl),
-                issn = COALESCE(journals.issn, EXCLUDED.issn),
-                eissn = COALESCE(journals.eissn, EXCLUDED.eissn),
-                publisher_id = COALESCE(journals.publisher_id, EXCLUDED.publisher_id),
-                oa_model = COALESCE(journals.oa_model, EXCLUDED.oa_model)
-            RETURNING id
-        """, (title, title_normalized, issn, eissn, issn_l,
-              publisher_id, openalex_id, oa_model))
-        return cur.fetchone()[0]
-
-    if issn_l:
-        cur.execute("SELECT id FROM journals WHERE issnl = %s LIMIT 1", (issn_l,))
-        row = cur.fetchone()
-        if row:
-            return row[0]
-
-    cur.execute("SELECT id FROM journals WHERE title_normalized = %s LIMIT 1",
-                (title_normalized,))
-    row = cur.fetchone()
-    if row:
-        return row[0]
-
-    cur.execute("""
-        INSERT INTO journals (title, title_normalized, issn, eissn, issnl,
-                              publisher_id, oa_model)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-    """, (title, title_normalized, issn, eissn, issn_l, publisher_id, oa_model))
-    return cur.fetchone()[0]
+    return find_or_create_journal(
+        cur, title, issn=issn, eissn=eissn, issnl=issn_l,
+        publisher_id=publisher_id, openalex_id=openalex_id or None,
+        oa_model=oa_model)
 
 
 # =============================================================
@@ -280,13 +209,9 @@ def upsert_journal(cur, work: dict, publisher_id: int | None) -> int | None:
 # =============================================================
 
 def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
-    """
-    Insère la publication dans la table unifiée.
-    Retourne le publication.id.
-    """
+    """Insère ou retrouve la publication. Délègue au service publications."""
     doi = clean_doi(work.get("doi"))
     title = work.get("title") or work.get("display_name") or ""
-    title_normalized = normalize_text(title)
     pub_year = work.get("publication_year")
 
     if not pub_year or not title:
@@ -307,53 +232,12 @@ def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
         source = location.get("source") or {}
         container_title = source.get("display_name")
 
-    if doi:
-        cur.execute("""
-            INSERT INTO publications
-                (title, title_normalized, doc_type, pub_year, doi,
-                 oa_status, journal_id, container_title, language)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT ((lower(doi))) WHERE doi IS NOT NULL DO UPDATE SET
-                journal_id = COALESCE(publications.journal_id, EXCLUDED.journal_id),
-                doc_type = CASE
-                    WHEN publications.doc_type = 'other' AND EXCLUDED.doc_type <> 'other'
-                        THEN EXCLUDED.doc_type
-                    ELSE COALESCE(publications.doc_type, EXCLUDED.doc_type)
-                END,
-                oa_status = CASE
-                    WHEN publications.oa_status = 'unknown' THEN EXCLUDED.oa_status
-                    WHEN EXCLUDED.oa_status = 'diamond' THEN 'diamond'
-                    ELSE publications.oa_status
-                END,
-                updated_at = now()
-            RETURNING id
-        """, (title, title_normalized, doc_type, pub_year, doi,
-              oa_status, journal_id, container_title, language))
-        return cur.fetchone()[0]
-    else:
-        # Chercher par titre+année+même journal
-        # Uniquement pour les articles, et seulement si journal_id est connu
-        # (aucun NULL dans les critères de fusion)
-        if doc_type == "article" and journal_id:
-            cur.execute("""
-                SELECT id FROM publications
-                WHERE title_normalized = %s AND pub_year = %s
-                  AND journal_id = %s
-                LIMIT 1
-            """, (title_normalized, pub_year, journal_id))
-            row = cur.fetchone()
-            if row:
-                return row[0]
-
-        cur.execute("""
-            INSERT INTO publications
-                (title, title_normalized, doc_type, pub_year,
-                 oa_status, journal_id, container_title, language)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id
-        """, (title, title_normalized, doc_type, pub_year,
-              oa_status, journal_id, container_title, language))
-        return cur.fetchone()[0]
+    pub_id, _created = find_or_create_publication(
+        cur, title=title, title_normalized=normalize_text(title),
+        pub_year=pub_year, doc_type=doc_type, doi=doi,
+        oa_status=oa_status, journal_id=journal_id,
+        container_title=container_title, language=language)
+    return pub_id
 
 
 # =============================================================

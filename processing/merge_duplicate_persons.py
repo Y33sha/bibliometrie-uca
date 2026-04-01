@@ -29,7 +29,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "merge_duplicate_persons.log")
+            os.path.join(os.path.dirname(__file__), "logs", "merge_duplicate_persons.log")
         ),
     ],
 )
