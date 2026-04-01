@@ -69,7 +69,7 @@ def phase_normalize(**kw):
     run_python("processing/normalize_openalex.py")
     run_python("processing/normalize_hal.py")
     run_python("processing/normalize_wos.py")
-    run_python("processing/backfill_wos_addresses.py")
+    run_python("processing/enrich_hal_structures.py")
 
 
 def phase_merge_pubs(mode="full", **kw):
@@ -118,6 +118,7 @@ def phase_enrich(mode="full", **kw):
     """Phase 9 : Enrichissements optionnels."""
     if mode in ("full", "monthly"):
         run_python("processing/enrich_oa_unpaywall.py")
+        run_python("processing/enrich_journal_apc.py")
         run_python("processing/harvest_hal_idrefs.py")
         run_python("processing/harvest_hal_orcids.py")
     else:

@@ -1,5 +1,5 @@
-# Données intermédiaires et extractions RH
-data/
+# Imports manuels (RH, APC, exports WoS)
+imports_manuels/
 
 # Logs
 *.log

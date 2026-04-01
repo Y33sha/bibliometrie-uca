@@ -4,7 +4,7 @@ import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 import pytest
-from utils.merge_persons import merge_person
+from services.persons import merge_person
 from services.publications import find_or_create, find_by_doi
 
 
