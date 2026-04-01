@@ -174,7 +174,7 @@ def add_name_form(cur, person_id, full_name):
     cur.execute("""
         INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids)
         VALUES (%s, %s, ARRAY[%s])
-        ON CONFLICT (name_form_normalized) DO UPDATE
+        ON CONFLICT (name_form_normalized) WHERE name_form_normalized IS NOT NULL DO UPDATE
         SET person_ids = (
             SELECT array_agg(DISTINCT x)
             FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
@@ -314,6 +314,19 @@ def build_person_index(existing_persons):
     return by_name
 
 
+def register_person_in_index(person_index, person_id, last_norm, first_norm, pub_ids=None):
+    """Ajoute une personne fraîchement créée dans l'index en mémoire."""
+    if not last_norm:
+        return
+    key = (last_norm, first_norm or "")
+    person_index[key].append({
+        "person_id": person_id,
+        "last_norm": last_norm,
+        "first_norm": first_norm or "",
+        "pub_ids": set(pub_ids) if pub_ids else set(),
+    })
+
+
 def find_compatible_person(a, person_index, require_copub=True):
     """Cherche une personne compatible (nom compatible, optionnellement co-publication).
     Retourne person_id si match unique, None sinon.
@@ -354,6 +367,32 @@ def find_exact_person(a, person_index):
     if len(distinct_pids) == 1:
         return distinct_pids.pop()
     return None
+
+
+def find_person_by_name(a, person_index):
+    """Cherche parmi les personnes existantes celles dont le nom est compatible
+    (sans exiger de co-publication).
+    Retourne :
+      - person_id si exactement 1 personne compatible (→ rattacher)
+      - None si 0 (→ nom inconnu, on peut créer)
+      - -1 si 2+ (→ ambigu, laisser orphelin)
+    """
+    ln, fn = a["last_norm"], a["first_norm"]
+    if not ln:
+        return None
+
+    matched_pids = set()
+    for (pln, pfn), candidates in person_index.items():
+        if not names_compatible(ln, fn, pln, pfn):
+            continue
+        for ep in candidates:
+            matched_pids.add(ep["person_id"])
+            if len(matched_pids) > 1:
+                return -1  # Ambigu → ne pas créer
+
+    if len(matched_pids) == 1:
+        return matched_pids.pop()
+    return None  # Inconnu → peut créer
 
 
 # ---------------------------------------------------------------------------
@@ -498,6 +537,7 @@ def run(dry_run=False):
 
     p4_created = 0
     p4_merged = 0
+    p4_skipped = 0
     for name_key, group in by_name.items():
         if len(group) < 2:
             continue
@@ -550,22 +590,48 @@ def run(dry_run=False):
                     for a in comp:
                         add_name_form(cur, matched_pid, a["full_name"])
                 p4_merged += len(comp)
+                for a in comp:
+                    linked_ids.add((a["source"], a["authorship_id"]))
             else:
-                last, first = pick_best_name(comp)
-                if not dry_run:
-                    pid = create_person(cur, last, first)
-                    link_to_person(cur, pid, comp)
-                    add_identifiers(cur, pid, comp)
+                # Vérifier si le nom existe déjà (sans exiger co-pub)
+                name_pid = find_person_by_name(comp[0], person_index)
+                if name_pid == -1:
+                    # Ambigu (2+ personnes) → laisser orphelin
+                    p4_skipped += 1
+                    continue
+                elif name_pid:
+                    # 1 seule personne compatible → rattacher
+                    if not dry_run:
+                        link_to_person(cur, name_pid, comp)
+                        for a in comp:
+                            add_name_form(cur, name_pid, a["full_name"])
+                    p4_merged += len(comp)
+                else:
+                    # Nom inconnu → créer
+                    last, first = pick_best_name(comp)
+                    all_pubs = set()
                     for a in comp:
-                        add_name_form(cur, pid, a["full_name"])
-                p4_created += 1
+                        all_pubs.update(a.get("pub_ids", []))
+                    if not dry_run:
+                        pid = create_person(cur, last, first)
+                        link_to_person(cur, pid, comp)
+                        add_identifiers(cur, pid, comp)
+                        for a in comp:
+                            add_name_form(cur, pid, a["full_name"])
+                    else:
+                        pid = None
+                    register_person_in_index(
+                        person_index, pid,
+                        normalize_name(last), normalize_name(first), all_pubs)
+                    p4_created += 1
 
-            for a in comp:
-                linked_ids.add((a["source"], a["authorship_id"]))
+                for a in comp:
+                    linked_ids.add((a["source"], a["authorship_id"]))
 
     stats["pass4_created"] = p4_created
     stats["pass4_merged"] = p4_merged
-    logger.info(f"  {p4_created} personnes créées, {p4_merged} rattachées à existantes")
+    stats["pass4_skipped"] = p4_skipped
+    logger.info(f"  {p4_created} personnes créées, {p4_merged} rattachées, {p4_skipped} groupes ignorés (ambigus)")
 
     # ── Passe 5 : Singletons ──
     logger.info("\n--- Passe 5 : singletons ---")
@@ -579,6 +645,7 @@ def run(dry_run=False):
 
     p5_created = 0
     p5_merged = 0
+    p5_skipped = 0
     for a in remaining2:
         if not a["last_norm"]:
             continue
@@ -590,34 +657,55 @@ def run(dry_run=False):
                 link_to_person(cur, matched_pid, [a])
                 add_name_form(cur, matched_pid, a["full_name"])
             p5_merged += 1
+            linked_ids.add((a["source"], a["authorship_id"]))
         else:
-            last = a["last_name"] or a["full_name"] or "?"
-            first = a["first_name"] or ""
-            if not dry_run:
-                pid = create_person(cur, last, first)
-                link_to_person(cur, pid, [a])
-                add_identifiers(cur, pid, [a])
-                add_name_form(cur, pid, a["full_name"])
-            p5_created += 1
-
-        linked_ids.add((a["source"], a["authorship_id"]))
+            # Vérifier si le nom existe déjà (sans exiger co-pub)
+            name_pid = find_person_by_name(a, person_index)
+            if name_pid == -1:
+                # Ambigu (2+ personnes) → laisser orphelin
+                p5_skipped += 1
+            elif name_pid:
+                # 1 seule personne compatible → rattacher
+                if not dry_run:
+                    link_to_person(cur, name_pid, [a])
+                    add_name_form(cur, name_pid, a["full_name"])
+                p5_merged += 1
+                linked_ids.add((a["source"], a["authorship_id"]))
+            else:
+                # Nom inconnu → créer
+                last = a["last_name"] or a["full_name"] or "?"
+                first = a["first_name"] or ""
+                if not dry_run:
+                    pid = create_person(cur, last, first)
+                    link_to_person(cur, pid, [a])
+                    add_identifiers(cur, pid, [a])
+                    add_name_form(cur, pid, a["full_name"])
+                else:
+                    pid = None
+                register_person_in_index(
+                    person_index, pid,
+                    normalize_name(last), normalize_name(first),
+                    a.get("pub_ids", []))
+                p5_created += 1
+                linked_ids.add((a["source"], a["authorship_id"]))
 
     stats["pass5_created"] = p5_created
     stats["pass5_merged"] = p5_merged
-    logger.info(f"  {p5_created} personnes créées, {p5_merged} rattachées à existantes")
+    stats["pass5_skipped"] = p5_skipped
+    logger.info(f"  {p5_created} personnes créées, {p5_merged} rattachées, {p5_skipped} ignorées (ambiguës)")
 
     # ── Résumé ──
     total_created = stats["pass0"] + stats["pass4_created"] + stats["pass5_created"]
-    total_linked = sum(stats.values())
-    unlinked = len(all_authorships) - len(linked_ids)
+    total_linked = len(linked_ids)
+    unlinked = len(all_authorships) - total_linked
 
     logger.info(f"\n=== Résumé ===")
     logger.info(f"  Passe 0 (comptes HAL)     : {stats['pass0']} rattachées")
     logger.info(f"  Passe 1 (name_forms)      : {stats['pass1']} rattachées")
     logger.info(f"  Passe 2 (nom+co-pub)      : {stats['pass2']} rattachées")
     logger.info(f"  Passe 3 (nom seul)        : {stats['pass3']} rattachées")
-    logger.info(f"  Passe 4 (groupement)      : {stats['pass4_created']} créées, {stats['pass4_merged']} rattachées")
-    logger.info(f"  Passe 5 (singletons)      : {stats['pass5_created']} créées, {stats['pass5_merged']} rattachées")
+    logger.info(f"  Passe 4 (groupement)      : {stats['pass4_created']} créées, {stats['pass4_merged']} rattachées, {stats['pass4_skipped']} ambiguës")
+    logger.info(f"  Passe 5 (singletons)      : {stats['pass5_created']} créées, {stats['pass5_merged']} rattachées, {stats['pass5_skipped']} ambiguës")
     logger.info(f"  Non résolues              : {unlinked}")
 
     if dry_run:

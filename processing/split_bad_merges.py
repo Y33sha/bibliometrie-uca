@@ -219,7 +219,7 @@ def main():
             # Vérifier si un DOI existe déjà (ne pas créer de doublon)
             new_pub_id = None
             if doi:
-                cur.execute("SELECT id FROM publications WHERE doi = %s", (doi,))
+                cur.execute("SELECT id FROM publications WHERE lower(doi) = lower(%s)", (doi,))
                 existing = cur.fetchone()
                 if existing:
                     new_pub_id = existing["id"]

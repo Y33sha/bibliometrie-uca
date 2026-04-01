@@ -583,16 +583,16 @@ async def person_profile(person_id: int):
         """, (person_id,))
         identifiers = cur.fetchall()
 
-        # Auteurs liés HAL + compte publis UCA
+        # Auteurs liés HAL + compte publis UCA (exclut les authorships rejetées)
         cur.execute("""
             SELECT DISTINCT ha.id, 'hal' AS source, ha.full_name, ha.orcid, ha.idhal,
                    ha.hal_person_id,
                    NULL::text AS openalex_id,
                    (SELECT COUNT(*) FROM hal_authorships has2
-                    WHERE has2.hal_author_id = ha.id AND has2.is_uca = TRUE) AS uca_pub_count
+                    WHERE has2.hal_author_id = ha.id AND has2.is_uca = TRUE AND NOT has2.excluded) AS uca_pub_count
             FROM hal_authors ha
             JOIN hal_authorships has ON has.hal_author_id = ha.id
-            WHERE has.person_id = %s
+            WHERE has.person_id = %s AND NOT has.excluded
         """, (person_id,))
         hal_authors = cur.fetchall()
 
@@ -1085,17 +1085,8 @@ async def update_person_name(person_id: int, body: dict):
             WHERE id = %s
         """, (last_name, first_name, last_name, first_name, person_id))
         # Ajouter les nouvelles formes de nom
-        for form in [f"{first_name} {last_name}", f"{last_name} {first_name}", f"{last_name}, {first_name}"] if first_name else [last_name]:
-            cur.execute("""
-                INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids, sources)
-                VALUES (unaccent(lower(trim(%s))), unaccent(lower(trim(%s))), ARRAY[%s], ARRAY['persons'])
-                ON CONFLICT (name_form) DO UPDATE SET
-                    person_ids = (
-                        SELECT array_agg(DISTINCT x ORDER BY x)
-                        FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
-                    ),
-                    updated_at = now()
-            """, (form, form, person_id, person_id))
+        for form in [f"{first_name} {last_name}", f"{last_name} {first_name}"] if first_name else [last_name]:
+            _add_name_form(cur, person_id, form, "persons")
         return {"ok": True}
 
 
@@ -1225,13 +1216,17 @@ async def list_orphan_authorships(
 
 
 def _add_name_form(cur, person_id, full_name, source):
-    """Ajoute une forme de nom dans person_name_forms."""
+    """Ajoute une forme de nom dans person_name_forms (normalisée sans ponctuation)."""
     name_form = full_name.strip()
     if not name_form:
         return
     cur.execute("""
         INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids, sources)
-        VALUES (unaccent(lower(trim(%s))), unaccent(lower(trim(%s))), ARRAY[%s], ARRAY[%s])
+        VALUES (
+            regexp_replace(unaccent(lower(trim(%s))), '[.,;:]+', '', 'g'),
+            regexp_replace(unaccent(lower(trim(%s))), '[.,;:]+', '', 'g'),
+            ARRAY[%s], ARRAY[%s]
+        )
         ON CONFLICT (name_form) DO UPDATE SET
             person_ids = (
                 SELECT array_agg(DISTINCT x ORDER BY x)
@@ -1306,17 +1301,8 @@ async def assign_orphan_authorship(body: dict):
             """, (ln, fn, ln, fn))
             person_id = cur.fetchone()["id"]
             # Ajouter les formes de nom de la nouvelle personne
-            for form in [f"{fn} {ln}", f"{ln} {fn}", f"{ln}, {fn}"] if fn else [ln]:
-                cur.execute("""
-                    INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids, sources)
-                    VALUES (unaccent(lower(trim(%s))), unaccent(lower(trim(%s))), ARRAY[%s], ARRAY['persons'])
-                    ON CONFLICT (name_form) DO UPDATE SET
-                        person_ids = (
-                            SELECT array_agg(DISTINCT x ORDER BY x)
-                            FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
-                        ),
-                        updated_at = now()
-                """, (form, form, person_id, person_id))
+            for form in [f"{fn} {ln}", f"{ln} {fn}"] if fn else [ln]:
+                _add_name_form(cur, person_id, form, "persons")
         elif not person_id:
             raise HTTPException(status_code=400, detail="person_id ou create_person requis")
 
@@ -1403,7 +1389,8 @@ async def batch_assign_orphan_authorships(body: dict):
 @router.get("/api/persons/{person_id}/name-form-authorships")
 async def name_form_authorships(person_id: int, name_form: str = Query(...)):
     """Liste les authorships sources liées à une personne pour une forme de nom donnée.
-    name_form est la forme normalisée (lowercase, unaccent) depuis person_name_forms."""
+    name_form est la forme normalisée (lowercase, unaccent) depuis person_name_forms.
+    Retourne aussi les autres personnes partageant cette forme de nom."""
     with get_cursor() as (cur, conn):
         cur.execute("""
             SELECT 'hal' AS source, has.id AS authorship_id,
@@ -1431,7 +1418,25 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
             WHERE was.person_id = %s AND unaccent(lower(trim(wa.full_name))) = %s
             ORDER BY pub_year DESC, title
         """, (person_id, name_form, person_id, name_form, person_id, name_form))
-        return cur.fetchall()
+        authorships = cur.fetchall()
+
+        # Autres personnes partageant cette forme de nom
+        cur.execute("""
+            SELECT p.id, p.first_name, p.last_name,
+                   pr.department_name,
+                   EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh
+            FROM person_name_forms pnf,
+                 LATERAL unnest(pnf.person_ids) AS pid
+            JOIN persons p ON p.id = pid
+            LEFT JOIN persons_rh pr ON pr.person_id = p.id
+            WHERE pnf.name_form_normalized = %s
+              AND pid <> %s
+              AND p.rejected = FALSE
+            ORDER BY p.last_name, p.first_name
+        """, (name_form, person_id))
+        other_persons = cur.fetchall()
+
+        return {"authorships": authorships, "other_persons": other_persons}
 
 
 @router.post("/api/persons/{person_id}/detach-authorships")

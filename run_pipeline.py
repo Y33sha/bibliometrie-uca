@@ -46,12 +46,22 @@ BASE = Path(__file__).resolve().parent
 
 def phase_extract(mode="full", **kw):
     """Phase 1 : Extraction des sources vers staging."""
+    import datetime
     if mode == "weekly":
-        log.info("Mode hebdomadaire : extraction des 6 derniers mois")
-    run_python("extraction/openalex/extract_openalex.py")
-    run_python("extraction/hal/extract_hal.py")
-    # WoS : API instable, scraper si besoin
-    log.info("WoS : lancer manuellement scrape_wos.py ou cross_import_wos.py si besoin")
+        # Année en cours + n-1 (économise le quota API WoS)
+        current_year = datetime.date.today().year
+        years = [str(current_year - 1), str(current_year)]
+        log.info("Mode hebdomadaire : années %s", " + ".join(years))
+        for y in years:
+            run_python("extraction/openalex/extract_openalex.py", "--year", y)
+        for y in years:
+            run_python("extraction/hal/extract_hal.py", "--year", y)
+        for y in years:
+            run_python("extraction/wos/extract_wos.py", "--year", y)
+    else:
+        run_python("extraction/openalex/extract_openalex.py")
+        run_python("extraction/hal/extract_hal.py")
+        run_python("extraction/wos/extract_wos.py")
 
 
 def phase_normalize(**kw):

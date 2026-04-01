@@ -238,7 +238,7 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
 
     # 1. Chercher par DOI (match inter-sources)
     if doi:
-        cur.execute("SELECT id FROM publications WHERE doi = %s", (doi,))
+        cur.execute("SELECT id FROM publications WHERE lower(doi) = lower(%s)", (doi,))
         row = cur.fetchone()
         if row:
             # Publication déjà connue (probablement via OpenAlex) → enrichir

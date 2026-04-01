@@ -146,7 +146,8 @@
 
 	/* Detach modal state */
 	interface DetachAuthorship { source: string; authorship_id: number; pub_id: number; title: string; pub_year: number | null; doi: string | null; checked: boolean }
-	let detachModal: { personId: number; nameForm: string; authorships: DetachAuthorship[]; loading: boolean } | null = $state(null);
+	interface OtherPerson { id: number; first_name: string; last_name: string; department_name: string | null; has_rh: boolean }
+	let detachModal: { personId: number; nameForm: string; authorships: DetachAuthorship[]; otherPersons: OtherPerson[]; loading: boolean } | null = $state(null);
 
 	/* Merge search state */
 	interface MergeSearch { query: string; results: { id: number; first_name: string; last_name: string; department_name: string | null; has_rh: boolean }[]; loading: boolean }
@@ -539,11 +540,12 @@
 	/* ── Detach modal ── */
 
 	async function openDetachModal(personId: number, nameForm: string) {
-		detachModal = { personId, nameForm, authorships: [], loading: true };
-		const rows = await api<any[]>(`/api/persons/${personId}/name-form-authorships?name_form=${encodeURIComponent(nameForm)}`);
+		detachModal = { personId, nameForm, authorships: [], otherPersons: [], loading: true };
+		const data = await api<{ authorships: any[]; other_persons: OtherPerson[] }>(`/api/persons/${personId}/name-form-authorships?name_form=${encodeURIComponent(nameForm)}`);
 		detachModal = {
 			personId, nameForm, loading: false,
-			authorships: rows.map(r => ({ ...r, checked: true }))
+			authorships: data.authorships.map(r => ({ ...r, checked: true })),
+			otherPersons: data.other_persons,
 		};
 	}
 
@@ -604,6 +606,19 @@
 			body: JSON.stringify({ source_id: sourceId })
 		});
 		closeMergeSearch(targetId);
+		loadStats();
+		loadTable();
+	}
+
+	async function mergeFromModal(sourceId: number) {
+		if (!detachModal) return;
+		const targetId = detachModal.personId;
+		await fetch(`${base}/api/persons/${targetId}/merge`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ source_id: sourceId })
+		});
+		detachModal = null;
 		loadStats();
 		loadTable();
 	}
@@ -826,7 +841,27 @@
 			<h3>Forme de nom : « {detachModal.nameForm} »</h3>
 			{#if detachModal.loading}
 				<p>Chargement…</p>
-			{:else if detachModal.authorships.length === 0}
+			{:else}
+			{#if detachModal.otherPersons.length > 0}
+				<div class="other-persons-section">
+					<h4>Autres personnes partageant cette forme de nom</h4>
+					<div class="other-persons-list">
+						{#each detachModal.otherPersons as op}
+							<div class="other-person-row">
+								<span class="other-person-name">
+									{op.first_name} {op.last_name}
+									{#if op.department_name}<span class="other-person-dept">({op.department_name})</span>{/if}
+									{#if op.has_rh}<span class="tag tag-rh">RH</span>{/if}
+								</span>
+								<button class="btn btn-small btn-merge" onclick={() => mergeFromModal(op.id)}>
+									← Fusionner
+								</button>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+			{#if detachModal.authorships.length === 0}
 				<p>Aucune authorship liée.</p>
 			{:else}
 				<p>Cochez les authorships à détacher de cette personne :</p>
@@ -846,6 +881,7 @@
 						Détacher {detachModal.authorships.filter(a => a.checked).length} authorship{detachModal.authorships.filter(a => a.checked).length > 1 ? 's' : ''}
 					</button>
 				</div>
+			{/if}
 			{/if}
 		</div>
 	</div>
@@ -1440,6 +1476,16 @@
 	.detach-source { flex-shrink: 0; }
 	.detach-year { color: #888; font-size: 0.8rem; min-width: 30px; }
 	.detach-title { font-size: 0.85rem; }
+	.other-persons-section { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e0e0e0; }
+	.other-persons-section h4 { margin: 0 0 8px; font-size: 0.9rem; color: #666; }
+	.other-persons-list { display: flex; flex-direction: column; gap: 4px; }
+	.other-person-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 4px; }
+	.other-person-row:hover { background: #f5f5f5; }
+	.other-person-name { font-size: 0.9rem; }
+	.other-person-dept { color: #888; font-size: 0.8rem; }
+	.btn-small { padding: 3px 10px; font-size: 0.8rem; }
+	.btn-merge { background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; }
+	.btn-merge:hover { background: #1565c0; }
 	.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 	.btn-danger { background: #d32f2f; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; }
 	.btn-danger:hover { background: #b71c1c; }
