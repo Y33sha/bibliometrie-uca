@@ -10,7 +10,7 @@ pg_dump -U lalecoz -d publisher_stats -F c -f bibliometrie.dump
 * [ ] exploiter OpenAPC
 
 ## OpenAlex
-* [ ] re-fetch individuel des docts OpenAlex plafonnés à 100 authorships (auteurs UCA au-delà de la pos. 100 sont perdus)
+* [x] re-fetch individuel des docts OpenAlex plafonnés à 100 authorships (auteurs UCA au-delà de la pos. 100 sont perdus)
 * [ ] importer orcid des openalex authors seulement quand display_name = raw_author_name (et pas d'initiale)
 * [ ] type peer_review: les auteurs qui apparaissent sont ceux de l'article
 
@@ -53,6 +53,7 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis
 * [ ] afficher quand compte HAL relié ou non à l'ORCID
 * [ ] dans l'onglet "identités", mettre une condition "excluded = false" pour éviter de faire apparaître des comptes HAL erronés
+* [ ] forme de nom avec zéro authorship liée: option de supprimer
 
 ## Mega-authorships et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap)
@@ -75,6 +76,9 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] afficher les abstracts?
 * [ ] dédoublonner DOI figshare (.v1)
 * [ ] fonction pour casser affiliations UCA d'une publication (authorships vérité => déclarer fausses les affiliations au niveau des sources pour éviter qu'elles soient reconstruites)
+* [ ] ne pas afficher "non applicable" dans les pays! (ni dans les facettes)
+* [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
+* [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
 
 ### Types de documents
 * [ ] gérer le document type "correction" sur wos, "erratum" sur OA (actuellement, apparaît comme article) (Corrigendum to ...)
@@ -94,6 +98,7 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] Rendre les filtres sticky
 * [ ] Rendre tous les tableaux triables
 * [ ] interface pour afficher le staging json (pour vérif)
+* [ ] différencier interfaces à usage interne vs externe? (rôles?)
 
 # Trucs pour plus tard
 * compte fractionnaire?
@@ -103,4 +108,6 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * openalex répète des auteurs : publi 77832
 * claire richard: pourquoi 0 publi UCA sur page admin?
 * publi 103567: structures identifiées sur HAL: UCA, Inserm: pourquoi?
+* personne 57907: comprendre comment Damien Boyer a pu devenir une de ses formes de nom
 
+* checkmark dans dropdrown de la page authorships_orphelines => pb affichage

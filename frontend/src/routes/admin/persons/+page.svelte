@@ -567,6 +567,18 @@
 		loadTable();
 	}
 
+	async function detachNameForm() {
+		if (!detachModal) return;
+		await fetch(`${base}/api/persons/${detachModal.personId}/detach-name-form`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name_form: detachModal.nameForm }),
+		});
+		detachModal = null;
+		loadStats();
+		loadTable();
+	}
+
 	/* ── Merge ── */
 
 	function openMergeSearch(personId: number) {
@@ -821,7 +833,7 @@
 								{/if}
 							</div>
 						{:else}
-							<button class="btn btn-merge" onclick={() => openMergeSearch(p.id)}>Fusionner…</button>
+							<button class="btn btn-merge-inline" onclick={() => openMergeSearch(p.id)}>Fusionner…</button>
 						{/if}
 					</td>
 				</tr>
@@ -849,11 +861,11 @@
 						{#each detachModal.otherPersons as op}
 							<div class="other-person-row">
 								<span class="other-person-name">
-									{op.first_name} {op.last_name}
+									{op.first_name} <strong>{op.last_name}</strong>
 									{#if op.department_name}<span class="other-person-dept">({op.department_name})</span>{/if}
 									{#if op.has_rh}<span class="tag tag-rh">RH</span>{/if}
 								</span>
-								<button class="btn btn-small btn-merge" onclick={() => mergeFromModal(op.id)}>
+								<button class="btn btn-sm btn-merge-modal" onclick={() => mergeFromModal(op.id)}>
 									← Fusionner
 								</button>
 							</div>
@@ -863,6 +875,12 @@
 			{/if}
 			{#if detachModal.authorships.length === 0}
 				<p>Aucune authorship liée.</p>
+				<div class="modal-actions">
+					<button class="btn" onclick={() => { detachModal = null; }}>Annuler</button>
+					<button class="btn btn-danger" onclick={detachNameForm}>
+						Détacher cette forme
+					</button>
+				</div>
 			{:else}
 				<p>Cochez les authorships à détacher de cette personne :</p>
 				<div class="detach-list">
@@ -914,25 +932,13 @@
 				{/if}
 				<span style="flex:1"></span>
 				<button class="btn" onclick={() => { editNameModal = null; }}>Annuler</button>
-				<button class="btn btn-primary" onclick={savePersonName}>Enregistrer</button>
+				<button class="btn btn-confirm" onclick={savePersonName}>Enregistrer</button>
 			</div>
 		</div>
 	</div>
 {/if}
 
 <style>
-	/* ── Local CSS variables ── */
-	:root {
-		--success: #2a7d4f;
-		--success-light: #e6f4ec;
-		--danger: #c0392b;
-		--danger-light: #fbeaea;
-		--warning: #d4a017;
-		--warning-light: #fef8e8;
-		--accent-light: #e8f0f8;
-		--text-muted: #777;
-	}
-
 	/* ── Stats row ── */
 	.stats-row {
 		display: flex;
@@ -974,57 +980,9 @@
 	}
 
 	/* ── Toolbar ── */
-	.toolbar {
-		display: flex;
-		gap: 8px;
-		margin-bottom: 16px;
-		align-items: center;
-		flex-wrap: wrap;
-	}
-	.toolbar input {
-		padding: 6px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		font-size: 0.95rem;
-		background: white;
-		font-family: inherit;
-		width: 250px;
-	}
-	.count {
-		margin-left: auto;
-		color: var(--text-muted);
-		font-size: 0.85rem;
-	}
-
-	/* ── Table ── */
-	.data-table {
-		width: 100%;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		overflow: visible;
-	}
-	.data-table th {
-		text-align: left;
-		padding: 8px 10px;
-		font-size: 0.8rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		color: var(--text-muted);
-		border-bottom: 2px solid var(--border);
-		background: #fafaf8;
-	}
-	.data-table td {
-		padding: 7px 10px;
-		font-size: 0.95rem;
-		border-bottom: 1px solid #f0efec;
-		vertical-align: top;
-	}
-	.data-table tr:hover td {
-		background: #fafaf8;
-	}
+	.toolbar { margin-bottom: 16px; }
+	.toolbar input { width: 250px; background: white; }
+	.data-table { overflow: visible; }
 	.period-cell {
 		font-size: 0.85rem;
 		color: var(--text-muted);
@@ -1093,7 +1051,7 @@
 	}
 
 	/* ── Merge search ── */
-	.btn-merge {
+	.btn-merge-inline {
 		padding: 2px 8px;
 		border: 1px dashed var(--border);
 		border-radius: 4px;
@@ -1104,9 +1062,8 @@
 		margin-top: 4px;
 		font-family: inherit;
 	}
-	.btn-merge:hover {
+	.btn-merge-inline:hover {
 		background: var(--warning-light);
-		border-style: solid;
 		color: var(--warning);
 		border-color: var(--warning);
 	}
@@ -1168,18 +1125,6 @@
 		padding: 2px 6px;
 		color: var(--accent);
 		font-family: inherit;
-	}
-	.btn {
-		padding: 4px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		background: white;
-		font-size: 0.85rem;
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.btn:hover {
-		background: var(--accent-light);
 	}
 	.btn-link {
 		border-color: var(--success);
@@ -1407,8 +1352,6 @@
 		color: var(--danger);
 	}
 
-	/* ── RH checkmark ── */
-	.sortable { cursor: pointer; user-select: none; }
 	.sortable:hover { color: #2563eb; }
 	.col-name { min-width: 200px; }
 	.td-name { position: relative; padding-left: 30px !important; }
@@ -1416,31 +1359,8 @@
 	.person-name:hover { color: #2563eb; text-decoration: underline; }
 	.person-last { font-weight: 600; }
 	.uca-count { font-size: 0.85em; color: var(--muted); }
-	.rh-check {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 15px;
-		height: 15px;
-		border-radius: 50%;
-		background: var(--accent, #3b82f6);
-		color: white;
-		font-size: 0.7rem;
-		font-weight: 700;
-		margin-left: 4px;
-		vertical-align: middle;
-		line-height: 1;
-	}
-
 	/* ── Misc ── */
-	.loading-text {
-		color: var(--text-muted);
-	}
-	.empty {
-		text-align: center;
-		padding: 40px;
-		color: var(--text-muted);
-	}
+	.loading-text { color: var(--text-muted); }
 
 	/* ── Name forms ── */
 	.name-forms-list { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
@@ -1456,17 +1376,6 @@
 	.nf-sources { color: #888; font-size: 0.7rem; }
 
 	/* ── Modal ── */
-	.modal-overlay {
-		position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-		display: flex; align-items: center; justify-content: center;
-		z-index: 9999;
-	}
-	.modal-content {
-		background: white; border-radius: 8px; padding: 24px;
-		max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto;
-		box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-	}
-	.modal-content h3 { margin: 0 0 12px; font-size: 1.05rem; }
 	.detach-list { display: flex; flex-direction: column; gap: 4px; margin: 12px 0; }
 	.detach-item {
 		display: flex; align-items: center; gap: 8px;
@@ -1483,14 +1392,8 @@
 	.other-person-row:hover { background: #f5f5f5; }
 	.other-person-name { font-size: 0.9rem; }
 	.other-person-dept { color: #888; font-size: 0.8rem; }
-	.btn-small { padding: 3px 10px; font-size: 0.8rem; }
-	.btn-merge { background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; }
-	.btn-merge:hover { background: #1565c0; }
-	.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-	.btn-danger { background: #d32f2f; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; }
-	.btn-danger:hover { background: #b71c1c; }
-	.btn-primary { background: #4caf50; color: white !important; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; transition: background 0.15s; }
-	.btn-primary:hover { background: #2e7d32; }
+	.btn-merge-modal { background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; }
+	.btn-merge-modal:hover { background: #1565c0; }
 
 	/* ── Edit name ── */
 	.btn-edit-name {

@@ -114,31 +114,64 @@ def compute_hash(raw_data: dict) -> str:
     return hashlib.md5(canonical.encode("utf-8")).hexdigest()
 
 
+def compute_meta_hash(raw_data: dict) -> str:
+    """Calcule le hash MD5 des métadonnées hors authorships.
+    Permet de détecter les changements réels (OA status, titre, etc.)
+    sans être perturbé par la troncature à 100 auteurs de l'API bulk.
+    """
+    filtered = {k: v for k, v in raw_data.items() if k != "authorships"}
+    canonical = json.dumps(filtered, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
+
+
 def insert_batch(conn, batch: list[tuple]):
     """Insère un batch de works dans staging_openalex.
-    Si le work existe et que le hash a changé, met à jour raw_data et remet processed = FALSE.
+
+    Logique de mise à jour :
+    - Compare meta_hash (métadonnées hors authorships) pour détecter les vrais changements
+    - Si meta_hash identique → rien à faire
+    - Si meta_hash différent → met à jour raw_data en préservant les authorships de la
+      version en base si elle en a plus (cas des works >100 auteurs déjà re-fetchés)
     """
     query = """
-        INSERT INTO staging_openalex (openalex_id, doi, raw_data, raw_hash)
+        INSERT INTO staging_openalex (openalex_id, doi, raw_data, raw_hash, meta_hash)
         VALUES %s
         ON CONFLICT (openalex_id) DO UPDATE SET
             raw_data = CASE
-                WHEN staging_openalex.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                    THEN EXCLUDED.raw_data
-                ELSE staging_openalex.raw_data
+                WHEN staging_openalex.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
+                    THEN staging_openalex.raw_data
+                WHEN jsonb_array_length(staging_openalex.raw_data->'authorships')
+                     > jsonb_array_length(EXCLUDED.raw_data->'authorships')
+                    THEN jsonb_set(staging_openalex.raw_data,
+                         '{title}', EXCLUDED.raw_data->'title')
+                      || jsonb_build_object(
+                         'open_access', EXCLUDED.raw_data->'open_access',
+                         'primary_location', EXCLUDED.raw_data->'primary_location',
+                         'locations', EXCLUDED.raw_data->'locations',
+                         'cited_by_count', EXCLUDED.raw_data->'cited_by_count',
+                         'type', EXCLUDED.raw_data->'type',
+                         'language', EXCLUDED.raw_data->'language',
+                         'biblio', EXCLUDED.raw_data->'biblio',
+                         'is_retracted', EXCLUDED.raw_data->'is_retracted')
+                ELSE EXCLUDED.raw_data
             END,
-            raw_hash = COALESCE(EXCLUDED.raw_hash, staging_openalex.raw_hash),
+            raw_hash = CASE
+                WHEN staging_openalex.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
+                    THEN staging_openalex.raw_hash
+                ELSE EXCLUDED.raw_hash
+            END,
+            meta_hash = COALESCE(EXCLUDED.meta_hash, staging_openalex.meta_hash),
             processed = CASE
-                WHEN staging_openalex.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                    THEN FALSE
-                ELSE staging_openalex.processed
+                WHEN staging_openalex.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
+                    THEN staging_openalex.processed
+                ELSE FALSE
             END,
             last_seen_at = now()
     """
     with conn.cursor() as cur:
         execute_values(
             cur, query, batch,
-            template="(%s, %s, %s::jsonb, %s)"
+            template="(%s, %s, %s::jsonb, %s, %s)"
         )
     conn.commit()
 
@@ -180,7 +213,8 @@ def extract_year(year: int, conn, existing_ids: set, dry_run: bool = False) -> i
             oa_id = extract_openalex_id(work)
             doi = extract_doi(work)
             raw_hash = compute_hash(work)
-            batch.append((oa_id, doi, Json(work), raw_hash))
+            meta_hash = compute_meta_hash(work)
+            batch.append((oa_id, doi, Json(work), raw_hash, meta_hash))
             if oa_id not in existing_ids:
                 existing_ids.add(oa_id)
                 new_count += 1

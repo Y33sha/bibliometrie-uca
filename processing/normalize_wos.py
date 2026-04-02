@@ -689,17 +689,22 @@ def process_authorships(cur, rec: dict, wos_document_id: int):
         cur.execute("""
             INSERT INTO wos_authorships
                 (wos_document_id, wos_author_id, author_position,
-                 is_corresponding, raw_affiliation)
-            VALUES (%s, %s, %s, %s, %s)
+                 is_corresponding, raw_affiliation, author_name_normalized)
+            VALUES (%s, %s, %s, %s, %s, normalize_name_form(%s))
             ON CONFLICT (wos_document_id, wos_author_id) DO UPDATE SET
                 raw_affiliation = COALESCE(
                     EXCLUDED.raw_affiliation,
                     wos_authorships.raw_affiliation
                 ),
-                is_corresponding = EXCLUDED.is_corresponding OR wos_authorships.is_corresponding
+                is_corresponding = EXCLUDED.is_corresponding OR wos_authorships.is_corresponding,
+                author_name_normalized = COALESCE(
+                    EXCLUDED.author_name_normalized,
+                    wos_authorships.author_name_normalized
+                )
             RETURNING id
         """, (wos_document_id, wos_author_id, author["position"],
-              author["is_corresponding"], author.get("raw_affiliation")))
+              author["is_corresponding"], author.get("raw_affiliation"),
+              author["full_name"]))
         was_id = cur.fetchone()[0]
 
         # Créer les liens adresses individuelles

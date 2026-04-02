@@ -201,35 +201,23 @@
 {/if}
 
 <style>
-	.info-box {
-		background: #f0f7ff;
-		border: 1px solid #c4daf4;
-		border-radius: 6px;
-		padding: 12px 16px;
-		font-size: 0.9rem;
-		color: #2c5282;
-		margin-bottom: 16px;
-		line-height: 1.5;
-	}
+	/* Override tabs for this page: underline variant */
 	.tabs {
-		display: flex;
-		gap: 0;
-		margin-bottom: 16px;
+		background: none;
+		border-left: none;
+		border-right: none;
 		border-bottom: 2px solid var(--border);
+		border-radius: 0;
 	}
 	.tab {
+		flex: none;
 		padding: 8px 16px;
 		background: none;
-		border: none;
-		font-size: 0.95rem;
-		cursor: pointer;
-		color: var(--muted);
+		border-right: none;
 		border-bottom: 2px solid transparent;
 		margin-bottom: -2px;
-		font-family: inherit;
 	}
-	.tab:hover { color: var(--text); }
-	.tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+	.tab.active { box-shadow: none; border-bottom-color: var(--accent); }
 
 	.pub-table {
 		width: 100%;
@@ -240,18 +228,13 @@
 		overflow: hidden;
 	}
 	.pub-table thead th {
-		background: #f5f4f1;
-		padding: 8px 12px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
+		background: #f5f4f1; padding: 8px 12px; text-align: left;
+		font-size: 0.85rem; font-weight: 600; color: var(--muted);
 		border-bottom: 2px solid var(--border);
 	}
 	.pub-table tbody tr { border-bottom: 1px solid #f0efec; }
 	.pub-table tbody tr:hover { background: #fafaf8; }
 	.pub-table td { padding: 8px 12px; font-size: 0.9rem; vertical-align: top; }
-
 	.meta-table td { width: 50%; }
 
 	.doi-list { display: flex; flex-direction: column; gap: 8px; }
@@ -261,54 +244,20 @@
 		border-radius: 6px;
 		padding: 10px 14px;
 	}
-	.hal-list {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		margin-top: 6px;
-		padding-left: 20px;
-	}
-	.hal-row {
-		display: flex;
-		gap: 6px;
-		align-items: center;
-	}
+	.hal-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-left: 20px; }
+	.hal-row { display: flex; gap: 6px; align-items: center; }
 	.doi-ref { font-size: 0.82rem; color: var(--muted); margin-left: 8px; }
 	.doi-ref a { color: var(--accent); text-decoration: none; }
 	.doi-ref a:hover { text-decoration: underline; }
-
 	.pub-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
 	.pub-link:hover { text-decoration: underline; }
-
-	.pub-meta-line {
-		display: flex;
-		gap: 6px;
-		align-items: center;
-		flex-wrap: wrap;
-		margin-top: 3px;
-	}
-	.meta-badge {
-		display: inline-block;
-		padding: 1px 6px;
-		background: #f0efec;
-		border-radius: 3px;
-		font-size: 0.8rem;
-		color: var(--muted);
-	}
-	.type-badge { background: #e8f0f8; color: var(--accent); }
+	.pub-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 3px; }
 	.hal-badge {
-		display: inline-block;
-		padding: 2px 8px;
-		background: #1a6fb5;
-		border-radius: 4px;
-		font-size: 0.82rem;
-		color: #fff;
-		text-decoration: none;
-		font-weight: 500;
+		display: inline-block; padding: 2px 8px; background: #1a6fb5;
+		border-radius: 4px; font-size: 0.82rem; color: #fff;
+		text-decoration: none; font-weight: 500;
 	}
 	.hal-badge:hover { background: #145a94; }
 	.author-count { font-size: 0.8rem; color: var(--muted); }
 	.container-title { font-size: 0.82rem; color: var(--muted); margin-top: 2px; font-style: italic; }
-
-	.loading, .no-results { text-align: center; padding: 40px; color: var(--muted); }
 </style>

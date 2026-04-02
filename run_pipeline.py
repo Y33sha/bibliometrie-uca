@@ -10,6 +10,7 @@ Usage:
     python3 run_pipeline.py --dry-run          # Afficher sans exécuter
     python3 run_pipeline.py --mode weekly      # Import incrémental (6 derniers mois)
     python3 run_pipeline.py --mode monthly     # Repasse complète + cross-imports
+    python3 run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement (sans WoS)
 
 Phases:
     extract       Extraction des 3 sources (staging)
@@ -44,24 +45,30 @@ BASE = Path(__file__).resolve().parent
 # Définition des phases
 # ---------------------------------------------------------------------------
 
-def phase_extract(mode="full", **kw):
+def phase_extract(mode="full", sources=None, **kw):
     """Phase 1 : Extraction des sources vers staging."""
+    sources = sources or {"hal", "openalex", "wos"}
     import datetime
     if mode == "weekly":
-        # Année en cours + n-1 (économise le quota API WoS)
         current_year = datetime.date.today().year
         years = [str(current_year - 1), str(current_year)]
         log.info("Mode hebdomadaire : années %s", " + ".join(years))
-        for y in years:
-            run_python("extraction/openalex/extract_openalex.py", "--year", y)
-        for y in years:
-            run_python("extraction/hal/extract_hal.py", "--year", y)
-        for y in years:
-            run_python("extraction/wos/extract_wos.py", "--year", y)
+        if "openalex" in sources:
+            for y in years:
+                run_python("extraction/openalex/extract_openalex.py", "--year", y)
+        if "hal" in sources:
+            for y in years:
+                run_python("extraction/hal/extract_hal.py", "--year", y)
+        if "wos" in sources:
+            for y in years:
+                run_python("extraction/wos/extract_wos.py", "--year", y)
     else:
-        run_python("extraction/openalex/extract_openalex.py")
-        run_python("extraction/hal/extract_hal.py")
-        run_python("extraction/wos/extract_wos.py")
+        if "openalex" in sources:
+            run_python("extraction/openalex/extract_openalex.py")
+        if "hal" in sources:
+            run_python("extraction/hal/extract_hal.py")
+        if "wos" in sources:
+            run_python("extraction/wos/extract_wos.py")
 
 
 def phase_normalize(**kw):
@@ -79,7 +86,9 @@ def phase_merge_pubs(mode="full", **kw):
         log.info("Cross-imports (mode %s)", mode)
         run_python("processing/fetch_missing_hal.py")
         run_python("extraction/openalex/cross_import_openalex.py")
-        # Relancer les normalisations pour les nouveaux records
+        # Re-fetch des publications OA tronquées à 100 auteurs
+        run_python("extraction/openalex/refetch_truncated.py")
+        # Relancer les normalisations pour les nouveaux/mis à jour
         run_python("processing/normalize_openalex.py")
         run_python("processing/normalize_hal.py")
     else:
@@ -195,6 +204,8 @@ def main():
                         help="Afficher les étapes sans exécuter")
     parser.add_argument("--mode", choices=["full", "weekly", "monthly"], default="full",
                         help="Mode d'exécution (défaut: full)")
+    parser.add_argument("--sources", default="hal,openalex,wos",
+                        help="Sources à extraire, séparées par des virgules (défaut: hal,openalex,wos)")
     args = parser.parse_args()
 
     if args.list:
@@ -231,13 +242,16 @@ def main():
         print("\n(dry-run : rien n'a été exécuté)")
         return
 
+    sources = set(s.strip() for s in args.sources.split(",") if s.strip())
+    log.info("Sources : %s", ", ".join(sorted(sources)))
+
     t0_total = time.time()
     for name, fn in phases_to_run:
         log.info("─" * 40)
         log.info("PHASE : %s", name)
         log.info("─" * 40)
         try:
-            fn(mode=args.mode)
+            fn(mode=args.mode, sources=sources)
         except RuntimeError as e:
             log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
             log.error("Pour reprendre : python3 run_pipeline.py --from %s", name)

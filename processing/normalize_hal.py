@@ -452,15 +452,17 @@ def process_authors(cur, doc: dict, hal_document_id: int):
 
         cur.execute("""
             INSERT INTO hal_authorships
-                (hal_document_id, hal_author_id, author_position, hal_struct_ids)
-            VALUES (%s, %s, %s, %s)
+                (hal_document_id, hal_author_id, author_position, hal_struct_ids,
+                 author_name_normalized)
+            VALUES (%s, %s, %s, %s, normalize_name_form(%s))
             ON CONFLICT (hal_document_id, hal_author_id) DO UPDATE SET
                 hal_struct_ids = COALESCE(
                     EXCLUDED.hal_struct_ids,
                     hal_authorships.hal_struct_ids
-                )
+                ),
+                author_name_normalized = EXCLUDED.author_name_normalized
         """, (hal_document_id, hal_author_id, position,
-              hal_struct_ids))
+              hal_struct_ids, name))
 
 
 # =============================================================

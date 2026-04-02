@@ -135,23 +135,6 @@
 {/if}
 
 <style>
-	.info-box {
-		background: #f0f7ff;
-		border: 1px solid #c4daf4;
-		border-radius: 6px;
-		padding: 12px 16px;
-		font-size: 0.9rem;
-		color: #2c5282;
-		margin-bottom: 16px;
-		line-height: 1.5;
-	}
-	.toolbar {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		margin-bottom: 12px;
-		flex-wrap: wrap;
-	}
 	.lab-select {
 		padding: 6px 10px;
 		border: 2px solid var(--accent);
@@ -162,8 +145,7 @@
 		color: var(--accent);
 		min-width: 300px;
 	}
-	.count { font-size: 0.9rem; color: var(--muted); }
-
+	.count { font-size: 0.9rem; }
 	.pub-list { display: flex; flex-direction: column; gap: 8px; }
 	.pub-card {
 		background: var(--card);
@@ -171,58 +153,26 @@
 		border-radius: 6px;
 		padding: 10px 14px;
 	}
-	.pub-meta-line {
-		display: flex;
-		gap: 6px;
-		align-items: center;
-		flex-wrap: wrap;
-	}
-	.meta-badge {
-		display: inline-block;
-		padding: 1px 6px;
-		background: #f0efec;
-		border-radius: 3px;
-		font-size: 0.8rem;
-		color: var(--muted);
-		flex-shrink: 0;
-	}
-	.type-badge { background: #e8f0f8; color: var(--accent); }
+	.pub-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+	.meta-badge { flex-shrink: 0; }
 	.badge-hors-uca {
-		display: inline-block;
-		padding: 1px 8px;
-		background: #fff3e0;
-		border: 1px solid #ffb74d;
-		border-radius: 3px;
-		font-size: 0.78rem;
-		color: #e65100;
-		font-weight: 600;
-		flex-shrink: 0;
+		display: inline-block; padding: 1px 8px; background: #fff3e0;
+		border: 1px solid #ffb74d; border-radius: 3px; font-size: 0.78rem;
+		color: #e65100; font-weight: 600; flex-shrink: 0;
 	}
 	.pub-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
 	.pub-link:hover { text-decoration: underline; }
-
 	.hal-list {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-		align-items: center;
-		margin-top: 6px;
-		padding-left: 20px;
+		display: flex; flex-wrap: wrap; gap: 6px;
+		align-items: center; margin-top: 6px; padding-left: 20px;
 	}
 	.hal-badge {
-		display: inline-block;
-		padding: 2px 8px;
-		background: #1a6fb5;
-		border-radius: 4px;
-		font-size: 0.82rem;
-		color: #fff;
-		text-decoration: none;
-		font-weight: 500;
+		display: inline-block; padding: 2px 8px; background: #1a6fb5;
+		border-radius: 4px; font-size: 0.82rem; color: #fff;
+		text-decoration: none; font-weight: 500;
 	}
 	.hal-badge:hover { background: #145a94; }
 	.doi-ref { font-size: 0.82rem; color: var(--muted); }
 	.doi-ref a { color: var(--accent); text-decoration: none; }
 	.doi-ref a:hover { text-decoration: underline; }
-
-	.loading, .no-results { text-align: center; padding: 40px; color: var(--muted); }
 </style>

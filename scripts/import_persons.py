@@ -25,6 +25,7 @@ from psycopg2.extras import execute_values
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from utils.normalize import normalize_name
+from services.persons import refresh_person_name_forms
 
 logging.basicConfig(
     level=logging.INFO,
@@ -235,6 +236,7 @@ def import_persons(conn, records: list[dict], dry_run: bool = False,
             RETURNING id
         """, (last_name, first_name, last_norm, first_norm))
         person_id = cur.fetchone()["id"]
+        refresh_person_name_forms(cur, person_id, last_name, first_name)
 
         cur.execute("""
             INSERT INTO persons_rh

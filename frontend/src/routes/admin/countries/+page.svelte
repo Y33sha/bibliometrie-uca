@@ -295,27 +295,14 @@
 
 <style>
 	h1 { font-size: 1.3rem; margin-bottom: 12px; }
-	.toolbar {
-		display: flex; align-items: center; gap: 8px;
-		margin-bottom: 10px; flex-wrap: wrap;
-	}
-	.toolbar input[type="text"] {
-		padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px;
-		font-size: 0.95rem; width: 300px;
-	}
-	.toolbar-spacer { flex: 1; }
-	.count { font-size: 0.85rem; color: var(--muted); }
+	.toolbar input[type="text"] { width: 300px; }
 	.batch-bar {
 		display: flex; align-items: center; gap: 8px;
 		padding: 8px 12px; margin-bottom: 10px;
 		background: #e8f0f8; border-radius: 6px; font-size: 0.9rem;
 	}
 	.batch-bar select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; }
-	.btn-primary {
-		padding: 4px 12px; background: var(--accent); color: white;
-		border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem;
-	}
-	.btn-primary:disabled, .btn-secondary:disabled { opacity: 0.5; cursor: default; }
+	.btn-secondary:disabled { opacity: 0.5; cursor: default; }
 	.btn-secondary {
 		padding: 4px 12px; background: #f0f0f0; color: var(--text);
 		border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 0.85rem;

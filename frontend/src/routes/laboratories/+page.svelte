@@ -83,7 +83,7 @@
 <h2>Laboratoires UCA</h2>
 <p class="subtitle">Structures de recherche ayant l'Université Clermont Auvergne pour tutelle</p>
 
-<div class="toolbar">
+<div class="toolbar toolbar-card">
 	<input type="text" placeholder="Rechercher un laboratoire..." bind:value={search} />
 	<span class="count">{filtered.length} laboratoire{filtered.length > 1 ? 's' : ''}</span>
 </div>
@@ -153,33 +153,7 @@
 		font-weight: 600;
 		margin: 0 0 14px;
 	}
-	.subtitle {
-		font-size: 0.95rem;
-		color: var(--muted);
-		margin: -10px 0 16px;
-	}
-	.toolbar {
-		display: flex;
-		gap: 8px;
-		align-items: center;
-		margin-bottom: 12px;
-		padding: 10px 14px;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-	}
-	.toolbar input[type='text'] {
-		padding: 6px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		font-size: 0.95rem;
-		width: 260px;
-	}
-	.count {
-		margin-left: auto;
-		font-size: 0.85rem;
-		color: var(--muted);
-	}
+	.toolbar input[type='text'] { width: 260px; }
 	table {
 		width: 100%;
 		border-collapse: collapse;
@@ -202,80 +176,20 @@
 		user-select: none;
 		white-space: nowrap;
 	}
-	thead th:hover {
-		color: var(--text);
-	}
-	.sort-arrow {
-		font-size: 0.7rem;
-		margin-left: 3px;
-		color: #bbb;
-	}
-	thead th.sorted .sort-arrow {
-		color: var(--accent);
-	}
-	tbody tr {
-		border-bottom: 1px solid #f0efec;
-	}
-	tbody tr:last-child {
-		border-bottom: none;
-	}
-	tbody tr:hover {
-		background: #fafaf8;
-	}
+	thead th:hover { color: var(--text); }
+	tbody tr { border-bottom: 1px solid #f0efec; }
+	tbody tr:last-child { border-bottom: none; }
+	tbody tr:hover { background: #fafaf8; }
 	td {
 		padding: 10px 12px;
 		font-size: 0.95rem;
 		vertical-align: middle;
 	}
-	td a {
-		color: var(--accent);
-		text-decoration: none;
-	}
-	td a:hover {
-		text-decoration: underline;
-	}
-	.lab-link {
-		text-decoration: none;
-		color: inherit;
-	}
-	.lab-link:hover .lab-name {
-		color: var(--accent);
-		text-decoration: underline;
-	}
-	.lab-name {
-		font-weight: 500;
-	}
-	.lab-acronym {
-		font-size: 0.85rem;
-		color: var(--muted);
-		margin-left: 6px;
-	}
-	.tutelles {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px;
-	}
-	.tutelle-tag {
-		display: inline-block;
-		padding: 2px 7px;
-		background: #f0efec;
-		border-radius: 3px;
-		font-size: 0.8rem;
-		color: var(--muted);
-		white-space: nowrap;
-	}
-	.id-badge {
-		display: inline-block;
-		padding: 2px 7px;
-		background: #e8f0f8;
-		border-radius: 3px;
-		font-size: 0.8rem;
-		color: var(--accent);
-		text-decoration: none;
-		white-space: nowrap;
-	}
-	.id-badge:hover {
-		background: #d4e4f3;
-		text-decoration: none;
-	}
+	td a { color: var(--accent); text-decoration: none; }
+	td a:hover { text-decoration: underline; }
+	.lab-link { text-decoration: none; color: inherit; }
+	.lab-link:hover .lab-name { color: var(--accent); text-decoration: underline; }
+	.lab-name { font-weight: 500; }
+	.lab-acronym { font-size: 0.85rem; color: var(--muted); margin-left: 6px; }
+	.tutelles { display: flex; flex-wrap: wrap; gap: 4px; }
 </style>

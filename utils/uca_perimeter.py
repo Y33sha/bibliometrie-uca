@@ -17,7 +17,7 @@ def get_uca_structure_ids(cur) -> set[int]:
         JOIN structures s ON s.id = sr.parent_id
         WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
     """)
-    return {r["id"] for r in cur.fetchall()}
+    return {r[0] for r in cur.fetchall()}
 
 
 def get_uca_structure_ids_list(cur) -> list[int]:

@@ -60,22 +60,16 @@
 		loadOrphans();
 	}
 
-	async function createAndAssign(orphan: any) {
+	function createAndAssign(orphan: any) {
 		const parts = orphan.full_name.includes(',')
 			? orphan.full_name.split(',').map((s: string) => s.trim())
 			: [orphan.full_name.split(' ').slice(-1)[0], orphan.full_name.split(' ').slice(0, -1).join(' ')];
-		const lastName = parts[0] || orphan.full_name;
-		const firstName = parts[1] || '';
-		await fetch(`${base}/api/orphan-authorships/assign`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				source: orphan.source, authorship_id: orphan.authorship_id,
-				create_person: { last_name: lastName, first_name: firstName }
-			})
-		});
+		createModal = {
+			lastName: parts[0] || orphan.full_name,
+			firstName: parts[1] || '',
+			items: [orphan],
+		};
 		assignSearch = {};
-		loadOrphans();
 	}
 
 	function toggleSelect(o: any) {
@@ -208,6 +202,7 @@
 					<button class="result-btn" onclick={() => batchAssign(r.id)}>
 						<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
 						{#if r.has_rh}<span class="rh-check">✓</span>{/if}
+						<span class="result-hint">{r.department_name || `#${r.id}`}</span>
 					</button>
 				{/each}
 			</div>
@@ -256,6 +251,7 @@
 											<button class="result-btn" onclick={() => assign(o, r.id)}>
 												<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
 												{#if r.has_rh}<span class="rh-check">✓</span>{/if}
+												<span class="result-hint">{r.department_name || `#${r.id}`}</span>
 											</button>
 										{/each}
 									</div>
@@ -311,15 +307,11 @@
 		background: #fff8e1; border: 1px solid #ffe082; border-radius: 6px;
 		padding: 10px 14px; font-size: 0.85rem; color: #6d4c00; margin-bottom: 14px;
 	}
-	.toolbar { margin-bottom: 10px; }
-	.toolbar input { padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; width: 300px; }
-	.data-table { width: 100%; border-collapse: collapse; background: var(--card, white); border: 1px solid var(--border, #e0e0e0); border-radius: 6px; overflow: hidden; }
-	.data-table thead th { padding: 8px 12px; text-align: left; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted, #888); border-bottom: 2px solid var(--border, #e0e0e0); background: #fafaf8; }
-	.data-table td { padding: 8px 12px; font-size: 0.9rem; border-bottom: 1px solid #f0efec; vertical-align: top; }
-	.data-table tr:hover td { background: #fafaf8; }
+	.toolbar input { width: 300px; }
 	.tag-source { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; background: #e8f0f8; color: #3b6b9e; }
 	.pub-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
 	.pub-link:hover { text-decoration: underline; }
+	:global(.data-table) { overflow: visible; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
 	.assign-row input { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; width: 200px; }
@@ -334,9 +326,7 @@
 		border: none; background: #f5f5f5; cursor: pointer; border-radius: 3px; font-size: 0.85rem;
 	}
 	.result-btn:hover { background: #e0e0e0; }
-	.rh-check { color: #2e7d32; margin-left: 4px; }
-	.btn-create { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
-	.btn-create:hover { background: #c8e6c9; }
+	.result-hint { font-size: 0.75rem; color: #888; margin-left: 4px; }
 	.loading-text { font-size: 0.8rem; color: #888; }
 	.batch-bar {
 		display: flex; align-items: center; gap: 10px;
@@ -352,17 +342,8 @@
 		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 280px;
 		margin-top: 4px;
 	}
-	.empty { text-align: center; padding: 40px; color: #888; }
-	.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-	.modal-content { background: white; border-radius: 8px; padding: 24px; max-width: 400px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
-	.modal-content h3 { margin: 0 0 12px; font-size: 1.05rem; }
+	.modal-content { max-width: 400px; }
 	.create-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 	.create-form label { display: flex; flex-direction: column; gap: 3px; font-size: 0.85rem; font-weight: 500; }
 	.create-form input { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
-	.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-	.btn-confirm { background: #4caf50; color: white !important; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; }
-	.btn-confirm:hover { background: #2e7d32; }
-	.btn { padding: 5px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); cursor: pointer; font-size: 0.85rem; text-decoration: none; color: var(--text); }
-	.btn:hover { background: #f0f0f0; }
-	.btn-sm { padding: 3px 8px; font-size: 0.8rem; }
 </style>

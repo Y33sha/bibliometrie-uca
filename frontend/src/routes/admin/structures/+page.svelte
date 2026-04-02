@@ -790,18 +790,6 @@
 {/if}
 
 <style>
-	/* ── Local CSS variables ── */
-	:root {
-		--success: #2a7d4f;
-		--success-light: #e6f4ec;
-		--danger: #c0392b;
-		--danger-light: #fbeaea;
-		--warning: #d4a017;
-		--warning-light: #fef8e8;
-		--accent-light: #e8f0f8;
-		--text-muted: #777;
-	}
-
 	/* Sortir du conteneur pour utiliser toute la largeur */
 	:global(.container.full-width) {
 		max-width: none;
@@ -1110,44 +1098,7 @@
 		font-size: 0.8rem;
 	}
 
-	/* ── Buttons ── */
-	.btn {
-		padding: 5px 12px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		font-size: 0.85rem;
-		cursor: pointer;
-		background: white;
-		font-family: inherit;
-	}
-	.btn:hover {
-		background: #f5f5f5;
-	}
-	.btn-primary {
-		background: var(--accent);
-		color: white;
-		border-color: var(--accent);
-	}
-	.btn-primary:hover {
-		background: #2d5a87;
-	}
-	.btn-danger {
-		color: var(--danger);
-		border-color: var(--danger);
-	}
-	.btn-danger:hover {
-		background: var(--danger-light);
-	}
-	.btn-sm {
-		padding: 2px 7px;
-		font-size: 0.8rem;
-	}
-	.btn-success {
-		background: var(--success);
-		color: white;
-		border-color: var(--success);
-	}
-
+	/* ── Buttons (page-specific) ── */
 	.btn-add {
 		display: inline-flex;
 		align-items: center;

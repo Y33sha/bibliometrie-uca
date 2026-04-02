@@ -1,20 +1,19 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { titleCase, formatDate, sanitizeTitle } from '$lib/utils';
 	import { typeLabels, docTypeLabelsMap, oaLabelsMap } from '$lib/labels';
+	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
+	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
-	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
+	import TabNav from '$lib/components/TabNav.svelte';
 
 	const personId = $derived($page.params.id);
 	let canGoBack = $state(false);
-	const validTabs = ['publications', 'identities', 'addresses'] as const;
-	type Tab = (typeof validTabs)[number];
 
 	// --- Types ---
 	interface Person {
@@ -68,12 +67,6 @@
 		is_corresponding: boolean | null;
 		authorship_id: number | null;
 	}
-	interface PubResponse {
-		total: number;
-		page: number;
-		pages: number;
-		publications: Publication[];
-	}
 
 	// --- State ---
 	let profile: Person | null = $state(null);
@@ -82,33 +75,71 @@
 	let error = $state(false);
 	let isAdmin = $state(false);
 
-	const activeTab: Tab = $derived(
+	const activeTab = $derived(
 		(() => {
-			const t = $page.url.searchParams.get('tab') as Tab | null;
-			return t && validTabs.includes(t) ? t : 'publications';
+			const t = $page.url.searchParams.get('tab');
+			return t === 'identities' || t === 'addresses' ? t : 'publications';
 		})()
 	);
 
-	// Publications tab
-	let publications: Publication[] = $state([]);
-	let pubTotal = $state(0);
-	let pubPage = $state(1);
-	let pubPages = $state(1);
-	const pubPerPage = 50;
-
-	// Facet state
+	// Facet filter selections
 	let selectedYears: string[] = $state([]);
 	let selectedDocTypes: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
 	let selectedCorr: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
 	let sourceStates: Record<string, string> = $state({});
-	let sourceCounts: Record<string, number> = $state({});
-	let yearOptions: FacetOption[] = $state([]);
-	let docTypeOptions: FacetOption[] = $state([]);
-	let oaOptions: FacetOption[] = $state([]);
-	let corrOptions: FacetOption[] = $state([]);
-	let countryOptions: FacetOption[] = $state([]);
+
+	function buildFilterParams(): URLSearchParams {
+		const params = new URLSearchParams();
+		params.set('person_id', personId ?? '');
+		if (selectedYears.length) params.set('year', selectedYears.join(','));
+		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
+		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
+		if (selectedCorr.length) params.set('is_corresponding', selectedCorr.join(','));
+		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
+		const sf = Object.entries(sourceStates).filter(([, v]) => v === 'yes' || v === 'no').map(([k, v]) => `${k}_${v}`).join(',');
+		if (sf) params.set('source_filter', sf);
+		return params;
+	}
+
+	// Publications (paginated)
+	const pubs = usePaginatedFetch<Publication>({
+		endpoint: '/api/publications',
+		itemsKey: 'publications',
+		perPage: 50,
+		apiKey: 'person-detail-pubs',
+		buildParams: () => {
+			const params = buildFilterParams();
+			params.set('sort', 'year_desc');
+			return params;
+		},
+	});
+
+	// Facets
+	const facets = useFacets<'years' | 'docTypes' | 'oa' | 'corresponding' | 'countries'>({
+		endpoint: '/api/publications/facets',
+		apiKey: 'person-detail-facets',
+		buildParams: () => buildFilterParams(),
+		facets: {
+			years: { type: 'simple', apiKey: 'years' },
+			docTypes: { type: 'label_map', apiKey: 'doc_types', labels: docTypeLabelsMap },
+			oa: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
+			corresponding: { type: 'boolean', apiKey: 'corresponding', yesLabel: 'Oui', noLabel: 'Non' },
+			countries: {
+				type: 'passthrough',
+				apiKey: 'countries',
+				transform: (c) => ({ value: c.value, text: `${c.text} (${c.value.toUpperCase()})`, count: c.count }),
+			},
+		},
+		sourceCountsKey: 'source_counts',
+	});
+
+	function onFilterChange() {
+		pubs.page = 1;
+		pubs.load();
+		facets.load();
+	}
 
 	// Addresses tab
 	let addresses: Address[] = $state([]);
@@ -151,67 +182,6 @@
 		return Array.from(map, ([value, confirmed]) => ({ value, confirmed }));
 	});
 
-	function buildFilterParams(): URLSearchParams {
-		const params = new URLSearchParams();
-		params.set('person_id', personId ?? '');
-		if (selectedYears.length) params.set('year', selectedYears.join(','));
-		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
-		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
-		if (selectedCorr.length) params.set('is_corresponding', selectedCorr.join(','));
-		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
-		const sf = Object.entries(sourceStates).filter(([, v]) => v === 'yes' || v === 'no').map(([k, v]) => `${k}_${v}`).join(',');
-		if (sf) params.set('source_filter', sf);
-		return params;
-	}
-
-	async function loadFacets() {
-		const params = buildFilterParams();
-		const data = await api<{
-			years: { value: number; count: number }[];
-			doc_types: { value: string; count: number }[];
-			oa_statuses: { value: string; count: number }[];
-			corresponding: { value: string; count: number }[];
-			source_counts: Record<string, number>;
-			countries: { value: string; count: number }[];
-		}>('/api/publications/facets?' + params, { key: 'person-detail-facets' });
-		yearOptions = data.years.map((y) => ({
-			value: String(y.value), text: String(y.value), count: y.count
-		}));
-		docTypeOptions = data.doc_types.map((d) => ({
-			value: d.value, text: docTypeLabelsMap[d.value] || d.value, count: d.count
-		}));
-		oaOptions = data.oa_statuses.map((o) => ({
-			value: o.value, text: oaLabelsMap[o.value] || o.value, count: o.count
-		}));
-		if (data.corresponding?.length) {
-			corrOptions = data.corresponding.map((c) => ({
-				value: c.value, text: c.value === 'yes' ? 'Oui' : 'Non', count: c.count
-			}));
-		}
-		sourceCounts = data.source_counts || {};
-		if (data.countries) {
-			countryOptions = data.countries.map(c => ({ value: c.value, text: `${c.text} (${c.value.toUpperCase()})`, count: c.count }));
-		}
-	}
-
-	async function loadPublications() {
-		const params = buildFilterParams();
-		params.set('page', String(pubPage));
-		params.set('per_page', String(pubPerPage));
-		params.set('sort', 'year_desc');
-		const data = await api<PubResponse>('/api/publications?' + params, { key: 'person-detail-pubs' });
-		publications = data.publications;
-		pubTotal = data.total;
-		pubPages = data.pages;
-		pubPage = data.page;
-	}
-
-	function onFilterChange() {
-		pubPage = 1;
-		loadPublications();
-		loadFacets();
-	}
-
 	async function loadAddresses() {
 		const params = new URLSearchParams({
 			page: String(addrPage),
@@ -236,19 +206,11 @@
 	async function excludeAuthorship(authorshipId: number, pubId: number) {
 		if (!confirm('Exclure ce lien auteur–publication ? Il ne sera pas recréé automatiquement.')) return;
 		await fetch(base + `/api/authorships/${authorshipId}/exclude`, { method: 'PATCH' });
-		publications = publications.filter(p => p.id !== pubId);
-		pubTotal--;
+		pubs.items = pubs.items.filter(p => p.id !== pubId);
 	}
 
-	function switchTab(tab: Tab) {
-		const url = new URL($page.url);
-		if (tab === 'publications') {
-			url.searchParams.delete('tab');
-		} else {
-			url.searchParams.set('tab', tab);
-		}
-		goto(url.toString(), { replaceState: true, noScroll: true });
-		if (tab === 'publications' && publications.length === 0 && pubTotal === 0) { loadFacets(); loadPublications(); }
+	function onTabSwitch(tab: string) {
+		if (tab === 'publications' && pubs.items.length === 0 && pubs.total === 0) { facets.load(); pubs.load(); }
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
 	}
 
@@ -267,7 +229,7 @@
 		}
 		// Load data for active tab
 		if (activeTab === 'addresses') loadAddresses();
-		else if (activeTab === 'publications') { loadFacets(); loadPublications(); }
+		else if (activeTab === 'publications') { facets.load(); pubs.load(); }
 	});
 </script>
 
@@ -309,23 +271,23 @@
 				</span>
 			{/if}
 			{#each allOrcids() as oid}
-				<span class="id-item" class:id-confirmed={oid.confirmed}>
+				<span class="id-item">
 					<span class="id-label">ORCID</span>
-					<a href="https://orcid.org/{oid.value}" target="_blank" rel="noopener" class="id-badge">{oid.value}</a>
+					<a href="https://orcid.org/{oid.value}" target="_blank" rel="noopener" class="id-badge" class:id-confirmed={oid.confirmed}>{oid.value}</a>
 					{#if oid.confirmed}<span class="confirmed-check" title="Vérifié manuellement">&#10003;</span>{/if}
 				</span>
 			{/each}
 			{#each allIdhals() as idh}
-				<span class="id-item" class:id-confirmed={idh.confirmed}>
+				<span class="id-item">
 					<span class="id-label">idHAL</span>
-					<a href="https://hal.science/search/index/?q=%2A&authIdHal_s={idh.value}" target="_blank" rel="noopener" class="id-badge">{idh.value}</a>
+					<a href="https://hal.science/search/index/?q=%2A&authIdHal_s={idh.value}" target="_blank" rel="noopener" class="id-badge" class:id-confirmed={idh.confirmed}>{idh.value}</a>
 					{#if idh.confirmed}<span class="confirmed-check" title="Vérifié manuellement">&#10003;</span>{/if}
 				</span>
 			{/each}
 			{#each allIdrefs() as idr}
-				<span class="id-item" class:id-confirmed={idr.confirmed}>
+				<span class="id-item">
 					<span class="id-label">IdRef</span>
-					<a href="https://www.idref.fr/{idr.value}" target="_blank" rel="noopener" class="id-badge">{idr.value}</a>
+					<a href="https://www.idref.fr/{idr.value}" target="_blank" rel="noopener" class="id-badge" class:id-confirmed={idr.confirmed}>{idr.value}</a>
 					{#if idr.confirmed}<span class="confirmed-check" title="Vérifié manuellement">&#10003;</span>{/if}
 				</span>
 			{/each}
@@ -333,35 +295,29 @@
 	</div>
 
 	<!-- Tabs -->
-	<div class="tabs">
-		<button class="tab" class:active={activeTab === 'publications'} onclick={() => switchTab('publications')}>
-			Publications
-			{#if pubTotal}<span class="tab-count">{pubTotal}</span>{/if}
-		</button>
-		<button class="tab" class:active={activeTab === 'identities'} onclick={() => switchTab('identities')}>
-			Identités
-			{#if authors.length}<span class="tab-count">{authors.length}</span>{/if}
-		</button>
-		<button class="tab" class:active={activeTab === 'addresses'} onclick={() => switchTab('addresses')}>
-			Adresses
-			{#if addrLoaded}<span class="tab-count">{addrTotal}</span>{/if}
-		</button>
-	</div>
+	<TabNav
+		tabs={[
+			{ id: 'publications', label: 'Publications', count: pubs.total },
+			{ id: 'identities', label: 'Identités', count: authors.length },
+			{ id: 'addresses', label: 'Adresses', count: addrLoaded ? addrTotal : undefined },
+		]}
+		onswitch={onTabSwitch}
+	/>
 
 	<!-- Tab: Publications -->
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
 			<div class="toolbar">
-				<FacetDropdown label="Années" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
-				<FacetDropdown label="Types" options={docTypeOptions} bind:selected={selectedDocTypes} onchange={onFilterChange} />
-				<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
-				{#if corrOptions.length}
-					<FacetDropdown label="Corresp." options={corrOptions} bind:selected={selectedCorr} onchange={onFilterChange} />
+				<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
+				<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />
+				<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
+				{#if facets.options.corresponding.length}
+					<FacetDropdown label="Corresp." options={facets.options.corresponding} bind:selected={selectedCorr} onchange={onFilterChange} />
 				{/if}
-				<FacetDropdown label="Pays" options={countryOptions} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
-				<SourceFilterToggle bind:states={sourceStates} counts={sourceCounts} onchange={onFilterChange} />
+				<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
+				<SourceFilterToggle bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
 				<span class="toolbar-spacer"></span>
-				<span class="count">{pubTotal} publication{pubTotal > 1 ? 's' : ''}</span>
+				<span class="count">{pubs.total} publication{pubs.total > 1 ? 's' : ''}</span>
 				<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 			</div>
 			<table class="pub-table">
@@ -380,10 +336,10 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#if publications.length === 0}
+					{#if pubs.items.length === 0}
 						<tr><td colspan={isAdmin ? 10 : 9} class="no-results">Aucune publication</td></tr>
 					{:else}
-						{#each publications as p (p.id)}
+						{#each pubs.items as p (p.id)}
 							<tr>
 								{#if isAdmin}
 									<td class="exclude-cell">
@@ -464,7 +420,7 @@
 					{/if}
 				</tbody>
 			</table>
-			<Pagination page={pubPage} pages={pubPages} onchange={(p) => { pubPage = p; loadPublications(); }} />
+			<Pagination page={pubs.page} pages={pubs.pages} onchange={(p) => pubs.goToPage(p)} />
 		</div>
 	{/if}
 
@@ -558,15 +514,6 @@
 {/if}
 
 <style>
-	.back-link {
-		display: inline-block;
-		margin-bottom: 12px;
-		font-size: 0.95rem;
-		color: var(--accent);
-		text-decoration: none;
-	}
-	.back-link:hover { text-decoration: underline; }
-
 	.profile-header {
 		background: var(--card);
 		border: 1px solid var(--border);
@@ -574,11 +521,7 @@
 		padding: 20px 24px;
 		margin-bottom: 0;
 	}
-	.profile-name {
-		font-size: 1.45rem;
-		font-weight: 600;
-		margin: 0 0 6px;
-	}
+	.profile-name { font-size: 1.45rem; font-weight: 600; margin: 0 0 6px; }
 	.profile-last { font-weight: 600; }
 	.profile-meta {
 		display: flex;
@@ -598,64 +541,7 @@
 	}
 	.id-item { display: flex; align-items: center; gap: 6px; font-size: 0.95rem; }
 	.id-label { font-weight: 500; color: var(--muted); font-size: 0.85rem; }
-	.id-badge {
-		display: inline-block;
-		padding: 2px 7px;
-		background: #e8f0f8;
-		border-radius: 3px;
-		font-size: 0.8rem;
-		color: var(--accent);
-		text-decoration: none;
-		white-space: nowrap;
-	}
-	.id-badge:hover { background: #d4e4f3; text-decoration: none; }
-	.id-confirmed .id-badge { background: #e6f4ec; color: #2a7d4f; }
-	.id-confirmed .id-badge:hover { background: #d0eadb; }
-	.confirmed-check {
-		color: #2a7d4f;
-		font-size: 0.8rem;
-		font-weight: 700;
-		margin-left: 2px;
-	}
-
-	/* Tabs */
-	.tabs {
-		display: flex;
-		gap: 0;
-		background: var(--card);
-		border-left: 1px solid var(--border);
-		border-right: 1px solid var(--border);
-		border-bottom: 1px solid var(--border);
-		border-radius: 0 0 6px 6px;
-		margin-bottom: 16px;
-		overflow: hidden;
-	}
-	.tab {
-		flex: 1;
-		padding: 10px 16px;
-		border: none;
-		background: #f5f4f1;
-		font-size: 0.95rem;
-		font-weight: 500;
-		color: var(--muted);
-		cursor: pointer;
-		font-family: inherit;
-		border-right: 1px solid var(--border);
-		transition: background 0.15s, color 0.15s;
-	}
-	.tab:last-child { border-right: none; }
-	.tab:hover { background: #eae9e5; color: var(--text); }
-	.tab.active {
-		background: var(--card);
-		color: var(--accent);
-		box-shadow: inset 0 -2px 0 var(--accent);
-	}
-	.tab-count {
-		font-size: 0.8rem;
-		font-weight: 400;
-		color: var(--muted);
-		margin-left: 4px;
-	}
+	.confirmed-check { color: #2a7d4f; font-size: 0.8rem; font-weight: 700; margin-left: 2px; }
 
 	/* Shared table styles */
 	.tab-content table {
@@ -679,118 +565,14 @@
 	.tab-content tbody tr { border-bottom: 1px solid #f0efec; }
 	.tab-content tbody tr:last-child { border-bottom: none; }
 	.tab-content tbody tr:hover { background: #fafaf8; }
-	.tab-content td {
-		padding: 7px 10px;
-		font-size: 0.95rem;
-		vertical-align: middle;
-	}
+	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: middle; }
 	.tab-content td a { color: var(--accent); text-decoration: none; }
 	.tab-content td a:hover { text-decoration: underline; }
 
-	.source-tag-label {
-		display: inline-block;
-		padding: 2px 7px;
-		border-radius: 3px;
-		font-size: 0.8rem;
-		font-weight: 600;
-	}
-	.source-hal-label { background: #e8f0f8; color: #3b6b9e; }
-	.source-oa-label { background: #fef3e0; color: #b8733e; }
-	.source-wos-label { background: #e8e0f8; color: #5a3d8a; }
+	.source-tag-label { padding: 2px 7px; font-size: 0.8rem; }
 
 	/* Publications tab */
-	.toolbar {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin-bottom: 10px;
-		flex-wrap: wrap;
-	}
-	.toolbar-spacer { flex: 1; }
-	.count {
-		font-size: 0.85rem;
-		color: var(--muted);
-	}
-	.export-btn {
-		padding: 4px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		background: var(--card);
-		font-size: 0.85rem;
-		color: var(--muted);
-		text-decoration: none;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	.export-btn:hover {
-		border-color: var(--accent);
-		color: var(--accent);
-	}
 	.pub-table td { vertical-align: top; }
-	.pub-title {
-		font-weight: 500; color: var(--text); max-width: 500px;
-		text-decoration: none; display: inline-block;
-	}
-	.pub-title:hover { color: var(--accent); text-decoration: underline; }
-	.journal-cell { font-size: 0.85rem; color: var(--muted); }
-
-	.source-tag {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 22px;
-		height: 22px;
-		border-radius: 50%;
-		text-decoration: none;
-		margin-right: 3px;
-		vertical-align: middle;
-		transition: transform 0.1s;
-	}
-	.source-tag:hover { transform: scale(1.15); }
-	.source-tag img, .source-tag :global(svg) { width: 14px; height: 14px; display: block; }
-	.source-hal { background: #e8f0f8; }
-	.source-hal:hover { background: #d0e3f4; }
-	.source-oa { background: #fef3e0; }
-	.source-oa:hover { background: #fde8c8; }
-	.source-wos { background: #e8e0f8; }
-	.source-wos:hover { background: #d8c8f4; }
-	.wos-label { font-size: 11px; font-weight: 700; color: #5a3d8a; line-height: 14px; }
-	.source-doi { background: #f0f0f0; }
-	.source-doi:hover { background: #e0e0e0; }
-	.source-placeholder { visibility: hidden; }
-	.links-cell { white-space: nowrap; }
-
-	.lab-tag {
-		display: inline-block;
-		font-size: 0.8rem;
-		padding: 1px 7px;
-		border-radius: 10px;
-		background: #e8f0f8;
-		color: var(--accent);
-		font-weight: 500;
-	}
-	.apc-cell { text-align: right; white-space: nowrap; }
-	.apc-tag {
-		display: inline-block; font-size: 0.75rem; padding: 1px 5px;
-		border-radius: 3px; background: #e8f5e9; color: #2e7d32;
-		font-weight: 500; cursor: default;
-	}
-	.apc-other { background: #f0f0f0; color: #888; }
-
-	.oa-tag {
-		display: inline-block;
-		font-size: 0.7rem;
-		padding: 1px 6px;
-		border-radius: 8px;
-		font-weight: 600;
-	}
-	:global(.oa-gold) { background: #fef3e0; color: #d4a017; }
-	:global(.oa-diamond) { background: #e0f2f7; color: #0288a8; }
-	:global(.oa-hybrid) { background: #f3eef9; color: #8e6bbf; }
-	:global(.oa-green) { background: #e6f4ec; color: #2a7d4f; }
-	:global(.oa-bronze) { background: #fdf0e6; color: #b8733e; }
-	:global(.oa-closed) { background: #e0e0e0; color: #555; }
-	.type-label { font-size: 0.8rem; color: var(--muted); }
 	.corr-cell { text-align: center; color: var(--accent); font-size: 0.85rem; }
 
 	/* Addresses tab */
@@ -805,7 +587,6 @@
 		font-weight: 500;
 		margin: 1px 2px;
 	}
-
 	.exclude-cell { padding: 0 2px !important; text-align: center; vertical-align: middle; }
 	.exclude-btn {
 		background: none; border: none; cursor: pointer;
@@ -814,6 +595,17 @@
 	}
 	.exclude-btn:hover { color: #c0392b; background: #fdeaea; }
 
-	.no-results { text-align: center; padding: 40px; color: var(--muted); }
-	.loading { text-align: center; padding: 40px; color: var(--muted); }
+	.orphan-banner {
+		display: block;
+		background: #fef3e0;
+		border: 1px solid #f0dca0;
+		border-radius: 5px;
+		padding: 8px 14px;
+		margin-bottom: 12px;
+		font-size: 0.95rem;
+		color: #8a6d1b;
+		text-decoration: none;
+	}
+	.orphan-banner:hover { background: #fdecc8; }
+	.orphan-detail { font-size: 0.85rem; color: #a08530; }
 </style>

@@ -404,8 +404,8 @@ def process_authorships(cur, work: dict, oa_document_id: int):
             INSERT INTO openalex_authorships
                 (openalex_document_id, openalex_author_id, author_position,
                  raw_affiliation, openalex_institution_ids,
-                 raw_author_name, raw_orcid)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                 raw_author_name, raw_orcid, author_name_normalized)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, normalize_name_form(%s))
             ON CONFLICT (openalex_document_id, openalex_author_id) DO UPDATE SET
                 raw_affiliation = COALESCE(
                     EXCLUDED.raw_affiliation,
@@ -418,10 +418,14 @@ def process_authorships(cur, work: dict, oa_document_id: int):
                 raw_orcid = COALESCE(
                     EXCLUDED.raw_orcid,
                     openalex_authorships.raw_orcid
+                ),
+                author_name_normalized = COALESCE(
+                    EXCLUDED.author_name_normalized,
+                    openalex_authorships.author_name_normalized
                 )
         """, (oa_document_id, oa_author_id, position,
               raw_affil_text, institution_ids or None,
-              raw_author_name, raw_orcid))
+              raw_author_name, raw_orcid, raw_author_name))
 
 
 # =============================================================

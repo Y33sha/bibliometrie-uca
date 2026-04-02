@@ -23,7 +23,9 @@ def create_person(cur, last_name: str, first_name: str = "") -> int:
         RETURNING id
     """, (last_name, first_name,
           normalize_name(last_name), normalize_name(first_name)))
-    return cur.fetchone()["id"]
+    person_id = cur.fetchone()["id"]
+    refresh_person_name_forms(cur, person_id, last_name, first_name)
+    return person_id
 
 
 # ── Rattachement / détachement authorships ──
@@ -107,6 +109,65 @@ def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict
 
 # ── Formes de noms ──
 
+def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
+    """Calcule les variantes normalisées de formes de nom pour une personne.
+
+    Retourne un ensemble de formes normalisées :
+      - "prenom nom", "nom prenom"
+      - "initiale(s) nom", "nom initiale(s)"
+        Si le prénom a plusieurs mots (ex: "jean michel"), produit :
+        - initiales séparées : "j m nom", "nom j m"
+        - initiales collées  : "jm nom", "nom jm"
+    """
+    ln = normalize_name(last_name)
+    fn = normalize_name(first_name)
+    if not ln:
+        return set()
+
+    forms = set()
+    if fn:
+        forms.add(f"{fn} {ln}")
+        forms.add(f"{ln} {fn}")
+
+        parts = fn.split()
+        if parts:
+            initials_spaced = " ".join(p[0] for p in parts)
+            initials_joined = "".join(p[0] for p in parts)
+            forms.add(f"{initials_spaced} {ln}")
+            forms.add(f"{ln} {initials_spaced}")
+            if initials_joined != initials_spaced:
+                forms.add(f"{initials_joined} {ln}")
+                forms.add(f"{ln} {initials_joined}")
+    else:
+        forms.add(ln)
+
+    return forms
+
+
+def refresh_person_name_forms(cur, person_id: int, last_name: str, first_name: str):
+    """Recalcule les formes de nom source 'persons' d'une personne.
+
+    Supprime les anciennes formes 'persons' de cette personne, puis insère
+    les nouvelles. Les formes partagées avec d'autres personnes ou d'autres
+    sources sont préservées (seul le person_id et la source sont retirés/ajoutés).
+    """
+    # 1. Retirer person_id de toutes les formes source 'persons' de cette personne
+    cur.execute("""
+        UPDATE person_name_forms
+        SET person_ids = array_remove(person_ids, %s)
+        WHERE %s = ANY(person_ids) AND 'persons' = ANY(sources)
+    """, (person_id, person_id))
+    # Nettoyer les formes devenues vides
+    cur.execute("""
+        DELETE FROM person_name_forms
+        WHERE person_ids = '{}' OR person_ids IS NULL
+    """)
+
+    # 2. Ajouter les nouvelles formes
+    for form in compute_person_name_forms(last_name, first_name):
+        add_name_form(cur, person_id, form, source="persons")
+
+
 def add_name_form(cur, person_id: int, full_name: str, source: str | None = None):
     """Ajoute une forme de nom à person_name_forms si elle n'existe pas déjà.
 
@@ -120,9 +181,9 @@ def add_name_form(cur, person_id: int, full_name: str, source: str | None = None
         return
     if source:
         cur.execute("""
-            INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids, sources)
-            VALUES (%s, %s, ARRAY[%s], ARRAY[%s])
-            ON CONFLICT (name_form_normalized) WHERE name_form_normalized IS NOT NULL DO UPDATE
+            INSERT INTO person_name_forms (name_form, person_ids, sources)
+            VALUES (%s, ARRAY[%s], ARRAY[%s])
+            ON CONFLICT (name_form) DO UPDATE
             SET person_ids = (
                     SELECT array_agg(DISTINCT x)
                     FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
@@ -132,17 +193,35 @@ def add_name_form(cur, person_id: int, full_name: str, source: str | None = None
                     FROM unnest(COALESCE(person_name_forms.sources, '{}') || ARRAY[%s]) AS x
                 ),
                 updated_at = now()
-        """, (full_name.strip(), norm, person_id, source, person_id, source))
+        """, (norm, person_id, source, person_id, source))
     else:
         cur.execute("""
-            INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids)
-            VALUES (%s, %s, ARRAY[%s])
-            ON CONFLICT (name_form_normalized) WHERE name_form_normalized IS NOT NULL DO UPDATE
+            INSERT INTO person_name_forms (name_form, person_ids)
+            VALUES (%s, ARRAY[%s])
+            ON CONFLICT (name_form) DO UPDATE
             SET person_ids = (
                 SELECT array_agg(DISTINCT x)
                 FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
             )
-        """, (full_name.strip(), norm, person_id, person_id))
+        """, (norm, person_id, person_id))
+
+
+def detach_name_form(cur, person_id: int, name_form: str):
+    """Détache une personne d'une forme de nom.
+
+    Retire person_id de person_ids. Supprime la forme si person_ids devient vide.
+    Retourne True si le détachement a eu lieu.
+    """
+    cur.execute("""
+        UPDATE person_name_forms
+        SET person_ids = array_remove(person_ids, %s)
+        WHERE name_form = %s
+    """, (person_id, name_form))
+    cur.execute("""
+        DELETE FROM person_name_forms
+        WHERE name_form = %s AND person_ids = '{}'
+    """, (name_form,))
+    return True
 
 
 # ── Rattachement / détachement par auteur source ──
@@ -279,32 +358,19 @@ def assign_orphan_authorship(cur, person_id: int, source: str, authorship_id: in
     if not cfg:
         raise ValueError(f"Source inconnue : {source}")
 
-    # 1. Rattacher et récupérer le nom + statut excluded
-    if source == "hal":
-        cur.execute("""
-            UPDATE hal_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
-            RETURNING excluded,
-                (SELECT ha.full_name FROM hal_authors ha WHERE ha.id = hal_author_id) AS full_name
-        """, (person_id, authorship_id))
-    elif source == "openalex":
-        cur.execute("""
-            UPDATE openalex_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
-            RETURNING excluded, raw_author_name AS full_name
-        """, (person_id, authorship_id))
-    elif source == "wos":
-        cur.execute("""
-            UPDATE wos_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL
-            RETURNING excluded,
-                (SELECT wa.full_name FROM wos_authors wa WHERE wa.id = wos_author_id) AS full_name
-        """, (person_id, authorship_id))
+    # 1. Rattacher et récupérer le nom normalisé + statut excluded
+    cur.execute(f"""
+        UPDATE {cfg['authorship_table']} SET person_id = %s WHERE id = %s AND person_id IS NULL
+        RETURNING excluded, author_name_normalized
+    """, (person_id, authorship_id))
 
     row = cur.fetchone()
     if not row:
         return False
 
     # 2. Ajouter la forme de nom (sauf si authorship exclue)
-    if row["full_name"] and not row.get("excluded"):
-        add_name_form(cur, person_id, row["full_name"])
+    if row["author_name_normalized"] and not row.get("excluded"):
+        add_name_form(cur, person_id, row["author_name_normalized"], source=source)
 
     # 3. Créer/mettre à jour l'authorship vérité
     _ensure_truth_authorship(cur, person_id, source, authorship_id)
@@ -414,6 +480,7 @@ def merge_person(cur, target_id: int, source_id: int):
     """, (target_id, source_id, target_id))
 
     # 7. Mettre à jour person_name_forms : remplacer source_id par target_id
+    #    (pour les formes non-persons : hal, openalex, wos, manual)
     cur.execute("""
         UPDATE person_name_forms
         SET person_ids = (
@@ -423,6 +490,12 @@ def merge_person(cur, target_id: int, source_id: int):
             updated_at = now()
         WHERE %s = ANY(person_ids)
     """, (source_id, target_id, source_id))
+
+    # 7b. Recalculer les formes source 'persons' du target
+    cur.execute("SELECT last_name, first_name FROM persons WHERE id = %s", (target_id,))
+    target = cur.fetchone()
+    refresh_person_name_forms(cur, target_id, target["last_name"],
+                              target["first_name"] or "")
 
     # 8. Supprimer la personne source
     cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))

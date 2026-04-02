@@ -1,0 +1,152 @@
+"""
+Re-fetch des publications OpenAlex tronquées à 100 auteurs.
+
+L'API OpenAlex bulk retourne max 100 authorships par work. Ce script
+détecte les works avec exactement 100 auteurs dans le staging et les
+re-fetche individuellement via l'API (qui retourne alors tous les auteurs).
+
+Usage:
+    python refetch_truncated.py              # re-fetch complet
+    python refetch_truncated.py --dry-run    # compter seulement
+    python refetch_truncated.py --limit 50   # limiter le nombre
+"""
+
+import argparse
+import hashlib
+import json
+import logging
+import os
+import sys
+import time
+
+import requests
+import psycopg2
+from psycopg2.extras import Json, RealDictCursor
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from config.settings import OPENALEX
+from db.connection import get_connection
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(
+            os.path.join(os.path.dirname(__file__), "logs", "refetch_truncated.log")
+        ),
+    ],
+)
+logger = logging.getLogger(__name__)
+
+BASE_URL = "https://api.openalex.org/works"
+
+SELECT_FIELDS = ",".join([
+    "id", "doi", "title", "display_name", "publication_year",
+    "publication_date", "type", "language", "primary_location",
+    "locations", "authorships", "open_access", "cited_by_count",
+    "biblio", "is_retracted",
+])
+
+
+def compute_hash(raw_data: dict) -> str:
+    canonical = json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
+
+
+def compute_meta_hash(raw_data: dict) -> str:
+    filtered = {k: v for k, v in raw_data.items() if k != "authorships"}
+    canonical = json.dumps(filtered, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
+
+
+def fetch_work(openalex_id: str) -> dict | None:
+    """Fetch un work individuel par son ID OpenAlex (retourne tous les auteurs)."""
+    url = f"{BASE_URL}/{openalex_id}"
+    params = {
+        "select": SELECT_FIELDS,
+        "mailto": OPENALEX["email"],
+    }
+    try:
+        resp = requests.get(url, params=params, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            return None
+        logger.warning(f"Erreur API pour {openalex_id}: {e}")
+    except Exception as e:
+        logger.warning(f"Erreur pour {openalex_id}: {e}")
+    return None
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Re-fetch publications OA tronquées (>= 100 auteurs)")
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
+    args = parser.parse_args()
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    # Détecter les works avec exactement 100 authorships dans le staging
+    cur.execute("""
+        SELECT id, openalex_id
+        FROM staging_openalex
+        WHERE jsonb_array_length(raw_data->'authorships') = 100
+        ORDER BY id
+    """)
+    truncated = cur.fetchall()
+
+    if args.limit:
+        truncated = truncated[:args.limit]
+
+    logger.info(f"{len(truncated)} works avec 100 auteurs détectés (potentiellement tronqués)")
+
+    if not truncated or args.dry_run:
+        conn.close()
+        return
+
+    updated = 0
+    already_complete = 0
+    errors = 0
+
+    for i, row in enumerate(truncated):
+        oa_id = row["openalex_id"]
+        work = fetch_work(oa_id)
+        time.sleep(OPENALEX.get("request_delay", 0.1))
+
+        if not work:
+            errors += 1
+            continue
+
+        n_authors = len(work.get("authorships", []))
+        if n_authors <= 100:
+            # Pas réellement tronqué (la publication a exactement 100 auteurs)
+            already_complete += 1
+            continue
+
+        # Mettre à jour le staging avec la version complète
+        raw_hash = compute_hash(work)
+        meta_hash = compute_meta_hash(work)
+        cur.execute("""
+            UPDATE staging_openalex
+            SET raw_data = %s::jsonb, raw_hash = %s, meta_hash = %s,
+                processed = FALSE, last_seen_at = now()
+            WHERE id = %s
+        """, (Json(work), raw_hash, meta_hash, row["id"]))
+        updated += 1
+
+        if (i + 1) % 50 == 0:
+            conn.commit()
+            logger.info(f"  {i+1}/{len(truncated)}... ({updated} mis à jour, {already_complete} déjà complets)")
+
+    conn.commit()
+    conn.close()
+
+    logger.info(f"Terminé : {updated} works mis à jour avec authorships complètes, "
+                f"{already_complete} déjà complets, {errors} erreurs")
+
+
+if __name__ == "__main__":
+    main()
