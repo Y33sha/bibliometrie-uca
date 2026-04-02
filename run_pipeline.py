@@ -177,7 +177,7 @@ def run_sql(script: str):
     if not path.exists():
         log.warning("Script SQL introuvable : %s — ignoré", script)
         return
-    cmd = ["psql", "-d", "publisher_stats", "-U", "lalecoz", "-f", str(path)]
+    cmd = ["psql", "-d", "bibliometrie", "-U", "lalecoz", "-f", str(path)]
     log.info("▶ %s", script)
     t0 = time.time()
     result = subprocess.run(cmd, cwd=str(BASE))

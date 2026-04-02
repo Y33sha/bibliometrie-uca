@@ -10,7 +10,7 @@
 -- (dérivés de l'algo OpenAlex, souvent fautifs).
 --
 -- Usage :
---   psql -d publisher_stats -U lalecoz -f db/refresh_publication_countries.sql
+--   psql -d bibliometrie -U lalecoz -f db/refresh_publication_countries.sql
 
 UPDATE publications p
 SET countries = sub.all_countries

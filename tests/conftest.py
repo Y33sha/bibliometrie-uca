@@ -1,8 +1,8 @@
 """
-Configuration pytest pour publisher-stats.
+Configuration pytest pour bibliometrie-uca.
 
 Fournit une fixture `db` qui donne accès à une base de test propre.
-La base publisher_stats_test est recréée depuis schema.sql avant chaque
+La base bibliometrie_test est recréée depuis schema.sql avant chaque
 session de tests, et chaque test individuel tourne dans une transaction
 qui est rollbackée à la fin (isolation complète, aucune donnée persistée).
 """
@@ -14,7 +14,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import pytest
 
-DB_NAME = "publisher_stats_test"
+DB_NAME = "bibliometrie_test"
 DB_USER = "lalecoz"
 SCHEMA = pathlib.Path(__file__).parent.parent / "db" / "schema.sql"
 

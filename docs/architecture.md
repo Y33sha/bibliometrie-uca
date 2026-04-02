@@ -188,13 +188,22 @@ un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ
 
 ### `person_name_forms`
 
-Formes de noms observées dans les sources, utilisées pour le matching lors de la
-création de personnes. Chaque forme normalisée pointe vers un tableau de `person_ids`.
+Formes de noms normalisées, utilisées pour le matching lors de la création de
+personnes. Chaque forme pointe vers un tableau de `person_ids`.
 
-- `name_form` : forme brute ou normalisée
-- `name_form_normalized` : forme normalisée (UNIQUE, utilisée pour le matching)
+- `name_form` : forme normalisée (UNIQUE), calculée par `normalize_name_form()` SQL
 - `person_ids` : tableau d'entiers — les personnes associées à cette forme
 - `sources` : tableau de textes (`hal`, `openalex`, `wos`, `persons`, `manual`)
+
+La normalisation (`normalize_name_form()`) produit : minuscules, sans accents,
+tout ce qui n'est pas lettre/chiffre remplacé par des espaces. Exemple :
+"Nédélec, J.-M." → `nedelec j m`.
+
+Les authorships sources portent la même forme dans `author_name_normalized`,
+ce qui permet un matching direct sans recalcul.
+
+Pour la source `persons`, les formes sont calculées par `compute_person_name_forms()`
+qui génère les variantes : "prénom nom", "nom prénom", "initiales nom", "nom initiales".
 
 Une forme avec `person_ids` de longueur > 1 est **ambiguë** (homonymes).
 
