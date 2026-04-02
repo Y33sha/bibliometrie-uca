@@ -19,7 +19,7 @@ import requests
 import psycopg2
 import psycopg2.extras
 
-DB_DSN = "dbname=publisher_stats"
+DB_DSN = "dbname=bibliometrie"
 HAL_API = "https://api.archives-ouvertes.fr/ref/structure/"
 BATCH_SIZE = 50  # nb de structures par requête API
 RATE_LIMIT = 0.3  # secondes entre requêtes

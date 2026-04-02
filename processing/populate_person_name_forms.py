@@ -176,7 +176,7 @@ def populate(conn):
 
 
 if __name__ == "__main__":
-    conn = psycopg2.connect("dbname=publisher_stats user=lalecoz")
+    conn = psycopg2.connect("dbname=bibliometrie user=lalecoz")
     try:
         populate(conn)
     finally:

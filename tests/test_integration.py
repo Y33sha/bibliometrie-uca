@@ -1,4 +1,4 @@
-"""Tests d'intégration — nécessitent la base publisher_stats_test."""
+"""Tests d'intégration — nécessitent la base bibliometrie_test."""
 
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))

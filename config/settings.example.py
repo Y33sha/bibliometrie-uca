@@ -1,5 +1,5 @@
 """
-Configuration du projet publisher-stats.
+Configuration du projet bibliometrie-uca.
 Copier ce fichier vers settings.py et adapter les valeurs.
 """
 
@@ -13,7 +13,7 @@ SESSION_SECRET = "uca-biblio-session-key-change-me"  # clé de signature des coo
 
 # ----- Base de données -----
 DB = {
-    "dbname": "publisher_stats",
+    "dbname": "bibliometrie",
     "user": "postgres",       # à adapter
     "password": "",           # vide si auth peer/ident
     "host": "localhost",

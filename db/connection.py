@@ -13,5 +13,5 @@ from config.settings import DB
 
 
 def get_connection():
-    """Retourne une connexion psycopg2 vers la base publisher-stats."""
+    """Retourne une connexion psycopg2 vers la base bibliometrie."""
     return psycopg2.connect(**DB)

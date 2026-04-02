@@ -1,4 +1,4 @@
-pg_dump -U lalecoz -d publisher_stats -F c -f bibliometrie.dump
+pg_dump -U lalecoz -d bibliometrie -F c -f bibliometrie.dump
 * [ ] programmation cron pour les dumps de sauvegarde
 * [ ] programmation cron pour les imports
 
@@ -109,5 +109,3 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * claire richard: pourquoi 0 publi UCA sur page admin?
 * publi 103567: structures identifiées sur HAL: UCA, Inserm: pourquoi?
 * personne 57907: comprendre comment Damien Boyer a pu devenir une de ses formes de nom
-
-* checkmark dans dropdrown de la page authorships_orphelines => pb affichage
