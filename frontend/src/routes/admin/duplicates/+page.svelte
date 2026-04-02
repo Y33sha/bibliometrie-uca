@@ -273,17 +273,6 @@
 		gap: 4px;
 		align-items: center;
 	}
-	.btn-nav {
-		padding: 4px 10px;
-		border: 1px solid var(--border, #ccc);
-		border-radius: 4px;
-		background: var(--card, #fff);
-		cursor: pointer;
-		font-size: 1rem;
-		line-height: 1;
-	}
-	.btn-nav:hover:not(:disabled) { background: #f0f0f0; }
-	.btn-nav:disabled { opacity: 0.3; cursor: default; }
 
 	.pair-card {
 		background: var(--card, #fff);
@@ -408,39 +397,7 @@
 		background: #fafafa;
 		justify-content: center;
 	}
-	.btn-merge {
-		padding: 8px 18px;
-		border: 1px solid #28a745;
-		border-radius: 4px;
-		background: white;
-		color: #28a745;
-		cursor: pointer;
-		font-size: 0.9rem;
-		font-weight: 500;
-	}
-	.btn-merge:hover:not(:disabled) { background: #d4edda; }
-	.btn-merge:disabled { opacity: 0.5; cursor: default; }
-	.btn-distinct {
-		padding: 8px 18px;
-		border: 1px solid var(--border, #ccc);
-		border-radius: 4px;
-		background: white;
-		color: var(--muted, #666);
-		cursor: pointer;
-		font-size: 0.9rem;
-	}
-	.btn-distinct:hover:not(:disabled) { background: #fff3cd; }
-	.btn-skip {
-		padding: 8px 18px;
-		border: 1px solid var(--border, #ccc);
-		border-radius: 4px;
-		background: white;
-		color: var(--muted, #666);
-		cursor: pointer;
-		font-size: 0.9rem;
-	}
-	.btn-skip:hover:not(:disabled) { background: #f0f0f0; }
-	.btn-skip:disabled, .btn-distinct:disabled { opacity: 0.5; cursor: default; }
+	.btn-merge, .btn-distinct, .btn-skip { padding: 8px 18px; font-size: 0.9rem; }
 
 	.loading, .empty {
 		text-align: center;

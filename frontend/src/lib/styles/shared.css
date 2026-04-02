@@ -1,0 +1,477 @@
+/* ============================================================
+   Shared CSS — bibliometrie-uca
+   Classes used across multiple pages, extracted to avoid duplication.
+   Imported globally in +layout.svelte.
+   ============================================================ */
+
+/* ── Semantic color variables (used by admin pages) ── */
+:root {
+	--success: #2a7d4f;
+	--success-light: #e6f4ec;
+	--danger: #c0392b;
+	--danger-light: #fbeaea;
+	--warning: #d4a017;
+	--warning-light: #fef8e8;
+	--accent-light: #e8f0f8;
+	--text-muted: #777;
+}
+
+/* ── Toolbar ── */
+.toolbar {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	flex-wrap: wrap;
+	margin-bottom: 12px;
+}
+.toolbar input[type='text'],
+.toolbar input[type='text' i] {
+	padding: 6px 10px;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	font-size: 0.95rem;
+	font-family: inherit;
+}
+.toolbar select {
+	padding: 6px 10px;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	font-size: 0.95rem;
+	font-family: inherit;
+}
+.toolbar-spacer { flex: 1; }
+
+/* Toolbar card variant (with background, border, padding) */
+.toolbar-card {
+	padding: 10px 14px;
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+}
+
+/* ── Count badge (usually in toolbar) ── */
+.count {
+	margin-left: auto;
+	font-size: 0.85rem;
+	color: var(--muted);
+	white-space: nowrap;
+}
+
+/* ── Export button ── */
+.export-btn {
+	padding: 4px 10px;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: var(--card);
+	font-size: 0.85rem;
+	color: var(--muted);
+	text-decoration: none;
+	cursor: pointer;
+	white-space: nowrap;
+}
+.export-btn:hover {
+	border-color: var(--accent);
+	color: var(--accent);
+}
+
+/* ── Data table ── */
+.data-table {
+	width: 100%;
+	border-collapse: collapse;
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	overflow: hidden;
+}
+.data-table th {
+	text-align: left;
+	padding: 8px 10px;
+	font-size: 0.8rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: var(--muted);
+	border-bottom: 2px solid var(--border);
+	background: #fafaf8;
+	white-space: nowrap;
+}
+.data-table td {
+	padding: 7px 10px;
+	font-size: 0.95rem;
+	border-bottom: 1px solid #f0efec;
+	vertical-align: top;
+}
+.data-table tr:last-child td {
+	border-bottom: none;
+}
+.data-table tr:hover td {
+	background: #fafaf8;
+}
+.num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+/* ── Sortable columns ── */
+.sortable {
+	cursor: pointer;
+	user-select: none;
+}
+.sortable:hover { color: var(--accent); }
+.sort-arrow { font-size: 0.75rem; margin-left: 3px; color: #bbb; }
+.sortable.active .sort-arrow,
+th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
+
+/* ── Empty / loading states ── */
+.no-results,
+.empty,
+.loading,
+.loading-msg {
+	text-align: center;
+	padding: 40px;
+	color: var(--muted);
+}
+
+/* ── Subtitle ── */
+.subtitle {
+	font-size: 0.95rem;
+	color: var(--muted);
+	margin: -10px 0 16px;
+}
+
+/* ── Back link ── */
+.back-link {
+	display: inline-block;
+	margin-bottom: 12px;
+	font-size: 0.95rem;
+	color: var(--accent);
+	text-decoration: none;
+}
+.back-link:hover { text-decoration: underline; }
+
+/* ── Tabs (detail pages) ── */
+.tabs {
+	display: flex;
+	gap: 0;
+	background: var(--card);
+	border-left: 1px solid var(--border);
+	border-right: 1px solid var(--border);
+	border-bottom: 1px solid var(--border);
+	border-radius: 0 0 6px 6px;
+	margin-bottom: 16px;
+	overflow: hidden;
+}
+.tab {
+	flex: 1;
+	padding: 10px 16px;
+	border: none;
+	background: #f5f4f1;
+	font-size: 0.95rem;
+	font-weight: 500;
+	color: var(--muted);
+	cursor: pointer;
+	font-family: inherit;
+	border-right: 1px solid var(--border);
+	transition: background 0.15s, color 0.15s;
+}
+.tab:last-child { border-right: none; }
+.tab:hover { background: #eae9e5; color: var(--text); }
+.tab.active {
+	background: var(--card);
+	color: var(--accent);
+	box-shadow: inset 0 -2px 0 var(--accent);
+}
+.tab-count {
+	font-size: 0.8rem;
+	font-weight: 400;
+	color: var(--muted);
+	margin-left: 4px;
+}
+
+/* ── ID badge ── */
+.id-badge {
+	display: inline-block;
+	padding: 2px 7px;
+	background: #e8f0f8;
+	border-radius: 3px;
+	font-size: 0.8rem;
+	color: var(--accent);
+	text-decoration: none;
+	white-space: nowrap;
+}
+.id-badge:hover { background: #d4e4f3; color: var(--accent); text-decoration: none; }
+.id-badge.id-confirmed { background: #e6f4ec; color: #2a7d4f; }
+.id-badge.id-confirmed:hover { background: #d0eadb; color: #2a7d4f; }
+
+/* ── Source icon tags (round) ── */
+.source-tag {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	text-decoration: none;
+	margin-right: 3px;
+	vertical-align: middle;
+	transition: transform 0.1s;
+}
+.source-tag:hover { transform: scale(1.15); }
+.source-tag img,
+.source-tag :is(svg) { width: 14px; height: 14px; display: block; }
+.source-hal { background: #e8f0f8; }
+.source-hal:hover { background: #d0e3f4; }
+.source-oa { background: #fef3e0; }
+.source-oa:hover { background: #fde8c8; }
+.source-wos { background: #e8e0f8; }
+.source-wos:hover { background: #d8c8f4; }
+.wos-label { font-size: 11px; font-weight: 700; color: #5a3d8a; line-height: 14px; }
+.source-doi { background: #f0f0f0; }
+.source-doi:hover { background: #e0e0e0; }
+.source-placeholder { visibility: hidden; }
+.links-cell { white-space: nowrap; }
+
+/* ── Source label tags (inline text) ── */
+.source-tag-label {
+	display: inline-block;
+	padding: 1px 5px;
+	border-radius: 3px;
+	font-size: 0.7rem;
+	font-weight: 600;
+	margin-right: 2px;
+}
+.source-hal-label { background: #e8f0f8; color: #3b6b9e; }
+.source-oa-label { background: #fef3e0; color: #b8733e; }
+.source-wos-label { background: #e8e0f8; color: #5a3d8a; }
+
+/* ── Lab tag (pill) ── */
+.lab-tag {
+	display: inline-block;
+	font-size: 0.8rem;
+	padding: 1px 7px;
+	border-radius: 10px;
+	background: #e8f0f8;
+	color: var(--accent);
+	font-weight: 500;
+}
+
+/* ── Role / tutelle tag (neutral) ── */
+.role-tag,
+.tutelle-tag {
+	display: inline-block;
+	padding: 2px 7px;
+	background: #f0efec;
+	border-radius: 3px;
+	font-size: 0.8rem;
+	color: var(--muted);
+	white-space: nowrap;
+}
+
+/* ── Meta badge (detail pages) ── */
+.meta-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	background: #f0efec;
+	border-radius: 3px;
+	font-size: 0.85rem;
+	color: var(--muted);
+	font-weight: 500;
+}
+.type-badge { background: #e8f0f8; color: var(--accent); }
+
+/* ── OA tags ── */
+.oa-tag {
+	display: inline-block;
+	font-size: 0.7rem;
+	padding: 1px 6px;
+	border-radius: 8px;
+	font-weight: 600;
+}
+.oa-gold { background: #fef3e0; color: #d4a017; }
+.oa-diamond { background: #e0f2f7; color: #0288a8; }
+.oa-hybrid { background: #f3eef9; color: #8e6bbf; }
+.oa-green { background: #e6f4ec; color: #2a7d4f; }
+.oa-bronze { background: #fdf0e6; color: #b8733e; }
+.oa-closed { background: #e0e0e0; color: #555; }
+
+/* ── APC tag ── */
+.apc-tag {
+	display: inline-block;
+	font-size: 0.75rem;
+	padding: 1px 5px;
+	border-radius: 3px;
+	background: #e8f5e9;
+	color: #2e7d32;
+	font-weight: 500;
+	cursor: default;
+}
+.apc-other { background: #f0f0f0; color: #888; }
+.apc-cell { text-align: right; white-space: nowrap; }
+
+/* ── Type label ── */
+.type-label { font-size: 0.8rem; color: var(--muted); }
+
+/* ── RH checkmark ── */
+.rh-check {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 15px;
+	height: 15px;
+	border-radius: 50%;
+	background: var(--accent, #3b82f6);
+	color: white;
+	font-size: 0.7rem;
+	font-weight: 700;
+	margin-left: 4px;
+	vertical-align: middle;
+	line-height: 1;
+}
+
+/* ── Buttons ── */
+.btn {
+	padding: 5px 12px;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: var(--card, white);
+	cursor: pointer;
+	font-size: 0.85rem;
+	font-family: inherit;
+	text-decoration: none;
+	color: var(--text);
+	transition: all 0.15s;
+}
+.btn:hover { background: #f0f0f0; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+.btn-sm { padding: 3px 8px; font-size: 0.8rem; }
+
+.btn-confirm {
+	background: var(--success);
+	color: white;
+	border-color: var(--success);
+}
+.btn-confirm:hover {
+	background: #1e5e3b;
+	color: white;
+	border-color: #1e5e3b;
+}
+
+.btn-primary {
+	background: var(--accent);
+	color: white;
+	border-color: var(--accent);
+}
+.btn-primary:hover {
+	background: #2d5a87;
+	color: white;
+	border-color: #2d5a87;
+}
+
+.btn-danger {
+	background: var(--danger);
+	color: white;
+	border-color: var(--danger);
+}
+.btn-danger:hover {
+	background: #962018;
+	color: white;
+	border-color: #962018;
+}
+
+.btn-create {
+	background: var(--success-light);
+	color: var(--success);
+	border-color: var(--success);
+}
+.btn-create:hover {
+	background: var(--success);
+	color: white;
+}
+
+.btn-nav {
+	padding: 4px 10px;
+	font-size: 1rem;
+	line-height: 1;
+}
+.btn-nav:disabled { opacity: 0.3; }
+
+.btn-merge {
+	border-color: var(--success);
+	color: var(--success);
+	font-weight: 500;
+}
+.btn-merge:hover:not(:disabled) {
+	background: var(--success-light);
+}
+.btn-merge:disabled { opacity: 0.5; cursor: default; }
+
+.btn-distinct {
+	color: var(--text-muted);
+}
+.btn-distinct:hover:not(:disabled) {
+	background: var(--warning-light);
+}
+.btn-distinct:disabled { opacity: 0.5; cursor: default; }
+
+.btn-skip {
+	color: var(--text-muted);
+}
+.btn-skip:hover:not(:disabled) {
+	background: #f0f0f0;
+}
+.btn-skip:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Publication title link ── */
+.pub-title {
+	font-weight: 500;
+	color: var(--text);
+	max-width: 500px;
+	text-decoration: none;
+	display: inline-block;
+}
+.pub-title:hover { color: var(--accent); text-decoration: underline; }
+.journal-cell { font-size: 0.85rem; color: var(--muted); }
+
+/* ── Info box (hal-problems, feedback) ── */
+.info-box {
+	background: #f0f7ff;
+	border: 1px solid #c4daf4;
+	border-radius: 6px;
+	padding: 12px 16px;
+	font-size: 0.9rem;
+	color: #2c5282;
+	margin-bottom: 16px;
+	line-height: 1.5;
+}
+
+/* ── Modal ── */
+.modal-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.4);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 9999;
+}
+.modal-content {
+	background: white;
+	border-radius: 8px;
+	padding: 24px;
+	max-width: 700px;
+	width: 90%;
+	max-height: 80vh;
+	overflow-y: auto;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+.modal-content h3 {
+	margin: 0 0 12px;
+	font-size: 1.05rem;
+}
+.modal-actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 16px;
+}

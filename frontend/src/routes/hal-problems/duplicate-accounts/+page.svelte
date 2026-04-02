@@ -150,28 +150,7 @@
 {/if}
 
 <style>
-	.info-box {
-		background: #f0f7ff;
-		border: 1px solid #c4daf4;
-		border-radius: 6px;
-		padding: 12px 16px;
-		font-size: 0.9rem;
-		color: #2c5282;
-		margin-bottom: 16px;
-		line-height: 1.5;
-	}
-	.toolbar {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		margin-bottom: 12px;
-		flex-wrap: wrap;
-	}
-	.count {
-		font-size: 0.9rem;
-		color: var(--muted);
-	}
-
+	.count { font-size: 0.9rem; }
 	.pub-table {
 		width: 100%;
 		border-collapse: collapse;
@@ -181,81 +160,21 @@
 		overflow: hidden;
 	}
 	.pub-table thead th {
-		background: #f5f4f1;
-		padding: 8px 12px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
+		background: #f5f4f1; padding: 8px 12px; text-align: left;
+		font-size: 0.85rem; font-weight: 600; color: var(--muted);
 		border-bottom: 2px solid var(--border);
 	}
-	.pub-table tbody tr {
-		border-bottom: 1px solid #f0efec;
-	}
-	.pub-table tbody tr:hover {
-		background: #fafaf8;
-	}
-	.pub-table td {
-		padding: 8px 12px;
-		font-size: 0.9rem;
-		vertical-align: top;
-	}
-
-	.person-link {
-		color: var(--accent);
-		text-decoration: none;
-		font-weight: 500;
-	}
-	.person-link:hover {
-		text-decoration: underline;
-	}
-	.rh-check {
-		color: #3b82f6;
-		font-size: 0.8rem;
-		margin-left: 4px;
-	}
-
-	.hal-accounts {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-	}
-	.hal-account {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		font-size: 0.85rem;
-		flex-wrap: wrap;
-	}
-	.hal-id {
-		color: var(--accent);
-		text-decoration: none;
-		font-family: monospace;
-		font-size: 0.8rem;
-	}
-	.hal-id:hover {
-		text-decoration: underline;
-	}
-	.hal-name {
-		font-weight: 500;
-	}
-	.hal-pubs {
-		font-size: 0.8rem;
-		color: var(--muted);
-		background: #f0efec;
-		padding: 1px 6px;
-		border-radius: 3px;
-	}
-	.hal-idhal,
-	.hal-orcid {
-		font-size: 0.8rem;
-		color: var(--muted);
-	}
-
-	.loading,
-	.no-results {
-		text-align: center;
-		padding: 40px;
-		color: var(--muted);
-	}
+	.pub-table tbody tr { border-bottom: 1px solid #f0efec; }
+	.pub-table tbody tr:hover { background: #fafaf8; }
+	.pub-table td { padding: 8px 12px; font-size: 0.9rem; vertical-align: top; }
+	.person-link { color: var(--accent); text-decoration: none; font-weight: 500; }
+	.person-link:hover { text-decoration: underline; }
+	.rh-check { color: #3b82f6; font-size: 0.8rem; margin-left: 4px; }
+	.hal-accounts { display: flex; flex-direction: column; gap: 4px; }
+	.hal-account { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; flex-wrap: wrap; }
+	.hal-id { color: var(--accent); text-decoration: none; font-family: monospace; font-size: 0.8rem; }
+	.hal-id:hover { text-decoration: underline; }
+	.hal-name { font-weight: 500; }
+	.hal-pubs { font-size: 0.8rem; color: var(--muted); background: #f0efec; padding: 1px 6px; border-radius: 3px; }
+	.hal-idhal, .hal-orcid { font-size: 0.8rem; color: var(--muted); }
 </style>

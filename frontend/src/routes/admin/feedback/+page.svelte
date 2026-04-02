@@ -600,16 +600,6 @@
 </div>
 
 <style>
-	.page-feedback {
-		--danger: #c0392b;
-		--danger-light: #fbeaea;
-		--success: #2a7d4f;
-		--success-light: #e6f4ec;
-		--warning: #d4a017;
-		--warning-light: #fef8e8;
-		--accent-light: #e8f0f8;
-	}
-
 	h2 {
 		font-size: 1.2rem;
 		font-weight: 600;
@@ -679,14 +669,7 @@
 	}
 
 	/* Toolbar */
-	.toolbar {
-		display: flex;
-		gap: 8px;
-		margin-bottom: 16px;
-		align-items: center;
-		flex-wrap: wrap;
-	}
-
+	.toolbar { margin-bottom: 16px; }
 	.structure-filter {
 		padding: 6px 10px;
 		border: 1px solid var(--accent);
@@ -734,21 +717,7 @@
 		border-color: var(--accent);
 	}
 
-	.toolbar input[type='text'] {
-		padding: 6px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		font-size: 0.95rem;
-		background: white;
-		width: 250px;
-		font-family: inherit;
-	}
-
-	.count {
-		margin-left: auto;
-		color: var(--muted);
-		font-size: 0.85rem;
-	}
+	.toolbar input[type='text'] { width: 250px; background: white; }
 
 	.rerun-btn {
 		padding: 6px 14px;
@@ -771,52 +740,12 @@
 	}
 
 	/* Table */
-	.data-table {
-		width: 100%;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		overflow: hidden;
-	}
-	.data-table th {
-		text-align: left;
-		padding: 8px 10px;
-		font-size: 0.8rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		color: var(--muted);
-		border-bottom: 2px solid var(--border);
-		background: #fafaf8;
-	}
-	.data-table td {
-		padding: 7px 10px;
-		font-size: 0.95rem;
-		border-bottom: 1px solid #f0efec;
-		vertical-align: top;
-	}
-	.data-table tr:last-child td {
-		border-bottom: none;
-	}
-	.data-table tr:hover td {
-		background: #fafaf8;
-	}
-	.num {
-		text-align: right;
-		font-variant-numeric: tabular-nums;
-	}
 	.addr-text {
 		font-family: 'SF Mono', 'Consolas', monospace;
 		font-size: 0.85rem;
 		line-height: 1.4;
 		word-break: break-word;
 		max-width: 600px;
-	}
-	.empty {
-		text-align: center;
-		padding: 40px;
-		color: var(--muted);
 	}
 	.muted-small {
 		color: var(--muted);

@@ -31,9 +31,9 @@ class TestNormalizeName:
     def test_uppercase(self):
         assert normalize_name("DUPONT") == "dupont"
 
-    def test_digits_stripped(self):
-        # normalize_name supprime les chiffres (contrairement à normalize_text)
-        assert normalize_name("Jean2") == "jean"
+    def test_digits_kept(self):
+        # normalize_name conserve les chiffres (aligné sur normalize_name_form SQL)
+        assert normalize_name("Jean2") == "jean2"
 
     def test_multiple_spaces(self):
         assert normalize_name("  Jean   Dupont  ") == "jean dupont"

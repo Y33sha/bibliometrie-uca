@@ -2,12 +2,12 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
-	import { replaceState } from '$app/navigation';
-	import { api } from '$lib/api';
 	import { titleCase } from '$lib/utils';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
-	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
+	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
+	import { useFacets } from '$lib/composables/useFacets.svelte';
+	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 
 	interface Person {
 		id: number;
@@ -20,46 +20,13 @@
 		idhals: string[];
 	}
 
-	interface DirectoryResponse {
-		total: number;
-		page: number;
-		pages: number;
-		per_page: number;
-		persons: Person[];
-	}
-
-	let persons: Person[] = $state([]);
-	let total = $state(0);
-	let currentPage = $state(1);
-	let totalPages = $state(1);
-	const perPage = 50;
-
+	// --- Filter state ---
 	let search = $state('');
-	let debounceTimer: ReturnType<typeof setTimeout>;
-
-	let deptOptions: FacetOption[] = $state([]);
-	let roleOptions: FacetOption[] = $state([]);
-	let orcidOptions: FacetOption[] = $state([]);
-	let idhalOptions: FacetOption[] = $state([]);
-	let rhOptions: FacetOption[] = $state([]);
 	let selectedDepts: string[] = $state([]);
 	let selectedRoles: string[] = $state([]);
 	let selectedOrcid: string[] = $state([]);
 	let selectedIdhal: string[] = $state([]);
 	let selectedRh: string[] = $state(['yes']);
-
-	function syncUrl() {
-		const p = new URLSearchParams();
-		if (selectedDepts.length) p.set('department', selectedDepts.join(','));
-		if (selectedRoles.length) p.set('role', selectedRoles.join(','));
-		if (selectedOrcid.length === 1) p.set('has_orcid', selectedOrcid[0]);
-		if (selectedIdhal.length === 1) p.set('has_idhal', selectedIdhal[0]);
-		p.set('has_rh', selectedRh.length === 1 ? selectedRh[0] : 'all');
-		if (search.trim()) p.set('search', search.trim());
-		if (currentPage > 1) p.set('page', String(currentPage));
-		const qs = p.toString();
-		replaceState(base + '/persons' + (qs ? '?' + qs : ''), {});
-	}
 
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
@@ -71,80 +38,85 @@
 		return params;
 	}
 
-	async function loadFacets() {
-		const params = buildFilterParams();
-		const data = await api<{
-			departments: { value: string; count: number }[];
-			roles: { value: string; count: number }[];
-			orcid: { yes: number; no: number };
-			idhal: { yes: number; no: number };
-			rh: { yes: number; no: number };
-		}>('/api/persons/facets?' + params, { key: 'persons-dir-facets' });
-		deptOptions = data.departments.map((d) => ({
-			value: d.value, text: d.value, count: d.count
-		}));
-		roleOptions = data.roles.map((r) => ({
-			value: r.value, text: r.value, count: r.count
-		}));
-		orcidOptions = [
-			{ value: 'yes', text: 'Avec ORCID', count: data.orcid.yes },
-			{ value: 'no', text: 'Sans ORCID', count: data.orcid.no }
-		];
-		idhalOptions = [
-			{ value: 'yes', text: 'Avec idHAL', count: data.idhal.yes },
-			{ value: 'no', text: 'Sans idHAL', count: data.idhal.no }
-		];
-		rhOptions = [
-			{ value: 'yes', text: 'Oui', count: data.rh.yes },
-			{ value: 'no', text: 'Non', count: data.rh.no }
-		];
-	}
+	// --- Composables ---
+	const dir = usePaginatedFetch<Person>({
+		endpoint: '/api/persons/directory',
+		itemsKey: 'persons',
+		perPage: 50,
+		apiKey: 'persons-dir-list',
+		buildParams() {
+			const params = buildFilterParams();
+			const q = search.trim();
+			if (q) params.set('search', q);
+			return params;
+		},
+	});
 
-	async function loadData() {
-		const params = buildFilterParams();
-		params.set('page', String(currentPage));
-		params.set('per_page', String(perPage));
-		const q = search.trim();
-		if (q) params.set('search', q);
+	const facets = useFacets({
+		endpoint: '/api/persons/facets',
+		apiKey: 'persons-dir-facets',
+		buildParams: buildFilterParams,
+		facets: {
+			depts:  { type: 'simple',  apiKey: 'departments' },
+			roles:  { type: 'simple',  apiKey: 'roles' },
+			orcid:  { type: 'boolean', apiKey: 'orcid', yesLabel: 'Avec ORCID', noLabel: 'Sans ORCID' },
+			idhal:  { type: 'boolean', apiKey: 'idhal', yesLabel: 'Avec idHAL', noLabel: 'Sans idHAL' },
+			rh:     { type: 'boolean', apiKey: 'rh', yesLabel: 'Oui', noLabel: 'Non' },
+		},
+	});
 
-		const data = await api<DirectoryResponse>('/api/persons/directory?' + params, { key: 'persons-dir-list' });
-		total = data.total;
-		totalPages = data.pages;
-		currentPage = data.page;
-		persons = data.persons;
+	const url = useUrlFilters({
+		basePath: '/persons',
+		debounceMs: 300,
+		filters: {
+			selectedDepts:  { type: 'string_array', urlKey: 'department' },
+			selectedRoles:  { type: 'string_array', urlKey: 'role' },
+			selectedOrcid:  { type: 'string_array', urlKey: 'has_orcid' },
+			selectedIdhal:  { type: 'string_array', urlKey: 'has_idhal' },
+			hasRh:          { type: 'single',       urlKey: 'has_rh', defaultValue: 'yes' },
+			search:         { type: 'single',       urlKey: 'search' },
+			currentPage:    { type: 'page',         urlKey: 'page' },
+		},
+	});
+
+	// --- Handlers ---
+	function syncUrl() {
+		url.syncUrl(() => ({
+			selectedDepts, selectedRoles, selectedOrcid, selectedIdhal,
+			hasRh: selectedRh.length === 1 ? selectedRh[0] : 'all',
+			search, currentPage: dir.page,
+		}));
 	}
 
 	function onFilterChange() {
-		currentPage = 1;
+		dir.page = 1;
 		syncUrl();
-		loadData();
-		loadFacets();
+		dir.load();
+		facets.load();
 	}
 
-	function onSearchInput() {
-		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => {
-			currentPage = 1;
-			syncUrl();
-			loadData();
-		}, 300);
-	}
+	const onSearchInput = url.debouncedSearch(() => {
+		dir.page = 1;
+		syncUrl();
+		dir.load();
+	});
 
 	onMount(async () => {
 		const urlParams = $page.url.searchParams;
-		if (urlParams.get('department')) selectedDepts = urlParams.get('department')!.split(',');
-		if (urlParams.get('role')) selectedRoles = urlParams.get('role')!.split(',');
-		if (urlParams.get('has_orcid')) selectedOrcid = [urlParams.get('has_orcid')!];
-		if (urlParams.get('has_idhal')) selectedIdhal = [urlParams.get('has_idhal')!];
-		if (urlParams.has('has_rh')) {
-			const rh = urlParams.get('has_rh')!;
+		const restored = url.restoreFromUrl(urlParams);
+		if (restored.selectedDepts) selectedDepts = restored.selectedDepts as string[];
+		if (restored.selectedRoles) selectedRoles = restored.selectedRoles as string[];
+		if (restored.selectedOrcid) selectedOrcid = restored.selectedOrcid as string[];
+		if (restored.selectedIdhal) selectedIdhal = restored.selectedIdhal as string[];
+		if (restored.hasRh != null) {
+			const rh = restored.hasRh as string;
 			selectedRh = rh === 'all' ? [] : [rh];
 		}
-		if (urlParams.get('search')) search = urlParams.get('search')!;
-		if (urlParams.get('page')) currentPage = Number(urlParams.get('page')) || 1;
+		if (restored.search) search = restored.search as string;
+		if (restored.currentPage) dir.page = restored.currentPage as number;
 
-		await loadFacets();
-		loadData();
+		await facets.load();
+		dir.load();
 	});
 </script>
 
@@ -155,14 +127,14 @@
 <h2>Personnes UCA</h2>
 <p class="subtitle">Enseignants-chercheurs de l'Université Clermont Auvergne</p>
 
-<div class="toolbar">
+<div class="toolbar toolbar-card">
 	<input type="text" placeholder="Rechercher par nom..." bind:value={search} oninput={onSearchInput} />
-	<FacetDropdown label="Département" options={deptOptions} searchable bind:selected={selectedDepts} onchange={onFilterChange} />
-	<FacetDropdown label="Rôle" options={roleOptions} searchable bind:selected={selectedRoles} onchange={onFilterChange} />
-	<FacetDropdown label="ORCID" options={orcidOptions} bind:selected={selectedOrcid} onchange={onFilterChange} />
-	<FacetDropdown label="idHAL" options={idhalOptions} bind:selected={selectedIdhal} onchange={onFilterChange} />
-	<FacetDropdown label="Base RH" options={rhOptions} bind:selected={selectedRh} onchange={onFilterChange} />
-	<span class="count">{total} personne{total > 1 ? 's' : ''}</span>
+	<FacetDropdown label="Département" options={facets.options.depts} searchable bind:selected={selectedDepts} onchange={onFilterChange} />
+	<FacetDropdown label="Rôle" options={facets.options.roles} searchable bind:selected={selectedRoles} onchange={onFilterChange} />
+	<FacetDropdown label="ORCID" options={facets.options.orcid} bind:selected={selectedOrcid} onchange={onFilterChange} />
+	<FacetDropdown label="idHAL" options={facets.options.idhal} bind:selected={selectedIdhal} onchange={onFilterChange} />
+	<FacetDropdown label="Base RH" options={facets.options.rh} bind:selected={selectedRh} onchange={onFilterChange} />
+	<span class="count">{dir.total} personne{dir.total > 1 ? 's' : ''}</span>
 </div>
 
 <table>
@@ -176,10 +148,10 @@
 		</tr>
 	</thead>
 	<tbody>
-		{#if persons.length === 0}
+		{#if dir.items.length === 0}
 			<tr><td colspan="5" class="no-results">Aucune personne trouvée</td></tr>
 		{:else}
-			{#each persons as p (p.id)}
+			{#each dir.items as p (p.id)}
 				<tr>
 					<td>
 						<a href="{base}/persons/{p.id}" class="person-name">
@@ -210,37 +182,11 @@
 	</tbody>
 </table>
 
-<Pagination page={currentPage} pages={totalPages} onchange={(p) => { currentPage = p; syncUrl(); loadData(); }} />
+<Pagination page={dir.page} pages={dir.pages} onchange={(p) => { dir.goToPage(p); syncUrl(); }} />
 
 <style>
 	h2 { font-size: 1.2rem; font-weight: 600; margin: 0 0 14px; }
-	.subtitle { font-size: 0.95rem; color: var(--muted); margin: -10px 0 16px; }
-
-	.toolbar {
-		display: flex;
-		gap: 8px;
-		align-items: center;
-		flex-wrap: wrap;
-		margin-bottom: 12px;
-		padding: 10px 14px;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-	}
-	.toolbar input[type='text'] {
-		padding: 6px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		font-size: 0.95rem;
-		width: 240px;
-	}
-	.count {
-		margin-left: auto;
-		font-size: 0.85rem;
-		color: var(--muted);
-		white-space: nowrap;
-	}
-
+	.toolbar input[type='text'] { width: 240px; }
 	table {
 		width: 100%;
 		border-collapse: collapse;
@@ -271,45 +217,7 @@
 	}
 	td a { color: var(--accent); text-decoration: none; }
 	td a:hover { text-decoration: underline; }
-
+	td a.id-badge:hover { text-decoration: none; }
 	.person-name { font-weight: 500; }
 	.person-last { font-weight: 600; }
-	.role-tag {
-		display: inline-block;
-		padding: 2px 7px;
-		background: #f0efec;
-		border-radius: 3px;
-		font-size: 0.8rem;
-		color: var(--muted);
-		white-space: nowrap;
-	}
-	.id-badge {
-		display: inline-block;
-		padding: 2px 7px;
-		background: #e8f0f8;
-		border-radius: 3px;
-		font-size: 0.8rem;
-		color: var(--accent);
-		text-decoration: none;
-		white-space: nowrap;
-	}
-	.id-badge:hover { background: #d4e4f3; text-decoration: none; }
-	.id-confirmed { background: #e6f4ec; color: #2a7d4f; }
-	.id-confirmed:hover { background: #d0eadb; }
-	.no-results { text-align: center; padding: 40px; color: var(--muted); }
-	.rh-check {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 15px;
-		height: 15px;
-		border-radius: 50%;
-		background: var(--accent, #3b82f6);
-		color: white;
-		font-size: 0.7rem;
-		font-weight: 700;
-		margin-left: 4px;
-		vertical-align: middle;
-		line-height: 1;
-	}
 </style>

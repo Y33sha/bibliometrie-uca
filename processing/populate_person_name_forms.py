@@ -15,9 +15,13 @@ Sources :
 3. wos_authors.full_name via wos_authorships.person_id (source: 'wos')
 4. openalex_authorships.raw_author_name via person_id (source: 'openalex')
 """
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import logging
+from services.persons import compute_person_name_forms
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
@@ -44,11 +48,8 @@ def populate(conn):
     for r in cur.fetchall():
         fn = (r["first_name"] or "").strip()
         ln = r["last_name"].strip()
-        if fn:
-            triples.append((f"{fn} {ln}", r["id"], "persons"))
-            triples.append((f"{ln} {fn}", r["id"], "persons"))
-        else:
-            triples.append((ln, r["id"], "persons"))
+        for form in compute_person_name_forms(ln, fn):
+            triples.append((form, r["id"], "persons"))
 
     # 2. hal_authors.full_name (via hal_authorships.person_id)
     log.info("Source 2 : hal_authors.full_name")
@@ -100,18 +101,12 @@ def populate(conn):
         cur.executemany("INSERT INTO _raw_forms VALUES (%s, %s, %s)", batch)
 
     cur.execute("""
-        SELECT regexp_replace(
-                   unaccent(lower(trim(raw_text))),
-                   '[.,;:]+', '', 'g'
-               ) AS name_form,
+        SELECT normalize_name_form(raw_text) AS name_form,
                array_agg(DISTINCT person_id ORDER BY person_id) AS person_ids,
                array_agg(DISTINCT source ORDER BY source) AS sources
         FROM _raw_forms
         WHERE trim(raw_text) != ''
-        GROUP BY regexp_replace(
-                   unaccent(lower(trim(raw_text))),
-                   '[.,;:]+', '', 'g'
-               )
+        GROUP BY normalize_name_form(raw_text)
     """)
     new_forms = {r["name_form"]: r for r in cur.fetchall() if r["name_form"]}
     log.info(f"  {len(new_forms)} formes distinctes depuis les sources")
@@ -142,9 +137,9 @@ def populate(conn):
                 updated += 1
         else:
             cur.execute("""
-                INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids, sources)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (name_form_normalized) WHERE name_form_normalized IS NOT NULL DO UPDATE SET
+                INSERT INTO person_name_forms (name_form, person_ids, sources)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (name_form) DO UPDATE SET
                     person_ids = (
                         SELECT array_agg(DISTINCT x ORDER BY x)
                         FROM unnest(person_name_forms.person_ids || EXCLUDED.person_ids) AS x
@@ -154,7 +149,7 @@ def populate(conn):
                         FROM unnest(COALESCE(person_name_forms.sources, '{}') || EXCLUDED.sources) AS x
                     ),
                     updated_at = now()
-            """, (nf, nf, data["person_ids"], data["sources"]))
+            """, (nf, data["person_ids"], data["sources"]))
             inserted += 1
 
     # 2. Supprimer les formes obsolètes (uniquement si sources purement bibliographiques)

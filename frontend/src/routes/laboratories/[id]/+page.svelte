@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { goto, replaceState } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api } from '$lib/api';
@@ -11,13 +10,14 @@
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
-	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
+	import TabNav from '$lib/components/TabNav.svelte';
 	import { docTypeLabelsMap, oaLabelsMap, typeLabels } from '$lib/labels';
+	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
+	import { useFacets } from '$lib/composables/useFacets.svelte';
+	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 
 	const labId = $derived($page.params.id);
 	let canGoBack = $state(false);
-	const validTabs = ['dashboard', 'publications', 'persons', 'addresses'] as const;
-	type Tab = (typeof validTabs)[number];
 
 	// --- Types ---
 	interface Structure {
@@ -56,12 +56,6 @@
 		labs: string | null;
 		apc: { amount: number; institution: string | null; lab_id: number | null; lab_acronym: string | null; budget_structure_id: number | null }[] | null;
 	}
-	interface PubResponse {
-		total: number;
-		page: number;
-		pages: number;
-		publications: Publication[];
-	}
 	interface LabPerson {
 		id: number;
 		last_name: string;
@@ -78,6 +72,11 @@
 		pages: number;
 		persons: LabPerson[];
 		orphan_authorships: { hal: number; openalex: number; total: number };
+		facets?: {
+			rh: { yes: number; no: number };
+			orcid: { yes: number; no: number };
+			idhal: { yes: number; no: number };
+		};
 	}
 	interface LabAddress {
 		id: number;
@@ -97,40 +96,24 @@
 	let children: RelatedStructure[] = $state([]);
 	let error = $state(false);
 
-	const activeTab: Tab = $derived(
+	const validTabs = ['dashboard', 'publications', 'persons', 'addresses'];
+	const activeTab = $derived(
 		(() => {
-			const t = $page.url.searchParams.get('tab') as Tab | null;
+			const t = $page.url.searchParams.get('tab');
 			return t && validTabs.includes(t) ? t : 'dashboard';
 		})()
 	);
 
-	// Publications tab
-	let publications: Publication[] = $state([]);
-	let pubTotal = $state(0);
-	let pubPage = $state(1);
-	let pubPages = $state(1);
-	const pubPerPage = 50;
-
-	// Pub filters
+	// --- Publication filters ---
 	let pubSearch = $state('');
-	let debounceTimer: ReturnType<typeof setTimeout>;
 	let selectedYears: string[] = $state([]);
 	let sourceStates: Record<string, string> = $state({});
-	let sourceCounts: Record<string, number> = $state({});
 	let selectedDocTypes: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
 	let selectedApc: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
-	let yearOptions: FacetOption[] = $state([]);
 
-	let docTypeOptions: FacetOption[] = $state([]);
-	let oaOptions: FacetOption[] = $state([]);
-	let apcOptions: FacetOption[] = $state([]);
-	let countryOptions: FacetOption[] = $state([]);
-
-	let pubsLoaded = $state(false);
-
-	// Persons tab
+	// --- Persons tab (manual state: API returns total_persons, not total, + inline facets) ---
 	let persons: LabPerson[] = $state([]);
 	let personsTotal = $state(0);
 	let personsPage = $state(1);
@@ -176,23 +159,7 @@
 		return rorId.replace('https://ror.org/', '');
 	}
 
-	function syncUrl() {
-		const p = new URLSearchParams();
-		if (activeTab !== 'publications') p.set('tab', activeTab);
-		if (selectedYears.length) p.set('year', selectedYears.join(','));
-		const sf = Object.entries(sourceStates).map(([k, v]) => `${k}_${v}`).join(',');
-		if (sf) p.set('source_filter', sf);
-		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
-		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
-		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
-		if (selectedCountries.length) p.set('country', selectedCountries.join(','));
-		if (pubSearch.trim()) p.set('search', pubSearch.trim());
-		if (pubPage > 1) p.set('page', String(pubPage));
-		if (personsSort !== 'name') p.set('psort', personsSort);
-		const qs = p.toString();
-		replaceState(`${base}/laboratories/${labId}` + (qs ? '?' + qs : ''), {});
-	}
-
+	// --- Shared filter params builder (bridge between filter state and composables) ---
 	function buildPubFilterParams(): URLSearchParams {
 		const params = new URLSearchParams({ lab_id: labId });
 		if (selectedYears.length) params.set('year', selectedYears.join(','));
@@ -205,55 +172,68 @@
 		return params;
 	}
 
-	async function loadPubFacets() {
-		const params = buildPubFilterParams();
-		const data = await api<{
-			years: { value: number; count: number }[];
-			doc_types: { value: string; count: number }[];
-			oa_statuses: { value: string; count: number }[];
-			source_counts: Record<string, number>;
-			apc: { value: string; text: string; count: number }[];
-			countries: { value: string; count: number }[];
-		}>('/api/publications/facets?' + params, { key: 'lab-pub-facets' });
-		yearOptions = data.years.map((y) => ({
-			value: String(y.value), text: String(y.value), count: y.count
-		}));
-		docTypeOptions = data.doc_types.map((d) => ({
-			value: d.value, text: docTypeLabelsMap[d.value] || d.value, count: d.count
-		}));
-		oaOptions = data.oa_statuses.map((o) => ({
-			value: o.value, text: oaLabelsMap[o.value] || o.value, count: o.count
-		}));
-		sourceCounts = data.source_counts || {};
-		if (data.apc) {
-			apcOptions = data.apc.map(a => ({ value: a.value, text: a.text, count: a.count }));
-		}
-		if (data.countries) {
-			countryOptions = data.countries.map(c => ({ value: c.value, text: `${c.text} (${c.value.toUpperCase()})`, count: c.count }));
-		}
-	}
+	// --- Composables: Publications ---
+	const pubs = usePaginatedFetch<Publication>({
+		endpoint: '/api/publications',
+		itemsKey: 'publications',
+		perPage: 50,
+		apiKey: 'lab-pubs',
+		buildParams() {
+			const params = buildPubFilterParams();
+			params.set('sort', 'year_desc');
+			const q = pubSearch.trim();
+			if (q) params.set('search', q);
+			return params;
+		},
+	});
 
-	async function loadPublications() {
-		const params = buildPubFilterParams();
-		params.set('page', String(pubPage));
-		params.set('per_page', String(pubPerPage));
-		params.set('sort', 'year_desc');
-		const q = pubSearch.trim();
-		if (q) params.set('search', q);
+	const facets = useFacets({
+		endpoint: '/api/publications/facets',
+		apiKey: 'lab-pub-facets',
+		buildParams: buildPubFilterParams,
+		sourceCountsKey: 'source_counts',
+		facets: {
+			years:     { type: 'simple',      apiKey: 'years' },
+			docTypes:  { type: 'label_map',   apiKey: 'doc_types',   labels: docTypeLabelsMap },
+			oa:        { type: 'label_map',   apiKey: 'oa_statuses', labels: oaLabelsMap },
+			apc:       { type: 'passthrough', apiKey: 'apc' },
+			countries: { type: 'passthrough', apiKey: 'countries',
+				transform: (c) => ({ value: c.value, text: `${c.text} (${c.value.toUpperCase()})`, count: c.count }) },
+		},
+	});
 
-		const data = await api<PubResponse>('/api/publications?' + params, { key: 'lab-pubs' });
-		publications = data.publications;
-		pubTotal = data.total;
-		pubPages = data.pages;
-		pubPage = data.page;
-		pubsLoaded = true;
+	const url = useUrlFilters({
+		basePath: `/laboratories/${labId}`,
+		filters: {
+			tab:              { type: 'single',        urlKey: 'tab', defaultValue: 'publications' },
+			selectedYears:    { type: 'string_array',  urlKey: 'year' },
+			sourceStates:     { type: 'source_states', urlKey: 'source_filter' },
+			selectedDocTypes: { type: 'string_array',  urlKey: 'doc_type' },
+			selectedOa:       { type: 'string_array',  urlKey: 'oa_status' },
+			selectedApc:      { type: 'string_array',  urlKey: 'has_apc' },
+			selectedCountries:{ type: 'string_array',  urlKey: 'country' },
+			pubSearch:        { type: 'single',        urlKey: 'search' },
+			currentPage:      { type: 'page',          urlKey: 'page' },
+			personsSort:      { type: 'single',        urlKey: 'psort', defaultValue: 'name' },
+		},
+	});
+
+	// --- Handlers ---
+	function syncUrl() {
+		url.syncUrl(() => ({
+			tab: activeTab,
+			selectedYears, sourceStates, selectedDocTypes,
+			selectedOa, selectedApc, selectedCountries, pubSearch,
+			currentPage: pubs.page,
+			personsSort,
+		}));
 	}
 
 	function onFilterChange() {
-		pubPage = 1;
+		pubs.page = 1;
 		syncUrl();
-		loadPublications();
-		loadPubFacets();
+		pubs.load();
+		facets.load();
 	}
 
 	function exportCsvUrl(): string {
@@ -264,14 +244,11 @@
 		return `${base}/api/publications/export.csv?${params}`;
 	}
 
-	function onSearchInput() {
-		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => {
-			pubPage = 1;
-			syncUrl();
-			loadPublications();
-		}, 400);
-	}
+	const onSearchInput = url.debouncedSearch(() => {
+		pubs.page = 1;
+		syncUrl();
+		pubs.load();
+	});
 
 	function togglePersonsSort(col: string) {
 		if (personsSort === col) personsSort = '-' + col;
@@ -480,17 +457,9 @@
 		}
 	}
 
-	function switchTab(tab: Tab) {
-		// Update tab via goto (triggers $derived activeTab update)
-		const url = new URL($page.url);
-		if (tab === 'dashboard') {
-			url.searchParams.delete('tab');
-		} else {
-			url.searchParams.set('tab', tab);
-		}
-		goto(url.toString(), { replaceState: true, noScroll: true }).then(() => syncUrl());
+	function onTabSwitch(tab: string) {
 		if (tab === 'dashboard') loadDashboard();
-		if (tab === 'publications' && !pubsLoaded) { loadPubFacets(); loadPublications(); }
+		if (tab === 'publications' && !pubs.loaded) { facets.load(); pubs.load(); }
 		if (tab === 'persons' && !personsLoaded) loadPersons();
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
 	}
@@ -499,22 +468,16 @@
 		canGoBack = (window.navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
 
 		// Restore filters from URL
-		const urlParams = $page.url.searchParams;
-		if (urlParams.get('year')) selectedYears = urlParams.get('year')!.split(',');
-		if (urlParams.get('doc_type')) selectedDocTypes = urlParams.get('doc_type')!.split(',');
-		if (urlParams.get('oa_status')) selectedOa = urlParams.get('oa_status')!.split(',');
-		if (urlParams.get('has_apc')) selectedApc = urlParams.get('has_apc')!.split(',');
-		if (urlParams.get('source_filter')) {
-			const states: Record<string, string> = {};
-			for (const v of urlParams.get('source_filter')!.split(',')) {
-				const m = v.match(/^(\w+)_(yes|no)$/);
-				if (m) states[m[1]] = m[2];
-			}
-			sourceStates = states;
-		}
-		if (urlParams.get('search')) pubSearch = urlParams.get('search')!;
-		if (urlParams.get('page')) pubPage = Number(urlParams.get('page')) || 1;
-		if (urlParams.get('psort')) personsSort = urlParams.get('psort')!;
+		const restored = url.restoreFromUrl($page.url.searchParams);
+		if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
+		if (restored.sourceStates) sourceStates = restored.sourceStates as Record<string, string>;
+		if (restored.selectedDocTypes) selectedDocTypes = restored.selectedDocTypes as string[];
+		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
+		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
+		if (restored.selectedCountries) selectedCountries = restored.selectedCountries as string[];
+		if (restored.pubSearch) pubSearch = restored.pubSearch as string;
+		if (restored.currentPage) pubs.page = restored.currentPage as number;
+		if (restored.personsSort) personsSort = restored.personsSort as string;
 
 		try {
 			const profileData = await api<LabProfile>(`/api/laboratories/${labId}`);
@@ -529,8 +492,8 @@
 		if (activeTab === 'dashboard') {
 			loadDashboard();
 		} else if (activeTab === 'publications') {
-			loadPubFacets();
-			loadPublications();
+			facets.load();
+			pubs.load();
 		} else if (activeTab === 'persons') {
 			loadPersons();
 		} else if (activeTab === 'addresses') {
@@ -607,23 +570,16 @@
 	</div>
 
 	<!-- Tabs -->
-	<div class="tabs">
-		<button class="tab" class:active={activeTab === 'dashboard'} onclick={() => switchTab('dashboard')}>
-			Dashboard
-		</button>
-		<button class="tab" class:active={activeTab === 'publications'} onclick={() => switchTab('publications')}>
-			Publications
-			{#if pubTotal}<span class="tab-count">{pubTotal}</span>{/if}
-		</button>
-		<button class="tab" class:active={activeTab === 'persons'} onclick={() => switchTab('persons')}>
-			Personnes
-			{#if personsLoaded}<span class="tab-count">{personsTotal}</span>{/if}
-		</button>
-		<button class="tab" class:active={activeTab === 'addresses'} onclick={() => switchTab('addresses')}>
-			Adresses
-			{#if addrLoaded}<span class="tab-count">{addrTotal}</span>{/if}
-		</button>
-	</div>
+	<TabNav
+		tabs={[
+			{ id: 'dashboard', label: 'Dashboard', showCount: false },
+			{ id: 'publications', label: 'Publications', count: pubs.total },
+			{ id: 'persons', label: 'Personnes', count: personsLoaded ? personsTotal : undefined },
+			{ id: 'addresses', label: 'Adresses', count: addrLoaded ? addrTotal : undefined },
+		]}
+		onswitch={onTabSwitch}
+		afterNavigate={syncUrl}
+	/>
 
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
@@ -676,15 +632,15 @@
 	<!-- Tab: Publications -->
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
-			<div class="toolbar">
+			<div class="toolbar toolbar-card">
 				<input type="text" placeholder="Rechercher par titre..." bind:value={pubSearch} oninput={onSearchInput} />
-				<FacetDropdown label="Années" options={yearOptions} bind:selected={selectedYears} onchange={onFilterChange} />
-				<FacetDropdown label="Types" options={docTypeOptions} bind:selected={selectedDocTypes} onchange={onFilterChange} />
-				<FacetDropdown label="Voies OA" options={oaOptions} bind:selected={selectedOa} onchange={onFilterChange} />
-				<FacetDropdown label="APC" options={apcOptions} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
-				<FacetDropdown label="Pays" options={countryOptions} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
-				<SourceFilterToggle bind:states={sourceStates} counts={sourceCounts} onchange={onFilterChange} />
-				<span class="count">{pubTotal} publication{pubTotal > 1 ? 's' : ''}</span>
+				<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
+				<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />
+				<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
+				<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
+				<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
+				<SourceFilterToggle bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
+				<span class="count">{pubs.total} publication{pubs.total > 1 ? 's' : ''}</span>
 				<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 			</div>
 			<table class="pub-table">
@@ -700,10 +656,10 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#if publications.length === 0}
+					{#if pubs.items.length === 0}
 						<tr><td colspan="7" class="no-results">Aucune publication</td></tr>
 					{:else}
-						{#each publications as p (p.id)}
+						{#each pubs.items as p (p.id)}
 							<tr>
 								<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
 								<td class="journal-cell">{p.journal || ''}</td>
@@ -766,7 +722,7 @@
 					{/if}
 				</tbody>
 			</table>
-			<Pagination page={pubPage} pages={pubPages} onchange={(p) => { pubPage = p; syncUrl(); loadPublications(); window.scrollTo(0, 0); }} />
+			<Pagination page={pubs.page} pages={pubs.pages} onchange={(p) => { pubs.goToPage(p); syncUrl(); }} />
 		</div>
 	{/if}
 
@@ -778,7 +734,7 @@
 					{orphanStats.total} authorship{orphanStats.total > 1 ? 's' : ''} non relié{orphanStats.total > 1 ? 'es' : 'e'} à une personne
 				</div>
 			{/if}
-			<div class="toolbar">
+			<div class="toolbar toolbar-card">
 				<input type="text" placeholder="Rechercher..." bind:value={personsSearch} oninput={() => { clearTimeout(personsSearchTimer); personsSearchTimer = setTimeout(() => { personsPage = 1; loadPersons(); }, 300); }} />
 				<FacetDropdown label="Base RH" options={rhOptions} bind:selected={selectedRh} onchange={() => { personsPage = 1; loadPersons(); }} />
 				<FacetDropdown label="ORCID" options={orcidOptions} bind:selected={selectedOrcid} onchange={() => { personsPage = 1; loadPersons(); }} />
@@ -855,15 +811,6 @@
 {/if}
 
 <style>
-	.back-link {
-		display: inline-block;
-		margin-bottom: 12px;
-		font-size: 0.95rem;
-		color: var(--accent);
-		text-decoration: none;
-	}
-	.back-link:hover { text-decoration: underline; }
-
 	/* Header */
 	.lab-header {
 		background: var(--card);
@@ -872,163 +819,35 @@
 		padding: 20px 24px;
 		margin-bottom: 0;
 	}
-	.lab-name {
-		font-size: 1.3rem;
-		font-weight: 600;
-		margin: 0 0 10px;
-	}
-	.lab-acronym {
-		font-size: 1.05rem;
-		color: var(--muted);
-		font-weight: 400;
-	}
-	.lab-meta {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
+	.lab-name { font-size: 1.3rem; font-weight: 600; margin: 0 0 10px; }
+	.lab-acronym { font-size: 1.05rem; color: var(--muted); font-weight: 400; }
+	.lab-meta { display: flex; flex-direction: column; gap: 6px; }
 	.meta-row {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		flex-wrap: wrap;
-		font-size: 0.95rem;
+		display: flex; align-items: center; gap: 6px;
+		flex-wrap: wrap; font-size: 0.95rem;
 	}
 	.meta-label {
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: var(--muted);
-		text-transform: uppercase;
-		letter-spacing: 0.3px;
-	}
-	.tutelle-tag, .partner-tag {
-		display: inline-block;
-		padding: 2px 7px;
-		border-radius: 3px;
-		font-size: 0.8rem;
-		white-space: nowrap;
+		font-size: 0.8rem; font-weight: 600; color: var(--muted);
+		text-transform: uppercase; letter-spacing: 0.3px;
 	}
 	.tutelle-tag { background: #e8f0f8; color: var(--accent); }
 	.partner-tag { background: #f0efec; color: var(--muted); }
-	.id-badge {
-		display: inline-block;
-		padding: 2px 7px;
-		background: #e8f0f8;
-		border-radius: 3px;
-		font-size: 0.8rem;
-		color: var(--accent);
-		text-decoration: none;
-		white-space: nowrap;
-	}
-	.id-badge:hover { background: #d4e4f3; }
 	.id-badge { margin-right: 8px; }
 
-	/* Tabs */
-	.tabs {
-		display: flex;
-		gap: 0;
-		background: var(--card);
-		border-left: 1px solid var(--border);
-		border-right: 1px solid var(--border);
-		border-bottom: 1px solid var(--border);
-		border-radius: 0 0 6px 6px;
-		margin-bottom: 16px;
-		overflow: hidden;
-	}
-	.tab {
-		flex: 1;
-		padding: 10px 16px;
-		border: none;
-		background: #f5f4f1;
-		font-size: 0.95rem;
-		font-weight: 500;
-		color: var(--muted);
-		cursor: pointer;
-		font-family: inherit;
-		border-right: 1px solid var(--border);
-		transition: background 0.15s, color 0.15s;
-	}
-	.tab:last-child { border-right: none; }
-	.tab:hover { background: #eae9e5; color: var(--text); }
-	.tab.active {
-		background: var(--card);
-		color: var(--accent);
-		box-shadow: inset 0 -2px 0 var(--accent);
-	}
-	.tab-count {
-		font-size: 0.8rem;
-		font-weight: 400;
-		color: var(--muted);
-		margin-left: 4px;
-	}
-
 	/* Toolbar */
-	.toolbar {
-		display: flex;
-		gap: 8px;
-		align-items: center;
-		flex-wrap: wrap;
-		margin-bottom: 12px;
-		padding: 10px 14px;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-	}
-	.toolbar input[type='text'] {
-		padding: 6px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		font-size: 0.95rem;
-		width: 220px;
-	}
-	.count {
-		margin-left: auto;
-		font-size: 0.85rem;
-		color: var(--muted);
-	}
-	.export-btn {
-		padding: 4px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		background: var(--card);
-		font-size: 0.85rem;
-		color: var(--muted);
-		text-decoration: none;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	.export-btn:hover {
-		border-color: var(--accent);
-		color: var(--accent);
-	}
+	.toolbar input[type='text'] { width: 220px; }
 
 	/* Dashboard */
-	.dash-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 16px;
-	}
+	.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 	.dash-card {
 		background: var(--card);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		padding: 16px;
 	}
-	.dash-card h3 {
-		font-size: 0.95rem;
-		font-weight: 600;
-		margin: 0 0 12px;
-	}
-	.chart-wrap {
-		position: relative;
-		height: 280px;
-	}
-	.oa-summary {
-		text-align: center;
-		font-size: 0.9rem;
-		color: var(--muted);
-		margin-top: 8px;
-	}
+	.dash-card h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 12px; }
+	.chart-wrap { position: relative; height: 280px; }
+	.oa-summary { text-align: center; font-size: 0.9rem; color: var(--muted); margin-top: 8px; }
 
 	/* Shared table styles */
 	.tab-content table {
@@ -1049,109 +868,18 @@
 		border-bottom: 2px solid var(--border);
 		white-space: nowrap;
 	}
-	.tab-content thead th.sortable {
-		cursor: pointer;
-		user-select: none;
-	}
-	.tab-content thead th.sortable:hover {
-		color: var(--accent);
-	}
+	.tab-content thead th.sortable { cursor: pointer; user-select: none; }
+	.tab-content thead th.sortable:hover { color: var(--accent); }
 	.tab-content tbody tr { border-bottom: 1px solid #f0efec; }
 	.tab-content tbody tr:last-child { border-bottom: none; }
 	.tab-content tbody tr:hover { background: #fafaf8; }
-	.tab-content td {
-		padding: 7px 10px;
-		font-size: 0.95rem;
-		vertical-align: top;
-	}
-
-	/* Publications tab */
-	.pub-title {
-		font-weight: 500; color: var(--text);
-		text-decoration: none; display: inline-block;
-	}
-	.pub-title:hover { color: var(--accent); text-decoration: underline; }
-	.journal-cell { font-size: 0.85rem; color: var(--muted); }
-	.source-tag {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 22px;
-		height: 22px;
-		border-radius: 50%;
-		text-decoration: none;
-		margin-right: 3px;
-		vertical-align: middle;
-		transition: transform 0.1s;
-	}
-	.source-tag:hover { transform: scale(1.15); }
-	.source-tag img, .source-tag :global(svg) { width: 14px; height: 14px; display: block; }
-	.source-hal { background: #e8f0f8; }
-	.source-hal:hover { background: #d0e3f4; }
-	.source-oa { background: #fef3e0; }
-	.source-oa:hover { background: #fde8c8; }
-	.source-wos { background: #e8e0f8; }
-	.source-wos:hover { background: #d8c8f4; }
-	.wos-label { font-size: 11px; font-weight: 700; color: #5a3d8a; line-height: 14px; }
-	.source-doi { background: #f0f0f0; }
-	.source-doi:hover { background: #e0e0e0; }
-	.source-placeholder { visibility: hidden; }
-	.links-cell { white-space: nowrap; }
-	.apc-cell { text-align: right; white-space: nowrap; }
-	.apc-tag {
-		display: inline-block; font-size: 0.75rem; padding: 1px 5px;
-		border-radius: 3px; background: #e8f5e9; color: #2e7d32;
-		font-weight: 500; cursor: default;
-	}
-	.apc-other { background: #f0f0f0; color: #888; }
-
-	.oa-tag {
-		display: inline-block;
-		font-size: 0.7rem;
-		padding: 1px 6px;
-		border-radius: 8px;
-		font-weight: 600;
-	}
-	:global(.oa-gold) { background: #fef3e0; color: #d4a017; }
-	:global(.oa-diamond) { background: #e0f2f7; color: #0288a8; }
-	:global(.oa-hybrid) { background: #f3eef9; color: #8e6bbf; }
-	:global(.oa-green) { background: #e6f4ec; color: #2a7d4f; }
-	:global(.oa-bronze) { background: #fdf0e6; color: #b8733e; }
-	:global(.oa-closed) { background: #e0e0e0; color: #555; }
-	.type-label { font-size: 0.8rem; color: var(--muted); }
+	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
 
 	/* Persons tab */
-	.person-link {
-		color: var(--accent);
-		text-decoration: none;
-		font-weight: 500;
-	}
+	.person-link { color: var(--accent); text-decoration: none; font-weight: 500; }
 	.person-link:hover { text-decoration: underline; }
 	.person-last { font-weight: 600; }
-	.rh-check {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 15px;
-		height: 15px;
-		border-radius: 50%;
-		background: var(--accent, #3b82f6);
-		color: white;
-		font-size: 0.7rem;
-		font-weight: 700;
-		margin-left: 4px;
-		vertical-align: middle;
-		line-height: 1;
-	}
 	.muted-cell { font-size: 0.85rem; color: var(--muted); }
-	.id-badge {
-		display: inline-block; padding: 2px 7px; background: #e8f0f8;
-		border-radius: 3px; font-size: 0.8rem; color: var(--accent);
-		text-decoration: none; white-space: nowrap;
-	}
-	.id-badge:hover { background: #d4e4f3; text-decoration: none; }
-	.id-confirmed { background: #e6f4ec; color: #2a7d4f; }
-	.id-confirmed:hover { background: #d0eadb; }
 	.orphan-banner {
 		display: block;
 		background: #fef3e0;
@@ -1163,20 +891,11 @@
 		color: #8a6d1b;
 		text-decoration: none;
 	}
-	.orphan-banner:hover {
-		background: #fdecc8;
-	}
-	.orphan-detail {
-		font-size: 0.85rem;
-		color: #a08530;
-	}
+	.orphan-banner:hover { background: #fdecc8; }
+	.orphan-detail { font-size: 0.85rem; color: #a08530; }
 
 	/* Addresses tab */
-	.addr-cell {
-		font-size: 0.85rem;
-		color: var(--muted);
-		word-break: break-all;
-	}
+	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }
 	.status-tag {
 		display: inline-block;
 		padding: 2px 7px;
@@ -1186,7 +905,4 @@
 	}
 	.status-tag.confirmed { background: #e6f4ec; color: #2a7d4f; }
 	.status-tag.pending { background: #f0efec; color: var(--muted); }
-
-	.no-results { text-align: center; padding: 40px; color: var(--muted); }
-	.loading { text-align: center; padding: 40px; color: var(--muted); }
 </style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import "$lib/styles/shared.css";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";

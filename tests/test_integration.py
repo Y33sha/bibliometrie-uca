@@ -134,12 +134,12 @@ class TestMergePersons:
         source = create_person(db, "Dupont", "J.")
 
         db.execute("""
-            INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids)
-            VALUES ('jean dupont', 'jean dupont', %s)
+            INSERT INTO person_name_forms (name_form, person_ids)
+            VALUES ('jean dupont', %s)
         """, ([target],))
         db.execute("""
-            INSERT INTO person_name_forms (name_form, name_form_normalized, person_ids)
-            VALUES ('j dupont', 'j dupont', %s)
+            INSERT INTO person_name_forms (name_form, person_ids)
+            VALUES ('j dupont', %s)
         """, ([source],))
 
         merge_person(db, target, source)
@@ -149,7 +149,7 @@ class TestMergePersons:
         assert db.fetchone() is None
 
         # Name forms transférées
-        db.execute("SELECT person_ids FROM person_name_forms WHERE name_form_normalized = 'j dupont'")
+        db.execute("SELECT person_ids FROM person_name_forms WHERE name_form = 'j dupont'")
         row = db.fetchone()
         assert target in row["person_ids"]
         assert source not in row["person_ids"]

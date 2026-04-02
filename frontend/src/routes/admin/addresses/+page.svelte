@@ -498,7 +498,7 @@
 							role="group"
 						>
 							<button
-								class="btn btn-reject"
+								class="btn btn-danger"
 								title="Rejeter le lien"
 								onclick={() => reviewAddr(addr.id, false)}>&#x2717;</button
 							>
@@ -560,12 +560,8 @@
 	/* Local CSS variables for status colors */
 	.page-addresses {
 		--danger: #c44;
-		--danger-light: #fce8e8;
-		--success: #2a7d4f;
-		--success-light: #e6f5ed;
 		--warning: #c68a19;
 		--warning-light: #fef5e0;
-		--accent-light: #e8f0f8;
 		--highlight: #fff3b0;
 	}
 
@@ -603,30 +599,9 @@
 	}
 
 	/* Toolbar */
-	.toolbar {
-		display: flex;
-		gap: 8px;
-		margin-bottom: 12px;
-		align-items: center;
-		flex-wrap: wrap;
-	}
 	.toolbar input[type='text'],
-	.toolbar select {
-		padding: 6px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		font-size: 0.95rem;
-		background: white;
-		font-family: inherit;
-	}
-	.search-input {
-		width: 250px;
-	}
-	.count {
-		margin-left: auto;
-		color: var(--muted);
-		font-size: 0.85rem;
-	}
+	.toolbar select { background: white; }
+	.search-input { width: 250px; }
 	.toolbar-sep {
 		width: 1px;
 		height: 24px;
@@ -778,34 +753,7 @@
 		text-decoration: underline;
 	}
 
-	/* Buttons */
-	.btn {
-		padding: 4px 10px;
-		border-radius: 4px;
-		border: 1px solid var(--border);
-		background: white;
-		font-size: 0.85rem;
-		cursor: pointer;
-		transition: all 0.15s;
-		font-family: inherit;
-	}
-	.btn:hover {
-		background: #f0f0f0;
-	}
-	.btn-reject {
-		color: var(--danger);
-	}
-	.btn-reject:hover {
-		background: var(--danger-light);
-		border-color: var(--danger);
-	}
-	.btn-confirm {
-		color: var(--success);
-	}
-	.btn-confirm:hover {
-		background: var(--success-light);
-		border-color: var(--success);
-	}
+	/* Buttons (page-specific) */
 	.btn-reset {
 		color: #888;
 	}
@@ -843,10 +791,4 @@
 		background: rgba(255, 255, 255, 0.15);
 	}
 
-	/* Loading */
-	.loading-msg {
-		text-align: center;
-		padding: 40px;
-		color: var(--muted);
-	}
 </style>

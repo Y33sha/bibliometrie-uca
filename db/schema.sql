@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict djwnWSlSWaPkUpOm5Y1d3sQfEf5ACUL01albQ2qIxxaVXok5GT02M7LSjTXveSl
+\restrict GrHv1EfX8SpeUqvivel3hHpoQ6Y7VZPQshkWgRxkhyWzRW4R5ktpek5CNRHdsiK
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -118,6 +118,15 @@ CREATE TYPE public.structure_type AS ENUM (
     'autre',
     'onr'
 );
+
+
+--
+-- Name: normalize_name_form(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE OR REPLACE FUNCTION public.normalize_name_form(text) RETURNS text AS $$
+  SELECT trim(regexp_replace(unaccent(lower(trim($1))), '[^a-z0-9]+', ' ', 'g'));
+$$ LANGUAGE SQL IMMUTABLE STRICT;
 
 
 SET default_tablespace = '';
@@ -423,7 +432,8 @@ CREATE TABLE public.hal_authorships (
     excluded boolean DEFAULT false,
     structure_ids integer[],
     countries text[],
-    person_id integer
+    person_id integer,
+    author_name_normalized text
 );
 
 
@@ -706,7 +716,8 @@ CREATE TABLE public.openalex_authorships (
     raw_author_name text,
     raw_orcid text,
     person_id integer,
-    countries text[]
+    countries text[],
+    author_name_normalized text
 );
 
 
@@ -850,7 +861,6 @@ CREATE TABLE public.person_name_forms (
     person_ids integer[] NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    name_form_normalized text,
     sources text[]
 );
 
@@ -1120,7 +1130,8 @@ CREATE TABLE public.staging_openalex (
     processed boolean DEFAULT false,
     imported_at timestamp with time zone DEFAULT now(),
     raw_hash text,
-    last_seen_at timestamp with time zone DEFAULT now()
+    last_seen_at timestamp with time zone DEFAULT now(),
+    meta_hash text
 );
 
 
@@ -1334,7 +1345,8 @@ CREATE TABLE public.wos_authorships (
     excluded boolean DEFAULT false,
     structure_ids integer[],
     countries text[],
-    person_id integer
+    person_id integer,
+    author_name_normalized text
 );
 
 
@@ -2294,6 +2306,13 @@ CREATE INDEX idx_hal_as_uca ON public.hal_authorships USING btree (is_uca) WHERE
 
 
 --
+-- Name: idx_hal_as_name_norm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_hal_as_name_norm ON public.hal_authorships USING btree (author_name_normalized) WHERE (author_name_normalized IS NOT NULL);
+
+
+--
 -- Name: idx_hal_authors_form_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2476,6 +2495,13 @@ CREATE INDEX idx_oa_as_doc ON public.openalex_authorships USING btree (openalex_
 
 
 --
+-- Name: idx_oa_as_name_norm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_oa_as_name_norm ON public.openalex_authorships USING btree (author_name_normalized) WHERE (author_name_normalized IS NOT NULL);
+
+
+--
 -- Name: idx_oa_as_doc_uca_structs; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2599,20 +2625,6 @@ CREATE INDEX idx_persons_rh_department ON public.persons_rh USING btree (departm
 --
 
 CREATE INDEX idx_persons_rh_person_id ON public.persons_rh USING btree (person_id);
-
-
---
--- Name: idx_pnf_normalized; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_pnf_normalized ON public.person_name_forms USING btree (name_form_normalized);
-
-
---
--- Name: idx_pnf_normalized_uq; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_pnf_normalized_uq ON public.person_name_forms USING btree (name_form_normalized) WHERE (name_form_normalized IS NOT NULL);
 
 
 --
@@ -2781,6 +2793,13 @@ CREATE INDEX idx_wos_as_structs ON public.wos_authorships USING gin (structure_i
 --
 
 CREATE INDEX idx_wos_as_uca ON public.wos_authorships USING btree (is_uca) WHERE (is_uca = true);
+
+
+--
+-- Name: idx_wos_as_name_norm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_wos_as_name_norm ON public.wos_authorships USING btree (author_name_normalized) WHERE (author_name_normalized IS NOT NULL);
 
 
 --
@@ -3205,5 +3224,5 @@ ALTER TABLE ONLY public.wos_documents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict djwnWSlSWaPkUpOm5Y1d3sQfEf5ACUL01albQ2qIxxaVXok5GT02M7LSjTXveSl
+\unrestrict GrHv1EfX8SpeUqvivel3hHpoQ6Y7VZPQshkWgRxkhyWzRW4R5ktpek5CNRHdsiK
 

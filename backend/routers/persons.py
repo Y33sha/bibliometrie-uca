@@ -24,7 +24,9 @@ from services.persons import (
     assign_orphan_authorship as _assign_orphan,
     add_identifier as _add_identifier,
     add_name_form as _add_name_form,
+    detach_name_form as _detach_name_form,
     create_person as _create_person,
+    refresh_person_name_forms as _refresh_person_name_forms,
 )
 
 router = APIRouter()
@@ -965,9 +967,7 @@ async def update_person_name(person_id: int, body: dict):
                    updated_at = now()
             WHERE id = %s
         """, (last_name, first_name, last_name, first_name, person_id))
-        # Ajouter les nouvelles formes de nom
-        for form in [f"{first_name} {last_name}", f"{last_name} {first_name}"] if first_name else [last_name]:
-            _add_name_form(cur, person_id, form, source="persons")
+        _refresh_person_name_forms(cur, person_id, last_name, first_name)
         return {"ok": True}
 
 
@@ -1120,9 +1120,6 @@ async def assign_orphan_authorship_endpoint(body: dict):
             if not ln:
                 raise HTTPException(status_code=400, detail="Nom requis")
             person_id = _create_person(cur, ln, fn)
-            # Ajouter les formes de nom de la nouvelle personne
-            for form in [f"{fn} {ln}", f"{ln} {fn}"] if fn else [ln]:
-                _add_name_form(cur, person_id, form)
         elif not person_id:
             raise HTTPException(status_code=400, detail="person_id ou create_person requis")
 
@@ -1173,26 +1170,23 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
             SELECT 'hal' AS source, has.id AS authorship_id,
                    p.id AS pub_id, p.title, p.pub_year, p.doi
             FROM hal_authorships has
-            JOIN hal_authors ha ON ha.id = has.hal_author_id
             JOIN hal_documents hd ON hd.id = has.hal_document_id
             JOIN publications p ON p.id = hd.publication_id
-            WHERE has.person_id = %s AND unaccent(lower(trim(ha.full_name))) = %s
+            WHERE has.person_id = %s AND has.author_name_normalized = %s
             UNION ALL
             SELECT 'openalex', oas.id,
                    p.id, p.title, p.pub_year, p.doi
             FROM openalex_authorships oas
-            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
             JOIN publications p ON p.id = od.publication_id
-            WHERE oas.person_id = %s AND unaccent(lower(trim(COALESCE(oas.raw_author_name, oa.full_name)))) = %s
+            WHERE oas.person_id = %s AND oas.author_name_normalized = %s
             UNION ALL
             SELECT 'wos', was.id,
                    p.id, p.title, p.pub_year, p.doi
             FROM wos_authorships was
-            JOIN wos_authors wa ON wa.id = was.wos_author_id
             JOIN wos_documents wd ON wd.id = was.wos_document_id
             JOIN publications p ON p.id = wd.publication_id
-            WHERE was.person_id = %s AND unaccent(lower(trim(wa.full_name))) = %s
+            WHERE was.person_id = %s AND was.author_name_normalized = %s
             ORDER BY pub_year DESC, title
         """, (person_id, name_form, person_id, name_form, person_id, name_form))
         authorships = cur.fetchall()
@@ -1206,7 +1200,7 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
                  LATERAL unnest(pnf.person_ids) AS pid
             JOIN persons p ON p.id = pid
             LEFT JOIN persons_rh pr ON pr.person_id = p.id
-            WHERE pnf.name_form_normalized = %s
+            WHERE pnf.name_form = %s
               AND pid <> %s
               AND p.rejected = FALSE
             ORDER BY p.last_name, p.first_name
@@ -1239,16 +1233,13 @@ async def detach_authorships(person_id: int, body: dict):
             cur.execute("""
                 SELECT COUNT(*) FROM (
                     SELECT 1 FROM hal_authorships has
-                    JOIN hal_authors ha ON ha.id = has.hal_author_id
-                    WHERE has.person_id = %s AND unaccent(lower(trim(ha.full_name))) = %s
+                    WHERE has.person_id = %s AND has.author_name_normalized = %s
                     UNION ALL
                     SELECT 1 FROM openalex_authorships oas
-                    JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-                    WHERE oas.person_id = %s AND unaccent(lower(trim(COALESCE(oas.raw_author_name, oa.full_name)))) = %s
+                    WHERE oas.person_id = %s AND oas.author_name_normalized = %s
                     UNION ALL
                     SELECT 1 FROM wos_authorships was
-                    JOIN wos_authors wa ON wa.id = was.wos_author_id
-                    WHERE was.person_id = %s AND unaccent(lower(trim(wa.full_name))) = %s
+                    WHERE was.person_id = %s AND was.author_name_normalized = %s
                 ) remaining
             """, (person_id, name_form, person_id, name_form, person_id, name_form))
             remaining = cur.fetchone()["count"]
@@ -1272,6 +1263,35 @@ async def detach_authorships(person_id: int, body: dict):
             "deleted_authorships": deleted_authorships,
             "cleaned_form": cleaned_form,
         }
+
+
+@router.post("/api/persons/{person_id}/detach-name-form")
+async def detach_name_form(person_id: int, body: dict):
+    """Détache une forme de nom d'une personne (quand aucune authorship n'y est liée)."""
+    name_form = body.get("name_form", "")
+    if not name_form:
+        raise HTTPException(status_code=400, detail="name_form requis")
+
+    with get_cursor() as (cur, conn):
+        # Vérifier qu'il n'y a aucune authorship liée
+        cur.execute("""
+            SELECT COUNT(*) FROM (
+                SELECT 1 FROM hal_authorships has
+                WHERE has.person_id = %s AND has.author_name_normalized = %s
+                UNION ALL
+                SELECT 1 FROM openalex_authorships oas
+                WHERE oas.person_id = %s AND oas.author_name_normalized = %s
+                UNION ALL
+                SELECT 1 FROM wos_authorships was
+                WHERE was.person_id = %s AND was.author_name_normalized = %s
+            ) remaining
+        """, (person_id, name_form, person_id, name_form, person_id, name_form))
+        remaining = cur.fetchone()["count"]
+        if remaining > 0:
+            raise HTTPException(status_code=400, detail="Cette forme a encore des authorships liées")
+
+        _detach_name_form(cur, person_id, name_form)
+        return {"detached": True}
 
 
 # ----- API: Doublons personnes -----

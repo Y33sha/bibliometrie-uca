@@ -193,13 +193,12 @@ def get_all_unlinked_authorships(cur):
 def load_name_form_map(cur):
     """Charge person_name_forms (formes pointant vers une seule personne)."""
     cur.execute("""
-        SELECT name_form_normalized, person_ids FROM person_name_forms
+        SELECT name_form, person_ids FROM person_name_forms
         WHERE array_length(person_ids, 1) = 1
-          AND name_form_normalized IS NOT NULL
     """)
     result = {}
     for r in cur.fetchall():
-        result[r["name_form_normalized"]] = r["person_ids"][0]
+        result[r["name_form"]] = r["person_ids"][0]
     return result
 
 
