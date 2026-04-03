@@ -104,7 +104,7 @@ def phase_addresses(**kw):
 
 def phase_uca_flags(**kw):
     """Phase 5 : Flags UCA sur authorships sources (étapes 1-3b)."""
-    run_sql("db/populate_uca_flags.sql")
+    run_python("processing/populate_uca_flags.py")
 
 
 def phase_persons(**kw):
