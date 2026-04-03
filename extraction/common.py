@@ -7,24 +7,13 @@ import json
 import logging
 import os
 
+from utils.doi import clean_doi  # noqa: F401 — réexporté pour les scripts d'extraction
+
 
 def compute_hash(raw_data: dict) -> str:
     """Calcule le hash MD5 du JSON canonique (clés triées, compact)."""
     canonical = json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.md5(canonical.encode("utf-8")).hexdigest()
-
-
-def clean_doi(doi: str | None) -> str | None:
-    """Nettoie un DOI brut : supprime le préfixe URL, normalise la casse."""
-    if not doi:
-        return None
-    doi = doi.strip()
-    for prefix in ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/"):
-        if doi.lower().startswith(prefix):
-            doi = doi[len(prefix):]
-            break
-    doi = doi.strip()
-    return doi if doi else None
 
 
 def get_existing_ids(conn, table: str, column: str) -> set:
