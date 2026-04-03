@@ -15,13 +15,12 @@ Usage:
 import argparse
 import logging
 import os
-import re
 import sys
 import time
-import unicodedata
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.normalize import normalize_text
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,21 +49,6 @@ SOURCES = {
         "fk_column": "wos_authorship_id",
     },
 }
-
-
-def normalize_text(text: str) -> str:
-    """Normalise une adresse : minuscules, sans accents, sans ponctuation."""
-    if not text:
-        return ""
-    # Décomposition Unicode → suppression des diacritiques
-    text = unicodedata.normalize("NFKD", text)
-    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
-    text = text.lower()
-    # Ponctuation → espaces
-    text = re.sub(r"[.,;:()\[\]{}\"\'/\-–—]", " ", text)
-    # Espaces multiples → un seul
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
 
 
 def show_stats(cur):
