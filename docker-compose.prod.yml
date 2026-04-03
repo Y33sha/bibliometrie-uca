@@ -1,0 +1,41 @@
+# =============================================================
+# Docker Compose — mode production
+# Usage : docker compose -f docker-compose.prod.yml up -d
+# =============================================================
+# Le backend sert l'API + le frontend buildé (SPA).
+# Pas de conteneur frontend séparé.
+
+services:
+  # ---- PostgreSQL ----
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bibliometrie}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    # Pas de port exposé en prod (accès interne uniquement)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      retries: 5
+
+  # ---- Application (backend + frontend buildé) ----
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8003:8000"
+    env_file: .env
+    environment:
+      DB_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

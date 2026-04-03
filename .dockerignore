@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+.venv
+venv
+
+# Frontend (rebuildé dans le conteneur)
+frontend/node_modules
+frontend/.svelte-kit
+frontend/build
+
+# IDE
+.vscode
+.idea
+
+# Claude
+.claude
+
+# Config sensible (env vars utilisées à la place)
+config/settings.py
+
+# Divers
+*.log
+imports_manuels
+db/backup
+analysis
+PLAN_AMELIORATION.md
+TODO_CLAUDE.md
+TODO_LAURA.md

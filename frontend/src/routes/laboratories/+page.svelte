@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { base } from '$app/paths';
-	import { api } from '$lib/api';
+	import { onMount } from "svelte";
+	import { base } from "$app/paths";
+	import { api } from "$lib/api";
 
 	interface Tutelle {
 		id: number;
@@ -21,8 +21,8 @@
 	}
 
 	let labs: Lab[] = $state([]);
-	let search = $state('');
-	let sortCol: 'name' | 'tutelles' = $state('name');
+	let search = $state("");
+	let sortCol: "name" | "tutelles" = $state("name");
 	let sortAsc = $state(true);
 
 	const filtered = $derived.by(() => {
@@ -33,22 +33,22 @@
 				(l) =>
 					l.name?.toLowerCase().includes(q) ||
 					l.acronym?.toLowerCase().includes(q) ||
-					l.code?.toLowerCase().includes(q)
+					l.code?.toLowerCase().includes(q),
 			);
 		}
 		result = [...result].sort((a, b) => {
 			let va: string, vb: string;
-			if (sortCol === 'name') {
-				va = (a.name || '').toLowerCase();
-				vb = (b.name || '').toLowerCase();
+			if (sortCol === "name") {
+				va = (a.name || "").toLowerCase();
+				vb = (b.name || "").toLowerCase();
 			} else {
 				va = (a.tutelles || [])
 					.map((t) => t.acronym || t.name)
-					.join(', ')
+					.join(", ")
 					.toLowerCase();
 				vb = (b.tutelles || [])
 					.map((t) => t.acronym || t.name)
-					.join(', ')
+					.join(", ")
 					.toLowerCase();
 			}
 			if (va < vb) return sortAsc ? -1 : 1;
@@ -58,7 +58,7 @@
 		return result;
 	});
 
-	function toggleSort(col: 'name' | 'tutelles') {
+	function toggleSort(col: "name" | "tutelles") {
 		if (sortCol === col) {
 			sortAsc = !sortAsc;
 		} else {
@@ -68,11 +68,11 @@
 	}
 
 	function rorShortId(rorId: string): string {
-		return rorId.replace('https://ror.org/', '');
+		return rorId.replace("https://ror.org/", "");
 	}
 
 	onMount(async () => {
-		labs = await api<Lab[]>('/api/laboratories');
+		labs = await api<Lab[]>("/api/laboratories");
 	});
 </script>
 
@@ -80,25 +80,40 @@
 	<title>Laboratoires — Bibliométrie UCA</title>
 </svelte:head>
 
-<h2>Laboratoires UCA</h2>
-<p class="subtitle">Structures de recherche ayant l'Université Clermont Auvergne pour tutelle</p>
-
 <div class="toolbar toolbar-card">
-	<input type="text" placeholder="Rechercher un laboratoire..." bind:value={search} />
-	<span class="count">{filtered.length} laboratoire{filtered.length > 1 ? 's' : ''}</span>
+	<input
+		type="text"
+		placeholder="Rechercher un laboratoire..."
+		bind:value={search}
+	/>
+	<span class="count"
+		>{filtered.length} laboratoire{filtered.length > 1 ? "s" : ""}</span
+	>
 </div>
 
 <table>
 	<thead>
 		<tr>
-			<th class:sorted={sortCol === 'name'} onclick={() => toggleSort('name')}>
+			<th
+				class:sorted={sortCol === "name"}
+				onclick={() => toggleSort("name")}
+			>
 				Laboratoire
-				<span class="sort-arrow">{sortCol === 'name' ? (sortAsc ? '▲' : '▼') : '▲'}</span>
+				<span class="sort-arrow"
+					>{sortCol === "name" ? (sortAsc ? "▲" : "▼") : "▲"}</span
+				>
 			</th>
-			<th class:sorted={sortCol === 'tutelles'} onclick={() => toggleSort('tutelles')}>
+			<th
+				class:sorted={sortCol === "tutelles"}
+				onclick={() => toggleSort("tutelles")}
+			>
 				Co-tutelles
 				<span class="sort-arrow"
-					>{sortCol === 'tutelles' ? (sortAsc ? '▲' : '▼') : '▲'}</span
+					>{sortCol === "tutelles"
+						? sortAsc
+							? "▲"
+							: "▼"
+						: "▲"}</span
 				>
 			</th>
 			<th>ROR</th>
@@ -119,13 +134,20 @@
 				<td>
 					<div class="tutelles">
 						{#each lab.tutelles || [] as t (t.id)}
-							<span class="tutelle-tag">{t.acronym || t.name}</span>
+							<span class="tutelle-tag"
+								>{t.acronym || t.name}</span
+							>
 						{/each}
 					</div>
 				</td>
 				<td>
 					{#if lab.ror_id}
-						<a href={lab.ror_id} target="_blank" rel="noopener" class="id-badge">
+						<a
+							href={lab.ror_id}
+							target="_blank"
+							rel="noopener"
+							class="id-badge"
+						>
 							{rorShortId(lab.ror_id)}
 						</a>
 					{/if}
@@ -153,7 +175,9 @@
 		font-weight: 600;
 		margin: 0 0 14px;
 	}
-	.toolbar input[type='text'] { width: 260px; }
+	.toolbar input[type="text"] {
+		width: 260px;
+	}
 	table {
 		width: 100%;
 		border-collapse: collapse;
@@ -176,20 +200,49 @@
 		user-select: none;
 		white-space: nowrap;
 	}
-	thead th:hover { color: var(--text); }
-	tbody tr { border-bottom: 1px solid #f0efec; }
-	tbody tr:last-child { border-bottom: none; }
-	tbody tr:hover { background: #fafaf8; }
+	thead th:hover {
+		color: var(--text);
+	}
+	tbody tr {
+		border-bottom: 1px solid #f0efec;
+	}
+	tbody tr:last-child {
+		border-bottom: none;
+	}
+	tbody tr:hover {
+		background: #fafaf8;
+	}
 	td {
 		padding: 10px 12px;
 		font-size: 0.95rem;
 		vertical-align: middle;
 	}
-	td a { color: var(--accent); text-decoration: none; }
-	td a:hover { text-decoration: underline; }
-	.lab-link { text-decoration: none; color: inherit; }
-	.lab-link:hover .lab-name { color: var(--accent); text-decoration: underline; }
-	.lab-name { font-weight: 500; }
-	.lab-acronym { font-size: 0.85rem; color: var(--muted); margin-left: 6px; }
-	.tutelles { display: flex; flex-wrap: wrap; gap: 4px; }
+	td a {
+		color: var(--accent);
+		text-decoration: none;
+	}
+	td a:hover {
+		text-decoration: underline;
+	}
+	.lab-link {
+		text-decoration: none;
+		color: inherit;
+	}
+	.lab-link:hover .lab-name {
+		color: var(--accent);
+		text-decoration: underline;
+	}
+	.lab-name {
+		font-weight: 500;
+	}
+	.lab-acronym {
+		font-size: 0.85rem;
+		color: var(--muted);
+		margin-left: 6px;
+	}
+	.tutelles {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+	}
 </style>

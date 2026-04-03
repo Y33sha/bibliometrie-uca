@@ -13,12 +13,76 @@ référentiel dédupliqué de publications, personnes et laboratoires.
 
 ## Prérequis
 
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+Ou, pour une installation sans Docker :
+
 - Python 3.10+
 - Node.js 20+ / npm 10+
-- PostgreSQL 18+
-- Extension PostgreSQL : `pg_trgm`, `unaccent`
+- PostgreSQL 18+ avec extensions `pg_trgm`, `unaccent`
 
-## Installation
+## Installation avec Docker (recommandé)
+
+### 1. Configuration
+
+```bash
+cp .env.example .env
+```
+
+Editer `.env` avec vos valeurs (credentials DB, admin, clés API).
+
+### 2. Lancement (dev)
+
+```bash
+docker compose up
+```
+
+- Frontend : http://localhost:5176/bibliometrie
+- Backend / API : http://localhost:8003
+
+Le code est monté en volume : les modifications sont prises en compte en temps
+réel (hot reload backend + frontend).
+
+### 3. Importer une base existante
+
+```bash
+# Copier le dump dans le conteneur
+docker cp bibliometrie.dump bibliometrie-uca-db-1:/tmp/
+
+# Restaurer
+docker compose exec db bash -c "pg_restore -U lalecoz -d bibliometrie --no-owner -j 4 /tmp/bibliometrie.dump"
+```
+
+Pour créer une base vide à la place :
+
+```bash
+docker compose exec db psql -U postgres -d bibliometrie -f /app/db/schema.sql
+```
+
+### 4. Pipeline de données
+
+```bash
+docker compose exec backend python run_pipeline.py
+```
+
+### 5. Lancement (prod)
+
+En production, le backend sert l'API et le frontend buildé (image unique) :
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Commandes utiles
+
+```bash
+docker compose down        # Arrêter les conteneurs
+docker compose down -v     # Arrêter et supprimer le volume PostgreSQL
+docker compose logs -f     # Suivre les logs
+docker compose exec backend bash   # Shell dans le conteneur backend
+```
+
+## Installation sans Docker
 
 ### Base de données
 
@@ -40,12 +104,12 @@ cd frontend
 npm install
 ```
 
-## Lancement
+## Lancement sans Docker
 
 ### Développement
 
 ```bash
-# Backend (port 8000 par défaut)
+# Backend (port 8003 par défaut)
 uvicorn backend.app:app --reload
 
 # Frontend (port 5173 par défaut)
