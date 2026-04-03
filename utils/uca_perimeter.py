@@ -20,6 +20,22 @@ def get_uca_structure_ids(cur) -> set[int]:
     return {r[0] for r in cur.fetchall()}
 
 
+def get_uca_structure_ids_wide(cur) -> set[int]:
+    """Retourne le périmètre UCA large (restreint + partenaires CHU, INP…).
+
+    Utilisé pour structure_ids (toutes les structures détectées),
+    tandis que le périmètre restreint sert pour is_uca.
+    """
+    restricted = get_uca_structure_ids(cur)
+    cur.execute("""
+        SELECT sr.parent_id FROM structure_relations sr
+        JOIN structures s ON s.id = sr.child_id
+        WHERE s.code = 'uca' AND sr.relation_type = 'est_partenaire_de'
+    """)
+    partners = {r[0] for r in cur.fetchall()}
+    return restricted | partners
+
+
 def get_uca_structure_ids_list(cur) -> list[int]:
     """Variante retournant une liste (pour usage dans les requêtes SQL ANY(%s))."""
     return list(get_uca_structure_ids(cur))
