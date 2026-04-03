@@ -16,33 +16,20 @@ Usage:
 """
 
 import argparse
-import hashlib
-import json
-import logging
 import os
 import sys
 import time
 
 import requests
-import psycopg2
 from psycopg2.extras import Json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config.settings import HAL
 from db.connection import get_connection
+from extraction.common import compute_hash, setup_logger
 
 # ----- Logging -----
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "logs", "cross_import_hal.log")
-        ),
-    ],
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger("cross_import_hal", os.path.join(os.path.dirname(__file__), "logs"))
 
 HAL_API = "https://api.archives-ouvertes.fr/search"
 HAL_FIELDS = (
@@ -79,11 +66,6 @@ def get_missing_dois(conn) -> list[str]:
             ORDER BY doi
         """)
         return [row[0] for row in cur.fetchall()]
-
-
-def compute_hash(raw_data: dict) -> str:
-    canonical = json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
 
 
 def fetch_by_doi(doi: str) -> dict | None:

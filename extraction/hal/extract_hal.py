@@ -17,33 +17,20 @@ stocke la liste séparée par des virgules.
 """
 
 import argparse
-import json
-import logging
 import os
 import sys
 import time
 
-import hashlib
 import requests
-import psycopg2
 from psycopg2.extras import Json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config.settings import HAL
 from db.connection import get_connection
+from extraction.common import compute_hash, clean_doi, get_existing_ids, setup_logger
 
 # ----- Logging -----
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "logs", "extract_hal.log")
-        ),
-    ],
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))
 
 # ----- Constantes API -----
 BASE_URL = "https://api.archives-ouvertes.fr/search"
@@ -132,16 +119,7 @@ def extract_hal_id(doc: dict) -> str:
 
 def extract_doi(doc: dict) -> str | None:
     """Extrait le DOI nettoyé."""
-    doi = doc.get("doiId_s")
-    if doi:
-        return doi.replace("https://doi.org/", "").strip()
-    return None
-
-
-def compute_hash(raw_data: dict) -> str:
-    """Calcule le hash MD5 du JSON canonique (clés triées, compact)."""
-    canonical = json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
+    return clean_doi(doc.get("doiId_s"))
 
 
 def upsert_work(conn, hal_id: str, doi: str | None, raw_data: dict, collection: str):
@@ -158,7 +136,7 @@ def upsert_work(conn, hal_id: str, doi: str | None, raw_data: dict, collection: 
             ON CONFLICT (halid) DO UPDATE SET
                 collection = CASE
                     WHEN staging_hal.collection IS NULL THEN EXCLUDED.collection
-                    WHEN staging_hal.collection LIKE '%%' || EXCLUDED.collection || '%%'
+                    WHEN EXCLUDED.collection = ANY(string_to_array(staging_hal.collection, ','))
                         THEN staging_hal.collection
                     ELSE staging_hal.collection || ',' || EXCLUDED.collection
                 END,
@@ -303,11 +281,9 @@ def extract_portal(
     return total_count, total_new
 
 
-def get_existing_ids(conn) -> set:
+def get_existing_hal_ids(conn) -> set:
     """Récupère les halId déjà en base."""
-    with conn.cursor() as cur:
-        cur.execute("SELECT halid FROM staging_hal")
-        return {row[0] for row in cur.fetchall()}
+    return get_existing_ids(conn, "staging_hal", "halid")
 
 
 def main():
@@ -331,7 +307,7 @@ def main():
 
     conn = get_connection()
     try:
-        existing_ids = get_existing_ids(conn)
+        existing_ids = get_existing_hal_ids(conn)
         logger.info(f"{len(existing_ids)} works déjà en staging")
 
         grand_total_new = 0
