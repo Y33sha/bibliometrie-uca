@@ -28,5 +28,8 @@ db/backup/
 .vscode/
 .idea/
 
+# Docker
+.env
+
 # Claude Code
 .claude/
