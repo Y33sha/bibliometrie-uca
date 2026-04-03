@@ -143,6 +143,7 @@
 		{pages}
 		onchange={(p) => {
 			page = p;
+			syncUrl();
 			load();
 			window.scrollTo(0, 0);
 		}}

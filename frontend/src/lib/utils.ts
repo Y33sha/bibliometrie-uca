@@ -1,3 +1,5 @@
+import katex from 'katex';
+
 export function esc(s: string | null | undefined): string {
 	if (!s) return '';
 	const d = document.createElement('div');
@@ -8,10 +10,12 @@ export function esc(s: string | null | undefined): string {
 /* ── sanitizeTitle ─────────────────────────────────────────────
  * Renders publication titles that may contain:
  *  - MathML with mml: namespace prefix  (<mml:msup>, <mml:mi>, …)
+ *  - LaTeX inline/display math          ($...$, $$...$$)
  *  - Plain HTML formatting              (<sub>, <sup>, <i>)
  *
- * Strips the mml: prefix so browsers render native MathML,
- * keeps only an allowlist of safe tags/attributes, and escapes
+ * LaTeX segments are rendered via KaTeX.
+ * MathML: strips the mml: prefix for native browser rendering.
+ * Keeps only an allowlist of safe tags/attributes, and escapes
  * everything else (XSS-safe → use with {@html}).
  * ────────────────────────────────────────────────────────────── */
 
@@ -33,10 +37,35 @@ function escapeHtml(s: string): string {
 		.replace(/"/g, '&quot;');
 }
 
-export function sanitizeTitle(s: string | null | undefined): string {
-	if (!s) return '';
+/* Render LaTeX $...$ and $$...$$ segments via KaTeX,
+ * escape all non-LaTeX text. */
+function renderLatex(s: string): string {
+	const parts: string[] = [];
+	let lastIdx = 0;
+	// Match $$...$$ (display) then $...$ (inline)
+	const re = /\$\$([\s\S]+?)\$\$|\$([^$]+?)\$/g;
+	let m;
 
-	// Strip mml: namespace prefix from tags
+	while ((m = re.exec(s)) !== null) {
+		parts.push(escapeHtml(s.slice(lastIdx, m.index)));
+		const tex = (m[1] || m[2]).trim();
+		try {
+			parts.push(katex.renderToString(tex, {
+				displayMode: false,
+				throwOnError: false
+			}));
+		} catch {
+			parts.push(escapeHtml(tex));
+		}
+		lastIdx = m.index + m[0].length;
+	}
+
+	parts.push(escapeHtml(s.slice(lastIdx)));
+	return parts.join('');
+}
+
+/* Sanitize MathML + HTML formatting tags. */
+function sanitizeMathML(s: string): string {
 	const input = s.replace(/<(\/?)\s*mml:/g, '<$1');
 
 	const parts: string[] = [];
@@ -45,7 +74,6 @@ export function sanitizeTitle(s: string | null | undefined): string {
 	let m;
 
 	while ((m = re.exec(input)) !== null) {
-		// Escape text between tags
 		parts.push(escapeHtml(input.slice(lastIdx, m.index)));
 
 		const [full, slash, tag, rawAttrs] = m;
@@ -60,7 +88,6 @@ export function sanitizeTitle(s: string | null | undefined): string {
 			}
 			parts.push(`<${slash}${tag.toLowerCase()}${attrs}>`);
 		}
-		// Non-allowed tags are silently stripped
 		lastIdx = m.index + full.length;
 	}
 
@@ -68,11 +95,23 @@ export function sanitizeTitle(s: string | null | undefined): string {
 	return parts.join('');
 }
 
+const HAS_LATEX = /\$\$[\s\S]+?\$\$|\$[^$]+?\$/;
+const HAS_MATHML = /<\/?mml:/;
+
+export function sanitizeTitle(s: string | null | undefined): string {
+	if (!s) return '';
+
+	if (HAS_LATEX.test(s)) return renderLatex(s);
+	if (HAS_MATHML.test(s) || /<\/?[a-z]/i.test(s)) return sanitizeMathML(s);
+
+	return escapeHtml(s);
+}
+
 export function titleCase(s: string | null | undefined): string {
 	if (!s) return '';
 	return s
-		.split(/(\s+|[-\u2010\u2011\u2012\u2013\u2014])/g)
-		.map((w) => (/^[\s\-\u2010-\u2014]+$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+		.split(/(\s+|[-\u2010\u2011\u2012\u2013\u2014''])/g)
+		.map((w) => (/^[\s\-\u2010-\u2014'']+$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
 		.join('');
 }
 

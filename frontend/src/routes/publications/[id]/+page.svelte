@@ -717,7 +717,7 @@
 		font-size: 0.75rem;
 		font-weight: 700;
 	}
-	.ok-icon { background: #e6f4ec; color: #2a7d4f; }
+	.ok-icon { background: var(--accent, #3b82f6); color: white; }
 	.conflict-icon { background: #fde8e8; color: #c0392b; }
 	.source-summary-count { font-size: 0.85rem; color: var(--muted); font-weight: 400; }
 	.source-wos-link { background: #f0e8f5; color: #6b4c8a; }

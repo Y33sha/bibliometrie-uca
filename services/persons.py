@@ -10,6 +10,7 @@ le person_id y est la source de vérité du lien personne.
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.normalize import normalize_name
+from utils.uca_perimeter import get_uca_structure_ids_list
 
 
 # ── Création ──
@@ -151,13 +152,23 @@ def refresh_person_name_forms(cur, person_id: int, last_name: str, first_name: s
     les nouvelles. Les formes partagées avec d'autres personnes ou d'autres
     sources sont préservées (seul le person_id et la source sont retirés/ajoutés).
     """
-    # 1. Retirer person_id de toutes les formes source 'persons' de cette personne
+    # 1a. Formes dont 'persons' est la seule source : retirer le person_id
     cur.execute("""
         UPDATE person_name_forms
         SET person_ids = array_remove(person_ids, %s)
-        WHERE %s = ANY(person_ids) AND 'persons' = ANY(sources)
+        WHERE %s = ANY(person_ids)
+          AND sources = ARRAY['persons']
     """, (person_id, person_id))
-    # Nettoyer les formes devenues vides
+    # 1b. Formes multi-sources : retirer 'persons' de sources, garder person_id
+    cur.execute("""
+        UPDATE person_name_forms
+        SET sources = array_remove(sources, 'persons'),
+            updated_at = now()
+        WHERE %s = ANY(person_ids)
+          AND 'persons' = ANY(sources)
+          AND array_length(sources, 1) > 1
+    """, (person_id,))
+    # 1c. Nettoyer les formes devenues vides
     cur.execute("""
         DELETE FROM person_name_forms
         WHERE person_ids = '{}' OR person_ids IS NULL
@@ -379,7 +390,12 @@ def assign_orphan_authorship(cur, person_id: int, source: str, authorship_id: in
 
 
 def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: int):
-    """Crée l'authorship vérité si elle n'existe pas, et met à jour la FK source."""
+    """Crée/synchronise l'authorship vérité à partir des authorships sources.
+
+    Même logique que build_authorships.py mais pour une seule paire
+    (publication_id, person_id) : FK, author_position, is_corresponding,
+    is_uca, structure_ids.
+    """
     cfg = _SOURCE_CONFIG[source]
 
     # Trouver la publication_id via la table de documents
@@ -399,18 +415,76 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
         return
     pub_id = row["publication_id"]
 
-    # INSERT si pas déjà existant
+    # 1. INSERT si pas déjà existant
     cur.execute("""
         INSERT INTO authorships (publication_id, person_id)
         VALUES (%s, %s)
         ON CONFLICT (publication_id, person_id) DO NOTHING
     """, (pub_id, person_id))
 
-    # Mettre à jour la FK source
-    cur.execute(f"""
-        UPDATE authorships SET {cfg['truth_fk']} = %s, updated_at = now()
-        WHERE publication_id = %s AND person_id = %s AND {cfg['truth_fk']} IS NULL
-    """, (authorship_id, pub_id, person_id))
+    # 2. FK sources
+    for src, src_cfg in _SOURCE_CONFIG.items():
+        s_auth_tbl, s_doc_tbl, s_doc_fk = doc_table[src]
+        cur.execute(f"""
+            UPDATE authorships a
+            SET {src_cfg['truth_fk']} = sub.aid
+            FROM (
+                SELECT sa.id AS aid
+                FROM {s_auth_tbl} sa
+                JOIN {s_doc_tbl} sd ON sd.id = sa.{s_doc_fk}
+                WHERE sd.publication_id = %s AND sa.person_id = %s
+                  AND NOT sa.excluded
+                ORDER BY sa.id
+                LIMIT 1
+            ) sub
+            WHERE a.publication_id = %s AND a.person_id = %s
+              AND a.{src_cfg['truth_fk']} IS NULL
+        """, (pub_id, person_id, pub_id, person_id))
+
+    # 3. author_position et is_corresponding
+    cur.execute("""
+        UPDATE authorships a
+        SET author_position = COALESCE(has.author_position, oas.author_position, was.author_position),
+            is_corresponding = COALESCE(a.is_corresponding, was.is_corresponding)
+        FROM authorships a2
+        LEFT JOIN hal_authorships has ON has.id = a2.hal_authorship_id
+        LEFT JOIN openalex_authorships oas ON oas.id = a2.openalex_authorship_id
+        LEFT JOIN wos_authorships was ON was.id = a2.wos_authorship_id
+        WHERE a.id = a2.id
+          AND a.publication_id = %s AND a.person_id = %s
+    """, (pub_id, person_id))
+
+    # 4. is_uca et structure_ids (union des 3 sources)
+    uca_ids = get_uca_structure_ids_list(cur)
+    cur.execute("""
+        WITH src AS (
+            SELECT has.is_uca AS uca, has.structure_ids AS sids
+            FROM hal_authorships has
+            JOIN hal_documents hd ON hd.id = has.hal_document_id
+            WHERE hd.publication_id = %s AND has.person_id = %s AND NOT has.excluded
+            UNION ALL
+            SELECT oas.is_uca, oas.structure_ids
+            FROM openalex_authorships oas
+            JOIN openalex_documents od ON od.id = oas.openalex_document_id
+            WHERE od.publication_id = %s AND oas.person_id = %s AND NOT oas.excluded
+            UNION ALL
+            SELECT was.is_uca, was.structure_ids
+            FROM wos_authorships was
+            JOIN wos_documents wd ON wd.id = was.wos_document_id
+            WHERE wd.publication_id = %s AND was.person_id = %s AND NOT was.excluded
+        ),
+        agg AS (
+            SELECT bool_or(uca) AS is_uca,
+                   array_agg(DISTINCT sid) FILTER (WHERE sid IS NOT NULL) AS all_sids
+            FROM src, LATERAL unnest(COALESCE(sids, '{}')) AS sid
+        )
+        UPDATE authorships a
+        SET is_uca = COALESCE(agg.is_uca, FALSE),
+            structure_ids = NULLIF(agg.all_sids, ARRAY[]::int[]),
+            updated_at = now()
+        FROM agg
+        WHERE a.publication_id = %s AND a.person_id = %s
+    """, (pub_id, person_id, pub_id, person_id, pub_id, person_id, pub_id, person_id))
 
 
 # ── Fusion ──

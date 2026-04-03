@@ -4,6 +4,7 @@
 	import { replaceState } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+	import { sanitizeTitle } from '$lib/utils';
 
 	interface Identifier {
 		id: number;
@@ -251,7 +252,7 @@
 					{#each pair.conflict_pubs as cp}
 						<div class="conflict-pub-item">
 							<span class="conflict-pos" title="Position de l'auteur">pos. {(cp.position ?? 0) + 1}</span>
-							<a href="{base}/publications/{cp.id}" class="pub-link">{@html cp.title}</a>
+							<a href="{base}/publications/{cp.id}" class="pub-link">{@html sanitizeTitle(cp.title)}</a>
 							<span class="pub-meta-mini">{cp.pub_year ?? '?'}{#if cp.doc_type} · {cp.doc_type}{/if}</span>
 						</div>
 					{/each}
@@ -311,7 +312,7 @@
 										{/each}
 									</div>
 									<a href="{base}/publications/{pub.id}" class="pub-link">
-										{@html pub.title}
+										{@html sanitizeTitle(pub.title)}
 									</a>
 									<span class="pub-meta-mini">
 										{pub.pub_year ?? '?'}

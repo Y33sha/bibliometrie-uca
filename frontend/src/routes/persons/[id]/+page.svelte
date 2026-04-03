@@ -541,7 +541,20 @@
 	}
 	.id-item { display: flex; align-items: center; gap: 6px; font-size: 0.95rem; }
 	.id-label { font-weight: 500; color: var(--muted); font-size: 0.85rem; }
-	.confirmed-check { color: #2a7d4f; font-size: 0.8rem; font-weight: 700; margin-left: 2px; }
+	.confirmed-check {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 15px;
+		height: 15px;
+		border-radius: 50%;
+		background: var(--accent, #3b82f6);
+		color: white;
+		font-size: 0.7rem;
+		font-weight: 700;
+		margin-left: 2px;
+		vertical-align: middle;
+	}
 
 	/* Shared table styles */
 	.tab-content table {

@@ -23,7 +23,7 @@ import re
 import sys
 
 import psycopg2
-from psycopg2.extras import Json
+from psycopg2.extras import Json, RealDictCursor
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
@@ -143,8 +143,8 @@ def find_hal_publication_id(cur, work: dict) -> int | None:
         (hal_id,)
     )
     row = cur.fetchone()
-    if row and row[0]:
-        return row[0]
+    if row and row["publication_id"]:
+        return row["publication_id"]
     return None
 
 
@@ -269,7 +269,7 @@ def insert_openalex_document(cur, work: dict, staging_id: int,
         RETURNING id
     """, (openalex_id, doi, title, pub_year, doc_type,
           publication_id, staging_id))
-    return cur.fetchone()[0]
+    return cur.fetchone()["id"]
 
 
 # =============================================================
@@ -316,7 +316,7 @@ def upsert_openalex_author(cur, authorship: dict) -> int | None:
             updated_at = now()
         RETURNING id
     """, (openalex_id, display_name, last_name, first_name, orcid))
-    return cur.fetchone()[0]
+    return cur.fetchone()["id"]
 
 
 # =============================================================
@@ -352,7 +352,7 @@ def upsert_openalex_institution(cur, institution: dict) -> str | None:
         RETURNING openalex_id
     """, (openalex_id, name, ror_id, country_code, inst_type))
     row = cur.fetchone()
-    return row[0] if row else openalex_id
+    return row["openalex_id"] if row else openalex_id
 
 
 # =============================================================
@@ -437,8 +437,13 @@ def process_work(cur, staging_row: tuple) -> bool:
     Traite un work du staging OpenAlex.
     Retourne True si traité avec succès.
     """
-    staging_id, openalex_id, doi, raw_data = staging_row
-    work = raw_data
+    if isinstance(staging_row, dict):
+        staging_id = staging_row["id"]
+        openalex_id = staging_row["openalex_id"]
+        doi = staging_row["doi"]
+        work = staging_row["raw_data"]
+    else:
+        staging_id, openalex_id, doi, work = staging_row
 
     try:
         # Détecter si la primary_location pointe vers HAL ou un repository
@@ -501,7 +506,7 @@ def main():
     conn.autocommit = False
 
     try:
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
 
         if args.reset:
             cur.execute("UPDATE staging_openalex SET processed = FALSE")
@@ -511,7 +516,7 @@ def main():
             return
 
         cur.execute("SELECT COUNT(*) FROM staging_openalex WHERE processed = FALSE")
-        total = cur.fetchone()[0]
+        total = cur.fetchone()["count"]
         logger.info(f"=== Normalisation OpenAlex : {total} works à traiter ===")
 
         if total == 0:
@@ -522,33 +527,43 @@ def main():
         limit = min(limit, total)
         logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
 
+        # Charger les IDs puis fetch par lots pour limiter la mémoire
         cur.execute("""
-            SELECT id, openalex_id, doi, raw_data
-            FROM staging_openalex
+            SELECT id FROM staging_openalex
             WHERE processed = FALSE
             ORDER BY id
             LIMIT %s
         """, (limit,))
+        work_ids = [r["id"] for r in cur.fetchall()]
 
-        rows = cur.fetchall()
         processed = 0
         errors = 0
+        FETCH_BATCH = 50
 
-        for row in rows:
-            try:
-                success = process_work(cur, row)
-                if success:
-                    processed += 1
-                else:
+        for batch_start in range(0, len(work_ids), FETCH_BATCH):
+            batch_ids = work_ids[batch_start:batch_start + FETCH_BATCH]
+            cur.execute("""
+                SELECT id, openalex_id, doi, raw_data
+                FROM staging_openalex WHERE id = ANY(%s)
+                ORDER BY id
+            """, (batch_ids,))
+            batch_rows = cur.fetchall()
+
+            for row in batch_rows:
+                try:
+                    success = process_work(cur, row)
+                    if success:
+                        processed += 1
+                    else:
+                        errors += 1
+                except Exception:
+                    conn.rollback()
                     errors += 1
-            except Exception:
-                conn.rollback()
-                errors += 1
-                continue
+                    continue
 
-            if processed % args.batch_size == 0:
-                conn.commit()
-                logger.info(f"  {processed}/{limit} traités ({errors} erreurs)")
+                if processed % args.batch_size == 0:
+                    conn.commit()
+                    logger.info(f"  {processed}/{limit} traités ({errors} erreurs)")
 
         conn.commit()
 
@@ -561,7 +576,7 @@ def main():
                        "openalex_documents", "openalex_authors",
                        "openalex_authorships", "openalex_institutions"]:
             cur.execute(f"SELECT COUNT(*) FROM {table}")
-            count = cur.fetchone()[0]
+            count = cur.fetchone()["count"]
             logger.info(f"  {table} : {count} enregistrements")
 
     except KeyboardInterrupt:

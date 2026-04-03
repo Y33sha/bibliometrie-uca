@@ -1168,24 +1168,21 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
     with get_cursor() as (cur, conn):
         cur.execute("""
             SELECT 'hal' AS source, has.id AS authorship_id,
-                   p.id AS pub_id, p.title, p.pub_year, p.doi
+                   hd.publication_id AS pub_id, hd.title, hd.pub_year, hd.doi
             FROM hal_authorships has
             JOIN hal_documents hd ON hd.id = has.hal_document_id
-            JOIN publications p ON p.id = hd.publication_id
             WHERE has.person_id = %s AND has.author_name_normalized = %s
             UNION ALL
             SELECT 'openalex', oas.id,
-                   p.id, p.title, p.pub_year, p.doi
+                   od.publication_id, od.title, od.pub_year, od.doi
             FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
-            JOIN publications p ON p.id = od.publication_id
             WHERE oas.person_id = %s AND oas.author_name_normalized = %s
             UNION ALL
             SELECT 'wos', was.id,
-                   p.id, p.title, p.pub_year, p.doi
+                   wd.publication_id, wd.title, wd.pub_year, wd.doi
             FROM wos_authorships was
             JOIN wos_documents wd ON wd.id = was.wos_document_id
-            JOIN publications p ON p.id = wd.publication_id
             WHERE was.person_id = %s AND was.author_name_normalized = %s
             ORDER BY pub_year DESC, title
         """, (person_id, name_form, person_id, name_form, person_id, name_form))
