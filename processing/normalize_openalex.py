@@ -27,6 +27,7 @@ from psycopg2.extras import Json, RealDictCursor
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.doi import clean_doi
 from utils.normalize import normalize_text
 from services.publications import find_or_create as find_or_create_publication
 from services.journals import find_or_create_publisher, find_or_create_journal
@@ -88,14 +89,6 @@ OA_MAP = {
 # =============================================================
 # UTILITAIRES
 # =============================================================
-
-
-def clean_doi(doi: str | None) -> str | None:
-    """Nettoie un DOI."""
-    if not doi:
-        return None
-    doi = doi.replace("https://doi.org/", "").strip()
-    return doi if doi else None
 
 
 def extract_short_id(url: str, prefix: str = "https://openalex.org/") -> str:
