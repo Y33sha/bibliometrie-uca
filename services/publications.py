@@ -13,7 +13,7 @@ def find_by_doi(cur, doi: str):
     """
     if not doi:
         return None
-    cur.execute("SELECT id FROM publications WHERE lower(doi) = lower(%s)", (doi,))
+    cur.execute("SELECT id, doc_type, title_normalized FROM publications WHERE lower(doi) = lower(%s)", (doi,))
     return cur.fetchone()
 
 
@@ -25,7 +25,7 @@ def find_by_title(cur, title_normalized: str, pub_year: int, journal_id: int):
     if not title_normalized or not journal_id:
         return None
     cur.execute("""
-        SELECT id FROM publications
+        SELECT id, doi FROM publications
         WHERE title_normalized = %s AND pub_year = %s AND journal_id = %s
         LIMIT 1
     """, (title_normalized, pub_year, journal_id))
@@ -96,19 +96,52 @@ def find_or_create(cur, *, title: str, title_normalized: str,
     if doi:
         existing = find_by_doi(cur, doi)
         if existing:
-            _enrich(cur, existing["id"], doi=doi, doc_type=doc_type,
-                    journal_id=journal_id, oa_status=oa_status,
-                    container_title=container_title, language=language)
-            return existing["id"], False
+            ex_type = existing.get("doc_type", "")
+            ex_title = existing.get("title_normalized", "")
+            chapter_types = ("book_chapter", "book-chapter", "chapter")
+            book_types = ("book",)
+
+            # Cas chapitre vs ouvrage : le DOI est celui de l'ouvrage,
+            # pas du chapitre → on le retire du chapitre, pas de fusion
+            if doc_type in chapter_types and ex_type in book_types:
+                # Le nouveau est un chapitre, l'existant est un ouvrage → skip
+                doi = None  # ne pas attribuer ce DOI au chapitre
+            elif doc_type in book_types and ex_type in chapter_types:
+                # Le nouveau est un ouvrage, l'existant est un chapitre → retirer le DOI du chapitre
+                cur.execute("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s", (existing["id"],))
+                # On ne fusionne pas, on continue (création ou match titre)
+            elif doc_type in chapter_types and ex_type in chapter_types:
+                # Deux chapitres : fusionner seulement si même titre normalisé
+                if title_normalized != ex_title:
+                    # Titres différents → DOI erroné, le retirer partout
+                    cur.execute("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s", (existing["id"],))
+                    doi = None
+                else:
+                    # Même titre → vraie fusion
+                    _enrich(cur, existing["id"], doi=doi, doc_type=doc_type,
+                            journal_id=journal_id, oa_status=oa_status,
+                            container_title=container_title, language=language)
+                    return existing["id"], False
+            else:
+                # Cas normal (articles, etc.) → fusion standard
+                _enrich(cur, existing["id"], doi=doi, doc_type=doc_type,
+                        journal_id=journal_id, oa_status=oa_status,
+                        container_title=container_title, language=language)
+                return existing["id"], False
 
     # 2. Chercher par titre + année + journal (articles uniquement)
     if doc_type == "article" and journal_id:
         existing = find_by_title(cur, title_normalized, pub_year, journal_id)
         if existing:
-            _enrich(cur, existing["id"], doi=doi, doc_type=doc_type,
-                    journal_id=journal_id, oa_status=oa_status,
-                    container_title=container_title, language=language)
-            return existing["id"], False
+            ex_doi = existing.get("doi")
+            # Ne pas fusionner si les deux ont un DOI différent
+            if doi and ex_doi and doi.lower() != ex_doi.lower():
+                pass  # DOI contradictoires → ne pas fusionner
+            else:
+                _enrich(cur, existing["id"], doi=doi, doc_type=doc_type,
+                        journal_id=journal_id, oa_status=oa_status,
+                        container_title=container_title, language=language)
+                return existing["id"], False
 
     # 3. Créer
     if not allow_create:
