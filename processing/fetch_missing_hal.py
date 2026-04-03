@@ -16,20 +16,18 @@ Usage:
 """
 
 import argparse
-import hashlib
-import json
 import logging
 import os
-import re
 import sys
 import time
 
 import requests
-import psycopg2
 from psycopg2.extras import Json, RealDictCursor
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from extraction.common import compute_hash
+from utils.hal import extract_hal_id_from_url, HAL_FIELDS_STR
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,26 +36,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 HAL_API = "https://api.archives-ouvertes.fr/search"
-HAL_FIELDS = (
-    "halId_s,docid,doiId_s,title_s,subTitle_s,"
-    "authFullName_s,authIdHal_s,authOrcid_s,authIdHal_i,"
-    "authFullNameIdHal_fs,authFullNameId_fs,"
-    "authFullNameFormIDPersonIDIDHal_fs,authIdHasStructure_fs,"
-    "producedDateY_i,publicationDate_s,docType_s,language_s,"
-    "journalTitle_s,journalIssn_s,journalEissn_s,journalPublisher_s,"
-    "bookTitle_s,publisher_s,conferenceTitle_s,"
-    "openAccess_bool,linkExtUrl_s,uri_s,label_s,"
-    "collCode_s,structId_i,structName_s,structType_s,structAcronym_s"
-)
 REQUEST_DELAY = 0.3
-
-
-def extract_hal_id_from_url(url: str) -> str | None:
-    """Extrait le halId depuis une URL HAL."""
-    if not url:
-        return None
-    match = re.search(r'((?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+)', url)
-    return match.group(1) if match else None
 
 
 def find_hal_primary_locations(cur) -> list[dict]:
@@ -114,7 +93,7 @@ def fetch_hal_document(hal_id: str) -> dict | None:
     try:
         resp = requests.get(HAL_API, params={
             "q": f"halId_s:{hal_id}",
-            "fl": HAL_FIELDS,
+            "fl": HAL_FIELDS_STR,
             "wt": "json",
             "rows": 1,
         }, timeout=15)
@@ -140,8 +119,7 @@ def insert_staging_hal(cur, hal_id: str, doi: str | None, doc: dict):
     """Insère un document dans staging_hal avec collection = NULL (hors périmètre).
     Si le document existe et a changé (hash différent), met à jour et remet processed = FALSE.
     """
-    canonical = json.dumps(doc, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    raw_hash = hashlib.md5(canonical.encode("utf-8")).hexdigest()
+    raw_hash = compute_hash(doc)
     cur.execute("""
         INSERT INTO staging_hal (halid, doi, raw_data, collection, processed, raw_hash)
         VALUES (%s, %s, %s::jsonb, NULL, FALSE, %s)
