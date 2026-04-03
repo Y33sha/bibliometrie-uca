@@ -172,6 +172,17 @@ def process_source(conn, cur, source_name: str):
     logger.info(f"  Insérées : {inserted}, déjà existantes : {existing}")
 
     # ─── Étape 3 : créer les liens authorship ↔ address ───
+    # D'abord supprimer les liens existants des authorships traitées
+    all_as_ids = list(set(as_id for ids in addr_to_as_ids.values() for as_id in ids))
+    logger.info(f"[{source_name}] Suppression des anciens liens pour {len(all_as_ids)} authorships...")
+    deleted_links = 0
+    for i in range(0, len(all_as_ids), BATCH_SIZE):
+        batch_ids = all_as_ids[i:i + BATCH_SIZE]
+        cur.execute(f"DELETE FROM {link_table} WHERE {fk_col} = ANY(%s)", (batch_ids,))
+        deleted_links += cur.rowcount
+    conn.commit()
+    logger.info(f"  {deleted_links} anciens liens supprimés")
+
     logger.info(f"[{source_name}] Création des liens {link_table}...")
 
     total_links = 0

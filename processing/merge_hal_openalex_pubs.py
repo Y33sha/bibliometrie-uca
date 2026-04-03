@@ -25,7 +25,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from psycopg2.extras import RealDictCursor
-from services.publications import merge_publications
+from services.publications import merge_publications as _merge_pub
 
 logging.basicConfig(
     level=logging.INFO,
@@ -125,7 +125,7 @@ def merge_publications(cur, items, dry_run=False):
 
         try:
             cur.execute("SAVEPOINT merge_pub")
-            merge_publications(cur, hal_pub_id, oa_pub_id)
+            _merge_pub(cur, hal_pub_id, oa_pub_id)
             cur.execute("RELEASE SAVEPOINT merge_pub")
             merged += 1
 
