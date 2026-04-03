@@ -19,11 +19,11 @@ Usage:
 import argparse
 import logging
 import os
-import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.hal import extract_hal_id_from_url
 from psycopg2.extras import RealDictCursor
 from services.publications import merge_publications as _merge_pub
 
@@ -32,13 +32,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 log = logging.getLogger(__name__)
-
-
-def extract_hal_id(url):
-    if not url:
-        return None
-    m = re.search(r'((?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+)', url)
-    return m.group(1) if m else None
 
 
 def find_duplicates(cur):
@@ -58,7 +51,7 @@ def find_duplicates(cur):
 
     oa_by_halid = {}
     for r in oa_rows:
-        hid = extract_hal_id(r['url'])
+        hid = extract_hal_id_from_url(r['url'])
         if hid:
             oa_by_halid[hid] = {
                 'oa_doc_id': r['oa_doc_id'],

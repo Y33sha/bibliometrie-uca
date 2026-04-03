@@ -28,6 +28,7 @@ from psycopg2.extras import Json, RealDictCursor
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from utils.doi import clean_doi
+from utils.hal import extract_hal_id_from_url
 from utils.normalize import normalize_text
 from services.publications import find_or_create as find_or_create_publication
 from services.journals import find_or_create_publisher, find_or_create_journal
@@ -110,14 +111,6 @@ def is_hal_primary_location(work: dict) -> bool:
     if source_type == "repository" and ("hal" in source_url.lower() or "hal" in (source.get("display_name") or "").lower()):
         return True
     return False
-
-
-def extract_hal_id_from_url(url: str) -> str | None:
-    """Extrait le halId depuis une URL HAL."""
-    if not url:
-        return None
-    match = re.search(r'((?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+)(?:v\d+)?', url)
-    return match.group(1) if match else None
 
 
 def find_hal_publication_id(cur, work: dict) -> int | None:

@@ -7,11 +7,11 @@ import pytest
 from processing.normalize_openalex import (
     extract_short_id,
     is_hal_primary_location,
-    extract_hal_id_from_url,
     is_repository_source,
     DOCTYPE_MAP as OA_DOCTYPE_MAP,
     OA_MAP,
 )
+from utils.hal import extract_hal_id_from_url
 
 
 class TestOAExtractShortId:

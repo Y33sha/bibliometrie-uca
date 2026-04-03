@@ -27,22 +27,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from config.settings import HAL
 from db.connection import get_connection
 from extraction.common import compute_hash, setup_logger
+from utils.hal import HAL_FIELDS_STR
 
 # ----- Logging -----
 logger = setup_logger("cross_import_hal", os.path.join(os.path.dirname(__file__), "logs"))
 
 HAL_API = "https://api.archives-ouvertes.fr/search"
-HAL_FIELDS = (
-    "halId_s,docid,doiId_s,title_s,subTitle_s,"
-    "authFullName_s,authIdHal_s,authOrcid_s,authIdHal_i,"
-    "authFullNameIdHal_fs,authFullNameId_fs,"
-    "authFullNameFormIDPersonIDIDHal_fs,authIdHasStructure_fs,"
-    "producedDateY_i,publicationDate_s,docType_s,language_s,"
-    "journalTitle_s,journalIssn_s,journalEissn_s,journalPublisher_s,"
-    "bookTitle_s,publisher_s,conferenceTitle_s,"
-    "openAccess_bool,linkExtUrl_s,uri_s,label_s,"
-    "collCode_s,structId_i,structName_s,structType_s,structAcronym_s"
-)
 
 
 def get_missing_dois(conn) -> list[str]:
@@ -72,7 +62,7 @@ def fetch_by_doi(doi: str) -> dict | None:
     """Interroge l'API HAL pour un DOI donné. Retourne le document ou None."""
     params = {
         "q": f"doiId_s:\"{doi}\"",
-        "fl": HAL_FIELDS,
+        "fl": HAL_FIELDS_STR,
         "wt": "json",
         "rows": 1,
     }

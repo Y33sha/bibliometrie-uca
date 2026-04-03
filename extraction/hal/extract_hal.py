@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from config.settings import HAL
 from db.connection import get_connection
 from extraction.common import compute_hash, clean_doi, get_existing_ids, setup_logger
+from utils.hal import HAL_FIELDS
 
 # ----- Logging -----
 logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))
@@ -35,42 +36,6 @@ logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "lo
 # ----- Constantes API -----
 BASE_URL = "https://api.archives-ouvertes.fr/search"
 
-# Champs à récupérer — large pour le staging
-FIELDS = [
-    "halId_s",
-    "docid",
-    "doiId_s",
-    "title_s",
-    "subTitle_s",
-    "authFullName_s",
-    "authIdHal_s",
-    "authOrcid_s",
-    "authIdHal_i",
-    "authFullNameIdHal_fs",               # nom_FacetSep_idhal — ALIGNÉ
-    "authFullNameId_fs",                  # nom_FacetSep_personId — ALIGNÉ
-    "authFullNameFormIDPersonIDIDHal_fs",  # nom_FacetSep_formId-personId_FacetSep_idhal
-    "authIdHasStructure_fs",              # personId_FacetSep_Nom_JoinSep_structId_FacetSep_StructNom
-    "producedDateY_i",
-    "publicationDate_s",
-    "docType_s",
-    "language_s",
-    "journalTitle_s",
-    "journalIssn_s",
-    "journalEissn_s",
-    "journalPublisher_s",
-    "bookTitle_s",
-    "publisher_s",
-    "conferenceTitle_s",
-    "openAccess_bool",
-    "linkExtUrl_s",
-    "uri_s",
-    "label_s",
-    "collCode_s",       # collections auxquelles appartient le doc
-    "structId_i",        # structures rattachées (utile pour affiliations)
-    "structName_s",      # noms des structures (aligné avec structId_i)
-    "structType_s",      # types (laboratory, institution, regroupinstitution)
-    "structAcronym_s",   # acronymes
-]
 
 
 def build_query(collection_code: str = None, portal: str = None, years: list = None) -> str:
@@ -98,7 +63,7 @@ def fetch_page(
     """Récupère une page de résultats depuis l'API HAL."""
     params = {
         "q": query,
-        "fl": ",".join(FIELDS),
+        "fl": ",".join(HAL_FIELDS),
         "rows": HAL["per_page"],
         "start": start,
         "sort": "docid asc",
