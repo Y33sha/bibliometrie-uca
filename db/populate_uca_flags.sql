@@ -12,13 +12,14 @@
 -- structure_ids   ↔  toutes les structures du périmètre large détectées
 -- =============================================================
 
+DO $$
+DECLARE
+    cnt INTEGER;
+BEGIN
 
 -- #############################################################
 -- ÉTAPE 1 : HAL — mapper hal_struct_ids → structure_ids (réels)
 -- #############################################################
--- hal_authorships.hal_struct_ids contient des identifiants HAL.
--- On les traduit en structures.id via hal_structures.structure_id.
--- Seules les hal_structures ayant un mapping sont conservées.
 
 UPDATE hal_authorships has
 SET structure_ids = mapped.struct_ids
@@ -32,22 +33,17 @@ FROM (
     GROUP BY has2.id
 ) mapped
 WHERE has.id = mapped.id;
-
--- Vérification :
--- SELECT COUNT(*) FROM hal_authorships WHERE structure_ids IS NOT NULL;
--- SELECT COUNT(*) FROM hal_authorships WHERE is_uca = TRUE;
+GET DIAGNOSTICS cnt = ROW_COUNT;
+RAISE NOTICE 'Étape 1 — HAL structure_ids mappés : % authorships', cnt;
 
 
 -- #############################################################
 -- ÉTAPE 2 : HAL — recalculer is_uca à partir du périmètre UCA
 -- #############################################################
--- is_uca est actuellement rempli par le script normalize_hal.
--- On le recalcule ici pour être sûr qu'il est cohérent avec
--- le périmètre UCA défini dans structures/structure_relations.
---
--- NB : on ne RESET PAS is_uca à FALSE d'abord, car certains
--- authorships sont UCA via des hal_structures non encore mappées
--- (structure_id NULL). On ne fait qu'AJOUTER le flag.
+
+UPDATE hal_authorships SET is_uca = FALSE;
+GET DIAGNOSTICS cnt = ROW_COUNT;
+RAISE NOTICE 'Étape 2 — HAL is_uca reset : % authorships', cnt;
 
 WITH uca_perimeter AS (
     SELECT s.id FROM structures s WHERE s.code = 'uca'
@@ -64,22 +60,17 @@ WHERE has.structure_ids IS NOT NULL
     FROM unnest(has.structure_ids) AS sid
     WHERE sid IN (SELECT id FROM uca_perimeter)
   );
-
--- Vérification :
--- SELECT COUNT(*) FROM hal_authorships WHERE is_uca = TRUE;
+GET DIAGNOSTICS cnt = ROW_COUNT;
+RAISE NOTICE 'Étape 2 — HAL is_uca = TRUE : % authorships', cnt;
 
 
 -- #############################################################
 -- ÉTAPE 3 : OpenAlex — calculer is_uca + structure_ids
 -- #############################################################
--- Chemin : openalex_authorships
---        → openalex_authorship_addresses
---        → addresses
---        → address_structures
---        → structures dans le périmètre
 
--- D'abord remettre à zéro
 UPDATE openalex_authorships SET is_uca = FALSE, structure_ids = NULL;
+GET DIAGNOSTICS cnt = ROW_COUNT;
+RAISE NOTICE 'Étape 3 — OA reset : % authorships', cnt;
 
 -- is_uca via périmètre restreint
 WITH uca_perimeter AS (
@@ -98,6 +89,8 @@ WHERE EXISTS (
     WHERE oaa.openalex_authorship_id = oas.id
       AND ast.structure_id IN (SELECT id FROM uca_perimeter)
 );
+GET DIAGNOSTICS cnt = ROW_COUNT;
+RAISE NOTICE 'Étape 3 — OA is_uca = TRUE : % authorships', cnt;
 
 -- structure_ids via périmètre large (restreint + partenaires)
 WITH uca_perimeter AS (
@@ -126,23 +119,17 @@ UPDATE openalex_authorships oas
 SET structure_ids = os.struct_ids
 FROM oas_structs os
 WHERE oas.id = os.openalex_authorship_id;
-
--- Vérification :
--- SELECT COUNT(*) FROM openalex_authorships WHERE is_uca = TRUE;
--- SELECT COUNT(*) FROM openalex_authorships WHERE structure_ids IS NOT NULL;
+GET DIAGNOSTICS cnt = ROW_COUNT;
+RAISE NOTICE 'Étape 3 — OA structure_ids : % authorships', cnt;
 
 
 -- #############################################################
 -- ÉTAPE 3b : WoS — calculer is_uca + structure_ids
 -- #############################################################
--- Chemin : wos_authorships
---        → wos_authorship_addresses
---        → addresses
---        → address_structures
---        → structures dans le périmètre
 
--- D'abord remettre à zéro
 UPDATE wos_authorships SET is_uca = FALSE, structure_ids = NULL;
+GET DIAGNOSTICS cnt = ROW_COUNT;
+RAISE NOTICE 'Étape 3b — WoS reset : % authorships', cnt;
 
 -- is_uca via périmètre restreint
 WITH uca_perimeter AS (
@@ -161,6 +148,8 @@ WHERE EXISTS (
     WHERE waa.wos_authorship_id = was.id
       AND ast.structure_id IN (SELECT id FROM uca_perimeter)
 );
+GET DIAGNOSTICS cnt = ROW_COUNT;
+RAISE NOTICE 'Étape 3b — WoS is_uca = TRUE : % authorships', cnt;
 
 -- structure_ids via périmètre large
 WITH uca_perimeter AS (
@@ -189,111 +178,7 @@ UPDATE wos_authorships was
 SET structure_ids = ws.struct_ids
 FROM was_structs ws
 WHERE was.id = ws.wos_authorship_id;
+GET DIAGNOSTICS cnt = ROW_COUNT;
+RAISE NOTICE 'Étape 3b — WoS structure_ids : % authorships', cnt;
 
--- Vérification :
--- SELECT COUNT(*) FROM wos_authorships WHERE is_uca = TRUE;
--- SELECT COUNT(*) FROM wos_authorships WHERE structure_ids IS NOT NULL;
-
-
--- #############################################################
--- ÉTAPE 4 : Propager vers authorships (table de vérité)
--- #############################################################
--- Le matching se fait par (publication_id, person_id).
--- Seuls les authorships avec person_id résolu sont traités.
---
--- structure_ids = périmètre large (toutes structures pertinentes)
--- is_uca = TRUE si au moins une structure du périmètre restreint
-
--- D'abord reset
-UPDATE authorships SET is_uca = FALSE, structure_ids = NULL;
-
--- 4a. Depuis HAL
-WITH uca_perimeter AS (
-    SELECT s.id FROM structures s WHERE s.code = 'uca'
-    UNION
-    SELECT sr.child_id FROM structure_relations sr
-    JOIN structures s ON s.id = sr.parent_id
-    WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
-),
-hal_data AS (
-    SELECT hd.publication_id,
-           has.person_id,
-           array_agg(DISTINCT sid) AS all_struct_ids,
-           bool_or(sid IN (SELECT id FROM uca_perimeter)) AS has_uca
-    FROM hal_authorships has
-    JOIN hal_documents hd ON hd.id = has.hal_document_id,
-    LATERAL unnest(has.structure_ids) AS sid
-    WHERE has.structure_ids IS NOT NULL
-      AND hd.publication_id IS NOT NULL
-      AND has.person_id IS NOT NULL
-    GROUP BY hd.publication_id, has.person_id
-)
-UPDATE authorships a
-SET structure_ids = hd.all_struct_ids,
-    is_uca = hd.has_uca,
-    updated_at = now()
-FROM hal_data hd
-WHERE a.publication_id = hd.publication_id
-  AND a.person_id = hd.person_id
-  AND a.person_id IS NOT NULL;
-
--- 4b. Depuis OpenAlex
--- Merge les structure_ids OpenAlex avec ceux déjà présents (HAL)
-WITH uca_perimeter AS (
-    SELECT s.id FROM structures s WHERE s.code = 'uca'
-    UNION
-    SELECT sr.child_id FROM structure_relations sr
-    JOIN structures s ON s.id = sr.parent_id
-    WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
-),
-oa_data AS (
-    SELECT od.publication_id,
-           oas.person_id,
-           oas.structure_ids AS struct_ids,
-           oas.is_uca AS src_is_uca
-    FROM openalex_authorships oas
-    JOIN openalex_documents od ON od.id = oas.openalex_document_id
-    WHERE oas.structure_ids IS NOT NULL
-      AND od.publication_id IS NOT NULL
-      AND oas.person_id IS NOT NULL
-)
-UPDATE authorships a
-SET structure_ids = (
-        SELECT array_agg(DISTINCT x)
-        FROM unnest(COALESCE(a.structure_ids, '{}') || od.struct_ids) AS x
-    ),
-    is_uca = a.is_uca OR od.src_is_uca,
-    updated_at = now()
-FROM oa_data od
-WHERE a.publication_id = od.publication_id
-  AND a.person_id = od.person_id
-  AND a.person_id IS NOT NULL;
-
--- 4c. Depuis WoS
--- Merge les structure_ids WoS avec ceux déjà présents (HAL + OpenAlex)
-WITH wos_data AS (
-    SELECT wd.publication_id,
-           was.person_id,
-           was.structure_ids AS struct_ids,
-           was.is_uca AS src_is_uca
-    FROM wos_authorships was
-    JOIN wos_documents wd ON wd.id = was.wos_document_id
-    WHERE was.structure_ids IS NOT NULL
-      AND wd.publication_id IS NOT NULL
-      AND was.person_id IS NOT NULL
-)
-UPDATE authorships a
-SET structure_ids = (
-        SELECT array_agg(DISTINCT x)
-        FROM unnest(COALESCE(a.structure_ids, '{}') || wd.struct_ids) AS x
-    ),
-    is_uca = a.is_uca OR wd.src_is_uca,
-    updated_at = now()
-FROM wos_data wd
-WHERE a.publication_id = wd.publication_id
-  AND a.person_id = wd.person_id
-  AND a.person_id IS NOT NULL;
-
--- Vérification finale :
--- SELECT COUNT(*) FROM authorships WHERE is_uca = TRUE;
--- SELECT COUNT(*) FROM authorships WHERE structure_ids IS NOT NULL;
+END $$;
