@@ -889,7 +889,7 @@
 							<input type="checkbox" bind:checked={detachModal.authorships[i].checked} />
 							<span class="detach-source tag tag-source">{a.source === 'openalex' ? 'OA' : a.source === 'hal' ? 'HAL' : 'WoS'}</span>
 							<span class="detach-year">{a.pub_year ?? '?'}</span>
-							<span class="detach-title">{a.title}</span>
+							<span class="detach-title">{@html sanitizeTitle(a.title)}</span>
 						</label>
 					{/each}
 				</div>

@@ -52,16 +52,13 @@ def phase_extract(mode="full", sources=None, **kw):
     if mode == "weekly":
         current_year = datetime.date.today().year
         years = [str(current_year - 1), str(current_year)]
-        log.info("Mode hebdomadaire : années %s", " + ".join(years))
+        log.info("Mode hebdomadaire : années %s (WoS exclu pour économiser le crédit API)", " + ".join(years))
         if "openalex" in sources:
             for y in years:
                 run_python("extraction/openalex/extract_openalex.py", "--year", y)
         if "hal" in sources:
             for y in years:
                 run_python("extraction/hal/extract_hal.py", "--year", y)
-        if "wos" in sources:
-            for y in years:
-                run_python("extraction/wos/extract_wos.py", "--year", y)
     else:
         if "openalex" in sources:
             run_python("extraction/openalex/extract_openalex.py")
@@ -88,11 +85,14 @@ def phase_merge_pubs(mode="full", **kw):
         run_python("extraction/openalex/cross_import_openalex.py")
         # Re-fetch des publications OA tronquées à 100 auteurs
         run_python("extraction/openalex/refetch_truncated.py")
-        # Relancer les normalisations pour les nouveaux/mis à jour
-        run_python("processing/normalize_openalex.py")
-        run_python("processing/normalize_hal.py")
     else:
         log.info("Cross-imports ignorés en mode hebdomadaire")
+
+
+def phase_renormalize(**kw):
+    """Phase 3b : Re-normalisation après cross-imports et refetch."""
+    run_python("processing/normalize_openalex.py", "--batch-size", "10")
+    run_python("processing/normalize_hal.py")
 
 
 def phase_addresses(**kw):
@@ -139,6 +139,7 @@ PHASES = [
     ("extract", phase_extract),
     ("normalize", phase_normalize),
     ("merge_pubs", phase_merge_pubs),
+    ("renormalize", phase_renormalize),
     ("addresses", phase_addresses),
     ("uca_flags", phase_uca_flags),
     ("persons", phase_persons),

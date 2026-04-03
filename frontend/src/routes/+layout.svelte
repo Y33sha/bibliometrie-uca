@@ -1,5 +1,6 @@
 <script lang="ts">
 	import "$lib/styles/shared.css";
+	import "katex/dist/katex.min.css";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
@@ -39,14 +40,18 @@
 	}
 </script>
 
-<div class="site-header">
+<div class="site-header" class:admin={isAdmin}>
 	{#if isAdmin}
-		<h1 class="site-title">
-			Bibliométrie UCA <span class="site-title-admin">Admin</span>
-		</h1>
+		<div class="site-brand">
+			<img src="{base}/connectome.png" alt="" class="site-icon" />
+			<h1 class="site-title">
+				Bibliométrie UCA <span class="site-title-admin">Admin</span>
+			</h1>
+		</div>
 		<nav class="site-nav">
 			<div
 				class="nav-dropdown"
+				role="navigation"
 				class:active={isAddresses}
 				onmouseenter={() => (dropdownOpen = true)}
 				onmouseleave={() => (dropdownOpen = false)}
@@ -85,6 +90,7 @@
 			>
 			<div
 				class="nav-dropdown"
+				role="navigation"
 				class:active={isDuplicates}
 				onmouseenter={() => (dupDropdownOpen = true)}
 				onmouseleave={() => (dupDropdownOpen = false)}
@@ -113,7 +119,10 @@
 			>
 		</nav>
 	{:else}
-		<h1 class="site-title">Bibliométrie UCA</h1>
+		<div class="site-brand">
+			<img src="{base}/favicon.png" alt="" class="site-icon" />
+			<h1 class="site-title">Bibliométrie UCA</h1>
+		</div>
 		<nav class="site-nav">
 			<a
 				href="{base}/stats"
@@ -137,6 +146,7 @@
 			>
 			<div
 				class="nav-dropdown"
+				role="navigation"
 				class:active={isHalProblems}
 				onmouseenter={() => (halDropdownOpen = true)}
 				onmouseleave={() => (halDropdownOpen = false)}
@@ -215,8 +225,17 @@
 	:global(*, *::before, *::after) {
 		box-sizing: border-box;
 	}
+	.site-brand {
+		display: flex;
+		align-items: center;
+	}
+	.site-icon {
+		height: 30px;
+		width: auto;
+		margin-right: 10px;
+	}
 	.site-header {
-		background: #2c3e50;
+		background: #5b9ea0;
 		color: white;
 		padding: 0 24px;
 		display: flex;
@@ -224,9 +243,16 @@
 		justify-content: space-between;
 		height: 46px;
 	}
+	.site-header.admin {
+		background: #3d7a7c;
+	}
+	.site-header.admin .nav-dropdown-menu {
+		background: #4d8a8c;
+	}
 	.site-title {
+		font-family: 'Ubuntu', sans-serif;
 		font-size: 1.15rem;
-		font-weight: 600;
+		font-weight: 500;
 		margin: 0;
 	}
 	.site-title-admin {
@@ -287,7 +313,7 @@
 		position: absolute;
 		top: 46px;
 		left: 0;
-		background: #34495e;
+		background: #4a8c8e;
 		border-radius: 0 0 5px 5px;
 		min-width: 150px;
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);

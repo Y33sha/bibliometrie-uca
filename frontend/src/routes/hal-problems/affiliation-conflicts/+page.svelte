@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { typeLabels } from '$lib/labels';
+	import { sanitizeTitle } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
 
 	interface Pub {
@@ -83,7 +84,7 @@
 					{#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
 					{#if pub.doc_type}<span class="meta-badge type-badge">{typeLabels[pub.doc_type] || pub.doc_type}</span>{/if}
 					{#if pub.labs}<span class="meta-badge lab-badge">{pub.labs}</span>{/if}
-					<a href="{base}/publications/{pub.id}" class="pub-link">{pub.title}</a>
+					<a href="{base}/publications/{pub.id}" class="pub-link">{@html sanitizeTitle(pub.title)}</a>
 				</div>
 				<div class="hal-list">
 					{#if pub.halids}
@@ -98,7 +99,7 @@
 			</div>
 		{/each}
 	</div>
-	<Pagination {page} {pages} onchange={(p) => { page = p; load(); window.scrollTo(0, 0); }} />
+	<Pagination {page} {pages} onchange={(p) => { page = p; syncUrl(); load(); window.scrollTo(0, 0); }} />
 {/if}
 
 <style>

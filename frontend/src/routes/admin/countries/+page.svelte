@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
+	import { replaceState } from '$app/navigation';
 	import { api } from '$lib/api';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
@@ -89,6 +90,17 @@
 		loading = false;
 	}
 
+	function syncUrl() {
+		const p = new URLSearchParams();
+		if (page > 1) p.set('page', String(page));
+		if (search.trim()) p.set('search', search.trim());
+		if (selectedCountry.length === 1) p.set('country', selectedCountry[0]);
+		if (selectedHasCountry.length === 1) p.set('has_country', selectedHasCountry[0]);
+		if (selectedSugCountry.length === 1) p.set('sug_country', selectedSugCountry[0]);
+		const qs = p.toString();
+		replaceState(`${base}/admin/countries` + (qs ? '?' + qs : ''), {});
+	}
+
 	function onFilterChange() {
 		page = 1;
 		selectedIds = new Set();
@@ -96,6 +108,7 @@
 		if (selectedSugCountry.length === 1) {
 			batchCountry = selectedSugCountry[0];
 		}
+		syncUrl();
 		loadAddresses();
 	}
 
@@ -202,6 +215,12 @@
 	}
 
 	onMount(() => {
+		const params = new URLSearchParams(window.location.search);
+		if (params.get('page')) page = parseInt(params.get('page')!) || 1;
+		if (params.get('search')) search = params.get('search')!;
+		if (params.get('country')) selectedCountry = [params.get('country')!];
+		if (params.get('has_country')) selectedHasCountry = [params.get('has_country')!];
+		if (params.get('sug_country')) selectedSugCountry = [params.get('sug_country')!];
 		loadCountries();
 		loadAddresses();
 	});
@@ -291,7 +310,7 @@
 	</tbody>
 </table>
 
-<Pagination {page} {pages} onchange={(p) => { page = p; loadAddresses(); }} />
+<Pagination {page} {pages} onchange={(p) => { page = p; syncUrl(); loadAddresses(); }} />
 
 <style>
 	h1 { font-size: 1.3rem; margin-bottom: 12px; }

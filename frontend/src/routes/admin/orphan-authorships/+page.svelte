@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
+	import { replaceState } from '$app/navigation';
 	import { api } from '$lib/api';
 	import { titleCase } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -161,13 +162,26 @@
 		loadOrphans();
 	}
 
+	function syncUrl() {
+		const p = new URLSearchParams();
+		if (currentPage > 1) p.set('page', String(currentPage));
+		if (search.trim()) p.set('search', search.trim());
+		const qs = p.toString();
+		replaceState(`${base}/admin/orphan-authorships` + (qs ? '?' + qs : ''), {});
+	}
+
 	let debounceTimer: ReturnType<typeof setTimeout>;
 	function onSearchInput() {
 		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => { currentPage = 1; loadOrphans(); }, 400);
+		debounceTimer = setTimeout(() => { currentPage = 1; syncUrl(); loadOrphans(); }, 400);
 	}
 
-	onMount(() => { loadOrphans(); });
+	onMount(() => {
+		const params = new URLSearchParams(window.location.search);
+		if (params.get('page')) currentPage = parseInt(params.get('page')!) || 1;
+		if (params.get('search')) search = params.get('search')!;
+		loadOrphans();
+	});
 </script>
 
 <svelte:head>
@@ -271,7 +285,7 @@
 		</tbody>
 	</table>
 
-	<Pagination page={currentPage} pages={totalPages} onchange={(p) => { currentPage = p; loadOrphans(); }} />
+	<Pagination page={currentPage} pages={totalPages} onchange={(p) => { currentPage = p; syncUrl(); loadOrphans(); }} />
 {/if}
 
 {#if createModal}

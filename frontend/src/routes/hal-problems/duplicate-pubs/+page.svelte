@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { typeLabels } from '$lib/labels';
+	import { sanitizeTitle } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
 
 	interface HalDoc {
@@ -134,7 +135,7 @@
 					<div class="pub-meta-line">
 						{#if pair.publication.pub_year}<span class="meta-badge">{pair.publication.pub_year}</span>{/if}
 						{#if pair.publication.doc_type}<span class="meta-badge type-badge">{typeLabels[pair.publication.doc_type] || pair.publication.doc_type}</span>{/if}
-						<a href="{base}/publications/{pair.publication.id}" class="pub-link">{pair.publication.title}</a>
+						<a href="{base}/publications/{pair.publication.id}" class="pub-link">{@html sanitizeTitle(pair.publication.title)}</a>
 					</div>
 					<div class="hal-list">
 						{#each pair.publication.hal_docs as hd}
@@ -150,7 +151,7 @@
 				</div>
 			{/each}
 		</div>
-		<Pagination page={doiPage} pages={doiPages} onchange={(p) => { doiPage = p; loadDoi(); window.scrollTo(0, 0); }} />
+		<Pagination page={doiPage} pages={doiPages} onchange={(p) => { doiPage = p; syncUrl(); loadDoi(); window.scrollTo(0, 0); }} />
 	{/if}
 
 {:else}
@@ -171,7 +172,7 @@
 					<tr>
 						{#each [pair.pub_a, pair.pub_b] as pub}
 							<td>
-								<a href="{base}/publications/{pub.id}" class="pub-link">{pub.title}</a>
+								<a href="{base}/publications/{pub.id}" class="pub-link">{@html sanitizeTitle(pub.title)}</a>
 								<div class="pub-meta-line">
 									{#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
 									{#if pub.doc_type}<span class="meta-badge type-badge">{typeLabels[pub.doc_type] || pub.doc_type}</span>{/if}
@@ -196,7 +197,7 @@
 				{/each}
 			</tbody>
 		</table>
-		<Pagination page={metaPage} pages={metaPages} onchange={(p) => { metaPage = p; loadMeta(); window.scrollTo(0, 0); }} />
+		<Pagination page={metaPage} pages={metaPages} onchange={(p) => { metaPage = p; syncUrl(); loadMeta(); window.scrollTo(0, 0); }} />
 	{/if}
 {/if}
 

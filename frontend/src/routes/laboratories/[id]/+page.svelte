@@ -215,6 +215,11 @@
 			pubSearch:        { type: 'single',        urlKey: 'search' },
 			currentPage:      { type: 'page',          urlKey: 'page' },
 			personsSort:      { type: 'single',        urlKey: 'psort', defaultValue: 'name' },
+			hasRh:            { type: 'single',        urlKey: 'has_rh', defaultValue: 'yes' },
+			hasOrcid:         { type: 'single',        urlKey: 'has_orcid' },
+			hasIdhal:         { type: 'single',        urlKey: 'has_idhal' },
+			personsPage:      { type: 'page',          urlKey: 'ppage' },
+			addrPage:         { type: 'page',          urlKey: 'apage' },
 		},
 	});
 
@@ -226,6 +231,11 @@
 			selectedOa, selectedApc, selectedCountries, pubSearch,
 			currentPage: pubs.page,
 			personsSort,
+			hasRh: selectedRh.length === 1 ? selectedRh[0] : 'all',
+			hasOrcid: selectedOrcid.length === 1 ? selectedOrcid[0] : undefined,
+			hasIdhal: selectedIdhal.length === 1 ? selectedIdhal[0] : undefined,
+			personsPage,
+			addrPage,
 		}));
 	}
 
@@ -478,6 +488,20 @@
 		if (restored.pubSearch) pubSearch = restored.pubSearch as string;
 		if (restored.currentPage) pubs.page = restored.currentPage as number;
 		if (restored.personsSort) personsSort = restored.personsSort as string;
+		if (restored.hasRh != null) {
+			const rh = restored.hasRh as string;
+			selectedRh = rh === 'all' ? [] : [rh];
+		}
+		if (restored.hasOrcid != null) {
+			const o = restored.hasOrcid as string;
+			selectedOrcid = o === 'all' ? [] : [o];
+		}
+		if (restored.hasIdhal != null) {
+			const h = restored.hasIdhal as string;
+			selectedIdhal = h === 'all' ? [] : [h];
+		}
+		if (restored.personsPage) personsPage = restored.personsPage as number;
+		if (restored.addrPage) addrPage = restored.addrPage as number;
 
 		try {
 			const profileData = await api<LabProfile>(`/api/laboratories/${labId}`);
@@ -736,9 +760,9 @@
 			{/if}
 			<div class="toolbar toolbar-card">
 				<input type="text" placeholder="Rechercher..." bind:value={personsSearch} oninput={() => { clearTimeout(personsSearchTimer); personsSearchTimer = setTimeout(() => { personsPage = 1; loadPersons(); }, 300); }} />
-				<FacetDropdown label="Base RH" options={rhOptions} bind:selected={selectedRh} onchange={() => { personsPage = 1; loadPersons(); }} />
-				<FacetDropdown label="ORCID" options={orcidOptions} bind:selected={selectedOrcid} onchange={() => { personsPage = 1; loadPersons(); }} />
-				<FacetDropdown label="idHAL" options={idhalOptions} bind:selected={selectedIdhal} onchange={() => { personsPage = 1; loadPersons(); }} />
+				<FacetDropdown label="Base RH" options={rhOptions} bind:selected={selectedRh} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
+				<FacetDropdown label="ORCID" options={orcidOptions} bind:selected={selectedOrcid} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
+				<FacetDropdown label="idHAL" options={idhalOptions} bind:selected={selectedIdhal} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
 				<span class="count">{personsTotal} personne{personsTotal > 1 ? 's' : ''}</span>
 			</div>
 			<table>
@@ -772,7 +796,7 @@
 					{/if}
 				</tbody>
 			</table>
-			<Pagination page={personsPage} pages={personsPages} onchange={(p) => { personsPage = p; loadPersons(); }} />
+			<Pagination page={personsPage} pages={personsPages} onchange={(p) => { personsPage = p; syncUrl(); loadPersons(); }} />
 		</div>
 	{/if}
 
@@ -805,7 +829,7 @@
 					{/if}
 				</tbody>
 			</table>
-			<Pagination page={addrPage} pages={addrPages} onchange={(p) => { addrPage = p; loadAddresses(); }} />
+			<Pagination page={addrPage} pages={addrPages} onchange={(p) => { addrPage = p; syncUrl(); loadAddresses(); }} />
 		</div>
 	{/if}
 {/if}
