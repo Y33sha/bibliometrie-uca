@@ -11,33 +11,20 @@ Usage:
 """
 
 import argparse
-import hashlib
-import json
-import logging
 import os
 import sys
 import time
 
 import requests
-import psycopg2
 from psycopg2.extras import Json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config.settings import WOS
 from db.connection import get_connection
+from extraction.common import compute_hash, setup_logger
 
 # ----- Logging -----
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "logs", "cross_import_wos.log")
-        ),
-    ],
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger("cross_import_wos", os.path.join(os.path.dirname(__file__), "logs"))
 
 BASE_URL = WOS["base_url"]
 HEADERS = {
@@ -111,7 +98,7 @@ def extract_doi(rec: dict) -> str | None:
     return None
 
 
-def clean_doi(doi: str) -> str | None:
+def clean_doi_for_wos_search(doi: str) -> str | None:
     """Nettoie un DOI pour la recherche WoS. Retourne None si inutilisable."""
     import re
     doi = doi.strip()
@@ -130,7 +117,7 @@ def clean_doi(doi: str) -> str | None:
 def search_by_dois(dois: list[str]) -> list[dict]:
     """Cherche un lot de DOIs dans WoS. Retourne les records trouvés."""
     # Nettoyer les DOIs
-    clean = [clean_doi(d) for d in dois]
+    clean = [clean_doi_for_wos_search(d) for d in dois]
     clean = [d for d in clean if d]
     if not clean:
         return []
@@ -232,8 +219,7 @@ def main():
                 skipped_total += 1
                 continue
 
-            raw_json = json.dumps(rec, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-            h = hashlib.md5(raw_json.encode("utf-8")).hexdigest()
+            h = compute_hash(rec)
             cur.execute("""
                 INSERT INTO staging_wos (ut, doi, raw_data, raw_hash)
                 VALUES (%s, %s, %s, %s)

@@ -12,32 +12,19 @@ Usage:
 """
 
 import argparse
-import hashlib
-import json
-import logging
 import os
 import sys
 import time
 
 import requests
-import psycopg2
 from psycopg2.extras import Json, RealDictCursor
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config.settings import OPENALEX
 from db.connection import get_connection
+from extraction.common import compute_hash, setup_logger
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "logs", "refetch_truncated.log")
-        ),
-    ],
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger("refetch_truncated", os.path.join(os.path.dirname(__file__), "logs"))
 
 BASE_URL = "https://api.openalex.org/works"
 
@@ -49,15 +36,10 @@ SELECT_FIELDS = ",".join([
 ])
 
 
-def compute_hash(raw_data: dict) -> str:
-    canonical = json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
-
-
 def compute_meta_hash(raw_data: dict) -> str:
+    """Hash des métadonnées hors authorships."""
     filtered = {k: v for k, v in raw_data.items() if k != "authorships"}
-    canonical = json.dumps(filtered, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
+    return compute_hash(filtered)
 
 
 def fetch_work(openalex_id: str) -> dict | None:

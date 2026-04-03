@@ -16,33 +16,20 @@ Query:  OG=(Universite Clermont Auvergne OR CHU Clermont Ferrand
 """
 
 import argparse
-import hashlib
-import json
-import logging
 import os
 import sys
 import time
 
 import requests
-import psycopg2
 from psycopg2.extras import Json, execute_values
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config.settings import WOS
 from db.connection import get_connection
+from extraction.common import compute_hash, get_existing_ids, setup_logger
 
 # ----- Logging -----
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "logs", "extract_wos.log")
-        ),
-    ],
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger("extract_wos", os.path.join(os.path.dirname(__file__), "logs"))
 
 # ----- Constantes API -----
 BASE_URL = WOS["base_url"]
@@ -155,15 +142,7 @@ def get_records_found(data: dict) -> int:
 
 def get_existing_uts(conn) -> set:
     """Récupère les UT déjà en base pour éviter les doublons."""
-    with conn.cursor() as cur:
-        cur.execute("SELECT ut FROM staging_wos")
-        return {row[0] for row in cur.fetchall()}
-
-
-def compute_hash(raw_data) -> str:
-    """Calcule le hash MD5 du JSON canonique."""
-    canonical = json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
+    return get_existing_ids(conn, "staging_wos", "ut")
 
 
 def insert_batch(conn, batch: list[tuple]):

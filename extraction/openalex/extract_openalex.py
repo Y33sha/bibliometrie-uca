@@ -13,32 +13,20 @@ Les works déjà présents (même openalex_id) sont ignorés.
 
 import argparse
 import json
-import logging
-import sys
 import os
+import sys
 import time
 
-import hashlib
 import requests
-import psycopg2
 from psycopg2.extras import Json, execute_values
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config.settings import OPENALEX
 from db.connection import get_connection
+from extraction.common import compute_hash, clean_doi, get_existing_ids, setup_logger
 
 # ----- Logging -----
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "logs", "extract_openalex.log")
-        ),
-    ],
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger("extract_openalex", os.path.join(os.path.dirname(__file__), "logs"))
 
 # ----- Constantes API -----
 BASE_URL = "https://api.openalex.org/works"
@@ -89,29 +77,13 @@ def fetch_page(year: int, cursor: str = "*") -> dict:
 
 
 def extract_doi(work: dict) -> str | None:
-    """Extrait le DOI nettoyé (sans préfixe https://doi.org/)."""
-    doi = work.get("doi")
-    if doi:
-        return doi.replace("https://doi.org/", "").strip()
-    return None
+    """Extrait le DOI nettoyé (sans préfixe URL)."""
+    return clean_doi(work.get("doi"))
 
 
 def extract_openalex_id(work: dict) -> str:
     """Extrait l'ID OpenAlex court (ex: W2741809807)."""
     return work["id"].replace("https://openalex.org/", "")
-
-
-def get_existing_ids(conn) -> set:
-    """Récupère les openalex_id déjà en base pour éviter les doublons."""
-    with conn.cursor() as cur:
-        cur.execute("SELECT openalex_id FROM staging_openalex")
-        return {row[0] for row in cur.fetchall()}
-
-
-def compute_hash(raw_data: dict) -> str:
-    """Calcule le hash MD5 du JSON canonique (clés triées, compact)."""
-    canonical = json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
 
 
 def compute_meta_hash(raw_data: dict) -> str:
@@ -120,8 +92,7 @@ def compute_meta_hash(raw_data: dict) -> str:
     sans être perturbé par la troncature à 100 auteurs de l'API bulk.
     """
     filtered = {k: v for k, v in raw_data.items() if k != "authorships"}
-    canonical = json.dumps(filtered, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
+    return compute_hash(filtered)
 
 
 def insert_batch(conn, batch: list[tuple]):
@@ -261,7 +232,7 @@ def main():
 
     conn = get_connection()
     try:
-        existing_ids = get_existing_ids(conn)
+        existing_ids = get_existing_ids(conn, "staging_openalex", "openalex_id")
         logger.info(f"{len(existing_ids)} works déjà en staging")
 
         grand_total = 0
