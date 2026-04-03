@@ -369,6 +369,11 @@ def process_authorships(cur, work: dict, oa_document_id: int):
     """
     authorships = work.get("authorships") or []
 
+    # Supprimer les anciennes authorships de ce document
+    # (nécessaire quand un work refetché a changé d'auteurs/positions)
+    cur.execute("DELETE FROM openalex_authorships WHERE openalex_document_id = %s",
+                (oa_document_id,))
+
     for position, authorship in enumerate(authorships):
         oa_author_id = upsert_openalex_author(cur, authorship)
         if not oa_author_id:

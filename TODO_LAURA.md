@@ -47,7 +47,6 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 ## Personnes
 * [x] moissonner ORCID liés aux comptes HAL (processing/harvest_hal_orcids.py — 12125 ORCID récupérés) => quelle place dans le pipeline?
 * [x] publications: indiquer si auteur correspondant / premier auteur
-* [ ] correction des noms; création de personnes, interface de gestion des formes de noms
 * [ ] ajouter IdRef? => fait pour comptes HAL; chercher les autres; + add_identifiers_from_authorships ne tient compte que d'orcid et idhal
 * [ ] ajouter quelques visus (%OA)
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis
@@ -57,14 +56,15 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 
 ## Mega-authorships et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap)
-* [ ] OpenAlex cap 100 authorships: re-fetch individuel via API pour récupérer les auteurs UCA au-delà de la position 100
 * [ ] en attendant, le mode "conflit de sources" dans la dédup personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`)
+* [ ] vérifier pourquoi Openalex contient parfois beaucoup plus d'auteurs : ex. 21105
 
 ## Structures
 * [ ] signatures: afficher nombre de publis + dates; trier par publis décroissantes; idem sur page personne
 
 ## Publications
 * [ ] ajouter filtre corresponding_is_uca?
+* [ ] relations entre publications (est traduction de, est preprint de..., fait partie de...)
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
 * [ ] lien Publications -> Dashboard?
 * [ ] pb des auteurs openalex liés à une personne mais non listés dans les auteurs d'une publi: http://172.22.130.105/bibliometrie/publications/12380
@@ -79,6 +79,7 @@ pb des types non fiables sur OpenAlex: https://openalex.org/works/W4225722715
 * [ ] ne pas afficher "non applicable" dans les pays! (ni dans les facettes)
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
 * [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
+* [ ] document dumas: ouvrir sur dumas, pas HAL
 
 ### Types de documents
 * [ ] gérer le document type "correction" sur wos, "erratum" sur OA (actuellement, apparaît comme article) (Corrigendum to ...)
