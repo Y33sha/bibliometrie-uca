@@ -4,12 +4,12 @@ import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 from utils.normalize import normalize_name, normalize_text
-from processing.normalize_hal import clean_doi
-from processing.create_persons_from_source_authorships import (
+from utils.doi import clean_doi
+from utils.names import (
     parse_raw_author_name, names_compatible, first_names_compatible,
-    last_names_compatible, find_person_by_name,
+    last_names_compatible,
 )
-from collections import defaultdict
+from services.persons import compute_person_name_forms
 
 
 # ── normalize_name ──
@@ -114,35 +114,27 @@ class TestNamesCompatible:
         assert first_names_compatible("", "jean") is False
 
 
-# ── find_person_by_name ──
+# ── compute_person_name_forms ──
 
-def _make_index(persons):
-    """Helper : construit un person_index depuis une liste de (pid, ln, fn)."""
-    idx = defaultdict(list)
-    for pid, ln, fn in persons:
-        idx[(ln, fn)].append({
-            "person_id": pid, "last_norm": ln, "first_norm": fn, "pub_ids": set()
-        })
-    return idx
+class TestComputePersonNameForms:
+    def test_standard(self):
+        forms = compute_person_name_forms("Dupont", "Jean")
+        assert "jean dupont" in forms
+        assert "dupont jean" in forms
+        assert "j dupont" in forms
+        assert "dupont j" in forms
 
-class TestFindPersonByName:
-    def test_no_match_returns_none(self):
-        idx = _make_index([(1, "dupont", "jean")])
-        a = {"last_norm": "martin", "first_norm": "paul"}
-        assert find_person_by_name(a, idx) is None
+    def test_compound_first_name(self):
+        forms = compute_person_name_forms("Dupont", "Jean Michel")
+        assert "jean michel dupont" in forms
+        assert "j m dupont" in forms
+        assert "jm dupont" in forms
 
-    def test_single_match_returns_pid(self):
-        idx = _make_index([(42, "dupont", "jean")])
-        a = {"last_norm": "dupont", "first_norm": "j"}
-        assert find_person_by_name(a, idx) == 42
+    def test_no_first_name(self):
+        forms = compute_person_name_forms("Dupont", "")
+        assert "dupont" in forms
+        assert len(forms) == 1
 
-    def test_ambiguous_returns_minus_one(self):
-        idx = _make_index([(1, "dupont", "jean"), (2, "dupont", "jacques")])
-        # "j" est compatible avec "jean" ET "jacques"
-        a = {"last_norm": "dupont", "first_norm": "j"}
-        assert find_person_by_name(a, idx) == -1
-
-    def test_empty_last_returns_none(self):
-        idx = _make_index([(1, "dupont", "jean")])
-        a = {"last_norm": "", "first_norm": "jean"}
-        assert find_person_by_name(a, idx) is None
+    def test_empty_last_name(self):
+        forms = compute_person_name_forms("", "Jean")
+        assert forms == set()
