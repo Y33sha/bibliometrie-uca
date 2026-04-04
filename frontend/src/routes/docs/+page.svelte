@@ -58,16 +58,25 @@
 		if (!link) return;
 		const href = link.getAttribute("href");
 		if (!href) return;
+
+		// Liens externes → laisser le navigateur gérer
+		if (href.startsWith("http") || href.startsWith("/")) return;
+
+		// Ancre sur la même page (#section)
+		if (href.startsWith("#")) return; // le navigateur gère nativement
+
 		// Lien interne vers une autre page de doc (ex: "pipeline" ou "glossaire#terme")
-		if (!href.startsWith("http") && !href.startsWith("/") && !href.startsWith("#")) {
-			e.preventDefault();
-			const [slug] = href.split("#");
-			if (slug && pages.some((p) => p.slug === slug)) {
-				const url = new URL(window.location.href);
-				url.searchParams.set("page", slug);
-				window.history.pushState({}, "", url);
-				loadPage(slug);
-			}
+		e.preventDefault();
+		const [slug, anchor] = href.split("#");
+		if (slug && pages.some((p) => p.slug === slug)) {
+			goto(`${base}/docs?page=${slug}`, { replaceState: false, noScroll: true }).then(() => {
+				if (anchor) {
+					tick().then(() => {
+						const el = document.getElementById(anchor);
+						if (el) el.scrollIntoView({ behavior: "smooth" });
+					});
+				}
+			});
 		}
 	}
 
