@@ -2,12 +2,9 @@
 
 ## Vue d'ensemble
 
-Le système gère les publications scientifiques de l'Université Clermont Auvergne en
-intégrant plusieurs sources de données (HAL, OpenAlex, Web of Science).
+Le système centralise la production scientifique de l'Université Clermont Auvergne en intégrant plusieurs [sources de données](sources) (HAL, OpenAlex, Web of Science).
 
-Principe fondamental : **les données source ne se mélangent jamais**. Chaque source
-a ses propres tables ; les entités canoniques (publications, personnes, structures,
-authorships) sont construites par déduplication et mapping.
+Principe fondamental : les données source sont strictement séparées et ne s'écrasent jamais. Chaque source a ses propres tables ; les entités canoniques (publications, personnes, structures, [authorships](glossaire#authorship)) sont construites par mapping à partir des sources.
 
 ```
  STAGING (brut API)                SOURCE (normalisé)                     VÉRITÉ
@@ -29,16 +26,18 @@ authorships) sont construites par déduplication et mapping.
                          wos_authorships ────────────────┘
 ```
 
-### Diagramme entité-relation (tables de vérité)
+### Diagramme entité-relation (tables canoniques)
 
 ```mermaid
 erDiagram
+    publications }o--|| journals : "journal_id"
+    journals }o--|| publishers : "publisher_id"
     publications ||--o{ authorships : "publication_id"
     persons ||--o{ authorships : "person_id"
     persons ||--o{ person_identifiers : "person_id"
     persons ||--o{ person_name_forms : "person_ids[]"
-    publications }o--|| journals : "journal_id"
-    journals }o--|| publishers : "publisher_id"
+    
+    authorships }o--o{ structures : "structure_ids[]"
     structures ||--o{ structure_relations : "parent/child"
     structures ||--o{ name_forms : "structure_id"
 
@@ -189,7 +188,7 @@ le service pour écrire.
 Note : `person_id` sur les `*_authorships` est écrit par `services/persons.py`
 (rattachement), pas par les normalizers.
 
-### Authorships vérité
+### Authorships canoniques
 
 | Table | Propriétaire | Violations actuelles |
 |-------|-------------|---------------------|
@@ -418,66 +417,6 @@ Lien adresse → structure détectée, avec traçabilité (`matched_form_id`).
 Vue (pas table) qui consolide les liens publication → source en combinant les FK
 `publication_id` de `hal_documents`, `openalex_documents` et `wos_documents`.
 
-
-## Pipeline de traitement (`run_pipeline.py`)
-
-L'orchestrateur central gère 9 phases séquentielles, avec possibilité de reprendre
-à n'importe quelle phase (`--from`) ou d'en exécuter une seule (`--only`).
-Modes : `full`, `monthly`, `weekly` (via `--mode`).
-
-### Phase 1 : `extract` — Moissonnage
-```
-extract_openalex.py → staging_openalex
-extract_hal.py → staging_hal
-extract_wos.py → staging_wos
-```
-
-### Phase 2 : `normalize` — Normalisation
-```
-staging → documents + authors + authorships (par source)
-```
-
-### Phase 3 : `merge_pubs` — Fusion inter-sources
-```
-merge_hal_openalex_pubs.py (DOI, liens explicites)
-fetch_missing_hal.py (cross-import HAL → OA)
-cross_import_openalex.py (cross-import OA → HAL)
-+ re-normalisation des nouveaux records
-```
-
-### Phase 4 : `addresses` — Adresses
-```
-populate_addresses.py --source openalex|wos
-resolve_addresses.py (détection structures dans les adresses)
-```
-
-### Phase 5 : `uca_flags` — Flags UCA
-```
-populate_uca_flags.sql (étapes 1-3b sur authorships sources)
-```
-
-### Phase 6 : `persons` — Personnes
-```
-create_persons_from_source_authorships.py (6 passes, source-agnostique)
-populate_person_name_forms.py (formes de noms depuis les sources)
-```
-
-### Phase 7 : `authorships` — Construction authorships vérité
-```
-build_authorships.py (INSERT + FK + author_position + is_corresponding + propagation UCA)
-```
-
-### Phase 8 : `countries` — Pays
-```
-refresh_publication_countries.sql
-```
-
-### Phase 9 : `enrich` — Enrichissements
-```
-enrich_oa_unpaywall.py
-harvest_hal_idrefs.py
-harvest_hal_orcids.py
-```
 
 
 ## Inventaire des tables
