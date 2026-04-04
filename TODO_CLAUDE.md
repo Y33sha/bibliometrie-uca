@@ -30,3 +30,44 @@
 **Cas connu :** ouvrage + chapitre avec le même DOI (DOI de l'ouvrage attribué au chapitre). Contrainte unique sur `lower(doi)` → impossible d'avoir les deux. Il faudrait supprimer le DOI sur l'un des deux (celui qui est en fait le chapitre) et maintenir les deux publications distinctes.
 
 **À implémenter :** garde-fous dans `find_or_create()` ou en amont dans les normalizers, pour détecter les cas où un DOI identique recouvre des publications de types incompatibles (livre vs chapitre, article vs erratum).
+
+**Note :** les garde-fous chapitre/ouvrage sont désormais implémentés dans `find_or_create()` (testés dans `test_dedup_publications.py`).
+
+## Tests d'idempotence du pipeline
+
+Vérifier que lancer deux fois de suite chaque phase du pipeline produit le même résultat (pas de doublons de personnes, pas d'authorships rattachées en double, pas de publications créées en double).
+
+**Scénario type :**
+1. Insérer des données de test dans le staging
+2. Lancer la phase (ex: `create_persons`)
+3. Compter les résultats (nb personnes, nb authorships rattachées)
+4. Relancer la même phase
+5. Vérifier que les compteurs n'ont pas bougé
+
+**Phases à tester en priorité :**
+- `create_persons_from_source_authorships.py` (risque de créer des personnes en double)
+- `build_authorships.py` (risque de doublons dans la table authorships)
+- `normalize_*.py` (risque de doublons de documents/auteurs)
+
+## Automatisation de l'attribution des pays aux adresses
+
+Actuellement, `addresses.countries` est assigné manuellement via l'interface admin. Il faudrait une couche d'automatisation a minima pour les adresses qui se terminent par un nom de pays.
+
+**Implémentation envisagée :**
+- Nouvelle table `country_name_forms` (formes de noms de pays dans différentes langues)
+- Script de parsing des adresses pour détecter les name_forms et assigner automatiquement des pays
+- Les attributions auto seraient en `suggested_countries`, validables manuellement
+
+**Note :** chantier conséquent, à planifier séparément.
+
+## Uniformisation compatibilité de noms (Python vs SQL)
+
+Les fonctions de compatibilité de noms existent en deux versions :
+- Python : `utils/names.py` (`names_compatible`, `first_names_compatible`, etc.)
+- SQL : requêtes dans `backend/routers/admin_person_duplicates.py` (`PERSON_DUP_QUERIES`)
+
+Les deux implémentent la même logique mais indépendamment. Idéalement, le backend devrait utiliser les fonctions Python de `utils/names.py` pour la détection de doublons. Mais les requêtes SQL sont plus performantes pour le matching en masse (JOIN direct en base). À réévaluer si la logique diverge.
+
+## Colonne raw_orcid dans openalex_authorships
+
+Redondante avec `openalex_authors.orcid` — même valeur, même source. À supprimer dans une migration future (cf. TODO_LAURA.md).
