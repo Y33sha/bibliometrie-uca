@@ -1,7 +1,7 @@
 """
 Crée des entités Personnes à partir des authorships sources UCA non rattachées.
 
-Algorithme en 3 étapes :
+Algorithme en 4 étapes :
 
   Étape 0 : Comptes HAL
     hal_authors avec hal_person_id → création/mapping personne, propagation
@@ -12,7 +12,13 @@ Algorithme en 3 étapes :
     (même position) une authorship d'une autre source qui a un person_id.
     Si le nom est compatible → rattacher à cette personne.
 
-  Étape 2 : Lookup person_name_forms
+  Étape 2 : ORCID connu
+    Si l'authorship a un ORCID déjà présent en base (status != rejected)
+    et mappé à une personne → rattacher à cette personne.
+    L'ORCID ne prime pas sur le cross-source (risque d'ORCID erroné
+    dans OpenAlex/WoS supérieur au risque d'homonymie en cross-source).
+
+  Étape 3 : Lookup person_name_forms
     Normaliser le nom de l'auteur et chercher dans person_name_forms.
     - Mappé à 1 personne → rattacher
     - Mappé à >1 personnes → orphelin (traitement manuel)
@@ -288,10 +294,55 @@ def step1_cross_source(cur, all_authorships, linked_ids, linked_index, dry_run):
 
 
 # ---------------------------------------------------------------------------
-# Étape 2 : Lookup person_name_forms
+# Étape 2 : ORCID connu
 # ---------------------------------------------------------------------------
 
-def step2_name_forms(cur, all_authorships, linked_ids, name_form_map, dry_run):
+def load_orcid_person_map(cur):
+    """Charge les ORCID déjà mappés à une personne (status != rejected).
+
+    Retourne : {orcid: person_id}
+    """
+    cur.execute("""
+        SELECT id_value, person_id
+        FROM person_identifiers
+        WHERE id_type = 'orcid'
+          AND status != 'rejected'
+    """)
+    return {r["id_value"]: r["person_id"] for r in cur.fetchall()}
+
+
+def step2_orcid(cur, all_authorships, linked_ids, dry_run):
+    """Si l'authorship a un ORCID déjà connu en base (non rejeté),
+    rattacher à la personne correspondante.
+    """
+    orcid_map = load_orcid_person_map(cur)
+    linked = 0
+
+    for a in all_authorships:
+        if (a["source"], a["authorship_id"]) in linked_ids:
+            continue
+
+        orcid = a.get("orcid")
+        if not orcid:
+            continue
+
+        pid = orcid_map.get(orcid)
+        if pid:
+            if not dry_run:
+                link_to_person(cur, pid, [a])
+                add_name_form(cur, pid, a["full_name"])
+            linked_ids.add((a["source"], a["authorship_id"]))
+            linked += 1
+
+    logger.info(f"  {linked} authorships rattachées par ORCID connu")
+    return linked
+
+
+# ---------------------------------------------------------------------------
+# Étape 3 : Lookup person_name_forms
+# ---------------------------------------------------------------------------
+
+def step3_name_forms(cur, all_authorships, linked_ids, name_form_map, dry_run):
     """Lookup par author_name_normalized dans person_name_forms.
 
     - Mappé à 1 personne → rattacher
@@ -381,10 +432,14 @@ def run(dry_run=False):
     linked_index = load_linked_authorships_by_pub(cur)
     s1 = step1_cross_source(cur, all_authorships, linked_ids, linked_index, dry_run)
 
-    # ── Étape 2 : Name forms ──
-    logger.info("\n--- Étape 2 : person_name_forms ---")
+    # ── Étape 2 : ORCID connu ──
+    logger.info("\n--- Étape 2 : ORCID connu ---")
+    s2 = step2_orcid(cur, all_authorships, linked_ids, dry_run)
+
+    # ── Étape 3 : Name forms ──
+    logger.info("\n--- Étape 3 : person_name_forms ---")
     name_form_map = load_name_form_map(cur)
-    s2_created, s2_linked, s2_ambiguous = step2_name_forms(
+    s3_created, s3_linked, s3_ambiguous = step3_name_forms(
         cur, all_authorships, linked_ids, name_form_map, dry_run)
 
     # ── Résumé ──
@@ -394,7 +449,8 @@ def run(dry_run=False):
     logger.info(f"\n=== Résumé ===")
     logger.info(f"  Étape 0 (comptes HAL)    : {s0} rattachées")
     logger.info(f"  Étape 1 (cross-source)   : {s1} rattachées")
-    logger.info(f"  Étape 2 (name_forms)     : {s2_created} créées, {s2_linked} rattachées, {s2_ambiguous} ambiguës")
+    logger.info(f"  Étape 2 (ORCID connu)    : {s2} rattachées")
+    logger.info(f"  Étape 3 (name_forms)     : {s3_created} créées, {s3_linked} rattachées, {s3_ambiguous} ambiguës")
     logger.info(f"  Non résolues             : {unlinked}")
 
     if dry_run:
