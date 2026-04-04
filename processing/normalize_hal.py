@@ -223,8 +223,8 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
 # =============================================================
 
 def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
-                      idhal: str | None, hal_form_id: int | None = None
-                      ) -> int | None:
+                      idhal: str | None, hal_form_id: int | None = None,
+                      orcid: str | None = None) -> int | None:
     """
     Insère/retrouve un auteur HAL.
     Déduplique par :
@@ -250,14 +250,15 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
     if hal_person_id and hal_person_id > 0:
         cur.execute("""
             INSERT INTO hal_authors
-                (hal_person_id, full_name, last_name, first_name, idhal)
-            VALUES (%s, %s, %s, %s, %s)
+                (hal_person_id, full_name, last_name, first_name, idhal, orcid)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (hal_person_id) DO UPDATE SET
                 idhal = COALESCE(hal_authors.idhal, EXCLUDED.idhal),
+                orcid = COALESCE(hal_authors.orcid, EXCLUDED.orcid),
                 full_name = EXCLUDED.full_name,
                 updated_at = now()
             RETURNING id
-        """, (hal_person_id, full_name, last_name, first_name, idhal))
+        """, (hal_person_id, full_name, last_name, first_name, idhal, orcid))
         return cur.fetchone()[0]
 
     # 2. Par hal_form_id (auteurs sans compte HAL mais avec form_id)
@@ -272,19 +273,20 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
             cur.execute("""
                 UPDATE hal_authors SET
                     idhal = COALESCE(hal_authors.idhal, %s),
+                    orcid = COALESCE(hal_authors.orcid, %s),
                     full_name = %s,
                     updated_at = now()
                 WHERE id = %s
-            """, (idhal, full_name, row[0]))
+            """, (idhal, orcid, full_name, row[0]))
             return row[0]
 
         # Nouveau avec form_id
         cur.execute("""
             INSERT INTO hal_authors
-                (full_name, last_name, first_name, idhal, hal_form_id)
-            VALUES (%s, %s, %s, %s, %s)
+                (full_name, last_name, first_name, idhal, orcid, hal_form_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id
-        """, (full_name, last_name, first_name, idhal, hal_form_id))
+        """, (full_name, last_name, first_name, idhal, orcid, hal_form_id))
         return cur.fetchone()[0]
 
     # 3. Pas de hal_person_id ni form_id → chercher par nom exact
@@ -298,21 +300,22 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
     """, (full_name, first_name))
     row = cur.fetchone()
     if row:
-        if idhal:
+        if idhal or orcid:
             cur.execute("""
                 UPDATE hal_authors SET
                     idhal = COALESCE(hal_authors.idhal, %s),
+                    orcid = COALESCE(hal_authors.orcid, %s),
                     updated_at = now()
                 WHERE id = %s
-            """, (idhal, row[0]))
+            """, (idhal, orcid, row[0]))
         return row[0]
 
     # 4. Nouveau sans identifiant
     cur.execute("""
-        INSERT INTO hal_authors (full_name, last_name, first_name, idhal)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO hal_authors (full_name, last_name, first_name, idhal, orcid)
+        VALUES (%s, %s, %s, %s, %s)
         RETURNING id
-    """, (full_name, last_name, first_name, idhal))
+    """, (full_name, last_name, first_name, idhal, orcid))
     return cur.fetchone()[0]
 
 
@@ -375,6 +378,7 @@ def process_authors(cur, doc: dict, hal_document_id: int):
     - Crée les hal_authorships avec hal_struct_ids
     """
     names = doc.get("authFullName_s") or []
+    orcids = doc.get("authOrcid_s") or []
 
     # authFullNameFormIDPersonIDIDHal_fs :
     #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position
@@ -431,9 +435,13 @@ def process_authors(cur, doc: dict, hal_document_id: int):
         idhal = idhal_by_pos.get(position)
         hal_person_id = hal_person_id_by_pos.get(position)
         form_id = form_id_by_pos.get(position)
+        orcid = orcids[position] if position < len(orcids) else None
+        # authOrcid_s peut contenir des chaînes vides
+        if orcid and not orcid.strip():
+            orcid = None
 
         hal_author_id = upsert_hal_author(
-            cur, name, hal_person_id, idhal, form_id
+            cur, name, hal_person_id, idhal, form_id, orcid=orcid
         )
         if not hal_author_id:
             continue
