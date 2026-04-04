@@ -151,7 +151,7 @@ async def feedback_false_positives(
                     'structure_name', COALESCE(s.acronym, s.name)
                 ))
                 FROM address_structures ast2
-                JOIN name_forms nf ON nf.id = ast2.matched_form_id
+                JOIN structure_name_forms nf ON nf.id = ast2.matched_form_id
                 JOIN structures s ON s.id = nf.structure_id
                 WHERE ast2.address_id = a.id
                   AND ast2.structure_id = %s

@@ -106,7 +106,7 @@ Re-normalise les records OpenAlex et HAL nouvellement importés par les cross-im
 Extrait les adresses brutes des authorships sources (OpenAlex, WoS) et les résout en structures. HAL n'a pas d'adresses (les affiliations passent par `hal_struct_ids`).
 
 1. **`populate_addresses.py`** — split les `raw_affiliation` (séparateur ` | `) en adresses individuelles, déduplique dans la table `addresses`, crée les liens `*_authorship_addresses`
-2. **`resolve_addresses.py`** — matche les adresses normalisées avec les formes de nom des structures (`name_forms`), en tenant compte du contexte (tutelles). Résultat dans `address_structures`
+2. **`resolve_addresses.py`** — matche les adresses normalisées avec les formes de nom des structures (`structure_name_forms`), en tenant compte du contexte (tutelles). Résultat dans `address_structures`
 
 
 ### Phase 5 — `uca_flags` : Flags UCA

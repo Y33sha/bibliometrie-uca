@@ -1,7 +1,7 @@
 """
 Résolution des adresses : identification UCA + rattachement structures.
 
-Lit les formes de noms depuis la table name_forms,
+Lit les formes de noms depuis la table structure_name_forms,
 et enregistre dans address_structures avec matched_form_id pour
 la traçabilité (boucle de rétroaction).
 
@@ -38,12 +38,12 @@ BATCH_SIZE = 1000
 # ─── Chargement des données ──────────────────────────────────────
 
 def load_forms(cur):
-    """Charge toutes les formes actives depuis name_forms."""
+    """Charge toutes les formes actives depuis structure_name_forms."""
     cur.execute("""
         SELECT nf.id, nf.structure_id, nf.form_text, nf.form_normalized,
                nf.is_regex, nf.requires_context_of,
                s.code AS struct_code, s.structure_type::text AS struct_type
-        FROM name_forms nf
+        FROM structure_name_forms nf
         JOIN structures s ON s.id = nf.structure_id
         WHERE nf.is_active = TRUE
         ORDER BY nf.id
