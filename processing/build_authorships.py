@@ -19,7 +19,6 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-from utils.uca_perimeter import get_uca_structure_ids_list
 
 logging.basicConfig(
     level=logging.INFO,
@@ -171,6 +170,8 @@ def build(cur):
     logger.info(f"  {corr_count} is_corresponding mises à jour")
 
     # ── Étape 4 : Propagation is_uca et structure_ids ──
+    # Les 3 sources ont déjà is_uca et structure_ids peuplés par
+    # populate_uca_flags.py → on fait l'union des 3 sources.
     logger.info("Étape 4 : propagation is_uca et structure_ids...")
 
     # Reset toutes les authorships
@@ -178,43 +179,23 @@ def build(cur):
     reset_count = cur.rowcount
     logger.info(f"  Reset {reset_count} authorships")
 
-    # 4a. Depuis HAL (exclut peer_review : auteurs = ceux de l'article reviewé, pas du review)
-    uca_ids = get_uca_structure_ids_list(cur)
-    cur.execute("""
-        WITH hal_data AS (
-            SELECT hd.publication_id,
-                   has.person_id,
-                   array_agg(DISTINCT sid) AS all_struct_ids,
-                   bool_or(sid = ANY(%s)) AS has_uca
+    # Même logique pour les 3 sources : union des structure_ids, OR des is_uca
+    SOURCE_QUERIES = [
+        ("HAL", """
+            SELECT hd.publication_id, has.person_id,
+                   has.structure_ids AS struct_ids, has.is_uca AS src_is_uca
             FROM hal_authorships has
             JOIN hal_documents hd ON hd.id = has.hal_document_id
-            JOIN publications pub ON pub.id = hd.publication_id,
-            LATERAL unnest(has.structure_ids) AS sid
+            JOIN publications pub ON pub.id = hd.publication_id
             WHERE has.structure_ids IS NOT NULL
               AND hd.publication_id IS NOT NULL
               AND has.person_id IS NOT NULL
               AND NOT has.excluded
               AND pub.doc_type != 'peer_review'
-            GROUP BY hd.publication_id, has.person_id
-        )
-        UPDATE authorships a
-        SET structure_ids = hd.all_struct_ids,
-            is_uca = hd.has_uca,
-            updated_at = now()
-        FROM hal_data hd
-        WHERE a.publication_id = hd.publication_id
-          AND a.person_id = hd.person_id
-    """, (uca_ids,))
-    hal_uca = cur.rowcount
-    logger.info(f"  {hal_uca} authorships mises à jour depuis HAL")
-
-    # 4b. Depuis OpenAlex (union avec existant, exclut peer_review)
-    cur.execute("""
-        WITH oa_data AS (
-            SELECT od.publication_id,
-                   oas.person_id,
-                   oas.structure_ids AS struct_ids,
-                   oas.is_uca AS src_is_uca
+        """),
+        ("OpenAlex", """
+            SELECT od.publication_id, oas.person_id,
+                   oas.structure_ids AS struct_ids, oas.is_uca AS src_is_uca
             FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
             JOIN publications pub ON pub.id = od.publication_id
@@ -223,28 +204,10 @@ def build(cur):
               AND oas.person_id IS NOT NULL
               AND NOT oas.excluded
               AND pub.doc_type != 'peer_review'
-        )
-        UPDATE authorships a
-        SET structure_ids = (
-                SELECT array_agg(DISTINCT x)
-                FROM unnest(COALESCE(a.structure_ids, '{}') || od.struct_ids) AS x
-            ),
-            is_uca = a.is_uca OR od.src_is_uca,
-            updated_at = now()
-        FROM oa_data od
-        WHERE a.publication_id = od.publication_id
-          AND a.person_id = od.person_id
-    """)
-    oa_uca = cur.rowcount
-    logger.info(f"  {oa_uca} authorships mises à jour depuis OpenAlex")
-
-    # 4c. Depuis WoS (union avec existant, exclut peer_review)
-    cur.execute("""
-        WITH wos_data AS (
-            SELECT wd.publication_id,
-                   was.person_id,
-                   was.structure_ids AS struct_ids,
-                   was.is_uca AS src_is_uca
+        """),
+        ("WoS", """
+            SELECT wd.publication_id, was.person_id,
+                   was.structure_ids AS struct_ids, was.is_uca AS src_is_uca
             FROM wos_authorships was
             JOIN wos_documents wd ON wd.id = was.wos_document_id
             JOIN publications pub ON pub.id = wd.publication_id
@@ -253,20 +216,24 @@ def build(cur):
               AND was.person_id IS NOT NULL
               AND NOT was.excluded
               AND pub.doc_type != 'peer_review'
-        )
-        UPDATE authorships a
-        SET structure_ids = (
-                SELECT array_agg(DISTINCT x)
-                FROM unnest(COALESCE(a.structure_ids, '{}') || wd.struct_ids) AS x
-            ),
-            is_uca = a.is_uca OR wd.src_is_uca,
-            updated_at = now()
-        FROM wos_data wd
-        WHERE a.publication_id = wd.publication_id
-          AND a.person_id = wd.person_id
-    """)
-    wos_uca = cur.rowcount
-    logger.info(f"  {wos_uca} authorships mises à jour depuis WoS")
+        """),
+    ]
+
+    for source_name, source_query in SOURCE_QUERIES:
+        cur.execute(f"""
+            WITH src_data AS ({source_query})
+            UPDATE authorships a
+            SET structure_ids = (
+                    SELECT array_agg(DISTINCT x)
+                    FROM unnest(COALESCE(a.structure_ids, '{{}}'::int[]) || sd.struct_ids) AS x
+                ),
+                is_uca = a.is_uca OR sd.src_is_uca,
+                updated_at = now()
+            FROM src_data sd
+            WHERE a.publication_id = sd.publication_id
+              AND a.person_id = sd.person_id
+        """)
+        logger.info(f"  {source_name} : {cur.rowcount} authorships mises à jour")
 
     cur.execute("SELECT COUNT(*) FROM authorships WHERE is_uca = TRUE")
     total_uca = cur.fetchone()[0]
