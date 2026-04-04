@@ -26,6 +26,8 @@
 		"@sveltejs/adapter-node": "^5.5.4",
 		"chart.js": "^4.5.1",
 		"chartjs-plugin-datalabels": "^2.2.0",
-		"katex": "^0.16.44"
+		"katex": "^0.16.44",
+		"marked": "^17.0.5",
+		"mermaid": "^11.14.0"
 	}
 }
