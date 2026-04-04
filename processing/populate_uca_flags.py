@@ -15,7 +15,6 @@ Usage:
 """
 
 import argparse
-import logging
 import os
 import sys
 import time
@@ -23,12 +22,9 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from utils.uca_perimeter import get_uca_structure_ids, get_uca_structure_ids_wide
+from utils.log import setup_logger
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger("populate_uca_flags", os.path.join(os.path.dirname(__file__), "logs"))
 
 
 def step1_hal_structure_ids(cur):

@@ -9,7 +9,6 @@ Utilise le filtre openalex avec pipe (|) pour interroger jusqu'à 50 sources par
 """
 
 import argparse
-import logging
 import os
 import sys
 import time
@@ -19,18 +18,9 @@ import requests
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from services.journals import update_journal_apc, reset_journal_apc
+from utils.log import setup_logger
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "logs", "enrich_journal_apc.log")
-        ),
-    ],
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger("enrich_journal_apc", os.path.join(os.path.dirname(__file__), "logs"))
 
 OPENALEX_API = "https://api.openalex.org/sources"
 OPENALEX_PREFIX = "https://openalex.org/"

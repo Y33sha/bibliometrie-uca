@@ -19,12 +19,11 @@ import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from psycopg2.extras import RealDictCursor
-import logging
 from db.connection import get_connection
 from services.persons import compute_person_name_forms
+from utils.log import setup_logger
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-log = logging.getLogger(__name__)
+log = setup_logger("populate_person_name_forms", os.path.join(os.path.dirname(__file__), "logs"))
 
 BIBLIO_SOURCES = {'hal', 'openalex', 'wos'}
 

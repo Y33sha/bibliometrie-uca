@@ -18,7 +18,6 @@ Usage:
 """
 
 import argparse
-import logging
 import os
 import re
 import sys
@@ -26,20 +25,11 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.log import setup_logger
 from utils.normalize import normalize_text as normalize
 from utils.uca_perimeter import get_uca_structure_ids
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "logs", "resolve_addresses.log")
-        ),
-    ],
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger("resolve_addresses", os.path.join(os.path.dirname(__file__), "logs"))
 
 BATCH_SIZE = 1000
 

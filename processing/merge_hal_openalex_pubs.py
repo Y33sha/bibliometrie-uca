@@ -17,7 +17,6 @@ Usage:
 """
 
 import argparse
-import logging
 import os
 import sys
 
@@ -26,12 +25,9 @@ from db.connection import get_connection
 from utils.hal import extract_hal_id_from_url
 from psycopg2.extras import RealDictCursor
 from services.publications import merge_publications as _merge_pub
+from utils.log import setup_logger
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
-log = logging.getLogger(__name__)
+log = setup_logger("merge_hal_openalex_pubs", os.path.join(os.path.dirname(__file__), "logs"))
 
 
 def find_duplicates(cur):

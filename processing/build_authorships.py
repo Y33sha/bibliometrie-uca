@@ -12,25 +12,15 @@ Usage:
 """
 
 import argparse
-import logging
 import os
 import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.log import setup_logger
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "logs", "build_authorships.log")
-        ),
-    ],
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger("build_authorships", os.path.join(os.path.dirname(__file__), "logs"))
 
 
 def build(cur):

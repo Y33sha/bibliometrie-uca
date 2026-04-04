@@ -16,7 +16,6 @@ Usage:
 """
 
 import argparse
-import logging
 import os
 import sys
 import time
@@ -28,12 +27,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from extraction.common import compute_hash
 from utils.hal import extract_hal_id_from_url, HAL_FIELDS_STR
+from utils.log import setup_logger
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
-log = logging.getLogger(__name__)
+log = setup_logger("fetch_missing_hal", os.path.join(os.path.dirname(__file__), "logs"))
 
 HAL_API = "https://api.archives-ouvertes.fr/search"
 REQUEST_DELAY = 0.3
