@@ -18,6 +18,7 @@ from backend.routers import (
     auth, pub_stats, publications, admin_duplicates,
     addresses, feedback, laboratories, stats,
     structures, authorships, persons, admin_person_duplicates,
+    docs,
 )
 
 app = FastAPI(title="Bibliométrie UCA")
@@ -75,6 +76,7 @@ app.include_router(structures.router)
 app.include_router(authorships.router)
 app.include_router(persons.router)
 app.include_router(admin_person_duplicates.router)
+app.include_router(docs.router)
 
 
 if __name__ == "__main__":
