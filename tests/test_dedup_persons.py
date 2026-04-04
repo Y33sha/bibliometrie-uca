@@ -77,16 +77,15 @@ def _insert_oa_document(db, openalex_id, publication_id):
 
 
 def _insert_oa_authorship(db, oa_document_id, oa_author_id, position=0,
-                          is_uca=True, person_id=None, raw_author_name=None,
-                          raw_orcid=None):
+                          is_uca=True, person_id=None, raw_author_name=None):
     """Crée une openalex_authorship."""
     db.execute("""
         INSERT INTO openalex_authorships
             (openalex_document_id, openalex_author_id, author_position,
-             is_uca, person_id, raw_author_name, raw_orcid)
-        VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
+             is_uca, person_id, raw_author_name)
+        VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
     """, (oa_document_id, oa_author_id, position, is_uca, person_id,
-          raw_author_name, raw_orcid))
+          raw_author_name))
     return db.fetchone()["id"]
 
 
@@ -202,7 +201,7 @@ class TestStep2Orcid:
         oa_doc = _insert_oa_document(db, "W333", pub)
         oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=0,
                                       raw_author_name="J Dupont",
-                                      raw_orcid="0000-0001-2345-6789")
+)
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
@@ -224,7 +223,7 @@ class TestStep2Orcid:
         oa_doc = _insert_oa_document(db, "W444", pub)
         oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=0,
                                       raw_author_name="J Dupont",
-                                      raw_orcid="0000-0001-9999-0000")
+)
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
@@ -242,7 +241,7 @@ class TestStep2Orcid:
         oa_doc = _insert_oa_document(db, "W555", pub)
         oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=0,
                                       raw_author_name="Nobody",
-                                      raw_orcid="0000-9999-9999-9999")
+)
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()

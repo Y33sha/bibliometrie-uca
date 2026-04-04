@@ -358,13 +358,6 @@ def process_authorships(cur, work: dict, oa_document_id: int):
         # Nom brut de l'auteur (fiable, contrairement à author.display_name)
         raw_author_name = authorship.get("raw_author_name")
 
-        # ORCID par authorship (plus fiable que via l'entité auteur)
-        raw_orcid = None
-        author_data = authorship.get("author") or {}
-        orcid_url = author_data.get("orcid")
-        if orcid_url:
-            raw_orcid = orcid_url.replace("https://orcid.org/", "").strip() or None
-
         # Affiliations brutes
         raw_strings = authorship.get("raw_affiliation_strings") or []
         if raw_strings:
@@ -385,8 +378,8 @@ def process_authorships(cur, work: dict, oa_document_id: int):
             INSERT INTO openalex_authorships
                 (openalex_document_id, openalex_author_id, author_position,
                  raw_affiliation, openalex_institution_ids,
-                 raw_author_name, raw_orcid, author_name_normalized)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, normalize_name_form(%s))
+                 raw_author_name, author_name_normalized)
+            VALUES (%s, %s, %s, %s, %s, %s, normalize_name_form(%s))
             ON CONFLICT (openalex_document_id, openalex_author_id) DO UPDATE SET
                 raw_affiliation = COALESCE(
                     EXCLUDED.raw_affiliation,
@@ -396,17 +389,13 @@ def process_authorships(cur, work: dict, oa_document_id: int):
                     EXCLUDED.raw_author_name,
                     openalex_authorships.raw_author_name
                 ),
-                raw_orcid = COALESCE(
-                    EXCLUDED.raw_orcid,
-                    openalex_authorships.raw_orcid
-                ),
                 author_name_normalized = COALESCE(
                     EXCLUDED.author_name_normalized,
                     openalex_authorships.author_name_normalized
                 )
         """, (oa_document_id, oa_author_id, position,
               raw_affil_text, institution_ids or None,
-              raw_author_name, raw_orcid, raw_author_name))
+              raw_author_name, raw_author_name))
 
 
 # =============================================================
