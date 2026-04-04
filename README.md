@@ -186,14 +186,19 @@ bibliometrie-uca/
 ├── config/               Configuration (settings.py)
 ├── run_pipeline.py       Orchestrateur du pipeline
 └── docs/                 Documentation
+    ├── architecture.md   Schéma, principes de conception, tables
+    ├── pipeline.md       Pipeline détaillé (11 phases)
+    ├── sources.md        Sources de données (API, imports, particularités)
+    ├── exploitation.md   Guide d'exploitation (lancement, reprise, supervision)
     ├── glossaire.md      Termes métier
-    ├── pipeline.md       Pipeline détaillé
     └── guide-utilisateur.md  Fonctionnalités de l'application
 ```
 
 ## Documentation
 
-- [Architecture des données](ARCHITECTURE.md) — schéma, principes de conception, tables
+- [Architecture des données](docs/architecture.md) — schéma, principes de conception, diagramme ER
+- [Pipeline](docs/pipeline.md) — les 11 phases de traitement, utilitaires partagés
+- [Sources de données](docs/sources.md) — API, imports manuels, particularités de chaque source
+- [Guide d'exploitation](docs/exploitation.md) — lancement du pipeline, reprise, supervision, limites connues
 - [Glossaire](docs/glossaire.md) — définitions des termes métier
-- [Pipeline](docs/pipeline.md) — les 9 phases de traitement
 - [Guide utilisateur](docs/guide-utilisateur.md) — pages et fonctionnalités de l'application

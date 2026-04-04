@@ -1,5 +1,5 @@
 """
-Normalisation des données HAL : staging_hal → tables v2.
+Normalisation des données HAL : staging_hal → tables structurées.
 
 Usage:
     python normalize_hal.py              # traiter tous les works non traités
@@ -13,7 +13,7 @@ Tables peuplées :
     hal_authorships                         (lien document × auteur, avec hal_struct_ids)
 
 La résolution UCA (hal_authorships.structure_ids, is_uca) se fait en post-traitement
-via populate_uca_flags.sql, pas ici. Ce script ne fait que stocker les hal_struct_ids
+via populate_uca_flags.py, pas ici. Ce script ne fait que stocker les hal_struct_ids
 bruts extraits de authIdHasStructure_fs.
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
@@ -154,7 +154,7 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
 
 
 # =============================================================
-# HAL DOCUMENTS (nouveau — remplace publication_sources)
+# HAL DOCUMENTS
 # =============================================================
 
 def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
@@ -209,7 +209,7 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
 
 
 # =============================================================
-# HAL AUTHORS (nouveau — remplace upsert dans authors)
+# HAL AUTHORS
 # =============================================================
 
 def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
@@ -310,7 +310,7 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
 
 
 # =============================================================
-# HAL AUTHORSHIPS (nouveau — remplace publication_authors + resolve)
+# HAL AUTHORSHIPS
 # =============================================================
 
 def parse_author_structures(doc: dict) -> dict[int, set[int]]:
@@ -501,7 +501,7 @@ def process_work(cur, staging_row: tuple) -> bool:
                 logger.warning(f"Impossible d'insérer {hal_id} — échec insertion publication")
             return False
 
-        # Document HAL (remplace l'ancienne publication_sources)
+        # Document HAL
         t0 = time.perf_counter()
         hal_document_id = insert_hal_document(
             cur, doc, staging_id, hal_id, collection, publication_id
@@ -531,7 +531,7 @@ def process_work(cur, staging_row: tuple) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Normalisation HAL → tables v2")
+    parser = argparse.ArgumentParser(description="Normalisation HAL → tables structurées")
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
     parser.add_argument("--reset", action="store_true",
                         help="Remettre tous les works à processed=FALSE")

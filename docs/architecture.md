@@ -29,6 +29,61 @@ authorships) sont construites par déduplication et mapping.
                          wos_authorships ────────────────┘
 ```
 
+### Diagramme entité-relation (tables de vérité)
+
+```mermaid
+erDiagram
+    publications ||--o{ authorships : "publication_id"
+    persons ||--o{ authorships : "person_id"
+    persons ||--o{ person_identifiers : "person_id"
+    persons ||--o{ person_name_forms : "person_ids[]"
+    publications }o--|| journals : "journal_id"
+    journals }o--|| publishers : "publisher_id"
+    structures ||--o{ structure_relations : "parent/child"
+    structures ||--o{ name_forms : "structure_id"
+
+    publications {
+        int id PK
+        text title
+        text doi UK
+        int pub_year
+        doc_type doc_type
+        oa_type oa_status
+        int journal_id FK
+        text[] countries
+    }
+    persons {
+        int id PK
+        text last_name
+        text first_name
+        bool rejected
+    }
+    authorships {
+        int id PK
+        int publication_id FK
+        int person_id FK
+        bool is_uca
+        int[] structure_ids
+        int hal_authorship_id FK
+        int openalex_authorship_id FK
+        int wos_authorship_id FK
+    }
+    person_identifiers {
+        int id PK
+        int person_id FK
+        text id_type
+        text id_value UK
+        text status
+    }
+    structures {
+        int id PK
+        text name
+        text acronym
+        text code UK
+        structure_type structure_type
+    }
+```
+
 
 ## Principes de conception
 

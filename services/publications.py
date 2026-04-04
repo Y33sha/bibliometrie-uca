@@ -32,10 +32,17 @@ def find_by_title(cur, title_normalized: str, pub_year: int, journal_id: int):
     return cur.fetchone()
 
 
-def _enrich(cur, pub_id: int, *, doi=None, doc_type=None, journal_id=None,
-            oa_status=None, container_title=None, language=None):
+def _enrich(cur, pub_id: int, *, doi: str | None = None,
+            doc_type: str | None = None, journal_id: int | None = None,
+            oa_status: str | None = None, container_title: str | None = None,
+            language: str | None = None):
     """Enrichit une publication existante avec des métadonnées complémentaires.
-    Ne remplace jamais une valeur existante par une valeur moins bonne.
+
+    Règles de priorité (ne jamais dégrader) :
+    - DOI : ne remplace pas un DOI existant
+    - doc_type : 'other' peut être remplacé par un type plus précis
+    - oa_status : 'green' gagne sur 'closed'/'unknown', 'diamond' gagne sur tout
+    - journal_id, container_title, language : COALESCE (premier arrivé gagne)
     """
     cur.execute("""
         UPDATE publications SET

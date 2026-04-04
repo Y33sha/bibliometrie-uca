@@ -187,9 +187,16 @@ Exécutée uniquement en mode `full` et `monthly` :
 
 ## Dépendances entre phases
 
+```mermaid
+flowchart LR
+    extract --> normalize --> merge_pubs --> renormalize
+    renormalize --> addresses --> uca_flags --> identifiers
+    identifiers --> persons --> authorships --> countries
+    countries --> enrich
 ```
-extract → normalize → merge_pubs → renormalize → addresses → uca_flags → identifiers → persons → authorships → countries
-                                                                                                               ↘ enrich
+
+```
+extract → normalize → merge_pubs → renormalize → addresses → uca_flags → identifiers → persons → authorships → countries → enrich
 ```
 
 Chaque phase dépend de la précédente. Il est possible de relancer une phase individuelle avec `--only`, à condition que ses prérequis soient à jour.
