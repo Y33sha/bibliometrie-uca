@@ -305,7 +305,8 @@ async def publications_facets(
             GROUP BY co.code, co.name
             ORDER BY count DESC
         """, p)
-        country_facets = [{"value": r["code"].strip(), "text": r["name"], "count": r["count"]} for r in cur.fetchall()]
+        country_facets = [{"value": r["code"].strip(), "text": r["name"], "count": r["count"]}
+                         for r in cur.fetchall() if r["code"].strip() != "xx"]
 
         return {
             "years": year_facets,
