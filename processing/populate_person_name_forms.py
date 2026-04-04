@@ -18,9 +18,9 @@ Sources :
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import psycopg2
 from psycopg2.extras import RealDictCursor
 import logging
+from db.connection import get_connection
 from services.persons import compute_person_name_forms
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -176,7 +176,7 @@ def populate(conn):
 
 
 if __name__ == "__main__":
-    conn = psycopg2.connect("dbname=bibliometrie user=lalecoz")
+    conn = get_connection()
     try:
         populate(conn)
     finally:
