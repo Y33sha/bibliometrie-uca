@@ -120,7 +120,7 @@ def phase_authorships(**kw):
 
 def phase_countries(**kw):
     """Phase 8 : Recalcul des pays des publications."""
-    run_sql("db/refresh_publication_countries.sql")
+    run_python("processing/refresh_publication_countries.py")
 
 
 def phase_enrich(mode="full", **kw):
@@ -172,21 +172,7 @@ def run_python(script: str, *args):
     log.info("✓ %s terminé en %.1fs", script, elapsed)
 
 
-def run_sql(script: str):
-    """Lance un script SQL via psql."""
-    path = BASE / script
-    if not path.exists():
-        log.warning("Script SQL introuvable : %s — ignoré", script)
-        return
-    cmd = ["psql", "-d", "bibliometrie", "-U", "lalecoz", "-f", str(path)]
-    log.info("▶ %s", script)
-    t0 = time.time()
-    result = subprocess.run(cmd, cwd=str(BASE))
-    elapsed = time.time() - t0
-    if result.returncode != 0:
-        log.error("✗ %s a échoué (code %d) en %.1fs", script, result.returncode, elapsed)
-        raise RuntimeError(f"{script} a échoué (code {result.returncode})")
-    log.info("✓ %s terminé en %.1fs", script, elapsed)
+    # run_sql supprimé — tous les scripts SQL ont été convertis en Python
 
 
 # ---------------------------------------------------------------------------
