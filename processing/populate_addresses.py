@@ -13,26 +13,16 @@ Usage:
 """
 
 import argparse
-import logging
 import os
 import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
+from utils.log import setup_logger
 from utils.normalize import normalize_text
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "logs", "populate_addresses.log")
-        ),
-    ],
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger("populate_addresses", os.path.join(os.path.dirname(__file__), "logs"))
 
 BATCH_SIZE = 5000
 

@@ -24,7 +24,6 @@ Usage:
 """
 
 import argparse
-import logging
 import os
 import sys
 from collections import defaultdict
@@ -40,8 +39,9 @@ from services.persons import (
     add_name_form,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger(__name__)
+from utils.log import setup_logger
+
+logger = setup_logger("create_persons", os.path.join(os.path.dirname(__file__), "logs"))
 
 
 # ---------------------------------------------------------------------------

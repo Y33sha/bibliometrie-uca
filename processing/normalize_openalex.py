@@ -17,7 +17,6 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
 import argparse
-import logging
 import os
 import re
 import sys
@@ -29,22 +28,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from utils.doi import clean_doi
 from utils.hal import extract_hal_id_from_url
+from utils.log import setup_logger
 from utils.normalize import normalize_text
 from services.publications import find_or_create as find_or_create_publication
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(
-            os.path.join(os.path.dirname(__file__), "logs", "normalize_openalex.log")
-        ),
-    ],
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger("normalize_openalex", os.path.join(os.path.dirname(__file__), "logs"))
 
 
 # =============================================================

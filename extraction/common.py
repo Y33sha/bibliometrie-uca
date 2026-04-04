@@ -4,10 +4,10 @@ Fonctions partagées par les scripts d'extraction (OpenAlex, HAL, WoS).
 
 import hashlib
 import json
-import logging
 import os
 
 from utils.doi import clean_doi  # noqa: F401 — réexporté pour les scripts d'extraction
+from utils.log import setup_logger  # noqa: F401 — réexporté pour les scripts d'extraction
 
 
 def compute_hash(raw_data: dict) -> str:
@@ -32,22 +32,3 @@ def get_existing_ids(conn, table: str, column: str) -> set:
     with conn.cursor() as cur:
         cur.execute(f"SELECT {column} FROM {table}")
         return {row[0] for row in cur.fetchall()}
-
-
-def setup_logger(name: str, log_dir: str) -> logging.Logger:
-    """Configure un logger avec sortie console + fichier.
-
-    Crée le répertoire de logs si nécessaire.
-    """
-    os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, f"{name}.log")
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler(log_file),
-        ],
-    )
-    return logging.getLogger(name)

@@ -15,7 +15,6 @@ Rate limit: 100 000 req/jour, ~10 req/s recommandé
 """
 
 import argparse
-import logging
 import os
 import sys
 import time
@@ -24,12 +23,9 @@ import requests
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from services.publications import update_oa_status
+from utils.log import setup_logger
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
-log = logging.getLogger(__name__)
+log = setup_logger("enrich_oa_unpaywall", os.path.join(os.path.dirname(__file__), "logs"))
 
 # Email requis par Unpaywall (politesse, pas d'auth)
 UNPAYWALL_EMAIL = "bibliometrie@uca.fr"
