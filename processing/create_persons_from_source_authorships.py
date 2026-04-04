@@ -80,13 +80,14 @@ def get_all_unlinked_authorships(cur):
         SELECT oas.id AS authorship_id, 'openalex' AS source,
                oas.raw_author_name AS full_name,
                NULL::text AS last_name, NULL::text AS first_name,
-               oas.raw_orcid AS orcid, NULL::text AS idhal,
+               oa.orcid, NULL::text AS idhal,
                NULL::int AS hal_author_id,
                FALSE AS has_hal_person_id,
                NULL::int AS hal_person_id,
                od.publication_id,
                oas.author_position
         FROM openalex_authorships oas
+        JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
         JOIN openalex_documents od ON od.id = oas.openalex_document_id
         WHERE oas.person_id IS NULL
           AND oas.is_uca = TRUE

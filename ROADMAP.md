@@ -2,16 +2,6 @@
 
 Chantiers restants, classés par effort. Consolidation des TODO_LAURA.md et TODO_CLAUDE.md.
 
-## Déjà fait (à nettoyer des TODO)
-
-- [x] Re-fetch OA plafonnés à 100 authorships
-- [x] Fetch documents HAL référencés par OpenAlex
-- [x] Moissonner ORCID HAL (intégré au pipeline, phase identifiers)
-- [x] Auteur correspondant / premier auteur
-- [x] DOI identique mais type différent → garde-fous dans find_or_create
-- [x] Colonne collections du staging_hal → sert à la normalisation (+ collCode_s du JSON)
-
-
 ## Quick wins (< 1h)
 
 ### Suppression colonne raw_orcid (openalex_authorships)

@@ -71,7 +71,7 @@ Le système intègre 3 sources bibliographiques principales, complétées par de
 - Le `raw_author_name` de l'authorship est plus fiable que `author.display_name` (ce dernier est un nom unifié par l'algo OA, qui peut être erroné)
 - Le `meta_hash` (hash hors authorships) permet de détecter les vrais changements sans être perturbé par la troncature à 100 auteurs
 - Si la `primary_location` pointe vers HAL (`hal.science/hal-XXXXX`), la publication est rattachée au document HAL existant plutôt que d'en créer une nouvelle
-- Les ORCID OpenAlex sont récupérés dans `openalex_authorships.raw_orcid` mais utilisés avec prudence (risque d'attribution erronée)
+- Les ORCID OpenAlex sont sur l'entité `openalex_authors.orcid` et utilisés avec prudence dans le pipeline persons (risque d'attribution erronée par l'algo OpenAlex)
 
 
 ## Web of Science
