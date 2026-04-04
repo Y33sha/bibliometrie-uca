@@ -1,5 +1,5 @@
 """
-Normalisation des données OpenAlex : staging_openalex → tables v2.
+Normalisation des données OpenAlex : staging_openalex → tables structurées.
 
 Usage:
     python normalize_openalex.py              # traiter tous les works non traités
@@ -217,7 +217,7 @@ def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
 
 
 # =============================================================
-# OPENALEX DOCUMENTS (nouveau — remplace publication_sources)
+# OPENALEX DOCUMENTS
 # =============================================================
 
 def insert_openalex_document(cur, work: dict, staging_id: int,
@@ -249,7 +249,7 @@ def insert_openalex_document(cur, work: dict, staging_id: int,
 
 
 # =============================================================
-# OPENALEX AUTHORS (nouveau — remplace upsert dans authors)
+# OPENALEX AUTHORS
 # =============================================================
 
 def upsert_openalex_author(cur, authorship: dict) -> int | None:
@@ -296,7 +296,7 @@ def upsert_openalex_author(cur, authorship: dict) -> int | None:
 
 
 # =============================================================
-# OPENALEX INSTITUTIONS (nouveau)
+# OPENALEX INSTITUTIONS
 # =============================================================
 
 def upsert_openalex_institution(cur, institution: dict) -> str | None:
@@ -332,7 +332,7 @@ def upsert_openalex_institution(cur, institution: dict) -> str | None:
 
 
 # =============================================================
-# OPENALEX AUTHORSHIPS (nouveau — remplace publication_authors)
+# OPENALEX AUTHORSHIPS
 # =============================================================
 
 def process_authorships(cur, work: dict, oa_document_id: int):
@@ -453,7 +453,7 @@ def process_work(cur, staging_row: tuple) -> bool:
             logger.warning(f"Impossible d'insérer {openalex_id} — titre ou année manquant")
             return False
 
-        # Document OpenAlex (remplace l'ancienne publication_sources)
+        # Document OpenAlex
         oa_document_id = insert_openalex_document(
             cur, work, staging_id, publication_id
         )
@@ -475,7 +475,7 @@ def process_work(cur, staging_row: tuple) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Normalisation OpenAlex → tables v2")
+    parser = argparse.ArgumentParser(description="Normalisation OpenAlex → tables structurées")
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
     parser.add_argument("--reset", action="store_true",
                         help="Remettre tous les works à processed=FALSE")
