@@ -183,11 +183,11 @@ Ces sujets pourront être revisités par la DSI si le besoin se confirme en prod
 |-------|--------------|--------|
 | ~~1. Docker + variables d'env~~ | ~~1-2 jours~~ | ~~FAIT~~ |
 | ~~2. Tests + refactoring pipeline~~ | ~~2-3 jours~~ | ~~FAIT~~ |
-| 3. Index PostgreSQL | 1 heure | Performances immédiates |
-| 4. Lisibilité code | 1-2 jours | Le code est compréhensible |
-| 5. Documentation transmission | 1-2 jours | La DSI est autonome |
-| 6. Migrations de schéma | 1 jour | Le schéma peut évoluer |
-| 7. CI GitHub Actions | 1 heure | Les tests tournent automatiquement |
+| ~~3. Index PostgreSQL~~ | ~~1 heure~~ | ~~FAIT~~ |
+| ~~4. Lisibilité code~~ | ~~1-2 jours~~ | ~~FAIT~~ |
+| ~~5. Documentation transmission~~ | ~~1-2 jours~~ | ~~FAIT~~ |
+| ~~6. Migrations de schéma~~ | ~~1 jour~~ | ~~FAIT~~ |
+| ~~7. CI GitHub Actions~~ | ~~1 heure~~ | ~~FAIT~~ |
 
 **Date de création** : Avril 2026
-**Version** : 3.0
+**Version** : 4.0 — Plan complété.
