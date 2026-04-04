@@ -39,7 +39,7 @@ erDiagram
     
     authorships }o--o{ structures : "structure_ids[]"
     structures ||--o{ structure_relations : "parent/child"
-    structures ||--o{ name_forms : "structure_id"
+    structures ||--o{ structure_name_forms : "structure_id"
 
     publications {
         int id PK
@@ -171,7 +171,7 @@ le service pour écrire.
 
 | Table | Propriétaire |
 |-------|-------------|
-| `structures`, `structure_relations`, `name_forms` | admin / SQL |
+| `structures`, `structure_relations`, `structure_name_forms` | admin / SQL |
 | `countries` | référentiel statique |
 
 ### Sources bibliographiques — scripts de normalisation
@@ -217,7 +217,7 @@ les tutelles (CNRS, INRAE...), composantes (INP, VetAgro Sup...), CHU, etc.
 
 Tables associées :
 - `structure_relations` : hiérarchie (tutelles, partenariats)
-- `name_forms` : formes de noms pour la détection automatique dans les affiliations
+- `structure_name_forms` : formes de noms pour la détection automatique dans les affiliations
 
 ### `persons`
 
@@ -422,7 +422,7 @@ Vue (pas table) qui consolide les liens publication → source en combinant les 
 ## Inventaire des tables
 
 ### Vérité (13)
-`structures`, `structure_relations`, `name_forms`, `persons`, `persons_rh`,
+`structures`, `structure_relations`, `structure_name_forms`, `persons`, `persons_rh`,
 `person_identifiers`, `person_name_forms`, `publishers`, `journals`,
 `publications`, `distinct_publications`, `authorships`, `apc_payments`
 

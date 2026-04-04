@@ -2,27 +2,6 @@
 
 Chantiers restants, classés par effort. Consolidation des TODO_LAURA.md et TODO_CLAUDE.md.
 
-## Quick wins (< 1h)
-
-### Suppression colonne raw_orcid (openalex_authorships)
-Redondante avec openalex_authors.orcid. Migration SQL + nettoyage des références dans le code.
-
-### Condition excluded = false dans l'onglet identités personnes
-Éviter d'afficher des comptes HAL erronés dans l'onglet identités de la page personne. Ajouter `AND NOT excluded` dans la requête du router.
-
-### Ne pas afficher "non applicable" dans les pays
-Filtrer le code pays `xx` dans les facettes et l'affichage des pays des publications.
-
-### Authorship source rejetée → rejeter de l'authorship vérité
-Quand une authorship source est marquée `excluded = TRUE`, propager vers l'authorship vérité (supprimer ou marquer). Actuellement, elle reste affichée.
-
-### Forme de nom avec zéro authorship → option supprimer
-Endpoint DELETE sur person_name_forms quand aucune authorship n'est liée à cette forme. Bouton dans l'interface personne.
-
-### Seed structures UCA
-Script SQL avec les structures de base nécessaires au démarrage (UCA, départements, labos). Permet de démarrer sur une base vide sans import manuel.
-
-
 ## Chantiers moyens (quelques heures)
 
 ### Automatisation pays des adresses (country_name_forms)

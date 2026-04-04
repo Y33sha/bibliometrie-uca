@@ -72,7 +72,7 @@ async def get_structure(structure_id: int):
 
         # Formes de noms
         cur.execute("""
-            SELECT * FROM name_forms
+            SELECT * FROM structure_name_forms
             WHERE structure_id = %s
             ORDER BY is_active DESC, form_text
         """, (structure_id,))
@@ -161,7 +161,7 @@ async def delete_relation(relation_id: int):
 @router.get("/api/name-forms/{form_id}")
 async def get_name_form(form_id: int):
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT * FROM name_forms WHERE id = %s", (form_id,))
+        cur.execute("SELECT * FROM structure_name_forms WHERE id = %s", (form_id,))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Form not found")
@@ -175,7 +175,7 @@ async def create_name_form(data: NameFormCreate):
         form_normalized = normalize_text(data.form_text)
         ctx_json = _json.dumps(data.requires_context_of) if data.requires_context_of else None
         cur.execute("""
-            INSERT INTO name_forms (structure_id, form_text, form_normalized, is_regex,
+            INSERT INTO structure_name_forms (structure_id, form_text, form_normalized, is_regex,
                                     requires_context_of, notes)
             VALUES (%s, %s, %s, %s, %s::jsonb, %s)
             RETURNING *
@@ -188,7 +188,7 @@ async def create_name_form(data: NameFormCreate):
 async def update_name_form(form_id: int, data: NameFormUpdate):
     import json as _json
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT id FROM name_forms WHERE id = %s", (form_id,))
+        cur.execute("SELECT id FROM structure_name_forms WHERE id = %s", (form_id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Name form not found")
 
@@ -218,7 +218,7 @@ async def update_name_form(form_id: int, data: NameFormUpdate):
 
         params.append(form_id)
         cur.execute(f"""
-            UPDATE name_forms SET {', '.join(updates)} WHERE id = %s RETURNING *
+            UPDATE structure_name_forms SET {', '.join(updates)} WHERE id = %s RETURNING *
         """, params)
         return cur.fetchone()
 
@@ -226,7 +226,7 @@ async def update_name_form(form_id: int, data: NameFormUpdate):
 @router.delete("/api/name-forms/{form_id}")
 async def delete_name_form(form_id: int):
     with get_cursor() as (cur, conn):
-        cur.execute("DELETE FROM name_forms WHERE id = %s", (form_id,))
+        cur.execute("DELETE FROM structure_name_forms WHERE id = %s", (form_id,))
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Name form not found")
         return {"deleted": True}
