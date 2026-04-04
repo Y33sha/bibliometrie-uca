@@ -546,18 +546,18 @@ async def get_person(person_id: int):
                     SELECT DISTINCT ha.id, ha.full_name, ha.orcid, ha.idhal, 'hal' AS source
                     FROM hal_authors ha
                     JOIN hal_authorships has ON has.hal_author_id = ha.id
-                    WHERE has.person_id = p.id
+                    WHERE has.person_id = p.id AND NOT has.excluded
                     UNION ALL
                     SELECT MIN(oas.openalex_author_id) AS id, COALESCE(oas.raw_author_name, oa.full_name) AS full_name, NULL AS orcid, NULL AS idhal, 'openalex' AS source
                     FROM openalex_authorships oas
                     JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-                    WHERE oas.person_id = p.id
+                    WHERE oas.person_id = p.id AND NOT oas.excluded
                     GROUP BY COALESCE(oas.raw_author_name, oa.full_name)
                     UNION ALL
                     SELECT wa.id, wa.full_name, wa.orcid, NULL AS idhal, 'wos' AS source
                     FROM wos_authors wa
                     JOIN wos_authorships was ON was.wos_author_id = wa.id
-                    WHERE was.person_id = p.id
+                    WHERE was.person_id = p.id AND NOT was.excluded
                     GROUP BY wa.id
                 ) x) AS linked_authors,
                 (SELECT json_agg(json_build_object(
