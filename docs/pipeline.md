@@ -137,11 +137,12 @@ Exécutée en mode `full` et `monthly` uniquement.
 
 ### Phase 6 — `persons` : Création de personnes
 
-**`create_persons_from_source_authorships.py`** — algorithme en 3 étapes :
+**`create_persons_from_source_authorships.py`** — algorithme en 4 étapes :
 
 1. **Comptes HAL** : les `hal_authors` avec `hal_person_id` sont rattachés ou créent une personne. Propagation aux authorships liées. Récupération ORCID, idHAL.
 2. **Cross-source** : pour chaque authorship sans personne, cherche sur la même publication (même position) une authorship d'une autre source déjà rattachée à une personne. Si le nom est compatible → rattacher. Approche conservatrice (même position requise).
-3. **Person name forms** : lookup par nom normalisé dans `person_name_forms`.
+3. **ORCID connu** : si l'authorship a un ORCID déjà présent en base (`person_identifiers`, status != rejected) et mappé à une personne → rattacher. L'ORCID ne prime pas sur le cross-source (risque d'ORCID erroné dans OA/WoS supérieur au risque d'homonymie en cross-source).
+4. **Person name forms** : lookup par nom normalisé dans `person_name_forms`.
    - Mappé à 1 personne → rattacher
    - Mappé à >1 personnes → orphelin (traitement manuel)
    - Forme inconnue → créer nouvelle personne
