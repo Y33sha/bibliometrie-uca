@@ -16,12 +16,14 @@ Phases:
     extract       Extraction des 3 sources (staging)
     normalize     Normalisation HAL, OpenAlex, WoS
     merge_pubs    Fusion HAL/OpenAlex + cross-imports
+    renormalize   Re-normalisation après cross-imports
     addresses     Adresses: extraction, résolution, pays
     uca_flags     Flags UCA sur authorships sources
+    identifiers   Moissonnage identifiants HAL (ORCID, IdRef)
     persons       Création/mapping personnes + formes de noms
-    authorships   Reconstruction authorships (vérité) + re-propagation UCA
+    authorships   Reconstruction authorships (vérité) + propagation UCA
     countries     Recalcul des pays des publications
-    enrich        Enrichissements optionnels (Unpaywall, idRef, etc.)
+    enrich        Enrichissements optionnels (Unpaywall, APC)
 """
 
 import argparse
@@ -107,6 +109,14 @@ def phase_uca_flags(**kw):
     run_python("processing/populate_uca_flags.py")
 
 
+def phase_identifiers(mode="full", **kw):
+    """Phase 5b : Moissonnage identifiants HAL (ORCID, IdRef)."""
+    if mode in ("full", "monthly"):
+        run_python("processing/harvest_hal_identifiers.py")
+    else:
+        log.info("Moissonnage identifiants ignoré en mode hebdomadaire")
+
+
 def phase_persons(**kw):
     """Phase 6 : Création/mapping personnes + formes de noms."""
     run_python("processing/create_persons_from_source_authorships.py")
@@ -128,8 +138,6 @@ def phase_enrich(mode="full", **kw):
     if mode in ("full", "monthly"):
         run_python("processing/enrich_oa_unpaywall.py")
         run_python("processing/enrich_journal_apc.py")
-        run_python("processing/harvest_hal_idrefs.py")
-        run_python("processing/harvest_hal_orcids.py")
     else:
         log.info("Enrichissements ignorés en mode hebdomadaire")
 
@@ -142,6 +150,7 @@ PHASES = [
     ("renormalize", phase_renormalize),
     ("addresses", phase_addresses),
     ("uca_flags", phase_uca_flags),
+    ("identifiers", phase_identifiers),
     ("persons", phase_persons),
     ("authorships", phase_authorships),
     ("countries", phase_countries),

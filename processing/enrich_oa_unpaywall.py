@@ -50,27 +50,32 @@ REQUEST_DELAY = 0.12  # ~8 req/s, conservateur
 
 def fetch_oa_status(doi: str) -> str | None:
     """Interroge Unpaywall pour un DOI. Retourne le statut OA ou None."""
-    try:
-        url = f"{UNPAYWALL_BASE}/{doi}?email={UNPAYWALL_EMAIL}"
-        resp = requests.get(url, timeout=10)
+    for attempt in range(3):
+        try:
+            url = f"{UNPAYWALL_BASE}/{doi}?email={UNPAYWALL_EMAIL}"
+            resp = requests.get(url, timeout=10)
 
-        if resp.status_code == 404:
-            return None  # DOI inconnu d'Unpaywall
-        if resp.status_code == 429:
-            log.warning("Rate limited, pause 5s...")
-            time.sleep(5)
-            return fetch_oa_status(doi)  # retry
-        if resp.status_code != 200:
-            log.warning(f"  HTTP {resp.status_code} pour {doi}")
+            if resp.status_code == 404:
+                return None  # DOI inconnu d'Unpaywall
+            if resp.status_code == 429:
+                wait = 5 * (attempt + 1)
+                log.warning(f"Rate limited, pause {wait}s (tentative {attempt+1}/3)...")
+                time.sleep(wait)
+                continue
+            if resp.status_code != 200:
+                log.warning(f"  HTTP {resp.status_code} pour {doi}")
+                return None
+
+            data = resp.json()
+            oa_status = data.get("oa_status")
+            return OA_MAP.get(oa_status)
+
+        except requests.RequestException as e:
+            log.warning(f"  Erreur réseau pour {doi}: {e}")
             return None
 
-        data = resp.json()
-        oa_status = data.get("oa_status")
-        return OA_MAP.get(oa_status)
-
-    except requests.RequestException as e:
-        log.warning(f"  Erreur réseau pour {doi}: {e}")
-        return None
+    log.warning(f"  Échec après 3 tentatives pour {doi}")
+    return None
 
 
 def main():
