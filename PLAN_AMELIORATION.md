@@ -23,33 +23,34 @@ Réalisé en avril 2026.
 
 ---
 
-## 2. Tests sur le cœur critique (Priorité #2)
+## ~~2. Tests et refactoring du pipeline (Priorité #2)~~ FAIT (essentiel)
 
-**Pourquoi :** La déduplication des publications et des personnes est la valeur ajoutée principale du projet. Une régression silencieuse ici serait catastrophique. Pas besoin de viser 70% de couverture partout — il faut couvrir les cas limites déjà rencontrés.
+Réalisé en avril 2026. Revue systématique des 11 phases du pipeline.
 
-### Actions
+### Refactoring
+- **Logique partagée centralisée** : `extraction/common.py` (compute_hash, get_existing_ids), `utils/doi.py` (clean_doi), `utils/hal.py` (extract_hal_id_from_url, HAL_FIELDS), `utils/names.py` (names_compatible, parse_raw_author_name), `utils/log.py` (setup_logger), `utils/uca_perimeter.py` (get_uca_structure_ids_wide)
+- **Scripts SQL convertis en Python** : `populate_uca_flags.py`, `refresh_publication_countries.py` — plus de dépendance à `psql`, portable Docker
+- **Phase persons réécrite** : 6 passes opaques → 3 étapes claires (comptes HAL, cross-source, name_forms)
+- **Harvest HAL fusionné** : `harvest_hal_idrefs.py` + `harvest_hal_orcids.py` → `harvest_hal_identifiers.py`, placé avant la création des personnes
+- **ORCID HAL exploité dès la normalisation** (`authOrcid_s` dans normalize_hal.py)
+- **Trou comblé** : `hal_documents.countries` n'était jamais peuplé
+- **build_authorships.py harmonisé** : même logique pour les 3 sources
+- **Logging uniformisé** : 16 scripts processing/ migrés vers `setup_logger`
+- **Bugs corrigés** : LIKE collections HAL, retry récursif Unpaywall, email hardcodé, connexion en dur
 
-- **Tests de déduplication publications** (`services/publications.py`) :
-  - Même DOI, même type → fusion correcte
-  - Même DOI, types incompatibles (livre vs chapitre, article vs erratum) → pas de fusion
-  - Titre similaire + même année + même journal → détection de doublon
-  - Publication sans DOI → pas de faux positif
-- **Tests de déduplication personnes** (`processing/create_persons_from_source_authorships.py`) :
-  - Même ORCID → fusion
-  - Même idHAL → fusion
-  - Homonymes avec ORCID différents → pas de fusion
-  - Variantes de noms (accents, tirets, initiales) → détection correcte
-- **Tests des normalizers** :
-  - `normalize_name()`, `clean_doi()`, `parse_raw_author_name()` — les tests existants dans `test_utils.py` sont un bon début, les compléter
-  - Transformation staging → source pour chaque source (HAL, OpenAlex, WoS) avec des cas réels
-- **Tests du pipeline** :
-  - Vérifier que chaque phase est idempotente (deux exécutions consécutives = même résultat)
-  - Vérifier la reprise (`--from <phase>`)
-- **Infrastructure** : utiliser le `conftest.py` existant avec transaction rollback pour l'isolation
+### Tests unitaires (147 passent)
+- `test_extraction_common.py` : compute_hash, clean_doi, get_existing_ids
+- `test_normalize.py` : parsing HAL (parse_author_structures, as_str, get_title), WoS (_parse_c1_field, map_doc_type, detect_format, map_oa_status), OA (is_hal_primary_location, extract_short_id, extract_hal_id_from_url)
+- `test_resolve_addresses.py` : match_form_in_text, resolve_context, resolve_address
+- `test_utils.py` : normalize_name, clean_doi, parse_raw_author_name, names_compatible, compute_person_name_forms
 
-### Critère de succès
+### Reste à faire (tests d'intégration)
+- **Déduplication publications** : même DOI + types incompatibles (livre vs chapitre), titre similaire + même année, publication sans DOI. Nécessite la DB de test.
+- **Déduplication personnes** : même ORCID → fusion, homonymes avec ORCID différents → pas de fusion. Nécessite la DB de test.
+- **Idempotence du pipeline** : deux exécutions consécutives = même résultat. Test lourd, à envisager dans la CI.
 
-Les scénarios de déduplication connus (DOI livre/chapitre, homonymes, etc.) sont couverts par des tests qui passent. Un `pytest` dans la CI donne confiance.
+### Documentation
+- `docs/pipeline.md` entièrement réécrit (11 phases, utilitaires partagés, dépendances)
 
 ---
 
@@ -100,7 +101,7 @@ Les pages de l'application qui chargent lentement répondent en moins de 2 secon
 
 ### Actions
 
-- **Docstrings sur les fonctions clés** des services : `find_or_create()`, `merge_persons()`, les 6 passes de matching dans `create_persons_from_source_authorships.py`. Expliquer le *pourquoi*, pas le *comment*.
+- **Docstrings sur les fonctions clés** des services : `find_or_create()`, `merge_persons()`, les 3 étapes de `create_persons_from_source_authorships.py`. Expliquer le *pourquoi*, pas le *comment*.
 - **Typage Python** : ajouter des type hints sur les signatures des fonctions principales (paramètres et retours). Pas besoin d'être exhaustif — juste les services et les fonctions de processing.
 - **Constantes nommées** : extraire les valeurs magiques (seuils de similarité, tailles de batch) en constantes en haut des fichiers.
 - **Commentaires de contexte métier** : là où le code encode une règle bibliométrique non évidente (ex : "un chapitre et son ouvrage peuvent avoir le même DOI"), un commentaire bref aide.
@@ -117,7 +118,7 @@ Un développeur Python expérimenté mais ignorant de la bibliométrie peut lire
 
 ### Actions
 
-- **Diagramme du pipeline** : schéma Mermaid montrant les 9 phases, les tables en entrée/sortie de chaque phase, et les dépendances entre phases.
+- **Diagramme du pipeline** : schéma Mermaid montrant les 11 phases, les tables en entrée/sortie de chaque phase, et les dépendances entre phases.
 - **Diagramme du modèle de données** : schéma entité-relation des tables principales (truth + source), en Mermaid.
 - **Guide d'exploitation** : comment lancer le pipeline (modes `full`, `monthly`, `weekly`), comment reprendre après une erreur, comment ajouter une source.
 - **Note sur l'authentification** : documenter que l'auth actuelle est un placeholder admin simple, et que le CAS universitaire devra être branché en amont. Lister les endpoints qui nécessitent une authentification.
@@ -181,7 +182,7 @@ Ces sujets pourront être revisités par la DSI si le besoin se confirme en prod
 | Étape | Effort estimé | Impact |
 |-------|--------------|--------|
 | ~~1. Docker + variables d'env~~ | ~~1-2 jours~~ | ~~FAIT~~ |
-| 2. Tests déduplication | 2-3 jours | Le cœur métier est protégé |
+| ~~2. Tests + refactoring pipeline~~ | ~~2-3 jours~~ | ~~FAIT~~ |
 | 3. Index PostgreSQL | 1 heure | Performances immédiates |
 | 4. Lisibilité code | 1-2 jours | Le code est compréhensible |
 | 5. Documentation transmission | 1-2 jours | La DSI est autonome |
@@ -189,4 +190,4 @@ Ces sujets pourront être revisités par la DSI si le besoin se confirme en prod
 | 7. CI GitHub Actions | 1 heure | Les tests tournent automatiquement |
 
 **Date de création** : Avril 2026
-**Version** : 2.0
+**Version** : 3.0
