@@ -1,63 +1,78 @@
 # Glossaire — Bibliométrie UCA
 
-Ce glossaire définit les termes métier utilisés dans le projet. Les termes sont
-regroupés par domaine.
+Termes métier utilisés dans le projet. Pour la documentation technique (pipeline, architecture, sources de données), voir les pages dédiées.
 
 ## Sources de données
 
 | Terme | Définition |
 |-------|-----------|
-| **HAL** | Archive ouverte nationale française. Les chercheurs y déposent volontairement leurs publications. |
-| **OpenAlex** | Index bibliographique ouvert (successeur de Microsoft Academic). Large couverture mais entités auteur peu fiables (fusions erronées fréquentes). |
-| **Web of Science (WoS)** | Index bibliographique commercial (Clarivate). Couverture sélective mais métadonnées de qualité. Entités auteur algorithmiques, non fiables. |
-| **Staging** | Tables d'import brut (`staging_hal`, `staging_openalex`, `staging_wos`). Contiennent la réponse API en JSONB, sans transformation. |
-| **Normalisation** | Transformation des données brutes (staging) en tables structurées par source (documents, authors, authorships). |
+| **HAL** | Archive ouverte nationale française. Les chercheurs y déposent volontairement leurs publications en texte intégral. Bonne couverture en SHS, plus faible en sciences dures. |
+| **OpenAlex** | Index bibliographique ouvert (successeur de Microsoft Academic). Couverture très large (>200M de publications), rattachement institutionnel algorithmique. |
+| **Web of Science (WoS)** | Index bibliographique commercial (Clarivate). Couverture sélective mais métadonnées de qualité. Accès par API payante avec quota annuel. |
+| **Unpaywall** | Service qui associe un statut d'accès ouvert à chaque DOI. Utilisé pour enrichir le champ `oa_status` des publications. |
 
-## Entités
-
-| Terme | Définition |
-|-------|-----------|
-| **Publication** | Entité canonique dédupliquée. Plusieurs documents sources (HAL, OA, WoS) peuvent pointer vers la même publication. Déduplication par DOI, liens explicites, ou heuristique titre+année+journal. |
-| **Personne** (`persons`) | Individu physique unique. Hub d'identité reliant les auteurs de toutes les sources. Peut être créé automatiquement (pipeline) ou manuellement (import RH). |
-| **Auteur source** (`hal_authors`, etc.) | Entité auteur telle que définie par la source. Un même individu peut avoir plusieurs auteurs source (variantes de nom, comptes multiples). Non fiable pour OpenAlex et WoS. |
-| **Authorship source** (`hal_authorships`, etc.) | Lien entre un document source et un auteur source. Porte le `person_id` (lien vers la personne canonique), les affiliations, et le flag `is_uca`. |
-| **Authorship vérité** (`authorships`) | Lien canonique entre une publication et une personne. Construit par `build_authorships.py` à partir des authorships sources. Porte les FK vers les authorships sources d'origine. |
-| **Structure** | Entité institutionnelle : université, laboratoire, équipe, tutelle (CNRS, INRAE...), partenaire (CHU, INP...). Référentiel maintenu manuellement. |
-
-## Personnes et noms
+## Identifiants
 
 | Terme | Définition |
 |-------|-----------|
-| **`persons_rh`** | Table satellite contenant les données RH (département, poste, dates). Une personne sans entrée RH a été créée automatiquement depuis les authorships. |
-| **Forme de nom** (`person_name_forms`) | Forme normalisée d'un nom d'auteur observé dans les sources. Utilisée pour le matching automatique lors de la création de personnes. Une forme peut pointer vers plusieurs personnes (homonymes = forme **ambiguë**). |
-| **`author_name_normalized`** | Colonne sur chaque authorship source contenant le nom de l'auteur normalisé via `normalize_name_form()`. Permet le matching direct avec `person_name_forms.name_form`. |
-| **Identifiant certifiant** | ORCID, idHAL ou IdRef. Garantit l'unicité d'une personne : si deux authorships partagent le même ORCID, elles correspondent à la même personne. Stockés dans `person_identifiers` avec un statut (`pending`, `confirmed`, `rejected`). |
-| **Fusion** (merge) | Opération qui absorbe une personne dans une autre : transfère tous les auteurs, authorships, identifiants et formes de nom. Bloquée si les deux personnes ont chacune une fiche RH. |
+| **DOI** | Digital Object Identifier. Identifiant unique et pérenne d'une publication (ex: `10.1234/article.5678`). Un même DOI peut être partagé entre un ouvrage et ses chapitres (cas problématique géré par le pipeline). |
+| **ORCID** | Identifiant unique d'un chercheur (ex: `0000-0001-2345-6789`). Auto-déclaratif. Fiable quand confirmé, mais parfois attribué par erreur dans les bases bibliographiques. |
+| **idHAL** | Identifiant auteur dans HAL. Créé par le chercheur dans AuréHAL pour regrouper ses publications sous un compte unique. Plus fiable que l'ORCID dans le contexte HAL. |
+| **IdRef** | Identifiant du référentiel des autorités du SUDOC (réseau des bibliothèques universitaires françaises). Utilisé pour relier un chercheur à sa production dans le catalogue des thèses. |
+| **AuréHAL** | Interface de gestion des référentiels HAL (auteurs, structures, revues). C'est là que les chercheurs créent leur idHAL et rattachent leurs publications à leur compte. |
+| **ROR** | Research Organization Registry. Identifiant unique d'une institution de recherche (ex: `https://ror.org/01a8ajp46` pour l'UCA). Utilisé par OpenAlex pour le rattachement institutionnel. |
+
+## Édition scientifique
+
+| Terme | Définition |
+|-------|-----------|
+| **APC** | Article Processing Charge. Frais de publication facturés par l'éditeur pour publier en accès ouvert (gold ou hybrid). Peut aller de quelques centaines à plusieurs milliers d'euros. |
+| **Éditeur** (publisher) | Maison d'édition scientifique (Elsevier, Springer Nature, EDP Sciences...). Un éditeur publie plusieurs revues. |
+| **Revue** (journal) | Périodique scientifique identifié par un ou plusieurs ISSN. Rattaché à un éditeur. |
+| **ISSN** | International Standard Serial Number. Identifiant d'un périodique. Il peut exister un ISSN print, un eISSN (électronique) et un ISSN-L (de liaison, qui regroupe les deux). |
+| **DOAJ** | Directory of Open Access Journals. Répertoire des revues en accès ouvert intégral (gold/diamond). Une revue présente dans le DOAJ est considérée full open access. |
+| **Auteur correspondant** | Auteur désigné comme contact principal pour une publication. Souvent le chercheur qui a piloté l'étude. Information disponible principalement dans WoS. |
+| **Premier auteur / dernier auteur** | Conventions de signature scientifique : le premier auteur a généralement fait le travail principal ; le dernier auteur est souvent le directeur de l'équipe (en sciences expérimentales). |
+
+## Voies open access
+
+| Terme | Définition |
+|-------|-----------|
+| **Green** | Publication déposée en archive ouverte (HAL, arXiv...), en général par l'auteur, parallèlement à sa publication dans une revue. La version déposée peut être un preprint ou un postprint. |
+| **Gold** | Publication en accès ouvert dans une revue entièrement OA. Souvent payant (APC). |
+| **Diamond** | Sous-catégorie du gold : revue OA sans APC (financement institutionnel). [Unpaywall](sources#unpaywall) ne distingue pas diamond de gold. |
+| **Hybrid** | Publication en accès ouvert dans une revue sous abonnement payant. L'auteur paie un APC pour rendre son article spécifique en OA. Déconseillé (l'institution paye les APC + l'abonnement à la revue). |
+| **Bronze** | Publication accessible gratuitement sur le site de l'éditeur, sans licence OA explicite. Open access éditeur *de facto*, accès sans garantie de pérennité. |
+| **Closed** | Publication fermée, accessible uniquement via abonnement. |
+
+## Entités du référentiel
+
+| Terme | Définition |
+|-------|-----------|
+| **Publication** | Entité canonique dédupliquée. Plusieurs documents sources (HAL, OA, WoS) peuvent pointer vers la même publication. Déduplication par DOI ou par titre+année+journal. |
+| **Personne** | Individu physique unique. Hub d'identité reliant les auteurs de toutes les sources. Peut être créé automatiquement (pipeline) ou manuellement (import RH). |
+| <a id="authorship"></a>**Authorship** | Couple (publication, personne) représentant la contribution d'un auteur à une publication. Porte les informations d'affiliation (structures UCA), de position (rang dans la liste d'auteurs) et le flag `is_uca`. Aussi appelé "contribution" dans le langage courant. |
+| **Structure** | Entité institutionnelle : université, laboratoire, organisme national de recherche (CNRS, INRAE...), établissement partenaire (CHU, INP...). Référentiel maintenu manuellement. |
+| **Forme de nom** | Variante normalisée d'un nom de structure (`structure_name_forms`) ou d'un nom d'auteur (`person_name_forms`). Utilisée pour le matching automatique (résolution d'adresses pour les structures, création de personnes pour les auteurs). |
+
+## Types de documents
+
+| Terme | Définition |
+|-------|-----------|
+| **Article** | Publication dans une revue à comité de lecture. Type le plus courant. |
+| **Review** | Article de synthèse (revue de la littérature). Attention : dans WoS, "book review" désigne un compte-rendu d'ouvrage, pas une revue de la littérature. |
+| **Book** | Ouvrage (monographie). Peut partager un DOI avec ses chapitres. |
+| **Book chapter** | Chapitre d'ouvrage. Le DOI est parfois celui de l'ouvrage entier (cas géré par le pipeline). |
+| **Conference paper** | Communication dans un colloque ou une conférence. Inclut les posters dans certaines sources. |
+| **Preprint** | Version pré-publication déposée avant peer review (arXiv, HAL, etc.). |
+| **Thesis** | Thèse de doctorat ou HDR (habilitation à diriger des recherches). |
+| **Editorial** | Éditorial de revue. |
+| **Peer review** | Rapport d'évaluation d'un article. Les "auteurs" listés sont ceux de l'article évalué, pas du review — cas traité spécifiquement dans le pipeline. |
 
 ## Périmètre UCA
 
 | Terme | Définition |
 |-------|-----------|
-| **UCA** | Université Clermont Auvergne — l'institution dont on suit la production scientifique. |
-| **Périmètre restreint** (`is_uca`) | UCA + ses unités en tutelle directe (`est_tutelle_de`). Détermine si un auteur est considéré "UCA" sur une publication. |
-| **Périmètre élargi** (`structure_ids`) | Périmètre restreint + partenaires (`est_partenaire_de` : CHU, INP, VetAgro Sup). Utilisé pour les affiliations. |
-| **`is_uca`** | Flag booléen sur les authorships (sources et vérité). TRUE si l'auteur est affilié au périmètre UCA restreint sur cette publication. |
-| **`excluded`** | Flag sur une authorship source indiquant un rattachement erroné (homonyme, affiliation incorrecte). Les authorships exclues sont ignorées par `build_authorships.py`. |
-
-## Pipeline
-
-| Terme | Définition |
-|-------|-----------|
-| **Moissonnage** (extract) | Récupération des données depuis les API sources (HAL, OpenAlex, WoS) vers les tables staging. |
-| **Cross-import** | Récupération dans une source B des publications trouvées dans une source A mais absentes de B (ex: un DOI trouvé dans HAL est cherché dans OpenAlex). |
-| **UCA flags** | Étape qui calcule `is_uca` et `structure_ids` sur les authorships sources, en croisant les affiliations avec le référentiel de structures. |
-| **Build authorships** | Construction de la table `authorships` (vérité) par agrégation des authorships sources. Insère les paires (publication, personne), peuple les FK, propage positions, UCA et structures. |
-
-## Interface d'administration
-
-| Terme | Définition |
-|-------|-----------|
-| **Authorship orpheline** | Authorship source UCA dont le `person_id` est NULL — l'auteur n'a pas encore été identifié. Visible dans l'interface admin pour attribution manuelle. |
-| **Forme ambiguë** | Forme de nom associée à plusieurs `person_ids`. Signale un homonyme potentiel nécessitant une intervention manuelle. |
-| **Doublon publications** | Deux publications distinctes dans la table `publications` qui correspondent en réalité au même article. Détectées par similarité de titre et proposées à la fusion dans l'interface admin. |
-| **Doublon personnes** | Deux personnes distinctes qui correspondent au même individu. Détectées par similarité de nom + publications communes et proposées à la fusion. |
+| **Périmètre restreint** | UCA + ses unités en tutelle directe. Détermine si un auteur est considéré "UCA" sur une publication (flag `is_uca`). |
+| **Périmètre élargi** | Périmètre restreint + établissements partenaires (CHU Clermont-Ferrand, Clermont Auvergne INP, VetAgro Sup...). Utilisé pour les affiliations détaillées (`structure_ids`). |
+| **Tutelle** | Relation hiérarchique entre une institution et un laboratoire. L'UCA est tutelle de ~30 laboratoires. Un laboratoire peut avoir plusieurs tutelles (co-tutelle CNRS, INRAE...). |

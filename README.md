@@ -40,8 +40,7 @@ docker compose up
 - Frontend : http://localhost:5176/bibliometrie
 - Backend / API : http://localhost:8003
 
-Le code est monté en volume : les modifications sont prises en compte en temps
-réel (hot reload backend + frontend).
+Le code est monté en volume : les modifications sont prises en compte en temps réel (hot reload backend + frontend).
 
 ### 3. Importer une base existante
 

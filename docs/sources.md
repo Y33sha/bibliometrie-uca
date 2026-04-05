@@ -99,23 +99,6 @@ Le système intègre 3 sources bibliographiques principales, complétées par de
 - Pause longue toutes les 10 pages (15s) et entre chaque année (30s) pour ménager l'API
 - Les DOI de preprints (10.48550, 10.21203, etc.) sont filtrés lors du cross-import
 
-
-## Imports manuels
-
-### Base RH (personnel UCA)
-
-Fichier CSV importé via `scripts/import_rh.py` → table `persons_rh`.
-- Contient : nom, prénom, département, rôle, date de début/fin
-- Rattaché à une personne du référentiel via `persons_rh.person_id`
-- Sert de filtre dans l'annuaire personnes (filtre "Base RH")
-
-### Données APC
-
-Fichier CSV importé via `scripts/import_apc.py` → table `apc_payments`.
-- Contient : DOI, montant, devise, éditeur, labo payeur, année
-- Rattaché aux publications par DOI et aux structures par nom
-
-
 ## APIs d'enrichissement
 
 ### Unpaywall
@@ -133,3 +116,35 @@ Script : `processing/enrich_journal_apc.py`
 Interroge l'API OpenAlex Sources pour les journaux avec `openalex_id`. Récupère les prix APC catalogue (DOAJ). Met à jour `journals.apc_amount`, `apc_currency`, `is_in_doaj`.
 
 Note : ces données ne sont pas encore exploitées en aval dans l'application.
+
+
+## Imports manuels
+
+### Base RH (personnel UCA)
+
+Fichier CSV importé via `scripts/import_rh.py` → table `persons_rh`.
+- Contient : email, nom, prénom, département, rôle, dates de début/fin
+- Rattaché à une personne du référentiel via `persons_rh.person_id`
+- Sert de filtre dans l'annuaire personnes (filtre "Base RH")
+
+Données fournies par la DPCG le 15/12/2025. La date est documentée dans la colonne `hr_export_date`. Cette extraction contient uniquement les **enseignants-chercheurs UCA**: pas les chercheurs CNRS, Inrae, etc., ni les personnels BIATSS UCA.
+
+La [création de personnes](pipeline#creation-personnes) se fait via les authorships des publications, indépendamment de l'existence d'une entrée `person_rh`.
+La FK sur la table `person_rh` permet de:
+- enrichir les données sur les personnes;
+- protéger les personnes contre la suppression (fusions, nettoyage des personnes sans authorship UCA).
+
+### Données APC
+
+Données fournies par la Biblothèque numérique.
+
+Fichier CSV importé via `scripts/import_apc.py` → table `apc_payments`.
+- Contient : DOI, montant en €, éditeur, labo payeur, année
+- Rattaché aux publications par DOI et aux structures par nom
+
+**Incomplet**. Cette extraction ne contient pas les APC payés après 2024, et contient des trous dans la colonne DOI.
+
+A compléter par une extraction des [raw data](https://github.com/OpenAPC/openapc-de/blob/master/data/apc_de.csv) de [OpenAPC](https://treemaps.openapc.net/apcdata/clermont-u/). A ma connaissance OpenAPC ne propose pas d'API.
+<!-- TODO: Exploiter les raw data d'OpenAPC -->
+
+
