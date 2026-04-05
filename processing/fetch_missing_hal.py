@@ -42,9 +42,8 @@ def find_hal_primary_locations(cur) -> list[dict]:
     Retourne [{openalex_id, hal_id, landing_url}, ...]
     """
     cur.execute("""
-        SELECT od.openalex_id, so.raw_data
-        FROM openalex_documents od
-        JOIN staging_openalex so ON so.id = od.staging_id
+        SELECT openalex_id, raw_data
+        FROM staging_openalex
     """)
 
     results = []
