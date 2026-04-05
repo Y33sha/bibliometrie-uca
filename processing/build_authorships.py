@@ -34,24 +34,24 @@ def build(cur):
             SELECT DISTINCT hd.publication_id, has.person_id
             FROM hal_authorships has
             JOIN hal_documents hd ON hd.id = has.hal_document_id
-            WHERE hd.publication_id IS NOT NULL AND has.person_id IS NOT NULL
-              AND NOT has.excluded
+            JOIN v_active_publications vap ON vap.id = hd.publication_id
+            WHERE has.person_id IS NOT NULL AND NOT has.excluded
 
             UNION
 
             SELECT DISTINCT od.publication_id, oas.person_id
             FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
-            WHERE od.publication_id IS NOT NULL AND oas.person_id IS NOT NULL
-              AND NOT oas.excluded
+            JOIN v_active_publications vap ON vap.id = od.publication_id
+            WHERE oas.person_id IS NOT NULL AND NOT oas.excluded
 
             UNION
 
             SELECT DISTINCT wd.publication_id, was.person_id
             FROM wos_authorships was
             JOIN wos_documents wd ON wd.id = was.wos_document_id
-            WHERE wd.publication_id IS NOT NULL AND was.person_id IS NOT NULL
-              AND NOT was.excluded
+            JOIN v_active_publications vap ON vap.id = wd.publication_id
+            WHERE was.person_id IS NOT NULL AND NOT was.excluded
         )
         INSERT INTO authorships (publication_id, person_id)
         SELECT ap.publication_id, ap.person_id
@@ -176,36 +176,30 @@ def build(cur):
                    has.structure_ids AS struct_ids, has.is_uca AS src_is_uca
             FROM hal_authorships has
             JOIN hal_documents hd ON hd.id = has.hal_document_id
-            JOIN publications pub ON pub.id = hd.publication_id
+            JOIN v_active_publications vap ON vap.id = hd.publication_id
             WHERE has.structure_ids IS NOT NULL
-              AND hd.publication_id IS NOT NULL
               AND has.person_id IS NOT NULL
               AND NOT has.excluded
-              AND pub.doc_type != 'peer_review'
         """),
         ("OpenAlex", """
             SELECT od.publication_id, oas.person_id,
                    oas.structure_ids AS struct_ids, oas.is_uca AS src_is_uca
             FROM openalex_authorships oas
             JOIN openalex_documents od ON od.id = oas.openalex_document_id
-            JOIN publications pub ON pub.id = od.publication_id
+            JOIN v_active_publications vap ON vap.id = od.publication_id
             WHERE oas.structure_ids IS NOT NULL
-              AND od.publication_id IS NOT NULL
               AND oas.person_id IS NOT NULL
               AND NOT oas.excluded
-              AND pub.doc_type != 'peer_review'
         """),
         ("WoS", """
             SELECT wd.publication_id, was.person_id,
                    was.structure_ids AS struct_ids, was.is_uca AS src_is_uca
             FROM wos_authorships was
             JOIN wos_documents wd ON wd.id = was.wos_document_id
-            JOIN publications pub ON pub.id = wd.publication_id
+            JOIN v_active_publications vap ON vap.id = wd.publication_id
             WHERE was.structure_ids IS NOT NULL
-              AND wd.publication_id IS NOT NULL
               AND was.person_id IS NOT NULL
               AND NOT was.excluded
-              AND pub.doc_type != 'peer_review'
         """),
     ]
 
