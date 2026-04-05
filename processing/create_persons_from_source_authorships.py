@@ -69,6 +69,7 @@ def get_all_unlinked_authorships(cur):
         FROM hal_authorships has
         JOIN hal_authors ha ON ha.id = has.hal_author_id
         JOIN hal_documents hd ON hd.id = has.hal_document_id
+        JOIN v_active_publications vap ON vap.id = hd.publication_id
         WHERE has.person_id IS NULL
           AND has.is_uca = TRUE
           AND hd.publication_id IS NOT NULL
@@ -76,11 +77,15 @@ def get_all_unlinked_authorships(cur):
     hal_rows = cur.fetchall()
 
     # OpenAlex
+    # L'ORCID n'est remonté que si raw_author_name est compatible avec
+    # le display_name de l'entité auteur OA (l'algo OA fusionne parfois
+    # des personnes différentes, attribuant un ORCID erroné).
     cur.execute("""
         SELECT oas.id AS authorship_id, 'openalex' AS source,
                oas.raw_author_name AS full_name,
                NULL::text AS last_name, NULL::text AS first_name,
-               oa.orcid, NULL::text AS idhal,
+               oa.orcid AS oa_orcid, oa.full_name AS oa_full_name,
+               NULL::text AS idhal,
                NULL::int AS hal_author_id,
                FALSE AS has_hal_person_id,
                NULL::int AS hal_person_id,
@@ -89,6 +94,7 @@ def get_all_unlinked_authorships(cur):
         FROM openalex_authorships oas
         JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
         JOIN openalex_documents od ON od.id = oas.openalex_document_id
+        JOIN v_active_publications vap ON vap.id = od.publication_id
         WHERE oas.person_id IS NULL
           AND oas.is_uca = TRUE
           AND oas.raw_author_name IS NOT NULL
@@ -109,13 +115,14 @@ def get_all_unlinked_authorships(cur):
         FROM wos_authorships was
         JOIN wos_authors wa ON wa.id = was.wos_author_id
         JOIN wos_documents wd ON wd.id = was.wos_document_id
+        JOIN v_active_publications vap ON vap.id = wd.publication_id
         WHERE was.person_id IS NULL
           AND was.is_uca = TRUE
           AND wd.publication_id IS NOT NULL
     """)
     wos_rows = cur.fetchall()
 
-    # Enrichir avec last_name/first_name parsés pour OA
+    # Enrichir avec last_name/first_name parsés + filtrage ORCID OA
     all_rows = []
     for r in hal_rows + oa_rows + wos_rows:
         r = dict(r)
@@ -123,6 +130,19 @@ def get_all_unlinked_authorships(cur):
             r["last_name"], r["first_name"] = parse_raw_author_name(r["full_name"])
         r["last_norm"] = normalize_name(r["last_name"])
         r["first_norm"] = normalize_name(r["first_name"])
+
+        # ORCID OpenAlex : ne garder que si le nom de l'entité auteur OA
+        # est compatible avec le raw_author_name de l'authorship
+        if r.get("oa_orcid"):
+            oa_ln, oa_fn = parse_raw_author_name(r.get("oa_full_name", ""))
+            if names_compatible(r["last_norm"], r["first_norm"],
+                               normalize_name(oa_ln), normalize_name(oa_fn)):
+                r["orcid"] = r["oa_orcid"]
+            else:
+                r["orcid"] = None
+            r.pop("oa_orcid", None)
+            r.pop("oa_full_name", None)
+
         all_rows.append(r)
 
     return all_rows
