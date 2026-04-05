@@ -13,10 +13,9 @@ Usage:
     python3 run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement (sans WoS)
 
 Phases:
-    extract       Extraction des 3 sources (staging)
-    normalize     Normalisation HAL, OpenAlex, WoS
-    merge_pubs    Fusion HAL/OpenAlex + cross-imports
-    renormalize   Re-normalisation après cross-imports
+    extract       Extraction des 3 sources (staging) + refetch truncated
+    cross_imports Cross-imports entre sources (DOIs manquants, refs HAL)
+    normalize     Normalisation staging → tables sources + merge inter-sources
     addresses     Adresses: extraction, résolution, pays
     uca_flags     Flags UCA sur authorships sources
     identifiers   Moissonnage identifiants HAL (ORCID, IdRef)
@@ -48,7 +47,7 @@ BASE = Path(__file__).resolve().parent
 # ---------------------------------------------------------------------------
 
 def phase_extract(mode="full", sources=None, **kw):
-    """Phase 1 : Extraction des sources vers staging.
+    """Phase 1 : Extraction des sources vers staging + refetch truncated.
 
     Les années sont déterminées par la config DB (pipeline_years_full/weekly).
     Les scripts d'extraction lisent la config directement.
@@ -68,33 +67,28 @@ def phase_extract(mode="full", sources=None, **kw):
             run_python("extraction/hal/extract_hal.py", "--mode", mode)
         if "wos" in sources:
             run_python("extraction/wos/extract_wos.py", "--mode", mode)
+    # Re-fetch des publications OA tronquées à 100 auteurs (lit le staging, pas les tables normalisées)
+    if "openalex" in (sources or {"openalex"}):
+        run_python("extraction/openalex/refetch_truncated.py")
 
 
-def phase_normalize(**kw):
-    """Phase 2 : Normalisation staging → tables sources."""
-    run_python("processing/normalize_openalex.py")
-    run_python("processing/normalize_hal.py")
-    run_python("processing/normalize_wos.py")
-    run_python("processing/enrich_hal_structures.py")
-
-
-def phase_merge_pubs(mode="full", **kw):
-    """Phase 3 : Fusion HAL/OpenAlex + cross-imports."""
-    run_python("processing/merge_hal_openalex_pubs.py")
+def phase_cross_imports(mode="full", **kw):
+    """Phase 2 : Cross-imports entre sources (lit le staging uniquement)."""
     if mode in ("full", "monthly"):
-        log.info("Cross-imports (mode %s)", mode)
         run_python("processing/fetch_missing_hal.py")
         run_python("extraction/openalex/cross_import_openalex.py")
-        # Re-fetch des publications OA tronquées à 100 auteurs
-        run_python("extraction/openalex/refetch_truncated.py")
+        run_python("extraction/hal/cross_import_hal.py")
     else:
         log.info("Cross-imports ignorés en mode hebdomadaire")
 
 
-def phase_renormalize(**kw):
-    """Phase 3b : Re-normalisation après cross-imports et refetch."""
-    run_python("processing/normalize_openalex.py", "--batch-size", "10")
+def phase_normalize(**kw):
+    """Phase 3 : Normalisation staging → tables sources + merge inter-sources."""
+    run_python("processing/normalize_openalex.py")
     run_python("processing/normalize_hal.py")
+    run_python("processing/normalize_wos.py")
+    run_python("processing/enrich_hal_structures.py")
+    run_python("processing/merge_hal_openalex_pubs.py")
 
 
 def phase_addresses(**kw):
@@ -145,9 +139,8 @@ def phase_enrich(mode="full", **kw):
 # Registre des phases, dans l'ordre
 PHASES = [
     ("extract", phase_extract),
+    ("cross_imports", phase_cross_imports),
     ("normalize", phase_normalize),
-    ("merge_pubs", phase_merge_pubs),
-    ("renormalize", phase_renormalize),
     ("addresses", phase_addresses),
     ("uca_flags", phase_uca_flags),
     ("identifiers", phase_identifiers),

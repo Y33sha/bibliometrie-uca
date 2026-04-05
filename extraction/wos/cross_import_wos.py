@@ -174,13 +174,17 @@ def main():
     conn = get_connection()
     cur = conn.cursor()
 
-    # DOIs en base sans source WoS ni staging WoS
+    # DOIs présents dans HAL ou OpenAlex mais absents du staging WoS
     cur.execute("""
-        SELECT p.doi FROM publications p
-        WHERE p.doi IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM wos_documents wd WHERE wd.publication_id = p.id)
-          AND NOT EXISTS (SELECT 1 FROM staging_wos sw WHERE LOWER(sw.doi) = LOWER(p.doi))
-        ORDER BY p.pub_year DESC NULLS LAST, p.id
+        SELECT DISTINCT doi FROM (
+            SELECT doi FROM staging_hal WHERE doi IS NOT NULL
+            UNION
+            SELECT doi FROM staging_openalex WHERE doi IS NOT NULL
+        ) src
+        WHERE doi NOT IN (
+            SELECT doi FROM staging_wos WHERE doi IS NOT NULL
+        )
+        ORDER BY doi
     """)
     all_dois = [r[0] for r in cur.fetchall()]
     logger.info(f"{len(all_dois)} DOIs sans source WoS")

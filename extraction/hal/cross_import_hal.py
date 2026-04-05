@@ -43,15 +43,12 @@ def get_missing_dois(conn) -> list[str]:
     with conn.cursor() as cur:
         cur.execute("""
             SELECT DISTINCT doi FROM (
-                SELECT doi FROM openalex_documents WHERE doi IS NOT NULL
+                SELECT doi FROM staging_openalex WHERE doi IS NOT NULL
                 UNION
-                SELECT doi FROM wos_documents WHERE doi IS NOT NULL
+                SELECT doi FROM staging_wos WHERE doi IS NOT NULL
             ) src
             WHERE doi NOT IN (
                 SELECT doi FROM staging_hal WHERE doi IS NOT NULL
-            )
-            AND doi NOT IN (
-                SELECT doi FROM hal_documents WHERE doi IS NOT NULL
             )
             ORDER BY doi
         """)
