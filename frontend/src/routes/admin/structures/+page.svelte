@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
-	import { base } from '$app/paths';
-	import { api } from '$lib/api';
+	import { onMount, onDestroy } from "svelte";
+	import { base } from "$app/paths";
+	import { api } from "$lib/api";
 
 	/* ── Types ── */
 
@@ -47,8 +47,8 @@
 	let allStructuresCache: Structure[] = $state([]);
 	let selectedId: number | null = $state(null);
 
-	let search = $state('');
-	let typeFilter = $state('');
+	let search = $state("");
+	let typeFilter = $state("");
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	// Detail state
@@ -56,21 +56,21 @@
 
 	// Relation picker state
 	let relationPickerOpen = $state(false);
-	let relationPickerSearch = $state('');
-	let pickerRelType = $state('');
-	let pickerDirection = $state('');
+	let relationPickerSearch = $state("");
+	let pickerRelType = $state("");
+	let pickerDirection = $state("");
 	let pickerStructId: number | null = $state(null);
 	let relationPickerEl: HTMLDivElement | undefined = $state();
 
 	// Context picker state
 	let ctxPickerOpen = $state(false);
-	let ctxPickerSearch = $state('');
+	let ctxPickerSearch = $state("");
 	let ctxPickerFormId: number | null = $state(null);
 	let ctxPickerCurrentCtx: (number | string)[] = $state([]);
 	let ctxPickerEl: HTMLDivElement | undefined = $state();
 
 	// New form state
-	let addFormText = $state('');
+	let addFormText = $state("");
 	let addFormRegex = $state(false);
 	let newFormCtx: (number | string)[] = $state([]);
 
@@ -85,20 +85,22 @@
 		country: string | null;
 	}
 	let halMappings: HalMapping[] = $state([]);
+	let halHelpOpen = $state(false);
+	let formsHelpOpen = $state(false);
 	let halSearchOpen = $state(false);
-	let halSearch = $state('');
+	let halSearch = $state("");
 	let halSearchResults: any[] = $state([]);
 	let halPickerEl: HTMLDivElement | undefined = $state();
 
 	// Create/Edit modal state
 	let editMode = $state(false);
 	let createModalOpen = $state(false);
-	let mCode = $state('');
-	let mName = $state('');
-	let mAcronym = $state('');
-	let mType = $state('labo');
-	let mRor = $state('');
-	let mHal = $state('');
+	let mCode = $state("");
+	let mName = $state("");
+	let mAcronym = $state("");
+	let mType = $state("labo");
+	let mRor = $state("");
+	let mHal = $state("");
 
 	// Forms data lookup (for context editing)
 	let formsData: Record<number, (number | string)[]> = $state({});
@@ -119,13 +121,7 @@
 	const relationPickerResults = $derived.by(() => {
 		const q = relationPickerSearch.toLowerCase();
 		return allStructuresCache
-			.filter(
-				(s) =>
-					!pickerExclude.has(s.id) &&
-					(s.name.toLowerCase().includes(q) ||
-						(s.acronym || '').toLowerCase().includes(q) ||
-						s.code.toLowerCase().includes(q))
-			)
+			.filter((s) => !pickerExclude.has(s.id) && (s.name.toLowerCase().includes(q) || (s.acronym || "").toLowerCase().includes(q) || s.code.toLowerCase().includes(q)))
 			.slice(0, 12);
 	});
 
@@ -133,37 +129,27 @@
 		const q = ctxPickerSearch.toLowerCase();
 		const existing = new Set(ctxPickerCurrentCtx.map((x) => String(x)));
 		return allStructuresCache
-			.filter(
-				(s) =>
-					!existing.has(String(s.id)) &&
-					(s.name.toLowerCase().includes(q) ||
-						(s.acronym || '').toLowerCase().includes(q) ||
-						s.code.toLowerCase().includes(q))
-			)
+			.filter((s) => !existing.has(String(s.id)) && (s.name.toLowerCase().includes(q) || (s.acronym || "").toLowerCase().includes(q) || s.code.toLowerCase().includes(q)))
 			.slice(0, 10);
 	});
 
-	const tutelles = $derived(detail ? detail.parents.filter((p) => p.relation_type === 'est_tutelle_de') : []);
-	const tutellesDe = $derived(detail ? detail.children.filter((c) => c.relation_type === 'est_tutelle_de') : []);
+	const tutelles = $derived(detail ? detail.parents.filter((p) => p.relation_type === "est_tutelle_de") : []);
+	const tutellesDe = $derived(detail ? detail.children.filter((c) => c.relation_type === "est_tutelle_de") : []);
 	const partenaires = $derived.by(() => {
 		if (!detail) return [];
 		return [
-			...detail.parents
-				.filter((p) => p.relation_type === 'est_partenaire_de')
-				.map((p) => ({ ...p, id_struct: p.id })),
-			...detail.children
-				.filter((c) => c.relation_type === 'est_partenaire_de')
-				.map((c) => ({ ...c, id_struct: c.id }))
+			...detail.parents.filter((p) => p.relation_type === "est_partenaire_de").map((p) => ({ ...p, id_struct: p.id })),
+			...detail.children.filter((c) => c.relation_type === "est_partenaire_de").map((c) => ({ ...c, id_struct: c.id })),
 		];
 	});
 
 	function rorShortId(rorId: string): string {
-		return rorId.replace('https://ror.org/', '');
+		return rorId.replace("https://ror.org/", "");
 	}
 
 	function rorFullUrl(rorId: string): string {
-		if (rorId.startsWith('http')) return rorId;
-		return 'https://ror.org/' + rorId;
+		if (rorId.startsWith("http")) return rorId;
+		return "https://ror.org/" + rorId;
 	}
 
 	function halCollectionUrl(code: string): string {
@@ -174,18 +160,18 @@
 
 	async function loadList() {
 		const params = new URLSearchParams();
-		if (typeFilter) params.set('type', typeFilter);
-		if (search) params.set('search', search);
-		allStructures = await api<Structure[]>('/api/structures?' + params);
+		if (typeFilter) params.set("type", typeFilter);
+		if (search) params.set("search", search);
+		allStructures = await api<Structure[]>("/api/structures?" + params);
 	}
 
 	async function refreshCache() {
-		allStructuresCache = await api<Structure[]>('/api/structures');
+		allStructuresCache = await api<Structure[]>("/api/structures");
 	}
 
 	async function selectStructure(id: number) {
 		selectedId = id;
-		const data = await api<StructureDetail>('/api/structures/' + id);
+		const data = await api<StructureDetail>("/api/structures/" + id);
 		detail = data;
 
 		// Build forms data lookup
@@ -196,20 +182,18 @@
 		formsData = fd;
 
 		// Build exclusion set for relation picker
-		const exclude = new Set<number>([
-			...data.parents.map((p) => p.id),
-			...data.children.map((c) => c.id),
-			data.structure.id
-		]);
+		const exclude = new Set<number>([...data.parents.map((p) => p.id), ...data.children.map((c) => c.id), data.structure.id]);
 		pickerExclude = exclude;
 
 		// HAL mappings
-		halMappings = await api<HalMapping[]>('/api/structures/' + id + '/hal-mappings');
+		halMappings = await api<HalMapping[]>("/api/structures/" + id + "/hal-mappings");
 
-		// Reset pickers
+		// Reset pickers et help
 		relationPickerOpen = false;
 		ctxPickerOpen = false;
 		halSearchOpen = false;
+		halHelpOpen = false;
+		formsHelpOpen = false;
 		newFormCtx = [];
 	}
 
@@ -224,22 +208,22 @@
 		pickerRelType = relType;
 		pickerDirection = direction;
 		pickerStructId = structId;
-		relationPickerSearch = '';
+		relationPickerSearch = "";
 		relationPickerOpen = true;
 		ctxPickerOpen = false;
 	}
 
 	async function pickStructure(otherId: number) {
-		const parentId = pickerDirection === 'parent' ? otherId : pickerStructId!;
-		const childId = pickerDirection === 'parent' ? pickerStructId! : otherId;
-		await fetch(base + '/api/structure-relations', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+		const parentId = pickerDirection === "parent" ? otherId : pickerStructId!;
+		const childId = pickerDirection === "parent" ? pickerStructId! : otherId;
+		await fetch(base + "/api/structure-relations", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				parent_id: parentId,
 				child_id: childId,
-				relation_type: pickerRelType
-			})
+				relation_type: pickerRelType,
+			}),
 		});
 		relationPickerOpen = false;
 		await selectStructure(pickerStructId!);
@@ -248,7 +232,9 @@
 	}
 
 	async function deleteRelation(relId: number) {
-		await fetch(base + '/api/structure-relations/' + relId, { method: 'DELETE' });
+		await fetch(base + "/api/structure-relations/" + relId, {
+			method: "DELETE",
+		});
 		if (selectedId) await selectStructure(selectedId);
 		loadList();
 		refreshCache();
@@ -261,22 +247,22 @@
 		if (!text) return;
 		const ctx = newFormCtx.length ? newFormCtx : null;
 
-		const resp = await fetch(base + '/api/name-forms', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+		const resp = await fetch(base + "/api/name-forms", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				structure_id: structId,
 				form_text: text,
 				is_regex: addFormRegex,
-				requires_context_of: ctx
-			})
+				requires_context_of: ctx,
+			}),
 		});
 		if (!resp.ok) {
 			const err = await resp.json().catch(() => ({ detail: `Erreur ${resp.status}` }));
 			alert(err.detail || `Erreur ${resp.status}`);
 			return;
 		}
-		addFormText = '';
+		addFormText = "";
 		addFormRegex = false;
 		newFormCtx = [];
 		await selectStructure(structId);
@@ -284,19 +270,21 @@
 	}
 
 	async function toggleForm(formId: number, active: boolean) {
-		await fetch(base + '/api/name-forms/' + formId, {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ is_active: active })
+		await fetch(base + "/api/name-forms/" + formId, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ is_active: active }),
 		});
 		if (selectedId) await selectStructure(selectedId);
 	}
 
 	async function deleteForm(formId: number) {
-		if (!confirm('Supprimer cette forme ?')) return;
-		const res = await fetch(base + '/api/name-forms/' + formId, { method: 'DELETE' });
+		if (!confirm("Supprimer cette forme ?")) return;
+		const res = await fetch(base + "/api/name-forms/" + formId, {
+			method: "DELETE",
+		});
 		if (!res.ok) {
-			alert('Erreur suppression: ' + (await res.text()));
+			alert("Erreur suppression: " + (await res.text()));
 			return;
 		}
 		if (selectedId) await selectStructure(selectedId);
@@ -306,11 +294,10 @@
 	/* ── Context picker ── */
 
 	function openCtxPicker(formId: number | null) {
-		const currentCtx =
-			formId === null ? [...newFormCtx] : [...(formsData[formId] || [])];
+		const currentCtx = formId === null ? [...newFormCtx] : [...(formsData[formId] || [])];
 		ctxPickerFormId = formId;
 		ctxPickerCurrentCtx = currentCtx;
-		ctxPickerSearch = '';
+		ctxPickerSearch = "";
 		ctxPickerOpen = true;
 		relationPickerOpen = false;
 	}
@@ -324,10 +311,12 @@
 		if (ctxPickerFormId === null) {
 			newFormCtx = [...ctxPickerCurrentCtx];
 		} else {
-			await fetch(base + '/api/name-forms/' + ctxPickerFormId, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ requires_context_of: ctxPickerCurrentCtx })
+			await fetch(base + "/api/name-forms/" + ctxPickerFormId, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					requires_context_of: ctxPickerCurrentCtx,
+				}),
 			});
 			if (selectedId) await selectStructure(selectedId);
 		}
@@ -339,10 +328,10 @@
 		if (ctxPickerFormId === null) {
 			newFormCtx = [];
 		} else {
-			await fetch(base + '/api/name-forms/' + ctxPickerFormId, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ requires_context_of: [] })
+			await fetch(base + "/api/name-forms/" + ctxPickerFormId, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ requires_context_of: [] }),
 			});
 			if (selectedId) await selectStructure(selectedId);
 		}
@@ -351,10 +340,10 @@
 	async function removeCtx(formId: number, itemToRemove: number | string) {
 		const currentCtx = formsData[formId] || [];
 		const newCtx = currentCtx.filter((x) => x !== itemToRemove);
-		await fetch(base + '/api/name-forms/' + formId, {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ requires_context_of: newCtx })
+		await fetch(base + "/api/name-forms/" + formId, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ requires_context_of: newCtx }),
 		});
 		if (selectedId) await selectStructure(selectedId);
 	}
@@ -364,15 +353,15 @@
 	}
 
 	function ctxLabel(x: number | string): string {
-		if (x === 'tutelles') return 'tutelles';
-		return structLookup[x as number] || 'id:' + x;
+		if (x === "tutelles") return "tutelles";
+		return structLookup[x as number] || "id:" + x;
 	}
 
 	/* ── Delete structure ── */
 
 	async function deleteStructure(id: number) {
-		if (!confirm('Supprimer cette structure et toutes ses formes/relations ?')) return;
-		await fetch(base + '/api/structures/' + id, { method: 'DELETE' });
+		if (!confirm("Supprimer cette structure et toutes ses formes/relations ?")) return;
+		await fetch(base + "/api/structures/" + id, { method: "DELETE" });
 		selectedId = null;
 		detail = null;
 		loadList();
@@ -382,25 +371,30 @@
 	/* ── HAL mapping ── */
 
 	async function searchHalStructures() {
-		if (halSearch.length < 2) { halSearchResults = []; return; }
+		if (halSearch.length < 2) {
+			halSearchResults = [];
+			return;
+		}
 		halSearchResults = await api<any[]>(`/api/hal-structures?unmapped=true&search=${encodeURIComponent(halSearch)}&limit=15`);
 	}
 
 	async function mapHalStructure(halStructId: number) {
 		if (!selectedId) return;
-		await fetch(base + '/api/hal-structures/' + halStructId + '/map', {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ structure_id: selectedId })
+		await fetch(base + "/api/hal-structures/" + halStructId + "/map", {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ structure_id: selectedId }),
 		});
 		halSearchOpen = false;
-		halSearch = '';
+		halSearch = "";
 		halSearchResults = [];
 		await selectStructure(selectedId);
 	}
 
 	async function unmapHalStructure(halStructId: number) {
-		await fetch(base + '/api/hal-structures/' + halStructId + '/map', { method: 'DELETE' });
+		await fetch(base + "/api/hal-structures/" + halStructId + "/map", {
+			method: "DELETE",
+		});
 		if (selectedId) await selectStructure(selectedId);
 	}
 
@@ -408,10 +402,10 @@
 		let ror = mRor.trim();
 		if (!ror) return true;
 		// Compléter l'URL si juste l'identifiant
-		if (/^0[a-z0-9]{8}$/.test(ror)) ror = 'https://ror.org/' + ror;
+		if (/^0[a-z0-9]{8}$/.test(ror)) ror = "https://ror.org/" + ror;
 		// Valider le format
 		if (!/^https:\/\/ror\.org\/0[a-z0-9]{8}$/.test(ror)) {
-			alert('Format ROR invalide. Attendu : https://ror.org/0xxxxxxxxx');
+			alert("Format ROR invalide. Attendu : https://ror.org/0xxxxxxxxx");
 			return false;
 		}
 		mRor = ror;
@@ -423,12 +417,12 @@
 	function openEditModal() {
 		if (!detail) return;
 		const s = detail.structure;
-		mCode = s.code || '';
-		mName = s.name || '';
-		mAcronym = s.acronym || '';
-		mType = s.type || 'labo';
-		mRor = s.ror_id || '';
-		mHal = s.hal_collection || '';
+		mCode = s.code || "";
+		mName = s.name || "";
+		mAcronym = s.acronym || "";
+		mType = s.type || "labo";
+		mRor = s.ror_id || "";
+		mHal = s.hal_collection || "";
 		editMode = true;
 		createModalOpen = true;
 	}
@@ -438,16 +432,16 @@
 		if (!normalizeRor()) return;
 		const data: Record<string, any> = {};
 		if (mName.trim()) data.name = mName.trim();
-		if (mAcronym.trim() !== (detail?.structure.acronym || '')) data.acronym = mAcronym.trim() || null;
+		if (mAcronym.trim() !== (detail?.structure.acronym || "")) data.acronym = mAcronym.trim() || null;
 		if (mType) data.type = mType;
-		if (mRor.trim() !== (detail?.structure.ror_id || '')) data.ror_id = mRor.trim() || null;
-		if (mHal.trim() !== (detail?.structure.hal_collection || '')) data.hal_collection = mHal.trim() || null;
+		if (mRor.trim() !== (detail?.structure.ror_id || "")) data.ror_id = mRor.trim() || null;
+		if (mHal.trim() !== (detail?.structure.hal_collection || "")) data.hal_collection = mHal.trim() || null;
 
 		try {
-			const res = await fetch(base + '/api/structures/' + selectedId, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
+			const res = await fetch(base + "/api/structures/" + selectedId, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(data),
 			});
 			if (!res.ok) throw new Error(await res.text());
 			createModalOpen = false;
@@ -456,7 +450,7 @@
 			loadList();
 			refreshCache();
 		} catch (e: any) {
-			alert('Erreur: ' + e.message);
+			alert("Erreur: " + e.message);
 		}
 	}
 
@@ -464,12 +458,12 @@
 
 	function openCreateModal() {
 		editMode = false;
-		mCode = '';
-		mName = '';
-		mAcronym = '';
-		mType = 'labo';
-		mRor = '';
-		mHal = '';
+		mCode = "";
+		mName = "";
+		mAcronym = "";
+		mType = "labo";
+		mRor = "";
+		mHal = "";
 		createModalOpen = true;
 	}
 
@@ -481,18 +475,18 @@
 			acronym: mAcronym.trim() || null,
 			type: mType,
 			ror_id: mRor.trim() || null,
-			hal_collection: mHal.trim() || null
+			hal_collection: mHal.trim() || null,
 		};
 		if (!data.code || !data.name) {
-			alert('Code et nom requis');
+			alert("Code et nom requis");
 			return;
 		}
 
 		try {
-			const res = await fetch(base + '/api/structures', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
+			const res = await fetch(base + "/api/structures", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(data),
 			});
 			if (!res.ok) throw new Error(await res.text());
 			const created = await res.json();
@@ -501,7 +495,7 @@
 			refreshCache();
 			selectStructure(created.id);
 		} catch (e: any) {
-			alert('Erreur: ' + e.message);
+			alert("Erreur: " + e.message);
 		}
 	}
 
@@ -509,28 +503,13 @@
 
 	function handleDocumentClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
-		if (
-			relationPickerOpen &&
-			relationPickerEl &&
-			!relationPickerEl.contains(target) &&
-			!target.classList.contains('btn-add')
-		) {
+		if (relationPickerOpen && relationPickerEl && !relationPickerEl.contains(target) && !target.classList.contains("btn-add")) {
 			relationPickerOpen = false;
 		}
-		if (
-			ctxPickerOpen &&
-			ctxPickerEl &&
-			!ctxPickerEl.contains(target) &&
-			!target.classList.contains('btn-add-tiny')
-		) {
+		if (ctxPickerOpen && ctxPickerEl && !ctxPickerEl.contains(target) && !target.classList.contains("btn-add-tiny")) {
 			ctxPickerOpen = false;
 		}
-		if (
-			halSearchOpen &&
-			halPickerEl &&
-			!halPickerEl.contains(target) &&
-			!target.classList.contains('btn-add')
-		) {
+		if (halSearchOpen && halPickerEl && !halPickerEl.contains(target) && !target.closest(".btn-hal-add")) {
 			halSearchOpen = false;
 		}
 	}
@@ -538,15 +517,15 @@
 	/* ── Lifecycle ── */
 
 	onMount(() => {
-		document.querySelector('.container')?.classList.add('full-width');
+		document.querySelector(".container")?.classList.add("full-width");
 		loadList();
 		refreshCache();
-		document.addEventListener('click', handleDocumentClick);
-		return () => document.removeEventListener('click', handleDocumentClick);
+		document.addEventListener("click", handleDocumentClick);
+		return () => document.removeEventListener("click", handleDocumentClick);
 	});
 
 	onDestroy(() => {
-		document.querySelector('.container')?.classList.remove('full-width');
+		document.querySelector(".container")?.classList.remove("full-width");
 	});
 </script>
 
@@ -558,21 +537,15 @@
 	<!-- LIST PANEL -->
 	<div class="list-panel">
 		<div class="toolbar">
-			<input
-				type="text"
-				placeholder="Rechercher..."
-				bind:value={search}
-				oninput={handleSearch}
-			/>
+			<input type="text" placeholder="Rechercher..." bind:value={search} oninput={handleSearch} />
 			<select bind:value={typeFilter} onchange={() => loadList()}>
 				<option value="">Tous types</option>
+				<option value="labo">Laboratoires</option>
 				<option value="universite">Universités</option>
 				<option value="onr">ONR</option>
 				<option value="chu">CHU</option>
 				<option value="ecole">Écoles</option>
-				<option value="labo">Laboratoires</option>
 				<option value="site">Sites</option>
-				<option value="autre">Autres</option>
 			</select>
 		</div>
 		<div class="list-header">
@@ -584,15 +557,11 @@
 				<div class="empty-list">Aucune structure</div>
 			{:else}
 				{#each allStructures as s (s.id)}
-					<button
-						class="struct-item"
-						class:active={s.id === selectedId}
-						onclick={() => selectStructure(s.id)}
-					>
+					<button class="struct-item" class:active={s.id === selectedId} onclick={() => selectStructure(s.id)}>
 						<span class="type-badge type-{s.type}">{s.type}</span>
 						<div class="info">
 							<div class="name">
-								{s.name}{s.acronym ? ` (${s.acronym})` : ''}
+								{#if s.acronym}<strong>{s.acronym}</strong> · {s.name}{:else}{s.name}{/if}
 							</div>
 						</div>
 					</button>
@@ -611,13 +580,11 @@
 				<!-- Header -->
 				<div class="detail-header">
 					<span class="type-badge type-{s.type}">{s.type}</span>
-					<h2>{s.acronym ? s.acronym + ' \u2014 ' + s.name : s.name}</h2>
-					<button class="btn btn-sm" onclick={openEditModal}>
-						Éditer
-					</button>
-					<button class="btn btn-danger btn-sm" onclick={() => deleteStructure(s.id)}>
-						Supprimer
-					</button>
+					<h2>
+						{#if s.acronym}<strong>{s.acronym}</strong> · {s.name}{:else}{s.name}{/if}
+					</h2>
+					<button class="btn btn-sm" onclick={openEditModal}> Éditer </button>
+					<button class="btn btn-danger btn-sm" onclick={() => deleteStructure(s.id)}> Supprimer </button>
 				</div>
 
 				<!-- ═══ SECTION DÉTAILS ═══ -->
@@ -648,11 +615,8 @@
 
 				<!-- Tutelles -->
 				<h3>
-					Tutelle{tutelles.length > 1 ? 's' : ''}
-					<button
-						class="btn-add"
-						onclick={() => openPicker('est_tutelle_de', 'parent', s.id)}
-					>+</button>
+					Tutelle{tutelles.length > 1 ? "s" : ""}
+					<button class="btn-add" onclick={() => openPicker("est_tutelle_de", "parent", s.id)}>+</button>
 				</h3>
 				<div>
 					{#if tutelles.length === 0}
@@ -663,11 +627,7 @@
 								<button class="tag-name" onclick={() => selectStructure(p.id)}>
 									{p.acronym || p.name}
 								</button>
-								<button
-									class="remove"
-									onclick={() => deleteRelation(p.relation_id)}
-									title="Supprimer"
-								>x</button>
+								<button class="remove" onclick={() => deleteRelation(p.relation_id)} title="Supprimer">x</button>
 							</span>
 						{/each}
 					{/if}
@@ -676,10 +636,7 @@
 				<!-- Est tutelle de -->
 				<h3>
 					Est tutelle de
-					<button
-						class="btn-add"
-						onclick={() => openPicker('est_tutelle_de', 'child', s.id)}
-					>+</button>
+					<button class="btn-add" onclick={() => openPicker("est_tutelle_de", "child", s.id)}>+</button>
 				</h3>
 				<div>
 					{#if tutellesDe.length === 0}
@@ -690,11 +647,7 @@
 								<button class="tag-name" onclick={() => selectStructure(c.id)}>
 									{c.acronym || c.name}
 								</button>
-								<button
-									class="remove"
-									onclick={() => deleteRelation(c.relation_id)}
-									title="Supprimer"
-								>x</button>
+								<button class="remove" onclick={() => deleteRelation(c.relation_id)} title="Supprimer">x</button>
 							</span>
 						{/each}
 					{/if}
@@ -702,11 +655,8 @@
 
 				<!-- Partenaires -->
 				<h3>
-					Partenaire{partenaires.length > 1 ? 's' : ''}
-					<button
-						class="btn-add"
-						onclick={() => openPicker('est_partenaire_de', 'parent', s.id)}
-					>+</button>
+					Partenaire{partenaires.length > 1 ? "s" : ""}
+					<button class="btn-add" onclick={() => openPicker("est_partenaire_de", "parent", s.id)}>+</button>
 				</h3>
 				<div>
 					{#if partenaires.length === 0}
@@ -717,11 +667,7 @@
 								<button class="tag-name" onclick={() => selectStructure(p.id_struct)}>
 									{p.acronym || p.name}
 								</button>
-								<button
-									class="remove"
-									onclick={() => deleteRelation(p.relation_id)}
-									title="Supprimer"
-								>x</button>
+								<button class="remove" onclick={() => deleteRelation(p.relation_id)} title="Supprimer">x</button>
 							</span>
 						{/each}
 					{/if}
@@ -731,17 +677,8 @@
 				{#if relationPickerOpen}
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div
-						class="picker-container"
-						bind:this={relationPickerEl}
-						onclick={(e) => e.stopPropagation()}
-					>
-						<input
-							type="text"
-							placeholder="Rechercher une structure..."
-							bind:value={relationPickerSearch}
-							autocomplete="off"
-						/>
+					<div class="picker-container" bind:this={relationPickerEl} onclick={(e) => e.stopPropagation()}>
+						<input type="text" placeholder="Rechercher une structure..." bind:value={relationPickerSearch} autocomplete="off" />
 						<div class="picker-results">
 							{#if relationPickerResults.length === 0}
 								<div class="picker-item disabled">Aucun résultat</div>
@@ -751,7 +688,7 @@
 										<span class="type-badge type-{rs.type}" style="font-size: 0.65rem;padding:0 5px">
 											{rs.type}
 										</span>
-										{rs.acronym ? rs.acronym + ' \u2014 ' : ''}{rs.name}
+										{rs.acronym ? rs.acronym + " \u2014 " : ""}{rs.name}
 									</button>
 								{/each}
 							{/if}
@@ -765,8 +702,31 @@
 				<!-- HAL structures mappées -->
 				<h3>
 					Structures HAL ({halMappings.length})
-					<button class="btn-add" onclick={() => { halSearchOpen = !halSearchOpen; halSearch = ''; halSearchResults = []; }}>+</button>
+					<button
+						class="btn-help-icon"
+						onclick={() => {
+							halHelpOpen = !halHelpOpen;
+						}}
+						title="Aide"
+						><svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg
+						></button
+					>
 				</h3>
+				{#if halHelpOpen}
+					<p class="help-text">
+						Le mapping avec les structures HAL permet d'identifier les affiliations des publications issues de HAL. Les changements seront pris en compte à la prochaine exécution du
+						pipeline. Pour une prise en compte immédiate, relancer le pipeline à partir de l'étape `uca_flags` : <code>python run_pipeline.py --from uca_flags</code>
+					</p>
+				{/if}
 				{#if halMappings.length === 0 && !halSearchOpen}
 					<span class="none-text">Aucune structure HAL mappée</span>
 				{:else}
@@ -785,13 +745,13 @@
 						</thead>
 						<tbody>
 							{#each halMappings as hm (hm.hal_struct_id)}
-								<tr class:hal-valid={hm.valid === 'VALID'} class:hal-old={hm.valid === 'OLD'} class:hal-incoming={hm.valid === 'INCOMING'}>
+								<tr class:hal-valid={hm.valid === "VALID"} class:hal-old={hm.valid === "OLD"} class:hal-incoming={hm.valid === "INCOMING"}>
 									<td><a href="https://aurehal.archives-ouvertes.fr/structure/read/id/{hm.hal_struct_id}" target="_blank" rel="noopener" class="id-badge">{hm.hal_struct_id}</a></td>
-									<td>{hm.name || ''}</td>
-									<td>{hm.acronym || ''}</td>
-									<td>{hm.type || ''}</td>
-									<td>{hm.start_date || ''}</td>
-									<td>{hm.end_date || ''}</td>
+									<td>{hm.name || ""}</td>
+									<td>{hm.acronym || ""}</td>
+									<td>{hm.type || ""}</td>
+									<td>{hm.start_date || ""}</td>
+									<td>{hm.end_date || ""}</td>
 									<td>{hm.doc_count || 0}</td>
 									<td>
 										<button class="btn btn-sm btn-danger" onclick={() => unmapHalStructure(hm.hal_struct_id)} title="Supprimer le mapping">x</button>
@@ -801,24 +761,29 @@
 						</tbody>
 					</table>
 				{/if}
+				<button
+					class="btn btn-sm btn-hal-add"
+					style="margin-top: 6px;"
+					onclick={() => {
+						halSearchOpen = !halSearchOpen;
+						halSearch = "";
+						halSearchResults = [];
+					}}>{halSearchOpen ? "Annuler" : "Ajouter"}</button
+				>
 				{#if halSearchOpen}
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div class="picker-container" style="margin-top: 8px;" bind:this={halPickerEl} onclick={(e) => e.stopPropagation()}>
-						<input
-							type="text"
-							placeholder="Rechercher une structure HAL non mappée..."
-							bind:value={halSearch}
-							oninput={searchHalStructures}
-							autocomplete="off"
-						/>
+						<input type="text" placeholder="Rechercher une structure HAL non mappée..." bind:value={halSearch} oninput={searchHalStructures} autocomplete="off" />
 						<div class="picker-results">
 							{#if halSearchResults.length === 0}
-								<div class="picker-item disabled">{halSearch.length < 2 ? 'Tapez au moins 2 caractères' : 'Aucun résultat'}</div>
+								<div class="picker-item disabled">
+									{halSearch.length < 2 ? "Tapez au moins 2 caractères" : "Aucun résultat"}
+								</div>
 							{:else}
 								{#each halSearchResults as hs (hs.hal_struct_id)}
 									<button class="picker-item" onclick={() => mapHalStructure(hs.hal_struct_id)}>
-										{hs.acronym ? hs.acronym + ' — ' : ''}{hs.name}
+										{hs.acronym ? hs.acronym + " — " : ""}{hs.name}
 										<span style="color: var(--muted); font-size: 0.8rem; margin-left: auto;">
 											{hs.type} · {hs.doc_count || 0} docs
 										</span>
@@ -830,54 +795,62 @@
 				{/if}
 
 				<!-- Forms table -->
-				<h3>Formes de noms ({detail.forms.length})</h3>
+				<h3>
+					Formes de noms ({detail.forms.length})
+					<button
+						class="btn-help-icon"
+						onclick={() => {
+							formsHelpOpen = !formsHelpOpen;
+						}}
+						title="Aide"
+						><svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg
+						></button
+					>
+				</h3>
+				{#if formsHelpOpen}
+					<p class="help-text">
+						Les formes de nom servent à identifier les affiliations des publications issues d'OpenAlex et WoS, via les adresses associées aux publications. Les changements seront pris en compte à la prochaine exécution du pipeline. Pour une prise en compte immédiate, relancer à partir de l'étape `addresses` : <code>python run_pipeline.py --from addresses</code>
+					</p>
+				{/if}
 				<table class="forms-table">
 					<thead>
-						<tr><th>Forme</th><th>Contexte requis</th><th></th></tr>
+						<tr><th class="col-badge"></th><th>Forme</th><th>Contexte requis</th><th></th></tr>
 					</thead>
 					<tbody>
 						{#if detail.forms.length === 0}
 							<tr>
-								<td colspan="3" style="text-align:center;color:var(--text-muted)">
-									Aucune forme
-								</td>
+								<td colspan="4" style="text-align:center;color:var(--text-muted)"> Aucune forme </td>
 							</tr>
 						{:else}
 							{#each detail.forms as f (f.id)}
 								<tr class:inactive={!f.is_active}>
-									<td class="form-text">
-										{f.form_text}
-										{#if f.is_regex}
-											<span class="regex-badge">regex</span>
-										{/if}
-									</td>
+									<td class="col-badge">{#if f.is_regex}<span class="match-badge regex">regex</span>{:else if f.form_text.length <= 6}<span class="match-badge word" title="Mot entier uniquement (≤ 6 car.)">mot entier</span>{:else}<span class="match-badge substr" title="Sous-chaîne (> 6 car.)">sous-chaîne</span>{/if}</td>
+									<td class="form-text">{f.form_text}</td>
 									<td>
 										{#if f.requires_context_of?.length}
 											{#each f.requires_context_of as x}
 												<span class="ctx-tag">
-													{#if x === 'tutelles'}tutelles{:else}{ctxLabel(x)}{/if}
-													<button
-														class="ctx-remove"
-														onclick={() => removeCtx(f.id, x)}
-													>x</button>
+													{#if x === "tutelles"}tutelles{:else}{ctxLabel(x)}{/if}
+													<button class="ctx-remove" onclick={() => removeCtx(f.id, x)}>x</button>
 												</span>
 											{/each}
-											<button class="btn-add-tiny" onclick={() => openCtxPicker(f.id)}>
-												+
-											</button>
+											<button class="btn-add-tiny" onclick={() => openCtxPicker(f.id)}> + </button>
 										{:else}
 											<span class="sufficient-label">suffisant</span>
-											<button class="btn-add-tiny" onclick={() => openCtxPicker(f.id)}>
-												+
-											</button>
+											<button class="btn-add-tiny" onclick={() => openCtxPicker(f.id)}> + </button>
 										{/if}
 									</td>
 									<td style="white-space:nowrap">
-										<button
-											class="btn btn-sm btn-danger"
-											onclick={() => deleteForm(f.id)}
-											title="Supprimer"
-										>x</button>
+										<button class="btn btn-sm btn-danger" onclick={() => deleteForm(f.id)} title="Supprimer">x</button>
 									</td>
 								</tr>
 							{/each}
@@ -891,9 +864,7 @@
 					<label class="regex-label">
 						<input type="checkbox" bind:checked={addFormRegex} /> regex
 					</label>
-					<button class="btn btn-sm btn-primary" onclick={() => addForm(s.id)}>
-						Ajouter
-					</button>
+					<button class="btn btn-sm btn-primary" onclick={() => addForm(s.id)}> Ajouter </button>
 				</div>
 
 				<!-- New form context tags -->
@@ -901,7 +872,7 @@
 					<span class="ctx-label-text">Contexte :</span>
 					{#each newFormCtx as x}
 						<span class="ctx-tag">
-							{#if x === 'tutelles'}tutelles{:else}{ctxLabel(x)}{/if}
+							{#if x === "tutelles"}tutelles{:else}{ctxLabel(x)}{/if}
 							<button class="ctx-remove" onclick={() => removeNewCtx(x)}>x</button>
 						</span>
 					{/each}
@@ -915,25 +886,12 @@
 				{#if ctxPickerOpen}
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div
-						class="picker-container ctx-picker"
-						bind:this={ctxPickerEl}
-						onclick={(e) => e.stopPropagation()}
-					>
+					<div class="picker-container ctx-picker" bind:this={ctxPickerEl} onclick={(e) => e.stopPropagation()}>
 						<div class="ctx-picker-shortcuts">
-							<button class="btn btn-sm" onclick={() => pickCtx('tutelles')}>
-								tutelles
-							</button>
-							<button class="btn btn-sm" onclick={pickCtxClear}>
-								&#x2715; suffisant
-							</button>
+							<button class="btn btn-sm" onclick={() => pickCtx("tutelles")}> tutelles </button>
+							<button class="btn btn-sm" onclick={pickCtxClear}> &#x2715; suffisant </button>
 						</div>
-						<input
-							type="text"
-							placeholder="Rechercher une structure..."
-							bind:value={ctxPickerSearch}
-							autocomplete="off"
-						/>
+						<input type="text" placeholder="Rechercher une structure..." bind:value={ctxPickerSearch} autocomplete="off" />
 						<div class="picker-results">
 							{#if ctxPickerResults.length === 0}
 								<div class="picker-item disabled">Aucun résultat</div>
@@ -943,7 +901,7 @@
 										<span class="type-badge type-{cs.type}" style="font-size: 0.65rem;padding:0 5px">
 											{cs.type}
 										</span>
-										{cs.acronym ? cs.acronym + ' \u2014 ' : ''}{cs.name}
+										{cs.acronym ? cs.acronym + " \u2014 " : ""}{cs.name}
 									</button>
 								{/each}
 							{/if}
@@ -963,7 +921,7 @@
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div class="modal" onclick={(e) => e.stopPropagation()}>
-			<h3>{editMode ? 'Modifier la structure' : 'Nouvelle structure'}</h3>
+			<h3>{editMode ? "Modifier la structure" : "Nouvelle structure"}</h3>
 			<label>Code (unique)</label>
 			<input placeholder="ex: lpc, chu_clermont, site_cezeaux" bind:value={mCode} disabled={editMode} />
 			<label>Nom complet</label>
@@ -987,7 +945,7 @@
 			<div class="actions">
 				<button class="btn" onclick={() => (createModalOpen = false)}>Annuler</button>
 				<button class="btn btn-primary" onclick={editMode ? submitEdit : submitCreate}>
-					{editMode ? 'Enregistrer' : 'Créer'}
+					{editMode ? "Enregistrer" : "Créer"}
 				</button>
 			</div>
 		</div>
@@ -1066,6 +1024,29 @@
 		color: var(--muted);
 		font-weight: 500;
 		font-size: 0.8rem;
+	}
+	.btn-help-icon {
+		background: none;
+		border: none;
+		color: var(--muted);
+		cursor: pointer;
+		padding: 0;
+		margin-left: 4px;
+		vertical-align: middle;
+		line-height: 1;
+	}
+	.btn-help-icon:hover {
+		color: var(--accent);
+	}
+	.help-text {
+		background: var(--accent-light);
+		border: 1px solid #c4d8ed;
+		border-radius: 5px;
+		padding: 8px 12px;
+		margin: 4px 0 8px;
+		font-size: 0.85rem;
+		color: #2c3e50;
+		line-height: 1.5;
 	}
 
 	/* ── Toolbar ── */
@@ -1201,7 +1182,6 @@
 		font-size: 1.3rem;
 	}
 
-
 	/* ── Tags ── */
 	.tag {
 		display: inline-flex;
@@ -1313,13 +1293,32 @@
 		opacity: 0.45;
 	}
 	.form-text {
-		font-family: 'SF Mono', Consolas, monospace;
+		font-family: "SF Mono", Consolas, monospace;
 		font-size: 0.85rem;
 	}
-	.regex-badge {
-		color: var(--warning);
-		font-size: 0.7rem;
-		font-family: inherit;
+	.col-badge {
+		width: 1px;
+		white-space: nowrap;
+		padding-right: 0 !important;
+	}
+	.match-badge {
+		font-size: 0.65rem;
+		padding: 1px 5px;
+		border-radius: 8px;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+	.match-badge.word {
+		background: #e8f0e8;
+		color: #2e6b2e;
+	}
+	.match-badge.substr {
+		background: #f0f0f0;
+		color: #888;
+	}
+	.match-badge.regex {
+		background: #fcf8e3;
+		color: #8a6d10;
 	}
 	.ctx-tag {
 		font-size: 0.7rem;
@@ -1404,7 +1403,7 @@
 		margin-top: 8px;
 		align-items: center;
 	}
-	.add-row input[type='text'],
+	.add-row input[type="text"],
 	.add-row input:not([type]) {
 		flex: 1;
 		padding: 4px 6px;
