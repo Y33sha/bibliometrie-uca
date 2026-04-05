@@ -135,7 +135,7 @@ Placée avant la phase `persons` pour que la création de personnes dispose des 
 Exécutée en mode `full` et `monthly` uniquement.
 
 
-### Phase 6 — `persons` : Création de personnes
+### <span id='creation-personnes'></span>Phase 6 — `persons` : Création de personnes
 
 **`create_persons_from_source_authorships.py`** — algorithme en 4 étapes :
 
