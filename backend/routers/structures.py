@@ -35,7 +35,15 @@ async def list_structures(
             SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text AS type
             FROM structures s
             WHERE {where}
-            ORDER BY s.structure_type, s.name
+            ORDER BY CASE s.structure_type::text
+                WHEN 'labo' THEN 1
+                WHEN 'universite' THEN 2
+                WHEN 'onr' THEN 3
+                WHEN 'chu' THEN 4
+                WHEN 'ecole' THEN 5
+                WHEN 'site' THEN 6
+                ELSE 7
+            END, s.name
         """, params)
         return cur.fetchall()
 
@@ -96,7 +104,8 @@ async def create_structure(data: StructureCreate):
         cur.execute("""
             INSERT INTO structures (code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-            RETURNING *
+            RETURNING id, code, name, acronym, structure_type::text AS type,
+                      ror_id, rnsr_id, hal_collection
         """, (data.code, data.name, data.acronym, data.type,
               data.ror_id, data.rnsr_id, data.hal_collection))
         return cur.fetchone()
@@ -124,7 +133,9 @@ async def update_structure(structure_id: int, data: StructureUpdate):
 
         params.append(structure_id)
         cur.execute(f"""
-            UPDATE structures SET {', '.join(updates)} WHERE id = %s RETURNING *
+            UPDATE structures SET {', '.join(updates)} WHERE id = %s
+            RETURNING id, code, name, acronym, structure_type::text AS type,
+                      ror_id, rnsr_id, hal_collection
         """, params)
         return cur.fetchone()
 
@@ -247,7 +258,7 @@ async def list_hal_mappings(structure_id: int):
     with get_cursor() as (cur, conn):
         cur.execute("""
             SELECT hal_struct_id, name, acronym, type, doc_count, valid,
-                   start_date, end_date, country, rnsr, ror, code
+                   start_date, end_date, country, code
             FROM hal_structures
             WHERE structure_id = %s
             ORDER BY start_date DESC NULLS LAST, name
