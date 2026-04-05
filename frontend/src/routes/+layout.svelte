@@ -49,6 +49,16 @@
 			</h1>
 		</div>
 		<nav class="site-nav">
+			<a
+				href="{base}/admin/config"
+				class="nav-link"
+				class:active={isActive("/admin/config")}>Config</a
+			>
+			<a
+				href="{base}/admin/structures"
+				class="nav-link"
+				class:active={isActive("/admin/structures")}>Structures</a
+			>
 			<div
 				class="nav-dropdown"
 				role="navigation"
@@ -78,11 +88,7 @@
 					</div>
 				{/if}
 			</div>
-			<a
-				href="{base}/admin/structures"
-				class="nav-link"
-				class:active={isActive("/admin/structures")}>Structures</a
-			>
+
 			<a
 				href="{base}/admin/persons"
 				class="nav-link"
@@ -188,7 +194,20 @@
 				class="nav-link nav-help-link"
 				title="Documentation"
 				class:active={isActive("/docs")}
-			><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></a
+				><svg
+					xmlns="http://www.w3.org/2000/svg"
+					width="18"
+					height="18"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					><circle cx="12" cy="12" r="10" /><path
+						d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"
+					/><line x1="12" y1="17" x2="12.01" y2="17" /></svg
+				></a
 			>
 			<a href="{base}/admin/addresses" class="nav-link nav-switch-link"
 				>Admin</a
@@ -257,7 +276,7 @@
 		background: #4d8a8c;
 	}
 	.site-title {
-		font-family: 'Ubuntu', sans-serif;
+		font-family: "Ubuntu", sans-serif;
 		font-size: 1.15rem;
 		font-weight: 500;
 		margin: 0;

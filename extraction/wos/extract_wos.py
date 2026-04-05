@@ -27,6 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from config.settings import WOS
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
+from utils.app_config import get_years, get_wos_affiliations
 
 # ----- Logging -----
 logger = setup_logger("extract_wos", os.path.join(os.path.dirname(__file__), "logs"))
@@ -42,9 +43,9 @@ BREATHER_EVERY = 10   # pause longue toutes les N pages
 BREATHER_SECS = 15    # durée de la pause longue (secondes)
 
 
-def build_query(year: int) -> str:
+def build_query(year: int, affiliations: list[str] | None = None) -> str:
     """Construit la requête WoS Advanced Search pour une année."""
-    orgs = " OR ".join(WOS["affiliations"])
+    orgs = " OR ".join(affiliations or WOS["affiliations"])
     return f"OG=({orgs}) AND PY=({year})"
 
 
@@ -268,13 +269,20 @@ def log_remaining_quota(resp_headers: dict):
 def main():
     parser = argparse.ArgumentParser(description="Extraction WoS → staging_wos")
     parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
+    parser.add_argument("--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
     args = parser.parse_args()
 
-    years = [args.year] if args.year else WOS["years"]
+    conn = get_connection()
+    cur = conn.cursor()
+    affiliations = get_wos_affiliations(cur)
+    config_years = get_years(cur, mode=args.mode)
+    cur.close()
+
+    years = [args.year] if args.year else config_years
 
     logger.info("=== Extraction Web of Science démarrée ===")
-    logger.info(f"Affiliations : {WOS['affiliations']}")
+    logger.info(f"Affiliations : {affiliations}")
     logger.info(f"Années : {years}")
 
     # Vérifier le quota avec une requête légère
@@ -296,7 +304,6 @@ def main():
     except requests.RequestException as e:
         logger.warning(f"Impossible de vérifier le quota : {e}")
 
-    conn = get_connection()
     try:
         existing_uts = get_existing_uts(conn)
         logger.info(f"{len(existing_uts)} records déjà en staging_wos")

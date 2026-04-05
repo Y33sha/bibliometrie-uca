@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from config.settings import OPENALEX
 from db.connection import get_connection
 from extraction.common import compute_hash, clean_doi, get_existing_ids, setup_logger
+from utils.app_config import get_years, get_openalex_institution_ids
 
 # ----- Logging -----
 logger = setup_logger("extract_openalex", os.path.join(os.path.dirname(__file__), "logs"))
@@ -32,10 +33,9 @@ logger = setup_logger("extract_openalex", os.path.join(os.path.dirname(__file__)
 BASE_URL = "https://api.openalex.org/works"
 
 
-def build_params(year: int, cursor: str = "*") -> dict:
+def build_params(year: int, cursor: str = "*", institution_ids: list[str] | None = None) -> dict:
     """Construit les paramètres de requête pour l'API OpenAlex."""
-    # Support liste d'IDs institution (OR via pipe)
-    ids = OPENALEX.get("institution_ids") or [OPENALEX.get("institution_id")]
+    ids = institution_ids or OPENALEX.get("institution_ids") or [OPENALEX.get("institution_id")]
     lineage_filter = "|".join(ids)
     params = {
         "filter": (
@@ -220,17 +220,21 @@ def extract_year(year: int, conn, existing_ids: set, dry_run: bool = False) -> i
 def main():
     parser = argparse.ArgumentParser(description="Extraction OpenAlex → staging")
     parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
+    parser.add_argument("--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
     args = parser.parse_args()
 
-    years = [args.year] if args.year else OPENALEX["years"]
+    conn = get_connection()
+    cur = conn.cursor()
+    institution_ids = get_openalex_institution_ids(cur)
+    config_years = get_years(cur, mode=args.mode)
+    cur.close()
+
+    years = [args.year] if args.year else config_years
 
     logger.info(f"=== Extraction OpenAlex démarrée ===")
-    ids = OPENALEX.get("institution_ids") or [OPENALEX.get("institution_id")]
-    logger.info(f"Institutions OpenAlex : {', '.join(ids)} (lineage OR)")
+    logger.info(f"Institutions OpenAlex : {', '.join(institution_ids)} (lineage OR)")
     logger.info(f"Années : {years}")
-
-    conn = get_connection()
     try:
         existing_ids = get_existing_ids(conn, "staging_openalex", "openalex_id")
         logger.info(f"{len(existing_ids)} works déjà en staging")
