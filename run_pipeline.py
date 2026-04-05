@@ -48,26 +48,26 @@ BASE = Path(__file__).resolve().parent
 # ---------------------------------------------------------------------------
 
 def phase_extract(mode="full", sources=None, **kw):
-    """Phase 1 : Extraction des sources vers staging."""
+    """Phase 1 : Extraction des sources vers staging.
+
+    Les années sont déterminées par la config DB (pipeline_years_full/weekly).
+    Les scripts d'extraction lisent la config directement.
+    En mode weekly, WoS est exclu pour économiser le crédit API.
+    """
     sources = sources or {"hal", "openalex", "wos"}
-    import datetime
     if mode == "weekly":
-        current_year = datetime.date.today().year
-        years = [str(current_year - 1), str(current_year)]
-        log.info("Mode hebdomadaire : années %s (WoS exclu pour économiser le crédit API)", " + ".join(years))
+        log.info("Mode hebdomadaire (WoS exclu)")
         if "openalex" in sources:
-            for y in years:
-                run_python("extraction/openalex/extract_openalex.py", "--year", y)
+            run_python("extraction/openalex/extract_openalex.py", "--mode", "weekly")
         if "hal" in sources:
-            for y in years:
-                run_python("extraction/hal/extract_hal.py", "--year", y)
+            run_python("extraction/hal/extract_hal.py", "--mode", "weekly")
     else:
         if "openalex" in sources:
-            run_python("extraction/openalex/extract_openalex.py")
+            run_python("extraction/openalex/extract_openalex.py", "--mode", mode)
         if "hal" in sources:
-            run_python("extraction/hal/extract_hal.py")
+            run_python("extraction/hal/extract_hal.py", "--mode", mode)
         if "wos" in sources:
-            run_python("extraction/wos/extract_wos.py")
+            run_python("extraction/wos/extract_wos.py", "--mode", mode)
 
 
 def phase_normalize(**kw):

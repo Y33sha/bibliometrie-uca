@@ -29,6 +29,7 @@ from config.settings import HAL
 from db.connection import get_connection
 from extraction.common import compute_hash, clean_doi, get_existing_ids, setup_logger
 from utils.hal import HAL_FIELDS
+from utils.app_config import get_years, get_hal_collections, get_hal_portal
 
 # ----- Logging -----
 logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))
@@ -183,12 +184,13 @@ def extract_portal(
     existing_ids: set,
     dry_run: bool = False,
     years: list = None,
+    portal: str = None,
 ) -> tuple[int, int]:
     """
     Extrait tous les works du portail global.
     Retourne (nb_total, nb_nouveaux).
     """
-    portal = HAL["portal"]
+    portal = portal or HAL["portal"]
     url = build_url(portal=portal)
     query = build_query(years=years)
 
@@ -260,17 +262,25 @@ def main():
     parser.add_argument("--dry-run", action="store_true",
                         help="Compter sans insérer")
     parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
+    parser.add_argument("--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)")
     args = parser.parse_args()
 
     do_collections = not args.portal_only
     do_portal = not args.collections_only
-    years = [args.year] if args.year else HAL["years"]
+
+    conn = get_connection()
+    cur = conn.cursor()
+    collections = get_hal_collections(cur)
+    portal = get_hal_portal(cur)
+    config_years = get_years(cur, mode=args.mode)
+    cur.close()
+
+    years = [args.year] if args.year else config_years
 
     logger.info("=== Extraction HAL démarrée ===")
     logger.info(f"Années : {years}")
     logger.info(f"Collections : {do_collections} | Portail : {do_portal}")
 
-    conn = get_connection()
     try:
         existing_ids = get_existing_hal_ids(conn)
         logger.info(f"{len(existing_ids)} works déjà en staging")
@@ -279,8 +289,8 @@ def main():
 
         # --- Passe 1 : collections labo ---
         if do_collections:
-            logger.info(f"\n--- Extraction par collection ({len(HAL['collections'])} labos) ---")
-            for code, label in HAL["collections"].items():
+            logger.info(f"\n--- Extraction par collection ({len(collections)} labos) ---")
+            for code, label in collections.items():
                 total, new = extract_collection(
                     code, label, conn, existing_ids, years=years, dry_run=args.dry_run
                 )
@@ -290,8 +300,8 @@ def main():
 
         # --- Passe 2 : portail global ---
         if do_portal:
-            logger.info(f"\n--- Extraction portail global ({HAL['portal']}) ---")
-            total, new = extract_portal(conn, existing_ids, dry_run=args.dry_run, years=years)
+            logger.info(f"\n--- Extraction portail global ({portal}) ---")
+            total, new = extract_portal(conn, existing_ids, dry_run=args.dry_run, years=years, portal=portal)
             grand_total_new += new
             if not args.dry_run:
                 logger.info(f"    → {new} nouveaux (non couverts par les collections)")
