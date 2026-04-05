@@ -27,10 +27,8 @@ RATE_LIMIT = 0.3  # secondes entre requêtes
 FIELDS = [
     "docid", "name_s", "acronym_s", "type_s", "valid_s",
     "startDate_s", "endDate_s",
-    "code_s", "rnsr_s", "ror_s", "idref_s", "isni_s",
-    "country_s", "address_s", "url_s",
-    "aliasDocid_i",
-    "parentDocid_i", "parentName_s", "parentAcronym_s", "parentType_s",
+    "code_s", "country_s",
+    "parentDocid_i",
 ]
 
 
@@ -55,12 +53,6 @@ def fetch_batch(struct_ids):
 
 def parse_doc(doc):
     """Extrait les champs d'un document API en dict prêt pour l'insertion."""
-    def first_or_none(field):
-        val = doc.get(field)
-        if isinstance(val, list):
-            return val[0] if val else None
-        return val
-    
     def int_list(field):
         """Convertit une liste (parfois de strings) en liste d'ints."""
         val = doc.get(field)
@@ -93,18 +85,8 @@ def parse_doc(doc):
         "start_date": normalize_date("startDate_s"),
         "end_date": normalize_date("endDate_s"),
         "code": code,
-        "rnsr": first_or_none("rnsr_s"),
-        "ror": first_or_none("ror_s"),
-        "idref": first_or_none("idref_s"),
-        "isni": first_or_none("isni_s"),
         "country": doc.get("country_s"),
-        "address": doc.get("address_s"),
-        "url": doc.get("url_s"),
-        "alias_ids": int_list("aliasDocid_i"),
         "parent_ids": int_list("parentDocid_i"),
-        "parent_names": doc.get("parentName_s"),
-        "parent_acronyms": doc.get("parentAcronym_s"),
-        "parent_types": doc.get("parentType_s"),
     }
 
 
@@ -116,18 +98,12 @@ def upsert_structures(cur, records):
     sql = """
         INSERT INTO hal_structures (
             hal_struct_id, name, acronym, type, valid,
-            start_date, end_date, code,
-            rnsr, ror, idref, isni,
-            country, address, url,
-            alias_ids, parent_ids, parent_names, parent_acronyms, parent_types,
-            enriched_at
+            start_date, end_date, code, country,
+            parent_ids, enriched_at
         ) VALUES (
             %(hal_struct_id)s, COALESCE(%(name)s, '(inconnu)'), %(acronym)s, %(type)s, %(valid)s,
-            %(start_date)s, %(end_date)s, %(code)s,
-            %(rnsr)s, %(ror)s, %(idref)s, %(isni)s,
-            %(country)s, %(address)s, %(url)s,
-            %(alias_ids)s, %(parent_ids)s, %(parent_names)s, %(parent_acronyms)s, %(parent_types)s,
-            now()
+            %(start_date)s, %(end_date)s, %(code)s, %(country)s,
+            %(parent_ids)s, now()
         )
         ON CONFLICT (hal_struct_id) DO UPDATE SET
             name = COALESCE(EXCLUDED.name, '(inconnu)'),
@@ -137,18 +113,8 @@ def upsert_structures(cur, records):
             start_date = EXCLUDED.start_date,
             end_date = EXCLUDED.end_date,
             code = EXCLUDED.code,
-            rnsr = EXCLUDED.rnsr,
-            ror = EXCLUDED.ror,
-            idref = EXCLUDED.idref,
-            isni = EXCLUDED.isni,
             country = EXCLUDED.country,
-            address = EXCLUDED.address,
-            url = EXCLUDED.url,
-            alias_ids = EXCLUDED.alias_ids,
             parent_ids = EXCLUDED.parent_ids,
-            parent_names = EXCLUDED.parent_names,
-            parent_acronyms = EXCLUDED.parent_acronyms,
-            parent_types = EXCLUDED.parent_types,
             enriched_at = now()
     """
     
