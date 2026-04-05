@@ -369,14 +369,14 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 }
 
 .btn-danger {
-	background: var(--danger);
-	color: white;
+	background: white;
+	color: var(--danger);
 	border-color: var(--danger);
 }
 .btn-danger:hover {
-	background: #962018;
+	background: var(--danger);
 	color: white;
-	border-color: #962018;
+	border-color: var(--danger);
 }
 
 .btn-create {

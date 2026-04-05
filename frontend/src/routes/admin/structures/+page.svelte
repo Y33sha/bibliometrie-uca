@@ -74,7 +74,24 @@
 	let addFormRegex = $state(false);
 	let newFormCtx: (number | string)[] = $state([]);
 
-	// Create modal state
+	// HAL mappings
+	interface HalMapping {
+		hal_struct_id: number;
+		name: string;
+		acronym: string | null;
+		type: string;
+		doc_count: number;
+		valid: string | null;
+		country: string | null;
+	}
+	let halMappings: HalMapping[] = $state([]);
+	let halSearchOpen = $state(false);
+	let halSearch = $state('');
+	let halSearchResults: any[] = $state([]);
+	let halPickerEl: HTMLDivElement | undefined = $state();
+
+	// Create/Edit modal state
+	let editMode = $state(false);
 	let createModalOpen = $state(false);
 	let mCode = $state('');
 	let mName = $state('');
@@ -140,18 +157,18 @@
 		];
 	});
 
-	const fields = $derived.by(() => {
-		if (!detail) return [];
-		const s = detail.structure;
-		const pairs: [string, string | null][] = [
-			['Code', s.code],
-			['Type', s.type],
-			['ROR', s.ror_id],
-			['RNSR', s.rnsr_id],
-			['HAL', s.hal_collection]
-		];
-		return pairs.filter(([, v]) => v);
-	});
+	function rorShortId(rorId: string): string {
+		return rorId.replace('https://ror.org/', '');
+	}
+
+	function rorFullUrl(rorId: string): string {
+		if (rorId.startsWith('http')) return rorId;
+		return 'https://ror.org/' + rorId;
+	}
+
+	function halCollectionUrl(code: string): string {
+		return `https://hal.science/search/index/?qa%5BcollCode_s%5D%5B%5D=${code}`;
+	}
 
 	/* ── Data loading ── */
 
@@ -186,9 +203,13 @@
 		]);
 		pickerExclude = exclude;
 
+		// HAL mappings
+		halMappings = await api<HalMapping[]>('/api/structures/' + id + '/hal-mappings');
+
 		// Reset pickers
 		relationPickerOpen = false;
 		ctxPickerOpen = false;
+		halSearchOpen = false;
 		newFormCtx = [];
 	}
 
@@ -358,9 +379,91 @@
 		refreshCache();
 	}
 
+	/* ── HAL mapping ── */
+
+	async function searchHalStructures() {
+		if (halSearch.length < 2) { halSearchResults = []; return; }
+		halSearchResults = await api<any[]>(`/api/hal-structures?unmapped=true&search=${encodeURIComponent(halSearch)}&limit=15`);
+	}
+
+	async function mapHalStructure(halStructId: number) {
+		if (!selectedId) return;
+		await fetch(base + '/api/hal-structures/' + halStructId + '/map', {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ structure_id: selectedId })
+		});
+		halSearchOpen = false;
+		halSearch = '';
+		halSearchResults = [];
+		await selectStructure(selectedId);
+	}
+
+	async function unmapHalStructure(halStructId: number) {
+		await fetch(base + '/api/hal-structures/' + halStructId + '/map', { method: 'DELETE' });
+		if (selectedId) await selectStructure(selectedId);
+	}
+
+	function normalizeRor(): boolean {
+		let ror = mRor.trim();
+		if (!ror) return true;
+		// Compléter l'URL si juste l'identifiant
+		if (/^0[a-z0-9]{8}$/.test(ror)) ror = 'https://ror.org/' + ror;
+		// Valider le format
+		if (!/^https:\/\/ror\.org\/0[a-z0-9]{8}$/.test(ror)) {
+			alert('Format ROR invalide. Attendu : https://ror.org/0xxxxxxxxx');
+			return false;
+		}
+		mRor = ror;
+		return true;
+	}
+
+	/* ── Edit modal ── */
+
+	function openEditModal() {
+		if (!detail) return;
+		const s = detail.structure;
+		mCode = s.code || '';
+		mName = s.name || '';
+		mAcronym = s.acronym || '';
+		mType = s.type || 'labo';
+		mRor = s.ror_id || '';
+		mHal = s.hal_collection || '';
+		editMode = true;
+		createModalOpen = true;
+	}
+
+	async function submitEdit() {
+		if (!selectedId) return;
+		if (!normalizeRor()) return;
+		const data: Record<string, any> = {};
+		if (mName.trim()) data.name = mName.trim();
+		if (mAcronym.trim() !== (detail?.structure.acronym || '')) data.acronym = mAcronym.trim() || null;
+		if (mType) data.type = mType;
+		if (mRor.trim() !== (detail?.structure.ror_id || '')) data.ror_id = mRor.trim() || null;
+		if (mHal.trim() !== (detail?.structure.hal_collection || '')) data.hal_collection = mHal.trim() || null;
+
+		try {
+			const res = await fetch(base + '/api/structures/' + selectedId, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(data)
+			});
+			if (!res.ok) throw new Error(await res.text());
+			createModalOpen = false;
+			editMode = false;
+			await selectStructure(selectedId);
+			loadList();
+			refreshCache();
+		} catch (e: any) {
+			alert('Erreur: ' + e.message);
+		}
+	}
+
 	/* ── Create modal ── */
 
 	function openCreateModal() {
+		editMode = false;
 		mCode = '';
 		mName = '';
 		mAcronym = '';
@@ -371,6 +474,7 @@
 	}
 
 	async function submitCreate() {
+		if (!normalizeRor()) return;
 		const data = {
 			code: mCode.trim(),
 			name: mName.trim(),
@@ -420,6 +524,14 @@
 			!target.classList.contains('btn-add-tiny')
 		) {
 			ctxPickerOpen = false;
+		}
+		if (
+			halSearchOpen &&
+			halPickerEl &&
+			!halPickerEl.contains(target) &&
+			!target.classList.contains('btn-add')
+		) {
+			halSearchOpen = false;
 		}
 	}
 
@@ -498,20 +610,41 @@
 			<div class="panel">
 				<!-- Header -->
 				<div class="detail-header">
-					<h2>{s.acronym ? s.acronym + ' \u2014 ' + s.name : s.name}</h2>
 					<span class="type-badge type-{s.type}">{s.type}</span>
+					<h2>{s.acronym ? s.acronym + ' \u2014 ' + s.name : s.name}</h2>
+					<button class="btn btn-sm" onclick={openEditModal}>
+						Éditer
+					</button>
 					<button class="btn btn-danger btn-sm" onclick={() => deleteStructure(s.id)}>
 						Supprimer
 					</button>
 				</div>
 
-				<!-- Field grid -->
-				<div class="field-grid">
-					{#each fields as [label, value]}
-						<div class="field-label">{label}</div>
-						<div class="field-value">{value}</div>
-					{/each}
+				<!-- ═══ SECTION DÉTAILS ═══ -->
+				<h3 class="section-title">Détails</h3>
+				<div class="details-inline">
+					{#if s.ror_id}
+						<span class="detail-item">
+							<span class="detail-label">ROR</span>
+							<a href={rorFullUrl(s.ror_id)} target="_blank" rel="noopener" class="id-badge">{rorShortId(s.ror_id)}</a>
+						</span>
+					{/if}
+					{#if s.rnsr_id}
+						<span class="detail-item">
+							<span class="detail-label">RNSR</span>
+							<span>{s.rnsr_id}</span>
+						</span>
+					{/if}
+					{#if s.hal_collection}
+						<span class="detail-item">
+							<span class="detail-label">Collection HAL</span>
+							<a href={halCollectionUrl(s.hal_collection)} target="_blank" rel="noopener" class="id-badge">{s.hal_collection}</a>
+						</span>
+					{/if}
 				</div>
+
+				<!-- ═══ SECTION RELATIONS ═══ -->
+				<h3 class="section-title">Relations</h3>
 
 				<!-- Tutelles -->
 				<h3>
@@ -619,6 +752,76 @@
 											{rs.type}
 										</span>
 										{rs.acronym ? rs.acronym + ' \u2014 ' : ''}{rs.name}
+									</button>
+								{/each}
+							{/if}
+						</div>
+					</div>
+				{/if}
+
+				<!-- ═══ SECTION IDENTIFICATION DANS LES PUBLICATIONS ═══ -->
+				<h3 class="section-title">Identification dans les publications</h3>
+
+				<!-- HAL structures mappées -->
+				<h3>
+					Structures HAL ({halMappings.length})
+					<button class="btn-add" onclick={() => { halSearchOpen = !halSearchOpen; halSearch = ''; halSearchResults = []; }}>+</button>
+				</h3>
+				{#if halMappings.length === 0 && !halSearchOpen}
+					<span class="none-text">Aucune structure HAL mappée</span>
+				{:else}
+					<table class="hal-table">
+						<thead>
+							<tr>
+								<th>ID HAL</th>
+								<th>Nom</th>
+								<th>Sigle</th>
+								<th>Type</th>
+								<th>Début</th>
+								<th>Fin</th>
+								<th>Publis</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each halMappings as hm (hm.hal_struct_id)}
+								<tr class:hal-valid={hm.valid === 'VALID'} class:hal-old={hm.valid === 'OLD'} class:hal-incoming={hm.valid === 'INCOMING'}>
+									<td><a href="https://aurehal.archives-ouvertes.fr/structure/read/id/{hm.hal_struct_id}" target="_blank" rel="noopener" class="id-badge">{hm.hal_struct_id}</a></td>
+									<td>{hm.name || ''}</td>
+									<td>{hm.acronym || ''}</td>
+									<td>{hm.type || ''}</td>
+									<td>{hm.start_date || ''}</td>
+									<td>{hm.end_date || ''}</td>
+									<td>{hm.doc_count || 0}</td>
+									<td>
+										<button class="btn btn-sm btn-danger" onclick={() => unmapHalStructure(hm.hal_struct_id)} title="Supprimer le mapping">x</button>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{/if}
+				{#if halSearchOpen}
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="picker-container" style="margin-top: 8px;" bind:this={halPickerEl} onclick={(e) => e.stopPropagation()}>
+						<input
+							type="text"
+							placeholder="Rechercher une structure HAL non mappée..."
+							bind:value={halSearch}
+							oninput={searchHalStructures}
+							autocomplete="off"
+						/>
+						<div class="picker-results">
+							{#if halSearchResults.length === 0}
+								<div class="picker-item disabled">{halSearch.length < 2 ? 'Tapez au moins 2 caractères' : 'Aucun résultat'}</div>
+							{:else}
+								{#each halSearchResults as hs (hs.hal_struct_id)}
+									<button class="picker-item" onclick={() => mapHalStructure(hs.hal_struct_id)}>
+										{hs.acronym ? hs.acronym + ' — ' : ''}{hs.name}
+										<span style="color: var(--muted); font-size: 0.8rem; margin-left: auto;">
+											{hs.type} · {hs.doc_count || 0} docs
+										</span>
 									</button>
 								{/each}
 							{/if}
@@ -760,9 +963,9 @@
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div class="modal" onclick={(e) => e.stopPropagation()}>
-			<h3>Nouvelle structure</h3>
+			<h3>{editMode ? 'Modifier la structure' : 'Nouvelle structure'}</h3>
 			<label>Code (unique)</label>
-			<input placeholder="ex: lpc, chu_clermont, site_cezeaux" bind:value={mCode} />
+			<input placeholder="ex: lpc, chu_clermont, site_cezeaux" bind:value={mCode} disabled={editMode} />
 			<label>Nom complet</label>
 			<input placeholder="ex: Laboratoire de Physique de Clermont" bind:value={mName} />
 			<label>Acronyme</label>
@@ -778,12 +981,14 @@
 				<option value="autre">Autre</option>
 			</select>
 			<label>ROR ID</label>
-			<input placeholder="https://ror.org/..." bind:value={mRor} />
+			<input placeholder="https://ror.org/0xxxxxxxxx" bind:value={mRor} />
 			<label>Collection HAL</label>
 			<input placeholder="ex: INSTITUT_PASCAL" bind:value={mHal} />
 			<div class="actions">
 				<button class="btn" onclick={() => (createModalOpen = false)}>Annuler</button>
-				<button class="btn btn-primary" onclick={submitCreate}>Creer</button>
+				<button class="btn btn-primary" onclick={editMode ? submitEdit : submitCreate}>
+					{editMode ? 'Enregistrer' : 'Créer'}
+				</button>
 			</div>
 		</div>
 	</div>
@@ -836,6 +1041,31 @@
 		color: var(--text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
+	}
+	.section-title {
+		margin: 20px -14px 10px !important;
+		padding: 6px 14px !important;
+		background: #5b9ea0;
+		color: white !important;
+		font-size: 0.75rem !important;
+		border-radius: 3px;
+	}
+	.details-inline {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 16px;
+		margin-bottom: 8px;
+		font-size: 0.9rem;
+	}
+	.detail-item {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+	}
+	.detail-label {
+		color: var(--muted);
+		font-weight: 500;
+		font-size: 0.8rem;
 	}
 
 	/* ── Toolbar ── */
@@ -971,20 +1201,6 @@
 		font-size: 1.3rem;
 	}
 
-	.field-grid {
-		display: grid;
-		grid-template-columns: 100px 1fr;
-		gap: 4px 10px;
-		font-size: 0.95rem;
-		margin-bottom: 14px;
-	}
-	.field-label {
-		color: var(--text-muted);
-		font-weight: 500;
-	}
-	.field-value {
-		word-break: break-all;
-	}
 
 	/* ── Tags ── */
 	.tag {
@@ -1030,6 +1246,37 @@
 		background: #f0e8d4;
 		color: #8a6b2e;
 	}
+	.hal-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.85rem;
+		margin-bottom: 8px;
+	}
+	.hal-table th {
+		text-align: left;
+		padding: 4px 8px;
+		font-size: 0.75rem;
+		color: var(--muted);
+		border-bottom: 2px solid var(--border);
+		font-weight: 600;
+	}
+	.hal-table td {
+		padding: 4px 8px;
+		border-bottom: 1px solid #f0efec;
+		vertical-align: middle;
+	}
+	.hal-table tr.hal-valid td {
+		background: #dff0d8;
+	}
+	.hal-table tr.hal-old td {
+		background: #fcf8e3;
+	}
+	.hal-table tr.hal-incoming td {
+		background: #f2dede;
+	}
+	.hal-table tr:hover td {
+		filter: brightness(0.97);
+	}
 	.none-text {
 		font-size: 0.85rem;
 		color: var(--text-muted);
@@ -1056,6 +1303,11 @@
 	}
 	.forms-table tr:hover td {
 		background: #fafaf8;
+	}
+	.forms-table td:last-child,
+	.hal-table td:last-child {
+		width: 36px;
+		text-align: right;
 	}
 	.forms-table .inactive {
 		opacity: 0.45;
@@ -1109,13 +1361,13 @@
 		border: 1px solid var(--border);
 		background: white;
 		color: var(--accent);
-		font-size: 1rem;
+		font-size: 0.85rem;
 		font-weight: bold;
 		cursor: pointer;
 		margin-left: 6px;
 		vertical-align: middle;
 		line-height: 1;
-		padding: 0;
+		padding: 0 0 1px 0;
 	}
 	.btn-add:hover {
 		background: var(--accent);

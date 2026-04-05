@@ -43,7 +43,11 @@ async def list_structures(
 @router.get("/api/structures/{structure_id}")
 async def get_structure(structure_id: int):
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT * FROM structures WHERE id = %s", (structure_id,))
+        cur.execute("""
+            SELECT id, code, name, acronym, structure_type::text AS type,
+                   ror_id, rnsr_id, hal_collection
+            FROM structures WHERE id = %s
+        """, (structure_id,))
         structure = cur.fetchone()
         if not structure:
             raise HTTPException(status_code=404, detail="Structure not found")
@@ -230,6 +234,95 @@ async def delete_name_form(form_id: int):
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Name form not found")
         return {"deleted": True}
+
+
+# =============================================================
+# HAL STRUCTURES MAPPING
+# =============================================================
+
+
+@router.get("/api/structures/{structure_id}/hal-mappings")
+async def list_hal_mappings(structure_id: int):
+    """Liste les hal_structures mappées vers cette structure."""
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            SELECT hal_struct_id, name, acronym, type, doc_count, valid,
+                   start_date, end_date, country, rnsr, ror, code
+            FROM hal_structures
+            WHERE structure_id = %s
+            ORDER BY start_date DESC NULLS LAST, name
+        """, (structure_id,))
+        return cur.fetchall()
+
+
+@router.get("/api/hal-structures")
+async def list_hal_structures(
+    search: str = Query(""),
+    unmapped: bool = Query(False),
+    limit: int = Query(50),
+):
+    """Recherche de hal_structures. Si unmapped=true, seulement les non mappées."""
+    with get_cursor() as (cur, conn):
+        conditions = []
+        params = []
+
+        if unmapped:
+            conditions.append("hs.structure_id IS NULL")
+        if search:
+            conditions.append(
+                "(unaccent(hs.name) ILIKE unaccent(%s) OR hs.acronym ILIKE %s OR hs.code ILIKE %s)")
+            params.extend([f"%{search}%"] * 3)
+
+        where = " AND ".join(conditions) if conditions else "TRUE"
+        cur.execute(f"""
+            SELECT hs.hal_struct_id, hs.name, hs.acronym, hs.type, hs.doc_count,
+                   hs.valid, hs.country, hs.code, hs.structure_id,
+                   s.name AS mapped_name, s.acronym AS mapped_acronym
+            FROM hal_structures hs
+            LEFT JOIN structures s ON s.id = hs.structure_id
+            WHERE {where}
+            ORDER BY hs.doc_count DESC NULLS LAST, hs.name
+            LIMIT %s
+        """, params + [limit])
+        return cur.fetchall()
+
+
+@router.put("/api/hal-structures/{hal_struct_id}/map")
+async def map_hal_structure(hal_struct_id: int, data: dict):
+    """Mapper une hal_structure vers une structure canonique."""
+    structure_id = data.get("structure_id")
+    if not structure_id:
+        raise HTTPException(status_code=400, detail="structure_id requis")
+
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id FROM structures WHERE id = %s", (structure_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Structure introuvable")
+
+        cur.execute("""
+            UPDATE hal_structures SET structure_id = %s
+            WHERE hal_struct_id = %s
+            RETURNING hal_struct_id
+        """, (structure_id, hal_struct_id))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="HAL structure introuvable")
+
+        return {"mapped": True}
+
+
+@router.delete("/api/hal-structures/{hal_struct_id}/map")
+async def unmap_hal_structure(hal_struct_id: int):
+    """Supprimer le mapping d'une hal_structure."""
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            UPDATE hal_structures SET structure_id = NULL
+            WHERE hal_struct_id = %s
+            RETURNING hal_struct_id
+        """, (hal_struct_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="HAL structure introuvable")
+
+        return {"unmapped": True}
 
 
 # =============================================================
