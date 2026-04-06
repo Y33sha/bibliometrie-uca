@@ -29,7 +29,7 @@
 	interface NameForm {
 		id: number;
 		form_text: string;
-		is_regex: boolean;
+		is_word_boundary: boolean;
 		is_active: boolean;
 		requires_context_of: (number | string)[] | null;
 	}
@@ -71,7 +71,8 @@
 
 	// New form state
 	let addFormText = $state("");
-	let addFormRegex = $state(false);
+	let addFormWordBoundary = $state(false);
+	let editFormModal: { id: number; form_text: string; is_word_boundary: boolean } | null = $state(null);
 	let newFormCtx: (number | string)[] = $state([]);
 
 	// HAL mappings
@@ -83,6 +84,8 @@
 		doc_count: number;
 		valid: string | null;
 		country: string | null;
+		start_date: string | null;
+		end_date: string | null;
 	}
 	let halMappings: HalMapping[] = $state([]);
 	let halHelpOpen = $state(false);
@@ -257,7 +260,7 @@
 			body: JSON.stringify({
 				structure_id: structId,
 				form_text: text,
-				is_regex: addFormRegex,
+				is_word_boundary: addFormWordBoundary || text.length <= 6,
 				requires_context_of: ctx,
 			}),
 		});
@@ -267,7 +270,7 @@
 			return;
 		}
 		addFormText = "";
-		addFormRegex = false;
+		addFormWordBoundary = false;
 		newFormCtx = [];
 		await selectStructure(structId);
 		loadList();
@@ -293,6 +296,25 @@
 		}
 		if (selectedId) await selectStructure(selectedId);
 		loadList();
+	}
+
+	function openEditFormModal(f: NameForm) {
+		editFormModal = { id: f.id, form_text: f.form_text, is_word_boundary: f.is_word_boundary };
+	}
+
+	async function saveEditForm() {
+		if (!editFormModal) return;
+		const text = editFormModal.form_text.trim();
+		await fetch(base + "/api/name-forms/" + editFormModal.id, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				form_text: text,
+				is_word_boundary: editFormModal.is_word_boundary || text.length <= 6,
+			}),
+		});
+		editFormModal = null;
+		if (selectedId) await selectStructure(selectedId);
 	}
 
 	/* ── Context picker ── */
@@ -539,6 +561,17 @@
 		document.querySelector(".container")?.classList.remove("full-width");
 	});
 </script>
+
+<svelte:window onkeydown={(e) => {
+	if (e.key === "Escape") {
+		if (editFormModal) { editFormModal = null; e.preventDefault(); }
+		else if (createModalOpen) { createModalOpen = false; e.preventDefault(); }
+	}
+	if (e.key === "Enter" && !e.shiftKey) {
+		if (editFormModal) { e.preventDefault(); saveEditForm(); }
+		else if (createModalOpen) { e.preventDefault(); editMode ? submitEdit() : submitCreate(); }
+	}
+}} />
 
 <svelte:head>
 	<title>Admin - Structures - Bibliometrie UCA</title>
@@ -844,7 +877,7 @@
 						{:else}
 							{#each detail.forms as f (f.id)}
 								<tr class:inactive={!f.is_active}>
-									<td class="col-badge">{#if f.is_regex}<span class="match-badge regex">regex</span>{:else if f.form_text.length <= 6}<span class="match-badge word" title="Mot entier uniquement (≤ 6 car.)">mot entier</span>{:else}<span class="match-badge substr" title="Sous-chaîne (> 6 car.)">sous-chaîne</span>{/if}</td>
+									<td class="col-badge">{#if f.is_word_boundary || f.form_text.length <= 6}<span class="match-badge word" title="Mot entier">mot entier</span>{:else}<span class="match-badge substr" title="Sous-chaîne">sous-chaîne</span>{/if}</td>
 									<td class="form-text">{f.form_text}</td>
 									<td>
 										{#if f.requires_context_of?.length}
@@ -861,6 +894,7 @@
 										{/if}
 									</td>
 									<td style="white-space:nowrap">
+										<button class="btn btn-sm" onclick={() => openEditFormModal(f)} title="Modifier">✎</button>
 										<button class="btn btn-sm btn-danger-outline" onclick={() => deleteForm(f.id)} title="Supprimer">x</button>
 									</td>
 								</tr>
@@ -873,7 +907,7 @@
 				<div class="add-row">
 					<input placeholder="Nouvelle forme..." bind:value={addFormText} />
 					<label class="regex-label">
-						<input type="checkbox" bind:checked={addFormRegex} /> regex
+						<input type="checkbox" checked={addFormWordBoundary || addFormText.length <= 6} disabled={addFormText.length <= 6} onchange={(e) => { addFormWordBoundary = (e.target as HTMLInputElement).checked; }} /> mot entier
 					</label>
 					<button class="btn btn-sm btn-primary" onclick={() => addForm(s.id)}> Ajouter </button>
 				</div>
@@ -923,6 +957,30 @@
 		{/if}
 	</div>
 </div>
+
+<!-- EDIT FORM MODAL -->
+{#if editFormModal}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="modal-bg" onclick={() => (editFormModal = null)}>
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="modal" onclick={(e) => e.stopPropagation()}>
+			<h3>Modifier la forme de nom</h3>
+			<label>Texte</label>
+			<input bind:value={editFormModal.form_text} />
+			<div class="modal-options">
+				<label>
+					<input type="checkbox" checked={editFormModal.is_word_boundary || editFormModal.form_text.length <= 6} disabled={editFormModal.form_text.length <= 6} onchange={(e) => { if (editFormModal) editFormModal.is_word_boundary = (e.target as HTMLInputElement).checked; }} /> Mot entier
+				</label>
+			</div>
+			<div class="actions">
+				<button class="btn" onclick={() => (editFormModal = null)}>Annuler</button>
+				<button class="btn btn-primary" onclick={saveEditForm}>Enregistrer</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <!-- CREATE MODAL -->
 {#if createModalOpen}
@@ -1302,6 +1360,28 @@
 	}
 	.forms-table .inactive {
 		opacity: 0.45;
+	}
+	.modal-options {
+		display: flex;
+		gap: 16px;
+		margin: 10px 0;
+		font-size: 0.9rem;
+	}
+	.modal-options label {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		cursor: pointer;
+		font-weight: normal;
+		margin: 0;
+	}
+	.edit-form-input {
+		width: 100%;
+		padding: 2px 4px;
+		font-family: "SF Mono", Consolas, monospace;
+		font-size: 0.85rem;
+		border: 1px solid var(--accent);
+		border-radius: 3px;
 	}
 	.form-text {
 		font-family: "SF Mono", Consolas, monospace;

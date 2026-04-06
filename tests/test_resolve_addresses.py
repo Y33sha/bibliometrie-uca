@@ -12,15 +12,14 @@ from processing.resolve_addresses import (
 
 # ── Helpers pour construire des formes de test ───────────────────
 
-def _form(structure_id, form_text, form_normalized=None, is_regex=False,
-          requires_context_of=None, form_id=None):
+def _form(structure_id, form_text, form_normalized=None,
+          requires_context_of=None, form_id=None, is_word_boundary=False):
     """Construit un dict de forme pour les tests."""
     return {
         "id": form_id or structure_id * 100,
         "structure_id": structure_id,
-        "form_text": form_text,
-        "form_normalized": form_normalized or form_text.lower(),
-        "is_regex": is_regex,
+        "form_text": form_normalized or form_text.lower(),
+        "is_word_boundary": is_word_boundary,
         "requires_context_of": requires_context_of,
         "struct_code": None,
         "struct_type": "laboratory",
@@ -53,24 +52,17 @@ class TestMatchFormInText:
         form = _form(1, "limos", "limos")
         assert match_form_in_text(form, "limos") is True
 
-    def test_regex_form(self):
-        form = _form(1, r"labo\w+", is_regex=True)
-        assert match_form_in_text(form, "laboratoire clermont") is True
+    def test_word_boundary_flag(self):
+        """Forme avec is_word_boundary=True, même si > 6 chars."""
+        form = _form(1, "clermont", is_word_boundary=True)
+        assert match_form_in_text(form, "clermont ferrand") is True
+        assert match_form_in_text(form, "preclermont") is False
 
-    def test_regex_no_match(self):
-        form = _form(1, r"^xyz\d+$", is_regex=True)
-        assert match_form_in_text(form, "abc 123") is False
-
-    def test_regex_invalid(self):
-        """Regex invalide → pas de crash, retourne False."""
-        form = _form(1, r"[invalid", is_regex=True)
-        assert match_form_in_text(form, "anything") is False
-
-    def test_empty_form_normalized(self):
+    def test_empty_form(self):
         form = _form(1, "", form_normalized="")
         assert match_form_in_text(form, "some text") is False
 
-    def test_none_form_normalized(self):
+    def test_none_form(self):
         form = _form(1, "", form_normalized=None)
         assert match_form_in_text(form, "some text") is False
 
