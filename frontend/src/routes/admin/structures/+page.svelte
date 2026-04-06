@@ -171,6 +171,10 @@
 
 	async function selectStructure(id: number) {
 		selectedId = id;
+		localStorage.setItem("admin_structure_id", String(id));
+		const sp = new URLSearchParams(window.location.search);
+		sp.set("id", String(id));
+		history.replaceState(null, "", "?" + sp.toString());
 		const data = await api<StructureDetail>("/api/structures/" + id);
 		detail = data;
 
@@ -521,6 +525,13 @@
 		loadList();
 		refreshCache();
 		document.addEventListener("click", handleDocumentClick);
+		// Lire structure_id depuis l'URL ou localStorage
+		const sp = new URLSearchParams(window.location.search);
+		const urlId = sp.get("id") || localStorage.getItem("admin_structure_id");
+		if (urlId) {
+			const id = parseInt(urlId);
+			if (id) selectStructure(id);
+		}
 		return () => document.removeEventListener("click", handleDocumentClick);
 	});
 

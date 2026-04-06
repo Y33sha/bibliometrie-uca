@@ -74,12 +74,7 @@
 						<a
 							href="{base}/admin/addresses"
 							class:active={isActive("/admin/addresses")}
-							>Repérage</a
-						>
-						<a
-							href="{base}/admin/feedback"
-							class:active={isActive("/admin/feedback")}
-							>Qualité</a
+							>Affiliations</a
 						>
 						<a
 							href="{base}/admin/countries"
