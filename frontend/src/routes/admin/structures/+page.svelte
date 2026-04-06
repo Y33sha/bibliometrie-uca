@@ -765,7 +765,7 @@
 									<td>{hm.end_date || ""}</td>
 									<td>{hm.doc_count || 0}</td>
 									<td>
-										<button class="btn btn-sm btn-danger" onclick={() => unmapHalStructure(hm.hal_struct_id)} title="Supprimer le mapping">x</button>
+										<button class="btn btn-sm btn-danger-outline" onclick={() => unmapHalStructure(hm.hal_struct_id)} title="Supprimer le mapping">x</button>
 									</td>
 								</tr>
 							{/each}
@@ -861,7 +861,7 @@
 										{/if}
 									</td>
 									<td style="white-space:nowrap">
-										<button class="btn btn-sm btn-danger" onclick={() => deleteForm(f.id)} title="Supprimer">x</button>
+										<button class="btn btn-sm btn-danger-outline" onclick={() => deleteForm(f.id)} title="Supprimer">x</button>
 									</td>
 								</tr>
 							{/each}

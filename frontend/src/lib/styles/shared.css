@@ -346,6 +346,7 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 
 .btn-sm { padding: 3px 8px; font-size: 0.8rem; }
 
+/* Boutons pleins (gros boutons à texte) */
 .btn-confirm {
 	background: var(--success);
 	color: white;
@@ -355,6 +356,17 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 	background: #1e5e3b;
 	color: white;
 	border-color: #1e5e3b;
+}
+
+.btn-danger {
+	background: var(--danger);
+	color: white;
+	border-color: var(--danger);
+}
+.btn-danger:hover {
+	background: #962018;
+	color: white;
+	border-color: #962018;
 }
 
 .btn-primary {
@@ -368,15 +380,27 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 	border-color: #2d5a87;
 }
 
-.btn-danger {
+/* Boutons outline (petits boutons icône ✕ ✓) */
+.btn-danger-outline {
 	background: white;
 	color: var(--danger);
 	border-color: var(--danger);
 }
-.btn-danger:hover {
+.btn-danger-outline:hover {
 	background: var(--danger);
 	color: white;
 	border-color: var(--danger);
+}
+
+.btn-confirm-outline {
+	background: white;
+	color: var(--success);
+	border-color: var(--success);
+}
+.btn-confirm-outline:hover {
+	background: var(--success);
+	color: white;
+	border-color: var(--success);
 }
 
 .btn-create {

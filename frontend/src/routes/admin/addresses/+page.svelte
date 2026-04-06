@@ -509,21 +509,15 @@
 							onclick={(e) => e.stopPropagation()}
 							role="group"
 						>
-							<button
-								class="btn btn-danger"
-								title="Rejeter le lien"
-								onclick={() => reviewAddr(addr.id, false)}>&#x2717;</button
-							>
-							<button
-								class="btn btn-confirm"
-								title="Relier à la structure"
-								onclick={() => reviewAddr(addr.id, true)}>&#x2713;</button
-							>
-							<button
-								class="btn btn-reset"
-								title="Reset"
-								onclick={() => reviewAddr(addr.id, null)}>&#x21BA;</button
-							>
+							{#if addr.is_confirmed !== false}
+								<button class="btn btn-sm btn-danger-outline" title="Rejeter le lien" onclick={() => reviewAddr(addr.id, false)}>&#x2717;</button>
+							{/if}
+							{#if addr.is_confirmed !== true}
+								<button class="btn btn-sm btn-confirm-outline" title="Relier à la structure" onclick={() => reviewAddr(addr.id, true)}>&#x2713;</button>
+							{/if}
+							{#if addr.is_confirmed !== null}
+								<button class="btn btn-sm btn-reset" title="Reset" onclick={() => reviewAddr(addr.id, null)}>&#x21BA;</button>
+							{/if}
 						</div>
 					</div>
 
