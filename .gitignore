@@ -18,9 +18,6 @@ frontend/node_modules/
 frontend/build/
 frontend/.svelte-kit/
 
-# Rapports d'analyse
-analysis/*.csv
-
 # Backups DB
 db/backup/
 

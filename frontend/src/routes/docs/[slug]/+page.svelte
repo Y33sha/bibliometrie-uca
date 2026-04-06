@@ -56,6 +56,13 @@
 		doc = await api<DocContent>(`/api/docs/${slug}`);
 		renderedHtml = await marked.parse(doc.content);
 		await renderMermaid();
+		// Scroller vers l'ancre si présente dans l'URL
+		await tick();
+		const hash = window.location.hash;
+		if (hash) {
+			const el = document.getElementById(hash.slice(1));
+			if (el) el.scrollIntoView();
+		}
 	}
 
 	async function loadTodos() {

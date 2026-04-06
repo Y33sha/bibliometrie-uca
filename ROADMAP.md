@@ -10,20 +10,8 @@ Table `country_name_forms` avec les formes de noms de pays (français, anglais, 
 ### Cron imports + dumps
 Automatiser les imports périodiques (hebdomadaires) et les dumps de sauvegarde. Docker cron ou systemd timer.
 
-### ORCID OpenAlex : condition de fiabilité
-Importer l'ORCID des openalex_authors seulement quand `display_name` correspond au `raw_author_name` de l'authorship (et pas une initiale). Condition dans normalize_openalex.py.
-
-### Page admin configuration
-Externaliser dans une page admin les paramètres de `config/settings.py` (années, collections HAL, périmètre UCA). Table `config` en base, API REST, page Svelte. Voir TODO_CLAUDE pour le détail.
-
 ### Tests d'idempotence du pipeline
 Vérifier que lancer deux fois chaque phase produit le même résultat. Fixtures + double exécution + compteurs. Voir TODO_CLAUDE pour le détail.
-
-### Type peer_review : auteurs = ceux de l'article reviewé
-Les publications de type `peer_review` dans OpenAlex listent les auteurs de l'article reviewé, pas du review. Diagnostiquer et corriger (exclure de la propagation UCA — déjà fait dans build_authorships, mais vérifier l'impact sur les personnes).
-
-### Interface mapping hal_structures → structures
-Page admin pour gérer le mapping entre structures HAL et structures canoniques. Actuellement fait en SQL direct.
 
 
 ## Gros chantiers (à planifier)
