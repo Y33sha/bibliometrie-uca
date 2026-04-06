@@ -35,14 +35,42 @@ ALL_TRUTH_FKS = [cfg["truth_fk"] for cfg in _SOURCE_CONFIG.values()]
 
 
 def exclude_authorship(cur, authorship_id: int) -> dict | None:
-    """Marque une authorship vérité comme exclue.
-    Retourne la row mise à jour ou None si introuvable.
+    """Marque une authorship vérité comme exclue et détache les authorships sources.
+
+    1. Marque l'authorship vérité excluded = TRUE
+    2. Met person_id = NULL sur les authorships sources liées
+       (pour que build_authorships ne recrée pas le lien)
     """
+    cur.execute("""
+        SELECT id, person_id, hal_authorship_id, openalex_authorship_id, wos_authorship_id
+        FROM authorships WHERE id = %s
+    """, (authorship_id,))
+    row = cur.fetchone()
+    if not row:
+        return None
+
+    person_id = row["person_id"]
+
+    # 1. Marquer exclue
     cur.execute("""
         UPDATE authorships SET excluded = TRUE, updated_at = now()
         WHERE id = %s RETURNING id, excluded
     """, (authorship_id,))
-    return cur.fetchone()
+    result = cur.fetchone()
+
+    # 2. Détacher les authorships sources (person_id = NULL)
+    if person_id:
+        for source, cfg in _SOURCE_CONFIG.items():
+            fk = cfg["truth_fk"]
+            source_id = row.get(fk)
+            if source_id:
+                cur.execute(f"""
+                    UPDATE {cfg['authorship_table']}
+                    SET person_id = NULL
+                    WHERE id = %s AND person_id = %s
+                """, (source_id, person_id))
+
+    return result
 
 
 def detach_source(cur, authorship_id: int, source: str):
