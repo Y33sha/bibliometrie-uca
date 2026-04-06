@@ -225,6 +225,7 @@ def _parse_tsv_authors(raw: dict) -> list[dict]:
             "is_corresponding": is_corresponding,
             "raw_affiliation": raw_affiliation,
             "addresses": author_addresses.get(i, []),
+            "organizations": [],
         })
 
     return authors
@@ -341,11 +342,25 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
     addresses_data = static.get("fullrecord_metadata", {}).get("addresses", {})
     addr_list = _safe_list(addresses_data.get("address_name"))
     addr_map = {}  # addr_no -> full_address
+    addr_orgs_map = {}  # addr_no -> [{name, ror_id, country}]
     for addr_entry in addr_list:
         spec = addr_entry.get("address_spec", {})
         addr_no = spec.get("addr_no")
         if addr_no is not None:
             addr_map[str(addr_no)] = spec.get("full_address", "")
+            # Organizations structurées
+            orgs_data = spec.get("organizations", {})
+            org_list = _safe_list(orgs_data.get("organization"))
+            orgs = []
+            for o in org_list:
+                if isinstance(o, dict) and o.get("content"):
+                    orgs.append({
+                        "name": o["content"],
+                        "ror_id": o.get("ror_id"),
+                        "pref": o.get("pref"),
+                    })
+            if orgs:
+                addr_orgs_map[str(addr_no)] = orgs
 
     authors = []
     for name_obj in name_list:
@@ -380,12 +395,20 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
         addr_nos = name_obj.get("addr_no")
         raw_affiliation = None
         individual_addresses = []
+        author_orgs = []
         if addr_nos:
             addr_no_list = str(addr_nos).split()
             affils = [addr_map[a] for a in addr_no_list if a in addr_map]
             individual_addresses = [a.strip() for a in affils if a.strip()]
             if affils:
                 raw_affiliation = " | ".join(affils)
+            # Collecter les organizations de cet auteur
+            seen_org_names = set()
+            for a_no in addr_no_list:
+                for org in addr_orgs_map.get(a_no, []):
+                    if org["name"] not in seen_org_names:
+                        author_orgs.append(org)
+                        seen_org_names.add(org["name"])
 
         authors.append({
             "position": position,
@@ -398,6 +421,7 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
             "is_corresponding": is_corresponding,
             "raw_affiliation": raw_affiliation,
             "addresses": individual_addresses,
+            "organizations": author_orgs,
         })
 
     return authors
@@ -662,18 +686,44 @@ def _get_or_create_address(cur, raw_text: str) -> int:
     return cur.fetchone()[0]
 
 
+def upsert_wos_institution(cur, org: dict) -> int | None:
+    """Insère/retrouve une organisation WoS. Retourne wos_organizations.id."""
+    name = org.get("name")
+    if not name:
+        return None
+    ror_id = org.get("ror_id")
+
+    cur.execute("""
+        INSERT INTO wos_organizations (name, ror_id)
+        VALUES (%s, %s)
+        ON CONFLICT (name) DO UPDATE SET
+            ror_id = COALESCE(wos_organizations.ror_id, EXCLUDED.ror_id),
+            updated_at = now()
+        RETURNING id
+    """, (name, ror_id))
+    return cur.fetchone()[0]
+
+
 def process_authorships(cur, rec: dict, wos_document_id: int):
-    """Traite les authorships d'un record WoS + crée les liens adresses."""
+    """Traite les authorships d'un record WoS + crée les liens adresses et institutions."""
     for author in rec.get("authors", []):
         wos_author_id = upsert_wos_author(cur, author)
         if not wos_author_id:
             continue
 
+        # Institutions WoS
+        institution_ids = []
+        for org in author.get("organizations", []):
+            inst_id = upsert_wos_institution(cur, org)
+            if inst_id:
+                institution_ids.append(inst_id)
+
         cur.execute("""
             INSERT INTO wos_authorships
                 (wos_document_id, wos_author_id, author_position,
-                 is_corresponding, raw_affiliation, author_name_normalized)
-            VALUES (%s, %s, %s, %s, %s, normalize_name_form(%s))
+                 is_corresponding, raw_affiliation, author_name_normalized,
+                 wos_institution_ids)
+            VALUES (%s, %s, %s, %s, %s, normalize_name_form(%s), %s)
             ON CONFLICT (wos_document_id, wos_author_id) DO UPDATE SET
                 raw_affiliation = COALESCE(
                     EXCLUDED.raw_affiliation,
@@ -683,11 +733,15 @@ def process_authorships(cur, rec: dict, wos_document_id: int):
                 author_name_normalized = COALESCE(
                     EXCLUDED.author_name_normalized,
                     wos_authorships.author_name_normalized
+                ),
+                wos_institution_ids = COALESCE(
+                    EXCLUDED.wos_institution_ids,
+                    wos_authorships.wos_institution_ids
                 )
             RETURNING id
         """, (wos_document_id, wos_author_id, author["position"],
               author["is_corresponding"], author.get("raw_affiliation"),
-              author["full_name"]))
+              author["full_name"], institution_ids or None))
         was_id = cur.fetchone()[0]
 
         # Créer les liens adresses individuelles
