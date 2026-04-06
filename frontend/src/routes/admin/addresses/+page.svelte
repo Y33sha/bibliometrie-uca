@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
+	import { page } from '$app/stores';
 	import { replaceState } from '$app/navigation';
 	import { api } from '$lib/api';
 	import { esc, sanitizeTitle } from '$lib/utils';
@@ -80,7 +81,7 @@
 	// ---- URL params helpers ----
 
 	function readUrlParams(): { detected: string; validation: string; search: string; searchMode: string; p: number; structureId: number | null } {
-		const sp = new URLSearchParams(window.location.search);
+		const sp = $page.url.searchParams;
 		return {
 			detected: sp.get('detected') || 'yes',
 			validation: sp.get('validation') || 'pending',
@@ -307,6 +308,7 @@
 
 	function onStructureChange(e: Event): void {
 		currentStructureId = parseInt((e.target as HTMLSelectElement).value);
+		localStorage.setItem('admin_structure_id', String(currentStructureId));
 		currentPage = 1;
 		loadStats();
 		loadAddresses();
@@ -350,8 +352,15 @@
 		currentPage = url.p;
 
 		loadStructures().then(() => {
-			// Si l'URL contenait un structure_id valide, l'utiliser
-			if (url.structureId) currentStructureId = url.structureId;
+			// Priorité : URL > localStorage > UCA par défaut
+			const urlSid = $page.url.searchParams.get('structure_id');
+			if (urlSid) {
+				currentStructureId = parseInt(urlSid);
+				localStorage.setItem('admin_structure_id', urlSid);
+			} else {
+				const saved = localStorage.getItem('admin_structure_id');
+				if (saved) currentStructureId = parseInt(saved);
+			}
 			loadStats();
 			loadAddresses();
 		});
@@ -363,8 +372,9 @@
 </svelte:head>
 
 <div class="page-addresses">
-	<!-- Toolbar: structure filter, search, filters -->
-	<div class="toolbar">
+	<!-- Structure selection + feedback button -->
+	<div class="structure-bar">
+		<span class="structure-label">Structure :</span>
 		<select
 			class="structure-filter"
 			value={currentStructureId ?? ''}
@@ -380,9 +390,20 @@
 				{/if}
 			{/each}
 		</select>
+		<div class="stats-bar">
+			<span class="stat-badge stat-total">{stats.total.toLocaleString('fr-FR')} adresses</span>
+			<span class="stat-badge stat-detected">Détectées : {stats.detected}</span>
+			<span class="stat-badge stat-pending">Non validées : {stats.pending}</span>
+			<span class="stat-badge stat-confirmed">Reliées : {stats.confirmed}</span>
+			<span class="stat-badge stat-rejected">Rejetées : {stats.rejected}</span>
+		</div>
+		{#if currentStructureId}
+			<a href="{base}/admin/feedback?structure_id={currentStructureId}" class="btn btn-sm feedback-btn">Qualité de la détection</a>
+		{/if}
+	</div>
 
-		<div class="toolbar-sep"></div>
-
+	<!-- Filters -->
+	<div class="toolbar">
 		<select value={currentSearchMode} onchange={onSearchModeChange}>
 			<option value="contains">contient</option>
 			<option value="not_contains">ne contient pas</option>
@@ -417,15 +438,6 @@
 		</select>
 
 		<span class="count">{resultCountText}</span>
-	</div>
-
-	<!-- Stats bar -->
-	<div class="stats-bar">
-		<span class="stat-badge stat-total">{stats.total.toLocaleString('fr-FR')} adresses</span>
-		<span class="stat-badge stat-detected">Détectées : {stats.detected}</span>
-		<span class="stat-badge stat-pending">Non validées : {stats.pending}</span>
-		<span class="stat-badge stat-confirmed">Reliées : {stats.confirmed}</span>
-		<span class="stat-badge stat-rejected">Rejetées : {stats.rejected}</span>
 	</div>
 
 	<!-- Batch action bar -->
@@ -566,11 +578,31 @@
 	}
 
 	/* Stats bar */
-	.stats-bar {
+	.structure-bar {
 		display: flex;
+		align-items: center;
 		gap: 12px;
 		margin-bottom: 10px;
+		padding: 8px 12px;
+		background: var(--card);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		flex-wrap: wrap;
+	}
+	.structure-label {
+		font-weight: 600;
+		font-size: 0.9rem;
+		color: var(--muted);
+	}
+	.stats-bar {
+		display: flex;
+		gap: 8px;
 		font-size: 0.85rem;
+		flex: 1;
+	}
+	.feedback-btn {
+		margin-left: auto;
+		white-space: nowrap;
 	}
 	.stat-badge {
 		padding: 3px 10px;
