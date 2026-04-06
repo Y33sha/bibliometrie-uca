@@ -3,7 +3,7 @@
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import { titleCase, formatDate, sanitizeTitle } from '$lib/utils';
+	import { titleCase, formatDate, sanitizeTitle, halDocUrl } from '$lib/utils';
 	import { typeLabels, docTypeLabelsMap, oaLabelsMap } from '$lib/labels';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
@@ -387,7 +387,7 @@
 								</td>
 								<td class="links-cell">
 									{#if p.hal_id}
-										<a href="https://hal.science/{p.hal_id}" target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
+										<a href={halDocUrl(p.hal_id)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
 											<img src="https://hal.science/favicon.ico" alt="HAL" />
 										</a>
 									{:else}

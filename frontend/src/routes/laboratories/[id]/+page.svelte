@@ -3,7 +3,7 @@
 	import { base } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api } from '$lib/api';
-	import { sanitizeTitle } from '$lib/utils';
+	import { sanitizeTitle, halDocUrl } from '$lib/utils';
 	import { Chart, registerables } from 'chart.js';
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
 	Chart.register(...registerables, ChartDataLabels);
@@ -713,7 +713,7 @@
 								</td>
 								<td class="links-cell">
 									{#if p.hal_id}
-										<a href="https://hal.science/{p.hal_id}" target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
+										<a href={halDocUrl(p.hal_id)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
 											<img src="https://hal.science/favicon.ico" alt="HAL" />
 										</a>
 									{:else}

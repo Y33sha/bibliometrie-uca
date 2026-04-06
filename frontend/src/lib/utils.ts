@@ -121,3 +121,9 @@ export function formatDate(d: string | null | undefined): string {
 	if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
 	return d;
 }
+
+export function halDocUrl(halid: string): string {
+	if (halid.startsWith('dumas-')) return `https://dumas.ccsd.cnrs.fr/${halid}`;
+	if (halid.startsWith('tel-')) return `https://theses.hal.science/${halid}`;
+	return `https://hal.science/${halid}`;
+}
