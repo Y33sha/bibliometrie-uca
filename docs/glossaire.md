@@ -1,4 +1,4 @@
-# Glossaire — Bibliométrie UCA
+# Glossaire métier — Bibliométrie UCA
 
 Termes métier utilisés dans le projet. Pour la documentation technique (pipeline, architecture, sources de données), voir les pages dédiées.
 
@@ -10,17 +10,19 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 | **OpenAlex** | Index bibliographique ouvert (successeur de Microsoft Academic). Couverture très large (>200M de publications), rattachement institutionnel algorithmique. |
 | **Web of Science (WoS)** | Index bibliographique commercial (Clarivate). Couverture sélective mais métadonnées de qualité. Accès par API payante avec quota annuel. |
 | **Unpaywall** | Service qui associe un statut d'accès ouvert à chaque DOI. Utilisé pour enrichir le champ `oa_status` des publications. |
+| **OpenAPC** | TODO |
+
 
 ## Identifiants
 
 | Terme | Définition |
 |-------|-----------|
-| **DOI** | Digital Object Identifier. Identifiant unique et pérenne d'une publication (ex: `10.1234/article.5678`). Un même DOI peut être partagé entre un ouvrage et ses chapitres (cas problématique géré par le pipeline). |
-| **ORCID** | Identifiant unique d'un chercheur (ex: `0000-0001-2345-6789`). Auto-déclaratif. Fiable quand confirmé, mais parfois attribué par erreur dans les bases bibliographiques. |
-| **idHAL** | Identifiant auteur dans HAL. Créé par le chercheur dans AuréHAL pour regrouper ses publications sous un compte unique. Plus fiable que l'ORCID dans le contexte HAL. |
-| **IdRef** | Identifiant du référentiel des autorités du SUDOC (réseau des bibliothèques universitaires françaises). Utilisé pour relier un chercheur à sa production dans le catalogue des thèses. |
-| **AuréHAL** | Interface de gestion des référentiels HAL (auteurs, structures, revues). C'est là que les chercheurs créent leur idHAL et rattachent leurs publications à leur compte. |
-| **ROR** | Research Organization Registry. Identifiant unique d'une institution de recherche (ex: `https://ror.org/01a8ajp46` pour l'UCA). Utilisé par OpenAlex pour le rattachement institutionnel. |
+| **DOI** | Digital Object Identifier. Identifiant unique et pérenne d'une publication (ex: `10.1234/article.5678`). |
+| **ORCID** | Identifiant unique d'un chercheur (ex: `0000-0001-2345-6789`). Créé par le chercheur. |
+| **idHAL** | Identifiant auteur dans HAL. Créé par le chercheur dans son profil HAL. |
+| **IdRef** | Identifiant auteur créé et maintenu par l'ABES (Agence bibliographique de l'enseignement supérieur). |
+| **AuréHAL** | Référentiel d'entités HAL (auteurs, structures, revues). |
+| **ROR** | Research Organization Registry. Identifiant unique d'une institution de recherche (ex: `https://ror.org/01a8ajp46` pour l'UCA). |
 
 ## Édition scientifique
 
@@ -30,9 +32,10 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 | **Éditeur** (publisher) | Maison d'édition scientifique (Elsevier, Springer Nature, EDP Sciences...). Un éditeur publie plusieurs revues. |
 | **Revue** (journal) | Périodique scientifique identifié par un ou plusieurs ISSN. Rattaché à un éditeur. |
 | **ISSN** | International Standard Serial Number. Identifiant d'un périodique. Il peut exister un ISSN print, un eISSN (électronique) et un ISSN-L (de liaison, qui regroupe les deux). |
-| **DOAJ** | Directory of Open Access Journals. Répertoire des revues en accès ouvert intégral (gold/diamond). Une revue présente dans le DOAJ est considérée full open access. |
-| **Auteur correspondant** | Auteur désigné comme contact principal pour une publication. Souvent le chercheur qui a piloté l'étude. Information disponible principalement dans WoS. |
-| **Premier auteur / dernier auteur** | Conventions de signature scientifique : le premier auteur a généralement fait le travail principal ; le dernier auteur est souvent le directeur de l'équipe (en sciences expérimentales). |
+| **DOAJ** | Directory of Open Access Journals. Répertoire des revues en accès ouvert. |
+| **Auteur correspondant** | Auteur désigné comme contact principal pour une publication. Il peut y en avoir plusieurs. |
+| **Premier auteur / dernier auteur** | Conventions de signature scientifique : le premier auteur a généralement fait le travail principal ; le dernier auteur est souvent le directeur de l'équipe. Notion pertinente dans les disciplines STEM. |
+| **Adresse** | (= signature institutionnelle) Chaîne de caractères associée à une publication et signalant l'affiliation institutionnelle de chaque auteur. Fournie par chaque auteur à l'éditeur. |
 
 ## Voies open access
 
@@ -51,7 +54,7 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 |-------|-----------|
 | **Publication** | Entité canonique dédupliquée. Plusieurs documents sources (HAL, OA, WoS) peuvent pointer vers la même publication. Déduplication par DOI ou par titre+année+journal. |
 | **Personne** | Individu physique unique. Hub d'identité reliant les auteurs de toutes les sources. Peut être créé automatiquement (pipeline) ou manuellement (import RH). |
-| <a id="authorship"></a>**Authorship** | Couple (publication, personne) représentant la contribution d'un auteur à une publication. Porte les informations d'affiliation (structures UCA), de position (rang dans la liste d'auteurs) et le flag `is_uca`. Aussi appelé "contribution" dans le langage courant. |
+| **Authorship** | <span id="authorship"></span>Couple (publication, personne) représentant la contribution d'un auteur à une publication. Porte les informations d'affiliation (structures UCA), de position (rang dans la liste d'auteurs) et le flag `is_uca`. |
 | **Structure** | Entité institutionnelle : université, laboratoire, organisme national de recherche (CNRS, INRAE...), établissement partenaire (CHU, INP...). Référentiel maintenu manuellement. |
 | **Forme de nom** | Variante normalisée d'un nom de structure (`structure_name_forms`) ou d'un nom d'auteur (`person_name_forms`). Utilisée pour le matching automatique (résolution d'adresses pour les structures, création de personnes pour les auteurs). |
 

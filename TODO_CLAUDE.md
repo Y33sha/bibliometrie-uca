@@ -67,7 +67,3 @@ Les fonctions de compatibilité de noms existent en deux versions :
 - SQL : requêtes dans `backend/routers/admin_person_duplicates.py` (`PERSON_DUP_QUERIES`)
 
 Les deux implémentent la même logique mais indépendamment. Idéalement, le backend devrait utiliser les fonctions Python de `utils/names.py` pour la détection de doublons. Mais les requêtes SQL sont plus performantes pour le matching en masse (JOIN direct en base). À réévaluer si la logique diverge.
-
-## Colonne raw_orcid dans openalex_authorships
-
-Redondante avec `openalex_authors.orcid` — même valeur, même source. À supprimer dans une migration future (cf. TODO_LAURA.md).

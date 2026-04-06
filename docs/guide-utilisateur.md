@@ -15,69 +15,124 @@ Elle permet de :
 
 ### Annuaire des personnes (`/persons`)
 
-Liste des chercheurs avec leurs publications, identifiants (ORCID, idHAL) et
-affiliations. Filtrable par laboratoire, source, ORCID, etc.
+Liste des personnes avec leurs identifiants (ORCID, idHAL) et affiliations.
+Filtrable par:
+- présence ou non dans la [base RH](sources#donnees-rh),
+- données RH (rôle, affiliation),
+- identifiants (ORCID, idHAL).
 
 ### Fiche personne (`/persons/{id}`)
 
-Vue détaillée d'un chercheur : identifiants, liste des publications
-avec les sources contributrices.
+Vue détaillée d'un chercheur. Identifiants, données RH si existent.
+3 onglets:
+- publications
+- identités (formes de noms présentes sur différentes sources, avec identifiants attachés et nombre de publications correspondantes)
+- adresses (adresses liées à cette personne dans les publications)
+<!-- TODO: Faire un onglet Dashboard par personne -->
+<!-- TODO: Distinguer les onglets visibles selon rôle utilisateur: les onglets "identités" et "adresses" sont des outils internes, sans intérêt pour le chercheur -->
+<!-- TODO: Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation? -->
 
 ### Annuaire des laboratoires (`/laboratories`)
 
-Liste des laboratoires avec effectifs et publications.
+Liste des laboratoires avec tutelles, identifiant ROR et lien vers collection HAL.
 
 ### Fiche laboratoire (`/laboratories/{id}`)
 
-Vue détaillée d'un laboratoire : membres, publications, indicateurs.
+Vue détaillée d'un laboratoire.
+
+Onglets:
+- Dashboard (production, taux d'accès ouvert, collaborations internationales);
+- Publications;
+- Personnes: affiche les personnes liées à ce laboratoire via une publication (ne repose pas sur l'affiliation renseignée dans la base RH);
+- Adresses (adresses ayant permis la détection de ce laboratoire dans les publications).
 
 ### Publications (`/publications`)
 
-Catalogue des publications avec filtres multiples : année, laboratoire, type de
-document, accès ouvert, source, éditeur, revue.
+Catalogue des publications avec filtres multiples : année, laboratoire, type de document, accès ouvert, source, éditeur, revue.
 
 ### Fiche publication (`/publications/{id}`)
 
-Vue détaillée : métadonnées, auteurs, sources contributrices, informations
-d'accès ouvert.
+Vue détaillée : métadonnées, auteurs, sources contributrices.
+
+Vue alignée des auteurs par source pour détecter d'éventuelles incohérences.
 
 ### Statistiques (`/stats`)
 
-Tableaux de bord : production par année, par laboratoire, par type de document,
-taux d'accès ouvert, répartition par éditeur.
+Tableaux de bord : production par année, par laboratoire, par type de document, taux d'accès ouvert, répartition par éditeur.
+
+### <span id='problemes-hal'></span>Problèmes HAL (`/hal-problems/*`)
+
+Pages dédiées aux problèmes de qualité spécifiques à HAL :
+
+- **Comptes en double** : auteurs HAL ayant plusieurs comptes
+- **Publications en double** : documents HAL doublonnés
+- **Manques dans les collections** : affiliations manquantes: publications HAL qui devraient être dans une collection HAL mais n'y sont pas
+- **Conflits d'affiliation** : publications HAL avec une affiliation UCA suspecte, en contradiction avec les autres sources
 
 ## Pages d'administration
 
+### Configuration (`/admin/config`)
+
+Paramètres des imports:
+- email (polite pool);
+- clé API WOS;
+- années interrogées (modes weekly et monthly);
+- périmètre interrogé par source.
+
+
+### Gestion des structures (`/admin/structures`)
+
+Gère le CRUD sur l'ensemble des structures du périmètre UCA + les co-tutelles des laboratoires (ONR, écoles, autres universités) + le CHU.
+
+Pour chaque structure:
+- **Détails** (nom, acronyme, identifiant ROR, collection HAL);
+- **Relations** (2 relations: tutelle, partenaire);
+- **Identification** dans les publications:
+  - Mapping avec les structures du référentiel HAL (pour l'identification dans les publications HAL);
+  - Gestion des formes de nom (pour l'identification dans les adresses => affiliation des publications OpenAlex et WoS)
+
+
+### Contrôle des affiliations des adresses (`/admin/addresses`)
+
+Contrôle des adresses d'affiliation résolues automatiquement par la phase `resolve_addresses` du pipeline.
+Confirmer ou rejeter manuellement les associations adresse → structure.
+
+### Qualité de la détection (`/admin/feedback`)
+
+Fait ressortir les faux positifs et faux négatifs dans la détection de structures dans les adresses:
+- **faux négatifs**: affiliations adresse-structure non détectées par le script mais créées manuellement => repérer les formes de nom non détectées, et les ajouter dans admin/structures.
+- **faux positifs**: affiliations détectées par le script mais rejetées manuellement => supprimer une forme de nom trop permissive ou lui ajouter un contexte contraignant.
+
+Les corrections seront prises en compte à la prochaine exécution du pipeline (phase `resolve_addresses`).
+
+### Gestion des pays (`/admin/countries`)
+
+Attribution et correction des pays liés aux adresses.
+Les corrections se propagent automatiquement aux publications liées, sans besoin de relancer le pipeline.
+
 ### Gestion des personnes (`/admin/persons`)
 
-Vue centrale pour le nettoyage du référentiel de personnes :
+Gestion du référentiel de personnes :
 
-- **Formes de nom** : chaque personne a des formes de nom normalisées issues des
-  sources. Un badge orange indique une forme **ambiguë** (partagée avec une autre
-  personne). Cliquer sur une forme ouvre un modal de détachement.
-- **Identifiants** : ORCID, idHAL, IdRef avec statut (en attente, confirmé, rejeté).
-  Les boutons ✓ et ✗ permettent de confirmer ou rejeter.
-- **Fusion** : le bouton "Fusionner" permet de chercher un doublon et de fusionner
-  deux personnes. Bloqué si les deux ont une fiche RH.
 - **Édition du nom** : le crayon permet de corriger le nom/prénom.
-- **Rejet** : marquer une personne comme fausse entité (homonyme non résolu).
+- **Rejet** : marquer une personne comme fausse entité (mauvais parsing, noms d'équipes de recherche…).
+- **Identifiants** : ORCID, idHAL, IdRef avec statut (en attente, confirmé, rejeté). Les boutons ✓ et ✗ permettent de confirmer ou rejeter. Ajout d'identifiants.
+- **Formes de nom** : chaque personne a des formes de nom normalisées issues des sources. Un badge orange indique une forme **ambiguë** (partagée avec une autre personne). Cliquer sur une forme ouvre un modal permettant de consulter les authorships liées et de les détacher.
+- **Fusion** : le bouton "Fusionner" permet de chercher un doublon et de fusionner deux personnes. Bloqué si les deux ont une fiche RH.
 
 ### Authorships orphelines (`/admin/orphan-authorships`)
 
-Authorships UCA dont l'auteur n'est pas encore identifié (`person_id = NULL`).
-Pour chaque authorship, on peut :
+Authorships UCA dont l'auteur n'est pas encore identifié (`person_id = NULL`). Pour chaque authorship, on peut :
 
 - **Attribuer** à une personne existante (recherche par nom)
 - **Créer** une nouvelle personne et lui attribuer l'authorship
-- **Traitement par lot** : sélectionner plusieurs authorships et les attribuer
-  en une fois
+- **Traitement par lot** : sélectionner plusieurs authorships et les attribuer en une fois
 
-Le dropdown de recherche affiche le département RH ou l'identifiant pour
-départager les homonymes.
+Le dropdown de recherche affiche le département RH (si existant) ou l'id interne (sinon) pour départager les homonymes.
 
 ### Doublons de publications (`/admin/duplicates`)
 
-Paires de publications potentiellement identiques (titre similaire, même année).
+Paires de publications potentiellement identiques (titre normalisé identique, même type, même année).
 Pour chaque paire, on peut :
 
 - **Fusionner** : absorber une publication dans l'autre
@@ -86,64 +141,12 @@ Pour chaque paire, on peut :
 
 ### Doublons de personnes (`/admin/duplicates-persons`)
 
-Paires de personnes potentiellement identiques. Même logique que les doublons de
-publications, avec en plus l'affichage des identifiants et laboratoires pour
-faciliter la décision.
+Paires de personnes potentiellement identiques. Même logique que les doublons de publications.
 
-### Gestion des structures (`/admin/structures`)
+Deux modes de détection des candidats au dédoublonnage:
+- Par similitude de noms (tolérance aux initiales et aux noms composés vs simples);
+- Par conflit entre sources (deux personnes en même position auteur sur la même publication).
 
-Référentiel institutionnel : créer, modifier, organiser les structures (labos,
-tutelles, partenaires) et leurs relations hiérarchiques.
 
-### Gestion des adresses (`/admin/addresses`)
 
-Validation des adresses d'affiliation résolues automatiquement. Confirmer ou
-rejeter les associations adresse → structure.
 
-### Gestion des pays (`/admin/countries`)
-
-Attribution et correction des pays des publications.
-
-### Retours utilisateurs (`/admin/feedback`)
-
-Gestion des signalements remontés par les utilisateurs.
-
-## Problèmes HAL (`/hal-problems/*`)
-
-Pages dédiées aux problèmes de qualité spécifiques à HAL :
-
-- **Conflits d'affiliation** : publications HAL avec des affiliations incohérentes
-- **Comptes en double** : auteurs HAL ayant plusieurs comptes
-- **Publications en double** : documents HAL doublonnés
-- **Collections manquantes** : publications qui devraient être dans une collection
-  HAL mais n'y sont pas
-
-## Concepts clés pour les utilisateurs
-
-### Authorship source vs vérité
-
-Une **authorship source** est le lien brut entre un auteur et un document dans
-une source donnée (HAL, OpenAlex ou WoS). Une **authorship** est le lien
-canonique entre une personne et une publication, construit en agrégeant les
-authorships sources.
-
-### Le périmètre UCA
-
-Est considéré "UCA" un auteur affilié à l'UCA ou à l'une de ses unités en
-tutelle directe. Le **périmètre élargi** inclut aussi les partenaires (CHU,
-INP, VetAgro Sup).
-
-### Formes de nom et matching
-
-Le système identifie les personnes en comparant les noms d'auteurs normalisés
-(minuscules, sans accents ni ponctuation). Par exemple, "Nédélec, J.-M." et
-"Jean-Marie Nedelec" se normalisent tous les deux en `jean marie nedelec`.
-
-Une forme de nom est **ambiguë** quand elle pointe vers plusieurs personnes
-(homonymes). Ces cas nécessitent une intervention manuelle.
-
-### Authorship exclue
-
-Une authorship source peut être **exclue** quand elle est rattachée à la mauvaise
-personne (homonyme, erreur de la source). Les authorships exclues sont ignorées
-par le pipeline : elles ne génèrent pas d'authorship vérité.
