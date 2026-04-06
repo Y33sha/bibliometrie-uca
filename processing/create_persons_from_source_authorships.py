@@ -384,8 +384,9 @@ def step3_name_forms(cur, all_authorships, linked_ids, name_form_map, dry_run):
 
         # Chercher dans les name_forms (essayer les deux ordres)
         person_ids = None
-        for form in [f"{fn} {ln}", f"{ln} {fn}", ln]:
-            if form and form in name_form_map:
+        forms_to_try = [f for f in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip(), ln] if f]
+        for form in forms_to_try:
+            if form in name_form_map:
                 person_ids = name_form_map[form]
                 break
 
@@ -411,12 +412,12 @@ def step3_name_forms(cur, all_authorships, linked_ids, name_form_map, dry_run):
                 add_identifiers(cur, pid, [a])
                 add_name_form(cur, pid, a["full_name"])
                 # Enregistrer la nouvelle forme pour les authorships suivantes
-                for form in [f"{fn} {ln}", f"{ln} {fn}"]:
-                    if form.strip():
+                for form in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip()]:
+                    if form:
                         name_form_map[form] = [pid]
             else:
-                for form in [f"{fn} {ln}", f"{ln} {fn}"]:
-                    if form.strip():
+                for form in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip()]:
+                    if form:
                         name_form_map[form] = [-1]  # placeholder dry-run
 
             linked_ids.add((a["source"], a["authorship_id"]))
