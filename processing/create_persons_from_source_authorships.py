@@ -60,7 +60,7 @@ def get_all_unlinked_authorships(cur):
     cur.execute("""
         SELECT has.id AS authorship_id, 'hal' AS source,
                ha.full_name, ha.last_name, ha.first_name,
-               ha.orcid, ha.idhal,
+               ha.orcid, ha.idhal, ha.idref,
                ha.id AS hal_author_id,
                (ha.hal_person_id IS NOT NULL) AS has_hal_person_id,
                ha.hal_person_id,

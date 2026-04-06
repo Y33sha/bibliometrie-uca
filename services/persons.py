@@ -97,7 +97,7 @@ def add_identifier(cur, person_id: int, id_type: str, id_value: str,
 
 
 def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict]):
-    """Ajoute les ORCID et idHAL trouvés dans un groupe d'authorships."""
+    """Ajoute les ORCID, idHAL et IdRef trouvés dans un groupe d'authorships."""
     seen = set()
     for a in authorships:
         if a.get("orcid") and ("orcid", a["orcid"]) not in seen:
@@ -106,6 +106,9 @@ def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict
         if a.get("idhal") and ("idhal", a["idhal"]) not in seen:
             add_identifier(cur, person_id, "idhal", a["idhal"])
             seen.add(("idhal", a["idhal"]))
+        if a.get("idref") and ("idref", a["idref"]) not in seen:
+            add_identifier(cur, person_id, "idref", a["idref"], source="hal")
+            seen.add(("idref", a["idref"]))
 
 
 # ── Formes de noms ──
