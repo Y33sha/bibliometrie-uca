@@ -40,8 +40,8 @@ BATCH_SIZE = 1000
 def load_forms(cur):
     """Charge toutes les formes actives depuis structure_name_forms."""
     cur.execute("""
-        SELECT nf.id, nf.structure_id, nf.form_text, nf.form_normalized,
-               nf.is_regex, nf.requires_context_of,
+        SELECT nf.id, nf.structure_id, nf.form_text,
+               nf.is_word_boundary, nf.requires_context_of,
                s.code AS struct_code, s.structure_type::text AS struct_type
         FROM structure_name_forms nf
         JOIN structures s ON s.id = nf.structure_id
@@ -75,22 +75,20 @@ def load_uca_perimeter(cur):
 # ─── Matching ────────────────────────────────────────────────────
 
 def match_form_in_text(form, text_normalized):
-    """Vérifie si une forme matche dans le texte normalisé."""
-    if form["is_regex"]:
-        try:
-            return bool(re.search(form["form_text"], text_normalized, re.IGNORECASE))
-        except re.error:
-            return False
+    """Vérifie si une forme matche dans le texte normalisé.
 
-    form_norm = form["form_normalized"]
-    if not form_norm:
+    Si is_word_boundary ou forme <= 6 chars : mot entier (word boundary).
+    Sinon : sous-chaîne.
+    """
+    form_text = form["form_text"]
+    if not form_text:
         return False
 
-    if len(form_norm) <= 6:
-        pattern = r"(?<![a-z0-9])" + re.escape(form_norm) + r"(?![a-z0-9])"
+    if form.get("is_word_boundary") or len(form_text) <= 6:
+        pattern = r"(?<![a-z0-9])" + re.escape(form_text) + r"(?![a-z0-9])"
         return bool(re.search(pattern, text_normalized))
     else:
-        return form_norm in text_normalized
+        return form_text in text_normalized
 
 
 def build_forms_by_structure(forms):

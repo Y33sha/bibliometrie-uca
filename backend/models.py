@@ -57,14 +57,14 @@ class RelationCreate(BaseModel):
 class NameFormCreate(BaseModel):
     structure_id: int
     form_text: str
-    is_regex: bool = False
+    is_word_boundary: bool = False
     requires_context_of: list | None = None
     notes: str | None = None
 
 
 class NameFormUpdate(BaseModel):
     form_text: str | None = None
-    is_regex: bool | None = None
+    is_word_boundary: bool | None = None
     requires_context_of: list | None = None
     is_active: bool | None = None
     notes: str | None = None

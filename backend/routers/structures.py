@@ -187,14 +187,14 @@ async def get_name_form(form_id: int):
 async def create_name_form(data: NameFormCreate):
     import json as _json
     with get_cursor() as (cur, conn):
-        form_normalized = normalize_text(data.form_text)
+        form_text = normalize_text(data.form_text)
         ctx_json = _json.dumps(data.requires_context_of) if data.requires_context_of else None
         cur.execute("""
-            INSERT INTO structure_name_forms (structure_id, form_text, form_normalized, is_regex,
-                                    requires_context_of, notes)
-            VALUES (%s, %s, %s, %s, %s::jsonb, %s)
+            INSERT INTO structure_name_forms (structure_id, form_text,
+                                    is_word_boundary, requires_context_of, notes)
+            VALUES (%s, %s, %s, %s::jsonb, %s)
             RETURNING *
-        """, (data.structure_id, data.form_text, form_normalized, data.is_regex,
+        """, (data.structure_id, form_text, data.is_word_boundary,
               ctx_json, data.notes))
         return cur.fetchone()
 
@@ -212,12 +212,10 @@ async def update_name_form(form_id: int, data: NameFormUpdate):
 
         if data.form_text is not None:
             updates.append("form_text = %s")
-            params.append(data.form_text)
-            updates.append("form_normalized = %s")
             params.append(normalize_text(data.form_text))
-        if data.is_regex is not None:
-            updates.append("is_regex = %s")
-            params.append(data.is_regex)
+        if data.is_word_boundary is not None:
+            updates.append("is_word_boundary = %s")
+            params.append(data.is_word_boundary)
         if data.requires_context_of is not None:
             updates.append("requires_context_of = %s::jsonb")
             params.append(_json.dumps(data.requires_context_of) if data.requires_context_of else None)
