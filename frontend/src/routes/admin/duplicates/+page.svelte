@@ -4,7 +4,7 @@
 	import { replaceState } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
-	import { sanitizeTitle } from '$lib/utils';
+	import { sanitizeTitle, halDocUrl } from '$lib/utils';
 
 	interface PubDetail {
 		id: number;
@@ -117,7 +117,7 @@
 		return src;
 	}
 	function sourceUrl(src: string, sourceId: string): string {
-		if (src === 'hal') return `https://hal.science/${sourceId}`;
+		if (src === 'hal') return halDocUrl(sourceId);
 		if (src === 'openalex') return `https://openalex.org/${sourceId}`;
 		if (src === 'wos') return `https://www.webofscience.com/wos/woscc/full-record/${sourceId}`;
 		return '#';

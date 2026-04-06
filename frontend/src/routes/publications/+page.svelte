@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
-	import { sanitizeTitle } from '$lib/utils';
+	import { sanitizeTitle, halDocUrl } from '$lib/utils';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -299,7 +299,7 @@
 					</td>
 					<td class="links-cell">
 						{#if p.hal_id}
-							<a href="https://hal.science/{p.hal_id}" target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
+							<a href={halDocUrl(p.hal_id)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
 								<img src="https://hal.science/favicon.ico" alt="HAL" />
 							</a>
 						{:else}

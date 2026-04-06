@@ -5,7 +5,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { typeLabels } from '$lib/labels';
-	import { sanitizeTitle } from '$lib/utils';
+	import { sanitizeTitle, halDocUrl } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
 
 	interface Pub {
@@ -47,9 +47,7 @@
 		syncUrl();
 	}
 
-	function halUrl(halid: string): string {
-		return `https://hal.science/${halid}`;
-	}
+	const halUrl = halDocUrl;
 
 	onMount(() => {
 		const urlParams = new URLSearchParams($pageStore.url.search);
