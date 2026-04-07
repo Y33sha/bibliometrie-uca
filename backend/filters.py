@@ -71,6 +71,7 @@ def apply_source_filter(conditions: list, source_values: list[str]):
     SOURCE_MAP = {
         "hal": "hal",
         "oa": "openalex",
+        "scanr": "scanr",
         "wos": "wos",
     }
     for sv in source_values:

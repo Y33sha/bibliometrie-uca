@@ -478,6 +478,8 @@ async def export_publications_csv(
                 (SELECT ps.source_id FROM publication_sources ps
                  WHERE ps.publication_id = p.id AND ps.source = 'openalex' LIMIT 1) AS openalex_id,
                 (SELECT ps.source_id FROM publication_sources ps
+                 WHERE ps.publication_id = p.id AND ps.source = 'scanr' LIMIT 1) AS scanr_id,
+                (SELECT ps.source_id FROM publication_sources ps
                  WHERE ps.publication_id = p.id AND ps.source = 'wos' LIMIT 1) AS wos_id,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
@@ -571,7 +573,16 @@ async def get_publication(pub_id: int):
                          unnest(addr.countries) AS c
                     WHERE was2.wos_document_id = wd.id AND addr.countries IS NOT NULL)
             FROM wos_documents wd WHERE wd.publication_id = %s
-        """, (pub_id, pub_id, pub_id))
+            UNION ALL
+            SELECT 'scanr', sd.scanr_id, sd.doi, NULL,
+                   (SELECT array_agg(DISTINCT c ORDER BY c)
+                    FROM scanr_authorships sas2
+                    JOIN scanr_authorship_addresses saa ON saa.scanr_authorship_id = sas2.id
+                    JOIN addresses addr ON addr.id = saa.address_id,
+                         unnest(addr.countries) AS c
+                    WHERE sas2.scanr_document_id = sd.id AND addr.countries IS NOT NULL)
+            FROM scanr_documents sd WHERE sd.publication_id = %s
+        """, (pub_id, pub_id, pub_id, pub_id))
         sources = cur.fetchall()
 
         # c) Authorships — truth table
@@ -894,6 +905,8 @@ async def list_publications(
                 (SELECT ps.source_id FROM publication_sources ps
                  WHERE ps.publication_id = p.id AND ps.source = 'openalex' LIMIT 1) AS openalex_id,
                 (SELECT ps.source_id FROM publication_sources ps
+                 WHERE ps.publication_id = p.id AND ps.source = 'scanr' LIMIT 1) AS scanr_id,
+                (SELECT ps.source_id FROM publication_sources ps
                  WHERE ps.publication_id = p.id AND ps.source = 'wos' LIMIT 1) AS wos_id,
                 -- Corresponding author + authorship id (only meaningful with person_id filter)
                 (SELECT a.is_corresponding FROM authorships a
@@ -946,6 +959,7 @@ async def list_publications(
                 "publisher": row["publisher_name"],
                 "hal_id": row["hal_id"],
                 "openalex_id": row["openalex_id"],
+                "scanr_id": row["scanr_id"],
                 "wos_id": row["wos_id"],
                 "labs": row["labs"],
                 "apc": row["apc_details"],

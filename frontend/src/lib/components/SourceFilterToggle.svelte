@@ -19,6 +19,7 @@
 		sources = [
 			{ key: 'hal', label: 'HAL' },
 			{ key: 'oa', label: 'OpenAlex' },
+			{ key: 'scanr', label: 'ScanR' },
 			{ key: 'wos', label: 'WoS' }
 		],
 		states = $bindable({}),

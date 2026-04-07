@@ -61,6 +61,7 @@
 		journal: string | null;
 		hal_id: string | null;
 		openalex_id: string | null;
+		scanr_id: string | null;
 		wos_id: string | null;
 		labs: string | null;
 		apc: { amount: number; institution: string | null; lab_id: number | null; lab_acronym: string | null; budget_structure_id: number | null }[] | null;
@@ -396,6 +397,13 @@
 									{#if p.openalex_id}
 										<a href="https://openalex.org/{p.openalex_id}" target="_blank" rel="noopener" class="source-tag source-oa" title="OpenAlex: {p.openalex_id}">
 											<img src="https://raw.githubusercontent.com/ourresearch/openalex-gui/refs/heads/master/public/favicon.png" alt="OA" />
+										</a>
+									{:else}
+										<span class="source-tag source-placeholder"></span>
+									{/if}
+									{#if p.scanr_id}
+										<a href="https://scanr.enseignementsup-recherche.gouv.fr/publications/{p.scanr_id}" target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {p.scanr_id}">
+											<img src="{base}/scanr-icon.svg" alt="ScanR" />
 										</a>
 									{:else}
 										<span class="source-tag source-placeholder"></span>
