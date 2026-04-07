@@ -60,6 +60,33 @@ Actuellement, `addresses.countries` est assigné manuellement via l'interface ad
 
 **Note :** chantier conséquent, à planifier séparément.
 
+## Renommage is_uca → in_perimeter + populate_uca_flags → populate_affiliations
+
+Renommer pour abstraire le code de l'institution spécifique (réutilisabilité).
+
+**Colonnes à renommer :**
+- `is_uca` → `in_perimeter` sur hal_authorships, openalex_authorships, wos_authorships, scanr_authorships, authorships
+- Index associés (`idx_*_uca` → `idx_*_perimeter`)
+
+**Scripts à renommer :**
+- `processing/populate_uca_flags.py` → `processing/populate_affiliations.py`
+- `utils/uca_perimeter.py` → `utils/perimeter.py` (fonctions `get_uca_structure_ids` → `get_perimeter_ids`)
+
+**Références à mettre à jour :**
+- `run_pipeline.py` (phase uca_flags → affiliations)
+- `build_authorships.py` (propagation is_uca → in_perimeter)
+- Backend : routers qui filtrent sur is_uca
+- Frontend : filtres/facettes UCA
+
+**Approche :** un commit atomique avec migration SQL ALTER COLUMN + renommage fichiers + search-replace dans tout le code. À faire dans une session dédiée après la fin de l'intégration ScanR.
+
+## Tests d'idempotence — phases restantes
+
+Les tests d'idempotence couvrent la normalisation (4 sources + inter-sources, 11 tests). Reste à couvrir :
+- `create_persons_from_source_authorships.py` (risque de doublons de personnes)
+- `build_authorships.py` (risque de doublons d'authorships vérité)
+- `populate_uca_flags.py` (idempotent par construction, mais à vérifier)
+
 ## Uniformisation compatibilité de noms (Python vs SQL)
 
 Les fonctions de compatibilité de noms existent en deux versions :

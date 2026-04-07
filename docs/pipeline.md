@@ -54,8 +54,9 @@ flowchart LR
     A[API HAL]-->|extract_hal|B[staging_hal]
     C[API OpenAlex]-->|extract_openalex|D[staging_openalex]
     E[API WOS]-->|extract_wos|F[staging_wos]
+    G[API ScanR]-->|extract_scanr|H[staging_scanr]
     classDef new  fill:#bbf
-    class B,D,F new;
+    class B,D,F,H new;
 ```
 
 **Critères de requête**:
@@ -80,7 +81,7 @@ Pour éviter d'écraser ces publications lors de l'import suivant, un *hash* est
 Comble certaines lacunes dans les données moissonnées.
 
 1. **`fetch_missing_hal.py`** — télécharge depuis HAL les documents référencés comme source par des works OpenAlex mais absents de notre staging.
-2. **`cross_import_openalex.py`, `cross_import_hal.py`, `cross_import_wos.py`** — cherche dans chaque source les DOI trouvés dans les autres mais non trouvés dans cette source; la plupart sont effectivement absents, mais beaucoup sont repêchés (cause: affiliations différentes selon source).
+2. **`cross_import_openalex.py`, `cross_import_hal.py`, `cross_import_wos.py`, `cross_import_scanr.py`** — cherche dans chaque source les DOI trouvés dans les autres mais non trouvés dans cette source; la plupart sont effectivement absents, mais beaucoup sont repêchés (cause: affiliations différentes selon source).
 
 ### <span id='normalize'></span>Phase 3 — `normalize` : Normalisation
 
@@ -89,17 +90,20 @@ Transforme les données brutes (staging) en tables structurées par source.
 ```mermaid
 flowchart LR
     A[API HAL]-->B[staging_hal]-->|normalize_hal|G@{ shape: processes, label: "Tables HAL: 
-    hal_publications, hal_authors, hal_authorships, hal_structures" }
+    hal_documents, hal_authors, hal_authorships, hal_structures" }
     C[API OpenAlex]-->D[staging_openalex]-->|normalize_openalex|H@{ shape: processes, label: "Tables OpenAlex: 
-    openalex_publications, openalex_authors, openalex_authorships, openalex_structures" }
+    openalex_documents, openalex_authors, openalex_authorships, openalex_institutions" }
     E[API WOS]-->F[staging_wos]-->|normalize_wos|I@{ shape: processes, label: "Tables WOS: 
-    wos_publications, wos_authors, wos_authorships, wos_structures" }
+    wos_documents, wos_authors, wos_authorships, wos_organizations" }
+    K[API ScanR]-->L[staging_scanr]-->|normalize_scanr|M@{ shape: processes, label: "Tables ScanR: 
+    scanr_documents, scanr_authors, scanr_authorships, scanr_structures" }
     G-->J@{ shape: processes, label: "Tables canoniques: 
     publications, publishers, journals" }
     H-->J
     I-->J
+    M-->J
     classDef new  fill:#bbf
-    class G,H,I,J new;
+    class G,H,I,J,M new;
 ```
 
 Le processus de normalisation peuple non seulement les tables sources, mais aussi la table canonique **publications** et ses tables satellites **publishers** et **journals**.
@@ -118,9 +122,9 @@ Les tables sources sont indépendantes les unes des autres et s'organisent selon
 ```mermaid
 erDiagram 
     direction LR
-    Publications ||--|{ Authorships : a_pour_auteurs
-    Authors ||--|{ Authorships : est_auteur_de
-    Authorships }o--|{ Structures : est_affilie_a
+    documents ||--|{ authorships : a_pour_auteurs
+    authors ||--|{ authorships : est_auteur_de
+    authorships }o--|{ structures : est_affilie_a
 
 ```
 
@@ -128,12 +132,13 @@ erDiagram
 
 ### Phase 4 — `addresses` : Adresses et affiliations
 
-Cette étape extrait les adresses brutes des authorships sources (OpenAlex, WoS) et les relie aux structures. (Pour le détail des différences de gestion des affiliations d'une source à l'autre: cf [doc sources](sources#sources-affiliations))
+Cette étape extrait les adresses brutes des authorships sources (OpenAlex, WoS, ScanR) et les relie aux structures. (Pour le détail des différences de gestion des affiliations d'une source à l'autre: cf [doc sources](sources#sources-affiliations))
 
 ```mermaid
 flowchart LR
     A[openalex_authorships]-->|populate_addresses|B[addresses]
     C[wos_authorships]-->|populate_addresses|B
+    G[scanr_authorships]-->|populate_addresses|B
     D[structures]-->E[structure_name_forms]
     E-->|resolve_addresses|F[address_structures]
     B-->|resolve_addresses|F
@@ -157,10 +162,11 @@ flowchart LR
     B-->C
     C[addresses]-->|populate_uca_flags|D[openalex_authorships]
     C-->|populate_uca_flags|E[wos_authorships]
+    C-->|populate_uca_flags|H[wos_authorships]
     A-->F[hal_structures]--->|populate_uca_flags|G[hal_authorships]
     classDef new  fill:#bbf
     classDef valid  fill:#af5
-    class D,E,G new;
+    class D,E,G,H new;
     class A valid;
 ```
 
@@ -181,11 +187,14 @@ Script : `processing/harvest_hal_identifiers.py`
 
 Interroge l'API `ref/author` de HAL pour récupérer les ORCID et IdRef des `hal_authors` avec `hal_person_id`. Met à jour `hal_authors` et `person_identifiers`.
 
-Placée avant la phase `persons` pour que la création de personnes dispose des identifiants. Les ORCID du staging HAL (`authOrcid_s`) sont déjà exploités à la normalisation (phase 2) ; ce script complète avec les ORCID qui ne sont pas dans les métadonnées des publications, + les identifiants IdRef. (TODO: vérifier s'il n'y a pas des idref dans le staging)
+Placée avant la phase `persons` pour que la création de personnes dispose des identifiants. Les ORCID du staging HAL (`authOrcid_s`) sont déjà exploités à la normalisation (phase 2) ; ce script complète avec les ORCID qui ne sont pas dans les métadonnées des publications, + les identifiants IdRef. <!--TODO: vérifier s'il n'y a pas des idref dans le staging de HAL.-->
 
 Exécutée en mode `full` et `monthly` uniquement.
 
-L'opération équivalente ne serait pas pertinente sur les autres sources: les `openalex_authors` et `wos_authors` sont des entités créées de manière algorithmique et peu fiable (fréquent saucissonnage d'un auteur en entités multiples; parfois fusion de plusieurs personnes dans la même entité). Les `hal_authors` moissonnés correspondent à des comptes HAL réels, et les identifiants qui y sont associés ont été ajoutés directement par les chercheurs.
+L'opération équivalente ne serait pas pertinente sur les autres sources:
+- les `openalex_authors` et `wos_authors` sont des entités créées de manière algorithmique et peu fiable (fréquent saucissonnage d'un auteur en entités multiples; parfois fusion de plusieurs personnes dans la même entité). Les `hal_authors` moissonnés correspondent à des comptes HAL réels, et les identifiants qui y sont associés ont été ajoutés directement par les chercheurs.
+
+<!--TODO: Vérifier si l'API Personnes de ScanR apporte une plus-value par rapport aux données récupérées avec les métadonnées des documents.-->
 
 
 ### <span id='creation-personnes'></span>Phase 7 — `persons` : Création de personnes
@@ -205,7 +214,7 @@ L'opération équivalente ne serait pas pertinente sur les autres sources: les `
 Fonctions de compatibilité de noms dans `utils/names.py`.
 
 
-### Phase 8 — `authorships` : Construction des authorships canoniques
+### <span id='authorships'></span>Phase 8 — `authorships` : Construction des authorships canoniques
 
 **`build_authorships.py`** construit la table `authorships` en 4 étapes :
 
@@ -219,15 +228,13 @@ Les authorships sources marquées `excluded = TRUE` sont ignorées à toutes les
 
 ### Phase 9 — `countries` : Pays des publications
 
-Script : `processing/refresh_publication_countries.py`
+Trois scripts enchaînés :
 
-Deux étapes :
-1. **HAL** : propage `hal_structures.country` → `hal_documents.countries`
-2. **Publications** : recalcule `publications.countries` en faisant l'union des pays des 3 sources (HAL via structures, OpenAlex/WoS via adresses résolues)
+1. **`scripts/detect_address_countries.py`** : détection automatique du pays des adresses sans pays. Parse le dernier segment après la dernière virgule et le matche contre la table `country_name_forms` (276 formes, 140 pays, variantes anglais/français/codes ISO/abréviations WoS). Rapide et fiable (seul le dernier segment est analysé, pas de faux positif).
 
-Les pays des adresses (`addresses.countries`) sont assignés manuellement via l'interface admin ou par suggestion automatique (`scripts/suggest_address_countries.py`).
+2. **`scripts/suggest_address_countries.py`** : pour les adresses restantes (pays absent du dernier segment), cherche une adresse similaire avec pays connu via LIKE sur le texte normalisé. Plus lent, résultats stockés dans `suggested_countries` (validation manuelle via l'interface admin).
 
-TODO: Automatiser la détection des pays des adresses
+3. **`processing/refresh_publication_countries.py`** : recalcule `publications.countries` en faisant l'union des pays des 4 sources (HAL via structures, OpenAlex/WoS/ScanR via adresses résolues).
 
 ### Phase 10 — `enrich` : Enrichissements optionnels
 
@@ -237,6 +244,78 @@ Exécutée uniquement en mode `full` et `monthly` :
 |--------|------|
 | `processing/enrich_oa_unpaywall.py` | Statut OA via API Unpaywall |
 | `processing/enrich_journal_apc.py` | Coûts APC via API OpenAlex Sources |
+
+## <span id='tables-canoniques'></span>Peuplement des tables canoniques
+
+
+1. Les **structures** préexistent au pipeline.
+
+```mermaid
+flowchart LR
+    subgraph vérité
+    direction LR
+    A[publications]-.-B[authorships]
+    C[persons]-.-B
+    B-.-F[structures]
+    end
+    classDef valid  fill:#af5
+    class F valid;
+```
+
+2. La [phase 3](#normalize) (`normalize`) peuple la table **publications** par mapping et fusion à partir des publications sources.
+
+```mermaid
+flowchart LR
+    G@{ shape: processes, label: "*_publications\n(sources)"}-->A
+
+    subgraph vérité
+    direction LR
+    A[publications]-.-B[authorships]
+    C[persons]-.-B
+    B-.-F[structures]
+    end
+    classDef valid  fill:#af5
+    class F,A valid;
+```
+
+3. Après repérage des affiliations dans les authorships sources, la [phase 7](#creation-personnes) `persons` crée les **personnes** correspondant aux *authorships* UCA (ou les mappe aux personnes existantes).
+
+```mermaid
+flowchart LR
+    G@{ shape: processes, label: "*_publications\n(sources)"}-->A
+    H@{ shape: processes, label: "*_authorships\n(sources)\nis_uca = true"}---G
+    H-->C
+
+    subgraph vérité
+    direction LR
+    A[publications]-.-B[authorships]
+    C[persons]-.-B
+    B-.-F[structures]
+    end
+    classDef valid  fill:#af5
+    class F,A,C valid;
+```
+
+4. Les **authorships** canoniques sont déduites à partir des sources dans la [phase 8](#authorships) (`authorships`). L'information (`person_id`, `structure_ids`) est donc répliquée dans la table canonique, pour deux raisons:
+- simplifier les requêtes;
+- servir de source d'autorité ultime en cas d'erreur dans une des sources (une authorship source peut être `excluded`).
+
+```mermaid
+flowchart LR
+    G@{ shape: processes, label: "*_publications\n(sources)"}---A
+    H@{ shape: processes, label: "*_authorships\n(sources)\nis_uca = true"}---G
+    H---C
+
+    subgraph vérité
+    direction LR
+    A[publications]-->B[authorships]
+    C[persons]-->B
+    B---F[structures]
+    end
+    classDef valid  fill:#af5
+    class F,A,C,B valid;
+```
+
 
 ## Utilitaires partagés
 

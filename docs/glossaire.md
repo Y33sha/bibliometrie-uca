@@ -6,11 +6,13 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 
 | Terme | Définition |
 |-------|-----------|
-| **HAL** | Archive ouverte nationale française. Les chercheurs y déposent volontairement leurs publications en texte intégral. Bonne couverture en SHS, plus faible en sciences dures. |
-| **OpenAlex** | Index bibliographique ouvert (successeur de Microsoft Academic). Couverture très large (>200M de publications), rattachement institutionnel algorithmique. |
-| **Web of Science (WoS)** | Index bibliographique commercial (Clarivate). Couverture sélective mais métadonnées de qualité. Accès par API payante avec quota annuel. |
+| **HAL** | Archive ouverte nationale française. |
+| **AuréHAL** | Référentiel d'entités HAL (auteurs, structures, revues). |
+| **OpenAlex** | Index bibliographique ouvert (successeur de Microsoft Academic). |
+| **Web of Science (WoS)** | Index bibliographique commercial (Clarivate). |
 | **Unpaywall** | Service qui associe un statut d'accès ouvert à chaque DOI. Utilisé pour enrichir le champ `oa_status` des publications. |
 | **OpenAPC** | TODO |
+| **ScanR** | TODO |
 
 
 ## Identifiants
@@ -21,7 +23,6 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 | **ORCID** | Identifiant unique d'un chercheur (ex: `0000-0001-2345-6789`). Créé par le chercheur. |
 | **idHAL** | Identifiant auteur dans HAL. Créé par le chercheur dans son profil HAL. |
 | **IdRef** | Identifiant auteur créé et maintenu par l'ABES (Agence bibliographique de l'enseignement supérieur). |
-| **AuréHAL** | Référentiel d'entités HAL (auteurs, structures, revues). |
 | **ROR** | Research Organization Registry. Identifiant unique d'une institution de recherche (ex: `https://ror.org/01a8ajp46` pour l'UCA). |
 
 ## Édition scientifique
