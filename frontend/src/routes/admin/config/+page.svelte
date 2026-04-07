@@ -90,10 +90,15 @@
 <!-- ═══ API ═══ -->
 <h3 class="section-title">API</h3>
 <div class="config-grid">
-	{#each ["openalex_email", "wos_api_key"] as key}
+	{#each ["openalex_email", "wos_api_key", "scanr_username", "scanr_password"] as key}
 		{#if configByKey(key)}
 			<div class="config-row">
-				<span class="config-label">{key === "openalex_email" ? "OpenAlex — Email (polite pool)" : "WoS — Clé API"}</span>
+				<span class="config-label">{
+					key === "openalex_email" ? "OpenAlex — Email (polite pool)" :
+					key === "wos_api_key" ? "WoS — Clé API" :
+					key === "scanr_username" ? "ScanR — Identifiant" :
+					key === "scanr_password" ? "ScanR — Mot de passe" : key
+				}</span>
 				{#if editingKey === key}
 					<input class="config-editor-inline" style="width: 300px;" bind:value={editValue} onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(key); }}} />
 					<button class="btn btn-sm btn-primary" onclick={() => save(key)} disabled={saving}>OK</button>
@@ -158,6 +163,21 @@
 			{:else}
 				<span class="config-value-inline">{Array.isArray(configByKey("wos_affiliations")?.value) ? configByKey("wos_affiliations")?.value.join(", ") : configByKey("wos_affiliations")?.value}</span>
 				<button class="btn btn-sm" onclick={() => startEdit("wos_affiliations")}>Modifier</button>
+			{/if}
+		</div>
+	{/if}
+	{#if configByKey("scanr_affiliation_ids")}
+		<div class="config-row">
+			<span class="config-label">ScanR — Affiliations SIREN</span>
+			{#if editingKey === "scanr_affiliation_ids"}
+				<textarea class="config-editor" bind:value={editValue} rows={3}></textarea>
+				<div class="config-actions">
+					<button class="btn btn-sm btn-primary" onclick={() => save("scanr_affiliation_ids")} disabled={saving}>OK</button>
+					<button class="btn btn-sm" onclick={() => { editingKey = null; }}>Annuler</button>
+				</div>
+			{:else}
+				<span class="config-value-inline">{Array.isArray(configByKey("scanr_affiliation_ids")?.value) ? configByKey("scanr_affiliation_ids")?.value.join(", ") : configByKey("scanr_affiliation_ids")?.value}</span>
+				<button class="btn btn-sm" onclick={() => startEdit("scanr_affiliation_ids")}>Modifier</button>
 			{/if}
 		</div>
 	{/if}

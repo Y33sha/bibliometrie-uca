@@ -149,3 +149,30 @@ def get_wos_api_key(cur) -> str:
         return WOS.get("api_key", "")
     except ImportError:
         return ""
+
+
+def get_scanr_affiliation_ids(cur) -> list[str]:
+    """Retourne les IDs SIREN des structures ScanR."""
+    val = _get_from_db(cur, "scanr_affiliation_ids")
+    if val and isinstance(val, list):
+        return val
+
+    try:
+        from config.settings import SCANR
+        return SCANR.get("affiliation_ids", [])
+    except ImportError:
+        return []
+
+
+def get_scanr_credentials(cur) -> tuple[str, str]:
+    """Retourne (username, password) pour l'API ScanR."""
+    user = _get_from_db(cur, "scanr_username")
+    pwd = _get_from_db(cur, "scanr_password")
+    if user and pwd:
+        return user, pwd
+
+    try:
+        from config.settings import SCANR
+        return SCANR.get("username", ""), SCANR.get("password", "")
+    except ImportError:
+        return "", ""
