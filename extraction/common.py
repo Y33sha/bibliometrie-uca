@@ -25,6 +25,7 @@ def get_existing_ids(conn, table: str, column: str) -> set:
         ("staging_openalex", "openalex_id"),
         ("staging_hal", "halid"),
         ("staging_wos", "ut"),
+        ("staging_scanr", "scanr_id"),
     }
     if (table, column) not in allowed:
         raise ValueError(f"Combinaison table/colonne non autorisée : {table}.{column}")
