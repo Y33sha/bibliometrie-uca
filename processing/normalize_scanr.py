@@ -305,7 +305,17 @@ def process_work(cur, staging_row) -> bool:
         timings["journal"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        publication_id, is_new = find_or_insert_publication(cur, doc, journal_id)
+        # Si le scanr_document existe déjà (relance idempotente),
+        # réutiliser sa publication plutôt que d'en créer une nouvelle
+        cur.execute(
+            "SELECT publication_id FROM scanr_documents WHERE scanr_id = %s",
+            (scanr_id,))
+        existing_doc = cur.fetchone()
+        if existing_doc and existing_doc["publication_id"]:
+            publication_id = existing_doc["publication_id"]
+            is_new = False
+        else:
+            publication_id, is_new = find_or_insert_publication(cur, doc, journal_id)
         timings["publication"] = time.perf_counter() - t0
 
         if not publication_id:
