@@ -138,7 +138,8 @@ def phase_authorships(**kw):
 
 
 def phase_countries(**kw):
-    """Phase 8 : Recalcul des pays des publications."""
+    """Phase 8 : Détection pays des adresses + recalcul pays des publications."""
+    run_python("scripts/suggest_address_countries.py", "--direct", "--apply")
     run_python("processing/refresh_publication_countries.py")
 
 
