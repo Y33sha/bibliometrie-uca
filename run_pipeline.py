@@ -10,10 +10,11 @@ Usage:
     python3 run_pipeline.py --dry-run          # Afficher sans exécuter
     python3 run_pipeline.py --mode weekly      # Import incrémental (6 derniers mois)
     python3 run_pipeline.py --mode monthly     # Repasse complète + cross-imports
-    python3 run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement (sans WoS)
+    python3 run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement
+    python3 run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
 
 Phases:
-    extract       Extraction des 3 sources (staging) + refetch truncated
+    extract       Extraction des sources (staging) + refetch truncated
     cross_imports Cross-imports entre sources (DOIs manquants, refs HAL)
     normalize     Normalisation staging → tables sources + merge inter-sources
     addresses     Adresses: extraction, résolution, pays
@@ -46,27 +47,30 @@ BASE = Path(__file__).resolve().parent
 # Définition des phases
 # ---------------------------------------------------------------------------
 
-def phase_extract(mode="full", sources=None, **kw):
+def phase_extract(mode="full", sources=None, year=None, **kw):
     """Phase 1 : Extraction des sources vers staging + refetch truncated.
 
     Les années sont déterminées par la config DB (pipeline_years_full/weekly).
     Les scripts d'extraction lisent la config directement.
     En mode weekly, WoS est exclu pour économiser le crédit API.
     """
-    sources = sources or {"hal", "openalex", "wos"}
+    sources = sources or {"hal", "openalex", "wos", "scanr"}
+    year_args = ["--year", str(year)] if year else []
     if mode == "weekly":
         log.info("Mode hebdomadaire (WoS exclu)")
         if "openalex" in sources:
-            run_python("extraction/openalex/extract_openalex.py", "--mode", "weekly")
+            run_python("extraction/openalex/extract_openalex.py", "--mode", "weekly", *year_args)
         if "hal" in sources:
-            run_python("extraction/hal/extract_hal.py", "--mode", "weekly")
+            run_python("extraction/hal/extract_hal.py", "--mode", "weekly", *year_args)
     else:
         if "openalex" in sources:
-            run_python("extraction/openalex/extract_openalex.py", "--mode", mode)
+            run_python("extraction/openalex/extract_openalex.py", "--mode", mode, *year_args)
         if "hal" in sources:
-            run_python("extraction/hal/extract_hal.py", "--mode", mode)
+            run_python("extraction/hal/extract_hal.py", "--mode", mode, *year_args)
         if "wos" in sources:
-            run_python("extraction/wos/extract_wos.py", "--mode", mode)
+            run_python("extraction/wos/extract_wos.py", "--mode", mode, *year_args)
+        if "scanr" in sources:
+            run_python("extraction/scanr/extract_scanr.py", *year_args)
     # Re-fetch des publications OA tronquées à 100 auteurs (lit le staging, pas les tables normalisées)
     if "openalex" in (sources or {"openalex"}):
         run_python("extraction/openalex/refetch_truncated.py")
@@ -78,6 +82,7 @@ def phase_cross_imports(mode="full", **kw):
         run_python("processing/fetch_missing_hal.py")
         run_python("extraction/openalex/cross_import_openalex.py")
         run_python("extraction/hal/cross_import_hal.py")
+        run_python("extraction/scanr/cross_import_scanr.py")
     else:
         log.info("Cross-imports ignorés en mode hebdomadaire")
 
@@ -193,8 +198,10 @@ def main():
                         help="Afficher les étapes sans exécuter")
     parser.add_argument("--mode", choices=["full", "weekly", "monthly"], default="full",
                         help="Mode d'exécution (défaut: full)")
-    parser.add_argument("--sources", default="hal,openalex,wos",
-                        help="Sources à extraire, séparées par des virgules (défaut: hal,openalex,wos)")
+    parser.add_argument("--sources", default="hal,openalex,wos,scanr",
+                        help="Sources à extraire, séparées par des virgules (défaut: hal,openalex,wos,scanr)")
+    parser.add_argument("--year", type=int,
+                        help="Surcharger l'année d'extraction (une seule année)")
     args = parser.parse_args()
 
     if args.list:
@@ -240,7 +247,7 @@ def main():
         log.info("PHASE : %s", name)
         log.info("─" * 40)
         try:
-            fn(mode=args.mode, sources=sources)
+            fn(mode=args.mode, sources=sources, year=args.year)
         except RuntimeError as e:
             log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
             log.error("Pour reprendre : python3 run_pipeline.py --from %s", name)
