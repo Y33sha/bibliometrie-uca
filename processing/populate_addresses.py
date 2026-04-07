@@ -38,6 +38,12 @@ SOURCES = {
         "link_table": "wos_authorship_addresses",
         "fk_column": "wos_authorship_id",
     },
+    "scanr": {
+        "authorship_table": "scanr_authorships",
+        "link_table": "scanr_authorship_addresses",
+        "fk_column": "scanr_authorship_id",
+        "jsonb": True,  # les adresses sont dans raw_affiliations (JSONB)
+    },
 }
 
 
@@ -69,15 +75,25 @@ def process_source(conn, cur, source_name: str):
 
     t_start = time.perf_counter()
 
-    # ─── Étape 1 : extraire les raw_affiliation ───
-    logger.info(f"[{source_name}] Extraction des raw_affiliation depuis {table}...")
+    # ─── Étape 1 : extraire les adresses ───
+    is_jsonb = cfg.get("jsonb", False)
 
-    cur.execute(f"""
-        SELECT id, raw_affiliation
-        FROM {table}
-        WHERE raw_affiliation IS NOT NULL
-          AND raw_affiliation != ''
-    """)
+    if is_jsonb:
+        logger.info(f"[{source_name}] Extraction des adresses depuis {table}.raw_affiliations (JSONB)...")
+        cur.execute(f"""
+            SELECT id, raw_affiliations
+            FROM {table}
+            WHERE raw_affiliations IS NOT NULL
+        """)
+    else:
+        logger.info(f"[{source_name}] Extraction des raw_affiliation depuis {table}...")
+        cur.execute(f"""
+            SELECT id, raw_affiliation
+            FROM {table}
+            WHERE raw_affiliation IS NOT NULL
+              AND raw_affiliation != ''
+        """)
+
     rows = cur.fetchall()
     logger.info(f"  {len(rows)} lignes avec affiliation")
 
@@ -88,11 +104,15 @@ def process_source(conn, cur, source_name: str):
     # Collecter toutes les adresses individuelles et leurs liens
     addr_to_as_ids: dict[str, set[int]] = {}
     for as_id, raw in rows:
-        parts = raw.split(" | ")
+        if is_jsonb:
+            # raw est un tableau d'objets JSON avec un champ "name"
+            affiliations = raw if isinstance(raw, list) else []
+            parts = [aff.get("name", "").strip() for aff in affiliations
+                     if isinstance(aff, dict) and aff.get("name")]
+        else:
+            parts = [p.strip() for p in raw.split(" | ") if p.strip()]
+
         for part in parts:
-            part = part.strip()
-            if not part:
-                continue
             if part not in addr_to_as_ids:
                 addr_to_as_ids[part] = set()
             addr_to_as_ids[part].add(as_id)
@@ -243,6 +263,12 @@ def main():
                 JOIN wos_authorships was ON was.id = waa.wos_authorship_id
                 JOIN wos_documents wd ON wd.id = was.wos_document_id
                 WHERE wd.publication_id IS NOT NULL
+                UNION
+                SELECT saa.address_id, sd.publication_id
+                FROM scanr_authorship_addresses saa
+                JOIN scanr_authorships sas ON sas.id = saa.scanr_authorship_id
+                JOIN scanr_documents sd ON sd.id = sas.scanr_document_id
+                WHERE sd.publication_id IS NOT NULL
             ) t
             GROUP BY address_id
         ) sub
