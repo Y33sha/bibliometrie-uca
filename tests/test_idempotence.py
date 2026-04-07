@@ -713,3 +713,130 @@ class TestNormalizeInterSourceIdempotence:
             WHERE title_normalized LIKE '%%geochemistry international%%'
         """)
         assert db.fetchone()["cnt"] == 1, "Le journal partagé ne doit exister qu'une fois"
+
+
+# ══════════════════════════════════════════════════════════════════
+# create_persons_from_source_authorships
+# ══════════════════════════════════════════════════════════════════
+
+def _setup_persons_test_data(db):
+    """Crée une chaîne complète de données pour tester create_persons :
+    publications → hal_documents → hal_authors → hal_authorships (is_uca=TRUE)
+    """
+    # Publications
+    db.execute("""
+        INSERT INTO publications (id, title, title_normalized, doc_type, pub_year)
+        VALUES (90001, 'Test Pub Alpha', 'test pub alpha', 'article', 2024),
+               (90002, 'Test Pub Beta', 'test pub beta', 'thesis', 2024)
+    """)
+
+    # HAL documents
+    db.execute("""
+        INSERT INTO hal_documents (id, halid, title, pub_year, doc_type, publication_id)
+        VALUES (90001, 'hal-90000001', 'Test Pub Alpha', 2024, 'ART', 90001),
+               (90002, 'hal-90000002', 'Test Pub Beta', 2024, 'THESE', 90002)
+    """)
+
+    # HAL authors (avec hal_person_id pour l'étape 0)
+    db.execute("""
+        INSERT INTO hal_authors (id, hal_person_id, full_name, last_name, first_name, orcid)
+        VALUES (90001, 900001, 'Eve Leroy', 'Leroy', 'Eve', '0000-0001-9999-0001'),
+               (90002, 900002, 'Frank Moreau', 'Moreau', 'Frank', NULL),
+               (90003, NULL, 'Grace Petit', 'Petit', 'Grace', NULL)
+    """)
+
+    # HAL authorships (is_uca=TRUE, person_id=NULL)
+    db.execute("""
+        INSERT INTO hal_authorships
+            (id, hal_document_id, hal_author_id, author_position, is_uca,
+             person_id, author_name_normalized)
+        VALUES
+            (90001, 90001, 90001, 0, TRUE, NULL, 'eve leroy'),
+            (90002, 90001, 90002, 1, TRUE, NULL, 'frank moreau'),
+            (90003, 90002, 90001, 0, TRUE, NULL, 'eve leroy'),
+            (90004, 90002, 90003, 1, TRUE, NULL, 'grace petit')
+    """)
+
+
+def _run_create_persons(db):
+    """Exécute create_persons sur le curseur de test."""
+    from processing.create_persons_from_source_authorships import (
+        get_all_unlinked_authorships, load_linked_authorships_by_pub,
+        load_name_form_map, step0_hal_accounts, step1_cross_source,
+        step2_orcid, step3_name_forms,
+    )
+
+    all_authorships = get_all_unlinked_authorships(db)
+    linked_ids = set()
+
+    step0_hal_accounts(db, all_authorships, linked_ids, dry_run=False)
+    linked_index = load_linked_authorships_by_pub(db)
+    step1_cross_source(db, all_authorships, linked_ids, linked_index, dry_run=False)
+    step2_orcid(db, all_authorships, linked_ids, dry_run=False)
+    name_form_map = load_name_form_map(db)
+    step3_name_forms(db, all_authorships, linked_ids, name_form_map, dry_run=False)
+
+    return len(linked_ids)
+
+
+def _count_persons_tables(db) -> dict:
+    counts = {}
+    for t in ["persons", "person_name_forms", "person_identifiers"]:
+        db.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
+        counts[t] = db.fetchone()["cnt"]
+    # Aussi les authorships rattachées
+    db.execute("SELECT COUNT(*) AS cnt FROM hal_authorships WHERE person_id IS NOT NULL")
+    counts["hal_as_linked"] = db.fetchone()["cnt"]
+    return counts
+
+
+class TestCreatePersonsIdempotence:
+    """create_persons produit le même résultat si lancé deux fois."""
+
+    def test_double_run_same_counts(self, db):
+        _setup_persons_test_data(db)
+
+        # Passe 1
+        linked_1 = _run_create_persons(db)
+        counts_1 = _count_persons_tables(db)
+
+        assert linked_1 == 4, f"4 authorships à rattacher, got {linked_1}"
+        assert counts_1["hal_as_linked"] == 4
+
+        # Reset : remettre person_id à NULL sur les authorships
+        # (mais PAS sur hal_authors — en production, hal_authors.person_id
+        # persiste entre les relances via le dual-write)
+        db.execute("UPDATE hal_authorships SET person_id = NULL")
+
+        # Passe 2
+        _run_create_persons(db)
+        counts_2 = _count_persons_tables(db)
+
+        assert counts_2 == counts_1, (
+            f"Compteurs différents après 2e passe !\n"
+            f"  1ère : {counts_1}\n  2ème : {counts_2}"
+        )
+
+    def test_same_hal_person_id_one_person(self, db):
+        """Deux authorships avec le même hal_person_id → une seule personne."""
+        _setup_persons_test_data(db)
+        _run_create_persons(db)
+
+        # Eve Leroy (hal_person_id=900001) apparaît sur 2 documents
+        db.execute("""
+            SELECT DISTINCT person_id FROM hal_authorships
+            WHERE hal_author_id = 90001 AND person_id IS NOT NULL
+        """)
+        rows = db.fetchall()
+        assert len(rows) == 1, "Eve Leroy devrait être une seule personne"
+
+    def test_orcid_registered(self, db):
+        """L'ORCID d'Eve Leroy est enregistré dans person_identifiers."""
+        _setup_persons_test_data(db)
+        _run_create_persons(db)
+
+        db.execute("""
+            SELECT COUNT(*) AS cnt FROM person_identifiers
+            WHERE id_type = 'orcid' AND id_value = '0000-0001-9999-0001'
+        """)
+        assert db.fetchone()["cnt"] == 1
