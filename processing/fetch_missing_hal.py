@@ -35,15 +35,19 @@ HAL_API = "https://api.archives-ouvertes.fr/search"
 REQUEST_DELAY = 0.3
 
 
-def find_hal_primary_locations(cur) -> list[dict]:
+def find_hal_primary_locations(cur, all_staged: bool = False) -> list[dict]:
     """
     Trouve les works OpenAlex dont la primary_location pointe vers HAL.
     Parcourt staging_openalex.raw_data pour extraire le landing_page_url.
+    Par défaut, ne considère que les documents non encore normalisés (processed=FALSE).
+    Avec all_staged=True, considère tout le staging.
     Retourne [{openalex_id, hal_id, landing_url}, ...]
     """
-    cur.execute("""
+    processed_filter = "" if all_staged else " WHERE processed = FALSE"
+    cur.execute(f"""
         SELECT openalex_id, raw_data
         FROM staging_openalex
+        {processed_filter}
     """)
 
     results = []
@@ -141,6 +145,8 @@ def main():
                         help="Lister sans télécharger")
     parser.add_argument("--stats", action="store_true",
                         help="Statistiques uniquement")
+    parser.add_argument("--all", action="store_true",
+                        help="Considérer tout le staging (pas seulement les non-normalisés)")
     args = parser.parse_args()
 
     conn = get_connection()
@@ -148,7 +154,7 @@ def main():
 
     # 1. Trouver les OpenAlex pointant vers HAL
     log.info("Recherche des works OpenAlex avec primary_location HAL...")
-    hal_refs = find_hal_primary_locations(cur)
+    hal_refs = find_hal_primary_locations(cur, all_staged=args.all)
     log.info(f"  {len(hal_refs)} works OpenAlex pointent vers HAL")
 
     if not hal_refs:

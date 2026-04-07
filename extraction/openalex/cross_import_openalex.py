@@ -26,7 +26,7 @@ from psycopg2.extras import Json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config.settings import OPENALEX
 from db.connection import get_connection
-from extraction.common import compute_hash, clean_doi, setup_logger
+from extraction.common import compute_hash, clean_doi, get_cross_import_dois, setup_logger
 
 # ----- Logging -----
 logger = setup_logger("cross_import_openalex", os.path.join(os.path.dirname(__file__), "logs"))
@@ -40,25 +40,6 @@ SELECT_FIELDS = ",".join([
     "biblio", "is_retracted",
 ])
 
-
-def get_missing_dois(conn) -> list[str]:
-    """
-    Retourne les DOI présents dans HAL ou WoS mais absents
-    du staging OpenAlex (et des openalex_documents).
-    """
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT DISTINCT doi FROM (
-                SELECT doi FROM staging_hal WHERE doi IS NOT NULL
-                UNION
-                SELECT doi FROM staging_wos WHERE doi IS NOT NULL
-            ) src
-            WHERE doi NOT IN (
-                SELECT doi FROM staging_openalex WHERE doi IS NOT NULL
-            )
-            ORDER BY doi
-        """)
-        return [row[0] for row in cur.fetchall()]
 
 
 def extract_openalex_id(work: dict) -> str:
@@ -113,11 +94,13 @@ def main():
     parser.add_argument("--limit", type=int, help="Nombre max de DOI à traiter")
     parser.add_argument("--normalize", action="store_true",
                         help="Lancer la normalisation après import")
+    parser.add_argument("--all", action="store_true",
+                        help="Considérer tout le staging (pas seulement les non-normalisés)")
     args = parser.parse_args()
 
     conn = get_connection()
     try:
-        dois = get_missing_dois(conn)
+        dois = get_cross_import_dois(conn, "openalex", all_staged=args.all)
         logger.info(f"{len(dois)} DOI à chercher sur OpenAlex")
 
         if args.dry_run:

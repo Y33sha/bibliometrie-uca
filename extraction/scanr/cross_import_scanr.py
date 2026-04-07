@@ -24,31 +24,13 @@ from psycopg2.extras import Json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config.settings import SCANR
 from db.connection import get_connection
-from extraction.common import compute_hash, clean_doi, setup_logger
+from extraction.common import compute_hash, clean_doi, get_cross_import_dois, setup_logger
 from utils.app_config import get_scanr_credentials
 
 logger = setup_logger("cross_import_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 
 BATCH_SIZE = 50  # nombre de DOI par requête ES (terms query)
 
-
-def get_missing_dois(conn) -> list[str]:
-    """DOI présents dans d'autres sources mais absents du staging ScanR."""
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT DISTINCT doi FROM (
-                SELECT doi FROM staging_hal WHERE doi IS NOT NULL
-                UNION
-                SELECT doi FROM staging_openalex WHERE doi IS NOT NULL
-                UNION
-                SELECT doi FROM staging_wos WHERE doi IS NOT NULL
-            ) src
-            WHERE lower(doi) NOT IN (
-                SELECT lower(doi) FROM staging_scanr WHERE doi IS NOT NULL
-            )
-            ORDER BY doi
-        """)
-        return [row[0] for row in cur.fetchall()]
 
 
 def fetch_by_dois(url: str, auth: tuple, dois: list[str]) -> list[dict]:
@@ -68,6 +50,8 @@ def main():
     parser = argparse.ArgumentParser(description="Cross-import ScanR")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--limit", type=int, help="Nombre max de DOI")
+    parser.add_argument("--all", action="store_true",
+                        help="Considérer tout le staging (pas seulement les non-normalisés)")
     args = parser.parse_args()
 
     conn = get_connection()
@@ -76,7 +60,7 @@ def main():
                      "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search")
     auth = (username, password)
 
-    missing = get_missing_dois(conn)
+    missing = get_cross_import_dois(conn, "scanr", all_staged=args.all)
     if args.limit:
         missing = missing[:args.limit]
 

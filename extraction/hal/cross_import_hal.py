@@ -26,7 +26,7 @@ from psycopg2.extras import Json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config.settings import HAL
 from db.connection import get_connection
-from extraction.common import compute_hash, setup_logger
+from extraction.common import compute_hash, get_cross_import_dois, setup_logger
 from utils.hal import HAL_FIELDS_STR
 
 # ----- Logging -----
@@ -34,25 +34,6 @@ logger = setup_logger("cross_import_hal", os.path.join(os.path.dirname(__file__)
 
 HAL_API = "https://api.archives-ouvertes.fr/search"
 
-
-def get_missing_dois(conn) -> list[str]:
-    """
-    Retourne les DOI présents dans OpenAlex ou WoS mais absents
-    du staging HAL (et des hal_documents).
-    """
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT DISTINCT doi FROM (
-                SELECT doi FROM staging_openalex WHERE doi IS NOT NULL
-                UNION
-                SELECT doi FROM staging_wos WHERE doi IS NOT NULL
-            ) src
-            WHERE doi NOT IN (
-                SELECT doi FROM staging_hal WHERE doi IS NOT NULL
-            )
-            ORDER BY doi
-        """)
-        return [row[0] for row in cur.fetchall()]
 
 
 def fetch_by_doi(doi: str) -> dict | None:
@@ -117,11 +98,13 @@ def main():
     parser.add_argument("--limit", type=int, help="Nombre max de DOI à traiter")
     parser.add_argument("--normalize", action="store_true",
                         help="Lancer la normalisation après import")
+    parser.add_argument("--all", action="store_true",
+                        help="Considérer tout le staging (pas seulement les non-normalisés)")
     args = parser.parse_args()
 
     conn = get_connection()
     try:
-        dois = get_missing_dois(conn)
+        dois = get_cross_import_dois(conn, "hal", all_staged=args.all)
         logger.info(f"{len(dois)} DOI à chercher sur HAL")
 
         if args.dry_run:

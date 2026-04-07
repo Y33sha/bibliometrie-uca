@@ -21,7 +21,7 @@ from psycopg2.extras import Json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config.settings import WOS
 from db.connection import get_connection
-from extraction.common import compute_hash, setup_logger
+from extraction.common import compute_hash, get_cross_import_dois, setup_logger
 
 # ----- Logging -----
 logger = setup_logger("cross_import_wos", os.path.join(os.path.dirname(__file__), "logs"))
@@ -169,24 +169,14 @@ def main():
     parser = argparse.ArgumentParser(description="Cross-import WoS par DOI")
     parser.add_argument("--dry-run", action="store_true", help="Compte sans insérer")
     parser.add_argument("--limit", type=int, default=0, help="Limite de DOIs à traiter")
+    parser.add_argument("--all", action="store_true",
+                        help="Considérer tout le staging (pas seulement les non-normalisés)")
     args = parser.parse_args()
 
     conn = get_connection()
     cur = conn.cursor()
 
-    # DOIs présents dans HAL ou OpenAlex mais absents du staging WoS
-    cur.execute("""
-        SELECT DISTINCT doi FROM (
-            SELECT doi FROM staging_hal WHERE doi IS NOT NULL
-            UNION
-            SELECT doi FROM staging_openalex WHERE doi IS NOT NULL
-        ) src
-        WHERE doi NOT IN (
-            SELECT doi FROM staging_wos WHERE doi IS NOT NULL
-        )
-        ORDER BY doi
-    """)
-    all_dois = [r[0] for r in cur.fetchall()]
+    all_dois = get_cross_import_dois(conn, "wos", all_staged=args.all)
     logger.info(f"{len(all_dois)} DOIs sans source WoS")
 
     if args.limit:
