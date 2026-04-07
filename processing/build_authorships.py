@@ -52,6 +52,14 @@ def build(cur):
             JOIN wos_documents wd ON wd.id = was.wos_document_id
             JOIN v_active_publications vap ON vap.id = wd.publication_id
             WHERE was.person_id IS NOT NULL AND NOT was.excluded
+
+            UNION
+
+            SELECT DISTINCT sd.publication_id, sas.person_id
+            FROM scanr_authorships sas
+            JOIN scanr_documents sd ON sd.id = sas.scanr_document_id
+            JOIN v_active_publications vap ON vap.id = sd.publication_id
+            WHERE sas.person_id IS NOT NULL AND NOT sas.excluded
         )
         INSERT INTO authorships (publication_id, person_id)
         SELECT ap.publication_id, ap.person_id
@@ -131,19 +139,41 @@ def build(cur):
     wos_fk = cur.rowcount
     logger.info(f"  WoS FK : {wos_fk} liens")
 
+    # 2d. ScanR
+    cur.execute("""
+        UPDATE authorships a
+        SET scanr_authorship_id = sub.sas_id
+        FROM (
+            SELECT DISTINCT ON (sd.publication_id, sas.person_id)
+                   sd.publication_id, sas.person_id, sas.id AS sas_id
+            FROM scanr_authorships sas
+            JOIN scanr_documents sd ON sd.id = sas.scanr_document_id
+            WHERE sd.publication_id IS NOT NULL
+              AND sas.person_id IS NOT NULL
+              AND NOT sas.excluded
+            ORDER BY sd.publication_id, sas.person_id, sas.id
+        ) sub
+        WHERE a.publication_id = sub.publication_id
+          AND a.person_id = sub.person_id
+          AND a.scanr_authorship_id IS NULL
+    """)
+    scanr_fk = cur.rowcount
+    logger.info(f"  ScanR FK : {scanr_fk} liens")
+
     # ── Étape 3 : author_position et is_corresponding ──
     logger.info("Étape 3 : author_position et is_corresponding...")
 
     cur.execute("""
         UPDATE authorships a
-        SET author_position = COALESCE(has.author_position, oas.author_position, was.author_position)
+        SET author_position = COALESCE(has.author_position, oas.author_position, sas.author_position, was.author_position)
         FROM authorships a2
         LEFT JOIN hal_authorships has ON has.id = a2.hal_authorship_id
         LEFT JOIN openalex_authorships oas ON oas.id = a2.openalex_authorship_id
+        LEFT JOIN scanr_authorships sas ON sas.id = a2.scanr_authorship_id
         LEFT JOIN wos_authorships was ON was.id = a2.wos_authorship_id
         WHERE a.id = a2.id
           AND a.author_position IS NULL
-          AND COALESCE(has.author_position, oas.author_position, was.author_position) IS NOT NULL
+          AND COALESCE(has.author_position, oas.author_position, sas.author_position, was.author_position) IS NOT NULL
     """)
     pos_count = cur.rowcount
     logger.info(f"  {pos_count} positions mises à jour")
@@ -201,6 +231,16 @@ def build(cur):
               AND was.person_id IS NOT NULL
               AND NOT was.excluded
         """),
+        ("ScanR", """
+            SELECT sd.publication_id, sas.person_id,
+                   sas.structure_ids AS struct_ids, sas.is_uca AS src_is_uca
+            FROM scanr_authorships sas
+            JOIN scanr_documents sd ON sd.id = sas.scanr_document_id
+            JOIN v_active_publications vap ON vap.id = sd.publication_id
+            WHERE sas.structure_ids IS NOT NULL
+              AND sas.person_id IS NOT NULL
+              AND NOT sas.excluded
+        """),
     ]
 
     for source_name, source_query in SOURCE_QUERIES:
@@ -235,6 +275,8 @@ def build(cur):
     oa_total = cur.fetchone()[0]
     cur.execute("SELECT COUNT(*) FROM authorships WHERE wos_authorship_id IS NOT NULL")
     wos_total = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM authorships WHERE scanr_authorship_id IS NOT NULL")
+    scanr_total = cur.fetchone()[0]
     cur.execute("""
         SELECT COUNT(*) FROM authorships
         WHERE hal_authorship_id IS NOT NULL AND openalex_authorship_id IS NOT NULL
@@ -245,6 +287,7 @@ def build(cur):
     logger.info(f"  Total                  : {total}")
     logger.info(f"  Avec HAL FK            : {hal_total}")
     logger.info(f"  Avec OpenAlex FK       : {oa_total}")
+    logger.info(f"  Avec ScanR FK          : {scanr_total}")
     logger.info(f"  Avec WoS FK            : {wos_total}")
     logger.info(f"  HAL + OpenAlex         : {both}")
     logger.info(f"  dont is_uca            : {total_uca}")

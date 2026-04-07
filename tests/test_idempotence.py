@@ -840,3 +840,49 @@ class TestCreatePersonsIdempotence:
             WHERE id_type = 'orcid' AND id_value = '0000-0001-9999-0001'
         """)
         assert db.fetchone()["cnt"] == 1
+
+
+# ══════════════════════════════════════════════════════════════════
+# build_authorships
+# ══════════════════════════════════════════════════════════════════
+
+def _run_build_authorships(db):
+    """Exécute build_authorships sur le curseur de test (plain cursor)."""
+    plain_cur = db.connection.cursor()
+    from processing.build_authorships import build
+    build(plain_cur)
+
+
+def _count_authorships_tables(db) -> dict:
+    counts = {}
+    db.execute("SELECT COUNT(*) AS cnt FROM authorships")
+    counts["total"] = db.fetchone()["cnt"]
+    db.execute("SELECT COUNT(*) AS cnt FROM authorships WHERE is_uca = TRUE")
+    counts["is_uca"] = db.fetchone()["cnt"]
+    db.execute("SELECT COUNT(*) AS cnt FROM authorships WHERE hal_authorship_id IS NOT NULL")
+    counts["hal_fk"] = db.fetchone()["cnt"]
+    db.execute("SELECT COUNT(*) AS cnt FROM authorships WHERE structure_ids IS NOT NULL")
+    counts["with_structs"] = db.fetchone()["cnt"]
+    return counts
+
+
+class TestBuildAuthorshipsIdempotence:
+    """build_authorships produit le même résultat si lancé deux fois."""
+
+    def test_double_run_same_counts(self, db):
+        _setup_persons_test_data(db)
+        _run_create_persons(db)
+
+        _run_build_authorships(db)
+        counts_1 = _count_authorships_tables(db)
+
+        assert counts_1["total"] >= 3, f"Au moins 3 authorships, got {counts_1['total']}"
+        assert counts_1["hal_fk"] >= 3, "Les FK HAL doivent être peuplées"
+
+        _run_build_authorships(db)
+        counts_2 = _count_authorships_tables(db)
+
+        assert counts_2 == counts_1, (
+            f"Compteurs différents après 2e passe !\n"
+            f"  1ère : {counts_1}\n  2ème : {counts_2}"
+        )
