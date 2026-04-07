@@ -572,3 +572,144 @@ class TestNormalizeWosIdempotence:
             f"Compteurs différents après 2e passe !\n"
             f"  1ère : {counts_1}\n  2ème : {counts_2}"
         )
+
+
+# ══════════════════════════════════════════════════════════════════
+# Inter-sources
+# ══════════════════════════════════════════════════════════════════
+
+SHARED_DOI = "10.9999/shared-article-001"
+
+INTER_HAL_DOCS = [
+    {
+        "halid": "hal-99100001",
+        "doi": SHARED_DOI,
+        "collection": "TEST",
+        "raw_data": {
+            "docType_s": "ART",
+            "title_s": ["Shared Article on Geochemistry"],
+            "producedDateY_i": 2024,
+            "doiId_s": SHARED_DOI,
+            "journalTitle_s": "Geochemistry International",
+            "journalIssn_s": "5555-6666",
+            "journalPublisher_s": "Geochem Press",
+            "authFullName_s": ["Alice Dupont", "Bob Martin"],
+            "openAccess_bool": True,
+        },
+    },
+    {
+        "halid": "hal-99100002",
+        "doi": None,
+        "collection": "TEST",
+        "raw_data": {
+            "docType_s": "REPORT",
+            "title_s": ["Un rapport sans DOI"],
+            "producedDateY_i": 2024,
+            "authFullName_s": ["Alice Dupont"],
+        },
+    },
+]
+
+INTER_OA_DOCS = [
+    {
+        "openalex_id": "W9910000001",
+        "doi": SHARED_DOI,
+        "raw_data": {
+            "id": "https://openalex.org/W9910000001",
+            "doi": f"https://doi.org/{SHARED_DOI}",
+            "title": "Shared Article on Geochemistry",
+            "display_name": "Shared Article on Geochemistry",
+            "publication_year": 2024,
+            "type": "article",
+            "language": "en",
+            "primary_location": {
+                "source": {
+                    "display_name": "Geochemistry International",
+                    "type": "journal",
+                    "issn": ["5555-6666"],
+                    "host_organization_name": "Geochem Press",
+                },
+            },
+            "authorships": [
+                {"author": {"id": "https://openalex.org/A991001", "display_name": "Alice Dupont"},
+                 "author_position": "first", "institutions": [], "raw_affiliation_strings": []},
+                {"author": {"id": "https://openalex.org/A991002", "display_name": "Bob Martin"},
+                 "author_position": "last", "institutions": [], "raw_affiliation_strings": []},
+            ],
+            "open_access": {"oa_status": "gold", "is_oa": True},
+            "cited_by_count": 3,
+        },
+    },
+    {
+        "openalex_id": "W9910000002",
+        "doi": None,
+        "raw_data": {
+            "id": "https://openalex.org/W9910000002",
+            "title": "Another OA-only Article",
+            "display_name": "Another OA-only Article",
+            "publication_year": 2024,
+            "type": "article",
+            "primary_location": {"source": None},
+            "authorships": [
+                {"author": {"id": "https://openalex.org/A991003", "display_name": "Charlie Noid"},
+                 "author_position": "first", "institutions": [], "raw_affiliation_strings": []},
+            ],
+            "open_access": {"oa_status": "closed", "is_oa": False},
+        },
+    },
+]
+
+
+class TestNormalizeInterSourceIdempotence:
+    """Normaliser HAL puis OA puis relancer HAL ne crée pas de doublons."""
+
+    def test_hal_then_oa_then_hal_again(self, db):
+        _insert_hal_staging(db, INTER_HAL_DOCS)
+        _insert_oa_staging(db, INTER_OA_DOCS)
+
+        # Passe 1 : HAL
+        _run_normalize_hal(db)
+        db.execute("SELECT COUNT(*) AS cnt FROM publications")
+        pubs_after_hal = db.fetchone()["cnt"]
+
+        # Passe 2 : OA
+        _run_normalize_oa(db)
+        db.execute("SELECT COUNT(*) AS cnt FROM publications")
+        pubs_after_oa = db.fetchone()["cnt"]
+
+        # L'article partagé ne doit pas être dupliqué (même DOI)
+        db.execute(
+            "SELECT COUNT(*) AS cnt FROM publications WHERE lower(doi) = lower(%s)",
+            (SHARED_DOI,))
+        assert db.fetchone()["cnt"] == 1, "L'article partagé ne doit exister qu'une fois"
+
+        # Le rapport HAL sans DOI + l'article OA-only = 2 pubs de plus
+        assert pubs_after_oa == pubs_after_hal + 1, (
+            f"OA devrait ajouter 1 pub (OA-only), pas plus. "
+            f"HAL={pubs_after_hal}, après OA={pubs_after_oa}"
+        )
+
+        # Passe 3 : relancer HAL
+        db.execute("UPDATE staging_hal SET processed = FALSE")
+        _run_normalize_hal(db)
+        db.execute("SELECT COUNT(*) AS cnt FROM publications")
+        pubs_after_hal2 = db.fetchone()["cnt"]
+
+        assert pubs_after_hal2 == pubs_after_oa, (
+            f"Relancer HAL ne devrait rien créer. "
+            f"Avant={pubs_after_oa}, après={pubs_after_hal2}"
+        )
+
+    def test_shared_doi_same_journal(self, db):
+        """L'article partagé pointe vers le même journal, pas un doublon."""
+        _insert_hal_staging(db, INTER_HAL_DOCS)
+        _insert_oa_staging(db, INTER_OA_DOCS)
+
+        _run_normalize_hal(db)
+        _run_normalize_oa(db)
+
+        db.execute("""
+            SELECT COUNT(*) AS cnt FROM journals
+            WHERE title_normalized LIKE '%%geochemistry international%%'
+        """)
+        assert db.fetchone()["cnt"] == 1, "Le journal partagé ne doit exister qu'une fois"
