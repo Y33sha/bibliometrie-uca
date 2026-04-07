@@ -1,118 +1,150 @@
-"""Pré-calcule suggested_countries pour les adresses sans pays.
+"""
+Détection automatique des pays des adresses via country_name_forms.
 
-Pour chaque adresse sans pays, cherche les adresses AVEC pays
-dont le normalized_text contient celui-ci (via index trigram).
-Stocke les pays trouvés dans addresses.suggested_countries.
+Parse le dernier segment (après la dernière virgule) de chaque adresse
+sans pays et le matche contre la table country_name_forms.
+
+Deux modes :
+  - suggest : peuple addresses.suggested_countries (validation manuelle)
+  - apply   : peuple directement addresses.countries (confiance élevée)
 
 Usage:
-    python processing/suggest_address_countries.py [--batch-size 10000]
+    python scripts/suggest_address_countries.py                  # suggest (dry-run)
+    python scripts/suggest_address_countries.py --apply          # appliquer les suggestions
+    python scripts/suggest_address_countries.py --direct         # écrire directement dans countries
+    python scripts/suggest_address_countries.py --direct --apply # appliquer direct
+    python scripts/suggest_address_countries.py --stats          # statistiques uniquement
 """
+
 import argparse
+import os
 import sys
-import time
 
-import psycopg2
-from psycopg2.extras import RealDictCursor
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from db.connection import get_connection
+from utils.log import setup_logger
+from utils.normalize import normalize_text
 
-sys.path.insert(0, ".")
-from config.settings import DB
+logger = setup_logger("suggest_countries", "processing/logs")
+
+
+def load_country_forms(cur) -> dict[str, str]:
+    """Charge country_name_forms. Retourne {form_normalized: iso_code}."""
+    cur.execute("SELECT form_normalized, iso_code FROM country_name_forms")
+    return {r[0]: r[1] for r in cur.fetchall()}
+
+
+def extract_last_segment(raw_text: str) -> str:
+    """Extrait et normalise le dernier segment après la dernière virgule."""
+    parts = raw_text.rsplit(",", 1)
+    if len(parts) < 2:
+        return normalize_text(raw_text.strip())
+    return normalize_text(parts[-1].strip())
+
+
+def show_stats(cur):
+    cur.execute("""
+        SELECT count(*) AS total,
+               count(*) FILTER (WHERE countries IS NOT NULL) AS avec_pays,
+               count(*) FILTER (WHERE countries IS NULL AND suggested_countries IS NOT NULL
+                                AND array_length(suggested_countries, 1) > 0) AS avec_suggestion,
+               count(*) FILTER (WHERE countries IS NULL AND suggested_countries IS NULL) AS sans_rien
+        FROM addresses WHERE pub_count > 0
+    """)
+    r = cur.fetchone()
+    logger.info(f"Adresses (pub_count > 0) :")
+    logger.info(f"  Total            : {r[0]}")
+    logger.info(f"  Avec pays        : {r[1]}")
+    logger.info(f"  Avec suggestion  : {r[2]}")
+    logger.info(f"  Sans rien        : {r[3]}")
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--batch-size", type=int, default=10000)
-    parser.add_argument("--reset", action="store_true",
-                        help="Remet à NULL les suggested_countries (y compris les tableaux vides) avant de relancer")
+    parser = argparse.ArgumentParser(description="Détection pays des adresses")
+    parser.add_argument("--apply", action="store_true", help="Appliquer (sinon dry-run)")
+    parser.add_argument("--direct", action="store_true",
+                        help="Écrire dans countries au lieu de suggested_countries")
+    parser.add_argument("--stats", action="store_true", help="Stats uniquement")
     args = parser.parse_args()
 
-    conn = psycopg2.connect(**DB)
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    conn = get_connection()
+    cur = conn.cursor()
 
-    if args.reset:
-        cur.execute("""
-            UPDATE addresses SET suggested_countries = NULL
-            WHERE countries IS NULL AND suggested_countries IS NOT NULL
-        """)
-        conn.commit()
-        print(f"{cur.rowcount} suggestions réinitialisées")
+    if args.stats:
+        show_stats(cur)
+        conn.close()
+        return
 
-    # Compter les adresses à traiter
+    country_forms = load_country_forms(cur)
+    logger.info(f"{len(country_forms)} formes de noms de pays chargées")
+
+    # Récupérer les adresses sans pays
     cur.execute("""
-        SELECT COUNT(*) FROM addresses
+        SELECT id, raw_text FROM addresses
         WHERE countries IS NULL
-          AND suggested_countries IS NULL
-          AND LENGTH(normalized_text) >= 5
     """)
-    total = cur.fetchone()["count"]
-    print(f"{total} adresses à traiter (batch_size={args.batch_size})")
+    rows = cur.fetchall()
+    logger.info(f"{len(rows)} adresses sans pays")
 
-    processed = 0
-    updated = 0
-    t0 = time.time()
+    matched = 0
+    unmatched = 0
+    updates = []
 
-    while True:
-        # Récupérer un batch d'IDs à traiter
-        cur.execute("""
-            SELECT id, normalized_text FROM addresses
-            WHERE countries IS NULL
-              AND suggested_countries IS NULL
-              AND LENGTH(normalized_text) >= 5
-            ORDER BY pub_count DESC, id
-            LIMIT %s
-        """, (args.batch_size,))
-        batch = cur.fetchall()
-        if not batch:
-            break
+    for addr_id, raw_text in rows:
+        last_seg = extract_last_segment(raw_text)
+        if not last_seg:
+            unmatched += 1
+            continue
 
-        for a in batch:
-            # Compter les occurrences de chaque pays dans les adresses similaires
-            cur.execute("""
-                SELECT c, COUNT(*) AS cnt
-                FROM addresses a2, unnest(a2.countries) AS c
-                WHERE a2.countries IS NOT NULL
-                  AND a2.normalized_text LIKE '%%' || %s || '%%'
-                GROUP BY c ORDER BY cnt DESC
-            """, (a["normalized_text"],))
-            rows = cur.fetchall()
+        iso = country_forms.get(last_seg)
+        if iso:
+            updates.append((addr_id, iso))
+            matched += 1
+        else:
+            unmatched += 1
 
-            if rows:
-                # Ne garder que le(s) pays ayant le score max
-                max_cnt = rows[0]["cnt"]
-                suggested = sorted(r["c"].strip() for r in rows if r["cnt"] == max_cnt)
-            else:
-                suggested = []
+    logger.info(f"Matchés : {matched}, non matchés : {unmatched}")
 
-            cur.execute(
-                "UPDATE addresses SET suggested_countries = %s WHERE id = %s",
-                (suggested, a["id"]),
-            )
+    if not args.apply:
+        # Afficher les formes non reconnues les plus fréquentes
+        from collections import Counter
+        unknown = Counter()
+        for addr_id, raw_text in rows:
+            last_seg = extract_last_segment(raw_text)
+            if last_seg and last_seg not in country_forms:
+                unknown[last_seg] += 1
+        logger.info(f"\nTop 20 formes non reconnues :")
+        for form, cnt in unknown.most_common(20):
+            logger.info(f"  {cnt:>5}  {form}")
+        logger.info(f"\nDry-run — ajouter --apply pour appliquer.")
+        conn.close()
+        return
 
+    # Appliquer
+    column = "countries" if args.direct else "suggested_countries"
+    batch = []
+    for addr_id, iso in updates:
+        batch.append((addr_id, [iso.lower()]))
+        if len(batch) >= 5000:
+            _apply_batch(cur, batch, column)
+            conn.commit()
+            batch = []
+    if batch:
+        _apply_batch(cur, batch, column)
         conn.commit()
-        processed += len(batch)
-        batch_updated = sum(1 for _ in batch)  # on a tout traité
-        updated += batch_updated
-        elapsed = time.time() - t0
-        rate = processed / elapsed if elapsed > 0 else 0
-        remaining = (total - processed) / rate if rate > 0 else 0
-        print(
-            f"  {processed}/{total} traités "
-            f"({elapsed:.0f}s écoulées, ~{remaining:.0f}s restantes, "
-            f"{rate:.0f} addr/s)"
-        )
 
-    elapsed = time.time() - t0
-    print(f"\nTerminé: {processed} adresses traitées en {elapsed:.0f}s")
-
-    # Stats
-    cur.execute("""
-        SELECT COUNT(*) FILTER (WHERE suggested_countries IS NOT NULL AND array_length(suggested_countries, 1) > 0) AS with_sug,
-               COUNT(*) FILTER (WHERE suggested_countries = '{}') AS no_sug
-        FROM addresses WHERE countries IS NULL
-    """)
-    stats = cur.fetchone()
-    print(f"Avec suggestion: {stats['with_sug']}, sans suggestion: {stats['no_sug']}")
-
+    logger.info(f"{matched} adresses mises à jour ({column})")
+    show_stats(cur)
     conn.close()
+
+
+def _apply_batch(cur, batch, column):
+    from psycopg2.extras import execute_values
+    execute_values(
+        cur,
+        f"UPDATE addresses SET {column} = data.countries FROM (VALUES %s) AS data(id, countries) WHERE addresses.id = data.id",
+        batch,
+    )
 
 
 if __name__ == "__main__":
