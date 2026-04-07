@@ -5,24 +5,31 @@
 Le schéma repose sur une distinction entre des tables "sources" (séparées par source: HAL, OpenAlex, WoS) et des tables "canoniques" (= vérité).
 
 ```mermaid
-flowchart TD
+flowchart BT
+    subgraph vérité
+    end
     subgraph sources
-        direction LR
+        direction TD
         A[HAL]
         B[OpenAlex]
         C[WOS]
+        D[ScanR]
     end
-    D[vérité]
+    A-->vérité
+    B-->vérité
+    C-->vérité
+    D-->vérité
+    
 ```
 
 ### Entités principales et relations
 
-Chaque source s'organise selon le même schéma en quatre tables: Publications, Authors, Authorships, Structures. Une `authorship` représente la contribution d'un auteur à une publication. C'est elle qui porte l'information d'affiliation (`structure_ids`).
+Chaque source s'organise selon le même schéma en quatre tables: `documents`, `authors`, `authorships`, `structures`. Une `authorship` représente la contribution d'**un** auteur à **une** publication. C'est elle qui porte l'information d'affiliation (`structure_ids`).
 
 ```mermaid
 erDiagram 
     direction LR
-    Publications ||--|{ Authorships : a_pour_auteurs
+    Documents ||--|{ Authorships : a_pour_auteurs
     Authors ||--|{ Authorships : est_auteur_de
     Authorships }o--|{ Structures : est_affilie_a
 
@@ -32,16 +39,15 @@ erDiagram
 
 Chaque source possède ses propres tables pour les entités clés, et ses propres identifiants internes pour toutes les entités.
 
-| Entité     | HAL                | OpenAlex                | WoS                | Vérité         |
+| Entité     | HAL                | OpenAlex                | WoS                | ScanR         |
 |------------|--------------------|-------------------------|--------------------|----------------|
-| Documents  | `hal_documents`    | `openalex_documents`    | `wos_documents`    | `publications` |
-| Auteurs    | `hal_authors`      | `openalex_authors`      | `wos_authors`      | `persons`      |
-| Structures | `hal_structures`   | `openalex_institutions` | `wos_organizations`                  | `structures`   |
-| Authorship | `hal_authorships`  | `openalex_authorships`  | `wos_authorships`  | `authorships`  |
+| Documents  | `hal_documents`    | `openalex_documents`    | `wos_documents`    | `scanr_documents` |
+| Auteurs    | `hal_authors`      | `openalex_authors`      | `wos_authors`      | `scanr_authors`      |
+| Authorship | `hal_authorships`  | `openalex_authorships`  | `wos_authorships`  | `scanr_authorships`  |
+| Structures | `hal_structures`   | `openalex_institutions` | `wos_organizations`                  | —   |
 
 
-
-```
+<!--
  STAGING (brut API)                SOURCE (normalisé)                     VÉRITÉ
  ──────────────────               ─────────────────────                  ────────
 
@@ -61,84 +67,26 @@ Chaque source possède ses propres tables pour les entités clés, et ses propre
                          wos_authorships ────────────────┘
 ```
 
+-->
 
 
-
-Tous les identifiants primaires sont des `SERIAL`. Les identifiants naturels (DOI, halId, openalex_id, hal_person_id, hal_struct_id, etc.) sont en colonnes `UNIQUE` mais ne servent jamais de PK. Cela évite les problèmes quand un identifiant naturel est absent.
+Tous les identifiants primaires sont des `SERIAL`. Les identifiants naturels, qu'ils soient internes à une source (halId, openalex_id, hal_person_id, hal_struct_id, etc.) ou universels (DOI, ORCID, ROR) sont en colonnes `UNIQUE` mais ne servent jamais de PK. Cela évite les problèmes quand un identifiant naturel est absent.
 
 Les tables sources sont toutes peuplées lors de la [phase 3](pipeline#normalize) du pipeline (`normalize`).
 
-### Peuplement des tables canoniques
+### Tables “canoniques”
 
-Les tables canoniques obéissent au même schéma et sont peuplées progressivement au cours du [pipeline](pipeline) de traitement.
+Les tables canoniques obéissent au même schéma et sont peuplées progressivement au cours du [pipeline](pipeline#tables-canoniques) de traitement.
 
-1. Les **structures** préexistent au pipeline.
 
-```mermaid
-flowchart LR
-    subgraph vérité
-    direction LR
-    A[publications]-.-B[authorships]
-    C[persons]-.-B
-    B-.-F[structures]
-    end
-    classDef valid  fill:#af5
-    class F valid;
-```
+| Entité     |  Vérité        |
+|------------|----------------|
+| Documents  | `publications` |
+| Auteurs    | `persons`      |
+| Authorship | `authorships`  |
+| Structures | `structures`   |
 
-2. La [phase 3](pipeline#normalize) (`normalize`) peuple la table **publications** par mapping et fusion à partir des publications sources.
 
-```mermaid
-flowchart LR
-    G@{ shape: processes, label: "*_publications\n(sources)"}-->A
-
-    subgraph vérité
-    direction LR
-    A[publications]-.-B[authorships]
-    C[persons]-.-B
-    B-.-F[structures]
-    end
-    classDef valid  fill:#af5
-    class F,A valid;
-```
-
-3. Après repérage des affiliations dans les authorships sources, la [phase 7](pipeline#phase-7--persons--création-de-personnes) `persons` crée les **personnes** correspondant aux *authorships* UCA (ou les mappe aux personnes existantes).
-
-```mermaid
-flowchart LR
-    G@{ shape: processes, label: "*_publications\n(sources)"}-->A
-    H@{ shape: processes, label: "*_authorships\n(sources)\nis_uca = true"}---G
-    H-->C
-
-    subgraph vérité
-    direction LR
-    A[publications]-.-B[authorships]
-    C[persons]-.-B
-    B-.-F[structures]
-    end
-    classDef valid  fill:#af5
-    class F,A,C valid;
-```
-
-4. Les **authorships** canoniques sont déduites à partir des sources dans la [phase 8](pipeline#phase-8--authorships--construction-des-authorships-canoniques) (`authorships`). L'information (`person_id`, `structure_ids`) est donc répliquée dans la table canonique, pour deux raisons:
-- simplifier les requêtes;
-- servir de source d'autorité ultime en cas d'erreur dans une des sources (une authorship source peut être `excluded`).
-
-```mermaid
-flowchart LR
-    G@{ shape: processes, label: "*_publications\n(sources)"}---A
-    H@{ shape: processes, label: "*_authorships\n(sources)\nis_uca = true"}---G
-    H---C
-
-    subgraph vérité
-    direction LR
-    A[publications]-->B[authorships]
-    C[persons]-->B
-    B---F[structures]
-    end
-    classDef valid  fill:#af5
-    class F,A,C,B valid;
-```
 
 
 ## Zones fonctionnelles et propriétaires de données
