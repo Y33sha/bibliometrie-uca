@@ -114,7 +114,9 @@ class TestOADocTypeMap:
 
     def test_all_values_valid(self):
         valid = {"article", "review", "book", "book_chapter", "conference_paper",
-                 "preprint", "thesis", "editorial", "report", "peer_review", "other"}
+                 "preprint", "thesis", "editorial", "report", "peer_review", "other",
+                 "dataset", "software", "patent", "hdr", "memoir", "poster",
+                 "letter", "erratum", "retraction"}
         for v in OA_DOCTYPE_MAP.values():
             assert v in valid, f"Type inconnu : {v}"
 
@@ -215,7 +217,9 @@ class TestHALDocTypeMap:
 
     def test_all_values_valid(self):
         valid = {"article", "review", "book", "book_chapter", "conference_paper",
-                 "preprint", "thesis", "editorial", "report", "other"}
+                 "preprint", "thesis", "editorial", "report", "other",
+                 "dataset", "software", "patent", "hdr", "memoir", "poster",
+                 "letter", "erratum", "retraction"}
         for v in HAL_DOCTYPE_MAP.values():
             assert v in valid, f"Type inconnu : {v}"
 
@@ -250,8 +254,8 @@ class TestWoSMapDocType:
         assert map_doc_type("Article; Proceedings Paper") == "article"
 
     def test_composite_other_first(self):
-        """Si le premier type est 'other', cherche un type significatif."""
-        assert map_doc_type("Correction; Article") == "article"
+        """Si le premier type est 'erratum', cherche un type plus significatif."""
+        assert map_doc_type("Correction; Article") == "erratum"
 
     def test_none(self):
         assert map_doc_type(None) == "other"

@@ -1,0 +1,21 @@
+"""Helpers pour l'accès aux rows psycopg2, compatibles tuple et RealDictCursor."""
+
+
+def row_val(row, index_or_key, default=None):
+    """Extrait une valeur d'une row psycopg2, quel que soit le type de curseur.
+
+    Supporte les tuples (accès par index) et les RealDictRow (accès par clé).
+    Avec un index entier, tente d'abord l'accès par position, puis par
+    position dans les valeurs du dict si c'est un RealDictRow.
+    """
+    if row is None:
+        return default
+    try:
+        return row[index_or_key]
+    except (KeyError, IndexError, TypeError):
+        if isinstance(index_or_key, int):
+            try:
+                return list(row.values())[index_or_key]
+            except (AttributeError, IndexError):
+                pass
+        return default
