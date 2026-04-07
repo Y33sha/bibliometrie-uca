@@ -67,7 +67,7 @@ def propagate_countries_for_addresses(cur, address_ids: list[int]):
     wos_docs = cur.rowcount
 
     # 3. Recalculer publications.countries pour les publications touchées
-    #    Même logique que refresh_publication_countries.sql : HAL (structures) + adresses (OA + WoS)
+    #    Même logique que refresh_publication_countries.sql : HAL (structures) + adresses (OA + WoS + ScanR)
     #    On n'utilise PAS openalex_documents.countries (données staging OA non fiables)
     cur.execute("""
         WITH affected_pubs AS (
@@ -82,6 +82,12 @@ def propagate_countries_for_addresses(cur, address_ids: list[int]):
             JOIN wos_authorships was ON was.id = waa.wos_authorship_id
             JOIN wos_documents wd ON wd.id = was.wos_document_id
             WHERE waa.address_id = ANY(%s) AND wd.publication_id IS NOT NULL
+            UNION
+            SELECT DISTINCT sd.publication_id
+            FROM scanr_authorship_addresses saa
+            JOIN scanr_authorships sas ON sas.id = saa.scanr_authorship_id
+            JOIN scanr_documents sd ON sd.id = sas.scanr_document_id
+            WHERE saa.address_id = ANY(%s) AND sd.publication_id IS NOT NULL
         )
         UPDATE publications p
         SET countries = sub.all_countries
@@ -106,13 +112,20 @@ def propagate_countries_for_addresses(cur, address_ids: list[int]):
                         JOIN wos_authorships was ON was.id = waa.wos_authorship_id
                         JOIN wos_documents wd ON wd.id = was.wos_document_id
                         WHERE wd.publication_id = ap.publication_id AND a.countries IS NOT NULL
+                        UNION ALL
+                        SELECT unnest(a.countries) AS c
+                        FROM scanr_authorship_addresses saa
+                        JOIN addresses a ON a.id = saa.address_id
+                        JOIN scanr_authorships sas ON sas.id = saa.scanr_authorship_id
+                        JOIN scanr_documents sd ON sd.id = sas.scanr_document_id
+                        WHERE sd.publication_id = ap.publication_id AND a.countries IS NOT NULL
                     ) src
                    ) AS all_countries
             FROM affected_pubs ap
         ) sub
         WHERE p.id = sub.publication_id
           AND p.countries IS DISTINCT FROM sub.all_countries
-    """, (address_ids, address_ids))
+    """, (address_ids, address_ids, address_ids))
     pubs = cur.rowcount
 
     if oa_docs or wos_docs or pubs:
@@ -284,12 +297,20 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)):
                 JOIN wos_documents wd ON wd.id = was.wos_document_id
                 JOIN wos_authors wa ON wa.id = was.wos_author_id
                 WHERE waa.address_id = %s AND wd.publication_id IS NOT NULL
+                UNION
+                SELECT sd.publication_id, sa.full_name AS author_name,
+                       sd.scanr_id AS source_id
+                FROM scanr_authorship_addresses saa
+                JOIN scanr_authorships sas ON sas.id = saa.scanr_authorship_id
+                JOIN scanr_documents sd ON sd.id = sas.scanr_document_id
+                JOIN scanr_authors sa ON sa.id = sas.scanr_author_id
+                WHERE saa.address_id = %s AND sd.publication_id IS NOT NULL
             ) sub
             JOIN publications p ON p.id = sub.publication_id
             LEFT JOIN journals j ON j.id = p.journal_id
             ORDER BY p.id, p.pub_year DESC
             LIMIT %s
-        """, (addr_id, addr_id, limit))
+        """, (addr_id, addr_id, addr_id, limit))
 
         return {
             "address_id": addr_id,
