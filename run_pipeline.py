@@ -12,6 +12,7 @@ Usage:
     python3 run_pipeline.py --mode monthly     # Repasse complète + cross-imports
     python3 run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement
     python3 run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
+    python3 run_pipeline.py --only cross_imports --sources scanr --full-cross-import  # Cross-import ScanR complet
 
 Phases:
     extract       Extraction des sources (staging) + refetch truncated
@@ -76,13 +77,20 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
         run_python("extraction/openalex/refetch_truncated.py")
 
 
-def phase_cross_imports(mode="full", **kw):
+def phase_cross_imports(mode="full", sources=None, full_cross_import=False, **kw):
     """Phase 2 : Cross-imports entre sources (lit le staging uniquement)."""
     if mode in ("full", "monthly"):
-        run_python("processing/fetch_missing_hal.py")
-        run_python("extraction/openalex/cross_import_openalex.py")
-        run_python("extraction/hal/cross_import_hal.py")
-        run_python("extraction/scanr/cross_import_scanr.py")
+        sources = sources or {"hal", "openalex", "wos", "scanr"}
+        full_flag = ["--all"] if full_cross_import else []
+        if "hal" in sources:
+            run_python("processing/fetch_missing_hal.py", *full_flag)
+            run_python("extraction/hal/cross_import_hal.py", *full_flag)
+        if "openalex" in sources:
+            run_python("extraction/openalex/cross_import_openalex.py", *full_flag)
+        if "wos" in sources:
+            run_python("extraction/wos/cross_import_wos.py", *full_flag)
+        if "scanr" in sources:
+            run_python("extraction/scanr/cross_import_scanr.py", *full_flag)
     else:
         log.info("Cross-imports ignorés en mode hebdomadaire")
 
@@ -92,6 +100,7 @@ def phase_normalize(**kw):
     run_python("processing/normalize_openalex.py")
     run_python("processing/normalize_hal.py")
     run_python("processing/normalize_wos.py")
+    run_python("processing/normalize_scanr.py")
     run_python("processing/enrich_hal_structures.py")
     run_python("processing/merge_hal_openalex_pubs.py")
 
@@ -202,6 +211,8 @@ def main():
                         help="Sources à extraire, séparées par des virgules (défaut: hal,openalex,wos,scanr)")
     parser.add_argument("--year", type=int,
                         help="Surcharger l'année d'extraction (une seule année)")
+    parser.add_argument("--full-cross-import", action="store_true",
+                        help="Cross-imports sur tout le staging (pas seulement les non-normalisés)")
     args = parser.parse_args()
 
     if args.list:
@@ -247,7 +258,8 @@ def main():
         log.info("PHASE : %s", name)
         log.info("─" * 40)
         try:
-            fn(mode=args.mode, sources=sources, year=args.year)
+            fn(mode=args.mode, sources=sources, year=args.year,
+               full_cross_import=args.full_cross_import)
         except RuntimeError as e:
             log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
             log.error("Pour reprendre : python3 run_pipeline.py --from %s", name)
