@@ -1,13 +1,9 @@
 """
 Nettoyage rétroactif des doublons Zenodo (concept DOI vs version DOI).
 
-Zenodo attribue à chaque dépôt un concept DOI (parent, zenodo.N) et un
-version DOI (zenodo.N+1). Le concept DOI redirige vers la dernière version.
-Quand les deux sont importés, on a un doublon.
-
-Stratégie : pour chaque paire de publications Zenodo ayant le même titre
-normalisé et des numéros consécutifs (N, N+1), fusionner N (concept) dans
-N+1 (version). Pas d'appel API Zenodo nécessaire.
+Deux passes :
+1. Paires consécutives (N, N+1) — sans appel API, rapide
+2. Paires non consécutives — résolution via API Zenodo avec backoff
 
 Usage:
     python scripts/cleanup_zenodo_duplicates.py              # dry-run
@@ -17,13 +13,78 @@ Usage:
 import argparse
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from utils.log import setup_logger
+from utils.zenodo import resolve_zenodo_doi
 from services.publications import merge_publications
 
 logger = setup_logger("cleanup_zenodo", os.path.join(os.path.dirname(__file__), "../processing/logs"))
+
+# Pause entre chaque appel API (secondes)
+API_POLITE_DELAY = 1.5
+
+
+def find_consecutive_pairs(cur):
+    """Passe 1 : paires N/N+1 (sans API)."""
+    cur.execute("""
+        WITH zenodo_pubs AS (
+            SELECT id, doi,
+                   (regexp_match(doi, 'zenodo\\.(\d+)'))[1]::bigint AS zid,
+                   title_normalized
+            FROM publications
+            WHERE doi ~* 'zenodo\\.\\d+'
+        )
+        SELECT concept.id, concept.doi, version.id, version.doi,
+               concept.title_normalized
+        FROM zenodo_pubs concept
+        JOIN zenodo_pubs version
+          ON version.title_normalized = concept.title_normalized
+         AND version.zid = concept.zid + 1
+        ORDER BY concept.title_normalized
+    """)
+    return cur.fetchall()
+
+
+def find_remaining_groups(cur):
+    """Passe 2 : groupes de doublons Zenodo restants (non consécutifs)."""
+    cur.execute("""
+        WITH zenodo_pubs AS (
+            SELECT id, doi, title_normalized
+            FROM publications
+            WHERE doi ~* 'zenodo\\.\\d+'
+        )
+        SELECT title_normalized, array_agg(id ORDER BY id) AS pub_ids,
+               array_agg(doi ORDER BY id) AS dois
+        FROM zenodo_pubs
+        GROUP BY title_normalized
+        HAVING count(*) > 1
+    """)
+    return cur.fetchall()
+
+
+def do_merge(cur, conn, target_id, target_doi, source_id, source_doi, apply):
+    """Fusionne source dans target + supprime l'openalex_document source."""
+    label = f"pub {source_id} ({source_doi}) → {target_id} ({target_doi})"
+    print(f"  {'MERGE' if apply else 'DRY'} {label}")
+
+    if not apply:
+        return True
+
+    try:
+        merge_publications(cur, target_id, source_id)
+        # Supprimer l'openalex_document du concept DOI (maintenant rattaché à target)
+        cur.execute("""
+            DELETE FROM openalex_documents
+            WHERE publication_id = %s AND lower(doi) = lower(%s)
+        """, (target_id, source_doi))
+        return True
+    except Exception as e:
+        logger.error(f"Erreur merge {label}: {e}")
+        conn.rollback()
+        return False
 
 
 def main():
@@ -35,52 +96,62 @@ def main():
     conn.autocommit = False
     cur = conn.cursor()
 
-    # Trouver les paires concept/version : même titre, numéros N et N+1
-    cur.execute("""
-        WITH zenodo_pubs AS (
-            SELECT id, doi,
-                   (regexp_match(doi, 'zenodo\.(\d+)'))[1]::bigint AS zid,
-                   title_normalized
-            FROM publications
-            WHERE doi ~* 'zenodo\.\d+'
-        )
-        SELECT concept.id AS concept_pub_id, concept.doi AS concept_doi,
-               version.id AS version_pub_id, version.doi AS version_doi,
-               concept.title_normalized
-        FROM zenodo_pubs concept
-        JOIN zenodo_pubs version
-          ON version.title_normalized = concept.title_normalized
-         AND version.zid = concept.zid + 1
-        ORDER BY concept.title_normalized
-    """)
-    pairs = cur.fetchall()
-    print(f"{len(pairs)} paires concept→version trouvées\n")
-
     merged = 0
     errors = 0
 
-    for concept_pub_id, concept_doi, version_pub_id, version_doi, title_norm in pairs:
-        label = f"pub {concept_pub_id} ({concept_doi}) → {version_pub_id} ({version_doi})"
-        print(f"  {'MERGE' if args.apply else 'DRY'} {label}")
+    # --- Passe 1 : paires consécutives (N, N+1) ---
+    pairs = find_consecutive_pairs(cur)
+    if pairs:
+        print(f"=== Passe 1 : {len(pairs)} paires consécutives ===\n")
+        for concept_id, concept_doi, version_id, version_doi, _ in pairs:
+            if do_merge(cur, conn, version_id, version_doi,
+                        concept_id, concept_doi, args.apply):
+                merged += 1
+            else:
+                errors += 1
+        if args.apply:
+            conn.commit()
+
+    # --- Passe 2 : doublons restants (via API) ---
+    groups = find_remaining_groups(cur)
+    if groups:
+        print(f"\n=== Passe 2 : {len(groups)} groupes restants (appel API) ===\n")
+        for title_norm, pub_ids, dois in groups:
+            # Résoudre chaque DOI via l'API
+            version_ids = []
+            concept_ids = []
+
+            for pub_id, doi in zip(pub_ids, dois):
+                time.sleep(API_POLITE_DELAY)
+                version_doi = resolve_zenodo_doi(doi)
+                if version_doi is None:
+                    version_ids.append((pub_id, doi))
+                else:
+                    concept_ids.append((pub_id, doi))
+
+            if not version_ids or not concept_ids:
+                print(f"  SKIP {title_norm[:60]} — impossible de distinguer "
+                      f"concept/version")
+                continue
+
+            target_id, target_doi = version_ids[0]
+            sources = concept_ids + [(pid, d) for pid, d in version_ids[1:]]
+
+            for source_id, source_doi in sources:
+                if do_merge(cur, conn, target_id, target_doi,
+                            source_id, source_doi, args.apply):
+                    merged += 1
+                else:
+                    errors += 1
 
         if args.apply:
-            try:
-                merge_publications(cur, version_pub_id, concept_pub_id)
-                merged += 1
-            except Exception as e:
-                logger.error(f"Erreur merge {label}: {e}")
-                conn.rollback()
-                errors += 1
+            conn.commit()
 
-    if args.apply:
-        conn.commit()
-
+    # --- Résumé ---
     print(f"\nRésumé :")
-    print(f"  Paires traitées : {len(pairs)}")
-    if args.apply:
-        print(f"  Fusionnées : {merged}")
-        print(f"  Erreurs : {errors}")
-    else:
+    print(f"  Fusionnées : {merged}")
+    print(f"  Erreurs : {errors}")
+    if not args.apply and merged:
         print(f"\nDry-run — ajouter --apply pour appliquer.")
 
     cur.close()
