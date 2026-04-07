@@ -91,6 +91,7 @@
 <h3 class="section-title">API</h3>
 <div class="config-grid">
 	{#each ["openalex_email", "wos_api_key", "scanr_username", "scanr_password"] as key}
+		{@const isSecret = key === "wos_api_key" || key === "scanr_password"}
 		{#if configByKey(key)}
 			<div class="config-row">
 				<span class="config-label">{
@@ -101,10 +102,12 @@
 				}</span>
 				{#if editingKey === key}
 					<input class="config-editor-inline" style="width: 300px;" bind:value={editValue} onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(key); }}} />
-					<button class="btn btn-sm btn-primary" onclick={() => save(key)} disabled={saving}>OK</button>
-					<button class="btn btn-sm" onclick={() => { editingKey = null; }}>Annuler</button>
+					<span class="config-actions-inline">
+						<button class="btn btn-sm btn-primary" onclick={() => save(key)} disabled={saving}>OK</button>
+						<button class="btn btn-sm" onclick={() => { editingKey = null; }}>Annuler</button>
+					</span>
 				{:else}
-					<span class="config-value-inline">{configByKey(key)?.value || "(non défini)"}</span>
+					<span class="config-value-inline">{isSecret ? "••••••••" : (configByKey(key)?.value || "(non défini)")}</span>
 					<button class="btn btn-sm" onclick={() => startEdit(key)}>Modifier</button>
 				{/if}
 			</div>
@@ -248,7 +251,8 @@
 	.config-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 5px; }
 	.config-label { font-weight: 600; font-size: 0.9rem; min-width: 180px; }
 	.config-value-inline { font-size: 0.9rem; flex: 1; }
-	.config-editor-inline { width: 80px; font-family: "JetBrains Mono", monospace; font-size: 0.85rem; padding: 3px 6px; border: 1px solid var(--accent); border-radius: 3px; }
+	.config-editor-inline { width: 80px; font-family: "JetBrains Mono", monospace; font-size: 0.85rem; padding: 3px 6px; border: 1px solid var(--accent); border-radius: 3px; flex: 1; }
+	.config-actions-inline { display: flex; gap: 4px; margin-left: auto; }
 	.config-editor { width: 100%; font-family: "JetBrains Mono", monospace; font-size: 0.85rem; padding: 6px 8px; border: 1px solid var(--accent); border-radius: 3px; resize: vertical; margin-top: 4px; }
 	.config-actions { display: flex; gap: 4px; margin-top: 4px; }
 

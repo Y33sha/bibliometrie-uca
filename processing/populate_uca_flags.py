@@ -137,11 +137,49 @@ def step3b_wos(cur, uca_ids, uca_wide_ids):
     logger.info(f"Étape 3b — WoS structure_ids : {cur.rowcount} authorships")
 
 
+def step3c_scanr(cur, uca_ids, uca_wide_ids):
+    """Étape 3c : ScanR — calculer is_uca + structure_ids."""
+    cur.execute("UPDATE scanr_authorships SET is_uca = FALSE, structure_ids = NULL")
+    logger.info(f"Étape 3c — ScanR reset : {cur.rowcount} authorships")
+
+    # is_uca via périmètre restreint
+    cur.execute("""
+        UPDATE scanr_authorships sas
+        SET is_uca = TRUE
+        WHERE EXISTS (
+            SELECT 1
+            FROM scanr_authorship_addresses saa
+            JOIN address_structures ast ON ast.address_id = saa.address_id
+            WHERE saa.scanr_authorship_id = sas.id
+              AND ast.structure_id = ANY(%s)
+        )
+    """, (list(uca_ids),))
+    logger.info(f"Étape 3c — ScanR is_uca = TRUE : {cur.rowcount} authorships")
+
+    # structure_ids via périmètre large
+    cur.execute("""
+        WITH sas_structs AS (
+            SELECT saa.scanr_authorship_id,
+                   array_agg(DISTINCT ast.structure_id) AS struct_ids
+            FROM scanr_authorship_addresses saa
+            JOIN address_structures ast ON ast.address_id = saa.address_id
+            WHERE ast.structure_id = ANY(%s)
+            GROUP BY saa.scanr_authorship_id
+        )
+        UPDATE scanr_authorships sas
+        SET structure_ids = ss.struct_ids
+        FROM sas_structs ss
+        WHERE sas.id = ss.scanr_authorship_id
+    """, (list(uca_wide_ids),))
+    logger.info(f"Étape 3c — ScanR structure_ids : {cur.rowcount} authorships")
+
+
 def show_stats(cur):
     """Affiche les compteurs is_uca par source."""
     for source, table in [("HAL", "hal_authorships"),
                           ("OpenAlex", "openalex_authorships"),
-                          ("WoS", "wos_authorships")]:
+                          ("WoS", "wos_authorships"),
+                          ("ScanR", "scanr_authorships")]:
         cur.execute(f"SELECT COUNT(*) FROM {table}")
         total = cur.fetchone()[0]
         cur.execute(f"SELECT COUNT(*) FROM {table} WHERE is_uca = TRUE")
@@ -177,6 +215,7 @@ def main():
     step2_hal_is_uca(cur, uca_ids)
     step3_openalex(cur, uca_ids, uca_wide_ids)
     step3b_wos(cur, uca_ids, uca_wide_ids)
+    step3c_scanr(cur, uca_ids, uca_wide_ids)
 
     conn.commit()
     elapsed = time.perf_counter() - t0
