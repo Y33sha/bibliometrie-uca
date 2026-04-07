@@ -4,6 +4,17 @@
 
 Le schéma repose sur une distinction entre des tables "sources" (séparées par source: HAL, OpenAlex, WoS) et des tables "canoniques" (= vérité).
 
+```mermaid
+flowchart TD
+    subgraph sources
+        direction LR
+        A[HAL]
+        B[OpenAlex]
+        C[WOS]
+    end
+    D[vérité]
+```
+
 ### Entités principales et relations
 
 Chaque source s'organise selon le même schéma en quatre tables: Publications, Authors, Authorships, Structures. Une `authorship` représente la contribution d'un auteur à une publication. C'est elle qui porte l'information d'affiliation (`structure_ids`).
@@ -25,7 +36,7 @@ Chaque source possède ses propres tables pour les entités clés, et ses propre
 |------------|--------------------|-------------------------|--------------------|----------------|
 | Documents  | `hal_documents`    | `openalex_documents`    | `wos_documents`    | `publications` |
 | Auteurs    | `hal_authors`      | `openalex_authors`      | `wos_authors`      | `persons`      |
-| Structures | `hal_structures`   | `openalex_institutions` | —                  | `structures`   |
+| Structures | `hal_structures`   | `openalex_institutions` | `wos_organizations`                  | `structures`   |
 | Authorship | `hal_authorships`  | `openalex_authorships`  | `wos_authorships`  | `authorships`  |
 
 
@@ -115,9 +126,9 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    G@{ shape: processes, label: "*_publications\n(sources)"}-->A
+    G@{ shape: processes, label: "*_publications\n(sources)"}---A
     H@{ shape: processes, label: "*_authorships\n(sources)\nis_uca = true"}---G
-    H-->C
+    H---C
 
     subgraph vérité
     direction LR
@@ -226,61 +237,51 @@ erDiagram
     apc_payments |o--o| publications : ""
 ```
 
-#### `persons`
-
-Référentiel des individus. Une ligne = une personne physique. Alimenté par les
-exports RH (données dans la table satellite `persons_rh`) et par le script
-`create_persons_from_source_authorships.py` (création automatique depuis les
-authorships en 6 passes). Ne contient aucun identifiant bibliométrique directement —
-ceux-ci sont dans `person_identifiers`.
-
-#### `persons_rh`
-
-Table satellite liée à `persons` (FK `person_id`, ON DELETE CASCADE). Contient les
-données issues des exports RH : `department_name`, `role_title`, `structure_id`,
-`start_date`, `end_date`. Une personne sans entrée dans `persons_rh` n'a pas de
-données RH (créée automatiquement depuis les authorships).
-
-#### `person_identifiers`
-
-Identifiants certifiants : ORCID, idHAL, IdRef, etc. Chaque ligne associe
-un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ
-`source` trace la provenance (`hr`, `hal`, `openalex`, `manual`, `auto`).
-
-#### `person_name_forms`
-
-Formes de noms normalisées, utilisées pour le matching lors de la création de
-personnes. Chaque forme pointe vers un tableau de `person_ids`.
-
-- `name_form` : forme normalisée (UNIQUE), calculée par `normalize_name_form()` SQL
-- `person_ids` : tableau d'entiers — les personnes associées à cette forme
-- `sources` : tableau de textes (`hal`, `openalex`, `wos`, `persons`, `manual`)
-
-La normalisation (`normalize_name_form()`) produit : minuscules, sans accents,
-tout ce qui n'est pas lettre/chiffre remplacé par des espaces. Exemple :
-"Nédélec, J.-M." → `nedelec j m`.
-
-Les authorships sources portent la même forme dans `author_name_normalized`,
-ce qui permet un matching direct sans recalcul.
-
-Pour la source `persons`, les formes sont calculées par `compute_person_name_forms()`
-qui génère les variantes : "prénom nom", "nom prénom", "initiales nom", "nom initiales".
-
-Une forme avec `person_ids` de longueur > 1 est **ambiguë** (homonymes).
-
 #### `publications`
 
 Référentiel dédupliqué. Hiérarchie de déduplication :
 1. **DOI identique** (case-insensitive) → même publication
 2. **Lien explicite** source→source (ex: OpenAlex cite HAL comme primary_location)
-3. **Heuristique** : titre normalisé + année + même journal
+3. **Métadonnées** : titre normalisé + année + même journal
 
 Contrainte unique : `lower(doi)` WHERE `doi IS NOT NULL`.
 
-#### `distinct_publications`
+Table associée:
+- `distinct_publications`: Paires de publications marquées comme **distinctes malgré un titre identique** (faux positifs de déduplication). Contrainte : `pub_id_a < pub_id_b`.
+- `publishers` 
+- `journals`
+- `apc_payments`: Données de paiements d'APC (Article Processing Charges) importées depuis les exports DPCG. Liées à `publications`, `journals` et `publishers` par FK optionnelles.
 
-Paires de publications marquées comme **distinctes malgré un titre similaire**
-(faux positifs de déduplication). Contrainte : `pub_id_a < pub_id_b`.
+```mermaid
+erDiagram
+    hal_documents }o--|| publications : ""
+    openalex_documents }o--|| publications : ""
+    wos_documents }o--|| publications : ""
+    publications ||--o{ authorships : ""
+    publications }o--|| journals : ""
+    journals }o--|| publishers : ""
+    
+    publications ||--o{ apc_payments : ""
+```
+
+#### `persons`
+
+Référentiel des individus. Une ligne = une personne physique. Alimenté par le script `create_persons_from_source_authorships.py` (création automatique depuis les authorships) et complété par les exports RH (données dans la table satellite `persons_rh`).
+
+Tables associées :
+- `persons_rh`: Table satellite liée à `persons` (FK `person_id`, ON DELETE CASCADE). Contient les données issues des exports RH : `department_name`, `role_title`, `structure_id`, `start_date`, `end_date`.
+- `person_identifiers`: Identifiants persistants : ORCID, idHAL, IdRef, etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` trace la provenance (`hr`, `hal`, `openalex`, `manual`, `auto` TODO: revoir enum).
+- `person_name_forms`: Formes de noms normalisées, utilisées pour le matching lors de la création de personnes. Chaque forme pointe vers un tableau de `person_ids`. Les authorships sources portent la même forme dans `author_name_normalized`, ce qui permet un matching direct sans recalcul.
+
+
+```mermaid
+erDiagram
+    persons ||--o{ authorships : ""
+    persons ||--o{ person_identifiers : ""
+    persons ||--o{ person_name_forms : "person_ids[]"
+    persons |o--o| persons_rh : "person_id"
+
+```
 
 #### `authorships`
 
@@ -296,15 +297,7 @@ Table de vérité reliant personnes, publications et structures. Construite par
   quelles sources ont contribué à cet authorship
 - `excluded` : lien erroné (homonyme, etc.)
 
-#### `publishers` / `journals`
 
-Référentiel bibliographique. Non dupliqué par source — une seule entrée par journal,
-alignée par ISSN-L ou openalex_id.
-
-#### `apc_payments`
-
-Données de paiement d'APC (Article Processing Charges) importées depuis les exports
-DPCG. Liées à `publications`, `journals` et `publishers` par FK optionnelles.
 
 
 ### Tables source — HAL
