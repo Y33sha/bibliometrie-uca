@@ -109,6 +109,7 @@ def phase_addresses(**kw):
     """Phase 4 : Adresses — extraction, résolution structures, pays."""
     run_python("processing/populate_addresses.py", "--source", "openalex")
     run_python("processing/populate_addresses.py", "--source", "wos")
+    run_python("processing/populate_addresses.py", "--source", "scanr")
     run_python("processing/resolve_addresses.py")
 
 
