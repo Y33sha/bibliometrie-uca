@@ -223,6 +223,8 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 .source-hal:hover { background: #d0e3f4; }
 .source-oa { background: #fef3e0; }
 .source-oa:hover { background: #fde8c8; }
+.source-scanr { background: transparent; }
+.source-scanr img { width: 22px; height: 22px; }
 .source-wos { background: #e8e0f8; }
 .source-wos:hover { background: #d8c8f4; }
 .wos-label { font-size: 11px; font-weight: 700; color: #5a3d8a; line-height: 14px; }

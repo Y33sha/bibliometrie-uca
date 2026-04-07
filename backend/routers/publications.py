@@ -211,6 +211,10 @@ async def publications_facets(
                 )) AS oa_count,
                 COUNT(*) FILTER (WHERE EXISTS (
                     SELECT 1 FROM publication_sources ps
+                    WHERE ps.publication_id = p.id AND ps.source = 'scanr'
+                )) AS scanr_count,
+                COUNT(*) FILTER (WHERE EXISTS (
+                    SELECT 1 FROM publication_sources ps
                     WHERE ps.publication_id = p.id AND ps.source = 'wos'
                 )) AS wos_count
             FROM publications p
@@ -318,6 +322,7 @@ async def publications_facets(
             "source_counts": {
                 "hal": source_counts["hal_count"],
                 "oa": source_counts["oa_count"],
+                "scanr": source_counts["scanr_count"],
                 "wos": source_counts["wos_count"],
             },
             "apc": apc_facets,
