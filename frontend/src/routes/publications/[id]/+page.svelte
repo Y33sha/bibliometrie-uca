@@ -137,6 +137,7 @@
 
 	const halSource = $derived(data?.sources.find(s => s.source === 'hal'));
 	const oaSource = $derived(data?.sources.find(s => s.source === 'openalex'));
+	const scanrSource = $derived(data?.sources.find(s => s.source === 'scanr'));
 	const wosSource = $derived(data?.sources.find(s => s.source === 'wos'));
 
 	// Nombre de sources présentes
@@ -273,6 +274,12 @@
 				<a href="https://openalex.org/{oaSource.source_id}" target="_blank" rel="noopener" class="source-link source-oa-link">
 					<img src="https://raw.githubusercontent.com/ourresearch/openalex-gui/refs/heads/master/public/favicon.png" alt="" class="source-ico" />
 					OpenAlex : {oaSource.source_id}
+				</a>
+			{/if}
+			{#if scanrSource}
+				<a href="https://scanr.enseignementsup-recherche.gouv.fr/publications/{scanrSource.source_id}" target="_blank" rel="noopener" class="source-link source-scanr-link">
+					<img src="{base}/scanr-icon.svg" alt="" class="source-ico" />
+					ScanR : {scanrSource.source_id}
 				</a>
 			{/if}
 			{#if wosSource}
@@ -611,6 +618,8 @@
 	.source-hal-link:hover { background: #d0e3f4; }
 	.source-oa-link { background: #fef3e0; color: #b8733e; }
 	.source-oa-link:hover { background: #fde8c8; }
+	.source-scanr-link { background: #e0edf5; color: #1B4F72; }
+	.source-scanr-link:hover { background: #cde0ef; }
 	.source-ico { width: 14px; height: 14px; }
 
 	.collections-line {
