@@ -355,6 +355,52 @@ def step1_cross_source(cur, all_authorships, linked_ids, linked_index, dry_run):
 
 
 # ---------------------------------------------------------------------------
+# Étape 1b : IdRef connu
+# ---------------------------------------------------------------------------
+
+def load_idref_person_map(cur):
+    """Charge les IdRef déjà mappés à une personne (status != rejected).
+
+    Retourne : {idref: person_id}
+    """
+    cur.execute("""
+        SELECT id_value, person_id
+        FROM person_identifiers
+        WHERE id_type = 'idref'
+          AND status != 'rejected'
+    """)
+    return {r["id_value"]: r["person_id"] for r in cur.fetchall()}
+
+
+def step1b_idref(cur, all_authorships, linked_ids, dry_run):
+    """Si l'authorship a un IdRef déjà connu en base (non rejeté),
+    rattacher à la personne correspondante.
+    """
+    idref_map = load_idref_person_map(cur)
+    linked = 0
+
+    for a in all_authorships:
+        if (a["source"], a["authorship_id"]) in linked_ids:
+            continue
+
+        idref = a.get("idref")
+        if not idref:
+            continue
+
+        pid = idref_map.get(idref)
+        if pid:
+            if not dry_run:
+                link_to_person(cur, pid, [a])
+                add_name_form(cur, pid, a["full_name"])
+                add_identifiers(cur, pid, [a])
+            linked_ids.add((a["source"], a["authorship_id"]))
+            linked += 1
+
+    logger.info(f"  {linked} authorships rattachées par IdRef connu")
+    return linked
+
+
+# ---------------------------------------------------------------------------
 # Étape 2 : ORCID connu
 # ---------------------------------------------------------------------------
 
@@ -494,6 +540,10 @@ def run(dry_run=False):
     linked_index = load_linked_authorships_by_pub(cur)
     s1 = step1_cross_source(cur, all_authorships, linked_ids, linked_index, dry_run)
 
+    # ── Étape 1b : IdRef connu ──
+    logger.info("\n--- Étape 1b : IdRef connu ---")
+    s1b = step1b_idref(cur, all_authorships, linked_ids, dry_run)
+
     # ── Étape 2 : ORCID connu ──
     logger.info("\n--- Étape 2 : ORCID connu ---")
     s2 = step2_orcid(cur, all_authorships, linked_ids, dry_run)
@@ -511,6 +561,7 @@ def run(dry_run=False):
     logger.info(f"\n=== Résumé ===")
     logger.info(f"  Étape 0 (comptes HAL)    : {s0} rattachées")
     logger.info(f"  Étape 1 (cross-source)   : {s1} rattachées")
+    logger.info(f"  Étape 1b (IdRef connu)   : {s1b} rattachées")
     logger.info(f"  Étape 2 (ORCID connu)    : {s2} rattachées")
     logger.info(f"  Étape 3 (name_forms)     : {s3_created} créées, {s3_linked} rattachées, {s3_ambiguous} ambiguës")
     logger.info(f"  Non résolues             : {unlinked}")
