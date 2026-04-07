@@ -52,6 +52,9 @@ def link_authorship(cur, person_id: int, source: str, authorship_id: int,
     elif source == "wos":
         cur.execute("UPDATE wos_authorships SET person_id = %s WHERE id = %s",
                     (person_id, authorship_id))
+    elif source == "scanr":
+        cur.execute("UPDATE scanr_authorships SET person_id = %s WHERE id = %s",
+                    (person_id, authorship_id))
 
 
 def link_authorships(cur, person_id: int, authorships: list[dict]):
@@ -107,7 +110,8 @@ def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict
             add_identifier(cur, person_id, "idhal", a["idhal"])
             seen.add(("idhal", a["idhal"]))
         if a.get("idref") and ("idref", a["idref"]) not in seen:
-            add_identifier(cur, person_id, "idref", a["idref"], source="hal")
+            idref_source = a.get("source", "hal")
+            add_identifier(cur, person_id, "idref", a["idref"], source=idref_source)
             seen.add(("idref", a["idref"]))
 
 
