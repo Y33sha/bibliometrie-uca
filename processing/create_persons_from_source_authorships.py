@@ -122,9 +122,29 @@ def get_all_unlinked_authorships(cur):
     """)
     wos_rows = cur.fetchall()
 
+    # ScanR
+    cur.execute("""
+        SELECT sas.id AS authorship_id, 'scanr' AS source,
+               sa.full_name, sa.last_name, sa.first_name,
+               sa.orcid, NULL::text AS idhal, sa.idref,
+               NULL::int AS hal_author_id,
+               FALSE AS has_hal_person_id,
+               NULL::int AS hal_person_id,
+               sd.publication_id,
+               sas.author_position
+        FROM scanr_authorships sas
+        JOIN scanr_authors sa ON sa.id = sas.scanr_author_id
+        JOIN scanr_documents sd ON sd.id = sas.scanr_document_id
+        JOIN v_active_publications vap ON vap.id = sd.publication_id
+        WHERE sas.person_id IS NULL
+          AND sas.is_uca = TRUE
+          AND sd.publication_id IS NOT NULL
+    """)
+    scanr_rows = cur.fetchall()
+
     # Enrichir avec last_name/first_name parsés + filtrage ORCID OA
     all_rows = []
-    for r in hal_rows + oa_rows + wos_rows:
+    for r in hal_rows + oa_rows + wos_rows + scanr_rows:
         r = dict(r)
         if not r.get("last_name"):
             r["last_name"], r["first_name"] = parse_raw_author_name(r["full_name"])
@@ -206,6 +226,26 @@ def load_linked_authorships_by_pub(cur):
     for r in cur.fetchall():
         ln = normalize_name(r["last_name"] or "")
         fn = normalize_name(r["first_name"] or "")
+        index[(r["publication_id"], r["author_position"])].append(
+            (r["person_id"], ln, fn, r["source"]))
+
+    cur.execute("""
+        SELECT sas.person_id, sas.author_position,
+               sd.publication_id,
+               sa.last_name, sa.first_name, sa.full_name,
+               'scanr' AS source
+        FROM scanr_authorships sas
+        JOIN scanr_authors sa ON sa.id = sas.scanr_author_id
+        JOIN scanr_documents sd ON sd.id = sas.scanr_document_id
+        WHERE sas.person_id IS NOT NULL
+          AND sd.publication_id IS NOT NULL
+    """)
+    for r in cur.fetchall():
+        ln = normalize_name(r["last_name"] or "")
+        fn = normalize_name(r["first_name"] or "")
+        if not ln and r["full_name"]:
+            last, first = parse_raw_author_name(r["full_name"])
+            ln, fn = normalize_name(last), normalize_name(first)
         index[(r["publication_id"], r["author_position"])].append(
             (r["person_id"], ln, fn, r["source"]))
 
