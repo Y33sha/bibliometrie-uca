@@ -3,7 +3,7 @@
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import { titleCase, sanitizeTitle, halDocUrl } from '$lib/utils';
+	import { titleCase, sanitizeTitle, halDocUrl, scanrPubUrl } from '$lib/utils';
 	import { typeLabels as baseTypeLabels } from '$lib/labels';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 
@@ -277,7 +277,7 @@
 				</a>
 			{/if}
 			{#if scanrSource}
-				<a href="https://scanr.enseignementsup-recherche.gouv.fr/publications/{scanrSource.source_id}" target="_blank" rel="noopener" class="source-link source-scanr-link">
+				<a href={scanrPubUrl(scanrSource.source_id)} target="_blank" rel="noopener" class="source-link source-scanr-link">
 					<img src="{base}/scanr-icon.svg" alt="" class="source-ico" />
 					ScanR : {scanrSource.source_id}
 				</a>

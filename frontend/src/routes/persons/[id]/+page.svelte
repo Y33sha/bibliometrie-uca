@@ -3,7 +3,7 @@
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import { titleCase, formatDate, sanitizeTitle, halDocUrl } from '$lib/utils';
+	import { titleCase, formatDate, sanitizeTitle, halDocUrl, scanrPubUrl } from '$lib/utils';
 	import { typeLabels, docTypeLabelsMap, oaLabelsMap } from '$lib/labels';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
@@ -402,7 +402,7 @@
 										<span class="source-tag source-placeholder"></span>
 									{/if}
 									{#if p.scanr_id}
-										<a href="https://scanr.enseignementsup-recherche.gouv.fr/publications/{p.scanr_id}" target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {p.scanr_id}">
+										<a href={scanrPubUrl(p.scanr_id)} target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {p.scanr_id}">
 											<img src="{base}/scanr-icon.svg" alt="ScanR" />
 										</a>
 									{:else}

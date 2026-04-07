@@ -127,3 +127,7 @@ export function halDocUrl(halid: string): string {
 	if (halid.startsWith('tel-')) return `https://theses.hal.science/${halid}`;
 	return `https://hal.science/${halid}`;
 }
+
+export function scanrPubUrl(scanrId: string): string {
+	return `https://scanr.enseignementsup-recherche.gouv.fr/publications/${encodeURIComponent(scanrId)}`;
+}
