@@ -30,6 +30,7 @@ from utils.doi import clean_doi
 from utils.hal import extract_hal_id_from_url
 from utils.log import setup_logger
 from utils.normalize import normalize_text
+from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
 from services.publications import find_or_create as find_or_create_publication
 from services.journals import find_or_create_publisher, find_or_create_journal
 
@@ -53,16 +54,16 @@ DOCTYPE_MAP = {
     "dissertation": "thesis",
     "editorial": "editorial",
     "report": "report",
-    "letter": "article",
-    "retraction": "other",
-    "erratum": "other",
+    "letter": "letter",
+    "retraction": "retraction",
+    "erratum": "erratum",
     "paratext": "other",
     "peer-review": "peer_review",
     "standard": "other",
-    "dataset": "other",
+    "dataset": "dataset",
     "grant": "other",
     "supplementary-materials": "other",
-    "software": "other",
+    "software": "software",
     "other": "other",
 }
 
@@ -416,6 +417,23 @@ def process_work(cur, staging_row: tuple) -> bool:
         staging_id, openalex_id, doi, work = staging_row
 
     try:
+        # Zenodo : si le DOI est un concept DOI, vérifier si le version DOI
+        # est déjà en staging → skip pour éviter les doublons
+        raw_doi = clean_doi(doi)
+        if is_zenodo_doi(raw_doi):
+            version_doi = resolve_zenodo_doi(raw_doi)
+            if version_doi:
+                cur.execute(
+                    "SELECT id FROM staging_openalex WHERE lower(doi) = lower(%s)",
+                    (version_doi,))
+                if cur.fetchone():
+                    logger.info(f"  {openalex_id} concept DOI Zenodo {raw_doi} → "
+                                f"version {version_doi} déjà en staging, skip")
+                    cur.execute(
+                        "UPDATE staging_openalex SET processed = TRUE WHERE id = %s",
+                        (staging_id,))
+                    return False
+
         # Détecter si la primary_location pointe vers HAL ou un repository
         hal_location = is_hal_primary_location(work)
         repo_location = is_repository_source(work)

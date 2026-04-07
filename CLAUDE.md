@@ -5,6 +5,7 @@
 - Privilégier les solutions architecturalement propres même si elles impliquent plus de fichiers modifiés. Ne jamais appliquer de fix local sans vérifier si le problème est structurel. Demander confirmation avant de choisir une approche quick-fix.
 - Ne pas proposer de pauses ou demander si l'utilisatrice veut continuer — elle le dira d'elle-même.
 - Ne pas qualifier les tâches de "pas urgentes" — prioriser en fonction de l'impact sur le code, pas sur les données.
+- Ne rien supposer. Vérifier.
 
 ## Conventions du projet
 

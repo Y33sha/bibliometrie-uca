@@ -2,6 +2,23 @@
 
 Chantiers restants, classés par effort. Consolidation des TODO_LAURA.md et TODO_CLAUDE.md.
 
+## Quick wins
+
+2. Publi 79637 : authorship source rejetée → rejeter de l'authorship vérité (TODO_LAURA l.123)
+Un cas ponctuel à investiguer en base puis corriger via le service. Rapide si c'est un cas isolé.
+
+3. Harmoniser noms de routes API / URL frontend (TODO_LAURA l.25)
+Un audit rapide des routes pour lister les incohérences, puis renommage. Mécanique mais sans risque.
+
+4. Rendre tous les tableaux triables (ROADMAP l.54)
+Si les tableaux utilisent déjà un composant partagé, ajouter le tri est assez systématique. Je peux vérifier l'état actuel.
+
+5. Afficher les abstracts dans publications/id (ROADMAP l.58)
+Si les abstracts sont déjà en base, c'est juste un affichage supplémentaire côté frontend. Très peu de code.
+
+6. Filtre corresponding_is_uca (TODO_LAURA l.93)
+Si is_corresponding et is_uca existent déjà sur les authorships, c'est un filtre backend + une checkbox frontend.
+
 ## Chantiers moyens (quelques heures)
 
 ### Automatisation pays des adresses (country_name_forms)

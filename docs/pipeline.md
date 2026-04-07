@@ -227,7 +227,7 @@ Deux étapes :
 
 Les pays des adresses (`addresses.countries`) sont assignés manuellement via l'interface admin ou par suggestion automatique (`scripts/suggest_address_countries.py`).
 
-<!-- TODO: Automatiser la détection des pays des adresses -->
+TODO: Automatiser la détection des pays des adresses
 
 ### Phase 10 — `enrich` : Enrichissements optionnels
 
