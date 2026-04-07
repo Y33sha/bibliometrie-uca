@@ -777,8 +777,16 @@ def process_record(cur, staging_row: tuple) -> bool:
         publisher_id = upsert_publisher(cur, rec.get("publisher_name"))
         journal_id = upsert_journal(cur, rec, publisher_id)
 
-        # Publication canonique
-        publication_id = upsert_publication(cur, rec, journal_id)
+        # Idempotence : si wos_documents a déjà ce UT avec un publication_id,
+        # le réutiliser au lieu de risquer un doublon
+        cur.execute(
+            "SELECT publication_id FROM wos_documents WHERE ut = %s",
+            (rec["ut"],))
+        existing_doc = cur.fetchone()
+        if existing_doc and existing_doc[0]:
+            publication_id = existing_doc[0]
+        else:
+            publication_id = upsert_publication(cur, rec, journal_id)
         if not publication_id:
             logger.warning(f"Impossible d'insérer {ut} — titre ou année manquant")
             # Marquer processed quand même pour ne pas reboucler

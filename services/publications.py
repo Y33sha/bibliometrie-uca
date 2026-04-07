@@ -2,25 +2,32 @@
 Service Publications — accès exclusif en écriture à la table `publications`.
 
 Toute création, mise à jour ou recherche de publication passe par ce module.
-Les scripts de normalisation (HAL, OpenAlex, WoS) et les autres traitements
-appellent ces fonctions au lieu de faire du SQL direct.
+Les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres
+traitements appellent ces fonctions au lieu de faire du SQL direct.
+
+Les fonctions find_by_* retournent des namedtuples pour un accès par nom
+indépendant du type de curseur (tuple ou RealDictCursor).
 """
 
+from collections import namedtuple
+from utils.db_helpers import row_val as _val
 
-def find_by_doi(cur, doi: str):
-    """Cherche une publication par DOI (case-insensitive).
-    Retourne le dict de la row ou None.
-    """
+PubByDoi = namedtuple("PubByDoi", ["id", "doc_type", "title_normalized"])
+PubByTitle = namedtuple("PubByTitle", ["id", "doi"])
+
+
+def find_by_doi(cur, doi: str) -> PubByDoi | None:
+    """Cherche une publication par DOI (case-insensitive)."""
     if not doi:
         return None
     cur.execute("SELECT id, doc_type, title_normalized FROM publications WHERE lower(doi) = lower(%s)", (doi,))
-    return cur.fetchone()
+    row = cur.fetchone()
+    return PubByDoi(_val(row, 0), _val(row, 1), _val(row, 2)) if row else None
 
 
-def find_by_title(cur, title_normalized: str, pub_year: int, journal_id: int):
+def find_by_title(cur, title_normalized: str, pub_year: int, journal_id: int) -> PubByTitle | None:
     """Cherche une publication par titre normalisé + année + journal.
     Ne matche que les articles avec journal connu (aucun NULL dans les critères).
-    Retourne le dict de la row ou None.
     """
     if not title_normalized or not journal_id:
         return None
@@ -29,7 +36,8 @@ def find_by_title(cur, title_normalized: str, pub_year: int, journal_id: int):
         WHERE title_normalized = %s AND pub_year = %s AND journal_id = %s
         LIMIT 1
     """, (title_normalized, pub_year, journal_id))
-    return cur.fetchone()
+    row = cur.fetchone()
+    return PubByTitle(_val(row, 0), _val(row, 1)) if row else None
 
 
 def _enrich(cur, pub_id: int, *, doi: str | None = None,
@@ -103,8 +111,8 @@ def find_or_create(cur, *, title: str, title_normalized: str,
     if doi:
         existing = find_by_doi(cur, doi)
         if existing:
-            ex_type = existing.get("doc_type", "")
-            ex_title = existing.get("title_normalized", "")
+            ex_type = existing.doc_type or ""
+            ex_title = existing.title_normalized or ""
             chapter_types = ("book_chapter", "book-chapter", "chapter")
             book_types = ("book",)
 
@@ -115,40 +123,40 @@ def find_or_create(cur, *, title: str, title_normalized: str,
                 doi = None  # ne pas attribuer ce DOI au chapitre
             elif doc_type in book_types and ex_type in chapter_types:
                 # Le nouveau est un ouvrage, l'existant est un chapitre → retirer le DOI du chapitre
-                cur.execute("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s", (existing["id"],))
+                cur.execute("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s", (existing.id,))
                 # On ne fusionne pas, on continue (création ou match titre)
             elif doc_type in chapter_types and ex_type in chapter_types:
                 # Deux chapitres : fusionner seulement si même titre normalisé
                 if title_normalized != ex_title:
                     # Titres différents → DOI erroné, le retirer partout
-                    cur.execute("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s", (existing["id"],))
+                    cur.execute("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s", (existing.id,))
                     doi = None
                 else:
                     # Même titre → vraie fusion
-                    _enrich(cur, existing["id"], doi=doi, doc_type=doc_type,
+                    _enrich(cur, existing.id, doi=doi, doc_type=doc_type,
                             journal_id=journal_id, oa_status=oa_status,
                             container_title=container_title, language=language)
-                    return existing["id"], False
+                    return existing.id, False
             else:
                 # Cas normal (articles, etc.) → fusion standard
-                _enrich(cur, existing["id"], doi=doi, doc_type=doc_type,
+                _enrich(cur, existing.id, doi=doi, doc_type=doc_type,
                         journal_id=journal_id, oa_status=oa_status,
                         container_title=container_title, language=language)
-                return existing["id"], False
+                return existing.id, False
 
     # 2. Chercher par titre + année + journal (articles uniquement)
     if doc_type == "article" and journal_id:
         existing = find_by_title(cur, title_normalized, pub_year, journal_id)
         if existing:
-            ex_doi = existing.get("doi")
+            ex_doi = existing.doi
             # Ne pas fusionner si les deux ont un DOI différent
             if doi and ex_doi and doi.lower() != ex_doi.lower():
                 pass  # DOI contradictoires → ne pas fusionner
             else:
-                _enrich(cur, existing["id"], doi=doi, doc_type=doc_type,
+                _enrich(cur, existing.id, doi=doi, doc_type=doc_type,
                         journal_id=journal_id, oa_status=oa_status,
                         container_title=container_title, language=language)
-                return existing["id"], False
+                return existing.id, False
 
     # 3. Créer
     if not allow_create:
@@ -162,7 +170,7 @@ def find_or_create(cur, *, title: str, title_normalized: str,
         RETURNING id
     """, (title, title_normalized, doc_type, pub_year, doi,
           oa_status, journal_id, container_title, language))
-    return cur.fetchone()["id"], True
+    return _val(cur.fetchone(), 0), True
 
 
 def update_oa_status(cur, pub_id: int, oa_status: str):

@@ -3,11 +3,13 @@ Service Référentiel bibliographique — accès exclusif en écriture
 aux tables `publishers` et `journals`.
 
 Toute création ou recherche de journal/éditeur passe par ce module.
+Compatible avec les curseurs tuples (standard) et RealDictCursor.
 """
 
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.normalize import normalize_text
+from utils.db_helpers import row_val as _val
 
 
 # ── Publishers ──
@@ -44,8 +46,8 @@ def find_or_create_publisher(cur, name: str | None, *,
         cur.execute("SELECT id FROM publishers WHERE openalex_id = %s", (openalex_id,))
         row = cur.fetchone()
         if row:
-            _add_publisher_name_form(cur, row["id"], name_normalized)
-            return row["id"]
+            _add_publisher_name_form(cur, _val(row, 0), name_normalized)
+            return _val(row, 0)
 
     # 2. Par forme de nom
     cur.execute("""
@@ -54,7 +56,7 @@ def find_or_create_publisher(cur, name: str | None, *,
     """, (name_normalized,))
     row = cur.fetchone()
     if row:
-        pub_id = row["publisher_id"]
+        pub_id = _val(row, 0)
         # Rattacher l'openalex_id si on ne l'avait pas
         if openalex_id:
             cur.execute("""
@@ -69,7 +71,7 @@ def find_or_create_publisher(cur, name: str | None, *,
         VALUES (%s, %s, %s)
         RETURNING id
     """, (name.strip(), name_normalized, openalex_id))
-    pub_id = cur.fetchone()["id"]
+    pub_id = _val(cur.fetchone(), 0)
     _add_publisher_name_form(cur, pub_id, name_normalized)
     return pub_id
 
@@ -131,10 +133,10 @@ def find_or_create_journal(cur, title: str | None, *,
         cur.execute("SELECT id FROM journals WHERE openalex_id = %s", (openalex_id,))
         row = cur.fetchone()
         if row:
-            _enrich_journal(cur, row["id"], issn=issn, eissn=eissn,
+            _enrich_journal(cur, _val(row, 0), issn=issn, eissn=eissn,
                             publisher_id=publisher_id)
-            _add_journal_name_form(cur, row["id"], title_normalized, publisher_id)
-            return row["id"]
+            _add_journal_name_form(cur, _val(row, 0), title_normalized, publisher_id)
+            return _val(row, 0)
         # openalex_id inconnu : on cherche quand même par ISSN/name_form
         # avant de créer, pour rattacher l'openalex_id à un journal existant
 
@@ -145,11 +147,11 @@ def find_or_create_journal(cur, title: str | None, *,
             (issn, issn, issn))
         row = cur.fetchone()
         if row:
-            _enrich_journal(cur, row["id"], issn=issn, eissn=eissn,
+            _enrich_journal(cur, _val(row, 0), issn=issn, eissn=eissn,
                             publisher_id=publisher_id, openalex_id=openalex_id,
                             oa_model=oa_model)
-            _add_journal_name_form(cur, row["id"], title_normalized, publisher_id)
-            return row["id"]
+            _add_journal_name_form(cur, _val(row, 0), title_normalized, publisher_id)
+            return _val(row, 0)
 
     # 3. Par eISSN (cherche dans issn, eissn, issnl)
     if eissn:
@@ -158,11 +160,11 @@ def find_or_create_journal(cur, title: str | None, *,
             (eissn, eissn, eissn))
         row = cur.fetchone()
         if row:
-            _enrich_journal(cur, row["id"], issn=issn, eissn=eissn,
+            _enrich_journal(cur, _val(row, 0), issn=issn, eissn=eissn,
                             publisher_id=publisher_id, openalex_id=openalex_id,
                             oa_model=oa_model)
-            _add_journal_name_form(cur, row["id"], title_normalized, publisher_id)
-            return row["id"]
+            _add_journal_name_form(cur, _val(row, 0), title_normalized, publisher_id)
+            return _val(row, 0)
 
     # 4. Par ISSN-L (cherche dans issn, eissn, issnl)
     if issnl:
@@ -171,11 +173,11 @@ def find_or_create_journal(cur, title: str | None, *,
             (issnl, issnl, issnl))
         row = cur.fetchone()
         if row:
-            _enrich_journal(cur, row["id"], issn=issn, eissn=eissn,
+            _enrich_journal(cur, _val(row, 0), issn=issn, eissn=eissn,
                             publisher_id=publisher_id, openalex_id=openalex_id,
                             oa_model=oa_model)
-            _add_journal_name_form(cur, row["id"], title_normalized, publisher_id)
-            return row["id"]
+            _add_journal_name_form(cur, _val(row, 0), title_normalized, publisher_id)
+            return _val(row, 0)
 
     # 5. Par forme de nom (journal_name_forms)
     # Priorité aux journals avec eISSN (plus fiable que les ISSN print)
@@ -189,10 +191,10 @@ def find_or_create_journal(cur, title: str | None, *,
     """, (title_normalized, publisher_id, publisher_id))
     row = cur.fetchone()
     if row:
-        _enrich_journal(cur, row["journal_id"], issn=issn, eissn=eissn,
+        _enrich_journal(cur, _val(row, 0), issn=issn, eissn=eissn,
                         publisher_id=publisher_id, openalex_id=openalex_id,
                         oa_model=oa_model)
-        return row["journal_id"]
+        return _val(row, 0)
 
     # 6. Créer + enregistrer la forme de nom
     cur.execute("""
@@ -202,7 +204,7 @@ def find_or_create_journal(cur, title: str | None, *,
         RETURNING id
     """, (title.strip(), title_normalized, issn, eissn, issnl,
           publisher_id, openalex_id, oa_model))
-    journal_id = cur.fetchone()["id"]
+    journal_id = _val(cur.fetchone(), 0)
     cur.execute("""
         INSERT INTO journal_name_forms (journal_id, form_normalized, publisher_id)
         VALUES (%s, %s, %s)

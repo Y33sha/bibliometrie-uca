@@ -501,11 +501,21 @@ def process_work(cur, staging_row: tuple) -> bool:
         timings["journal"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        # Hors périmètre UCA (collection = NULL, vient de fetch_missing_hal.py) :
-        # on enrichit les publications existantes mais on n'en crée pas de nouvelles
-        publication_id, is_new = find_or_insert_publication(
-            cur, doc, journal_id, allow_create=(collection is not None)
-        )
+        # Idempotence : si hal_documents a déjà ce halid avec un publication_id,
+        # le réutiliser au lieu de risquer un doublon
+        cur.execute(
+            "SELECT publication_id FROM hal_documents WHERE halid = %s",
+            (hal_id,))
+        existing_doc = cur.fetchone()
+        if existing_doc and existing_doc[0]:
+            publication_id = existing_doc[0]
+            is_new = False
+        else:
+            # Hors périmètre UCA (collection = NULL, vient de fetch_missing_hal.py) :
+            # on enrichit les publications existantes mais on n'en crée pas de nouvelles
+            publication_id, is_new = find_or_insert_publication(
+                cur, doc, journal_id, allow_create=(collection is not None)
+            )
         timings["publication"] = time.perf_counter() - t0
 
         if not publication_id:

@@ -453,6 +453,16 @@ def process_work(cur, staging_row: tuple) -> bool:
         if hal_location:
             publication_id = find_hal_publication_id(cur, work)
 
+        # Idempotence : si openalex_documents a déjà cet openalex_id avec un
+        # publication_id, le réutiliser au lieu de risquer un doublon
+        if not publication_id:
+            cur.execute(
+                "SELECT publication_id FROM openalex_documents WHERE openalex_id = %s",
+                (openalex_id,))
+            existing_doc = cur.fetchone()
+            if existing_doc and existing_doc["publication_id"]:
+                publication_id = existing_doc["publication_id"]
+
         # Publication (table de vérité) — fallback si pas trouvée via HAL
         if not publication_id:
             publication_id = insert_publication(cur, work, journal_id)

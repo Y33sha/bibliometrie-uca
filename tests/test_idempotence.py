@@ -253,3 +253,322 @@ class TestNormalizeScanrIdempotence:
 
         db.execute("SELECT count(*) AS cnt FROM publishers WHERE name_normalized LIKE '%elsevier%'")
         assert db.fetchone()["cnt"] == 1, "Elsevier BV ne devrait exister qu'une fois"
+
+
+# ══════════════════════════════════════════════════════════════════
+# HAL
+# ══════════════════════════════════════════════════════════════════
+
+HAL_STAGING_DOCS = [
+    {
+        "halid": "hal-99000001",
+        "doi": "10.9999/hal-test-001",
+        "collection": "TEST",
+        "raw_data": {
+            "docType_s": "ART",
+            "title_s": ["A HAL Article on Tectonics"],
+            "producedDateY_i": 2024,
+            "doiId_s": "10.9999/hal-test-001",
+            "journalTitle_s": "Journal of Tectonics",
+            "journalPublisher_s": "Test Publisher HAL",
+            "authFullName_s": ["Eve Leroy", "Frank Moreau"],
+            "openAccess_bool": True,
+        },
+    },
+    {
+        "halid": "hal-99000002",
+        "doi": "10.9999/hal-test-002",
+        "collection": "TEST",
+        "raw_data": {
+            "docType_s": "COUV",
+            "title_s": ["A Chapter in a Book"],
+            "producedDateY_i": 2023,
+            "doiId_s": "10.9999/hal-test-002",
+            "bookTitle_s": "Big Book of Science",
+            "publisher_s": "Academic Press",
+            "authFullName_s": ["Eve Leroy"],
+        },
+    },
+    {
+        "halid": "hal-99000003",
+        "doi": None,
+        "collection": "TEST",
+        "raw_data": {
+            "docType_s": "THESE",
+            "title_s": ["Une thèse sans DOI sur la géologie"],
+            "producedDateY_i": 2024,
+            "authFullName_s": ["Grace Petit"],
+        },
+    },
+]
+
+
+def _insert_hal_staging(cur, docs):
+    for doc in docs:
+        cur.execute("""
+            INSERT INTO staging_hal (halid, doi, raw_data, collection, processed)
+            VALUES (%s, %s, %s, %s, FALSE)
+            ON CONFLICT (halid) DO UPDATE SET processed = FALSE
+        """, (doc["halid"], doc["doi"], Json(doc["raw_data"]), doc["collection"]))
+
+
+def _run_normalize_hal(cur):
+    """Exécute la normalisation HAL via un curseur tuple (comme le vrai script)."""
+    plain_cur = cur.connection.cursor()
+    from processing.normalize_hal import process_work
+    plain_cur.execute("""
+        SELECT id, halid, doi, raw_data, collection
+        FROM staging_hal WHERE processed = FALSE ORDER BY id
+    """)
+    rows = plain_cur.fetchall()
+    processed = 0
+    for row in rows:
+        if process_work(plain_cur, row):
+            processed += 1
+    return processed
+
+
+def _count_hal_tables(cur) -> dict:
+    counts = {}
+    for t in ["publications", "hal_documents", "hal_authors", "hal_authorships"]:
+        cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
+        counts[t] = cur.fetchone()["cnt"]
+    return counts
+
+
+class TestNormalizeHalIdempotence:
+    def test_double_run_same_counts(self, db):
+        _insert_hal_staging(db, HAL_STAGING_DOCS)
+
+        processed_1 = _run_normalize_hal(db)
+        counts_1 = _count_hal_tables(db)
+        assert processed_1 == 3
+
+        db.execute("UPDATE staging_hal SET processed = FALSE")
+        _run_normalize_hal(db)
+        counts_2 = _count_hal_tables(db)
+
+        assert counts_2 == counts_1, (
+            f"Compteurs différents après 2e passe !\n"
+            f"  1ère : {counts_1}\n  2ème : {counts_2}"
+        )
+
+
+# ══════════════════════════════════════════════════════════════════
+# OpenAlex
+# ══════════════════════════════════════════════════════════════════
+
+OA_STAGING_DOCS = [
+    {
+        "openalex_id": "W9990000001",
+        "doi": "10.9999/oa-test-001",
+        "raw_data": {
+            "id": "https://openalex.org/W9990000001",
+            "doi": "https://doi.org/10.9999/oa-test-001",
+            "title": "An OpenAlex Article on Crystals",
+            "display_name": "An OpenAlex Article on Crystals",
+            "publication_year": 2024,
+            "type": "article",
+            "language": "en",
+            "primary_location": {
+                "source": {
+                    "display_name": "Crystal Research Journal",
+                    "type": "journal",
+                    "issn": ["1111-2222"],
+                    "host_organization_name": "Crystal Press",
+                },
+            },
+            "authorships": [
+                {"author": {"id": "https://openalex.org/A999001", "display_name": "Hector Vidal"},
+                 "author_position": "first", "institutions": [], "raw_affiliation_strings": ["UCA"]},
+            ],
+            "open_access": {"oa_status": "gold", "is_oa": True},
+            "cited_by_count": 5,
+        },
+    },
+    {
+        "openalex_id": "W9990000002",
+        "doi": "10.9999/oa-test-002",
+        "raw_data": {
+            "id": "https://openalex.org/W9990000002",
+            "doi": "https://doi.org/10.9999/oa-test-002",
+            "title": "A Book Chapter on Minerals",
+            "display_name": "A Book Chapter on Minerals",
+            "publication_year": 2023,
+            "type": "book-chapter",
+            "primary_location": {"source": {"display_name": "Mineral Handbook", "type": "book"}},
+            "authorships": [
+                {"author": {"id": "https://openalex.org/A999001", "display_name": "Hector Vidal"},
+                 "author_position": "first", "institutions": [], "raw_affiliation_strings": []},
+            ],
+            "open_access": {"oa_status": "closed", "is_oa": False},
+        },
+    },
+    {
+        "openalex_id": "W9990000003",
+        "doi": None,
+        "raw_data": {
+            "id": "https://openalex.org/W9990000003",
+            "title": "A Dissertation Without DOI",
+            "display_name": "A Dissertation Without DOI",
+            "publication_year": 2024,
+            "type": "dissertation",
+            "primary_location": {"source": None},
+            "authorships": [
+                {"author": {"id": "https://openalex.org/A999002", "display_name": "Irene Blanc"},
+                 "author_position": "first", "institutions": [], "raw_affiliation_strings": []},
+            ],
+            "open_access": {"oa_status": "closed", "is_oa": False},
+        },
+    },
+]
+
+
+def _insert_oa_staging(cur, docs):
+    for doc in docs:
+        cur.execute("""
+            INSERT INTO staging_openalex (openalex_id, doi, raw_data, processed)
+            VALUES (%s, %s, %s, FALSE)
+            ON CONFLICT (openalex_id) DO UPDATE SET processed = FALSE
+        """, (doc["openalex_id"], doc["doi"], Json(doc["raw_data"])))
+
+
+def _run_normalize_oa(cur):
+    from processing.normalize_openalex import process_work
+    cur.execute("""
+        SELECT id, openalex_id, doi, raw_data
+        FROM staging_openalex WHERE processed = FALSE ORDER BY id
+    """)
+    rows = cur.fetchall()
+    processed = 0
+    for row in rows:
+        if process_work(cur, row):
+            processed += 1
+    return processed
+
+
+def _count_oa_tables(cur) -> dict:
+    counts = {}
+    for t in ["publications", "openalex_documents", "openalex_authors", "openalex_authorships"]:
+        cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
+        counts[t] = cur.fetchone()["cnt"]
+    return counts
+
+
+class TestNormalizeOpenalexIdempotence:
+    def test_double_run_same_counts(self, db):
+        _insert_oa_staging(db, OA_STAGING_DOCS)
+
+        processed_1 = _run_normalize_oa(db)
+        counts_1 = _count_oa_tables(db)
+        assert processed_1 == 3
+
+        db.execute("UPDATE staging_openalex SET processed = FALSE")
+        _run_normalize_oa(db)
+        counts_2 = _count_oa_tables(db)
+
+        assert counts_2 == counts_1, (
+            f"Compteurs différents après 2e passe !\n"
+            f"  1ère : {counts_1}\n  2ème : {counts_2}"
+        )
+
+
+# ══════════════════════════════════════════════════════════════════
+# WoS
+# ══════════════════════════════════════════════════════════════════
+
+WOS_STAGING_DOCS = [
+    {
+        "ut": "WOS:999000001",
+        "doi": "10.9999/wos-test-001",
+        "raw_data": {
+            "UT": "WOS:999000001",
+            "TI": "A WoS Article on Polymers",
+            "AU": "Lambert, Jean; Roche, Marie",
+            "DT": "Article",
+            "PY": "2024",
+            "DI": "10.9999/wos-test-001",
+            "SO": "Polymer Science Letters",
+            "PU": "Polymer Press",
+            "SN": "3333-4444",
+            "C1": "[Lambert, J] Univ Clermont Auvergne, ICCF, Clermont Ferrand, France; [Roche, M] CNRS, France",
+            "OA": "gold",
+        },
+    },
+    {
+        "ut": "WOS:999000002",
+        "doi": "10.9999/wos-test-002",
+        "raw_data": {
+            "UT": "WOS:999000002",
+            "TI": "A Review on Catalysis",
+            "AU": "Lambert, Jean",
+            "DT": "Review",
+            "PY": "2023",
+            "DI": "10.9999/wos-test-002",
+            "SO": "Catalysis Reviews",
+            "PU": "Taylor Francis",
+        },
+    },
+    {
+        "ut": "WOS:999000003",
+        "doi": None,
+        "raw_data": {
+            "UT": "WOS:999000003",
+            "TI": "A Technical Report Without DOI",
+            "AU": "Dubois, Claire",
+            "DT": "Meeting Abstract",
+            "PY": "2024",
+            "SO": "Conference Proceedings X",
+        },
+    },
+]
+
+
+def _insert_wos_staging(cur, docs):
+    for doc in docs:
+        cur.execute("""
+            INSERT INTO staging_wos (ut, doi, raw_data, processed)
+            VALUES (%s, %s, %s, FALSE)
+            ON CONFLICT (ut) DO UPDATE SET processed = FALSE
+        """, (doc["ut"], doc["doi"], Json(doc["raw_data"])))
+
+
+def _run_normalize_wos(cur):
+    plain_cur = cur.connection.cursor()
+    from processing.normalize_wos import process_record
+    plain_cur.execute("""
+        SELECT id, ut, doi, raw_data
+        FROM staging_wos WHERE processed = FALSE ORDER BY id
+    """)
+    rows = plain_cur.fetchall()
+    processed = 0
+    for row in rows:
+        if process_record(plain_cur, row):
+            processed += 1
+    return processed
+
+
+def _count_wos_tables(cur) -> dict:
+    counts = {}
+    for t in ["publications", "wos_documents", "wos_authors", "wos_authorships"]:
+        cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
+        counts[t] = cur.fetchone()["cnt"]
+    return counts
+
+
+class TestNormalizeWosIdempotence:
+    def test_double_run_same_counts(self, db):
+        _insert_wos_staging(db, WOS_STAGING_DOCS)
+
+        processed_1 = _run_normalize_wos(db)
+        counts_1 = _count_wos_tables(db)
+        assert processed_1 == 3
+
+        db.execute("UPDATE staging_wos SET processed = FALSE")
+        _run_normalize_wos(db)
+        counts_2 = _count_wos_tables(db)
+
+        assert counts_2 == counts_1, (
+            f"Compteurs différents après 2e passe !\n"
+            f"  1ère : {counts_1}\n  2ème : {counts_2}"
+        )
