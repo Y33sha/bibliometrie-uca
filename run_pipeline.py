@@ -147,7 +147,7 @@ def phase_countries(**kw):
 def phase_enrich(mode="full", **kw):
     """Phase 9 : Enrichissements optionnels."""
     if mode in ("full", "monthly"):
-        run_python("processing/enrich_oa_unpaywall.py")
+        run_python("processing/enrich_oa_status.py")
         run_python("processing/enrich_journal_apc.py")
     else:
         log.info("Enrichissements ignorés en mode hebdomadaire")
