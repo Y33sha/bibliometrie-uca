@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
-	import { sanitizeTitle, halDocUrl } from '$lib/utils';
+	import { sanitizeTitle, halDocUrl, scanrPubUrl } from '$lib/utils';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -314,7 +314,7 @@
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 						{#if p.scanr_id}
-							<a href="https://scanr.enseignementsup-recherche.gouv.fr/publications/{p.scanr_id}" target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {p.scanr_id}">
+							<a href={scanrPubUrl(p.scanr_id)} target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {p.scanr_id}">
 								<img src="{base}/scanr-icon.svg" alt="ScanR" />
 							</a>
 						{:else}
