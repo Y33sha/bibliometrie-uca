@@ -16,8 +16,9 @@ CREATE TABLE IF NOT EXISTS journal_name_forms (
     id              SERIAL PRIMARY KEY,
     journal_id      INTEGER NOT NULL REFERENCES journals(id) ON DELETE CASCADE,
     form_normalized TEXT NOT NULL,
+    publisher_id    INTEGER REFERENCES publishers(id),
     created_at      TIMESTAMPTZ DEFAULT now(),
-    UNIQUE (form_normalized)
+    UNIQUE (form_normalized, publisher_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_jnl_nf_journal ON journal_name_forms (journal_id);
