@@ -34,6 +34,7 @@ from db.connection import get_connection
 from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.normalize import normalize_text
+from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
 from services.publications import find_or_create as find_or_create_publication
 from services.journals import find_or_create_publisher, find_or_create_journal
 
@@ -49,25 +50,25 @@ logger = setup_logger("normalize_hal", os.path.join(os.path.dirname(__file__), "
 DOCTYPE_MAP = {
     "ART": "article",
     "COMM": "conference_paper",
-    "POSTER": "conference_paper",
+    "POSTER": "poster",
     "OUV": "book",
     "COUV": "book_chapter",
     "DOUV": "book_chapter",
     "THESE": "thesis",
-    "HDR": "thesis",
+    "HDR": "hdr",
     "PREPRINT": "preprint",
     "PREPUBLICATION": "preprint",
     "UNDEFINED": "other",
     "OTHER": "other",
     "REPORT": "report",
-    "MEM": "thesis",
+    "MEM": "memoir",
     "LECTURE": "other",
     "IMG": "other",
     "VIDEO": "other",
     "SON": "other",
     "MAP": "other",
-    "SOFTWARE": "other",
-    "PATENT": "other",
+    "SOFTWARE": "software",
+    "PATENT": "patent",
     "NOTE": "article",
     "BLOG": "other",
 }
@@ -472,6 +473,23 @@ def process_work(cur, staging_row: tuple) -> bool:
         if not title or not pub_year:
             logger.warning(f"Impossible d'insérer {hal_id} — titre ou année manquant")
             return False
+
+        # Zenodo : si le DOI est un concept DOI, vérifier si le version DOI
+        # est déjà en staging → skip pour éviter les doublons
+        raw_doi = clean_doi(as_str(doc.get("doiId_s")))
+        if is_zenodo_doi(raw_doi):
+            version_doi = resolve_zenodo_doi(raw_doi)
+            if version_doi:
+                cur.execute(
+                    "SELECT id FROM staging_hal WHERE lower(doi) = lower(%s)",
+                    (version_doi,))
+                if cur.fetchone():
+                    logger.info(f"  {hal_id} concept DOI Zenodo {raw_doi} → "
+                                f"version {version_doi} déjà en staging, skip")
+                    cur.execute(
+                        "UPDATE staging_hal SET processed = TRUE WHERE id = %s",
+                        (staging_id,))
+                    return False
 
         t0 = time.perf_counter()
         publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))

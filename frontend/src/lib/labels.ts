@@ -9,6 +9,16 @@ export const docTypeLabelsMap: Record<string, string> = {
 	preprint: 'Preprints',
 	editorial: 'Éditoriaux',
 	report: 'Rapports',
+	dataset: 'Jeux de données',
+	software: 'Logiciels',
+	patent: 'Brevets',
+	hdr: 'HDR',
+	memoir: 'Mémoires',
+	poster: 'Posters',
+	letter: 'Letters',
+	erratum: 'Errata',
+	retraction: 'Rétractations',
+	peer_review: 'Peer reviews',
 	other: 'Autres'
 };
 
@@ -23,6 +33,16 @@ export const typeLabels: Record<string, string> = {
 	preprint: 'Preprint',
 	editorial: 'Éditorial',
 	report: 'Rapport',
+	dataset: 'Jeu de données',
+	software: 'Logiciel',
+	patent: 'Brevet',
+	hdr: 'HDR',
+	memoir: 'Mémoire',
+	poster: 'Poster',
+	letter: 'Letter',
+	erratum: 'Erratum',
+	retraction: 'Rétractation',
+	peer_review: 'Peer review',
 	other: 'Autre'
 };
 

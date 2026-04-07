@@ -1,6 +1,6 @@
 # Workflow
 ## Automatisation
-* [ ] programmation cron pour les dumps de sauvegarde: `pg_dump -U lalecoz -d bibliometrie -F c -f bibliometrie.dump`
+* [x] programmation cron pour les dumps de sauvegarde: `pg_dump -U lalecoz -d bibliometrie -F c -f bibliometrie.dump`
 * [ ] programmation cron pour le pipeline de traitement
 
 ## Transmissibilité
@@ -10,6 +10,7 @@
 * [ ] nouveaux imports: comment prendre en compte fusions de comptes auteurs ayant eu lieu entre-temps (par ex. sur HAL)? / + ré-importer et écraser publis déjà présentes et modifiées entre-temps (stocker hash puis comparer?)
 * [ ] Comment se met à jour le référentiel structures HAL en cas de changement entre deux imports? faut-il des champs `hash` et `last_seen_at` comme pour les publis?
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
+* [ ] authorships excluded: info perdue si réimport (grave?)
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?)
 * [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?).
 * [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer)
@@ -17,14 +18,17 @@
 
 ## Pipeline
 * [ ] dédoublonnage DOI figshare (.v1)
-* [ ] dédoublonnage documents Zenodo avec DOI distincts (appel API Zenodo si 2 titres identiques?)
+* [x] dédoublonnage documents Zenodo avec DOI distincts (appel API Zenodo si 2 titres identiques?)
 * [ ] backfilling wos_organizations: relancer  python scripts/backfill_wos_institutions.py jusqu'à ce qu'il soit fini puis supprimer
 
 # Trucs techniques
-* [ ] harmoniser les noms de routes API avec les url frontend
-* [ ] is_uca encode en dur le nom de l'UCA dans les noms de colonnes de la base de données. Pas terrible pour la réutilisabilité. idem: rôles des 2 périmètres uca et uca_wide (is_uca, structure_ids), à rendre configurable; idem, phase uca_flags à renommer pour plus d'abstraction?
 * [ ] table perimeters mal torchée: devrait inclure un jsonb avec id structures + bool "with children"
 * [ ] chercher des moyens d'optimiser la taille de la base (supprimer données qui ne sont plus utiles? ex.: supprimer staging après normalisation, supprimer données sources des publications hors périmètre?)
+
+# Sémantique
+* [ ] harmoniser les noms de routes API avec les url frontend
+* [ ] is_uca encode en dur le nom de l'UCA dans les noms de colonnes de la base de données. Pas terrible pour la réutilisabilité. idem: rôles des 2 périmètres uca et uca_wide (is_uca, structure_ids), à rendre configurable; idem, phase uca_flags à renommer pour plus d'abstraction?
+* [ ] publications => plutôt des documents
 
 # Sources de données
 
@@ -32,6 +36,7 @@
 * [ ] pour les publis: ArXiv, Pubmed, ScanR, CrossRef
 * [ ] pour les jeux de données: DataCite, autres?
 * [ ] pour les thèses: theses.fr
+* [ ] brevets?
 * [ ] divers: ORCID, IdRef, OpenAPC, DOAJ, scraping sites éditeurs pour les adresses manquantes? (soyons fous); figshare, zenodo
 
 ## Structure des données sources
@@ -44,10 +49,12 @@
 * [ ] revues (avec liens doaj; apc): pb des formes de noms différentes quand ISSN absent (JHEP vs Journal of High Energy Particles...): table `journal_name_forms`
 
 ## Qualité des données
+* [ ] utiliser DOAJ pour enrichir données journals et s'en servir pour contrôler oa_status?
+
 ### Types de documents
-* [ ] types parfois non fiables sur OpenAlex: https://openalex.org/works/W4225722715 (utiliser Unpaywall aussi pour corriger type doc? ou utiliser DOAJ pour enrichir données journals et s'en servir pour contrôler oa_status?)
+* [ ] types parfois non fiables sur OpenAlex: https://openalex.org/works/W4225722715 (utiliser Unpaywall aussi pour corriger type doc?)
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
-* [ ] enum type doc à revoir: correction/erratum/corrigendum; peer_review; compte-rendu (= autre sur HAL); review (= book review ou reue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); dataset; preprints en accès gold selon OpenAlex (?)
+* [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou reue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); preprints en accès gold selon OpenAlex (?)
 * [ ] source theConversation: pas closed (statut erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
 
 ### Problèmes spécifiques HAL
@@ -63,7 +70,6 @@
 ## Admin
 
 ### Structures
-* [ ] supprimer formes de noms redondantes
 * [ ] créer formes de noms excluantes? ex. "Zone Ateliers Territoires Uranifères" => reconnaît à tort UMR Territoires à cause du contexte Clermont
 
 ### Adresses

@@ -20,6 +20,7 @@ HAL_FIELDS = [
     "producedDateY_i",
     "publicationDate_s",
     "docType_s",
+    "docSubType_s",
     "language_s",
     "journalTitle_s",
     "journalIssn_s",
