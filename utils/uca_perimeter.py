@@ -1,57 +1,49 @@
 """Calcul des périmètres de structures.
 
-Lit les périmètres depuis les tables `perimeters` / `perimeter_rules`.
-Fallback sur l'ancienne logique hardcodée si les tables n'existent pas.
+Lit les périmètres depuis la table `perimeters` (colonne structure_ids).
+Chaque structure racine inclut récursivement ses sous-structures
+(via est_tutelle_de dans structure_relations).
 """
 
 
 def get_perimeter_structure_ids(cur, perimeter_code: str) -> set[int]:
     """Retourne l'ensemble des structure_ids pour un périmètre donné.
 
-    Chaque rule du périmètre définit une structure racine.
-    Si include_children = TRUE, les enfants récursifs (via est_tutelle_de)
-    sont inclus.
+    Chaque structure listée dans perimeters.structure_ids est une racine.
+    Ses descendants récursifs (via est_tutelle_de) sont inclus.
     """
     try:
-        cur.execute("""
-            SELECT pr.structure_id, pr.include_children
-            FROM perimeter_rules pr
-            JOIN perimeters p ON p.id = pr.perimeter_id
-            WHERE p.code = %s
-        """, (perimeter_code,))
-        rules = cur.fetchall()
+        cur.execute(
+            "SELECT structure_ids FROM perimeters WHERE code = %s",
+            (perimeter_code,))
+        row = cur.fetchone()
     except Exception:
         return _fallback_uca(cur) if perimeter_code == "uca" else set()
 
-    if not rules:
-        # Table existe mais périmètre non défini → fallback
+    if not row:
         if perimeter_code == "uca":
             return _fallback_uca(cur)
         if perimeter_code == "uca_wide":
             return _fallback_uca_wide(cur)
         return set()
 
-    result = set()
-    for row in rules:
-        struct_id = row[0] if isinstance(row, tuple) else row["structure_id"]
-        include_children = row[1] if isinstance(row, tuple) else row["include_children"]
-        result.add(struct_id)
-        if include_children:
-            cur.execute("""
-                WITH RECURSIVE descendants AS (
-                    SELECT child_id FROM structure_relations
-                    WHERE parent_id = %s AND relation_type = 'est_tutelle_de'
-                    UNION
-                    SELECT sr.child_id FROM structure_relations sr
-                    JOIN descendants d ON d.child_id = sr.parent_id
-                    WHERE sr.relation_type = 'est_tutelle_de'
-                )
-                SELECT child_id FROM descendants
-            """, (struct_id,))
-            for r in cur.fetchall():
-                result.add(r["child_id"] if isinstance(r, dict) else r[0])
+    root_ids = row["structure_ids"] if isinstance(row, dict) else row[0]
+    if not root_ids:
+        return set()
 
-    return result
+    # Résoudre les descendants récursifs en une seule requête
+    cur.execute("""
+        WITH RECURSIVE descendants AS (
+            SELECT unnest(%s::int[]) AS id
+            UNION
+            SELECT sr.child_id FROM structure_relations sr
+            JOIN descendants d ON d.id = sr.parent_id
+            WHERE sr.relation_type = 'est_tutelle_de'
+        )
+        SELECT id FROM descendants
+    """, (root_ids,))
+
+    return {r["id"] if isinstance(r, dict) else r[0] for r in cur.fetchall()}
 
 
 def get_uca_structure_ids(cur) -> set[int]:
@@ -69,9 +61,8 @@ def get_uca_structure_ids_list(cur) -> list[int]:
     return list(get_uca_structure_ids(cur))
 
 
-# Fallback si les tables perimeters n'existent pas encore
+# Fallback si la table perimeters n'existe pas encore
 def _val(r, key):
-    """Extrait une valeur d'un row (dict ou tuple)."""
     return r[key] if isinstance(r, dict) else r[0]
 
 

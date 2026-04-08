@@ -4,8 +4,8 @@
 	import { api } from "$lib/api";
 
 	interface ConfigItem { key: string; value: any; description: string | null; updated_at: string; }
-	interface PerimeterRule { id: number; structure_id: number; include_children: boolean; name: string; acronym: string | null; code: string; }
-	interface Perimeter { id: number; code: string; name: string; description: string | null; rules: PerimeterRule[]; structure_count: number; }
+	interface PerimeterStructure { id: number; name: string; acronym: string | null; code: string; }
+	interface Perimeter { id: number; code: string; name: string; description: string | null; structure_ids: number[]; structures: PerimeterStructure[]; structure_count: number; }
 	interface HalCollections { collections: Record<string, string>; count: number; }
 
 	let configs: ConfigItem[] = $state([]);
@@ -15,11 +15,10 @@
 	let editValue = $state("");
 	let saving = $state(false);
 
-	// Perimeter rule add
-	let addRulePerimeterId: number | null = $state(null);
-	let ruleSearch = $state("");
-	let ruleResults: any[] = $state([]);
-	let ruleIncludeChildren = $state(true);
+	// Perimeter structure add
+	let addStructPerimeterId: number | null = $state(null);
+	let structSearch = $state("");
+	let structResults: any[] = $state([]);
 
 	function currentYear(): number { return new Date().getFullYear(); }
 
@@ -61,21 +60,21 @@
 	}
 
 	async function searchStructures() {
-		if (ruleSearch.length < 2) { ruleResults = []; return; }
-		ruleResults = await api<any[]>(`/api/structures?search=${encodeURIComponent(ruleSearch)}`);
+		if (structSearch.length < 2) { structResults = []; return; }
+		structResults = await api<any[]>(`/api/structures?search=${encodeURIComponent(structSearch)}`);
 	}
 
-	async function addRule(structureId: number) {
-		if (!addRulePerimeterId) return;
-		await fetch(base + `/api/perimeters/${addRulePerimeterId}/rules`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ structure_id: structureId, include_children: ruleIncludeChildren }) });
-		addRulePerimeterId = null;
-		ruleSearch = "";
-		ruleResults = [];
+	async function addPerimeterStructure(structureId: number) {
+		if (!addStructPerimeterId) return;
+		await fetch(base + `/api/perimeters/${addStructPerimeterId}/structures`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ structure_id: structureId }) });
+		addStructPerimeterId = null;
+		structSearch = "";
+		structResults = [];
 		await load();
 	}
 
-	async function deleteRule(ruleId: number) {
-		await fetch(base + `/api/perimeter-rules/${ruleId}`, { method: "DELETE" });
+	async function removePerimeterStructure(perimeterId: number, structureId: number) {
+		await fetch(base + `/api/perimeters/${perimeterId}/structures/${structureId}`, { method: "DELETE" });
 		await load();
 	}
 
@@ -201,7 +200,7 @@
 
 <!-- ═══ PÉRIMÈTRES ═══ -->
 <h3 class="section-title">Périmètres</h3>
-<p class="help-text">Chaque périmètre est défini par une liste de structures racines. "Avec enfants" inclut récursivement les structures en tutelle.</p>
+<p class="help-text">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
 {#each perimeters as perim (perim.id)}
 	<div class="perimeter-card">
 		<div class="perimeter-header">
@@ -213,29 +212,27 @@
 			<p class="perimeter-desc">{perim.description}</p>
 		{/if}
 		<div class="perimeter-rules">
-			{#each perim.rules as rule (rule.id)}
+			{#each perim.structures as struct (struct.id)}
 				<span class="tag">
-					{rule.acronym || rule.name}
-					{#if rule.include_children}<span class="children-badge">+ enfants</span>{/if}
-					<button class="remove" onclick={() => deleteRule(rule.id)} title="Retirer">x</button>
+					{struct.acronym || struct.name}
+					<button class="remove" onclick={() => removePerimeterStructure(perim.id, struct.id)} title="Retirer">x</button>
 				</span>
 			{/each}
 		</div>
-		{#if addRulePerimeterId === perim.id}
+		{#if addStructPerimeterId === perim.id}
 			<div class="rule-add-form">
-				<input type="text" placeholder="Rechercher une structure..." bind:value={ruleSearch} oninput={searchStructures} autocomplete="off" />
-				<label class="children-label"><input type="checkbox" bind:checked={ruleIncludeChildren} /> avec enfants</label>
-				<button class="btn btn-sm" onclick={() => { addRulePerimeterId = null; }}>Annuler</button>
-				{#if ruleResults.length > 0}
+				<input type="text" placeholder="Rechercher une structure..." bind:value={structSearch} oninput={searchStructures} autocomplete="off" />
+				<button class="btn btn-sm" onclick={() => { addStructPerimeterId = null; }}>Annuler</button>
+				{#if structResults.length > 0}
 					<div class="rule-results">
-						{#each ruleResults.slice(0, 10) as s (s.id)}
-							<button class="picker-item" onclick={() => addRule(s.id)}>{s.acronym ? s.acronym + " — " : ""}{s.name}</button>
+						{#each structResults.slice(0, 10) as s (s.id)}
+							<button class="picker-item" onclick={() => addPerimeterStructure(s.id)}>{s.acronym ? s.acronym + " — " : ""}{s.name}</button>
 						{/each}
 					</div>
 				{/if}
 			</div>
 		{:else}
-			<button class="btn btn-sm" style="margin-top: 6px;" onclick={() => { addRulePerimeterId = perim.id; ruleSearch = ""; ruleResults = []; ruleIncludeChildren = true; }}>Ajouter</button>
+			<button class="btn btn-sm" style="margin-top: 6px;" onclick={() => { addStructPerimeterId = perim.id; structSearch = ""; structResults = []; }}>Ajouter</button>
 		{/if}
 	</div>
 {/each}
@@ -245,7 +242,6 @@
 	.subtitle { color: var(--muted); font-size: 0.9rem; margin: 0 0 20px; }
 	.section-title { margin: 24px 0 8px; padding: 6px 14px; background: #5b9ea0; color: white; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 3px; }
 	.help-text { background: var(--accent-light); border: 1px solid #c4d8ed; border-radius: 5px; padding: 8px 12px; margin: 4px 0 12px; font-size: 0.85rem; color: #2c3e50; line-height: 1.5; }
-	.help-text a { color: var(--accent); }
 
 	.config-grid { display: flex; flex-direction: column; gap: 8px; max-width: 800px; margin-bottom: 8px; }
 	.config-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 5px; }
@@ -267,12 +263,11 @@
 	.perimeter-desc { font-size: 0.85rem; color: var(--muted); margin: 4px 0 8px; }
 	.perimeter-rules { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
 	.tag { display: inline-flex; align-items: center; gap: 4px; font-size: 0.85rem; padding: 2px 8px; border-radius: 10px; background: #f0f0f0; }
-	.children-badge { font-size: 0.7rem; color: var(--accent); }
+
 	.remove { cursor: pointer; color: var(--danger); font-weight: bold; background: none; border: none; padding: 0; font-family: inherit; }
 
 	.rule-add-form { margin-top: 8px; }
 	.rule-add-form input[type="text"] { width: 250px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 3px; font-size: 0.9rem; font-family: inherit; }
-	.children-label { font-size: 0.85rem; margin-left: 8px; }
 	.rule-results { border: 1px solid var(--border); border-radius: 4px; margin-top: 4px; max-height: 200px; overflow-y: auto; background: white; }
 	.picker-item { display: block; width: 100%; padding: 6px 10px; font-size: 0.9rem; cursor: pointer; background: none; border: none; text-align: left; font-family: inherit; }
 	.picker-item:hover { background: var(--accent-light); }
