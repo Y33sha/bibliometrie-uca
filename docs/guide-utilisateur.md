@@ -71,7 +71,7 @@ Pages dédiées aux problèmes de qualité spécifiques à HAL :
 
 ## Pages d'administration
 
-### Configuration (`/admin/config`)
+### <span id="admin-config"></span>Configuration (`/admin/config`)
 
 Paramètres des imports:
 - email (polite pool);
@@ -80,7 +80,7 @@ Paramètres des imports:
 - périmètre interrogé par source.
 
 
-### Gestion des structures (`/admin/structures`)
+### <span id="admin-structures"></span>Gestion des structures (`/admin/structures`)
 
 Gère le CRUD sur l'ensemble des structures du périmètre UCA + les co-tutelles des laboratoires (ONR, écoles, autres universités) + le CHU.
 

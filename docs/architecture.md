@@ -35,7 +35,7 @@ erDiagram
 
 ```
 
-### Tables sources
+### Tables “sources”
 
 Chaque source possède ses propres tables pour les entités clés, et ses propres identifiants internes pour toutes les entités.
 
@@ -205,6 +205,10 @@ Tables associées :
 - `address_structures`: table de liaison. Les adresses proviennent des authorships sources (phase 4 `addresses` du pipeline). Les structures identifiées sont propagées aux authorships sources.
 - `apc_payments`: données provenant d'un import CSV, voir [doc sources](sources#donnees-apc).
 
+
+La page [**admin/structures**](guide-utilisateur#admin-structures) permet de gérer le CRUD des structures ainsi que leurs relations et formes de noms.
+
+La page [**admin/config**](guide-utilisateur#admin-config) permet de gérer la définition des périmètres et quel périmètre est pris en compte à différentes étapes du *pipeline*.
 
 
 
