@@ -27,6 +27,12 @@
 	let selectedOrcid: string[] = $state([]);
 	let selectedIdhal: string[] = $state([]);
 	let selectedRh: string[] = $state(["yes"]);
+	let currentSort = $state("name");
+
+	function toggleSortName() {
+		currentSort = currentSort === "name" ? "-name" : "name";
+		dir.page = 1; syncUrl(); dir.load();
+	}
 
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
@@ -51,6 +57,7 @@
 			const params = buildFilterParams();
 			const q = search.trim();
 			if (q) params.set("search", q);
+			params.set("sort", currentSort);
 			return params;
 		},
 	});
@@ -93,6 +100,7 @@
 			selectedIdhal: { type: "string_array", urlKey: "has_idhal" },
 			hasRh: { type: "single", urlKey: "has_rh", defaultValue: "yes" },
 			search: { type: "single", urlKey: "search" },
+			currentSort: { type: "single", urlKey: "sort", defaultValue: "name" },
 			currentPage: { type: "page", urlKey: "page" },
 		},
 	});
@@ -106,6 +114,7 @@
 			selectedIdhal,
 			hasRh: selectedRh.length === 1 ? selectedRh[0] : "all",
 			search,
+			currentSort,
 			currentPage: dir.page,
 		}));
 	}
@@ -139,6 +148,7 @@
 			selectedRh = rh === "all" ? [] : [rh];
 		}
 		if (restored.search) search = restored.search as string;
+		if (restored.currentSort) currentSort = restored.currentSort as string;
 		if (restored.currentPage) dir.page = restored.currentPage as number;
 
 		await facets.load();
@@ -195,7 +205,7 @@
 <table>
 	<thead>
 		<tr>
-			<th>Nom</th>
+			<th class="sortable" class:active={currentSort === 'name' || currentSort === '-name'} onclick={toggleSortName}>Nom {currentSort === 'name' ? '▲' : currentSort === '-name' ? '▼' : ''}</th>
 			<th>Rôle</th>
 			<th>Département</th>
 			<th>ORCID</th>
@@ -297,6 +307,9 @@
 		border-bottom: 1px solid var(--border);
 		white-space: nowrap;
 	}
+	thead th.sortable { cursor: pointer; user-select: none; }
+	thead th.sortable:hover { color: var(--accent); }
+	thead th.sortable.active { color: var(--accent); }
 	tbody tr {
 		border-bottom: 1px solid #f0efec;
 	}

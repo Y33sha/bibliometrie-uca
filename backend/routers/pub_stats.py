@@ -47,6 +47,7 @@ async def publisher_stats(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
+    sort: str = Query("-pubs"),
 ):
     """Stats d'articles par éditeur."""
     offset = (page - 1) * per_page
@@ -101,7 +102,14 @@ async def publisher_stats(
             JOIN publishers pub ON pub.id = j.publisher_id
             WHERE {where}
             GROUP BY pub.id, pub.name
-            ORDER BY COUNT(DISTINCT p.id) DESC
+            ORDER BY {
+                {
+                    "name": "pub.name ASC",
+                    "-name": "pub.name DESC",
+                    "pubs": "COUNT(DISTINCT p.id) ASC",
+                    "-pubs": "COUNT(DISTINCT p.id) DESC",
+                }.get(sort, "COUNT(DISTINCT p.id) DESC")
+            }
             LIMIT %s OFFSET %s
         """, params + [per_page, offset])
 
@@ -124,6 +132,7 @@ async def journal_stats(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
+    sort: str = Query("-pubs"),
 ):
     """Stats d'articles par revue."""
     offset = (page - 1) * per_page
@@ -187,7 +196,14 @@ async def journal_stats(
             LEFT JOIN publishers pub ON pub.id = j.publisher_id
             WHERE {where}
             GROUP BY j.id, j.title, j.issn, j.eissn, pub.name, j.is_predatory, j.apc_amount
-            ORDER BY COUNT(DISTINCT p.id) DESC
+            ORDER BY {
+                {
+                    "name": "j.title ASC",
+                    "-name": "j.title DESC",
+                    "pubs": "COUNT(DISTINCT p.id) ASC",
+                    "-pubs": "COUNT(DISTINCT p.id) DESC",
+                }.get(sort, "COUNT(DISTINCT p.id) DESC")
+            }
             LIMIT %s OFFSET %s
         """, params + [per_page, offset])
 
@@ -326,6 +342,7 @@ async def stats_labs(
     has_apc: str = Query(""),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
+    sort: str = Query("-pubs"),
 ):
     """Stats d'articles par laboratoire."""
     offset = (page - 1) * per_page
@@ -409,7 +426,14 @@ async def stats_labs(
             LEFT JOIN apc_payments ap_lab ON ap_lab.publication_id = p.id AND ap_lab.lab_structure_id = s.id
             WHERE {where}
             GROUP BY s.id, s.acronym, s.name
-            ORDER BY COUNT(DISTINCT p.id) DESC
+            ORDER BY {
+                {
+                    "name": "COALESCE(s.acronym, s.name) ASC",
+                    "-name": "COALESCE(s.acronym, s.name) DESC",
+                    "pubs": "COUNT(DISTINCT p.id) ASC",
+                    "-pubs": "COUNT(DISTINCT p.id) DESC",
+                }.get(sort, "COUNT(DISTINCT p.id) DESC")
+            }
             LIMIT %s OFFSET %s
         """, params + [per_page, offset])
 
