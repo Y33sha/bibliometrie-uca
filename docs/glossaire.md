@@ -13,17 +13,19 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 | **Unpaywall** | <span id="unpaywall"></span>Service qui associe un statut d'accès ouvert à chaque DOI. Utilisé pour enrichir le champ `oa_status` des publications. |
 | **OpenAPC** | TODO |
 | **ScanR** | TODO |
+| **CrossRef** | TODO |
+| **DataCite** | TODO |
 
 
 ## Identifiants
 
 | Terme | Définition |
 |-------|-----------|
-| **DOI** | Digital Object Identifier. Identifiant unique et pérenne d'une publication (ex: `10.1234/article.5678`). |
+| **DOI** | *Digital Object Identifier*. Identifiant unique et pérenne d'une publication (ex: `10.1234/article.5678`). |
 | **ORCID** | Identifiant unique d'un chercheur (ex: `0000-0001-2345-6789`). Créé par le chercheur. |
 | **idHAL** | Identifiant auteur dans HAL. Créé par le chercheur dans son profil HAL. |
 | **IdRef** | Identifiant auteur créé et maintenu par l'ABES (Agence bibliographique de l'enseignement supérieur). |
-| **ROR** | Research Organization Registry. Identifiant unique d'une institution de recherche (ex: `https://ror.org/01a8ajp46` pour l'UCA). |
+| **ROR** | <span id="ror"></span>*Research Organization Registry*. Registre international des structures de recherche, attribuant des identifiants uniques à chaque structure. (ex: [01a8ajp46](https://ror.org/01a8ajp46) pour l'UCA). |
 
 ## Édition scientifique
 
