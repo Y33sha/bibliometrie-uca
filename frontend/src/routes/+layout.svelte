@@ -23,6 +23,7 @@
 	);
 
 	let dropdownOpen = $state(false);
+	let refDropdownOpen = $state(false);
 	let dupDropdownOpen = $state(false);
 	let halDropdownOpen = $state(false);
 
@@ -84,11 +85,36 @@
 				{/if}
 			</div>
 
-			<a
-				href="{base}/admin/persons"
-				class="nav-link"
-				class:active={isActive("/admin/persons")}>Personnes</a
+			<div
+				class="nav-dropdown"
+				role="navigation"
+				class:active={isActive("/admin/persons") || isActive("/admin/publishers") || isActive("/admin/journals")}
+				onmouseenter={() => (refDropdownOpen = true)}
+				onmouseleave={() => (refDropdownOpen = false)}
 			>
+				<button class="nav-link" class:active={isActive("/admin/persons") || isActive("/admin/publishers") || isActive("/admin/journals")}
+					>Référentiels &#x25BE;</button
+				>
+				{#if refDropdownOpen}
+					<div class="nav-dropdown-menu">
+						<a
+							href="{base}/admin/persons"
+							class:active={isActive("/admin/persons")}
+							>Personnes</a
+						>
+						<a
+							href="{base}/admin/publishers"
+							class:active={isActive("/admin/publishers")}
+							>Éditeurs</a
+						>
+						<a
+							href="{base}/admin/journals"
+							class:active={isActive("/admin/journals")}
+							>Revues</a
+						>
+					</div>
+				{/if}
+			</div>
 			<div
 				class="nav-dropdown"
 				role="navigation"
