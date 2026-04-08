@@ -266,7 +266,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    G@{ shape: processes, label: "*_publications\n(sources)"}-->A
+    G@{ shape: processes, label: "*_documents\n(sources)"}-->A
 
     subgraph vérité
     direction LR

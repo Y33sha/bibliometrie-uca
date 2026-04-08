@@ -159,33 +159,54 @@ Note : `person_id` sur les `*_authorships` est écrit par `services/persons.py`
 
 ### Tables canoniques
 
-#### `structures`
+#### Domaine fonctionnel `structures`
 
-Référentiel institutionnel maintenu manuellement. Contient l'UCA, ses laboratoires,
-les tutelles (CNRS, INRAE...), composantes (INP, VetAgro Sup...), CHU, etc.
+Référentiel institutionnel maintenu manuellement. Contient l'UCA, ses laboratoires, les tutelles (CNRS, INRAE...), composantes (INP, VetAgro Sup...), CHU, etc.
 
 - `code` : identifiant court stable (`uca`, `cnrs`, `lpc`, `ip`)
 - `type` : `universite`, `onr`, `chu`, `ecole`, `labo`, `equipe`, `site`, `autre`
 - `ror_id`, `rnsr_id` : identifiants externes (optionnels)
 - `hal_collection` : collection HAL associée (labos uniquement)
 
-Tables associées :
-- `structure_relations` : hiérarchie (tutelles, partenariats)
-- `structure_name_forms` : formes de noms pour la détection automatique dans les affiliations
-
 ```mermaid
-erDiagram
-    structures ||--o{ structure_relations : ""
-    structures ||--o{ structure_name_forms : ""
-    structures }o--o{ addresses : "est_reference_dans"
-    structures }o--o{ authorships : ""
-    structures ||--o{ apc_payments : "paye"
-    authorships }o--|| persons : ""
-    authorships }o--|| publications : ""
-    apc_payments |o--o| publications : ""
+flowchart LR
+    structure_name_forms --- structures
+    structure_relations --- structures
+    perimeters---structures
+    structures --- authorships
+    authorships --- publications
+    authorships --- persons
+    structures ---|acronyme| apc_payments
+    apc_payments ---|DOI| publications
+    structures --- address_structures
+    address_structures --- addresses
+    
+    classDef manuel  fill:#8e5,stroke:#5a3
+    class structures,structure_name_forms,perimeters,structure_relations manuel;
+    classDef csv fill:#fa5
+    class apc_payments csv
+    classDef main stroke-width:4px,font-weight:bold
+    class structures,publications,persons,authorships main
 ```
 
-#### `publications`
+Légende:
+- **vert**: tables peuplées manuellement;
+- **orange**: imports CSV;
+- **violet**: tables peuplées automatiquement par le pipeline à partir des imports API.
+
+Tables associées :
+- `perimeters` : un périmètre est un ensemble de structures incluant récursivement leurs sous-structures. Actuellement deux périmètres sont définis: **UCA strict** et **UCA large** (UCA + CHU + INP). Impacte:
+    - Les authorships sources dont le champ `structure_ids` sera peuplé par le pipeline, et qui serviront à générer les `personnes`. Une *authorship* hors périmètre UCA strict n'est pas génératrice d'entités personnes.
+    - (à terme: les appels API devront être déduits du périmètre. Pour l'instant les critères de requête sont écrits en dur dans la config.) <!--TODO: mapper structures aux identifiants de chaque source, supprimer les identifiants hardcoded dans la config des appels API et les déduire du périmètre UCA -->
+- `structure_relations` : définit les relations entre structures. Deux relations existent: **tutelle** (asymétrique), **partenariat** (symétrique, non transitif). La relation "partenariat" est purement informative (elle réplique l'information présente dans ROR), la relation "tutelle" a une conséquence sur les structures incluses dans un périmètre donné.
+- `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: *LMV* reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `addresses` du pipeline pour peupler la table de liaison `adress_structures`.
+- `address_structures`: table de liaison. Les adresses proviennent des authorships sources (phase 4 `addresses` du pipeline). Les structures identifiées sont propagées aux authorships sources.
+- `apc_payments`: données provenant d'un import CSV, voir [doc sources](sources#donnees-apc).
+
+
+
+
+#### Domaine fonctionnel  `publications`
 
 Référentiel dédupliqué. Hiérarchie de déduplication :
 1. **DOI identique** (case-insensitive) → même publication
