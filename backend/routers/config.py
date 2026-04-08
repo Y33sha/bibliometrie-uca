@@ -52,44 +52,56 @@ async def update_config(key: str, data: dict):
 @router.get("/api/perimeters")
 async def list_perimeters():
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT id, code, name, description FROM perimeters ORDER BY id")
+        cur.execute("SELECT id, code, name, description, structure_ids FROM perimeters ORDER BY id")
         perimeters = cur.fetchall()
         for p in perimeters:
-            pid = p["id"]
-            cur.execute("""
-                SELECT pr.id, pr.structure_id, pr.include_children, s.name, s.acronym, s.code
-                FROM perimeter_rules pr
-                JOIN structures s ON s.id = pr.structure_id
-                WHERE pr.perimeter_id = %s
-                ORDER BY s.name
-            """, (pid,))
-            p["rules"] = cur.fetchall()
+            # Résoudre les noms des structures racines
+            root_ids = p["structure_ids"] or []
+            if root_ids:
+                cur.execute("""
+                    SELECT id, name, acronym, code FROM structures
+                    WHERE id = ANY(%s) ORDER BY name
+                """, (root_ids,))
+                p["structures"] = cur.fetchall()
+            else:
+                p["structures"] = []
             resolved = get_perimeter_structure_ids(cur, p["code"])
             p["structure_count"] = len(resolved)
         return perimeters
 
 
-@router.post("/api/perimeters/{perimeter_id}/rules")
-async def add_perimeter_rule(perimeter_id: int, data: dict):
+@router.post("/api/perimeters/{perimeter_id}/structures")
+async def add_perimeter_structure(perimeter_id: int, data: dict):
     structure_id = data.get("structure_id")
-    include_children = data.get("include_children", True)
     if not structure_id:
         raise HTTPException(status_code=400, detail="structure_id requis")
 
     with get_cursor() as (cur, conn):
         cur.execute("""
-            INSERT INTO perimeter_rules (perimeter_id, structure_id, include_children)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (perimeter_id, structure_id) DO UPDATE SET include_children = EXCLUDED.include_children
+            UPDATE perimeters
+            SET structure_ids = array_append(structure_ids, %s)
+            WHERE id = %s AND NOT structure_ids @> ARRAY[%s]
             RETURNING id
-        """, (perimeter_id, structure_id, include_children))
-        return cur.fetchone()
+        """, (structure_id, perimeter_id, structure_id))
+        if not cur.fetchone():
+            # Vérifier si le périmètre existe
+            cur.execute("SELECT id FROM perimeters WHERE id = %s", (perimeter_id,))
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Périmètre introuvable")
+            # Structure déjà présente
+            return {"status": "already_present"}
+        return {"status": "added"}
 
 
-@router.delete("/api/perimeter-rules/{rule_id}")
-async def delete_perimeter_rule(rule_id: int):
+@router.delete("/api/perimeters/{perimeter_id}/structures/{structure_id}")
+async def remove_perimeter_structure(perimeter_id: int, structure_id: int):
     with get_cursor() as (cur, conn):
-        cur.execute("DELETE FROM perimeter_rules WHERE id = %s", (rule_id,))
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Règle introuvable")
-        return {"deleted": True}
+        cur.execute("""
+            UPDATE perimeters
+            SET structure_ids = array_remove(structure_ids, %s)
+            WHERE id = %s
+            RETURNING id
+        """, (structure_id, perimeter_id))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Périmètre introuvable")
+        return {"status": "removed"}
