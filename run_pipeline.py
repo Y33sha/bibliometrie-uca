@@ -97,12 +97,19 @@ def phase_cross_imports(mode="full", sources=None, full_cross_import=False, **kw
 
 def phase_normalize(**kw):
     """Phase 3 : Normalisation staging → tables sources + merge inter-sources."""
-    run_python("processing/normalize_openalex.py")
-    run_python("processing/normalize_hal.py")
-    run_python("processing/normalize_wos.py")
-    run_python("processing/normalize_scanr.py")
-    run_python("processing/enrich_hal_structures.py")
-    run_python("processing/merge_hal_openalex_pubs.py")
+    sources = kw.get("sources", {"hal", "openalex", "wos", "scanr"})
+    if "openalex" in sources:
+        run_python("processing/normalize_openalex.py")
+    if "hal" in sources:
+        run_python("processing/normalize_hal.py")
+    if "wos" in sources:
+        run_python("processing/normalize_wos.py")
+    if "scanr" in sources:
+        run_python("processing/normalize_scanr.py")
+    if "hal" in sources:
+        run_python("processing/enrich_hal_structures.py")
+    # Toujours lancer le merge inter-sources (dépend de toutes les sources)
+    run_python("processing/merge_pubs_by_hal_id.py")
 
 
 def phase_addresses(**kw):
