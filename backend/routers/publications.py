@@ -201,22 +201,10 @@ async def publications_facets(
         where = where_sql(c)
         cur.execute(f"""
             SELECT
-                COUNT(*) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM publication_sources ps
-                    WHERE ps.publication_id = p.id AND ps.source = 'hal'
-                )) AS hal_count,
-                COUNT(*) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM publication_sources ps
-                    WHERE ps.publication_id = p.id AND ps.source = 'openalex'
-                )) AS oa_count,
-                COUNT(*) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM publication_sources ps
-                    WHERE ps.publication_id = p.id AND ps.source = 'scanr'
-                )) AS scanr_count,
-                COUNT(*) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM publication_sources ps
-                    WHERE ps.publication_id = p.id AND ps.source = 'wos'
-                )) AS wos_count
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['hal'::source_type]) AS hal_count,
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['openalex'::source_type]) AS oa_count,
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['scanr'::source_type]) AS scanr_count,
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['wos'::source_type]) AS wos_count
             FROM publications p
             WHERE {where}
         """, p)
@@ -433,25 +421,13 @@ async def export_publications_csv(
         if source_values:
             for sv in source_values:
                 if sv == "hal_yes":
-                    conditions.append(
-                        "EXISTS (SELECT 1 FROM publication_sources ps"
-                        " WHERE ps.publication_id = p.id AND ps.source = 'hal')"
-                    )
+                    conditions.append("p.sources @> ARRAY['hal'::source_type]")
                 elif sv == "hal_no":
-                    conditions.append(
-                        "NOT EXISTS (SELECT 1 FROM publication_sources ps"
-                        " WHERE ps.publication_id = p.id AND ps.source = 'hal')"
-                    )
+                    conditions.append("NOT p.sources @> ARRAY['hal'::source_type]")
                 elif sv == "oa_yes":
-                    conditions.append(
-                        "EXISTS (SELECT 1 FROM publication_sources ps"
-                        " WHERE ps.publication_id = p.id AND ps.source = 'openalex')"
-                    )
+                    conditions.append("p.sources @> ARRAY['openalex'::source_type]")
                 elif sv == "oa_no":
-                    conditions.append(
-                        "NOT EXISTS (SELECT 1 FROM publication_sources ps"
-                        " WHERE ps.publication_id = p.id AND ps.source = 'openalex')"
-                    )
+                    conditions.append("NOT p.sources @> ARRAY['openalex'::source_type]")
         if oa_values:
             expanded = []
             for v in oa_values:
@@ -478,14 +454,14 @@ async def export_publications_csv(
                 p.oa_status::text,
                 j.title AS journal_title,
                 pub.name AS publisher_name,
-                (SELECT ps.source_id FROM publication_sources ps
-                 WHERE ps.publication_id = p.id AND ps.source = 'hal' LIMIT 1) AS hal_id,
-                (SELECT ps.source_id FROM publication_sources ps
-                 WHERE ps.publication_id = p.id AND ps.source = 'openalex' LIMIT 1) AS openalex_id,
-                (SELECT ps.source_id FROM publication_sources ps
-                 WHERE ps.publication_id = p.id AND ps.source = 'scanr' LIMIT 1) AS scanr_id,
-                (SELECT ps.source_id FROM publication_sources ps
-                 WHERE ps.publication_id = p.id AND ps.source = 'wos' LIMIT 1) AS wos_id,
+                (SELECT hd.halid FROM hal_documents hd
+                 WHERE hd.publication_id = p.id LIMIT 1) AS hal_id,
+                (SELECT od.openalex_id FROM openalex_documents od
+                 WHERE od.publication_id = p.id LIMIT 1) AS openalex_id,
+                (SELECT sd.scanr_id FROM scanr_documents sd
+                 WHERE sd.publication_id = p.id LIMIT 1) AS scanr_id,
+                (SELECT wd.ut FROM wos_documents wd
+                 WHERE wd.publication_id = p.id LIMIT 1) AS wos_id,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
@@ -905,14 +881,14 @@ async def list_publications(
                 j.title AS journal_title,
                 pub.name AS publisher_name,
                 -- Sources: HAL, OpenAlex and WoS IDs
-                (SELECT ps.source_id FROM publication_sources ps
-                 WHERE ps.publication_id = p.id AND ps.source = 'hal' LIMIT 1) AS hal_id,
-                (SELECT ps.source_id FROM publication_sources ps
-                 WHERE ps.publication_id = p.id AND ps.source = 'openalex' LIMIT 1) AS openalex_id,
-                (SELECT ps.source_id FROM publication_sources ps
-                 WHERE ps.publication_id = p.id AND ps.source = 'scanr' LIMIT 1) AS scanr_id,
-                (SELECT ps.source_id FROM publication_sources ps
-                 WHERE ps.publication_id = p.id AND ps.source = 'wos' LIMIT 1) AS wos_id,
+                (SELECT hd.halid FROM hal_documents hd
+                 WHERE hd.publication_id = p.id LIMIT 1) AS hal_id,
+                (SELECT od.openalex_id FROM openalex_documents od
+                 WHERE od.publication_id = p.id LIMIT 1) AS openalex_id,
+                (SELECT sd.scanr_id FROM scanr_documents sd
+                 WHERE sd.publication_id = p.id LIMIT 1) AS scanr_id,
+                (SELECT wd.ut FROM wos_documents wd
+                 WHERE wd.publication_id = p.id LIMIT 1) AS wos_id,
                 -- Corresponding author + authorship id (only meaningful with person_id filter)
                 (SELECT a.is_corresponding FROM authorships a
                  WHERE a.publication_id = p.id AND a.person_id = %s

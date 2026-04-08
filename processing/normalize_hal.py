@@ -35,7 +35,7 @@ from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
-from services.publications import find_or_create as find_or_create_publication
+from services.publications import find_or_create as find_or_create_publication, update_sources
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -534,6 +534,7 @@ def process_work(cur, staging_row: tuple) -> bool:
         hal_document_id = insert_hal_document(
             cur, doc, staging_id, hal_id, collection, publication_id
         )
+        update_sources(cur, publication_id)
         timings["hal_doc"] = time.perf_counter() - t0
 
         # Auteurs et authorships (avec hal_struct_ids)

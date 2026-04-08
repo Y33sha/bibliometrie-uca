@@ -32,7 +32,7 @@ from db.connection import get_connection
 from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.normalize import normalize_text
-from services.publications import find_or_create as find_or_create_publication
+from services.publications import find_or_create as find_or_create_publication, update_sources
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -798,6 +798,7 @@ def process_record(cur, staging_row: tuple) -> bool:
 
         # Document WoS
         wos_document_id = insert_wos_document(cur, rec, staging_id, publication_id)
+        update_sources(cur, publication_id)
 
         # Auteurs et authorships
         process_authorships(cur, rec, wos_document_id)
