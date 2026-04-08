@@ -31,7 +31,7 @@ from db.connection import get_connection
 from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.normalize import normalize_text
-from services.publications import find_or_create as find_or_create_publication, _enrich as enrich_publication, update_sources
+from services.publications import find_or_create as find_or_create_publication, update_sources
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__), "logs"))
@@ -115,25 +115,11 @@ def upsert_journal(cur, doc: dict, publisher_id: int | None) -> int | None:
 # PUBLICATIONS (via services/publications.py)
 # =============================================================
 
-def find_publication_by_hal_id(cur, hal_id: str) -> int | None:
-    """Cherche une publication existante via un hal_document portant ce halid."""
-    if not hal_id:
-        return None
-    cur.execute(
-        "SELECT publication_id FROM hal_documents WHERE halid = %s AND publication_id IS NOT NULL",
-        (hal_id,))
-    row = cur.fetchone()
-    return row["publication_id"] if row else None
-
-
 def find_or_insert_publication(cur, doc: dict, journal_id: int | None) -> tuple[int | None, bool]:
     """Cherche ou crée une publication. Délègue au service publications.
 
-    Ordre de déduplication :
-    0. Par HAL ID (si présent dans les externalIds ScanR → hal_documents)
-    1. Par DOI (case-insensitive)
-    2. Par titre normalisé + année + journal (articles)
-    3. Création
+    La déduplication par HAL ID est gérée en post-traitement
+    par merge_pubs_by_hal_id.py (passe centralisée).
     """
     doi = extract_doi(doc)
     title = get_title(doc)
@@ -152,17 +138,6 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None) -> tuple[
         source = doc.get("source") or {}
         container_title = source.get("title")
 
-    # 0. Déduplication par HAL ID — prioritaire
-    hal_id = extract_hal_id(doc)
-    if hal_id:
-        existing_pub_id = find_publication_by_hal_id(cur, hal_id)
-        if existing_pub_id:
-            enrich_publication(cur, existing_pub_id, doi=doi, doc_type=doc_type,
-                    journal_id=journal_id, oa_status=oa_status,
-                    container_title=container_title)
-            return existing_pub_id, False
-
-    # 1-3. Déduplication générique (DOI, titre+année+journal, création)
     return find_or_create_publication(
         cur, title=title, title_normalized=normalize_text(title),
         pub_year=pub_year, doc_type=doc_type, doi=doi,
