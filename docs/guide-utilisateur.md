@@ -77,7 +77,9 @@ Paramètres des imports:
 - email (polite pool);
 - clé API WOS;
 - années interrogées (modes weekly et monthly);
-- périmètre interrogé par source.
+- paramètres de requête par source;
+- définition des périmètres (`uca`, `uca_wide`); (CRUD pas encore mis en place <!--TODO: mettre en place le CRUD des périmètres dans admin/config-->)
+- périmètres utilisés à différentes étapes du pipeline.
 
 
 ### <span id="admin-structures"></span>Gestion des structures (`/admin/structures`)
