@@ -200,6 +200,8 @@
 
 <!-- ═══ PÉRIMÈTRES ═══ -->
 <h3 class="section-title">Périmètres</h3>
+
+<h4 class="subsection-title">Définition des périmètres</h4>
 <p class="help-text">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
 {#each perimeters as perim (perim.id)}
 	<div class="perimeter-card">
@@ -237,11 +239,44 @@
 	</div>
 {/each}
 
+<h4 class="subsection-title">Rôle des périmètres</h4>
+<div class="config-grid">
+	{#each [
+		{ key: "perimeter_affiliations", label: "Phase affiliations", hint: "Résolution structure_ids sur les authorships sources" },
+		{ key: "perimeter_persons", label: "Phase persons", hint: "Sélection des authorships génératrices de personnes (is_uca)" },
+	] as role}
+		{@const item = configByKey(role.key)}
+		{#if item}
+			<div class="config-row" style="flex-wrap: wrap;">
+				<span class="config-label">{role.label}</span>
+				<select class="config-select"
+					value={item.value}
+					onchange={async (e) => {
+						const target = e.target as HTMLSelectElement;
+						const res = await fetch(base + "/api/config/" + role.key, {
+							method: "PUT",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ value: target.value })
+						});
+						if (res.ok) await load();
+					}}
+				>
+					{#each perimeters as p (p.id)}
+						<option value={p.code}>{p.name} ({p.code})</option>
+					{/each}
+				</select>
+				<span class="config-hint" style="width: 100%;">{role.hint}</span>
+			</div>
+		{/if}
+	{/each}
+</div>
+
 <style>
 	h2 { font-size: 1.2rem; font-weight: 600; margin: 0 0 4px; }
 	.subtitle { color: var(--muted); font-size: 0.9rem; margin: 0 0 20px; }
 	.section-title { margin: 24px 0 8px; padding: 6px 14px; background: #5b9ea0; color: white; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 3px; }
 	.help-text { background: var(--accent-light); border: 1px solid #c4d8ed; border-radius: 5px; padding: 8px 12px; margin: 4px 0 12px; font-size: 0.85rem; color: #2c3e50; line-height: 1.5; }
+	.subsection-title { font-size: 0.85rem; font-weight: 600; color: var(--muted); margin: 16px 0 6px; }
 
 	.config-grid { display: flex; flex-direction: column; gap: 8px; max-width: 800px; margin-bottom: 8px; }
 	.config-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 5px; }
@@ -272,6 +307,7 @@
 	.picker-item { display: block; width: 100%; padding: 6px 10px; font-size: 0.9rem; cursor: pointer; background: none; border: none; text-align: left; font-family: inherit; }
 	.picker-item:hover { background: var(--accent-light); }
 	.config-hint { font-size: 0.8rem; color: var(--muted); width: 100%; margin-top: 4px; }
+	.config-select { padding: 3px 6px; font-size: 0.9rem; font-family: inherit; border: 1px solid var(--border); border-radius: 3px; }
 	.config-hint a { color: var(--accent); }
 	.none-text { font-size: 0.85rem; color: var(--muted); }
 </style>

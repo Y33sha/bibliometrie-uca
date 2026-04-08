@@ -204,7 +204,7 @@
 					/><line x1="12" y1="17" x2="12.01" y2="17" /></svg
 				></a
 			>
-			<a href="{base}/admin/addresses" class="nav-link nav-switch-link"
+			<a href="{base}/admin/config" class="nav-link nav-switch-link"
 				>Admin</a
 			>
 		</nav>
