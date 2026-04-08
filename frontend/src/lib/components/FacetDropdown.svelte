@@ -19,6 +19,7 @@
 
 	let { label, options, searchable = false, selected = $bindable([]), allLabel = 'Tous', tooltip, onchange }: Props = $props();
 	let showTooltip = $state(false);
+	let tooltipBelow = $state(false);
 	let tooltipTimer: ReturnType<typeof setTimeout>;
 
 	let open = $state(false);
@@ -115,7 +116,13 @@
 			open = true;
 			filterText = '';
 		}}
-		onmouseenter={() => { if (tooltip && !open) showTooltip = true; }}
+		onmouseenter={(e) => {
+			if (tooltip && !open) {
+				const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+				tooltipBelow = rect.top < 80;
+				showTooltip = true;
+			}
+		}}
 		onmouseleave={() => { showTooltip = false; }}
 	>
 		<span class="facet-label">{label}</span>
@@ -125,7 +132,7 @@
 		<span class="facet-arrow">&#9662;</span>
 	</button>
 	{#if showTooltip && tooltip}
-		<div class="facet-tooltip">{@html tooltip}</div>
+		<div class="facet-tooltip" class:facet-tooltip-below={tooltipBelow}>{@html tooltip}</div>
 	{/if}
 
 	{#if open}
@@ -227,6 +234,16 @@
 		transform: translateX(-50%);
 		border: 5px solid transparent;
 		border-top-color: #333;
+	}
+	.facet-tooltip-below {
+		bottom: auto;
+		top: calc(100% + 6px);
+	}
+	.facet-tooltip-below::after {
+		top: auto;
+		bottom: 100%;
+		border-top-color: transparent;
+		border-bottom-color: #333;
 	}
 
 	.facet-panel {

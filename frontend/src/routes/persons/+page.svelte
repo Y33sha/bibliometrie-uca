@@ -160,7 +160,7 @@
 	<title>Personnes — Bibliométrie UCA</title>
 </svelte:head>
 
-<div class="toolbar toolbar-card">
+<div class="toolbar toolbar-card toolbar-sticky">
 	<input
 		type="text"
 		placeholder="Rechercher par nom..."

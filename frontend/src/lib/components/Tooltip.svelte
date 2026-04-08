@@ -11,12 +11,15 @@
 	let wrapEl: HTMLSpanElement;
 	let x = $state(0);
 	let y = $state(0);
+	let below = $state(false);
 
 	function onEnter() {
 		if (!text) return;
 		const rect = wrapEl.getBoundingClientRect();
 		x = rect.left + rect.width / 2;
-		y = rect.top;
+		// Si pas assez de place au-dessus (< 80px), afficher en dessous
+		below = rect.top < 80;
+		y = below ? rect.bottom : rect.top;
 		show = true;
 	}
 </script>
@@ -30,7 +33,7 @@
 </span>
 
 {#if show && text}
-	<div class="tooltip-box" style="left:{x}px; top:{y}px;">
+	<div class="tooltip-box" class:tooltip-below={below} style="left:{x}px; top:{y}px;">
 		{@html text.replace(/\n/g, '<br>')}
 	</div>
 {/if}
@@ -63,5 +66,14 @@
 		transform: translateX(-50%);
 		border: 5px solid transparent;
 		border-top-color: #333;
+	}
+	.tooltip-below {
+		transform: translate(-50%, 8px);
+	}
+	.tooltip-below::after {
+		top: auto;
+		bottom: 100%;
+		border-top-color: transparent;
+		border-bottom-color: #333;
 	}
 </style>
