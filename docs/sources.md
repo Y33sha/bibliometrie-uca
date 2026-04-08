@@ -157,9 +157,9 @@ La FK sur la table `person_rh` permet:
 - d'enrichir les données sur les personnes;
 - d'empêcher la suppression de ces personnes (lors de fusions ou de nettoyage en masse des personnes sans authorship UCA).
 
-### Données APC
+### <span id="donnees-apc"></span>Données APC
 
-Données fournies par la Bibliothèque numérique le ../../2026.
+Données fournies par la Bibliothèque numérique le 11/03/2026.
 
 Fichier CSV importé via `scripts/import_apc.py` → table `apc_payments`.
 - Contient : DOI, montant en €, éditeur, labo payeur, année
