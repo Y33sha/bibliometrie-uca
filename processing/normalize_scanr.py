@@ -31,7 +31,7 @@ from db.connection import get_connection
 from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.normalize import normalize_text
-from services.publications import find_or_create as find_or_create_publication
+from services.publications import find_or_create as find_or_create_publication, _enrich as enrich_publication, update_sources
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__), "logs"))
@@ -115,8 +115,26 @@ def upsert_journal(cur, doc: dict, publisher_id: int | None) -> int | None:
 # PUBLICATIONS (via services/publications.py)
 # =============================================================
 
+def find_publication_by_hal_id(cur, hal_id: str) -> int | None:
+    """Cherche une publication existante via un hal_document portant ce halid."""
+    if not hal_id:
+        return None
+    cur.execute(
+        "SELECT publication_id FROM hal_documents WHERE halid = %s AND publication_id IS NOT NULL",
+        (hal_id,))
+    row = cur.fetchone()
+    return row["publication_id"] if row else None
+
+
 def find_or_insert_publication(cur, doc: dict, journal_id: int | None) -> tuple[int | None, bool]:
-    """Cherche ou crée une publication. Délègue au service publications."""
+    """Cherche ou crée une publication. Délègue au service publications.
+
+    Ordre de déduplication :
+    0. Par HAL ID (si présent dans les externalIds ScanR → hal_documents)
+    1. Par DOI (case-insensitive)
+    2. Par titre normalisé + année + journal (articles)
+    3. Création
+    """
     doi = extract_doi(doc)
     title = get_title(doc)
     pub_year = doc.get("year")
@@ -134,6 +152,17 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None) -> tuple[
         source = doc.get("source") or {}
         container_title = source.get("title")
 
+    # 0. Déduplication par HAL ID — prioritaire
+    hal_id = extract_hal_id(doc)
+    if hal_id:
+        existing_pub_id = find_publication_by_hal_id(cur, hal_id)
+        if existing_pub_id:
+            enrich_publication(cur, existing_pub_id, doi=doi, doc_type=doc_type,
+                    journal_id=journal_id, oa_status=oa_status,
+                    container_title=container_title)
+            return existing_pub_id, False
+
+    # 1-3. Déduplication générique (DOI, titre+année+journal, création)
     return find_or_create_publication(
         cur, title=title, title_normalized=normalize_text(title),
         pub_year=pub_year, doc_type=doc_type, doi=doi,
@@ -149,22 +178,24 @@ def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
                           publication_id: int | None) -> int:
     """Crée/retrouve l'entrée scanr_documents. Retourne scanr_document.id."""
     doi = extract_doi(doc)
+    hal_id = extract_hal_id(doc)
     title = get_title(doc) or ""
     pub_year = doc.get("year")
     doc_type = doc.get("type")
 
     cur.execute("""
         INSERT INTO scanr_documents
-            (scanr_id, doi, title, pub_year, doc_type, publication_id, staging_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+            (scanr_id, doi, hal_id, title, pub_year, doc_type, publication_id, staging_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (scanr_id) DO UPDATE SET
             publication_id = COALESCE(
                 scanr_documents.publication_id, EXCLUDED.publication_id
             ),
             doi = COALESCE(scanr_documents.doi, EXCLUDED.doi),
+            hal_id = COALESCE(scanr_documents.hal_id, EXCLUDED.hal_id),
             doc_type = COALESCE(EXCLUDED.doc_type, scanr_documents.doc_type)
         RETURNING id
-    """, (scanr_id, doi, title, pub_year, doc_type, publication_id, staging_id))
+    """, (scanr_id, doi, hal_id, title, pub_year, doc_type, publication_id, staging_id))
     return cur.fetchone()["id"]
 
 
@@ -327,6 +358,7 @@ def process_work(cur, staging_row) -> bool:
         scanr_document_id = insert_scanr_document(
             cur, doc, staging_id, scanr_id, publication_id
         )
+        update_sources(cur, publication_id)
         timings["scanr_doc"] = time.perf_counter() - t0
 
         # Auteurs et authorships

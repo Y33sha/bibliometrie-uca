@@ -1,13 +1,14 @@
 """
-Récupère les entrées HAL manquantes découvertes via OpenAlex.
+Récupère les entrées HAL manquantes découvertes via OpenAlex et ScanR.
 
-Quand un work OpenAlex a sa primary_location pointant vers HAL
-(https://hal.science/hal-XXXXX), mais que ce halId n'est pas dans
-notre staging_hal, on le télécharge via l'API HAL.
+Sources de halIds :
+- OpenAlex : primary_location pointant vers hal.science/hal-XXXXX
+- ScanR : externalIds contenant un identifiant de type "hal"
 
-Ces entrées sont marquées collection = NULL (hors périmètre UCA),
-ce qui permet de les distinguer des entrées issues du portail ou
-des collections labo.
+Quand un halId n'est pas dans notre staging_hal, on le télécharge
+via l'API HAL. Ces entrées sont marquées collection = NULL (hors
+périmètre UCA), ce qui permet de les distinguer des entrées issues
+du portail ou des collections labo.
 
 Usage:
     python fetch_missing_hal.py              # télécharger les manquants
@@ -69,6 +70,26 @@ def find_hal_primary_locations(cur, all_staged: bool = False) -> list[dict]:
             })
 
     return results
+
+
+def find_hal_ids_from_scanr(cur) -> list[dict]:
+    """
+    Trouve les HAL IDs référencés dans scanr_documents.hal_id
+    mais absents de staging_hal.
+    Retourne [{source: "scanr", hal_id, scanr_id}, ...]
+    """
+    cur.execute("""
+        SELECT sd.scanr_id, sd.hal_id
+        FROM scanr_documents sd
+        WHERE sd.hal_id IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM staging_hal sh WHERE sh.halid = sd.hal_id
+          )
+    """)
+    return [
+        {"source": "scanr", "hal_id": row["hal_id"], "scanr_id": row["scanr_id"]}
+        for row in cur.fetchall()
+    ]
 
 
 def find_missing_hal_ids(cur, hal_refs: list[dict]) -> list[dict]:
@@ -152,28 +173,40 @@ def main():
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    # 1. Trouver les OpenAlex pointant vers HAL
+    # 1. Trouver les HAL IDs manquants depuis OpenAlex et ScanR
     log.info("Recherche des works OpenAlex avec primary_location HAL...")
-    hal_refs = find_hal_primary_locations(cur, all_staged=args.all)
-    log.info(f"  {len(hal_refs)} works OpenAlex pointent vers HAL")
+    hal_refs_oa = find_hal_primary_locations(cur, all_staged=args.all)
+    log.info(f"  {len(hal_refs_oa)} works OpenAlex pointent vers HAL")
 
-    if not hal_refs:
-        conn.close()
-        return
+    log.info("Recherche des HAL IDs dans ScanR...")
+    hal_refs_scanr = find_hal_ids_from_scanr(cur)
+    log.info(f"  {len(hal_refs_scanr)} HAL IDs ScanR absents de staging_hal")
 
-    # 2. Identifier ceux absents de staging_hal
-    missing = find_missing_hal_ids(cur, hal_refs)
-    log.info(f"  {len(missing)} halIds absents de staging_hal")
+    # 2. Identifier ceux absents de staging_hal (OpenAlex)
+    missing_oa = find_missing_hal_ids(cur, hal_refs_oa)
+    log.info(f"  {len(missing_oa)} halIds OpenAlex absents de staging_hal")
+
+    # Combiner et dédupliquer par hal_id
+    seen_hal_ids = set()
+    missing = []
+    for ref in missing_oa + hal_refs_scanr:
+        if ref["hal_id"] not in seen_hal_ids:
+            seen_hal_ids.add(ref["hal_id"])
+            missing.append(ref)
+    log.info(f"  {len(missing)} halIds manquants au total (après déduplication)")
 
     if args.stats:
         log.info("--- Statistiques ---")
-        log.info(f"  Works OA → HAL : {len(hal_refs)}")
-        log.info(f"  Déjà en staging : {len(hal_refs) - len(missing)}")
-        log.info(f"  Manquants : {len(missing)}")
+        log.info(f"  Works OA → HAL : {len(hal_refs_oa)}")
+        log.info(f"  HAL IDs ScanR : {len(hal_refs_scanr)}")
+        log.info(f"  Manquants OA : {len(missing_oa)}")
+        log.info(f"  Total manquants (dédupliqués) : {len(missing)}")
         if missing:
             log.info("  Exemples :")
             for ref in missing[:10]:
-                log.info(f"    {ref['openalex_id']} → {ref['hal_id']} ({ref['landing_url']})")
+                source = ref.get("source", "openalex")
+                label = ref.get("openalex_id") or ref.get("scanr_id", "?")
+                log.info(f"    [{source}] {label} → {ref['hal_id']}")
         conn.close()
         return
 
