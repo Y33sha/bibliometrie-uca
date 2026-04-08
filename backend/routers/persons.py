@@ -41,6 +41,7 @@ async def persons_directory(
     has_orcid: str = Query(""),       # "yes" or "no"
     has_idhal: str = Query(""),       # "yes" or "no"
     has_rh: str = Query(""),          # "yes" or "no"
+    sort: str = Query("name"),       # name, -name
 ):
     """Annuaire public des personnes UCA avec ORCID et idHAL."""
     offset = (page - 1) * per_page
@@ -112,7 +113,12 @@ async def persons_directory(
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             {where}
-            ORDER BY LOWER(p.last_name), LOWER(p.first_name)
+            ORDER BY {
+                {
+                    "name": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
+                    "-name": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
+                }.get(sort, "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC")
+            }
             LIMIT %s OFFSET %s
         """, params + [per_page, offset])
 

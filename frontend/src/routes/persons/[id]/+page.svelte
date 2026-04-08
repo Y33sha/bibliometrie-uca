@@ -90,6 +90,16 @@
 	let selectedCorr: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
 	let sourceStates: Record<string, string> = $state({});
+	let currentSort = $state('year_desc');
+
+	function toggleSortYear() {
+		currentSort = currentSort === 'year_desc' ? 'year_asc' : 'year_desc';
+		pubs.load(); facets.load();
+	}
+	function toggleSortTitle() {
+		currentSort = currentSort === 'title' ? 'title_desc' : 'title';
+		pubs.load(); facets.load();
+	}
 
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
@@ -112,7 +122,7 @@
 		apiKey: 'person-detail-pubs',
 		buildParams: () => {
 			const params = buildFilterParams();
-			params.set('sort', 'year_desc');
+			params.set('sort', currentSort);
 			return params;
 		},
 	});
@@ -325,10 +335,10 @@
 				<thead>
 					<tr>
 						{#if isAdmin}<th style="width:28px"></th>{/if}
-						<th>Titre</th>
+						<th class="sortable" class:active={currentSort === 'title' || currentSort === 'title_desc'} onclick={toggleSortTitle}>Titre {currentSort === 'title' ? '↑' : currentSort === 'title_desc' ? '↓' : ''}</th>
 						<th>Revue</th>
 						<th style="width:80px">Type</th>
-						<th style="width:40px">An.</th>
+						<th style="width:40px" class="sortable" class:active={currentSort === 'year_desc' || currentSort === 'year_asc'} onclick={toggleSortYear}>An. {currentSort === 'year_asc' ? '↑' : '↓'}</th>
 						<th style="width:80px">Labo(s)</th>
 						<th style="width:30px" title="Auteur correspondant">&#9993;</th>
 						<th style="width:60px">APC</th>
@@ -594,6 +604,9 @@
 
 	/* Publications tab */
 	.pub-table td { vertical-align: top; }
+	.pub-table th.sortable { cursor: pointer; user-select: none; }
+	.pub-table th.sortable:hover { color: var(--accent); }
+	.pub-table th.sortable.active { color: var(--accent); }
 	.corr-cell { text-align: center; color: var(--accent); font-size: 0.85rem; }
 
 	/* Addresses tab */

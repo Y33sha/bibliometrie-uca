@@ -36,6 +36,15 @@
 	let publisherName = $state('');
 	let journalId: number | null = $state(null);
 	let journalName = $state('');
+	let pubSort = $state('-pubs');
+	let journalSort = $state('-pubs');
+	let labSort = $state('-pubs');
+
+	function toggleSort(current: string, field: string): string {
+		if (current === field) return '-' + field;
+		if (current === '-' + field) return field;
+		return field;
+	}
 
 	let summary: Summary = $state({ total_pubs: 0, publisher_count: 0, journal_count: 0 });
 
@@ -64,6 +73,7 @@
 		buildParams: () => {
 			const p = chartParams();
 			if (search.trim()) p.set('search', search.trim());
+			p.set('sort', pubSort);
 			return p;
 		},
 	});
@@ -76,6 +86,7 @@
 		buildParams: () => {
 			const p = chartParams();
 			if (search.trim()) p.set('search', search.trim());
+			p.set('sort', journalSort);
 			return p;
 		},
 	});
@@ -85,7 +96,11 @@
 		itemsKey: 'labs',
 		perPage: 50,
 		apiKey: 'pub-stats-labs',
-		buildParams: chartParams,
+		buildParams: () => {
+			const p = chartParams();
+			p.set('sort', labSort);
+			return p;
+		},
 	});
 
 	// --- Composable: facets ---
@@ -480,9 +495,9 @@
 	<table class="data-table">
 		<thead>
 			<tr>
-				<th>Éditeur</th>
+				<th class="sortable" class:active={pubSort === 'name' || pubSort === '-name'} onclick={() => { pubSort = toggleSort(pubSort, 'name'); pubFetch.page = 1; pubFetch.load(); }}>Éditeur {pubSort === 'name' ? '▲' : pubSort === '-name' ? '▼' : ''}</th>
 				<th class="num">Revues</th>
-				<th class="num">Articles</th>
+				<th class="num sortable" class:active={pubSort === 'pubs' || pubSort === '-pubs'} onclick={() => { pubSort = toggleSort(pubSort, 'pubs'); pubFetch.page = 1; pubFetch.load(); }}>Articles {pubSort === 'pubs' ? '▲' : pubSort === '-pubs' ? '▼' : ''}</th>
 				<th class="num">APC UCA</th>
 				<th style="min-width:100px">OA</th>
 				<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
@@ -529,9 +544,9 @@
 	<table class="data-table">
 		<thead>
 			<tr>
-				<th>Revue</th>
+				<th class="sortable" class:active={journalSort === 'name' || journalSort === '-name'} onclick={() => { journalSort = toggleSort(journalSort, 'name'); journalFetch.page = 1; journalFetch.load(); }}>Revue {journalSort === 'name' ? '▲' : journalSort === '-name' ? '▼' : ''}</th>
 				{#if !publisherId}<th>Éditeur</th>{/if}
-				<th class="num">Articles</th>
+				<th class="num sortable" class:active={journalSort === 'pubs' || journalSort === '-pubs'} onclick={() => { journalSort = toggleSort(journalSort, 'pubs'); journalFetch.page = 1; journalFetch.load(); }}>Articles {journalSort === 'pubs' ? '▲' : journalSort === '-pubs' ? '▼' : ''}</th>
 				<th class="num">APC UCA</th>
 				<th style="min-width:100px">OA</th>
 				<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
@@ -581,8 +596,8 @@
 		<table class="data-table">
 			<thead>
 				<tr>
-					<th>Laboratoire</th>
-					<th class="num">Articles</th>
+					<th class="sortable" class:active={labSort === 'name' || labSort === '-name'} onclick={() => { labSort = toggleSort(labSort, 'name'); labFetch.page = 1; labFetch.load(); }}>Laboratoire {labSort === 'name' ? '▲' : labSort === '-name' ? '▼' : ''}</th>
+					<th class="num sortable" class:active={labSort === 'pubs' || labSort === '-pubs'} onclick={() => { labSort = toggleSort(labSort, 'pubs'); labFetch.page = 1; labFetch.load(); }}>Articles {labSort === 'pubs' ? '▲' : labSort === '-pubs' ? '▼' : ''}</th>
 					<th class="num">APC UCA</th>
 					<th style="min-width:100px">OA</th>
 					<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
@@ -733,6 +748,9 @@
 	}
 
 	.data-table { margin-bottom: 4px; }
+	th.sortable { cursor: pointer; user-select: none; }
+	th.sortable:hover { color: var(--accent); }
+	th.sortable.active { color: var(--accent); }
 
 	.name-cell {
 		max-width: 300px;

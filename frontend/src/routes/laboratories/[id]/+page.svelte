@@ -113,6 +113,16 @@
 	let selectedOa: string[] = $state([]);
 	let selectedApc: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
+	let pubSort = $state('year_desc');
+
+	function togglePubSortYear() {
+		pubSort = pubSort === 'year_desc' ? 'year_asc' : 'year_desc';
+		pubs.page = 1; syncUrl(); pubs.load();
+	}
+	function togglePubSortTitle() {
+		pubSort = pubSort === 'title' ? 'title_desc' : 'title';
+		pubs.page = 1; syncUrl(); pubs.load();
+	}
 
 	// --- Persons tab (manual state: API returns total_persons, not total, + inline facets) ---
 	let persons: LabPerson[] = $state([]);
@@ -181,7 +191,7 @@
 		apiKey: 'lab-pubs',
 		buildParams() {
 			const params = buildPubFilterParams();
-			params.set('sort', 'year_desc');
+			params.set('sort', pubSort);
 			const q = pubSearch.trim();
 			if (q) params.set('search', q);
 			return params;
@@ -214,6 +224,7 @@
 			selectedApc:      { type: 'string_array',  urlKey: 'has_apc' },
 			selectedCountries:{ type: 'string_array',  urlKey: 'country' },
 			pubSearch:        { type: 'single',        urlKey: 'search' },
+			pubSort:          { type: 'single',        urlKey: 'sort', defaultValue: 'year_desc' },
 			currentPage:      { type: 'page',          urlKey: 'page' },
 			personsSort:      { type: 'single',        urlKey: 'psort', defaultValue: 'name' },
 			hasRh:            { type: 'single',        urlKey: 'has_rh', defaultValue: 'yes' },
@@ -229,7 +240,7 @@
 		url.syncUrl(() => ({
 			tab: activeTab,
 			selectedYears, sourceStates, selectedDocTypes,
-			selectedOa, selectedApc, selectedCountries, pubSearch,
+			selectedOa, selectedApc, selectedCountries, pubSearch, pubSort,
 			currentPage: pubs.page,
 			personsSort,
 			hasRh: selectedRh.length === 1 ? selectedRh[0] : 'all',
@@ -487,6 +498,7 @@
 		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
 		if (restored.selectedCountries) selectedCountries = restored.selectedCountries as string[];
 		if (restored.pubSearch) pubSearch = restored.pubSearch as string;
+		if (restored.pubSort) pubSort = restored.pubSort as string;
 		if (restored.currentPage) pubs.page = restored.currentPage as number;
 		if (restored.personsSort) personsSort = restored.personsSort as string;
 		if (restored.hasRh != null) {
@@ -671,10 +683,10 @@
 			<table class="pub-table">
 				<thead>
 					<tr>
-						<th>Titre</th>
+						<th class="sortable" class:active={pubSort === 'title' || pubSort === 'title_desc'} onclick={togglePubSortTitle}>Titre {pubSort === 'title' ? '↑' : pubSort === 'title_desc' ? '↓' : ''}</th>
 						<th>Revue</th>
 						<th style="width:80px">Type</th>
-						<th style="width:40px">An.</th>
+						<th style="width:40px" class="sortable" class:active={pubSort === 'year_desc' || pubSort === 'year_asc'} onclick={togglePubSortYear}>An. {pubSort === 'year_asc' ? '↑' : '↓'}</th>
 						<th style="width:60px">APC</th>
 						<th style="width:50px">OA</th>
 						<th style="width:80px">Liens</th>
@@ -902,6 +914,7 @@
 	}
 	.tab-content thead th.sortable { cursor: pointer; user-select: none; }
 	.tab-content thead th.sortable:hover { color: var(--accent); }
+	.tab-content thead th.sortable.active { color: var(--accent); }
 	.tab-content tbody tr { border-bottom: 1px solid #f0efec; }
 	.tab-content tbody tr:last-child { border-bottom: none; }
 	.tab-content tbody tr:hover { background: #fafaf8; }
