@@ -370,6 +370,7 @@ def process_authors(cur, doc: dict, hal_document_id: int):
     """
     names = doc.get("authFullName_s") or []
     orcids = doc.get("authOrcid_s") or []
+    qualities = doc.get("authQuality_s") or []
 
     # authFullNameFormIDPersonIDIDHal_fs :
     #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position
@@ -431,6 +432,11 @@ def process_authors(cur, doc: dict, hal_document_id: int):
         if orcid and not orcid.strip():
             orcid = None
 
+        # authQuality_s : rôle de l'auteur (aut, crp, dir, edt, …)
+        quality = qualities[position] if position < len(qualities) else None
+        is_corresponding = quality == "crp"
+        role = quality if quality and quality not in ("aut", "crp") else None
+
         hal_author_id = upsert_hal_author(
             cur, name, hal_person_id, idhal, form_id, orcid=orcid
         )
@@ -445,16 +451,18 @@ def process_authors(cur, doc: dict, hal_document_id: int):
         cur.execute("""
             INSERT INTO hal_authorships
                 (hal_document_id, hal_author_id, author_position, hal_struct_ids,
-                 author_name_normalized)
-            VALUES (%s, %s, %s, %s, normalize_name_form(%s))
+                 author_name_normalized, is_corresponding, role)
+            VALUES (%s, %s, %s, %s, normalize_name_form(%s), %s, %s)
             ON CONFLICT (hal_document_id, hal_author_id) DO UPDATE SET
                 hal_struct_ids = COALESCE(
                     EXCLUDED.hal_struct_ids,
                     hal_authorships.hal_struct_ids
                 ),
-                author_name_normalized = EXCLUDED.author_name_normalized
+                author_name_normalized = EXCLUDED.author_name_normalized,
+                is_corresponding = EXCLUDED.is_corresponding,
+                role = EXCLUDED.role
         """, (hal_document_id, hal_author_id, position,
-              hal_struct_ids, name))
+              hal_struct_ids, name, is_corresponding, role))
 
 
 # =============================================================

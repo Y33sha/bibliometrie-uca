@@ -359,6 +359,9 @@ def process_authorships(cur, work: dict, oa_document_id: int):
         # Nom brut de l'auteur (fiable, contrairement à author.display_name)
         raw_author_name = authorship.get("raw_author_name")
 
+        # Corresponding author
+        is_corresponding = authorship.get("is_corresponding", False)
+
         # Affiliations brutes
         raw_strings = authorship.get("raw_affiliation_strings") or []
         if raw_strings:
@@ -379,8 +382,8 @@ def process_authorships(cur, work: dict, oa_document_id: int):
             INSERT INTO openalex_authorships
                 (openalex_document_id, openalex_author_id, author_position,
                  raw_affiliation, openalex_institution_ids,
-                 raw_author_name, author_name_normalized)
-            VALUES (%s, %s, %s, %s, %s, %s, normalize_name_form(%s))
+                 raw_author_name, author_name_normalized, is_corresponding)
+            VALUES (%s, %s, %s, %s, %s, %s, normalize_name_form(%s), %s)
             ON CONFLICT (openalex_document_id, openalex_author_id) DO UPDATE SET
                 raw_affiliation = COALESCE(
                     EXCLUDED.raw_affiliation,
@@ -393,10 +396,11 @@ def process_authorships(cur, work: dict, oa_document_id: int):
                 author_name_normalized = COALESCE(
                     EXCLUDED.author_name_normalized,
                     openalex_authorships.author_name_normalized
-                )
+                ),
+                is_corresponding = EXCLUDED.is_corresponding
         """, (oa_document_id, oa_author_id, position,
               raw_affil_text, institution_ids or None,
-              raw_author_name, raw_author_name))
+              raw_author_name, raw_author_name, is_corresponding))
 
 
 # =============================================================

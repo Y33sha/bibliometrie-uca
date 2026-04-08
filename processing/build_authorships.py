@@ -180,11 +180,14 @@ def build(cur):
 
     cur.execute("""
         UPDATE authorships a
-        SET is_corresponding = was.is_corresponding
-        FROM wos_authorships was
-        WHERE was.id = a.wos_authorship_id
+        SET is_corresponding = COALESCE(was.is_corresponding, oas.is_corresponding, has.is_corresponding)
+        FROM authorships a2
+        LEFT JOIN wos_authorships was ON was.id = a2.wos_authorship_id
+        LEFT JOIN openalex_authorships oas ON oas.id = a2.openalex_authorship_id
+        LEFT JOIN hal_authorships has ON has.id = a2.hal_authorship_id
+        WHERE a.id = a2.id
           AND a.is_corresponding IS NULL
-          AND was.is_corresponding IS NOT NULL
+          AND COALESCE(was.is_corresponding, oas.is_corresponding, has.is_corresponding) IS NOT NULL
     """)
     corr_count = cur.rowcount
     logger.info(f"  {corr_count} is_corresponding mises à jour")

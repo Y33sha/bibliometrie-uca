@@ -366,7 +366,8 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
     for name_obj in name_list:
         if not isinstance(name_obj, dict):
             continue
-        if name_obj.get("role") != "author":
+        wos_role = name_obj.get("role")
+        if not wos_role:
             continue
 
         full_name = name_obj.get("display_name") or name_obj.get("full_name") or ""
@@ -410,6 +411,8 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
                         author_orgs.append(org)
                         seen_org_names.add(org["name"])
 
+        role = wos_role if wos_role != "author" else None
+
         authors.append({
             "position": position,
             "full_name": full_name.strip(),
@@ -422,6 +425,7 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
             "raw_affiliation": raw_affiliation,
             "addresses": individual_addresses,
             "organizations": author_orgs,
+            "role": role,
         })
 
     return authors
@@ -722,8 +726,8 @@ def process_authorships(cur, rec: dict, wos_document_id: int):
             INSERT INTO wos_authorships
                 (wos_document_id, wos_author_id, author_position,
                  is_corresponding, raw_affiliation, author_name_normalized,
-                 wos_institution_ids)
-            VALUES (%s, %s, %s, %s, %s, normalize_name_form(%s), %s)
+                 wos_institution_ids, role)
+            VALUES (%s, %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
             ON CONFLICT (wos_document_id, wos_author_id) DO UPDATE SET
                 raw_affiliation = COALESCE(
                     EXCLUDED.raw_affiliation,
@@ -737,11 +741,12 @@ def process_authorships(cur, rec: dict, wos_document_id: int):
                 wos_institution_ids = COALESCE(
                     EXCLUDED.wos_institution_ids,
                     wos_authorships.wos_institution_ids
-                )
+                ),
+                role = EXCLUDED.role
             RETURNING id
         """, (wos_document_id, wos_author_id, author["position"],
               author["is_corresponding"], author.get("raw_affiliation"),
-              author["full_name"], institution_ids or None))
+              author["full_name"], institution_ids or None, author.get("role")))
         was_id = cur.fetchone()[0]
 
         # Créer les liens adresses individuelles
