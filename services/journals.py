@@ -235,3 +235,151 @@ def reset_journal_apc(cur):
         WHERE openalex_id IS NOT NULL
     """)
     return cur.rowcount
+
+
+# ── Fusions ──
+
+def merge_publishers(cur, target_id: int, source_id: int):
+    """Fusionne l'éditeur source dans l'éditeur cible.
+
+    1. Fusionne les journals qui auraient le même titre normalisé
+    2. Transfère les journals restants
+    3. Transfère les formes de nom
+    4. Transfère les apc_payments
+    5. Enrichit la cible (openalex_id, country)
+    6. Supprime la source
+    """
+    if target_id == source_id:
+        raise RuntimeError("Impossible de fusionner un éditeur avec lui-même")
+
+    # 1. Journals avec même titre normalisé → fusionner
+    cur.execute("""
+        SELECT jt.id AS target_journal_id, js.id AS source_journal_id
+        FROM journals jt
+        JOIN journals js ON js.title_normalized = jt.title_normalized
+        WHERE jt.publisher_id = %s AND js.publisher_id = %s
+    """, (target_id, source_id))
+    journal_pairs = cur.fetchall()
+
+    for pair in journal_pairs:
+        tj_id = pair["target_journal_id"]
+        sj_id = pair["source_journal_id"]
+        # Vérifier les conflits ISSN avant de fusionner
+        cur.execute("SELECT issn, eissn, issnl FROM journals WHERE id = %s", (tj_id,))
+        target_j = cur.fetchone()
+        cur.execute("SELECT issn, eissn, issnl FROM journals WHERE id = %s", (sj_id,))
+        source_j = cur.fetchone()
+
+        for field in ("issn", "eissn", "issnl"):
+            tv = target_j[field]
+            sv = source_j[field]
+            if tv and sv and tv != sv:
+                raise RuntimeError(
+                    f"Conflit {field} lors de la fusion des revues "
+                    f"(cible #{tj_id}: {tv}, source #{sj_id}: {sv}). "
+                    f"Fusionner les revues manuellement d'abord."
+                )
+
+        merge_journals(cur, tj_id, sj_id)
+
+    # 2. Transférer les journals restants
+    cur.execute(
+        "UPDATE journals SET publisher_id = %s WHERE publisher_id = %s",
+        (target_id, source_id))
+
+    # 3. Transférer les formes de nom
+    cur.execute("""
+        UPDATE publisher_name_forms SET publisher_id = %s
+        WHERE publisher_id = %s
+          AND form_normalized NOT IN (
+              SELECT form_normalized FROM publisher_name_forms WHERE publisher_id = %s
+          )
+    """, (target_id, source_id, target_id))
+    cur.execute("DELETE FROM publisher_name_forms WHERE publisher_id = %s", (source_id,))
+
+    # 3b. Transférer les journal_name_forms référençant le publisher source
+    #     Supprimer celles qui existent déjà pour le publisher cible (UNIQUE form_normalized + publisher_id)
+    cur.execute("""
+        DELETE FROM journal_name_forms
+        WHERE publisher_id = %s
+          AND form_normalized IN (
+              SELECT form_normalized FROM journal_name_forms WHERE publisher_id = %s
+          )
+    """, (source_id, target_id))
+    cur.execute(
+        "UPDATE journal_name_forms SET publisher_id = %s WHERE publisher_id = %s",
+        (target_id, source_id))
+
+    # 4. Transférer les apc_payments
+    cur.execute(
+        "UPDATE apc_payments SET publisher_id = %s WHERE publisher_id = %s",
+        (target_id, source_id))
+
+    # 5. Enrichir la cible
+    cur.execute("""
+        UPDATE publishers dest SET
+            openalex_id = COALESCE(dest.openalex_id, src.openalex_id),
+            country = COALESCE(dest.country, src.country),
+            is_predatory = dest.is_predatory OR src.is_predatory,
+            updated_at = now()
+        FROM publishers src
+        WHERE dest.id = %s AND src.id = %s
+    """, (target_id, source_id))
+
+    # 6. Supprimer la source
+    cur.execute("DELETE FROM publishers WHERE id = %s", (source_id,))
+
+
+def merge_journals(cur, target_id: int, source_id: int):
+    """Fusionne le journal source dans le journal cible.
+
+    1. Transfère les publications
+    2. Transfère les formes de nom
+    3. Transfère les apc_payments
+    4. Enrichit la cible (ISSN, openalex_id, APC, flags)
+    5. Supprime la source
+    """
+    if target_id == source_id:
+        raise RuntimeError("Impossible de fusionner un journal avec lui-même")
+
+    # 1. Transférer les publications
+    cur.execute(
+        "UPDATE publications SET journal_id = %s WHERE journal_id = %s",
+        (target_id, source_id))
+
+    # 2. Transférer les formes de nom
+    cur.execute("""
+        UPDATE journal_name_forms SET journal_id = %s
+        WHERE journal_id = %s
+          AND (form_normalized, COALESCE(publisher_id, 0)) NOT IN (
+              SELECT form_normalized, COALESCE(publisher_id, 0)
+              FROM journal_name_forms WHERE journal_id = %s
+          )
+    """, (target_id, source_id, target_id))
+    cur.execute("DELETE FROM journal_name_forms WHERE journal_id = %s", (source_id,))
+
+    # 3. Transférer les apc_payments
+    cur.execute(
+        "UPDATE apc_payments SET journal_id = %s WHERE journal_id = %s",
+        (target_id, source_id))
+
+    # 4. Enrichir la cible
+    cur.execute("""
+        UPDATE journals dest SET
+            issn = COALESCE(dest.issn, src.issn),
+            eissn = COALESCE(dest.eissn, src.eissn),
+            issnl = COALESCE(dest.issnl, src.issnl),
+            publisher_id = COALESCE(dest.publisher_id, src.publisher_id),
+            openalex_id = COALESCE(dest.openalex_id, src.openalex_id),
+            is_in_doaj = dest.is_in_doaj OR src.is_in_doaj,
+            is_predatory = dest.is_predatory OR src.is_predatory,
+            apc_amount = COALESCE(dest.apc_amount, src.apc_amount),
+            apc_currency = COALESCE(dest.apc_currency, src.apc_currency),
+            oa_model = COALESCE(dest.oa_model, src.oa_model),
+            updated_at = now()
+        FROM journals src
+        WHERE dest.id = %s AND src.id = %s
+    """, (target_id, source_id))
+
+    # 5. Supprimer la source
+    cur.execute("DELETE FROM journals WHERE id = %s", (source_id,))
