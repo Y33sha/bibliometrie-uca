@@ -77,6 +77,7 @@ def step3_openalex(cur, uca_ids, uca_wide_ids):
             JOIN address_structures ast ON ast.address_id = oaa.address_id
             WHERE oaa.openalex_authorship_id = oas.id
               AND ast.structure_id = ANY(%s)
+              AND ast.is_confirmed IS DISTINCT FROM FALSE
         )
     """, (list(uca_ids),))
     logger.info(f"Étape 3 — OA is_uca = TRUE : {cur.rowcount} authorships")
@@ -89,6 +90,7 @@ def step3_openalex(cur, uca_ids, uca_wide_ids):
             FROM openalex_authorship_addresses oaa
             JOIN address_structures ast ON ast.address_id = oaa.address_id
             WHERE ast.structure_id = ANY(%s)
+              AND ast.is_confirmed IS DISTINCT FROM FALSE
             GROUP BY oaa.openalex_authorship_id
         )
         UPDATE openalex_authorships oas
@@ -114,6 +116,7 @@ def step3b_wos(cur, uca_ids, uca_wide_ids):
             JOIN address_structures ast ON ast.address_id = waa.address_id
             WHERE waa.wos_authorship_id = was.id
               AND ast.structure_id = ANY(%s)
+              AND ast.is_confirmed IS DISTINCT FROM FALSE
         )
     """, (list(uca_ids),))
     logger.info(f"Étape 3b — WoS is_uca = TRUE : {cur.rowcount} authorships")
@@ -126,6 +129,7 @@ def step3b_wos(cur, uca_ids, uca_wide_ids):
             FROM wos_authorship_addresses waa
             JOIN address_structures ast ON ast.address_id = waa.address_id
             WHERE ast.structure_id = ANY(%s)
+              AND ast.is_confirmed IS DISTINCT FROM FALSE
             GROUP BY waa.wos_authorship_id
         )
         UPDATE wos_authorships was
@@ -151,6 +155,7 @@ def step3c_scanr(cur, uca_ids, uca_wide_ids):
             JOIN address_structures ast ON ast.address_id = saa.address_id
             WHERE saa.scanr_authorship_id = sas.id
               AND ast.structure_id = ANY(%s)
+              AND ast.is_confirmed IS DISTINCT FROM FALSE
         )
     """, (list(uca_ids),))
     logger.info(f"Étape 3c — ScanR is_uca = TRUE : {cur.rowcount} authorships")
@@ -163,6 +168,7 @@ def step3c_scanr(cur, uca_ids, uca_wide_ids):
             FROM scanr_authorship_addresses saa
             JOIN address_structures ast ON ast.address_id = saa.address_id
             WHERE ast.structure_id = ANY(%s)
+              AND ast.is_confirmed IS DISTINCT FROM FALSE
             GROUP BY saa.scanr_authorship_id
         )
         UPDATE scanr_authorships sas
