@@ -232,7 +232,7 @@
 	</div>
 {/if}
 
-<div class="toolbar toolbar-card">
+<div class="toolbar toolbar-card toolbar-sticky">
 	<input type="text" placeholder="Rechercher par titre..." bind:value={search} oninput={onSearchInput} />
 	<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
 	<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />

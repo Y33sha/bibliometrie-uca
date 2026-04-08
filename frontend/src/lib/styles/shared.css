@@ -49,6 +49,13 @@
 	border-radius: 6px;
 }
 
+/* Sticky toolbar variant */
+.toolbar-sticky {
+	position: sticky;
+	top: 0;
+	z-index: 100;
+}
+
 /* ── Count badge (usually in toolbar) ── */
 .count {
 	margin-left: auto;
