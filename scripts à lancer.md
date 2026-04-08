@@ -9,3 +9,7 @@ rerun wos normalize pour insérer roles (attention: le filtre role != author a s
 # points à résoudre
 enum roles?
 thèses en cours dans scanr: clé d'alignement?
+
+* [ ] cache pour améliorer la perf?
+* [ ] dumps automatisés sur le cloud (Backblaze B2 + rclone + GPG)
+* [ ] imports quotidiens (mode rapide, seulement nouveaux docts)
