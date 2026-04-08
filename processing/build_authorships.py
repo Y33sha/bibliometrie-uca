@@ -191,7 +191,7 @@ def build(cur):
 
     # ── Étape 4 : Propagation is_uca et structure_ids ──
     # Les 3 sources ont déjà is_uca et structure_ids peuplés par
-    # populate_uca_flags.py → on fait l'union des 3 sources.
+    # populate_affiliations.py → on fait l'union des 3 sources.
     logger.info("Étape 4 : propagation is_uca et structure_ids...")
 
     # Reset toutes les authorships

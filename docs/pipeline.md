@@ -130,7 +130,7 @@ erDiagram
 
 <!-- TODO: Tables `publisher_name_forms` et `journal_name_forms` pour gérer les formes de noms multiples en l'absence d'identifiant unique (ISSN pour les journals): "Elsevier", "Elsevier BV"; "JHEP", "Journal of High Energy Particles" -->
 
-### Phase 4 — `addresses` : Adresses et affiliations
+### <span id="addresses"></span>Phase 4 — `addresses` : Adresses et affiliations
 
 Cette étape extrait les adresses brutes des authorships sources (OpenAlex, WoS, ScanR) et les relie aux structures. (Pour le détail des différences de gestion des affiliations d'une source à l'autre: cf [doc sources](sources#sources-affiliations))
 
@@ -152,18 +152,18 @@ flowchart LR
 2. **`resolve_addresses.py`** — matche les adresses normalisées avec les formes de nom des structures (`structure_name_forms`). Résultat dans `address_structures`
 
 
-### <span id='uca_flags'></span>Phase 5 — `uca_flags` : Flags UCA
+### <span id='affiliations'></span>Phase 5 — `affiliations` : Résolution affiliations
 
-Script : `processing/populate_uca_flags.py`
+Script : `processing/populate_affiliations.py`
 
 ```mermaid
 flowchart LR
     A[structures]-->B[address_structures]
     B-->C
-    C[addresses]-->|populate_uca_flags|D[openalex_authorships]
-    C-->|populate_uca_flags|E[wos_authorships]
-    C-->|populate_uca_flags|H[wos_authorships]
-    A-->F[hal_structures]--->|populate_uca_flags|G[hal_authorships]
+    C[addresses]-->|populate_affiliations|D[openalex_authorships]
+    C-->|populate_affiliations|E[wos_authorships]
+    C-->|populate_affiliations|H[scanr_authorships]
+    A-->F[hal_structures]--->|populate_affiliations|G[hal_authorships]
     classDef new  fill:#bbf
     classDef valid  fill:#af5
     class D,E,G,H new;
@@ -221,7 +221,7 @@ Fonctions de compatibilité de noms dans `utils/names.py`.
 1. **Insertion** des paires (publication_id, person_id) manquantes, depuis les authorships sources non exclues
 2. **FK** : rattache chaque authorship canonique à ses authorships sources (`hal_authorship_id`, `openalex_authorship_id`, `wos_authorship_id`)
 3. **Métadonnées** : propage `author_position` et `is_corresponding`
-4. **UCA** : propage `is_uca` et `structure_ids` depuis les 3 sources (union). Même logique pour les 3 sources (déjà calculées par `populate_uca_flags.py`).
+4. **UCA** : propage `is_uca` et `structure_ids` depuis les 3 sources (union). Même logique pour les 3 sources (déjà calculées par `populate_affiliations.py`).
 
 Les authorships sources marquées `excluded = TRUE` sont ignorées à toutes les étapes. Les publications de type `peer_review` sont exclues de la propagation UCA.
 
@@ -296,9 +296,9 @@ flowchart LR
     class F,A,C valid;
 ```
 
-4. Les **authorships** canoniques sont déduites à partir des sources dans la [phase 8](#authorships) (`authorships`). L'information (`person_id`, `structure_ids`) est donc répliquée dans la table canonique, pour deux raisons:
+4. Les **authorships** canoniques sont déduites à partir des sources dans la [phase 8](#authorships) (`authorships`). L'information (`person_id`, `structure_ids`) présente dans les *authorships* sources est donc répliquée dans la table *authorships* canonique, pour deux raisons:
 - simplifier les requêtes;
-- servir de source d'autorité ultime en cas d'erreur dans une des sources (une authorship source peut être `excluded`).
+- servir de source d'autorité ultime en cas d'erreur dans une des sources (une *authorship* source peut être `excluded`).
 
 ```mermaid
 flowchart LR

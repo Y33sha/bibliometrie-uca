@@ -2,13 +2,14 @@
 
 ## Vue d'ensemble
 
-Le système intègre 3 sources bibliographiques principales, complétées par des imports manuels et des APIs d'enrichissement.
+Le système intègre 4 sources bibliographiques principales, complétées par des imports manuels et des APIs d'enrichissement.
 
 | Source | Type | Couverture | API |
 |--------|------|-----------|-----|
 | HAL | Archive ouverte | Publications déposées par les chercheurs UCA | Solr (search) + ref/author + ref/structure |
 | OpenAlex | Base bibliométrique ouverte | Publications mondiales, rattachement institutionnel par affiliation | REST (works, sources) |
 | Web of Science | Base bibliométrique commerciale | Publications indexées WoS, affiliation OG | REST (Expanded API, quota annuel) |
+| ScanR | Portail officiel du MESRE |  |
 | Unpaywall | Enrichissement OA | Statut Open Access par DOI | REST (gratuit, 100k req/jour) |
 | Base RH | Import manuel | Personnel UCA (noms, départements, rôles) | Fichier CSV |
 | Données APC | Import manuel | Paiements APC (montants, éditeurs) | Fichier CSV |
@@ -23,7 +24,7 @@ Le système intègre 3 sources bibliographiques principales, complétées par de
 
 - Dans **HAL**, les liens authorships-structures sont basés sur les affiliations renseignées dans les comptes HAL des auteurs au moment du dépôt (Cf [doc HAL](https://doc.hal.science/depot-fonctionnement-de-l-affiliation-automatique/#)), et éventuellement complétés manuellement par le déposant. Les métadonnées de HAL ne contiennent pas les adresses brutes. La seule option est donc de récupérer les affiliations telles quelles, via un *mapping* entre `hal_structures` et `structures` canoniques. Les erreurs sont détectées *a posteriori* (pages [hal-problems](guide-utilisateur#problemes-hal)).
 Le *mapping* est géré via la page [admin/structures](guide-utilisateur#gestion-des-structures-adminstructures).
-La résolution des affiliations se fait pendant la [phase `uca_flags` du pipeline](pipeline#uca_flags).
+La résolution des affiliations se fait pendant la [phase `affiliations` du pipeline](pipeline#affiliations).
 
 #### <span id='entites-auteurs'></span>Nature des entités auteurs
 

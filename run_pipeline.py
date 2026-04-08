@@ -19,7 +19,7 @@ Phases:
     cross_imports Cross-imports entre sources (DOIs manquants, refs HAL)
     normalize     Normalisation staging → tables sources + merge inter-sources
     addresses     Adresses: extraction, résolution, pays
-    uca_flags     Flags UCA sur authorships sources
+    affiliations  Résolution affiliations sur authorships sources
     identifiers   Moissonnage identifiants HAL (ORCID, IdRef)
     persons       Création/mapping personnes + formes de noms
     authorships   Reconstruction authorships (vérité) + propagation UCA
@@ -120,9 +120,9 @@ def phase_addresses(**kw):
     run_python("processing/resolve_addresses.py")
 
 
-def phase_uca_flags(**kw):
-    """Phase 5 : Flags UCA sur authorships sources (étapes 1-3b)."""
-    run_python("processing/populate_uca_flags.py")
+def phase_affiliations(**kw):
+    """Phase 5 : Résolution affiliations sur authorships sources."""
+    run_python("processing/populate_affiliations.py")
 
 
 def phase_identifiers(mode="full", **kw):
@@ -166,7 +166,7 @@ PHASES = [
     ("cross_imports", phase_cross_imports),
     ("normalize", phase_normalize),
     ("addresses", phase_addresses),
-    ("uca_flags", phase_uca_flags),
+    ("affiliations", phase_affiliations),
     ("identifiers", phase_identifiers),
     ("persons", phase_persons),
     ("authorships", phase_authorships),

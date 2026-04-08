@@ -13,7 +13,7 @@ Tables peuplées :
     hal_authorships                         (lien document × auteur, avec hal_struct_ids)
 
 La résolution UCA (hal_authorships.structure_ids, is_uca) se fait en post-traitement
-via populate_uca_flags.py, pas ici. Ce script ne fait que stocker les hal_struct_ids
+via populate_affiliations.py, pas ici. Ce script ne fait que stocker les hal_struct_ids
 bruts extraits de authIdHasStructure_fs.
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).

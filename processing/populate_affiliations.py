@@ -1,17 +1,16 @@
 """
-Peuplement is_uca et structure_ids sur les authorships sources.
+Résolution des affiliations sur les authorships sources.
 
-Convertit l'ancien script SQL db/populate_uca_flags.sql en Python
-pour être portable (pas de dépendance à psql) et réutiliser
-le périmètre UCA centralisé (utils/uca_perimeter.py).
+Peuple is_uca et structure_ids sur les authorships sources
+en utilisant les périmètres configurés (utils/uca_perimeter.py).
 
 Deux périmètres :
   - restreint : UCA + labos tutellés → sert pour is_uca
   - large : restreint + partenaires (CHU, INP…) → sert pour structure_ids
 
 Usage:
-    python populate_uca_flags.py          # exécution complète
-    python populate_uca_flags.py --stats  # afficher les compteurs sans modifier
+    python populate_affiliations.py          # exécution complète
+    python populate_affiliations.py --stats  # afficher les compteurs sans modifier
 """
 
 import argparse
@@ -24,7 +23,7 @@ from db.connection import get_connection
 from utils.uca_perimeter import get_uca_structure_ids, get_uca_structure_ids_wide
 from utils.log import setup_logger
 
-logger = setup_logger("populate_uca_flags", os.path.join(os.path.dirname(__file__), "logs"))
+logger = setup_logger("populate_affiliations", os.path.join(os.path.dirname(__file__), "logs"))
 
 
 def step1_hal_structure_ids(cur):

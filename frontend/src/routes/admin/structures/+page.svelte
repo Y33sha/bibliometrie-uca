@@ -768,7 +768,7 @@
 				{#if halHelpOpen}
 					<p class="help-text">
 						Le mapping avec les structures HAL permet d'identifier les affiliations des publications issues de HAL. Les changements seront pris en compte à la prochaine exécution du
-						pipeline. Pour une prise en compte immédiate, relancer le pipeline à partir de l'étape `uca_flags` : <code>python run_pipeline.py --from uca_flags</code>
+						pipeline. Pour une prise en compte immédiate, relancer le pipeline à partir de l'étape `affiliations` : <code>python run_pipeline.py --from affiliations</code>
 					</p>
 				{/if}
 				{#if halMappings.length === 0 && !halSearchOpen}

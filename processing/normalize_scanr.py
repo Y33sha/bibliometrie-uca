@@ -13,7 +13,7 @@ Tables peuplées :
     scanr_authorships                       (lien document × auteur, avec affiliations)
 
 La résolution UCA (scanr_authorships.structure_ids, is_uca) se fait en post-traitement
-via populate_uca_flags.py, pas ici.
+via populate_affiliations.py, pas ici.
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
