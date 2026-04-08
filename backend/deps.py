@@ -14,7 +14,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.settings import DB, ADMIN_USER, ADMIN_SALT, ADMIN_HASH, SESSION_SECRET
+from config.settings import DB, DB_POOL_MIN, DB_POOL_MAX, ADMIN_USER, ADMIN_SALT, ADMIN_HASH, SESSION_SECRET
 
 
 # ----- SPA Static Files -----
@@ -71,9 +71,14 @@ def require_admin(session: str | None = Cookie(None, alias="session")):
 
 # ----- DB helpers -----
 
+from psycopg2.pool import ThreadedConnectionPool
+
+_pool = ThreadedConnectionPool(minconn=DB_POOL_MIN, maxconn=DB_POOL_MAX, **DB)
+
+
 @contextmanager
 def get_cursor():
-    conn = psycopg2.connect(**DB)
+    conn = _pool.getconn()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             yield cur, conn
@@ -82,4 +87,4 @@ def get_cursor():
         conn.rollback()
         raise
     finally:
-        conn.close()
+        _pool.putconn(conn)
