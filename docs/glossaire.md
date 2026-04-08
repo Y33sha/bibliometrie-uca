@@ -10,7 +10,7 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 | **AuréHAL** | Référentiel d'entités HAL (auteurs, structures, revues). |
 | **OpenAlex** | Index bibliographique ouvert (successeur de Microsoft Academic). |
 | **Web of Science (WoS)** | Index bibliographique commercial (Clarivate). |
-| **Unpaywall** | Service qui associe un statut d'accès ouvert à chaque DOI. Utilisé pour enrichir le champ `oa_status` des publications. |
+| **Unpaywall** | <span id="unpaywall"></span>Service qui associe un statut d'accès ouvert à chaque DOI. Utilisé pour enrichir le champ `oa_status` des publications. |
 | **OpenAPC** | TODO |
 | **ScanR** | TODO |
 
