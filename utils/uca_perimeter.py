@@ -3,6 +3,10 @@
 Lit les périmètres depuis la table `perimeters` (colonne structure_ids).
 Chaque structure racine inclut récursivement ses sous-structures
 (via est_tutelle_de dans structure_relations).
+
+L'association phase→périmètre est lue depuis la table `config` :
+- perimeter_affiliations : périmètre pour la résolution des affiliations
+- perimeter_persons : périmètre pour la création des personnes
 """
 
 
@@ -46,22 +50,58 @@ def get_perimeter_structure_ids(cur, perimeter_code: str) -> set[int]:
     return {r["id"] if isinstance(r, dict) else r[0] for r in cur.fetchall()}
 
 
+# ── Fonctions par rôle (lisent la config) ──
+
+def _config_perimeter_code(cur, config_key: str, default: str) -> str:
+    """Lit un code périmètre depuis la table config."""
+    try:
+        cur.execute("SELECT value FROM config WHERE key = %s", (config_key,))
+        row = cur.fetchone()
+        if row:
+            val = row["value"] if isinstance(row, dict) else row[0]
+            # value est du JSONB, donc déjà désérialisé (str)
+            return val if isinstance(val, str) else default
+    except Exception:
+        pass
+    return default
+
+
+def get_affiliations_structure_ids(cur) -> set[int]:
+    """Périmètre pour la résolution des affiliations (structure_ids)."""
+    code = _config_perimeter_code(cur, "perimeter_affiliations", "uca_wide")
+    return get_perimeter_structure_ids(cur, code)
+
+
+def get_persons_structure_ids(cur) -> set[int]:
+    """Périmètre pour la création des personnes (is_uca)."""
+    code = _config_perimeter_code(cur, "perimeter_persons", "uca")
+    return get_perimeter_structure_ids(cur, code)
+
+
+def get_persons_structure_ids_list(cur) -> list[int]:
+    """Variante liste (pour usage dans les requêtes SQL ANY(%s))."""
+    return list(get_persons_structure_ids(cur))
+
+
+# ── Aliases de compatibilité ──
+
 def get_uca_structure_ids(cur) -> set[int]:
-    """Retourne le périmètre UCA restreint (is_uca)."""
-    return get_perimeter_structure_ids(cur, "uca")
+    """Alias → get_persons_structure_ids."""
+    return get_persons_structure_ids(cur)
 
 
 def get_uca_structure_ids_wide(cur) -> set[int]:
-    """Retourne le périmètre UCA élargi (structure_ids)."""
-    return get_perimeter_structure_ids(cur, "uca_wide")
+    """Alias → get_affiliations_structure_ids."""
+    return get_affiliations_structure_ids(cur)
 
 
 def get_uca_structure_ids_list(cur) -> list[int]:
-    """Variante retournant une liste (pour usage dans les requêtes SQL ANY(%s))."""
-    return list(get_uca_structure_ids(cur))
+    """Alias → get_persons_structure_ids_list."""
+    return get_persons_structure_ids_list(cur)
 
 
-# Fallback si la table perimeters n'existe pas encore
+# ── Fallbacks ──
+
 def _val(r, key):
     return r[key] if isinstance(r, dict) else r[0]
 
