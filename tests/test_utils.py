@@ -60,6 +60,16 @@ class TestCleanDoi:
     def test_whitespace(self):
         assert clean_doi("  10.1234/test  ") == "10.1234/test"
 
+    def test_strip_version_suffix_v1(self):
+        assert clean_doi("10.6084/m9.figshare.31023197.v1") == "10.6084/m9.figshare.31023197"
+
+    def test_strip_version_suffix_v2(self):
+        assert clean_doi("10.36227/techrxiv.19754971.v2") == "10.36227/techrxiv.19754971"
+
+    def test_no_false_positive_on_v_in_doi(self):
+        """Un .v suivi de non-chiffre ne doit pas être strippé."""
+        assert clean_doi("10.1234/journal.v12.issue3") == "10.1234/journal.v12.issue3"
+
 
 # ── parse_raw_author_name ──
 
