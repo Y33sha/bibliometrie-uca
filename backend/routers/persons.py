@@ -673,6 +673,7 @@ async def person_addresses(
                     FROM address_structures ast
                     JOIN structures s ON s.id = ast.structure_id
                     WHERE ast.address_id = a.id AND s.structure_type != 'site'
+                      AND ast.is_confirmed IS DISTINCT FROM FALSE
                    ) AS structures
             FROM addresses a
             WHERE {base_where}

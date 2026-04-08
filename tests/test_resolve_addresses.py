@@ -156,6 +156,40 @@ class TestResolveAddress:
         structure_ids = {sid for sid, _ in result}
         assert 1 not in structure_ids
 
+    def test_u999_paris_no_match_lrl(self):
+        """Régression : u999 dans une adresse parisienne ne doit pas matcher LRL.
+
+        u999 est une forme de LRL avec requires_context_of = [UCA].
+        L'adresse parisienne ne contient pas UCA → pas de match.
+        """
+        forms = [
+            _form(217, "u999", "u999", form_id=1566, is_word_boundary=True,
+                  requires_context_of=[169]),  # LRL, nécessite UCA
+            _form(169, "universite clermont auvergne", form_id=100),  # UCA
+        ]
+        fbs = build_forms_by_structure(forms)
+        text = ("pole des cardiopathies congenitales du nouveau ne a l adulte "
+                "centre constitutif cardiopathies congenitales complexes m3c "
+                "groupe hospitalier paris saint joseph hopital marie lannelongue "
+                "inserm u999 universite paris saclay")
+        result = resolve_address(text, forms, fbs, {})
+        matched_ids = {sid for sid, _ in result}
+        assert 217 not in matched_ids  # LRL ne doit PAS matcher
+
+    def test_u999_clermont_matches_lrl(self):
+        """u999 dans une adresse clermontoise avec UCA → matche LRL."""
+        forms = [
+            _form(217, "u999", "u999", form_id=1566, is_word_boundary=True,
+                  requires_context_of=[169]),
+            _form(169, "universite clermont auvergne", form_id=100),
+        ]
+        fbs = build_forms_by_structure(forms)
+        text = "inserm u999 universite clermont auvergne"
+        result = resolve_address(text, forms, fbs, {})
+        matched_ids = {sid for sid, _ in result}
+        assert 217 in matched_ids  # LRL doit matcher
+        assert 169 in matched_ids  # UCA aussi
+
     def test_context_tutelles(self):
         """requires_context_of = ["tutelles"] → résolu via tutelles_map."""
         forms = [
