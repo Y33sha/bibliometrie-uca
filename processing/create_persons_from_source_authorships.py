@@ -3,9 +3,10 @@ Crée des entités Personnes à partir des authorships sources UCA non rattaché
 
 Algorithme en 4 étapes :
 
-  Étape 0 : Comptes HAL
-    hal_authors avec hal_person_id → création/mapping personne, propagation
-    aux authorships liées. Récupération ORCID, idHAL.
+  Étape 0 : Comptes HAL déjà rattachés
+    hal_authors avec hal_person_id ET person_id → propagation aux nouvelles
+    authorships du même compte. Les comptes non rattachés sont laissés
+    aux étapes suivantes (matching par nom, ORCID, position).
 
   Étape 1 : Cross-source
     Pour chaque authorship sans person_id, chercher sur la même publication
@@ -266,7 +267,12 @@ def load_name_form_map(cur):
 # ---------------------------------------------------------------------------
 
 def step0_hal_accounts(cur, all_authorships, linked_ids, dry_run):
-    """hal_authors avec hal_person_id → création/mapping personne."""
+    """Propagation des comptes HAL déjà rattachés à une personne.
+
+    Seuls les hal_authors avec hal_person_id ET person_id sont traités.
+    Les comptes HAL non encore rattachés sont laissés aux passes suivantes
+    (matching par nom, ORCID, position) pour éviter de créer des doublons.
+    """
     by_hal_pid = defaultdict(list)
     for a in all_authorships:
         if a["source"] == "hal" and a["has_hal_person_id"]:
@@ -281,28 +287,21 @@ def step0_hal_accounts(cur, all_authorships, linked_ids, dry_run):
     hal_person_map = {r["hal_person_id"]: r["person_id"] for r in cur.fetchall()}
 
     linked = 0
-    created = 0
+    skipped = 0
     for hal_pid, group in by_hal_pid.items():
         existing_pid = hal_person_map.get(hal_pid)
         if existing_pid:
             if not dry_run:
                 link_to_person(cur, existing_pid, group)
                 add_identifiers(cur, existing_pid, group)
+            linked += len(group)
+            for a in group:
+                linked_ids.add((a["source"], a["authorship_id"]))
         else:
-            best = max(group, key=lambda a: 1)  # pick any
-            last = best["last_name"] or ""
-            first = best["first_name"] or ""
-            if not dry_run:
-                pid = create_person(cur, last, first)
-                link_to_person(cur, pid, group)
-                add_identifiers(cur, pid, group)
-            created += 1
+            # Compte HAL non rattaché → laisser aux passes suivantes
+            skipped += len(group)
 
-        linked += len(group)
-        for a in group:
-            linked_ids.add((a["source"], a["authorship_id"]))
-
-    logger.info(f"  {created} personnes créées, {linked} authorships rattachées")
+    logger.info(f"  {linked} authorships rattachées, {skipped} ignorées (comptes HAL non rattachés)")
     return linked
 
 
@@ -343,6 +342,7 @@ def step1_cross_source(cur, all_authorships, linked_ids, linked_index, dry_run):
             if not dry_run:
                 link_to_person(cur, matched_pid, [a])
                 add_name_form(cur, matched_pid, a["full_name"])
+                add_identifiers(cur, matched_pid, [a])
             linked_ids.add((a["source"], a["authorship_id"]))
             # Mettre à jour l'index pour les passes suivantes
             ln, fn = a["last_norm"], a["first_norm"]
@@ -438,6 +438,7 @@ def step2_orcid(cur, all_authorships, linked_ids, dry_run):
             if not dry_run:
                 link_to_person(cur, pid, [a])
                 add_name_form(cur, pid, a["full_name"])
+                add_identifiers(cur, pid, [a])
             linked_ids.add((a["source"], a["authorship_id"]))
             linked += 1
 

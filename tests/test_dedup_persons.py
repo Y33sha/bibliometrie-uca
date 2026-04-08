@@ -101,18 +101,31 @@ def _get_person_id_of_oa_authorship(db, authorship_id):
     return row["person_id"] if row else None
 
 
+def _get_person_identifiers(db, person_id):
+    """Retourne les identifiants d'une personne : {(id_type, id_value), ...}"""
+    db.execute(
+        "SELECT id_type, id_value FROM person_identifiers WHERE person_id = %s",
+        (person_id,))
+    return {(r["id_type"], r["id_value"]) for r in db.fetchall()}
+
+
 # ── Étape 0 : Comptes HAL ───────────────────────────────────────
 
 class TestStep0HalAccounts:
-    def test_same_hal_person_id_groups(self, db):
-        """Deux authorships avec même hal_person_id → même personne."""
+    def test_existing_person_propagates(self, db):
+        """hal_author avec hal_person_id déjà rattaché → propage aux nouvelles authorships."""
         from processing.create_persons_from_source_authorships import (
             get_all_unlinked_authorships, step0_hal_accounts,
         )
         pub1 = _insert_publication(db, "Pub 1")
         pub2 = _insert_publication(db, "Pub 2")
 
+        # Personne existante + hal_author rattaché
+        person_id = create_person(db, "Dupont", "Jean")
         ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=12345)
+        db.execute("UPDATE hal_authors SET person_id = %s WHERE id = %s",
+                   (person_id, ha))
+
         hd1 = _insert_hal_document(db, "hal-001", pub1)
         hd2 = _insert_hal_document(db, "hal-002", pub2)
         has1 = _insert_hal_authorship(db, hd1, ha, position=0)
@@ -122,10 +135,56 @@ class TestStep0HalAccounts:
         linked_ids = set()
         step0_hal_accounts(db, all_as, linked_ids, dry_run=False)
 
-        pid1 = _get_person_id_of_hal_authorship(db, has1)
-        pid2 = _get_person_id_of_hal_authorship(db, has2)
-        assert pid1 is not None
-        assert pid1 == pid2
+        assert _get_person_id_of_hal_authorship(db, has1) == person_id
+        assert _get_person_id_of_hal_authorship(db, has2) == person_id
+
+    def test_virgin_hal_account_skipped(self, db):
+        """hal_author avec hal_person_id mais sans person_id → ignoré par passe 0."""
+        from processing.create_persons_from_source_authorships import (
+            get_all_unlinked_authorships, step0_hal_accounts,
+        )
+        pub = _insert_publication(db, "Pub vierge")
+        ha = _insert_hal_author(db, "Népomucène Bensoussan", hal_person_id=99999)
+        hd = _insert_hal_document(db, "hal-virgin", pub)
+        has_id = _insert_hal_authorship(db, hd, ha, position=0)
+
+        all_as = get_all_unlinked_authorships(db)
+        linked_ids = set()
+        step0_hal_accounts(db, all_as, linked_ids, dry_run=False)
+
+        # Pas de rattachement en passe 0
+        assert _get_person_id_of_hal_authorship(db, has_id) is None
+        # L'authorship ne doit pas être marquée comme traitée
+        assert ("hal", has_id) not in linked_ids
+
+    def test_virgin_hal_account_matched_by_name(self, db):
+        """hal_author vierge → ignoré en passe 0, rattaché par nom en passe 3."""
+        from processing.create_persons_from_source_authorships import (
+            get_all_unlinked_authorships, step0_hal_accounts,
+            step3_name_forms, load_name_form_map,
+        )
+        pub = _insert_publication(db)
+
+        # Personne existante (créée par un import précédent)
+        person_id = create_person(db, "Bensoussan", "Népomucène")
+
+        # Nouveau hal_author vierge, même nom
+        ha = _insert_hal_author(db, "Népomucène Bensoussan",
+                                hal_person_id=88888, orcid="0000-0001-1111-2222")
+        hd = _insert_hal_document(db, "hal-nepo", pub)
+        has_id = _insert_hal_authorship(db, hd, ha, position=0)
+
+        all_as = get_all_unlinked_authorships(db)
+        linked_ids = set()
+
+        # Passe 0 : ignoré
+        step0_hal_accounts(db, all_as, linked_ids, dry_run=False)
+        assert _get_person_id_of_hal_authorship(db, has_id) is None
+
+        # Passe 3 : rattaché par nom
+        name_form_map = load_name_form_map(db)
+        step3_name_forms(db, all_as, linked_ids, name_form_map, dry_run=False)
+        assert _get_person_id_of_hal_authorship(db, has_id) == person_id
 
 
 # ── Étape 1 : Cross-source ──────────────────────────────────────
@@ -157,6 +216,34 @@ class TestStep1CrossSource:
         step1_cross_source(db, all_as, linked_ids, linked_index, dry_run=False)
 
         assert _get_person_id_of_oa_authorship(db, oa_as) == person_id
+
+    def test_cross_source_imports_identifiers(self, db):
+        """Cross-source rattachement → les identifiants de l'authorship sont importés."""
+        from processing.create_persons_from_source_authorships import (
+            get_all_unlinked_authorships, step1_cross_source,
+            load_linked_authorships_by_pub,
+        )
+        pub = _insert_publication(db)
+
+        person_id = create_person(db, "Dupont", "Jean")
+        ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=111)
+        hd = _insert_hal_document(db, "hal-id-test", pub)
+        _insert_hal_authorship(db, hd, ha, position=0, person_id=person_id)
+
+        # OA authorship avec ORCID, même publi, même position
+        oa_author = _insert_oa_author(db, "J Dupont", "A-id1",
+                                      orcid="0000-0001-9999-8888")
+        oa_doc = _insert_oa_document(db, "W-id1", pub)
+        _insert_oa_authorship(db, oa_doc, oa_author, position=0,
+                              raw_author_name="J Dupont")
+
+        all_as = get_all_unlinked_authorships(db)
+        linked_ids = set()
+        linked_index = load_linked_authorships_by_pub(db)
+        step1_cross_source(db, all_as, linked_ids, linked_index, dry_run=False)
+
+        ids = _get_person_identifiers(db, person_id)
+        assert ("orcid", "0000-0001-9999-8888") in ids
 
     def test_same_pub_different_position_no_match(self, db):
         """Même publi mais position différente → pas de rattachement."""
@@ -208,6 +295,33 @@ class TestStep2Orcid:
         step2_orcid(db, all_as, linked_ids, dry_run=False)
 
         assert _get_person_id_of_oa_authorship(db, oa_as) == person_id
+
+    def test_orcid_match_imports_other_identifiers(self, db):
+        """Rattachement par ORCID → les autres identifiants (IdRef) sont aussi importés."""
+        from processing.create_persons_from_source_authorships import (
+            get_all_unlinked_authorships, step2_orcid,
+        )
+        pub = _insert_publication(db)
+        person_id = create_person(db, "Dupont", "Jean")
+        add_identifier(db, person_id, "orcid", "0000-0001-2345-6789",
+                       source="hal", status="confirmed")
+
+        # HAL author avec même ORCID + un IdRef
+        ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=None,
+                                orcid="0000-0001-2345-6789")
+        # Ajouter idref manuellement (helper ne le gère pas)
+        db.execute("UPDATE hal_authors SET idref = %s WHERE id = %s",
+                   ("123456789", ha))
+
+        hd = _insert_hal_document(db, "hal-orcid-idref", pub)
+        _insert_hal_authorship(db, hd, ha, position=0)
+
+        all_as = get_all_unlinked_authorships(db)
+        linked_ids = set()
+        step2_orcid(db, all_as, linked_ids, dry_run=False)
+
+        ids = _get_person_identifiers(db, person_id)
+        assert ("idref", "123456789") in ids
 
     def test_rejected_orcid_ignored(self, db):
         """ORCID rejeté en base → pas de rattachement."""
