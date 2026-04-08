@@ -2,7 +2,7 @@
 
 ## Principes de conception
 
-Le schéma repose sur une distinction entre des tables "sources" (séparées par source: HAL, OpenAlex, WoS) et des tables "canoniques" (= vérité).
+Le schéma repose sur une distinction entre des tables "sources" (séparées par source: HAL, OpenAlex, WoS, ScanR) et des tables "canoniques" (= vérité).
 
 ```mermaid
 flowchart BT
@@ -159,7 +159,7 @@ Note : `person_id` sur les `*_authorships` est écrit par `services/persons.py`
 
 ### Tables canoniques
 
-#### Domaine fonctionnel `structures`
+#### <span id="structures"></span>Domaine fonctionnel `structures`
 
 Référentiel institutionnel maintenu manuellement. Contient l'UCA, ses laboratoires, les tutelles (CNRS, INRAE...), composantes (INP, VetAgro Sup...), CHU, etc.
 
@@ -185,6 +185,8 @@ flowchart LR
     class structures,structure_name_forms,perimeters,structure_relations manuel;
     classDef csv fill:#fa5
     class apc_payments csv
+    classDef auto fill:#adf,stroke:#58c
+    class address_structures,addresses,authorships,persons,publications auto
     classDef main stroke-width:4px,font-weight:bold
     class structures,publications,persons,authorships main
 ```
@@ -192,78 +194,99 @@ flowchart LR
 Légende:
 - **vert**: tables peuplées manuellement;
 - **orange**: imports CSV;
-- **violet**: tables peuplées automatiquement par le pipeline à partir des imports API.
+- **bleu**: tables peuplées automatiquement par le pipeline à partir des imports API.
 
 Tables associées :
 - `perimeters` : un périmètre est un ensemble de structures incluant récursivement leurs sous-structures. Actuellement deux périmètres sont définis: **UCA strict** et **UCA large** (UCA + CHU + INP). Impacte:
-    - Les authorships sources dont le champ `structure_ids` sera peuplé par le pipeline, et qui serviront à générer les `personnes`. Une *authorship* hors périmètre UCA strict n'est pas génératrice d'entités personnes.
+    - Les authorships sources dont le champ `structure_ids` sera peuplé par le pipeline ([phase 5](pipeline#affiliations) du pipeline), et qui serviront à générer les `personnes` ([phase 7](pipeline#creation-personnes)). Une *authorship* hors périmètre UCA strict n'est pas génératrice d'entités personnes.
     - (à terme: les appels API devront être déduits du périmètre. Pour l'instant les critères de requête sont écrits en dur dans la config.) <!--TODO: mapper structures aux identifiants de chaque source, supprimer les identifiants hardcoded dans la config des appels API et les déduire du périmètre UCA -->
 - `structure_relations` : définit les relations entre structures. Deux relations existent: **tutelle** (asymétrique), **partenariat** (symétrique, non transitif). La relation "partenariat" est purement informative (elle réplique l'information présente dans ROR), la relation "tutelle" a une conséquence sur les structures incluses dans un périmètre donné.
-- `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: *LMV* reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `addresses` du pipeline pour peupler la table de liaison `adress_structures`.
+- `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: *LMV* reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `addresses` du [pipeline](pipeline#addresses) pour peupler la table de liaison `adress_structures`.
 - `address_structures`: table de liaison. Les adresses proviennent des authorships sources (phase 4 `addresses` du pipeline). Les structures identifiées sont propagées aux authorships sources.
 - `apc_payments`: données provenant d'un import CSV, voir [doc sources](sources#donnees-apc).
 
 
 
 
-#### Domaine fonctionnel  `publications`
+#### <span id="publications"></span>Domaine fonctionnel  `publications`
 
 Référentiel dédupliqué. Hiérarchie de déduplication :
 1. **DOI identique** (case-insensitive) → même publication
 2. **Lien explicite** source→source (ex: OpenAlex cite HAL comme primary_location)
 3. **Métadonnées** : titre normalisé + année + même journal
 
-Contrainte unique : `lower(doi)` WHERE `doi IS NOT NULL`.
-
-Table associée:
-- `distinct_publications`: Paires de publications marquées comme **distinctes malgré un titre identique** (faux positifs de déduplication). Contrainte : `pub_id_a < pub_id_b`.
-- `publishers` 
-- `journals`
-- `apc_payments`: Données de paiements d'APC (Article Processing Charges) importées depuis les exports DPCG. Liées à `publications`, `journals` et `publishers` par FK optionnelles.
 
 ```mermaid
-erDiagram
-    hal_documents }o--|| publications : ""
-    openalex_documents }o--|| publications : ""
-    wos_documents }o--|| publications : ""
-    publications ||--o{ authorships : ""
-    publications }o--|| journals : ""
-    journals }o--|| publishers : ""
-    
-    publications ||--o{ apc_payments : ""
+flowchart LR
+    structures --- authorships
+    authorships --- publications
+    authorships --- persons
+    structures --- apc_payments
+    apc_payments ---|DOI| publications
+    A@{ shape: processes, label: "*_documents\n(sources)"}-->|normalize|publications
+    publications---journals
+    journals---publishers
+        
+    classDef manuel  fill:#8e5,stroke:#5a3
+    class structures,structure_name_forms,perimeters,structure_relations manuel;
+    classDef csv fill:#fa5
+    class apc_payments csv
+    classDef auto fill:#adf,stroke:#58c
+    class A,publications,journals,publishers,authorships,persons auto
+    classDef main stroke-width:4px,font-weight:bold
+    class structures,publications,persons,authorships main
+
 ```
 
-#### `persons`
+Table associées:
+- `journals`: référentiel des revues
+- `publishers` : référentiel des éditeurs
+- `apc_payments`
+- `distinct_publications` (non représenté ci-dessus): Paires de publications marquées comme **distinctes malgré un titre identique**, évite de les re-suggérer dans l'interface de dédoublonnage `admin/duplicates`.
+
+#### <span id="persons"></span>Domaine fonctionnel `persons`
 
 Référentiel des individus. Une ligne = une personne physique. Alimenté par le script `create_persons_from_source_authorships.py` (création automatique depuis les authorships) et complété par les exports RH (données dans la table satellite `persons_rh`).
 
-Tables associées :
-- `persons_rh`: Table satellite liée à `persons` (FK `person_id`, ON DELETE CASCADE). Contient les données issues des exports RH : `department_name`, `role_title`, `structure_id`, `start_date`, `end_date`.
-- `person_identifiers`: Identifiants persistants : ORCID, idHAL, IdRef, etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` trace la provenance (`hr`, `hal`, `openalex`, `manual`, `auto` TODO: revoir enum).
-- `person_name_forms`: Formes de noms normalisées, utilisées pour le matching lors de la création de personnes. Chaque forme pointe vers un tableau de `person_ids`. Les authorships sources portent la même forme dans `author_name_normalized`, ce qui permet un matching direct sans recalcul.
-
-
 ```mermaid
-erDiagram
-    persons ||--o{ authorships : ""
-    persons ||--o{ person_identifiers : ""
-    persons ||--o{ person_name_forms : "person_ids[]"
-    persons |o--o| persons_rh : "person_id"
+flowchart LR
+    structures --- authorships
+    
+    authorships --- publications
+    authorships ---- persons
+    A@{ shape: processes, label: "*_authorships\n(sources)"}---persons
+    persons---persons_rh
+    persons---person_identifiers
+    persons---person_name_forms
+
+    classDef manuel  fill:#8e5,stroke:#5a3
+    class structures,structure_name_forms,perimeters,structure_relations manuel;
+    classDef csv fill:#fa5
+    class persons_rh csv
+    classDef auto fill:#adf,stroke:#58c
+    class A,publications,person_identifiers,person_name_forms,authorships,persons auto
+    classDef main stroke-width:4px,font-weight:bold
+    class structures,publications,persons,authorships main
+
 
 ```
 
+Tables associées :
+- `persons_rh`: Table satellite liée à `persons` (FK `person_id`, ON DELETE CASCADE). Contient les données issues des exports RH : cf [doc sources](sources#donnees-rh).
+- `person_identifiers`: Identifiants persistants : ORCID, idHAL, IdRef, etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` trace la provenance (`hr`, `hal`, `openalex`, `manual`, `auto` TODO: revoir enum).
+- `person_name_forms`: Formes de noms normalisées, utilisées pour le matching lors de la création de personnes. Chaque forme pointe vers un tableau de `person_ids`. Lorsqu'une authorship source est reliée à une personne, la forme de nom est ajoutée (si absente) aux name_forms de cette personne.
+
+
 #### `authorships`
 
-Table de vérité reliant personnes, publications et structures. Construite par
-`build_authorships.py` à partir des authorships source.
+Table de laison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures. Construite par `build_authorships.py` à partir des *authorships* sources.
 
 - `person_id` : peut être NULL si la personne n'est pas encore identifiée
 - `structure_id` : structure UCA (NULL si non UCA ou non résolu)
 - `is_uca` : TRUE si l'auteur est affilié UCA sur cette publication
 - `author_position` : position dans la liste d'auteurs
 - `is_corresponding` : auteur correspondant
-- `source_hal`, `source_openalex`, `source_wos`, `source_manual` : booléens traçant
-  quelles sources ont contribué à cet authorship
+- `source_hal`, `source_openalex`, `source_wos`, `source_manual` : booléens traçant   quelles sources ont contribué à cet authorship; (TODO: remplacer par champ liste pour éviter d'ajouter une colonne chaque fois que j'ajoute une source)
 - `excluded` : lien erroné (homonyme, etc.)
 
 
