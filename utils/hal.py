@@ -16,6 +16,7 @@ HAL_FIELDS = [
     "authFullNameIdHal_fs",
     "authFullNameId_fs",
     "authFullNameFormIDPersonIDIDHal_fs",
+    "authQuality_s",
     "authIdHasStructure_fs",
     "producedDateY_i",
     "publicationDate_s",
