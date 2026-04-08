@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
 
-from backend.deps import _verify_token
+from backend.deps import _verify_token, get_cursor
 
 from backend.routers import (
     auth, pub_stats, publications, admin_duplicates,
@@ -56,6 +56,19 @@ async def strip_prefix(request: Request, call_next):
     if request.url.path.startswith("/bibliometrie/api/"):
         request.scope["path"] = request.url.path[len("/bibliometrie"):]
     return await call_next(request)
+
+
+# ----- Health check -----
+
+@app.get("/api/health")
+async def health():
+    """Vérifie que l'API est opérationnelle et la DB accessible."""
+    try:
+        with get_cursor() as (cur, conn):
+            cur.execute("SELECT 1")
+        return {"status": "ok", "db": "ok"}
+    except Exception as e:
+        return JSONResponse(status_code=503, content={"status": "error", "db": str(e)})
 
 
 # ----- Root redirect -----

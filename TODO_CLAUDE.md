@@ -36,3 +36,13 @@ Les deux implémentent la même logique mais indépendamment. Idéalement, le ba
 ## Authorships vérité : FK source-agnostiques
 
 Les colonnes `hal_authorship_id`, `openalex_authorship_id`, `wos_authorship_id`, `scanr_authorship_id` sur `authorships` ne sont pas extensibles (ajouter une source = ajouter une colonne). Envisager une inversion des FK (les tables source pointent vers authorships) ou un tableau. Chantier structurel, à planifier.
+
+## Observabilité
+
+- [x] Health check endpoint (`/api/health`)
+- [ ] Rapport de synthèse pipeline : publis ajoutées/modifiées/erreurs par run, consultable côté admin (table `pipeline_runs` ?)
+
+## Scalabilité
+
+- [ ] Connection pooling DB (remplacer `psycopg2.connect()` par un pool dans `get_cursor()` — changement localisé)
+
