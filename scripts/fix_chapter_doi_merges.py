@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db.connection import get_connection
 from psycopg2.extras import RealDictCursor
-from services.publications import find_or_create
+from services.publications import find_or_create, update_sources
 from utils.normalize import normalize_text
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -179,6 +179,7 @@ def fix(conn, dry_run=False):
             if new_pub_id:
                 cur.execute(f"UPDATE {d['table']} SET publication_id = %s WHERE id = %s",
                             (new_pub_id, d["id"]))
+                update_sources(cur, new_pub_id)
                 log.info(f"  [{d['src']}] #{d['id']} → publication {new_pub_id}")
             else:
                 log.warning(f"  [{d['src']}] #{d['id']} — pas de titre/année, ignoré")

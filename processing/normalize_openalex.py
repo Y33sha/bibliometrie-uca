@@ -31,7 +31,7 @@ from utils.hal import extract_hal_id_from_url
 from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
-from services.publications import find_or_create as find_or_create_publication
+from services.publications import find_or_create as find_or_create_publication, update_sources
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -474,6 +474,7 @@ def process_work(cur, staging_row: tuple) -> bool:
         oa_document_id = insert_openalex_document(
             cur, work, staging_id, publication_id
         )
+        update_sources(cur, publication_id)
 
         # Auteurs et authorships
         process_authorships(cur, work, oa_document_id)

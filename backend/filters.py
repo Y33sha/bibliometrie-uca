@@ -67,7 +67,7 @@ def apply_doc_type_filter(conditions: list, params: list, doc_types: list[str]):
 
 
 def apply_source_filter(conditions: list, source_values: list[str]):
-    """Ajoute les filtres de source (hal_yes, hal_no, oa_yes, oa_no, wos_yes, wos_no)."""
+    """Ajoute les filtres de source via la colonne publications.sources (GIN)."""
     SOURCE_MAP = {
         "hal": "hal",
         "oa": "openalex",
@@ -82,11 +82,10 @@ def apply_source_filter(conditions: list, source_values: list[str]):
         source = SOURCE_MAP.get(prefix)
         if not source or mode not in ("yes", "no"):
             continue
-        op = "EXISTS" if mode == "yes" else "NOT EXISTS"
-        conditions.append(
-            f"{op} (SELECT 1 FROM publication_sources ps"
-            f" WHERE ps.publication_id = p.id AND ps.source = '{source}')"
-        )
+        if mode == "yes":
+            conditions.append(f"p.sources @> ARRAY['{source}'::source_type]")
+        else:
+            conditions.append(f"NOT p.sources @> ARRAY['{source}'::source_type]")
 
 
 def apply_person_filter(conditions: list, params: list, person_id: int):
