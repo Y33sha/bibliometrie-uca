@@ -10,7 +10,7 @@ Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_documents                        (lien staging ↔ publication, source='wos')
     source_authors                          (auteurs unifiés, source='wos')
-    wos_authorships                         (lien document × auteur)
+    source_authorships                      (lien document × auteur, source='wos')
 
 Gère deux formats de raw_data :
     - TSV (fichiers téléchargés) : clés 2 lettres (TI, AU, AF, SO, PU, etc.)
@@ -744,32 +744,36 @@ def process_authorships(cur, rec: dict, source_document_id: int):
             if inst_id:
                 institution_ids.append(inst_id)
 
+        # raw_affiliations : JSONB array wrapping the text
+        raw_affil_text = author.get("raw_affiliation")
+        raw_affiliations_json = Json([raw_affil_text]) if raw_affil_text else None
+
         cur.execute("""
-            INSERT INTO wos_authorships
-                (source_document_id, source_author_id, author_position,
-                 is_corresponding, raw_affiliation, author_name_normalized,
+            INSERT INTO source_authorships
+                (source, source_document_id, source_author_id, author_position,
+                 is_corresponding, raw_affiliations, author_name_normalized,
                  source_struct_ids, roles)
-            VALUES (%s, %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
+            VALUES ('wos', %s, %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
             ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
-                raw_affiliation = COALESCE(
-                    EXCLUDED.raw_affiliation,
-                    wos_authorships.raw_affiliation
+                raw_affiliations = COALESCE(
+                    EXCLUDED.raw_affiliations,
+                    source_authorships.raw_affiliations
                 ),
-                is_corresponding = EXCLUDED.is_corresponding OR wos_authorships.is_corresponding,
+                is_corresponding = EXCLUDED.is_corresponding OR source_authorships.is_corresponding,
                 author_name_normalized = COALESCE(
                     EXCLUDED.author_name_normalized,
-                    wos_authorships.author_name_normalized
+                    source_authorships.author_name_normalized
                 ),
                 source_struct_ids = COALESCE(
                     EXCLUDED.source_struct_ids,
-                    wos_authorships.source_struct_ids
+                    source_authorships.source_struct_ids
                 ),
                 roles = EXCLUDED.roles
             RETURNING id
         """, (source_document_id, source_author_id, author["position"],
-              author["is_corresponding"], author.get("raw_affiliation"),
+              author["is_corresponding"], raw_affiliations_json,
               author["full_name"], institution_ids or None, author.get("roles")))
-        was_id = cur.fetchone()[0]
+        sa_id = cur.fetchone()[0]
 
         # Créer les liens adresses individuelles
         for addr_text in author.get("addresses", []):
@@ -778,7 +782,7 @@ def process_authorships(cur, rec: dict, source_document_id: int):
                 INSERT INTO wos_authorship_addresses (wos_authorship_id, address_id)
                 VALUES (%s, %s)
                 ON CONFLICT (wos_authorship_id, address_id) DO NOTHING
-            """, (was_id, addr_id))
+            """, (sa_id, addr_id))
 
 
 # =============================================================
@@ -911,11 +915,13 @@ def main():
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Erreurs : {errors}")
 
-        for table in ["publications", "journals", "publishers",
-                       "wos_authorships"]:
+        for table in ["publications", "journals", "publishers"]:
             cur.execute(f"SELECT COUNT(*) FROM {table}")
             count = cur.fetchone()[0]
             logger.info(f"  {table} : {count} enregistrements")
+        cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = 'wos'")
+        count = cur.fetchone()[0]
+        logger.info(f"  source_authorships (wos) : {count} enregistrements")
         cur.execute("SELECT COUNT(*) FROM source_authors WHERE source = 'wos'")
         count = cur.fetchone()[0]
         logger.info(f"  source_authors (wos) : {count} enregistrements")

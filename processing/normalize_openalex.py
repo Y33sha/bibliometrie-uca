@@ -10,7 +10,7 @@ Tables peuplées :
     publishers, journals, publications          (tables de vérité — partagées)
     source_documents                            (lien staging ↔ publication, source='openalex')
     source_authors                              (auteurs unifiés, source='openalex')
-    openalex_authorships                        (lien document × auteur, avec source_struct_ids)
+    source_authorships                          (lien document × auteur, source='openalex', avec source_struct_ids)
     source_structures                           (structures sources, source='openalex')
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
@@ -352,7 +352,7 @@ def process_authorships(cur, work: dict, source_document_id: int):
     """
     Traite les authorships d'un work OpenAlex :
     - Insère/retrouve chaque auteur dans source_authors (source='openalex')
-    - Crée les liens openalex_authorships
+    - Crée les liens source_authorships (source='openalex')
     - Extrait et insère les institutions dans source_structures (source='openalex')
     - Stocke les source_struct_ids (source_structures.id) sur chaque authorship
     """
@@ -360,7 +360,7 @@ def process_authorships(cur, work: dict, source_document_id: int):
 
     # Supprimer les anciennes authorships de ce document
     # (nécessaire quand un work refetché a changé d'auteurs/positions)
-    cur.execute("DELETE FROM openalex_authorships WHERE source_document_id = %s",
+    cur.execute("DELETE FROM source_authorships WHERE source = 'openalex' AND source_document_id = %s",
                 (source_document_id,))
 
     for position, authorship in enumerate(authorships):
@@ -390,29 +390,32 @@ def process_authorships(cur, work: dict, source_document_id: int):
             if ss_id:
                 source_struct_ids.append(ss_id)
 
+        # raw_affiliations : JSONB array wrapping the text
+        raw_affiliations_json = Json([raw_affil_text]) if raw_affil_text else None
+        # source_data : raw_author_name stocké en JSONB
+        source_data_json = Json({"raw_author_name": raw_author_name}) if raw_author_name else None
+
         cur.execute("""
-            INSERT INTO openalex_authorships
-                (source_document_id, source_author_id, author_position,
-                 raw_affiliation, source_struct_ids,
-                 raw_author_name, author_name_normalized, is_corresponding)
-            VALUES (%s, %s, %s, %s, %s, %s, normalize_name_form(%s), %s)
+            INSERT INTO source_authorships
+                (source, source_document_id, source_author_id, author_position,
+                 raw_affiliations, source_struct_ids,
+                 source_data, author_name_normalized, is_corresponding)
+            VALUES ('openalex', %s, %s, %s, %s, %s, %s, normalize_name_form(%s), %s)
             ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
-                raw_affiliation = COALESCE(
-                    EXCLUDED.raw_affiliation,
-                    openalex_authorships.raw_affiliation
+                raw_affiliations = COALESCE(
+                    EXCLUDED.raw_affiliations,
+                    source_authorships.raw_affiliations
                 ),
-                raw_author_name = COALESCE(
-                    EXCLUDED.raw_author_name,
-                    openalex_authorships.raw_author_name
-                ),
+                source_data = COALESCE(source_authorships.source_data, '{}') ||
+                              COALESCE(EXCLUDED.source_data, '{}'),
                 author_name_normalized = COALESCE(
                     EXCLUDED.author_name_normalized,
-                    openalex_authorships.author_name_normalized
+                    source_authorships.author_name_normalized
                 ),
                 is_corresponding = EXCLUDED.is_corresponding
         """, (source_document_id, source_author_id, position,
-              raw_affil_text, source_struct_ids or None,
-              raw_author_name, raw_author_name, is_corresponding))
+              raw_affiliations_json, source_struct_ids or None,
+              source_data_json, raw_author_name, is_corresponding))
 
 
 # =============================================================
@@ -587,11 +590,13 @@ def main():
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Erreurs : {errors}")
 
-        for table in ["publications", "journals", "publishers",
-                       "openalex_authorships"]:
+        for table in ["publications", "journals", "publishers"]:
             cur.execute(f"SELECT COUNT(*) FROM {table}")
             count = cur.fetchone()["count"]
             logger.info(f"  {table} : {count} enregistrements")
+        cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = 'openalex'")
+        count = cur.fetchone()["count"]
+        logger.info(f"  source_authorships (openalex) : {count} enregistrements")
         cur.execute("SELECT COUNT(*) FROM source_structures WHERE source = 'openalex'")
         count = cur.fetchone()["count"]
         logger.info(f"  source_structures (openalex) : {count} enregistrements")

@@ -10,9 +10,9 @@ Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_documents                        (lien staging ↔ publication, source='hal')
     source_authors                          (auteurs unifiés, source='hal')
-    hal_authorships                         (lien document × auteur, avec source_struct_ids)
+    source_authorships                      (lien document × auteur, source='hal', avec source_struct_ids)
 
-La résolution UCA (hal_authorships.structure_ids, is_uca) se fait en post-traitement
+La résolution UCA (source_authorships.structure_ids, in_perimeter) se fait en post-traitement
 via populate_affiliations.py, pas ici. Ce script ne fait que stocker les source_struct_ids
 (source_structures.id) extraits de authIdHasStructure_fs.
 
@@ -407,7 +407,7 @@ def process_authors(cur, doc: dict, source_document_id: int):
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
     - Parse authIdHasStructure_fs pour les affiliations (clé = form_id)
     - Crée/retrouve chaque auteur dans source_authors (source='hal')
-    - Crée les hal_authorships avec source_struct_ids (source_structures.id)
+    - Crée les source_authorships (source='hal') avec source_struct_ids (source_structures.id)
     """
     names = doc.get("authFullName_s") or []
     orcids = doc.get("authOrcid_s") or []
@@ -498,14 +498,14 @@ def process_authors(cur, doc: dict, source_document_id: int):
                 source_struct_ids = sorted(r[0] for r in rows)
 
         cur.execute("""
-            INSERT INTO hal_authorships
-                (source_document_id, source_author_id, author_position, source_struct_ids,
+            INSERT INTO source_authorships
+                (source, source_document_id, source_author_id, author_position, source_struct_ids,
                  author_name_normalized, is_corresponding, roles)
-            VALUES (%s, %s, %s, %s, normalize_name_form(%s), %s, %s)
+            VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
             ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
                 source_struct_ids = COALESCE(
                     EXCLUDED.source_struct_ids,
-                    hal_authorships.source_struct_ids
+                    source_authorships.source_struct_ids
                 ),
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 is_corresponding = EXCLUDED.is_corresponding,
@@ -690,11 +690,13 @@ def main():
         logger.info(f"Hors périmètre (enrichissement seul) : {skipped_hors_perimetre}")
         logger.info(f"Erreurs : {errors}")
 
-        for table in ["publications", "journals", "publishers",
-                       "hal_authorships"]:
+        for table in ["publications", "journals", "publishers"]:
             cur.execute(f"SELECT COUNT(*) FROM {table}")
             count = cur.fetchone()[0]
             logger.info(f"  {table} : {count} enregistrements")
+        cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = 'hal'")
+        count = cur.fetchone()[0]
+        logger.info(f"  source_authorships (hal) : {count} enregistrements")
         cur.execute("SELECT COUNT(*) FROM source_authors WHERE source = 'hal'")
         count = cur.fetchone()[0]
         logger.info(f"  source_authors (hal) : {count} enregistrements")

@@ -1,5 +1,5 @@
 """Script one-shot : rattache automatiquement les authorships sources orphelines
-(person_id IS NULL, is_uca = TRUE) à une personne lorsque la forme de nom
+(person_id IS NULL, in_perimeter = TRUE) à une personne lorsque la forme de nom
 normalisée pointe vers une personne unique dans person_name_forms.
 
 Affiche un résumé puis demande confirmation avant d'appliquer.
@@ -19,7 +19,7 @@ def main():
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    print("\n=== Authorships orphelines UCA rattachables par forme de nom ===\n")
+    print("\n=== Authorships orphelines (périmètre) rattachables par forme de nom ===\n")
 
     # Charger les formes non-ambiguës (1 seul person_id)
     cur.execute("""
@@ -30,30 +30,15 @@ def main():
     uniq_forms = {r["name_form"]: r["person_id"] for r in cur.fetchall()}
     print(f"  {len(uniq_forms)} formes de nom non-ambiguës en base.\n")
 
-    # Trouver les orphelines UCA dont la forme existe et pointe vers 1 personne
+    # Trouver les orphelines dans le périmètre dont la forme existe et pointe vers 1 personne
     cur.execute("""
-        SELECT 'hal' AS source, has.id AS authorship_id,
-               has.author_name_normalized AS norm
-        FROM hal_authorships has
-        WHERE has.person_id IS NULL AND has.is_uca = TRUE AND NOT has.excluded
-          AND has.author_name_normalized IS NOT NULL
-          AND has.author_name_normalized != ''
-
-        UNION ALL
-
-        SELECT 'openalex', oas.id, oas.author_name_normalized
-        FROM openalex_authorships oas
-        WHERE oas.person_id IS NULL AND oas.is_uca = TRUE AND NOT oas.excluded
-          AND oas.author_name_normalized IS NOT NULL
-          AND oas.author_name_normalized != ''
-
-        UNION ALL
-
-        SELECT 'wos', was.id, was.author_name_normalized
-        FROM wos_authorships was
-        WHERE was.person_id IS NULL AND was.is_uca = TRUE AND NOT was.excluded
-          AND was.author_name_normalized IS NOT NULL
-          AND was.author_name_normalized != ''
+        SELECT sa.source, sa.id AS authorship_id,
+               sa.author_name_normalized AS norm
+        FROM source_authorships sa
+        WHERE sa.person_id IS NULL AND sa.in_perimeter = TRUE AND NOT sa.excluded
+          AND sa.author_name_normalized IS NOT NULL
+          AND sa.author_name_normalized != ''
+          AND sa.source IN ('hal', 'openalex', 'wos')
     """)
 
     # Filtrer celles qui matchent une forme unique
@@ -64,7 +49,7 @@ def main():
             matchable.append({**r, "person_id": pid})
 
     if not matchable:
-        print("  Aucune authorship orpheline UCA rattachable.\n")
+        print("  Aucune authorship orpheline rattachable.\n")
         conn.close()
         return
 
@@ -105,13 +90,8 @@ def main():
     # Appliquer
     assigned = 0
     for m in matchable:
-        table = {
-            'hal': 'hal_authorships',
-            'openalex': 'openalex_authorships',
-            'wos': 'wos_authorships',
-        }[m["source"]]
         cur.execute(
-            f"UPDATE {table} SET person_id = %s WHERE id = %s AND person_id IS NULL",
+            "UPDATE source_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL",
             (m["person_id"], m["authorship_id"]))
         if cur.rowcount:
             assigned += 1

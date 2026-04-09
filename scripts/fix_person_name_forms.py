@@ -28,24 +28,24 @@ from db.connection import get_connection
 SOURCES = [
     ("hal", """
         SELECT DISTINCT author_name_normalized AS name_form, person_id
-        FROM hal_authorships
-        WHERE is_uca AND NOT excluded
+        FROM source_authorships
+        WHERE source = 'hal' AND in_perimeter AND NOT excluded
           AND person_id IS NOT NULL
           AND author_name_normalized IS NOT NULL
           AND author_name_normalized != ''
     """),
     ("openalex", """
         SELECT DISTINCT author_name_normalized AS name_form, person_id
-        FROM openalex_authorships
-        WHERE is_uca AND NOT excluded
+        FROM source_authorships
+        WHERE source = 'openalex' AND in_perimeter AND NOT excluded
           AND person_id IS NOT NULL
           AND author_name_normalized IS NOT NULL
           AND author_name_normalized != ''
     """),
     ("wos", """
         SELECT DISTINCT author_name_normalized AS name_form, person_id
-        FROM wos_authorships
-        WHERE is_uca AND NOT excluded
+        FROM source_authorships
+        WHERE source = 'wos' AND in_perimeter AND NOT excluded
           AND person_id IS NOT NULL
           AND author_name_normalized IS NOT NULL
           AND author_name_normalized != ''

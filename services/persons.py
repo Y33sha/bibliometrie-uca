@@ -3,8 +3,8 @@ Service Référentiel Personnes — accès exclusif en écriture aux tables
 `persons`, `person_identifiers`, `person_name_forms`.
 
 Gère aussi le rattachement/détachement des authorships sources
-(hal_authorships, openalex_authorships, wos_authorships) puisque
-le person_id y est la source de vérité du lien personne.
+(source_authorships) puisque le person_id y est la source de vérité
+du lien personne.
 
 Les auteurs sources sont dans la table unifiée `source_authors`
 (UNIQUE(source, source_id)), les authorships utilisent `source_author_id`.
@@ -41,17 +41,11 @@ def link_authorship(cur, person_id: int, source: str, authorship_id: int,
 
     Pour HAL, fait aussi le dual-write sur source_authors si c'est un compte HAL.
     """
-    table = {
-        "hal": "hal_authorships",
-        "openalex": "openalex_authorships",
-        "wos": "wos_authorships",
-        "scanr": "scanr_authorships",
-    }.get(source)
-    if not table:
+    if source not in ("hal", "openalex", "wos", "scanr"):
         return
 
-    cur.execute(f"UPDATE {table} SET person_id = %s WHERE id = %s",
-                (person_id, authorship_id))
+    cur.execute("UPDATE source_authorships SET person_id = %s WHERE id = %s AND source = %s",
+                (person_id, authorship_id, source))
 
     # Dual-write sur source_authors pour les comptes HAL
     if source == "hal" and source_author_id and has_hal_person_id:
@@ -74,15 +68,10 @@ def link_authorships(cur, person_id: int, authorships: list[dict]):
 
 def unlink_authorship(cur, person_id: int, source: str, authorship_id: int):
     """Détache une authorship source d'une personne (met person_id à NULL)."""
-    table = {
-        "hal": "hal_authorships",
-        "openalex": "openalex_authorships",
-        "wos": "wos_authorships",
-    }.get(source)
-    if table:
+    if source in ("hal", "openalex", "wos", "scanr"):
         cur.execute(
-            f"UPDATE {table} SET person_id = NULL WHERE id = %s AND person_id = %s",
-            (authorship_id, person_id))
+            "UPDATE source_authorships SET person_id = NULL WHERE id = %s AND person_id = %s AND source = %s",
+            (authorship_id, person_id, source))
 
 
 # ── Identifiants ──
@@ -247,25 +236,22 @@ def detach_name_form(cur, person_id: int, name_form: str):
 # ou détachent TOUTES les authorships d'un auteur source, propagent vers
 # les authorships vérité, et gèrent les identifiants.
 
-# Tables et FK par source
+# FK dans authorships vérité par source
 _SOURCE_CONFIG = {
     "hal": {
         "author_fk": "source_author_id",
-        "authorship_table": "hal_authorships",
         "truth_fk": "hal_authorship_id",
         "id_fields": ["orcid"],
         "source_ids_fields": {"idhal": "idhal"},
     },
     "openalex": {
         "author_fk": "source_author_id",
-        "authorship_table": "openalex_authorships",
         "truth_fk": "openalex_authorship_id",
         "id_fields": ["orcid"],
         "source_ids_fields": {},
     },
     "wos": {
         "author_fk": "source_author_id",
-        "authorship_table": "wos_authorships",
         "truth_fk": "wos_authorship_id",
         "id_fields": ["orcid"],
         "source_ids_fields": {},
@@ -295,10 +281,10 @@ def link_author_to_person(cur, person_id: int, source: str, author_id: int):
         return None
 
     # 1. Rattacher les authorships sources
-    cur.execute(f"""
-        UPDATE {cfg['authorship_table']} SET person_id = %s
-        WHERE {cfg['author_fk']} = %s
-    """, (person_id, author_id))
+    cur.execute("""
+        UPDATE source_authorships SET person_id = %s
+        WHERE source = %s AND source_author_id = %s
+    """, (person_id, source, author_id))
 
     # 2. Dual-write source_authors pour les comptes HAL
     if source == "hal" and author.get("source_ids", {}).get("hal_person_id"):
@@ -309,11 +295,11 @@ def link_author_to_person(cur, person_id: int, source: str, author_id: int):
     # 3. Propager vers authorships vérité (seulement celles sans person_id)
     cur.execute(f"""
         UPDATE authorships a SET person_id = %s        WHERE a.{cfg['truth_fk']} IN (
-            SELECT s.id FROM {cfg['authorship_table']} s
-            WHERE s.{cfg['author_fk']} = %s
+            SELECT sa.id FROM source_authorships sa
+            WHERE sa.source = %s AND sa.source_author_id = %s
         )
         AND a.person_id IS NULL
-    """, (person_id, author_id))
+    """, (person_id, source, author_id))
 
     # 4. Propager les identifiants
     for field in cfg["id_fields"]:
@@ -343,10 +329,10 @@ def unlink_author_from_person(cur, person_id: int, source: str, author_id: int):
         raise ValueError(f"Source inconnue : {source}")
 
     # 1. Détacher les authorships sources
-    cur.execute(f"""
-        UPDATE {cfg['authorship_table']} SET person_id = NULL
-        WHERE {cfg['author_fk']} = %s AND person_id = %s
-    """, (author_id, person_id))
+    cur.execute("""
+        UPDATE source_authorships SET person_id = NULL
+        WHERE source = %s AND source_author_id = %s AND person_id = %s
+    """, (source, author_id, person_id))
 
     # 2. Détacher source_authors (comptes HAL)
     if source == "hal":
@@ -357,11 +343,11 @@ def unlink_author_from_person(cur, person_id: int, source: str, author_id: int):
     # 3. Propager vers authorships vérité
     cur.execute(f"""
         UPDATE authorships a SET person_id = NULL
-        FROM {cfg['authorship_table']} s
-        WHERE a.{cfg['truth_fk']} = s.id
-          AND s.{cfg['author_fk']} = %s
+        FROM source_authorships sa
+        WHERE a.{cfg['truth_fk']} = sa.id
+          AND sa.source = %s AND sa.source_author_id = %s
           AND a.person_id = %s
-    """, (author_id, person_id))
+    """, (source, author_id, person_id))
 
 
 # ── Attribution d'authorships orphelines ──
@@ -381,10 +367,10 @@ def assign_orphan_authorship(cur, person_id: int, source: str, authorship_id: in
         raise ValueError(f"Source inconnue : {source}")
 
     # 1. Rattacher et récupérer le nom normalisé + statut excluded
-    cur.execute(f"""
-        UPDATE {cfg['authorship_table']} SET person_id = %s WHERE id = %s AND person_id IS NULL
+    cur.execute("""
+        UPDATE source_authorships SET person_id = %s WHERE id = %s AND source = %s AND person_id IS NULL
         RETURNING excluded, author_name_normalized
-    """, (person_id, authorship_id))
+    """, (person_id, authorship_id, source))
 
     row = cur.fetchone()
     if not row:
@@ -405,16 +391,16 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
 
     Même logique que build_authorships.py mais pour une seule paire
     (publication_id, person_id) : FK, author_position, is_corresponding,
-    is_uca, structure_ids.
+    in_perimeter, structure_ids.
     """
     cfg = _SOURCE_CONFIG[source]
 
     # Trouver la publication_id via source_documents
     cur.execute("""
-        SELECT d.publication_id FROM {auth_tbl} a
-        JOIN source_documents d ON d.id = a.source_document_id
-        WHERE a.id = %s
-    """.format(auth_tbl=cfg['authorship_table']), (authorship_id,))
+        SELECT d.publication_id FROM source_authorships sa
+        JOIN source_documents d ON d.id = sa.source_document_id
+        WHERE sa.id = %s AND sa.source = %s
+    """, (authorship_id, source))
     row = cur.fetchone()
     if not row or not row["publication_id"]:
         return
@@ -434,61 +420,52 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
             SET {src_cfg['truth_fk']} = sub.aid
             FROM (
                 SELECT sa.id AS aid
-                FROM {src_cfg['authorship_table']} sa
+                FROM source_authorships sa
                 JOIN source_documents sd ON sd.id = sa.source_document_id
-                WHERE sd.publication_id = %s AND sa.person_id = %s
+                WHERE sa.source = %s AND sd.publication_id = %s AND sa.person_id = %s
                   AND NOT sa.excluded
                 ORDER BY sa.id
                 LIMIT 1
             ) sub
             WHERE a.publication_id = %s AND a.person_id = %s
               AND a.{src_cfg['truth_fk']} IS NULL
-        """, (pub_id, person_id, pub_id, person_id))
+        """, (src, pub_id, person_id, pub_id, person_id))
 
     # 3. author_position et is_corresponding
     cur.execute("""
         UPDATE authorships a
-        SET author_position = COALESCE(has.author_position, oas.author_position, was.author_position),
-            is_corresponding = COALESCE(a.is_corresponding, was.is_corresponding)
+        SET author_position = COALESCE(sa_hal.author_position, sa_oa.author_position, sa_wos.author_position),
+            is_corresponding = COALESCE(a.is_corresponding, sa_wos.is_corresponding)
         FROM authorships a2
-        LEFT JOIN hal_authorships has ON has.id = a2.hal_authorship_id
-        LEFT JOIN openalex_authorships oas ON oas.id = a2.openalex_authorship_id
-        LEFT JOIN wos_authorships was ON was.id = a2.wos_authorship_id
+        LEFT JOIN source_authorships sa_hal ON sa_hal.id = a2.hal_authorship_id
+        LEFT JOIN source_authorships sa_oa ON sa_oa.id = a2.openalex_authorship_id
+        LEFT JOIN source_authorships sa_wos ON sa_wos.id = a2.wos_authorship_id
         WHERE a.id = a2.id
           AND a.publication_id = %s AND a.person_id = %s
     """, (pub_id, person_id))
 
-    # 4. is_uca et structure_ids (union des sources)
+    # 4. in_perimeter et structure_ids (union des sources)
     uca_ids = get_uca_structure_ids_list(cur)
     cur.execute("""
         WITH src AS (
-            SELECT sa.is_uca AS uca, sa.structure_ids AS sids
-            FROM hal_authorships sa
+            SELECT sa.in_perimeter AS uca, sa.structure_ids AS sids
+            FROM source_authorships sa
             JOIN source_documents sd ON sd.id = sa.source_document_id
-            WHERE sd.publication_id = %s AND sa.person_id = %s AND NOT sa.excluded
-            UNION ALL
-            SELECT sa.is_uca, sa.structure_ids
-            FROM openalex_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
-            WHERE sd.publication_id = %s AND sa.person_id = %s AND NOT sa.excluded
-            UNION ALL
-            SELECT sa.is_uca, sa.structure_ids
-            FROM wos_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
-            WHERE sd.publication_id = %s AND sa.person_id = %s AND NOT sa.excluded
+            WHERE sa.source IN ('hal', 'openalex', 'wos')
+              AND sd.publication_id = %s AND sa.person_id = %s AND NOT sa.excluded
         ),
         agg AS (
-            SELECT bool_or(uca) AS is_uca,
+            SELECT bool_or(uca) AS in_perimeter,
                    array_agg(DISTINCT sid) FILTER (WHERE sid IS NOT NULL) AS all_sids
             FROM src, LATERAL unnest(COALESCE(sids, '{}')) AS sid
         )
         UPDATE authorships a
-        SET is_uca = COALESCE(agg.is_uca, FALSE),
+        SET in_perimeter = COALESCE(agg.in_perimeter, FALSE),
             structure_ids = NULLIF(agg.all_sids, ARRAY[]::int[]),
             updated_at = now()
         FROM agg
         WHERE a.publication_id = %s AND a.person_id = %s
-    """, (pub_id, person_id, pub_id, person_id, pub_id, person_id, pub_id, person_id))
+    """, (pub_id, person_id, pub_id, person_id))
 
 
 # ── Fusion ──
@@ -516,16 +493,8 @@ def merge_person(cur, target_id: int, source_id: int):
     cur.execute("UPDATE source_authors SET person_id = %s WHERE person_id = %s",
                 (target_id, source_id))
 
-    # 1b. Transférer les hal_authorships
-    cur.execute("UPDATE hal_authorships SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
-
-    # 2. Transférer les authorships OpenAlex
-    cur.execute("UPDATE openalex_authorships SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
-
-    # 3. Transférer les authorships WoS
-    cur.execute("UPDATE wos_authorships SET person_id = %s WHERE person_id = %s",
+    # 1b. Transférer les source_authorships
+    cur.execute("UPDATE source_authorships SET person_id = %s WHERE person_id = %s",
                 (target_id, source_id))
 
     # 4. Transférer les authorships consolidées (supprimer les doublons publication)

@@ -360,19 +360,12 @@ async def export_publications_csv(
 
         if person_id:
             conditions = ["""
-                (
-                    EXISTS (SELECT 1 FROM source_documents sd
-                            JOIN hal_authorships has ON has.source_document_id = sd.id
-                            WHERE sd.publication_id = p.id AND has.person_id = %s
-                              AND has.excluded = FALSE)
-                    OR
-                    EXISTS (SELECT 1 FROM source_documents sd
-                            JOIN openalex_authorships oas ON oas.source_document_id = sd.id
-                            WHERE sd.publication_id = p.id AND oas.person_id = %s
-                              AND oas.excluded = FALSE)
-                )
+                EXISTS (SELECT 1 FROM source_documents sd
+                        JOIN source_authorships sa ON sa.source_document_id = sd.id
+                        WHERE sd.publication_id = p.id AND sa.person_id = %s
+                          AND sa.excluded = FALSE)
             """]
-            params: list = [person_id, person_id]
+            params: list = [person_id]
         elif lab_none and not lab_ids:
             conditions = [PUB_IS_UCA]
             params = []
@@ -467,7 +460,7 @@ async def export_publications_csv(
                  FROM authorships a3
                  CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
                  JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
-                 WHERE a3.publication_id = p.id AND a3.is_uca = TRUE
+                 WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
                    AND a3.structure_ids IS NOT NULL
                 ) AS labs
             FROM publications p
@@ -539,36 +532,36 @@ async def get_publication(pub_id: int):
             UNION ALL
             SELECT 'openalex', sd.source_id, sd.doi, NULL,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM openalex_authorships oas2
-                    JOIN openalex_authorship_addresses oaa ON oaa.openalex_authorship_id = oas2.id
+                    FROM source_authorships sa2
+                    JOIN openalex_authorship_addresses oaa ON oaa.openalex_authorship_id = sa2.id
                     JOIN addresses addr ON addr.id = oaa.address_id,
                          unnest(addr.countries) AS c
-                    WHERE oas2.source_document_id = sd.id AND addr.countries IS NOT NULL)
+                    WHERE sa2.source_document_id = sd.id AND addr.countries IS NOT NULL)
             FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'openalex'
             UNION ALL
             SELECT 'wos', sd.source_id, sd.doi, NULL,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM wos_authorships was2
-                    JOIN wos_authorship_addresses waa ON waa.wos_authorship_id = was2.id
+                    FROM source_authorships sa2
+                    JOIN wos_authorship_addresses waa ON waa.wos_authorship_id = sa2.id
                     JOIN addresses addr ON addr.id = waa.address_id,
                          unnest(addr.countries) AS c
-                    WHERE was2.source_document_id = sd.id AND addr.countries IS NOT NULL)
+                    WHERE sa2.source_document_id = sd.id AND addr.countries IS NOT NULL)
             FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'wos'
             UNION ALL
             SELECT 'scanr', sd.source_id, sd.doi, NULL,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM scanr_authorships sas2
-                    JOIN scanr_authorship_addresses saa ON saa.scanr_authorship_id = sas2.id
+                    FROM source_authorships sa2
+                    JOIN scanr_authorship_addresses saa ON saa.scanr_authorship_id = sa2.id
                     JOIN addresses addr ON addr.id = saa.address_id,
                          unnest(addr.countries) AS c
-                    WHERE sas2.source_document_id = sd.id AND addr.countries IS NOT NULL)
+                    WHERE sa2.source_document_id = sd.id AND addr.countries IS NOT NULL)
             FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'scanr'
         """, (pub_id, pub_id, pub_id, pub_id))
         sources = cur.fetchall()
 
         # c) Authorships — truth table
         cur.execute("""
-            SELECT a.author_position, a.is_uca, a.is_corresponding,
+            SELECT a.author_position, a.in_perimeter, a.is_corresponding,
                    a.structure_ids,
                    (a.hal_authorship_id IS NOT NULL) AS source_hal,
                    (a.openalex_authorship_id IS NOT NULL) AS source_openalex,
@@ -583,53 +576,53 @@ async def get_publication(pub_id: int):
 
         # d) HAL authorships
         cur.execute("""
-            SELECT has.id, has.author_position, ha.full_name, has.person_id,
-                   has.is_uca, has.structure_ids, has.excluded, has.countries
-            FROM hal_authorships has
-            JOIN source_authors ha ON ha.id = has.source_author_id
-            JOIN source_documents sd ON sd.id = has.source_document_id
-            WHERE sd.publication_id = %s
-            ORDER BY has.author_position
+            SELECT sa.id, sa.author_position, sauth.full_name, sa.person_id,
+                   sa.in_perimeter, sa.structure_ids, sa.excluded, sa.countries
+            FROM source_authorships sa
+            JOIN source_authors sauth ON sauth.id = sa.source_author_id
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            WHERE sa.source = 'hal' AND sd.publication_id = %s
+            ORDER BY sa.author_position
         """, (pub_id,))
         hal_authorships = cur.fetchall()
 
         # e) OpenAlex authorships — pays depuis les adresses
         cur.execute("""
-            SELECT oas.id, oas.author_position,
-                   COALESCE(oas.raw_author_name, oa.full_name) AS full_name,
-                   oas.person_id,
-                   oas.is_uca, oas.structure_ids, oas.raw_affiliation, oas.excluded,
+            SELECT sa.id, sa.author_position,
+                   COALESCE(sa.source_data->>'raw_author_name', sauth.full_name) AS full_name,
+                   sa.person_id,
+                   sa.in_perimeter, sa.structure_ids, sa.raw_affiliation, sa.excluded,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
                     FROM openalex_authorship_addresses oaa
                     JOIN addresses addr ON addr.id = oaa.address_id,
                          unnest(addr.countries) AS c
-                    WHERE oaa.openalex_authorship_id = oas.id
+                    WHERE oaa.openalex_authorship_id = sa.id
                       AND addr.countries IS NOT NULL
                    ) AS countries
-            FROM openalex_authorships oas
-            JOIN source_authors oa ON oa.id = oas.source_author_id
-            JOIN source_documents sd ON sd.id = oas.source_document_id
-            WHERE sd.publication_id = %s
-            ORDER BY oas.author_position
+            FROM source_authorships sa
+            JOIN source_authors sauth ON sauth.id = sa.source_author_id
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            WHERE sa.source = 'openalex' AND sd.publication_id = %s
+            ORDER BY sa.author_position
         """, (pub_id,))
         oa_authorships = cur.fetchall()
 
         # e2) WoS authorships — pays depuis les adresses
         cur.execute("""
-            SELECT was.id, was.author_position, wa.full_name, was.person_id,
-                   was.is_uca, was.structure_ids, was.raw_affiliation, was.excluded,
+            SELECT sa.id, sa.author_position, sauth.full_name, sa.person_id,
+                   sa.in_perimeter, sa.structure_ids, sa.raw_affiliation, sa.excluded,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
                     FROM wos_authorship_addresses waa
                     JOIN addresses addr ON addr.id = waa.address_id,
                          unnest(addr.countries) AS c
-                    WHERE waa.wos_authorship_id = was.id
+                    WHERE waa.wos_authorship_id = sa.id
                       AND addr.countries IS NOT NULL
                    ) AS countries
-            FROM wos_authorships was
-            JOIN source_authors wa ON wa.id = was.source_author_id
-            JOIN source_documents sd ON sd.id = was.source_document_id
-            WHERE sd.publication_id = %s
-            ORDER BY was.author_position
+            FROM source_authorships sa
+            JOIN source_authors sauth ON sauth.id = sa.source_author_id
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            WHERE sa.source = 'wos' AND sd.publication_id = %s
+            ORDER BY sa.author_position
         """, (pub_id,))
         wos_authorships = cur.fetchall()
 
@@ -673,9 +666,9 @@ async def get_publication(pub_id: int):
 # ----- API: Exclude source authorship -----
 
 VALID_SOURCE_TABLES = {
-    "hal": ("hal_authorships", "hal_authorship_id"),
-    "openalex": ("openalex_authorships", "openalex_authorship_id"),
-    "wos": ("wos_authorships", "wos_authorship_id"),
+    "hal": ("source_authorships", "hal_authorship_id"),
+    "openalex": ("source_authorships", "openalex_authorship_id"),
+    "wos": ("source_authorships", "wos_authorship_id"),
 }
 
 
@@ -689,14 +682,14 @@ async def exclude_source_authorship(source: str, authorship_id: int, body: dict 
     if source not in VALID_SOURCE_TABLES:
         raise HTTPException(status_code=400, detail="Source invalide")
 
-    table, fk_col = VALID_SOURCE_TABLES[source]
+    _, fk_col = VALID_SOURCE_TABLES[source]
     excluded = body.get("excluded", True)
 
     with get_cursor() as (cur, conn):
         # 1. Toggler excluded sur l'authorship source
         cur.execute(
-            f"UPDATE {table} SET excluded = %s WHERE id = %s RETURNING id",
-            (excluded, authorship_id),
+            "UPDATE source_authorships SET excluded = %s WHERE id = %s AND source = %s RETURNING id",
+            (excluded, authorship_id, source),
         )
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Authorship source introuvable")
@@ -760,7 +753,7 @@ async def list_publications(
             conditions = [PUB_IS_UCA]
             params = []
         elif lab_ids:
-            # lab_id filter already implies is_uca = TRUE, skip PUB_IS_UCA
+            # lab_id filter already implies in_perimeter = TRUE, skip PUB_IS_UCA
             conditions = []
             params = []
         else:
@@ -904,7 +897,7 @@ async def list_publications(
                  FROM authorships a3
                  CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
                  JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
-                 WHERE a3.publication_id = p.id AND a3.is_uca = TRUE
+                 WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
                    AND a3.structure_ids IS NOT NULL
                 ) AS labs,
                 -- APC: montant total, détails par labo payeur
