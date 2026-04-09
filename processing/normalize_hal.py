@@ -35,6 +35,7 @@ from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
+from utils.authorship_roles import map_role
 from services.publications import find_or_create as find_or_create_publication, update_sources
 from services.journals import find_or_create_publisher, find_or_create_journal
 
@@ -434,8 +435,8 @@ def process_authors(cur, doc: dict, source_document_id: int):
 
         # authQuality_s : rôle de l'auteur (aut, crp, dir, edt, …)
         quality = qualities[position] if position < len(qualities) else None
-        is_corresponding = quality == "crp"
-        role = quality if quality and quality not in ("aut", "crp") else None
+        roles, is_corresponding_from_role = map_role("hal", quality)
+        is_corresponding = is_corresponding or is_corresponding_from_role
 
         hal_author_id = upsert_hal_author(
             cur, name, hal_person_id, idhal, form_id, orcid=orcid
@@ -451,7 +452,7 @@ def process_authors(cur, doc: dict, source_document_id: int):
         cur.execute("""
             INSERT INTO hal_authorships
                 (source_document_id, hal_author_id, author_position, hal_struct_ids,
-                 author_name_normalized, is_corresponding, role)
+                 author_name_normalized, is_corresponding, roles)
             VALUES (%s, %s, %s, %s, normalize_name_form(%s), %s, %s)
             ON CONFLICT (source_document_id, hal_author_id) DO UPDATE SET
                 hal_struct_ids = COALESCE(
@@ -460,9 +461,9 @@ def process_authors(cur, doc: dict, source_document_id: int):
                 ),
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 is_corresponding = EXCLUDED.is_corresponding,
-                role = EXCLUDED.role
+                roles = EXCLUDED.roles
         """, (source_document_id, hal_author_id, position,
-              hal_struct_ids, name, is_corresponding, role))
+              hal_struct_ids, name, is_corresponding, roles or None))
 
 
 # =============================================================
