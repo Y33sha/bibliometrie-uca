@@ -9,7 +9,7 @@ Usage:
 Tables peuplées :
     publishers, journals, publications          (tables de vérité — partagées)
     source_documents                            (lien staging ↔ publication, source='openalex')
-    openalex_authors                            (auteurs OpenAlex dédupliqués)
+    source_authors                              (auteurs unifiés, source='openalex')
     openalex_authorships                        (lien document × auteur)
     openalex_institutions                       (institutions OpenAlex)
 
@@ -250,14 +250,14 @@ def insert_openalex_document(cur, work: dict, staging_id: int,
 
 
 # =============================================================
-# OPENALEX AUTHORS
+# OPENALEX AUTHORS (source_authors, source='openalex')
 # =============================================================
 
 def upsert_openalex_author(cur, authorship: dict) -> int | None:
     """
-    Insère/retrouve un auteur OpenAlex.
-    Déduplique par openalex_id (clé unique).
-    Retourne openalex_authors.id ou None.
+    Insère/retrouve un auteur OpenAlex dans source_authors (source='openalex').
+    Déduplique par openalex_id (clé unique via source_id).
+    Retourne source_authors.id ou None.
     """
     author_data = authorship.get("author") or {}
     display_name = author_data.get("display_name")
@@ -267,6 +267,10 @@ def upsert_openalex_author(cur, authorship: dict) -> int | None:
     openalex_id = extract_short_id(author_data.get("id") or "")
     if not openalex_id:
         return None
+
+    # source_id = COALESCE(openalex_id, 'nokey-{old_id}')
+    # Ici openalex_id est toujours présent (on retourne None sinon)
+    source_id = openalex_id
 
     orcid = author_data.get("orcid")
     if orcid:
@@ -284,15 +288,14 @@ def upsert_openalex_author(cur, authorship: dict) -> int | None:
         last_name = display_name
 
     cur.execute("""
-        INSERT INTO openalex_authors
-            (openalex_id, full_name, last_name, first_name, orcid)
-        VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT (openalex_id) DO UPDATE SET
-            orcid = COALESCE(openalex_authors.orcid, EXCLUDED.orcid),
-            full_name = EXCLUDED.full_name,
-            updated_at = now()
+        INSERT INTO source_authors
+            (source, source_id, full_name, last_name, first_name, orcid)
+        VALUES ('openalex', %s, %s, %s, %s, %s)
+        ON CONFLICT (source, source_id) DO UPDATE SET
+            orcid = COALESCE(source_authors.orcid, EXCLUDED.orcid),
+            full_name = EXCLUDED.full_name
         RETURNING id
-    """, (openalex_id, display_name, last_name, first_name, orcid))
+    """, (source_id, display_name, last_name, first_name, orcid))
     return cur.fetchone()["id"]
 
 
@@ -339,7 +342,7 @@ def upsert_openalex_institution(cur, institution: dict) -> str | None:
 def process_authorships(cur, work: dict, source_document_id: int):
     """
     Traite les authorships d'un work OpenAlex :
-    - Insère/retrouve chaque auteur dans openalex_authors
+    - Insère/retrouve chaque auteur dans source_authors (source='openalex')
     - Crée les liens openalex_authorships
     - Extrait et insère les institutions dans openalex_institutions
     - Stocke les openalex_institution_ids sur chaque authorship
@@ -352,8 +355,8 @@ def process_authorships(cur, work: dict, source_document_id: int):
                 (source_document_id,))
 
     for position, authorship in enumerate(authorships):
-        oa_author_id = upsert_openalex_author(cur, authorship)
-        if not oa_author_id:
+        source_author_id = upsert_openalex_author(cur, authorship)
+        if not source_author_id:
             continue
 
         # Nom brut de l'auteur (fiable, contrairement à author.display_name)
@@ -380,11 +383,11 @@ def process_authorships(cur, work: dict, source_document_id: int):
 
         cur.execute("""
             INSERT INTO openalex_authorships
-                (source_document_id, openalex_author_id, author_position,
+                (source_document_id, source_author_id, author_position,
                  raw_affiliation, openalex_institution_ids,
                  raw_author_name, author_name_normalized, is_corresponding)
             VALUES (%s, %s, %s, %s, %s, %s, normalize_name_form(%s), %s)
-            ON CONFLICT (source_document_id, openalex_author_id) DO UPDATE SET
+            ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
                 raw_affiliation = COALESCE(
                     EXCLUDED.raw_affiliation,
                     openalex_authorships.raw_affiliation
@@ -398,7 +401,7 @@ def process_authorships(cur, work: dict, source_document_id: int):
                     openalex_authorships.author_name_normalized
                 ),
                 is_corresponding = EXCLUDED.is_corresponding
-        """, (source_document_id, oa_author_id, position,
+        """, (source_document_id, source_author_id, position,
               raw_affil_text, institution_ids or None,
               raw_author_name, raw_author_name, is_corresponding))
 
@@ -576,11 +579,13 @@ def main():
         logger.info(f"Erreurs : {errors}")
 
         for table in ["publications", "journals", "publishers",
-                       "openalex_authors",
                        "openalex_authorships", "openalex_institutions"]:
             cur.execute(f"SELECT COUNT(*) FROM {table}")
             count = cur.fetchone()["count"]
             logger.info(f"  {table} : {count} enregistrements")
+        cur.execute("SELECT COUNT(*) FROM source_authors WHERE source = 'openalex'")
+        count = cur.fetchone()["count"]
+        logger.info(f"  source_authors (openalex) : {count} enregistrements")
         cur.execute("SELECT COUNT(*) FROM source_documents WHERE source = 'openalex'")
         count = cur.fetchone()["count"]
         logger.info(f"  source_documents (openalex) : {count} enregistrements")

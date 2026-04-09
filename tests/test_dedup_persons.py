@@ -23,15 +23,22 @@ def _insert_publication(db, title="Test Pub", pub_year=2024):
 
 
 def _insert_hal_author(db, full_name, hal_person_id=None, orcid=None, idhal=None):
-    """Crée un hal_author minimal."""
+    """Crée un source_author HAL minimal."""
     parts = full_name.strip().split()
     last = parts[-1] if len(parts) >= 2 else full_name
     first = " ".join(parts[:-1]) if len(parts) >= 2 else None
+    import json
+    source_ids = {}
+    if hal_person_id is not None:
+        source_ids["hal_person_id"] = hal_person_id
+    if idhal is not None:
+        source_ids["idhal"] = idhal
     db.execute("""
-        INSERT INTO hal_authors (full_name, last_name, first_name,
-                                 hal_person_id, orcid, idhal)
-        VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
-    """, (full_name, last, first, hal_person_id, orcid, idhal))
+        INSERT INTO source_authors (source, source_id, full_name, last_name, first_name,
+                                    orcid, source_ids)
+        VALUES ('hal', %s, %s, %s, %s, %s, %s) RETURNING id
+    """, (f"hal-{full_name}", full_name, last, first, orcid,
+          json.dumps(source_ids) if source_ids else None))
     return db.fetchone()["id"]
 
 
@@ -44,25 +51,25 @@ def _insert_hal_document(db, halid, publication_id):
     return db.fetchone()["id"]
 
 
-def _insert_hal_authorship(db, source_document_id, hal_author_id, position=0,
+def _insert_hal_authorship(db, source_document_id, source_author_id, position=0,
                            is_uca=True, person_id=None):
     """Crée une hal_authorship."""
     db.execute("""
         INSERT INTO hal_authorships
-            (source_document_id, hal_author_id, author_position, is_uca, person_id)
+            (source_document_id, source_author_id, author_position, is_uca, person_id)
         VALUES (%s, %s, %s, %s, %s) RETURNING id
-    """, (source_document_id, hal_author_id, position, is_uca, person_id))
+    """, (source_document_id, source_author_id, position, is_uca, person_id))
     return db.fetchone()["id"]
 
 
 def _insert_oa_author(db, full_name, openalex_id, orcid=None):
-    """Crée un openalex_author minimal."""
+    """Crée un source_author OpenAlex minimal."""
     parts = full_name.strip().split()
     last = parts[-1] if len(parts) >= 2 else full_name
     first = " ".join(parts[:-1]) if len(parts) >= 2 else None
     db.execute("""
-        INSERT INTO openalex_authors (openalex_id, full_name, last_name, first_name, orcid)
-        VALUES (%s, %s, %s, %s, %s) RETURNING id
+        INSERT INTO source_authors (source, source_id, full_name, last_name, first_name, orcid)
+        VALUES ('openalex', %s, %s, %s, %s, %s) RETURNING id
     """, (openalex_id, full_name, last, first, orcid))
     return db.fetchone()["id"]
 
@@ -81,7 +88,7 @@ def _insert_oa_authorship(db, oa_document_id, oa_author_id, position=0,
     """Crée une openalex_authorship."""
     db.execute("""
         INSERT INTO openalex_authorships
-            (source_document_id, openalex_author_id, author_position,
+            (source_document_id, source_author_id, author_position,
              is_uca, person_id, raw_author_name)
         VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
     """, (oa_document_id, oa_author_id, position, is_uca, person_id,
@@ -123,7 +130,7 @@ class TestStep0HalAccounts:
         # Personne existante + hal_author rattaché
         person_id = create_person(db, "Dupont", "Jean")
         ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=12345)
-        db.execute("UPDATE hal_authors SET person_id = %s WHERE id = %s",
+        db.execute("UPDATE source_authors SET person_id = %s WHERE id = %s",
                    (person_id, ha))
 
         hd1 = _insert_hal_document(db, "hal-001", pub1)
@@ -310,7 +317,7 @@ class TestStep2Orcid:
         ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=None,
                                 orcid="0000-0001-2345-6789")
         # Ajouter idref manuellement (helper ne le gère pas)
-        db.execute("UPDATE hal_authors SET idref = %s WHERE id = %s",
+        db.execute("UPDATE source_authors SET idref = %s WHERE id = %s",
                    ("123456789", ha))
 
         hd = _insert_hal_document(db, "hal-orcid-idref", pub)

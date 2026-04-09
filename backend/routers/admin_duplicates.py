@@ -79,11 +79,11 @@ async def next_duplicate_candidate(
                 FROM authorships a
                 LEFT JOIN persons p2 ON p2.id = a.person_id
                 LEFT JOIN hal_authorships has2 ON has2.id = a.hal_authorship_id
-                LEFT JOIN hal_authors ha ON ha.id = has2.hal_author_id
+                LEFT JOIN source_authors ha ON ha.id = has2.source_author_id
                 LEFT JOIN openalex_authorships oas ON oas.id = a.openalex_authorship_id
-                LEFT JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+                LEFT JOIN source_authors oa ON oa.id = oas.source_author_id
                 LEFT JOIN wos_authorships was2 ON was2.id = a.wos_authorship_id
-                LEFT JOIN wos_authors wa ON wa.id = was2.wos_author_id
+                LEFT JOIN source_authors wa ON wa.id = was2.source_author_id
                 WHERE a.publication_id = %s AND NOT a.excluded
                 ORDER BY a.author_position NULLS LAST
             """, (pub_id,))

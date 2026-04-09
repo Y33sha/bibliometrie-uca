@@ -4,7 +4,7 @@ Crée des entités Personnes à partir des authorships sources UCA non rattaché
 Algorithme en 4 étapes :
 
   Étape 0 : Comptes HAL déjà rattachés
-    hal_authors avec hal_person_id ET person_id → propagation aux nouvelles
+    source_authors HAL avec hal_person_id ET person_id → propagation aux nouvelles
     authorships du même compte. Les comptes non rattachés sont laissés
     aux étapes suivantes (matching par nom, ORCID, position).
 
@@ -60,15 +60,17 @@ def get_all_unlinked_authorships(cur):
     # HAL
     cur.execute("""
         SELECT has.id AS authorship_id, 'hal' AS source,
-               ha.full_name, ha.last_name, ha.first_name,
-               ha.orcid, ha.idhal, ha.idref,
-               ha.id AS hal_author_id,
-               (ha.hal_person_id IS NOT NULL) AS has_hal_person_id,
-               ha.hal_person_id,
+               sa.full_name, sa.last_name, sa.first_name,
+               sa.orcid,
+               sa.source_ids->>'idhal' AS idhal,
+               sa.idref,
+               sa.id AS source_author_id,
+               ((sa.source_ids->>'hal_person_id') IS NOT NULL) AS has_hal_person_id,
+               (sa.source_ids->>'hal_person_id')::int AS hal_person_id,
                sd.publication_id,
                has.author_position
         FROM hal_authorships has
-        JOIN hal_authors ha ON ha.id = has.hal_author_id
+        JOIN source_authors sa ON sa.id = has.source_author_id
         JOIN source_documents sd ON sd.id = has.source_document_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE has.person_id IS NULL
@@ -85,15 +87,15 @@ def get_all_unlinked_authorships(cur):
         SELECT oas.id AS authorship_id, 'openalex' AS source,
                oas.raw_author_name AS full_name,
                NULL::text AS last_name, NULL::text AS first_name,
-               oa.orcid AS oa_orcid, oa.full_name AS oa_full_name,
+               sa.orcid AS oa_orcid, sa.full_name AS oa_full_name,
                NULL::text AS idhal,
-               NULL::int AS hal_author_id,
+               NULL::int AS source_author_id,
                FALSE AS has_hal_person_id,
                NULL::int AS hal_person_id,
                sd.publication_id,
                oas.author_position
         FROM openalex_authorships oas
-        JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+        JOIN source_authors sa ON sa.id = oas.source_author_id
         JOIN source_documents sd ON sd.id = oas.source_document_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE oas.person_id IS NULL
@@ -106,15 +108,15 @@ def get_all_unlinked_authorships(cur):
     # WoS
     cur.execute("""
         SELECT was.id AS authorship_id, 'wos' AS source,
-               wa.full_name, wa.last_name, wa.first_name,
-               wa.orcid, NULL::text AS idhal,
-               NULL::int AS hal_author_id,
+               sa.full_name, sa.last_name, sa.first_name,
+               sa.orcid, NULL::text AS idhal,
+               NULL::int AS source_author_id,
                FALSE AS has_hal_person_id,
                NULL::int AS hal_person_id,
                sd.publication_id,
                was.author_position
         FROM wos_authorships was
-        JOIN wos_authors wa ON wa.id = was.wos_author_id
+        JOIN source_authors sa ON sa.id = was.source_author_id
         JOIN source_documents sd ON sd.id = was.source_document_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE was.person_id IS NULL
@@ -128,13 +130,13 @@ def get_all_unlinked_authorships(cur):
         SELECT sas.id AS authorship_id, 'scanr' AS source,
                sa.full_name, sa.last_name, sa.first_name,
                sa.orcid, NULL::text AS idhal, sa.idref,
-               NULL::int AS hal_author_id,
+               NULL::int AS source_author_id,
                FALSE AS has_hal_person_id,
                NULL::int AS hal_person_id,
                sd.publication_id,
                sas.author_position
         FROM scanr_authorships sas
-        JOIN scanr_authors sa ON sa.id = sas.scanr_author_id
+        JOIN source_authors sa ON sa.id = sas.source_author_id
         JOIN source_documents sd ON sd.id = sas.source_document_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE sas.person_id IS NULL
@@ -180,10 +182,10 @@ def load_linked_authorships_by_pub(cur):
     cur.execute("""
         SELECT has.person_id, has.author_position,
                sd.publication_id,
-               ha.last_name, ha.first_name, ha.full_name,
+               sa.last_name, sa.first_name, sa.full_name,
                'hal' AS source
         FROM hal_authorships has
-        JOIN hal_authors ha ON ha.id = has.hal_author_id
+        JOIN source_authors sa ON sa.id = has.source_author_id
         JOIN source_documents sd ON sd.id = has.source_document_id
         WHERE has.person_id IS NOT NULL
           AND sd.publication_id IS NOT NULL
@@ -216,10 +218,10 @@ def load_linked_authorships_by_pub(cur):
     cur.execute("""
         SELECT was.person_id, was.author_position,
                sd.publication_id,
-               wa.last_name, wa.first_name,
+               sa.last_name, sa.first_name,
                'wos' AS source
         FROM wos_authorships was
-        JOIN wos_authors wa ON wa.id = was.wos_author_id
+        JOIN source_authors sa ON sa.id = was.source_author_id
         JOIN source_documents sd ON sd.id = was.source_document_id
         WHERE was.person_id IS NOT NULL
           AND sd.publication_id IS NOT NULL
@@ -236,7 +238,7 @@ def load_linked_authorships_by_pub(cur):
                sa.last_name, sa.first_name, sa.full_name,
                'scanr' AS source
         FROM scanr_authorships sas
-        JOIN scanr_authors sa ON sa.id = sas.scanr_author_id
+        JOIN source_authors sa ON sa.id = sas.source_author_id
         JOIN source_documents sd ON sd.id = sas.source_document_id
         WHERE sas.person_id IS NOT NULL
           AND sd.publication_id IS NOT NULL
@@ -269,7 +271,7 @@ def load_name_form_map(cur):
 def step0_hal_accounts(cur, all_authorships, linked_ids, dry_run):
     """Propagation des comptes HAL déjà rattachés à une personne.
 
-    Seuls les hal_authors avec hal_person_id ET person_id sont traités.
+    Seuls les source_authors HAL avec hal_person_id ET person_id sont traités.
     Les comptes HAL non encore rattachés sont laissés aux passes suivantes
     (matching par nom, ORCID, position) pour éviter de créer des doublons.
     """
@@ -278,11 +280,13 @@ def step0_hal_accounts(cur, all_authorships, linked_ids, dry_run):
         if a["source"] == "hal" and a["has_hal_person_id"]:
             by_hal_pid[a["hal_person_id"]].append(a)
 
-    # hal_authors déjà liés à une personne
+    # source_authors HAL déjà liés à une personne
     cur.execute("""
-        SELECT ha.hal_person_id, ha.person_id
-        FROM hal_authors ha
-        WHERE ha.hal_person_id IS NOT NULL AND ha.person_id IS NOT NULL
+        SELECT (sa.source_ids->>'hal_person_id')::int AS hal_person_id, sa.person_id
+        FROM source_authors sa
+        WHERE sa.source = 'hal'
+          AND (sa.source_ids->>'hal_person_id') IS NOT NULL
+          AND sa.person_id IS NOT NULL
     """)
     hal_person_map = {r["hal_person_id"]: r["person_id"] for r in cur.fetchall()}
 

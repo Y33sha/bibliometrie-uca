@@ -5,7 +5,7 @@
 Le peuplement de la base s'effectue via un *pipeline* composé des étapes suivantes:
 
 ### Moissonnage
-- [Moissonnage](#extract): Récupère les données brutes depuis les API et les stocke en JSONB dans les tables de *staging*.
+- [Moissonnage](#extract): Récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
 - [Cross-imports](#cross_imports): Tente de combler les lacunes par des imports croisés ciblés (documents HAL référencés par OpenAlex ou ScanR mais absents de notre import HAL; recherche ciblée des DOI manquant dans chaque source)
 ### Normalisation
 - [Normalisation](#normalize): Transforme les données brutes (*staging*) en tables structurées *par source*: `*_publications`, `*_authors`, `*_authorships`, `*_structures`. Peuple la table canonique `publications`  à partir des publications sources.
@@ -52,16 +52,17 @@ python run_pipeline.py --list
 
 ### <span id="extract"></span>Phase 1 — `extract` : Moissonnage
 
-Récupère les données brutes depuis les API et les stocke en JSONB dans les tables de *staging*.
+Récupère les données brutes depuis les API et les stocke en JSONB dans le *staging*.
 
 ```mermaid
 flowchart LR
-    A[API HAL]-->|extract_hal|B[staging_hal]
-    C[API OpenAlex]-->|extract_openalex|D[staging_openalex]
-    E[API WOS]-->|extract_wos|F[staging_wos]
-    G[API ScanR]-->|extract_scanr|H[staging_scanr]
+    A[API HAL]-->|extract_hal|B[staging]
+    C[API OpenAlex]-->|extract_openalex|B
+    E[API WOS]-->|extract_wos|B
+    G[API ScanR]-->|extract_scanr|B
+    H[API theses.fr]-->|extract_theses|B
     classDef new  fill:#bbf
-    class B,D,F,H new;
+    class B new;
 ```
 
 **Critères de requête**:
@@ -94,21 +95,15 @@ Transforme les données brutes (staging) en tables structurées par source.
 
 ```mermaid
 flowchart LR
-    A[API HAL]-->B[staging_hal]-->|normalize_hal|G@{ shape: processes, label: "Tables HAL: 
-    hal_documents, hal_authors, hal_authorships, hal_structures" }
-    C[API OpenAlex]-->D[staging_openalex]-->|normalize_openalex|H@{ shape: processes, label: "Tables OpenAlex: 
-    openalex_documents, openalex_authors, openalex_authorships, openalex_institutions" }
-    E[API WOS]-->F[staging_wos]-->|normalize_wos|I@{ shape: processes, label: "Tables WOS: 
-    wos_documents, wos_authors, wos_authorships, wos_organizations" }
-    K[API ScanR]-->L[staging_scanr]-->|normalize_scanr|M@{ shape: processes, label: "Tables ScanR: 
-    scanr_documents, scanr_authors, scanr_authorships, scanr_structures" }
+    A[API HAL]-->B[staging]-->|normalize_hal|G@{ shape: processes, label: "Tables sources: 
+    source_documents, source_authors, source_authorships, source_structures" }
+    C[API OpenAlex]-->B-->|normalize_openalex|G
+    E[API WOS]-->B-->|normalize_wos|G
+    K[API ScanR]-->B-->|normalize_scanr|G
     G-->J@{ shape: processes, label: "Tables canoniques: 
     publications, publishers, journals" }
-    H-->J
-    I-->J
-    M-->J
     classDef new  fill:#bbf
-    class G,H,I,J,M new;
+    class G,J new;
 ```
 
 Le processus de normalisation peuple non seulement les tables sources, mais aussi la table canonique **publications** et ses tables satellites **publishers** et **journals**.
@@ -137,13 +132,11 @@ erDiagram
 
 ### <span id="addresses"></span>Phase 4 — `addresses` : Adresses et affiliations
 
-Cette étape extrait les adresses brutes des authorships sources (OpenAlex, WoS, ScanR) et les relie aux structures. (Pour le détail des différences de gestion des affiliations d'une source à l'autre: cf [doc sources](sources#sources-affiliations))
+Cette étape extrait les adresses brutes des *authorships* sources pourvues d'une adresse (OpenAlex, WoS, ScanR) et les relie aux structures. (Pour le détail des différences de gestion des affiliations d'une source à l'autre: cf [doc sources](sources#sources-affiliations))
 
 ```mermaid
 flowchart LR
-    A[openalex_authorships]-->|populate_addresses|B[addresses]
-    C[wos_authorships]-->|populate_addresses|B
-    G[scanr_authorships]-->|populate_addresses|B
+    A["source_authorships"]-->|populate_addresses|B[addresses]
     D[structures]-->E[structure_name_forms]
     E-->|resolve_addresses|F[address_structures]
     B-->|resolve_addresses|F
@@ -165,13 +158,11 @@ Script : `processing/populate_affiliations.py`
 flowchart LR
     A[structures]-->B[address_structures]
     B-->C
-    C[addresses]-->|populate_affiliations|D[openalex_authorships]
-    C-->|populate_affiliations|E[wos_authorships]
-    C-->|populate_affiliations|H[scanr_authorships]
-    A-->F[hal_structures]--->|populate_affiliations|G[hal_authorships]
+    C[addresses]-->|populate_affiliations|D[source_authorships]
+    A-->F[hal_structures]--->|populate_affiliations|D
     classDef new  fill:#bbf
     classDef valid  fill:#af5
-    class D,E,G,H new;
+    class D new;
     class A valid;
 ```
 
@@ -273,7 +264,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    G@{ shape: processes, label: "*_documents\n(sources)"}-->A
+    source_documents-->A
 
     subgraph vérité
     direction LR
@@ -289,9 +280,9 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    G@{ shape: processes, label: "*_publications\n(sources)"}-->A
-    H@{ shape: processes, label: "*_authorships\n(sources)\nis_uca = true"}---G
-    H-->C
+    source_documents-->A
+    source_authorships---source_documents
+    source_authorships-->C
 
     subgraph vérité
     direction LR
@@ -309,9 +300,9 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    G@{ shape: processes, label: "*_publications\n(sources)"}---A
-    H@{ shape: processes, label: "*_authorships\n(sources)\nis_uca = true"}---G
-    H---C
+    source_documents---A
+    source_authorships---source_documents
+    source_authorships---C
 
     subgraph vérité
     direction LR

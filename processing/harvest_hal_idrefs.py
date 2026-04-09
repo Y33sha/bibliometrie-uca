@@ -1,4 +1,4 @@
-"""Récupère les IdRef depuis l'API HAL ref/author pour les hal_authors avec idhal.
+"""Récupère les IdRef depuis l'API HAL ref/author pour les source_authors HAL avec idhal.
 
 Pour chaque hal_author ayant un idhal et un person_id, interroge l'API HAL
 et insère l'IdRef dans person_identifiers.
@@ -52,14 +52,18 @@ def main():
     conn = psycopg2.connect(**DB)
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    # Hal authors avec hal_person_id + person_id, sans IdRef déjà connu
+    # source_authors HAL avec hal_person_id + person_id, sans IdRef déjà connu
     cur.execute("""
-        SELECT ha.id AS ha_id, ha.hal_person_id, ha.idhal, ha.person_id, ha.full_name
-        FROM hal_authors ha
-        WHERE ha.hal_person_id IS NOT NULL
-          AND ha.person_id IS NOT NULL
-          AND ha.idref IS NULL
-        ORDER BY ha.person_id
+        SELECT sa.id AS ha_id,
+               (sa.source_ids->>'hal_person_id')::int AS hal_person_id,
+               sa.source_ids->>'idhal' AS idhal,
+               sa.person_id, sa.full_name
+        FROM source_authors sa
+        WHERE sa.source = 'hal'
+          AND (sa.source_ids->>'hal_person_id') IS NOT NULL
+          AND sa.person_id IS NOT NULL
+          AND sa.idref IS NULL
+        ORDER BY sa.person_id
     """)
     authors = cur.fetchall()
     print(f"{len(authors)} auteurs HAL à interroger")
@@ -70,8 +74,8 @@ def main():
         if idref:
             found += 1
             if not args.dry_run:
-                # Stocker dans hal_authors
-                cur.execute("UPDATE hal_authors SET idref = %s WHERE id = %s",
+                # Stocker dans source_authors
+                cur.execute("UPDATE source_authors SET idref = %s WHERE id = %s",
                             (idref, a["ha_id"]))
                 # Stocker dans person_identifiers
                 add_identifier(cur, a["person_id"], "idref", idref, source="hal")

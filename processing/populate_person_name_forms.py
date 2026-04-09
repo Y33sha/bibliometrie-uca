@@ -11,8 +11,8 @@ Mode incrémental :
 
 Sources :
 1. persons.last_name + persons.first_name (source: 'persons')
-2. hal_authors.full_name via hal_authorships.person_id (source: 'hal')
-3. wos_authors.full_name via wos_authorships.person_id (source: 'wos')
+2. source_authors.full_name via hal_authorships.source_author_id (source: 'hal')
+3. source_authors.full_name via wos_authorships.source_author_id (source: 'wos')
 4. openalex_authorships.raw_author_name via person_id (source: 'openalex')
 """
 import os, sys
@@ -50,26 +50,26 @@ def populate(conn):
         for form in compute_person_name_forms(ln, fn):
             triples.append((form, r["id"], "persons"))
 
-    # 2. hal_authors.full_name (via hal_authorships.person_id)
-    log.info("Source 2 : hal_authors.full_name")
+    # 2. source_authors.full_name via hal_authorships.person_id
+    log.info("Source 2 : source_authors (HAL) full_name")
     cur.execute("""
-        SELECT DISTINCT ha.full_name, has.person_id
+        SELECT DISTINCT sa.full_name, has.person_id
         FROM hal_authorships has
-        JOIN hal_authors ha ON ha.id = has.hal_author_id
+        JOIN source_authors sa ON sa.id = has.source_author_id
         WHERE has.person_id IS NOT NULL AND NOT has.excluded
-          AND ha.full_name IS NOT NULL AND ha.full_name != ''
+          AND sa.full_name IS NOT NULL AND sa.full_name != ''
     """)
     for r in cur.fetchall():
         triples.append((r["full_name"], r["person_id"], "hal"))
 
-    # 3. wos_authors.full_name
-    log.info("Source 3 : wos_authors.full_name")
+    # 3. source_authors.full_name via wos_authorships
+    log.info("Source 3 : source_authors (WoS) full_name")
     cur.execute("""
-        SELECT DISTINCT wa.full_name, was.person_id
-        FROM wos_authors wa
-        JOIN wos_authorships was ON was.wos_author_id = wa.id
+        SELECT DISTINCT sa.full_name, was.person_id
+        FROM source_authors sa
+        JOIN wos_authorships was ON was.source_author_id = sa.id
         WHERE was.person_id IS NOT NULL AND NOT was.excluded
-          AND wa.full_name IS NOT NULL AND wa.full_name != ''
+          AND sa.full_name IS NOT NULL AND sa.full_name != ''
     """)
     for r in cur.fetchall():
         triples.append((r["full_name"], r["person_id"], "wos"))

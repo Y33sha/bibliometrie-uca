@@ -70,12 +70,12 @@ async def persons_directory(
             "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')")
     if has_idhal == "yes":
         conditions.append("""(
-            EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
+            EXISTS (SELECT 1 FROM source_authors sa WHERE sa.person_id = p.id AND sa.source = 'hal' AND (sa.source_ids->>'idhal') IS NOT NULL)
             OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
         )""")
     elif has_idhal == "no":
         conditions.append("""(
-            NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
+            NOT EXISTS (SELECT 1 FROM source_authors sa WHERE sa.person_id = p.id AND sa.source = 'hal' AND (sa.source_ids->>'idhal') IS NOT NULL)
             AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
         )""")
     if has_rh == "yes":
@@ -100,11 +100,12 @@ async def persons_directory(
                 ) AS orcids,
                 (SELECT json_agg(json_build_object('value', sub.v, 'confirmed', sub.confirmed)) FROM (
                     SELECT DISTINCT ON (v) v, confirmed FROM (
-                        SELECT ha.idhal AS v, false AS confirmed FROM hal_authors ha
-                        WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL
+                        SELECT sa.source_ids->>'idhal' AS v, false AS confirmed FROM source_authors sa
+                        WHERE sa.person_id = p.id AND sa.source = 'hal'
+                          AND (sa.source_ids->>'idhal') IS NOT NULL
                           AND NOT EXISTS (SELECT 1 FROM person_identifiers pi2
                               WHERE pi2.person_id = p.id AND pi2.id_type = 'idhal'
-                                AND pi2.id_value = ha.idhal AND pi2.status = 'rejected')
+                                AND pi2.id_value = sa.source_ids->>'idhal' AND pi2.status = 'rejected')
                         UNION ALL
                         SELECT pi.id_value, (pi.status = 'confirmed') FROM person_identifiers pi
                         WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
@@ -334,12 +335,12 @@ async def persons_facets(
         if skip != "has_idhal":
             if has_idhal == "yes":
                 conds.append("""(
-                    EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
+                    EXISTS (SELECT 1 FROM source_authors sa WHERE sa.person_id = p.id AND sa.source = 'hal' AND (sa.source_ids->>'idhal') IS NOT NULL)
                     OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
                 )""")
             elif has_idhal == "no":
                 conds.append("""(
-                    NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
+                    NOT EXISTS (SELECT 1 FROM source_authors sa WHERE sa.person_id = p.id AND sa.source = 'hal' AND (sa.source_ids->>'idhal') IS NOT NULL)
                     AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
                 )""")
         if skip != "has_rh":
@@ -401,11 +402,11 @@ async def persons_facets(
         cur.execute(f"""
             SELECT
                 COUNT(*) FILTER (WHERE
-                    EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
+                    EXISTS (SELECT 1 FROM source_authors sa WHERE sa.person_id = p.id AND sa.source = 'hal' AND (sa.source_ids->>'idhal') IS NOT NULL)
                     OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
                 ) AS yes,
                 COUNT(*) FILTER (WHERE
-                    NOT EXISTS (SELECT 1 FROM hal_authors ha WHERE ha.person_id = p.id AND ha.idhal IS NOT NULL)
+                    NOT EXISTS (SELECT 1 FROM source_authors sa WHERE sa.person_id = p.id AND sa.source = 'hal' AND (sa.source_ids->>'idhal') IS NOT NULL)
                     AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
                 ) AS no
             FROM {base_from} {where}
@@ -496,44 +497,26 @@ async def persons_stats():
 async def author_details(source: str, author_id: int, max_pubs: int = Query(10, ge=1, le=50)):
     """Détails d'un auteur source : ses publications récentes."""
     with get_cursor() as (cur, conn):
-        if source == "hal":
-            cur.execute("""
-                SELECT p.id, p.title, p.pub_year, p.doi,
-                       has.is_uca,
-                       'hal' AS source
-                FROM hal_authorships has
-                JOIN source_documents sd ON sd.id = has.source_document_id
-                LEFT JOIN publications p ON p.id = sd.publication_id
-                WHERE has.hal_author_id = %s AND has.is_uca = TRUE
-                ORDER BY COALESCE(p.pub_year, sd.pub_year) DESC
-                LIMIT %s
-            """, (author_id, max_pubs))
-        elif source == "openalex":
-            cur.execute("""
-                SELECT p.id, p.title, p.pub_year, p.doi,
-                       oas.is_uca,
-                       'openalex' AS source
-                FROM openalex_authorships oas
-                JOIN source_documents sd ON sd.id = oas.source_document_id
-                LEFT JOIN publications p ON p.id = sd.publication_id
-                WHERE oas.openalex_author_id = %s AND oas.is_uca = TRUE
-                ORDER BY COALESCE(p.pub_year, sd.pub_year) DESC
-                LIMIT %s
-            """, (author_id, max_pubs))
-        elif source == "wos":
-            cur.execute("""
-                SELECT p.id, p.title, p.pub_year, p.doi,
-                       was.is_uca,
-                       'wos' AS source
-                FROM wos_authorships was
-                JOIN source_documents sd ON sd.id = was.source_document_id
-                LEFT JOIN publications p ON p.id = sd.publication_id
-                WHERE was.wos_author_id = %s AND was.is_uca = TRUE
-                ORDER BY COALESCE(p.pub_year, sd.pub_year) DESC
-                LIMIT %s
-            """, (author_id, max_pubs))
-        else:
+        source_tables = {
+            "hal": ("hal_authorships", "source_author_id"),
+            "openalex": ("openalex_authorships", "source_author_id"),
+            "wos": ("wos_authorships", "source_author_id"),
+        }
+        if source not in source_tables:
             raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
+
+        tbl, fk = source_tables[source]
+        cur.execute(f"""
+            SELECT p.id, p.title, p.pub_year, p.doi,
+                   sa.is_uca,
+                   %s AS source
+            FROM {tbl} sa
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            LEFT JOIN publications p ON p.id = sd.publication_id
+            WHERE sa.{fk} = %s AND sa.is_uca = TRUE
+            ORDER BY COALESCE(p.pub_year, sd.pub_year) DESC
+            LIMIT %s
+        """, (source, author_id, max_pubs))
 
         publications = cur.fetchall()
         return {"signatures": [], "publications": publications}
@@ -549,22 +532,25 @@ async def get_person(person_id: int):
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh,
                 (SELECT json_agg(x) FROM (
-                    SELECT DISTINCT ha.id, ha.full_name, ha.orcid, ha.idhal, 'hal' AS source
-                    FROM hal_authors ha
-                    JOIN hal_authorships has ON has.hal_author_id = ha.id
+                    SELECT DISTINCT sa.id, sa.full_name, sa.orcid,
+                           sa.source_ids->>'idhal' AS idhal, 'hal' AS source
+                    FROM source_authors sa
+                    JOIN hal_authorships has ON has.source_author_id = sa.id
                     WHERE has.person_id = p.id AND NOT has.excluded
                     UNION ALL
-                    SELECT MIN(oas.openalex_author_id) AS id, COALESCE(oas.raw_author_name, oa.full_name) AS full_name, NULL AS orcid, NULL AS idhal, 'openalex' AS source
+                    SELECT MIN(oas.source_author_id) AS id,
+                           COALESCE(oas.raw_author_name, sa.full_name) AS full_name,
+                           NULL AS orcid, NULL AS idhal, 'openalex' AS source
                     FROM openalex_authorships oas
-                    JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+                    JOIN source_authors sa ON sa.id = oas.source_author_id
                     WHERE oas.person_id = p.id AND NOT oas.excluded
-                    GROUP BY COALESCE(oas.raw_author_name, oa.full_name)
+                    GROUP BY COALESCE(oas.raw_author_name, sa.full_name)
                     UNION ALL
-                    SELECT wa.id, wa.full_name, wa.orcid, NULL AS idhal, 'wos' AS source
-                    FROM wos_authors wa
-                    JOIN wos_authorships was ON was.wos_author_id = wa.id
+                    SELECT sa.id, sa.full_name, sa.orcid, NULL AS idhal, 'wos' AS source
+                    FROM source_authors sa
+                    JOIN wos_authorships was ON was.source_author_id = sa.id
                     WHERE was.person_id = p.id AND NOT was.excluded
-                    GROUP BY wa.id
+                    GROUP BY sa.id, sa.full_name, sa.orcid
                 ) x) AS linked_authors,
                 (SELECT json_agg(json_build_object(
                     'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
@@ -607,13 +593,14 @@ async def person_profile(person_id: int):
 
         # Auteurs liés HAL + compte publis UCA (exclut les authorships rejetées)
         cur.execute("""
-            SELECT DISTINCT ha.id, 'hal' AS source, ha.full_name, ha.orcid, ha.idhal,
-                   ha.hal_person_id,
+            SELECT DISTINCT sa.id, 'hal' AS source, sa.full_name, sa.orcid,
+                   sa.source_ids->>'idhal' AS idhal,
+                   (sa.source_ids->>'hal_person_id')::int AS hal_person_id,
                    NULL::text AS openalex_id,
                    (SELECT COUNT(*) FROM hal_authorships has2
-                    WHERE has2.hal_author_id = ha.id AND has2.is_uca = TRUE AND NOT has2.excluded) AS uca_pub_count
-            FROM hal_authors ha
-            JOIN hal_authorships has ON has.hal_author_id = ha.id
+                    WHERE has2.source_author_id = sa.id AND has2.is_uca = TRUE AND NOT has2.excluded) AS uca_pub_count
+            FROM source_authors sa
+            JOIN hal_authorships has ON has.source_author_id = sa.id
             WHERE has.person_id = %s AND NOT has.excluded
         """, (person_id,))
         hal_authors = cur.fetchall()
@@ -621,27 +608,27 @@ async def person_profile(person_id: int):
         # Auteurs liés OpenAlex : formes de noms distinctes (raw_author_name)
         cur.execute("""
             SELECT MIN(oas.id) AS id,
-                   COALESCE(oas.raw_author_name, oa.full_name) AS full_name,
+                   COALESCE(oas.raw_author_name, sa.full_name) AS full_name,
                    'openalex' AS source,
                    NULL::text AS orcid, NULL::text AS idhal, NULL::text AS openalex_id,
                    COUNT(*) FILTER (WHERE oas.is_uca = TRUE) AS uca_pub_count
             FROM openalex_authorships oas
-            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+            JOIN source_authors sa ON sa.id = oas.source_author_id
             WHERE oas.person_id = %s
-            GROUP BY COALESCE(oas.raw_author_name, oa.full_name)
+            GROUP BY COALESCE(oas.raw_author_name, sa.full_name)
         """, (person_id,))
         oa_authors = cur.fetchall()
 
         # Auteurs liés WoS + compte publis UCA
         cur.execute("""
-            SELECT wa.id, 'wos' AS source, wa.full_name, wa.orcid,
+            SELECT sa.id, 'wos' AS source, sa.full_name, sa.orcid,
                    NULL::text AS idhal, NULL::text AS openalex_id,
                    (SELECT COUNT(*) FROM wos_authorships was2
-                    WHERE was2.wos_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count
-            FROM wos_authors wa
-            JOIN wos_authorships was ON was.wos_author_id = wa.id
+                    WHERE was2.source_author_id = sa.id AND was2.is_uca = TRUE) AS uca_pub_count
+            FROM source_authors sa
+            JOIN wos_authorships was ON was.source_author_id = sa.id
             WHERE was.person_id = %s
-            GROUP BY wa.id
+            GROUP BY sa.id, sa.full_name, sa.orcid
         """, (person_id,))
         wos_authors = cur.fetchall()
 
@@ -720,68 +707,60 @@ async def person_author_candidates(person_id: int, limit: int = Query(10, ge=1, 
 
         # Build SQL condition: each word from the person's full name must
         # appear in the author's full_name (accent-insensitive)
-        word_conditions_hal = " AND ".join(
-            "lower(unaccent(ha.full_name)) LIKE %s" for _ in full_words
-        )
-        word_conditions_oa = " AND ".join(
-            "lower(unaccent(oa.full_name)) LIKE %s" for _ in full_words
+        word_conditions_sa = " AND ".join(
+            "lower(unaccent(sa.full_name)) LIKE %s" for _ in full_words
         )
         word_params = [f"%{w}%" for w in full_words]
 
         # Add ORCID matching condition
         if person_orcid:
-            orcid_cond_hal = "OR ha.orcid = %s"
-            orcid_cond_oa = "OR oa.orcid = %s"
-            orcid_cond_wos = "OR wa.orcid = %s"
+            orcid_cond = "OR sa.orcid = %s"
             orcid_params = [person_orcid]
         else:
-            orcid_cond_hal = ""
-            orcid_cond_oa = ""
-            orcid_cond_wos = ""
+            orcid_cond = ""
             orcid_params = []
-
-        word_conditions_wos = " AND ".join(
-            "lower(unaccent(wa.full_name)) LIKE %s" for _ in full_words
-        )
 
         cur.execute(f"""
             WITH candidates AS (
-                SELECT ha.id, 'hal' AS source, ha.full_name, ha.last_name, ha.first_name,
-                       ha.orcid, ha.idhal, NULL::text AS openalex_id,
+                SELECT sa.id, 'hal' AS source, sa.full_name, sa.last_name, sa.first_name,
+                       sa.orcid, sa.source_ids->>'idhal' AS idhal, NULL::text AS openalex_id,
                        (SELECT has3.person_id FROM hal_authorships has3
-                        WHERE has3.hal_author_id = ha.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
+                        WHERE has3.source_author_id = sa.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
                        (SELECT COUNT(*) FROM hal_authorships has2
-                        WHERE has2.hal_author_id = ha.id AND has2.is_uca = TRUE) AS uca_pub_count,
+                        WHERE has2.source_author_id = sa.id AND has2.is_uca = TRUE) AS uca_pub_count,
                        (SELECT COUNT(*) FROM hal_authorships has2
-                        WHERE has2.hal_author_id = ha.id) AS pub_count
-                FROM hal_authors ha
-                WHERE ({word_conditions_hal} {orcid_cond_hal})
+                        WHERE has2.source_author_id = sa.id) AS pub_count
+                FROM source_authors sa
+                WHERE sa.source = 'hal'
+                  AND ({word_conditions_sa} {orcid_cond})
                   AND EXISTS (SELECT 1 FROM hal_authorships has
-                              WHERE has.hal_author_id = ha.id AND has.is_uca = TRUE)
+                              WHERE has.source_author_id = sa.id AND has.is_uca = TRUE)
                 UNION ALL
-                SELECT oa.id, 'openalex' AS source, oa.full_name, oa.last_name, oa.first_name,
-                       oa.orcid, NULL::text AS idhal, oa.openalex_id, oa.person_id,
+                SELECT sa.id, 'openalex' AS source, sa.full_name, sa.last_name, sa.first_name,
+                       sa.orcid, NULL::text AS idhal, sa.source_id AS openalex_id, sa.person_id,
                        (SELECT COUNT(*) FROM openalex_authorships oas2
-                        WHERE oas2.openalex_author_id = oa.id AND oas2.is_uca = TRUE) AS uca_pub_count,
+                        WHERE oas2.source_author_id = sa.id AND oas2.is_uca = TRUE) AS uca_pub_count,
                        (SELECT COUNT(*) FROM openalex_authorships oas2
-                        WHERE oas2.openalex_author_id = oa.id) AS pub_count
-                FROM openalex_authors oa
-                WHERE ({word_conditions_oa} {orcid_cond_oa})
+                        WHERE oas2.source_author_id = sa.id) AS pub_count
+                FROM source_authors sa
+                WHERE sa.source = 'openalex'
+                  AND ({word_conditions_sa} {orcid_cond})
                   AND EXISTS (SELECT 1 FROM openalex_authorships oas
-                              WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE)
+                              WHERE oas.source_author_id = sa.id AND oas.is_uca = TRUE)
                 UNION ALL
-                SELECT wa.id, 'wos' AS source, wa.full_name, wa.last_name, wa.first_name,
-                       wa.orcid, NULL::text AS idhal, NULL::text AS openalex_id,
+                SELECT sa.id, 'wos' AS source, sa.full_name, sa.last_name, sa.first_name,
+                       sa.orcid, NULL::text AS idhal, NULL::text AS openalex_id,
                        (SELECT was3.person_id FROM wos_authorships was3
-                        WHERE was3.wos_author_id = wa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
+                        WHERE was3.source_author_id = sa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
                        (SELECT COUNT(*) FROM wos_authorships was2
-                        WHERE was2.wos_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count,
+                        WHERE was2.source_author_id = sa.id AND was2.is_uca = TRUE) AS uca_pub_count,
                        (SELECT COUNT(*) FROM wos_authorships was2
-                        WHERE was2.wos_author_id = wa.id) AS pub_count
-                FROM wos_authors wa
-                WHERE ({word_conditions_wos} {orcid_cond_wos})
+                        WHERE was2.source_author_id = sa.id) AS pub_count
+                FROM source_authors sa
+                WHERE sa.source = 'wos'
+                  AND ({word_conditions_sa} {orcid_cond})
                   AND EXISTS (SELECT 1 FROM wos_authorships was
-                              WHERE was.wos_author_id = wa.id AND was.is_uca = TRUE)
+                              WHERE was.source_author_id = sa.id AND was.is_uca = TRUE)
             )
             SELECT * FROM candidates
             WHERE uca_pub_count > 0
@@ -1033,17 +1012,17 @@ async def list_orphan_authorships(
     params: list = []
     if search.strip():
         params.append(f"%{search.strip()}%")
-        search_cond_hal = "AND unaccent(lower(ha.full_name)) LIKE unaccent(lower(%s))"
+        search_cond_hal = "AND unaccent(lower(sa.full_name)) LIKE unaccent(lower(%s))"
         search_cond_oa = "AND unaccent(lower(oas.raw_author_name)) LIKE unaccent(lower(%s))"
-        search_cond_wos = "AND unaccent(lower(wa.full_name)) LIKE unaccent(lower(%s))"
+        search_cond_wos = "AND unaccent(lower(sa.full_name)) LIKE unaccent(lower(%s))"
 
     with get_cursor() as (cur, conn):
         # Count
         cur.execute(f"""
             SELECT COUNT(*) FROM (
-                SELECT ha.full_name
+                SELECT sa.full_name
                 FROM hal_authorships has
-                JOIN hal_authors ha ON ha.id = has.hal_author_id
+                JOIN source_authors sa ON sa.id = has.source_author_id
                 WHERE has.person_id IS NULL AND has.is_uca = TRUE {search_cond_hal}
                 UNION ALL
                 SELECT oas.raw_author_name
@@ -1051,9 +1030,9 @@ async def list_orphan_authorships(
                 WHERE oas.person_id IS NULL AND oas.is_uca = TRUE
                   AND oas.raw_author_name IS NOT NULL {search_cond_oa}
                 UNION ALL
-                SELECT wa.full_name
+                SELECT sa.full_name
                 FROM wos_authorships was
-                JOIN wos_authors wa ON wa.id = was.wos_author_id
+                JOIN source_authors sa ON sa.id = was.source_author_id
                 WHERE was.person_id IS NULL AND was.is_uca = TRUE {search_cond_wos}
             ) sub
         """, params * 3)
@@ -1063,10 +1042,10 @@ async def list_orphan_authorships(
         cur.execute(f"""
             SELECT * FROM (
                 SELECT 'hal' AS source, has.id AS authorship_id,
-                       ha.full_name, sd.publication_id,
+                       sa.full_name, sd.publication_id,
                        p.title AS pub_title, p.pub_year
                 FROM hal_authorships has
-                JOIN hal_authors ha ON ha.id = has.hal_author_id
+                JOIN source_authors sa ON sa.id = has.source_author_id
                 JOIN source_documents sd ON sd.id = has.source_document_id
                 JOIN publications p ON p.id = sd.publication_id
                 WHERE has.person_id IS NULL AND has.is_uca = TRUE {search_cond_hal}
@@ -1082,10 +1061,10 @@ async def list_orphan_authorships(
                   AND oas.raw_author_name IS NOT NULL {search_cond_oa}
                 UNION ALL
                 SELECT 'wos', was.id,
-                       wa.full_name, sd.publication_id,
+                       sa.full_name, sd.publication_id,
                        p.title, p.pub_year
                 FROM wos_authorships was
-                JOIN wos_authors wa ON wa.id = was.wos_author_id
+                JOIN source_authors sa ON sa.id = was.source_author_id
                 JOIN source_documents sd ON sd.id = was.source_document_id
                 JOIN publications p ON p.id = sd.publication_id
                 WHERE was.person_id IS NULL AND was.is_uca = TRUE {search_cond_wos}
@@ -1557,10 +1536,11 @@ async def hal_duplicate_accounts(
         cur.execute("""
             SELECT COUNT(*) FROM (
                 SELECT person_id
-                FROM hal_authors
-                WHERE person_id IS NOT NULL AND hal_person_id IS NOT NULL
+                FROM source_authors
+                WHERE source = 'hal' AND person_id IS NOT NULL
+                  AND (source_ids->>'hal_person_id') IS NOT NULL
                 GROUP BY person_id
-                HAVING COUNT(DISTINCT hal_person_id) >= 2
+                HAVING COUNT(DISTINCT source_ids->>'hal_person_id') >= 2
             ) sub
         """)
         total = cur.fetchone()["count"]
@@ -1569,24 +1549,26 @@ async def hal_duplicate_accounts(
             SELECT p.id AS person_id, p.last_name, p.first_name,
                    (prh.id IS NOT NULL) AS has_rh,
                    (SELECT json_agg(json_build_object(
-                       'hal_person_id', ha.hal_person_id,
-                       'full_name', ha.full_name,
-                       'idhal', ha.idhal,
-                       'orcid', ha.orcid,
+                       'hal_person_id', (sa.source_ids->>'hal_person_id')::int,
+                       'full_name', sa.full_name,
+                       'idhal', sa.source_ids->>'idhal',
+                       'orcid', sa.orcid,
                        'pub_count', (SELECT COUNT(*) FROM hal_authorships has2
-                                     WHERE has2.hal_author_id = ha.id)
-                   ) ORDER BY ha.hal_person_id)
-                    FROM hal_authors ha
-                    WHERE ha.person_id = p.id AND ha.hal_person_id IS NOT NULL
+                                     WHERE has2.source_author_id = sa.id)
+                   ) ORDER BY (sa.source_ids->>'hal_person_id')::int)
+                    FROM source_authors sa
+                    WHERE sa.source = 'hal' AND sa.person_id = p.id
+                      AND (sa.source_ids->>'hal_person_id') IS NOT NULL
                    ) AS hal_accounts
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             WHERE p.id IN (
                 SELECT person_id
-                FROM hal_authors
-                WHERE person_id IS NOT NULL AND hal_person_id IS NOT NULL
+                FROM source_authors
+                WHERE source = 'hal' AND person_id IS NOT NULL
+                  AND (source_ids->>'hal_person_id') IS NOT NULL
                 GROUP BY person_id
-                HAVING COUNT(DISTINCT hal_person_id) >= 2
+                HAVING COUNT(DISTINCT source_ids->>'hal_person_id') >= 2
             )
             ORDER BY LOWER(p.last_name), LOWER(p.first_name)
             LIMIT %s OFFSET %s
