@@ -220,15 +220,16 @@ def process_persons(cur, these: dict, source_document_id: int):
         cur.execute("""
             INSERT INTO source_authorships
                 (source, source_document_id, source_author_id, author_position,
-                 author_name_normalized, roles)
-            VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s)
+                 author_name_normalized, roles, in_perimeter)
+            VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s)
             ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
                 roles = EXCLUDED.roles,
-                author_name_normalized = EXCLUDED.author_name_normalized
+                author_name_normalized = EXCLUDED.author_name_normalized,
+                in_perimeter = EXCLUDED.in_perimeter
         """, (source_document_id, source_author_id,
               position if is_author else None,
               info["person"].get("prenom", "") + " " + info["person"].get("nom", ""),
-              roles))
+              roles, is_author))
         if is_author:
             position += 1
 

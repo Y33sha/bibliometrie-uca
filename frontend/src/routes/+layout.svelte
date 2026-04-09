@@ -162,6 +162,11 @@
 				class:active={isActive("/publications")}>Publications</a
 			>
 			<a
+				href="{base}/theses"
+				class="nav-link"
+				class:active={isActive("/theses")}>Thèses</a
+			>
+			<a
 				href="{base}/laboratories"
 				class="nav-link"
 				class:active={isActive("/laboratories")}>Laboratoires</a
@@ -289,6 +294,9 @@
 		align-items: center;
 		justify-content: space-between;
 		height: 46px;
+		position: sticky;
+		top: 0;
+		z-index: 20;
 	}
 	.site-header.admin {
 		background: #3d7a7c;

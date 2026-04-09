@@ -57,6 +57,7 @@ def build(cur):
         ("OpenAlex", "openalex"),
         ("WoS", "wos"),
         ("ScanR", "scanr"),
+        ("theses.fr", "theses"),
     ]
 
     for source_name, source_value in FK_SOURCES:
@@ -128,8 +129,7 @@ def build(cur):
     logger.info(f"  Reset {reset_count} authorships")
 
     # Union des structure_ids et OR des in_perimeter par source
-    for source_name, source_value in [("HAL", "hal"), ("OpenAlex", "openalex"),
-                                       ("WoS", "wos"), ("ScanR", "scanr")]:
+    for source_name, source_value in FK_SOURCES:
         cur.execute("""
             WITH src_data AS (
                 SELECT sd.publication_id, sa.person_id,

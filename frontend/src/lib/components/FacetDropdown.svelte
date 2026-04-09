@@ -19,7 +19,6 @@
 
 	let { label, options, searchable = false, selected = $bindable([]), allLabel = 'Tous', tooltip, onchange }: Props = $props();
 	let showTooltip = $state(false);
-	let tooltipBelow = $state(false);
 	let tooltipTimer: ReturnType<typeof setTimeout>;
 
 	let open = $state(false);
@@ -116,10 +115,8 @@
 			open = true;
 			filterText = '';
 		}}
-		onmouseenter={(e) => {
+		onmouseenter={() => {
 			if (tooltip && !open) {
-				const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-				tooltipBelow = rect.top < 80;
 				showTooltip = true;
 			}
 		}}
@@ -132,7 +129,7 @@
 		<span class="facet-arrow">&#9662;</span>
 	</button>
 	{#if showTooltip && tooltip}
-		<div class="facet-tooltip" class:facet-tooltip-below={tooltipBelow}>{@html tooltip}</div>
+		<div class="facet-tooltip facet-tooltip-below">{@html tooltip}</div>
 	{/if}
 
 	{#if open}

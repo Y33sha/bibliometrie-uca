@@ -97,7 +97,7 @@ def phase_cross_imports(mode="full", sources=None, full_cross_import=False, **kw
 
 def phase_normalize(**kw):
     """Phase 3 : Normalisation staging → tables sources + merge inter-sources."""
-    sources = kw.get("sources", {"hal", "openalex", "wos", "scanr"})
+    sources = kw.get("sources", {"hal", "openalex", "wos", "scanr", "theses"})
     if "openalex" in sources:
         run_python("processing/normalize_openalex.py")
     if "hal" in sources:
@@ -106,6 +106,8 @@ def phase_normalize(**kw):
         run_python("processing/normalize_wos.py")
     if "scanr" in sources:
         run_python("processing/normalize_scanr.py")
+    if "theses" in sources:
+        run_python("processing/normalize_theses.py")
     if "hal" in sources:
         run_python("processing/enrich_hal_structures.py")
     # Toujours lancer le merge inter-sources (dépend de toutes les sources)

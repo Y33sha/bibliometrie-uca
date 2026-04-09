@@ -52,8 +52,7 @@
 /* Sticky toolbar variant */
 .toolbar-sticky {
 	position: sticky;
-	top: 0;
-	z-index: 100;
+	top: 46px;
 }
 
 /* ── Count badge (usually in toolbar) ── */
