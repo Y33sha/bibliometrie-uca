@@ -246,20 +246,26 @@ async def delete_name_form(form_id: int):
 
 
 # =============================================================
-# HAL STRUCTURES MAPPING
+# HAL STRUCTURES MAPPING (source_structures, source='hal')
 # =============================================================
 
 
 @router.get("/api/structures/{structure_id}/hal-mappings")
 async def list_hal_mappings(structure_id: int):
-    """Liste les hal_structures mappées vers cette structure."""
+    """Liste les source_structures (hal) mappees vers cette structure."""
     with get_cursor() as (cur, conn):
         cur.execute("""
-            SELECT hal_struct_id, name, acronym, type, doc_count, valid,
-                   start_date, end_date, country, code
-            FROM hal_structures
-            WHERE structure_id = %s
-            ORDER BY start_date DESC NULLS LAST, name
+            SELECT ss.source_id AS hal_struct_id, ss.name, ss.acronym,
+                   ss.source_data->>'type' AS type,
+                   (ss.source_data->>'doc_count')::int AS doc_count,
+                   ss.source_data->>'valid' AS valid,
+                   ss.source_data->>'start_date' AS start_date,
+                   ss.source_data->>'end_date' AS end_date,
+                   ss.country,
+                   ss.source_data->>'code' AS code
+            FROM source_structures ss
+            WHERE ss.source = 'hal' AND ss.structure_id = %s
+            ORDER BY ss.source_data->>'start_date' DESC NULLS LAST, ss.name
         """, (structure_id,))
         return cur.fetchall()
 
@@ -270,35 +276,41 @@ async def list_hal_structures(
     unmapped: bool = Query(False),
     limit: int = Query(50),
 ):
-    """Recherche de hal_structures. Si unmapped=true, seulement les non mappées."""
+    """Recherche de source_structures (hal). Si unmapped=true, seulement les non mappees."""
     with get_cursor() as (cur, conn):
-        conditions = []
+        conditions = ["ss.source = 'hal'"]
         params = []
 
         if unmapped:
-            conditions.append("hs.structure_id IS NULL")
+            conditions.append("ss.structure_id IS NULL")
         if search:
             conditions.append(
-                "(unaccent(hs.name) ILIKE unaccent(%s) OR hs.acronym ILIKE %s OR hs.code ILIKE %s)")
+                "(unaccent(ss.name) ILIKE unaccent(%s) OR ss.acronym ILIKE %s"
+                " OR ss.source_data->>'code' ILIKE %s)")
             params.extend([f"%{search}%"] * 3)
 
-        where = " AND ".join(conditions) if conditions else "TRUE"
+        where = " AND ".join(conditions)
         cur.execute(f"""
-            SELECT hs.hal_struct_id, hs.name, hs.acronym, hs.type, hs.doc_count,
-                   hs.valid, hs.country, hs.code, hs.structure_id,
+            SELECT ss.source_id AS hal_struct_id, ss.name, ss.acronym,
+                   ss.source_data->>'type' AS type,
+                   (ss.source_data->>'doc_count')::int AS doc_count,
+                   ss.source_data->>'valid' AS valid,
+                   ss.country,
+                   ss.source_data->>'code' AS code,
+                   ss.structure_id,
                    s.name AS mapped_name, s.acronym AS mapped_acronym
-            FROM hal_structures hs
-            LEFT JOIN structures s ON s.id = hs.structure_id
+            FROM source_structures ss
+            LEFT JOIN structures s ON s.id = ss.structure_id
             WHERE {where}
-            ORDER BY hs.doc_count DESC NULLS LAST, hs.name
+            ORDER BY (ss.source_data->>'doc_count')::int DESC NULLS LAST, ss.name
             LIMIT %s
         """, params + [limit])
         return cur.fetchall()
 
 
 @router.put("/api/hal-structures/{hal_struct_id}/map")
-async def map_hal_structure(hal_struct_id: int, data: dict):
-    """Mapper une hal_structure vers une structure canonique."""
+async def map_hal_structure(hal_struct_id: str, data: dict):
+    """Mapper une source_structure (hal) vers une structure canonique."""
     structure_id = data.get("structure_id")
     if not structure_id:
         raise HTTPException(status_code=400, detail="structure_id requis")
@@ -309,27 +321,27 @@ async def map_hal_structure(hal_struct_id: int, data: dict):
             raise HTTPException(status_code=404, detail="Structure introuvable")
 
         cur.execute("""
-            UPDATE hal_structures SET structure_id = %s
-            WHERE hal_struct_id = %s
-            RETURNING hal_struct_id
+            UPDATE source_structures SET structure_id = %s
+            WHERE source = 'hal' AND source_id = %s
+            RETURNING id
         """, (structure_id, hal_struct_id))
         if not cur.fetchone():
-            raise HTTPException(status_code=404, detail="HAL structure introuvable")
+            raise HTTPException(status_code=404, detail="Structure HAL introuvable")
 
         return {"mapped": True}
 
 
 @router.delete("/api/hal-structures/{hal_struct_id}/map")
-async def unmap_hal_structure(hal_struct_id: int):
-    """Supprimer le mapping d'une hal_structure."""
+async def unmap_hal_structure(hal_struct_id: str):
+    """Supprimer le mapping d'une source_structure (hal)."""
     with get_cursor() as (cur, conn):
         cur.execute("""
-            UPDATE hal_structures SET structure_id = NULL
-            WHERE hal_struct_id = %s
-            RETURNING hal_struct_id
+            UPDATE source_structures SET structure_id = NULL
+            WHERE source = 'hal' AND source_id = %s
+            RETURNING id
         """, (hal_struct_id,))
         if not cur.fetchone():
-            raise HTTPException(status_code=404, detail="HAL structure introuvable")
+            raise HTTPException(status_code=404, detail="Structure HAL introuvable")
 
         return {"unmapped": True}
 

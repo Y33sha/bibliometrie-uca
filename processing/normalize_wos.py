@@ -714,20 +714,19 @@ def _get_or_create_address(cur, raw_text: str) -> int:
 
 
 def upsert_wos_institution(cur, org: dict) -> int | None:
-    """Insère/retrouve une organisation WoS. Retourne wos_organizations.id."""
+    """Insère/retrouve une organisation WoS dans source_structures. Retourne source_structures.id."""
     name = org.get("name")
     if not name:
         return None
     ror_id = org.get("ror_id")
 
     cur.execute("""
-        INSERT INTO wos_organizations (name, ror_id)
-        VALUES (%s, %s)
-        ON CONFLICT (name) DO UPDATE SET
-            ror_id = COALESCE(wos_organizations.ror_id, EXCLUDED.ror_id),
-            updated_at = now()
+        INSERT INTO source_structures (source, source_id, name, ror_id)
+        VALUES ('wos', %s, %s, %s)
+        ON CONFLICT (source, source_id) DO UPDATE SET
+            ror_id = COALESCE(source_structures.ror_id, EXCLUDED.ror_id)
         RETURNING id
-    """, (name, ror_id))
+    """, (name, name, ror_id))
     return cur.fetchone()[0]
 
 
@@ -749,7 +748,7 @@ def process_authorships(cur, rec: dict, source_document_id: int):
             INSERT INTO wos_authorships
                 (source_document_id, source_author_id, author_position,
                  is_corresponding, raw_affiliation, author_name_normalized,
-                 wos_institution_ids, roles)
+                 source_struct_ids, roles)
             VALUES (%s, %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
             ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
                 raw_affiliation = COALESCE(
@@ -761,9 +760,9 @@ def process_authorships(cur, rec: dict, source_document_id: int):
                     EXCLUDED.author_name_normalized,
                     wos_authorships.author_name_normalized
                 ),
-                wos_institution_ids = COALESCE(
-                    EXCLUDED.wos_institution_ids,
-                    wos_authorships.wos_institution_ids
+                source_struct_ids = COALESCE(
+                    EXCLUDED.source_struct_ids,
+                    wos_authorships.source_struct_ids
                 ),
                 roles = EXCLUDED.roles
             RETURNING id

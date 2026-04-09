@@ -10,11 +10,11 @@ Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_documents                        (lien staging ↔ publication, source='hal')
     source_authors                          (auteurs unifiés, source='hal')
-    hal_authorships                         (lien document × auteur, avec hal_struct_ids)
+    hal_authorships                         (lien document × auteur, avec source_struct_ids)
 
 La résolution UCA (hal_authorships.structure_ids, is_uca) se fait en post-traitement
-via populate_affiliations.py, pas ici. Ce script ne fait que stocker les hal_struct_ids
-bruts extraits de authIdHasStructure_fs.
+via populate_affiliations.py, pas ici. Ce script ne fait que stocker les source_struct_ids
+(source_structures.id) extraits de authIdHasStructure_fs.
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
@@ -355,13 +355,16 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
 def parse_author_structures(doc: dict) -> dict[int, set[int]]:
     """
     Parse authIdHasStructure_fs pour extraire le mapping
-    form_id → {hal_struct_ids}.
+    form_id → {hal_struct_id bruts (entiers HAL, résolus en source_struct_ids ensuite)}.
 
     Format : "formId-personId_FacetSep_Nom_JoinSep_structId_FacetSep_StructNom"
 
     On utilise le form_id (et non le person_id) comme clé, car le form_id
     est toujours présent, y compris pour les auteurs sans compte HAL
     (personId = 0).
+
+    Note : retourne les hal_struct_id bruts (entiers HAL). La résolution
+    vers source_structures.id se fait dans process_authors via lookup SQL.
     """
     entries = doc.get("authIdHasStructure_fs") or []
     form_structs: dict[int, set[int]] = {}
@@ -404,7 +407,7 @@ def process_authors(cur, doc: dict, source_document_id: int):
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
     - Parse authIdHasStructure_fs pour les affiliations (clé = form_id)
     - Crée/retrouve chaque auteur dans source_authors (source='hal')
-    - Crée les hal_authorships avec hal_struct_ids
+    - Crée les hal_authorships avec source_struct_ids (source_structures.id)
     """
     names = doc.get("authFullName_s") or []
     orcids = doc.get("authOrcid_s") or []
@@ -458,7 +461,7 @@ def process_authors(cur, doc: dict, source_document_id: int):
                 except ValueError:
                     pass
 
-    # authIdHasStructure_fs → {form_id: set of hal_struct_ids}
+    # authIdHasStructure_fs → {form_id: set of hal_struct_id bruts}
     form_struct_map = parse_author_structures(doc)
 
     for position, name in enumerate(names):
@@ -482,25 +485,33 @@ def process_authors(cur, doc: dict, source_document_id: int):
             continue
 
         # Structures affiliées à cet auteur sur ce document (par form_id)
-        hal_struct_ids = None
+        # Résoudre les hal_struct_id bruts → source_structures.id
+        source_struct_ids = None
         if form_id and form_id in form_struct_map:
-            hal_struct_ids = sorted(form_struct_map[form_id])
+            raw_hal_ids = sorted(form_struct_map[form_id])
+            cur.execute("""
+                SELECT id FROM source_structures
+                WHERE source = 'hal' AND source_id = ANY(%s)
+            """, ([str(hid) for hid in raw_hal_ids],))
+            rows = cur.fetchall()
+            if rows:
+                source_struct_ids = sorted(r[0] for r in rows)
 
         cur.execute("""
             INSERT INTO hal_authorships
-                (source_document_id, source_author_id, author_position, hal_struct_ids,
+                (source_document_id, source_author_id, author_position, source_struct_ids,
                  author_name_normalized, is_corresponding, roles)
             VALUES (%s, %s, %s, %s, normalize_name_form(%s), %s, %s)
             ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
-                hal_struct_ids = COALESCE(
-                    EXCLUDED.hal_struct_ids,
-                    hal_authorships.hal_struct_ids
+                source_struct_ids = COALESCE(
+                    EXCLUDED.source_struct_ids,
+                    hal_authorships.source_struct_ids
                 ),
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 is_corresponding = EXCLUDED.is_corresponding,
                 roles = EXCLUDED.roles
         """, (source_document_id, source_author_id, position,
-              hal_struct_ids, name, is_corresponding, roles or None))
+              source_struct_ids, name, is_corresponding, roles or None))
 
 
 # =============================================================
@@ -583,7 +594,7 @@ def process_work(cur, staging_row: tuple) -> bool:
         update_sources(cur, publication_id)
         timings["hal_doc"] = time.perf_counter() - t0
 
-        # Auteurs et authorships (avec hal_struct_ids)
+        # Auteurs et authorships (avec source_struct_ids)
         t0 = time.perf_counter()
         process_authors(cur, doc, source_document_id)
         timings["authors"] = time.perf_counter() - t0
