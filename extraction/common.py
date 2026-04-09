@@ -16,7 +16,7 @@ def compute_hash(raw_data: dict) -> str:
     return hashlib.md5(canonical.encode("utf-8")).hexdigest()
 
 
-VALID_SOURCES = {"hal", "openalex", "wos", "scanr"}
+VALID_SOURCES = {"hal", "openalex", "wos", "scanr", "theses"}
 
 
 def get_cross_import_dois(conn, target: str, all_staged: bool = False) -> list[str]:
