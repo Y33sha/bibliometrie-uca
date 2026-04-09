@@ -1,7 +1,7 @@
 """
-Peuple wos_organizations et wos_authorships.wos_institution_ids.
+Peuple source_structures (source='wos') et wos_authorships.source_struct_ids.
 
-Passe 1 : insère toutes les organizations manquantes (un seul gros INSERT)
+Passe 1 : insère toutes les organizations manquantes dans source_structures
 Passe 2 : met à jour les authorships par batch SQL
 
 Usage:
@@ -23,7 +23,7 @@ def main():
     conn.autocommit = False
     cur = conn.cursor()
 
-    cur.execute("SELECT COUNT(*) FROM wos_authorships WHERE wos_institution_ids IS NULL")
+    cur.execute("SELECT COUNT(*) FROM wos_authorships WHERE source_struct_ids IS NULL")
     total = cur.fetchone()[0]
     print(f"{total} authorships WoS à traiter")
 
@@ -34,8 +34,8 @@ def main():
     # ── Passe 1 : insérer toutes les organizations manquantes ──
     print("Passe 1 : insertion des organisations...")
     cur.execute("""
-        INSERT INTO wos_organizations (name, ror_id)
-        SELECT name, MAX(ror_id) AS ror_id
+        INSERT INTO source_structures (source, source_id, name, ror_id)
+        SELECT 'wos', name, name, MAX(ror_id) AS ror_id
         FROM (
             SELECT org->>'content' AS name, org->>'ror_id' AS ror_id
             FROM staging sw,
@@ -56,13 +56,12 @@ def main():
             WHERE org->>'content' IS NOT NULL AND org->>'content' != ''
         ) raw_orgs
         GROUP BY name
-        ON CONFLICT (name) DO UPDATE SET
-            ror_id = COALESCE(wos_organizations.ror_id, EXCLUDED.ror_id),
-            updated_at = now()
+        ON CONFLICT (source, source_id) DO UPDATE SET
+            ror_id = COALESCE(source_structures.ror_id, EXCLUDED.ror_id)
     """)
     conn.commit()
-    cur.execute("SELECT COUNT(*) FROM wos_organizations")
-    print(f"  {cur.fetchone()[0]} organisations en base")
+    cur.execute("SELECT COUNT(*) FROM source_structures WHERE source = 'wos'")
+    print(f"  {cur.fetchone()[0]} organisations WoS en base")
 
     # ── Passe 2 : mettre à jour les authorships par batch ──
     print("Passe 2 : mise à jour des authorships...")
@@ -77,13 +76,13 @@ def main():
                 FROM wos_authorships was
                 JOIN source_documents wd ON wd.id = was.source_document_id AND wd.source = 'wos'
                 JOIN staging sw ON sw.id = wd.staging_id
-                WHERE was.wos_institution_ids IS NULL
+                WHERE was.source_struct_ids IS NULL
                 ORDER BY was.id
                 LIMIT %s
             ),
             resolved AS (
                 SELECT b.was_id,
-                       array_agg(DISTINCT wo.id) AS org_ids
+                       array_agg(DISTINCT ss.id) AS org_ids
                 FROM batch b,
                 LATERAL jsonb_array_elements(
                     CASE jsonb_typeof(b.static->'summary'->'names'->'name')
@@ -104,14 +103,15 @@ def main():
                         ELSE jsonb_build_array(addr->'address_spec'->'organizations'->'organization')
                     END
                 ) AS org
-                JOIN wos_organizations wo ON wo.name = org->>'content'
+                JOIN source_structures ss
+                    ON ss.source = 'wos' AND ss.source_id = org->>'content'
                 WHERE name_obj->>'role' = 'author'
                   AND (COALESCE((name_obj->>'seq_no')::int, 1) - 1) = b.author_position
                   AND (addr->'address_spec'->>'addr_no') = addr_no_str
                 GROUP BY b.was_id
             )
             UPDATE wos_authorships was
-            SET wos_institution_ids = COALESCE(r.org_ids, '{}')
+            SET source_struct_ids = COALESCE(r.org_ids, '{}')
             FROM (
                 SELECT b2.was_id, r2.org_ids
                 FROM batch b2
@@ -132,7 +132,7 @@ def main():
         print(f"  {processed}/{total} ({rate:.0f}/s, ~{remaining/60:.0f}min)")
 
     elapsed = time.time() - t0
-    cur.execute("SELECT COUNT(*) FROM wos_authorships WHERE wos_institution_ids != '{}'")
+    cur.execute("SELECT COUNT(*) FROM wos_authorships WHERE source_struct_ids != '{}'")
     total_with = cur.fetchone()[0]
 
     print(f"\nTerminé en {elapsed/60:.0f}min :")

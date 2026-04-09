@@ -10,8 +10,8 @@ Tables peuplées :
     publishers, journals, publications          (tables de vérité — partagées)
     source_documents                            (lien staging ↔ publication, source='openalex')
     source_authors                              (auteurs unifiés, source='openalex')
-    openalex_authorships                        (lien document × auteur)
-    openalex_institutions                       (institutions OpenAlex)
+    openalex_authorships                        (lien document × auteur, avec source_struct_ids)
+    source_structures                           (structures sources, source='openalex')
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
@@ -300,13 +300,13 @@ def upsert_openalex_author(cur, authorship: dict) -> int | None:
 
 
 # =============================================================
-# OPENALEX INSTITUTIONS
+# OPENALEX INSTITUTIONS (source_structures, source='openalex')
 # =============================================================
 
-def upsert_openalex_institution(cur, institution: dict) -> str | None:
+def upsert_openalex_institution(cur, institution: dict) -> int | None:
     """
-    Insère/retrouve une institution OpenAlex.
-    Retourne l'openalex_id court (ex: I123456) ou None.
+    Insère/retrouve une institution OpenAlex dans source_structures.
+    Retourne source_structures.id ou None.
     """
     inst_id_url = institution.get("id")
     if not inst_id_url:
@@ -319,20 +319,29 @@ def upsert_openalex_institution(cur, institution: dict) -> str | None:
     inst_type = institution.get("type")
 
     if not name:
-        return openalex_id
+        # Essayer de retrouver quand même par source_id
+        cur.execute("""
+            SELECT id FROM source_structures
+            WHERE source = 'openalex' AND source_id = %s
+        """, (openalex_id,))
+        row = cur.fetchone()
+        return row["id"] if row else None
+
+    source_data = Json({"type": inst_type}) if inst_type else None
 
     cur.execute("""
-        INSERT INTO openalex_institutions
-            (openalex_id, name, ror_id, country_code, type)
-        VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT (openalex_id) DO UPDATE SET
-            name = COALESCE(NULLIF(openalex_institutions.name, ''), EXCLUDED.name),
-            ror_id = COALESCE(openalex_institutions.ror_id, EXCLUDED.ror_id),
-            updated_at = now()
-        RETURNING openalex_id
-    """, (openalex_id, name, ror_id, country_code, inst_type))
+        INSERT INTO source_structures
+            (source, source_id, name, ror_id, country, source_data)
+        VALUES ('openalex', %s, %s, %s, %s, %s)
+        ON CONFLICT (source, source_id) DO UPDATE SET
+            name = COALESCE(NULLIF(source_structures.name, ''), EXCLUDED.name),
+            ror_id = COALESCE(source_structures.ror_id, EXCLUDED.ror_id),
+            source_data = COALESCE(source_structures.source_data, '{}') ||
+                          COALESCE(EXCLUDED.source_data, '{}')
+        RETURNING id
+    """, (openalex_id, name, ror_id, country_code, source_data))
     row = cur.fetchone()
-    return row["openalex_id"] if row else openalex_id
+    return row["id"] if row else None
 
 
 # =============================================================
@@ -344,8 +353,8 @@ def process_authorships(cur, work: dict, source_document_id: int):
     Traite les authorships d'un work OpenAlex :
     - Insère/retrouve chaque auteur dans source_authors (source='openalex')
     - Crée les liens openalex_authorships
-    - Extrait et insère les institutions dans openalex_institutions
-    - Stocke les openalex_institution_ids sur chaque authorship
+    - Extrait et insère les institutions dans source_structures (source='openalex')
+    - Stocke les source_struct_ids (source_structures.id) sur chaque authorship
     """
     authorships = work.get("authorships") or []
 
@@ -374,17 +383,17 @@ def process_authorships(cur, work: dict, source_document_id: int):
             inst_names = [i.get("display_name") for i in institutions if i.get("display_name")]
             raw_affil_text = " | ".join(inst_names) if inst_names else None
 
-        # Institutions OpenAlex
-        institution_ids = []
+        # Institutions OpenAlex → source_structures.id
+        source_struct_ids = []
         for inst in (authorship.get("institutions") or []):
-            inst_oa_id = upsert_openalex_institution(cur, inst)
-            if inst_oa_id:
-                institution_ids.append(inst_oa_id)
+            ss_id = upsert_openalex_institution(cur, inst)
+            if ss_id:
+                source_struct_ids.append(ss_id)
 
         cur.execute("""
             INSERT INTO openalex_authorships
                 (source_document_id, source_author_id, author_position,
-                 raw_affiliation, openalex_institution_ids,
+                 raw_affiliation, source_struct_ids,
                  raw_author_name, author_name_normalized, is_corresponding)
             VALUES (%s, %s, %s, %s, %s, %s, normalize_name_form(%s), %s)
             ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
@@ -402,7 +411,7 @@ def process_authorships(cur, work: dict, source_document_id: int):
                 ),
                 is_corresponding = EXCLUDED.is_corresponding
         """, (source_document_id, source_author_id, position,
-              raw_affil_text, institution_ids or None,
+              raw_affil_text, source_struct_ids or None,
               raw_author_name, raw_author_name, is_corresponding))
 
 
@@ -579,10 +588,13 @@ def main():
         logger.info(f"Erreurs : {errors}")
 
         for table in ["publications", "journals", "publishers",
-                       "openalex_authorships", "openalex_institutions"]:
+                       "openalex_authorships"]:
             cur.execute(f"SELECT COUNT(*) FROM {table}")
             count = cur.fetchone()["count"]
             logger.info(f"  {table} : {count} enregistrements")
+        cur.execute("SELECT COUNT(*) FROM source_structures WHERE source = 'openalex'")
+        count = cur.fetchone()["count"]
+        logger.info(f"  source_structures (openalex) : {count} enregistrements")
         cur.execute("SELECT COUNT(*) FROM source_authors WHERE source = 'openalex'")
         count = cur.fetchone()["count"]
         logger.info(f"  source_authors (openalex) : {count} enregistrements")

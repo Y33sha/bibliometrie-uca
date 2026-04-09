@@ -2,7 +2,7 @@
 Recalcule publications.countries à partir des 3 sources.
 
 Sources des pays :
-  - HAL : source_documents.countries (via hal_structures.country)
+  - HAL : source_documents.countries (via source_structures.country)
   - OpenAlex : addresses.countries (via openalex_authorship_addresses)
   - WoS : addresses.countries (via wos_authorship_addresses)
 
@@ -65,21 +65,21 @@ REFRESH_QUERY = """
 
 
 def refresh_hal_document_countries(cur):
-    """Étape préalable : propager hal_structures.country → source_documents.countries (HAL).
+    """Étape préalable : propager source_structures.country → source_documents.countries (HAL).
 
     Pour chaque document HAL, collecte les pays des structures de ses auteurs
-    (via hal_authorships.hal_struct_ids → hal_structures.country).
+    (via hal_authorships.source_struct_ids → source_structures.country).
     """
     cur.execute("""
         UPDATE source_documents sd
         SET countries = sub.doc_countries
         FROM (
             SELECT has.source_document_id,
-                   array_agg(DISTINCT hs.country ORDER BY hs.country) AS doc_countries
+                   array_agg(DISTINCT ss.country ORDER BY ss.country) AS doc_countries
             FROM hal_authorships has,
-                 LATERAL unnest(has.hal_struct_ids) AS hsid(val)
-            JOIN hal_structures hs ON hs.hal_struct_id = hsid.val
-            WHERE hs.country IS NOT NULL
+                 LATERAL unnest(has.source_struct_ids) AS ssid(val)
+            JOIN source_structures ss ON ss.id = ssid.val
+            WHERE ss.country IS NOT NULL
             GROUP BY has.source_document_id
         ) sub
         WHERE sd.id = sub.source_document_id

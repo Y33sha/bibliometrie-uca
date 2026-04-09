@@ -2,8 +2,13 @@
 """
 enrich_hal_structures.py
 ========================
-Interroge l'API ref/structure de HAL pour enrichir la table hal_structures
-avec les métadonnées complètes : dates, parents, identifiants externes, alias, etc.
+Interroge l'API ref/structure de HAL pour enrichir la table source_structures
+(source='hal') avec les métadonnées complètes : dates, parents, identifiants
+externes, alias, etc.
+
+Les champs spécifiques HAL (type, valid, code, doc_count, parent_ids,
+start_date, end_date) sont stockés dans le champ JSONB source_data.
+enriched_at est une colonne réelle de source_structures.
 
 Usage:
     python3 enrich_hal_structures.py                # enrichir les structures non-enrichies
@@ -52,14 +57,19 @@ def fetch_batch(struct_ids):
 
 
 def parse_doc(doc):
-    """Extrait les champs d'un document API en dict prêt pour l'insertion."""
+    """Extrait les champs d'un document API en dict prêt pour l'insertion.
+
+    Retourne un dict avec :
+    - Les colonnes réelles de source_structures (source_id, name, acronym, country, enriched_at)
+    - source_data : JSONB contenant type, valid, code, doc_count, parent_ids, start_date, end_date
+    """
     def int_list(field):
         """Convertit une liste (parfois de strings) en liste d'ints."""
         val = doc.get(field)
         if not val:
             return None
         return [int(v) for v in val]
-    
+
     def normalize_date(field):
         """Normalise une date HAL qui peut être 'YYYY', 'YYYY-MM' ou 'YYYY-MM-DD'."""
         val = doc.get(field)
@@ -71,56 +81,58 @@ def parse_doc(doc):
         if len(val) == 7:       # "2021-01" → "2021-01-01"
             return f"{val}-01"
         return val              # "2021-01-01" → tel quel
-    
+
     # code_s peut contenir des doublons (un par parent), on prend le premier
     codes = doc.get("code_s")
     code = codes[0] if codes else None
-    
+
+    parent_ids = int_list("parentDocid_i")
+
     return {
-        "hal_struct_id": doc["docid"],
+        "source_id": str(doc["docid"]),
         "name": doc.get("name_s"),
         "acronym": doc.get("acronym_s"),
-        "type": doc.get("type_s"),
-        "valid": doc.get("valid_s"),
-        "start_date": normalize_date("startDate_s"),
-        "end_date": normalize_date("endDate_s"),
-        "code": code,
         "country": doc.get("country_s"),
-        "parent_ids": int_list("parentDocid_i"),
+        "source_data": {
+            "type": doc.get("type_s"),
+            "valid": doc.get("valid_s"),
+            "start_date": normalize_date("startDate_s"),
+            "end_date": normalize_date("endDate_s"),
+            "code": code,
+            "parent_ids": parent_ids,
+        },
     }
 
 
 def upsert_structures(cur, records):
-    """Insère ou met à jour les structures dans hal_structures."""
+    """Insère ou met à jour les structures dans source_structures (source='hal')."""
     if not records:
         return 0
-    
-    sql = """
-        INSERT INTO hal_structures (
-            hal_struct_id, name, acronym, type, valid,
-            start_date, end_date, code, country,
-            parent_ids, enriched_at
-        ) VALUES (
-            %(hal_struct_id)s, COALESCE(%(name)s, '(inconnu)'), %(acronym)s, %(type)s, %(valid)s,
-            %(start_date)s, %(end_date)s, %(code)s, %(country)s,
-            %(parent_ids)s, now()
-        )
-        ON CONFLICT (hal_struct_id) DO UPDATE SET
-            name = COALESCE(EXCLUDED.name, '(inconnu)'),
-            acronym = EXCLUDED.acronym,
-            type = EXCLUDED.type,
-            valid = EXCLUDED.valid,
-            start_date = EXCLUDED.start_date,
-            end_date = EXCLUDED.end_date,
-            code = EXCLUDED.code,
-            country = EXCLUDED.country,
-            parent_ids = EXCLUDED.parent_ids,
-            enriched_at = now()
-    """
-    
+
     count = 0
     for rec in records:
-        cur.execute(sql, rec)
+        source_data_json = psycopg2.extras.Json(rec["source_data"])
+        cur.execute("""
+            INSERT INTO source_structures (
+                source, source_id, name, acronym, country,
+                source_data, enriched_at
+            ) VALUES (
+                'hal', %(source_id)s, COALESCE(%(name)s, '(inconnu)'), %(acronym)s,
+                %(country)s, %(source_data)s, now()
+            )
+            ON CONFLICT (source, source_id) DO UPDATE SET
+                name = COALESCE(EXCLUDED.name, '(inconnu)'),
+                acronym = EXCLUDED.acronym,
+                country = EXCLUDED.country,
+                source_data = EXCLUDED.source_data,
+                enriched_at = now()
+        """, {
+            "source_id": rec["source_id"],
+            "name": rec["name"],
+            "acronym": rec["acronym"],
+            "country": rec["country"],
+            "source_data": source_data_json,
+        })
         count += 1
     return count
 
@@ -128,12 +140,12 @@ def upsert_structures(cur, records):
 def enrich(conn, only_missing=True):
     """Enrichit les structures depuis l'API HAL."""
     cur = conn.cursor()
-    
+
     if only_missing:
-        cur.execute("SELECT hal_struct_id FROM hal_structures WHERE enriched_at IS NULL")
+        cur.execute("SELECT source_id::int FROM source_structures WHERE source = 'hal' AND enriched_at IS NULL")
     else:
-        cur.execute("SELECT hal_struct_id FROM hal_structures")
-    
+        cur.execute("SELECT source_id::int FROM source_structures WHERE source = 'hal'")
+
     ids = [row[0] for row in cur.fetchall()]
     
     if not ids:
@@ -168,23 +180,25 @@ def enrich(conn, only_missing=True):
 
 def crawl_parents(conn):
     """Découvre et enrichit les parents non encore présents dans la table.
-    
+
     Parcourt récursivement l'arbre des parents jusqu'à ce qu'il n'y ait
     plus de parents inconnus. Permet de reconstruire toute la hiérarchie.
     """
     cur = conn.cursor()
     iteration = 0
-    
+
     while True:
         iteration += 1
-        
+
         # Trouver les parent_ids référencés mais pas encore dans la table
         cur.execute("""
-            SELECT DISTINCT unnest(parent_ids) AS pid
-            FROM hal_structures
-            WHERE parent_ids IS NOT NULL
+            SELECT DISTINCT pid::int
+            FROM source_structures ss,
+                 LATERAL jsonb_array_elements_text(ss.source_data->'parent_ids') AS pid
+            WHERE ss.source = 'hal'
+              AND ss.source_data->'parent_ids' IS NOT NULL
             EXCEPT
-            SELECT hal_struct_id FROM hal_structures
+            SELECT source_id::int FROM source_structures WHERE source = 'hal'
         """)
         missing_parents = [row[0] for row in cur.fetchall()]
         
@@ -209,79 +223,95 @@ def crawl_parents(conn):
         print(f"  → {total} parents insérés et enrichis.")
     
     # Résumé
-    cur.execute("SELECT count(*) FROM hal_structures")
-    print(f"\nTotal dans hal_structures: {cur.fetchone()[0]} structures.")
+    cur.execute("SELECT count(*) FROM source_structures WHERE source = 'hal'")
+    print(f"\nTotal dans source_structures (hal): {cur.fetchone()[0]} structures.")
 
 
 def find_children(conn, root_id):
     """Trouve récursivement tous les enfants (directs et indirects) d'une structure.
-    
-    Utilise le champ parent_ids : si root_id est dans parent_ids d'une structure,
-    c'est un enfant direct. On descend ensuite récursivement.
+
+    Utilise le champ source_data->'parent_ids' : si root_id est dans parent_ids
+    d'une structure, c'est un enfant direct. On descend ensuite récursivement.
     """
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    
+
     # Charger la structure racine
-    cur.execute("SELECT hal_struct_id, name, acronym, type FROM hal_structures WHERE hal_struct_id = %s", (root_id,))
+    cur.execute("""
+        SELECT source_id, name, acronym, source_data->>'type' AS type
+        FROM source_structures
+        WHERE source = 'hal' AND source_id = %s
+    """, (str(root_id),))
     root = cur.fetchone()
     if not root:
-        print(f"Structure {root_id} non trouvée dans hal_structures.")
+        print(f"Structure {root_id} non trouvee dans source_structures (hal).")
         return
-    
+
     print(f"Enfants de: {root['name']} ({root['acronym'] or '?'}) [HAL#{root_id}]\n")
-    
-    # Requête récursive
+
+    # Requete recursive
     cur.execute("""
         WITH RECURSIVE children AS (
             -- Enfants directs
-            SELECT hal_struct_id, name, acronym, type, valid, start_date, end_date,
-                   parent_ids, 1 AS depth
-            FROM hal_structures
-            WHERE %s = ANY(parent_ids)
-            
+            SELECT source_id, name, acronym,
+                   source_data->>'type' AS type,
+                   source_data->>'valid' AS valid,
+                   source_data->>'start_date' AS start_date,
+                   source_data->>'end_date' AS end_date,
+                   source_data->'parent_ids' AS parent_ids,
+                   1 AS depth
+            FROM source_structures
+            WHERE source = 'hal'
+              AND source_data->'parent_ids' @> %s::jsonb
+
             UNION ALL
-            
+
             -- Enfants indirects
-            SELECT hs.hal_struct_id, hs.name, hs.acronym, hs.type, hs.valid,
-                   hs.start_date, hs.end_date, hs.parent_ids, c.depth + 1
-            FROM hal_structures hs
-            JOIN children c ON c.hal_struct_id = ANY(hs.parent_ids)
-            WHERE c.depth < 10  -- sécurité anti-boucle
+            SELECT ss.source_id, ss.name, ss.acronym,
+                   ss.source_data->>'type' AS type,
+                   ss.source_data->>'valid' AS valid,
+                   ss.source_data->>'start_date' AS start_date,
+                   ss.source_data->>'end_date' AS end_date,
+                   ss.source_data->'parent_ids' AS parent_ids,
+                   c.depth + 1
+            FROM source_structures ss
+            JOIN children c ON ss.source_data->'parent_ids' @> to_jsonb(c.source_id::int)
+            WHERE ss.source = 'hal'
+              AND c.depth < 10  -- securite anti-boucle
         )
-        SELECT DISTINCT ON (hal_struct_id)
-            hal_struct_id, name, acronym, type, valid, start_date, end_date, depth
+        SELECT DISTINCT ON (source_id)
+            source_id, name, acronym, type, valid, start_date, end_date, depth
         FROM children
-        ORDER BY hal_struct_id, depth
-    """, (root_id,))
-    
+        ORDER BY source_id, depth
+    """, (str(root_id),))
+
     children = cur.fetchall()
-    
+
     # Grouper par type
     by_type = {}
     for c in children:
         t = c["type"] or "unknown"
         by_type.setdefault(t, []).append(c)
-    
+
     for typ in sorted(by_type.keys()):
         items = sorted(by_type[typ], key=lambda x: (x["name"] or ""))
-        print(f"── {typ} ({len(items)}) ──")
+        print(f"-- {typ} ({len(items)}) --")
         for c in items:
             status = f" [{c['valid']}]" if c["valid"] else ""
             dates = ""
             if c["start_date"] or c["end_date"]:
                 s = str(c["start_date"])[:4] if c["start_date"] else "?"
-                e = str(c["end_date"])[:4] if c["end_date"] else "···"
-                dates = f" ({s}→{e})"
+                e = str(c["end_date"])[:4] if c["end_date"] else "..."
+                dates = f" ({s}->{e})"
             acr = f" ({c['acronym']})" if c['acronym'] else ""
-            depth_marker = "  " * (c["depth"] - 1) + "├─ " if c["depth"] > 1 else ""
-            print(f"  {depth_marker}HAL#{c['hal_struct_id']:>8}  {c['name']}{acr}{dates}{status}")
+            depth_marker = "  " * (c["depth"] - 1) + "|- " if c["depth"] > 1 else ""
+            print(f"  {depth_marker}HAL#{c['source_id']:>8}  {c['name']}{acr}{dates}{status}")
         print()
-    
+
     print(f"Total: {len(children)} structures enfants.")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Enrichir hal_structures depuis l'API HAL")
+    parser = argparse.ArgumentParser(description="Enrichir source_structures (HAL) depuis l'API HAL")
     parser.add_argument("--all", action="store_true",
                         help="Ré-enrichir toutes les structures (pas seulement les manquantes)")
     parser.add_argument("--crawl", action="store_true",

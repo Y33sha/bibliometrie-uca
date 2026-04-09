@@ -1,15 +1,15 @@
 """
-Peuple la table hal_structures depuis les données de staging HAL,
+Peuple la table source_structures (source='hal') depuis les données de staging HAL,
 puis propose des correspondances avec la table structures locale.
 
 Étape 1 : extract  — extrait les structures HAL depuis staging.raw_data
-Étape 2 : match    — propose des correspondances hal_structures → structures
+Étape 2 : match    — propose des correspondances source_structures → structures
 Étape 3 : apply    — applique les correspondances validées
 
 Usage:
-    python populate_hal_struct_ids.py extract         # peupler hal_structures
-    python populate_hal_struct_ids.py match           # proposer les correspondances
-    python populate_hal_struct_ids.py apply           # appliquer + copier hal_struct_id vers structures
+    python map_hal_structures.py extract         # peupler source_structures (hal)
+    python map_hal_structures.py match           # proposer les correspondances
+    python map_hal_structures.py apply           # appliquer
 """
 
 import argparse
@@ -28,11 +28,11 @@ logger = logging.getLogger(__name__)
 
 
 # =================================================================
-# EXTRACT : staging → hal_structures
+# EXTRACT : staging → source_structures (hal)
 # =================================================================
 
 def do_extract(conn):
-    """Extrait les structures HAL depuis staging vers hal_structures.
+    """Extrait les structures HAL depuis staging vers source_structures (source='hal').
 
     Utilise structIdName_fs (champ composé "id_FacetSep_nom") qui est
     auto-documenté et fiable. Les champs parallèles (structId_i, structName_s,
@@ -47,7 +47,7 @@ def do_extract(conn):
         WHERE source = 'hal' AND raw_data ? 'structIdName_fs'
     """)
 
-    structs = {}  # hal_struct_id → {name, count}
+    structs = {}  # hal_struct_id (str) → {name, count}
 
     for row in cur.fetchall():
         entries = row["entries"] or []
@@ -63,35 +63,39 @@ def do_extract(conn):
             if not name:
                 continue
 
-            if sid not in structs:
-                structs[sid] = {"name": name, "count": 0}
-            structs[sid]["count"] += 1
+            sid_str = str(sid)
+            if sid_str not in structs:
+                structs[sid_str] = {"name": name, "count": 0}
+            structs[sid_str]["count"] += 1
 
     logger.info(f"  {len(structs)} structures HAL distinctes extraites")
 
     inserted = 0
-    for hal_id, info in structs.items():
+    for source_id, info in structs.items():
+        from psycopg2.extras import Json
+        source_data = Json({"doc_count": info["count"]})
         cur.execute("""
-            INSERT INTO hal_structures (hal_struct_id, name, doc_count)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (hal_struct_id) DO UPDATE SET
+            INSERT INTO source_structures (source, source_id, name, source_data)
+            VALUES ('hal', %s, %s, %s)
+            ON CONFLICT (source, source_id) DO UPDATE SET
                 name = EXCLUDED.name,
-                doc_count = EXCLUDED.doc_count
-        """, (hal_id, info["name"], info["count"]))
+                source_data = COALESCE(source_structures.source_data, '{}') ||
+                              EXCLUDED.source_data
+        """, (source_id, info["name"], source_data))
         inserted += 1
 
     conn.commit()
-    logger.info(f"  {inserted} hal_structures insérées/mises à jour")
+    logger.info(f"  {inserted} source_structures (hal) insérées/mises à jour")
 
     cur.close()
 
 
 # =================================================================
-# MATCH : hal_structures ↔ structures
+# MATCH : source_structures (hal) ↔ structures
 # =================================================================
 
 def do_match(conn):
-    """Propose des correspondances entre hal_structures et structures.
+    """Propose des correspondances entre source_structures (hal) et structures.
 
     Matching par nom normalisé uniquement. On compare :
     - notre nom normalisé ↔ nom HAL normalisé
@@ -103,7 +107,10 @@ def do_match(conn):
     cur.execute("""
         SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text,
                s.hal_collection,
-               EXISTS (SELECT 1 FROM hal_structures hs WHERE hs.structure_id = s.id) AS has_hal_link
+               EXISTS (
+                   SELECT 1 FROM source_structures ss
+                   WHERE ss.source = 'hal' AND ss.structure_id = s.id
+               ) AS has_hal_link
         FROM structures s
         ORDER BY s.structure_type, s.name
     """)
@@ -111,9 +118,12 @@ def do_match(conn):
 
     # Toutes les structures HAL
     cur.execute("""
-        SELECT hal_struct_id, name, doc_count, structure_id
-        FROM hal_structures
-        ORDER BY doc_count DESC
+        SELECT source_id AS hal_struct_id, name,
+               (source_data->>'doc_count')::int AS doc_count,
+               structure_id
+        FROM source_structures
+        WHERE source = 'hal'
+        ORDER BY (source_data->>'doc_count')::int DESC NULLS LAST
     """)
     hal_structs = cur.fetchall()
 
@@ -185,7 +195,7 @@ def do_match(conn):
 # =================================================================
 
 def do_apply(conn):
-    """Applique les matchs et copie hal_struct_id vers structures."""
+    """Applique les matchs : lie source_structures (hal) → structures."""
     matches = do_match(conn)
 
     if not matches:
@@ -195,11 +205,11 @@ def do_apply(conn):
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     for struct_id, hal_struct_id in matches:
-        # Lier hal_structures → structures
+        # Lier source_structures → structures
         cur.execute("""
-            UPDATE hal_structures SET structure_id = %s
-            WHERE hal_struct_id = %s
-        """, (struct_id, hal_struct_id))
+            UPDATE source_structures SET structure_id = %s
+            WHERE source = 'hal' AND source_id = %s
+        """, (struct_id, str(hal_struct_id)))
 
     conn.commit()
     logger.info(f"\n  {len(matches)} correspondances appliquées.")
@@ -211,7 +221,7 @@ def do_apply(conn):
 def main():
     parser = argparse.ArgumentParser(description="Structures HAL → structures locales")
     parser.add_argument("action", choices=["extract", "match", "apply"],
-                        help="extract: peupler hal_structures ; match: proposer ; apply: appliquer")
+                        help="extract: peupler source_structures (hal) ; match: proposer ; apply: appliquer")
     args = parser.parse_args()
 
     conn = get_connection()

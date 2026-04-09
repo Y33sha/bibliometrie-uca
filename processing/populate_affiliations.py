@@ -27,17 +27,17 @@ logger = setup_logger("populate_affiliations", os.path.join(os.path.dirname(__fi
 
 
 def step1_hal_structure_ids(cur):
-    """Étape 1 : HAL — mapper hal_struct_ids → structure_ids (réels)."""
+    """Étape 1 : HAL — mapper source_struct_ids → structure_ids (réels)."""
     cur.execute("""
         UPDATE hal_authorships has
         SET structure_ids = mapped.struct_ids
         FROM (
             SELECT has2.id,
-                   array_agg(DISTINCT hs.structure_id) AS struct_ids
+                   array_agg(DISTINCT ss.structure_id) AS struct_ids
             FROM hal_authorships has2,
-                 LATERAL unnest(has2.hal_struct_ids) AS hsid(val)
-            JOIN hal_structures hs ON hs.hal_struct_id = hsid.val
-            WHERE hs.structure_id IS NOT NULL
+                 LATERAL unnest(has2.source_struct_ids) AS ssid(val)
+            JOIN source_structures ss ON ss.id = ssid.val
+            WHERE ss.structure_id IS NOT NULL
             GROUP BY has2.id
         ) mapped
         WHERE has.id = mapped.id
