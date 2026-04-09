@@ -44,11 +44,11 @@ def find_hal_primary_locations(cur, all_staged: bool = False) -> list[dict]:
     Avec all_staged=True, considère tout le staging.
     Retourne [{openalex_id, hal_id, landing_url}, ...]
     """
-    processed_filter = "" if all_staged else " WHERE processed = FALSE"
+    processed_filter = "" if all_staged else " AND processed = FALSE"
     cur.execute(f"""
-        SELECT openalex_id, raw_data
-        FROM staging_openalex
-        {processed_filter}
+        SELECT source_id AS openalex_id, raw_data
+        FROM staging
+        WHERE source = 'openalex'{processed_filter}
     """)
 
     results = []
@@ -83,7 +83,7 @@ def find_hal_ids_from_scanr(cur) -> list[dict]:
         FROM scanr_documents sd
         WHERE sd.hal_id IS NOT NULL
           AND NOT EXISTS (
-              SELECT 1 FROM staging_hal sh WHERE sh.halid = sd.hal_id
+              SELECT 1 FROM staging sh WHERE sh.source = 'hal' AND sh.source_id = sd.hal_id
           )
     """)
     return [
@@ -99,10 +99,10 @@ def find_missing_hal_ids(cur, hal_refs: list[dict]) -> list[dict]:
 
     hal_ids = [r["hal_id"] for r in hal_refs]
     cur.execute(
-        "SELECT halid FROM staging_hal WHERE halid = ANY(%s)",
+        "SELECT source_id FROM staging WHERE source = 'hal' AND source_id = ANY(%s)",
         (hal_ids,)
     )
-    existing = {row["halid"] for row in cur.fetchall()}
+    existing = {row["source_id"] for row in cur.fetchall()}
 
     missing = [r for r in hal_refs if r["hal_id"] not in existing]
     return missing
@@ -141,19 +141,19 @@ def insert_staging_hal(cur, hal_id: str, doi: str | None, doc: dict):
     """
     raw_hash = compute_hash(doc)
     cur.execute("""
-        INSERT INTO staging_hal (halid, doi, raw_data, collection, processed, raw_hash)
-        VALUES (%s, %s, %s::jsonb, NULL, FALSE, %s)
-        ON CONFLICT (halid) DO UPDATE SET
+        INSERT INTO staging (source, source_id, doi, raw_data, collection, processed, raw_hash)
+        VALUES ('hal', %s, %s, %s::jsonb, NULL, FALSE, %s)
+        ON CONFLICT (source, source_id) DO UPDATE SET
             raw_data = CASE
-                WHEN staging_hal.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                     THEN EXCLUDED.raw_data
-                ELSE staging_hal.raw_data
+                ELSE staging.raw_data
             END,
-            raw_hash = COALESCE(EXCLUDED.raw_hash, staging_hal.raw_hash),
+            raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
             processed = CASE
-                WHEN staging_hal.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                     THEN FALSE
-                ELSE staging_hal.processed
+                ELSE staging.processed
             END
     """, (hal_id, doi, Json(doc), raw_hash))
 

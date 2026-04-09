@@ -39,7 +39,7 @@ def find_duplicates(cur):
         SELECT od.id AS oa_doc_id, od.openalex_id, od.publication_id AS oa_pub_id,
                so.raw_data->'primary_location'->>'landing_page_url' AS url
         FROM openalex_documents od
-        JOIN staging_openalex so ON so.id = od.staging_id
+        JOIN staging so ON so.id = od.staging_id
         WHERE so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.science%'
            OR so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.archives-ouvertes.fr%'
     """)

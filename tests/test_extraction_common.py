@@ -72,29 +72,12 @@ class TestCleanDoi:
 # ── get_existing_ids ─────────────────────────────────────────────
 
 class TestGetExistingIds:
-    def test_rejects_unknown_table(self):
-        with pytest.raises(ValueError, match="non autorisée"):
-            get_existing_ids(None, "users", "id")
-
-    def test_rejects_wrong_column(self):
-        with pytest.raises(ValueError, match="non autorisée"):
-            get_existing_ids(None, "staging_hal", "id")
-
-    def test_allowed_combinations(self):
-        """Vérifie que les combinaisons autorisées ne lèvent pas ValueError."""
-        allowed = [
-            ("staging_openalex", "openalex_id"),
-            ("staging_hal", "halid"),
-            ("staging_wos", "ut"),
-        ]
-        for table, col in allowed:
-            # Devrait échouer sur la connexion, pas sur la validation
-            with pytest.raises(AttributeError):
-                get_existing_ids(None, table, col)
+    def test_rejects_unknown_source(self):
+        with pytest.raises(ValueError, match="Source inconnue"):
+            get_existing_ids(None, "unknown")
 
     def test_returns_set(self, db):
         """Avec une base vide, retourne un set vide."""
-        # db est un cursor, on a besoin de la connexion
         conn = db.connection
-        result = get_existing_ids(conn, "staging_hal", "halid")
+        result = get_existing_ids(conn, "hal")
         assert result == set()

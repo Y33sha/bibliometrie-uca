@@ -7,7 +7,7 @@ Usage:
     python extract_scanr.py --dry-run      # compter sans insérer
 
 L'API est un Elasticsearch interrogé via search_after pour la pagination.
-Les résultats bruts sont stockés dans staging_scanr (JSONB).
+Les résultats bruts sont stockés dans staging (JSONB).
 """
 
 import argparse
@@ -111,17 +111,17 @@ def extract_year(conn, url: str, auth: tuple, year: int,
             if scanr_id in existing_ids:
                 # Mettre à jour si le hash a changé
                 cur.execute("""
-                    UPDATE staging_scanr
+                    UPDATE staging
                     SET raw_data = %s, doi = %s, raw_hash = %s, last_seen_at = now()
-                    WHERE scanr_id = %s AND (raw_hash IS DISTINCT FROM %s)
+                    WHERE source = 'scanr' AND source_id = %s AND (raw_hash IS DISTINCT FROM %s)
                 """, (Json(doc), doi, raw_hash, scanr_id, raw_hash))
                 if cur.rowcount:
                     updated += 1
             else:
                 cur.execute("""
-                    INSERT INTO staging_scanr (scanr_id, doi, raw_data, raw_hash)
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (scanr_id) DO NOTHING
+                    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
+                    VALUES ('scanr', %s, %s, %s, %s)
+                    ON CONFLICT (source, source_id) DO NOTHING
                 """, (scanr_id, doi, Json(doc), raw_hash))
                 if cur.rowcount:
                     inserted += 1
@@ -159,7 +159,7 @@ def main():
     logger.info(f"=== Extraction ScanR : années {years}, {len(affiliation_ids)} structures ===")
 
     if not args.dry_run:
-        existing_ids = get_existing_ids(conn, "staging_scanr", "scanr_id")
+        existing_ids = get_existing_ids(conn, "scanr")
         logger.info(f"  {len(existing_ids)} documents déjà en staging")
     else:
         existing_ids = set()

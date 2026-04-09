@@ -73,9 +73,10 @@ def main():
 
     # Détecter les works avec exactement 100 authorships dans le staging
     cur.execute("""
-        SELECT id, openalex_id
-        FROM staging_openalex
-        WHERE jsonb_array_length(raw_data->'authorships') = 100
+        SELECT id, source_id
+        FROM staging
+        WHERE source = 'openalex'
+          AND jsonb_array_length(raw_data->'authorships') = 100
         ORDER BY id
     """)
     truncated = cur.fetchall()
@@ -94,7 +95,7 @@ def main():
     errors = 0
 
     for i, row in enumerate(truncated):
-        oa_id = row["openalex_id"]
+        oa_id = row["source_id"]
         work = fetch_work(oa_id)
         time.sleep(OPENALEX.get("request_delay", 0.1))
 
@@ -112,7 +113,7 @@ def main():
         raw_hash = compute_hash(work)
         meta_hash = compute_meta_hash(work)
         cur.execute("""
-            UPDATE staging_openalex
+            UPDATE staging
             SET raw_data = %s::jsonb, raw_hash = %s, meta_hash = %s,
                 processed = FALSE, last_seen_at = now()
             WHERE id = %s

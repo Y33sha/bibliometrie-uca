@@ -38,7 +38,7 @@ def main():
         SELECT name, MAX(ror_id) AS ror_id
         FROM (
             SELECT org->>'content' AS name, org->>'ror_id' AS ror_id
-            FROM staging_wos sw,
+            FROM staging sw,
             LATERAL jsonb_array_elements(
                 CASE jsonb_typeof(sw.raw_data->'static_data'->'fullrecord_metadata'->'addresses'->'address_name')
                     WHEN 'array' THEN sw.raw_data->'static_data'->'fullrecord_metadata'->'addresses'->'address_name'
@@ -76,7 +76,7 @@ def main():
                        sw.raw_data->'static_data' AS static
                 FROM wos_authorships was
                 JOIN wos_documents wd ON wd.id = was.wos_document_id
-                JOIN staging_wos sw ON sw.id = wd.staging_id
+                JOIN staging sw ON sw.id = wd.staging_id
                 WHERE was.wos_institution_ids IS NULL
                 ORDER BY was.id
                 LIMIT %s

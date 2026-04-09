@@ -7,7 +7,7 @@ Usage:
     python extract_wos.py --dry-run    # compte les résultats sans insérer
 
 L'API WoS est interrogée via le champ OG (Organization-Enhanced) + année.
-Les résultats bruts sont stockés dans staging_wos (JSONB).
+Les résultats bruts sont stockés dans staging (JSONB).
 Les records déjà présents (même UT) sont ignorés.
 
 Query:  OG=(Universite Clermont Auvergne OR CHU Clermont Ferrand
@@ -143,30 +143,30 @@ def get_records_found(data: dict) -> int:
 
 def get_existing_uts(conn) -> set:
     """Récupère les UT déjà en base pour éviter les doublons."""
-    return get_existing_ids(conn, "staging_wos", "ut")
+    return get_existing_ids(conn, "wos")
 
 
 def insert_batch(conn, batch: list[tuple]):
-    """Insère un batch de records dans staging_wos.
+    """Insère un batch de records dans staging.
     Si le record existe et le hash a changé, met à jour raw_data et remet processed = FALSE.
     """
     query = """
-        INSERT INTO staging_wos (ut, doi, raw_data, raw_hash)
+        INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
         VALUES %s
-        ON CONFLICT (ut) DO UPDATE SET
+        ON CONFLICT (source, source_id) DO UPDATE SET
             raw_data = CASE
-                WHEN staging_wos.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN EXCLUDED.raw_data ELSE staging_wos.raw_data END,
-            raw_hash = COALESCE(EXCLUDED.raw_hash, staging_wos.raw_hash),
+                WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN EXCLUDED.raw_data ELSE staging.raw_data END,
+            raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
             processed = CASE
-                WHEN staging_wos.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN FALSE ELSE staging_wos.processed END,
+                WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN FALSE ELSE staging.processed END,
             last_seen_at = now()
     """
     with conn.cursor() as cur:
         execute_values(
             cur, query, batch,
-            template="(%s, %s, %s::jsonb, %s)"
+            template="(%s, %s, %s, %s::jsonb, %s)"
         )
     conn.commit()
 
@@ -222,7 +222,7 @@ def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> i
             ut = extract_ut(rec)
             doi = extract_doi(rec)
             h = compute_hash(rec)
-            batch.append((ut, doi, Json(rec), h))
+            batch.append(("wos", ut, doi, Json(rec), h))
             existing_uts.add(ut)
 
         # Insérer
@@ -267,7 +267,7 @@ def log_remaining_quota(resp_headers: dict):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Extraction WoS → staging_wos")
+    parser = argparse.ArgumentParser(description="Extraction WoS → staging")
     parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
     parser.add_argument("--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
@@ -306,7 +306,7 @@ def main():
 
     try:
         existing_uts = get_existing_uts(conn)
-        logger.info(f"{len(existing_uts)} records déjà en staging_wos")
+        logger.info(f"{len(existing_uts)} records déjà en staging")
 
         grand_total = 0
         for i, year in enumerate(years):

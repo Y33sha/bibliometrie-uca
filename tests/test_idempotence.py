@@ -117,12 +117,12 @@ SCANR_STAGING_DOCS = [
 
 
 def _insert_staging(cur, docs):
-    """Insère des documents dans staging_scanr."""
+    """Insère des documents dans staging (source='scanr')."""
     for doc in docs:
         cur.execute("""
-            INSERT INTO staging_scanr (scanr_id, doi, raw_data, processed)
-            VALUES (%s, %s, %s, FALSE)
-            ON CONFLICT (scanr_id) DO UPDATE SET processed = FALSE
+            INSERT INTO staging (source, source_id, doi, raw_data, processed)
+            VALUES ('scanr', %s, %s, %s, FALSE)
+            ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
         """, (doc["scanr_id"], doc["doi"], Json(doc["raw_data"])))
 
 
@@ -144,9 +144,9 @@ def _run_normalize_scanr(cur):
     from processing.normalize_scanr import process_work
 
     cur.execute("""
-        SELECT id, scanr_id, doi, raw_data
-        FROM staging_scanr
-        WHERE processed = FALSE
+        SELECT id, source_id AS scanr_id, doi, raw_data
+        FROM staging
+        WHERE source = 'scanr' AND processed = FALSE
         ORDER BY id
     """)
     rows = cur.fetchall()
@@ -177,7 +177,7 @@ class TestNormalizeScanrIdempotence:
         assert counts_1["publications"] >= 3
 
         # Reset processed flags
-        db.execute("UPDATE staging_scanr SET processed = FALSE")
+        db.execute("UPDATE staging SET processed = FALSE WHERE source = 'scanr'")
 
         # Deuxième passe
         processed_2 = _run_normalize_scanr(db)
@@ -248,7 +248,7 @@ class TestNormalizeScanrIdempotence:
         _run_normalize_scanr(db)
 
         # Première passe ok, reset et relance
-        db.execute("UPDATE staging_scanr SET processed = FALSE")
+        db.execute("UPDATE staging SET processed = FALSE WHERE source = 'scanr'")
         _run_normalize_scanr(db)
 
         db.execute("SELECT count(*) AS cnt FROM publishers WHERE name_normalized LIKE '%elsevier%'")
@@ -306,9 +306,9 @@ HAL_STAGING_DOCS = [
 def _insert_hal_staging(cur, docs):
     for doc in docs:
         cur.execute("""
-            INSERT INTO staging_hal (halid, doi, raw_data, collection, processed)
-            VALUES (%s, %s, %s, %s, FALSE)
-            ON CONFLICT (halid) DO UPDATE SET processed = FALSE
+            INSERT INTO staging (source, source_id, doi, raw_data, collection, processed)
+            VALUES ('hal', %s, %s, %s, %s, FALSE)
+            ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
         """, (doc["halid"], doc["doi"], Json(doc["raw_data"]), doc["collection"]))
 
 
@@ -317,8 +317,8 @@ def _run_normalize_hal(cur):
     plain_cur = cur.connection.cursor()
     from processing.normalize_hal import process_work
     plain_cur.execute("""
-        SELECT id, halid, doi, raw_data, collection
-        FROM staging_hal WHERE processed = FALSE ORDER BY id
+        SELECT id, source_id AS halid, doi, raw_data, collection
+        FROM staging WHERE source = 'hal' AND processed = FALSE ORDER BY id
     """)
     rows = plain_cur.fetchall()
     processed = 0
@@ -344,7 +344,7 @@ class TestNormalizeHalIdempotence:
         counts_1 = _count_hal_tables(db)
         assert processed_1 == 3
 
-        db.execute("UPDATE staging_hal SET processed = FALSE")
+        db.execute("UPDATE staging SET processed = FALSE WHERE source = 'hal'")
         _run_normalize_hal(db)
         counts_2 = _count_hal_tables(db)
 
@@ -427,17 +427,17 @@ OA_STAGING_DOCS = [
 def _insert_oa_staging(cur, docs):
     for doc in docs:
         cur.execute("""
-            INSERT INTO staging_openalex (openalex_id, doi, raw_data, processed)
-            VALUES (%s, %s, %s, FALSE)
-            ON CONFLICT (openalex_id) DO UPDATE SET processed = FALSE
+            INSERT INTO staging (source, source_id, doi, raw_data, processed)
+            VALUES ('openalex', %s, %s, %s, FALSE)
+            ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
         """, (doc["openalex_id"], doc["doi"], Json(doc["raw_data"])))
 
 
 def _run_normalize_oa(cur):
     from processing.normalize_openalex import process_work
     cur.execute("""
-        SELECT id, openalex_id, doi, raw_data
-        FROM staging_openalex WHERE processed = FALSE ORDER BY id
+        SELECT id, source_id AS openalex_id, doi, raw_data
+        FROM staging WHERE source = 'openalex' AND processed = FALSE ORDER BY id
     """)
     rows = cur.fetchall()
     processed = 0
@@ -463,7 +463,7 @@ class TestNormalizeOpenalexIdempotence:
         counts_1 = _count_oa_tables(db)
         assert processed_1 == 3
 
-        db.execute("UPDATE staging_openalex SET processed = FALSE")
+        db.execute("UPDATE staging SET processed = FALSE WHERE source = 'openalex'")
         _run_normalize_oa(db)
         counts_2 = _count_oa_tables(db)
 
@@ -527,9 +527,9 @@ WOS_STAGING_DOCS = [
 def _insert_wos_staging(cur, docs):
     for doc in docs:
         cur.execute("""
-            INSERT INTO staging_wos (ut, doi, raw_data, processed)
-            VALUES (%s, %s, %s, FALSE)
-            ON CONFLICT (ut) DO UPDATE SET processed = FALSE
+            INSERT INTO staging (source, source_id, doi, raw_data, processed)
+            VALUES ('wos', %s, %s, %s, FALSE)
+            ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
         """, (doc["ut"], doc["doi"], Json(doc["raw_data"])))
 
 
@@ -537,8 +537,8 @@ def _run_normalize_wos(cur):
     plain_cur = cur.connection.cursor()
     from processing.normalize_wos import process_record
     plain_cur.execute("""
-        SELECT id, ut, doi, raw_data
-        FROM staging_wos WHERE processed = FALSE ORDER BY id
+        SELECT id, source_id AS ut, doi, raw_data
+        FROM staging WHERE source = 'wos' AND processed = FALSE ORDER BY id
     """)
     rows = plain_cur.fetchall()
     processed = 0
@@ -564,7 +564,7 @@ class TestNormalizeWosIdempotence:
         counts_1 = _count_wos_tables(db)
         assert processed_1 == 3
 
-        db.execute("UPDATE staging_wos SET processed = FALSE")
+        db.execute("UPDATE staging SET processed = FALSE WHERE source = 'wos'")
         _run_normalize_wos(db)
         counts_2 = _count_wos_tables(db)
 
@@ -690,7 +690,7 @@ class TestNormalizeInterSourceIdempotence:
         )
 
         # Passe 3 : relancer HAL
-        db.execute("UPDATE staging_hal SET processed = FALSE")
+        db.execute("UPDATE staging SET processed = FALSE WHERE source = 'hal'")
         _run_normalize_hal(db)
         db.execute("SELECT COUNT(*) AS cnt FROM publications")
         pubs_after_hal2 = db.fetchone()["cnt"]

@@ -27,7 +27,9 @@ def find_versioned_duplicates(cur):
         SELECT p1.id AS target_id, p1.doi AS target_doi,
                p2.id AS source_id, p2.doi AS source_doi
         FROM publications p1
-        JOIN publications p2 ON p2.doi ~ ('^' || p1.doi || '\\.v\\d+$')
+        JOIN publications p2
+          ON p2.doi LIKE p1.doi || '.v%'
+         AND substring(p2.doi FROM length(p1.doi) + 2) ~ '^v\\d+$'
         WHERE p1.doi !~ '\\.v\\d+$'
     """)
     return cur.fetchall()

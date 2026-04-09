@@ -1,5 +1,5 @@
 """
-Normalisation des données ScanR : staging_scanr → tables structurées.
+Normalisation des données ScanR : staging → tables structurées.
 
 Usage:
     python normalize_scanr.py              # traiter tous les works non traités
@@ -342,7 +342,7 @@ def process_work(cur, staging_row) -> bool:
         timings["authors"] = time.perf_counter() - t0
 
         cur.execute(
-            "UPDATE staging_scanr SET processed = TRUE WHERE id = %s",
+            "UPDATE staging SET processed = TRUE WHERE id = %s",
             (staging_id,)
         )
 
@@ -375,13 +375,13 @@ def main():
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
         if args.reset:
-            cur.execute("UPDATE staging_scanr SET processed = FALSE")
+            cur.execute("UPDATE staging SET processed = FALSE WHERE source = 'scanr'")
             count = cur.rowcount
             conn.commit()
             logger.info(f"Reset : {count} works remis à processed=FALSE")
             return
 
-        cur.execute("SELECT COUNT(*) AS cnt FROM staging_scanr WHERE processed = FALSE")
+        cur.execute("SELECT COUNT(*) AS cnt FROM staging WHERE source = 'scanr' AND processed = FALSE")
         total = cur.fetchone()["cnt"]
         logger.info(f"=== Normalisation ScanR : {total} works à traiter ===")
 
@@ -394,9 +394,9 @@ def main():
         logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
 
         cur.execute("""
-            SELECT id, scanr_id, doi, raw_data
-            FROM staging_scanr
-            WHERE processed = FALSE
+            SELECT id, source_id AS scanr_id, doi, raw_data
+            FROM staging
+            WHERE source = 'scanr' AND processed = FALSE
             ORDER BY id
             LIMIT %s
         """, (limit,))
