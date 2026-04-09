@@ -49,7 +49,7 @@ DOCTYPE_MAP = {
     "book": "book",
     "proceedings": "conference_paper",
     "thesis": "thesis",
-    "ongoing_thesis": "thesis",
+    "ongoing_thesis": "ongoing_thesis",
     "HDR": "hdr",
     "preprint": "preprint",
     "other": "other",
