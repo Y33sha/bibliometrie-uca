@@ -18,75 +18,39 @@ def propagate_countries_for_addresses(cur, address_ids: list[int]):
     if not address_ids:
         return
 
-    # 1. Recalculer countries des source_documents OpenAlex concernés
+    # 1. Recalculer countries des source_documents (OA + WoS + ScanR) concernés
     cur.execute("""
         UPDATE source_documents sd
         SET countries = sub.new_countries
         FROM (
-            SELECT oas.source_document_id AS doc_id,
+            SELECT sa.source_document_id AS doc_id,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM openalex_authorship_addresses oaa2
-                    JOIN addresses a2 ON a2.id = oaa2.address_id
-                    JOIN source_authorships oas2 ON oas2.id = oaa2.openalex_authorship_id,
+                    FROM source_authorship_addresses saa2
+                    JOIN addresses a2 ON a2.id = saa2.address_id
+                    JOIN source_authorships sa2 ON sa2.id = saa2.source_authorship_id,
                     LATERAL unnest(a2.countries) AS c
-                    WHERE oas2.source_document_id = oas.source_document_id
+                    WHERE sa2.source_document_id = sa.source_document_id
                       AND a2.countries IS NOT NULL
                    ) AS new_countries
-            FROM openalex_authorship_addresses oaa
-            JOIN source_authorships oas ON oas.id = oaa.openalex_authorship_id
-            WHERE oaa.address_id = ANY(%s)
-            GROUP BY oas.source_document_id
+            FROM source_authorship_addresses saa
+            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+            WHERE saa.address_id = ANY(%s)
+            GROUP BY sa.source_document_id
         ) sub
         WHERE sd.id = sub.doc_id
           AND sd.countries IS DISTINCT FROM sub.new_countries
     """, (address_ids,))
-    oa_docs = cur.rowcount
+    addr_docs = cur.rowcount
 
-    # 2. Recalculer countries des source_documents WoS concernés
-    cur.execute("""
-        UPDATE source_documents sd
-        SET countries = sub.new_countries
-        FROM (
-            SELECT was.source_document_id AS doc_id,
-                   (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM wos_authorship_addresses waa2
-                    JOIN addresses a2 ON a2.id = waa2.address_id
-                    JOIN source_authorships was2 ON was2.id = waa2.wos_authorship_id,
-                    LATERAL unnest(a2.countries) AS c
-                    WHERE was2.source_document_id = was.source_document_id
-                      AND a2.countries IS NOT NULL
-                   ) AS new_countries
-            FROM wos_authorship_addresses waa
-            JOIN source_authorships was ON was.id = waa.wos_authorship_id
-            WHERE waa.address_id = ANY(%s)
-            GROUP BY was.source_document_id
-        ) sub
-        WHERE sd.id = sub.doc_id
-          AND sd.countries IS DISTINCT FROM sub.new_countries
-    """, (address_ids,))
-    wos_docs = cur.rowcount
-
-    # 3. Recalculer publications.countries pour les publications touchées
-    #    Même logique que refresh_publication_countries.sql : HAL (structures) + adresses (OA + WoS + ScanR)
+    # 2. Recalculer publications.countries pour les publications touchées
+    #    Même logique que refresh_publication_countries.py : HAL (structures) + adresses (OA + WoS + ScanR)
     #    On n'utilise PAS source_documents.countries pour OA (données staging OA non fiables)
     cur.execute("""
         WITH affected_pubs AS (
             SELECT DISTINCT sd.publication_id
-            FROM openalex_authorship_addresses oaa
-            JOIN source_authorships oas ON oas.id = oaa.openalex_authorship_id
-            JOIN source_documents sd ON sd.id = oas.source_document_id
-            WHERE oaa.address_id = ANY(%s) AND sd.publication_id IS NOT NULL
-            UNION
-            SELECT DISTINCT sd.publication_id
-            FROM wos_authorship_addresses waa
-            JOIN source_authorships was ON was.id = waa.wos_authorship_id
-            JOIN source_documents sd ON sd.id = was.source_document_id
-            WHERE waa.address_id = ANY(%s) AND sd.publication_id IS NOT NULL
-            UNION
-            SELECT DISTINCT sd.publication_id
-            FROM scanr_authorship_addresses saa
-            JOIN source_authorships sas ON sas.id = saa.scanr_authorship_id
-            JOIN source_documents sd ON sd.id = sas.source_document_id
+            FROM source_authorship_addresses saa
+            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+            JOIN source_documents sd ON sd.id = sa.source_document_id
             WHERE saa.address_id = ANY(%s) AND sd.publication_id IS NOT NULL
         )
         UPDATE publications p
@@ -100,24 +64,10 @@ def propagate_countries_for_addresses(cur, address_ids: list[int]):
                         WHERE sd.publication_id = ap.publication_id AND sd.source = 'hal' AND sd.countries IS NOT NULL
                         UNION ALL
                         SELECT unnest(a.countries) AS c
-                        FROM openalex_authorship_addresses oaa
-                        JOIN addresses a ON a.id = oaa.address_id
-                        JOIN source_authorships oas ON oas.id = oaa.openalex_authorship_id
-                        JOIN source_documents sd ON sd.id = oas.source_document_id
-                        WHERE sd.publication_id = ap.publication_id AND a.countries IS NOT NULL
-                        UNION ALL
-                        SELECT unnest(a.countries) AS c
-                        FROM wos_authorship_addresses waa
-                        JOIN addresses a ON a.id = waa.address_id
-                        JOIN source_authorships was ON was.id = waa.wos_authorship_id
-                        JOIN source_documents sd ON sd.id = was.source_document_id
-                        WHERE sd.publication_id = ap.publication_id AND a.countries IS NOT NULL
-                        UNION ALL
-                        SELECT unnest(a.countries) AS c
-                        FROM scanr_authorship_addresses saa
+                        FROM source_authorship_addresses saa
                         JOIN addresses a ON a.id = saa.address_id
-                        JOIN source_authorships sas ON sas.id = saa.scanr_authorship_id
-                        JOIN source_documents sd ON sd.id = sas.source_document_id
+                        JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+                        JOIN source_documents sd ON sd.id = sa.source_document_id
                         WHERE sd.publication_id = ap.publication_id AND a.countries IS NOT NULL
                     ) src
                    ) AS all_countries
@@ -125,11 +75,11 @@ def propagate_countries_for_addresses(cur, address_ids: list[int]):
         ) sub
         WHERE p.id = sub.publication_id
           AND p.countries IS DISTINCT FROM sub.all_countries
-    """, (address_ids, address_ids, address_ids))
+    """, (address_ids,))
     pubs = cur.rowcount
 
-    if oa_docs or wos_docs or pubs:
-        logger.info(f"Propagation pays : {oa_docs} docs OA, {wos_docs} docs WoS, {pubs} publications")
+    if addr_docs or pubs:
+        logger.info(f"Propagation pays : {addr_docs} docs source, {pubs} publications")
 
 
 def _bg_propagate_countries(address_ids: list[int]):
@@ -278,39 +228,18 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)):
                 p.doi,
                 p.doc_type::text AS doc_type,
                 j.title AS journal_title,
-                sub.author_name,
-                sub.source_id
-            FROM (
-                SELECT sd.publication_id,
-                       COALESCE(oas.source_data->>'raw_author_name', oa.full_name) AS author_name,
-                       sd.source_id
-                FROM openalex_authorship_addresses oaa
-                JOIN source_authorships oas ON oas.id = oaa.openalex_authorship_id
-                JOIN source_documents sd ON sd.id = oas.source_document_id
-                JOIN source_authors oa ON oa.id = oas.source_author_id
-                WHERE oaa.address_id = %s AND sd.publication_id IS NOT NULL
-                UNION
-                SELECT sd.publication_id, wa.full_name AS author_name,
-                       sd.source_id
-                FROM wos_authorship_addresses waa
-                JOIN source_authorships was ON was.id = waa.wos_authorship_id
-                JOIN source_documents sd ON sd.id = was.source_document_id
-                JOIN source_authors wa ON wa.id = was.source_author_id
-                WHERE waa.address_id = %s AND sd.publication_id IS NOT NULL
-                UNION
-                SELECT sd.publication_id, sa.full_name AS author_name,
-                       sd.source_id
-                FROM scanr_authorship_addresses saa
-                JOIN source_authorships sas ON sas.id = saa.scanr_authorship_id
-                JOIN source_documents sd ON sd.id = sas.source_document_id
-                JOIN source_authors sa ON sa.id = sas.source_author_id
-                WHERE saa.address_id = %s AND sd.publication_id IS NOT NULL
-            ) sub
-            JOIN publications p ON p.id = sub.publication_id
+                COALESCE(sa.source_data->>'raw_author_name', auth.full_name) AS author_name,
+                sd.source_id
+            FROM source_authorship_addresses saa
+            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_authors auth ON auth.id = sa.source_author_id
+            JOIN publications p ON p.id = sd.publication_id
             LEFT JOIN journals j ON j.id = p.journal_id
+            WHERE saa.address_id = %s AND sd.publication_id IS NOT NULL
             ORDER BY p.id, p.pub_year DESC
             LIMIT %s
-        """, (addr_id, addr_id, addr_id, limit))
+        """, (addr_id, limit))
 
         return {
             "address_id": addr_id,

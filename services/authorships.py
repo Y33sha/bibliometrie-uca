@@ -182,72 +182,39 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
     if not uca_ids:
         return
 
-    # 2a. Trouver les source_authorships openalex affectés
+    # 2. Trouver les source_authorships (openalex/wos/scanr) affectés
     cur.execute("""
-        SELECT DISTINCT oaa.openalex_authorship_id
-        FROM openalex_authorship_addresses oaa
-        WHERE oaa.address_id = ANY(%s)
+        SELECT DISTINCT saa.source_authorship_id
+        FROM source_authorship_addresses saa
+        WHERE saa.address_id = ANY(%s)
     """, (address_ids,))
-    oas_ids = [r["openalex_authorship_id"] for r in cur.fetchall()]
+    affected_sa_ids = [r["source_authorship_id"] for r in cur.fetchall()]
 
-    # 2b. Trouver les source_authorships wos affectés
-    cur.execute("""
-        SELECT DISTINCT waa.wos_authorship_id
-        FROM wos_authorship_addresses waa
-        WHERE waa.address_id = ANY(%s)
-    """, (address_ids,))
-    was_ids = [r["wos_authorship_id"] for r in cur.fetchall()]
-
-    if not oas_ids and not was_ids:
+    if not affected_sa_ids:
         return
 
-    # 3a. Recalculer in_perimeter sur source_authorships openalex
-    if oas_ids:
-        cur.execute("""
-            WITH affected AS (
-                SELECT unnest(%s::int[]) AS sa_id
-            ),
-            uca_per_authorship AS (
-                SELECT oaa.openalex_authorship_id AS sa_id,
-                       array_agg(DISTINCT ast.structure_id) AS struct_ids
-                FROM affected af
-                JOIN openalex_authorship_addresses oaa ON oaa.openalex_authorship_id = af.sa_id
-                JOIN address_structures ast ON ast.address_id = oaa.address_id
-                WHERE ast.structure_id = ANY(%s)
-                  AND ast.is_confirmed IS DISTINCT FROM FALSE
-                GROUP BY oaa.openalex_authorship_id
-            )
-            UPDATE source_authorships sa
-            SET in_perimeter = (upa.struct_ids IS NOT NULL),
-                structure_ids = upa.struct_ids
+    # 3. Recalculer in_perimeter sur source_authorships affectés
+    cur.execute("""
+        WITH affected AS (
+            SELECT unnest(%s::int[]) AS sa_id
+        ),
+        uca_per_authorship AS (
+            SELECT saa.source_authorship_id AS sa_id,
+                   array_agg(DISTINCT ast.structure_id) AS struct_ids
             FROM affected af
-            LEFT JOIN uca_per_authorship upa ON upa.sa_id = af.sa_id
-            WHERE sa.id = af.sa_id
-        """, (oas_ids, uca_ids))
-
-    # 3b. Recalculer in_perimeter sur source_authorships wos
-    if was_ids:
-        cur.execute("""
-            WITH affected AS (
-                SELECT unnest(%s::int[]) AS sa_id
-            ),
-            uca_per_authorship AS (
-                SELECT waa.wos_authorship_id AS sa_id,
-                       array_agg(DISTINCT ast.structure_id) AS struct_ids
-                FROM affected af
-                JOIN wos_authorship_addresses waa ON waa.wos_authorship_id = af.sa_id
-                JOIN address_structures ast ON ast.address_id = waa.address_id
-                WHERE ast.structure_id = ANY(%s)
-                  AND ast.is_confirmed IS DISTINCT FROM FALSE
-                GROUP BY waa.wos_authorship_id
-            )
-            UPDATE source_authorships sa
-            SET in_perimeter = (upa.struct_ids IS NOT NULL),
-                structure_ids = upa.struct_ids
-            FROM affected af
-            LEFT JOIN uca_per_authorship upa ON upa.sa_id = af.sa_id
-            WHERE sa.id = af.sa_id
-        """, (was_ids, uca_ids))
+            JOIN source_authorship_addresses saa ON saa.source_authorship_id = af.sa_id
+            JOIN address_structures ast ON ast.address_id = saa.address_id
+            WHERE ast.structure_id = ANY(%s)
+              AND ast.is_confirmed IS DISTINCT FROM FALSE
+            GROUP BY saa.source_authorship_id
+        )
+        UPDATE source_authorships sa
+        SET in_perimeter = (upa.struct_ids IS NOT NULL),
+            structure_ids = upa.struct_ids
+        FROM affected af
+        LEFT JOIN uca_per_authorship upa ON upa.sa_id = af.sa_id
+        WHERE sa.id = af.sa_id
+    """, (affected_sa_ids, uca_ids))
 
     # 4. Propager vers authorships (vérité) pour les person_id résolus
     cur.execute("""
@@ -256,15 +223,7 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
             FROM source_authorships sa
             JOIN source_documents sd ON sd.id = sa.source_document_id
             WHERE sa.id = ANY(%s)
-              AND sa.source = 'openalex'
-              AND sd.publication_id IS NOT NULL
-              AND sa.person_id IS NOT NULL
-            UNION
-            SELECT DISTINCT sd.publication_id, sa.person_id
-            FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
-            WHERE sa.id = ANY(%s)
-              AND sa.source = 'wos'
+              AND sa.source IN ('openalex', 'wos', 'scanr')
               AND sd.publication_id IS NOT NULL
               AND sa.person_id IS NOT NULL
         ),
@@ -300,4 +259,4 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
         WHERE a.publication_id = m.publication_id
           AND a.person_id = m.person_id
           AND a.person_id IS NOT NULL
-    """, (oas_ids or [], was_ids or []))
+    """, (affected_sa_ids,))

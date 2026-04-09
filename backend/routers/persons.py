@@ -641,12 +641,12 @@ async def person_addresses(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
 ):
-    """Adresses distinctes utilisées dans les authorships OpenAlex de cette personne."""
+    """Adresses distinctes utilisées dans les authorships sources de cette personne."""
     with get_cursor() as (cur, conn):
         base_where = """a.id IN (
-                SELECT DISTINCT oaa.address_id
-                FROM openalex_authorship_addresses oaa
-                JOIN source_authorships sa ON sa.id = oaa.openalex_authorship_id
+                SELECT DISTINCT saa.address_id
+                FROM source_authorship_addresses saa
+                JOIN source_authorships sa ON sa.id = saa.source_authorship_id
                 WHERE sa.person_id = %s
             )"""
         cur.execute(f"SELECT COUNT(*) AS total FROM addresses a WHERE {base_where}", (person_id,))
@@ -1723,7 +1723,7 @@ async def hal_affiliation_conflicts(
                         AND sa.source = 'openalex'
                         AND sa.author_position = a.author_position
                         AND sa.in_perimeter = FALSE
-                        AND sa.raw_affiliation IS NOT NULL AND sa.raw_affiliation != ''
+                        AND sa.raw_affiliations IS NOT NULL AND sa.raw_affiliations != ''
                   )
                   OR EXISTS (
                       SELECT 1 FROM source_authorships sa
@@ -1732,7 +1732,7 @@ async def hal_affiliation_conflicts(
                         AND sa.source = 'wos'
                         AND sa.author_position = a.author_position
                         AND sa.in_perimeter = FALSE
-                        AND sa.raw_affiliation IS NOT NULL AND sa.raw_affiliation != ''
+                        AND sa.raw_affiliations IS NOT NULL AND sa.raw_affiliations != ''
                   )
               )
         """
