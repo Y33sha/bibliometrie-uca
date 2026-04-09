@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict RDBhS3SdCZoJD4zBHTq9jftT2GHf3TA7f2uw6ITA4fJ9m9j6sclDDHj560EqL7I
+\restrict whPbIsQ12UOaRbBPdGKCdDSdRxn6xteh3kXmbM6te8ehzjMG3czmvWXY9DrQYCv
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -57,6 +57,7 @@ CREATE TYPE public.doc_type AS ENUM (
     'book',
     'book_chapter',
     'thesis',
+    'ongoing_thesis',
     'preprint',
     'review',
     'editorial',
@@ -109,7 +110,8 @@ CREATE TYPE public.source_type AS ENUM (
     'hal',
     'openalex',
     'wos',
-    'scanr'
+    'scanr',
+    'theses'
 );
 
 
@@ -2596,5 +2598,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict RDBhS3SdCZoJD4zBHTq9jftT2GHf3TA7f2uw6ITA4fJ9m9j6sclDDHj560EqL7I
+\unrestrict whPbIsQ12UOaRbBPdGKCdDSdRxn6xteh3kXmbM6te8ehzjMG3czmvWXY9DrQYCv
 
