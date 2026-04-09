@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict nea6vRaFT3MENtcKuYwU75OfDxetn5gbqWzrDClNFyNezVBkBm2wuieWArfun7Y
+\restrict PjcB148wZvOwNfMkb5d8e5f5faP1OTEPe2wUJMTMdgAh4IVjsulkd3uKOz0i09N
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -278,7 +278,7 @@ CREATE TABLE public.authorships (
     publication_id integer NOT NULL,
     person_id integer,
     author_position smallint,
-    is_uca boolean DEFAULT false,
+    in_perimeter boolean DEFAULT false,
     source_manual boolean DEFAULT false,
     excluded boolean DEFAULT false,
     notes text,
@@ -508,37 +508,6 @@ CREATE SEQUENCE public.journals_id_seq
 --
 
 ALTER SEQUENCE public.journals_id_seq OWNED BY public.journals.id;
-
-
---
--- Name: openalex_authorship_addresses; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.openalex_authorship_addresses (
-    id integer NOT NULL,
-    openalex_authorship_id integer NOT NULL,
-    address_id integer NOT NULL
-);
-
-
---
--- Name: openalex_authorship_addresses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.openalex_authorship_addresses_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: openalex_authorship_addresses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.openalex_authorship_addresses_id_seq OWNED BY public.openalex_authorship_addresses.id;
 
 
 --
@@ -832,37 +801,6 @@ ALTER SEQUENCE public.publishers_id_seq OWNED BY public.publishers.id;
 
 
 --
--- Name: scanr_authorship_addresses; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.scanr_authorship_addresses (
-    id integer NOT NULL,
-    scanr_authorship_id integer NOT NULL,
-    address_id integer NOT NULL
-);
-
-
---
--- Name: scanr_authorship_addresses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.scanr_authorship_addresses_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: scanr_authorship_addresses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.scanr_authorship_addresses_id_seq OWNED BY public.scanr_authorship_addresses.id;
-
-
---
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -909,6 +847,37 @@ CREATE SEQUENCE public.source_authors_id_seq
 --
 
 ALTER SEQUENCE public.source_authors_id_seq OWNED BY public.source_authors.id;
+
+
+--
+-- Name: source_authorship_addresses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_authorship_addresses (
+    id integer NOT NULL,
+    source_authorship_id integer NOT NULL,
+    address_id integer NOT NULL
+);
+
+
+--
+-- Name: source_authorship_addresses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.source_authorship_addresses_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: source_authorship_addresses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.source_authorship_addresses_id_seq OWNED BY public.source_authorship_addresses.id;
 
 
 --
@@ -1190,37 +1159,6 @@ CREATE VIEW public.v_active_publications AS
 
 
 --
--- Name: wos_authorship_addresses; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.wos_authorship_addresses (
-    id integer NOT NULL,
-    wos_authorship_id integer NOT NULL,
-    address_id integer NOT NULL
-);
-
-
---
--- Name: wos_authorship_addresses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.wos_authorship_addresses_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: wos_authorship_addresses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.wos_authorship_addresses_id_seq OWNED BY public.wos_authorship_addresses.id;
-
-
---
 -- Name: address_structures id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1284,13 +1222,6 @@ ALTER TABLE ONLY public.journals ALTER COLUMN id SET DEFAULT nextval('public.jou
 
 
 --
--- Name: openalex_authorship_addresses id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.openalex_authorship_addresses ALTER COLUMN id SET DEFAULT nextval('public.openalex_authorship_addresses_id_seq'::regclass);
-
-
---
 -- Name: perimeters id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1347,17 +1278,17 @@ ALTER TABLE ONLY public.publishers ALTER COLUMN id SET DEFAULT nextval('public.p
 
 
 --
--- Name: scanr_authorship_addresses id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.scanr_authorship_addresses ALTER COLUMN id SET DEFAULT nextval('public.scanr_authorship_addresses_id_seq'::regclass);
-
-
---
 -- Name: source_authors id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_authors ALTER COLUMN id SET DEFAULT nextval('public.source_authors_id_seq'::regclass);
+
+
+--
+-- Name: source_authorship_addresses id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_authorship_addresses ALTER COLUMN id SET DEFAULT nextval('public.source_authorship_addresses_id_seq'::regclass);
 
 
 --
@@ -1407,13 +1338,6 @@ ALTER TABLE ONLY public.structure_relations ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.structures ALTER COLUMN id SET DEFAULT nextval('public.structures_id_seq'::regclass);
-
-
---
--- Name: wos_authorship_addresses id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.wos_authorship_addresses ALTER COLUMN id SET DEFAULT nextval('public.wos_authorship_addresses_id_seq'::regclass);
 
 
 --
@@ -1569,22 +1493,6 @@ ALTER TABLE ONLY public.structure_name_forms
 
 
 --
--- Name: openalex_authorship_addresses openalex_authorship_addresses_openalex_authorship_id_addres_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.openalex_authorship_addresses
-    ADD CONSTRAINT openalex_authorship_addresses_openalex_authorship_id_addres_key UNIQUE (openalex_authorship_id, address_id);
-
-
---
--- Name: openalex_authorship_addresses openalex_authorship_addresses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.openalex_authorship_addresses
-    ADD CONSTRAINT openalex_authorship_addresses_pkey PRIMARY KEY (id);
-
-
---
 -- Name: perimeters perimeters_code_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1697,22 +1605,6 @@ ALTER TABLE ONLY public.publishers
 
 
 --
--- Name: scanr_authorship_addresses scanr_authorship_addresses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.scanr_authorship_addresses
-    ADD CONSTRAINT scanr_authorship_addresses_pkey PRIMARY KEY (id);
-
-
---
--- Name: scanr_authorship_addresses scanr_authorship_addresses_scanr_authorship_id_address_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.scanr_authorship_addresses
-    ADD CONSTRAINT scanr_authorship_addresses_scanr_authorship_id_address_id_key UNIQUE (scanr_authorship_id, address_id);
-
-
---
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1734,6 +1626,22 @@ ALTER TABLE ONLY public.source_authors
 
 ALTER TABLE ONLY public.source_authors
     ADD CONSTRAINT source_authors_source_source_id_key UNIQUE (source, source_id);
+
+
+--
+-- Name: source_authorship_addresses source_authorship_addresses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_authorship_addresses
+    ADD CONSTRAINT source_authorship_addresses_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: source_authorship_addresses source_authorship_addresses_source_authorship_id_address_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_authorship_addresses
+    ADD CONSTRAINT source_authorship_addresses_source_authorship_id_address_id_key UNIQUE (source_authorship_id, address_id);
 
 
 --
@@ -1849,22 +1757,6 @@ ALTER TABLE ONLY public.structure_name_forms
 
 
 --
--- Name: wos_authorship_addresses wos_authorship_addresses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.wos_authorship_addresses
-    ADD CONSTRAINT wos_authorship_addresses_pkey PRIMARY KEY (id);
-
-
---
--- Name: wos_authorship_addresses wos_authorship_addresses_wos_authorship_id_address_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.wos_authorship_addresses
-    ADD CONSTRAINT wos_authorship_addresses_wos_authorship_id_address_id_key UNIQUE (wos_authorship_id, address_id);
-
-
---
 -- Name: idx_addr_norm_trgm; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1959,7 +1851,7 @@ CREATE INDEX idx_apc_pub ON public.apc_payments USING btree (publication_id) WHE
 -- Name: idx_authorships_corresponding_uca; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_authorships_corresponding_uca ON public.authorships USING btree (publication_id) WHERE ((is_corresponding = true) AND (is_uca = true));
+CREATE INDEX idx_authorships_corresponding_uca ON public.authorships USING btree (publication_id) WHERE ((is_corresponding = true) AND (in_perimeter = true));
 
 
 --
@@ -2008,7 +1900,7 @@ CREATE INDEX idx_authorships_structs ON public.authorships USING gin (structure_
 -- Name: idx_authorships_uca; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_authorships_uca ON public.authorships USING btree (is_uca) WHERE (is_uca = true);
+CREATE INDEX idx_authorships_uca ON public.authorships USING btree (in_perimeter) WHERE (in_perimeter = true);
 
 
 --
@@ -2079,13 +1971,6 @@ CREATE INDEX idx_journals_publisher ON public.journals USING btree (publisher_id
 --
 
 CREATE INDEX idx_journals_titlenorm ON public.journals USING btree (title_normalized);
-
-
---
--- Name: idx_oaa_address; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_oaa_address ON public.openalex_authorship_addresses USING btree (address_id);
 
 
 --
@@ -2274,7 +2159,14 @@ CREATE INDEX idx_sa_source_doc ON public.source_authorships USING btree (source_
 -- Name: idx_saa_address; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_saa_address ON public.scanr_authorship_addresses USING btree (address_id);
+CREATE INDEX idx_saa_address ON public.source_authorship_addresses USING btree (address_id);
+
+
+--
+-- Name: idx_saa_authorship; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_saa_authorship ON public.source_authorship_addresses USING btree (source_authorship_id);
 
 
 --
@@ -2446,20 +2338,6 @@ CREATE INDEX idx_structures_type ON public.structures USING btree (structure_typ
 
 
 --
--- Name: idx_wos_aa_address; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_wos_aa_address ON public.wos_authorship_addresses USING btree (address_id);
-
-
---
--- Name: idx_wos_aa_authorship; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_wos_aa_authorship ON public.wos_authorship_addresses USING btree (wos_authorship_id);
-
-
---
 -- Name: publications_doi_lower_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2611,14 +2489,6 @@ ALTER TABLE ONLY public.structure_name_forms
 
 
 --
--- Name: openalex_authorship_addresses openalex_authorship_addresses_address_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.openalex_authorship_addresses
-    ADD CONSTRAINT openalex_authorship_addresses_address_id_fkey FOREIGN KEY (address_id) REFERENCES public.addresses(id) ON DELETE CASCADE;
-
-
---
 -- Name: person_identifiers person_identifiers_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2659,19 +2529,27 @@ ALTER TABLE ONLY public.publisher_name_forms
 
 
 --
--- Name: scanr_authorship_addresses scanr_authorship_addresses_address_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.scanr_authorship_addresses
-    ADD CONSTRAINT scanr_authorship_addresses_address_id_fkey FOREIGN KEY (address_id) REFERENCES public.addresses(id) ON DELETE CASCADE;
-
-
---
 -- Name: source_authors source_authors_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_authors
     ADD CONSTRAINT source_authors_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE SET NULL;
+
+
+--
+-- Name: source_authorship_addresses source_authorship_addresses_address_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_authorship_addresses
+    ADD CONSTRAINT source_authorship_addresses_address_id_fkey FOREIGN KEY (address_id) REFERENCES public.addresses(id) ON DELETE CASCADE;
+
+
+--
+-- Name: source_authorship_addresses source_authorship_addresses_source_authorship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_authorship_addresses
+    ADD CONSTRAINT source_authorship_addresses_source_authorship_id_fkey FOREIGN KEY (source_authorship_id) REFERENCES public.source_authorships(id) ON DELETE CASCADE;
 
 
 --
@@ -2739,16 +2617,8 @@ ALTER TABLE ONLY public.structure_relations
 
 
 --
--- Name: wos_authorship_addresses wos_authorship_addresses_address_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.wos_authorship_addresses
-    ADD CONSTRAINT wos_authorship_addresses_address_id_fkey FOREIGN KEY (address_id) REFERENCES public.addresses(id) ON DELETE CASCADE;
-
-
---
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nea6vRaFT3MENtcKuYwU75OfDxetn5gbqWzrDClNFyNezVBkBm2wuieWArfun7Y
+\unrestrict PjcB148wZvOwNfMkb5d8e5f5faP1OTEPe2wUJMTMdgAh4IVjsulkd3uKOz0i09N
 

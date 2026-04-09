@@ -237,7 +237,7 @@ def _parse_c1_field(c1_str: str, author_names: list[str]) -> tuple[dict[int, str
 
     Retourne :
     - dict {position_auteur: affiliation concaténée} (pour raw_affiliation)
-    - dict {position_auteur: [adresses individuelles]} (pour wos_authorship_addresses)
+    - dict {position_auteur: [adresses individuelles]} (pour source_authorship_addresses)
 
     Format C1 :
         [Author1; Author2] Address1; [Author3] Address2
@@ -779,9 +779,9 @@ def process_authorships(cur, rec: dict, source_document_id: int):
         for addr_text in author.get("addresses", []):
             addr_id = _get_or_create_address(cur, addr_text)
             cur.execute("""
-                INSERT INTO wos_authorship_addresses (wos_authorship_id, address_id)
+                INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
                 VALUES (%s, %s)
-                ON CONFLICT (wos_authorship_id, address_id) DO NOTHING
+                ON CONFLICT (source_authorship_id, address_id) DO NOTHING
             """, (sa_id, addr_id))
 
 

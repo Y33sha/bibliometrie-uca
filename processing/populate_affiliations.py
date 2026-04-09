@@ -76,9 +76,9 @@ def step3_openalex(cur, uca_ids, uca_wide_ids):
         WHERE sa.source = 'openalex'
           AND EXISTS (
             SELECT 1
-            FROM openalex_authorship_addresses oaa
-            JOIN address_structures ast ON ast.address_id = oaa.address_id
-            WHERE oaa.openalex_authorship_id = sa.id
+            FROM source_authorship_addresses saa
+            JOIN address_structures ast ON ast.address_id = saa.address_id
+            WHERE saa.source_authorship_id = sa.id
               AND ast.structure_id = ANY(%s)
               AND ast.is_confirmed IS DISTINCT FROM FALSE
         )
@@ -88,19 +88,21 @@ def step3_openalex(cur, uca_ids, uca_wide_ids):
     # structure_ids via périmètre large
     cur.execute("""
         WITH oa_structs AS (
-            SELECT oaa.openalex_authorship_id,
+            SELECT saa.source_authorship_id,
                    array_agg(DISTINCT ast.structure_id) AS struct_ids
-            FROM openalex_authorship_addresses oaa
-            JOIN address_structures ast ON ast.address_id = oaa.address_id
-            WHERE ast.structure_id = ANY(%s)
+            FROM source_authorship_addresses saa
+            JOIN address_structures ast ON ast.address_id = saa.address_id
+            JOIN source_authorships sa2 ON sa2.id = saa.source_authorship_id
+            WHERE sa2.source = 'openalex'
+              AND ast.structure_id = ANY(%s)
               AND ast.is_confirmed IS DISTINCT FROM FALSE
-            GROUP BY oaa.openalex_authorship_id
+            GROUP BY saa.source_authorship_id
         )
         UPDATE source_authorships sa
         SET structure_ids = os.struct_ids
         FROM oa_structs os
         WHERE sa.source = 'openalex'
-          AND sa.id = os.openalex_authorship_id
+          AND sa.id = os.source_authorship_id
     """, (list(uca_wide_ids),))
     logger.info(f"Étape 3 — OA structure_ids : {cur.rowcount} authorships")
 
@@ -117,9 +119,9 @@ def step3b_wos(cur, uca_ids, uca_wide_ids):
         WHERE sa.source = 'wos'
           AND EXISTS (
             SELECT 1
-            FROM wos_authorship_addresses waa
-            JOIN address_structures ast ON ast.address_id = waa.address_id
-            WHERE waa.wos_authorship_id = sa.id
+            FROM source_authorship_addresses saa
+            JOIN address_structures ast ON ast.address_id = saa.address_id
+            WHERE saa.source_authorship_id = sa.id
               AND ast.structure_id = ANY(%s)
               AND ast.is_confirmed IS DISTINCT FROM FALSE
         )
@@ -129,19 +131,21 @@ def step3b_wos(cur, uca_ids, uca_wide_ids):
     # structure_ids via périmètre large
     cur.execute("""
         WITH wos_structs AS (
-            SELECT waa.wos_authorship_id,
+            SELECT saa.source_authorship_id,
                    array_agg(DISTINCT ast.structure_id) AS struct_ids
-            FROM wos_authorship_addresses waa
-            JOIN address_structures ast ON ast.address_id = waa.address_id
-            WHERE ast.structure_id = ANY(%s)
+            FROM source_authorship_addresses saa
+            JOIN address_structures ast ON ast.address_id = saa.address_id
+            JOIN source_authorships sa2 ON sa2.id = saa.source_authorship_id
+            WHERE sa2.source = 'wos'
+              AND ast.structure_id = ANY(%s)
               AND ast.is_confirmed IS DISTINCT FROM FALSE
-            GROUP BY waa.wos_authorship_id
+            GROUP BY saa.source_authorship_id
         )
         UPDATE source_authorships sa
         SET structure_ids = ws.struct_ids
         FROM wos_structs ws
         WHERE sa.source = 'wos'
-          AND sa.id = ws.wos_authorship_id
+          AND sa.id = ws.source_authorship_id
     """, (list(uca_wide_ids),))
     logger.info(f"Étape 3b — WoS structure_ids : {cur.rowcount} authorships")
 
@@ -158,9 +162,9 @@ def step3c_scanr(cur, uca_ids, uca_wide_ids):
         WHERE sa.source = 'scanr'
           AND EXISTS (
             SELECT 1
-            FROM scanr_authorship_addresses saa
+            FROM source_authorship_addresses saa
             JOIN address_structures ast ON ast.address_id = saa.address_id
-            WHERE saa.scanr_authorship_id = sa.id
+            WHERE saa.source_authorship_id = sa.id
               AND ast.structure_id = ANY(%s)
               AND ast.is_confirmed IS DISTINCT FROM FALSE
         )
@@ -170,19 +174,21 @@ def step3c_scanr(cur, uca_ids, uca_wide_ids):
     # structure_ids via périmètre large
     cur.execute("""
         WITH scanr_structs AS (
-            SELECT saa.scanr_authorship_id,
+            SELECT saa.source_authorship_id,
                    array_agg(DISTINCT ast.structure_id) AS struct_ids
-            FROM scanr_authorship_addresses saa
+            FROM source_authorship_addresses saa
             JOIN address_structures ast ON ast.address_id = saa.address_id
-            WHERE ast.structure_id = ANY(%s)
+            JOIN source_authorships sa2 ON sa2.id = saa.source_authorship_id
+            WHERE sa2.source = 'scanr'
+              AND ast.structure_id = ANY(%s)
               AND ast.is_confirmed IS DISTINCT FROM FALSE
-            GROUP BY saa.scanr_authorship_id
+            GROUP BY saa.source_authorship_id
         )
         UPDATE source_authorships sa
         SET structure_ids = ss.struct_ids
         FROM scanr_structs ss
         WHERE sa.source = 'scanr'
-          AND sa.id = ss.scanr_authorship_id
+          AND sa.id = ss.source_authorship_id
     """, (list(uca_wide_ids),))
     logger.info(f"Étape 3c — ScanR structure_ids : {cur.rowcount} authorships")
 

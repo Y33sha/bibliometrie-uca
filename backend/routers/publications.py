@@ -530,33 +530,15 @@ async def get_publication(pub_id: int):
             SELECT 'hal' AS source, sd.source_id, sd.doi, sd.collections, sd.countries
             FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'hal'
             UNION ALL
-            SELECT 'openalex', sd.source_id, sd.doi, NULL,
+            SELECT sd.source, sd.source_id, sd.doi, NULL,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
                     FROM source_authorships sa2
-                    JOIN openalex_authorship_addresses oaa ON oaa.openalex_authorship_id = sa2.id
-                    JOIN addresses addr ON addr.id = oaa.address_id,
-                         unnest(addr.countries) AS c
-                    WHERE sa2.source_document_id = sd.id AND addr.countries IS NOT NULL)
-            FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'openalex'
-            UNION ALL
-            SELECT 'wos', sd.source_id, sd.doi, NULL,
-                   (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM source_authorships sa2
-                    JOIN wos_authorship_addresses waa ON waa.wos_authorship_id = sa2.id
-                    JOIN addresses addr ON addr.id = waa.address_id,
-                         unnest(addr.countries) AS c
-                    WHERE sa2.source_document_id = sd.id AND addr.countries IS NOT NULL)
-            FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'wos'
-            UNION ALL
-            SELECT 'scanr', sd.source_id, sd.doi, NULL,
-                   (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM source_authorships sa2
-                    JOIN scanr_authorship_addresses saa ON saa.scanr_authorship_id = sa2.id
+                    JOIN source_authorship_addresses saa ON saa.source_authorship_id = sa2.id
                     JOIN addresses addr ON addr.id = saa.address_id,
                          unnest(addr.countries) AS c
                     WHERE sa2.source_document_id = sd.id AND addr.countries IS NOT NULL)
-            FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'scanr'
-        """, (pub_id, pub_id, pub_id, pub_id))
+            FROM source_documents sd WHERE sd.publication_id = %s AND sd.source IN ('openalex', 'wos', 'scanr')
+        """, (pub_id, pub_id))
         sources = cur.fetchall()
 
         # c) Authorships — truth table
@@ -591,12 +573,12 @@ async def get_publication(pub_id: int):
             SELECT sa.id, sa.author_position,
                    COALESCE(sa.source_data->>'raw_author_name', sauth.full_name) AS full_name,
                    sa.person_id,
-                   sa.in_perimeter, sa.structure_ids, sa.raw_affiliation, sa.excluded,
+                   sa.in_perimeter, sa.structure_ids, sa.raw_affiliations, sa.excluded,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM openalex_authorship_addresses oaa
-                    JOIN addresses addr ON addr.id = oaa.address_id,
+                    FROM source_authorship_addresses saa
+                    JOIN addresses addr ON addr.id = saa.address_id,
                          unnest(addr.countries) AS c
-                    WHERE oaa.openalex_authorship_id = sa.id
+                    WHERE saa.source_authorship_id = sa.id
                       AND addr.countries IS NOT NULL
                    ) AS countries
             FROM source_authorships sa
@@ -610,12 +592,12 @@ async def get_publication(pub_id: int):
         # e2) WoS authorships — pays depuis les adresses
         cur.execute("""
             SELECT sa.id, sa.author_position, sauth.full_name, sa.person_id,
-                   sa.in_perimeter, sa.structure_ids, sa.raw_affiliation, sa.excluded,
+                   sa.in_perimeter, sa.structure_ids, sa.raw_affiliations, sa.excluded,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM wos_authorship_addresses waa
-                    JOIN addresses addr ON addr.id = waa.address_id,
+                    FROM source_authorship_addresses saa
+                    JOIN addresses addr ON addr.id = saa.address_id,
                          unnest(addr.countries) AS c
-                    WHERE waa.wos_authorship_id = sa.id
+                    WHERE saa.source_authorship_id = sa.id
                       AND addr.countries IS NOT NULL
                    ) AS countries
             FROM source_authorships sa

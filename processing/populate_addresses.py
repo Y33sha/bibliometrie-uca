@@ -30,18 +30,18 @@ BATCH_SIZE = 5000
 SOURCES = {
     "openalex": {
         "source_filter": "openalex",
-        "link_table": "openalex_authorship_addresses",
-        "fk_column": "openalex_authorship_id",
+        "link_table": "source_authorship_addresses",
+        "fk_column": "source_authorship_id",
     },
     "wos": {
         "source_filter": "wos",
-        "link_table": "wos_authorship_addresses",
-        "fk_column": "wos_authorship_id",
+        "link_table": "source_authorship_addresses",
+        "fk_column": "source_authorship_id",
     },
     "scanr": {
         "source_filter": "scanr",
-        "link_table": "scanr_authorship_addresses",
-        "fk_column": "scanr_authorship_id",
+        "link_table": "source_authorship_addresses",
+        "fk_column": "source_authorship_id",
         "jsonb": True,  # les adresses sont dans raw_affiliations (JSONB)
     },
 }
@@ -61,7 +61,11 @@ def show_stats(cur):
     logger.info(f"  Affiliations (address_structures) : {affils}")
 
     for name, cfg in SOURCES.items():
-        cur.execute(f"SELECT COUNT(*) FROM {cfg['link_table']}")
+        cur.execute("""
+            SELECT COUNT(*) FROM source_authorship_addresses saa
+            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+            WHERE sa.source = %s
+        """, (cfg['source_filter'],))
         links = cur.fetchone()[0]
         logger.info(f"  Liens {name:10s} ↔ address    : {links}")
 
@@ -252,27 +256,12 @@ def main():
         UPDATE addresses a
         SET pub_count = COALESCE(sub.cnt, 0)
         FROM (
-            SELECT address_id, COUNT(DISTINCT publication_id) AS cnt
-            FROM (
-                SELECT oaa.address_id, sd.publication_id
-                FROM openalex_authorship_addresses oaa
-                JOIN source_authorships sa ON sa.id = oaa.openalex_authorship_id
-                JOIN source_documents sd ON sd.id = sa.source_document_id
-                WHERE sd.publication_id IS NOT NULL
-                UNION
-                SELECT waa.address_id, sd.publication_id
-                FROM wos_authorship_addresses waa
-                JOIN source_authorships sa ON sa.id = waa.wos_authorship_id
-                JOIN source_documents sd ON sd.id = sa.source_document_id
-                WHERE sd.publication_id IS NOT NULL
-                UNION
-                SELECT saa.address_id, sd.publication_id
-                FROM scanr_authorship_addresses saa
-                JOIN source_authorships sa ON sa.id = saa.scanr_authorship_id
-                JOIN source_documents sd ON sd.id = sa.source_document_id
-                WHERE sd.publication_id IS NOT NULL
-            ) t
-            GROUP BY address_id
+            SELECT saa.address_id, COUNT(DISTINCT sd.publication_id) AS cnt
+            FROM source_authorship_addresses saa
+            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            WHERE sd.publication_id IS NOT NULL
+            GROUP BY saa.address_id
         ) sub
         WHERE a.id = sub.address_id AND a.pub_count IS DISTINCT FROM sub.cnt
     """)

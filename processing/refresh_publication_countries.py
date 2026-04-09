@@ -3,8 +3,7 @@ Recalcule publications.countries à partir des 3 sources.
 
 Sources des pays :
   - HAL : source_documents.countries (via source_structures.country)
-  - OpenAlex : addresses.countries (via openalex_authorship_addresses)
-  - WoS : addresses.countries (via wos_authorship_addresses)
+  - OpenAlex/WoS/ScanR : addresses.countries (via source_authorship_addresses)
 
 On n'utilise PAS les countries des source_documents OpenAlex (données staging OA non fiables).
 
@@ -39,21 +38,11 @@ REFRESH_QUERY = """
 
             UNION ALL
 
-            -- OpenAlex : pays des adresses résolues
+            -- OpenAlex + WoS + ScanR : pays des adresses résolues
             SELECT sd.publication_id AS pub_id, unnest(a.countries) AS c
-            FROM openalex_authorship_addresses oaa
-            JOIN addresses a ON a.id = oaa.address_id
-            JOIN source_authorships sa ON sa.id = oaa.openalex_authorship_id
-            JOIN source_documents sd ON sd.id = sa.source_document_id
-            WHERE a.countries IS NOT NULL AND sd.publication_id IS NOT NULL
-
-            UNION ALL
-
-            -- WoS : pays des adresses résolues
-            SELECT sd.publication_id AS pub_id, unnest(a.countries) AS c
-            FROM wos_authorship_addresses waa
-            JOIN addresses a ON a.id = waa.address_id
-            JOIN source_authorships sa ON sa.id = waa.wos_authorship_id
+            FROM source_authorship_addresses saa
+            JOIN addresses a ON a.id = saa.address_id
+            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
             JOIN source_documents sd ON sd.id = sa.source_document_id
             WHERE a.countries IS NOT NULL AND sd.publication_id IS NOT NULL
         ) src
