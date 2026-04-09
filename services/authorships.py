@@ -9,20 +9,7 @@ Ce service encapsule les opérations ponctuelles utilisées par les routeurs
 et les scripts de correction.
 """
 
-# Config par source : FK dans authorships
-_SOURCE_CONFIG = {
-    "hal": {
-        "truth_fk": "hal_authorship_id",
-    },
-    "openalex": {
-        "truth_fk": "openalex_authorship_id",
-    },
-    "wos": {
-        "truth_fk": "wos_authorship_id",
-    },
-}
-
-ALL_TRUTH_FKS = [cfg["truth_fk"] for cfg in _SOURCE_CONFIG.values()]
+VALID_SOURCES = ("hal", "openalex", "wos", "scanr")
 
 
 def exclude_authorship(cur, authorship_id: int) -> dict | None:
@@ -33,8 +20,7 @@ def exclude_authorship(cur, authorship_id: int) -> dict | None:
        (pour que build_authorships ne recrée pas le lien)
     """
     cur.execute("""
-        SELECT id, person_id, hal_authorship_id, openalex_authorship_id, wos_authorship_id
-        FROM authorships WHERE id = %s
+        SELECT id, person_id FROM authorships WHERE id = %s
     """, (authorship_id,))
     row = cur.fetchone()
     if not row:
@@ -49,52 +35,51 @@ def exclude_authorship(cur, authorship_id: int) -> dict | None:
     """, (authorship_id,))
     result = cur.fetchone()
 
-    # 2. Détacher les authorships sources (person_id = NULL)
+    # 2. Détacher les authorships sources (person_id = NULL) et casser le lien FK
     if person_id:
-        for source, cfg in _SOURCE_CONFIG.items():
-            fk = cfg["truth_fk"]
-            source_id = row.get(fk)
-            if source_id:
-                cur.execute("""
-                    UPDATE source_authorships
-                    SET person_id = NULL
-                    WHERE id = %s AND person_id = %s
-                """, (source_id, person_id))
+        cur.execute("""
+            UPDATE source_authorships
+            SET person_id = NULL, authorship_id = NULL
+            WHERE authorship_id = %s AND person_id = %s
+        """, (authorship_id, person_id))
 
     return result
 
 
-def detach_source(cur, authorship_id: int, source: str):
-    """Détache une FK source d'une authorship vérité.
-    Si plus aucune source ne l'atteste, supprime l'authorship.
+def detach_source(cur, source_authorship_id: int, source: str):
+    """Détache une authorship source de son authorship vérité.
+    Si plus aucune source ne l'atteste, supprime l'authorship vérité.
 
-    Retourne True si l'authorship a été supprimée, False sinon.
+    Retourne True si l'authorship vérité a été supprimée, False sinon.
     """
-    cfg = _SOURCE_CONFIG.get(source)
-    if not cfg:
+    if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}")
 
-    fk_col = cfg["truth_fk"]
-
-    # Détacher la FK source
-    cur.execute(f"""
-        UPDATE authorships SET {fk_col} = NULL, updated_at = now()
-        WHERE {fk_col} = %s
-        RETURNING id
-    """, (authorship_id,))
+    # Trouver l'authorship vérité liée
+    cur.execute("""
+        SELECT authorship_id FROM source_authorships
+        WHERE id = %s AND source = %s
+    """, (source_authorship_id, source))
     row = cur.fetchone()
-    if not row:
+    if not row or not row["authorship_id"]:
         return False
 
-    truth_id = row["id"]
+    truth_id = row["authorship_id"]
+
+    # Détacher la FK source
+    cur.execute("""
+        UPDATE source_authorships SET authorship_id = NULL
+        WHERE id = %s AND source = %s
+    """, (source_authorship_id, source))
 
     # Vérifier s'il reste d'autres sources
-    checks = " AND ".join(f"{fk} IS NULL" for fk in ALL_TRUTH_FKS)
-    cur.execute(f"""
-        SELECT 1 FROM authorships WHERE id = %s AND {checks}
+    cur.execute("""
+        SELECT 1 FROM source_authorships
+        WHERE authorship_id = %s AND NOT excluded
+        LIMIT 1
     """, (truth_id,))
 
-    if cur.fetchone():
+    if not cur.fetchone():
         # Plus aucune source → supprimer
         cur.execute("DELETE FROM authorships WHERE id = %s", (truth_id,))
         return True
@@ -124,16 +109,16 @@ def move_authorships_for_source(cur, source: str, source_authorship_ids: list[in
     pour les authorships liées aux source_authorship_ids donnés.
     Utilisé par split_bad_merges.
     """
-    cfg = _SOURCE_CONFIG.get(source)
-    if not cfg:
+    if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}")
 
-    fk_col = cfg["truth_fk"]
     for sa_id in source_authorship_ids:
-        cur.execute(f"""
+        cur.execute("""
             UPDATE authorships a
             SET publication_id = %s, updated_at = now()
-            WHERE a.{fk_col} = %s AND a.publication_id = %s
+            FROM source_authorships sa
+            WHERE sa.authorship_id = a.id
+              AND sa.id = %s AND a.publication_id = %s
         """, (to_pub_id, sa_id, from_pub_id))
 
 
@@ -142,17 +127,14 @@ def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int
     Évite les doublons (publication_id, person_id).
     Utilisé par fix_oa_person_conflicts.
     """
-    cfg = _SOURCE_CONFIG.get(source)
-    if not cfg:
+    if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}")
 
-    fk_col = cfg["truth_fk"]
-
-    cur.execute(f"""
+    cur.execute("""
         UPDATE authorships a
         SET person_id = src.person_id, updated_at = now()
         FROM source_authorships src
-        WHERE a.{fk_col} = src.id
+        WHERE src.authorship_id = a.id
           AND a.person_id IS DISTINCT FROM src.person_id
           AND src.person_id IS NOT NULL
           AND src.id = ANY(%s)

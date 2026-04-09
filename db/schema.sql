@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict PjcB148wZvOwNfMkb5d8e5f5faP1OTEPe2wUJMTMdgAh4IVjsulkd3uKOz0i09N
+\restrict RDBhS3SdCZoJD4zBHTq9jftT2GHf3TA7f2uw6ITA4fJ9m9j6sclDDHj560EqL7I
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -285,11 +285,7 @@ CREATE TABLE public.authorships (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     structure_ids integer[],
-    is_corresponding boolean,
-    hal_authorship_id integer,
-    openalex_authorship_id integer,
-    wos_authorship_id integer,
-    scanr_authorship_id integer
+    is_corresponding boolean
 );
 
 
@@ -900,7 +896,8 @@ CREATE TABLE public.source_authorships (
     is_corresponding boolean DEFAULT false,
     roles text[],
     raw_affiliations jsonb,
-    source_data jsonb
+    source_data jsonb,
+    authorship_id integer
 );
 
 
@@ -1365,14 +1362,6 @@ ALTER TABLE ONLY public.addresses
 
 
 --
--- Name: addresses addresses_raw_text_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.addresses
-    ADD CONSTRAINT addresses_raw_text_key UNIQUE (raw_text);
-
-
---
 -- Name: apc_payments apc_payments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1757,6 +1746,13 @@ ALTER TABLE ONLY public.structure_name_forms
 
 
 --
+-- Name: addresses_raw_text_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX addresses_raw_text_key ON public.addresses USING btree (md5(raw_text));
+
+
+--
 -- Name: idx_addr_norm_trgm; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1796,13 +1792,6 @@ CREATE INDEX idx_addr_sug_countries ON public.addresses USING gin (suggested_cou
 --
 
 CREATE INDEX idx_addresses_countries ON public.addresses USING gin (countries) WHERE (countries IS NOT NULL);
-
-
---
--- Name: idx_addresses_normalized; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_addresses_normalized ON public.addresses USING btree (normalized_text);
 
 
 --
@@ -1855,20 +1844,6 @@ CREATE INDEX idx_authorships_corresponding_uca ON public.authorships USING btree
 
 
 --
--- Name: idx_authorships_hal_as; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_authorships_hal_as ON public.authorships USING btree (hal_authorship_id) WHERE (hal_authorship_id IS NOT NULL);
-
-
---
--- Name: idx_authorships_oa_as; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_authorships_oa_as ON public.authorships USING btree (openalex_authorship_id) WHERE (openalex_authorship_id IS NOT NULL);
-
-
---
 -- Name: idx_authorships_person; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1883,13 +1858,6 @@ CREATE INDEX idx_authorships_pub ON public.authorships USING btree (publication_
 
 
 --
--- Name: idx_authorships_scanr; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_authorships_scanr ON public.authorships USING btree (scanr_authorship_id) WHERE (scanr_authorship_id IS NOT NULL);
-
-
---
 -- Name: idx_authorships_structs; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1901,13 +1869,6 @@ CREATE INDEX idx_authorships_structs ON public.authorships USING gin (structure_
 --
 
 CREATE INDEX idx_authorships_uca ON public.authorships USING btree (in_perimeter) WHERE (in_perimeter = true);
-
-
---
--- Name: idx_authorships_wos_as; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_authorships_wos_as ON public.authorships USING btree (wos_authorship_id) WHERE (wos_authorship_id IS NOT NULL);
 
 
 --
@@ -2097,6 +2058,13 @@ CREATE INDEX idx_publishers_name_norm ON public.publishers USING btree (name_nor
 --
 
 CREATE INDEX idx_publishers_name_trgm ON public.publishers USING gin (name public.gin_trgm_ops);
+
+
+--
+-- Name: idx_sa_authorship; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authorship_id) WHERE (authorship_id IS NOT NULL);
 
 
 --
@@ -2553,6 +2521,14 @@ ALTER TABLE ONLY public.source_authorship_addresses
 
 
 --
+-- Name: source_authorships source_authorships_authorship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_authorships
+    ADD CONSTRAINT source_authorships_authorship_id_fkey FOREIGN KEY (authorship_id) REFERENCES public.authorships(id) ON DELETE SET NULL;
+
+
+--
 -- Name: source_authorships source_authorships_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2620,5 +2596,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PjcB148wZvOwNfMkb5d8e5f5faP1OTEPe2wUJMTMdgAh4IVjsulkd3uKOz0i09N
+\unrestrict RDBhS3SdCZoJD4zBHTq9jftT2GHf3TA7f2uw6ITA4fJ9m9j6sclDDHj560EqL7I
 

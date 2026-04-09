@@ -30,19 +30,12 @@ BATCH_SIZE = 5000
 SOURCES = {
     "openalex": {
         "source_filter": "openalex",
-        "link_table": "source_authorship_addresses",
-        "fk_column": "source_authorship_id",
     },
     "wos": {
         "source_filter": "wos",
-        "link_table": "source_authorship_addresses",
-        "fk_column": "source_authorship_id",
     },
     "scanr": {
         "source_filter": "scanr",
-        "link_table": "source_authorship_addresses",
-        "fk_column": "source_authorship_id",
-        "jsonb": True,  # les adresses sont dans raw_affiliations (JSONB)
     },
 }
 
@@ -65,7 +58,7 @@ def show_stats(cur):
             SELECT COUNT(*) FROM source_authorship_addresses saa
             JOIN source_authorships sa ON sa.id = saa.source_authorship_id
             WHERE sa.source = %s
-        """, (cfg['source_filter'],))
+        """, (cfg["source_filter"],))
         links = cur.fetchone()[0]
         logger.info(f"  Liens {name:10s} ↔ address    : {links}")
 
@@ -74,31 +67,17 @@ def process_source(conn, cur, source_name: str):
     """Traite une source : extraction, insertion, liaison."""
     cfg = SOURCES[source_name]
     source_filter = cfg["source_filter"]
-    link_table = cfg["link_table"]
-    fk_col = cfg["fk_column"]
 
     t_start = time.perf_counter()
 
     # ─── Étape 1 : extraire les adresses ───
-    is_jsonb = cfg.get("jsonb", False)
-
-    if is_jsonb:
-        logger.info(f"[{source_name}] Extraction des adresses depuis source_authorships.raw_affiliations (JSONB)...")
-        cur.execute("""
-            SELECT id, raw_affiliations
-            FROM source_authorships
-            WHERE source = %s
-              AND raw_affiliations IS NOT NULL
-        """, (source_filter,))
-    else:
-        logger.info(f"[{source_name}] Extraction des raw_affiliation depuis source_authorships...")
-        cur.execute("""
-            SELECT id, raw_affiliation
-            FROM source_authorships
-            WHERE source = %s
-              AND raw_affiliation IS NOT NULL
-              AND raw_affiliation != ''
-        """, (source_filter,))
+    logger.info(f"[{source_name}] Extraction des adresses depuis source_authorships.raw_affiliations...")
+    cur.execute("""
+        SELECT id, raw_affiliations
+        FROM source_authorships
+        WHERE source = %s
+          AND raw_affiliations IS NOT NULL
+    """, (source_filter,))
 
     rows = cur.fetchall()
     logger.info(f"  {len(rows)} lignes avec affiliation")
@@ -110,13 +89,23 @@ def process_source(conn, cur, source_name: str):
     # Collecter toutes les adresses individuelles et leurs liens
     addr_to_as_ids: dict[str, set[int]] = {}
     for as_id, raw in rows:
-        if is_jsonb:
-            # raw est un tableau d'objets JSON avec un champ "name"
-            affiliations = raw if isinstance(raw, list) else []
-            parts = [aff.get("name", "").strip() for aff in affiliations
-                     if isinstance(aff, dict) and aff.get("name")]
-        else:
-            parts = [p.strip() for p in raw.split(" | ") if p.strip()]
+        # raw_affiliations est toujours du JSONB :
+        # - OA/WoS : ["string", "string"]
+        # - ScanR : [{"name": "...", ...}, ...]
+        if not isinstance(raw, list):
+            continue
+        parts = []
+        for item in raw:
+            if isinstance(item, str):
+                # OA/WoS : peut contenir " | " comme séparateur interne
+                for sub in item.split(" | "):
+                    sub = sub.strip()
+                    if sub:
+                        parts.append(sub)
+            elif isinstance(item, dict):
+                text = (item.get("name") or "").strip()
+                if text:
+                    parts.append(text)
 
         for part in parts:
             if part not in addr_to_as_ids:
@@ -142,7 +131,7 @@ def process_source(conn, cur, source_name: str):
             cur.execute("""
                 INSERT INTO addresses (raw_text, normalized_text)
                 VALUES (%s, %s)
-                ON CONFLICT (raw_text) DO NOTHING
+                ON CONFLICT (md5(raw_text)) DO NOTHING
                 RETURNING id
             """, (addr_text, norm))
 
@@ -178,12 +167,12 @@ def process_source(conn, cur, source_name: str):
     deleted_links = 0
     for i in range(0, len(all_as_ids), BATCH_SIZE):
         batch_ids = all_as_ids[i:i + BATCH_SIZE]
-        cur.execute(f"DELETE FROM {link_table} WHERE {fk_col} = ANY(%s)", (batch_ids,))
+        cur.execute("DELETE FROM source_authorship_addresses WHERE source_authorship_id = ANY(%s)", (batch_ids,))
         deleted_links += cur.rowcount
     conn.commit()
     logger.info(f"  {deleted_links} anciens liens supprimés")
 
-    logger.info(f"[{source_name}] Création des liens {link_table}...")
+    logger.info(f"[{source_name}] Création des liens source_authorship_addresses...")
 
     total_links = 0
     link_batch = []
@@ -197,7 +186,7 @@ def process_source(conn, cur, source_name: str):
             link_batch.append((as_id, addr_id))
 
             if len(link_batch) >= BATCH_SIZE:
-                _insert_links(cur, link_batch, link_table, fk_col)
+                _insert_links(cur, link_batch)
                 total_links += len(link_batch)
                 link_batch = []
                 conn.commit()
@@ -205,7 +194,7 @@ def process_source(conn, cur, source_name: str):
                     logger.info(f"  {total_links} liens créés...")
 
     if link_batch:
-        _insert_links(cur, link_batch, link_table, fk_col)
+        _insert_links(cur, link_batch)
         total_links += len(link_batch)
         conn.commit()
 
@@ -215,15 +204,15 @@ def process_source(conn, cur, source_name: str):
     logger.info(f"  Liens    : {total_links}")
 
 
-def _insert_links(cur, batch, link_table, fk_col):
+def _insert_links(cur, batch):
     """Insert batch de liens en ignorant les doublons."""
     from psycopg2.extras import execute_values
     execute_values(
         cur,
-        f"""
-        INSERT INTO {link_table} ({fk_col}, address_id)
+        """
+        INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
         VALUES %s
-        ON CONFLICT ({fk_col}, address_id) DO NOTHING
+        ON CONFLICT (source_authorship_id, address_id) DO NOTHING
         """,
         batch,
     )

@@ -1712,7 +1712,7 @@ async def hal_affiliation_conflicts(
             FROM authorships a
             JOIN publications p ON p.id = a.publication_id
             WHERE a.in_perimeter = TRUE
-              AND a.hal_authorship_id IS NOT NULL
+              AND EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'hal')
               AND EXISTS (SELECT 1 FROM structures s WHERE s.id = ANY(a.structure_ids) AND s.structure_type = 'labo')
               AND (
                   -- Même position dans OA: adresse présente mais pas dans le périmètre
@@ -1723,7 +1723,7 @@ async def hal_affiliation_conflicts(
                         AND sa.source = 'openalex'
                         AND sa.author_position = a.author_position
                         AND sa.in_perimeter = FALSE
-                        AND sa.raw_affiliations IS NOT NULL AND sa.raw_affiliations != ''
+                        AND sa.raw_affiliations IS NOT NULL AND sa.raw_affiliations != '[]'::jsonb
                   )
                   OR EXISTS (
                       SELECT 1 FROM source_authorships sa
@@ -1732,7 +1732,7 @@ async def hal_affiliation_conflicts(
                         AND sa.source = 'wos'
                         AND sa.author_position = a.author_position
                         AND sa.in_perimeter = FALSE
-                        AND sa.raw_affiliations IS NOT NULL AND sa.raw_affiliations != ''
+                        AND sa.raw_affiliations IS NOT NULL AND sa.raw_affiliations != '[]'::jsonb
                   )
               )
         """

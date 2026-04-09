@@ -545,9 +545,9 @@ async def get_publication(pub_id: int):
         cur.execute("""
             SELECT a.author_position, a.in_perimeter, a.is_corresponding,
                    a.structure_ids,
-                   (a.hal_authorship_id IS NOT NULL) AS source_hal,
-                   (a.openalex_authorship_id IS NOT NULL) AS source_openalex,
-                   (a.wos_authorship_id IS NOT NULL) AS source_wos,
+                   EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'hal') AS source_hal,
+                   EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'openalex') AS source_openalex,
+                   EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'wos') AS source_wos,
                    pe.id AS person_id, pe.last_name, pe.first_name
             FROM authorships a
             JOIN persons pe ON pe.id = a.person_id
@@ -573,7 +573,9 @@ async def get_publication(pub_id: int):
             SELECT sa.id, sa.author_position,
                    COALESCE(sa.source_data->>'raw_author_name', sauth.full_name) AS full_name,
                    sa.person_id,
-                   sa.in_perimeter, sa.structure_ids, sa.raw_affiliations, sa.excluded,
+                   sa.in_perimeter, sa.structure_ids,
+                   (SELECT string_agg(CASE jsonb_typeof(e) WHEN 'string' THEN e #>> '{}' ELSE e->>'name' END, ' | ') FROM jsonb_array_elements(sa.raw_affiliations) AS e) AS raw_affiliation,
+                   sa.excluded,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
                     FROM source_authorship_addresses saa
                     JOIN addresses addr ON addr.id = saa.address_id,
@@ -592,7 +594,9 @@ async def get_publication(pub_id: int):
         # e2) WoS authorships — pays depuis les adresses
         cur.execute("""
             SELECT sa.id, sa.author_position, sauth.full_name, sa.person_id,
-                   sa.in_perimeter, sa.structure_ids, sa.raw_affiliations, sa.excluded,
+                   sa.in_perimeter, sa.structure_ids,
+                   (SELECT string_agg(CASE jsonb_typeof(e) WHEN 'string' THEN e #>> '{}' ELSE e->>'name' END, ' | ') FROM jsonb_array_elements(sa.raw_affiliations) AS e) AS raw_affiliation,
+                   sa.excluded,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
                     FROM source_authorship_addresses saa
                     JOIN addresses addr ON addr.id = saa.address_id,
@@ -648,9 +652,9 @@ async def get_publication(pub_id: int):
 # ----- API: Exclude source authorship -----
 
 VALID_SOURCE_TABLES = {
-    "hal": ("source_authorships", "hal_authorship_id"),
-    "openalex": ("source_authorships", "openalex_authorship_id"),
-    "wos": ("source_authorships", "wos_authorship_id"),
+    "hal": "source_authorships",
+    "openalex": "source_authorships",
+    "wos": "source_authorships",
 }
 
 
@@ -664,7 +668,6 @@ async def exclude_source_authorship(source: str, authorship_id: int, body: dict 
     if source not in VALID_SOURCE_TABLES:
         raise HTTPException(status_code=400, detail="Source invalide")
 
-    _, fk_col = VALID_SOURCE_TABLES[source]
     excluded = body.get("excluded", True)
 
     with get_cursor() as (cur, conn):
