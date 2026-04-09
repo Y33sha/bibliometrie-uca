@@ -31,6 +31,7 @@ from db.connection import get_connection
 from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.normalize import normalize_text
+from utils.authorship_roles import map_role
 from services.publications import find_or_create as find_or_create_publication, update_sources
 from services.journals import find_or_create_publisher, find_or_create_journal
 
@@ -250,7 +251,8 @@ def process_authors(cur, doc: dict, source_document_id: int):
         if not scanr_author_id:
             continue
 
-        role = author_data.get("role")
+        raw_role = author_data.get("role")
+        roles, _ = map_role("scanr", raw_role)
 
         # Affiliations par auteur
         author_affiliations = author_data.get("affiliations") or []
@@ -269,7 +271,7 @@ def process_authors(cur, doc: dict, source_document_id: int):
 
         cur.execute("""
             INSERT INTO scanr_authorships
-                (source_document_id, scanr_author_id, author_position, role,
+                (source_document_id, scanr_author_id, author_position, roles,
                  raw_affiliations, affiliation_ids, detected_countries,
                  author_name_normalized)
             VALUES (%s, %s, %s, %s, %s, %s, %s, normalize_name_form(%s))
@@ -280,8 +282,9 @@ def process_authors(cur, doc: dict, source_document_id: int):
                     scanr_authorships.affiliation_ids),
                 detected_countries = COALESCE(EXCLUDED.detected_countries,
                     scanr_authorships.detected_countries),
-                author_name_normalized = EXCLUDED.author_name_normalized
-        """, (source_document_id, scanr_author_id, position, role,
+                author_name_normalized = EXCLUDED.author_name_normalized,
+                roles = EXCLUDED.roles
+        """, (source_document_id, scanr_author_id, position, roles or None,
               Json(raw_affiliations) if raw_affiliations else None,
               affiliation_ids or None,
               detected_countries or None,
