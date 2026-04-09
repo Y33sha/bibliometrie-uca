@@ -455,6 +455,8 @@ async def export_publications_csv(
                  WHERE sd.publication_id = p.id AND sd.source = 'scanr' LIMIT 1) AS scanr_id,
                 (SELECT sd.source_id FROM source_documents sd
                  WHERE sd.publication_id = p.id AND sd.source = 'wos' LIMIT 1) AS wos_id,
+                (SELECT sd.source_id FROM source_documents sd
+                 WHERE sd.publication_id = p.id AND sd.source = 'theses' LIMIT 1) AS theses_id,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
@@ -867,6 +869,8 @@ async def list_publications(
                  WHERE sd.publication_id = p.id AND sd.source = 'scanr' LIMIT 1) AS scanr_id,
                 (SELECT sd.source_id FROM source_documents sd
                  WHERE sd.publication_id = p.id AND sd.source = 'wos' LIMIT 1) AS wos_id,
+                (SELECT sd.source_id FROM source_documents sd
+                 WHERE sd.publication_id = p.id AND sd.source = 'theses' LIMIT 1) AS theses_id,
                 -- Corresponding author + authorship id (only meaningful with person_id filter)
                 (SELECT a.is_corresponding FROM authorships a
                  WHERE a.publication_id = p.id AND a.person_id = %s

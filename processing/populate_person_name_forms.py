@@ -89,6 +89,19 @@ def populate(conn):
     for r in cur.fetchall():
         triples.append((r["raw_author_name"], r["person_id"], "openalex"))
 
+    # 5. source_authors.full_name via source_authorships (theses.fr)
+    log.info("Source 5 : source_authors (theses.fr) full_name")
+    cur.execute("""
+        SELECT DISTINCT sa.full_name, sa_auth.person_id
+        FROM source_authorships sa_auth
+        JOIN source_authors sa ON sa.id = sa_auth.source_author_id
+        WHERE sa_auth.source = 'theses'
+          AND sa_auth.person_id IS NOT NULL AND NOT sa_auth.excluded
+          AND sa.full_name IS NOT NULL AND sa.full_name != ''
+    """)
+    for r in cur.fetchall():
+        triples.append((r["full_name"], r["person_id"], "theses"))
+
     log.info(f"  {len(triples)} triplets collectés")
 
     # Normaliser via PostgreSQL et regrouper

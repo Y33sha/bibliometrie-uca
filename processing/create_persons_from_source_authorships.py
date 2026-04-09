@@ -149,9 +149,30 @@ def get_all_unlinked_authorships(cur):
     """)
     scanr_rows = cur.fetchall()
 
+    # theses.fr (même structure que ScanR : idref comme clé)
+    cur.execute("""
+        SELECT sa_auth.id AS authorship_id, 'theses' AS source,
+               sa.full_name, sa.last_name, sa.first_name,
+               sa.orcid, NULL::text AS idhal, sa.idref,
+               NULL::int AS source_author_id,
+               FALSE AS has_hal_person_id,
+               NULL::int AS hal_person_id,
+               sd.publication_id,
+               sa_auth.author_position
+        FROM source_authorships sa_auth
+        JOIN source_authors sa ON sa.id = sa_auth.source_author_id
+        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
+        JOIN v_active_publications vap ON vap.id = sd.publication_id
+        WHERE sa_auth.source = 'theses'
+          AND sa_auth.person_id IS NULL
+          AND sa_auth.in_perimeter = TRUE
+          AND sd.publication_id IS NOT NULL
+    """)
+    theses_rows = cur.fetchall()
+
     # Enrichir avec last_name/first_name parsés + filtrage ORCID OA
     all_rows = []
-    for r in hal_rows + oa_rows + wos_rows + scanr_rows:
+    for r in hal_rows + oa_rows + wos_rows + scanr_rows + theses_rows:
         r = dict(r)
         if not r.get("last_name"):
             r["last_name"], r["first_name"] = parse_raw_author_name(r["full_name"])
