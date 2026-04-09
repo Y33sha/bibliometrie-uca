@@ -78,11 +78,11 @@ async def next_duplicate_candidate(
                                 ha.full_name, sa_oa.source_data->>'raw_author_name', oa.full_name, wa.full_name) AS full_name
                 FROM authorships a
                 LEFT JOIN persons p2 ON p2.id = a.person_id
-                LEFT JOIN source_authorships sa_hal ON sa_hal.id = a.hal_authorship_id
+                LEFT JOIN source_authorships sa_hal ON sa_hal.authorship_id = a.id AND sa_hal.source = 'hal'
                 LEFT JOIN source_authors ha ON ha.id = sa_hal.source_author_id
-                LEFT JOIN source_authorships sa_oa ON sa_oa.id = a.openalex_authorship_id
+                LEFT JOIN source_authorships sa_oa ON sa_oa.authorship_id = a.id AND sa_oa.source = 'openalex'
                 LEFT JOIN source_authors oa ON oa.id = sa_oa.source_author_id
-                LEFT JOIN source_authorships sa_wos ON sa_wos.id = a.wos_authorship_id
+                LEFT JOIN source_authorships sa_wos ON sa_wos.authorship_id = a.id AND sa_wos.source = 'wos'
                 LEFT JOIN source_authors wa ON wa.id = sa_wos.source_author_id
                 WHERE a.publication_id = %s AND NOT a.excluded
                 ORDER BY a.author_position NULLS LAST

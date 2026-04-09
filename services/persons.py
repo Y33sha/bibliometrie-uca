@@ -236,23 +236,20 @@ def detach_name_form(cur, person_id: int, name_form: str):
 # ou détachent TOUTES les authorships d'un auteur source, propagent vers
 # les authorships vérité, et gèrent les identifiants.
 
-# FK dans authorships vérité par source
+# Config par source
 _SOURCE_CONFIG = {
     "hal": {
         "author_fk": "source_author_id",
-        "truth_fk": "hal_authorship_id",
         "id_fields": ["orcid"],
         "source_ids_fields": {"idhal": "idhal"},
     },
     "openalex": {
         "author_fk": "source_author_id",
-        "truth_fk": "openalex_authorship_id",
         "id_fields": ["orcid"],
         "source_ids_fields": {},
     },
     "wos": {
         "author_fk": "source_author_id",
-        "truth_fk": "wos_authorship_id",
         "id_fields": ["orcid"],
         "source_ids_fields": {},
     },
@@ -293,12 +290,12 @@ def link_author_to_person(cur, person_id: int, source: str, author_id: int):
         """, (person_id, author_id))
 
     # 3. Propager vers authorships vérité (seulement celles sans person_id)
-    cur.execute(f"""
-        UPDATE authorships a SET person_id = %s        WHERE a.{cfg['truth_fk']} IN (
-            SELECT sa.id FROM source_authorships sa
-            WHERE sa.source = %s AND sa.source_author_id = %s
-        )
-        AND a.person_id IS NULL
+    cur.execute("""
+        UPDATE authorships a SET person_id = %s
+        FROM source_authorships sa
+        WHERE sa.authorship_id = a.id
+          AND sa.source = %s AND sa.source_author_id = %s
+          AND a.person_id IS NULL
     """, (person_id, source, author_id))
 
     # 4. Propager les identifiants
@@ -341,10 +338,10 @@ def unlink_author_from_person(cur, person_id: int, source: str, author_id: int):
         """, (author_id, person_id))
 
     # 3. Propager vers authorships vérité
-    cur.execute(f"""
+    cur.execute("""
         UPDATE authorships a SET person_id = NULL
         FROM source_authorships sa
-        WHERE a.{cfg['truth_fk']} = sa.id
+        WHERE sa.authorship_id = a.id
           AND sa.source = %s AND sa.source_author_id = %s
           AND a.person_id = %s
     """, (source, author_id, person_id))
@@ -413,34 +410,38 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
         ON CONFLICT (publication_id, person_id) DO NOTHING
     """, (pub_id, person_id))
 
-    # 2. FK sources
-    for src, src_cfg in _SOURCE_CONFIG.items():
-        cur.execute(f"""
-            UPDATE authorships a
-            SET {src_cfg['truth_fk']} = sub.aid
-            FROM (
-                SELECT sa.id AS aid
-                FROM source_authorships sa
-                JOIN source_documents sd ON sd.id = sa.source_document_id
-                WHERE sa.source = %s AND sd.publication_id = %s AND sa.person_id = %s
-                  AND NOT sa.excluded
-                ORDER BY sa.id
-                LIMIT 1
-            ) sub
-            WHERE a.publication_id = %s AND a.person_id = %s
-              AND a.{src_cfg['truth_fk']} IS NULL
-        """, (src, pub_id, person_id, pub_id, person_id))
+    # 2. FK sources (source_authorships.authorship_id → authorships.id)
+    cur.execute("""
+        UPDATE source_authorships sa
+        SET authorship_id = a.id
+        FROM source_documents sd, authorships a
+        WHERE sd.id = sa.source_document_id
+          AND a.publication_id = sd.publication_id
+          AND a.person_id = sa.person_id
+          AND sd.publication_id = %s
+          AND sa.person_id = %s
+          AND NOT sa.excluded
+          AND sa.authorship_id IS NULL
+    """, (pub_id, person_id))
 
     # 3. author_position et is_corresponding
     cur.execute("""
         UPDATE authorships a
-        SET author_position = COALESCE(sa_hal.author_position, sa_oa.author_position, sa_wos.author_position),
-            is_corresponding = COALESCE(a.is_corresponding, sa_wos.is_corresponding)
-        FROM authorships a2
-        LEFT JOIN source_authorships sa_hal ON sa_hal.id = a2.hal_authorship_id
-        LEFT JOIN source_authorships sa_oa ON sa_oa.id = a2.openalex_authorship_id
-        LEFT JOIN source_authorships sa_wos ON sa_wos.id = a2.wos_authorship_id
-        WHERE a.id = a2.id
+        SET author_position = sub.pos,
+            is_corresponding = COALESCE(a.is_corresponding, sub.corr)
+        FROM (
+            SELECT sa.authorship_id,
+                   (array_agg(sa.author_position ORDER BY
+                       CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 WHEN 'wos' THEN 3 END
+                   ))[1] AS pos,
+                   (array_agg(sa.is_corresponding ORDER BY
+                       CASE sa.source WHEN 'wos' THEN 1 WHEN 'openalex' THEN 2 WHEN 'hal' THEN 3 END
+                   ))[1] AS corr
+            FROM source_authorships sa
+            WHERE sa.authorship_id IS NOT NULL AND NOT sa.excluded
+            GROUP BY sa.authorship_id
+        ) sub
+        WHERE a.id = sub.authorship_id
           AND a.publication_id = %s AND a.person_id = %s
     """, (pub_id, person_id))
 

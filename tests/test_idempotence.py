@@ -875,7 +875,7 @@ def _count_authorships_tables(db) -> dict:
     counts["total"] = db.fetchone()["cnt"]
     db.execute("SELECT COUNT(*) AS cnt FROM authorships WHERE in_perimeter = TRUE")
     counts["in_perimeter"] = db.fetchone()["cnt"]
-    db.execute("SELECT COUNT(*) AS cnt FROM authorships WHERE hal_authorship_id IS NOT NULL")
+    db.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE authorship_id IS NOT NULL AND source = 'hal'")
     counts["hal_fk"] = db.fetchone()["cnt"]
     db.execute("SELECT COUNT(*) AS cnt FROM authorships WHERE structure_ids IS NOT NULL")
     counts["with_structs"] = db.fetchone()["cnt"]

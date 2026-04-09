@@ -2,7 +2,7 @@
 Construit la table authorships (table de vérité) à partir des authorships sources.
 
 Étape 1 : Insérer les authorships manquantes (paires publication_id, person_id)
-Étape 2 : Peupler les FK (hal_authorship_id, openalex_authorship_id, wos_authorship_id)
+Étape 2 : Peupler les FK (source_authorships.authorship_id → authorships.id)
 Étape 3 : Propager author_position et is_corresponding
 Étape 4 : Propager in_perimeter et structure_ids (union des sources)
 
@@ -49,34 +49,28 @@ def build(cur):
     inserted = cur.rowcount
     logger.info(f"  {inserted} authorships créées")
 
-    # ── Étape 2 : Peupler les FK ──
-    logger.info("Étape 2 : peuplement des FK...")
+    # ── Étape 2 : Peupler les FK (source_authorships.authorship_id) ──
+    logger.info("Étape 2 : peuplement des FK (source_authorships → authorships)...")
 
-    FK_QUERIES = [
-        ("HAL", "hal", "hal_authorship_id"),
-        ("OpenAlex", "openalex", "openalex_authorship_id"),
-        ("WoS", "wos", "wos_authorship_id"),
-        ("ScanR", "scanr", "scanr_authorship_id"),
+    FK_SOURCES = [
+        ("HAL", "hal"),
+        ("OpenAlex", "openalex"),
+        ("WoS", "wos"),
+        ("ScanR", "scanr"),
     ]
 
-    for source_name, source_value, fk_col in FK_QUERIES:
-        cur.execute(f"""
-            UPDATE authorships a
-            SET {fk_col} = sub.sa_id
-            FROM (
-                SELECT DISTINCT ON (sd.publication_id, sa.person_id)
-                       sd.publication_id, sa.person_id, sa.id AS sa_id
-                FROM source_authorships sa
-                JOIN source_documents sd ON sd.id = sa.source_document_id
-                WHERE sa.source = %s
-                  AND sd.publication_id IS NOT NULL
-                  AND sa.person_id IS NOT NULL
-                  AND NOT sa.excluded
-                ORDER BY sd.publication_id, sa.person_id, sa.id
-            ) sub
-            WHERE a.publication_id = sub.publication_id
-              AND a.person_id = sub.person_id
-              AND a.{fk_col} IS NULL
+    for source_name, source_value in FK_SOURCES:
+        cur.execute("""
+            UPDATE source_authorships sa
+            SET authorship_id = a.id
+            FROM source_documents sd
+            JOIN authorships a ON a.publication_id = sd.publication_id
+            WHERE sd.id = sa.source_document_id
+              AND sa.source = %s
+              AND sa.person_id IS NOT NULL
+              AND a.person_id = sa.person_id
+              AND NOT sa.excluded
+              AND sa.authorship_id IS NULL
         """, (source_value,))
         logger.info(f"  {source_name} FK : {cur.rowcount} liens")
 
@@ -85,29 +79,40 @@ def build(cur):
 
     cur.execute("""
         UPDATE authorships a
-        SET author_position = COALESCE(sa_hal.author_position, sa_oa.author_position, sa_scanr.author_position, sa_wos.author_position)
-        FROM authorships a2
-        LEFT JOIN source_authorships sa_hal ON sa_hal.id = a2.hal_authorship_id
-        LEFT JOIN source_authorships sa_oa ON sa_oa.id = a2.openalex_authorship_id
-        LEFT JOIN source_authorships sa_scanr ON sa_scanr.id = a2.scanr_authorship_id
-        LEFT JOIN source_authorships sa_wos ON sa_wos.id = a2.wos_authorship_id
-        WHERE a.id = a2.id
+        SET author_position = sub.pos
+        FROM (
+            SELECT sa.authorship_id,
+                   (array_agg(sa.author_position ORDER BY
+                       CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 WHEN 'scanr' THEN 3 WHEN 'wos' THEN 4 END
+                   ))[1] AS pos
+            FROM source_authorships sa
+            WHERE sa.authorship_id IS NOT NULL
+              AND sa.author_position IS NOT NULL
+              AND NOT sa.excluded
+            GROUP BY sa.authorship_id
+        ) sub
+        WHERE a.id = sub.authorship_id
           AND a.author_position IS NULL
-          AND COALESCE(sa_hal.author_position, sa_oa.author_position, sa_scanr.author_position, sa_wos.author_position) IS NOT NULL
     """)
     pos_count = cur.rowcount
     logger.info(f"  {pos_count} positions mises à jour")
 
     cur.execute("""
         UPDATE authorships a
-        SET is_corresponding = COALESCE(sa_wos.is_corresponding, sa_oa.is_corresponding, sa_hal.is_corresponding)
-        FROM authorships a2
-        LEFT JOIN source_authorships sa_wos ON sa_wos.id = a2.wos_authorship_id
-        LEFT JOIN source_authorships sa_oa ON sa_oa.id = a2.openalex_authorship_id
-        LEFT JOIN source_authorships sa_hal ON sa_hal.id = a2.hal_authorship_id
-        WHERE a.id = a2.id
+        SET is_corresponding = sub.corr
+        FROM (
+            SELECT sa.authorship_id,
+                   (array_agg(sa.is_corresponding ORDER BY
+                       CASE sa.source WHEN 'wos' THEN 1 WHEN 'openalex' THEN 2 WHEN 'hal' THEN 3 END
+                   ))[1] AS corr
+            FROM source_authorships sa
+            WHERE sa.authorship_id IS NOT NULL
+              AND sa.is_corresponding IS NOT NULL
+              AND NOT sa.excluded
+            GROUP BY sa.authorship_id
+        ) sub
+        WHERE a.id = sub.authorship_id
           AND a.is_corresponding IS NULL
-          AND COALESCE(sa_wos.is_corresponding, sa_oa.is_corresponding, sa_hal.is_corresponding) IS NOT NULL
     """)
     corr_count = cur.rowcount
     logger.info(f"  {corr_count} is_corresponding mises à jour")
@@ -160,17 +165,18 @@ def build(cur):
     # Stats finales
     cur.execute("SELECT COUNT(*) FROM authorships")
     total = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM authorships WHERE hal_authorship_id IS NOT NULL")
+    cur.execute("SELECT COUNT(*) FROM source_authorships WHERE authorship_id IS NOT NULL AND source = 'hal'")
     hal_total = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM authorships WHERE openalex_authorship_id IS NOT NULL")
+    cur.execute("SELECT COUNT(*) FROM source_authorships WHERE authorship_id IS NOT NULL AND source = 'openalex'")
     oa_total = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM authorships WHERE wos_authorship_id IS NOT NULL")
+    cur.execute("SELECT COUNT(*) FROM source_authorships WHERE authorship_id IS NOT NULL AND source = 'wos'")
     wos_total = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM authorships WHERE scanr_authorship_id IS NOT NULL")
+    cur.execute("SELECT COUNT(*) FROM source_authorships WHERE authorship_id IS NOT NULL AND source = 'scanr'")
     scanr_total = cur.fetchone()[0]
     cur.execute("""
-        SELECT COUNT(*) FROM authorships
-        WHERE hal_authorship_id IS NOT NULL AND openalex_authorship_id IS NOT NULL
+        SELECT COUNT(DISTINCT a.id) FROM authorships a
+        WHERE EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'hal')
+          AND EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'openalex')
     """)
     both = cur.fetchone()[0]
 
