@@ -75,10 +75,10 @@ def do_merge(cur, conn, target_id, target_doi, source_id, source_doi, apply):
 
     try:
         merge_publications(cur, target_id, source_id)
-        # Supprimer l'openalex_document du concept DOI (maintenant rattaché à target)
+        # Supprimer le source_document du concept DOI (maintenant rattaché à target)
         cur.execute("""
-            DELETE FROM openalex_documents
-            WHERE publication_id = %s AND lower(doi) = lower(%s)
+            DELETE FROM source_documents
+            WHERE source = 'openalex' AND publication_id = %s AND lower(doi) = lower(%s)
         """, (target_id, source_doi))
         return True
     except Exception as e:

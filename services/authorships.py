@@ -9,25 +9,19 @@ Ce service encapsule les opérations ponctuelles utilisées par les routeurs
 et les scripts de correction.
 """
 
-# Config par source : table source, FK dans authorships, table documents, FK document
+# Config par source : table source, FK dans authorships
 _SOURCE_CONFIG = {
     "hal": {
         "authorship_table": "hal_authorships",
         "truth_fk": "hal_authorship_id",
-        "doc_table": "hal_documents",
-        "doc_fk": "hal_document_id",
     },
     "openalex": {
         "authorship_table": "openalex_authorships",
         "truth_fk": "openalex_authorship_id",
-        "doc_table": "openalex_documents",
-        "doc_fk": "openalex_document_id",
     },
     "wos": {
         "authorship_table": "wos_authorships",
         "truth_fk": "wos_authorship_id",
-        "doc_table": "wos_documents",
-        "doc_fk": "wos_document_id",
     },
 }
 
@@ -120,14 +114,14 @@ def delete_orphan_authorships(cur, person_id: int) -> int:
         DELETE FROM authorships a
         WHERE a.person_id = %s
           AND NOT EXISTS (SELECT 1 FROM hal_authorships has
-                          JOIN hal_documents hd ON hd.id = has.hal_document_id
-                          WHERE has.person_id = %s AND hd.publication_id = a.publication_id)
+                          JOIN source_documents sd ON sd.id = has.source_document_id
+                          WHERE has.person_id = %s AND sd.publication_id = a.publication_id)
           AND NOT EXISTS (SELECT 1 FROM openalex_authorships oas
-                          JOIN openalex_documents od ON od.id = oas.openalex_document_id
-                          WHERE oas.person_id = %s AND od.publication_id = a.publication_id)
+                          JOIN source_documents sd ON sd.id = oas.source_document_id
+                          WHERE oas.person_id = %s AND sd.publication_id = a.publication_id)
           AND NOT EXISTS (SELECT 1 FROM wos_authorships was
-                          JOIN wos_documents wd ON wd.id = was.wos_document_id
-                          WHERE was.person_id = %s AND wd.publication_id = a.publication_id)
+                          JOIN source_documents sd ON sd.id = was.source_document_id
+                          WHERE was.person_id = %s AND sd.publication_id = a.publication_id)
     """, (person_id, person_id, person_id, person_id))
     return cur.rowcount
 
@@ -267,46 +261,49 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
     # 4. Propager vers authorships (vérité) pour les person_id résolus
     cur.execute("""
         WITH affected_pubs AS (
-            SELECT DISTINCT od.publication_id, oas.person_id
+            SELECT DISTINCT sd.publication_id, oas.person_id
             FROM openalex_authorships oas
-            JOIN openalex_documents od ON od.id = oas.openalex_document_id
+            JOIN source_documents sd ON sd.id = oas.source_document_id
             WHERE oas.id = ANY(%s)
-              AND od.publication_id IS NOT NULL
+              AND sd.publication_id IS NOT NULL
               AND oas.person_id IS NOT NULL
             UNION
-            SELECT DISTINCT wd.publication_id, was.person_id
+            SELECT DISTINCT sd.publication_id, was.person_id
             FROM wos_authorships was
-            JOIN wos_documents wd ON wd.id = was.wos_document_id
+            JOIN source_documents sd ON sd.id = was.source_document_id
             WHERE was.id = ANY(%s)
-              AND wd.publication_id IS NOT NULL
+              AND sd.publication_id IS NOT NULL
               AND was.person_id IS NOT NULL
         ),
         hal_uca AS (
-            SELECT hd.publication_id, has.person_id,
+            SELECT sd.publication_id, has.person_id,
                    array_agg(DISTINCT sid) AS struct_ids
             FROM affected_pubs ap
-            JOIN hal_documents hd ON hd.publication_id = ap.publication_id
-            JOIN hal_authorships has ON has.hal_document_id = hd.id
+            JOIN source_documents sd ON sd.publication_id = ap.publication_id
+                AND sd.source = 'hal'
+            JOIN hal_authorships has ON has.source_document_id = sd.id
                 AND has.person_id = ap.person_id,
             LATERAL unnest(has.structure_ids) AS sid
             WHERE has.is_uca = TRUE AND has.structure_ids IS NOT NULL
-            GROUP BY hd.publication_id, has.person_id
+            GROUP BY sd.publication_id, has.person_id
         ),
         oa_uca AS (
-            SELECT od.publication_id, oas.person_id,
+            SELECT sd.publication_id, oas.person_id,
                    oas.structure_ids AS struct_ids
             FROM affected_pubs ap
-            JOIN openalex_documents od ON od.publication_id = ap.publication_id
-            JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
+            JOIN source_documents sd ON sd.publication_id = ap.publication_id
+                AND sd.source = 'openalex'
+            JOIN openalex_authorships oas ON oas.source_document_id = sd.id
                 AND oas.person_id = ap.person_id
             WHERE oas.is_uca = TRUE AND oas.structure_ids IS NOT NULL
         ),
         wos_uca AS (
-            SELECT wd.publication_id, was.person_id,
+            SELECT sd.publication_id, was.person_id,
                    was.structure_ids AS struct_ids
             FROM affected_pubs ap
-            JOIN wos_documents wd ON wd.publication_id = ap.publication_id
-            JOIN wos_authorships was ON was.wos_document_id = wd.id
+            JOIN source_documents sd ON sd.publication_id = ap.publication_id
+                AND sd.source = 'wos'
+            JOIN wos_authorships was ON was.source_document_id = sd.id
                 AND was.person_id = ap.person_id
             WHERE was.is_uca = TRUE AND was.structure_ids IS NOT NULL
         ),

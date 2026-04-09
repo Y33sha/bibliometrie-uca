@@ -405,18 +405,12 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
     """
     cfg = _SOURCE_CONFIG[source]
 
-    # Trouver la publication_id via la table de documents
-    doc_table = {
-        "hal": ("hal_authorships", "hal_documents", "hal_document_id"),
-        "openalex": ("openalex_authorships", "openalex_documents", "openalex_document_id"),
-        "wos": ("wos_authorships", "wos_documents", "wos_document_id"),
-    }
-    auth_tbl, doc_tbl, doc_fk = doc_table[source]
-    cur.execute(f"""
+    # Trouver la publication_id via source_documents
+    cur.execute("""
         SELECT d.publication_id FROM {auth_tbl} a
-        JOIN {doc_tbl} d ON d.id = a.{doc_fk}
+        JOIN source_documents d ON d.id = a.source_document_id
         WHERE a.id = %s
-    """, (authorship_id,))
+    """.format(auth_tbl=cfg['authorship_table']), (authorship_id,))
     row = cur.fetchone()
     if not row or not row["publication_id"]:
         return
@@ -431,14 +425,13 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
 
     # 2. FK sources
     for src, src_cfg in _SOURCE_CONFIG.items():
-        s_auth_tbl, s_doc_tbl, s_doc_fk = doc_table[src]
         cur.execute(f"""
             UPDATE authorships a
             SET {src_cfg['truth_fk']} = sub.aid
             FROM (
                 SELECT sa.id AS aid
-                FROM {s_auth_tbl} sa
-                JOIN {s_doc_tbl} sd ON sd.id = sa.{s_doc_fk}
+                FROM {src_cfg['authorship_table']} sa
+                JOIN source_documents sd ON sd.id = sa.source_document_id
                 WHERE sd.publication_id = %s AND sa.person_id = %s
                   AND NOT sa.excluded
                 ORDER BY sa.id
@@ -461,24 +454,24 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
           AND a.publication_id = %s AND a.person_id = %s
     """, (pub_id, person_id))
 
-    # 4. is_uca et structure_ids (union des 3 sources)
+    # 4. is_uca et structure_ids (union des sources)
     uca_ids = get_uca_structure_ids_list(cur)
     cur.execute("""
         WITH src AS (
-            SELECT has.is_uca AS uca, has.structure_ids AS sids
-            FROM hal_authorships has
-            JOIN hal_documents hd ON hd.id = has.hal_document_id
-            WHERE hd.publication_id = %s AND has.person_id = %s AND NOT has.excluded
+            SELECT sa.is_uca AS uca, sa.structure_ids AS sids
+            FROM hal_authorships sa
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            WHERE sd.publication_id = %s AND sa.person_id = %s AND NOT sa.excluded
             UNION ALL
-            SELECT oas.is_uca, oas.structure_ids
-            FROM openalex_authorships oas
-            JOIN openalex_documents od ON od.id = oas.openalex_document_id
-            WHERE od.publication_id = %s AND oas.person_id = %s AND NOT oas.excluded
+            SELECT sa.is_uca, sa.structure_ids
+            FROM openalex_authorships sa
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            WHERE sd.publication_id = %s AND sa.person_id = %s AND NOT sa.excluded
             UNION ALL
-            SELECT was.is_uca, was.structure_ids
-            FROM wos_authorships was
-            JOIN wos_documents wd ON wd.id = was.wos_document_id
-            WHERE wd.publication_id = %s AND was.person_id = %s AND NOT was.excluded
+            SELECT sa.is_uca, sa.structure_ids
+            FROM wos_authorships sa
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            WHERE sd.publication_id = %s AND sa.person_id = %s AND NOT sa.excluded
         ),
         agg AS (
             SELECT bool_or(uca) AS is_uca,

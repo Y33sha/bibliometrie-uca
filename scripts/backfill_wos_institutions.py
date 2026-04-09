@@ -75,7 +75,7 @@ def main():
                 SELECT was.id AS was_id, was.author_position,
                        sw.raw_data->'static_data' AS static
                 FROM wos_authorships was
-                JOIN wos_documents wd ON wd.id = was.wos_document_id
+                JOIN source_documents wd ON wd.id = was.source_document_id AND wd.source = 'wos'
                 JOIN staging sw ON sw.id = wd.staging_id
                 WHERE was.wos_institution_ids IS NULL
                 ORDER BY was.id

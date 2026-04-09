@@ -46,9 +46,9 @@ conflict_pairs AS (
         LEAST(oas.person_id, has2.person_id) AS id_a,
         GREATEST(oas.person_id, has2.person_id) AS id_b
     FROM openalex_authorships oas
-    JOIN openalex_documents od ON od.id = oas.openalex_document_id
-    JOIN hal_documents hd ON hd.publication_id = od.publication_id
-    JOIN hal_authorships has2 ON has2.hal_document_id = hd.id
+    JOIN source_documents od ON od.id = oas.source_document_id AND od.source = 'openalex'
+    JOIN source_documents hd ON hd.publication_id = od.publication_id AND hd.source = 'hal'
+    JOIN hal_authorships has2 ON has2.source_document_id = hd.id
         AND has2.author_position = oas.author_position
     WHERE oas.person_id IS NOT NULL AND has2.person_id IS NOT NULL
       AND oas.person_id <> has2.person_id
@@ -57,9 +57,9 @@ conflict_pairs AS (
         LEAST(oas.person_id, was.person_id),
         GREATEST(oas.person_id, was.person_id)
     FROM openalex_authorships oas
-    JOIN openalex_documents od ON od.id = oas.openalex_document_id
-    JOIN wos_documents wd ON wd.publication_id = od.publication_id
-    JOIN wos_authorships was ON was.wos_document_id = wd.id
+    JOIN source_documents od ON od.id = oas.source_document_id AND od.source = 'openalex'
+    JOIN source_documents wd ON wd.publication_id = od.publication_id AND wd.source = 'wos'
+    JOIN wos_authorships was ON was.source_document_id = wd.id
         AND was.author_position = oas.author_position
     WHERE oas.person_id IS NOT NULL AND was.person_id IS NOT NULL
       AND oas.person_id <> was.person_id

@@ -29,20 +29,21 @@ def find_duplicates(cur) -> list[dict]:
     """Trouve les paires (scanr_pub, hal_pub) à fusionner.
 
     Critères :
-    - scanr_documents.hal_id correspond à un hal_documents.halid
+    - source_documents (scanr) external_ids->>'hal' correspond à un source_documents (hal) source_id
     - Les deux documents ont un publication_id non NULL
     - Les publication_id sont différents
     """
     cur.execute("""
         SELECT sd.id AS scanr_doc_id,
-               sd.scanr_id,
-               sd.hal_id,
+               sd.source_id AS scanr_id,
+               sd.external_ids->>'hal' AS hal_id,
                sd.publication_id AS scanr_pub_id,
                hd.publication_id AS hal_pub_id,
                sd.title
-        FROM scanr_documents sd
-        JOIN hal_documents hd ON hd.halid = sd.hal_id
-        WHERE sd.hal_id IS NOT NULL
+        FROM source_documents sd
+        JOIN source_documents hd ON hd.source = 'hal' AND hd.source_id = sd.external_ids->>'hal'
+        WHERE sd.source = 'scanr'
+          AND sd.external_ids->>'hal' IS NOT NULL
           AND sd.publication_id IS NOT NULL
           AND hd.publication_id IS NOT NULL
           AND sd.publication_id != hd.publication_id

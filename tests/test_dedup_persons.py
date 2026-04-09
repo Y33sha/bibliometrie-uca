@@ -36,22 +36,22 @@ def _insert_hal_author(db, full_name, hal_person_id=None, orcid=None, idhal=None
 
 
 def _insert_hal_document(db, halid, publication_id):
-    """Crée un hal_document minimal."""
+    """Crée un source_document minimal (source='hal')."""
     db.execute("""
-        INSERT INTO hal_documents (halid, title, pub_year, publication_id)
-        VALUES (%s, 'Test', 2024, %s) RETURNING id
+        INSERT INTO source_documents (source, source_id, title, pub_year, publication_id)
+        VALUES ('hal', %s, 'Test', 2024, %s) RETURNING id
     """, (halid, publication_id))
     return db.fetchone()["id"]
 
 
-def _insert_hal_authorship(db, hal_document_id, hal_author_id, position=0,
+def _insert_hal_authorship(db, source_document_id, hal_author_id, position=0,
                            is_uca=True, person_id=None):
     """Crée une hal_authorship."""
     db.execute("""
         INSERT INTO hal_authorships
-            (hal_document_id, hal_author_id, author_position, is_uca, person_id)
+            (source_document_id, hal_author_id, author_position, is_uca, person_id)
         VALUES (%s, %s, %s, %s, %s) RETURNING id
-    """, (hal_document_id, hal_author_id, position, is_uca, person_id))
+    """, (source_document_id, hal_author_id, position, is_uca, person_id))
     return db.fetchone()["id"]
 
 
@@ -68,10 +68,10 @@ def _insert_oa_author(db, full_name, openalex_id, orcid=None):
 
 
 def _insert_oa_document(db, openalex_id, publication_id):
-    """Crée un openalex_document minimal."""
+    """Crée un source_document minimal (source='openalex')."""
     db.execute("""
-        INSERT INTO openalex_documents (openalex_id, title, pub_year, publication_id)
-        VALUES (%s, 'Test', 2024, %s) RETURNING id
+        INSERT INTO source_documents (source, source_id, title, pub_year, publication_id)
+        VALUES ('openalex', %s, 'Test', 2024, %s) RETURNING id
     """, (openalex_id, publication_id))
     return db.fetchone()["id"]
 
@@ -81,7 +81,7 @@ def _insert_oa_authorship(db, oa_document_id, oa_author_id, position=0,
     """Crée une openalex_authorship."""
     db.execute("""
         INSERT INTO openalex_authorships
-            (openalex_document_id, openalex_author_id, author_position,
+            (source_document_id, openalex_author_id, author_position,
              is_uca, person_id, raw_author_name)
         VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
     """, (oa_document_id, oa_author_id, position, is_uca, person_id,

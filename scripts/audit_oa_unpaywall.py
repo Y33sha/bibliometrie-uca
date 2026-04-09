@@ -60,8 +60,8 @@ def main():
         FROM publications p
         WHERE p.doi IS NOT NULL
           AND p.oa_status != 'unknown'
-          AND EXISTS (SELECT 1 FROM openalex_documents od
-                      WHERE od.publication_id = p.id)
+          AND EXISTS (SELECT 1 FROM source_documents sd
+                      WHERE sd.publication_id = p.id AND sd.source = 'openalex')
         ORDER BY p.id
     """
     if args.limit:

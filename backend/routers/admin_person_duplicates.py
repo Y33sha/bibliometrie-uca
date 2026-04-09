@@ -157,11 +157,15 @@ def _get_person_dedup_detail(cur, person_id):
 
     cur.execute("""
         SELECT pub.id, pub.title, pub.pub_year, pub.doi, pub.doc_type::text,
-               ARRAY_REMOVE(ARRAY[
-                   CASE WHEN EXISTS(SELECT 1 FROM hal_documents WHERE publication_id = pub.id) THEN 'HAL' END,
-                   CASE WHEN EXISTS(SELECT 1 FROM openalex_documents WHERE publication_id = pub.id) THEN 'OpenAlex' END,
-                   CASE WHEN EXISTS(SELECT 1 FROM wos_documents WHERE publication_id = pub.id) THEN 'WoS' END
-               ], NULL) AS sources
+               (SELECT array_agg(DISTINCT
+                   CASE sd.source
+                       WHEN 'hal' THEN 'HAL'
+                       WHEN 'openalex' THEN 'OpenAlex'
+                       WHEN 'wos' THEN 'WoS'
+                       WHEN 'scanr' THEN 'ScanR'
+                   END
+                ) FROM source_documents sd WHERE sd.publication_id = pub.id
+               ) AS sources
         FROM authorships a
         JOIN publications pub ON pub.id = a.publication_id
         WHERE a.person_id = %s AND NOT a.excluded
@@ -314,38 +318,38 @@ MAX_AUTHORS_CONFLICT = 50  # Exclure les mega-authorships (physique des particul
 CONFLICT_PAIRS_SQL = """
 WITH pub_author_counts AS (
     SELECT publication_id, MAX(cnt) AS max_authors FROM (
-        SELECT hd.publication_id, COUNT(*) AS cnt
-        FROM hal_documents hd JOIN hal_authorships has ON has.hal_document_id = hd.id
-        WHERE NOT has.excluded GROUP BY hd.publication_id
+        SELECT sd.publication_id, COUNT(*) AS cnt
+        FROM source_documents sd JOIN hal_authorships has ON has.source_document_id = sd.id
+        WHERE NOT has.excluded GROUP BY sd.publication_id
         UNION ALL
-        SELECT od.publication_id, COUNT(*)
-        FROM openalex_documents od JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-        WHERE NOT oas.excluded GROUP BY od.publication_id
+        SELECT sd.publication_id, COUNT(*)
+        FROM source_documents sd JOIN openalex_authorships oas ON oas.source_document_id = sd.id
+        WHERE NOT oas.excluded GROUP BY sd.publication_id
         UNION ALL
-        SELECT wd.publication_id, COUNT(*)
-        FROM wos_documents wd JOIN wos_authorships was ON was.wos_document_id = wd.id
-        WHERE NOT was.excluded GROUP BY wd.publication_id
+        SELECT sd.publication_id, COUNT(*)
+        FROM source_documents sd JOIN wos_authorships was ON was.source_document_id = sd.id
+        WHERE NOT was.excluded GROUP BY sd.publication_id
     ) sub GROUP BY publication_id
 ),
 author_positions AS (
-    SELECT DISTINCT hd.publication_id, has.author_position, has.person_id
-    FROM hal_documents hd
-    JOIN hal_authorships has ON has.hal_document_id = hd.id
-    JOIN pub_author_counts pac ON pac.publication_id = hd.publication_id
+    SELECT DISTINCT sd.publication_id, has.author_position, has.person_id
+    FROM source_documents sd
+    JOIN hal_authorships has ON has.source_document_id = sd.id
+    JOIN pub_author_counts pac ON pac.publication_id = sd.publication_id
     WHERE has.person_id IS NOT NULL AND NOT has.excluded
       AND pac.max_authors <= {max_authors}
     UNION
-    SELECT DISTINCT od.publication_id, oas.author_position, oas.person_id
-    FROM openalex_documents od
-    JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-    JOIN pub_author_counts pac ON pac.publication_id = od.publication_id
+    SELECT DISTINCT sd.publication_id, oas.author_position, oas.person_id
+    FROM source_documents sd
+    JOIN openalex_authorships oas ON oas.source_document_id = sd.id
+    JOIN pub_author_counts pac ON pac.publication_id = sd.publication_id
     WHERE oas.person_id IS NOT NULL AND NOT oas.excluded
       AND pac.max_authors <= {max_authors}
     UNION
-    SELECT DISTINCT wd.publication_id, was.author_position, was.person_id
-    FROM wos_documents wd
-    JOIN wos_authorships was ON was.wos_document_id = wd.id
-    JOIN pub_author_counts pac ON pac.publication_id = wd.publication_id
+    SELECT DISTINCT sd.publication_id, was.author_position, was.person_id
+    FROM source_documents sd
+    JOIN wos_authorships was ON was.source_document_id = sd.id
+    JOIN pub_author_counts pac ON pac.publication_id = sd.publication_id
     WHERE was.person_id IS NOT NULL AND NOT was.excluded
       AND pac.max_authors <= {max_authors}
 )

@@ -8,7 +8,7 @@ Usage:
 
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
-    scanr_documents                         (lien staging ↔ publication)
+    source_documents                        (lien staging ↔ publication, source='scanr')
     scanr_authors                           (auteurs ScanR dédupliqués par idref)
     scanr_authorships                       (lien document × auteur, avec affiliations)
 
@@ -146,31 +146,37 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None) -> tuple[
 
 
 # =============================================================
-# SCANR DOCUMENTS
+# SOURCE DOCUMENTS (SCANR)
 # =============================================================
 
 def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
                           publication_id: int | None) -> int:
-    """Crée/retrouve l'entrée scanr_documents. Retourne scanr_document.id."""
+    """Crée/retrouve l'entrée source_documents pour ScanR. Retourne source_documents.id."""
     doi = extract_doi(doc)
     hal_id = extract_hal_id(doc)
     title = get_title(doc) or ""
     pub_year = doc.get("year")
     doc_type = doc.get("type")
 
+    # external_ids stocke le hal_id comme metadata JSON
+    external_ids = None
+    if hal_id:
+        external_ids = Json({"hal": hal_id})
+
     cur.execute("""
-        INSERT INTO scanr_documents
-            (scanr_id, doi, hal_id, title, pub_year, doc_type, publication_id, staging_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (scanr_id) DO UPDATE SET
+        INSERT INTO source_documents
+            (source, source_id, doi, title, pub_year, doc_type,
+             publication_id, staging_id, external_ids)
+        VALUES ('scanr', %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
-                scanr_documents.publication_id, EXCLUDED.publication_id
+                source_documents.publication_id, EXCLUDED.publication_id
             ),
-            doi = COALESCE(scanr_documents.doi, EXCLUDED.doi),
-            hal_id = COALESCE(scanr_documents.hal_id, EXCLUDED.hal_id),
-            doc_type = COALESCE(EXCLUDED.doc_type, scanr_documents.doc_type)
+            doi = COALESCE(source_documents.doi, EXCLUDED.doi),
+            external_ids = COALESCE(EXCLUDED.external_ids, source_documents.external_ids),
+            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type)
         RETURNING id
-    """, (scanr_id, doi, hal_id, title, pub_year, doc_type, publication_id, staging_id))
+    """, (scanr_id, doi, title, pub_year, doc_type, publication_id, staging_id, external_ids))
     return cur.fetchone()["id"]
 
 
@@ -235,7 +241,7 @@ def upsert_scanr_author(cur, author: dict) -> int | None:
 # SCANR AUTHORSHIPS
 # =============================================================
 
-def process_authors(cur, doc: dict, scanr_document_id: int):
+def process_authors(cur, doc: dict, source_document_id: int):
     """Traite les auteurs d'un document ScanR."""
     authors = doc.get("authors") or []
 
@@ -263,11 +269,11 @@ def process_authors(cur, doc: dict, scanr_document_id: int):
 
         cur.execute("""
             INSERT INTO scanr_authorships
-                (scanr_document_id, scanr_author_id, author_position, role,
+                (source_document_id, scanr_author_id, author_position, role,
                  raw_affiliations, affiliation_ids, detected_countries,
                  author_name_normalized)
             VALUES (%s, %s, %s, %s, %s, %s, %s, normalize_name_form(%s))
-            ON CONFLICT (scanr_document_id, scanr_author_id) DO UPDATE SET
+            ON CONFLICT (source_document_id, scanr_author_id) DO UPDATE SET
                 raw_affiliations = COALESCE(EXCLUDED.raw_affiliations,
                     scanr_authorships.raw_affiliations),
                 affiliation_ids = COALESCE(EXCLUDED.affiliation_ids,
@@ -275,7 +281,7 @@ def process_authors(cur, doc: dict, scanr_document_id: int):
                 detected_countries = COALESCE(EXCLUDED.detected_countries,
                     scanr_authorships.detected_countries),
                 author_name_normalized = EXCLUDED.author_name_normalized
-        """, (scanr_document_id, scanr_author_id, position, role,
+        """, (source_document_id, scanr_author_id, position, role,
               Json(raw_affiliations) if raw_affiliations else None,
               affiliation_ids or None,
               detected_countries or None,
@@ -311,10 +317,10 @@ def process_work(cur, staging_row) -> bool:
         timings["journal"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        # Si le scanr_document existe déjà (relance idempotente),
+        # Si le source_document existe déjà (relance idempotente),
         # réutiliser sa publication plutôt que d'en créer une nouvelle
         cur.execute(
-            "SELECT publication_id FROM scanr_documents WHERE scanr_id = %s",
+            "SELECT publication_id FROM source_documents WHERE source = 'scanr' AND source_id = %s",
             (scanr_id,))
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc["publication_id"]:
@@ -328,9 +334,9 @@ def process_work(cur, staging_row) -> bool:
             logger.warning(f"Impossible d'insérer {scanr_id} — échec insertion publication")
             return False
 
-        # Document ScanR
+        # Document ScanR (source_documents)
         t0 = time.perf_counter()
-        scanr_document_id = insert_scanr_document(
+        source_document_id = insert_scanr_document(
             cur, doc, staging_id, scanr_id, publication_id
         )
         update_sources(cur, publication_id)
@@ -338,7 +344,7 @@ def process_work(cur, staging_row) -> bool:
 
         # Auteurs et authorships
         t0 = time.perf_counter()
-        process_authors(cur, doc, scanr_document_id)
+        process_authors(cur, doc, source_document_id)
         timings["authors"] = time.perf_counter() - t0
 
         cur.execute(
@@ -428,10 +434,13 @@ def main():
         logger.info(f"Erreurs : {errors}")
 
         for table in ["publications", "journals", "publishers",
-                       "scanr_documents", "scanr_authors", "scanr_authorships"]:
+                       "scanr_authors", "scanr_authorships"]:
             cur.execute(f"SELECT COUNT(*) AS cnt FROM {table}")
             count = cur.fetchone()["cnt"]
             logger.info(f"  {table} : {count} enregistrements")
+        cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'scanr'")
+        count = cur.fetchone()["cnt"]
+        logger.info(f"  source_documents (scanr) : {count} enregistrements")
 
     except KeyboardInterrupt:
         conn.commit()

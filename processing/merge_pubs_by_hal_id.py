@@ -3,7 +3,7 @@ Fusionne les publications qui pointent vers le même document HAL.
 
 Sources de hal_id :
 - OpenAlex : primary_location pointant vers hal.science/hal-XXXXX
-- ScanR : scanr_documents.hal_id (extrait des externalIds)
+- ScanR : source_documents.external_ids->>'hal' (extrait des externalIds)
 
 Deux cas :
 1. HAL doc a publication_id = NULL → on le relie à la publication source
@@ -36,17 +36,18 @@ def find_duplicates(cur):
 
     Sources :
     - OpenAlex : primary_location → hal.science URL
-    - ScanR : scanr_documents.hal_id
+    - ScanR : source_documents.external_ids->>'hal'
     """
     # --- OpenAlex → HAL ---
     cur.execute("""
-        SELECT od.id AS src_doc_id, od.openalex_id AS src_id,
+        SELECT od.id AS src_doc_id, od.source_id AS src_id,
                od.publication_id AS src_pub_id,
                so.raw_data->'primary_location'->>'landing_page_url' AS url
-        FROM openalex_documents od
+        FROM source_documents od
         JOIN staging so ON so.id = od.staging_id
-        WHERE so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.science%'
-           OR so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.archives-ouvertes.fr%'
+        WHERE od.source = 'openalex'
+          AND (so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.science%'
+           OR so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.archives-ouvertes.fr%')
     """)
 
     src_by_halid = {}
@@ -62,10 +63,12 @@ def find_duplicates(cur):
 
     # --- ScanR → HAL ---
     cur.execute("""
-        SELECT sd.id AS src_doc_id, sd.scanr_id AS src_id,
-               sd.publication_id AS src_pub_id, sd.hal_id
-        FROM scanr_documents sd
-        WHERE sd.hal_id IS NOT NULL
+        SELECT sd.id AS src_doc_id, sd.source_id AS src_id,
+               sd.publication_id AS src_pub_id,
+               sd.external_ids->>'hal' AS hal_id
+        FROM source_documents sd
+        WHERE sd.source = 'scanr'
+          AND sd.external_ids->>'hal' IS NOT NULL
     """)
     for r in cur.fetchall():
         hid = r['hal_id']
@@ -78,7 +81,7 @@ def find_duplicates(cur):
             }
 
     # --- HAL documents ---
-    cur.execute("SELECT id AS hal_doc_id, halid, publication_id AS hal_pub_id FROM hal_documents")
+    cur.execute("SELECT id AS hal_doc_id, source_id AS halid, publication_id AS hal_pub_id FROM source_documents WHERE source = 'hal'")
     hal_by_id = {r['halid']: r for r in cur.fetchall()}
 
     # --- Croiser ---
@@ -112,7 +115,7 @@ def link_hal_to_publication(cur, items, dry_run=False):
             continue
 
         cur.execute(
-            "UPDATE hal_documents SET publication_id = %s WHERE id = %s",
+            "UPDATE source_documents SET publication_id = %s WHERE id = %s",
             (src_pub_id, hal_doc_id)
         )
         update_sources(cur, src_pub_id)
@@ -192,7 +195,7 @@ def main():
         if link_only:
             log.info(f"\n--- Liaison HAL → publication existante ---")
             n = link_hal_to_publication(cur, link_only, dry_run=args.dry_run)
-            log.info(f"  {n} hal_documents reliés")
+            log.info(f"  {n} source_documents HAL reliés")
 
         if merge_needed:
             log.info(f"\n--- Fusion de publications ---")

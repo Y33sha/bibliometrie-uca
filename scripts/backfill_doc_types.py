@@ -65,13 +65,11 @@ def main():
     # Récupérer toutes les publications avec les types sources
     cur.execute("""
         SELECT p.id, p.doc_type::text,
-               array_agg(DISTINCT hd.doc_type) FILTER (WHERE hd.doc_type IS NOT NULL) AS hal_types,
-               array_agg(DISTINCT od.doc_type) FILTER (WHERE od.doc_type IS NOT NULL) AS oa_types,
-               array_agg(DISTINCT wd.doc_type) FILTER (WHERE wd.doc_type IS NOT NULL) AS wos_types
+               array_agg(DISTINCT sd.doc_type) FILTER (WHERE sd.source = 'hal' AND sd.doc_type IS NOT NULL) AS hal_types,
+               array_agg(DISTINCT sd.doc_type) FILTER (WHERE sd.source = 'openalex' AND sd.doc_type IS NOT NULL) AS oa_types,
+               array_agg(DISTINCT sd.doc_type) FILTER (WHERE sd.source = 'wos' AND sd.doc_type IS NOT NULL) AS wos_types
         FROM publications p
-        LEFT JOIN hal_documents hd ON hd.publication_id = p.id
-        LEFT JOIN openalex_documents od ON od.publication_id = p.id
-        LEFT JOIN wos_documents wd ON wd.publication_id = p.id
+        LEFT JOIN source_documents sd ON sd.publication_id = p.id
         GROUP BY p.id, p.doc_type
     """)
 

@@ -8,7 +8,7 @@ Usage:
 
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
-    wos_documents                           (lien staging ↔ publication)
+    source_documents                        (lien staging ↔ publication, source='wos')
     wos_authors                             (auteurs WoS dédupliqués)
     wos_authorships                         (lien document × auteur)
 
@@ -577,21 +577,21 @@ def upsert_publication(cur, rec: dict, journal_id: int | None) -> int | None:
 
 
 # =============================================================
-# WOS DOCUMENTS
+# SOURCE DOCUMENTS (WOS)
 # =============================================================
 
 def insert_wos_document(cur, rec: dict, staging_id: int,
                         publication_id: int) -> int:
-    """Crée/retrouve l'entrée wos_documents. Retourne wos_document.id."""
+    """Crée/retrouve l'entrée source_documents pour WoS. Retourne source_documents.id."""
     cur.execute("""
-        INSERT INTO wos_documents
-            (ut, doi, title, pub_year, doc_type, publication_id, staging_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (ut) DO UPDATE SET
+        INSERT INTO source_documents
+            (source, source_id, doi, title, pub_year, doc_type, publication_id, staging_id)
+        VALUES ('wos', %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
-                wos_documents.publication_id, EXCLUDED.publication_id
+                source_documents.publication_id, EXCLUDED.publication_id
             ),
-            doc_type = COALESCE(EXCLUDED.doc_type, wos_documents.doc_type)
+            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type)
         RETURNING id
     """, (rec["ut"], rec["doi"], rec["title"], rec["pub_year"],
           rec["doc_type"], publication_id, staging_id))
@@ -708,7 +708,7 @@ def upsert_wos_institution(cur, org: dict) -> int | None:
     return cur.fetchone()[0]
 
 
-def process_authorships(cur, rec: dict, wos_document_id: int):
+def process_authorships(cur, rec: dict, source_document_id: int):
     """Traite les authorships d'un record WoS + crée les liens adresses et institutions."""
     for author in rec.get("authors", []):
         wos_author_id = upsert_wos_author(cur, author)
@@ -724,11 +724,11 @@ def process_authorships(cur, rec: dict, wos_document_id: int):
 
         cur.execute("""
             INSERT INTO wos_authorships
-                (wos_document_id, wos_author_id, author_position,
+                (source_document_id, wos_author_id, author_position,
                  is_corresponding, raw_affiliation, author_name_normalized,
                  wos_institution_ids, role)
             VALUES (%s, %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
-            ON CONFLICT (wos_document_id, wos_author_id) DO UPDATE SET
+            ON CONFLICT (source_document_id, wos_author_id) DO UPDATE SET
                 raw_affiliation = COALESCE(
                     EXCLUDED.raw_affiliation,
                     wos_authorships.raw_affiliation
@@ -744,7 +744,7 @@ def process_authorships(cur, rec: dict, wos_document_id: int):
                 ),
                 role = EXCLUDED.role
             RETURNING id
-        """, (wos_document_id, wos_author_id, author["position"],
+        """, (source_document_id, wos_author_id, author["position"],
               author["is_corresponding"], author.get("raw_affiliation"),
               author["full_name"], institution_ids or None, author.get("role")))
         was_id = cur.fetchone()[0]
@@ -782,10 +782,10 @@ def process_record(cur, staging_row: tuple) -> bool:
         publisher_id = upsert_publisher(cur, rec.get("publisher_name"))
         journal_id = upsert_journal(cur, rec, publisher_id)
 
-        # Idempotence : si wos_documents a déjà ce UT avec un publication_id,
+        # Idempotence : si source_documents a déjà ce UT avec un publication_id,
         # le réutiliser au lieu de risquer un doublon
         cur.execute(
-            "SELECT publication_id FROM wos_documents WHERE ut = %s",
+            "SELECT publication_id FROM source_documents WHERE source = 'wos' AND source_id = %s",
             (rec["ut"],))
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc[0]:
@@ -801,12 +801,12 @@ def process_record(cur, staging_row: tuple) -> bool:
             )
             return False
 
-        # Document WoS
-        wos_document_id = insert_wos_document(cur, rec, staging_id, publication_id)
+        # Document WoS (source_documents)
+        source_document_id = insert_wos_document(cur, rec, staging_id, publication_id)
         update_sources(cur, publication_id)
 
         # Auteurs et authorships
-        process_authorships(cur, rec, wos_document_id)
+        process_authorships(cur, rec, source_document_id)
 
         # Marquer comme traité
         cur.execute(
@@ -890,10 +890,13 @@ def main():
         logger.info(f"Erreurs : {errors}")
 
         for table in ["publications", "journals", "publishers",
-                       "wos_documents", "wos_authors", "wos_authorships"]:
+                       "wos_authors", "wos_authorships"]:
             cur.execute(f"SELECT COUNT(*) FROM {table}")
             count = cur.fetchone()[0]
             logger.info(f"  {table} : {count} enregistrements")
+        cur.execute("SELECT COUNT(*) FROM source_documents WHERE source = 'wos'")
+        count = cur.fetchone()[0]
+        logger.info(f"  source_documents (wos) : {count} enregistrements")
 
     except KeyboardInterrupt:
         conn.commit()
