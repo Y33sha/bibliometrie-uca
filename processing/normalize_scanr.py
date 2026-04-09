@@ -9,7 +9,7 @@ Usage:
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_documents                        (lien staging ↔ publication, source='scanr')
-    scanr_authors                           (auteurs ScanR dédupliqués par idref)
+    source_authors                          (auteurs unifiés, source='scanr')
     scanr_authorships                       (lien document × auteur, avec affiliations)
 
 La résolution UCA (scanr_authorships.structure_ids, is_uca) se fait en post-traitement
@@ -182,11 +182,12 @@ def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
 
 
 # =============================================================
-# SCANR AUTHORS
+# SCANR AUTHORS (source_authors, source='scanr')
 # =============================================================
 
 def upsert_scanr_author(cur, author: dict) -> int | None:
-    """Insère/retrouve un auteur ScanR. Déduplique par idref."""
+    """Insère/retrouve un auteur ScanR dans source_authors (source='scanr').
+    Déduplique par idref (via source_id). L'idref va dans BOTH source_id et idref."""
     full_name = author.get("fullName")
     if not full_name:
         return None
@@ -205,22 +206,27 @@ def upsert_scanr_author(cur, author: dict) -> int | None:
     orcid = denorm.get("orcid")
 
     # 1. Par idref (clé fiable)
+    #    source_id = COALESCE(idref, 'scanr-{old_id}')
+    #    idref va aussi dans la colonne idref de source_authors
     if idref:
+        source_id = idref
         cur.execute("""
-            INSERT INTO scanr_authors (idref, full_name, last_name, first_name, orcid)
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (idref) DO UPDATE SET
-                orcid = COALESCE(scanr_authors.orcid, EXCLUDED.orcid),
+            INSERT INTO source_authors
+                (source, source_id, full_name, last_name, first_name, orcid, idref)
+            VALUES ('scanr', %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (source, source_id) DO UPDATE SET
+                orcid = COALESCE(source_authors.orcid, EXCLUDED.orcid),
                 full_name = EXCLUDED.full_name,
-                updated_at = now()
+                idref = COALESCE(source_authors.idref, EXCLUDED.idref)
             RETURNING id
-        """, (idref, full_name, last_name, first_name, orcid))
+        """, (source_id, full_name, last_name, first_name, orcid, idref))
         return cur.fetchone()["id"]
 
     # 2. Par nom exact (auteurs sans idref)
     cur.execute("""
-        SELECT id FROM scanr_authors
-        WHERE idref IS NULL
+        SELECT id FROM source_authors
+        WHERE source = 'scanr'
+          AND source_id LIKE 'scanr-%%'
           AND full_name = %s
           AND first_name IS NOT DISTINCT FROM %s
         LIMIT 1
@@ -229,12 +235,16 @@ def upsert_scanr_author(cur, author: dict) -> int | None:
     if row:
         return row["id"]
 
-    # 3. Nouveau sans identifiant
+    # 3. Nouveau sans identifiant — on génère un source_id séquentiel
+    cur.execute("SELECT nextval('source_authors_id_seq')")
+    next_id = cur.fetchone()["nextval"]
+    source_id = f"scanr-{next_id}"
     cur.execute("""
-        INSERT INTO scanr_authors (full_name, last_name, first_name, orcid)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO source_authors
+            (id, source, source_id, full_name, last_name, first_name, orcid)
+        VALUES (%s, 'scanr', %s, %s, %s, %s, %s)
         RETURNING id
-    """, (full_name, last_name, first_name, orcid))
+    """, (next_id, source_id, full_name, last_name, first_name, orcid))
     return cur.fetchone()["id"]
 
 
@@ -247,8 +257,8 @@ def process_authors(cur, doc: dict, source_document_id: int):
     authors = doc.get("authors") or []
 
     for position, author_data in enumerate(authors):
-        scanr_author_id = upsert_scanr_author(cur, author_data)
-        if not scanr_author_id:
+        source_author_id = upsert_scanr_author(cur, author_data)
+        if not source_author_id:
             continue
 
         raw_role = author_data.get("role")
@@ -271,11 +281,11 @@ def process_authors(cur, doc: dict, source_document_id: int):
 
         cur.execute("""
             INSERT INTO scanr_authorships
-                (source_document_id, scanr_author_id, author_position, roles,
+                (source_document_id, source_author_id, author_position, roles,
                  raw_affiliations, affiliation_ids, detected_countries,
                  author_name_normalized)
             VALUES (%s, %s, %s, %s, %s, %s, %s, normalize_name_form(%s))
-            ON CONFLICT (source_document_id, scanr_author_id) DO UPDATE SET
+            ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
                 raw_affiliations = COALESCE(EXCLUDED.raw_affiliations,
                     scanr_authorships.raw_affiliations),
                 affiliation_ids = COALESCE(EXCLUDED.affiliation_ids,
@@ -284,7 +294,7 @@ def process_authors(cur, doc: dict, source_document_id: int):
                     scanr_authorships.detected_countries),
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 roles = EXCLUDED.roles
-        """, (source_document_id, scanr_author_id, position, roles or None,
+        """, (source_document_id, source_author_id, position, roles or None,
               Json(raw_affiliations) if raw_affiliations else None,
               affiliation_ids or None,
               detected_countries or None,
@@ -437,10 +447,13 @@ def main():
         logger.info(f"Erreurs : {errors}")
 
         for table in ["publications", "journals", "publishers",
-                       "scanr_authors", "scanr_authorships"]:
+                       "scanr_authorships"]:
             cur.execute(f"SELECT COUNT(*) AS cnt FROM {table}")
             count = cur.fetchone()["cnt"]
             logger.info(f"  {table} : {count} enregistrements")
+        cur.execute("SELECT COUNT(*) AS cnt FROM source_authors WHERE source = 'scanr'")
+        count = cur.fetchone()["cnt"]
+        logger.info(f"  source_authors (scanr) : {count} enregistrements")
         cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'scanr'")
         count = cur.fetchone()["cnt"]
         logger.info(f"  source_documents (scanr) : {count} enregistrements")

@@ -24,29 +24,29 @@ async def authorships_stats(lab_id: int = Query(0)):
             WITH uca_authors AS (
                 SELECT ha.id,
                        (SELECT has3.person_id FROM hal_authorships has3
-                        WHERE has3.hal_author_id = ha.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                       ha.orcid, ha.idhal, 'hal' AS source
-                FROM hal_authors ha
+                        WHERE has3.source_author_id = ha.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
+                       ha.orcid, ha.source_ids->>'idhal' AS idhal, 'hal' AS source
+                FROM source_authors ha
                 WHERE EXISTS (
                     SELECT 1 FROM hal_authorships has
-                    WHERE has.hal_author_id = ha.id AND has.is_uca = TRUE{lab_filter_hal}
+                    WHERE has.source_author_id = ha.id AND has.is_uca = TRUE{lab_filter_hal}
                 )
                 UNION ALL
                 SELECT oa.id, oa.person_id, oa.orcid, NULL AS idhal, 'openalex' AS source
-                FROM openalex_authors oa
+                FROM source_authors oa
                 WHERE EXISTS (
                     SELECT 1 FROM openalex_authorships oas
-                    WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE{lab_filter_oa}
+                    WHERE oas.source_author_id = oa.id AND oas.is_uca = TRUE{lab_filter_oa}
                 )
                 UNION ALL
                 SELECT wa.id,
                        (SELECT was3.person_id FROM wos_authorships was3
-                        WHERE was3.wos_author_id = wa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
+                        WHERE was3.source_author_id = wa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
                        wa.orcid, NULL AS idhal, 'wos' AS source
-                FROM wos_authors wa
+                FROM source_authors wa
                 WHERE EXISTS (
                     SELECT 1 FROM wos_authorships was
-                    WHERE was.wos_author_id = wa.id AND was.is_uca = TRUE{lab_filter_wos}
+                    WHERE was.source_author_id = wa.id AND was.is_uca = TRUE{lab_filter_wos}
                 )
             )
             SELECT
@@ -81,41 +81,41 @@ async def authorships_facets(
         WITH uca_authors AS (
             SELECT ha.id,
                    (SELECT has3.person_id FROM hal_authorships has3
-                    WHERE has3.hal_author_id = ha.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                   ha.orcid, ha.idhal, 'hal' AS source,
+                    WHERE has3.source_author_id = ha.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
+                   ha.orcid, ha.source_ids->>'idhal' AS idhal, 'hal' AS source,
                    ha.full_name,
                    (SELECT COUNT(DISTINCT sd.publication_id) FROM hal_authorships has2
                     JOIN source_documents sd ON sd.id = has2.source_document_id
-                    WHERE has2.hal_author_id = ha.id AND has2.is_uca = TRUE) AS uca_pub_count
-            FROM hal_authors ha
+                    WHERE has2.source_author_id = ha.id AND has2.is_uca = TRUE) AS uca_pub_count
+            FROM source_authors ha
             WHERE EXISTS (
                 SELECT 1 FROM hal_authorships has
-                WHERE has.hal_author_id = ha.id AND has.is_uca = TRUE{lab_filter_hal}
+                WHERE has.source_author_id = ha.id AND has.is_uca = TRUE{lab_filter_hal}
             )
             UNION ALL
             SELECT oa.id, oa.person_id, oa.orcid, NULL AS idhal, 'openalex' AS source,
                    oa.full_name,
                    (SELECT COUNT(DISTINCT sd.publication_id) FROM openalex_authorships oas2
                     JOIN source_documents sd ON sd.id = oas2.source_document_id
-                    WHERE oas2.openalex_author_id = oa.id AND oas2.is_uca = TRUE) AS uca_pub_count
-            FROM openalex_authors oa
+                    WHERE oas2.source_author_id = oa.id AND oas2.is_uca = TRUE) AS uca_pub_count
+            FROM source_authors oa
             WHERE EXISTS (
                 SELECT 1 FROM openalex_authorships oas
-                WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE{lab_filter_oa}
+                WHERE oas.source_author_id = oa.id AND oas.is_uca = TRUE{lab_filter_oa}
             )
             UNION ALL
             SELECT wa.id,
                    (SELECT was3.person_id FROM wos_authorships was3
-                    WHERE was3.wos_author_id = wa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
+                    WHERE was3.source_author_id = wa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
                    wa.orcid, NULL AS idhal, 'wos' AS source,
                    wa.full_name,
                    (SELECT COUNT(DISTINCT sd.publication_id) FROM wos_authorships was2
                     JOIN source_documents sd ON sd.id = was2.source_document_id
-                    WHERE was2.wos_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count
-            FROM wos_authors wa
+                    WHERE was2.source_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count
+            FROM source_authors wa
             WHERE EXISTS (
                 SELECT 1 FROM wos_authorships was
-                WHERE was.wos_author_id = wa.id AND was.is_uca = TRUE{lab_filter_wos}
+                WHERE was.source_author_id = wa.id AND was.is_uca = TRUE{lab_filter_wos}
             )
         )
     """
@@ -179,48 +179,48 @@ async def authorships_facets(
             WITH uca_authors AS (
                 SELECT ha.id,
                        (SELECT has3.person_id FROM hal_authorships has3
-                        WHERE has3.hal_author_id = ha.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                       ha.orcid, ha.idhal, 'hal' AS source,
+                        WHERE has3.source_author_id = ha.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
+                       ha.orcid, ha.source_ids->>'idhal' AS idhal, 'hal' AS source,
                        ha.full_name
-                FROM hal_authors ha
+                FROM source_authors ha
                 WHERE EXISTS (
                     SELECT 1 FROM hal_authorships has
-                    WHERE has.hal_author_id = ha.id AND has.is_uca = TRUE
+                    WHERE has.source_author_id = ha.id AND has.is_uca = TRUE
                 )
                 UNION ALL
                 SELECT oa.id, oa.person_id, oa.orcid, NULL AS idhal, 'openalex' AS source,
                        oa.full_name
-                FROM openalex_authors oa
+                FROM source_authors oa
                 WHERE EXISTS (
                     SELECT 1 FROM openalex_authorships oas
-                    WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE
+                    WHERE oas.source_author_id = oa.id AND oas.is_uca = TRUE
                 )
                 UNION ALL
                 SELECT wa.id,
                        (SELECT was3.person_id FROM wos_authorships was3
-                        WHERE was3.wos_author_id = wa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
+                        WHERE was3.source_author_id = wa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
                        wa.orcid, NULL AS idhal, 'wos' AS source,
                        wa.full_name
-                FROM wos_authors wa
+                FROM source_authors wa
                 WHERE EXISTS (
                     SELECT 1 FROM wos_authorships was
-                    WHERE was.wos_author_id = wa.id AND was.is_uca = TRUE
+                    WHERE was.source_author_id = wa.id AND was.is_uca = TRUE
                 )
             ),
             author_structs AS (
                 SELECT ha.id AS author_id, 'hal' AS source, unnest(has2.structure_ids) AS struct_id
-                FROM hal_authors ha
-                JOIN hal_authorships has2 ON has2.hal_author_id = ha.id
+                FROM source_authors ha
+                JOIN hal_authorships has2 ON has2.source_author_id = ha.id
                 WHERE has2.is_uca = TRUE AND has2.structure_ids IS NOT NULL
                 UNION
                 SELECT oa.id, 'openalex', unnest(oas.structure_ids)
-                FROM openalex_authors oa
-                JOIN openalex_authorships oas ON oas.openalex_author_id = oa.id
+                FROM source_authors oa
+                JOIN openalex_authorships oas ON oas.source_author_id = oa.id
                 WHERE oas.is_uca = TRUE AND oas.structure_ids IS NOT NULL
                 UNION
                 SELECT wa.id, 'wos', unnest(was.structure_ids)
-                FROM wos_authors wa
-                JOIN wos_authorships was ON was.wos_author_id = wa.id
+                FROM source_authors wa
+                JOIN wos_authorships was ON was.source_author_id = wa.id
                 WHERE was.is_uca = TRUE AND was.structure_ids IS NOT NULL
             )
         """
@@ -295,40 +295,40 @@ async def list_authorships(
         cte = f"""
             WITH uca_authors AS (
                 SELECT ha.id, 'hal' AS source, ha.full_name, ha.last_name, ha.first_name,
-                       ha.orcid, ha.idhal, NULL::text AS openalex_id,
+                       ha.orcid, ha.source_ids->>'idhal' AS idhal, NULL::text AS openalex_id,
                        (SELECT has3.person_id FROM hal_authorships has3
-                        WHERE has3.hal_author_id = ha.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
+                        WHERE has3.source_author_id = ha.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
                        (SELECT COUNT(DISTINCT has2.source_document_id)
                         FROM hal_authorships has2
-                        WHERE has2.hal_author_id = ha.id AND has2.is_uca = TRUE) AS uca_pub_count
-                FROM hal_authors ha
+                        WHERE has2.source_author_id = ha.id AND has2.is_uca = TRUE) AS uca_pub_count
+                FROM source_authors ha
                 WHERE EXISTS (
                     SELECT 1 FROM hal_authorships has
-                    WHERE has.hal_author_id = ha.id AND has.is_uca = TRUE{lab_filter_hal}
+                    WHERE has.source_author_id = ha.id AND has.is_uca = TRUE{lab_filter_hal}
                 )
                 UNION ALL
                 SELECT oa.id, 'openalex' AS source, oa.full_name, oa.last_name, oa.first_name,
-                       oa.orcid, NULL::text AS idhal, oa.openalex_id, oa.person_id,
+                       oa.orcid, NULL::text AS idhal, oa.source_id AS openalex_id, oa.person_id,
                        (SELECT COUNT(DISTINCT oas2.source_document_id)
                         FROM openalex_authorships oas2
-                        WHERE oas2.openalex_author_id = oa.id AND oas2.is_uca = TRUE) AS uca_pub_count
-                FROM openalex_authors oa
+                        WHERE oas2.source_author_id = oa.id AND oas2.is_uca = TRUE) AS uca_pub_count
+                FROM source_authors oa
                 WHERE EXISTS (
                     SELECT 1 FROM openalex_authorships oas
-                    WHERE oas.openalex_author_id = oa.id AND oas.is_uca = TRUE{lab_filter_oa}
+                    WHERE oas.source_author_id = oa.id AND oas.is_uca = TRUE{lab_filter_oa}
                 )
                 UNION ALL
                 SELECT wa.id, 'wos' AS source, wa.full_name, wa.last_name, wa.first_name,
                        wa.orcid, NULL::text AS idhal, NULL::text AS openalex_id,
                        (SELECT was3.person_id FROM wos_authorships was3
-                        WHERE was3.wos_author_id = wa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
+                        WHERE was3.source_author_id = wa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
                        (SELECT COUNT(DISTINCT was2.source_document_id)
                         FROM wos_authorships was2
-                        WHERE was2.wos_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count
-                FROM wos_authors wa
+                        WHERE was2.source_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count
+                FROM source_authors wa
                 WHERE EXISTS (
                     SELECT 1 FROM wos_authorships was
-                    WHERE was.wos_author_id = wa.id AND was.is_uca = TRUE{lab_filter_wos}
+                    WHERE was.source_author_id = wa.id AND was.is_uca = TRUE{lab_filter_wos}
                 )
             )
         """

@@ -9,7 +9,7 @@ Usage:
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_documents                        (lien staging ↔ publication, source='wos')
-    wos_authors                             (auteurs WoS dédupliqués)
+    source_authors                          (auteurs unifiés, source='wos')
     wos_authorships                         (lien document × auteur)
 
 Gère deux formats de raw_data :
@@ -601,11 +601,12 @@ def insert_wos_document(cur, rec: dict, staging_id: int,
 
 
 # =============================================================
-# WOS AUTHORS
+# WOS AUTHORS (source_authors, source='wos')
 # =============================================================
 
 def upsert_wos_author(cur, author: dict) -> int | None:
-    """Insère/retrouve un auteur WoS. Retourne wos_authors.id."""
+    """Insère/retrouve un auteur WoS dans source_authors (source='wos').
+    Retourne source_authors.id."""
     full_name = author["full_name"]
     if not full_name:
         return None
@@ -616,62 +617,82 @@ def upsert_wos_author(cur, author: dict) -> int | None:
     orcid = author.get("orcid")
     researcher_id = author.get("researcher_id")
 
-    # 1. Par daisng_id (clé unique, format API uniquement)
+    # Construire le JSONB source_ids pour les IDs spécifiques WoS
+    source_ids = {}
     if daisng_id:
+        source_ids["daisng_id"] = daisng_id
+    if researcher_id:
+        source_ids["researcher_id"] = researcher_id
+    source_ids_json = Json(source_ids) if source_ids else None
+
+    # 1. Par daisng_id (clé unique, format API uniquement)
+    #    source_id = COALESCE(daisng_id, 'wos-{old_id}')
+    if daisng_id:
+        source_id = daisng_id
         cur.execute("""
-            INSERT INTO wos_authors
-                (full_name, last_name, first_name, daisng_id, orcid, researcher_id)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON CONFLICT (daisng_id) DO UPDATE SET
-                orcid = COALESCE(wos_authors.orcid, EXCLUDED.orcid),
-                researcher_id = COALESCE(wos_authors.researcher_id, EXCLUDED.researcher_id),
+            INSERT INTO source_authors
+                (source, source_id, full_name, last_name, first_name, orcid,
+                 source_ids)
+            VALUES ('wos', %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (source, source_id) DO UPDATE SET
+                orcid = COALESCE(source_authors.orcid, EXCLUDED.orcid),
                 full_name = EXCLUDED.full_name,
-                updated_at = now()
+                source_ids = COALESCE(source_authors.source_ids, '{}') ||
+                             COALESCE(EXCLUDED.source_ids, '{}')
             RETURNING id
-        """, (full_name, last_name, first_name, daisng_id, orcid, researcher_id))
+        """, (source_id, full_name, last_name, first_name, orcid,
+              source_ids_json))
         return cur.fetchone()[0]
 
     # 2. Par ORCID (si disponible et déjà connu)
     if orcid:
-        cur.execute(
-            "SELECT id FROM wos_authors WHERE orcid = %s LIMIT 1",
-            (orcid,)
-        )
+        cur.execute("""
+            SELECT id FROM source_authors
+            WHERE source = 'wos' AND orcid = %s
+            LIMIT 1
+        """, (orcid,))
         row = cur.fetchone()
         if row:
             cur.execute("""
-                UPDATE wos_authors SET
-                    researcher_id = COALESCE(wos_authors.researcher_id, %s),
-                    updated_at = now()
+                UPDATE source_authors SET
+                    source_ids = COALESCE(source_authors.source_ids, '{}') ||
+                                 COALESCE(%s::jsonb, '{}')
                 WHERE id = %s
-            """, (researcher_id, row[0]))
+            """, (source_ids_json, row[0]))
             return row[0]
 
     # 3. Par nom exact (last_name + first_name)
     if last_name and first_name:
         cur.execute("""
-            SELECT id FROM wos_authors
-            WHERE last_name = %s AND first_name = %s AND daisng_id IS NULL
+            SELECT id FROM source_authors
+            WHERE source = 'wos'
+              AND last_name = %s AND first_name = %s
+              AND source_id LIKE 'wos-%%'
             LIMIT 1
         """, (last_name, first_name))
         row = cur.fetchone()
         if row:
             cur.execute("""
-                UPDATE wos_authors SET
-                    orcid = COALESCE(wos_authors.orcid, %s),
-                    researcher_id = COALESCE(wos_authors.researcher_id, %s),
-                    updated_at = now()
+                UPDATE source_authors SET
+                    orcid = COALESCE(source_authors.orcid, %s),
+                    source_ids = COALESCE(source_authors.source_ids, '{}') ||
+                                 COALESCE(%s::jsonb, '{}')
                 WHERE id = %s
-            """, (orcid, researcher_id, row[0]))
+            """, (orcid, source_ids_json, row[0]))
             return row[0]
 
-    # 4. Créer
+    # 4. Créer — on génère un source_id séquentiel
+    cur.execute("SELECT nextval('source_authors_id_seq')")
+    next_id = cur.fetchone()[0]
+    source_id = f"wos-{next_id}"
     cur.execute("""
-        INSERT INTO wos_authors
-            (full_name, last_name, first_name, orcid, researcher_id)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO source_authors
+            (id, source, source_id, full_name, last_name, first_name, orcid,
+             source_ids)
+        VALUES (%s, 'wos', %s, %s, %s, %s, %s, %s)
         RETURNING id
-    """, (full_name, last_name, first_name, orcid, researcher_id))
+    """, (next_id, source_id, full_name, last_name, first_name, orcid,
+          source_ids_json))
     return cur.fetchone()[0]
 
 
@@ -713,8 +734,8 @@ def upsert_wos_institution(cur, org: dict) -> int | None:
 def process_authorships(cur, rec: dict, source_document_id: int):
     """Traite les authorships d'un record WoS + crée les liens adresses et institutions."""
     for author in rec.get("authors", []):
-        wos_author_id = upsert_wos_author(cur, author)
-        if not wos_author_id:
+        source_author_id = upsert_wos_author(cur, author)
+        if not source_author_id:
             continue
 
         # Institutions WoS
@@ -726,11 +747,11 @@ def process_authorships(cur, rec: dict, source_document_id: int):
 
         cur.execute("""
             INSERT INTO wos_authorships
-                (source_document_id, wos_author_id, author_position,
+                (source_document_id, source_author_id, author_position,
                  is_corresponding, raw_affiliation, author_name_normalized,
                  wos_institution_ids, roles)
             VALUES (%s, %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
-            ON CONFLICT (source_document_id, wos_author_id) DO UPDATE SET
+            ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
                 raw_affiliation = COALESCE(
                     EXCLUDED.raw_affiliation,
                     wos_authorships.raw_affiliation
@@ -746,7 +767,7 @@ def process_authorships(cur, rec: dict, source_document_id: int):
                 ),
                 roles = EXCLUDED.roles
             RETURNING id
-        """, (source_document_id, wos_author_id, author["position"],
+        """, (source_document_id, source_author_id, author["position"],
               author["is_corresponding"], author.get("raw_affiliation"),
               author["full_name"], institution_ids or None, author.get("roles")))
         was_id = cur.fetchone()[0]
@@ -892,10 +913,13 @@ def main():
         logger.info(f"Erreurs : {errors}")
 
         for table in ["publications", "journals", "publishers",
-                       "wos_authors", "wos_authorships"]:
+                       "wos_authorships"]:
             cur.execute(f"SELECT COUNT(*) FROM {table}")
             count = cur.fetchone()[0]
             logger.info(f"  {table} : {count} enregistrements")
+        cur.execute("SELECT COUNT(*) FROM source_authors WHERE source = 'wos'")
+        count = cur.fetchone()[0]
+        logger.info(f"  source_authors (wos) : {count} enregistrements")
         cur.execute("SELECT COUNT(*) FROM source_documents WHERE source = 'wos'")
         count = cur.fetchone()[0]
         logger.info(f"  source_documents (wos) : {count} enregistrements")

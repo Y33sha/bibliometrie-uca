@@ -115,13 +115,16 @@ def delete_orphan_authorships(cur, person_id: int) -> int:
         WHERE a.person_id = %s
           AND NOT EXISTS (SELECT 1 FROM hal_authorships has
                           JOIN source_documents sd ON sd.id = has.source_document_id
-                          WHERE has.person_id = %s AND sd.publication_id = a.publication_id)
+                          WHERE has.person_id = %s AND sd.publication_id = a.publication_id
+                            AND NOT has.excluded)
           AND NOT EXISTS (SELECT 1 FROM openalex_authorships oas
                           JOIN source_documents sd ON sd.id = oas.source_document_id
-                          WHERE oas.person_id = %s AND sd.publication_id = a.publication_id)
+                          WHERE oas.person_id = %s AND sd.publication_id = a.publication_id
+                            AND NOT oas.excluded)
           AND NOT EXISTS (SELECT 1 FROM wos_authorships was
                           JOIN source_documents sd ON sd.id = was.source_document_id
-                          WHERE was.person_id = %s AND sd.publication_id = a.publication_id)
+                          WHERE was.person_id = %s AND sd.publication_id = a.publication_id
+                            AND NOT was.excluded)
     """, (person_id, person_id, person_id, person_id))
     return cur.rowcount
 

@@ -144,8 +144,8 @@ def get_person_details(cur, person_ids):
                (SELECT array_agg(DISTINCT pi.id_type || ':' || pi.id_value)
                 FROM person_identifiers pi
                 WHERE pi.person_id = p.id AND pi.status != 'rejected') AS identifiers,
-               (SELECT COUNT(DISTINCT has3.hal_author_id) FROM hal_authorships has3 WHERE has3.person_id = p.id) AS hal_authors,
-               (SELECT COUNT(DISTINCT oas3.openalex_author_id) FROM openalex_authorships oas3 WHERE oas3.person_id = p.id) AS oa_authors
+               (SELECT COUNT(DISTINCT has3.source_author_id) FROM hal_authorships has3 WHERE has3.person_id = p.id) AS hal_authors,
+               (SELECT COUNT(DISTINCT oas3.source_author_id) FROM openalex_authorships oas3 WHERE oas3.person_id = p.id) AS oa_authors
         FROM persons p
         LEFT JOIN persons_rh prh ON prh.person_id = p.id
         WHERE p.id = ANY(%s)

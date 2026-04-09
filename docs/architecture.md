@@ -2,29 +2,30 @@
 
 ## Principes de conception
 
-Le schéma repose sur une distinction entre des tables "sources" (séparées par source: HAL, OpenAlex, WoS, ScanR) et des tables "canoniques" (= vérité).
+Le schéma repose sur une distinction entre des tables "sources" et des tables "canoniques" (= vérité). Les tables sources contiennent les *records* non dédupliqués exportés depuis les API. Les tables canoniques contiennent les référentiels **publications** et **personnes** dédupliqués et mappés depuis les sources, ainsi que le référentiel **structures** (endogène).
 
 ```mermaid
-flowchart BT
-    subgraph vérité
-    end
+flowchart LR
     subgraph sources
-        direction TD
-        A[HAL]
-        B[OpenAlex]
-        C[WOS]
-        D[ScanR]
+    direction LR
+        source_documents---source_authorships
+        source_authors---source_authorships
+        source_authorships---source_structures
     end
-    A-->vérité
-    B-->vérité
-    C-->vérité
-    D-->vérité
+    subgraph vérité
+        direction LR
+        publications---authorships
+        persons---authorships
+        authorships---structures
+    end
+    source_documents--->publications
+    source_authorships--->persons
     
 ```
 
 ### Entités principales et relations
 
-Chaque source s'organise selon le même schéma en quatre tables: `documents`, `authors`, `authorships`, `structures`. Une `authorship` représente la contribution d'**un** auteur à **une** publication. C'est elle qui porte l'information d'affiliation (`structure_ids`).
+Les tables sources s'organisent selon un schéma en quatre tables: `source_documents`, `source_authors`, `source_authorships`, `source_structures`. Une `authorship` représente la contribution d'**un** auteur à **une** publication. C'est elle qui porte l'information d'affiliation (`structure_ids`).
 
 ```mermaid
 erDiagram 
@@ -34,43 +35,6 @@ erDiagram
     Authorships }o--|{ Structures : est_affilie_a
 
 ```
-
-### Tables “sources”
-
-Chaque source possède ses propres tables pour les entités clés, et ses propres identifiants internes pour toutes les entités.
-
-| Entité     | HAL                | OpenAlex                | WoS                | ScanR         |
-|------------|--------------------|-------------------------|--------------------|----------------|
-| Documents  | `hal_documents`    | `openalex_documents`    | `wos_documents`    | `scanr_documents` |
-| Auteurs    | `hal_authors`      | `openalex_authors`      | `wos_authors`      | `scanr_authors`      |
-| Authorship | `hal_authorships`  | `openalex_authorships`  | `wos_authorships`  | `scanr_authorships`  |
-| Structures | `hal_structures`   | `openalex_institutions` | `wos_organizations`                  | —   |
-
-
-<!--
- STAGING (brut API)                SOURCE (normalisé)                     VÉRITÉ
- ──────────────────               ─────────────────────                  ────────
-
- staging_hal ──────────→ hal_documents ──────────────────────────┐
-                         hal_authors ─────────────────────┐      ├──→ publications
-                         hal_authorships                  │      │
-                         hal_structures ──────────┐       ├──→ persons ←── person_identifiers
-                                                  │       │      │         person_name_forms
-                                                  ├──→ structures │
-                                                  │       │      ├──→ authorships
- staging_openalex ─────→ openalex_documents ──────────────┘      │
-                         openalex_authors ────────────┘          │
-                         openalex_authorships ───────────────────┤
-                                                                 │
- staging_wos ──────────→ wos_documents ──────────────────────────┘
-                         wos_authors ────────────────────┘
-                         wos_authorships ────────────────┘
-```
-
--->
-
-
-Tous les identifiants primaires sont des `SERIAL`. Les identifiants naturels, qu'ils soient internes à une source (halId, openalex_id, hal_person_id, hal_struct_id, etc.) ou universels (DOI, ORCID, ROR) sont en colonnes `UNIQUE` mais ne servent jamais de PK. Cela évite les problèmes quand un identifiant naturel est absent.
 
 Les tables sources sont toutes peuplées lors de la [phase 3](pipeline#normalize) du pipeline (`normalize`).
 
@@ -296,119 +260,7 @@ Table de laison recensant les contributions individuelles aux publications. Chaq
 
 
 
-### Tables source — HAL
+### Tables source
 
-#### `staging_hal`
+A réécrire entièrement
 
-Import brut de l'API HAL. `raw_data` (JSONB) contient la réponse API complète.
-`collection` est la collection d'origine de la requête. `processed` passe à TRUE
-après normalisation.
-
-#### `hal_structures`
-
-Référentiel des structures HAL, peuplé depuis l'API `ref/structure`.
-
-- `hal_struct_id` : identifiant numérique HAL (UNIQUE, pas PK)
-- `parent_ids` : hiérarchie (tableau d'entiers → autres hal_structures)
-- `structure_id` (FK → `structures`) : mapping vers le référentiel
-
-#### `hal_authors`
-
-Un enregistrement = un identifiant auteur dans HAL.
-
-- `hal_person_id` : numérique HAL (de `authFullNameId_fs`), UNIQUE mais nullable
-- `idhal` : identifiant volontaire lié à un compte HAL (donnée source)
-- `orcid` : ORCID observé dans HAL (donnée source)
-- `is_reliable` : FALSE si cet identifiant recouvre plusieurs personnes réelles
-- `person_id` : FK vers `persons` — dual-write depuis `hal_authorships.person_id`
-  uniquement pour les comptes HAL (avec `hal_person_id`)
-
-#### `hal_documents`
-
-- `halid` : identifiant HAL (UNIQUE)
-- `collections` : **tableau** de collections HAL contenant ce document
-- `publication_id` : FK vers la publication canonique
-
-#### `hal_authorships`
-
-Relation document × auteur dans HAL.
-
-- `hal_struct_ids` : tableau des hal_struct_id affiliés
-- `structure_ids` : tableau des `structures.id` UCA résolues
-- `is_uca` : TRUE si `structure_ids` est non vide
-- `person_id` : FK vers `persons` — **source de vérité** pour le lien personne
-
-
-### Tables source — OpenAlex
-
-#### `openalex_institutions`
-
-Pendant de `hal_structures`. `ror_id` permet l'alignement avec `structures.ror_id`.
-
-#### `openalex_authors`
-
-Un enregistrement = un auteur OpenAlex. `is_reliable` important car OpenAlex
-fusionne parfois des homonymes.
-
-#### `openalex_documents`
-
-Même logique que `hal_documents`. Pas de champ `collections`.
-
-#### `openalex_authorships`
-
-- `raw_author_name` : nom brut de l'auteur sur cette publication
-- `raw_affiliation` : affiliation brute
-- `openalex_institution_ids` : institutions OpenAlex détectées
-- `person_id` : FK vers `persons` — **source de vérité** pour le lien personne
-
-
-### Tables source — Web of Science
-
-#### `staging_wos`
-
-Import brut depuis l'API Web of Science (ou fichiers Excel/CSV en fallback).
-
-#### `wos_authors`
-
-- `full_name`, `last_name`, `first_name` : noms
-- `daisng_id` : identifiant WoS Distinct Author
-- `orcid`, `researcher_id` : identifiants externes (données source)
-- `is_reliable` : fiabilité de l'entité
-
-#### `wos_documents`
-
-- `ut` : identifiant WoS (UNIQUE)
-- `doi`, `title`, `pub_year`, `doc_type`
-- `publication_id` : FK vers la publication canonique
-
-#### `wos_authorships`
-
-- `author_position`, `is_corresponding`
-- `raw_affiliation` : affiliation brute
-- `is_uca`, `structure_ids`, `countries`
-- `person_id` : FK vers `persons` — **source de vérité** pour le lien personne
-
-
-### Adresses d'affiliation
-
-Tables **source-agnostiques** pour les adresses et leur résolution en structures.
-
-#### `addresses`
-
-Chaque adresse brute unique rencontrée. `review_status` : `pending`, `confirmed`,
-`rejected`.
-
-#### `address_structures`
-
-Lien adresse → structure détectée, avec traçabilité (`matched_form_id`).
-
-#### Tables de liaison
-
-- `openalex_authorship_addresses` : lie `openalex_authorships.id` → `addresses.id`
-- `wos_authorship_addresses` : lie `wos_authorships.id` → `addresses.id`
-
-
-### Vue `publication_sources`
-
-Vue (pas table) qui consolide les liens publication → source en combinant les FK
-`publication_id` de `hal_documents`, `openalex_documents` et `wos_documents`.

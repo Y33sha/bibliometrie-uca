@@ -5,6 +5,9 @@ Service Référentiel Personnes — accès exclusif en écriture aux tables
 Gère aussi le rattachement/détachement des authorships sources
 (hal_authorships, openalex_authorships, wos_authorships) puisque
 le person_id y est la source de vérité du lien personne.
+
+Les auteurs sources sont dans la table unifiée `source_authors`
+(UNIQUE(source, source_id)), les authorships utilisent `source_author_id`.
 """
 
 import sys, os
@@ -32,56 +35,53 @@ def create_person(cur, last_name: str, first_name: str = "") -> int:
 # ── Rattachement / détachement authorships ──
 
 def link_authorship(cur, person_id: int, source: str, authorship_id: int,
-                    *, hal_author_id: int | None = None,
+                    *, source_author_id: int | None = None,
                     has_hal_person_id: bool = False):
     """Rattache une authorship source à une personne.
 
-    Pour HAL, fait aussi le dual-write sur hal_authors si c'est un compte HAL.
+    Pour HAL, fait aussi le dual-write sur source_authors si c'est un compte HAL.
     """
-    if source == "hal":
-        cur.execute("UPDATE hal_authorships SET person_id = %s WHERE id = %s",
-                    (person_id, authorship_id))
-        if hal_author_id and has_hal_person_id:
-            cur.execute("""
-                UPDATE hal_authors SET person_id = %s, updated_at = now()
-                WHERE id = %s AND hal_person_id IS NOT NULL
-            """, (person_id, hal_author_id))
-    elif source == "openalex":
-        cur.execute("UPDATE openalex_authorships SET person_id = %s WHERE id = %s",
-                    (person_id, authorship_id))
-    elif source == "wos":
-        cur.execute("UPDATE wos_authorships SET person_id = %s WHERE id = %s",
-                    (person_id, authorship_id))
-    elif source == "scanr":
-        cur.execute("UPDATE scanr_authorships SET person_id = %s WHERE id = %s",
-                    (person_id, authorship_id))
+    table = {
+        "hal": "hal_authorships",
+        "openalex": "openalex_authorships",
+        "wos": "wos_authorships",
+        "scanr": "scanr_authorships",
+    }.get(source)
+    if not table:
+        return
+
+    cur.execute(f"UPDATE {table} SET person_id = %s WHERE id = %s",
+                (person_id, authorship_id))
+
+    # Dual-write sur source_authors pour les comptes HAL
+    if source == "hal" and source_author_id and has_hal_person_id:
+        cur.execute("""
+            UPDATE source_authors SET person_id = %s            WHERE id = %s AND (source_ids->>'hal_person_id') IS NOT NULL
+        """, (person_id, source_author_id))
 
 
 def link_authorships(cur, person_id: int, authorships: list[dict]):
     """Rattache un groupe d'authorships à une personne.
 
     Chaque dict doit avoir 'source' et 'authorship_id',
-    et optionnellement 'hal_author_id' et 'has_hal_person_id'.
+    et optionnellement 'source_author_id' et 'has_hal_person_id'.
     """
     for a in authorships:
         link_authorship(cur, person_id, a["source"], a["authorship_id"],
-                        hal_author_id=a.get("hal_author_id"),
+                        source_author_id=a.get("source_author_id"),
                         has_hal_person_id=a.get("has_hal_person_id", False))
 
 
 def unlink_authorship(cur, person_id: int, source: str, authorship_id: int):
     """Détache une authorship source d'une personne (met person_id à NULL)."""
-    if source == "hal":
+    table = {
+        "hal": "hal_authorships",
+        "openalex": "openalex_authorships",
+        "wos": "wos_authorships",
+    }.get(source)
+    if table:
         cur.execute(
-            "UPDATE hal_authorships SET person_id = NULL WHERE id = %s AND person_id = %s",
-            (authorship_id, person_id))
-    elif source == "openalex":
-        cur.execute(
-            "UPDATE openalex_authorships SET person_id = NULL WHERE id = %s AND person_id = %s",
-            (authorship_id, person_id))
-    elif source == "wos":
-        cur.execute(
-            "UPDATE wos_authorships SET person_id = NULL WHERE id = %s AND person_id = %s",
+            f"UPDATE {table} SET person_id = NULL WHERE id = %s AND person_id = %s",
             (authorship_id, person_id))
 
 
@@ -250,25 +250,25 @@ def detach_name_form(cur, person_id: int, name_form: str):
 # Tables et FK par source
 _SOURCE_CONFIG = {
     "hal": {
-        "author_table": "hal_authors",
-        "author_fk": "hal_author_id",
+        "author_fk": "source_author_id",
         "authorship_table": "hal_authorships",
         "truth_fk": "hal_authorship_id",
-        "id_fields": ["idhal", "orcid"],
+        "id_fields": ["orcid"],
+        "source_ids_fields": {"idhal": "idhal"},
     },
     "openalex": {
-        "author_table": "openalex_authors",
-        "author_fk": "openalex_author_id",
+        "author_fk": "source_author_id",
         "authorship_table": "openalex_authorships",
         "truth_fk": "openalex_authorship_id",
         "id_fields": ["orcid"],
+        "source_ids_fields": {},
     },
     "wos": {
-        "author_table": "wos_authors",
-        "author_fk": "wos_author_id",
+        "author_fk": "source_author_id",
         "authorship_table": "wos_authorships",
         "truth_fk": "wos_authorship_id",
         "id_fields": ["orcid"],
+        "source_ids_fields": {},
     },
 }
 
@@ -277,7 +277,7 @@ def link_author_to_person(cur, person_id: int, source: str, author_id: int):
     """Rattache un auteur source (et toutes ses authorships) à une personne.
 
     1. Met person_id sur toutes les authorships de cet auteur
-    2. Dual-write sur hal_authors si c'est un compte HAL
+    2. Dual-write sur source_authors si c'est un compte HAL
     3. Propage vers les authorships vérité (person_id NULL uniquement)
     4. Propage les identifiants (ORCID, idHAL) vers person_identifiers
 
@@ -288,7 +288,8 @@ def link_author_to_person(cur, person_id: int, source: str, author_id: int):
         raise ValueError(f"Source inconnue : {source}")
 
     # Charger l'auteur source
-    cur.execute(f"SELECT * FROM {cfg['author_table']} WHERE id = %s", (author_id,))
+    cur.execute("SELECT * FROM source_authors WHERE id = %s AND source = %s",
+                (author_id, source))
     author = cur.fetchone()
     if not author:
         return None
@@ -299,17 +300,15 @@ def link_author_to_person(cur, person_id: int, source: str, author_id: int):
         WHERE {cfg['author_fk']} = %s
     """, (person_id, author_id))
 
-    # 2. Dual-write hal_authors pour les comptes HAL
-    if source == "hal" and author.get("hal_person_id"):
+    # 2. Dual-write source_authors pour les comptes HAL
+    if source == "hal" and author.get("source_ids", {}).get("hal_person_id"):
         cur.execute("""
-            UPDATE hal_authors SET person_id = %s, updated_at = now()
-            WHERE id = %s
+            UPDATE source_authors SET person_id = %s            WHERE id = %s
         """, (person_id, author_id))
 
     # 3. Propager vers authorships vérité (seulement celles sans person_id)
     cur.execute(f"""
-        UPDATE authorships a SET person_id = %s, updated_at = now()
-        WHERE a.{cfg['truth_fk']} IN (
+        UPDATE authorships a SET person_id = %s        WHERE a.{cfg['truth_fk']} IN (
             SELECT s.id FROM {cfg['authorship_table']} s
             WHERE s.{cfg['author_fk']} = %s
         )
@@ -320,8 +319,14 @@ def link_author_to_person(cur, person_id: int, source: str, author_id: int):
     for field in cfg["id_fields"]:
         value = author.get(field)
         if value:
-            id_type = "idhal" if field == "idhal" else "orcid"
-            add_identifier(cur, person_id, id_type, value, source=source)
+            add_identifier(cur, person_id, "orcid", value, source=source)
+
+    # 4b. Propager les identifiants depuis source_ids (ex: idhal)
+    source_ids = author.get("source_ids") or {}
+    for json_key, id_type in cfg.get("source_ids_fields", {}).items():
+        value = source_ids.get(json_key)
+        if value:
+            add_identifier(cur, person_id, id_type, str(value), source=source)
 
     return author
 
@@ -330,7 +335,7 @@ def unlink_author_from_person(cur, person_id: int, source: str, author_id: int):
     """Détache un auteur source (et toutes ses authorships) d'une personne.
 
     1. Met person_id à NULL sur les authorships sources de cet auteur
-    2. Détache hal_authors si c'est HAL
+    2. Détache source_authors si c'est HAL
     3. Propage vers les authorships vérité
     """
     cfg = _SOURCE_CONFIG.get(source)
@@ -343,11 +348,10 @@ def unlink_author_from_person(cur, person_id: int, source: str, author_id: int):
         WHERE {cfg['author_fk']} = %s AND person_id = %s
     """, (author_id, person_id))
 
-    # 2. Détacher hal_authors (comptes HAL)
+    # 2. Détacher source_authors (comptes HAL)
     if source == "hal":
         cur.execute("""
-            UPDATE hal_authors SET person_id = NULL, updated_at = now()
-            WHERE id = %s AND person_id = %s
+            UPDATE source_authors SET person_id = NULL            WHERE id = %s AND person_id = %s
         """, (author_id, person_id))
 
     # 3. Propager vers authorships vérité
@@ -508,8 +512,8 @@ def merge_person(cur, target_id: int, source_id: int):
             f"ont chacune une fiche RH distincte."
         )
 
-    # 1. Transférer les auteurs HAL (comptes avec hal_person_id)
-    cur.execute("UPDATE hal_authors SET person_id = %s WHERE person_id = %s",
+    # 1. Transférer les auteurs sources (comptes HAL/ScanR avec person_id)
+    cur.execute("UPDATE source_authors SET person_id = %s WHERE person_id = %s",
                 (target_id, source_id))
 
     # 1b. Transférer les hal_authorships

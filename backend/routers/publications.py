@@ -586,7 +586,7 @@ async def get_publication(pub_id: int):
             SELECT has.id, has.author_position, ha.full_name, has.person_id,
                    has.is_uca, has.structure_ids, has.excluded, has.countries
             FROM hal_authorships has
-            JOIN hal_authors ha ON ha.id = has.hal_author_id
+            JOIN source_authors ha ON ha.id = has.source_author_id
             JOIN source_documents sd ON sd.id = has.source_document_id
             WHERE sd.publication_id = %s
             ORDER BY has.author_position
@@ -607,7 +607,7 @@ async def get_publication(pub_id: int):
                       AND addr.countries IS NOT NULL
                    ) AS countries
             FROM openalex_authorships oas
-            JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
+            JOIN source_authors oa ON oa.id = oas.source_author_id
             JOIN source_documents sd ON sd.id = oas.source_document_id
             WHERE sd.publication_id = %s
             ORDER BY oas.author_position
@@ -626,7 +626,7 @@ async def get_publication(pub_id: int):
                       AND addr.countries IS NOT NULL
                    ) AS countries
             FROM wos_authorships was
-            JOIN wos_authors wa ON wa.id = was.wos_author_id
+            JOIN source_authors wa ON wa.id = was.source_author_id
             JOIN source_documents sd ON sd.id = was.source_document_id
             WHERE sd.publication_id = %s
             ORDER BY was.author_position
