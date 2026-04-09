@@ -436,7 +436,7 @@ def process_authors(cur, doc: dict, source_document_id: int):
         # authQuality_s : rôle de l'auteur (aut, crp, dir, edt, …)
         quality = qualities[position] if position < len(qualities) else None
         roles, is_corresponding_from_role = map_role("hal", quality)
-        is_corresponding = is_corresponding or is_corresponding_from_role
+        is_corresponding = is_corresponding_from_role
 
         hal_author_id = upsert_hal_author(
             cur, name, hal_person_id, idhal, form_id, orcid=orcid
