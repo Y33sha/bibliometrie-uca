@@ -74,16 +74,17 @@ def find_hal_primary_locations(cur, all_staged: bool = False) -> list[dict]:
 
 def find_hal_ids_from_scanr(cur) -> list[dict]:
     """
-    Trouve les HAL IDs référencés dans scanr_documents.hal_id
+    Trouve les HAL IDs référencés dans source_documents.external_ids->>'hal' (source='scanr')
     mais absents de staging_hal.
     Retourne [{source: "scanr", hal_id, scanr_id}, ...]
     """
     cur.execute("""
-        SELECT sd.scanr_id, sd.hal_id
-        FROM scanr_documents sd
-        WHERE sd.hal_id IS NOT NULL
+        SELECT sd.source_id AS scanr_id, sd.external_ids->>'hal' AS hal_id
+        FROM source_documents sd
+        WHERE sd.source = 'scanr'
+          AND sd.external_ids->>'hal' IS NOT NULL
           AND NOT EXISTS (
-              SELECT 1 FROM staging sh WHERE sh.source = 'hal' AND sh.source_id = sd.hal_id
+              SELECT 1 FROM staging sh WHERE sh.source = 'hal' AND sh.source_id = sd.external_ids->>'hal'
           )
     """)
     return [

@@ -190,27 +190,16 @@ def update_countries(cur, pub_id: int, countries: list[str]):
 
 
 def update_sources(cur, pub_id: int):
-    """Recalcule publications.sources depuis les 4 tables source."""
+    """Recalcule publications.sources depuis source_documents."""
     cur.execute("""
         UPDATE publications SET sources = COALESCE(sub.srcs, '{}'), updated_at = now()
         FROM (
-            SELECT array_agg(DISTINCT src ORDER BY src) AS srcs
-            FROM (
-                SELECT 'hal'::source_type AS src FROM hal_documents
-                    WHERE publication_id = %s
-                UNION ALL
-                SELECT 'openalex'::source_type FROM openalex_documents
-                    WHERE publication_id = %s
-                UNION ALL
-                SELECT 'wos'::source_type FROM wos_documents
-                    WHERE publication_id = %s
-                UNION ALL
-                SELECT 'scanr'::source_type FROM scanr_documents
-                    WHERE publication_id = %s
-            ) t
+            SELECT array_agg(DISTINCT source::source_type ORDER BY source::source_type) AS srcs
+            FROM source_documents
+            WHERE publication_id = %s
         ) sub
         WHERE id = %s
-    """, (pub_id, pub_id, pub_id, pub_id, pub_id))
+    """, (pub_id, pub_id))
 
 
 def merge_publications(cur, target_id: int, source_id: int):
@@ -222,9 +211,8 @@ def merge_publications(cur, target_id: int, source_id: int):
     4. Supprime la source et les distinct_publications associées
     """
     # 1. Transférer les documents sources
-    for tbl in ("hal_documents", "openalex_documents", "wos_documents", "scanr_documents"):
-        cur.execute(f"UPDATE {tbl} SET publication_id = %s WHERE publication_id = %s",
-                    (target_id, source_id))
+    cur.execute("UPDATE source_documents SET publication_id = %s WHERE publication_id = %s",
+                (target_id, source_id))
 
     # 2. Transférer les authorships vérité (supprimer doublons par person_id)
     cur.execute("""

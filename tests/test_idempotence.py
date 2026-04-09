@@ -130,12 +130,14 @@ def _count_tables(cur) -> dict:
     """Retourne les compteurs des tables normalisées."""
     tables = [
         "publications", "journals", "publishers",
-        "scanr_documents", "scanr_authors", "scanr_authorships",
+        "scanr_authors", "scanr_authorships",
     ]
     counts = {}
     for t in tables:
         cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
         counts[t] = cur.fetchone()["cnt"]
+    cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'scanr'")
+    counts["scanr_documents"] = cur.fetchone()["cnt"]
     return counts
 
 
@@ -231,7 +233,7 @@ class TestNormalizeScanrIdempotence:
         db.execute("SELECT count(*) AS cnt FROM publications WHERE lower(doi) = '10.1234/test-article-001'")
         assert db.fetchone()["cnt"] == 1, "Le DOI devrait être dédupliqué"
 
-        db.execute("SELECT count(*) AS cnt FROM scanr_documents")
+        db.execute("SELECT count(*) AS cnt FROM source_documents WHERE source = 'scanr'")
         assert db.fetchone()["cnt"] == 4, "4 scanr_documents (3 originaux + 1 bis)"
 
     def test_journal_dedup(self, db):
@@ -330,9 +332,11 @@ def _run_normalize_hal(cur):
 
 def _count_hal_tables(cur) -> dict:
     counts = {}
-    for t in ["publications", "hal_documents", "hal_authors", "hal_authorships"]:
+    for t in ["publications", "hal_authors", "hal_authorships"]:
         cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
         counts[t] = cur.fetchone()["cnt"]
+    cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'hal'")
+    counts["hal_documents"] = cur.fetchone()["cnt"]
     return counts
 
 
@@ -449,9 +453,11 @@ def _run_normalize_oa(cur):
 
 def _count_oa_tables(cur) -> dict:
     counts = {}
-    for t in ["publications", "openalex_documents", "openalex_authors", "openalex_authorships"]:
+    for t in ["publications", "openalex_authors", "openalex_authorships"]:
         cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
         counts[t] = cur.fetchone()["cnt"]
+    cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'openalex'")
+    counts["openalex_documents"] = cur.fetchone()["cnt"]
     return counts
 
 
@@ -550,9 +556,11 @@ def _run_normalize_wos(cur):
 
 def _count_wos_tables(cur) -> dict:
     counts = {}
-    for t in ["publications", "wos_documents", "wos_authors", "wos_authorships"]:
+    for t in ["publications", "wos_authors", "wos_authorships"]:
         cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
         counts[t] = cur.fetchone()["cnt"]
+    cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'wos'")
+    counts["wos_documents"] = cur.fetchone()["cnt"]
     return counts
 
 
@@ -721,7 +729,7 @@ class TestNormalizeInterSourceIdempotence:
 
 def _setup_persons_test_data(db):
     """Crée une chaîne complète de données pour tester create_persons :
-    publications → hal_documents → hal_authors → hal_authorships (is_uca=TRUE)
+    publications → source_documents (hal) → hal_authors → hal_authorships (is_uca=TRUE)
     """
     # Publications
     db.execute("""
@@ -730,11 +738,11 @@ def _setup_persons_test_data(db):
                (90002, 'Test Pub Beta', 'test pub beta', 'thesis', 2024)
     """)
 
-    # HAL documents
+    # HAL documents (source_documents)
     db.execute("""
-        INSERT INTO hal_documents (id, halid, title, pub_year, doc_type, publication_id)
-        VALUES (90001, 'hal-90000001', 'Test Pub Alpha', 2024, 'ART', 90001),
-               (90002, 'hal-90000002', 'Test Pub Beta', 2024, 'THESE', 90002)
+        INSERT INTO source_documents (id, source, source_id, title, pub_year, doc_type, publication_id)
+        VALUES (90001, 'hal', 'hal-90000001', 'Test Pub Alpha', 2024, 'ART', 90001),
+               (90002, 'hal', 'hal-90000002', 'Test Pub Beta', 2024, 'THESE', 90002)
     """)
 
     # HAL authors (avec hal_person_id pour l'étape 0)
@@ -748,7 +756,7 @@ def _setup_persons_test_data(db):
     # HAL authorships (is_uca=TRUE, person_id=NULL)
     db.execute("""
         INSERT INTO hal_authorships
-            (id, hal_document_id, hal_author_id, author_position, is_uca,
+            (id, source_document_id, hal_author_id, author_position, is_uca,
              person_id, author_name_normalized)
         VALUES
             (90001, 90001, 90001, 0, TRUE, NULL, 'eve leroy'),

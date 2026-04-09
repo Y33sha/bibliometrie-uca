@@ -36,12 +36,13 @@ def find_duplicates(cur):
     vers des publications différentes (ou HAL → NULL).
     """
     cur.execute("""
-        SELECT od.id AS oa_doc_id, od.openalex_id, od.publication_id AS oa_pub_id,
+        SELECT od.id AS oa_doc_id, od.source_id AS openalex_id, od.publication_id AS oa_pub_id,
                so.raw_data->'primary_location'->>'landing_page_url' AS url
-        FROM openalex_documents od
+        FROM source_documents od
         JOIN staging so ON so.id = od.staging_id
-        WHERE so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.science%'
-           OR so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.archives-ouvertes.fr%'
+        WHERE od.source = 'openalex'
+          AND (so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.science%'
+           OR so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.archives-ouvertes.fr%')
     """)
     oa_rows = cur.fetchall()
 
@@ -55,7 +56,7 @@ def find_duplicates(cur):
                 'oa_pub_id': r['oa_pub_id'],
             }
 
-    cur.execute("SELECT id AS hal_doc_id, halid, publication_id AS hal_pub_id FROM hal_documents")
+    cur.execute("SELECT id AS hal_doc_id, source_id AS halid, publication_id AS hal_pub_id FROM source_documents WHERE source = 'hal'")
     hal_rows = cur.fetchall()
     hal_by_id = {r['halid']: r for r in hal_rows}
 
@@ -89,7 +90,7 @@ def link_hal_to_oa_publication(cur, items, dry_run=False):
             continue
 
         cur.execute(
-            "UPDATE hal_documents SET publication_id = %s WHERE id = %s",
+            "UPDATE source_documents SET publication_id = %s WHERE id = %s",
             (oa_pub_id, hal_doc_id)
         )
         update_sources(cur, oa_pub_id)
@@ -153,7 +154,7 @@ def main():
         if link_only:
             log.info(f"\n--- Liaison HAL → publication existante ---")
             n = link_hal_to_oa_publication(cur, link_only, dry_run=args.dry_run)
-            log.info(f"  {n} hal_documents reliés")
+            log.info(f"  {n} source_documents HAL reliés")
 
         if merge_needed:
             log.info(f"\n--- Fusion de publications ---")

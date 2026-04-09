@@ -8,7 +8,7 @@ Usage:
 
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
-    hal_documents                           (lien staging ↔ publication)
+    source_documents                        (lien staging ↔ publication, source='hal')
     hal_authors                             (auteurs HAL dédupliqués par hal_person_id)
     hal_authorships                         (lien document × auteur, avec hal_struct_ids)
 
@@ -155,16 +155,16 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
 
 
 # =============================================================
-# HAL DOCUMENTS
+# SOURCE DOCUMENTS (HAL)
 # =============================================================
 
 def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
                         collection: str | None,
                         publication_id: int | None) -> int:
     """
-    Crée/retrouve l'entrée hal_documents.
+    Crée/retrouve l'entrée source_documents pour HAL.
     Le champ collections agrège toutes les collections vues.
-    Retourne hal_document.id.
+    Retourne source_documents.id.
     """
     doi = clean_doi(as_str(doc.get("doiId_s")))
     title = get_title(doc)
@@ -186,20 +186,20 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
     collections_array = sorted(collections) if collections else None
 
     cur.execute("""
-        INSERT INTO hal_documents
-            (halid, doi, title, pub_year, doc_type,
+        INSERT INTO source_documents
+            (source, source_id, doi, title, pub_year, doc_type,
              collections, publication_id, staging_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (halid) DO UPDATE SET
+        VALUES ('hal', %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
-                hal_documents.publication_id, EXCLUDED.publication_id
+                source_documents.publication_id, EXCLUDED.publication_id
             ),
-            doi = COALESCE(hal_documents.doi, EXCLUDED.doi),
-            doc_type = COALESCE(EXCLUDED.doc_type, hal_documents.doc_type),
+            doi = COALESCE(source_documents.doi, EXCLUDED.doi),
+            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
             collections = (
                 SELECT array_agg(DISTINCT c ORDER BY c)
                 FROM unnest(
-                    COALESCE(hal_documents.collections, '{}') ||
+                    COALESCE(source_documents.collections, '{}') ||
                     COALESCE(EXCLUDED.collections, '{}')
                 ) AS c
             )
@@ -360,7 +360,7 @@ def parse_author_structures(doc: dict) -> dict[int, set[int]]:
     return form_structs
 
 
-def process_authors(cur, doc: dict, hal_document_id: int):
+def process_authors(cur, doc: dict, source_document_id: int):
     """
     Traite les auteurs d'un document HAL :
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
@@ -450,10 +450,10 @@ def process_authors(cur, doc: dict, hal_document_id: int):
 
         cur.execute("""
             INSERT INTO hal_authorships
-                (hal_document_id, hal_author_id, author_position, hal_struct_ids,
+                (source_document_id, hal_author_id, author_position, hal_struct_ids,
                  author_name_normalized, is_corresponding, role)
             VALUES (%s, %s, %s, %s, normalize_name_form(%s), %s, %s)
-            ON CONFLICT (hal_document_id, hal_author_id) DO UPDATE SET
+            ON CONFLICT (source_document_id, hal_author_id) DO UPDATE SET
                 hal_struct_ids = COALESCE(
                     EXCLUDED.hal_struct_ids,
                     hal_authorships.hal_struct_ids
@@ -461,7 +461,7 @@ def process_authors(cur, doc: dict, hal_document_id: int):
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 is_corresponding = EXCLUDED.is_corresponding,
                 role = EXCLUDED.role
-        """, (hal_document_id, hal_author_id, position,
+        """, (source_document_id, hal_author_id, position,
               hal_struct_ids, name, is_corresponding, role))
 
 
@@ -509,10 +509,10 @@ def process_work(cur, staging_row: tuple) -> bool:
         timings["journal"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        # Idempotence : si hal_documents a déjà ce halid avec un publication_id,
+        # Idempotence : si source_documents a déjà ce source_id avec un publication_id,
         # le réutiliser au lieu de risquer un doublon
         cur.execute(
-            "SELECT publication_id FROM hal_documents WHERE halid = %s",
+            "SELECT publication_id FROM source_documents WHERE source = 'hal' AND source_id = %s",
             (hal_id,))
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc[0]:
@@ -537,9 +537,9 @@ def process_work(cur, staging_row: tuple) -> bool:
                 logger.warning(f"Impossible d'insérer {hal_id} — échec insertion publication")
             return False
 
-        # Document HAL
+        # Document HAL (source_documents)
         t0 = time.perf_counter()
-        hal_document_id = insert_hal_document(
+        source_document_id = insert_hal_document(
             cur, doc, staging_id, hal_id, collection, publication_id
         )
         update_sources(cur, publication_id)
@@ -547,7 +547,7 @@ def process_work(cur, staging_row: tuple) -> bool:
 
         # Auteurs et authorships (avec hal_struct_ids)
         t0 = time.perf_counter()
-        process_authors(cur, doc, hal_document_id)
+        process_authors(cur, doc, source_document_id)
         timings["authors"] = time.perf_counter() - t0
 
         cur.execute(
@@ -642,16 +642,19 @@ def main():
         logger.info(f"Erreurs : {errors}")
 
         for table in ["publications", "journals", "publishers",
-                       "hal_documents", "hal_authors", "hal_authorships"]:
+                       "hal_authors", "hal_authorships"]:
             cur.execute(f"SELECT COUNT(*) FROM {table}")
             count = cur.fetchone()[0]
             logger.info(f"  {table} : {count} enregistrements")
+        cur.execute("SELECT COUNT(*) FROM source_documents WHERE source = 'hal'")
+        count = cur.fetchone()[0]
+        logger.info(f"  source_documents (hal) : {count} enregistrements")
 
         # Stats de recouvrement (publications dans les deux sources)
         cur.execute("""
             SELECT COUNT(*) FROM publications p
-            WHERE EXISTS (SELECT 1 FROM hal_documents hd WHERE hd.publication_id = p.id)
-              AND EXISTS (SELECT 1 FROM openalex_documents od WHERE od.publication_id = p.id)
+            WHERE EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal')
+              AND EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'openalex')
         """)
         overlap = cur.fetchone()[0]
         logger.info(f"\nPublications dans les deux sources : {overlap}")

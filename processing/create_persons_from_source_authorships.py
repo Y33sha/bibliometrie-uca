@@ -65,15 +65,15 @@ def get_all_unlinked_authorships(cur):
                ha.id AS hal_author_id,
                (ha.hal_person_id IS NOT NULL) AS has_hal_person_id,
                ha.hal_person_id,
-               hd.publication_id,
+               sd.publication_id,
                has.author_position
         FROM hal_authorships has
         JOIN hal_authors ha ON ha.id = has.hal_author_id
-        JOIN hal_documents hd ON hd.id = has.hal_document_id
-        JOIN v_active_publications vap ON vap.id = hd.publication_id
+        JOIN source_documents sd ON sd.id = has.source_document_id
+        JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE has.person_id IS NULL
           AND has.is_uca = TRUE
-          AND hd.publication_id IS NOT NULL
+          AND sd.publication_id IS NOT NULL
     """)
     hal_rows = cur.fetchall()
 
@@ -90,16 +90,16 @@ def get_all_unlinked_authorships(cur):
                NULL::int AS hal_author_id,
                FALSE AS has_hal_person_id,
                NULL::int AS hal_person_id,
-               od.publication_id,
+               sd.publication_id,
                oas.author_position
         FROM openalex_authorships oas
         JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-        JOIN openalex_documents od ON od.id = oas.openalex_document_id
-        JOIN v_active_publications vap ON vap.id = od.publication_id
+        JOIN source_documents sd ON sd.id = oas.source_document_id
+        JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE oas.person_id IS NULL
           AND oas.is_uca = TRUE
           AND oas.raw_author_name IS NOT NULL
-          AND od.publication_id IS NOT NULL
+          AND sd.publication_id IS NOT NULL
     """)
     oa_rows = cur.fetchall()
 
@@ -111,15 +111,15 @@ def get_all_unlinked_authorships(cur):
                NULL::int AS hal_author_id,
                FALSE AS has_hal_person_id,
                NULL::int AS hal_person_id,
-               wd.publication_id,
+               sd.publication_id,
                was.author_position
         FROM wos_authorships was
         JOIN wos_authors wa ON wa.id = was.wos_author_id
-        JOIN wos_documents wd ON wd.id = was.wos_document_id
-        JOIN v_active_publications vap ON vap.id = wd.publication_id
+        JOIN source_documents sd ON sd.id = was.source_document_id
+        JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE was.person_id IS NULL
           AND was.is_uca = TRUE
-          AND wd.publication_id IS NOT NULL
+          AND sd.publication_id IS NOT NULL
     """)
     wos_rows = cur.fetchall()
 
@@ -135,7 +135,7 @@ def get_all_unlinked_authorships(cur):
                sas.author_position
         FROM scanr_authorships sas
         JOIN scanr_authors sa ON sa.id = sas.scanr_author_id
-        JOIN scanr_documents sd ON sd.id = sas.scanr_document_id
+        JOIN source_documents sd ON sd.id = sas.source_document_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE sas.person_id IS NULL
           AND sas.is_uca = TRUE
@@ -179,14 +179,14 @@ def load_linked_authorships_by_pub(cur):
 
     cur.execute("""
         SELECT has.person_id, has.author_position,
-               hd.publication_id,
+               sd.publication_id,
                ha.last_name, ha.first_name, ha.full_name,
                'hal' AS source
         FROM hal_authorships has
         JOIN hal_authors ha ON ha.id = has.hal_author_id
-        JOIN hal_documents hd ON hd.id = has.hal_document_id
+        JOIN source_documents sd ON sd.id = has.source_document_id
         WHERE has.person_id IS NOT NULL
-          AND hd.publication_id IS NOT NULL
+          AND sd.publication_id IS NOT NULL
     """)
     for r in cur.fetchall():
         ln = normalize_name(r["last_name"] or "")
@@ -199,13 +199,13 @@ def load_linked_authorships_by_pub(cur):
 
     cur.execute("""
         SELECT oas.person_id, oas.author_position,
-               od.publication_id,
+               sd.publication_id,
                oas.raw_author_name AS full_name,
                'openalex' AS source
         FROM openalex_authorships oas
-        JOIN openalex_documents od ON od.id = oas.openalex_document_id
+        JOIN source_documents sd ON sd.id = oas.source_document_id
         WHERE oas.person_id IS NOT NULL
-          AND od.publication_id IS NOT NULL
+          AND sd.publication_id IS NOT NULL
     """)
     for r in cur.fetchall():
         last, first = parse_raw_author_name(r["full_name"])
@@ -215,14 +215,14 @@ def load_linked_authorships_by_pub(cur):
 
     cur.execute("""
         SELECT was.person_id, was.author_position,
-               wd.publication_id,
+               sd.publication_id,
                wa.last_name, wa.first_name,
                'wos' AS source
         FROM wos_authorships was
         JOIN wos_authors wa ON wa.id = was.wos_author_id
-        JOIN wos_documents wd ON wd.id = was.wos_document_id
+        JOIN source_documents sd ON sd.id = was.source_document_id
         WHERE was.person_id IS NOT NULL
-          AND wd.publication_id IS NOT NULL
+          AND sd.publication_id IS NOT NULL
     """)
     for r in cur.fetchall():
         ln = normalize_name(r["last_name"] or "")
@@ -237,7 +237,7 @@ def load_linked_authorships_by_pub(cur):
                'scanr' AS source
         FROM scanr_authorships sas
         JOIN scanr_authors sa ON sa.id = sas.scanr_author_id
-        JOIN scanr_documents sd ON sd.id = sas.scanr_document_id
+        JOIN source_documents sd ON sd.id = sas.source_document_id
         WHERE sas.person_id IS NOT NULL
           AND sd.publication_id IS NOT NULL
     """)

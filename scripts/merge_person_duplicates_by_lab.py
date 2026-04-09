@@ -131,15 +131,15 @@ def get_person_details(cur, person_ids):
                prh.department_name, prh.role_title,
                (prh.id IS NOT NULL) AS has_rh,
                (SELECT COUNT(DISTINCT pub_id) FROM (
-                    SELECT hd.publication_id AS pub_id
+                    SELECT sd.publication_id AS pub_id
                     FROM hal_authorships has2
-                    JOIN hal_documents hd ON hd.id = has2.hal_document_id
-                    WHERE has2.person_id = p.id AND hd.publication_id IS NOT NULL
+                    JOIN source_documents sd ON sd.id = has2.source_document_id
+                    WHERE has2.person_id = p.id AND sd.publication_id IS NOT NULL
                     UNION
-                    SELECT od.publication_id
+                    SELECT sd2.publication_id
                     FROM openalex_authorships oas2
-                    JOIN openalex_documents od ON od.id = oas2.openalex_document_id
-                    WHERE oas2.person_id = p.id AND od.publication_id IS NOT NULL
+                    JOIN source_documents sd2 ON sd2.id = oas2.source_document_id
+                    WHERE oas2.person_id = p.id AND sd2.publication_id IS NOT NULL
                 ) _pubs) AS pub_count,
                (SELECT array_agg(DISTINCT pi.id_type || ':' || pi.id_value)
                 FROM person_identifiers pi
@@ -152,15 +152,15 @@ def get_person_details(cur, person_ids):
         ORDER BY
             (prh.id IS NOT NULL) DESC,
             (SELECT COUNT(DISTINCT pub_id) FROM (
-                SELECT hd.publication_id AS pub_id
+                SELECT sd.publication_id AS pub_id
                 FROM hal_authorships has2
-                JOIN hal_documents hd ON hd.id = has2.hal_document_id
-                WHERE has2.person_id = p.id AND hd.publication_id IS NOT NULL
+                JOIN source_documents sd ON sd.id = has2.source_document_id
+                WHERE has2.person_id = p.id AND sd.publication_id IS NOT NULL
                 UNION
-                SELECT od.publication_id
+                SELECT sd2.publication_id
                 FROM openalex_authorships oas2
-                JOIN openalex_documents od ON od.id = oas2.openalex_document_id
-                WHERE oas2.person_id = p.id AND od.publication_id IS NOT NULL
+                JOIN source_documents sd2 ON sd2.id = oas2.source_document_id
+                WHERE oas2.person_id = p.id AND sd2.publication_id IS NOT NULL
             ) _pubs) DESC,
             p.id ASC
     """, (person_ids,))

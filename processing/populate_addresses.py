@@ -252,22 +252,22 @@ def main():
         FROM (
             SELECT address_id, COUNT(DISTINCT publication_id) AS cnt
             FROM (
-                SELECT oaa.address_id, od.publication_id
+                SELECT oaa.address_id, sd.publication_id
                 FROM openalex_authorship_addresses oaa
                 JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
-                JOIN openalex_documents od ON od.id = oas.openalex_document_id
-                WHERE od.publication_id IS NOT NULL
+                JOIN source_documents sd ON sd.id = oas.source_document_id
+                WHERE sd.publication_id IS NOT NULL
                 UNION
-                SELECT waa.address_id, wd.publication_id
+                SELECT waa.address_id, sd.publication_id
                 FROM wos_authorship_addresses waa
                 JOIN wos_authorships was ON was.id = waa.wos_authorship_id
-                JOIN wos_documents wd ON wd.id = was.wos_document_id
-                WHERE wd.publication_id IS NOT NULL
+                JOIN source_documents sd ON sd.id = was.source_document_id
+                WHERE sd.publication_id IS NOT NULL
                 UNION
                 SELECT saa.address_id, sd.publication_id
                 FROM scanr_authorship_addresses saa
                 JOIN scanr_authorships sas ON sas.id = saa.scanr_authorship_id
-                JOIN scanr_documents sd ON sd.id = sas.scanr_document_id
+                JOIN source_documents sd ON sd.id = sas.source_document_id
                 WHERE sd.publication_id IS NOT NULL
             ) t
             GROUP BY address_id

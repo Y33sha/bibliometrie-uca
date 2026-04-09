@@ -361,14 +361,14 @@ async def export_publications_csv(
         if person_id:
             conditions = ["""
                 (
-                    EXISTS (SELECT 1 FROM hal_documents hd
-                            JOIN hal_authorships has ON has.hal_document_id = hd.id
-                            WHERE hd.publication_id = p.id AND has.person_id = %s
+                    EXISTS (SELECT 1 FROM source_documents sd
+                            JOIN hal_authorships has ON has.source_document_id = sd.id
+                            WHERE sd.publication_id = p.id AND has.person_id = %s
                               AND has.excluded = FALSE)
                     OR
-                    EXISTS (SELECT 1 FROM openalex_documents od
-                            JOIN openalex_authorships oas ON oas.openalex_document_id = od.id
-                            WHERE od.publication_id = p.id AND oas.person_id = %s
+                    EXISTS (SELECT 1 FROM source_documents sd
+                            JOIN openalex_authorships oas ON oas.source_document_id = sd.id
+                            WHERE sd.publication_id = p.id AND oas.person_id = %s
                               AND oas.excluded = FALSE)
                 )
             """]
@@ -454,14 +454,14 @@ async def export_publications_csv(
                 p.oa_status::text,
                 j.title AS journal_title,
                 pub.name AS publisher_name,
-                (SELECT hd.halid FROM hal_documents hd
-                 WHERE hd.publication_id = p.id LIMIT 1) AS hal_id,
-                (SELECT od.openalex_id FROM openalex_documents od
-                 WHERE od.publication_id = p.id LIMIT 1) AS openalex_id,
-                (SELECT sd.scanr_id FROM scanr_documents sd
-                 WHERE sd.publication_id = p.id LIMIT 1) AS scanr_id,
-                (SELECT wd.ut FROM wos_documents wd
-                 WHERE wd.publication_id = p.id LIMIT 1) AS wos_id,
+                (SELECT sd.source_id FROM source_documents sd
+                 WHERE sd.publication_id = p.id AND sd.source = 'hal' LIMIT 1) AS hal_id,
+                (SELECT sd.source_id FROM source_documents sd
+                 WHERE sd.publication_id = p.id AND sd.source = 'openalex' LIMIT 1) AS openalex_id,
+                (SELECT sd.source_id FROM source_documents sd
+                 WHERE sd.publication_id = p.id AND sd.source = 'scanr' LIMIT 1) AS scanr_id,
+                (SELECT sd.source_id FROM source_documents sd
+                 WHERE sd.publication_id = p.id AND sd.source = 'wos' LIMIT 1) AS wos_id,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
@@ -532,37 +532,37 @@ async def get_publication(pub_id: int):
         if not pub:
             raise HTTPException(status_code=404, detail="Publication not found")
 
-        # b) Sources — HAL: countries du document; OA/WoS: countries depuis adresses
+        # b) Sources — HAL: countries du document; OA/WoS/ScanR: countries depuis adresses
         cur.execute("""
-            SELECT 'hal' AS source, hd.halid AS source_id, hd.doi, hd.collections, hd.countries
-            FROM hal_documents hd WHERE hd.publication_id = %s
+            SELECT 'hal' AS source, sd.source_id, sd.doi, sd.collections, sd.countries
+            FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'hal'
             UNION ALL
-            SELECT 'openalex', od.openalex_id, od.doi, NULL,
+            SELECT 'openalex', sd.source_id, sd.doi, NULL,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
                     FROM openalex_authorships oas2
                     JOIN openalex_authorship_addresses oaa ON oaa.openalex_authorship_id = oas2.id
                     JOIN addresses addr ON addr.id = oaa.address_id,
                          unnest(addr.countries) AS c
-                    WHERE oas2.openalex_document_id = od.id AND addr.countries IS NOT NULL)
-            FROM openalex_documents od WHERE od.publication_id = %s
+                    WHERE oas2.source_document_id = sd.id AND addr.countries IS NOT NULL)
+            FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'openalex'
             UNION ALL
-            SELECT 'wos', wd.ut, wd.doi, NULL,
+            SELECT 'wos', sd.source_id, sd.doi, NULL,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
                     FROM wos_authorships was2
                     JOIN wos_authorship_addresses waa ON waa.wos_authorship_id = was2.id
                     JOIN addresses addr ON addr.id = waa.address_id,
                          unnest(addr.countries) AS c
-                    WHERE was2.wos_document_id = wd.id AND addr.countries IS NOT NULL)
-            FROM wos_documents wd WHERE wd.publication_id = %s
+                    WHERE was2.source_document_id = sd.id AND addr.countries IS NOT NULL)
+            FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'wos'
             UNION ALL
-            SELECT 'scanr', sd.scanr_id, sd.doi, NULL,
+            SELECT 'scanr', sd.source_id, sd.doi, NULL,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
                     FROM scanr_authorships sas2
                     JOIN scanr_authorship_addresses saa ON saa.scanr_authorship_id = sas2.id
                     JOIN addresses addr ON addr.id = saa.address_id,
                          unnest(addr.countries) AS c
-                    WHERE sas2.scanr_document_id = sd.id AND addr.countries IS NOT NULL)
-            FROM scanr_documents sd WHERE sd.publication_id = %s
+                    WHERE sas2.source_document_id = sd.id AND addr.countries IS NOT NULL)
+            FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'scanr'
         """, (pub_id, pub_id, pub_id, pub_id))
         sources = cur.fetchall()
 
@@ -587,8 +587,8 @@ async def get_publication(pub_id: int):
                    has.is_uca, has.structure_ids, has.excluded, has.countries
             FROM hal_authorships has
             JOIN hal_authors ha ON ha.id = has.hal_author_id
-            JOIN hal_documents hd ON hd.id = has.hal_document_id
-            WHERE hd.publication_id = %s
+            JOIN source_documents sd ON sd.id = has.source_document_id
+            WHERE sd.publication_id = %s
             ORDER BY has.author_position
         """, (pub_id,))
         hal_authorships = cur.fetchall()
@@ -608,8 +608,8 @@ async def get_publication(pub_id: int):
                    ) AS countries
             FROM openalex_authorships oas
             JOIN openalex_authors oa ON oa.id = oas.openalex_author_id
-            JOIN openalex_documents od ON od.id = oas.openalex_document_id
-            WHERE od.publication_id = %s
+            JOIN source_documents sd ON sd.id = oas.source_document_id
+            WHERE sd.publication_id = %s
             ORDER BY oas.author_position
         """, (pub_id,))
         oa_authorships = cur.fetchall()
@@ -627,8 +627,8 @@ async def get_publication(pub_id: int):
                    ) AS countries
             FROM wos_authorships was
             JOIN wos_authors wa ON wa.id = was.wos_author_id
-            JOIN wos_documents wd ON wd.id = was.wos_document_id
-            WHERE wd.publication_id = %s
+            JOIN source_documents sd ON sd.id = was.source_document_id
+            WHERE sd.publication_id = %s
             ORDER BY was.author_position
         """, (pub_id,))
         wos_authorships = cur.fetchall()
@@ -880,15 +880,15 @@ async def list_publications(
                 p.oa_status::text,
                 j.title AS journal_title,
                 pub.name AS publisher_name,
-                -- Sources: HAL, OpenAlex and WoS IDs
-                (SELECT hd.halid FROM hal_documents hd
-                 WHERE hd.publication_id = p.id LIMIT 1) AS hal_id,
-                (SELECT od.openalex_id FROM openalex_documents od
-                 WHERE od.publication_id = p.id LIMIT 1) AS openalex_id,
-                (SELECT sd.scanr_id FROM scanr_documents sd
-                 WHERE sd.publication_id = p.id LIMIT 1) AS scanr_id,
-                (SELECT wd.ut FROM wos_documents wd
-                 WHERE wd.publication_id = p.id LIMIT 1) AS wos_id,
+                -- Sources: HAL, OpenAlex, ScanR and WoS IDs
+                (SELECT sd.source_id FROM source_documents sd
+                 WHERE sd.publication_id = p.id AND sd.source = 'hal' LIMIT 1) AS hal_id,
+                (SELECT sd.source_id FROM source_documents sd
+                 WHERE sd.publication_id = p.id AND sd.source = 'openalex' LIMIT 1) AS openalex_id,
+                (SELECT sd.source_id FROM source_documents sd
+                 WHERE sd.publication_id = p.id AND sd.source = 'scanr' LIMIT 1) AS scanr_id,
+                (SELECT sd.source_id FROM source_documents sd
+                 WHERE sd.publication_id = p.id AND sd.source = 'wos' LIMIT 1) AS wos_id,
                 -- Corresponding author + authorship id (only meaningful with person_id filter)
                 (SELECT a.is_corresponding FROM authorships a
                  WHERE a.publication_id = p.id AND a.person_id = %s

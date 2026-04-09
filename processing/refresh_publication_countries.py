@@ -2,11 +2,11 @@
 Recalcule publications.countries à partir des 3 sources.
 
 Sources des pays :
-  - HAL : hal_documents.countries (via hal_structures.country)
+  - HAL : source_documents.countries (via hal_structures.country)
   - OpenAlex : addresses.countries (via openalex_authorship_addresses)
   - WoS : addresses.countries (via wos_authorship_addresses)
 
-On n'utilise PAS openalex_documents.countries (données staging OA non fiables).
+On n'utilise PAS les countries des source_documents OpenAlex (données staging OA non fiables).
 
 Usage:
     python refresh_publication_countries.py              # recalculer
@@ -33,29 +33,29 @@ REFRESH_QUERY = """
                array_agg(DISTINCT c ORDER BY c) AS all_countries
         FROM (
             -- HAL : pays des structures HAL
-            SELECT hd.publication_id AS pub_id, unnest(hd.countries) AS c
-            FROM hal_documents hd
-            WHERE hd.countries IS NOT NULL
+            SELECT sd.publication_id AS pub_id, unnest(sd.countries) AS c
+            FROM source_documents sd
+            WHERE sd.source = 'hal' AND sd.countries IS NOT NULL
 
             UNION ALL
 
             -- OpenAlex : pays des adresses résolues
-            SELECT od.publication_id AS pub_id, unnest(a.countries) AS c
+            SELECT sd.publication_id AS pub_id, unnest(a.countries) AS c
             FROM openalex_authorship_addresses oaa
             JOIN addresses a ON a.id = oaa.address_id
             JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
-            JOIN openalex_documents od ON od.id = oas.openalex_document_id
-            WHERE a.countries IS NOT NULL AND od.publication_id IS NOT NULL
+            JOIN source_documents sd ON sd.id = oas.source_document_id
+            WHERE a.countries IS NOT NULL AND sd.publication_id IS NOT NULL
 
             UNION ALL
 
             -- WoS : pays des adresses résolues
-            SELECT wd.publication_id AS pub_id, unnest(a.countries) AS c
+            SELECT sd.publication_id AS pub_id, unnest(a.countries) AS c
             FROM wos_authorship_addresses waa
             JOIN addresses a ON a.id = waa.address_id
             JOIN wos_authorships was ON was.id = waa.wos_authorship_id
-            JOIN wos_documents wd ON wd.id = was.wos_document_id
-            WHERE a.countries IS NOT NULL AND wd.publication_id IS NOT NULL
+            JOIN source_documents sd ON sd.id = was.source_document_id
+            WHERE a.countries IS NOT NULL AND sd.publication_id IS NOT NULL
         ) src
         GROUP BY pub_id
     ) sub
@@ -65,25 +65,26 @@ REFRESH_QUERY = """
 
 
 def refresh_hal_document_countries(cur):
-    """Étape préalable : propager hal_structures.country → hal_documents.countries.
+    """Étape préalable : propager hal_structures.country → source_documents.countries (HAL).
 
     Pour chaque document HAL, collecte les pays des structures de ses auteurs
     (via hal_authorships.hal_struct_ids → hal_structures.country).
     """
     cur.execute("""
-        UPDATE hal_documents hd
+        UPDATE source_documents sd
         SET countries = sub.doc_countries
         FROM (
-            SELECT has.hal_document_id,
+            SELECT has.source_document_id,
                    array_agg(DISTINCT hs.country ORDER BY hs.country) AS doc_countries
             FROM hal_authorships has,
                  LATERAL unnest(has.hal_struct_ids) AS hsid(val)
             JOIN hal_structures hs ON hs.hal_struct_id = hsid.val
             WHERE hs.country IS NOT NULL
-            GROUP BY has.hal_document_id
+            GROUP BY has.source_document_id
         ) sub
-        WHERE hd.id = sub.hal_document_id
-          AND hd.countries IS DISTINCT FROM sub.doc_countries
+        WHERE sd.id = sub.source_document_id
+          AND sd.source = 'hal'
+          AND sd.countries IS DISTINCT FROM sub.doc_countries
     """)
     updated = cur.rowcount
     logger.info(f"HAL documents countries : {updated} mis à jour")

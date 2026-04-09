@@ -84,8 +84,8 @@ async def authorships_facets(
                     WHERE has3.hal_author_id = ha.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
                    ha.orcid, ha.idhal, 'hal' AS source,
                    ha.full_name,
-                   (SELECT COUNT(DISTINCT hd.publication_id) FROM hal_authorships has2
-                    JOIN hal_documents hd ON hd.id = has2.hal_document_id
+                   (SELECT COUNT(DISTINCT sd.publication_id) FROM hal_authorships has2
+                    JOIN source_documents sd ON sd.id = has2.source_document_id
                     WHERE has2.hal_author_id = ha.id AND has2.is_uca = TRUE) AS uca_pub_count
             FROM hal_authors ha
             WHERE EXISTS (
@@ -95,8 +95,8 @@ async def authorships_facets(
             UNION ALL
             SELECT oa.id, oa.person_id, oa.orcid, NULL AS idhal, 'openalex' AS source,
                    oa.full_name,
-                   (SELECT COUNT(DISTINCT od.publication_id) FROM openalex_authorships oas2
-                    JOIN openalex_documents od ON od.id = oas2.openalex_document_id
+                   (SELECT COUNT(DISTINCT sd.publication_id) FROM openalex_authorships oas2
+                    JOIN source_documents sd ON sd.id = oas2.source_document_id
                     WHERE oas2.openalex_author_id = oa.id AND oas2.is_uca = TRUE) AS uca_pub_count
             FROM openalex_authors oa
             WHERE EXISTS (
@@ -109,8 +109,8 @@ async def authorships_facets(
                     WHERE was3.wos_author_id = wa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
                    wa.orcid, NULL AS idhal, 'wos' AS source,
                    wa.full_name,
-                   (SELECT COUNT(DISTINCT wd.publication_id) FROM wos_authorships was2
-                    JOIN wos_documents wd ON wd.id = was2.wos_document_id
+                   (SELECT COUNT(DISTINCT sd.publication_id) FROM wos_authorships was2
+                    JOIN source_documents sd ON sd.id = was2.source_document_id
                     WHERE was2.wos_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count
             FROM wos_authors wa
             WHERE EXISTS (
@@ -208,10 +208,10 @@ async def authorships_facets(
                 )
             ),
             author_structs AS (
-                SELECT ha.id AS author_id, 'hal' AS source, unnest(has.structure_ids) AS struct_id
+                SELECT ha.id AS author_id, 'hal' AS source, unnest(has2.structure_ids) AS struct_id
                 FROM hal_authors ha
-                JOIN hal_authorships has ON has.hal_author_id = ha.id
-                WHERE has.is_uca = TRUE AND has.structure_ids IS NOT NULL
+                JOIN hal_authorships has2 ON has2.hal_author_id = ha.id
+                WHERE has2.is_uca = TRUE AND has2.structure_ids IS NOT NULL
                 UNION
                 SELECT oa.id, 'openalex', unnest(oas.structure_ids)
                 FROM openalex_authors oa
@@ -298,7 +298,7 @@ async def list_authorships(
                        ha.orcid, ha.idhal, NULL::text AS openalex_id,
                        (SELECT has3.person_id FROM hal_authorships has3
                         WHERE has3.hal_author_id = ha.id AND has3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                       (SELECT COUNT(DISTINCT has2.hal_document_id)
+                       (SELECT COUNT(DISTINCT has2.source_document_id)
                         FROM hal_authorships has2
                         WHERE has2.hal_author_id = ha.id AND has2.is_uca = TRUE) AS uca_pub_count
                 FROM hal_authors ha
@@ -309,7 +309,7 @@ async def list_authorships(
                 UNION ALL
                 SELECT oa.id, 'openalex' AS source, oa.full_name, oa.last_name, oa.first_name,
                        oa.orcid, NULL::text AS idhal, oa.openalex_id, oa.person_id,
-                       (SELECT COUNT(DISTINCT oas2.openalex_document_id)
+                       (SELECT COUNT(DISTINCT oas2.source_document_id)
                         FROM openalex_authorships oas2
                         WHERE oas2.openalex_author_id = oa.id AND oas2.is_uca = TRUE) AS uca_pub_count
                 FROM openalex_authors oa
@@ -322,7 +322,7 @@ async def list_authorships(
                        wa.orcid, NULL::text AS idhal, NULL::text AS openalex_id,
                        (SELECT was3.person_id FROM wos_authorships was3
                         WHERE was3.wos_author_id = wa.id AND was3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                       (SELECT COUNT(DISTINCT was2.wos_document_id)
+                       (SELECT COUNT(DISTINCT was2.source_document_id)
                         FROM wos_authorships was2
                         WHERE was2.wos_author_id = wa.id AND was2.is_uca = TRUE) AS uca_pub_count
                 FROM wos_authors wa

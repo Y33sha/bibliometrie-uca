@@ -8,7 +8,7 @@ Usage:
 
 Tables peuplées :
     publishers, journals, publications          (tables de vérité — partagées)
-    openalex_documents                          (lien staging ↔ publication)
+    source_documents                            (lien staging ↔ publication, source='openalex')
     openalex_authors                            (auteurs OpenAlex dédupliqués)
     openalex_authorships                        (lien document × auteur)
     openalex_institutions                       (institutions OpenAlex)
@@ -116,7 +116,7 @@ def find_hal_publication_id(cur, work: dict) -> int | None:
         return None
 
     cur.execute(
-        "SELECT publication_id FROM hal_documents WHERE halid = %s",
+        "SELECT publication_id FROM source_documents WHERE source = 'hal' AND source_id = %s",
         (hal_id,)
     )
     row = cur.fetchone()
@@ -218,14 +218,14 @@ def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
 
 
 # =============================================================
-# OPENALEX DOCUMENTS
+# SOURCE DOCUMENTS (OPENALEX)
 # =============================================================
 
 def insert_openalex_document(cur, work: dict, staging_id: int,
                              publication_id: int) -> int:
     """
-    Crée/retrouve l'entrée openalex_documents.
-    Retourne openalex_document.id.
+    Crée/retrouve l'entrée source_documents pour OpenAlex.
+    Retourne source_documents.id.
     """
     openalex_id = extract_short_id(work["id"])
     doi = clean_doi(work.get("doi"))
@@ -234,15 +234,15 @@ def insert_openalex_document(cur, work: dict, staging_id: int,
     doc_type = work.get("type")
 
     cur.execute("""
-        INSERT INTO openalex_documents
-            (openalex_id, doi, title, pub_year, doc_type,
+        INSERT INTO source_documents
+            (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (openalex_id) DO UPDATE SET
+        VALUES ('openalex', %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
-                openalex_documents.publication_id, EXCLUDED.publication_id
+                source_documents.publication_id, EXCLUDED.publication_id
             ),
-            doc_type = COALESCE(EXCLUDED.doc_type, openalex_documents.doc_type)
+            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type)
         RETURNING id
     """, (openalex_id, doi, title, pub_year, doc_type,
           publication_id, staging_id))
@@ -336,7 +336,7 @@ def upsert_openalex_institution(cur, institution: dict) -> str | None:
 # OPENALEX AUTHORSHIPS
 # =============================================================
 
-def process_authorships(cur, work: dict, oa_document_id: int):
+def process_authorships(cur, work: dict, source_document_id: int):
     """
     Traite les authorships d'un work OpenAlex :
     - Insère/retrouve chaque auteur dans openalex_authors
@@ -348,8 +348,8 @@ def process_authorships(cur, work: dict, oa_document_id: int):
 
     # Supprimer les anciennes authorships de ce document
     # (nécessaire quand un work refetché a changé d'auteurs/positions)
-    cur.execute("DELETE FROM openalex_authorships WHERE openalex_document_id = %s",
-                (oa_document_id,))
+    cur.execute("DELETE FROM openalex_authorships WHERE source_document_id = %s",
+                (source_document_id,))
 
     for position, authorship in enumerate(authorships):
         oa_author_id = upsert_openalex_author(cur, authorship)
@@ -380,11 +380,11 @@ def process_authorships(cur, work: dict, oa_document_id: int):
 
         cur.execute("""
             INSERT INTO openalex_authorships
-                (openalex_document_id, openalex_author_id, author_position,
+                (source_document_id, openalex_author_id, author_position,
                  raw_affiliation, openalex_institution_ids,
                  raw_author_name, author_name_normalized, is_corresponding)
             VALUES (%s, %s, %s, %s, %s, %s, normalize_name_form(%s), %s)
-            ON CONFLICT (openalex_document_id, openalex_author_id) DO UPDATE SET
+            ON CONFLICT (source_document_id, openalex_author_id) DO UPDATE SET
                 raw_affiliation = COALESCE(
                     EXCLUDED.raw_affiliation,
                     openalex_authorships.raw_affiliation
@@ -398,7 +398,7 @@ def process_authorships(cur, work: dict, oa_document_id: int):
                     openalex_authorships.author_name_normalized
                 ),
                 is_corresponding = EXCLUDED.is_corresponding
-        """, (oa_document_id, oa_author_id, position,
+        """, (source_document_id, oa_author_id, position,
               raw_affil_text, institution_ids or None,
               raw_author_name, raw_author_name, is_corresponding))
 
@@ -457,11 +457,11 @@ def process_work(cur, staging_row: tuple) -> bool:
         if hal_location:
             publication_id = find_hal_publication_id(cur, work)
 
-        # Idempotence : si openalex_documents a déjà cet openalex_id avec un
+        # Idempotence : si source_documents a déjà cet openalex_id avec un
         # publication_id, le réutiliser au lieu de risquer un doublon
         if not publication_id:
             cur.execute(
-                "SELECT publication_id FROM openalex_documents WHERE openalex_id = %s",
+                "SELECT publication_id FROM source_documents WHERE source = 'openalex' AND source_id = %s",
                 (openalex_id,))
             existing_doc = cur.fetchone()
             if existing_doc and existing_doc["publication_id"]:
@@ -474,14 +474,14 @@ def process_work(cur, staging_row: tuple) -> bool:
             logger.warning(f"Impossible d'insérer {openalex_id} — titre ou année manquant")
             return False
 
-        # Document OpenAlex
-        oa_document_id = insert_openalex_document(
+        # Document OpenAlex (source_documents)
+        source_document_id = insert_openalex_document(
             cur, work, staging_id, publication_id
         )
         update_sources(cur, publication_id)
 
         # Auteurs et authorships
-        process_authorships(cur, work, oa_document_id)
+        process_authorships(cur, work, source_document_id)
 
         # Marquer comme traité
         cur.execute(
@@ -576,11 +576,14 @@ def main():
         logger.info(f"Erreurs : {errors}")
 
         for table in ["publications", "journals", "publishers",
-                       "openalex_documents", "openalex_authors",
+                       "openalex_authors",
                        "openalex_authorships", "openalex_institutions"]:
             cur.execute(f"SELECT COUNT(*) FROM {table}")
             count = cur.fetchone()["count"]
             logger.info(f"  {table} : {count} enregistrements")
+        cur.execute("SELECT COUNT(*) FROM source_documents WHERE source = 'openalex'")
+        count = cur.fetchone()["count"]
+        logger.info(f"  source_documents (openalex) : {count} enregistrements")
 
     except KeyboardInterrupt:
         conn.commit()

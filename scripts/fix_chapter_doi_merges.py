@@ -41,24 +41,10 @@ def find_bad_merges(cur):
     cur.execute("""
         WITH pub_docs AS (
             SELECT p.id AS pub_id, p.doi,
-                   'hal' AS src, hd.id AS doc_id, hd.doc_type, hd.title,
-                   hd.pub_year, hd.doi AS doc_doi
+                   sd.source AS src, sd.id AS doc_id, sd.doc_type, sd.title,
+                   sd.pub_year, sd.doi AS doc_doi
             FROM publications p
-            JOIN hal_documents hd ON hd.publication_id = p.id
-            WHERE p.doi IS NOT NULL
-            UNION ALL
-            SELECT p.id, p.doi,
-                   'oa', od.id, od.doc_type, od.title,
-                   od.pub_year, od.doi
-            FROM publications p
-            JOIN openalex_documents od ON od.publication_id = p.id
-            WHERE p.doi IS NOT NULL
-            UNION ALL
-            SELECT p.id, p.doi,
-                   'wos', wd.id, wd.doc_type, wd.title,
-                   wd.pub_year, wd.doi
-            FROM publications p
-            JOIN wos_documents wd ON wd.publication_id = p.id
+            JOIN source_documents sd ON sd.publication_id = p.id
             WHERE p.doi IS NOT NULL
         )
         SELECT pub_id, doi, array_agg(DISTINCT doc_type) AS types
@@ -78,14 +64,13 @@ def find_bad_merges(cur):
 
 def get_pub_documents(cur, pub_id):
     """Récupère tous les documents sources d'une publication."""
+    cur.execute("""
+        SELECT id, source AS src, title, doc_type, pub_year, doi
+        FROM source_documents WHERE publication_id = %s
+    """, (pub_id,))
     docs = []
-    for src, tbl in [('hal', 'hal_documents'), ('oa', 'openalex_documents'), ('wos', 'wos_documents')]:
-        cur.execute(f"""
-            SELECT id, title, doc_type, pub_year, doi
-            FROM {tbl} WHERE publication_id = %s
-        """, (pub_id,))
-        for r in cur.fetchall():
-            docs.append({**r, 'src': src, 'table': tbl})
+    for r in cur.fetchall():
+        docs.append({**r, 'table': 'source_documents'})
     return docs
 
 
