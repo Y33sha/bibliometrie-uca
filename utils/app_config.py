@@ -164,6 +164,19 @@ def get_scanr_affiliation_ids(cur) -> list[str]:
         return []
 
 
+def get_theses_etab_ppns(cur) -> list[str]:
+    """Retourne les PPN IdRef des établissements de soutenance pour theses.fr."""
+    val = _get_from_db(cur, "theses_etab_ppns")
+    if val and isinstance(val, list):
+        return val
+
+    try:
+        from config.settings import THESES
+        return THESES.get("etab_ppns", [])
+    except ImportError:
+        return []
+
+
 def get_scanr_credentials(cur) -> tuple[str, str]:
     """Retourne (username, password) pour l'API ScanR."""
     user = _get_from_db(cur, "scanr_username")

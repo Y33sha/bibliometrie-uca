@@ -25,13 +25,15 @@ import requests
 from psycopg2.extras import Json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config.settings import THESES
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
+from utils.app_config import get_theses_etab_ppns
 
 logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
 
-BASE_URL = THESES["base_url"]
+BASE_URL = "https://theses.fr/api/v1/theses/recherche/"
+PER_PAGE = 500
+REQUEST_DELAY = 0.3
 
 
 def build_query(ppn: str, status: str | None = None) -> str:
@@ -47,7 +49,7 @@ def fetch_page(query: str, debut: int = 0, nombre: int = 500) -> dict:
     params = {
         "q": query,
         "debut": debut,
-        "nombre": nombre,
+        "nombre": nombre or PER_PAGE,
     }
     resp = requests.get(BASE_URL, params=params, timeout=30)
     resp.raise_for_status()
@@ -93,7 +95,7 @@ def extract_ppn(ppn: str, conn, existing_ids: set,
     inserted = 0
     updated = 0
     debut = 0
-    per_page = THESES["per_page"]
+    per_page = PER_PAGE
 
     with conn.cursor() as cur:
         while debut < total:
@@ -141,7 +143,7 @@ def extract_ppn(ppn: str, conn, existing_ids: set,
             if debut % 1000 == 0 or debut >= total:
                 logger.info(f"    {debut}/{total} traités ({inserted} nouveaux, {updated} mis à jour)")
 
-            time.sleep(THESES["request_delay"])
+            time.sleep(REQUEST_DELAY)
 
     return total, inserted, updated
 
@@ -166,13 +168,19 @@ def main():
     else:
         statuses = ["soutenue", "enCours"]
 
-    ppns = THESES["etab_ppns"]
+    conn = get_connection()
+    cur = conn.cursor()
+    ppns = get_theses_etab_ppns(cur)
+    cur.close()
+
+    if not ppns:
+        logger.error("Aucun PPN configuré (clé 'theses_etab_ppns' dans config)")
+        conn.close()
+        sys.exit(1)
 
     logger.info("=== Extraction theses.fr démarrée ===")
     logger.info(f"Établissements PPN : {ppns}")
     logger.info(f"Statuts : {statuses}")
-
-    conn = get_connection()
 
     try:
         existing_ids = get_existing_ids(conn, "theses") if not args.dry_run else set()
