@@ -25,44 +25,39 @@ from utils.log import setup_logger
 
 logger = setup_logger("cleanup_non_affiliated", os.path.join(os.path.dirname(__file__), "../processing/logs"))
 
-TABLES = [
-    ("hal_authorships", "hal"),
-    ("openalex_authorships", "openalex"),
-    ("wos_authorships", "wos"),
-    ("scanr_authorships", "scanr"),
-]
+SOURCES = ["hal", "openalex", "wos", "scanr"]
 
 
 def count_affected(cur):
     """Compte les authorships sources avec person_id et sans structure_ids."""
     counts = {}
-    for table, label in TABLES:
-        cur.execute(f"""
+    for source in SOURCES:
+        cur.execute("""
             SELECT COUNT(*) AS cnt
-            FROM {table}
-            WHERE person_id IS NOT NULL AND structure_ids IS NULL
-        """)
-        counts[label] = cur.fetchone()["cnt"]
+            FROM source_authorships
+            WHERE source = %s AND person_id IS NOT NULL AND structure_ids IS NULL
+        """, (source,))
+        counts[source] = cur.fetchone()["cnt"]
     return counts
 
 
 def cleanup(cur, dry_run=False):
     """Supprime les person_id des authorships sans affiliation."""
     total = 0
-    for table, label in TABLES:
+    for source in SOURCES:
         if dry_run:
-            cur.execute(f"""
-                SELECT COUNT(*) AS cnt FROM {table}
-                WHERE person_id IS NOT NULL AND structure_ids IS NULL
-            """)
+            cur.execute("""
+                SELECT COUNT(*) AS cnt FROM source_authorships
+                WHERE source = %s AND person_id IS NOT NULL AND structure_ids IS NULL
+            """, (source,))
             count = cur.fetchone()["cnt"]
         else:
-            cur.execute(f"""
-                UPDATE {table} SET person_id = NULL
-                WHERE person_id IS NOT NULL AND structure_ids IS NULL
-            """)
+            cur.execute("""
+                UPDATE source_authorships SET person_id = NULL
+                WHERE source = %s AND person_id IS NOT NULL AND structure_ids IS NULL
+            """, (source,))
             count = cur.rowcount
-        logger.info(f"  {label} : {count} authorships {'à nettoyer' if dry_run else 'nettoyées'}")
+        logger.info(f"  {source} : {count} authorships {'à nettoyer' if dry_run else 'nettoyées'}")
         total += count
     return total
 

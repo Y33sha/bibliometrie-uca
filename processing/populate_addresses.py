@@ -29,17 +29,17 @@ BATCH_SIZE = 5000
 # Configuration par source
 SOURCES = {
     "openalex": {
-        "authorship_table": "openalex_authorships",
+        "source_filter": "openalex",
         "link_table": "openalex_authorship_addresses",
         "fk_column": "openalex_authorship_id",
     },
     "wos": {
-        "authorship_table": "wos_authorships",
+        "source_filter": "wos",
         "link_table": "wos_authorship_addresses",
         "fk_column": "wos_authorship_id",
     },
     "scanr": {
-        "authorship_table": "scanr_authorships",
+        "source_filter": "scanr",
         "link_table": "scanr_authorship_addresses",
         "fk_column": "scanr_authorship_id",
         "jsonb": True,  # les adresses sont dans raw_affiliations (JSONB)
@@ -69,7 +69,7 @@ def show_stats(cur):
 def process_source(conn, cur, source_name: str):
     """Traite une source : extraction, insertion, liaison."""
     cfg = SOURCES[source_name]
-    table = cfg["authorship_table"]
+    source_filter = cfg["source_filter"]
     link_table = cfg["link_table"]
     fk_col = cfg["fk_column"]
 
@@ -79,20 +79,22 @@ def process_source(conn, cur, source_name: str):
     is_jsonb = cfg.get("jsonb", False)
 
     if is_jsonb:
-        logger.info(f"[{source_name}] Extraction des adresses depuis {table}.raw_affiliations (JSONB)...")
-        cur.execute(f"""
+        logger.info(f"[{source_name}] Extraction des adresses depuis source_authorships.raw_affiliations (JSONB)...")
+        cur.execute("""
             SELECT id, raw_affiliations
-            FROM {table}
-            WHERE raw_affiliations IS NOT NULL
-        """)
+            FROM source_authorships
+            WHERE source = %s
+              AND raw_affiliations IS NOT NULL
+        """, (source_filter,))
     else:
-        logger.info(f"[{source_name}] Extraction des raw_affiliation depuis {table}...")
-        cur.execute(f"""
+        logger.info(f"[{source_name}] Extraction des raw_affiliation depuis source_authorships...")
+        cur.execute("""
             SELECT id, raw_affiliation
-            FROM {table}
-            WHERE raw_affiliation IS NOT NULL
+            FROM source_authorships
+            WHERE source = %s
+              AND raw_affiliation IS NOT NULL
               AND raw_affiliation != ''
-        """)
+        """, (source_filter,))
 
     rows = cur.fetchall()
     logger.info(f"  {len(rows)} lignes avec affiliation")
@@ -254,20 +256,20 @@ def main():
             FROM (
                 SELECT oaa.address_id, sd.publication_id
                 FROM openalex_authorship_addresses oaa
-                JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
-                JOIN source_documents sd ON sd.id = oas.source_document_id
+                JOIN source_authorships sa ON sa.id = oaa.openalex_authorship_id
+                JOIN source_documents sd ON sd.id = sa.source_document_id
                 WHERE sd.publication_id IS NOT NULL
                 UNION
                 SELECT waa.address_id, sd.publication_id
                 FROM wos_authorship_addresses waa
-                JOIN wos_authorships was ON was.id = waa.wos_authorship_id
-                JOIN source_documents sd ON sd.id = was.source_document_id
+                JOIN source_authorships sa ON sa.id = waa.wos_authorship_id
+                JOIN source_documents sd ON sd.id = sa.source_document_id
                 WHERE sd.publication_id IS NOT NULL
                 UNION
                 SELECT saa.address_id, sd.publication_id
                 FROM scanr_authorship_addresses saa
-                JOIN scanr_authorships sas ON sas.id = saa.scanr_authorship_id
-                JOIN source_documents sd ON sd.id = sas.source_document_id
+                JOIN source_authorships sa ON sa.id = saa.scanr_authorship_id
+                JOIN source_documents sd ON sd.id = sa.source_document_id
                 WHERE sd.publication_id IS NOT NULL
             ) t
             GROUP BY address_id

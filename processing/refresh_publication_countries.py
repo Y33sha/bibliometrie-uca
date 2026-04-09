@@ -43,8 +43,8 @@ REFRESH_QUERY = """
             SELECT sd.publication_id AS pub_id, unnest(a.countries) AS c
             FROM openalex_authorship_addresses oaa
             JOIN addresses a ON a.id = oaa.address_id
-            JOIN openalex_authorships oas ON oas.id = oaa.openalex_authorship_id
-            JOIN source_documents sd ON sd.id = oas.source_document_id
+            JOIN source_authorships sa ON sa.id = oaa.openalex_authorship_id
+            JOIN source_documents sd ON sd.id = sa.source_document_id
             WHERE a.countries IS NOT NULL AND sd.publication_id IS NOT NULL
 
             UNION ALL
@@ -53,8 +53,8 @@ REFRESH_QUERY = """
             SELECT sd.publication_id AS pub_id, unnest(a.countries) AS c
             FROM wos_authorship_addresses waa
             JOIN addresses a ON a.id = waa.address_id
-            JOIN wos_authorships was ON was.id = waa.wos_authorship_id
-            JOIN source_documents sd ON sd.id = was.source_document_id
+            JOIN source_authorships sa ON sa.id = waa.wos_authorship_id
+            JOIN source_documents sd ON sd.id = sa.source_document_id
             WHERE a.countries IS NOT NULL AND sd.publication_id IS NOT NULL
         ) src
         GROUP BY pub_id
@@ -68,19 +68,20 @@ def refresh_hal_document_countries(cur):
     """Étape préalable : propager source_structures.country → source_documents.countries (HAL).
 
     Pour chaque document HAL, collecte les pays des structures de ses auteurs
-    (via hal_authorships.source_struct_ids → source_structures.country).
+    (via source_authorships.source_struct_ids → source_structures.country).
     """
     cur.execute("""
         UPDATE source_documents sd
         SET countries = sub.doc_countries
         FROM (
-            SELECT has.source_document_id,
+            SELECT sa.source_document_id,
                    array_agg(DISTINCT ss.country ORDER BY ss.country) AS doc_countries
-            FROM hal_authorships has,
-                 LATERAL unnest(has.source_struct_ids) AS ssid(val)
+            FROM source_authorships sa,
+                 LATERAL unnest(sa.source_struct_ids) AS ssid(val)
             JOIN source_structures ss ON ss.id = ssid.val
-            WHERE ss.country IS NOT NULL
-            GROUP BY has.source_document_id
+            WHERE sa.source = 'hal'
+              AND ss.country IS NOT NULL
+            GROUP BY sa.source_document_id
         ) sub
         WHERE sd.id = sub.source_document_id
           AND sd.source = 'hal'

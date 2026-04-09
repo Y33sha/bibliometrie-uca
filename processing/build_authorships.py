@@ -4,7 +4,7 @@ Construit la table authorships (table de vérité) à partir des authorships sou
 Étape 1 : Insérer les authorships manquantes (paires publication_id, person_id)
 Étape 2 : Peupler les FK (hal_authorship_id, openalex_authorship_id, wos_authorship_id)
 Étape 3 : Propager author_position et is_corresponding
-Étape 4 : Propager is_uca et structure_ids (union des 3 sources)
+Étape 4 : Propager in_perimeter et structure_ids (union des sources)
 
 Usage:
     python build_authorships.py              # exécuter
@@ -31,35 +31,11 @@ def build(cur):
 
     cur.execute("""
         WITH all_pairs AS (
-            SELECT DISTINCT sd.publication_id, has.person_id
-            FROM hal_authorships has
-            JOIN source_documents sd ON sd.id = has.source_document_id
+            SELECT DISTINCT sd.publication_id, sa.person_id
+            FROM source_authorships sa
+            JOIN source_documents sd ON sd.id = sa.source_document_id
             JOIN v_active_publications vap ON vap.id = sd.publication_id
-            WHERE has.person_id IS NOT NULL AND NOT has.excluded
-
-            UNION
-
-            SELECT DISTINCT sd.publication_id, oas.person_id
-            FROM openalex_authorships oas
-            JOIN source_documents sd ON sd.id = oas.source_document_id
-            JOIN v_active_publications vap ON vap.id = sd.publication_id
-            WHERE oas.person_id IS NOT NULL AND NOT oas.excluded
-
-            UNION
-
-            SELECT DISTINCT sd.publication_id, was.person_id
-            FROM wos_authorships was
-            JOIN source_documents sd ON sd.id = was.source_document_id
-            JOIN v_active_publications vap ON vap.id = sd.publication_id
-            WHERE was.person_id IS NOT NULL AND NOT was.excluded
-
-            UNION
-
-            SELECT DISTINCT sd.publication_id, sas.person_id
-            FROM scanr_authorships sas
-            JOIN source_documents sd ON sd.id = sas.source_document_id
-            JOIN v_active_publications vap ON vap.id = sd.publication_id
-            WHERE sas.person_id IS NOT NULL AND NOT sas.excluded
+            WHERE sa.person_id IS NOT NULL AND NOT sa.excluded
         )
         INSERT INTO authorships (publication_id, person_id)
         SELECT ap.publication_id, ap.person_id
@@ -76,195 +52,107 @@ def build(cur):
     # ── Étape 2 : Peupler les FK ──
     logger.info("Étape 2 : peuplement des FK...")
 
-    # 2a. HAL
-    cur.execute("""
-        UPDATE authorships a
-        SET hal_authorship_id = sub.has_id
-        FROM (
-            SELECT DISTINCT ON (sd.publication_id, has.person_id)
-                   sd.publication_id, has.person_id, has.id AS has_id
-            FROM hal_authorships has
-            JOIN source_documents sd ON sd.id = has.source_document_id
-            WHERE sd.publication_id IS NOT NULL
-              AND has.person_id IS NOT NULL
-              AND NOT has.excluded
-            ORDER BY sd.publication_id, has.person_id, has.id
-        ) sub
-        WHERE a.publication_id = sub.publication_id
-          AND a.person_id = sub.person_id
-          AND a.hal_authorship_id IS NULL
-    """)
-    hal_fk = cur.rowcount
-    logger.info(f"  HAL FK : {hal_fk} liens")
+    FK_QUERIES = [
+        ("HAL", "hal", "hal_authorship_id"),
+        ("OpenAlex", "openalex", "openalex_authorship_id"),
+        ("WoS", "wos", "wos_authorship_id"),
+        ("ScanR", "scanr", "scanr_authorship_id"),
+    ]
 
-    # 2b. OpenAlex
-    cur.execute("""
-        UPDATE authorships a
-        SET openalex_authorship_id = sub.oas_id
-        FROM (
-            SELECT DISTINCT ON (sd.publication_id, oas.person_id)
-                   sd.publication_id, oas.person_id, oas.id AS oas_id
-            FROM openalex_authorships oas
-            JOIN source_documents sd ON sd.id = oas.source_document_id
-            WHERE sd.publication_id IS NOT NULL
-              AND oas.person_id IS NOT NULL
-              AND NOT oas.excluded
-            ORDER BY sd.publication_id, oas.person_id, oas.id
-        ) sub
-        WHERE a.publication_id = sub.publication_id
-          AND a.person_id = sub.person_id
-          AND a.openalex_authorship_id IS NULL
-    """)
-    oa_fk = cur.rowcount
-    logger.info(f"  OpenAlex FK : {oa_fk} liens")
-
-    # 2c. WoS
-    cur.execute("""
-        UPDATE authorships a
-        SET wos_authorship_id = sub.was_id
-        FROM (
-            SELECT DISTINCT ON (sd.publication_id, was.person_id)
-                   sd.publication_id, was.person_id, was.id AS was_id
-            FROM wos_authorships was
-            JOIN source_documents sd ON sd.id = was.source_document_id
-            WHERE sd.publication_id IS NOT NULL
-              AND was.person_id IS NOT NULL
-              AND NOT was.excluded
-            ORDER BY sd.publication_id, was.person_id, was.id
-        ) sub
-        WHERE a.publication_id = sub.publication_id
-          AND a.person_id = sub.person_id
-          AND a.wos_authorship_id IS NULL
-    """)
-    wos_fk = cur.rowcount
-    logger.info(f"  WoS FK : {wos_fk} liens")
-
-    # 2d. ScanR
-    cur.execute("""
-        UPDATE authorships a
-        SET scanr_authorship_id = sub.sas_id
-        FROM (
-            SELECT DISTINCT ON (sd.publication_id, sas.person_id)
-                   sd.publication_id, sas.person_id, sas.id AS sas_id
-            FROM scanr_authorships sas
-            JOIN source_documents sd ON sd.id = sas.source_document_id
-            WHERE sd.publication_id IS NOT NULL
-              AND sas.person_id IS NOT NULL
-              AND NOT sas.excluded
-            ORDER BY sd.publication_id, sas.person_id, sas.id
-        ) sub
-        WHERE a.publication_id = sub.publication_id
-          AND a.person_id = sub.person_id
-          AND a.scanr_authorship_id IS NULL
-    """)
-    scanr_fk = cur.rowcount
-    logger.info(f"  ScanR FK : {scanr_fk} liens")
+    for source_name, source_value, fk_col in FK_QUERIES:
+        cur.execute(f"""
+            UPDATE authorships a
+            SET {fk_col} = sub.sa_id
+            FROM (
+                SELECT DISTINCT ON (sd.publication_id, sa.person_id)
+                       sd.publication_id, sa.person_id, sa.id AS sa_id
+                FROM source_authorships sa
+                JOIN source_documents sd ON sd.id = sa.source_document_id
+                WHERE sa.source = %s
+                  AND sd.publication_id IS NOT NULL
+                  AND sa.person_id IS NOT NULL
+                  AND NOT sa.excluded
+                ORDER BY sd.publication_id, sa.person_id, sa.id
+            ) sub
+            WHERE a.publication_id = sub.publication_id
+              AND a.person_id = sub.person_id
+              AND a.{fk_col} IS NULL
+        """, (source_value,))
+        logger.info(f"  {source_name} FK : {cur.rowcount} liens")
 
     # ── Étape 3 : author_position et is_corresponding ──
     logger.info("Étape 3 : author_position et is_corresponding...")
 
     cur.execute("""
         UPDATE authorships a
-        SET author_position = COALESCE(has.author_position, oas.author_position, sas.author_position, was.author_position)
+        SET author_position = COALESCE(sa_hal.author_position, sa_oa.author_position, sa_scanr.author_position, sa_wos.author_position)
         FROM authorships a2
-        LEFT JOIN hal_authorships has ON has.id = a2.hal_authorship_id
-        LEFT JOIN openalex_authorships oas ON oas.id = a2.openalex_authorship_id
-        LEFT JOIN scanr_authorships sas ON sas.id = a2.scanr_authorship_id
-        LEFT JOIN wos_authorships was ON was.id = a2.wos_authorship_id
+        LEFT JOIN source_authorships sa_hal ON sa_hal.id = a2.hal_authorship_id
+        LEFT JOIN source_authorships sa_oa ON sa_oa.id = a2.openalex_authorship_id
+        LEFT JOIN source_authorships sa_scanr ON sa_scanr.id = a2.scanr_authorship_id
+        LEFT JOIN source_authorships sa_wos ON sa_wos.id = a2.wos_authorship_id
         WHERE a.id = a2.id
           AND a.author_position IS NULL
-          AND COALESCE(has.author_position, oas.author_position, sas.author_position, was.author_position) IS NOT NULL
+          AND COALESCE(sa_hal.author_position, sa_oa.author_position, sa_scanr.author_position, sa_wos.author_position) IS NOT NULL
     """)
     pos_count = cur.rowcount
     logger.info(f"  {pos_count} positions mises à jour")
 
     cur.execute("""
         UPDATE authorships a
-        SET is_corresponding = COALESCE(was.is_corresponding, oas.is_corresponding, has.is_corresponding)
+        SET is_corresponding = COALESCE(sa_wos.is_corresponding, sa_oa.is_corresponding, sa_hal.is_corresponding)
         FROM authorships a2
-        LEFT JOIN wos_authorships was ON was.id = a2.wos_authorship_id
-        LEFT JOIN openalex_authorships oas ON oas.id = a2.openalex_authorship_id
-        LEFT JOIN hal_authorships has ON has.id = a2.hal_authorship_id
+        LEFT JOIN source_authorships sa_wos ON sa_wos.id = a2.wos_authorship_id
+        LEFT JOIN source_authorships sa_oa ON sa_oa.id = a2.openalex_authorship_id
+        LEFT JOIN source_authorships sa_hal ON sa_hal.id = a2.hal_authorship_id
         WHERE a.id = a2.id
           AND a.is_corresponding IS NULL
-          AND COALESCE(was.is_corresponding, oas.is_corresponding, has.is_corresponding) IS NOT NULL
+          AND COALESCE(sa_wos.is_corresponding, sa_oa.is_corresponding, sa_hal.is_corresponding) IS NOT NULL
     """)
     corr_count = cur.rowcount
     logger.info(f"  {corr_count} is_corresponding mises à jour")
 
-    # ── Étape 4 : Propagation is_uca et structure_ids ──
-    # Les 3 sources ont déjà is_uca et structure_ids peuplés par
-    # populate_affiliations.py → on fait l'union des 3 sources.
-    logger.info("Étape 4 : propagation is_uca et structure_ids...")
+    # ── Étape 4 : Propagation in_perimeter et structure_ids ──
+    # Les sources ont déjà in_perimeter et structure_ids peuplés par
+    # populate_affiliations.py → on fait l'union des sources.
+    logger.info("Étape 4 : propagation in_perimeter et structure_ids...")
 
     # Reset toutes les authorships
-    cur.execute("UPDATE authorships SET is_uca = FALSE, structure_ids = NULL")
+    cur.execute("UPDATE authorships SET in_perimeter = FALSE, structure_ids = NULL")
     reset_count = cur.rowcount
     logger.info(f"  Reset {reset_count} authorships")
 
-    # Même logique pour les 3 sources : union des structure_ids, OR des is_uca
-    SOURCE_QUERIES = [
-        ("HAL", """
-            SELECT sd.publication_id, has.person_id,
-                   has.structure_ids AS struct_ids, has.is_uca AS src_is_uca
-            FROM hal_authorships has
-            JOIN source_documents sd ON sd.id = has.source_document_id
-            JOIN v_active_publications vap ON vap.id = sd.publication_id
-            WHERE has.structure_ids IS NOT NULL
-              AND has.person_id IS NOT NULL
-              AND NOT has.excluded
-        """),
-        ("OpenAlex", """
-            SELECT sd.publication_id, oas.person_id,
-                   oas.structure_ids AS struct_ids, oas.is_uca AS src_is_uca
-            FROM openalex_authorships oas
-            JOIN source_documents sd ON sd.id = oas.source_document_id
-            JOIN v_active_publications vap ON vap.id = sd.publication_id
-            WHERE oas.structure_ids IS NOT NULL
-              AND oas.person_id IS NOT NULL
-              AND NOT oas.excluded
-        """),
-        ("WoS", """
-            SELECT sd.publication_id, was.person_id,
-                   was.structure_ids AS struct_ids, was.is_uca AS src_is_uca
-            FROM wos_authorships was
-            JOIN source_documents sd ON sd.id = was.source_document_id
-            JOIN v_active_publications vap ON vap.id = sd.publication_id
-            WHERE was.structure_ids IS NOT NULL
-              AND was.person_id IS NOT NULL
-              AND NOT was.excluded
-        """),
-        ("ScanR", """
-            SELECT sd.publication_id, sas.person_id,
-                   sas.structure_ids AS struct_ids, sas.is_uca AS src_is_uca
-            FROM scanr_authorships sas
-            JOIN source_documents sd ON sd.id = sas.source_document_id
-            JOIN v_active_publications vap ON vap.id = sd.publication_id
-            WHERE sas.structure_ids IS NOT NULL
-              AND sas.person_id IS NOT NULL
-              AND NOT sas.excluded
-        """),
-    ]
-
-    for source_name, source_query in SOURCE_QUERIES:
-        cur.execute(f"""
-            WITH src_data AS ({source_query})
+    # Union des structure_ids et OR des in_perimeter par source
+    for source_name, source_value in [("HAL", "hal"), ("OpenAlex", "openalex"),
+                                       ("WoS", "wos"), ("ScanR", "scanr")]:
+        cur.execute("""
+            WITH src_data AS (
+                SELECT sd.publication_id, sa.person_id,
+                       sa.structure_ids AS struct_ids, sa.in_perimeter AS src_in_perimeter
+                FROM source_authorships sa
+                JOIN source_documents sd ON sd.id = sa.source_document_id
+                JOIN v_active_publications vap ON vap.id = sd.publication_id
+                WHERE sa.source = %s
+                  AND sa.structure_ids IS NOT NULL
+                  AND sa.person_id IS NOT NULL
+                  AND NOT sa.excluded
+            )
             UPDATE authorships a
             SET structure_ids = (
                     SELECT array_agg(DISTINCT x)
-                    FROM unnest(COALESCE(a.structure_ids, '{{}}'::int[]) || sd.struct_ids) AS x
+                    FROM unnest(COALESCE(a.structure_ids, '{}'::int[]) || sd.struct_ids) AS x
                 ),
-                is_uca = a.is_uca OR sd.src_is_uca,
+                in_perimeter = a.in_perimeter OR sd.src_in_perimeter,
                 updated_at = now()
             FROM src_data sd
             WHERE a.publication_id = sd.publication_id
               AND a.person_id = sd.person_id
-        """)
+        """, (source_value,))
         logger.info(f"  {source_name} : {cur.rowcount} authorships mises à jour")
 
-    cur.execute("SELECT COUNT(*) FROM authorships WHERE is_uca = TRUE")
+    cur.execute("SELECT COUNT(*) FROM authorships WHERE in_perimeter = TRUE")
     total_uca = cur.fetchone()[0]
-    logger.info(f"  Total authorships is_uca=TRUE : {total_uca}")
+    logger.info(f"  Total authorships in_perimeter=TRUE : {total_uca}")
 
     elapsed = time.perf_counter() - t0
     logger.info(f"\nTerminé en {elapsed:.1f}s")
@@ -293,7 +181,7 @@ def build(cur):
     logger.info(f"  Avec ScanR FK          : {scanr_total}")
     logger.info(f"  Avec WoS FK            : {wos_total}")
     logger.info(f"  HAL + OpenAlex         : {both}")
-    logger.info(f"  dont is_uca            : {total_uca}")
+    logger.info(f"  dont in_perimeter      : {total_uca}")
 
 
 def main():

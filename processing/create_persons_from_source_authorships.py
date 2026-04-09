@@ -59,7 +59,7 @@ def get_all_unlinked_authorships(cur):
     """Récupère toutes les authorships UCA sans person_id, toutes sources."""
     # HAL
     cur.execute("""
-        SELECT has.id AS authorship_id, 'hal' AS source,
+        SELECT sa_auth.id AS authorship_id, 'hal' AS source,
                sa.full_name, sa.last_name, sa.first_name,
                sa.orcid,
                sa.source_ids->>'idhal' AS idhal,
@@ -68,13 +68,14 @@ def get_all_unlinked_authorships(cur):
                ((sa.source_ids->>'hal_person_id') IS NOT NULL) AS has_hal_person_id,
                (sa.source_ids->>'hal_person_id')::int AS hal_person_id,
                sd.publication_id,
-               has.author_position
-        FROM hal_authorships has
-        JOIN source_authors sa ON sa.id = has.source_author_id
-        JOIN source_documents sd ON sd.id = has.source_document_id
+               sa_auth.author_position
+        FROM source_authorships sa_auth
+        JOIN source_authors sa ON sa.id = sa_auth.source_author_id
+        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
-        WHERE has.person_id IS NULL
-          AND has.is_uca = TRUE
+        WHERE sa_auth.source = 'hal'
+          AND sa_auth.person_id IS NULL
+          AND sa_auth.in_perimeter = TRUE
           AND sd.publication_id IS NOT NULL
     """)
     hal_rows = cur.fetchall()
@@ -84,8 +85,8 @@ def get_all_unlinked_authorships(cur):
     # le display_name de l'entité auteur OA (l'algo OA fusionne parfois
     # des personnes différentes, attribuant un ORCID erroné).
     cur.execute("""
-        SELECT oas.id AS authorship_id, 'openalex' AS source,
-               oas.raw_author_name AS full_name,
+        SELECT sa_auth.id AS authorship_id, 'openalex' AS source,
+               sa_auth.source_data->>'raw_author_name' AS full_name,
                NULL::text AS last_name, NULL::text AS first_name,
                sa.orcid AS oa_orcid, sa.full_name AS oa_full_name,
                NULL::text AS idhal,
@@ -93,54 +94,57 @@ def get_all_unlinked_authorships(cur):
                FALSE AS has_hal_person_id,
                NULL::int AS hal_person_id,
                sd.publication_id,
-               oas.author_position
-        FROM openalex_authorships oas
-        JOIN source_authors sa ON sa.id = oas.source_author_id
-        JOIN source_documents sd ON sd.id = oas.source_document_id
+               sa_auth.author_position
+        FROM source_authorships sa_auth
+        JOIN source_authors sa ON sa.id = sa_auth.source_author_id
+        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
-        WHERE oas.person_id IS NULL
-          AND oas.is_uca = TRUE
-          AND oas.raw_author_name IS NOT NULL
+        WHERE sa_auth.source = 'openalex'
+          AND sa_auth.person_id IS NULL
+          AND sa_auth.in_perimeter = TRUE
+          AND sa_auth.source_data->>'raw_author_name' IS NOT NULL
           AND sd.publication_id IS NOT NULL
     """)
     oa_rows = cur.fetchall()
 
     # WoS
     cur.execute("""
-        SELECT was.id AS authorship_id, 'wos' AS source,
+        SELECT sa_auth.id AS authorship_id, 'wos' AS source,
                sa.full_name, sa.last_name, sa.first_name,
                sa.orcid, NULL::text AS idhal,
                NULL::int AS source_author_id,
                FALSE AS has_hal_person_id,
                NULL::int AS hal_person_id,
                sd.publication_id,
-               was.author_position
-        FROM wos_authorships was
-        JOIN source_authors sa ON sa.id = was.source_author_id
-        JOIN source_documents sd ON sd.id = was.source_document_id
+               sa_auth.author_position
+        FROM source_authorships sa_auth
+        JOIN source_authors sa ON sa.id = sa_auth.source_author_id
+        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
-        WHERE was.person_id IS NULL
-          AND was.is_uca = TRUE
+        WHERE sa_auth.source = 'wos'
+          AND sa_auth.person_id IS NULL
+          AND sa_auth.in_perimeter = TRUE
           AND sd.publication_id IS NOT NULL
     """)
     wos_rows = cur.fetchall()
 
     # ScanR
     cur.execute("""
-        SELECT sas.id AS authorship_id, 'scanr' AS source,
+        SELECT sa_auth.id AS authorship_id, 'scanr' AS source,
                sa.full_name, sa.last_name, sa.first_name,
                sa.orcid, NULL::text AS idhal, sa.idref,
                NULL::int AS source_author_id,
                FALSE AS has_hal_person_id,
                NULL::int AS hal_person_id,
                sd.publication_id,
-               sas.author_position
-        FROM scanr_authorships sas
-        JOIN source_authors sa ON sa.id = sas.source_author_id
-        JOIN source_documents sd ON sd.id = sas.source_document_id
+               sa_auth.author_position
+        FROM source_authorships sa_auth
+        JOIN source_authors sa ON sa.id = sa_auth.source_author_id
+        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
-        WHERE sas.person_id IS NULL
-          AND sas.is_uca = TRUE
+        WHERE sa_auth.source = 'scanr'
+          AND sa_auth.person_id IS NULL
+          AND sa_auth.in_perimeter = TRUE
           AND sd.publication_id IS NOT NULL
     """)
     scanr_rows = cur.fetchall()
@@ -179,15 +183,17 @@ def load_linked_authorships_by_pub(cur):
     """
     index = defaultdict(list)
 
+    # HAL, WoS, ScanR : noms depuis source_authors
     cur.execute("""
-        SELECT has.person_id, has.author_position,
+        SELECT sa_auth.person_id, sa_auth.author_position,
                sd.publication_id,
                sa.last_name, sa.first_name, sa.full_name,
-               'hal' AS source
-        FROM hal_authorships has
-        JOIN source_authors sa ON sa.id = has.source_author_id
-        JOIN source_documents sd ON sd.id = has.source_document_id
-        WHERE has.person_id IS NOT NULL
+               sa_auth.source
+        FROM source_authorships sa_auth
+        JOIN source_authors sa ON sa.id = sa_auth.source_author_id
+        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
+        WHERE sa_auth.source IN ('hal', 'wos', 'scanr')
+          AND sa_auth.person_id IS NOT NULL
           AND sd.publication_id IS NOT NULL
     """)
     for r in cur.fetchall():
@@ -199,56 +205,21 @@ def load_linked_authorships_by_pub(cur):
         index[(r["publication_id"], r["author_position"])].append(
             (r["person_id"], ln, fn, r["source"]))
 
+    # OpenAlex : nom depuis raw_author_name
     cur.execute("""
-        SELECT oas.person_id, oas.author_position,
+        SELECT sa_auth.person_id, sa_auth.author_position,
                sd.publication_id,
-               oas.raw_author_name AS full_name,
+               sa_auth.source_data->>'raw_author_name' AS full_name,
                'openalex' AS source
-        FROM openalex_authorships oas
-        JOIN source_documents sd ON sd.id = oas.source_document_id
-        WHERE oas.person_id IS NOT NULL
+        FROM source_authorships sa_auth
+        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
+        WHERE sa_auth.source = 'openalex'
+          AND sa_auth.person_id IS NOT NULL
           AND sd.publication_id IS NOT NULL
     """)
     for r in cur.fetchall():
         last, first = parse_raw_author_name(r["full_name"])
         ln, fn = normalize_name(last), normalize_name(first)
-        index[(r["publication_id"], r["author_position"])].append(
-            (r["person_id"], ln, fn, r["source"]))
-
-    cur.execute("""
-        SELECT was.person_id, was.author_position,
-               sd.publication_id,
-               sa.last_name, sa.first_name,
-               'wos' AS source
-        FROM wos_authorships was
-        JOIN source_authors sa ON sa.id = was.source_author_id
-        JOIN source_documents sd ON sd.id = was.source_document_id
-        WHERE was.person_id IS NOT NULL
-          AND sd.publication_id IS NOT NULL
-    """)
-    for r in cur.fetchall():
-        ln = normalize_name(r["last_name"] or "")
-        fn = normalize_name(r["first_name"] or "")
-        index[(r["publication_id"], r["author_position"])].append(
-            (r["person_id"], ln, fn, r["source"]))
-
-    cur.execute("""
-        SELECT sas.person_id, sas.author_position,
-               sd.publication_id,
-               sa.last_name, sa.first_name, sa.full_name,
-               'scanr' AS source
-        FROM scanr_authorships sas
-        JOIN source_authors sa ON sa.id = sas.source_author_id
-        JOIN source_documents sd ON sd.id = sas.source_document_id
-        WHERE sas.person_id IS NOT NULL
-          AND sd.publication_id IS NOT NULL
-    """)
-    for r in cur.fetchall():
-        ln = normalize_name(r["last_name"] or "")
-        fn = normalize_name(r["first_name"] or "")
-        if not ln and r["full_name"]:
-            last, first = parse_raw_author_name(r["full_name"])
-            ln, fn = normalize_name(last), normalize_name(first)
         index[(r["publication_id"], r["author_position"])].append(
             (r["person_id"], ln, fn, r["source"]))
 
@@ -577,7 +548,7 @@ def run(dry_run=False):
     else:
         conn.commit()
         logger.info("\n  ✓ Appliqué.")
-        logger.info("  → Lancer build_authorships.py pour propager is_uca/structure_ids")
+        logger.info("  → Lancer build_authorships.py pour propager in_perimeter/structure_ids")
 
     cur.close()
     conn.close()

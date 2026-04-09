@@ -11,9 +11,9 @@ Mode incrémental :
 
 Sources :
 1. persons.last_name + persons.first_name (source: 'persons')
-2. source_authors.full_name via hal_authorships.source_author_id (source: 'hal')
-3. source_authors.full_name via wos_authorships.source_author_id (source: 'wos')
-4. openalex_authorships.raw_author_name via person_id (source: 'openalex')
+2. source_authors.full_name via source_authorships (source: 'hal')
+3. source_authors.full_name via source_authorships (source: 'wos')
+4. source_authorships.source_data->>'raw_author_name' (source: 'openalex')
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -50,37 +50,41 @@ def populate(conn):
         for form in compute_person_name_forms(ln, fn):
             triples.append((form, r["id"], "persons"))
 
-    # 2. source_authors.full_name via hal_authorships.person_id
+    # 2. source_authors.full_name via source_authorships (HAL)
     log.info("Source 2 : source_authors (HAL) full_name")
     cur.execute("""
-        SELECT DISTINCT sa.full_name, has.person_id
-        FROM hal_authorships has
-        JOIN source_authors sa ON sa.id = has.source_author_id
-        WHERE has.person_id IS NOT NULL AND NOT has.excluded
+        SELECT DISTINCT sa.full_name, sa_auth.person_id
+        FROM source_authorships sa_auth
+        JOIN source_authors sa ON sa.id = sa_auth.source_author_id
+        WHERE sa_auth.source = 'hal'
+          AND sa_auth.person_id IS NOT NULL AND NOT sa_auth.excluded
           AND sa.full_name IS NOT NULL AND sa.full_name != ''
     """)
     for r in cur.fetchall():
         triples.append((r["full_name"], r["person_id"], "hal"))
 
-    # 3. source_authors.full_name via wos_authorships
+    # 3. source_authors.full_name via source_authorships (WoS)
     log.info("Source 3 : source_authors (WoS) full_name")
     cur.execute("""
-        SELECT DISTINCT sa.full_name, was.person_id
+        SELECT DISTINCT sa.full_name, sa_auth.person_id
         FROM source_authors sa
-        JOIN wos_authorships was ON was.source_author_id = sa.id
-        WHERE was.person_id IS NOT NULL AND NOT was.excluded
+        JOIN source_authorships sa_auth ON sa_auth.source_author_id = sa.id
+        WHERE sa_auth.source = 'wos'
+          AND sa_auth.person_id IS NOT NULL AND NOT sa_auth.excluded
           AND sa.full_name IS NOT NULL AND sa.full_name != ''
     """)
     for r in cur.fetchall():
         triples.append((r["full_name"], r["person_id"], "wos"))
 
-    # 4. openalex_authorships.raw_author_name
-    log.info("Source 4 : openalex_authorships.raw_author_name")
+    # 4. source_authorships.source_data->>'raw_author_name' (OpenAlex)
+    log.info("Source 4 : source_authorships source_data raw_author_name (OpenAlex)")
     cur.execute("""
-        SELECT DISTINCT oas.raw_author_name, oas.person_id
-        FROM openalex_authorships oas
-        WHERE oas.person_id IS NOT NULL AND NOT oas.excluded
-          AND oas.raw_author_name IS NOT NULL AND oas.raw_author_name != ''
+        SELECT DISTINCT sa.source_data->>'raw_author_name' AS raw_author_name, sa.person_id
+        FROM source_authorships sa
+        WHERE sa.source = 'openalex'
+          AND sa.person_id IS NOT NULL AND NOT sa.excluded
+          AND sa.source_data->>'raw_author_name' IS NOT NULL
+          AND sa.source_data->>'raw_author_name' != ''
     """)
     for r in cur.fetchall():
         triples.append((r["raw_author_name"], r["person_id"], "openalex"))

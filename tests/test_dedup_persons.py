@@ -52,13 +52,13 @@ def _insert_hal_document(db, halid, publication_id):
 
 
 def _insert_hal_authorship(db, source_document_id, source_author_id, position=0,
-                           is_uca=True, person_id=None):
-    """Crée une hal_authorship."""
+                           in_perimeter=True, person_id=None):
+    """Crée une source_authorship HAL."""
     db.execute("""
-        INSERT INTO hal_authorships
-            (source_document_id, source_author_id, author_position, is_uca, person_id)
-        VALUES (%s, %s, %s, %s, %s) RETURNING id
-    """, (source_document_id, source_author_id, position, is_uca, person_id))
+        INSERT INTO source_authorships
+            (source, source_document_id, source_author_id, author_position, in_perimeter, person_id)
+        VALUES ('hal', %s, %s, %s, %s, %s) RETURNING id
+    """, (source_document_id, source_author_id, position, in_perimeter, person_id))
     return db.fetchone()["id"]
 
 
@@ -84,26 +84,28 @@ def _insert_oa_document(db, openalex_id, publication_id):
 
 
 def _insert_oa_authorship(db, oa_document_id, oa_author_id, position=0,
-                          is_uca=True, person_id=None, raw_author_name=None):
-    """Crée une openalex_authorship."""
+                          in_perimeter=True, person_id=None, raw_author_name=None):
+    """Crée une source_authorship OpenAlex."""
+    import json
+    source_data = json.dumps({"raw_author_name": raw_author_name}) if raw_author_name else None
     db.execute("""
-        INSERT INTO openalex_authorships
-            (source_document_id, source_author_id, author_position,
-             is_uca, person_id, raw_author_name)
-        VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
-    """, (oa_document_id, oa_author_id, position, is_uca, person_id,
-          raw_author_name))
+        INSERT INTO source_authorships
+            (source, source_document_id, source_author_id, author_position,
+             in_perimeter, person_id, source_data)
+        VALUES ('openalex', %s, %s, %s, %s, %s, %s) RETURNING id
+    """, (oa_document_id, oa_author_id, position, in_perimeter, person_id,
+          source_data))
     return db.fetchone()["id"]
 
 
 def _get_person_id_of_hal_authorship(db, authorship_id):
-    db.execute("SELECT person_id FROM hal_authorships WHERE id = %s", (authorship_id,))
+    db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (authorship_id,))
     row = db.fetchone()
     return row["person_id"] if row else None
 
 
 def _get_person_id_of_oa_authorship(db, authorship_id):
-    db.execute("SELECT person_id FROM openalex_authorships WHERE id = %s", (authorship_id,))
+    db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (authorship_id,))
     row = db.fetchone()
     return row["person_id"] if row else None
 

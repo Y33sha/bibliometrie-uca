@@ -376,19 +376,13 @@ async def stats_labs(
 
         where = " AND ".join(conditions)
 
-        # CTE: union des structure_ids UCA depuis HAL et OpenAlex
+        # CTE: union des structure_ids UCA depuis les authorships sources
         structs_cte = """
             pub_structs AS (
-                SELECT sd.publication_id, has.structure_ids AS struct_ids
-                FROM hal_authorships has
-                JOIN source_documents sd ON sd.id = has.source_document_id
-                WHERE has.is_uca = TRUE AND has.structure_ids IS NOT NULL
-                  AND sd.publication_id IS NOT NULL
-                UNION ALL
-                SELECT sd.publication_id, oas.structure_ids AS struct_ids
-                FROM openalex_authorships oas
-                JOIN source_documents sd ON sd.id = oas.source_document_id
-                WHERE oas.is_uca = TRUE AND oas.structure_ids IS NOT NULL
+                SELECT sd.publication_id, sa.structure_ids AS struct_ids
+                FROM source_authorships sa
+                JOIN source_documents sd ON sd.id = sa.source_document_id
+                WHERE sa.in_perimeter = TRUE AND sa.structure_ids IS NOT NULL
                   AND sd.publication_id IS NOT NULL
             )
         """

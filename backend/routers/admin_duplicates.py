@@ -69,21 +69,21 @@ async def next_duplicate_candidate(
                 sources.append({"source": r["source"], "source_id": r["source_id"]})
 
             cur.execute("""
-                SELECT a.author_position, a.is_uca, a.person_id,
+                SELECT a.author_position, a.in_perimeter, a.person_id,
                        COALESCE(p2.last_name,
                                 ha.last_name, oa.last_name, wa.last_name) AS last_name,
                        COALESCE(p2.first_name,
                                 ha.first_name, oa.first_name, wa.first_name) AS first_name,
                        COALESCE(p2.last_name || ' ' || p2.first_name,
-                                ha.full_name, oas.raw_author_name, oa.full_name, wa.full_name) AS full_name
+                                ha.full_name, sa_oa.source_data->>'raw_author_name', oa.full_name, wa.full_name) AS full_name
                 FROM authorships a
                 LEFT JOIN persons p2 ON p2.id = a.person_id
-                LEFT JOIN hal_authorships has2 ON has2.id = a.hal_authorship_id
-                LEFT JOIN source_authors ha ON ha.id = has2.source_author_id
-                LEFT JOIN openalex_authorships oas ON oas.id = a.openalex_authorship_id
-                LEFT JOIN source_authors oa ON oa.id = oas.source_author_id
-                LEFT JOIN wos_authorships was2 ON was2.id = a.wos_authorship_id
-                LEFT JOIN source_authors wa ON wa.id = was2.source_author_id
+                LEFT JOIN source_authorships sa_hal ON sa_hal.id = a.hal_authorship_id
+                LEFT JOIN source_authors ha ON ha.id = sa_hal.source_author_id
+                LEFT JOIN source_authorships sa_oa ON sa_oa.id = a.openalex_authorship_id
+                LEFT JOIN source_authors oa ON oa.id = sa_oa.source_author_id
+                LEFT JOIN source_authorships sa_wos ON sa_wos.id = a.wos_authorship_id
+                LEFT JOIN source_authors wa ON wa.id = sa_wos.source_author_id
                 WHERE a.publication_id = %s AND NOT a.excluded
                 ORDER BY a.author_position NULLS LAST
             """, (pub_id,))

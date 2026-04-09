@@ -10,9 +10,9 @@ Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_documents                        (lien staging ↔ publication, source='scanr')
     source_authors                          (auteurs unifiés, source='scanr')
-    scanr_authorships                       (lien document × auteur, avec affiliations)
+    source_authorships                      (lien document × auteur, source='scanr', avec affiliations)
 
-La résolution UCA (scanr_authorships.structure_ids, is_uca) se fait en post-traitement
+La résolution UCA (source_authorships.structure_ids, in_perimeter) se fait en post-traitement
 via populate_affiliations.py, pas ici.
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
@@ -279,25 +279,30 @@ def process_authors(cur, doc: dict, source_document_id: int):
                 if c not in detected_countries:
                     detected_countries.append(c)
 
+        # source_data : affiliation_ids et detected_countries en JSONB
+        source_data = {}
+        if affiliation_ids:
+            source_data["affiliation_ids"] = affiliation_ids
+        if detected_countries:
+            source_data["detected_countries"] = detected_countries
+        source_data_json = Json(source_data) if source_data else None
+
         cur.execute("""
-            INSERT INTO scanr_authorships
-                (source_document_id, source_author_id, author_position, roles,
-                 raw_affiliations, affiliation_ids, detected_countries,
+            INSERT INTO source_authorships
+                (source, source_document_id, source_author_id, author_position, roles,
+                 raw_affiliations, source_data,
                  author_name_normalized)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, normalize_name_form(%s))
+            VALUES ('scanr', %s, %s, %s, %s, %s, %s, normalize_name_form(%s))
             ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
                 raw_affiliations = COALESCE(EXCLUDED.raw_affiliations,
-                    scanr_authorships.raw_affiliations),
-                affiliation_ids = COALESCE(EXCLUDED.affiliation_ids,
-                    scanr_authorships.affiliation_ids),
-                detected_countries = COALESCE(EXCLUDED.detected_countries,
-                    scanr_authorships.detected_countries),
+                    source_authorships.raw_affiliations),
+                source_data = COALESCE(source_authorships.source_data, '{}') ||
+                              COALESCE(EXCLUDED.source_data, '{}'),
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 roles = EXCLUDED.roles
         """, (source_document_id, source_author_id, position, roles or None,
               Json(raw_affiliations) if raw_affiliations else None,
-              affiliation_ids or None,
-              detected_countries or None,
+              source_data_json,
               author_data.get("fullName")))
 
 
@@ -446,11 +451,13 @@ def main():
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Erreurs : {errors}")
 
-        for table in ["publications", "journals", "publishers",
-                       "scanr_authorships"]:
+        for table in ["publications", "journals", "publishers"]:
             cur.execute(f"SELECT COUNT(*) AS cnt FROM {table}")
             count = cur.fetchone()["cnt"]
             logger.info(f"  {table} : {count} enregistrements")
+        cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'scanr'")
+        count = cur.fetchone()["cnt"]
+        logger.info(f"  source_authorships (scanr) : {count} enregistrements")
         cur.execute("SELECT COUNT(*) AS cnt FROM source_authors WHERE source = 'scanr'")
         count = cur.fetchone()["cnt"]
         logger.info(f"  source_authors (scanr) : {count} enregistrements")

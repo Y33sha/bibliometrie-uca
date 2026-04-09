@@ -1,5 +1,5 @@
 """
-Peuple source_structures (source='wos') et wos_authorships.source_struct_ids.
+Peuple source_structures (source='wos') et source_authorships.source_struct_ids.
 
 Passe 1 : insère toutes les organizations manquantes dans source_structures
 Passe 2 : met à jour les authorships par batch SQL
@@ -23,7 +23,7 @@ def main():
     conn.autocommit = False
     cur = conn.cursor()
 
-    cur.execute("SELECT COUNT(*) FROM wos_authorships WHERE source_struct_ids IS NULL")
+    cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = 'wos' AND source_struct_ids IS NULL")
     total = cur.fetchone()[0]
     print(f"{total} authorships WoS à traiter")
 
@@ -73,10 +73,10 @@ def main():
             WITH batch AS (
                 SELECT was.id AS was_id, was.author_position,
                        sw.raw_data->'static_data' AS static
-                FROM wos_authorships was
+                FROM source_authorships was
                 JOIN source_documents wd ON wd.id = was.source_document_id AND wd.source = 'wos'
                 JOIN staging sw ON sw.id = wd.staging_id
-                WHERE was.source_struct_ids IS NULL
+                WHERE was.source = 'wos' AND was.source_struct_ids IS NULL
                 ORDER BY was.id
                 LIMIT %s
             ),
@@ -110,7 +110,7 @@ def main():
                   AND (addr->'address_spec'->>'addr_no') = addr_no_str
                 GROUP BY b.was_id
             )
-            UPDATE wos_authorships was
+            UPDATE source_authorships was
             SET source_struct_ids = COALESCE(r.org_ids, '{}')
             FROM (
                 SELECT b2.was_id, r2.org_ids
@@ -132,7 +132,7 @@ def main():
         print(f"  {processed}/{total} ({rate:.0f}/s, ~{remaining/60:.0f}min)")
 
     elapsed = time.time() - t0
-    cur.execute("SELECT COUNT(*) FROM wos_authorships WHERE source_struct_ids != '{}'")
+    cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = 'wos' AND source_struct_ids != '{}'")
     total_with = cur.fetchone()[0]
 
     print(f"\nTerminé en {elapsed/60:.0f}min :")
