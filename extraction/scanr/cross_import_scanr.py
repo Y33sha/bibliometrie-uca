@@ -10,7 +10,7 @@ Usage:
 Étapes :
   1. Identifie les DOI HAL/OA/WoS absents du staging ScanR
   2. Interroge l'API ScanR par batch de DOI
-  3. Insère les publications trouvées dans staging_scanr (processed=FALSE)
+  3. Insère les publications trouvées dans staging (processed=FALSE)
 """
 
 import argparse
@@ -99,9 +99,9 @@ def main():
             raw_hash = compute_hash(doc)
 
             cur.execute("""
-                INSERT INTO staging_scanr (scanr_id, doi, raw_data, raw_hash)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (scanr_id) DO NOTHING
+                INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
+                VALUES ('scanr', %s, %s, %s, %s)
+                ON CONFLICT (source, source_id) DO NOTHING
             """, (scanr_id, doi, Json(doc), raw_hash))
             if cur.rowcount:
                 inserted += 1

@@ -11,7 +11,7 @@ Stratégie en deux passes :
 1. Par collection labo → chaque work est tagué avec sa/ses collection(s)
 2. Via le portail global clermont-univ → attrape ce qui n'est dans aucune collection
 
-Les résultats bruts sont stockés dans staging_hal (JSONB).
+Les résultats bruts sont stockés dans staging (JSONB).
 Un même halId peut apparaître dans plusieurs collections ; le champ `collection`
 stocke la liste séparée par des virgules.
 """
@@ -90,32 +90,32 @@ def extract_doi(doc: dict) -> str | None:
 
 def upsert_work(conn, hal_id: str, doi: str | None, raw_data: dict, collection: str):
     """
-    Insère ou met à jour un work dans staging_hal.
+    Insère ou met à jour un work dans staging.
     Si le halId existe déjà : ajoute la collection, et si le contenu a changé
     (hash différent), met à jour raw_data et remet processed = FALSE.
     """
     raw_hash = compute_hash(raw_data)
     with conn.cursor() as cur:
         cur.execute("""
-            INSERT INTO staging_hal (halid, doi, raw_data, collection, raw_hash)
-            VALUES (%s, %s, %s::jsonb, %s, %s)
-            ON CONFLICT (halid) DO UPDATE SET
+            INSERT INTO staging (source, source_id, doi, raw_data, collection, raw_hash)
+            VALUES ('hal', %s, %s, %s::jsonb, %s, %s)
+            ON CONFLICT (source, source_id) DO UPDATE SET
                 collection = CASE
-                    WHEN staging_hal.collection IS NULL THEN EXCLUDED.collection
-                    WHEN EXCLUDED.collection = ANY(string_to_array(staging_hal.collection, ','))
-                        THEN staging_hal.collection
-                    ELSE staging_hal.collection || ',' || EXCLUDED.collection
+                    WHEN staging.collection IS NULL THEN EXCLUDED.collection
+                    WHEN EXCLUDED.collection = ANY(string_to_array(staging.collection, ','))
+                        THEN staging.collection
+                    ELSE staging.collection || ',' || EXCLUDED.collection
                 END,
                 raw_data = CASE
-                    WHEN staging_hal.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                    WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                         THEN EXCLUDED.raw_data
-                    ELSE staging_hal.raw_data
+                    ELSE staging.raw_data
                 END,
-                raw_hash = COALESCE(EXCLUDED.raw_hash, staging_hal.raw_hash),
+                raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
                 processed = CASE
-                    WHEN staging_hal.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                    WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                         THEN FALSE
-                    ELSE staging_hal.processed
+                    ELSE staging.processed
                 END,
                 last_seen_at = now()
         """, (hal_id, doi, Json(raw_data), collection, raw_hash))
@@ -250,7 +250,7 @@ def extract_portal(
 
 def get_existing_hal_ids(conn) -> set:
     """Récupère les halId déjà en base."""
-    return get_existing_ids(conn, "staging_hal", "halid")
+    return get_existing_ids(conn, "hal")
 
 
 def main():

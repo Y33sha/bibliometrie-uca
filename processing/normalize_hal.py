@@ -1,5 +1,5 @@
 """
-Normalisation des données HAL : staging_hal → tables structurées.
+Normalisation des données HAL : staging → tables structurées.
 
 Usage:
     python normalize_hal.py              # traiter tous les works non traités
@@ -489,13 +489,13 @@ def process_work(cur, staging_row: tuple) -> bool:
             version_doi = resolve_zenodo_doi(raw_doi)
             if version_doi:
                 cur.execute(
-                    "SELECT id FROM staging_hal WHERE lower(doi) = lower(%s)",
+                    "SELECT id FROM staging WHERE source = 'hal' AND lower(doi) = lower(%s)",
                     (version_doi,))
                 if cur.fetchone():
                     logger.info(f"  {hal_id} concept DOI Zenodo {raw_doi} → "
                                 f"version {version_doi} déjà en staging, skip")
                     cur.execute(
-                        "UPDATE staging_hal SET processed = TRUE WHERE id = %s",
+                        "UPDATE staging SET processed = TRUE WHERE id = %s",
                         (staging_id,))
                     return False
 
@@ -530,7 +530,7 @@ def process_work(cur, staging_row: tuple) -> bool:
             if not collection:
                 logger.debug(f"  {hal_id} hors périmètre, pas de publication existante → skip")
                 cur.execute(
-                    "UPDATE staging_hal SET processed = TRUE WHERE id = %s",
+                    "UPDATE staging SET processed = TRUE WHERE id = %s",
                     (staging_id,)
                 )
             else:
@@ -551,7 +551,7 @@ def process_work(cur, staging_row: tuple) -> bool:
         timings["authors"] = time.perf_counter() - t0
 
         cur.execute(
-            "UPDATE staging_hal SET processed = TRUE WHERE id = %s",
+            "UPDATE staging SET processed = TRUE WHERE id = %s",
             (staging_id,)
         )
 
@@ -583,13 +583,13 @@ def main():
         cur = conn.cursor()
 
         if args.reset:
-            cur.execute("UPDATE staging_hal SET processed = FALSE")
+            cur.execute("UPDATE staging SET processed = FALSE WHERE source = 'hal'")
             count = cur.rowcount
             conn.commit()
             logger.info(f"Reset : {count} works remis à processed=FALSE")
             return
 
-        cur.execute("SELECT COUNT(*) FROM staging_hal WHERE processed = FALSE")
+        cur.execute("SELECT COUNT(*) FROM staging WHERE source = 'hal' AND processed = FALSE")
         total = cur.fetchone()[0]
         logger.info(f"=== Normalisation HAL : {total} works à traiter ===")
 
@@ -602,9 +602,9 @@ def main():
         logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
 
         cur.execute("""
-            SELECT id, halid, doi, raw_data, collection
-            FROM staging_hal
-            WHERE processed = FALSE
+            SELECT id, source_id, doi, raw_data, collection
+            FROM staging
+            WHERE source = 'hal' AND processed = FALSE
             ORDER BY id
             LIMIT %s
         """, (limit,))

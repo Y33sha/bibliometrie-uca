@@ -61,21 +61,21 @@ def _make_work(openalex_id, n_authors, title="Test Publication",
 
 
 def _insert_staging(db, work):
-    """Insère un work dans staging_openalex."""
+    """Insère un work dans staging."""
     raw_hash = compute_hash(work)
     meta_hash = compute_meta_hash(work)
     doi = work.get("doi", "").replace("https://doi.org/", "")
     openalex_id = work["id"].replace("https://openalex.org/", "")
     db.execute("""
-        INSERT INTO staging_openalex (openalex_id, doi, raw_data, raw_hash, meta_hash)
-        VALUES (%s, %s, %s::jsonb, %s, %s)
-        ON CONFLICT (openalex_id) DO UPDATE SET
+        INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, meta_hash)
+        VALUES ('openalex', %s, %s, %s::jsonb, %s, %s)
+        ON CONFLICT (source, source_id) DO UPDATE SET
             raw_data = CASE
-                WHEN staging_openalex.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
-                    THEN staging_openalex.raw_data
-                WHEN jsonb_array_length(staging_openalex.raw_data->'authorships')
+                WHEN staging.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
+                    THEN staging.raw_data
+                WHEN jsonb_array_length(staging.raw_data->'authorships')
                      > jsonb_array_length(EXCLUDED.raw_data->'authorships')
-                    THEN jsonb_set(staging_openalex.raw_data,
+                    THEN jsonb_set(staging.raw_data,
                          '{title}', EXCLUDED.raw_data->'title')
                       || jsonb_build_object(
                          'open_access', EXCLUDED.raw_data->'open_access',
@@ -89,14 +89,14 @@ def _insert_staging(db, work):
                 ELSE EXCLUDED.raw_data
             END,
             raw_hash = CASE
-                WHEN staging_openalex.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
-                    THEN staging_openalex.raw_hash
+                WHEN staging.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
+                    THEN staging.raw_hash
                 ELSE EXCLUDED.raw_hash
             END,
-            meta_hash = COALESCE(EXCLUDED.meta_hash, staging_openalex.meta_hash),
+            meta_hash = COALESCE(EXCLUDED.meta_hash, staging.meta_hash),
             processed = CASE
-                WHEN staging_openalex.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
-                    THEN staging_openalex.processed
+                WHEN staging.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
+                    THEN staging.processed
                 ELSE FALSE
             END,
             last_seen_at = now()
@@ -105,7 +105,7 @@ def _insert_staging(db, work):
 
 def _get_staging(db, openalex_id):
     db.execute(
-        "SELECT raw_data, raw_hash, meta_hash, processed FROM staging_openalex WHERE openalex_id = %s",
+        "SELECT raw_data, raw_hash, meta_hash, processed FROM staging WHERE source = 'openalex' AND source_id = %s",
         (openalex_id,))
     return db.fetchone()
 
@@ -122,7 +122,7 @@ class TestMetaHashProtection:
         assert len(row["raw_data"]["authorships"]) == 150
 
         # Marquer comme processed (simule normalisation)
-        db.execute("UPDATE staging_openalex SET processed = TRUE WHERE openalex_id = 'W100'")
+        db.execute("UPDATE staging SET processed = TRUE WHERE source = 'openalex' AND source_id = 'W100'")
 
         # 2. Import bulk : même work, mais tronqué à 100 auteurs
         truncated_work = _make_work("W100", 100)  # même metadata
@@ -179,16 +179,16 @@ class TestMetaHashProtection:
         # 2. Refetch individuel : 200 auteurs (complet)
         full = _make_work("W400", 200)
         db.execute("""
-            UPDATE staging_openalex
+            UPDATE staging
             SET raw_data = %s::jsonb, raw_hash = %s, meta_hash = %s,
                 processed = FALSE
-            WHERE openalex_id = 'W400'
+            WHERE source = 'openalex' AND source_id = 'W400'
         """, (Json(full), compute_hash(full), compute_meta_hash(full)))
 
         row = _get_staging(db, "W400")
         assert len(row["raw_data"]["authorships"]) == 200
 
-        db.execute("UPDATE staging_openalex SET processed = TRUE WHERE openalex_id = 'W400'")
+        db.execute("UPDATE staging SET processed = TRUE WHERE source = 'openalex' AND source_id = 'W400'")
 
         # 3. Reimport bulk : 100 auteurs, mêmes métadonnées
         reimport = _make_work("W400", 100)

@@ -2,7 +2,7 @@
 Peuple la table hal_structures depuis les données de staging HAL,
 puis propose des correspondances avec la table structures locale.
 
-Étape 1 : extract  — extrait les structures HAL depuis staging_hal.raw_data
+Étape 1 : extract  — extrait les structures HAL depuis staging.raw_data
 Étape 2 : match    — propose des correspondances hal_structures → structures
 Étape 3 : apply    — applique les correspondances validées
 
@@ -28,11 +28,11 @@ logger = logging.getLogger(__name__)
 
 
 # =================================================================
-# EXTRACT : staging_hal → hal_structures
+# EXTRACT : staging → hal_structures
 # =================================================================
 
 def do_extract(conn):
-    """Extrait les structures HAL depuis staging_hal vers hal_structures.
+    """Extrait les structures HAL depuis staging vers hal_structures.
 
     Utilise structIdName_fs (champ composé "id_FacetSep_nom") qui est
     auto-documenté et fiable. Les champs parallèles (structId_i, structName_s,
@@ -43,8 +43,8 @@ def do_extract(conn):
 
     cur.execute("""
         SELECT raw_data->'structIdName_fs' AS entries
-        FROM staging_hal
-        WHERE raw_data ? 'structIdName_fs'
+        FROM staging
+        WHERE source = 'hal' AND raw_data ? 'structIdName_fs'
     """)
 
     structs = {}  # hal_struct_id → {name, count}

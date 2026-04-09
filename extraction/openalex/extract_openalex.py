@@ -7,7 +7,7 @@ Usage:
     python extract_openalex.py --dry-run    # compte les résultats sans insérer
 
 L'API OpenAlex est interrogée via le filtre institution (ROR) + année.
-Les résultats bruts sont stockés dans staging_openalex (JSONB).
+Les résultats bruts sont stockés dans staging (JSONB).
 Les works déjà présents (même openalex_id) sont ignorés.
 """
 
@@ -96,7 +96,7 @@ def compute_meta_hash(raw_data: dict) -> str:
 
 
 def insert_batch(conn, batch: list[tuple]):
-    """Insère un batch de works dans staging_openalex.
+    """Insère un batch de works dans staging.
 
     Logique de mise à jour :
     - Compare meta_hash (métadonnées hors authorships) pour détecter les vrais changements
@@ -105,15 +105,15 @@ def insert_batch(conn, batch: list[tuple]):
       version en base si elle en a plus (cas des works >100 auteurs déjà re-fetchés)
     """
     query = """
-        INSERT INTO staging_openalex (openalex_id, doi, raw_data, raw_hash, meta_hash)
+        INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, meta_hash)
         VALUES %s
-        ON CONFLICT (openalex_id) DO UPDATE SET
+        ON CONFLICT (source, source_id) DO UPDATE SET
             raw_data = CASE
-                WHEN staging_openalex.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
-                    THEN staging_openalex.raw_data
-                WHEN jsonb_array_length(staging_openalex.raw_data->'authorships')
+                WHEN staging.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
+                    THEN staging.raw_data
+                WHEN jsonb_array_length(staging.raw_data->'authorships')
                      > jsonb_array_length(EXCLUDED.raw_data->'authorships')
-                    THEN jsonb_set(staging_openalex.raw_data,
+                    THEN jsonb_set(staging.raw_data,
                          '{title}', EXCLUDED.raw_data->'title')
                       || jsonb_build_object(
                          'open_access', EXCLUDED.raw_data->'open_access',
@@ -127,14 +127,14 @@ def insert_batch(conn, batch: list[tuple]):
                 ELSE EXCLUDED.raw_data
             END,
             raw_hash = CASE
-                WHEN staging_openalex.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
-                    THEN staging_openalex.raw_hash
+                WHEN staging.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
+                    THEN staging.raw_hash
                 ELSE EXCLUDED.raw_hash
             END,
-            meta_hash = COALESCE(EXCLUDED.meta_hash, staging_openalex.meta_hash),
+            meta_hash = COALESCE(EXCLUDED.meta_hash, staging.meta_hash),
             processed = CASE
-                WHEN staging_openalex.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
-                    THEN staging_openalex.processed
+                WHEN staging.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
+                    THEN staging.processed
                 ELSE FALSE
             END,
             last_seen_at = now()
@@ -142,7 +142,7 @@ def insert_batch(conn, batch: list[tuple]):
     with conn.cursor() as cur:
         execute_values(
             cur, query, batch,
-            template="(%s, %s, %s::jsonb, %s, %s)"
+            template="(%s, %s, %s, %s::jsonb, %s, %s)"
         )
     conn.commit()
 
@@ -185,7 +185,7 @@ def extract_year(year: int, conn, existing_ids: set, dry_run: bool = False) -> i
             doi = extract_doi(work)
             raw_hash = compute_hash(work)
             meta_hash = compute_meta_hash(work)
-            batch.append((oa_id, doi, Json(work), raw_hash, meta_hash))
+            batch.append(("openalex", oa_id, doi, Json(work), raw_hash, meta_hash))
             if oa_id not in existing_ids:
                 existing_ids.add(oa_id)
                 new_count += 1
@@ -236,7 +236,7 @@ def main():
     logger.info(f"Institutions OpenAlex : {', '.join(institution_ids)} (lineage OR)")
     logger.info(f"Années : {years}")
     try:
-        existing_ids = get_existing_ids(conn, "staging_openalex", "openalex_id")
+        existing_ids = get_existing_ids(conn, "openalex")
         logger.info(f"{len(existing_ids)} works déjà en staging")
 
         grand_total = 0

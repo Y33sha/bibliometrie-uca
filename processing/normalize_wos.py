@@ -1,5 +1,5 @@
 """
-Normalisation des données WoS : staging_wos → tables normalisées.
+Normalisation des données WoS : staging → tables normalisées.
 
 Usage:
     python normalize_wos.py              # traiter tous les works non traités
@@ -796,7 +796,7 @@ def process_record(cur, staging_row: tuple) -> bool:
             logger.warning(f"Impossible d'insérer {ut} — titre ou année manquant")
             # Marquer processed quand même pour ne pas reboucler
             cur.execute(
-                "UPDATE staging_wos SET processed = TRUE WHERE id = %s",
+                "UPDATE staging SET processed = TRUE WHERE id = %s",
                 (staging_id,)
             )
             return False
@@ -810,7 +810,7 @@ def process_record(cur, staging_row: tuple) -> bool:
 
         # Marquer comme traité
         cur.execute(
-            "UPDATE staging_wos SET processed = TRUE WHERE id = %s",
+            "UPDATE staging SET processed = TRUE WHERE id = %s",
             (staging_id,)
         )
         return True
@@ -836,13 +836,13 @@ def main():
         cur = conn.cursor()
 
         if args.reset:
-            cur.execute("UPDATE staging_wos SET processed = FALSE")
+            cur.execute("UPDATE staging SET processed = FALSE WHERE source = 'wos'")
             count = cur.rowcount
             conn.commit()
             logger.info(f"Reset : {count} works remis à processed=FALSE")
             return
 
-        cur.execute("SELECT COUNT(*) FROM staging_wos WHERE processed = FALSE")
+        cur.execute("SELECT COUNT(*) FROM staging WHERE source = 'wos' AND processed = FALSE")
         total = cur.fetchone()[0]
         logger.info(f"=== Normalisation WoS : {total} works à traiter ===")
 
@@ -855,9 +855,9 @@ def main():
         logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
 
         cur.execute("""
-            SELECT id, ut, doi, raw_data
-            FROM staging_wos
-            WHERE processed = FALSE
+            SELECT id, source_id AS ut, doi, raw_data
+            FROM staging
+            WHERE source = 'wos' AND processed = FALSE
             ORDER BY id
             LIMIT %s
         """, (limit,))

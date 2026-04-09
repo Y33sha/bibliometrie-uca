@@ -208,23 +208,23 @@ def main():
             doi = extract_doi(rec)
 
             # Vérifier si déjà en base
-            cur.execute("SELECT id FROM staging_wos WHERE ut = %s", (ut,))
+            cur.execute("SELECT id FROM staging WHERE source = 'wos' AND source_id = %s", (ut,))
             if cur.fetchone():
                 skipped_total += 1
                 continue
 
             h = compute_hash(rec)
             cur.execute("""
-                INSERT INTO staging_wos (ut, doi, raw_data, raw_hash)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (ut) DO UPDATE SET
+                INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
+                VALUES ('wos', %s, %s, %s, %s)
+                ON CONFLICT (source, source_id) DO UPDATE SET
                     raw_data = CASE
-                        WHEN staging_wos.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                        THEN EXCLUDED.raw_data ELSE staging_wos.raw_data END,
-                    raw_hash = COALESCE(EXCLUDED.raw_hash, staging_wos.raw_hash),
+                        WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                        THEN EXCLUDED.raw_data ELSE staging.raw_data END,
+                    raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
                     processed = CASE
-                        WHEN staging_wos.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                        THEN FALSE ELSE staging_wos.processed END,
+                        WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                        THEN FALSE ELSE staging.processed END,
                     last_seen_at = now()
             """, (ut, doi, Json(rec), h))
             if cur.rowcount:

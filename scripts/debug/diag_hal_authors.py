@@ -30,8 +30,8 @@ AUTHOR_FIELDS = [
 
 # Prendre un échantillon de documents avec plusieurs auteurs
 cur.execute("""
-    SELECT raw_data FROM staging_hal
-    WHERE jsonb_array_length(raw_data->'authFullName_s') >= 3
+    SELECT raw_data FROM staging
+    WHERE source = 'hal' AND jsonb_array_length(raw_data->'authFullName_s') >= 3
     LIMIT 20
 """)
 rows = cur.fetchall()
@@ -75,11 +75,11 @@ for i, row in enumerate(rows):
 print("\n=== Présence des champs sur l'ensemble du staging ===\n")
 for field in AUTHOR_FIELDS + ["authStructId_i"]:
     cur.execute(f"""
-        SELECT COUNT(*) FROM staging_hal
-        WHERE raw_data ? '{field}'
+        SELECT COUNT(*) FROM staging
+        WHERE source = 'hal' AND raw_data ? '{field}'
     """)
     count = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM staging_hal")
+    cur.execute("SELECT COUNT(*) FROM staging WHERE source = 'hal'")
     total = cur.fetchone()[0]
     print(f"  {field}: {count}/{total} docs ({100*count//total}%)")
 

@@ -11,7 +11,7 @@ Usage:
 Étapes :
   1. Identifie les DOI HAL/WoS absents du staging OpenAlex
   2. Interroge l'API OpenAlex pour chaque DOI
-  3. Insère les works trouvés dans staging_openalex (processed=FALSE)
+  3. Insère les works trouvés dans staging (processed=FALSE)
   4. (optionnel) Lance la normalisation sur les nouveaux works
 """
 
@@ -74,16 +74,16 @@ def fetch_by_doi(doi: str) -> dict | None:
 
 
 def insert_work(conn, work: dict):
-    """Insère un work dans staging_openalex."""
+    """Insère un work dans staging."""
     oa_id = extract_openalex_id(work)
     doi = extract_doi(work)
     raw_hash = compute_hash(work)
 
     with conn.cursor() as cur:
         cur.execute("""
-            INSERT INTO staging_openalex (openalex_id, doi, raw_data, raw_hash, processed)
-            VALUES (%s, %s, %s::jsonb, %s, FALSE)
-            ON CONFLICT (openalex_id) DO NOTHING
+            INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
+            VALUES ('openalex', %s, %s, %s::jsonb, %s, FALSE)
+            ON CONFLICT (source, source_id) DO NOTHING
         """, (oa_id, doi, Json(work), raw_hash))
     conn.commit()
 

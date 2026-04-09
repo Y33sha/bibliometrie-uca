@@ -11,7 +11,7 @@ Usage:
 Étapes :
   1. Identifie les DOI OpenAlex/WoS absents du staging HAL
   2. Interroge l'API HAL pour chaque DOI
-  3. Insère les documents trouvés dans staging_hal (collection=NULL, processed=FALSE)
+  3. Insère les documents trouvés dans staging (collection=NULL, processed=FALSE)
   4. (optionnel) Lance la normalisation sur les nouveaux documents
 """
 
@@ -58,8 +58,8 @@ def fetch_by_doi(doi: str) -> dict | None:
     return None
 
 
-def insert_staging_hal(conn, doc: dict):
-    """Insère un document dans staging_hal avec collection=NULL."""
+def insert_staging(conn, doc: dict):
+    """Insère un document dans staging avec collection=NULL."""
     hal_id = doc.get("halId_s")
     if isinstance(hal_id, list):
         hal_id = hal_id[0] if hal_id else None
@@ -74,19 +74,19 @@ def insert_staging_hal(conn, doc: dict):
 
     with conn.cursor() as cur:
         cur.execute("""
-            INSERT INTO staging_hal (halid, doi, raw_data, collection, processed, raw_hash)
-            VALUES (%s, %s, %s::jsonb, NULL, FALSE, %s)
-            ON CONFLICT (halid) DO UPDATE SET
+            INSERT INTO staging (source, source_id, doi, raw_data, collection, processed, raw_hash)
+            VALUES ('hal', %s, %s, %s::jsonb, NULL, FALSE, %s)
+            ON CONFLICT (source, source_id) DO UPDATE SET
                 raw_data = CASE
-                    WHEN staging_hal.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                    WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                         THEN EXCLUDED.raw_data
-                    ELSE staging_hal.raw_data
+                    ELSE staging.raw_data
                 END,
-                raw_hash = COALESCE(EXCLUDED.raw_hash, staging_hal.raw_hash),
+                raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
                 processed = CASE
-                    WHEN staging_hal.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                    WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                         THEN FALSE
-                    ELSE staging_hal.processed
+                    ELSE staging.processed
                 END
         """, (hal_id, doi, Json(doc), raw_hash))
     conn.commit()
@@ -121,7 +121,7 @@ def main():
         for i, doi in enumerate(dois):
             doc = fetch_by_doi(doi)
             if doc:
-                insert_staging_hal(conn, doc)
+                insert_staging(conn, doc)
                 found += 1
             else:
                 not_found += 1

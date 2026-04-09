@@ -1,5 +1,5 @@
 """
-Normalisation des données OpenAlex : staging_openalex → tables structurées.
+Normalisation des données OpenAlex : staging → tables structurées.
 
 Usage:
     python normalize_openalex.py              # traiter tous les works non traités
@@ -428,13 +428,13 @@ def process_work(cur, staging_row: tuple) -> bool:
             version_doi = resolve_zenodo_doi(raw_doi)
             if version_doi:
                 cur.execute(
-                    "SELECT id FROM staging_openalex WHERE lower(doi) = lower(%s)",
+                    "SELECT id FROM staging WHERE source = 'openalex' AND lower(doi) = lower(%s)",
                     (version_doi,))
                 if cur.fetchone():
                     logger.info(f"  {openalex_id} concept DOI Zenodo {raw_doi} → "
                                 f"version {version_doi} déjà en staging, skip")
                     cur.execute(
-                        "UPDATE staging_openalex SET processed = TRUE WHERE id = %s",
+                        "UPDATE staging SET processed = TRUE WHERE id = %s",
                         (staging_id,))
                     return False
 
@@ -485,7 +485,7 @@ def process_work(cur, staging_row: tuple) -> bool:
 
         # Marquer comme traité
         cur.execute(
-            "UPDATE staging_openalex SET processed = TRUE WHERE id = %s",
+            "UPDATE staging SET processed = TRUE WHERE id = %s",
             (staging_id,)
         )
 
@@ -512,13 +512,13 @@ def main():
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
         if args.reset:
-            cur.execute("UPDATE staging_openalex SET processed = FALSE")
+            cur.execute("UPDATE staging SET processed = FALSE WHERE source = 'openalex'")
             count = cur.rowcount
             conn.commit()
             logger.info(f"Reset : {count} works remis à processed=FALSE")
             return
 
-        cur.execute("SELECT COUNT(*) FROM staging_openalex WHERE processed = FALSE")
+        cur.execute("SELECT COUNT(*) FROM staging WHERE source = 'openalex' AND processed = FALSE")
         total = cur.fetchone()["count"]
         logger.info(f"=== Normalisation OpenAlex : {total} works à traiter ===")
 
@@ -532,8 +532,8 @@ def main():
 
         # Charger les IDs puis fetch par lots pour limiter la mémoire
         cur.execute("""
-            SELECT id FROM staging_openalex
-            WHERE processed = FALSE
+            SELECT id FROM staging
+            WHERE source = 'openalex' AND processed = FALSE
             ORDER BY id
             LIMIT %s
         """, (limit,))
@@ -546,8 +546,8 @@ def main():
         for batch_start in range(0, len(work_ids), FETCH_BATCH):
             batch_ids = work_ids[batch_start:batch_start + FETCH_BATCH]
             cur.execute("""
-                SELECT id, openalex_id, doi, raw_data
-                FROM staging_openalex WHERE id = ANY(%s)
+                SELECT id, source_id AS openalex_id, doi, raw_data
+                FROM staging WHERE id = ANY(%s)
                 ORDER BY id
             """, (batch_ids,))
             batch_rows = cur.fetchall()

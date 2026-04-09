@@ -10,7 +10,7 @@ Met à jour :
   - person_identifiers  (ajout d'entrées orcid source='hal')
 
 Workflow HAL — position dans le pipeline :
-  1. extract_hal.py           → staging_hal
+  1. extract_hal.py           → staging (source='hal')
   2. migrate_hal.py           → hal_documents, hal_authors, hal_authorships
   3. harvest_hal_orcids.py    → enrichit hal_authors.orcid (CE SCRIPT)
   4. migrate_person_identifiers.py → person_identifiers
