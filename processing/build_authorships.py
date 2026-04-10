@@ -23,8 +23,23 @@ from utils.log import setup_logger
 logger = setup_logger("build_authorships", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def build(cur):
+def build(cur, sources=None):
+    all_sources = [
+        ("HAL", "hal"),
+        ("OpenAlex", "openalex"),
+        ("WoS", "wos"),
+        ("ScanR", "scanr"),
+        ("theses.fr", "theses"),
+    ]
+    if sources:
+        active_sources = [(n, v) for n, v in all_sources if v in sources]
+    else:
+        active_sources = all_sources
+    active_values = {v for _, v in active_sources}
+    full_run = active_values == {v for _, v in all_sources}
+
     t0 = time.perf_counter()
+    logger.info(f"Sources : {', '.join(n for n, _ in active_sources)}")
 
     # ── Étape 1 : Insérer les authorships manquantes ──
     logger.info("Étape 1 : insertion des authorships manquantes...")
@@ -52,15 +67,7 @@ def build(cur):
     # ── Étape 2 : Peupler les FK (source_authorships.authorship_id) ──
     logger.info("Étape 2 : peuplement des FK (source_authorships → authorships)...")
 
-    FK_SOURCES = [
-        ("HAL", "hal"),
-        ("OpenAlex", "openalex"),
-        ("WoS", "wos"),
-        ("ScanR", "scanr"),
-        ("theses.fr", "theses"),
-    ]
-
-    for source_name, source_value in FK_SOURCES:
+    for source_name, source_value in active_sources:
         cur.execute("""
             UPDATE source_authorships sa
             SET authorship_id = a.id
@@ -123,13 +130,15 @@ def build(cur):
     # populate_affiliations.py → on fait l'union des sources.
     logger.info("Étape 4 : propagation in_perimeter et structure_ids...")
 
-    # Reset toutes les authorships
-    cur.execute("UPDATE authorships SET in_perimeter = FALSE, structure_ids = NULL")
-    reset_count = cur.rowcount
-    logger.info(f"  Reset {reset_count} authorships")
+    if full_run:
+        # Reset toutes les authorships (run complet)
+        cur.execute("UPDATE authorships SET in_perimeter = FALSE, structure_ids = NULL")
+        logger.info(f"  Reset {cur.rowcount} authorships")
+    else:
+        logger.info("  Pas de reset (run partiel)")
 
     # Union des structure_ids et OR des in_perimeter par source
-    for source_name, source_value in FK_SOURCES:
+    for source_name, source_value in active_sources:
         cur.execute("""
             WITH src_data AS (
                 SELECT sd.publication_id, sa.person_id,
@@ -138,15 +147,18 @@ def build(cur):
                 JOIN source_documents sd ON sd.id = sa.source_document_id
                 JOIN v_active_publications vap ON vap.id = sd.publication_id
                 WHERE sa.source = %s
-                  AND sa.structure_ids IS NOT NULL
+                  AND (sa.structure_ids IS NOT NULL OR sa.in_perimeter = TRUE)
                   AND sa.person_id IS NOT NULL
                   AND NOT sa.excluded
             )
             UPDATE authorships a
-            SET structure_ids = (
-                    SELECT array_agg(DISTINCT x)
-                    FROM unnest(COALESCE(a.structure_ids, '{}'::int[]) || sd.struct_ids) AS x
-                ),
+            SET structure_ids = CASE
+                    WHEN sd.struct_ids IS NOT NULL THEN (
+                        SELECT array_agg(DISTINCT x)
+                        FROM unnest(COALESCE(a.structure_ids, '{}'::int[]) || sd.struct_ids) AS x
+                    )
+                    ELSE a.structure_ids
+                END,
                 in_perimeter = a.in_perimeter OR sd.src_in_perimeter,
                 updated_at = now()
             FROM src_data sd
@@ -194,13 +206,17 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true",
                         help="Simuler sans modifier la base")
+    parser.add_argument("--sources", default=None,
+                        help="Sources à traiter (défaut: toutes)")
     args = parser.parse_args()
+
+    sources = set(s.strip() for s in args.sources.split(",") if s.strip()) if args.sources else None
 
     conn = get_connection()
     conn.autocommit = False
     cur = conn.cursor()
 
-    build(cur)
+    build(cur, sources=sources)
 
     if args.dry_run:
         conn.rollback()

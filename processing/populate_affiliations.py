@@ -193,10 +193,39 @@ def step3c_scanr(cur, uca_ids, uca_wide_ids):
     logger.info(f"Étape 3c — ScanR structure_ids : {cur.rowcount} authorships")
 
 
+def step3d_theses(cur, uca_wide_ids):
+    """Étape 3d : theses.fr — résoudre structure_ids via adresses.
+
+    in_perimeter est déjà à TRUE (posé par normalize_theses), on ne le reset pas.
+    On résout uniquement les structure_ids via les noms de labos dans raw_affiliations.
+    """
+    # structure_ids via périmètre large
+    cur.execute("""
+        WITH theses_structs AS (
+            SELECT saa.source_authorship_id,
+                   array_agg(DISTINCT ast.structure_id) AS struct_ids
+            FROM source_authorship_addresses saa
+            JOIN address_structures ast ON ast.address_id = saa.address_id
+            JOIN source_authorships sa2 ON sa2.id = saa.source_authorship_id
+            WHERE sa2.source = 'theses'
+              AND ast.structure_id = ANY(%s)
+              AND ast.is_confirmed IS DISTINCT FROM FALSE
+            GROUP BY saa.source_authorship_id
+        )
+        UPDATE source_authorships sa
+        SET structure_ids = ts.struct_ids
+        FROM theses_structs ts
+        WHERE sa.source = 'theses'
+          AND sa.id = ts.source_authorship_id
+    """, (list(uca_wide_ids),))
+    logger.info(f"Étape 3d — theses.fr structure_ids : {cur.rowcount} authorships")
+
+
 def show_stats(cur):
     """Affiche les compteurs in_perimeter par source."""
     for source_name, source_value in [("HAL", "hal"), ("OpenAlex", "openalex"),
-                                       ("WoS", "wos"), ("ScanR", "scanr")]:
+                                       ("WoS", "wos"), ("ScanR", "scanr"),
+                                       ("theses.fr", "theses")]:
         cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = %s", (source_value,))
         total = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = %s AND in_perimeter = TRUE", (source_value,))
@@ -209,7 +238,11 @@ def show_stats(cur):
 def main():
     parser = argparse.ArgumentParser(description="Peuplement in_perimeter et structure_ids")
     parser.add_argument("--stats", action="store_true", help="Stats uniquement")
+    parser.add_argument("--sources", default="hal,openalex,wos,scanr,theses",
+                        help="Sources à traiter (défaut: toutes)")
     args = parser.parse_args()
+
+    sources = set(s.strip() for s in args.sources.split(",") if s.strip())
 
     conn = get_connection()
     conn.autocommit = False
@@ -227,12 +260,19 @@ def main():
     uca_wide_ids = get_uca_structure_ids_wide(cur)
     logger.info(f"Périmètre UCA restreint : {len(uca_ids)} structures")
     logger.info(f"Périmètre UCA large     : {len(uca_wide_ids)} structures")
+    logger.info(f"Sources : {', '.join(sorted(sources))}")
 
-    step1_hal_structure_ids(cur)
-    step2_hal_in_perimeter(cur, uca_ids)
-    step3_openalex(cur, uca_ids, uca_wide_ids)
-    step3b_wos(cur, uca_ids, uca_wide_ids)
-    step3c_scanr(cur, uca_ids, uca_wide_ids)
+    if "hal" in sources:
+        step1_hal_structure_ids(cur)
+        step2_hal_in_perimeter(cur, uca_ids)
+    if "openalex" in sources:
+        step3_openalex(cur, uca_ids, uca_wide_ids)
+    if "wos" in sources:
+        step3b_wos(cur, uca_ids, uca_wide_ids)
+    if "scanr" in sources:
+        step3c_scanr(cur, uca_ids, uca_wide_ids)
+    if "theses" in sources:
+        step3d_theses(cur, uca_wide_ids)
 
     conn.commit()
     elapsed = time.perf_counter() - t0
