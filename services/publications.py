@@ -13,6 +13,7 @@ from collections import namedtuple
 from utils.db_helpers import row_val as _val
 
 PubByDoi = namedtuple("PubByDoi", ["id", "doc_type", "title_normalized"])
+PubByNnt = namedtuple("PubByNnt", ["id", "doc_type", "title_normalized"])
 PubByTitle = namedtuple("PubByTitle", ["id", "doi"])
 PubThesisCandidate = namedtuple("PubThesisCandidate", ["id", "doi"])
 
@@ -24,6 +25,21 @@ def find_by_doi(cur, doi: str) -> PubByDoi | None:
     cur.execute("SELECT id, doc_type, title_normalized FROM publications WHERE lower(doi) = lower(%s)", (doi,))
     row = cur.fetchone()
     return PubByDoi(_val(row, 0), _val(row, 1), _val(row, 2)) if row else None
+
+
+def find_by_nnt(cur, nnt: str) -> PubByNnt | None:
+    """Cherche une publication via NNT stocké dans source_documents.external_ids."""
+    if not nnt:
+        return None
+    cur.execute("""
+        SELECT p.id, p.doc_type, p.title_normalized
+        FROM publications p
+        JOIN source_documents sd ON sd.publication_id = p.id
+        WHERE sd.external_ids->>'nnt' = %s
+        LIMIT 1
+    """, (nnt.upper(),))
+    row = cur.fetchone()
+    return PubByNnt(_val(row, 0), _val(row, 1), _val(row, 2)) if row else None
 
 
 def find_by_title(cur, title_normalized: str, pub_year: int, journal_id: int) -> PubByTitle | None:
@@ -108,6 +124,7 @@ def _enrich(cur, pub_id: int, *, doi: str | None = None,
 def find_or_create(cur, *, title: str, title_normalized: str,
                    pub_year: int, doc_type: str = "other",
                    doi: str | None = None,
+                   nnt: str | None = None,
                    oa_status: str = "unknown",
                    journal_id: int | None = None,
                    container_title: str | None = None,
@@ -117,6 +134,7 @@ def find_or_create(cur, *, title: str, title_normalized: str,
 
     Logique de déduplication :
     1. Par DOI (case-insensitive)
+    1b. Par NNT (via source_documents.external_ids, thèses uniquement)
     2. Par titre normalisé + année + journal (articles uniquement)
     3. Création
 
@@ -162,6 +180,15 @@ def find_or_create(cur, *, title: str, title_normalized: str,
                         journal_id=journal_id, oa_status=oa_status,
                         container_title=container_title, language=language)
                 return existing.id, False
+
+    # 1b. Chercher par NNT (thèses uniquement)
+    if nnt:
+        existing = find_by_nnt(cur, nnt)
+        if existing:
+            _enrich(cur, existing.id, doi=doi, doc_type=doc_type,
+                    journal_id=journal_id, oa_status=oa_status,
+                    container_title=container_title, language=language)
+            return existing.id, False
 
     # 2. Chercher par titre + année + journal (articles uniquement)
     if doc_type == "article" and journal_id:

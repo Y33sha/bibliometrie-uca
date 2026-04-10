@@ -35,6 +35,7 @@ from services.publications import find_or_create, find_thesis_by_title, _enrich,
 from utils.log import setup_logger
 from utils.normalize import normalize_text, normalize_name
 from utils.names import names_compatible
+from utils.nnt import normalize_nnt
 from utils.authorship_roles import THESES_FIELD_ROLES, merge_roles
 
 logger = setup_logger("normalize_theses", os.path.join(os.path.dirname(__file__), "logs"))
@@ -114,14 +115,14 @@ def find_or_insert_publication(cur, these: dict) -> tuple[int | None, bool]:
             pass
 
     doi = these.get("doi")
-    nnt = these.get("nnt")
-    lookup_doi = doi or nnt
+    nnt_clean = normalize_nnt(these.get("nnt"))
     title_norm = normalize_text(title)
 
-    # 1. Chercher par DOI/NNT (sans créer)
+    # 1. Chercher par DOI ou NNT (sans créer)
     pub_id, is_new = find_or_create(
         cur, title=title, title_normalized=title_norm,
-        pub_year=pub_year, doc_type=doc_type, doi=lookup_doi,
+        pub_year=pub_year, doc_type=doc_type,
+        doi=doi, nnt=nnt_clean,
         allow_create=False)
     if pub_id:
         return pub_id, False
@@ -134,13 +135,14 @@ def find_or_insert_publication(cur, these: dict) -> tuple[int | None, bool]:
             for cand in candidates:
                 if not author or _thesis_author_compatible(cur, cand.id, author):
                     # Match trouvé → enrichir
-                    _enrich(cur, cand.id, doi=lookup_doi, doc_type=doc_type)
+                    _enrich(cur, cand.id, doi=doi, doc_type=doc_type)
                     return cand.id, False
 
     # 3. Créer
     return find_or_create(
         cur, title=title, title_normalized=title_norm,
-        pub_year=pub_year, doc_type=doc_type, doi=lookup_doi)
+        pub_year=pub_year, doc_type=doc_type,
+        doi=doi, nnt=nnt_clean)
 
 
 # =============================================================
@@ -169,19 +171,22 @@ def insert_source_document(cur, these: dict, staging_id: int,
             pass
 
     doi = these.get("doi")
+    nnt = normalize_nnt(these.get("nnt"))
+    external_ids = Json({"nnt": nnt}) if nnt else None
 
     cur.execute("""
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
-             publication_id, staging_id)
-        VALUES ('theses', %s, %s, %s, %s, %s, %s, %s)
+             publication_id, staging_id, external_ids)
+        VALUES ('theses', %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
             ),
-            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type)
+            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
+            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
         RETURNING id
-    """, (theses_id, doi, title, pub_year, doc_type, publication_id, staging_id))
+    """, (theses_id, doi, title, pub_year, doc_type, publication_id, staging_id, external_ids))
     return cur.fetchone()["id"]
 
 
@@ -331,8 +336,7 @@ def process_work(cur, row: dict) -> bool:
             # Re-traitement : enrichir (ex: ongoing_thesis → thesis après soutenance)
             status = these.get("status")
             doc_type = "ongoing_thesis" if status == "enCours" else "thesis"
-            doi = these.get("doi") or these.get("nnt")
-            _enrich(cur, publication_id, doi=doi, doc_type=doc_type)
+            _enrich(cur, publication_id, doi=these.get("doi"), doc_type=doc_type)
         else:
             publication_id, _ = find_or_insert_publication(cur, these)
 
