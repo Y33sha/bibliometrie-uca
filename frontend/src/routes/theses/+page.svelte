@@ -184,7 +184,9 @@
 				<td class="col-labs">{pub.labs || ''}</td>
 				<td class="col-link">
 					{#if pub.theses_id}
-						<a href="https://theses.fr/{pub.theses_id}" target="_blank" rel="noopener" class="ext-link">theses.fr</a>
+						<a href="https://theses.fr/{pub.theses_id}" target="_blank" rel="noopener" class="ext-link">
+							<img src="https://theses.fr/favicon.ico" alt="" class="source-ico" />
+						</a>
 					{/if}
 				</td>
 			</tr>
@@ -216,8 +218,9 @@
 	.col-status { width: 90px; text-align: center; }
 	.col-labs { width: 180px; font-size: 0.85rem; color: var(--muted); }
 	.col-link { width: 70px; text-align: center; }
-	.ext-link { font-size: 0.8rem; color: var(--accent); text-decoration: none; }
-	.ext-link:hover { text-decoration: underline; }
+	.ext-link { display: inline-block; }
+	.ext-link:hover { opacity: 0.7; }
+	.source-ico { width: 16px; height: 16px; vertical-align: middle; }
 
 	.sortable { cursor: pointer; user-select: none; }
 	.sortable.active { color: var(--accent); }

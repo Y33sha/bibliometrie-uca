@@ -116,15 +116,19 @@ def phase_normalize(**kw):
 
 def phase_addresses(**kw):
     """Phase 4 : Adresses — extraction, résolution structures, pays."""
-    run_python("processing/populate_addresses.py", "--source", "openalex")
-    run_python("processing/populate_addresses.py", "--source", "wos")
-    run_python("processing/populate_addresses.py", "--source", "scanr")
+    sources = kw.get("sources", {"openalex", "wos", "scanr", "theses"})
+    address_sources = ["openalex", "wos", "scanr", "theses"]
+    for src in address_sources:
+        if src in sources:
+            run_python("processing/populate_addresses.py", "--source", src)
     run_python("processing/resolve_addresses.py")
 
 
 def phase_affiliations(**kw):
     """Phase 5 : Résolution affiliations sur authorships sources."""
-    run_python("processing/populate_affiliations.py")
+    sources = kw.get("sources", {"hal", "openalex", "wos", "scanr", "theses"})
+    source_args = ",".join(sorted(sources))
+    run_python("processing/populate_affiliations.py", "--sources", source_args)
 
 
 def phase_identifiers(mode="full", **kw):
@@ -143,7 +147,11 @@ def phase_persons(**kw):
 
 def phase_authorships(**kw):
     """Phase 7 : Construction authorships (vérité) + propagation UCA."""
-    run_python("processing/build_authorships.py")
+    sources = kw.get("sources")
+    if sources and sources != {"hal", "openalex", "wos", "scanr", "theses"}:
+        run_python("processing/build_authorships.py", "--sources", ",".join(sorted(sources)))
+    else:
+        run_python("processing/build_authorships.py")
 
 
 def phase_countries(**kw):
@@ -219,8 +227,8 @@ def main():
                         help="Afficher les étapes sans exécuter")
     parser.add_argument("--mode", choices=["full", "weekly", "monthly"], default="full",
                         help="Mode d'exécution (défaut: full)")
-    parser.add_argument("--sources", default="hal,openalex,wos,scanr",
-                        help="Sources à extraire, séparées par des virgules (défaut: hal,openalex,wos,scanr)")
+    parser.add_argument("--sources", default="hal,openalex,wos,scanr,theses",
+                        help="Sources, séparées par des virgules (défaut: hal,openalex,wos,scanr,theses)")
     parser.add_argument("--year", type=int,
                         help="Surcharger l'année d'extraction (une seule année)")
     parser.add_argument("--full-cross-import", action="store_true",

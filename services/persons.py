@@ -41,7 +41,7 @@ def link_authorship(cur, person_id: int, source: str, authorship_id: int,
 
     Pour HAL, fait aussi le dual-write sur source_authors si c'est un compte HAL.
     """
-    if source not in ("hal", "openalex", "wos", "scanr"):
+    if source not in ("hal", "openalex", "wos", "scanr", "theses"):
         return
 
     cur.execute("UPDATE source_authorships SET person_id = %s WHERE id = %s AND source = %s",
@@ -68,7 +68,7 @@ def link_authorships(cur, person_id: int, authorships: list[dict]):
 
 def unlink_authorship(cur, person_id: int, source: str, authorship_id: int):
     """Détache une authorship source d'une personne (met person_id à NULL)."""
-    if source in ("hal", "openalex", "wos", "scanr"):
+    if source in ("hal", "openalex", "wos", "scanr", "theses"):
         cur.execute(
             "UPDATE source_authorships SET person_id = NULL WHERE id = %s AND person_id = %s AND source = %s",
             (authorship_id, person_id, source))

@@ -37,6 +37,9 @@ SOURCES = {
     "scanr": {
         "source_filter": "scanr",
     },
+    "theses": {
+        "source_filter": "theses",
+    },
 }
 
 

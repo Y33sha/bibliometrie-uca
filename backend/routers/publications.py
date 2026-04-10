@@ -539,7 +539,7 @@ async def get_publication(pub_id: int):
                     JOIN addresses addr ON addr.id = saa.address_id,
                          unnest(addr.countries) AS c
                     WHERE sa2.source_document_id = sd.id AND addr.countries IS NOT NULL)
-            FROM source_documents sd WHERE sd.publication_id = %s AND sd.source IN ('openalex', 'wos', 'scanr')
+            FROM source_documents sd WHERE sd.publication_id = %s AND sd.source IN ('openalex', 'wos', 'scanr', 'theses')
         """, (pub_id, pub_id))
         sources = cur.fetchall()
 
@@ -924,6 +924,7 @@ async def list_publications(
                 "openalex_id": row["openalex_id"],
                 "scanr_id": row["scanr_id"],
                 "wos_id": row["wos_id"],
+                "theses_id": row["theses_id"],
                 "labs": row["labs"],
                 "apc": row["apc_details"],
                 "is_corresponding": row["is_corresponding"],
