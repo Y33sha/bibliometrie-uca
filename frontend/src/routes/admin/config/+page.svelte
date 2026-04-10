@@ -287,9 +287,7 @@
           >
         </div>
       {:else}
-        <span class="config-value-inline"
-          >{Array.isArray(configByKey("theses_etab_ppns")?.value) ? configByKey("theses_etab_ppns")?.value.join(", ") : configByKey("theses_etab_ppns")?.value}</span
-        >
+        <span class="config-value-inline">{Array.isArray(configByKey("theses_etab_ppns")?.value) ? configByKey("theses_etab_ppns")?.value.join(", ") : configByKey("theses_etab_ppns")?.value}</span>
         <button class="btn btn-sm" onclick={() => startEdit("theses_etab_ppns")}>Modifier</button>
       {/if}
     </div>
@@ -364,7 +362,7 @@
 
 <h4 class="subsection-title">Rôle des périmètres</h4>
 <div class="config-grid">
-  {#each [{ key: "perimeter_affiliations", label: "Phase affiliations", hint: "Résolution structure_ids sur les authorships sources" }, { key: "perimeter_persons", label: "Phase persons", hint: "Sélection des authorships génératrices de personnes (is_uca)" }] as role}
+  {#each [{ key: "perimeter_affiliations", label: "Phase affiliations", hint: "Résolution structure_ids sur les authorships sources" }, { key: "perimeter_persons", label: "Phase persons", hint: "Sélection des authorships génératrices de personnes (in_perimeter)" }] as role}
     {@const item = configByKey(role.key)}
     {#if item}
       <div class="config-row" style="flex-wrap: wrap;">

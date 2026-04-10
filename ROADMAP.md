@@ -2,30 +2,21 @@
 
 ## Programme du 9 avril
 
-* Améliorer l'extensibilité en rendant la base de données source-agnostique: ce qui implique de fusionner ensemble les tables staging, puis les tables source_documents, etc. On étudiera ça étape par étape.
-    * [x] staging
-    * [x] documents
-    * [x] authors
-    * [ ] structures
-    * [ ] authorships
-
-* [ ] Rendre le pipeline structure-agnostique (in_parameter au lieu de is_uca)
-
-* [ ] enum doc_type: ajouter "thèses en cours" aux types de documents pour les distinguer des thèses soutenues et déposées. (attention, ScanR contient déjà des thèses en cours, il faudra les aligner en trouvant une clé d'alignement (pas de DOI))
-* [x] enum authors_roles: exploiter le nouveau champ "role" des authorships: partout où des rôles sont définis (hal authorQuality_s, wos role...), les importer. Ce sera particulièrement important pour theses.fr: auteur, rapporteur, membre du jury...
-
-* Intégrer la nouvelle source theses.fr (API: https://www.data.gouv.fr/dataservices/api-interroger-les-donnees-de-theses-fr )
-    * [x] extract -> staging
-    * [ ] normalize
-    * [ ] pipeline complet
-
 * une fois que tout ça sera en place:
     * [ ] réfléchir à la présentation des thèses (en cours/soutenues) dans le frontend: page spéciale? onglet spécial par labo? onglet par personne (rôles de rapporteur/jury)
+    
+    * [ ] année soutenance vs inscription
+    * [ ] statut ouvert vs closed
+    * [ ] page thèse: afficher personnes liées
+
+
+
     * [ ] réfléchir à un mode quotidien pour le pipeline (interrogation minimale des API: "quoi de neuf depuis hier"? pas de réimport+comparaison de hash, pas d'enrichissements)
+    * [ ] log post-pipeline (publications ajoutées, personnes créées, formes de nom rattachées, erreurs...)
 
 * divers backfillings en attente
 
-Chantiers restants, classés par effort. Consolidation des TODO_LAURA.md et TODO_CLAUDE.md.
+
 
 ## Quick wins
 

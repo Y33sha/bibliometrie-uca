@@ -301,7 +301,7 @@ async def get_laboratory_dashboard(lab_id: int):
             SELECT p.pub_year, COUNT(DISTINCT p.id) AS count
             FROM publications p
             JOIN authorships a ON a.publication_id = p.id
-            WHERE a.is_uca = TRUE
+            WHERE a.in_perimeter = TRUE
               AND a.structure_ids && %s::int[]
               AND p.pub_year IS NOT NULL
               AND p.pub_year >= %s
@@ -319,7 +319,7 @@ async def get_laboratory_dashboard(lab_id: int):
                 COUNT(DISTINCT p.id) AS total
             FROM publications p
             JOIN authorships a ON a.publication_id = p.id
-            WHERE a.is_uca = TRUE
+            WHERE a.in_perimeter = TRUE
               AND a.structure_ids && %s::int[]
         """, (lab_arr,))
         oa = cur.fetchone()
@@ -334,7 +334,7 @@ async def get_laboratory_dashboard(lab_id: int):
                 ) AS international
             FROM publications p
             JOIN authorships a ON a.publication_id = p.id
-            WHERE a.is_uca = TRUE
+            WHERE a.in_perimeter = TRUE
               AND a.structure_ids && %s::int[]
               AND p.doc_type = 'article'
         """, (lab_arr,))
@@ -347,7 +347,7 @@ async def get_laboratory_dashboard(lab_id: int):
             JOIN authorships a ON a.publication_id = p.id,
                  unnest(p.countries) AS cc
             JOIN countries co ON co.code = cc
-            WHERE a.is_uca = TRUE
+            WHERE a.in_perimeter = TRUE
               AND a.structure_ids && %s::int[]
               AND p.doc_type = 'article'
               AND cc <> 'fr'

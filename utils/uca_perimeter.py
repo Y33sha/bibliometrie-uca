@@ -73,7 +73,7 @@ def get_affiliations_structure_ids(cur) -> set[int]:
 
 
 def get_persons_structure_ids(cur) -> set[int]:
-    """Périmètre pour la création des personnes (is_uca)."""
+    """Périmètre pour la création des personnes (in_perimeter)."""
     code = _config_perimeter_code(cur, "perimeter_persons", "uca")
     return get_perimeter_structure_ids(cur, code)
 

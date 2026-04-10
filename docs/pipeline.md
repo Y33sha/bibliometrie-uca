@@ -11,10 +11,10 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 - [Normalisation](#normalize): Transforme les données brutes (*staging*) en tables structurées *par source*: `*_publications`, `*_authors`, `*_authorships`, `*_structures`. Peuple la table canonique `publications`  à partir des publications sources.
 ### Repérage des affiliations
 - [Adresses](#addresses): Peuple la table `addresses` à partir des adresses brutes associées aux [authorships](glossaire#authorship). Résout les affiliations des adresses à l'aide des formes de noms associées aux structures canoniques.
-- [Affiliations](#affiliations): Renseigne le bool `is_uca` et les `structure_ids` des authorships sources.
+- [Affiliations](#affiliations): Renseigne le bool `in_perimeter` et les `structure_ids` des authorships sources.
 ### Création/rattachement des personnes
 - [Identifiants](#identifiers): Enrichit la table `hal_authors` (ORCID, IdRef) à partir de l'API Auteurs de HAL.
-- [Personnes](#creation-personnes): Peuple la table canonique `persons` et ses tables satellites `person_name_forms` et `person_identifiers` (ORCID, idHAL, IdRef) *via* les authorhips souces ayant `is_uca` = true. Mappe les authorships sources aux `person_id` créées.
+- [Personnes](#creation-personnes): Peuple la table canonique `persons` et ses tables satellites `person_name_forms` et `person_identifiers` (ORCID, idHAL, IdRef) *via* les authorhips souces ayant `in_perimeter` = true. Mappe les authorships sources aux `person_id` créées.
 - [Authorships](#authorships): Peuple la table canonique `authorships` (liens entre `publications` canoniques et `persons` canoniques) à partir des `person_id` référencés dans les authorships sources.
 ### Enrichissements divers
 - [Pays](#countries): détection automatisée des pays des adresses. Utile pour interroger les collaborations internationales.
@@ -166,12 +166,12 @@ flowchart LR
     class A valid;
 ```
 
-Calcule `is_uca` et `structure_ids` sur les authorships des 4 sources :
-- **HAL** : `hal_struct_ids` → mapping via `hal_structures.structure_id` → `structure_ids`, puis vérification contre le périmètre UCA restreint → `is_uca`
+Calcule `in_perimeter` et `structure_ids` sur les authorships des 4 sources :
+- **HAL** : `hal_struct_ids` → mapping via `hal_structures.structure_id` → `structure_ids`, puis vérification contre le périmètre UCA restreint → `in_perimeter`
 - **OpenAlex / WoS / ScanR** : via `address_structures` (adresses résolues) → même logique
 
 Deux périmètres :
-- **Restreint** (UCA + labos UCA) → détermine `is_uca` (bool)
+- **Restreint** (UCA + labos UCA) → détermine `in_perimeter` (bool)
 - **Large** (restreint + CHU, INP…) → détermine `structure_ids`
 
 Périmètre centralisé dans `utils/uca_perimeter.py`.
@@ -219,7 +219,7 @@ Fonctions de compatibilité de noms dans `utils/names.py`.
 1. **Insertion** des paires (publication_id, person_id) manquantes, depuis les authorships sources non exclues
 2. **FK** : rattache chaque authorship canonique à ses authorships sources (`hal_authorship_id`, `openalex_authorship_id`, `wos_authorship_id`)
 3. **Métadonnées** : propage `author_position` et `is_corresponding`
-4. **UCA** : propage `is_uca` et `structure_ids` depuis les 3 sources (union). Même logique pour les 3 sources (déjà calculées par `populate_affiliations.py`).
+4. **UCA** : propage `in_perimeter` et `structure_ids` depuis les 3 sources (union). Même logique pour les 3 sources (déjà calculées par `populate_affiliations.py`).
 
 Les authorships sources marquées `excluded = TRUE` sont ignorées à toutes les étapes. Les publications de type `peer_review` sont exclues de la propagation UCA.
 
