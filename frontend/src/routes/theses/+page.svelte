@@ -4,6 +4,7 @@
   import { base } from "$app/paths";
   import { sanitizeTitle, halDocUrl, scanrPubUrl } from "$lib/utils";
   import FacetDropdown from "$lib/components/FacetDropdown.svelte";
+  import SourceFilterToggle from "$lib/components/SourceFilterToggle.svelte";
   import Pagination from "$lib/components/Pagination.svelte";
   import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
   import { useFacets } from "$lib/composables/useFacets.svelte";
@@ -32,6 +33,7 @@
   let selectedLabs: string[] = $state([]);
   let selectedStatus: string[] = $state([]);
   let selectedAccess: string[] = $state([]);
+  let sourceStates: Record<string, 'all' | 'yes' | 'no'> = $state({});
 
   function buildFilterParams(): URLSearchParams {
     const params = new URLSearchParams();
@@ -45,6 +47,8 @@
     const q = search.trim();
     if (q) params.set("search", q);
     if (selectedAccess.length) params.set("access", selectedAccess.join(","));
+    const sf = Object.entries(sourceStates).filter(([, v]) => v === 'yes' || v === 'no').map(([k, v]) => `${k}_${v}`).join(',');
+    if (sf) params.set("source_filter", sf);
     params.set("sort", currentSort);
     return params;
   }
@@ -61,6 +65,7 @@
     endpoint: "/api/publications/facets",
     apiKey: "theses-facets",
     buildParams: buildFilterParams,
+    sourceCountsKey: 'source_counts',
     facets: {
       years: { type: "simple", apiKey: "years" },
       labs: { type: "labeled", apiKey: "labs" },
@@ -84,6 +89,7 @@
       selectedLabs: { type: "string_array", urlKey: "lab_id" },
       selectedStatus: { type: "string_array", urlKey: "status" },
       selectedAccess: { type: "string_array", urlKey: "access" },
+      sourceStates: { type: "source_states", urlKey: "source_filter" },
       search: { type: "single", urlKey: "search" },
       currentSort: { type: "single", urlKey: "sort", defaultValue: "soutenance_desc" },
       currentPage: { type: "page", urlKey: "page" },
@@ -96,6 +102,7 @@
       selectedLabs,
       selectedStatus,
       selectedAccess,
+      sourceStates,
       search,
       currentSort,
       currentPage: pubs.page,
@@ -157,6 +164,7 @@
     if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
     if (restored.selectedStatus) selectedStatus = restored.selectedStatus as string[];
     if (restored.selectedAccess) selectedAccess = restored.selectedAccess as string[];
+    if (restored.sourceStates) sourceStates = restored.sourceStates as Record<string, 'all' | 'yes' | 'no'>;
     if (restored.search) search = restored.search as string;
     if (restored.currentSort) currentSort = restored.currentSort as string;
     if (restored.currentPage) pubs.page = restored.currentPage as number;
@@ -192,6 +200,7 @@
     <FacetDropdown label="Laboratoire" options={facets.options.labs} bind:selected={selectedLabs} onchange={(v: string[]) => onLabChange(v)} />
     <FacetDropdown label="Statut" options={facets.options.status} bind:selected={selectedStatus} onchange={() => onFilterChange()} />
     <FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={() => onFilterChange()} />
+    <SourceFilterToggle bind:states={sourceStates} counts={facets.sourceCounts} onchange={() => onFilterChange()} />
   </div>
 </div>
 

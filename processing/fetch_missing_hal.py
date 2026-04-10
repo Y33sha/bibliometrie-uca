@@ -1,11 +1,12 @@
 """
-Récupère les entrées HAL manquantes découvertes via OpenAlex et ScanR.
+Récupère les entrées HAL manquantes découvertes via OpenAlex, ScanR et theses.fr.
 
 Sources de halIds :
 - OpenAlex : primary_location pointant vers hal.science/hal-XXXXX
 - ScanR : externalIds contenant un identifiant de type "hal"
+- theses.fr (via NNT) : thèses soutenues avec NNT mais sans document HAL associé
 
-Quand un halId n'est pas dans notre staging_hal, on le télécharge
+Quand un halId (ou un NNT) n'est pas dans notre staging_hal, on le télécharge
 via l'API HAL. Ces entrées sont marquées collection = NULL (hors
 périmètre UCA), ce qui permet de les distinguer des entrées issues
 du portail ou des collections labo.
@@ -91,6 +92,57 @@ def find_hal_ids_from_scanr(cur) -> list[dict]:
         {"source": "scanr", "hal_id": row["hal_id"], "scanr_id": row["scanr_id"]}
         for row in cur.fetchall()
     ]
+
+
+def find_nnt_without_hal(cur) -> list[dict]:
+    """
+    Trouve les NNT (thèses soutenues) qui n'ont pas de document HAL associé.
+    Recherche via source_documents.external_ids->>'nnt' pour les publications
+    qui n'ont pas 'hal' dans leurs sources.
+    Retourne [{source: "nnt", nnt, theses_id}, ...]
+    """
+    cur.execute("""
+        SELECT sd.external_ids->>'nnt' AS nnt, sd.source_id AS theses_id
+        FROM source_documents sd
+        JOIN publications p ON p.id = sd.publication_id
+        WHERE sd.source = 'theses'
+          AND sd.external_ids->>'nnt' IS NOT NULL
+          AND p.doc_type != 'ongoing_thesis'
+          AND NOT EXISTS (
+              SELECT 1 FROM source_documents sd2
+              WHERE sd2.publication_id = p.id AND sd2.source = 'hal'
+          )
+    """)
+    return [
+        {"source": "nnt", "nnt": row["nnt"], "theses_id": row["theses_id"]}
+        for row in cur.fetchall()
+    ]
+
+
+def fetch_hal_by_nnt(nnt: str) -> dict | None:
+    """Télécharge un document depuis l'API HAL par NNT."""
+    try:
+        resp = requests.get(HAL_API, params={
+            "q": f"nntId_s:{nnt}",
+            "fl": HAL_FIELDS_STR,
+            "wt": "json",
+            "rows": 1,
+        }, timeout=15)
+
+        if resp.status_code != 200:
+            log.warning(f"  HTTP {resp.status_code} pour NNT {nnt}")
+            return None
+
+        data = resp.json()
+        docs = data.get("response", {}).get("docs", [])
+        if not docs:
+            return None  # pas sur HAL, c'est normal pour certaines thèses
+
+        return docs[0]
+
+    except requests.RequestException as e:
+        log.warning(f"  Erreur réseau pour NNT {nnt}: {e}")
+        return None
 
 
 def find_missing_hal_ids(cur, hal_refs: list[dict]) -> list[dict]:
@@ -183,6 +235,10 @@ def main():
     hal_refs_scanr = find_hal_ids_from_scanr(cur)
     log.info(f"  {len(hal_refs_scanr)} HAL IDs ScanR absents de staging_hal")
 
+    log.info("Recherche des NNT sans document HAL...")
+    nnt_refs = find_nnt_without_hal(cur)
+    log.info(f"  {len(nnt_refs)} NNT (thèses soutenues) sans HAL")
+
     # 2. Identifier ceux absents de staging_hal (OpenAlex)
     missing_oa = find_missing_hal_ids(cur, hal_refs_oa)
     log.info(f"  {len(missing_oa)} halIds OpenAlex absents de staging_hal")
@@ -200,26 +256,32 @@ def main():
         log.info("--- Statistiques ---")
         log.info(f"  Works OA → HAL : {len(hal_refs_oa)}")
         log.info(f"  HAL IDs ScanR : {len(hal_refs_scanr)}")
+        log.info(f"  NNT sans HAL : {len(nnt_refs)}")
         log.info(f"  Manquants OA : {len(missing_oa)}")
-        log.info(f"  Total manquants (dédupliqués) : {len(missing)}")
-        if missing:
-            log.info("  Exemples :")
-            for ref in missing[:10]:
-                source = ref.get("source", "openalex")
-                label = ref.get("openalex_id") or ref.get("scanr_id", "?")
-                log.info(f"    [{source}] {label} → {ref['hal_id']}")
+        log.info(f"  Total manquants halId (dédupliqués) : {len(missing)}")
         conn.close()
         return
 
-    if not missing:
-        log.info("Rien à faire — tous les halIds sont déjà en staging.")
+    if not missing and not nnt_refs:
+        log.info("Rien à faire.")
         conn.close()
         return
 
     if args.dry_run:
-        log.info(f"[DRY RUN] {len(missing)} documents HAL à télécharger :")
-        for ref in missing:
-            log.info(f"  {ref['openalex_id']} → {ref['hal_id']}")
+        if missing:
+            log.info(f"[DRY RUN] {len(missing)} documents HAL à télécharger (par halId) :")
+            for ref in missing[:10]:
+                source = ref.get("source", "openalex")
+                label = ref.get("openalex_id") or ref.get("scanr_id", "?")
+                log.info(f"  [{source}] {label} → {ref['hal_id']}")
+            if len(missing) > 10:
+                log.info(f"  ... et {len(missing) - 10} autres")
+        if nnt_refs:
+            log.info(f"[DRY RUN] {len(nnt_refs)} documents HAL à chercher (par NNT) :")
+            for ref in nnt_refs[:10]:
+                log.info(f"  [nnt] {ref['theses_id']} → NNT={ref['nnt']}")
+            if len(nnt_refs) > 10:
+                log.info(f"  ... et {len(nnt_refs) - 10} autres")
         conn.close()
         return
 
@@ -228,29 +290,68 @@ def main():
     not_found = 0
     errors = 0
 
-    for i, ref in enumerate(missing):
-        hal_id = ref["hal_id"]
-        doc = fetch_hal_document(hal_id)
+    # 3a. Par halId (OpenAlex + ScanR)
+    if missing:
+        log.info(f"\n--- Fetch par halId ({len(missing)} documents) ---")
+        for i, ref in enumerate(missing):
+            hal_id = ref["hal_id"]
+            doc = fetch_hal_document(hal_id)
 
-        if doc:
-            doi_str = doc.get("doiId_s")
-            if isinstance(doi_str, list):
-                doi_str = doi_str[0] if doi_str else None
-            insert_staging_hal(cur, hal_id, doi_str, doc)
-            fetched += 1
-        elif doc is None:
-            not_found += 1
-        else:
-            errors += 1
+            if doc:
+                doi_str = doc.get("doiId_s")
+                if isinstance(doi_str, list):
+                    doi_str = doi_str[0] if doi_str else None
+                insert_staging_hal(cur, hal_id, doi_str, doc)
+                fetched += 1
+            elif doc is None:
+                not_found += 1
+            else:
+                errors += 1
 
-        if (i + 1) % 50 == 0:
-            conn.commit()
-            log.info(f"  {i + 1}/{len(missing)} — {fetched} récupérés, {not_found} introuvables")
+            if (i + 1) % 50 == 0:
+                conn.commit()
+                log.info(f"  {i + 1}/{len(missing)} — {fetched} récupérés")
 
-        time.sleep(REQUEST_DELAY)
+            time.sleep(REQUEST_DELAY)
 
-    conn.commit()
-    log.info(f"Terminé : {fetched} récupérés, {not_found} introuvables, {errors} erreurs")
+        conn.commit()
+
+    # 3b. Par NNT (theses.fr)
+    if nnt_refs:
+        log.info(f"\n--- Fetch par NNT ({len(nnt_refs)} thèses) ---")
+        nnt_fetched = 0
+        nnt_not_found = 0
+        for i, ref in enumerate(nnt_refs):
+            doc = fetch_hal_by_nnt(ref["nnt"])
+
+            if doc:
+                hal_id = doc.get("halId_s")
+                if hal_id:
+                    # Vérifier que ce hal_id n'est pas déjà en staging
+                    cur.execute("SELECT 1 FROM staging WHERE source = 'hal' AND source_id = %s", (hal_id,))
+                    if not cur.fetchone():
+                        doi_str = doc.get("doiId_s")
+                        if isinstance(doi_str, list):
+                            doi_str = doi_str[0] if doi_str else None
+                        insert_staging_hal(cur, hal_id, doi_str, doc)
+                        nnt_fetched += 1
+                        fetched += 1
+                    else:
+                        log.debug(f"  NNT={ref['nnt']} → {hal_id} déjà en staging")
+            else:
+                nnt_not_found += 1
+                not_found += 1
+
+            if (i + 1) % 50 == 0:
+                conn.commit()
+                log.info(f"  {i + 1}/{len(nnt_refs)} — {nnt_fetched} récupérés, {nnt_not_found} absents de HAL")
+
+            time.sleep(REQUEST_DELAY)
+
+        conn.commit()
+        log.info(f"  NNT : {nnt_fetched} récupérés, {nnt_not_found} absents de HAL")
+
+    log.info(f"\nTerminé : {fetched} récupérés, {not_found} introuvables, {errors} erreurs")
     log.info(f"Les entrées insérées ont collection = NULL (hors périmètre UCA)")
     log.info(f"Relancer normalize_hal.py pour les intégrer")
     conn.close()
