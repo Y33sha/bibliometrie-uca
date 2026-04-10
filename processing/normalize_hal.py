@@ -37,6 +37,7 @@ from utils.normalize import normalize_text
 from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
 from utils.authorship_roles import map_role
 from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
+from utils.nnt import normalize_nnt
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -125,8 +126,7 @@ def upsert_journal(cur, doc: dict, publisher_id: int | None) -> int | None:
 # PUBLICATIONS (via services/publications.py)
 # =============================================================
 
-def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
-                               allow_create: bool = True) -> tuple[int, bool]:
+def find_or_insert_publication(cur, doc: dict, journal_id: int | None) -> tuple[int, bool]:
     """Cherche ou crée une publication. Délègue au service publications."""
     doi = clean_doi(as_str(doc.get("doiId_s")))
     title = get_title(doc)
@@ -147,12 +147,13 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
     if not journal_id:
         container_title = as_str(doc.get("bookTitle_s")) or as_str(doc.get("conferenceTitle_s"))
 
+    nnt = normalize_nnt(as_str(doc.get("nntId_s")))
+
     return find_or_create_publication(
         cur, title=title, title_normalized=normalize_text(title),
-        pub_year=pub_year, doc_type=doc_type, doi=doi,
+        pub_year=pub_year, doc_type=doc_type, doi=doi, nnt=nnt,
         oa_status=oa_status, journal_id=journal_id,
-        container_title=container_title, language=language,
-        allow_create=allow_create)
+        container_title=container_title, language=language)
 
 
 def _enrich_existing(cur, pub_id: int, doc: dict, journal_id: int | None):
@@ -205,11 +206,15 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
 
     collections_array = sorted(collections) if collections else None
 
+    # NNT dans external_ids (thèses HAL)
+    nnt = normalize_nnt(as_str(doc.get("nntId_s")))
+    external_ids = Json({"nnt": nnt}) if nnt else None
+
     cur.execute("""
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
-             collections, publication_id, staging_id)
-        VALUES ('hal', %s, %s, %s, %s, %s, %s, %s, %s)
+             collections, publication_id, staging_id, external_ids)
+        VALUES ('hal', %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
@@ -222,10 +227,11 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
                     COALESCE(source_documents.collections, '{}') ||
                     COALESCE(EXCLUDED.collections, '{}')
                 ) AS c
-            )
+            ),
+            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
         RETURNING id
     """, (hal_id, doi, title, pub_year, doc_type,
-          collections_array, publication_id, staging_id))
+          collections_array, publication_id, staging_id, external_ids))
     return cur.fetchone()[0]
 
 
@@ -589,22 +595,11 @@ def process_work(cur, staging_row: tuple) -> bool:
             # Re-traitement (raw_hash a changé) : enrichir avec les nouvelles métadonnées
             _enrich_existing(cur, publication_id, doc, journal_id)
         else:
-            # Hors périmètre UCA (collection = NULL, vient de fetch_missing_hal.py) :
-            # on enrichit les publications existantes mais on n'en crée pas de nouvelles
-            publication_id, is_new = find_or_insert_publication(
-                cur, doc, journal_id, allow_create=(collection is not None)
-            )
+            publication_id, is_new = find_or_insert_publication(cur, doc, journal_id)
         timings["publication"] = time.perf_counter() - t0
 
         if not publication_id:
-            if not collection:
-                logger.debug(f"  {hal_id} hors périmètre, pas de publication existante → skip")
-                cur.execute(
-                    "UPDATE staging SET processed = TRUE WHERE id = %s",
-                    (staging_id,)
-                )
-            else:
-                logger.warning(f"Impossible d'insérer {hal_id} — échec insertion publication")
+            logger.warning(f"Impossible d'insérer {hal_id} — échec insertion publication")
             return False
 
         # Document HAL (source_documents)

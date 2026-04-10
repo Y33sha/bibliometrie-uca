@@ -84,6 +84,7 @@ def apply_source_filter(conditions: list, source_values: list[str]):
         "oa": "openalex",
         "scanr": "scanr",
         "wos": "wos",
+        "theses": "theses",
     }
     for sv in source_values:
         parts = sv.rsplit("_", 1)

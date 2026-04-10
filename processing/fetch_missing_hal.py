@@ -189,7 +189,7 @@ def fetch_hal_document(hal_id: str) -> dict | None:
 
 
 def insert_staging_hal(cur, hal_id: str, doi: str | None, doc: dict):
-    """Insère un document dans staging_hal avec collection = NULL (hors périmètre).
+    """Insère un document dans staging_hal avec collection = NULL (cross-import).
     Si le document existe et a changé (hash différent), met à jour et remet processed = FALSE.
     """
     raw_hash = compute_hash(doc)
@@ -352,7 +352,7 @@ def main():
         log.info(f"  NNT : {nnt_fetched} récupérés, {nnt_not_found} absents de HAL")
 
     log.info(f"\nTerminé : {fetched} récupérés, {not_found} introuvables, {errors} erreurs")
-    log.info(f"Les entrées insérées ont collection = NULL (hors périmètre UCA)")
+    log.info(f"Les entrées insérées ont collection = NULL (cross-import)")
     log.info(f"Relancer normalize_hal.py pour les intégrer")
     conn.close()
 
