@@ -300,6 +300,7 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 .oa-lock-label { font-size: 0.65rem; font-variant: small-caps; font-weight: 600; letter-spacing: 0.03em; }
 .oa-lock-open .oa-lock-label { color: #4caf50; }
 .oa-lock-closed .oa-lock-label { color: #333; }
+.oa-lock-ongoing .oa-lock-label { color: #999; }
 
 /* ── OA tags ── */
 .oa-tag {
