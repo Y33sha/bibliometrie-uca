@@ -223,7 +223,8 @@ async def publications_facets(
                 COUNT(*) FILTER (WHERE p.sources @> ARRAY['hal'::source_type]) AS hal_count,
                 COUNT(*) FILTER (WHERE p.sources @> ARRAY['openalex'::source_type]) AS oa_count,
                 COUNT(*) FILTER (WHERE p.sources @> ARRAY['scanr'::source_type]) AS scanr_count,
-                COUNT(*) FILTER (WHERE p.sources @> ARRAY['wos'::source_type]) AS wos_count
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['wos'::source_type]) AS wos_count,
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['theses'::source_type]) AS theses_count
             FROM publications p
             WHERE {where}
         """, p)
@@ -332,6 +333,7 @@ async def publications_facets(
                 "oa": source_counts["oa_count"],
                 "scanr": source_counts["scanr_count"],
                 "wos": source_counts["wos_count"],
+                "theses": source_counts["theses_count"],
             },
             "apc": apc_facets,
             "countries": country_facets,

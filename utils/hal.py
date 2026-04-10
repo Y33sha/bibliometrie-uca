@@ -39,6 +39,7 @@ HAL_FIELDS = [
     "structName_s",
     "structType_s",
     "structAcronym_s",
+    "nntId_s",
 ]
 
 HAL_FIELDS_STR = ",".join(HAL_FIELDS)

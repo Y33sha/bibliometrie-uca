@@ -200,7 +200,14 @@
     <FacetDropdown label="Laboratoire" options={facets.options.labs} bind:selected={selectedLabs} onchange={(v: string[]) => onLabChange(v)} />
     <FacetDropdown label="Statut" options={facets.options.status} bind:selected={selectedStatus} onchange={() => onFilterChange()} />
     <FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={() => onFilterChange()} />
-    <SourceFilterToggle bind:states={sourceStates} counts={facets.sourceCounts} onchange={() => onFilterChange()} />
+    <SourceFilterToggle
+      sources={[
+        { key: 'theses', label: 'theses.fr' },
+        { key: 'hal', label: 'HAL' },
+        { key: 'oa', label: 'OpenAlex' },
+        { key: 'scanr', label: 'ScanR' },
+      ]}
+      bind:states={sourceStates} counts={facets.sourceCounts} onchange={() => onFilterChange()} />
   </div>
 </div>
 
