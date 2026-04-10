@@ -590,10 +590,18 @@ def process_work(cur, staging_row: tuple) -> bool:
             (hal_id,))
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc[0]:
-            publication_id = existing_doc[0]
-            is_new = False
-            # Re-traitement (raw_hash a changé) : enrichir avec les nouvelles métadonnées
+            old_pub_id = existing_doc[0]
+            # Re-traitement : relancer find_or_create pour détecter les fusions par DOI/NNT
+            publication_id, is_new = find_or_insert_publication(cur, doc, journal_id)
+            if publication_id and publication_id != old_pub_id:
+                # DOI/NNT pointe vers une autre publication → fusionner
+                from services.publications import merge_publications
+                logger.info(f"  {hal_id} : fusion pub {old_pub_id} → {publication_id} (DOI/NNT)")
+                merge_publications(cur, publication_id, old_pub_id)
+            elif not publication_id:
+                publication_id = old_pub_id
             _enrich_existing(cur, publication_id, doc, journal_id)
+            is_new = False
         else:
             publication_id, is_new = find_or_insert_publication(cur, doc, journal_id)
         timings["publication"] = time.perf_counter() - t0
