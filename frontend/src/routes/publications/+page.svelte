@@ -93,6 +93,7 @@
 	// --- Shared filter params builder ---
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
+		params.set('excluded_doc_type', 'ongoing_thesis');
 		if (selectedYears.length) params.set('year', selectedYears.join(','));
 		if (selectedLabs.length) params.set('lab_id', selectedLabs.join(','));
 		const sf = Object.entries(sourceStates).filter(([, v]) => v === 'yes' || v === 'no').map(([k, v]) => `${k}_${v}`).join(',');

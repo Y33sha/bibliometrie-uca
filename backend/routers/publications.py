@@ -20,6 +20,7 @@ async def publications_facets(
     year: str = Query(""),
     lab_id: str = Query(""),
     doc_type: str = Query(""),
+    excluded_doc_type: str = Query(""),
     access: str = Query(""),
     oa_status: str = Query(""),
     source_filter: str = Query(""),
@@ -37,16 +38,21 @@ async def publications_facets(
     lab_none = "none" in lab_id_parts
     lab_ids_clean = [int(v) for v in lab_id_parts if v != "none"] if lab_id_parts else []
     doc_types = parse_str_csv(doc_type)
+    excluded_types = parse_str_csv(excluded_doc_type)
     source_values = parse_str_csv(source_filter)
     country_values = parse_str_csv(country)
 
     def base_conds_params():
-        """Conditions de base : publications UCA ou personne. Exclut toujours peer_review."""
+        """Conditions de base : publications UCA ou personne. Exclut peer_review + excluded_doc_type."""
         if person_id:
             c, p = ["p.doc_type != 'peer_review'"], []
             apply_person_filter(c, p, person_id)
-            return c, p
-        return [PUB_IS_UCA], []  # PUB_IS_UCA exclut déjà peer_review
+        else:
+            c, p = [PUB_IS_UCA], []
+        if excluded_types:
+            c.append("p.doc_type::text != ALL(%s)")
+            p.append(excluded_types)
+        return c, p
 
     def add_all_except(conds, params, *, skip: str):
         """Ajoute tous les filtres sauf celui indiqué par skip."""
@@ -398,11 +404,10 @@ async def export_publications_csv(
             conditions = [PUB_IS_UCA]
             params = []
 
-        # Exclure peer_review + ongoing_thesis (sauf si doc_type explicitement demandé)
-        if doc_types:
-            conditions.append("p.doc_type != 'peer_review'")
-        else:
-            conditions.append("p.doc_type NOT IN ('peer_review', 'ongoing_thesis')")
+        conditions.append("p.doc_type != 'peer_review'")
+        if excluded_types:
+            conditions.append("p.doc_type::text != ALL(%s)")
+            params.append(excluded_types)
 
         if search:
             conditions.append("unaccent(p.title) ILIKE unaccent(%s)")
@@ -771,6 +776,7 @@ async def list_publications(
     oa_status: str = Query(""),        # comma-separated values
     source_filter: str = Query(""),    # comma-separated: hal_only, oa_only, both
     doc_type: str = Query(""),         # comma-separated values
+    excluded_doc_type: str = Query(""),  # comma-separated values to exclude
     sort: str = Query("year_desc"),    # year_desc, year_asc, title
     person_id: int | None = Query(None),
     is_corresponding: str = Query(""),  # yes, no
@@ -783,6 +789,7 @@ async def list_publications(
     # Parse comma-separated multi-value params
     years = [int(v) for v in year.split(',') if v.strip()] if year else []
     doc_types = [v.strip() for v in doc_type.split(',') if v.strip()] if doc_type else []
+    excluded_types = [v.strip() for v in excluded_doc_type.split(',') if v.strip()] if excluded_doc_type else []
     lab_id_parts = [v.strip() for v in lab_id.split(',') if v.strip()] if lab_id else []
     lab_none = "none" in lab_id_parts
     lab_ids = [int(v) for v in lab_id_parts if v != "none"] if lab_id_parts else []
@@ -815,11 +822,10 @@ async def list_publications(
             conditions = [PUB_IS_UCA]
             params = []
 
-        # Exclure peer_review + ongoing_thesis (sauf si doc_type explicitement demandé)
-        if doc_types:
-            conditions.append("p.doc_type != 'peer_review'")
-        else:
-            conditions.append("p.doc_type NOT IN ('peer_review', 'ongoing_thesis')")
+        conditions.append("p.doc_type != 'peer_review'")
+        if excluded_types:
+            conditions.append("p.doc_type::text != ALL(%s)")
+            params.append(excluded_types)
 
         if search:
             conditions.append("unaccent(p.title) ILIKE unaccent(%s)")
