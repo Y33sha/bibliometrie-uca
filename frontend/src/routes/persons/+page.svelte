@@ -9,6 +9,10 @@
 	import { useFacets } from "$lib/composables/useFacets.svelte";
 	import { useUrlFilters } from "$lib/composables/useUrlFilters.svelte";
 
+	interface IdEntry {
+		value: string;
+		confirmed: boolean;
+	}
 	interface Person {
 		id: number;
 		last_name: string;
@@ -16,8 +20,8 @@
 		role_title: string | null;
 		department_name: string | null;
 		has_rh: boolean;
-		orcids: string[];
-		idhals: string[];
+		orcids: IdEntry[] | null;
+		idhals: IdEntry[] | null;
 	}
 
 	// --- Filter state ---

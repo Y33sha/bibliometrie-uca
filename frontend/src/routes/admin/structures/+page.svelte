@@ -52,7 +52,7 @@
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	// Detail state
-	let detail: StructureDetail | null = $state(null);
+	let detail = $state<StructureDetail | null>(null);
 
 	// Relation picker state
 	let relationPickerOpen = $state(false);

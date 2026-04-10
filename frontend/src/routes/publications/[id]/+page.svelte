@@ -104,7 +104,7 @@
   }
 
   // --- State ---
-  let data: PubResponse | null = $state(null);
+  let data = $state<PubResponse | null>(null);
   let error = $state(false);
   let isAdmin = $state(false);
 
@@ -112,6 +112,9 @@
   const hasTruthTable = $derived((data?.authorships.length ?? 0) > 0);
   const thesesAuth = $derived(data?.theses_authorships ?? []);
   const thesisMeta = $derived(data?.thesis_meta);
+  const thesisAuthorStructures = $derived(
+    data?.authorships.find((a) => a.in_perimeter)?.structure_ids ?? []
+  );
 
   const typeLabels: Record<string, string> = { ...baseTypeLabels, conference_paper: "Communication" };
 
@@ -213,7 +216,7 @@
   }
 
   onMount(async () => {
-    canGoBack = window.navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin);
+    canGoBack = (window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin);
     fetch(base + "/api/auth/check")
       .then((r) => r.json())
       .then((d) => {
@@ -402,6 +405,9 @@
             {#each thesisMeta.partenaires as pr, i}
               <span>{pr.nom}{#if pr.type}&nbsp;({pr.type}){/if}</span>{#if i < thesisMeta.partenaires.length - 1},&nbsp;{/if}
             {/each}
+            {#each thesisAuthorStructures as sid}
+              <a href="{base}/laboratories/{sid}" class="struct-tag">{structLabel(sid)}</a>
+            {/each}
           </dd>
         {/if}
       </dl>
@@ -411,7 +417,7 @@
   <!-- Authorships - Truth table (masqué pour les thèses, remplacé par le bloc thèse) -->
   {#if hasTruthTable && pub.doc_type !== 'thesis' && pub.doc_type !== 'ongoing_thesis'}
     <div class="section">
-      <h2 class="section-title">Auteurs ({data.authorships.length})</h2>
+      <h2 class="section-title">Auteurs ({data!.authorships.length})</h2>
       <table class="auth-table">
         <thead>
           <tr>
@@ -423,7 +429,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each data.authorships as a, i (i)}
+          {#each data!.authorships as a, i (i)}
             <tr class:uca-row={a.in_perimeter}>
               <td class="pos-cell">{(a.author_position ?? 0) + 1}</td>
               <td>
@@ -904,6 +910,7 @@
   }
   a.struct-tag:hover {
     background: #d0e3f4;
+    text-decoration: none;
   }
 
   .uca-dot {

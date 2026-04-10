@@ -628,11 +628,107 @@ async def person_profile(person_id: int):
         """, (person_id,))
         wos_authors = cur.fetchall()
 
+        # Nombre de thèses avec rôle non-auteur
+        cur.execute("""
+            SELECT COUNT(*) AS count
+            FROM source_authorships sa
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            WHERE sa.person_id = %s
+              AND sa.source = 'theses'
+              AND NOT (sa.roles && ARRAY['author']::text[])
+              AND sd.publication_id IS NOT NULL
+        """, (person_id,))
+        theses_count = cur.fetchone()["count"]
+
         return {
             "person": person,
             "identifiers": identifiers,
             "authors": hal_authors + oa_authors + wos_authors,
+            "theses_count": theses_count,
         }
+
+
+@router.get("/api/persons/{person_id}/theses")
+async def person_theses(person_id: int):
+    """Thèses liées à cette personne avec un rôle non-auteur (directeur, rapporteur, jury)."""
+    with get_cursor() as (cur, conn):
+        cur.execute("""
+            SELECT p.id, p.title, p.pub_year, p.doi,
+                   sa.roles,
+                   (SELECT sauth2.full_name
+                    FROM source_authorships sa2
+                    JOIN source_authors sauth2 ON sauth2.id = sa2.source_author_id
+                    WHERE sa2.source_document_id = sd.id
+                      AND sa2.source = 'theses'
+                      AND sa2.roles && ARRAY['author']::text[]
+                    LIMIT 1
+                   ) AS author_name,
+                   (SELECT a.structure_ids
+                    FROM authorships a
+                    WHERE a.publication_id = p.id AND a.in_perimeter
+                    LIMIT 1
+                   ) AS structure_ids
+            FROM source_authorships sa
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN publications p ON p.id = sd.publication_id
+            WHERE sa.person_id = %s
+              AND sa.source = 'theses'
+              AND NOT (sa.roles && ARRAY['author']::text[])
+            ORDER BY p.pub_year DESC NULLS LAST, p.title
+        """, (person_id,))
+        rows = cur.fetchall()
+
+        # Collecter tous les structure_ids pour résolution
+        all_struct_ids = set()
+        for row in rows:
+            for sid in (row["structure_ids"] or []):
+                all_struct_ids.add(sid)
+
+        structures = {}
+        if all_struct_ids:
+            cur.execute(
+                "SELECT id, acronym, name FROM structures WHERE id = ANY(%s)",
+                (list(all_struct_ids),),
+            )
+            for s in cur.fetchall():
+                structures[s["id"]] = {"acronym": s["acronym"], "name": s["name"]}
+
+        # Grouper par role
+        role_labels = {
+            "thesis_director": "Directeur/directrice de thèse",
+            "rapporteur": "Rapporteur",
+            "jury_president": "Président du jury",
+            "jury_member": "Membre du jury",
+        }
+        by_role: dict[str, list] = {}
+        for row in rows:
+            roles = row["roles"] or []
+            # Prendre le role le plus specifique
+            role = "jury_member"
+            for r in ("thesis_director", "rapporteur", "jury_president", "jury_member"):
+                if r in roles:
+                    role = r
+                    break
+            by_role.setdefault(role, []).append({
+                "id": row["id"],
+                "title": row["title"],
+                "pub_year": row["pub_year"],
+                "doi": row["doi"],
+                "author_name": row["author_name"],
+                "structure_ids": row["structure_ids"] or [],
+            })
+
+        # Ordonner les sections
+        sections = []
+        for role_key in ("thesis_director", "rapporteur", "jury_president", "jury_member"):
+            if role_key in by_role:
+                sections.append({
+                    "role": role_key,
+                    "label": role_labels.get(role_key, role_key),
+                    "theses": by_role[role_key],
+                })
+
+        return {"sections": sections, "total": len(rows), "structures": structures}
 
 
 @router.get("/api/persons/{person_id}/addresses")

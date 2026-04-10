@@ -381,11 +381,11 @@
     min-width: 300px;
   }
   .col-title a {
-    color: inherit;
+    color: var(--accent);
     text-decoration: none;
   }
   .col-title a:hover {
-    color: var(--accent);
+    text-decoration: underline;
   }
   .col-status {
     width: 90px;
