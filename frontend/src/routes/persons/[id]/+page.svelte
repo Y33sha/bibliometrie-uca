@@ -7,6 +7,8 @@
 	import { typeLabels, docTypeLabelsMap, oaLabelsMap } from '$lib/labels';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
+	import { useColumnVisibility } from '$lib/composables/useColumnVisibility.svelte';
+	import ColumnMenu from '$lib/components/ColumnMenu.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
@@ -64,6 +66,7 @@
 		scanr_id: string | null;
 		wos_id: string | null;
 		labs: string | null;
+		lab_items: { id: number; label: string }[] | null;
 		apc: { amount: number; institution: string | null; lab_id: number | null; lab_acronym: string | null; budget_structure_id: number | null }[] | null;
 		is_corresponding: boolean | null;
 		authorship_id: number | null;
@@ -83,9 +86,25 @@
 		})()
 	);
 
+	// --- Column visibility ---
+	const cv = useColumnVisibility([
+		{ key: 'title',   label: 'Titre',    fixed: true },
+		{ key: 'journal', label: 'Revue' },
+		{ key: 'type',    label: 'Type' },
+		{ key: 'year',    label: 'Année' },
+		{ key: 'labs',    label: 'Labo(s)' },
+		{ key: 'corr',    label: 'Corresp.' },
+		{ key: 'apc',     label: 'APC' },
+		{ key: 'oa',      label: 'OA' },
+		{ key: 'oa_path', label: 'Voie OA' },
+		{ key: 'links',   label: 'Liens',    fixed: true },
+	], ['apc', 'oa_path']);
+	const col = cv.col;
+
 	// Facet filter selections
 	let selectedYears: string[] = $state([]);
 	let selectedDocTypes: string[] = $state([]);
+	let selectedAccess: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
 	let selectedCorr: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
@@ -106,6 +125,7 @@
 		params.set('person_id', personId ?? '');
 		if (selectedYears.length) params.set('year', selectedYears.join(','));
 		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
+		if (selectedAccess.length) params.set('access', selectedAccess.join(','));
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
 		if (selectedCorr.length) params.set('is_corresponding', selectedCorr.join(','));
 		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
@@ -128,13 +148,14 @@
 	});
 
 	// Facets
-	const facets = useFacets<'years' | 'docTypes' | 'oa' | 'corresponding' | 'countries'>({
+	const facets = useFacets<'years' | 'docTypes' | 'access' | 'oa' | 'corresponding' | 'countries'>({
 		endpoint: '/api/publications/facets',
 		apiKey: 'person-detail-facets',
 		buildParams: () => buildFilterParams(),
 		facets: {
 			years: { type: 'simple', apiKey: 'years' },
 			docTypes: { type: 'label_map', apiKey: 'doc_types', labels: docTypeLabelsMap },
+			access: { type: 'passthrough', apiKey: 'access' },
 			oa: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
 			corresponding: { type: 'boolean', apiKey: 'corresponding', yesLabel: 'Oui', noLabel: 'Non' },
 			countries: {
@@ -319,10 +340,11 @@
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
 			<div class="toolbar">
-				<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
-				<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />
-				<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
-				{#if facets.options.corresponding.length}
+				{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
+				{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
+				{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
+				{#if col('oa_path')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
+				{#if col('corr') && facets.options.corresponding.length}
 					<FacetDropdown label="Corresp." options={facets.options.corresponding} bind:selected={selectedCorr} onchange={onFilterChange} />
 				{/if}
 				<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
@@ -336,19 +358,26 @@
 					<tr>
 						{#if isAdmin}<th style="width:28px"></th>{/if}
 						<th class="sortable" class:active={currentSort === 'title' || currentSort === 'title_desc'} onclick={toggleSortTitle}>Titre {currentSort === 'title' ? '↑' : currentSort === 'title_desc' ? '↓' : ''}</th>
-						<th>Revue</th>
-						<th style="width:80px">Type</th>
-						<th style="width:40px" class="sortable" class:active={currentSort === 'year_desc' || currentSort === 'year_asc'} onclick={toggleSortYear}>An. {currentSort === 'year_asc' ? '↑' : '↓'}</th>
-						<th style="width:80px">Labo(s)</th>
-						<th style="width:30px" title="Auteur correspondant">&#9993;</th>
-						<th style="width:60px">APC</th>
-						<th style="width:50px">OA</th>
-						<th style="width:80px">Liens</th>
+						{#if col('journal')}<th>Revue</th>{/if}
+						{#if col('type')}<th style="width:80px">Type</th>{/if}
+						{#if col('year')}<th style="width:40px" class="sortable" class:active={currentSort === 'year_desc' || currentSort === 'year_asc'} onclick={toggleSortYear}>An. {currentSort === 'year_asc' ? '↑' : '↓'}</th>{/if}
+						{#if col('labs')}<th style="width:80px">Labo(s)</th>{/if}
+						{#if col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
+						{#if col('apc')}<th style="width:60px">APC</th>{/if}
+						{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
+						{#if col('oa_path')}<th style="width:60px">Voie OA</th>{/if}
+						<th style="width:80px" class="col-menu-th">
+							<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
+								showMenu={cv.showMenu}
+								onToggle={cv.toggle}
+								onClose={() => cv.showMenu = false}
+								onOpen={() => cv.showMenu = !cv.showMenu} />
+						</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#if pubs.items.length === 0}
-						<tr><td colspan={isAdmin ? 10 : 9} class="no-results">Aucune publication</td></tr>
+						<tr><td colspan={cv.visibleColumns.length + (isAdmin ? 1 : 0)} class="no-results">Aucune publication</td></tr>
 					{:else}
 						{#each pubs.items as p (p.id)}
 							<tr>
@@ -361,22 +390,22 @@
 									</td>
 								{/if}
 								<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
-								<td class="journal-cell">{p.journal || ''}</td>
-								<td>
+								{#if col('journal')}<td class="journal-cell">{p.journal || ''}</td>{/if}
+								{#if col('type')}<td>
 									<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
-								</td>
-								<td>{p.pub_year || ''}</td>
-								<td>
-									{#each (p.labs || '').split(', ').filter(Boolean) as lab}
-										<span class="lab-tag">{lab}</span>
+								</td>{/if}
+								{#if col('year')}<td>{p.pub_year || ''}</td>{/if}
+								{#if col('labs')}<td>
+									{#each p.lab_items || [] as lab}
+										<a href="{base}/laboratories/{lab.id}" class="lab-tag">{lab.label}</a>
 									{/each}
-								</td>
-								<td class="corr-cell">
+								</td>{/if}
+								{#if col('corr')}<td class="corr-cell">
 									{#if p.is_corresponding}
 										<span title="Auteur correspondant">&#10003;</span>
 									{/if}
-								</td>
-								<td class="apc-cell">
+								</td>{/if}
+								{#if col('apc')}<td class="apc-cell">
 									{#if p.apc}
 										{@const ucaApc = p.apc.filter(a => a.budget_structure_id === 169)}
 										{#if ucaApc.length > 0}
@@ -390,12 +419,25 @@
 											</span>
 										{/if}
 									{/if}
-								</td>
-								<td>
+								</td>{/if}
+								{#if col('oa')}<td class="oa-lock-cell">
+									{#if p.oa_status && !['unknown', 'closed'].includes(p.oa_status)}
+										<span class="oa-lock-badge oa-lock-open">
+											<img src="{base}/lock-open.svg" alt="Open Access" class="oa-lock" title="Open Access ({p.oa_status})" />
+											<span class="oa-lock-label">ouvert</span>
+										</span>
+									{:else}
+										<span class="oa-lock-badge oa-lock-closed">
+											<img src="{base}/lock-closed.svg" alt="Closed" class="oa-lock" title="Accès fermé" />
+											<span class="oa-lock-label">fermé</span>
+										</span>
+									{/if}
+								</td>{/if}
+								{#if col('oa_path')}<td>
 									{#if p.oa_status && p.oa_status !== 'unknown'}
 										<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
 									{/if}
-								</td>
+								</td>{/if}
 								<td class="links-cell">
 									{#if p.hal_id}
 										<a href={halDocUrl(p.hal_id)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
@@ -642,4 +684,5 @@
 	}
 	.orphan-banner:hover { background: #fdecc8; }
 	.orphan-detail { font-size: 0.85rem; color: #a08530; }
+	.col-menu-th { position: relative; }
 </style>

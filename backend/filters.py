@@ -1,7 +1,7 @@
 """Shared SQL filter helpers and constants."""
 
 
-OA_OPEN_STATUSES = ('gold', 'hybrid', 'bronze', 'green')
+OA_OPEN_STATUSES = ('gold', 'hybrid', 'bronze', 'green', 'diamond')
 
 # Filtre SQL : la publication a au moins un authorship dans le périmètre.
 # Exclut les peer_review et les personnes rejetées (fausses entités).
@@ -11,6 +11,17 @@ PUB_IS_UCA = """(
             WHERE a.publication_id = p.id AND a.in_perimeter = TRUE)
     AND p.doc_type != 'peer_review'
 )"""
+
+
+def apply_access_filter(conditions: list, params: list, access: str | None):
+    """Ajoute le filtre accès ouvert/fermé."""
+    if not access:
+        return
+    if access == "open":
+        conditions.append("p.oa_status::text = ANY(%s)")
+        params.append(list(OA_OPEN_STATUSES))
+    elif access == "closed":
+        conditions.append("(p.oa_status::text = 'closed' OR p.oa_status IS NULL OR p.oa_status::text = 'unknown')")
 
 
 def apply_oa_filter(conditions: list, params: list, oa_status: str | None):

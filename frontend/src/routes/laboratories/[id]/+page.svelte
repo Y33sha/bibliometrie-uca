@@ -15,6 +15,8 @@
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
+	import { useColumnVisibility } from '$lib/composables/useColumnVisibility.svelte';
+	import ColumnMenu from '$lib/components/ColumnMenu.svelte';
 
 	const labId = $derived($page.params.id);
 	let canGoBack = $state(false);
@@ -55,6 +57,7 @@
 		scanr_id: string | null;
 		wos_id: string | null;
 		labs: string | null;
+		lab_items: { id: number; label: string }[] | null;
 		apc: { amount: number; institution: string | null; lab_id: number | null; lab_acronym: string | null; budget_structure_id: number | null }[] | null;
 	}
 	interface LabPerson {
@@ -105,11 +108,25 @@
 		})()
 	);
 
+	// --- Column visibility ---
+	const cv = useColumnVisibility([
+		{ key: 'title',   label: 'Titre',    fixed: true },
+		{ key: 'journal', label: 'Revue' },
+		{ key: 'type',    label: 'Type' },
+		{ key: 'year',    label: 'Année' },
+		{ key: 'apc',     label: 'APC' },
+		{ key: 'oa',      label: 'OA' },
+		{ key: 'oa_path', label: 'Voie OA' },
+		{ key: 'links',   label: 'Liens',    fixed: true },
+	], ['apc', 'oa_path']);
+	const col = cv.col;
+
 	// --- Publication filters ---
 	let pubSearch = $state('');
 	let selectedYears: string[] = $state([]);
 	let sourceStates: Record<string, string> = $state({});
 	let selectedDocTypes: string[] = $state([]);
+	let selectedAccess: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
 	let selectedApc: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
@@ -177,6 +194,7 @@
 		const sf = Object.entries(sourceStates).filter(([, v]) => v === 'yes' || v === 'no').map(([k, v]) => `${k}_${v}`).join(',');
 		if (sf) params.set('source_filter', sf);
 		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
+		if (selectedAccess.length) params.set('access', selectedAccess.join(','));
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) params.set('has_apc', selectedApc.join(','));
 		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
@@ -206,6 +224,7 @@
 		facets: {
 			years:     { type: 'simple',      apiKey: 'years' },
 			docTypes:  { type: 'label_map',   apiKey: 'doc_types',   labels: docTypeLabelsMap },
+			access:    { type: 'passthrough', apiKey: 'access' },
 			oa:        { type: 'label_map',   apiKey: 'oa_statuses', labels: oaLabelsMap },
 			apc:       { type: 'passthrough', apiKey: 'apc' },
 			countries: { type: 'passthrough', apiKey: 'countries',
@@ -220,6 +239,7 @@
 			selectedYears:    { type: 'string_array',  urlKey: 'year' },
 			sourceStates:     { type: 'source_states', urlKey: 'source_filter' },
 			selectedDocTypes: { type: 'string_array',  urlKey: 'doc_type' },
+			selectedAccess:   { type: 'string_array',  urlKey: 'access' },
 			selectedOa:       { type: 'string_array',  urlKey: 'oa_status' },
 			selectedApc:      { type: 'string_array',  urlKey: 'has_apc' },
 			selectedCountries:{ type: 'string_array',  urlKey: 'country' },
@@ -240,7 +260,7 @@
 		url.syncUrl(() => ({
 			tab: activeTab,
 			selectedYears, sourceStates, selectedDocTypes,
-			selectedOa, selectedApc, selectedCountries, pubSearch, pubSort,
+			selectedAccess, selectedOa, selectedApc, selectedCountries, pubSearch, pubSort,
 			currentPage: pubs.page,
 			personsSort,
 			hasRh: selectedRh.length === 1 ? selectedRh[0] : 'all',
@@ -494,6 +514,7 @@
 		if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
 		if (restored.sourceStates) sourceStates = restored.sourceStates as Record<string, string>;
 		if (restored.selectedDocTypes) selectedDocTypes = restored.selectedDocTypes as string[];
+		if (restored.selectedAccess) selectedAccess = restored.selectedAccess as string[];
 		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
 		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
 		if (restored.selectedCountries) selectedCountries = restored.selectedCountries as string[];
@@ -671,10 +692,11 @@
 		<div class="tab-content">
 			<div class="toolbar toolbar-card">
 				<input type="text" placeholder="Rechercher par titre..." bind:value={pubSearch} oninput={onSearchInput} />
-				<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
-				<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />
-				<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
-				<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
+				{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
+				{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
+				{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
+				{#if col('oa_path')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
+				{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />{/if}
 				<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
 				<SourceFilterToggle bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
 				<span class="count">{pubs.total} publication{pubs.total > 1 ? 's' : ''}</span>
@@ -684,27 +706,34 @@
 				<thead>
 					<tr>
 						<th class="sortable" class:active={pubSort === 'title' || pubSort === 'title_desc'} onclick={togglePubSortTitle}>Titre {pubSort === 'title' ? '↑' : pubSort === 'title_desc' ? '↓' : ''}</th>
-						<th>Revue</th>
-						<th style="width:80px">Type</th>
-						<th style="width:40px" class="sortable" class:active={pubSort === 'year_desc' || pubSort === 'year_asc'} onclick={togglePubSortYear}>An. {pubSort === 'year_asc' ? '↑' : '↓'}</th>
-						<th style="width:60px">APC</th>
-						<th style="width:50px">OA</th>
-						<th style="width:80px">Liens</th>
+						{#if col('journal')}<th>Revue</th>{/if}
+						{#if col('type')}<th style="width:80px">Type</th>{/if}
+						{#if col('year')}<th style="width:40px" class="sortable" class:active={pubSort === 'year_desc' || pubSort === 'year_asc'} onclick={togglePubSortYear}>An. {pubSort === 'year_asc' ? '↑' : '↓'}</th>{/if}
+						{#if col('apc')}<th style="width:60px">APC</th>{/if}
+						{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
+						{#if col('oa_path')}<th style="width:60px">Voie OA</th>{/if}
+						<th style="width:80px" class="col-menu-th">
+							<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
+								showMenu={cv.showMenu}
+								onToggle={cv.toggle}
+								onClose={() => cv.showMenu = false}
+								onOpen={() => cv.showMenu = !cv.showMenu} />
+						</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#if pubs.items.length === 0}
-						<tr><td colspan="7" class="no-results">Aucune publication</td></tr>
+						<tr><td colspan={cv.visibleColumns.length} class="no-results">Aucune publication</td></tr>
 					{:else}
 						{#each pubs.items as p (p.id)}
 							<tr>
 								<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
-								<td class="journal-cell">{p.journal || ''}</td>
-								<td>
+								{#if col('journal')}<td class="journal-cell">{p.journal || ''}</td>{/if}
+								{#if col('type')}<td>
 									<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
-								</td>
-								<td>{p.pub_year || ''}</td>
-								<td class="apc-cell">
+								</td>{/if}
+								{#if col('year')}<td>{p.pub_year || ''}</td>{/if}
+								{#if col('apc')}<td class="apc-cell">
 									{#if p.apc}
 										{@const thisLabApc = p.apc.filter(a => a.lab_id === lab?.id)}
 										{@const otherApc = p.apc.filter(a => a.lab_id !== lab?.id)}
@@ -718,12 +747,25 @@
 											</span>
 										{/if}
 									{/if}
-								</td>
-								<td>
+								</td>{/if}
+								{#if col('oa')}<td class="oa-lock-cell">
+									{#if p.oa_status && !['unknown', 'closed'].includes(p.oa_status)}
+										<span class="oa-lock-badge oa-lock-open">
+											<img src="{base}/lock-open.svg" alt="Open Access" class="oa-lock" title="Open Access ({p.oa_status})" />
+											<span class="oa-lock-label">ouvert</span>
+										</span>
+									{:else}
+										<span class="oa-lock-badge oa-lock-closed">
+											<img src="{base}/lock-closed.svg" alt="Closed" class="oa-lock" title="Accès fermé" />
+											<span class="oa-lock-label">fermé</span>
+										</span>
+									{/if}
+								</td>{/if}
+								{#if col('oa_path')}<td>
 									{#if p.oa_status && p.oa_status !== 'unknown'}
 										<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
 									{/if}
-								</td>
+								</td>{/if}
 								<td class="links-cell">
 									{#if p.hal_id}
 										<a href={halDocUrl(p.hal_id)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
@@ -950,4 +992,5 @@
 	}
 	.status-tag.confirmed { background: #e6f4ec; color: #2a7d4f; }
 	.status-tag.pending { background: #f0efec; color: var(--muted); }
+	.col-menu-th { position: relative; }
 </style>

@@ -229,6 +229,8 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 .source-hal:hover { background: #d0e3f4; }
 .source-oa { background: #fef3e0; }
 .source-oa:hover { background: #fde8c8; }
+.source-theses { background: #e8f5e9; }
+.source-theses:hover { background: #d0eadb; }
 .source-scanr { background: transparent; }
 .source-scanr img { width: 22px; height: 22px; }
 .source-wos { background: #e8e0f8; }
@@ -261,6 +263,10 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 	background: #e8f0f8;
 	color: var(--accent);
 	font-weight: 500;
+	text-decoration: none;
+}
+.lab-tag:hover {
+	background: #d0e4f4;
 }
 
 /* ── Role / tutelle tag (neutral) ── */
@@ -286,6 +292,14 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 	font-weight: 500;
 }
 .type-badge { background: #e8f0f8; color: var(--accent); }
+
+/* ── OA lock icon + label ── */
+.oa-lock-cell { white-space: nowrap; }
+.oa-lock-badge { display: inline-flex; align-items: center; gap: 3px; }
+.oa-lock { width: 22px; height: 22px; }
+.oa-lock-label { font-size: 0.65rem; font-variant: small-caps; font-weight: 600; letter-spacing: 0.03em; }
+.oa-lock-open .oa-lock-label { color: #4caf50; }
+.oa-lock-closed .oa-lock-label { color: #333; }
 
 /* ── OA tags ── */
 .oa-tag {
