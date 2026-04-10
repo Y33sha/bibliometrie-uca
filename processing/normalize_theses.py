@@ -96,8 +96,7 @@ def find_or_insert_publication(cur, these: dict) -> tuple[int | None, bool]:
     if not title:
         return None, False
 
-    status = these.get("status")
-    doc_type = "ongoing_thesis" if status == "enCours" else "thesis"
+    doc_type = "thesis" if these.get("dateSoutenance") else "ongoing_thesis"
 
     # Année : depuis dateSoutenance ou datePremiereInscriptionDoctorat
     pub_year = None
@@ -145,6 +144,35 @@ def find_or_insert_publication(cur, these: dict) -> tuple[int | None, bool]:
         doi=doi, nnt=nnt_clean)
 
 
+def _parse_date_iso(date_str: str | None) -> str | None:
+    """Convertit JJ/MM/AAAA → YYYY-MM-DD."""
+    if not date_str:
+        return None
+    try:
+        parts = date_str.strip().split("/")
+        return f"{parts[2]}-{parts[1]}-{parts[0]}"
+    except (IndexError, ValueError):
+        return None
+
+
+def _update_thesis_meta(cur, pub_id: int, these: dict):
+    """Met à jour publications.meta avec les dates de thèse."""
+    meta = {}
+    ds = _parse_date_iso(these.get("dateSoutenance"))
+    di = _parse_date_iso(these.get("datePremiereInscriptionDoctorat"))
+    if ds:
+        meta["date_soutenance"] = ds
+    if di:
+        meta["date_inscription"] = di
+    if not meta:
+        return
+    cur.execute("""
+        UPDATE publications
+        SET meta = COALESCE(meta, '{}') || %s, updated_at = now()
+        WHERE id = %s
+    """, (Json(meta), pub_id))
+
+
 # =============================================================
 # SOURCE DOCUMENTS
 # =============================================================
@@ -153,8 +181,7 @@ def insert_source_document(cur, these: dict, staging_id: int,
                            theses_id: str, publication_id: int | None) -> int:
     """Crée/retrouve l'entrée source_documents pour theses.fr."""
     title = these.get("titrePrincipal") or ""
-    status = these.get("status")
-    doc_type = "ongoing_thesis" if status == "enCours" else "thesis"
+    doc_type = "thesis" if these.get("dateSoutenance") else "ongoing_thesis"
 
     pub_year = None
     date_sout = these.get("dateSoutenance")
@@ -334,8 +361,7 @@ def process_work(cur, row: dict) -> bool:
         if existing_doc and existing_doc["publication_id"]:
             publication_id = existing_doc["publication_id"]
             # Re-traitement : enrichir (ex: ongoing_thesis → thesis après soutenance)
-            status = these.get("status")
-            doc_type = "ongoing_thesis" if status == "enCours" else "thesis"
+            doc_type = "thesis" if these.get("dateSoutenance") else "ongoing_thesis"
             _enrich(cur, publication_id, doi=these.get("doi"), doc_type=doc_type)
         else:
             publication_id, _ = find_or_insert_publication(cur, these)
@@ -343,6 +369,9 @@ def process_work(cur, row: dict) -> bool:
         if not publication_id:
             logger.warning(f"Impossible d'insérer {theses_id} — échec publication")
             return False
+
+        # Dates de thèse → publications.meta
+        _update_thesis_meta(cur, publication_id, these)
 
         # Document
         source_document_id = insert_source_document(
