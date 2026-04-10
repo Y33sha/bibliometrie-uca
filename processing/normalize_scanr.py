@@ -32,7 +32,7 @@ from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.authorship_roles import map_role
-from services.publications import find_or_create as find_or_create_publication, update_sources
+from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__), "logs"))
@@ -344,6 +344,18 @@ def process_work(cur, staging_row) -> bool:
         if existing_doc and existing_doc["publication_id"]:
             publication_id = existing_doc["publication_id"]
             is_new = False
+            # Re-traitement : enrichir avec les nouvelles métadonnées
+            doi = extract_doi(doc)
+            raw_type = doc.get("type", "other")
+            doc_type = DOCTYPE_MAP.get(raw_type, "other")
+            oa_status = "green" if doc.get("isOa") else "closed"
+            container_title = None
+            if not journal_id:
+                source = doc.get("source") or {}
+                container_title = source.get("title")
+            _enrich(cur, publication_id, doi=doi, doc_type=doc_type,
+                    oa_status=oa_status, journal_id=journal_id,
+                    container_title=container_title)
         else:
             publication_id, is_new = find_or_insert_publication(cur, doc, journal_id)
         timings["publication"] = time.perf_counter() - t0

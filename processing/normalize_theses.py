@@ -328,6 +328,11 @@ def process_work(cur, row: dict) -> bool:
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc["publication_id"]:
             publication_id = existing_doc["publication_id"]
+            # Re-traitement : enrichir (ex: ongoing_thesis → thesis après soutenance)
+            status = these.get("status")
+            doc_type = "ongoing_thesis" if status == "enCours" else "thesis"
+            doi = these.get("doi") or these.get("nnt")
+            _enrich(cur, publication_id, doi=doi, doc_type=doc_type)
         else:
             publication_id, _ = find_or_insert_publication(cur, these)
 

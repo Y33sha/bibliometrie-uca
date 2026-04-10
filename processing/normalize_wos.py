@@ -33,7 +33,7 @@ from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.authorship_roles import map_role
-from services.publications import find_or_create as find_or_create_publication, update_sources
+from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -816,6 +816,11 @@ def process_record(cur, staging_row: tuple) -> bool:
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc[0]:
             publication_id = existing_doc[0]
+            # Re-traitement : enrichir avec les nouvelles métadonnées
+            container_title = rec.get("journal_title") if not journal_id else None
+            _enrich(cur, publication_id, doi=rec["doi"], doc_type=rec["doc_type"],
+                    oa_status=rec["oa_status"], journal_id=journal_id,
+                    container_title=container_title, language=rec.get("language"))
         else:
             publication_id = upsert_publication(cur, rec, journal_id)
         if not publication_id:
