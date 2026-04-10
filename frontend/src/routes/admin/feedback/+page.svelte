@@ -115,7 +115,7 @@
   let addresses: FeedbackAddress[] = $state([]);
   let search = $state("");
   let searchTimeout: ReturnType<typeof setTimeout> | null = $state(null);
-  let rerunState: "idle" | "running" | "done" | "error" = $state("idle");
+  let rerunState = $state<"idle" | "running" | "done" | "error">("idle");
   let rerunLines: string[] = $state([]);
 
   // Context picker state

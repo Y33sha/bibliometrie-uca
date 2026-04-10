@@ -1,7 +1,7 @@
 """
 Crée des entités Personnes à partir des authorships sources UCA non rattachées.
 
-Algorithme en 4 étapes :
+Algorithme en 4 étapes + 1 étape complémentaire :
 
   Étape 0 : Comptes HAL déjà rattachés
     source_authors HAL avec hal_person_id ET person_id → propagation aux nouvelles
@@ -25,6 +25,12 @@ Algorithme en 4 étapes :
     - Mappé à >1 personnes → orphelin (traitement manuel)
     - Forme inconnue → créer nouvelle personne
 
+  Étape 4 : Thèses hors-périmètre (directeurs, rapporteurs, jury)
+    Les rôles non-auteur des thèses sont hors périmètre (in_perimeter=false)
+    et ne passent pas par les étapes 0-3. Si leur source_author a un IdRef
+    correspondant à une personne connue, on rattache sans modifier
+    in_perimeter ni créer de personne.
+
 Usage:
     python create_persons_from_source_authorships.py              # exécuter
     python create_persons_from_source_authorships.py --dry-run    # dry-run
@@ -41,7 +47,7 @@ from psycopg2.extras import RealDictCursor
 from utils.normalize import normalize_name
 from utils.names import parse_raw_author_name, names_compatible
 from services.persons import (
-    create_person, link_authorships as link_to_person,
+    create_person, link_authorship, link_authorships as link_to_person,
     add_identifiers_from_authorships as add_identifiers,
     add_name_form,
 )
@@ -511,6 +517,45 @@ def step3_name_forms(cur, all_authorships, linked_ids, name_form_map, dry_run):
 
 
 # ---------------------------------------------------------------------------
+# Étape 4 : Thèses hors-périmètre — rattachement par IdRef
+# ---------------------------------------------------------------------------
+
+def step4_theses_non_authors(cur, dry_run):
+    """Rattache les source_authorships thèses hors-périmètre (directeurs,
+    rapporteurs, jury) à des personnes connues via leur IdRef.
+
+    Ne crée pas de personne, ne modifie pas in_perimeter.
+    """
+    idref_map = load_idref_person_map(cur)
+
+    cur.execute("""
+        SELECT sa_auth.id AS authorship_id, sa.idref, sa.full_name
+        FROM source_authorships sa_auth
+        JOIN source_authors sa ON sa.id = sa_auth.source_author_id
+        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
+        WHERE sa_auth.source = 'theses'
+          AND sa_auth.person_id IS NULL
+          AND sa_auth.in_perimeter = FALSE
+          AND sa.idref IS NOT NULL
+          AND sd.publication_id IS NOT NULL
+    """)
+    candidates = cur.fetchall()
+
+    linked = 0
+    for c in candidates:
+        pid = idref_map.get(c["idref"])
+        if pid:
+            if not dry_run:
+                link_authorship(cur, pid, "theses", c["authorship_id"])
+                add_name_form(cur, pid, c["full_name"])
+            linked += 1
+
+    logger.info(f"  {linked} authorships thèses hors-périmètre rattachées par IdRef "
+                f"(sur {len(candidates)} avec IdRef)")
+    return linked
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -551,6 +596,10 @@ def run(dry_run=False):
     s3_created, s3_linked, s3_ambiguous = step3_name_forms(
         cur, all_authorships, linked_ids, name_form_map, dry_run)
 
+    # ── Étape 4 : Thèses hors-périmètre ──
+    logger.info("\n--- Étape 4 : thèses hors-périmètre (IdRef) ---")
+    s4 = step4_theses_non_authors(cur, dry_run)
+
     # ── Résumé ──
     total_linked = len(linked_ids)
     unlinked = len(all_authorships) - total_linked
@@ -561,6 +610,7 @@ def run(dry_run=False):
     logger.info(f"  Étape 1b (IdRef connu)   : {s1b} rattachées")
     logger.info(f"  Étape 2 (ORCID connu)    : {s2} rattachées")
     logger.info(f"  Étape 3 (name_forms)     : {s3_created} créées, {s3_linked} rattachées, {s3_ambiguous} ambiguës")
+    logger.info(f"  Étape 4 (thèses h-p)     : {s4} rattachées")
     logger.info(f"  Non résolues             : {unlinked}")
 
     if dry_run:

@@ -14,7 +14,8 @@
 - Frontend : SvelteKit (Svelte 5), routes dans `frontend/src/routes/`
 - Pipeline : scripts dans `processing/` et `extraction/`, orchestrateur `run_pipeline.py`
 - Migrations SQL dans `db/migrations/`, appliquées via `python db/migrate.py`
-- Tests : `python -m pytest tests/ -v` (nécessite `export DB_PASSWORD=...`)
+- Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_PASSWORD=...`)
+- Tests frontend : `cd frontend && npm run check` (svelte-check, échoue sur les erreurs de types)
 - Lancement dev : `bash start.sh` (uvicorn port 8003 + vite port 5176)
 - Logging : utiliser `setup_logger` de `utils/log.py`
 - DOI : utiliser `clean_doi` de `utils/doi.py`

@@ -33,6 +33,10 @@
     status: "pending" | "confirmed" | "rejected";
   }
 
+  interface NameForm {
+    name_form: string;
+    ambiguous: boolean;
+  }
   interface Person {
     id: number;
     first_name: string;
@@ -43,8 +47,11 @@
     end_date?: string;
     has_rh?: boolean;
     rejected?: boolean;
+    pub_count?: number;
+    uca_pub_count?: number;
     linked_authors?: LinkedAuthor[];
     identifiers?: PersonIdentifier[];
+    name_forms?: NameForm[];
   }
 
   interface PersonListResponse {
@@ -85,7 +92,7 @@
 
   /* ── State ── */
 
-  let stats: PersonStats | null = $state(null);
+  let stats = $state<PersonStats | null>(null);
   let orphanCount = $state(0);
   let showOrphans = $state(false);
   let orphanSearch = $state("");

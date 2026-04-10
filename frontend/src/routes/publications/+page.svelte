@@ -50,7 +50,7 @@
 	let currentSort = $state('year_desc');
 	let selectedYears: string[] = $state([]);
 	let selectedLabs: string[] = $state([]);
-	let sourceStates: Record<string, string> = $state({});
+	let sourceStates = $state<Record<string, 'all' | 'yes' | 'no'>>({});
 	let selectedDocTypes: string[] = $state([]);
 	let selectedAccess: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
@@ -220,7 +220,7 @@
 		const restored = url.restoreFromUrl($page.url.searchParams);
 		if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
 		if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
-		if (restored.sourceStates) sourceStates = restored.sourceStates as Record<string, string>;
+		if (restored.sourceStates) sourceStates = restored.sourceStates as Record<string, 'all' | 'yes' | 'no'>;
 		if (restored.selectedDocTypes) selectedDocTypes = restored.selectedDocTypes as string[];
 		if (restored.selectedAccess) selectedAccess = restored.selectedAccess as string[];
 		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];

@@ -47,11 +47,34 @@
 		person: Person;
 		identifiers: Identifier[];
 		authors: Author[];
+		theses_count: number;
 	}
 	interface Address {
 		id: number;
 		raw_text: string;
 		structures: { id: number; acronym: string | null; name: string }[] | null;
+	}
+	interface ThesisEntry {
+		id: number;
+		title: string;
+		pub_year: number | null;
+		doi: string | null;
+		author_name: string;
+		structure_ids: number[];
+	}
+	interface ThesisSection {
+		role: string;
+		label: string;
+		theses: ThesisEntry[];
+	}
+	interface ThesisStructInfo {
+		acronym: string | null;
+		name: string;
+	}
+	interface ThesesResponse {
+		sections: ThesisSection[];
+		total: number;
+		structures: Record<string, ThesisStructInfo>;
 	}
 	interface Publication {
 		id: number;
@@ -73,16 +96,17 @@
 	}
 
 	// --- State ---
-	let profile: Person | null = $state(null);
-	let identifiers: Identifier[] = $state([]);
-	let authors: Author[] = $state([]);
+	let profile = $state<Person | null>(null);
+	let identifiers = $state<Identifier[]>([]);
+	let authors = $state<Author[]>([]);
+	let thesesCount = $state(0);
 	let error = $state(false);
 	let isAdmin = $state(false);
 
 	const activeTab = $derived(
 		(() => {
 			const t = $page.url.searchParams.get('tab');
-			return t === 'identities' || t === 'addresses' ? t : 'publications';
+			return t === 'identities' || t === 'theses' || t === 'addresses' ? t : 'publications';
 		})()
 	);
 
@@ -108,7 +132,7 @@
 	let selectedOa: string[] = $state([]);
 	let selectedCorr: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
-	let sourceStates: Record<string, string> = $state({});
+	let sourceStates = $state<Record<string, 'all' | 'yes' | 'no'>>({});
 	let currentSort = $state('year_desc');
 
 	function toggleSortYear() {
@@ -173,6 +197,12 @@
 		facets.load();
 	}
 
+	// Theses tab
+	let thesesSections: ThesisSection[] = $state([]);
+	let thesesTotal = $state(0);
+	let thesesStructures = $state<Record<string, ThesisStructInfo>>({});
+	let thesesLoaded = $state(false);
+
 	// Addresses tab
 	let addresses: Address[] = $state([]);
 	let addrTotal = $state(0);
@@ -214,6 +244,16 @@
 		return Array.from(map, ([value, confirmed]) => ({ value, confirmed }));
 	});
 
+	async function loadTheses() {
+		const res = await api<ThesesResponse>(
+			`/api/persons/${personId}/theses`, { key: 'person-detail-theses' }
+		);
+		thesesSections = res.sections;
+		thesesTotal = res.total;
+		thesesStructures = res.structures;
+		thesesLoaded = true;
+	}
+
 	async function loadAddresses() {
 		const params = new URLSearchParams({
 			page: String(addrPage),
@@ -243,11 +283,12 @@
 
 	function onTabSwitch(tab: string) {
 		if (tab === 'publications' && pubs.items.length === 0 && pubs.total === 0) { facets.load(); pubs.load(); }
+		if (tab === 'theses' && !thesesLoaded) loadTheses();
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
 	}
 
 	onMount(async () => {
-		canGoBack = (window.navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
+		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
 		// Check admin status (non-blocking)
 		fetch(base + '/api/auth/check').then(r => r.json()).then(d => { isAdmin = !!d.authenticated; }).catch(() => {});
 		try {
@@ -255,12 +296,14 @@
 			profile = profileData.person;
 			identifiers = profileData.identifiers;
 			authors = profileData.authors;
+			thesesCount = profileData.theses_count;
 		} catch {
 			error = true;
 			return;
 		}
 		// Load data for active tab
 		if (activeTab === 'addresses') loadAddresses();
+		else if (activeTab === 'theses') loadTheses();
 		else if (activeTab === 'publications') { facets.load(); pubs.load(); }
 	});
 </script>
@@ -330,6 +373,7 @@
 	<TabNav
 		tabs={[
 			{ id: 'publications', label: 'Publications', count: pubs.total },
+			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses', count: thesesCount }] : []),
 			{ id: 'identities', label: 'Identités', count: authors.length },
 			{ id: 'addresses', label: 'Adresses', count: addrLoaded ? addrTotal : undefined },
 		]}
@@ -484,6 +528,41 @@
 		</div>
 	{/if}
 
+	<!-- Tab: Thèses -->
+	{#if activeTab === 'theses'}
+		<div class="tab-content">
+			{#if !thesesLoaded}
+				<div class="loading">Chargement...</div>
+			{:else if thesesSections.length === 0}
+				<div class="no-results">Aucune thèse liée</div>
+			{:else}
+				{#each thesesSections as section (section.role)}
+					<h3 class="thesis-role-heading">{section.label}</h3>
+					<table class="pub-table">
+						<thead>
+							<tr>
+								<th>Titre</th>
+								<th style="width:100px">Labo</th>
+								<th style="width:160px">Auteur</th>
+								<th style="width:50px">Année</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each section.theses as t (t.id)}
+								<tr>
+									<td><a href="{base}/publications/{t.id}">{t.title}</a></td>
+									<td>{#each t.structure_ids as sid}<a href="{base}/laboratories/{sid}" class="struct-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
+									<td>{t.author_name}</td>
+									<td>{t.pub_year ?? ''}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{/each}
+			{/if}
+		</div>
+	{/if}
+
 	<!-- Tab: Identités -->
 	{#if activeTab === 'identities'}
 		<div class="tab-content">
@@ -574,6 +653,13 @@
 {/if}
 
 <style>
+	.thesis-role-heading {
+		font-size: 1rem;
+		font-weight: 600;
+		margin: 20px 0 8px;
+		color: var(--fg);
+	}
+	.thesis-role-heading:first-child { margin-top: 0; }
 	.profile-header {
 		background: var(--card);
 		border: 1px solid var(--border);
@@ -641,6 +727,7 @@
 	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: middle; }
 	.tab-content td a { color: var(--accent); text-decoration: none; }
 	.tab-content td a:hover { text-decoration: underline; }
+	.tab-content td a.struct-tag:hover { text-decoration: none; }
 
 	.source-tag-label { padding: 2px 7px; font-size: 0.8rem; }
 
@@ -662,6 +749,11 @@
 		color: var(--accent);
 		font-weight: 500;
 		margin: 1px 2px;
+		text-decoration: none;
+	}
+	a.struct-tag:hover {
+		background: #d0e3f4;
+		text-decoration: none;
 	}
 	.exclude-cell { padding: 0 2px !important; text-align: center; vertical-align: middle; }
 	.exclude-btn {
