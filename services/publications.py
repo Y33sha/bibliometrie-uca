@@ -91,11 +91,7 @@ def _enrich(cur, pub_id: int, *, doi: str | None = None,
         UPDATE publications SET
             doi = CASE
                 WHEN publications.doi IS NOT NULL THEN publications.doi
-                WHEN %s IS NOT NULL AND NOT EXISTS (
-                    SELECT 1 FROM publications p2
-                    WHERE lower(p2.doi) = lower(%s) AND p2.id != publications.id
-                ) THEN %s
-                ELSE publications.doi
+                ELSE %s
             END,
             journal_id = COALESCE(%s, publications.journal_id),
             doc_type = CASE
@@ -116,7 +112,7 @@ def _enrich(cur, pub_id: int, *, doi: str | None = None,
             language = COALESCE(%s, publications.language),
             updated_at = now()
         WHERE id = %s
-    """, (doi, doi, doi,
+    """, (doi,
           journal_id,
           doc_type, doc_type, doc_type, doc_type,
           oa_status, oa_status, oa_status, oa_status,
