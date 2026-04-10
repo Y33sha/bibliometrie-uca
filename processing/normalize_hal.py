@@ -36,7 +36,7 @@ from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
 from utils.authorship_roles import map_role
-from services.publications import find_or_create as find_or_create_publication, update_sources
+from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -153,6 +153,25 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
         oa_status=oa_status, journal_id=journal_id,
         container_title=container_title, language=language,
         allow_create=allow_create)
+
+
+def _enrich_existing(cur, pub_id: int, doc: dict, journal_id: int | None):
+    """Enrichit une publication existante lors d'un re-traitement HAL.
+
+    Appelé quand le source_document existe déjà (raw_hash a changé → processed
+    remis à FALSE). Met à jour les métadonnées qui ont pu changer (oa_status, etc.).
+    """
+    doi = clean_doi(as_str(doc.get("doiId_s")))
+    raw_type = doc.get("docType_s", "OTHER")
+    doc_type = DOCTYPE_MAP.get(raw_type, "other")
+    oa_status = "green" if doc.get("openAccess_bool") else "closed"
+    language_list = doc.get("language_s")
+    language = language_list[0] if isinstance(language_list, list) and language_list else None
+    container_title = None
+    if not journal_id:
+        container_title = as_str(doc.get("bookTitle_s")) or as_str(doc.get("conferenceTitle_s"))
+    _enrich(cur, pub_id, doi=doi, doc_type=doc_type, oa_status=oa_status,
+            journal_id=journal_id, container_title=container_title, language=language)
 
 
 # =============================================================
@@ -567,6 +586,8 @@ def process_work(cur, staging_row: tuple) -> bool:
         if existing_doc and existing_doc[0]:
             publication_id = existing_doc[0]
             is_new = False
+            # Re-traitement (raw_hash a changé) : enrichir avec les nouvelles métadonnées
+            _enrich_existing(cur, publication_id, doc, journal_id)
         else:
             # Hors périmètre UCA (collection = NULL, vient de fetch_missing_hal.py) :
             # on enrichit les publications existantes mais on n'en crée pas de nouvelles

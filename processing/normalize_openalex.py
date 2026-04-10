@@ -31,7 +31,7 @@ from utils.hal import extract_hal_id_from_url
 from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
-from services.publications import find_or_create as find_or_create_publication, update_sources
+from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -197,6 +197,13 @@ def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
     raw_type = work.get("type") or "other"
     doc_type = DOCTYPE_MAP.get(raw_type, "other")
 
+    # OpenAlex "dissertation" est mixte : thèses ET mémoires de master.
+    # On distingue via l'URL de la source primaire.
+    if raw_type == "dissertation":
+        loc_url = (work.get("primary_location") or {}).get("landing_page_url") or ""
+        if "dumas." in loc_url:
+            doc_type = "memoir"
+
     oa_info = work.get("open_access") or {}
     raw_oa = oa_info.get("oa_status") or "closed"
     oa_status = OA_MAP.get(raw_oa, "unknown")
@@ -215,6 +222,27 @@ def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
         oa_status=oa_status, journal_id=journal_id,
         container_title=container_title, language=language)
     return pub_id
+
+
+def _enrich_from_work(cur, pub_id: int, work: dict, journal_id: int | None):
+    """Enrichit une publication existante lors d'un re-traitement OpenAlex."""
+    doi = clean_doi(work.get("doi"))
+    raw_type = work.get("type") or "other"
+    doc_type = DOCTYPE_MAP.get(raw_type, "other")
+    if raw_type == "dissertation":
+        loc_url = (work.get("primary_location") or {}).get("landing_page_url") or ""
+        if "dumas." in loc_url:
+            doc_type = "memoir"
+    oa_info = work.get("open_access") or {}
+    oa_status = OA_MAP.get(oa_info.get("oa_status") or "closed", "unknown")
+    language = work.get("language")
+    container_title = None
+    if not journal_id:
+        location = work.get("primary_location") or {}
+        source = location.get("source") or {}
+        container_title = source.get("display_name")
+    _enrich(cur, pub_id, doi=doi, doc_type=doc_type, oa_status=oa_status,
+            journal_id=journal_id, container_title=container_title, language=language)
 
 
 # =============================================================
@@ -481,6 +509,8 @@ def process_work(cur, staging_row: tuple) -> bool:
             existing_doc = cur.fetchone()
             if existing_doc and existing_doc["publication_id"]:
                 publication_id = existing_doc["publication_id"]
+                # Re-traitement : enrichir avec les nouvelles métadonnées
+                _enrich_from_work(cur, publication_id, work, journal_id)
 
         # Publication (table de vérité) — fallback si pas trouvée via HAL
         if not publication_id:
