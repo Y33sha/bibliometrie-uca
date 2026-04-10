@@ -458,6 +458,10 @@ async def export_publications_csv(
             "year_asc": "p.pub_year ASC, p.title",
             "title": "p.title ASC",
             "title_desc": "p.title DESC",
+            "soutenance_desc": "p.meta->>'date_soutenance' DESC NULLS LAST, p.title",
+            "soutenance_asc": "p.meta->>'date_soutenance' ASC NULLS LAST, p.title",
+            "inscription_desc": "p.meta->>'date_inscription' DESC NULLS LAST, p.title",
+            "inscription_asc": "p.meta->>'date_inscription' ASC NULLS LAST, p.title",
         }
         order = order_map.get(sort, "p.pub_year DESC, p.title")
 
@@ -870,6 +874,10 @@ async def list_publications(
             "year_asc": "p.pub_year ASC, p.title",
             "title": "p.title ASC",
             "title_desc": "p.title DESC",
+            "soutenance_desc": "p.meta->>'date_soutenance' DESC NULLS LAST, p.title",
+            "soutenance_asc": "p.meta->>'date_soutenance' ASC NULLS LAST, p.title",
+            "inscription_desc": "p.meta->>'date_inscription' DESC NULLS LAST, p.title",
+            "inscription_asc": "p.meta->>'date_inscription' ASC NULLS LAST, p.title",
         }
         order = order_map.get(sort, "p.pub_year DESC, p.title")
 
@@ -895,6 +903,9 @@ async def list_publications(
                  WHERE sd.publication_id = p.id AND sd.source = 'wos' LIMIT 1) AS wos_id,
                 (SELECT sd.source_id FROM source_documents sd
                  WHERE sd.publication_id = p.id AND sd.source = 'theses' LIMIT 1) AS theses_id,
+                -- Dates thèse (soutenance / inscription) depuis publications.meta
+                p.meta->>'date_soutenance' AS date_soutenance,
+                p.meta->>'date_inscription' AS date_inscription,
                 -- Corresponding author + authorship id (only meaningful with person_id filter)
                 (SELECT a.is_corresponding FROM authorships a
                  WHERE a.publication_id = p.id AND a.person_id = %s
@@ -960,6 +971,8 @@ async def list_publications(
                 "scanr_id": row["scanr_id"],
                 "wos_id": row["wos_id"],
                 "theses_id": row["theses_id"],
+                "date_soutenance": row["date_soutenance"],
+                "date_inscription": row["date_inscription"],
                 "labs": row["labs"],
                 "lab_items": row["lab_items"],
                 "apc": row["apc_details"],

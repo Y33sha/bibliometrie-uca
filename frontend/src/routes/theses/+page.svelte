@@ -22,10 +22,12 @@
     scanr_id: string | null;
     theses_id: string | null;
     oa_status: string | null;
+    date_soutenance: string | null;
+    date_inscription: string | null;
   }
 
   let search = $state("");
-  let currentSort = $state("year_desc");
+  let currentSort = $state("soutenance_desc");
   let selectedYears: string[] = $state([]);
   let selectedLabs: string[] = $state([]);
   let selectedStatus: string[] = $state([]);
@@ -83,7 +85,7 @@
       selectedStatus: { type: "string_array", urlKey: "status" },
       selectedAccess: { type: "string_array", urlKey: "access" },
       search: { type: "single", urlKey: "search" },
-      currentSort: { type: "single", urlKey: "sort", defaultValue: "year_desc" },
+      currentSort: { type: "single", urlKey: "sort", defaultValue: "soutenance_desc" },
       currentPage: { type: "page", urlKey: "page" },
     },
   });
@@ -122,20 +124,32 @@
     pubs.load();
   });
 
-  function toggleSortYear() {
-    currentSort = currentSort === "year_desc" ? "year_asc" : "year_desc";
+  function toggleSort(asc: string, desc: string) {
+    currentSort = currentSort === desc ? asc : desc;
     onFilterChange();
   }
 
-  function toggleSortTitle() {
-    currentSort = currentSort === "title" ? "title_desc" : "title";
-    onFilterChange();
+  const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+  function formatDate(iso: string | null): { month: string; year: string } | null {
+    if (!iso) return null;
+    const [y, m] = iso.split('-');
+    return { month: MONTHS[parseInt(m, 10) - 1] || '', year: y };
   }
 
-  const yearSortArrow = $derived(currentSort === "year_asc" ? "↑" : "↓");
-  const yearSortActive = $derived(currentSort === "year_desc" || currentSort === "year_asc");
-  const titleSortArrow = $derived(currentSort === "title_desc" ? "↓" : "↑");
-  const titleSortActive = $derived(currentSort === "title" || currentSort === "title_desc");
+  function sortArrow(asc: string, desc: string): string {
+    return currentSort === asc ? '↑' : currentSort === desc ? '↓' : '';
+  }
+  function sortActive(asc: string, desc: string): boolean {
+    return currentSort === asc || currentSort === desc;
+  }
+
+  const soutArrow = $derived(sortArrow("soutenance_asc", "soutenance_desc"));
+  const soutActive = $derived(sortActive("soutenance_asc", "soutenance_desc"));
+  const inscrArrow = $derived(sortArrow("inscription_asc", "inscription_desc"));
+  const inscrActive = $derived(sortActive("inscription_asc", "inscription_desc"));
+  const titleSortArrow = $derived(sortArrow("title", "title_desc"));
+  const titleSortActive = $derived(sortActive("title", "title_desc"));
 
   onMount(async () => {
     const restored = url.restoreFromUrl($page.url.searchParams);
@@ -184,8 +198,9 @@
 <table class="data-table">
   <thead>
     <tr>
-      <th class="col-year sortable" class:active={yearSortActive} onclick={toggleSortYear}>Année {yearSortArrow}</th>
-      <th class="col-title sortable" class:active={titleSortActive} onclick={toggleSortTitle}>Titre {titleSortActive ? titleSortArrow : ""}</th>
+      <th class="col-date sortable" class:active={inscrActive} onclick={() => toggleSort('inscription_asc', 'inscription_desc')}>Inscription {inscrArrow}</th>
+      <th class="col-date sortable" class:active={soutActive} onclick={() => toggleSort('soutenance_asc', 'soutenance_desc')}>Soutenance {soutArrow}</th>
+      <th class="col-title sortable" class:active={titleSortActive} onclick={() => toggleSort('title', 'title_desc')}>Titre {titleSortArrow}</th>
       <th class="col-status">Statut</th>
       <th class="col-labs">Laboratoire(s)</th>
       <th class="col-oa">OA</th>
@@ -195,7 +210,8 @@
   <tbody>
     {#each pubs.items as pub (pub.id)}
       <tr>
-        <td class="col-year">{pub.pub_year || ""}</td>
+        <td class="col-date">{@html (() => { const d = formatDate(pub.date_inscription); return d ? `<span class="date-month">${d.month}</span> ${d.year}` : ''; })()}</td>
+        <td class="col-date">{@html (() => { const d = formatDate(pub.date_soutenance); return d ? `<span class="date-month">${d.month}</span> ${d.year}` : ''; })()}</td>
         <td class="col-title">
           <a href="{base}/publications/{pub.id}">{@html sanitizeTitle(pub.title)}</a>
         </td>
@@ -335,9 +351,15 @@
     background: var(--hover);
   }
 
-  .col-year {
-    width: 60px;
+  .col-date {
+    width: 85px;
     text-align: center;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  .col-date :global(.date-month) {
+    font-size: 0.75rem;
+    color: var(--muted);
   }
   .col-title {
     min-width: 300px;
