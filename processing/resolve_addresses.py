@@ -293,8 +293,8 @@ def process_addresses(cur, conn, rows, forms, forms_by_structure, tutelles_map,
         text_norm = normalize(raw_text)
         matches = resolve_address(text_norm, forms, forms_by_structure, tutelles_map)
 
-        is_uca = any(sid in uca_perimeter for sid, _ in matches)
-        if is_uca:
+        in_perimeter = any(sid in uca_perimeter for sid, _ in matches)
+        if in_perimeter:
             uca_count += 1
 
         detected_structure_ids = {sid for sid, _ in matches}

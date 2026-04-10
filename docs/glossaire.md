@@ -57,7 +57,7 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 |-------|-----------|
 | **Publication** | Entité canonique dédupliquée. Plusieurs documents sources (HAL, OA, WoS) peuvent pointer vers la même publication. Déduplication par DOI ou par titre+année+journal. |
 | **Personne** | Individu physique unique. Hub d'identité reliant les auteurs de toutes les sources. Peut être créé automatiquement (pipeline) ou manuellement (import RH). |
-| **Authorship** | <span id="authorship"></span>Couple (publication, personne) représentant la contribution d'un auteur à une publication. Porte les informations d'affiliation (structures UCA), de position (rang dans la liste d'auteurs) et le flag `is_uca`. |
+| **Authorship** | <span id="authorship"></span>Couple (publication, personne) représentant la contribution d'un auteur à une publication. Porte les informations d'affiliation (structures UCA), de position (rang dans la liste d'auteurs) et le flag `in_perimeter`. |
 | **Structure** | Entité institutionnelle : université, laboratoire, organisme national de recherche (CNRS, INRAE...), établissement partenaire (CHU, INP...). Référentiel maintenu manuellement. |
 | **Forme de nom** | Variante normalisée d'un nom de structure (`structure_name_forms`) ou d'un nom d'auteur (`person_name_forms`). Utilisée pour le matching automatique (résolution d'adresses pour les structures, création de personnes pour les auteurs). |
 
@@ -79,6 +79,6 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 
 | Terme | Définition |
 |-------|-----------|
-| **Périmètre restreint** | UCA + ses unités en tutelle directe. Détermine si un auteur est considéré "UCA" sur une publication (flag `is_uca`). |
+| **Périmètre restreint** | UCA + ses unités en tutelle directe. Détermine si un auteur est considéré "UCA" sur une publication (flag `in_perimeter`). |
 | **Périmètre élargi** | Périmètre restreint + établissements partenaires (CHU Clermont-Ferrand, Clermont Auvergne INP, VetAgro Sup...). Utilisé pour les affiliations détaillées (`structure_ids`). |
 | **Tutelle** | Relation hiérarchique entre une institution et un laboratoire. L'UCA est tutelle de ~30 laboratoires. Un laboratoire peut avoir plusieurs tutelles (co-tutelle CNRS, INRAE...). |

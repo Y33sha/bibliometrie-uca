@@ -1,14 +1,14 @@
 -- =============================================================
--- Peuplement is_uca et structure_ids
+-- Peuplement in_perimeter et structure_ids
 -- =============================================================
 -- À exécuter APRÈS migration_016.
 --
 -- Deux périmètres :
---   • uca_perimeter (restreint) : UCA + labos tutellés → sert pour is_uca
+--   • uca_perimeter (restreint) : UCA + labos tutellés → sert pour in_perimeter
 --   • uca_perimeter_wide (large) : restreint + partenaires (CHU, INP…)
 --     → sert pour structure_ids
 --
--- is_uca = TRUE  ↔  au moins une structure du périmètre restreint détectée
+-- in_perimeter = TRUE  ↔  au moins une structure du périmètre restreint détectée
 -- structure_ids   ↔  toutes les structures du périmètre large détectées
 -- =============================================================
 
@@ -38,12 +38,12 @@ RAISE NOTICE 'Étape 1 — HAL structure_ids mappés : % authorships', cnt;
 
 
 -- #############################################################
--- ÉTAPE 2 : HAL — recalculer is_uca à partir du périmètre UCA
+-- ÉTAPE 2 : HAL — recalculer in_perimeter à partir du périmètre UCA
 -- #############################################################
 
-UPDATE hal_authorships SET is_uca = FALSE;
+UPDATE hal_authorships SET in_perimeter = FALSE;
 GET DIAGNOSTICS cnt = ROW_COUNT;
-RAISE NOTICE 'Étape 2 — HAL is_uca reset : % authorships', cnt;
+RAISE NOTICE 'Étape 2 — HAL in_perimeter reset : % authorships', cnt;
 
 WITH uca_perimeter AS (
     SELECT s.id FROM structures s WHERE s.code = 'uca'
@@ -53,7 +53,7 @@ WITH uca_perimeter AS (
     WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
 )
 UPDATE hal_authorships has
-SET is_uca = TRUE
+SET in_perimeter = TRUE
 WHERE has.structure_ids IS NOT NULL
   AND EXISTS (
     SELECT 1
@@ -61,18 +61,18 @@ WHERE has.structure_ids IS NOT NULL
     WHERE sid IN (SELECT id FROM uca_perimeter)
   );
 GET DIAGNOSTICS cnt = ROW_COUNT;
-RAISE NOTICE 'Étape 2 — HAL is_uca = TRUE : % authorships', cnt;
+RAISE NOTICE 'Étape 2 — HAL in_perimeter = TRUE : % authorships', cnt;
 
 
 -- #############################################################
--- ÉTAPE 3 : OpenAlex — calculer is_uca + structure_ids
+-- ÉTAPE 3 : OpenAlex — calculer in_perimeter + structure_ids
 -- #############################################################
 
-UPDATE openalex_authorships SET is_uca = FALSE, structure_ids = NULL;
+UPDATE openalex_authorships SET in_perimeter = FALSE, structure_ids = NULL;
 GET DIAGNOSTICS cnt = ROW_COUNT;
 RAISE NOTICE 'Étape 3 — OA reset : % authorships', cnt;
 
--- is_uca via périmètre restreint
+-- in_perimeter via périmètre restreint
 WITH uca_perimeter AS (
     SELECT s.id FROM structures s WHERE s.code = 'uca'
     UNION
@@ -81,7 +81,7 @@ WITH uca_perimeter AS (
     WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
 )
 UPDATE openalex_authorships oas
-SET is_uca = TRUE
+SET in_perimeter = TRUE
 WHERE EXISTS (
     SELECT 1
     FROM openalex_authorship_addresses oaa
@@ -90,7 +90,7 @@ WHERE EXISTS (
       AND ast.structure_id IN (SELECT id FROM uca_perimeter)
 );
 GET DIAGNOSTICS cnt = ROW_COUNT;
-RAISE NOTICE 'Étape 3 — OA is_uca = TRUE : % authorships', cnt;
+RAISE NOTICE 'Étape 3 — OA in_perimeter = TRUE : % authorships', cnt;
 
 -- structure_ids via périmètre large (restreint + partenaires)
 WITH uca_perimeter AS (
@@ -124,14 +124,14 @@ RAISE NOTICE 'Étape 3 — OA structure_ids : % authorships', cnt;
 
 
 -- #############################################################
--- ÉTAPE 3b : WoS — calculer is_uca + structure_ids
+-- ÉTAPE 3b : WoS — calculer in_perimeter + structure_ids
 -- #############################################################
 
-UPDATE wos_authorships SET is_uca = FALSE, structure_ids = NULL;
+UPDATE wos_authorships SET in_perimeter = FALSE, structure_ids = NULL;
 GET DIAGNOSTICS cnt = ROW_COUNT;
 RAISE NOTICE 'Étape 3b — WoS reset : % authorships', cnt;
 
--- is_uca via périmètre restreint
+-- in_perimeter via périmètre restreint
 WITH uca_perimeter AS (
     SELECT s.id FROM structures s WHERE s.code = 'uca'
     UNION
@@ -140,7 +140,7 @@ WITH uca_perimeter AS (
     WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
 )
 UPDATE wos_authorships was
-SET is_uca = TRUE
+SET in_perimeter = TRUE
 WHERE EXISTS (
     SELECT 1
     FROM wos_authorship_addresses waa
@@ -149,7 +149,7 @@ WHERE EXISTS (
       AND ast.structure_id IN (SELECT id FROM uca_perimeter)
 );
 GET DIAGNOSTICS cnt = ROW_COUNT;
-RAISE NOTICE 'Étape 3b — WoS is_uca = TRUE : % authorships', cnt;
+RAISE NOTICE 'Étape 3b — WoS in_perimeter = TRUE : % authorships', cnt;
 
 -- structure_ids via périmètre large
 WITH uca_perimeter AS (

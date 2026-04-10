@@ -191,7 +191,7 @@ flowchart LR
     authorships --- persons
     structures --- apc_payments
     apc_payments ---|DOI| publications
-    A@{ shape: processes, label: "*_documents\n(sources)"}-->|normalize|publications
+    source_documents-->|normalize|publications
     publications---journals
     journals---publishers
         
@@ -200,13 +200,13 @@ flowchart LR
     classDef csv fill:#fa5
     class apc_payments csv
     classDef auto fill:#adf,stroke:#58c
-    class A,publications,journals,publishers,authorships,persons auto
+    class source_documents,publications,journals,publishers,authorships,persons auto
     classDef main stroke-width:4px,font-weight:bold
     class structures,publications,persons,authorships main
 
 ```
 
-Table associées:
+Tables associées:
 - `journals`: référentiel des revues
 - `publishers` : référentiel des éditeurs
 - `apc_payments`
@@ -222,7 +222,7 @@ flowchart LR
     
     authorships --- publications
     authorships ---- persons
-    A@{ shape: processes, label: "*_authorships\n(sources)"}---persons
+    source_authorships-->persons
     persons---persons_rh
     persons---person_identifiers
     persons---person_name_forms
@@ -232,7 +232,7 @@ flowchart LR
     classDef csv fill:#fa5
     class persons_rh csv
     classDef auto fill:#adf,stroke:#58c
-    class A,publications,person_identifiers,person_name_forms,authorships,persons auto
+    class source_authorships,publications,person_identifiers,person_name_forms,authorships,persons auto
     classDef main stroke-width:4px,font-weight:bold
     class structures,publications,persons,authorships main
 
@@ -251,7 +251,7 @@ Table de laison recensant les contributions individuelles aux publications. Chaq
 
 - `person_id` : peut être NULL si la personne n'est pas encore identifiée
 - `structure_id` : structure UCA (NULL si non UCA ou non résolu)
-- `is_uca` : TRUE si l'auteur est affilié UCA sur cette publication
+- `in_perimeter` : TRUE si l'auteur est affilié UCA sur cette publication
 - `author_position` : position dans la liste d'auteurs
 - `is_corresponding` : auteur correspondant
 - `source_hal`, `source_openalex`, `source_wos`, `source_manual` : booléens traçant   quelles sources ont contribué à cet authorship; (TODO: remplacer par champ liste pour éviter d'ajouter une colonne chaque fois que j'ajoute une source)
