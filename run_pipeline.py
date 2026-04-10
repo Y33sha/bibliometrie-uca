@@ -112,6 +112,7 @@ def phase_normalize(**kw):
         run_python("processing/enrich_hal_structures.py")
     # Toujours lancer le merge inter-sources (dépend de toutes les sources)
     run_python("processing/merge_pubs_by_hal_id.py")
+    run_python("processing/merge_pubs_by_nnt.py")
 
 
 def phase_addresses(**kw):

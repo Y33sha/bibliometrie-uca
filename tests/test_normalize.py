@@ -353,3 +353,77 @@ class TestWoSDocTypeMap:
         for t in ["article", "review", "book", "book chapter",
                    "proceedings paper", "editorial material"]:
             assert t in WOS_DOCTYPE_MAP
+
+
+# ── NNT ─────────────────────────────────────────────────────────
+
+from utils.nnt import normalize_nnt, is_theses_fr_source, extract_nnt_from_openalex
+
+
+class TestNormalizeNnt:
+    def test_standard(self):
+        assert normalize_nnt("2023UCFA0069") == "2023UCFA0069"
+
+    def test_lowercase(self):
+        assert normalize_nnt("2023ucfa0069") == "2023UCFA0069"
+
+    def test_whitespace(self):
+        assert normalize_nnt("  2023UCFA0069  ") == "2023UCFA0069"
+
+    def test_none(self):
+        assert normalize_nnt(None) is None
+
+    def test_empty(self):
+        assert normalize_nnt("") is None
+
+
+class TestIsThesesFrSource:
+    def test_display_name(self):
+        work = {"primary_location": {
+            "source": {"display_name": "theses.fr (ABES)"},
+            "landing_page_url": ""
+        }}
+        assert is_theses_fr_source(work) is True
+
+    def test_url(self):
+        work = {"primary_location": {
+            "source": {},
+            "landing_page_url": "http://www.theses.fr/2023UCFA0069/document"
+        }}
+        assert is_theses_fr_source(work) is True
+
+    def test_not_theses(self):
+        work = {"primary_location": {
+            "source": {"display_name": "Elsevier"},
+            "landing_page_url": "https://doi.org/10.1234"
+        }}
+        assert is_theses_fr_source(work) is False
+
+    def test_no_location(self):
+        assert is_theses_fr_source({}) is False
+
+
+class TestExtractNntFromOpenalex:
+    def test_pmh_format(self):
+        work = {"primary_location": {
+            "id": "pmh:2023UCFA0069",
+            "landing_page_url": ""
+        }}
+        assert extract_nnt_from_openalex(work) == "2023UCFA0069"
+
+    def test_url_format(self):
+        work = {"primary_location": {
+            "id": "",
+            "landing_page_url": "http://www.theses.fr/2023UCFA0069/document"
+        }}
+        assert extract_nnt_from_openalex(work) == "2023UCFA0069"
+
+    def test_no_nnt(self):
+        work = {"primary_location": {
+            "id": "",
+            "landing_page_url": "https://doi.org/10.1234"
+        }}
+        assert extract_nnt_from_openalex(work) is None
+
+    def test_no_location(self):
+        assert extract_nnt_from_openalex({}) is None

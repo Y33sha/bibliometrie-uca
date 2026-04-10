@@ -31,7 +31,8 @@ from utils.hal import extract_hal_id_from_url
 from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
-from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
+from services.publications import find_or_create as find_or_create_publication, find_by_nnt, _enrich, update_sources
+from utils.nnt import normalize_nnt, is_theses_fr_source, extract_nnt_from_openalex
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -197,9 +198,13 @@ def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
     raw_type = work.get("type") or "other"
     doc_type = DOCTYPE_MAP.get(raw_type, "other")
 
-    # OpenAlex "dissertation" est mixte : thèses ET mémoires de master.
-    # On distingue via l'URL de la source primaire.
-    if raw_type == "dissertation":
+    # Source theses.fr → toujours une thèse, quel que soit le type OpenAlex
+    nnt = None
+    if is_theses_fr_source(work):
+        doc_type = "thesis"
+        nnt = extract_nnt_from_openalex(work)
+    elif raw_type == "dissertation":
+        # OpenAlex "dissertation" est mixte : thèses ET mémoires de master.
         loc_url = (work.get("primary_location") or {}).get("landing_page_url") or ""
         if "dumas." in loc_url:
             doc_type = "memoir"
@@ -218,7 +223,7 @@ def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
 
     pub_id, _created = find_or_create_publication(
         cur, title=title, title_normalized=normalize_text(title),
-        pub_year=pub_year, doc_type=doc_type, doi=doi,
+        pub_year=pub_year, doc_type=doc_type, doi=doi, nnt=nnt,
         oa_status=oa_status, journal_id=journal_id,
         container_title=container_title, language=language)
     return pub_id
@@ -229,7 +234,9 @@ def _enrich_from_work(cur, pub_id: int, work: dict, journal_id: int | None):
     doi = clean_doi(work.get("doi"))
     raw_type = work.get("type") or "other"
     doc_type = DOCTYPE_MAP.get(raw_type, "other")
-    if raw_type == "dissertation":
+    if is_theses_fr_source(work):
+        doc_type = "thesis"
+    elif raw_type == "dissertation":
         loc_url = (work.get("primary_location") or {}).get("landing_page_url") or ""
         if "dumas." in loc_url:
             doc_type = "memoir"
@@ -261,19 +268,24 @@ def insert_openalex_document(cur, work: dict, staging_id: int,
     pub_year = work.get("publication_year")
     doc_type = work.get("type")
 
+    # Stocker le NNT dans external_ids si source = theses.fr
+    nnt = extract_nnt_from_openalex(work)
+    external_ids = Json({"nnt": nnt}) if nnt else None
+
     cur.execute("""
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
-             publication_id, staging_id)
-        VALUES ('openalex', %s, %s, %s, %s, %s, %s, %s)
+             publication_id, staging_id, external_ids)
+        VALUES ('openalex', %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
             ),
-            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type)
+            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
+            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
         RETURNING id
     """, (openalex_id, doi, title, pub_year, doc_type,
-          publication_id, staging_id))
+          publication_id, staging_id, external_ids))
     return cur.fetchone()["id"]
 
 
@@ -481,11 +493,12 @@ def process_work(cur, staging_row: tuple) -> bool:
                         (staging_id,))
                     return False
 
-        # Détecter si la primary_location pointe vers HAL ou un repository
+        # Détecter si la primary_location pointe vers HAL, theses.fr ou un repository
         hal_location = is_hal_primary_location(work)
+        theses_fr = is_theses_fr_source(work)
         repo_location = is_repository_source(work)
 
-        if hal_location:
+        if hal_location or theses_fr:
             publisher_id = None
             journal_id = None
         elif repo_location:
@@ -495,10 +508,16 @@ def process_work(cur, staging_row: tuple) -> bool:
             publisher_id = upsert_publisher(cur, work)
             journal_id = upsert_journal(cur, work, publisher_id)
 
-        # Si primary_location pointe vers HAL, réutiliser la publication HAL
+        # Si primary_location pointe vers HAL ou theses.fr, réutiliser la publication
         publication_id = None
         if hal_location:
             publication_id = find_hal_publication_id(cur, work)
+        if not publication_id and theses_fr:
+            nnt = extract_nnt_from_openalex(work)
+            if nnt:
+                existing = find_by_nnt(cur, nnt)
+                if existing:
+                    publication_id = existing.id
 
         # Idempotence : si source_documents a déjà cet openalex_id avec un
         # publication_id, le réutiliser au lieu de risquer un doublon

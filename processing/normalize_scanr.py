@@ -33,6 +33,7 @@ from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.authorship_roles import map_role
 from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
+from utils.nnt import normalize_nnt
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__), "logs"))
@@ -116,7 +117,15 @@ def upsert_journal(cur, doc: dict, publisher_id: int | None) -> int | None:
 # PUBLICATIONS (via services/publications.py)
 # =============================================================
 
-def find_or_insert_publication(cur, doc: dict, journal_id: int | None) -> tuple[int | None, bool]:
+def _extract_nnt_from_scanr_id(scanr_id: str) -> str | None:
+    """Extrait le NNT depuis un source_id ScanR (format nnt{NNT})."""
+    if scanr_id and scanr_id.lower().startswith("nnt"):
+        return normalize_nnt(scanr_id[3:])
+    return None
+
+
+def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
+                               scanr_id: str | None = None) -> tuple[int | None, bool]:
     """Cherche ou crée une publication. Délègue au service publications.
 
     La déduplication par HAL ID est gérée en post-traitement
@@ -139,9 +148,11 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None) -> tuple[
         source = doc.get("source") or {}
         container_title = source.get("title")
 
+    nnt = _extract_nnt_from_scanr_id(scanr_id) if scanr_id else None
+
     return find_or_create_publication(
         cur, title=title, title_normalized=normalize_text(title),
-        pub_year=pub_year, doc_type=doc_type, doi=doi,
+        pub_year=pub_year, doc_type=doc_type, doi=doi, nnt=nnt,
         oa_status=oa_status, journal_id=journal_id,
         container_title=container_title)
 
@@ -159,10 +170,14 @@ def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
     pub_year = doc.get("year")
     doc_type = doc.get("type")
 
-    # external_ids stocke le hal_id comme metadata JSON
-    external_ids = None
+    # external_ids stocke les identifiants cross-source (hal, nnt)
+    ext = {}
     if hal_id:
-        external_ids = Json({"hal": hal_id})
+        ext["hal"] = hal_id
+    nnt = _extract_nnt_from_scanr_id(scanr_id)
+    if nnt:
+        ext["nnt"] = nnt
+    external_ids = Json(ext) if ext else None
 
     cur.execute("""
         INSERT INTO source_documents
@@ -357,7 +372,7 @@ def process_work(cur, staging_row) -> bool:
                     oa_status=oa_status, journal_id=journal_id,
                     container_title=container_title)
         else:
-            publication_id, is_new = find_or_insert_publication(cur, doc, journal_id)
+            publication_id, is_new = find_or_insert_publication(cur, doc, journal_id, scanr_id=scanr_id)
         timings["publication"] = time.perf_counter() - t0
 
         if not publication_id:

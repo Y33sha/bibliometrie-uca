@@ -6,7 +6,8 @@ Chaque test tourne dans une transaction rollbackée (isolation complète).
 """
 
 import pytest
-from services.publications import find_or_create, find_by_doi
+from psycopg2.extras import Json
+from services.publications import find_or_create, find_by_doi, find_by_nnt
 
 
 # ── Helpers ──────────────────────────────────────────────────────
@@ -241,3 +242,85 @@ class TestEnrich:
         result, _ = find_or_create(db, title="X", title_normalized="x",
                                    pub_year=2024, allow_create=False)
         assert result is None
+
+
+# ── Déduplication par NNT ──────────────────────────────────────
+
+def _create_source_doc_with_nnt(db, pub_id, source, source_id, nnt):
+    """Helper : crée un source_document avec NNT dans external_ids."""
+    db.execute("""
+        INSERT INTO source_documents
+            (source, source_id, title, pub_year, publication_id, external_ids)
+        VALUES (%s, %s, 'Thesis', 2023, %s, %s)
+    """, (source, source_id, pub_id, Json({"nnt": nnt})))
+
+
+class TestDedupByNnt:
+    def test_nnt_dedup_theses_first(self, db):
+        """Thèse créée par theses.fr, retrouvée par NNT quand OpenAlex arrive."""
+        id1, new1 = _create(db, title="Ma thèse", title_normalized="ma these",
+                            pub_year=2023, doc_type="thesis", nnt="2023UCFA0069")
+        assert new1 is True
+        _create_source_doc_with_nnt(db, id1, 'theses', '2023UCFA0069', '2023UCFA0069')
+
+        id2, new2 = _create(db, title="My thesis", title_normalized="my thesis",
+                            pub_year=2023, doc_type="thesis", nnt="2023UCFA0069")
+        assert new2 is False
+        assert id1 == id2
+
+    def test_nnt_dedup_openalex_first(self, db):
+        """Thèse créée par OpenAlex, retrouvée par NNT quand theses.fr arrive."""
+        id1, new1 = _create(db, title="My thesis", title_normalized="my thesis",
+                            pub_year=2023, doc_type="thesis", nnt="2023UCFA0069")
+        assert new1 is True
+        _create_source_doc_with_nnt(db, id1, 'openalex', 'W123', '2023UCFA0069')
+
+        id2, new2 = _create(db, title="Ma thèse", title_normalized="ma these",
+                            pub_year=2023, doc_type="thesis", nnt="2023UCFA0069")
+        assert new2 is False
+        assert id1 == id2
+
+    def test_nnt_not_stored_as_doi(self, db):
+        """Le NNT ne doit jamais se retrouver dans publications.doi."""
+        id1, _ = _create(db, title="Ma thèse", title_normalized="ma these",
+                         pub_year=2023, doc_type="thesis", nnt="2023UCFA0069")
+        db.execute("SELECT doi FROM publications WHERE id = %s", (id1,))
+        assert db.fetchone()["doi"] is None
+
+    def test_thesis_with_both_doi_and_nnt(self, db):
+        """Thèse avec DOI réel + NNT : le DOI est stocké dans doi, NNT sert au dedup."""
+        id1, _ = _create(db, title="Ma thèse", title_normalized="ma these",
+                         pub_year=2023, doc_type="thesis",
+                         doi="10.1234/thesis", nnt="2023UCFA0069")
+        db.execute("SELECT doi FROM publications WHERE id = %s", (id1,))
+        assert db.fetchone()["doi"] == "10.1234/thesis"
+
+    def test_doi_dedup_takes_priority(self, db):
+        """Le DOI a priorité sur le NNT pour la déduplication."""
+        id1, _ = _create(db, title="Ma thèse", title_normalized="ma these",
+                         pub_year=2023, doc_type="thesis", doi="10.1234/thesis")
+        id2, new2 = _create(db, title="Ma thèse", title_normalized="ma these",
+                            pub_year=2023, doc_type="thesis",
+                            doi="10.1234/thesis", nnt="2023UCFA0069")
+        assert id1 == id2
+        assert new2 is False
+
+    def test_find_by_nnt(self, db):
+        """find_by_nnt retrouve une publication via external_ids."""
+        id1, _ = _create(db, title="Ma thèse", title_normalized="ma these",
+                         pub_year=2023, doc_type="thesis")
+        _create_source_doc_with_nnt(db, id1, 'theses', '2023UCFA0069', '2023UCFA0069')
+
+        result = find_by_nnt(db, "2023UCFA0069")
+        assert result is not None
+        assert result.id == id1
+
+    def test_find_by_nnt_case_insensitive(self, db):
+        """find_by_nnt normalise en uppercase."""
+        id1, _ = _create(db, title="Ma thèse", title_normalized="ma these",
+                         pub_year=2023, doc_type="thesis")
+        _create_source_doc_with_nnt(db, id1, 'theses', '2023UCFA0069', '2023UCFA0069')
+
+        result = find_by_nnt(db, "2023ucfa0069")
+        assert result is not None
+        assert result.id == id1
