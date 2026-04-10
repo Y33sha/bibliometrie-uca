@@ -31,9 +31,10 @@ from psycopg2.extras import Json, RealDictCursor
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-from services.publications import find_or_create, update_sources
+from services.publications import find_or_create, find_thesis_by_title, _enrich, update_sources
 from utils.log import setup_logger
-from utils.normalize import normalize_text
+from utils.normalize import normalize_text, normalize_name
+from utils.names import names_compatible
 from utils.authorship_roles import THESES_FIELD_ROLES, merge_roles
 
 logger = setup_logger("normalize_theses", os.path.join(os.path.dirname(__file__), "logs"))
@@ -43,8 +44,53 @@ logger = setup_logger("normalize_theses", os.path.join(os.path.dirname(__file__)
 # PUBLICATIONS
 # =============================================================
 
+def _extract_thesis_author(these: dict) -> tuple[str, str] | None:
+    """Extrait (last_name, first_name) normalisés de l'auteur de la thèse."""
+    auteurs = these.get("auteurs") or []
+    if not auteurs:
+        return None
+    auteur = auteurs[0]
+    ln = normalize_name(auteur.get("nom") or "")
+    fn = normalize_name(auteur.get("prenom") or "")
+    return (ln, fn) if ln else None
+
+
+def _thesis_author_compatible(cur, pub_id: int, author: tuple[str, str]) -> bool:
+    """Vérifie si l'auteur d'une thèse existante est compatible avec author."""
+    cur.execute("""
+        SELECT sa.last_name, sa.first_name
+        FROM source_authorships sas
+        JOIN source_documents sd ON sd.id = sas.source_document_id
+        JOIN source_authors sa ON sa.id = sas.source_author_id
+        WHERE sd.publication_id = %s
+          AND 'author' = ANY(sas.roles)
+        ORDER BY sd.id, sas.author_position
+        LIMIT 1
+    """, (pub_id,))
+    row = cur.fetchone()
+    if not row:
+        # Pas d'auteur connu → on accepte le match (titre+année suffisent)
+        return True
+    ln = normalize_name(row["last_name"] or "")
+    fn = normalize_name(row["first_name"] or "")
+    if not ln:
+        return True
+    if names_compatible(author[0], author[1], ln, fn):
+        return True
+    # Fallback : tokens identiques (gère les particules type Ben, Le, Da)
+    tokens_a = set(f"{author[0]} {author[1]}".split())
+    tokens_b = set(f"{ln} {fn}".split())
+    return tokens_a == tokens_b and len(tokens_a) >= 2
+
+
 def find_or_insert_publication(cur, these: dict) -> tuple[int | None, bool]:
-    """Trouve ou crée la publication pour une thèse."""
+    """Trouve ou crée la publication pour une thèse.
+
+    Déduplication en 3 étapes :
+    1. Par DOI ou NNT (via find_or_create standard)
+    2. Par titre normalisé + année + compatibilité auteur (spécifique thèses)
+    3. Création
+    """
     title = these.get("titrePrincipal")
     if not title:
         return None, False
@@ -69,12 +115,31 @@ def find_or_insert_publication(cur, these: dict) -> tuple[int | None, bool]:
 
     doi = these.get("doi")
     nnt = these.get("nnt")
-
-    # Chercher par DOI d'abord, puis par NNT comme DOI-équivalent
     lookup_doi = doi or nnt
+    title_norm = normalize_text(title)
 
+    # 1. Chercher par DOI/NNT (sans créer)
+    pub_id, is_new = find_or_create(
+        cur, title=title, title_normalized=title_norm,
+        pub_year=pub_year, doc_type=doc_type, doi=lookup_doi,
+        allow_create=False)
+    if pub_id:
+        return pub_id, False
+
+    # 2. Dédup spécifique thèses : titre + année + auteur compatible
+    if pub_year and title_norm:
+        candidates = find_thesis_by_title(cur, title_norm, pub_year)
+        if candidates:
+            author = _extract_thesis_author(these)
+            for cand in candidates:
+                if not author or _thesis_author_compatible(cur, cand.id, author):
+                    # Match trouvé → enrichir
+                    _enrich(cur, cand.id, doi=lookup_doi, doc_type=doc_type)
+                    return cand.id, False
+
+    # 3. Créer
     return find_or_create(
-        cur, title=title, title_normalized=normalize_text(title),
+        cur, title=title, title_normalized=title_norm,
         pub_year=pub_year, doc_type=doc_type, doi=lookup_doi)
 
 

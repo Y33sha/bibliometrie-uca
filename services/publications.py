@@ -14,6 +14,7 @@ from utils.db_helpers import row_val as _val
 
 PubByDoi = namedtuple("PubByDoi", ["id", "doc_type", "title_normalized"])
 PubByTitle = namedtuple("PubByTitle", ["id", "doi"])
+PubThesisCandidate = namedtuple("PubThesisCandidate", ["id", "doi"])
 
 
 def find_by_doi(cur, doi: str) -> PubByDoi | None:
@@ -38,6 +39,24 @@ def find_by_title(cur, title_normalized: str, pub_year: int, journal_id: int) ->
     """, (title_normalized, pub_year, journal_id))
     row = cur.fetchone()
     return PubByTitle(_val(row, 0), _val(row, 1)) if row else None
+
+
+def find_thesis_by_title(cur, title_normalized: str, pub_year: int) -> list[PubThesisCandidate]:
+    """Cherche des thèses par titre normalisé + année.
+
+    Retourne les candidats pour déduplication thesis-specific
+    (pas de journal_id, donc le tier 2 standard ne fonctionne pas).
+    """
+    if not title_normalized or not pub_year:
+        return []
+    cur.execute("""
+        SELECT id, doi FROM publications
+        WHERE title_normalized = %s AND pub_year = %s
+          AND doc_type IN ('thesis', 'ongoing_thesis')
+        ORDER BY id
+    """, (title_normalized, pub_year))
+    rows = cur.fetchall()
+    return [PubThesisCandidate(_val(row, 0), _val(row, 1)) for row in rows]
 
 
 def _enrich(cur, pub_id: int, *, doi: str | None = None,

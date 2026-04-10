@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from services.authorships import detach_source as _detach_source
 from backend.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, parse_int_csv, parse_str_csv,
     apply_lab_filter, apply_year_filter, apply_doc_type_filter, apply_source_filter,
-    apply_oa_filter, apply_person_filter, apply_corresponding_filter,
+    apply_access_filter, apply_oa_filter, apply_person_filter, apply_corresponding_filter,
     apply_publisher_journal_filter)
 
 router = APIRouter()
@@ -20,6 +20,7 @@ async def publications_facets(
     year: str = Query(""),
     lab_id: str = Query(""),
     doc_type: str = Query(""),
+    access: str = Query(""),
     oa_status: str = Query(""),
     source_filter: str = Query(""),
     publisher_id: int | None = Query(None),
@@ -68,6 +69,8 @@ async def publications_facets(
                 apply_lab_filter(conds, params, lab_ids_clean)
         if skip != "doc_type":
             apply_doc_type_filter(conds, params, doc_types)
+        if skip != "access":
+            apply_access_filter(conds, params, access)
         if skip != "oa_status":
             apply_oa_filter(conds, params, oa_status)
         if skip != "source":
@@ -156,6 +159,22 @@ async def publications_facets(
             GROUP BY p.doc_type ORDER BY count DESC
         """, p)
         doc_type_facets = cur.fetchall()
+
+        # --- Facette ACCÈS (ouvert / fermé) ---
+        c, p = base_conds_params()
+        add_all_except(c, p, skip="access")
+        cur.execute(f"""
+            SELECT
+                COUNT(*) FILTER (WHERE p.oa_status::text IN ('gold','hybrid','bronze','green','diamond')) AS open_count,
+                COUNT(*) FILTER (WHERE p.oa_status::text IN ('closed','unknown') OR p.oa_status IS NULL) AS closed_count
+            FROM publications p
+            WHERE {where_sql(c)}
+        """, p)
+        access_row = cur.fetchone()
+        access_facets = [
+            {"value": "open",   "text": "Ouvert", "count": access_row["open_count"]},
+            {"value": "closed", "text": "Fermé",  "count": access_row["closed_count"]},
+        ]
 
         # --- Facette OA_STATUS ---
         c, p = base_conds_params()
@@ -305,6 +324,7 @@ async def publications_facets(
             "labs": lab_facets,
             "no_lab_count": no_lab_count,
             "doc_types": doc_type_facets,
+            "access": access_facets,
             "oa_statuses": oa_facets,
             "corresponding": corr_facets,
             "source_counts": {
@@ -700,6 +720,7 @@ async def list_publications(
     year: str = Query(""),             # comma-separated ints
     publisher_id: int | None = Query(None),
     journal_id: int | None = Query(None),
+    access: str = Query(""),            # open, closed
     oa_status: str = Query(""),        # comma-separated values
     source_filter: str = Query(""),    # comma-separated: hal_only, oa_only, both
     doc_type: str = Query(""),         # comma-separated values
@@ -792,6 +813,9 @@ async def list_publications(
         # Source filter: per-source presence/absence (AND logic)
         if source_values:
             apply_source_filter(conditions, source_values)
+
+        # Access filter (open / closed)
+        apply_access_filter(conditions, params, access)
 
         # OA filter: expand 'oa' shortcut, then use ANY
         if oa_values:
@@ -889,6 +913,17 @@ async def list_publications(
                  WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
                    AND a3.structure_ids IS NOT NULL
                 ) AS labs,
+                -- Labs as JSON array with id+label for frontend links
+                (SELECT json_agg(sub ORDER BY sub.label)
+                 FROM (
+                    SELECT DISTINCT s.id, COALESCE(s.acronym, s.name) AS label
+                    FROM authorships a4
+                    CROSS JOIN LATERAL unnest(a4.structure_ids) AS struct_id
+                    JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
+                    WHERE a4.publication_id = p.id AND a4.in_perimeter = TRUE
+                      AND a4.structure_ids IS NOT NULL
+                 ) sub
+                ) AS lab_items,
                 -- APC: montant total, détails par labo payeur
                 (SELECT json_agg(json_build_object(
                     'amount', ap.amount_eur_ht,
@@ -926,6 +961,7 @@ async def list_publications(
                 "wos_id": row["wos_id"],
                 "theses_id": row["theses_id"],
                 "labs": row["labs"],
+                "lab_items": row["lab_items"],
                 "apc": row["apc_details"],
                 "is_corresponding": row["is_corresponding"],
                 "authorship_id": row["authorship_id"],
