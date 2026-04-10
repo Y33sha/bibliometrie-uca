@@ -396,8 +396,11 @@ async def export_publications_csv(
             conditions = [PUB_IS_UCA]
             params = []
 
-        # Exclure les peer_review
-        conditions.append("p.doc_type != 'peer_review'")
+        # Exclure peer_review + ongoing_thesis (sauf si doc_type explicitement demandé)
+        if doc_types:
+            conditions.append("p.doc_type != 'peer_review'")
+        else:
+            conditions.append("p.doc_type NOT IN ('peer_review', 'ongoing_thesis')")
 
         if search:
             conditions.append("unaccent(p.title) ILIKE unaccent(%s)")
@@ -772,8 +775,11 @@ async def list_publications(
             conditions = [PUB_IS_UCA]
             params = []
 
-        # Exclure les peer_review (auteurs = ceux de l'article reviewé, pas du review)
-        conditions.append("p.doc_type != 'peer_review'")
+        # Exclure peer_review + ongoing_thesis (sauf si doc_type explicitement demandé)
+        if doc_types:
+            conditions.append("p.doc_type != 'peer_review'")
+        else:
+            conditions.append("p.doc_type NOT IN ('peer_review', 'ongoing_thesis')")
 
         if search:
             conditions.append("unaccent(p.title) ILIKE unaccent(%s)")
