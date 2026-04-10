@@ -641,7 +641,43 @@ async def get_publication(pub_id: int):
         """, (pub_id,))
         wos_authorships = cur.fetchall()
 
-        # f) Resolve all structure_ids → names
+        # f) Theses.fr authorships (avec rôles)
+        cur.execute("""
+            SELECT sa.id, sa.author_position, sauth.full_name, sa.person_id,
+                   sa.roles, sa.in_perimeter
+            FROM source_authorships sa
+            JOIN source_authors sauth ON sauth.id = sa.source_author_id
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            WHERE sa.source = 'theses' AND sd.publication_id = %s
+            ORDER BY sa.author_position NULLS LAST, sauth.full_name
+        """, (pub_id,))
+        theses_authorships = cur.fetchall()
+
+        # f2) Métadonnées thèse (discipline, école doctorale, partenaires)
+        thesis_meta = None
+        if pub["doc_type"] in ("thesis", "ongoing_thesis"):
+            cur.execute("""
+                SELECT st.raw_data->>'discipline' AS discipline,
+                       st.raw_data->'ecolesDoctorale' AS ecoles_doctorales,
+                       st.raw_data->'partenairesDeRecherche' AS partenaires,
+                       p.meta
+                FROM publications p
+                LEFT JOIN source_documents sd ON sd.publication_id = p.id AND sd.source = 'theses'
+                LEFT JOIN staging st ON st.id = sd.staging_id
+                WHERE p.id = %s
+                LIMIT 1
+            """, (pub_id,))
+            row = cur.fetchone()
+            if row:
+                thesis_meta = {
+                    "discipline": row["discipline"],
+                    "ecoles_doctorales": row["ecoles_doctorales"],
+                    "partenaires": row["partenaires"],
+                    "date_soutenance": (row["meta"] or {}).get("date_soutenance"),
+                    "date_inscription": (row["meta"] or {}).get("date_inscription"),
+                }
+
+        # g) Resolve all structure_ids → names
         all_struct_ids = set()
         for row in authorships:
             if row["structure_ids"]:
@@ -674,6 +710,8 @@ async def get_publication(pub_id: int):
             "hal_authorships": [dict(a) for a in hal_authorships],
             "openalex_authorships": [dict(a) for a in oa_authorships],
             "wos_authorships": [dict(a) for a in wos_authorships],
+            "theses_authorships": [dict(a) for a in theses_authorships],
+            "thesis_meta": thesis_meta,
             "structures": structures,
         }
 
