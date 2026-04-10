@@ -681,13 +681,13 @@ def main():
 
         for row in rows:
             try:
+                cur.execute("SAVEPOINT normalize_work")
                 success = process_work(cur, row)
+                cur.execute("RELEASE SAVEPOINT normalize_work")
                 if success:
                     processed += 1
-                elif row[4] is None:  # collection = NULL → hors périmètre skipé
-                    skipped_hors_perimetre += 1
             except Exception:
-                conn.rollback()
+                cur.execute("ROLLBACK TO SAVEPOINT normalize_work")
                 errors += 1
                 continue
 
