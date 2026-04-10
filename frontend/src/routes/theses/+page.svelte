@@ -21,6 +21,7 @@
     openalex_id: string | null;
     scanr_id: string | null;
     theses_id: string | null;
+    oa_status: string | null;
   }
 
   let search = $state("");
@@ -28,6 +29,7 @@
   let selectedYears: string[] = $state([]);
   let selectedLabs: string[] = $state([]);
   let selectedStatus: string[] = $state([]);
+  let selectedAccess: string[] = $state([]);
 
   function buildFilterParams(): URLSearchParams {
     const params = new URLSearchParams();
@@ -40,6 +42,7 @@
     }
     const q = search.trim();
     if (q) params.set("search", q);
+    if (selectedAccess.length) params.set("access", selectedAccess.join(","));
     params.set("sort", currentSort);
     return params;
   }
@@ -59,6 +62,7 @@
     facets: {
       years: { type: "simple", apiKey: "years" },
       labs: { type: "labeled", apiKey: "labs" },
+      access: { type: "passthrough", apiKey: "access" },
       status: {
         type: "label_map",
         apiKey: "doc_types",
@@ -77,6 +81,7 @@
       selectedYears: { type: "string_array", urlKey: "year" },
       selectedLabs: { type: "string_array", urlKey: "lab_id" },
       selectedStatus: { type: "string_array", urlKey: "status" },
+      selectedAccess: { type: "string_array", urlKey: "access" },
       search: { type: "single", urlKey: "search" },
       currentSort: { type: "single", urlKey: "sort", defaultValue: "year_desc" },
       currentPage: { type: "page", urlKey: "page" },
@@ -88,6 +93,7 @@
       selectedYears,
       selectedLabs,
       selectedStatus,
+      selectedAccess,
       search,
       currentSort,
       currentPage: pubs.page,
@@ -136,6 +142,7 @@
     if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
     if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
     if (restored.selectedStatus) selectedStatus = restored.selectedStatus as string[];
+    if (restored.selectedAccess) selectedAccess = restored.selectedAccess as string[];
     if (restored.search) search = restored.search as string;
     if (restored.currentSort) currentSort = restored.currentSort as string;
     if (restored.currentPage) pubs.page = restored.currentPage as number;
@@ -170,6 +177,7 @@
     <FacetDropdown label="Année" options={facets.options.years} bind:selected={selectedYears} onchange={() => onFilterChange()} />
     <FacetDropdown label="Laboratoire" options={facets.options.labs} bind:selected={selectedLabs} onchange={(v: string[]) => onLabChange(v)} />
     <FacetDropdown label="Statut" options={facets.options.status} bind:selected={selectedStatus} onchange={() => onFilterChange()} />
+    <FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={() => onFilterChange()} />
   </div>
 </div>
 
@@ -180,6 +188,7 @@
       <th class="col-title sortable" class:active={titleSortActive} onclick={toggleSortTitle}>Titre {titleSortActive ? titleSortArrow : ""}</th>
       <th class="col-status">Statut</th>
       <th class="col-labs">Laboratoire(s)</th>
+      <th class="col-oa">OA</th>
       <th class="col-link">Sources</th>
     </tr>
   </thead>
@@ -199,6 +208,24 @@
           {#each pub.lab_items || [] as lab}
             <a href="{base}/laboratories/{lab.id}" class="lab-tag">{lab.label}</a>
           {/each}
+        </td>
+        <td class="oa-lock-cell">
+          {#if pub.doc_type === 'ongoing_thesis'}
+            <span class="oa-lock-badge oa-lock-ongoing">
+              <img src="{base}/hourglass.svg" alt="En cours" class="oa-lock" title="Thèse en cours" />
+              <span class="oa-lock-label">en cours</span>
+            </span>
+          {:else if pub.oa_status && !['unknown', 'closed'].includes(pub.oa_status)}
+            <span class="oa-lock-badge oa-lock-open">
+              <img src="{base}/lock-open.svg" alt="Open Access" class="oa-lock" title="Open Access ({pub.oa_status})" />
+              <span class="oa-lock-label">ouvert</span>
+            </span>
+          {:else}
+            <span class="oa-lock-badge oa-lock-closed">
+              <img src="{base}/lock-closed.svg" alt="Closed" class="oa-lock" title="Accès fermé" />
+              <span class="oa-lock-label">fermé</span>
+            </span>
+          {/if}
         </td>
         <td class="links-cell">
           {#if pub.theses_id}
@@ -328,6 +355,9 @@
   }
   .col-labs {
     width: 180px;
+  }
+  .col-oa {
+    width: 75px;
   }
   .col-link {
     width: 120px;
