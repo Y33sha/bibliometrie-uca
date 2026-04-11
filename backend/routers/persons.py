@@ -518,7 +518,7 @@ async def author_details(source: str, author_id: int, max_pubs: int = Query(10, 
 
 @router.get("/api/persons/{person_id}")
 async def get_person(person_id: int):
-    """Retourne une personne avec ses auteurs liés."""
+    """Retourne une personne avec ses auteurs lies."""
     with get_cursor() as (cur, conn):
         cur.execute("""
             SELECT p.id, p.last_name, p.first_name,
@@ -526,25 +526,17 @@ async def get_person(person_id: int):
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh,
                 (SELECT json_agg(x) FROM (
-                    SELECT DISTINCT sauth.id, sauth.full_name, sauth.orcid,
-                           sauth.source_ids->>'idhal' AS idhal, 'hal' AS source
-                    FROM source_authors sauth
-                    JOIN source_authorships sa ON sa.source = 'hal' AND sa.source_author_id = sauth.id
-                    WHERE sa.person_id = p.id AND NOT sa.excluded
-                    UNION ALL
-                    SELECT MIN(sa.source_author_id) AS id,
-                           COALESCE(sa.source_data->>'raw_author_name', sauth.full_name) AS full_name,
-                           NULL AS orcid, NULL AS idhal, 'openalex' AS source
+                    SELECT DISTINCT ON (sa.source, sauth.id)
+                           sauth.id, sa.source,
+                           CASE WHEN sa.source = 'openalex'
+                                THEN COALESCE(sa.source_data->>'raw_author_name', sauth.full_name)
+                                ELSE sauth.full_name END AS full_name,
+                           sauth.orcid,
+                           sauth.source_ids->>'idhal' AS idhal
                     FROM source_authorships sa
                     JOIN source_authors sauth ON sauth.id = sa.source_author_id
-                    WHERE sa.source = 'openalex' AND sa.person_id = p.id AND NOT sa.excluded
-                    GROUP BY COALESCE(sa.source_data->>'raw_author_name', sauth.full_name)
-                    UNION ALL
-                    SELECT sauth.id, sauth.full_name, sauth.orcid, NULL AS idhal, 'wos' AS source
-                    FROM source_authors sauth
-                    JOIN source_authorships sa ON sa.source = 'wos' AND sa.source_author_id = sauth.id
                     WHERE sa.person_id = p.id AND NOT sa.excluded
-                    GROUP BY sauth.id, sauth.full_name, sauth.orcid
+                    ORDER BY sa.source, sauth.id
                 ) x) AS linked_authors,
                 (SELECT json_agg(json_build_object(
                     'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,

@@ -561,20 +561,11 @@ async def get_publication(pub_id: int):
         if not pub:
             raise HTTPException(status_code=404, detail="Publication not found")
 
-        # b) Sources — HAL: countries du document; OA/WoS/ScanR: countries depuis adresses
+        # b) Sources — countries depuis le document
         cur.execute("""
-            SELECT 'hal' AS source, sd.source_id, sd.doi, sd.collections, sd.countries
-            FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'hal'
-            UNION ALL
-            SELECT sd.source, sd.source_id, sd.doi, NULL,
-                   (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM source_authorships sa2
-                    JOIN source_authorship_addresses saa ON saa.source_authorship_id = sa2.id
-                    JOIN addresses addr ON addr.id = saa.address_id,
-                         unnest(addr.countries) AS c
-                    WHERE sa2.source_document_id = sd.id AND addr.countries IS NOT NULL)
-            FROM source_documents sd WHERE sd.publication_id = %s AND sd.source IN ('openalex', 'wos', 'scanr', 'theses')
-        """, (pub_id, pub_id))
+            SELECT sd.source, sd.source_id, sd.doi, sd.collections, sd.countries
+            FROM source_documents sd WHERE sd.publication_id = %s
+        """, (pub_id,))
         sources = cur.fetchall()
 
         # c) Authorships — truth table

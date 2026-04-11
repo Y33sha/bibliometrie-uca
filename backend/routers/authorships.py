@@ -9,45 +9,25 @@ router = APIRouter()
 @router.get("/api/authorships/stats")
 async def authorships_stats(lab_id: int = Query(0)):
     """Statistiques auteurs UCA."""
-    lab_filter_hal = ""
-    lab_filter_oa = ""
-    lab_filter_wos = ""
+    lab_filter = ""
     params: list = []
     if lab_id:
-        lab_filter_hal = " AND sa.structure_ids && %s::int[]"
-        lab_filter_oa = " AND sa.structure_ids && %s::int[]"
-        lab_filter_wos = " AND sa.structure_ids && %s::int[]"
-        params = [[lab_id], [lab_id], [lab_id]]
+        lab_filter = " AND sa.structure_ids && %s::int[]"
+        params = [[lab_id]]
 
     with get_cursor() as (cur, conn):
         cur.execute(f"""
             WITH uca_authors AS (
-                SELECT ha.id,
+                SELECT sauth.id, sa.source,
                        (SELECT sa3.person_id FROM source_authorships sa3
-                        WHERE sa3.source = 'hal' AND sa3.source_author_id = ha.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                       ha.orcid, ha.source_ids->>'idhal' AS idhal, 'hal' AS source
-                FROM source_authors ha
+                        WHERE sa3.source_author_id = sauth.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id,
+                       sauth.orcid, sauth.source_ids->>'idhal' AS idhal
+                FROM source_authors sauth
                 WHERE EXISTS (
                     SELECT 1 FROM source_authorships sa
-                    WHERE sa.source = 'hal' AND sa.source_author_id = ha.id AND sa.in_perimeter = TRUE{lab_filter_hal}
+                    WHERE sa.source_author_id = sauth.id AND sa.in_perimeter = TRUE{lab_filter}
                 )
-                UNION ALL
-                SELECT oa.id, oa.person_id, oa.orcid, NULL AS idhal, 'openalex' AS source
-                FROM source_authors oa
-                WHERE EXISTS (
-                    SELECT 1 FROM source_authorships sa
-                    WHERE sa.source = 'openalex' AND sa.source_author_id = oa.id AND sa.in_perimeter = TRUE{lab_filter_oa}
-                )
-                UNION ALL
-                SELECT wa.id,
-                       (SELECT sa3.person_id FROM source_authorships sa3
-                        WHERE sa3.source = 'wos' AND sa3.source_author_id = wa.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                       wa.orcid, NULL AS idhal, 'wos' AS source
-                FROM source_authors wa
-                WHERE EXISTS (
-                    SELECT 1 FROM source_authorships sa
-                    WHERE sa.source = 'wos' AND sa.source_author_id = wa.id AND sa.in_perimeter = TRUE{lab_filter_wos}
-                )
+                AND sauth.source IN ('hal', 'openalex', 'wos')
             )
             SELECT
                 COUNT(*) AS total_uca_authors,
@@ -59,6 +39,39 @@ async def authorships_stats(lab_id: int = Query(0)):
         return cur.fetchone()
 
 
+def _uca_authors_cte(lab_id: int = 0, with_pub_count: bool = False) -> tuple[str, list]:
+    """Construit la CTE uca_authors unifiee (toutes sources)."""
+    lab_filter = ""
+    params: list = []
+    if lab_id:
+        lab_filter = " AND sa.structure_ids && %s::int[]"
+        params = [[lab_id]]
+
+    pub_count_col = ""
+    if with_pub_count:
+        pub_count_col = """,
+                   (SELECT COUNT(DISTINCT sa2.source_document_id)
+                    FROM source_authorships sa2
+                    WHERE sa2.source_author_id = sauth.id AND sa2.in_perimeter = TRUE) AS uca_pub_count"""
+
+    cte = f"""
+        WITH uca_authors AS (
+            SELECT sauth.id, sauth.source, sauth.full_name, sauth.last_name, sauth.first_name,
+                   sauth.orcid, sauth.source_ids->>'idhal' AS idhal,
+                   CASE WHEN sauth.source = 'openalex' THEN sauth.source_id ELSE NULL END AS openalex_id,
+                   (SELECT sa3.person_id FROM source_authorships sa3
+                    WHERE sa3.source_author_id = sauth.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id{pub_count_col}
+            FROM source_authors sauth
+            WHERE sauth.source IN ('hal', 'openalex', 'wos')
+              AND EXISTS (
+                  SELECT 1 FROM source_authorships sa
+                  WHERE sa.source_author_id = sauth.id AND sa.in_perimeter = TRUE{lab_filter}
+              )
+        )
+    """
+    return cte, params
+
+
 @router.get("/api/authorships/facets")
 async def authorships_facets(
     linked: str = Query(""),
@@ -67,58 +80,7 @@ async def authorships_facets(
     lab_id: int = Query(0),
 ):
     """Facettes dynamiques pour la page authorships admin."""
-    lab_filter_hal = ""
-    lab_filter_oa = ""
-    lab_filter_wos = ""
-    cte_params: list = []
-    if lab_id:
-        lab_filter_hal = " AND sa.structure_ids && %s::int[]"
-        lab_filter_oa = " AND sa.structure_ids && %s::int[]"
-        lab_filter_wos = " AND sa.structure_ids && %s::int[]"
-        cte_params = [[lab_id], [lab_id], [lab_id]]
-
-    cte = f"""
-        WITH uca_authors AS (
-            SELECT ha.id,
-                   (SELECT sa3.person_id FROM source_authorships sa3
-                    WHERE sa3.source = 'hal' AND sa3.source_author_id = ha.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                   ha.orcid, ha.source_ids->>'idhal' AS idhal, 'hal' AS source,
-                   ha.full_name,
-                   (SELECT COUNT(DISTINCT sd.publication_id) FROM source_authorships sa2
-                    JOIN source_documents sd ON sd.id = sa2.source_document_id
-                    WHERE sa2.source = 'hal' AND sa2.source_author_id = ha.id AND sa2.in_perimeter = TRUE) AS uca_pub_count
-            FROM source_authors ha
-            WHERE EXISTS (
-                SELECT 1 FROM source_authorships sa
-                WHERE sa.source = 'hal' AND sa.source_author_id = ha.id AND sa.in_perimeter = TRUE{lab_filter_hal}
-            )
-            UNION ALL
-            SELECT oa.id, oa.person_id, oa.orcid, NULL AS idhal, 'openalex' AS source,
-                   oa.full_name,
-                   (SELECT COUNT(DISTINCT sd.publication_id) FROM source_authorships sa2
-                    JOIN source_documents sd ON sd.id = sa2.source_document_id
-                    WHERE sa2.source = 'openalex' AND sa2.source_author_id = oa.id AND sa2.in_perimeter = TRUE) AS uca_pub_count
-            FROM source_authors oa
-            WHERE EXISTS (
-                SELECT 1 FROM source_authorships sa
-                WHERE sa.source = 'openalex' AND sa.source_author_id = oa.id AND sa.in_perimeter = TRUE{lab_filter_oa}
-            )
-            UNION ALL
-            SELECT wa.id,
-                   (SELECT sa3.person_id FROM source_authorships sa3
-                    WHERE sa3.source = 'wos' AND sa3.source_author_id = wa.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                   wa.orcid, NULL AS idhal, 'wos' AS source,
-                   wa.full_name,
-                   (SELECT COUNT(DISTINCT sd.publication_id) FROM source_authorships sa2
-                    JOIN source_documents sd ON sd.id = sa2.source_document_id
-                    WHERE sa2.source = 'wos' AND sa2.source_author_id = wa.id AND sa2.in_perimeter = TRUE) AS uca_pub_count
-            FROM source_authors wa
-            WHERE EXISTS (
-                SELECT 1 FROM source_authorships sa
-                WHERE sa.source = 'wos' AND sa.source_author_id = wa.id AND sa.in_perimeter = TRUE{lab_filter_wos}
-            )
-        )
-    """
+    cte, cte_params = _uca_authors_cte(lab_id=lab_id)
 
     def build_where(*, skip: str) -> tuple[str, list]:
         conds: list[str] = []
@@ -174,54 +136,14 @@ async def authorships_facets(
 
         # Labs (cross-filtered, excluding lab filter itself)
         where, p = build_where(skip="lab")
-        # For labs, we need a simplified CTE without lab filter
-        lab_cte = f"""
-            WITH uca_authors AS (
-                SELECT ha.id,
-                       (SELECT sa3.person_id FROM source_authorships sa3
-                        WHERE sa3.source = 'hal' AND sa3.source_author_id = ha.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                       ha.orcid, ha.source_ids->>'idhal' AS idhal, 'hal' AS source,
-                       ha.full_name
-                FROM source_authors ha
-                WHERE EXISTS (
-                    SELECT 1 FROM source_authorships sa
-                    WHERE sa.source = 'hal' AND sa.source_author_id = ha.id AND sa.in_perimeter = TRUE
-                )
-                UNION ALL
-                SELECT oa.id, oa.person_id, oa.orcid, NULL AS idhal, 'openalex' AS source,
-                       oa.full_name
-                FROM source_authors oa
-                WHERE EXISTS (
-                    SELECT 1 FROM source_authorships sa
-                    WHERE sa.source = 'openalex' AND sa.source_author_id = oa.id AND sa.in_perimeter = TRUE
-                )
-                UNION ALL
-                SELECT wa.id,
-                       (SELECT sa3.person_id FROM source_authorships sa3
-                        WHERE sa3.source = 'wos' AND sa3.source_author_id = wa.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                       wa.orcid, NULL AS idhal, 'wos' AS source,
-                       wa.full_name
-                FROM source_authors wa
-                WHERE EXISTS (
-                    SELECT 1 FROM source_authorships sa
-                    WHERE sa.source = 'wos' AND sa.source_author_id = wa.id AND sa.in_perimeter = TRUE
-                )
-            ),
+        lab_cte, lab_params = _uca_authors_cte(lab_id=0)
+        lab_cte += """,
             author_structs AS (
-                SELECT ha.id AS author_id, 'hal' AS source, unnest(sa2.structure_ids) AS struct_id
-                FROM source_authors ha
-                JOIN source_authorships sa2 ON sa2.source = 'hal' AND sa2.source_author_id = ha.id
+                SELECT sauth.id AS author_id, sauth.source, unnest(sa2.structure_ids) AS struct_id
+                FROM source_authors sauth
+                JOIN source_authorships sa2 ON sa2.source_author_id = sauth.id
                 WHERE sa2.in_perimeter = TRUE AND sa2.structure_ids IS NOT NULL
-                UNION
-                SELECT oa.id, 'openalex', unnest(sa2.structure_ids)
-                FROM source_authors oa
-                JOIN source_authorships sa2 ON sa2.source = 'openalex' AND sa2.source_author_id = oa.id
-                WHERE sa2.in_perimeter = TRUE AND sa2.structure_ids IS NOT NULL
-                UNION
-                SELECT wa.id, 'wos', unnest(sa2.structure_ids)
-                FROM source_authors wa
-                JOIN source_authorships sa2 ON sa2.source = 'wos' AND sa2.source_author_id = wa.id
-                WHERE sa2.in_perimeter = TRUE AND sa2.structure_ids IS NOT NULL
+                  AND sauth.source IN ('hal', 'openalex', 'wos')
             )
         """
         cur.execute(f"""{lab_cte}
@@ -233,7 +155,7 @@ async def authorships_facets(
             {where} {"AND" if where else "WHERE"} s.structure_type = 'labo'
             GROUP BY s.id, s.acronym, s.name
             ORDER BY count DESC
-        """, p)
+        """, lab_params + p)
         lab_facets = cur.fetchall()
 
         return {
@@ -254,21 +176,12 @@ async def list_authorships(
     has_idhal: str = Query(""),
     lab_id: int = Query(0),
 ):
-    """Liste des auteurs UCA avec filtres (UNION hal_authors + openalex_authors)."""
+    """Liste des auteurs UCA avec filtres."""
     offset = (page - 1) * per_page
 
-    # Filtre labo (injecté dans le CTE)
-    lab_filter_hal = ""
-    lab_filter_oa = ""
-    lab_filter_wos = ""
-    cte_params: list = []
-    if lab_id:
-        lab_filter_hal = " AND sa.structure_ids && %s::int[]"
-        lab_filter_oa = " AND sa.structure_ids && %s::int[]"
-        lab_filter_wos = " AND sa.structure_ids && %s::int[]"
-        cte_params = [[lab_id], [lab_id], [lab_id]]
+    cte, cte_params = _uca_authors_cte(lab_id=lab_id, with_pub_count=True)
 
-    # Filtres appliqués sur le résultat du CTE
+    # Filtres appliques sur le resultat du CTE
     cte_conditions = []
     params: list = []
 
@@ -292,47 +205,6 @@ async def list_authorships(
     where = ("WHERE " + " AND ".join(cte_conditions)) if cte_conditions else ""
 
     with get_cursor() as (cur, conn):
-        cte = f"""
-            WITH uca_authors AS (
-                SELECT ha.id, 'hal' AS source, ha.full_name, ha.last_name, ha.first_name,
-                       ha.orcid, ha.source_ids->>'idhal' AS idhal, NULL::text AS openalex_id,
-                       (SELECT sa3.person_id FROM source_authorships sa3
-                        WHERE sa3.source = 'hal' AND sa3.source_author_id = ha.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                       (SELECT COUNT(DISTINCT sa2.source_document_id)
-                        FROM source_authorships sa2
-                        WHERE sa2.source = 'hal' AND sa2.source_author_id = ha.id AND sa2.in_perimeter = TRUE) AS uca_pub_count
-                FROM source_authors ha
-                WHERE EXISTS (
-                    SELECT 1 FROM source_authorships sa
-                    WHERE sa.source = 'hal' AND sa.source_author_id = ha.id AND sa.in_perimeter = TRUE{lab_filter_hal}
-                )
-                UNION ALL
-                SELECT oa.id, 'openalex' AS source, oa.full_name, oa.last_name, oa.first_name,
-                       oa.orcid, NULL::text AS idhal, oa.source_id AS openalex_id, oa.person_id,
-                       (SELECT COUNT(DISTINCT sa2.source_document_id)
-                        FROM source_authorships sa2
-                        WHERE sa2.source = 'openalex' AND sa2.source_author_id = oa.id AND sa2.in_perimeter = TRUE) AS uca_pub_count
-                FROM source_authors oa
-                WHERE EXISTS (
-                    SELECT 1 FROM source_authorships sa
-                    WHERE sa.source = 'openalex' AND sa.source_author_id = oa.id AND sa.in_perimeter = TRUE{lab_filter_oa}
-                )
-                UNION ALL
-                SELECT wa.id, 'wos' AS source, wa.full_name, wa.last_name, wa.first_name,
-                       wa.orcid, NULL::text AS idhal, NULL::text AS openalex_id,
-                       (SELECT sa3.person_id FROM source_authorships sa3
-                        WHERE sa3.source = 'wos' AND sa3.source_author_id = wa.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id,
-                       (SELECT COUNT(DISTINCT sa2.source_document_id)
-                        FROM source_authorships sa2
-                        WHERE sa2.source = 'wos' AND sa2.source_author_id = wa.id AND sa2.in_perimeter = TRUE) AS uca_pub_count
-                FROM source_authors wa
-                WHERE EXISTS (
-                    SELECT 1 FROM source_authorships sa
-                    WHERE sa.source = 'wos' AND sa.source_author_id = wa.id AND sa.in_perimeter = TRUE{lab_filter_wos}
-                )
-            )
-        """
-
         cur.execute(f"""
             {cte}
             SELECT COUNT(*) FROM uca_authors ua {where}
