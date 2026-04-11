@@ -481,16 +481,8 @@ async def export_publications_csv(
                 p.oa_status::text,
                 j.title AS journal_title,
                 pub.name AS publisher_name,
-                (SELECT sd.source_id FROM source_documents sd
-                 WHERE sd.publication_id = p.id AND sd.source = 'hal' LIMIT 1) AS hal_id,
-                (SELECT sd.source_id FROM source_documents sd
-                 WHERE sd.publication_id = p.id AND sd.source = 'openalex' LIMIT 1) AS openalex_id,
-                (SELECT sd.source_id FROM source_documents sd
-                 WHERE sd.publication_id = p.id AND sd.source = 'scanr' LIMIT 1) AS scanr_id,
-                (SELECT sd.source_id FROM source_documents sd
-                 WHERE sd.publication_id = p.id AND sd.source = 'wos' LIMIT 1) AS wos_id,
-                (SELECT sd.source_id FROM source_documents sd
-                 WHERE sd.publication_id = p.id AND sd.source = 'theses' LIMIT 1) AS theses_id,
+                src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
+                src_ids.wos_id, src_ids.theses_id,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
@@ -502,6 +494,15 @@ async def export_publications_csv(
             FROM publications p
             LEFT JOIN journals j ON j.id = p.journal_id
             LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN LATERAL (
+                SELECT
+                    max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
+                    max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
+                    max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
+                    max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
+                    max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id
+                FROM source_documents sd WHERE sd.publication_id = p.id
+            ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}
         """, params)
@@ -546,7 +547,7 @@ async def get_publication(pub_id: int):
         # a) Publication + journal + publisher
         cur.execute("""
             SELECT p.id, p.title, p.pub_year, p.doi, p.doc_type::text, p.oa_status::text,
-                   p.language, p.container_title,
+                   p.language, p.container_title, p.abstract,
                    j.id AS journal_id, j.title AS journal_title, j.issn, j.eissn,
                    j.is_predatory AS journal_predatory, j.apc_amount, j.apc_currency,
                    j.oa_model,
@@ -595,7 +596,7 @@ async def get_publication(pub_id: int):
         """, (pub_id,))
         hal_authorships = cur.fetchall()
 
-        # e) OpenAlex authorships — pays depuis les adresses
+        # e) OpenAlex authorships — pays depuis sa.countries ou adresses
         cur.execute("""
             SELECT sa.id, sa.author_position,
                    COALESCE(sa.source_data->>'raw_author_name', sauth.full_name) AS full_name,
@@ -603,12 +604,13 @@ async def get_publication(pub_id: int):
                    sa.in_perimeter, sa.structure_ids,
                    (SELECT string_agg(CASE jsonb_typeof(e) WHEN 'string' THEN e #>> '{}' ELSE e->>'name' END, ' | ') FROM jsonb_array_elements(sa.raw_affiliations) AS e) AS raw_affiliation,
                    sa.excluded,
-                   (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM source_authorship_addresses saa
-                    JOIN addresses addr ON addr.id = saa.address_id,
-                         unnest(addr.countries) AS c
-                    WHERE saa.source_authorship_id = sa.id
-                      AND addr.countries IS NOT NULL
+                   COALESCE(sa.countries,
+                       (SELECT array_agg(DISTINCT c ORDER BY c)
+                        FROM source_authorship_addresses saa
+                        JOIN addresses addr ON addr.id = saa.address_id,
+                             unnest(addr.countries) AS c
+                        WHERE saa.source_authorship_id = sa.id
+                          AND addr.countries IS NOT NULL)
                    ) AS countries
             FROM source_authorships sa
             JOIN source_authors sauth ON sauth.id = sa.source_author_id
@@ -618,18 +620,19 @@ async def get_publication(pub_id: int):
         """, (pub_id,))
         oa_authorships = cur.fetchall()
 
-        # e2) WoS authorships — pays depuis les adresses
+        # e2) WoS authorships — pays depuis sa.countries ou adresses
         cur.execute("""
             SELECT sa.id, sa.author_position, sauth.full_name, sa.person_id,
                    sa.in_perimeter, sa.structure_ids,
                    (SELECT string_agg(CASE jsonb_typeof(e) WHEN 'string' THEN e #>> '{}' ELSE e->>'name' END, ' | ') FROM jsonb_array_elements(sa.raw_affiliations) AS e) AS raw_affiliation,
                    sa.excluded,
-                   (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM source_authorship_addresses saa
-                    JOIN addresses addr ON addr.id = saa.address_id,
-                         unnest(addr.countries) AS c
-                    WHERE saa.source_authorship_id = sa.id
-                      AND addr.countries IS NOT NULL
+                   COALESCE(sa.countries,
+                       (SELECT array_agg(DISTINCT c ORDER BY c)
+                        FROM source_authorship_addresses saa
+                        JOIN addresses addr ON addr.id = saa.address_id,
+                             unnest(addr.countries) AS c
+                        WHERE saa.source_authorship_id = sa.id
+                          AND addr.countries IS NOT NULL)
                    ) AS countries
             FROM source_authorships sa
             JOIN source_authors sauth ON sauth.id = sa.source_author_id
@@ -935,17 +938,9 @@ async def list_publications(
                 p.oa_status::text,
                 j.title AS journal_title,
                 pub.name AS publisher_name,
-                -- Sources: HAL, OpenAlex, ScanR and WoS IDs
-                (SELECT sd.source_id FROM source_documents sd
-                 WHERE sd.publication_id = p.id AND sd.source = 'hal' LIMIT 1) AS hal_id,
-                (SELECT sd.source_id FROM source_documents sd
-                 WHERE sd.publication_id = p.id AND sd.source = 'openalex' LIMIT 1) AS openalex_id,
-                (SELECT sd.source_id FROM source_documents sd
-                 WHERE sd.publication_id = p.id AND sd.source = 'scanr' LIMIT 1) AS scanr_id,
-                (SELECT sd.source_id FROM source_documents sd
-                 WHERE sd.publication_id = p.id AND sd.source = 'wos' LIMIT 1) AS wos_id,
-                (SELECT sd.source_id FROM source_documents sd
-                 WHERE sd.publication_id = p.id AND sd.source = 'theses' LIMIT 1) AS theses_id,
+                -- Sources: tous les IDs en un seul lateral
+                src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
+                src_ids.wos_id, src_ids.theses_id,
                 -- Dates thèse (soutenance / inscription) depuis publications.meta
                 p.meta->>'date_soutenance' AS date_soutenance,
                 p.meta->>'date_inscription' AS date_inscription,
@@ -993,6 +988,15 @@ async def list_publications(
             FROM publications p
             LEFT JOIN journals j ON j.id = p.journal_id
             LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN LATERAL (
+                SELECT
+                    max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
+                    max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
+                    max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
+                    max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
+                    max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id
+                FROM source_documents sd WHERE sd.publication_id = p.id
+            ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}
             LIMIT %s OFFSET %s

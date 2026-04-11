@@ -1169,26 +1169,73 @@ async def assign_orphan_authorship_endpoint(body: dict):
 
 @router.post("/api/orphan-authorships/batch-assign")
 async def batch_assign_orphan_authorships(body: dict):
-    """Attribue plusieurs authorships orphelines à une même personne."""
+    """Attribue plusieurs authorships orphelines a une meme personne.
+
+    Fait tout en SQL batch au lieu d'iterer authorship par authorship :
+    1. SET person_id sur les source_authorships
+    2. Cree les authorships canoniques manquantes
+    3. Met les FK source_authorships.authorship_id
+    4. Ajoute les formes de noms
+    """
     authorships = body.get("authorships", [])  # [{ source, authorship_id }, ...]
     person_id = body.get("person_id")
     if not authorships or not person_id:
         raise HTTPException(status_code=400, detail="authorships et person_id requis")
+
+    sa_ids = [a["authorship_id"] for a in authorships
+              if a.get("source") in ("hal", "openalex", "wos")]
+    if not sa_ids:
+        return {"ok": True, "assigned": 0}
 
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id FROM persons WHERE id = %s", (person_id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Personne introuvable")
 
-        count = 0
-        for a in authorships:
-            src = a.get("source")
-            if src not in ("hal", "openalex", "wos"):
-                continue
-            if _assign_orphan(cur, person_id, src, a["authorship_id"]):
-                count += 1
+        # 1. Rattacher les source_authorships
+        cur.execute("""
+            UPDATE source_authorships SET person_id = %s
+            WHERE id = ANY(%s) AND person_id IS NULL
+            RETURNING id
+        """, (person_id, sa_ids))
+        assigned = cur.rowcount
 
-        return {"ok": True, "assigned": count}
+        # 2. Creer les authorships canoniques manquantes
+        cur.execute("""
+            INSERT INTO authorships (publication_id, person_id,
+                author_position, in_perimeter, is_corresponding, structure_ids)
+            SELECT DISTINCT ON (sd.publication_id)
+                sd.publication_id, %s,
+                sa.author_position, sa.in_perimeter, sa.is_corresponding, sa.structure_ids
+            FROM source_authorships sa
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            WHERE sa.id = ANY(%s) AND sd.publication_id IS NOT NULL
+            ORDER BY sd.publication_id,
+                CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 WHEN 'wos' THEN 3 END
+            ON CONFLICT (publication_id, person_id) DO NOTHING
+        """, (person_id, sa_ids))
+
+        # 3. Mettre les FK authorship_id
+        cur.execute("""
+            UPDATE source_authorships sa SET authorship_id = a.id
+            FROM source_documents sd, authorships a
+            WHERE sa.id = ANY(%s)
+              AND sd.id = sa.source_document_id
+              AND a.publication_id = sd.publication_id
+              AND a.person_id = %s
+              AND sa.authorship_id IS NULL
+        """, (sa_ids, person_id))
+
+        # 4. Ajouter les formes de noms
+        cur.execute("""
+            SELECT DISTINCT author_name_normalized
+            FROM source_authorships
+            WHERE id = ANY(%s) AND author_name_normalized IS NOT NULL AND NOT excluded
+        """, (sa_ids,))
+        for row in cur.fetchall():
+            _add_name_form(cur, person_id, row["author_name_normalized"])
+
+        return {"ok": True, "assigned": assigned}
 
 
 # ----- API: Formes de noms / détachement authorships -----
