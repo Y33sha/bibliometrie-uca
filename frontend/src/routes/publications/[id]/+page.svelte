@@ -20,6 +20,7 @@
     oa_status: string | null;
     language: string | null;
     container_title: string | null;
+    abstract: string | null;
     journal_id: number | null;
     journal_title: string | null;
     issn: string | null;
@@ -414,7 +415,15 @@
     </div>
   {/if}
 
-  <!-- Authorships - Truth table (masqué pour les thèses, remplacé par le bloc thèse) -->
+  <!-- Abstract -->
+  {#if pub.abstract}
+    <div class="section abstract-section">
+      <h2 class="section-title">Abstract</h2>
+      <p class="abstract-text">{@html sanitizeTitle(pub.abstract)}</p>
+    </div>
+  {/if}
+
+  <!-- Authorships - Truth table (masque pour les theses, remplace par le bloc these) -->
   {#if hasTruthTable && pub.doc_type !== 'thesis' && pub.doc_type !== 'ongoing_thesis'}
     <div class="section">
       <h2 class="section-title">Auteurs ({data!.authorships.length})</h2>
@@ -819,6 +828,19 @@
     font-size: 1.05rem;
     font-weight: 600;
     margin: 0 0 8px;
+  }
+
+  .abstract-section {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 20px;
+  }
+  .abstract-text {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--fg);
+    margin: 0;
   }
 
   /* Thesis block */
