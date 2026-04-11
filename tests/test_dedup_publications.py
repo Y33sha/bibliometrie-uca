@@ -126,16 +126,16 @@ class TestDedupDoiTypeConflict:
 # ── Déduplication par titre + année + journal ────────────────────
 
 class TestDedupByTitle:
-    def test_same_title_year_journal_merges(self, db):
-        """Même titre normalisé + année + journal → fusion (articles)."""
+    def test_same_title_year_journal_no_merge(self, db):
+        """Meme titre + annee + journal sans DOI commun -> pas de fusion."""
         jid = _create_journal(db)
         id1, _ = _create(db, title="Mon Article", title_normalized="mon article",
                          pub_year=2024, journal_id=jid, doc_type="article")
         id2, new = _create(db, title="Mon Article (v2)", title_normalized="mon article",
                            pub_year=2024, journal_id=jid, doc_type="article")
 
-        assert id1 == id2
-        assert new is False
+        assert id1 != id2
+        assert new is True
 
     def test_same_title_different_year_no_merge(self, db):
         """Même titre + journal mais année différente → pas de fusion."""
@@ -210,16 +210,15 @@ class TestNoDoi:
 
 class TestEnrich:
     def test_doi_enriches_existing(self, db):
-        """Une 2e source apporte un DOI à une publication qui n'en avait pas."""
-        jid = _create_journal(db)
-        id1, _ = _create(db, title_normalized="mon article",
-                         pub_year=2024, journal_id=jid, doc_type="article")
-        id2, _ = _create(db, doi="10.1234/new", title_normalized="mon article",
-                         pub_year=2024, journal_id=jid, doc_type="article")
+        """Un 2e appel avec le meme DOI enrichit la publication existante."""
+        id1, _ = _create(db, doi="10.1234/enrich", oa_status="closed",
+                         pub_year=2024, doc_type="article")
+        id2, _ = _create(db, doi="10.1234/enrich", oa_status="closed",
+                         pub_year=2024, doc_type="article", language="en")
 
         assert id1 == id2
-        db.execute("SELECT doi FROM publications WHERE id = %s", (id1,))
-        assert db.fetchone()["doi"] == "10.1234/new"
+        db.execute("SELECT language FROM publications WHERE id = %s", (id1,))
+        assert db.fetchone()["language"] == "en"
 
     def test_oa_status_upgrade(self, db):
         """Le statut OA s'améliore (closed → green)."""

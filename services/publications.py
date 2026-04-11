@@ -78,15 +78,30 @@ def find_thesis_by_title(cur, title_normalized: str, pub_year: int) -> list[PubT
 def _enrich(cur, pub_id: int, *, doi: str | None = None,
             doc_type: str | None = None, journal_id: int | None = None,
             oa_status: str | None = None, container_title: str | None = None,
-            language: str | None = None):
-    """Enrichit une publication existante avec des métadonnées complémentaires.
+            language: str | None = None) -> int:
+    """Enrichit une publication existante avec des metadonnees complementaires.
 
-    Règles de priorité (ne jamais dégrader) :
+    Regles de priorite (ne jamais degrader) :
     - DOI : ne remplace pas un DOI existant
-    - doc_type : 'other' peut être remplacé par un type plus précis
+    - doc_type : 'other' peut etre remplace par un type plus precis
     - oa_status : 'green' gagne sur 'closed'/'unknown', 'diamond' gagne sur tout
-    - journal_id, container_title, language : COALESCE (premier arrivé gagne)
+    - journal_id, container_title, language : COALESCE (premier arrive gagne)
+
+    Si le DOI est deja pris par une autre publication, les deux sont fusionnees.
+    Retourne le pub_id effectif (peut changer en cas de fusion).
     """
+    # Si on veut attribuer un DOI, verifier qu'il n'est pas deja pris
+    if doi:
+        cur.execute("SELECT doi FROM publications WHERE id = %s", (pub_id,))
+        row = cur.fetchone()
+        current_doi = row["doi"] if isinstance(row, dict) else row[0] if row else None
+        if row and not current_doi:
+            existing = find_by_doi(cur, doi)
+            if existing and existing.id != pub_id:
+                # Le DOI est deja sur une autre publication -> fusionner
+                merge_publications(cur, existing.id, pub_id)
+                pub_id = existing.id
+
     cur.execute("""
         UPDATE publications SET
             doi = CASE
@@ -119,6 +134,45 @@ def _enrich(cur, pub_id: int, *, doi: str | None = None,
           container_title,
           language,
           pub_id))
+    return pub_id
+
+
+def resolve_doi_conflict(cur, doi: str, doc_type: str, title_normalized: str,
+                         existing) -> tuple[str | None, int | None]:
+    """Gere les conflits de DOI entre chapitres et ouvrages.
+
+    Quand un DOI existe deja sur une publication d'un type incompatible
+    (chapitre vs ouvrage), le DOI est retire de l'un ou des deux cotes.
+
+    Retourne (doi_corrige, publication_id_si_fusion).
+    - doi_corrige : le DOI a utiliser pour le nouveau document (None si retire)
+    - publication_id_si_fusion : l'id de la publication existante si fusion, None sinon
+    """
+    ex_type = existing.doc_type or ""
+    chapter_types = ("book_chapter", "book-chapter", "chapter")
+    book_types = ("book",)
+
+    # Chapitre vs ouvrage : le DOI est celui de l'ouvrage, pas du chapitre
+    if doc_type in chapter_types and ex_type in book_types:
+        return None, None
+
+    if doc_type in book_types and ex_type in chapter_types:
+        cur.execute("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s",
+                    (existing.id,))
+        return doi, None
+
+    # Deux chapitres avec titres differents : DOI errone des deux cotes
+    if doc_type in chapter_types and ex_type in chapter_types:
+        ex_title = existing.title_normalized or ""
+        if title_normalized != ex_title:
+            cur.execute("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s",
+                        (existing.id,))
+            return None, None
+        else:
+            return doi, existing.id
+
+    # Cas normal : meme DOI, types compatibles -> fusion
+    return doi, existing.id
 
 
 def find_or_create(cur, *, title: str, title_normalized: str,
@@ -130,16 +184,15 @@ def find_or_create(cur, *, title: str, title_normalized: str,
                    container_title: str | None = None,
                    language: str | None = None,
                    allow_create: bool = True) -> tuple[int | None, bool]:
-    """Trouve ou crée une publication.
+    """Trouve ou cree une publication.
 
-    Logique de déduplication :
+    Logique de deduplication par identifiant unique :
     1. Par DOI (case-insensitive)
-    1b. Par NNT (via source_documents.external_ids, thèses uniquement)
-    2. Par titre normalisé + année + journal (articles uniquement)
-    3. Création
+    1b. Par NNT (via source_documents.external_ids, theses uniquement)
+    2. Creation
 
     Retourne (publication_id, is_new).
-    Si allow_create=False et aucune publication trouvée, retourne (None, False).
+    Si allow_create=False et aucune publication trouvee, retourne (None, False).
     """
     if not pub_year or not title:
         return None, False
@@ -148,40 +201,15 @@ def find_or_create(cur, *, title: str, title_normalized: str,
     if doi:
         existing = find_by_doi(cur, doi)
         if existing:
-            ex_type = existing.doc_type or ""
-            ex_title = existing.title_normalized or ""
-            chapter_types = ("book_chapter", "book-chapter", "chapter")
-            book_types = ("book",)
-
-            # Cas chapitre vs ouvrage : le DOI est celui de l'ouvrage,
-            # pas du chapitre → on le retire du chapitre, pas de fusion
-            if doc_type in chapter_types and ex_type in book_types:
-                # Le nouveau est un chapitre, l'existant est un ouvrage → skip
-                doi = None  # ne pas attribuer ce DOI au chapitre
-            elif doc_type in book_types and ex_type in chapter_types:
-                # Le nouveau est un ouvrage, l'existant est un chapitre → retirer le DOI du chapitre
-                cur.execute("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s", (existing.id,))
-                # On ne fusionne pas, on continue (création ou match titre)
-            elif doc_type in chapter_types and ex_type in chapter_types:
-                # Deux chapitres : fusionner seulement si même titre normalisé
-                if title_normalized != ex_title:
-                    # Titres différents → DOI erroné, le retirer partout
-                    cur.execute("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s", (existing.id,))
-                    doi = None
-                else:
-                    # Même titre → vraie fusion
-                    _enrich(cur, existing.id, doi=doi, doc_type=doc_type,
-                            journal_id=journal_id, oa_status=oa_status,
-                            container_title=container_title, language=language)
-                    return existing.id, False
-            else:
-                # Cas normal (articles, etc.) → fusion standard
-                _enrich(cur, existing.id, doi=doi, doc_type=doc_type,
+            doi, merge_id = resolve_doi_conflict(
+                cur, doi, doc_type, title_normalized, existing)
+            if merge_id:
+                _enrich(cur, merge_id, doi=doi, doc_type=doc_type,
                         journal_id=journal_id, oa_status=oa_status,
                         container_title=container_title, language=language)
-                return existing.id, False
+                return merge_id, False
 
-    # 1b. Chercher par NNT (thèses uniquement)
+    # 1b. Chercher par NNT (theses uniquement)
     if nnt:
         existing = find_by_nnt(cur, nnt)
         if existing:
@@ -190,21 +218,7 @@ def find_or_create(cur, *, title: str, title_normalized: str,
                     container_title=container_title, language=language)
             return existing.id, False
 
-    # 2. Chercher par titre + année + journal (articles uniquement)
-    if doc_type == "article" and journal_id:
-        existing = find_by_title(cur, title_normalized, pub_year, journal_id)
-        if existing:
-            ex_doi = existing.doi
-            # Ne pas fusionner si les deux ont un DOI différent
-            if doi and ex_doi and doi.lower() != ex_doi.lower():
-                pass  # DOI contradictoires → ne pas fusionner
-            else:
-                _enrich(cur, existing.id, doi=doi, doc_type=doc_type,
-                        journal_id=journal_id, oa_status=oa_status,
-                        container_title=container_title, language=language)
-                return existing.id, False
-
-    # 3. Créer
+    # 2. Creer
     if not allow_create:
         return None, False
 

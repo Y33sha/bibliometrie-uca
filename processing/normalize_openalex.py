@@ -31,7 +31,7 @@ from utils.hal import extract_hal_id_from_url
 from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
-from services.publications import find_or_create as find_or_create_publication, find_by_nnt, _enrich, update_sources
+from services.publications import find_or_create as find_or_create_publication, find_by_nnt, find_by_doi, resolve_doi_conflict, _enrich, update_sources
 from utils.nnt import normalize_nnt, is_theses_fr_source, extract_nnt_from_openalex
 from services.journals import find_or_create_publisher, find_or_create_journal
 
@@ -126,6 +126,41 @@ def extract_locations_data(work: dict) -> tuple[list[str], dict]:
                 external_ids["pmc"] = f"PMC{m.group(1)}"
 
     return urls, external_ids
+
+
+def reconstruct_abstract(inverted_index: dict | None) -> str | None:
+    """Reconstruit le texte de l'abstract depuis l'inverted index OpenAlex.
+
+    Le format est {mot: [positions]} → on reconstitue le texte en ordre.
+    """
+    if not inverted_index:
+        return None
+    positions: dict[int, str] = {}
+    for word, indices in inverted_index.items():
+        for idx in indices:
+            positions[idx] = word
+    if not positions:
+        return None
+    return " ".join(positions[k] for k in sorted(positions))
+
+
+def extract_topics(work: dict) -> list[dict] | None:
+    """Extrait les topics OpenAlex sous forme de liste simplifiée."""
+    raw = work.get("topics")
+    if not raw:
+        return None
+    topics = []
+    for t in raw:
+        topic = {}
+        for level in ("domain", "field", "subfield", "topic"):
+            obj = t.get(level) or t if level == "topic" else t.get(level)
+            if obj and obj.get("display_name"):
+                topic[level] = obj["display_name"]
+        if t.get("score") is not None:
+            topic["score"] = t["score"]
+        if topic:
+            topics.append(topic)
+    return topics or None
 
 
 def extract_short_id(url: str, prefix: str = "https://openalex.org/") -> str:
@@ -301,8 +336,29 @@ def insert_openalex_document(cur, work: dict, staging_id: int,
     if nnt:
         location_ids["nnt"] = nnt
 
+    # Conserver le DOI original si retiré lors d'un conflit chapitre/ouvrage
+    if pub_meta and pub_meta.get("source_doi"):
+        location_ids["source_doi"] = pub_meta["source_doi"]
+
     external_ids = Json(location_ids) if location_ids else None
     cited_by_count = work.get("cited_by_count")
+    is_retracted = work.get("is_retracted") or False
+
+    # Biblio (volume, issue, pages)
+    raw_biblio = work.get("biblio") or {}
+    biblio_clean = {k: raw_biblio[k] for k in ("volume", "issue", "first_page", "last_page") if raw_biblio.get(k)}
+    biblio = Json(biblio_clean) if biblio_clean else None
+
+    # Abstract, keywords, topics
+    abstract = reconstruct_abstract(work.get("abstract_inverted_index"))
+    keywords = work.get("keywords")
+    if isinstance(keywords, list):
+        keywords = [k.get("keyword") if isinstance(k, dict) else k for k in keywords]
+        keywords = [k for k in keywords if k] or None
+    else:
+        keywords = None
+    topics = extract_topics(work)
+    topics_json = Json(topics) if topics else None
 
     # Métadonnées de publication (pour création différée)
     journal_id = pub_meta.get("journal_id") if pub_meta else None
@@ -314,9 +370,11 @@ def insert_openalex_document(cur, work: dict, staging_id: int,
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id, external_ids, urls, cited_by_count,
-             journal_id, oa_status, language, container_title)
+             journal_id, oa_status, language, container_title,
+             is_retracted, biblio, abstract, keywords, topics)
         VALUES ('openalex', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s)
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
@@ -328,11 +386,17 @@ def insert_openalex_document(cur, work: dict, staging_id: int,
             journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
             oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
             language = COALESCE(EXCLUDED.language, source_documents.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title)
+            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title),
+            is_retracted = COALESCE(EXCLUDED.is_retracted, source_documents.is_retracted),
+            biblio = COALESCE(EXCLUDED.biblio, source_documents.biblio),
+            abstract = COALESCE(EXCLUDED.abstract, source_documents.abstract),
+            keywords = COALESCE(EXCLUDED.keywords, source_documents.keywords),
+            topics = COALESCE(EXCLUDED.topics, source_documents.topics)
         RETURNING id
     """, (openalex_id, doi, title, pub_year, doc_type,
           publication_id, staging_id, external_ids, urls or None, cited_by_count,
-          journal_id, oa_status, language, container_title))
+          journal_id, oa_status, language, container_title,
+          is_retracted, biblio, abstract, keywords, topics_json))
     return cur.fetchone()["id"]
 
 
@@ -533,12 +597,12 @@ def process_work(cur, staging_row: tuple) -> bool:
                     "SELECT id FROM staging WHERE source = 'openalex' AND lower(doi) = lower(%s)",
                     (version_doi,))
                 if cur.fetchone():
-                    logger.info(f"  {openalex_id} concept DOI Zenodo {raw_doi} → "
-                                f"version {version_doi} déjà en staging, skip")
+                    logger.info(f"  {openalex_id} concept DOI Zenodo {raw_doi} -> "
+                                f"version {version_doi} deja en staging, skip")
                     cur.execute(
-                        "UPDATE staging SET processed = TRUE WHERE id = %s",
+                        "UPDATE staging SET processed = TRUE, raw_data = '{}'::jsonb WHERE id = %s",
                         (staging_id,))
-                    return False
+                    return None  # skip, pas une erreur
 
         # Détecter si la primary_location pointe vers HAL, theses.fr ou un repository
         hal_location = is_hal_primary_location(work)
@@ -586,21 +650,22 @@ def process_work(cur, staging_row: tuple) -> bool:
 
         # Enrichir la publication existante si trouvée
         if publication_id:
-            _enrich(cur, publication_id, doi=pub_meta["doi"],
+            enrich_doi = pub_meta["doi"]
+            # Résoudre les conflits de DOI chapitre/ouvrage
+            if enrich_doi:
+                existing = find_by_doi(cur, enrich_doi)
+                if existing and existing.id != publication_id:
+                    original_doi = enrich_doi
+                    enrich_doi, _ = resolve_doi_conflict(
+                        cur, enrich_doi, pub_meta["doc_type"],
+                        pub_meta["title_normalized"], existing)
+                    if enrich_doi != original_doi:
+                        pub_meta["source_doi"] = original_doi
+            publication_id = _enrich(cur, publication_id, doi=enrich_doi,
                     doc_type=pub_meta["doc_type"], oa_status=pub_meta["oa_status"],
                     journal_id=journal_id, container_title=pub_meta["container_title"],
                     language=pub_meta["language"])
             update_sources(cur, publication_id)
-
-            if work.get("is_retracted"):
-                cur.execute("UPDATE publications SET is_retracted = TRUE WHERE id = %s",
-                            (publication_id,))
-            biblio = work.get("biblio") or {}
-            bib_values = {k: biblio.get(k) for k in ("volume", "issue", "first_page", "last_page") if biblio.get(k)}
-            if bib_values:
-                set_clause = ", ".join(f"{k} = COALESCE(publications.{k}, %({k})s)" for k in bib_values)
-                bib_values["id"] = publication_id
-                cur.execute(f"UPDATE publications SET {set_clause} WHERE id = %(id)s", bib_values)
 
         # Document OpenAlex (source_documents) — publication_id peut être NULL
         source_document_id = insert_openalex_document(
@@ -668,6 +733,7 @@ def main():
         work_ids = [r["id"] for r in cur.fetchall()]
 
         processed = 0
+        skipped = 0
         errors = 0
         FETCH_BATCH = 50
 
@@ -682,9 +748,11 @@ def main():
 
             for row in batch_rows:
                 try:
-                    success = process_work(cur, row)
-                    if success:
+                    result = process_work(cur, row)
+                    if result is True:
                         processed += 1
+                    elif result is None:
+                        skipped += 1
                     else:
                         errors += 1
                 except Exception:
@@ -692,15 +760,23 @@ def main():
                     errors += 1
                     continue
 
-                if processed % args.batch_size == 0:
+                done = processed + skipped
+                if done % args.batch_size == 0:
                     conn.commit()
-                    logger.info(f"  {processed}/{limit} traités ({errors} erreurs)")
+                    parts = [f"{done}/{limit} traites"]
+                    if skipped:
+                        parts.append(f"{skipped} ignores")
+                    if errors:
+                        parts.append(f"{errors} erreurs")
+                    logger.info(f"  {', '.join(parts)}")
 
         conn.commit()
 
         # Stats finales
-        logger.info(f"\n=== Terminé ===")
-        logger.info(f"Traités avec succès : {processed}")
+        logger.info(f"\n=== Termine ===")
+        logger.info(f"Traites avec succes : {processed}")
+        if skipped:
+            logger.info(f"Ignores (Zenodo, etc.) : {skipped}")
         logger.info(f"Erreurs : {errors}")
 
         for table in ["publications", "journals", "publishers"]:

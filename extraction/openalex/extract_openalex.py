@@ -23,52 +23,28 @@ from psycopg2.extras import Json, execute_values
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config.settings import OPENALEX
 from db.connection import get_connection
-from extraction.common import compute_hash, clean_doi, get_existing_ids, setup_logger
+from extraction.common import compute_hash, get_existing_ids, setup_logger
+from extraction.openalex import BASE_URL, SELECT_FIELDS, extract_openalex_id, extract_doi, compute_meta_hash
 from utils.app_config import get_years, get_openalex_institution_ids
 
 # ----- Logging -----
 logger = setup_logger("extract_openalex", os.path.join(os.path.dirname(__file__), "logs"))
-
-# ----- Constantes API -----
-BASE_URL = "https://api.openalex.org/works"
 
 
 def build_params(year: int, cursor: str = "*", institution_ids: list[str] | None = None) -> dict:
     """Construit les paramètres de requête pour l'API OpenAlex."""
     ids = institution_ids or OPENALEX.get("institution_ids") or [OPENALEX.get("institution_id")]
     lineage_filter = "|".join(ids)
-    params = {
+    return {
         "filter": (
             f"authorships.institutions.lineage:{lineage_filter},"
             f"publication_year:{year}"
         ),
-        # Champs à récupérer — on prend large pour le staging,
-        # la sélection fine se fera à l'étape de normalisation
-        "select": ",".join([
-            "id",
-            "doi",
-            "title",
-            "display_name",
-            "publication_year",
-            "publication_date",
-            "type",
-            "language",
-            "primary_location",
-            "locations",
-            "authorships",
-            "open_access",
-            "cited_by_count",
-            "biblio",
-            "is_retracted",
-            "topics",
-            "keywords",
-            "abstract_inverted_index",
-        ]),
+        "select": SELECT_FIELDS,
         "per_page": OPENALEX["per_page"],
         "cursor": cursor,
         "mailto": OPENALEX["email"],
     }
-    return params
 
 
 def fetch_page(year: int, cursor: str = "*") -> dict:
@@ -77,25 +53,6 @@ def fetch_page(year: int, cursor: str = "*") -> dict:
     response = requests.get(BASE_URL, params=params, timeout=30)
     response.raise_for_status()
     return response.json()
-
-
-def extract_doi(work: dict) -> str | None:
-    """Extrait le DOI nettoyé (sans préfixe URL)."""
-    return clean_doi(work.get("doi"))
-
-
-def extract_openalex_id(work: dict) -> str:
-    """Extrait l'ID OpenAlex court (ex: W2741809807)."""
-    return work["id"].replace("https://openalex.org/", "")
-
-
-def compute_meta_hash(raw_data: dict) -> str:
-    """Calcule le hash MD5 des métadonnées hors authorships.
-    Permet de détecter les changements réels (OA status, titre, etc.)
-    sans être perturbé par la troncature à 100 auteurs de l'API bulk.
-    """
-    filtered = {k: v for k, v in raw_data.items() if k != "authorships"}
-    return compute_hash(filtered)
 
 
 def insert_batch(conn, batch: list[tuple]) -> int:
