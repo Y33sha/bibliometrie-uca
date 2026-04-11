@@ -80,6 +80,7 @@ def process_source(conn, cur, source_name: str):
         FROM source_authorships
         WHERE source = %s
           AND raw_affiliations IS NOT NULL
+          AND NOT addresses_extracted
     """, (source_filter,))
 
     rows = cur.fetchall()
@@ -200,6 +201,12 @@ def process_source(conn, cur, source_name: str):
         _insert_links(cur, link_batch)
         total_links += len(link_batch)
         conn.commit()
+
+    # Marquer toutes les authorships traitees
+    for i in range(0, len(all_as_ids), BATCH_SIZE):
+        batch_ids = all_as_ids[i:i + BATCH_SIZE]
+        cur.execute("UPDATE source_authorships SET addresses_extracted = TRUE WHERE id = ANY(%s)", (batch_ids,))
+    conn.commit()
 
     elapsed = time.perf_counter() - t_start
     logger.info(f"[{source_name}] Terminé en {elapsed:.1f}s")

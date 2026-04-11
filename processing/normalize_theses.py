@@ -36,6 +36,7 @@ from utils.log import setup_logger
 from utils.normalize import normalize_text, normalize_name
 from utils.names import names_compatible
 from utils.nnt import normalize_nnt
+from utils.db_helpers import mark_staging_done
 from utils.authorship_roles import THESES_FIELD_ROLES, merge_roles
 
 logger = setup_logger("normalize_theses", os.path.join(os.path.dirname(__file__), "logs"))
@@ -216,7 +217,22 @@ def insert_source_document(cur, these: dict, staging_id: int,
     nnt = normalize_nnt(these.get("nnt"))
     external_ids = Json({"nnt": nnt}) if nnt else None
 
-    # Métadonnées de publication (pour création différée)
+    # Keywords : sujets (mots-cles auteur)
+    sujets = these.get("sujets") or []
+    keywords = [s.get("libelle") for s in sujets if s.get("libelle")] or None
+
+    # Topics : discipline + sujets Rameau
+    topics = {}
+    discipline = these.get("discipline")
+    if discipline:
+        topics["discipline"] = discipline
+    rameau = these.get("sujetsRameau") or []
+    rameau_list = [r.get("libelle") for r in rameau if r.get("libelle")]
+    if rameau_list:
+        topics["rameau"] = rameau_list
+    topics_json = Json(topics) if topics else None
+
+    # Metadonnees de publication (pour creation differee)
     journal_id = pub_meta.get("journal_id") if pub_meta else None
     oa_status = pub_meta.get("oa_status") if pub_meta else None
     language = pub_meta.get("language") if pub_meta else None
@@ -226,9 +242,11 @@ def insert_source_document(cur, these: dict, staging_id: int,
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id, external_ids,
-             journal_id, oa_status, language, container_title)
+             journal_id, oa_status, language, container_title,
+             keywords, topics)
         VALUES ('theses', %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s)
+                %s, %s, %s, %s,
+                %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
@@ -238,10 +256,13 @@ def insert_source_document(cur, these: dict, staging_id: int,
             journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
             oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
             language = COALESCE(EXCLUDED.language, source_documents.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title)
+            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title),
+            keywords = COALESCE(EXCLUDED.keywords, source_documents.keywords),
+            topics = COALESCE(EXCLUDED.topics, source_documents.topics)
         RETURNING id
     """, (theses_id, doi, title, pub_year, doc_type, publication_id, staging_id, external_ids,
-          journal_id, oa_status, language, container_title))
+          journal_id, oa_status, language, container_title,
+          keywords, topics_json))
     return cur.fetchone()["id"]
 
 
@@ -354,7 +375,8 @@ def process_persons(cur, these: dict, source_document_id: int):
                 roles = EXCLUDED.roles,
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 in_perimeter = EXCLUDED.in_perimeter,
-                raw_affiliations = EXCLUDED.raw_affiliations
+                raw_affiliations = EXCLUDED.raw_affiliations,
+                addresses_extracted = FALSE
         """, (source_document_id, source_author_id,
               position if is_author else None,
               info["person"].get("prenom", "") + " " + info["person"].get("nom", ""),
@@ -400,8 +422,22 @@ def process_work(cur, row: dict) -> bool:
 
         # Enrichir la publication existante si trouvée
         if publication_id:
-            _enrich(cur, publication_id, doi=pub_meta["doi"],
-                    doc_type=pub_meta["doc_type"])
+            # Keywords et topics depuis les sujets/discipline
+            sujets = these.get("sujets") or []
+            enrich_kw = [s.get("libelle") for s in sujets if s.get("libelle")] or None
+            enrich_topics = {}
+            discipline = these.get("discipline")
+            if discipline:
+                enrich_topics["discipline"] = discipline
+            rameau = these.get("sujetsRameau") or []
+            rameau_list = [r.get("libelle") for r in rameau if r.get("libelle")]
+            if rameau_list:
+                enrich_topics["rameau"] = rameau_list
+
+            publication_id = _enrich(cur, publication_id, doi=pub_meta["doi"],
+                    doc_type=pub_meta["doc_type"],
+                    keywords=enrich_kw,
+                    topics=enrich_topics or None)
             update_sources(cur, publication_id)
             # Dates de thèse → publications.meta
             _update_thesis_meta(cur, publication_id, these)
@@ -414,9 +450,7 @@ def process_work(cur, row: dict) -> bool:
         # Personnes et authorships (avec rôles)
         process_persons(cur, these, source_document_id)
 
-        cur.execute(
-            "UPDATE staging SET processed = TRUE WHERE id = %s",
-            (staging_id,))
+        mark_staging_done(cur, staging_id)
 
         return True
 

@@ -33,6 +33,7 @@ from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.authorship_roles import map_role
 from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
+from utils.db_helpers import mark_staging_done
 from utils.nnt import normalize_nnt
 from services.journals import find_or_create_publisher, find_or_create_journal
 
@@ -48,7 +49,7 @@ DOCTYPE_MAP = {
     "journal-article": "article",
     "book-chapter": "book_chapter",
     "book": "book",
-    "proceedings": "conference_paper",
+    "proceedings": "proceedings",
     "thesis": "thesis",
     "ongoing_thesis": "ongoing_thesis",
     "HDR": "hdr",
@@ -176,16 +177,65 @@ def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
     pub_year = doc.get("year")
     doc_type = doc.get("type")
 
-    # external_ids stocke les identifiants cross-source (hal, nnt)
+    # external_ids : identifiants cross-source (hal, nnt, pmid, etc.)
     ext = {}
     if hal_id:
         ext["hal"] = hal_id
     nnt = _extract_nnt_from_scanr_id(scanr_id)
     if nnt:
         ext["nnt"] = nnt
+    for eid in doc.get("externalIds") or []:
+        if isinstance(eid, dict) and eid.get("type") and eid.get("id"):
+            etype = eid["type"].lower()
+            if etype == "pmid":
+                ext["pmid"] = eid["id"]
+            elif etype == "hal" and not ext.get("hal"):
+                ext["hal"] = eid["id"]
     external_ids = Json(ext) if ext else None
 
-    # Métadonnées de publication (pour création différée)
+    # Abstract
+    summary = doc.get("summary") or {}
+    abstract = summary.get("default") or summary.get("en") or summary.get("fr")
+
+    # Keywords
+    kw_raw = doc.get("keywords") or {}
+    kw_val = kw_raw.get("default") or kw_raw.get("en") or kw_raw.get("fr")
+    if isinstance(kw_val, list):
+        keywords = [str(k).strip() for k in kw_val if k] or None
+    elif isinstance(kw_val, str) and kw_val:
+        keywords = [k.strip() for k in kw_val.split(",") if k.strip()] or None
+    else:
+        keywords = None
+
+    # Topics (meme format qu'OpenAlex)
+    topics_raw = doc.get("topics")
+    topics = Json(topics_raw) if topics_raw else None
+    # Fallback : domains ScanR
+    if not topics_raw:
+        domains = doc.get("domains")
+        if domains:
+            topics = Json(domains)
+
+    # Citations
+    cbc = doc.get("cited_by_counts_by_year") or {}
+    cited_by_count = sum(cbc.values()) if cbc else None
+
+    # URLs
+    urls = []
+    seen = set()
+    for field in ("landingPage", "doiUrl", "pdfUrl"):
+        u = doc.get(field)
+        if u and u not in seen:
+            seen.add(u)
+            urls.append(u)
+    oa_ev = doc.get("oaEvidence") or {}
+    for field in ("landingPageUrl", "url", "pdfUrl"):
+        u = oa_ev.get(field)
+        if u and u not in seen:
+            seen.add(u)
+            urls.append(u)
+
+    # Metadonnees de publication (pour creation differee)
     journal_id = pub_meta.get("journal_id") if pub_meta else None
     oa_status = pub_meta.get("oa_status") if pub_meta else None
     language = pub_meta.get("language") if pub_meta else None
@@ -195,23 +245,31 @@ def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id, external_ids,
-             journal_id, oa_status, language, container_title)
+             journal_id, oa_status, language, container_title,
+             abstract, keywords, topics, cited_by_count, urls)
         VALUES ('scanr', %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s)
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
             ),
             doi = COALESCE(source_documents.doi, EXCLUDED.doi),
-            external_ids = COALESCE(EXCLUDED.external_ids, source_documents.external_ids),
+            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
             doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
             journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
             oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
             language = COALESCE(EXCLUDED.language, source_documents.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title)
+            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title),
+            abstract = COALESCE(EXCLUDED.abstract, source_documents.abstract),
+            keywords = COALESCE(EXCLUDED.keywords, source_documents.keywords),
+            topics = COALESCE(EXCLUDED.topics, source_documents.topics),
+            cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_documents.cited_by_count, 0)),
+            urls = COALESCE(EXCLUDED.urls, source_documents.urls)
         RETURNING id
     """, (scanr_id, doi, title, pub_year, doc_type, publication_id, staging_id, external_ids,
-          journal_id, oa_status, language, container_title))
+          journal_id, oa_status, language, container_title,
+          abstract, keywords, topics, cited_by_count, urls or None))
     return cur.fetchone()["id"]
 
 
@@ -333,7 +391,8 @@ def process_authors(cur, doc: dict, source_document_id: int):
                 source_data = COALESCE(source_authorships.source_data, '{}') ||
                               COALESCE(EXCLUDED.source_data, '{}'),
                 author_name_normalized = EXCLUDED.author_name_normalized,
-                roles = EXCLUDED.roles
+                roles = EXCLUDED.roles,
+                addresses_extracted = FALSE
         """, (source_document_id, source_author_id, position, roles or None,
               Json(raw_affiliations) if raw_affiliations else None,
               source_data_json,
@@ -390,9 +449,25 @@ def process_work(cur, staging_row) -> bool:
 
         # Enrichir la publication existante si trouvée
         if publication_id:
-            _enrich(cur, publication_id, doi=pub_meta["doi"],
+            # Extraire les champs enrichis
+            summary = doc.get("summary") or {}
+            abstract = summary.get("default") or summary.get("en") or summary.get("fr")
+            kw_raw = doc.get("keywords") or {}
+            kw_val = kw_raw.get("default") or kw_raw.get("en") or kw_raw.get("fr")
+            if isinstance(kw_val, list):
+                enrich_keywords = [str(k).strip() for k in kw_val if k] or None
+            elif isinstance(kw_val, str) and kw_val:
+                enrich_keywords = [k.strip() for k in kw_val.split(",") if k.strip()] or None
+            else:
+                enrich_keywords = None
+            topics_raw = doc.get("topics") or doc.get("domains")
+            enrich_topics = {"scanr": topics_raw} if topics_raw else None
+
+            publication_id = _enrich(cur, publication_id, doi=pub_meta["doi"],
                     doc_type=pub_meta["doc_type"], oa_status=pub_meta["oa_status"],
-                    journal_id=journal_id, container_title=pub_meta["container_title"])
+                    journal_id=journal_id, container_title=pub_meta["container_title"],
+                    abstract=abstract, keywords=enrich_keywords,
+                    topics=enrich_topics)
             update_sources(cur, publication_id)
 
         # Document ScanR (source_documents) — publication_id peut être NULL
@@ -407,10 +482,7 @@ def process_work(cur, staging_row) -> bool:
         process_authors(cur, doc, source_document_id)
         timings["authors"] = time.perf_counter() - t0
 
-        cur.execute(
-            "UPDATE staging SET processed = TRUE WHERE id = %s",
-            (staging_id,)
-        )
+        mark_staging_done(cur, staging_id)
 
         total = sum(timings.values())
         if total > 0.5:
@@ -430,8 +502,8 @@ def main():
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
     parser.add_argument("--reset", action="store_true",
                         help="Remettre tous les works à processed=FALSE")
-    parser.add_argument("--batch-size", type=int, default=500,
-                        help="Taille du commit batch (défaut: 500)")
+    parser.add_argument("--batch-size", type=int, default=100,
+                        help="Taille du commit batch (défaut: 100)")
     args = parser.parse_args()
 
     conn = get_connection()

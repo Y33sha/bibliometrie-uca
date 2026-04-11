@@ -1,4 +1,11 @@
-"""Helpers pour l'accès aux rows psycopg2, compatibles tuple et RealDictCursor."""
+"""Helpers pour l'acces aux rows psycopg2, compatibles tuple et RealDictCursor."""
+
+
+def mark_staging_done(cur, staging_id: int):
+    """Marque un document staging comme traite et vide le raw_data."""
+    cur.execute(
+        "UPDATE staging SET processed = TRUE, raw_data = '{}'::jsonb WHERE id = %s",
+        (staging_id,))
 
 
 def row_val(row, index_or_key, default=None):

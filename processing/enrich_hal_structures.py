@@ -18,13 +18,15 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 import time
 import requests
 import psycopg2
 import psycopg2.extras
 
-DB_DSN = "dbname=bibliometrie"
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from db.connection import get_connection
 HAL_API = "https://api.archives-ouvertes.fr/ref/structure/"
 BATCH_SIZE = 50  # nb de structures par requête API
 RATE_LIMIT = 0.3  # secondes entre requêtes
@@ -320,7 +322,7 @@ def main():
                         help="Lister tous les enfants d'une structure")
     args = parser.parse_args()
     
-    conn = psycopg2.connect(DB_DSN)
+    conn = get_connection()
     
     try:
         if args.children:

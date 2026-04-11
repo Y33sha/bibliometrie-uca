@@ -33,6 +33,7 @@ from utils.normalize import normalize_text
 from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
 from services.publications import find_or_create as find_or_create_publication, find_by_nnt, find_by_doi, resolve_doi_conflict, _enrich, update_sources
 from utils.nnt import normalize_nnt, is_theses_fr_source, extract_nnt_from_openalex
+from utils.db_helpers import mark_staging_done
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -563,7 +564,8 @@ def process_authorships(cur, work: dict, source_document_id: int):
                     EXCLUDED.author_name_normalized,
                     source_authorships.author_name_normalized
                 ),
-                is_corresponding = EXCLUDED.is_corresponding
+                is_corresponding = EXCLUDED.is_corresponding,
+                addresses_extracted = FALSE
         """, (source_document_id, source_author_id, position,
               raw_affiliations_json, source_struct_ids or None,
               source_data_json, raw_author_name, is_corresponding))
@@ -599,9 +601,7 @@ def process_work(cur, staging_row: tuple) -> bool:
                 if cur.fetchone():
                     logger.info(f"  {openalex_id} concept DOI Zenodo {raw_doi} -> "
                                 f"version {version_doi} deja en staging, skip")
-                    cur.execute(
-                        "UPDATE staging SET processed = TRUE, raw_data = '{}'::jsonb WHERE id = %s",
-                        (staging_id,))
+                    mark_staging_done(cur, staging_id)
                     return None  # skip, pas une erreur
 
         # Détecter si la primary_location pointe vers HAL, theses.fr ou un repository
@@ -661,10 +661,24 @@ def process_work(cur, staging_row: tuple) -> bool:
                         pub_meta["title_normalized"], existing)
                     if enrich_doi != original_doi:
                         pub_meta["source_doi"] = original_doi
+            # Extraire les champs enrichis depuis le work
+            abstract = reconstruct_abstract(work.get("abstract_inverted_index"))
+            kw_raw = work.get("keywords")
+            enrich_keywords = None
+            if isinstance(kw_raw, list):
+                enrich_keywords = [k.get("keyword") if isinstance(k, dict) else k for k in kw_raw]
+                enrich_keywords = [k for k in enrich_keywords if k] or None
+            enrich_topics = extract_topics(work)
+            raw_biblio = work.get("biblio") or {}
+            enrich_biblio = {k: raw_biblio[k] for k in ("volume", "issue", "first_page", "last_page") if raw_biblio.get(k)} or None
+
             publication_id = _enrich(cur, publication_id, doi=enrich_doi,
                     doc_type=pub_meta["doc_type"], oa_status=pub_meta["oa_status"],
                     journal_id=journal_id, container_title=pub_meta["container_title"],
-                    language=pub_meta["language"])
+                    language=pub_meta["language"],
+                    abstract=abstract, keywords=enrich_keywords,
+                    topics=enrich_topics, biblio=enrich_biblio,
+                    is_retracted=work.get("is_retracted"))
             update_sources(cur, publication_id)
 
         # Document OpenAlex (source_documents) — publication_id peut être NULL
@@ -675,12 +689,7 @@ def process_work(cur, staging_row: tuple) -> bool:
         # Auteurs et authorships
         process_authorships(cur, work, source_document_id)
 
-        # Marquer comme traité et vider le raw_data (les données utiles
-        # sont désormais dans les tables normalisées)
-        cur.execute(
-            "UPDATE staging SET processed = TRUE, raw_data = '{}'::jsonb WHERE id = %s",
-            (staging_id,)
-        )
+        mark_staging_done(cur, staging_id)
 
         return True
 

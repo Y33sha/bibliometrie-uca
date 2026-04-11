@@ -38,6 +38,7 @@ from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
 from utils.authorship_roles import map_role
 from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
 from utils.nnt import normalize_nnt
+from utils.db_helpers import mark_staging_done
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -48,8 +49,17 @@ logger = setup_logger("normalize_hal", os.path.join(os.path.dirname(__file__), "
 # MAPPINGS
 # =============================================================
 
-# HAL docType_s → notre enum doc_type
+# HAL docType_s (ou docType_s_docSubType_s) -> notre enum doc_type
+# Les cles avec _ sont des combinaisons type_sous-type, testees en priorite.
 DOCTYPE_MAP = {
+    # Combinaisons type_sous-type (prioritaires)
+    "ART_ARTREV": "review",
+    "ART_BOOKREVIEW": "book_review",
+    "ART_DATAPAPER": "data_paper",
+    "UNDEFINED_PREPRINT": "preprint",
+    "UNDEFINED_WORKINGPAPER": "preprint",
+    "CREPORT_RESREPORT": "report",
+    # Types simples
     "ART": "article",
     "COMM": "conference_paper",
     "POSTER": "poster",
@@ -63,6 +73,7 @@ DOCTYPE_MAP = {
     "UNDEFINED": "other",
     "OTHER": "other",
     "REPORT": "report",
+    "CREPORT": "report",
     "MEM": "memoir",
     "LECTURE": "other",
     "IMG": "other",
@@ -73,6 +84,10 @@ DOCTYPE_MAP = {
     "PATENT": "patent",
     "NOTE": "article",
     "BLOG": "other",
+    "NOTICE": "other",
+    "ISSUE": "other",
+    "PROCEEDINGS": "proceedings",
+    "TRAD": "other",
 }
 
 
@@ -126,8 +141,18 @@ def upsert_journal(cur, doc: dict, publisher_id: int | None) -> int | None:
 # PUBLICATIONS (via services/publications.py)
 # =============================================================
 
+def _map_hal_doc_type(doc: dict) -> str:
+    """Mappe le type HAL vers le type canonique.
+    Teste d'abord la combinaison TYPE_SOUS-TYPE, puis le type seul.
+    """
+    raw_type = doc.get("docType_s", "OTHER")
+    raw_sub = doc.get("docSubType_s") or ""
+    combo = f"{raw_type}_{raw_sub}" if raw_sub else ""
+    return DOCTYPE_MAP.get(combo) or DOCTYPE_MAP.get(raw_type, "other")
+
+
 def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
-    """Extrait les métadonnées de publication d'un document HAL.
+    """Extrait les metadonnees de publication d'un document HAL.
 
     Retourne un dict utilisable par find_or_create_publication.
     """
@@ -135,8 +160,7 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
     title = get_title(doc)
     pub_year = doc.get("producedDateY_i")
 
-    raw_type = doc.get("docType_s", "OTHER")
-    doc_type = DOCTYPE_MAP.get(raw_type, "other")
+    doc_type = _map_hal_doc_type(doc)
 
     language_list = doc.get("language_s")
     language = language_list[0] if isinstance(language_list, list) and language_list else None
@@ -164,23 +188,43 @@ def find_publication(cur, doc: dict, journal_id: int | None) -> int | None:
     return pub_id
 
 
-def _enrich_existing(cur, pub_id: int, doc: dict, journal_id: int | None):
+def _enrich_existing(cur, pub_id: int, doc: dict, journal_id: int | None) -> int:
     """Enrichit une publication existante lors d'un re-traitement HAL.
 
-    Appelé quand le source_document existe déjà (raw_hash a changé → processed
-    remis à FALSE). Met à jour les métadonnées qui ont pu changer (oa_status, etc.).
+    Appelé quand le source_document existe deja (raw_hash a change -> processed
+    remis a FALSE). Met a jour les metadonnees qui ont pu changer (oa_status, etc.).
+    Retourne le pub_id effectif (peut changer en cas de fusion DOI).
     """
     doi = clean_doi(as_str(doc.get("doiId_s")))
-    raw_type = doc.get("docType_s", "OTHER")
-    doc_type = DOCTYPE_MAP.get(raw_type, "other")
+    doc_type = _map_hal_doc_type(doc)
     oa_status = "green" if doc.get("openAccess_bool") else "closed"
     language_list = doc.get("language_s")
     language = language_list[0] if isinstance(language_list, list) and language_list else None
     container_title = None
     if not journal_id:
         container_title = as_str(doc.get("bookTitle_s")) or as_str(doc.get("conferenceTitle_s"))
-    _enrich(cur, pub_id, doi=doi, doc_type=doc_type, oa_status=oa_status,
-            journal_id=journal_id, container_title=container_title, language=language)
+
+    abstract = as_str(doc.get("abstract_s"))
+    kw_raw = doc.get("keyword_s")
+    keywords = list(dict.fromkeys(kw_raw)) if isinstance(kw_raw, list) and kw_raw else None
+    domain_raw = doc.get("domain_s")
+    topics = {"hal_domains": domain_raw} if isinstance(domain_raw, list) and domain_raw else None
+
+    biblio = {}
+    vol = as_str(doc.get("volume_s"))
+    if vol:
+        biblio["volume"] = vol
+    issue = as_str(doc.get("issue_s"))
+    if issue:
+        biblio["issue"] = issue
+    page = as_str(doc.get("page_s"))
+    if page:
+        biblio["pages"] = page
+
+    return _enrich(cur, pub_id, doi=doi, doc_type=doc_type, oa_status=oa_status,
+            journal_id=journal_id, container_title=container_title, language=language,
+            abstract=abstract, keywords=keywords, topics=topics,
+            biblio=biblio or None)
 
 
 # =============================================================
@@ -199,7 +243,11 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
     doi = clean_doi(as_str(doc.get("doiId_s")))
     title = get_title(doc)
     pub_year = doc.get("producedDateY_i")
-    doc_type = doc.get("docType_s")
+
+    # Type + sous-type concaténés (ex: "ART_review-article")
+    raw_type = doc.get("docType_s") or ""
+    raw_sub = doc.get("docSubType_s") or ""
+    doc_type = f"{raw_type}_{raw_sub}" if raw_sub else raw_type
 
     # Collections : depuis le staging (peut être "COL1,COL2") +
     # collCode_s du raw_data
@@ -225,13 +273,43 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
     language = pub_meta.get("language") if pub_meta else None
     container_title = pub_meta.get("container_title") if pub_meta else None
 
+    # Abstract
+    abstract = as_str(doc.get("abstract_s"))
+
+    # Keywords
+    kw_raw = doc.get("keyword_s")
+    keywords = list(dict.fromkeys(kw_raw)) if isinstance(kw_raw, list) and kw_raw else None
+
+    # Topics (domaines HAL)
+    domain_raw = doc.get("domain_s")
+    topics = Json({"hal_domains": domain_raw}) if isinstance(domain_raw, list) and domain_raw else None
+
+    # Biblio
+    biblio = {}
+    vol = as_str(doc.get("volume_s"))
+    if vol:
+        biblio["volume"] = vol
+    issue = as_str(doc.get("issue_s"))
+    if issue:
+        biblio["issue"] = issue
+    page = as_str(doc.get("page_s"))
+    if page:
+        biblio["pages"] = page
+    biblio_json = Json(biblio) if biblio else None
+
+    # URLs
+    uri = as_str(doc.get("uri_s"))
+    urls = [uri] if uri else None
+
     cur.execute("""
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
              collections, publication_id, staging_id, external_ids,
-             journal_id, oa_status, language, container_title)
+             journal_id, oa_status, language, container_title,
+             abstract, keywords, topics, biblio, urls)
         VALUES ('hal', %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s)
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
@@ -249,11 +327,17 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
             journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
             oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
             language = COALESCE(EXCLUDED.language, source_documents.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title)
+            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title),
+            abstract = COALESCE(EXCLUDED.abstract, source_documents.abstract),
+            keywords = COALESCE(EXCLUDED.keywords, source_documents.keywords),
+            topics = COALESCE(EXCLUDED.topics, source_documents.topics),
+            biblio = COALESCE(EXCLUDED.biblio, source_documents.biblio),
+            urls = COALESCE(EXCLUDED.urls, source_documents.urls)
         RETURNING id
     """, (hal_id, doi, title, pub_year, doc_type,
           collections_array, publication_id, staging_id, external_ids,
-          journal_id, oa_status, language, container_title))
+          journal_id, oa_status, language, container_title,
+          abstract, keywords, topics, biblio_json, urls))
     return cur.fetchone()[0]
 
 
@@ -264,16 +348,16 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
 def _hal_source_id(hal_person_id: int | None, hal_form_id: int | None,
                    old_id: int | None = None) -> str:
     """
-    Calcule le source_id HAL selon la règle de migration :
-    COALESCE(hal_person_id::text, '') || '_' || COALESCE(hal_form_id::text, '')
-    Fallback 'nokey-{old_id}' si les deux sont null.
+    Calcule le source_id HAL :
+    - hal_person_id seul si non null (un seul source_author par personne HAL)
+    - 0_hal_form_id si hal_person_id est null (auteur sans compte HAL)
+    - nokey-{old_id} si les deux sont null
     """
-    pid = str(hal_person_id) if hal_person_id and hal_person_id > 0 else ""
-    fid = str(hal_form_id) if hal_form_id else ""
-    key = f"{pid}_{fid}"
-    if key == "_":
-        return f"nokey-{old_id}" if old_id else "_"
-    return key
+    if hal_person_id and hal_person_id > 0:
+        return str(hal_person_id)
+    if hal_form_id:
+        return f"0_{hal_form_id}"
+    return f"nokey-{old_id}" if old_id else "_"
 
 
 def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
@@ -556,7 +640,8 @@ def process_authors(cur, doc: dict, source_document_id: int):
                 ),
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 is_corresponding = EXCLUDED.is_corresponding,
-                roles = EXCLUDED.roles
+                roles = EXCLUDED.roles,
+                addresses_extracted = FALSE
         """, (source_document_id, source_author_id, position,
               source_struct_ids, name, is_corresponding, roles or None))
 
@@ -588,11 +673,9 @@ def process_work(cur, staging_row: tuple) -> bool:
                     "SELECT id FROM staging WHERE source = 'hal' AND lower(doi) = lower(%s)",
                     (version_doi,))
                 if cur.fetchone():
-                    logger.info(f"  {hal_id} concept DOI Zenodo {raw_doi} → "
-                                f"version {version_doi} déjà en staging, skip")
-                    cur.execute(
-                        "UPDATE staging SET processed = TRUE WHERE id = %s",
-                        (staging_id,))
+                    logger.info(f"  {hal_id} concept DOI Zenodo {raw_doi} -> "
+                                f"version {version_doi} deja en staging, skip")
+                    mark_staging_done(cur, staging_id)
                     return False
 
         t0 = time.perf_counter()
@@ -635,19 +718,8 @@ def process_work(cur, staging_row: tuple) -> bool:
 
         # Enrichir la publication existante si trouvée
         if publication_id:
-            _enrich_existing(cur, publication_id, doc, journal_id)
+            publication_id = _enrich_existing(cur, publication_id, doc, journal_id)
             update_sources(cur, publication_id)
-
-            if doc.get("is_retracted"):
-                cur.execute("UPDATE publications SET is_retracted = TRUE WHERE id = %s",
-                            (publication_id,))
-            biblio = doc.get("biblio") or {}
-            if isinstance(biblio, dict):
-                bib_values = {k: biblio.get(k) for k in ("volume", "issue", "first_page", "last_page") if biblio.get(k)}
-                if bib_values:
-                    set_clause = ", ".join(f"{k} = COALESCE(publications.{k}, %({k})s)" for k in bib_values)
-                    bib_values["id"] = publication_id
-                    cur.execute(f"UPDATE publications SET {set_clause} WHERE id = %(id)s", bib_values)
 
         # Document HAL (source_documents) — publication_id peut être NULL
         t0 = time.perf_counter()
@@ -661,10 +733,7 @@ def process_work(cur, staging_row: tuple) -> bool:
         process_authors(cur, doc, source_document_id)
         timings["authors"] = time.perf_counter() - t0
 
-        cur.execute(
-            "UPDATE staging SET processed = TRUE WHERE id = %s",
-            (staging_id,)
-        )
+        mark_staging_done(cur, staging_id)
 
         total = sum(timings.values())
         if total > 0.5:
@@ -746,8 +815,50 @@ def main():
 
         conn.commit()
 
+        # Nettoyage : supprimer les doublons de position (garder le plus recent)
+        cur.execute("""
+            DELETE FROM source_authorship_addresses
+            WHERE source_authorship_id IN (
+                SELECT sa1.id FROM source_authorships sa1
+                JOIN source_authorships sa2
+                  ON sa2.source_document_id = sa1.source_document_id
+                 AND sa2.author_position = sa1.author_position
+                 AND sa2.id > sa1.id
+                WHERE sa1.source = 'hal' AND sa1.author_position IS NOT NULL
+            )
+        """)
+        cur.execute("""
+            DELETE FROM source_authorships
+            WHERE source = 'hal' AND id IN (
+                SELECT sa1.id FROM source_authorships sa1
+                JOIN source_authorships sa2
+                  ON sa2.source_document_id = sa1.source_document_id
+                 AND sa2.author_position = sa1.author_position
+                 AND sa2.id > sa1.id
+                WHERE sa1.source = 'hal' AND sa1.author_position IS NOT NULL
+            )
+        """)
+        dup_deleted = cur.rowcount
+        if dup_deleted:
+            logger.info(f"Doublons de position supprimes : {dup_deleted}")
+
+        # Nettoyage : supprimer les source_authors HAL orphelins
+        cur.execute("""
+            DELETE FROM source_authors
+            WHERE source = 'hal'
+              AND NOT EXISTS (
+                  SELECT 1 FROM source_authorships sa
+                  WHERE sa.source_author_id = source_authors.id
+              )
+        """)
+        orphans_deleted = cur.rowcount
+        if orphans_deleted:
+            logger.info(f"Source_authors orphelins supprimes : {orphans_deleted}")
+
+        conn.commit()
+
         # Stats finales
-        logger.info(f"\n=== Terminé ===")
+        logger.info(f"\n=== Termine ===")
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Hors périmètre (enrichissement seul) : {skipped_hors_perimetre}")
         logger.info(f"Erreurs : {errors}")

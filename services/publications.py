@@ -10,6 +10,7 @@ indépendant du type de curseur (tuple ou RealDictCursor).
 """
 
 from collections import namedtuple
+from psycopg2.extras import Json
 from utils.db_helpers import row_val as _val
 
 PubByDoi = namedtuple("PubByDoi", ["id", "doc_type", "title_normalized"])
@@ -78,14 +79,18 @@ def find_thesis_by_title(cur, title_normalized: str, pub_year: int) -> list[PubT
 def _enrich(cur, pub_id: int, *, doi: str | None = None,
             doc_type: str | None = None, journal_id: int | None = None,
             oa_status: str | None = None, container_title: str | None = None,
-            language: str | None = None) -> int:
+            language: str | None = None,
+            abstract: str | None = None, keywords: list | None = None,
+            topics: dict | None = None, biblio: dict | None = None,
+            is_retracted: bool | None = None) -> int:
     """Enrichit une publication existante avec des metadonnees complementaires.
 
     Regles de priorite (ne jamais degrader) :
     - DOI : ne remplace pas un DOI existant
     - doc_type : 'other' peut etre remplace par un type plus precis
     - oa_status : 'green' gagne sur 'closed'/'unknown', 'diamond' gagne sur tout
-    - journal_id, container_title, language : COALESCE (premier arrive gagne)
+    - is_retracted : True gagne toujours
+    - Autres champs : COALESCE (premier arrive gagne)
 
     Si le DOI est deja pris par une autre publication, les deux sont fusionnees.
     Retourne le pub_id effectif (peut changer en cas de fusion).
@@ -98,7 +103,6 @@ def _enrich(cur, pub_id: int, *, doi: str | None = None,
         if row and not current_doi:
             existing = find_by_doi(cur, doi)
             if existing and existing.id != pub_id:
-                # Le DOI est deja sur une autre publication -> fusionner
                 merge_publications(cur, existing.id, pub_id)
                 pub_id = existing.id
 
@@ -125,6 +129,11 @@ def _enrich(cur, pub_id: int, *, doi: str | None = None,
             END,
             container_title = COALESCE(%s, publications.container_title),
             language = COALESCE(%s, publications.language),
+            abstract = COALESCE(%s, publications.abstract),
+            keywords = COALESCE(%s, publications.keywords),
+            topics = COALESCE(%s, publications.topics),
+            biblio = COALESCE(publications.biblio, '{}'::jsonb) || COALESCE(%s, '{}'::jsonb),
+            is_retracted = publications.is_retracted OR COALESCE(%s, FALSE),
             updated_at = now()
         WHERE id = %s
     """, (doi,
@@ -133,6 +142,11 @@ def _enrich(cur, pub_id: int, *, doi: str | None = None,
           oa_status, oa_status, oa_status, oa_status,
           container_title,
           language,
+          abstract,
+          keywords,
+          Json(topics) if topics else None,
+          Json(biblio) if biblio else None,
+          is_retracted or False,
           pub_id))
     return pub_id
 

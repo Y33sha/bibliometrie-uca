@@ -40,6 +40,12 @@ HAL_FIELDS = [
     "structType_s",
     "structAcronym_s",
     "nntId_s",
+    "abstract_s",
+    "keyword_s",
+    "domain_s",
+    "volume_s",
+    "issue_s",
+    "page_s",
 ]
 
 HAL_FIELDS_STR = ",".join(HAL_FIELDS)
