@@ -296,7 +296,7 @@ def main():
                 )
                 grand_total_new += new
                 if not args.dry_run and new > 0:
-                    logger.info(f"    → {new} nouveaux insérés")
+                    logger.info(f"    ->{new} nouveaux insérés")
 
         # --- Passe 2 : portail global ---
         if do_portal:
@@ -304,7 +304,7 @@ def main():
             total, new = extract_portal(conn, existing_ids, dry_run=args.dry_run, years=years, portal=portal)
             grand_total_new += new
             if not args.dry_run:
-                logger.info(f"    → {new} nouveaux (non couverts par les collections)")
+                logger.info(f"    ->{new} nouveaux (non couverts par les collections)")
 
         logger.info(f"\n=== Terminé : {grand_total_new} works insérés au total ===")
         logger.info(f"Total en staging : {len(existing_ids)} works HAL")

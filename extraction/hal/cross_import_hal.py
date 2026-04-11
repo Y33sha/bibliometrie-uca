@@ -59,7 +59,7 @@ def fetch_by_doi(doi: str) -> dict | None:
 
 
 def insert_staging(conn, doc: dict):
-    """Insère un document dans staging avec collection=NULL."""
+    """Insere un document dans staging avec ses collections HAL."""
     hal_id = doc.get("halId_s")
     if isinstance(hal_id, list):
         hal_id = hal_id[0] if hal_id else None
@@ -70,12 +70,19 @@ def insert_staging(conn, doc: dict):
     if isinstance(doi, list):
         doi = doi[0] if doi else None
 
+    # Extraire les collections du document
+    coll_codes = doc.get("collCode_s") or []
+    if isinstance(coll_codes, list) and coll_codes:
+        collection = ",".join(coll_codes)
+    else:
+        collection = None
+
     raw_hash = compute_hash(doc)
 
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO staging (source, source_id, doi, raw_data, collection, processed, raw_hash)
-            VALUES ('hal', %s, %s, %s::jsonb, NULL, FALSE, %s)
+            VALUES ('hal', %s, %s, %s::jsonb, %s, FALSE, %s)
             ON CONFLICT (source, source_id) DO UPDATE SET
                 raw_data = CASE
                     WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
@@ -83,12 +90,17 @@ def insert_staging(conn, doc: dict):
                     ELSE staging.raw_data
                 END,
                 raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
+                collection = CASE
+                    WHEN staging.collection IS NULL THEN EXCLUDED.collection
+                    WHEN EXCLUDED.collection IS NULL THEN staging.collection
+                    ELSE staging.collection || ',' || EXCLUDED.collection
+                END,
                 processed = CASE
                     WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                         THEN FALSE
                     ELSE staging.processed
                 END
-        """, (hal_id, doi, Json(doc), raw_hash))
+        """, (hal_id, doi, Json(doc), collection, raw_hash))
     conn.commit()
 
 
@@ -138,8 +150,7 @@ def main():
             f"=== Terminé : {found} documents importés, "
             f"{not_found} absents de HAL ==="
         )
-        logger.info("Les entrées insérées ont collection = NULL (hors périmètre)")
-        logger.info("Relancer normalize_hal.py pour les intégrer")
+        logger.info("Relancer normalize_hal.py pour les integrer")
 
         if args.normalize and found > 0:
             logger.info("Lancement de la normalisation...")

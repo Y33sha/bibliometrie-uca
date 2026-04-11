@@ -47,7 +47,7 @@ def get_orphan_source_documents(cur):
         SELECT sd.id, sd.source, sd.source_id, sd.doi, sd.title, sd.pub_year,
                sd.doc_type, sd.journal_id, sd.oa_status, sd.language,
                sd.container_title, sd.external_ids,
-               sd.is_retracted, sd.biblio
+               sd.is_retracted, sd.biblio, sd.abstract, sd.keywords, sd.topics
         FROM source_documents sd
         WHERE sd.publication_id IS NULL
           AND EXISTS (
@@ -108,16 +108,13 @@ def process_document(cur, doc, dry_run):
     )
     update_sources(cur, pub_id)
 
-    # Propager is_retracted et biblio vers la publication
-    if doc.get("is_retracted"):
-        cur.execute("UPDATE publications SET is_retracted = TRUE WHERE id = %s", (pub_id,))
-
-    biblio = doc.get("biblio")
-    if biblio:
-        cur.execute("""
-            UPDATE publications SET biblio = COALESCE(publications.biblio, '{}') || %s
-            WHERE id = %s
-        """, (Json(biblio), pub_id))
+    # Propager les metadonnees enrichies vers la publication
+    _enrich(cur, pub_id,
+            abstract=doc.get("abstract"),
+            keywords=doc.get("keywords"),
+            topics=doc.get("topics"),
+            biblio=doc.get("biblio"),
+            is_retracted=doc.get("is_retracted"))
 
     return True
 

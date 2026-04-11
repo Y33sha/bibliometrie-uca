@@ -83,7 +83,7 @@ def phase_cross_imports(mode="full", sources=None, full_cross_import=False, **kw
         sources = sources or {"hal", "openalex", "wos", "scanr"}
         full_flag = ["--all"] if full_cross_import else []
         if "hal" in sources:
-            run_python("processing/fetch_missing_hal.py", *full_flag)
+            run_python("extraction/hal/fetch_missing_hal.py", *full_flag)
             run_python("extraction/hal/cross_import_hal.py", *full_flag)
         if "openalex" in sources:
             run_python("extraction/openalex/cross_import_openalex.py", *full_flag)
@@ -110,6 +110,21 @@ def phase_normalize(**kw):
         run_python("processing/normalize_theses.py")
     if "hal" in sources:
         run_python("processing/enrich_hal_structures.py")
+        if kw.get("mode", "full") in ("full", "monthly"):
+            run_python("processing/harvest_hal_identifiers.py")
+    # Liberer l'espace TOAST du staging (raw_data vide apres normalisation)
+    log.info("VACUUM FULL staging...")
+    _vacuum_staging()
+
+
+def _vacuum_staging():
+    """VACUUM FULL sur staging pour liberer l'espace TOAST."""
+    from db.connection import get_connection
+    conn = get_connection()
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute("VACUUM FULL staging")
+    conn.close()
 
 
 def phase_addresses(**kw):
@@ -136,12 +151,6 @@ def phase_publications(**kw):
     run_python("processing/merge_pubs_by_nnt.py")
 
 
-def phase_identifiers(mode="full", **kw):
-    """Phase 5b : Moissonnage identifiants HAL (ORCID, IdRef)."""
-    if mode in ("full", "monthly"):
-        run_python("processing/harvest_hal_identifiers.py")
-    else:
-        log.info("Moissonnage identifiants ignoré en mode hebdomadaire")
 
 
 def phase_persons(**kw):
@@ -183,7 +192,6 @@ PHASES = [
     ("addresses", phase_addresses),
     ("affiliations", phase_affiliations),
     ("publications", phase_publications),
-    ("identifiers", phase_identifiers),
     ("persons", phase_persons),
     ("authorships", phase_authorships),
     ("countries", phase_countries),

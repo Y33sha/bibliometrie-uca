@@ -189,13 +189,20 @@ def fetch_hal_document(hal_id: str) -> dict | None:
 
 
 def insert_staging_hal(cur, hal_id: str, doi: str | None, doc: dict):
-    """Insère un document dans staging_hal avec collection = NULL (cross-import).
-    Si le document existe et a changé (hash différent), met à jour et remet processed = FALSE.
+    """Insere un document dans staging HAL avec ses collections.
+    Si le document existe et a change (hash different), met a jour et remet processed = FALSE.
     """
+    # Extraire les collections du document
+    coll_codes = doc.get("collCode_s") or []
+    if isinstance(coll_codes, list) and coll_codes:
+        collection = ",".join(coll_codes)
+    else:
+        collection = None
+
     raw_hash = compute_hash(doc)
     cur.execute("""
         INSERT INTO staging (source, source_id, doi, raw_data, collection, processed, raw_hash)
-        VALUES ('hal', %s, %s, %s::jsonb, NULL, FALSE, %s)
+        VALUES ('hal', %s, %s, %s::jsonb, %s, FALSE, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             raw_data = CASE
                 WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
@@ -203,12 +210,17 @@ def insert_staging_hal(cur, hal_id: str, doi: str | None, doc: dict):
                 ELSE staging.raw_data
             END,
             raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
+            collection = CASE
+                WHEN staging.collection IS NULL THEN EXCLUDED.collection
+                WHEN EXCLUDED.collection IS NULL THEN staging.collection
+                ELSE staging.collection || ',' || EXCLUDED.collection
+            END,
             processed = CASE
                 WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                     THEN FALSE
                 ELSE staging.processed
             END
-    """, (hal_id, doi, Json(doc), raw_hash))
+    """, (hal_id, doi, Json(doc), collection, raw_hash))
 
 
 def main():
@@ -352,8 +364,7 @@ def main():
         log.info(f"  NNT : {nnt_fetched} récupérés, {nnt_not_found} absents de HAL")
 
     log.info(f"\nTerminé : {fetched} récupérés, {not_found} introuvables, {errors} erreurs")
-    log.info(f"Les entrées insérées ont collection = NULL (cross-import)")
-    log.info(f"Relancer normalize_hal.py pour les intégrer")
+    log.info(f"Relancer normalize_hal.py pour les integrer")
     conn.close()
 
 

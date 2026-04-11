@@ -2,6 +2,14 @@
 
 import pytest
 
+VALID_DOC_TYPES = {
+    "article", "review", "book", "book_chapter", "conference_paper",
+    "preprint", "thesis", "ongoing_thesis", "editorial", "report",
+    "peer_review", "other", "dataset", "software", "patent", "hdr",
+    "memoir", "poster", "letter", "erratum", "retraction",
+    "book_review", "data_paper", "proceedings",
+}
+
 # ── OpenAlex ─────────────────────────────────────────────────────
 
 from processing.normalize_openalex import (
@@ -113,10 +121,7 @@ class TestOADocTypeMap:
             assert t in OA_DOCTYPE_MAP
 
     def test_all_values_valid(self):
-        valid = {"article", "review", "book", "book_chapter", "conference_paper",
-                 "preprint", "thesis", "editorial", "report", "peer_review", "other",
-                 "dataset", "software", "patent", "hdr", "memoir", "poster",
-                 "letter", "erratum", "retraction"}
+        valid = VALID_DOC_TYPES
         for v in OA_DOCTYPE_MAP.values():
             assert v in valid, f"Type inconnu : {v}"
 
@@ -216,10 +221,7 @@ class TestHALDocTypeMap:
             assert t in HAL_DOCTYPE_MAP
 
     def test_all_values_valid(self):
-        valid = {"article", "review", "book", "book_chapter", "conference_paper",
-                 "preprint", "thesis", "editorial", "report", "other",
-                 "dataset", "software", "patent", "hdr", "memoir", "poster",
-                 "letter", "erratum", "retraction"}
+        valid = VALID_DOC_TYPES
         for v in HAL_DOCTYPE_MAP.values():
             assert v in valid, f"Type inconnu : {v}"
 

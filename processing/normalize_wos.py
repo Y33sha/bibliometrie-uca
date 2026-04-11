@@ -34,6 +34,7 @@ from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.authorship_roles import map_role
 from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
+from utils.db_helpers import mark_staging_done
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -54,7 +55,7 @@ DOCTYPE_MAP = {
     "editorial material": "editorial",
     "letter": "letter",
     "meeting abstract": "conference_paper",
-    "book review": "review",
+    "book review": "book_review",
     "correction": "erratum",
     "retraction": "retraction",
     "news item": "other",
@@ -295,6 +296,39 @@ def extract_from_tsv(raw: dict, staging_doi: str | None) -> dict:
         except ValueError:
             pass
 
+    # Biblio
+    biblio = {}
+    if raw.get("VL"):
+        biblio["volume"] = raw["VL"]
+    if raw.get("IS"):
+        biblio["issue"] = raw["IS"]
+    if raw.get("BP"):
+        biblio["first_page"] = raw["BP"]
+    if raw.get("EP"):
+        biblio["last_page"] = raw["EP"]
+    if raw.get("AR"):
+        biblio["article_number"] = raw["AR"]
+
+    # Keywords : ID = author keywords, DE = KeyWords Plus
+    keywords = []
+    for field in ("DE", "ID"):
+        val = raw.get(field)
+        if val:
+            keywords.extend(k.strip() for k in val.split(";") if k.strip())
+    keywords = list(dict.fromkeys(keywords)) or None  # dedup en preservant l'ordre
+
+    # Topics : subject categories + WoS categories
+    topics = {}
+    if raw.get("SC"):
+        topics["subjects"] = [s.strip() for s in raw["SC"].split(";") if s.strip()]
+    if raw.get("WC"):
+        topics["categories"] = [s.strip() for s in raw["WC"].split(";") if s.strip()]
+
+    # External IDs
+    external_ids = {}
+    if raw.get("PM"):
+        external_ids["pmid"] = raw["PM"]
+
     return {
         "ut": raw.get("UT", ""),
         "doi": doi,
@@ -308,6 +342,13 @@ def extract_from_tsv(raw: dict, staging_doi: str | None) -> dict:
         "eissn": raw.get("EI"),
         "publisher_name": raw.get("PU"),
         "authors": _parse_tsv_authors(raw),
+        "abstract": raw.get("AB"),
+        "cited_by_count": int(raw["TC"]) if raw.get("TC") else None,
+        "biblio": biblio or None,
+        "keywords": keywords,
+        "topics": topics or None,
+        "urls": [raw["DL"]] if raw.get("DL") else None,
+        "external_ids": external_ids or None,
     }
 
 
@@ -520,6 +561,69 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
     elif lang_list:
         language = str(lang_list[0])
 
+    # Biblio
+    page = pub_info.get("page", {})
+    if isinstance(page, str):
+        page = {}
+    biblio = {}
+    vol = pub_info.get("vol")
+    if vol:
+        biblio["volume"] = str(vol)
+    issue_val = pub_info.get("issue")
+    if issue_val:
+        biblio["issue"] = str(issue_val)
+    if isinstance(page, dict):
+        if page.get("begin"):
+            biblio["first_page"] = str(page["begin"])
+        if page.get("end"):
+            biblio["last_page"] = str(page["end"])
+
+    # Abstract
+    frm = static.get("fullrecord_metadata", {})
+    abstract = None
+    abstracts = frm.get("abstracts", {})
+    if abstracts:
+        ab = abstracts.get("abstract", {})
+        p = ab.get("abstract_text", {}).get("p", "")
+        if isinstance(p, list):
+            p = " ".join(str(x) for x in p)
+        if p:
+            abstract = str(p)
+
+    # Keywords
+    kw_data = frm.get("keywords", {})
+    kw_list = kw_data.get("keyword", []) if isinstance(kw_data, dict) else []
+    if isinstance(kw_list, str):
+        kw_list = [kw_list]
+    keywords = [k for k in kw_list if k] or None
+
+    # Topics : categories
+    cat = frm.get("category_info", {})
+    topics = {}
+    subjects = cat.get("subjects", {}).get("subject", [])
+    if isinstance(subjects, dict):
+        subjects = [subjects]
+    subj_names = [s.get("content") or s for s in subjects if isinstance(s, dict) and s.get("content")]
+    if subj_names:
+        topics["subjects"] = subj_names
+    headings = cat.get("headings", {}).get("heading", [])
+    if isinstance(headings, str):
+        headings = [headings]
+    if headings:
+        topics["headings"] = headings
+
+    # Citations
+    tc_list = dynamic.get("citation_related", {}).get("tc_list", {}).get("silo_tc", [])
+    if isinstance(tc_list, dict):
+        tc_list = [tc_list]
+    cited_by_count = None
+    for tc in tc_list:
+        if isinstance(tc, dict) and tc.get("coll_id") == "WOK":
+            try:
+                cited_by_count = int(tc.get("local_count", 0))
+            except (ValueError, TypeError):
+                pass
+
     return {
         "ut": raw.get("UID", ""),
         "doi": doi,
@@ -533,6 +637,13 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
         "eissn": _get_api_issn(dynamic, "eissn"),
         "publisher_name": publisher_name,
         "authors": _parse_api_authors(static, dynamic),
+        "abstract": abstract,
+        "cited_by_count": cited_by_count,
+        "biblio": biblio or None,
+        "keywords": keywords,
+        "topics": topics or None,
+        "urls": None,
+        "external_ids": None,
     }
 
 
@@ -597,13 +708,25 @@ def insert_wos_document(cur, rec: dict, staging_id: int,
     language = pub_meta.get("language") if pub_meta else None
     container_title = pub_meta.get("container_title") if pub_meta else None
 
+    abstract = rec.get("abstract")
+    cited_by_count = rec.get("cited_by_count")
+    biblio = Json(rec["biblio"]) if rec.get("biblio") else None
+    keywords = rec.get("keywords")
+    topics = Json(rec["topics"]) if rec.get("topics") else None
+    urls = rec.get("urls")
+    external_ids = Json(rec["external_ids"]) if rec.get("external_ids") else None
+
     cur.execute("""
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id,
-             journal_id, oa_status, language, container_title)
+             journal_id, oa_status, language, container_title,
+             abstract, cited_by_count, biblio, keywords, topics,
+             urls, external_ids)
         VALUES ('wos', %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s)
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
+                %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
@@ -612,11 +735,20 @@ def insert_wos_document(cur, rec: dict, staging_id: int,
             journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
             oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
             language = COALESCE(EXCLUDED.language, source_documents.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title)
+            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title),
+            abstract = COALESCE(EXCLUDED.abstract, source_documents.abstract),
+            cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_documents.cited_by_count, 0)),
+            biblio = COALESCE(EXCLUDED.biblio, source_documents.biblio),
+            keywords = COALESCE(EXCLUDED.keywords, source_documents.keywords),
+            topics = COALESCE(EXCLUDED.topics, source_documents.topics),
+            urls = COALESCE(EXCLUDED.urls, source_documents.urls),
+            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
         RETURNING id
     """, (rec["ut"], rec["doi"], rec["title"], rec["pub_year"],
           rec["doc_type"], publication_id, staging_id,
-          journal_id, oa_status, language, container_title))
+          journal_id, oa_status, language, container_title,
+          abstract, cited_by_count, biblio, keywords, topics,
+          urls, external_ids))
     return cur.fetchone()[0]
 
 
@@ -788,7 +920,8 @@ def process_authorships(cur, rec: dict, source_document_id: int):
                     EXCLUDED.source_struct_ids,
                     source_authorships.source_struct_ids
                 ),
-                roles = EXCLUDED.roles
+                roles = EXCLUDED.roles,
+                addresses_extracted = FALSE
             RETURNING id
         """, (source_document_id, source_author_id, author["position"],
               author["is_corresponding"], raw_affiliations_json,
@@ -848,10 +981,13 @@ def process_record(cur, staging_row: tuple) -> bool:
 
         # Enrichir la publication existante si trouvée
         if publication_id:
-            _enrich(cur, publication_id, doi=pub_meta["doi"],
+            publication_id = _enrich(cur, publication_id, doi=pub_meta["doi"],
                     doc_type=pub_meta["doc_type"], oa_status=pub_meta["oa_status"],
                     journal_id=journal_id, container_title=pub_meta["container_title"],
-                    language=pub_meta["language"])
+                    language=pub_meta["language"],
+                    abstract=rec.get("abstract"), keywords=rec.get("keywords"),
+                    topics=rec.get("topics"), biblio=rec.get("biblio"),
+                    is_retracted=rec.get("is_retracted"))
             update_sources(cur, publication_id)
 
         # Document WoS (source_documents) — publication_id peut être NULL
@@ -862,11 +998,7 @@ def process_record(cur, staging_row: tuple) -> bool:
         # Auteurs et authorships
         process_authorships(cur, rec, source_document_id)
 
-        # Marquer comme traité
-        cur.execute(
-            "UPDATE staging SET processed = TRUE WHERE id = %s",
-            (staging_id,)
-        )
+        mark_staging_done(cur, staging_id)
         return True
 
     except Exception as e:
@@ -908,33 +1040,43 @@ def main():
         limit = min(limit, total)
         logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
 
+        # Charger les IDs puis fetch par lots pour limiter la memoire
         cur.execute("""
-            SELECT id, source_id AS ut, doi, raw_data
-            FROM staging
+            SELECT id FROM staging
             WHERE source = 'wos' AND processed = FALSE
             ORDER BY id
             LIMIT %s
         """, (limit,))
+        work_ids = [r[0] for r in cur.fetchall()]
 
-        rows = cur.fetchall()
         processed = 0
         errors = 0
+        FETCH_BATCH = 50
 
-        for row in rows:
-            try:
-                success = process_record(cur, row)
-                if success:
-                    processed += 1
-                else:
+        for batch_start in range(0, len(work_ids), FETCH_BATCH):
+            batch_ids = work_ids[batch_start:batch_start + FETCH_BATCH]
+            cur.execute("""
+                SELECT id, source_id AS ut, doi, raw_data
+                FROM staging WHERE id = ANY(%s)
+                ORDER BY id
+            """, (batch_ids,))
+            batch_rows = cur.fetchall()
+
+            for row in batch_rows:
+                try:
+                    success = process_record(cur, row)
+                    if success:
+                        processed += 1
+                    else:
+                        errors += 1
+                except Exception:
+                    conn.rollback()
                     errors += 1
-            except Exception:
-                conn.rollback()
-                errors += 1
-                continue
+                    continue
 
-            if processed % args.batch_size == 0 and processed > 0:
-                conn.commit()
-                logger.info(f"  {processed}/{limit} traités ({errors} erreurs)")
+                if processed % args.batch_size == 0 and processed > 0:
+                    conn.commit()
+                    logger.info(f"  {processed}/{limit} traites ({errors} erreurs)")
 
         conn.commit()
 
