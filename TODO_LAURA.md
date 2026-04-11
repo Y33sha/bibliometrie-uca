@@ -7,7 +7,6 @@
 * [ ] générer un seed avec seulement les données nécessaires au démarrage *de novo* (structures uca, relations entre structures, périmètres...)
 
 ## Pérennité
-* [ ] nouveaux imports: comment prendre en compte fusions de comptes auteurs ayant eu lieu entre-temps (par ex. sur HAL)? / + ré-importer et écraser publis déjà présentes et modifiées entre-temps (stocker hash puis comparer?)
 * [ ] Comment se met à jour le référentiel structures HAL en cas de changement entre deux imports? faut-il des champs `hash` et `last_seen_at` comme pour les publis?
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
 * [ ] authorships excluded: info perdue si réimport (grave?)
@@ -17,57 +16,62 @@
 
 ## Pipeline
 * [x] dédoublonnage DOI versionnés (.v1...)
+* [x] déplacer création des publications *après* phase affiliations? (permet d'éviter des créations inutiles)
+* [x] phase identifiers dans normalize_hal, comme enrich_hal_structures => enrichir source_authors, pas directement persons
+* [x] pour raccourcir la phase addresses: pointer authorships quand adresses extraites et traitées?
 * [ ] imports quotidiens (mode rapide, seulement nouveaux docts)
-* [ ] stocker les hal_id d'OpenAlex dans le champ external_ids de la table source_documents: **backfill** (script à jour?)
-* [ ] déplacer création des publications *après* phase affiliations? (permet d'éviter des créations inutiles)
-* [ ] vérifier valeur ajoutée du mapping hal_structures *vs* utilisation des collections pour la phase affiliations du pipeline; ou mieux, prendre la chaîne de caractères "affiliation" et la vérifier comme une adresse?
-* [ ] normalize_wos: conserver le mapping addresses->structures dans le champ raw_affiliations (modifier script + **backfill**)
+* [ ] vérifier valeur ajoutée du mapping hal_structures *vs* utilisation des collections pour la phase affiliations du pipeline; ou mieux, prendre la chaîne de caractères "affiliation" et la vérifier comme une adresse? => pour pouvoir auditer, commencer par **backfill** les collections dans les publications HAL qui n'en ont pas.
+* [ ] normalize_wos: conserver le mapping addresses->structures dans le champ raw_affiliations? (modifier script + **backfill**)
 * [ ] structure_ids et in_perimeter des publis theses.fr: réfléchir
-* [ ] pour raccourcir la phase addresses: pointer authorships quand adresses extraites et traitées?
 * [ ] utiliser l'enum sources dans tous les scripts au lieu de dupliquer
-. [ ] logs post pipeline (nouvelles publis, nouvelles personnes, nouvelles formes de noms...)
+* [ ] logs post pipeline (nouvelles publis, nouvelles personnes, nouvelles formes de noms...)
+* [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
+* [ ] création de publications: comment sont renseignés les champs mots clés, topics? fusion ou premier arrivé premier servi? Vérifier et backfiller si besoin.
 
 # Trucs techniques
-* [ ] chercher des moyens d'optimiser la taille de la base (supprimer données qui ne sont plus utiles? ex.: supprimer staging après normalisation, supprimer données sources des publications hors périmètre?) / supprimer *_authors et *_structures (sauf hal)?
+* [ ] chercher des moyens d'optimiser la taille de la base supprimer données qui ne sont plus utiles? ex.: supprimer *_authors et *_structures (sauf hal)?
+* [ ] champs datetime: diminuer précision
 * [ ] finir transition des settings.py vers la config en base. (notamment api query parameters: renseigner dans un champ jsonb de la table structures, et déduire les structures à partir du périmètre)
 * [ ] cache pour améliorer la perf?
-* [ ] creuser les différents types de tests; mettre en place tests frontend
+* [ ] creuser les différents types de tests
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
-* [ ] audit complet du code pour retrouver tous les trucs hardcodés qu'on pourrait abstraire.
+* [ ] audit complet du code pour retrouver tous les trucs hardcodés qu'on pourrait abstraire, ou le SQL à simplifier suite aux fusions des tables sources.
+* [ ] version bac à sable?
+* [ ] logging errors: UnicodeEncodeError: 'charmap' codec can't encode character '\u2194' in position 50: character maps to <undefined> => inoffensif mais CHIANT
+* [ ] ensure_truth_authorship: utilisé où? sert à quoi?
 
 # Sémantique
 * [ ] harmoniser les noms de routes API avec les url frontend
 * [ ] publications => plutôt documents
+* [ ] collections => hal_collections
 
 # Données
 
 ## Explorer autres sources possibles
 * [ ] pour les publis: CrossRef, ArXiv, Pubmed
 * [ ] pour les jeux de données: DataCite, autres?
-* [x] pour les thèses: theses.fr
 * [ ] brevets?
 * [ ] divers: ORCID, IdRef, OpenAPC, DOAJ, scraping sites éditeurs pour les adresses manquantes? (soyons fous)
 
 ## Structure des données sources
 * [ ] OpenAlex et WOS: mapping structures UCA: pour remplacer la config hardcoded des requêtes API + pouvoir comparer sources/vérité
-* [x] différents rôles auteurs dans les authorships? (auteur, dir., trad.... sera particulièrement utile pour les thèses: rapporteur, jury...) => à mettre en place avant d'intégrer theses.fr; enum roles auteur (utiliser scanr, hal, wos)
 
 ## Entités supplémentaires
 * [ ] sujets / mots-clés: exploiter
 
 ## Qualité des données
 * [ ] utiliser DOAJ pour enrichir données journals et s'en servir pour contrôler oa_status?
-* [ ] rerun wos_normalize pour insérer roles (attention: le filtre role != author a sauté; vérifier d'abord s'il est pertinent de conserver les non auteurs) (**backfill**)
 * [ ] hal_authors importés sans id par un script de cross-import: ça ne devrait pas être possible. Auditer.
+* [ ] publis OpenAlex avec date correspondant au dépôt dans HAL: ex. 8651 => si dates différentes, utiliser l'autre.
+* [ ] contrôler données journal/doc_type via DOI? => DOI peut permettre de dédoublonner journals
 
 ### Types de documents
 * [ ] types parfois non fiables sur OpenAlex: https://openalex.org/works/W4225722715 (utiliser Unpaywall aussi pour corriger type doc?)
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
 * [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou reue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); preprints en accès gold selon OpenAlex (?); data papers?
 * [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
-* [ ] **backfill** staging HAL (sous-types, authQuality_s) par des appels API: le script n'existe pas encore
-* [X] thèses en cours dans scanr: quelle clé d'alignement? => NNT
-* [ ] thèses avant 2021: importer?
+* [ ] mémoires de master: quoi faire? cacher, séparer? (vérifier d'abord ce qu'on trouve en doc_type memoir, à part les trucs sur dumas)
+* [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?)
 
 ### Problèmes spécifiques HAL
 * [ ] problème des documents où l'affiliation de l'authorship n'est pas résolue: cf https://hal.science/hal-04987032
@@ -78,17 +82,15 @@
 * à quoi sert VRAIMENT la colonne collections du staging_hal?
 * [ ] documents tel-* sans document déposé: non visibles dans TEL. Rediriger vers hal.science
 * [ ] embargos (articles, thèses): afficher?
+* [ ] recherche par hal-id avec hal-id non trouvé dans hal (dédoublonné depuis?):  2026-04-11 08:55:58,660 [WARNING]   hal-03178520 non trouvé dans HAL => auditer, supprimer les hal-id erronés des external_ids
 
-# Code
-
-* [ ] suite à la fusion des tables sources, il y a forcément des requêtes à réécrire et optimiser: ex.:@router.get("/api/persons/{person_id}") async def get_person(person_id: int):
 
 # Interface
 
 ## Admin
 
 ### Config
-* [ ] gérer le CRUD des périmètres
+* [ ] gérer le CRUD des périmètres; les nommer
 
 ### Structures
 * [ ] créer formes de noms excluantes? ex. "Zone Ateliers Territoires Uranifères" => reconnaît à tort UMR Territoires à cause du contexte Clermont
@@ -104,9 +106,6 @@
 * [ ] possibilité de confirmer formes de nom (pour voir du premier coup d'oeil les formes non confirmées)
 * [ ] si source erronée: rejeter authorship source + recalculer affiliations de l'authorship à partir des sources non rejetées / caveat: Clarifier la sémantique de `excluded` sur les authorships sources: est-ce l'authorship qui est fausse, ou son affiliation? (allons plus loin: pourrait-on déclarer fausses certaines colonnes et pas d'autres? via un champ jsonb par exemple)
 
-### Dédoublonnage
-* [ ] interface admin pour gérer les formes de nom des publishers et journals et fusionner les doublons
-
 ## Publique
 
 ### Personnes (public)
@@ -115,20 +114,21 @@
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis (authorship ok, author pas ok => vérifier que ce ne sera pas ré-écrasé)
 * [ ] signaler publis HAL non correctement reliées au compte HAL (dans la page problèmes-hal?)
 * [ ] filtre "publications avec authorship UCA": certains ont 500 publications mais une seule en tant qu'auteur UCA, ça aiderait à les retrouver pour les vérifier
-* [ ] onglet thèses (rôles)
 
 ### Structures (public)
 * [ ] Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation?
 * [ ] liste publis: colonne "est dans la collection HAL du labo"
-* [ ] onglet thèses
 
 ### Publications
 * [ ] ajouter filtre corresponding_is_uca?
 * [ ] relations entre publications (est traduction de, est preprint de..., fait partie de..., data paper décrit dataset, dataset référencé dans...)
 * [ ] afficher les abstracts dans la page publications/id
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
-* [ ] pages dédiées pour les types spéciaux: datasets, thèses?
+* [ ] pages dédiées pour les types spéciaux: datasets?
 * [ ] filtre langue? (y a-t-il un code langue unique trans-sources? sinon, faire une table langues)
+
+### Pages "problèmes hal"
+* [ ] check marks: reprendre le style des autres pages
 
 ### Mega-authorships et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap)
@@ -142,14 +142,19 @@
 * [ ] interface pour afficher le staging json (pour vérif)
 * [ ] différencier interfaces à usage interne vs externe (users, roles)
 * [ ] accessibilité, responsivité de l'interface
-* [x] drowdown "problèmes hal" caché par barre filtres
+
+## Détails d'affichage
+* [ ] comportement de la flèche de tri sur page laboratoires, colonne co-tutelles; page publications, colonne Année
+* [ ] facette "auteur corresp.": compte toujours zéro
+* [ ] investiguer les erreurs TypeScript
+* [ ] décomptes sur les onglets: ne pas tenir compte des facettes
 
 # Trucs pour plus tard
 * compte fractionnaire des publications?
 * collaborations nationales et internationales: identification structures? compliqué, je pense que pour ça il vaut mieux réutiliser les sources directement
 * creuser le format de données CERIF, voir si c'est pertinent pour mon besoin
 
-# Cas particuliers, bizarreries à élucider
+# Cas particuliers, bizarreries à élucider, à examiner plus tard
 * openalex répète des auteurs : publi 77832
 * claire richard: pourquoi 0 publi UCA sur page admin?
 * publi 103567: structures identifiées sur HAL: UCA, Inserm: pourquoi?
@@ -157,4 +162,3 @@
 * [ ] pb des auteurs openalex liés à une personne mais non listés dans les auteurs d'une publi: publi 12380
 * [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
 * erreur de parsing OA: publication 113652
-* [ ] comportement de la flèche de tri sur page laboratoires, colonne co-tutelles; page publications, colonne Année

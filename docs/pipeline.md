@@ -8,12 +8,13 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 - [Moissonnage](#extract): Récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
 - [Cross-imports](#cross_imports): Tente de combler les lacunes par des imports croisés ciblés (documents HAL référencés par OpenAlex ou ScanR mais absents de notre import HAL; recherche ciblée des DOI manquant dans chaque source)
 ### Normalisation
-- [Normalisation](#normalize): Transforme les données brutes (*staging*) en tables structurées *par source*: `*_publications`, `*_authors`, `*_authorships`, `*_structures`. Peuple la table canonique `publications`  à partir des publications sources.
+- [Normalisation](#normalize): Transforme les données brutes (*staging*) en tables structurées *par source*: `*_publications`, `*_authors`, `*_authorships`, `*_structures`. 
 ### Repérage des affiliations
 - [Adresses](#addresses): Peuple la table `addresses` à partir des adresses brutes associées aux [authorships](glossaire#authorship). Résout les affiliations des adresses à l'aide des formes de noms associées aux structures canoniques.
 - [Affiliations](#affiliations): Renseigne le bool `in_perimeter` et les `structure_ids` des authorships sources.
+### Création/rattachement des publications
+- Publications: Peuple la table canonique `publications`  à partir des publications sources *via* les authorhips souces ayant `in_perimeter` = true. Dédoublonne.
 ### Création/rattachement des personnes
-- [Identifiants](#identifiers): Enrichit la table `hal_authors` (ORCID, IdRef) à partir de l'API Auteurs de HAL.
 - [Personnes](#creation-personnes): Peuple la table canonique `persons` et ses tables satellites `person_name_forms` et `person_identifiers` (ORCID, idHAL, IdRef) *via* les authorhips souces ayant `in_perimeter` = true. Mappe les authorships sources aux `person_id` créées.
 - [Authorships](#authorships): Peuple la table canonique `authorships` (liens entre `publications` canoniques et `persons` canoniques) à partir des `person_id` référencés dans les authorships sources.
 ### Enrichissements divers
