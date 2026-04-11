@@ -61,7 +61,7 @@ def propagate_countries_for_addresses(cur, address_ids: list[int]):
                     FROM (
                         SELECT unnest(sd.countries) AS c
                         FROM source_documents sd
-                        WHERE sd.publication_id = ap.publication_id AND sd.source = 'hal' AND sd.countries IS NOT NULL
+                        WHERE sd.publication_id = ap.publication_id AND sd.countries IS NOT NULL
                         UNION ALL
                         SELECT unnest(a.countries) AS c
                         FROM source_authorship_addresses saa
