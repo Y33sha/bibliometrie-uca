@@ -1,21 +1,11 @@
 # Roadmap — Bibliométrie UCA
 
-## Programme du 9 avril
+## Programme du 11 avril
 
-* une fois que tout ça sera en place:
-    * [ ] réfléchir à la présentation des thèses (en cours/soutenues) dans le frontend: page spéciale? onglet spécial par labo? onglet par personne (rôles de rapporteur/jury)
-    
-    * [ ] année soutenance vs inscription
-    * [ ] statut ouvert vs closed
-    * [ ] page thèse: afficher personnes liées
-
-
-
-    * [ ] réfléchir à un mode quotidien pour le pipeline (interrogation minimale des API: "quoi de neuf depuis hier"? pas de réimport+comparaison de hash, pas d'enrichissements)
-    * [ ] log post-pipeline (publications ajoutées, personnes créées, formes de nom rattachées, erreurs...)
-
-* divers backfillings en attente
-
+* [ ] Exploiter les nouvelles données: abstract, topics, keywords, oa_url
+* [ ] Optimiser taille de la base en supprimant au fur et à mesure les trucs non utilisés (raw staging):
+* [ ] réfléchir à un mode quotidien pour le pipeline (interrogation minimale des API: "quoi de neuf depuis hier"? pas de réimport+comparaison de hash, pas d'enrichissements)
+* [ ] log post-pipeline (publications ajoutées, personnes créées, formes de nom rattachées, erreurs...)
 
 
 ## Quick wins
