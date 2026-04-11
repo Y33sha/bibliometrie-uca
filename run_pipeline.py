@@ -96,7 +96,7 @@ def phase_cross_imports(mode="full", sources=None, full_cross_import=False, **kw
 
 
 def phase_normalize(**kw):
-    """Phase 3 : Normalisation staging → tables sources + merge inter-sources."""
+    """Phase 3 : Normalisation staging → tables sources (sans création de publications)."""
     sources = kw.get("sources", {"hal", "openalex", "wos", "scanr", "theses"})
     if "openalex" in sources:
         run_python("processing/normalize_openalex.py")
@@ -110,9 +110,6 @@ def phase_normalize(**kw):
         run_python("processing/normalize_theses.py")
     if "hal" in sources:
         run_python("processing/enrich_hal_structures.py")
-    # Toujours lancer le merge inter-sources (dépend de toutes les sources)
-    run_python("processing/merge_pubs_by_hal_id.py")
-    run_python("processing/merge_pubs_by_nnt.py")
 
 
 def phase_addresses(**kw):
@@ -130,6 +127,13 @@ def phase_affiliations(**kw):
     sources = kw.get("sources", {"hal", "openalex", "wos", "scanr", "theses"})
     source_args = ",".join(sorted(sources))
     run_python("processing/populate_affiliations.py", "--sources", source_args)
+
+
+def phase_publications(**kw):
+    """Phase 5b : Création des publications pour les source_documents in-perimeter + merges."""
+    run_python("processing/create_publications.py")
+    run_python("processing/merge_pubs_by_hal_id.py")
+    run_python("processing/merge_pubs_by_nnt.py")
 
 
 def phase_identifiers(mode="full", **kw):
@@ -178,6 +182,7 @@ PHASES = [
     ("normalize", phase_normalize),
     ("addresses", phase_addresses),
     ("affiliations", phase_affiliations),
+    ("publications", phase_publications),
     ("identifiers", phase_identifiers),
     ("persons", phase_persons),
     ("authorships", phase_authorships),

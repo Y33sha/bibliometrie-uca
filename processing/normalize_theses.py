@@ -84,21 +84,14 @@ def _thesis_author_compatible(cur, pub_id: int, author: tuple[str, str]) -> bool
     return tokens_a == tokens_b and len(tokens_a) >= 2
 
 
-def find_or_insert_publication(cur, these: dict) -> tuple[int | None, bool]:
-    """Trouve ou crée la publication pour une thèse.
+def extract_pub_metadata(these: dict) -> dict:
+    """Extrait les métadonnées de publication d'une thèse.
 
-    Déduplication en 3 étapes :
-    1. Par DOI ou NNT (via find_or_create standard)
-    2. Par titre normalisé + année + compatibilité auteur (spécifique thèses)
-    3. Création
+    Retourne un dict utilisable par find_or_create et par insert_source_document.
     """
     title = these.get("titrePrincipal")
-    if not title:
-        return None, False
-
     doc_type = "thesis" if these.get("dateSoutenance") else "ongoing_thesis"
 
-    # Année : depuis dateSoutenance ou datePremiereInscriptionDoctorat
     pub_year = None
     date_sout = these.get("dateSoutenance")
     date_insc = these.get("datePremiereInscriptionDoctorat")
@@ -115,16 +108,41 @@ def find_or_insert_publication(cur, these: dict) -> tuple[int | None, bool]:
 
     doi = these.get("doi")
     nnt_clean = normalize_nnt(these.get("nnt"))
-    title_norm = normalize_text(title)
+    title_norm = normalize_text(title) if title else None
+
+    return dict(title=title, title_normalized=title_norm,
+                pub_year=pub_year, doc_type=doc_type,
+                doi=doi, nnt=nnt_clean,
+                oa_status="closed", journal_id=None,
+                container_title=None, language=None)
+
+
+def find_publication(cur, these: dict) -> int | None:
+    """Cherche une publication existante sans en créer. Retourne l'id ou None.
+
+    Déduplication en 2 étapes :
+    1. Par DOI ou NNT (via find_or_create avec allow_create=False)
+    2. Par titre normalisé + année + compatibilité auteur (spécifique thèses)
+    """
+    meta = extract_pub_metadata(these)
+    title = meta["title"]
+    if not title:
+        return None
+
+    pub_year = meta["pub_year"]
+    doi = meta["doi"]
+    nnt_clean = meta["nnt"]
+    doc_type = meta["doc_type"]
+    title_norm = meta["title_normalized"]
 
     # 1. Chercher par DOI ou NNT (sans créer)
-    pub_id, is_new = find_or_create(
+    pub_id, _ = find_or_create(
         cur, title=title, title_normalized=title_norm,
         pub_year=pub_year, doc_type=doc_type,
         doi=doi, nnt=nnt_clean,
         allow_create=False)
     if pub_id:
-        return pub_id, False
+        return pub_id
 
     # 2. Dédup spécifique thèses : titre + année + auteur compatible
     if pub_year and title_norm:
@@ -135,13 +153,9 @@ def find_or_insert_publication(cur, these: dict) -> tuple[int | None, bool]:
                 if not author or _thesis_author_compatible(cur, cand.id, author):
                     # Match trouvé → enrichir
                     _enrich(cur, cand.id, doi=doi, doc_type=doc_type)
-                    return cand.id, False
+                    return cand.id
 
-    # 3. Créer
-    return find_or_create(
-        cur, title=title, title_normalized=title_norm,
-        pub_year=pub_year, doc_type=doc_type,
-        doi=doi, nnt=nnt_clean)
+    return None
 
 
 def _parse_date_iso(date_str: str | None) -> str | None:
@@ -178,7 +192,8 @@ def _update_thesis_meta(cur, pub_id: int, these: dict):
 # =============================================================
 
 def insert_source_document(cur, these: dict, staging_id: int,
-                           theses_id: str, publication_id: int | None) -> int:
+                           theses_id: str, publication_id: int | None,
+                           pub_meta: dict | None = None) -> int:
     """Crée/retrouve l'entrée source_documents pour theses.fr."""
     title = these.get("titrePrincipal") or ""
     doc_type = "thesis" if these.get("dateSoutenance") else "ongoing_thesis"
@@ -201,19 +216,32 @@ def insert_source_document(cur, these: dict, staging_id: int,
     nnt = normalize_nnt(these.get("nnt"))
     external_ids = Json({"nnt": nnt}) if nnt else None
 
+    # Métadonnées de publication (pour création différée)
+    journal_id = pub_meta.get("journal_id") if pub_meta else None
+    oa_status = pub_meta.get("oa_status") if pub_meta else None
+    language = pub_meta.get("language") if pub_meta else None
+    container_title = pub_meta.get("container_title") if pub_meta else None
+
     cur.execute("""
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
-             publication_id, staging_id, external_ids)
-        VALUES ('theses', %s, %s, %s, %s, %s, %s, %s, %s)
+             publication_id, staging_id, external_ids,
+             journal_id, oa_status, language, container_title)
+        VALUES ('theses', %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
             ),
             doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
-            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
+            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
+            journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
+            oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
+            language = COALESCE(EXCLUDED.language, source_documents.language),
+            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title)
         RETURNING id
-    """, (theses_id, doi, title, pub_year, doc_type, publication_id, staging_id, external_ids))
+    """, (theses_id, doi, title, pub_year, doc_type, publication_id, staging_id, external_ids,
+          journal_id, oa_status, language, container_title))
     return cur.fetchone()["id"]
 
 
@@ -352,32 +380,36 @@ def process_work(cur, row: dict) -> bool:
             logger.warning(f"Thèse {theses_id} sans titre — skip")
             return False
 
-        # Idempotence : si source_documents a déjà cette thèse avec un publication_id,
-        # le réutiliser
+        # Métadonnées de publication (stockées sur source_documents)
+        pub_meta = extract_pub_metadata(these)
+
+        # Chercher une publication existante (sans créer)
+        publication_id = None
+
+        # Idempotence : réutiliser le publication_id existant
         cur.execute(
             "SELECT publication_id FROM source_documents WHERE source = 'theses' AND source_id = %s",
             (theses_id,))
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc["publication_id"]:
             publication_id = existing_doc["publication_id"]
-            # Re-traitement : enrichir (ex: ongoing_thesis → thesis après soutenance)
-            doc_type = "thesis" if these.get("dateSoutenance") else "ongoing_thesis"
-            _enrich(cur, publication_id, doi=these.get("doi"), doc_type=doc_type)
-        else:
-            publication_id, _ = find_or_insert_publication(cur, these)
 
+        # Recherche par DOI/NNT/titre (sans création)
         if not publication_id:
-            logger.warning(f"Impossible d'insérer {theses_id} — échec publication")
-            return False
+            publication_id = find_publication(cur, these)
 
-        # Dates de thèse → publications.meta
-        _update_thesis_meta(cur, publication_id, these)
+        # Enrichir la publication existante si trouvée
+        if publication_id:
+            _enrich(cur, publication_id, doi=pub_meta["doi"],
+                    doc_type=pub_meta["doc_type"])
+            update_sources(cur, publication_id)
+            # Dates de thèse → publications.meta
+            _update_thesis_meta(cur, publication_id, these)
 
-        # Document
+        # Document (source_documents) — publication_id peut être NULL
         source_document_id = insert_source_document(
-            cur, these, staging_id, theses_id, publication_id
+            cur, these, staging_id, theses_id, publication_id, pub_meta
         )
-        update_sources(cur, publication_id)
 
         # Personnes et authorships (avec rôles)
         process_persons(cur, these, source_document_id)

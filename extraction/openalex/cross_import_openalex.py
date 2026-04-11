@@ -38,6 +38,7 @@ SELECT_FIELDS = ",".join([
     "publication_date", "type", "language", "primary_location",
     "locations", "authorships", "open_access", "cited_by_count",
     "biblio", "is_retracted",
+    "topics", "keywords", "abstract_inverted_index",
 ])
 
 

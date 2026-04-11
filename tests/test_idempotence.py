@@ -11,6 +11,59 @@ import json
 import pytest
 from psycopg2.extras import Json
 
+from utils.normalize import normalize_text
+from utils.nnt import normalize_nnt
+from services.publications import find_or_create as find_or_create_publication, update_sources
+from processing.normalize_hal import DOCTYPE_MAP as HAL_DOCTYPE_MAP
+from processing.normalize_openalex import DOCTYPE_MAP as OA_DOCTYPE_MAP
+from processing.normalize_wos import DOCTYPE_MAP as WOS_DOCTYPE_MAP
+from processing.normalize_scanr import DOCTYPE_MAP as SCANR_DOCTYPE_MAP
+
+_DOC_TYPE_MAPS = {
+    "hal": HAL_DOCTYPE_MAP,
+    "openalex": OA_DOCTYPE_MAP,
+    "wos": WOS_DOCTYPE_MAP,
+    "scanr": SCANR_DOCTYPE_MAP,
+}
+
+
+def _create_all_publications(cur):
+    """Crée les publications pour tous les source_documents orphelins.
+
+    Simule la phase 'publications' du pipeline dans les tests.
+    """
+    cur.execute("""
+        SELECT id, source, doi, title, pub_year, doc_type, journal_id,
+               oa_status, language, container_title, external_ids
+        FROM source_documents WHERE publication_id IS NULL
+        ORDER BY id
+    """)
+    for doc in cur.fetchall():
+        title = doc["title"] or ""
+        pub_year = doc["pub_year"]
+        if not title or not pub_year:
+            continue
+        raw_type = doc["doc_type"] or "other"
+        doc_type = _DOC_TYPE_MAPS.get(doc["source"], {}).get(raw_type, raw_type)
+        ext_ids = doc["external_ids"] or {}
+        nnt = ext_ids.get("nnt")
+        if nnt:
+            nnt = normalize_nnt(nnt)
+        pub_id, _ = find_or_create_publication(
+            cur, title=title, title_normalized=normalize_text(title),
+            pub_year=pub_year, doc_type=doc_type,
+            doi=doc["doi"], nnt=nnt,
+            oa_status=doc["oa_status"] or "unknown",
+            journal_id=doc["journal_id"],
+            container_title=doc["container_title"],
+            language=doc["language"],
+            allow_create=True,
+        )
+        if pub_id:
+            cur.execute("UPDATE source_documents SET publication_id = %s WHERE id = %s",
+                        (pub_id, doc["id"]))
+            update_sources(cur, pub_id)
+
 
 # ── Fixtures de données ScanR ────────────────────────────────────
 
@@ -173,6 +226,7 @@ class TestNormalizeScanrIdempotence:
 
         # Première passe
         processed_1 = _run_normalize_scanr(db)
+        _create_all_publications(db)
         counts_1 = _count_tables(db)
 
         assert processed_1 == 3, f"Première passe : {processed_1} traités (attendu 3)"
@@ -185,6 +239,7 @@ class TestNormalizeScanrIdempotence:
 
         # Deuxième passe
         processed_2 = _run_normalize_scanr(db)
+        _create_all_publications(db)
         counts_2 = _count_tables(db)
 
         assert counts_2 == counts_1, (
@@ -231,6 +286,7 @@ class TestNormalizeScanrIdempotence:
         }
         _insert_staging(db, SCANR_STAGING_DOCS + [dup])
         _run_normalize_scanr(db)
+        _create_all_publications(db)
 
         db.execute("SELECT count(*) AS cnt FROM publications WHERE lower(doi) = '10.1234/test-article-001'")
         assert db.fetchone()["cnt"] == 1, "Le DOI devrait être dédupliqué"
@@ -437,7 +493,8 @@ def _insert_oa_staging(cur, docs):
         cur.execute("""
             INSERT INTO staging (source, source_id, doi, raw_data, processed)
             VALUES ('openalex', %s, %s, %s, FALSE)
-            ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
+            ON CONFLICT (source, source_id) DO UPDATE SET
+                processed = FALSE, raw_data = EXCLUDED.raw_data
         """, (doc["openalex_id"], doc["doi"], Json(doc["raw_data"])))
 
 
@@ -472,11 +529,14 @@ class TestNormalizeOpenalexIdempotence:
         _insert_oa_staging(db, OA_STAGING_DOCS)
 
         processed_1 = _run_normalize_oa(db)
+        _create_all_publications(db)
         counts_1 = _count_oa_tables(db)
         assert processed_1 == 3
 
-        db.execute("UPDATE staging SET processed = FALSE WHERE source = 'openalex'")
+        # Réinjecter le raw_data (vidé par le normaliseur) et relancer
+        _insert_oa_staging(db, OA_STAGING_DOCS)
         _run_normalize_oa(db)
+        _create_all_publications(db)
         counts_2 = _count_oa_tables(db)
 
         assert counts_2 == counts_1, (
@@ -685,11 +745,13 @@ class TestNormalizeInterSourceIdempotence:
 
         # Passe 1 : HAL
         _run_normalize_hal(db)
+        _create_all_publications(db)
         db.execute("SELECT COUNT(*) AS cnt FROM publications")
         pubs_after_hal = db.fetchone()["cnt"]
 
         # Passe 2 : OA
         _run_normalize_oa(db)
+        _create_all_publications(db)
         db.execute("SELECT COUNT(*) AS cnt FROM publications")
         pubs_after_oa = db.fetchone()["cnt"]
 
@@ -706,7 +768,7 @@ class TestNormalizeInterSourceIdempotence:
         )
 
         # Passe 3 : relancer HAL
-        db.execute("UPDATE staging SET processed = FALSE WHERE source = 'hal'")
+        _insert_hal_staging(db, INTER_HAL_DOCS)
         _run_normalize_hal(db)
         db.execute("SELECT COUNT(*) AS cnt FROM publications")
         pubs_after_hal2 = db.fetchone()["cnt"]

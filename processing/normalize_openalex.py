@@ -84,6 +84,50 @@ OA_MAP = {
 # =============================================================
 
 
+def extract_locations_data(work: dict) -> tuple[list[str], dict]:
+    """Extrait les URLs et identifiants depuis les locations d'un work OpenAlex.
+
+    Retourne (urls, external_ids) où :
+      - urls : liste dédupliquée de landing_page_url et pdf_url
+      - external_ids : dict d'identifiants extraits des URLs (hal, nnt, pmid, pmc)
+    """
+    urls = []
+    seen = set()
+    external_ids: dict[str, str] = {}
+
+    for loc in work.get("locations") or []:
+        for key in ("landing_page_url", "pdf_url"):
+            url = loc.get(key)
+            if url and url not in seen:
+                seen.add(url)
+                urls.append(url)
+
+    # Extraire les identifiants des URLs
+    for url in urls:
+        # HAL
+        if not external_ids.get("hal"):
+            hal_id = extract_hal_id_from_url(url)
+            if hal_id:
+                external_ids["hal"] = hal_id
+        # theses.fr / NNT
+        if not external_ids.get("nnt"):
+            m = re.search(r'theses\.fr/([A-Za-z0-9]+)', url)
+            if m:
+                external_ids["nnt"] = m.group(1)
+        # PubMed
+        if not external_ids.get("pmid"):
+            m = re.search(r'pubmed\.ncbi\.nlm\.nih\.gov/(\d+)', url)
+            if m:
+                external_ids["pmid"] = m.group(1)
+        # PMC
+        if not external_ids.get("pmc"):
+            m = re.search(r'ncbi\.nlm\.nih\.gov/pmc/articles/(?:PMC)?(\d+)', url)
+            if m:
+                external_ids["pmc"] = f"PMC{m.group(1)}"
+
+    return urls, external_ids
+
+
 def extract_short_id(url: str, prefix: str = "https://openalex.org/") -> str:
     """Extrait l'ID court d'une URL OpenAlex."""
     if url and url.startswith(prefix):
@@ -186,70 +230,50 @@ def upsert_journal(cur, work: dict, publisher_id: int | None) -> int | None:
 # PUBLICATIONS (inchangé — table de vérité)
 # =============================================================
 
-def insert_publication(cur, work: dict, journal_id: int | None) -> int | None:
-    """Insère ou retrouve la publication. Délègue au service publications."""
+def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
+    """Extrait les métadonnées de publication d'un work OpenAlex.
+
+    Retourne un dict utilisable par find_or_create_publication.
+    """
     doi = clean_doi(work.get("doi"))
     title = work.get("title") or work.get("display_name") or ""
     pub_year = work.get("publication_year")
 
-    if not pub_year or not title:
-        return None
-
     raw_type = work.get("type") or "other"
     doc_type = DOCTYPE_MAP.get(raw_type, "other")
 
-    # Source theses.fr → toujours une thèse, quel que soit le type OpenAlex
     nnt = None
     if is_theses_fr_source(work):
         doc_type = "thesis"
         nnt = extract_nnt_from_openalex(work)
     elif raw_type == "dissertation":
-        # OpenAlex "dissertation" est mixte : thèses ET mémoires de master.
         loc_url = (work.get("primary_location") or {}).get("landing_page_url") or ""
         if "dumas." in loc_url:
             doc_type = "memoir"
 
-    oa_info = work.get("open_access") or {}
-    raw_oa = oa_info.get("oa_status") or "closed"
-    oa_status = OA_MAP.get(raw_oa, "unknown")
-
-    language = work.get("language")
-
-    container_title = None
-    if not journal_id:
-        location = work.get("primary_location") or {}
-        source = location.get("source") or {}
-        container_title = source.get("display_name")
-
-    pub_id, _created = find_or_create_publication(
-        cur, title=title, title_normalized=normalize_text(title),
-        pub_year=pub_year, doc_type=doc_type, doi=doi, nnt=nnt,
-        oa_status=oa_status, journal_id=journal_id,
-        container_title=container_title, language=language)
-    return pub_id
-
-
-def _enrich_from_work(cur, pub_id: int, work: dict, journal_id: int | None):
-    """Enrichit une publication existante lors d'un re-traitement OpenAlex."""
-    doi = clean_doi(work.get("doi"))
-    raw_type = work.get("type") or "other"
-    doc_type = DOCTYPE_MAP.get(raw_type, "other")
-    if is_theses_fr_source(work):
-        doc_type = "thesis"
-    elif raw_type == "dissertation":
-        loc_url = (work.get("primary_location") or {}).get("landing_page_url") or ""
-        if "dumas." in loc_url:
-            doc_type = "memoir"
     oa_info = work.get("open_access") or {}
     oa_status = OA_MAP.get(oa_info.get("oa_status") or "closed", "unknown")
     language = work.get("language")
+
     container_title = None
     if not journal_id:
         location = work.get("primary_location") or {}
         source = location.get("source") or {}
         container_title = source.get("display_name")
-    _enrich(cur, pub_id, doi=doi, doc_type=doc_type, oa_status=oa_status,
-            journal_id=journal_id, container_title=container_title, language=language)
+
+    return dict(title=title, title_normalized=normalize_text(title),
+                pub_year=pub_year, doc_type=doc_type, doi=doi, nnt=nnt,
+                oa_status=oa_status, journal_id=journal_id,
+                container_title=container_title, language=language)
+
+
+def find_publication(cur, work: dict, journal_id: int | None) -> int | None:
+    """Cherche une publication existante sans en créer. Retourne l'id ou None."""
+    meta = extract_pub_metadata(work, journal_id)
+    if not meta["pub_year"] or not meta["title"]:
+        return None
+    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
+    return pub_id
 
 
 # =============================================================
@@ -257,7 +281,8 @@ def _enrich_from_work(cur, pub_id: int, work: dict, journal_id: int | None):
 # =============================================================
 
 def insert_openalex_document(cur, work: dict, staging_id: int,
-                             publication_id: int) -> int:
+                             publication_id: int | None,
+                             pub_meta: dict | None = None) -> int:
     """
     Crée/retrouve l'entrée source_documents pour OpenAlex.
     Retourne source_documents.id.
@@ -268,24 +293,46 @@ def insert_openalex_document(cur, work: dict, staging_id: int,
     pub_year = work.get("publication_year")
     doc_type = work.get("type")
 
-    # Stocker le NNT dans external_ids si source = theses.fr
+    # URLs et identifiants extraits des locations
+    urls, location_ids = extract_locations_data(work)
+
+    # NNT depuis la structure du work (prioritaire sur celui extrait des URLs)
     nnt = extract_nnt_from_openalex(work)
-    external_ids = Json({"nnt": nnt}) if nnt else None
+    if nnt:
+        location_ids["nnt"] = nnt
+
+    external_ids = Json(location_ids) if location_ids else None
+    cited_by_count = work.get("cited_by_count")
+
+    # Métadonnées de publication (pour création différée)
+    journal_id = pub_meta.get("journal_id") if pub_meta else None
+    oa_status = pub_meta.get("oa_status") if pub_meta else None
+    language = pub_meta.get("language") if pub_meta else None
+    container_title = pub_meta.get("container_title") if pub_meta else None
 
     cur.execute("""
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
-             publication_id, staging_id, external_ids)
-        VALUES ('openalex', %s, %s, %s, %s, %s, %s, %s, %s)
+             publication_id, staging_id, external_ids, urls, cited_by_count,
+             journal_id, oa_status, language, container_title)
+        VALUES ('openalex', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
             ),
             doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
-            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
+            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
+            urls = COALESCE(EXCLUDED.urls, source_documents.urls),
+            cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_documents.cited_by_count, 0)),
+            journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
+            oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
+            language = COALESCE(EXCLUDED.language, source_documents.language),
+            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title)
         RETURNING id
     """, (openalex_id, doi, title, pub_year, doc_type,
-          publication_id, staging_id, external_ids))
+          publication_id, staging_id, external_ids, urls or None, cited_by_count,
+          journal_id, oa_status, language, container_title))
     return cur.fetchone()["id"]
 
 
@@ -508,8 +555,13 @@ def process_work(cur, staging_row: tuple) -> bool:
             publisher_id = upsert_publisher(cur, work)
             journal_id = upsert_journal(cur, work, publisher_id)
 
-        # Si primary_location pointe vers HAL ou theses.fr, réutiliser la publication
+        # Métadonnées de publication (stockées sur source_documents)
+        pub_meta = extract_pub_metadata(work, journal_id)
+
+        # Chercher une publication existante (sans créer)
         publication_id = None
+
+        # Via HAL ou theses.fr (cross-référence)
         if hal_location:
             publication_id = find_hal_publication_id(cur, work)
         if not publication_id and theses_fr:
@@ -519,8 +571,7 @@ def process_work(cur, staging_row: tuple) -> bool:
                 if existing:
                     publication_id = existing.id
 
-        # Idempotence : si source_documents a déjà cet openalex_id avec un
-        # publication_id, le réutiliser au lieu de risquer un doublon
+        # Idempotence : réutiliser le publication_id existant
         if not publication_id:
             cur.execute(
                 "SELECT publication_id FROM source_documents WHERE source = 'openalex' AND source_id = %s",
@@ -528,28 +579,41 @@ def process_work(cur, staging_row: tuple) -> bool:
             existing_doc = cur.fetchone()
             if existing_doc and existing_doc["publication_id"]:
                 publication_id = existing_doc["publication_id"]
-                # Re-traitement : enrichir avec les nouvelles métadonnées
-                _enrich_from_work(cur, publication_id, work, journal_id)
 
-        # Publication (table de vérité) — fallback si pas trouvée via HAL
+        # Recherche par DOI/NNT/titre (sans création)
         if not publication_id:
-            publication_id = insert_publication(cur, work, journal_id)
-        if not publication_id:
-            logger.warning(f"Impossible d'insérer {openalex_id} — titre ou année manquant")
-            return False
+            publication_id = find_publication(cur, work, journal_id)
 
-        # Document OpenAlex (source_documents)
+        # Enrichir la publication existante si trouvée
+        if publication_id:
+            _enrich(cur, publication_id, doi=pub_meta["doi"],
+                    doc_type=pub_meta["doc_type"], oa_status=pub_meta["oa_status"],
+                    journal_id=journal_id, container_title=pub_meta["container_title"],
+                    language=pub_meta["language"])
+            update_sources(cur, publication_id)
+
+            if work.get("is_retracted"):
+                cur.execute("UPDATE publications SET is_retracted = TRUE WHERE id = %s",
+                            (publication_id,))
+            biblio = work.get("biblio") or {}
+            bib_values = {k: biblio.get(k) for k in ("volume", "issue", "first_page", "last_page") if biblio.get(k)}
+            if bib_values:
+                set_clause = ", ".join(f"{k} = COALESCE(publications.{k}, %({k})s)" for k in bib_values)
+                bib_values["id"] = publication_id
+                cur.execute(f"UPDATE publications SET {set_clause} WHERE id = %(id)s", bib_values)
+
+        # Document OpenAlex (source_documents) — publication_id peut être NULL
         source_document_id = insert_openalex_document(
-            cur, work, staging_id, publication_id
+            cur, work, staging_id, publication_id, pub_meta
         )
-        update_sources(cur, publication_id)
 
         # Auteurs et authorships
         process_authorships(cur, work, source_document_id)
 
-        # Marquer comme traité
+        # Marquer comme traité et vider le raw_data (les données utiles
+        # sont désormais dans les tables normalisées)
         cur.execute(
-            "UPDATE staging SET processed = TRUE WHERE id = %s",
+            "UPDATE staging SET processed = TRUE, raw_data = '{}'::jsonb WHERE id = %s",
             (staging_id,)
         )
 

@@ -126,14 +126,14 @@ def upsert_journal(cur, doc: dict, publisher_id: int | None) -> int | None:
 # PUBLICATIONS (via services/publications.py)
 # =============================================================
 
-def find_or_insert_publication(cur, doc: dict, journal_id: int | None) -> tuple[int, bool]:
-    """Cherche ou crée une publication. Délègue au service publications."""
+def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
+    """Extrait les métadonnées de publication d'un document HAL.
+
+    Retourne un dict utilisable par find_or_create_publication.
+    """
     doi = clean_doi(as_str(doc.get("doiId_s")))
     title = get_title(doc)
     pub_year = doc.get("producedDateY_i")
-
-    if not pub_year or not title:
-        return None, False
 
     raw_type = doc.get("docType_s", "OTHER")
     doc_type = DOCTYPE_MAP.get(raw_type, "other")
@@ -149,11 +149,19 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None) -> tuple[
 
     nnt = normalize_nnt(as_str(doc.get("nntId_s")))
 
-    return find_or_create_publication(
-        cur, title=title, title_normalized=normalize_text(title),
-        pub_year=pub_year, doc_type=doc_type, doi=doi, nnt=nnt,
-        oa_status=oa_status, journal_id=journal_id,
-        container_title=container_title, language=language)
+    return dict(title=title, title_normalized=normalize_text(title),
+                pub_year=pub_year, doc_type=doc_type, doi=doi, nnt=nnt,
+                oa_status=oa_status, journal_id=journal_id,
+                container_title=container_title, language=language)
+
+
+def find_publication(cur, doc: dict, journal_id: int | None) -> int | None:
+    """Cherche une publication existante sans en créer. Retourne l'id ou None."""
+    meta = extract_pub_metadata(doc, journal_id)
+    if not meta["pub_year"] or not meta["title"]:
+        return None
+    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
+    return pub_id
 
 
 def _enrich_existing(cur, pub_id: int, doc: dict, journal_id: int | None):
@@ -181,7 +189,8 @@ def _enrich_existing(cur, pub_id: int, doc: dict, journal_id: int | None):
 
 def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
                         collection: str | None,
-                        publication_id: int | None) -> int:
+                        publication_id: int | None,
+                        pub_meta: dict | None = None) -> int:
     """
     Crée/retrouve l'entrée source_documents pour HAL.
     Le champ collections agrège toutes les collections vues.
@@ -210,11 +219,19 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
     nnt = normalize_nnt(as_str(doc.get("nntId_s")))
     external_ids = Json({"nnt": nnt}) if nnt else None
 
+    # Métadonnées de publication (pour création différée)
+    journal_id = pub_meta.get("journal_id") if pub_meta else None
+    oa_status = pub_meta.get("oa_status") if pub_meta else None
+    language = pub_meta.get("language") if pub_meta else None
+    container_title = pub_meta.get("container_title") if pub_meta else None
+
     cur.execute("""
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
-             collections, publication_id, staging_id, external_ids)
-        VALUES ('hal', %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             collections, publication_id, staging_id, external_ids,
+             journal_id, oa_status, language, container_title)
+        VALUES ('hal', %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
@@ -228,10 +245,15 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
                     COALESCE(EXCLUDED.collections, '{}')
                 ) AS c
             ),
-            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
+            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
+            journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
+            oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
+            language = COALESCE(EXCLUDED.language, source_documents.language),
+            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title)
         RETURNING id
     """, (hal_id, doi, title, pub_year, doc_type,
-          collections_array, publication_id, staging_id, external_ids))
+          collections_array, publication_id, staging_id, external_ids,
+          journal_id, oa_status, language, container_title))
     return cur.fetchone()[0]
 
 
@@ -582,7 +604,13 @@ def process_work(cur, staging_row: tuple) -> bool:
         journal_id = upsert_journal(cur, doc, publisher_id)
         timings["journal"] = time.perf_counter() - t0
 
+        # Métadonnées de publication (stockées sur source_documents)
+        pub_meta = extract_pub_metadata(doc, journal_id)
+
         t0 = time.perf_counter()
+        # Chercher une publication existante (sans créer)
+        publication_id = None
+
         # Idempotence : si source_documents a déjà ce source_id avec un publication_id,
         # le réutiliser au lieu de risquer un doublon
         cur.execute(
@@ -591,8 +619,8 @@ def process_work(cur, staging_row: tuple) -> bool:
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc[0]:
             old_pub_id = existing_doc[0]
-            # Re-traitement : relancer find_or_create pour détecter les fusions par DOI/NNT
-            publication_id, is_new = find_or_insert_publication(cur, doc, journal_id)
+            # Re-traitement : relancer find pour détecter les fusions par DOI/NNT
+            publication_id = find_publication(cur, doc, journal_id)
             if publication_id and publication_id != old_pub_id:
                 # DOI/NNT pointe vers une autre publication → fusionner
                 from services.publications import merge_publications
@@ -600,22 +628,32 @@ def process_work(cur, staging_row: tuple) -> bool:
                 merge_publications(cur, publication_id, old_pub_id)
             elif not publication_id:
                 publication_id = old_pub_id
-            _enrich_existing(cur, publication_id, doc, journal_id)
-            is_new = False
         else:
-            publication_id, is_new = find_or_insert_publication(cur, doc, journal_id)
+            # Recherche par DOI/NNT/titre (sans création)
+            publication_id = find_publication(cur, doc, journal_id)
         timings["publication"] = time.perf_counter() - t0
 
-        if not publication_id:
-            logger.warning(f"Impossible d'insérer {hal_id} — échec insertion publication")
-            return False
+        # Enrichir la publication existante si trouvée
+        if publication_id:
+            _enrich_existing(cur, publication_id, doc, journal_id)
+            update_sources(cur, publication_id)
 
-        # Document HAL (source_documents)
+            if doc.get("is_retracted"):
+                cur.execute("UPDATE publications SET is_retracted = TRUE WHERE id = %s",
+                            (publication_id,))
+            biblio = doc.get("biblio") or {}
+            if isinstance(biblio, dict):
+                bib_values = {k: biblio.get(k) for k in ("volume", "issue", "first_page", "last_page") if biblio.get(k)}
+                if bib_values:
+                    set_clause = ", ".join(f"{k} = COALESCE(publications.{k}, %({k})s)" for k in bib_values)
+                    bib_values["id"] = publication_id
+                    cur.execute(f"UPDATE publications SET {set_clause} WHERE id = %(id)s", bib_values)
+
+        # Document HAL (source_documents) — publication_id peut être NULL
         t0 = time.perf_counter()
         source_document_id = insert_hal_document(
-            cur, doc, staging_id, hal_id, collection, publication_id
+            cur, doc, staging_id, hal_id, collection, publication_id, pub_meta
         )
-        update_sources(cur, publication_id)
         timings["hal_doc"] = time.perf_counter() - t0
 
         # Auteurs et authorships (avec source_struct_ids)

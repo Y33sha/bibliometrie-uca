@@ -124,19 +124,15 @@ def _extract_nnt_from_scanr_id(scanr_id: str) -> str | None:
     return None
 
 
-def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
-                               scanr_id: str | None = None) -> tuple[int | None, bool]:
-    """Cherche ou crée une publication. Délègue au service publications.
+def extract_pub_metadata(doc: dict, journal_id: int | None,
+                         scanr_id: str | None = None) -> dict:
+    """Extrait les métadonnées de publication d'un document ScanR.
 
-    La déduplication par HAL ID est gérée en post-traitement
-    par merge_pubs_by_hal_id.py (passe centralisée).
+    Retourne un dict utilisable par find_or_create_publication.
     """
     doi = extract_doi(doc)
     title = get_title(doc)
     pub_year = doc.get("year")
-
-    if not pub_year or not title:
-        return None, False
 
     raw_type = doc.get("type", "other")
     doc_type = DOCTYPE_MAP.get(raw_type, "other")
@@ -150,11 +146,20 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
 
     nnt = _extract_nnt_from_scanr_id(scanr_id) if scanr_id else None
 
-    return find_or_create_publication(
-        cur, title=title, title_normalized=normalize_text(title),
-        pub_year=pub_year, doc_type=doc_type, doi=doi, nnt=nnt,
-        oa_status=oa_status, journal_id=journal_id,
-        container_title=container_title)
+    return dict(title=title, title_normalized=normalize_text(title) if title else None,
+                pub_year=pub_year, doc_type=doc_type, doi=doi, nnt=nnt,
+                oa_status=oa_status, journal_id=journal_id,
+                container_title=container_title)
+
+
+def find_publication(cur, doc: dict, journal_id: int | None,
+                     scanr_id: str | None = None) -> int | None:
+    """Cherche une publication existante sans en créer. Retourne l'id ou None."""
+    meta = extract_pub_metadata(doc, journal_id, scanr_id)
+    if not meta["pub_year"] or not meta["title"]:
+        return None
+    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
+    return pub_id
 
 
 # =============================================================
@@ -162,7 +167,8 @@ def find_or_insert_publication(cur, doc: dict, journal_id: int | None,
 # =============================================================
 
 def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
-                          publication_id: int | None) -> int:
+                          publication_id: int | None,
+                          pub_meta: dict | None = None) -> int:
     """Crée/retrouve l'entrée source_documents pour ScanR. Retourne source_documents.id."""
     doi = extract_doi(doc)
     hal_id = extract_hal_id(doc)
@@ -179,20 +185,33 @@ def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
         ext["nnt"] = nnt
     external_ids = Json(ext) if ext else None
 
+    # Métadonnées de publication (pour création différée)
+    journal_id = pub_meta.get("journal_id") if pub_meta else None
+    oa_status = pub_meta.get("oa_status") if pub_meta else None
+    language = pub_meta.get("language") if pub_meta else None
+    container_title = pub_meta.get("container_title") if pub_meta else None
+
     cur.execute("""
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
-             publication_id, staging_id, external_ids)
-        VALUES ('scanr', %s, %s, %s, %s, %s, %s, %s, %s)
+             publication_id, staging_id, external_ids,
+             journal_id, oa_status, language, container_title)
+        VALUES ('scanr', %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
             ),
             doi = COALESCE(source_documents.doi, EXCLUDED.doi),
             external_ids = COALESCE(EXCLUDED.external_ids, source_documents.external_ids),
-            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type)
+            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
+            journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
+            oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
+            language = COALESCE(EXCLUDED.language, source_documents.language),
+            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title)
         RETURNING id
-    """, (scanr_id, doi, title, pub_year, doc_type, publication_id, staging_id, external_ids))
+    """, (scanr_id, doi, title, pub_year, doc_type, publication_id, staging_id, external_ids,
+          journal_id, oa_status, language, container_title))
     return cur.fetchone()["id"]
 
 
@@ -349,42 +368,38 @@ def process_work(cur, staging_row) -> bool:
         journal_id = upsert_journal(cur, doc, publisher_id)
         timings["journal"] = time.perf_counter() - t0
 
+        # Métadonnées de publication (stockées sur source_documents)
+        pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
+
         t0 = time.perf_counter()
-        # Si le source_document existe déjà (relance idempotente),
-        # réutiliser sa publication plutôt que d'en créer une nouvelle
+        # Chercher une publication existante (sans créer)
+        publication_id = None
+
+        # Idempotence : réutiliser le publication_id existant
         cur.execute(
             "SELECT publication_id FROM source_documents WHERE source = 'scanr' AND source_id = %s",
             (scanr_id,))
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc["publication_id"]:
             publication_id = existing_doc["publication_id"]
-            is_new = False
-            # Re-traitement : enrichir avec les nouvelles métadonnées
-            doi = extract_doi(doc)
-            raw_type = doc.get("type", "other")
-            doc_type = DOCTYPE_MAP.get(raw_type, "other")
-            oa_status = "green" if doc.get("isOa") else "closed"
-            container_title = None
-            if not journal_id:
-                source = doc.get("source") or {}
-                container_title = source.get("title")
-            _enrich(cur, publication_id, doi=doi, doc_type=doc_type,
-                    oa_status=oa_status, journal_id=journal_id,
-                    container_title=container_title)
-        else:
-            publication_id, is_new = find_or_insert_publication(cur, doc, journal_id, scanr_id=scanr_id)
+
+        # Recherche par DOI/NNT/titre (sans création)
+        if not publication_id:
+            publication_id = find_publication(cur, doc, journal_id, scanr_id)
         timings["publication"] = time.perf_counter() - t0
 
-        if not publication_id:
-            logger.warning(f"Impossible d'insérer {scanr_id} — échec insertion publication")
-            return False
+        # Enrichir la publication existante si trouvée
+        if publication_id:
+            _enrich(cur, publication_id, doi=pub_meta["doi"],
+                    doc_type=pub_meta["doc_type"], oa_status=pub_meta["oa_status"],
+                    journal_id=journal_id, container_title=pub_meta["container_title"])
+            update_sources(cur, publication_id)
 
-        # Document ScanR (source_documents)
+        # Document ScanR (source_documents) — publication_id peut être NULL
         t0 = time.perf_counter()
         source_document_id = insert_scanr_document(
-            cur, doc, staging_id, scanr_id, publication_id
+            cur, doc, staging_id, scanr_id, publication_id, pub_meta
         )
-        update_sources(cur, publication_id)
         timings["scanr_doc"] = time.perf_counter() - t0
 
         # Auteurs et authorships

@@ -60,6 +60,9 @@ def build_params(year: int, cursor: str = "*", institution_ids: list[str] | None
             "cited_by_count",
             "biblio",
             "is_retracted",
+            "topics",
+            "keywords",
+            "abstract_inverted_index",
         ]),
         "per_page": OPENALEX["per_page"],
         "cursor": cursor,
@@ -95,7 +98,7 @@ def compute_meta_hash(raw_data: dict) -> str:
     return compute_hash(filtered)
 
 
-def insert_batch(conn, batch: list[tuple]):
+def insert_batch(conn, batch: list[tuple]) -> int:
     """Insère un batch de works dans staging.
 
     Logique de mise à jour :
@@ -103,6 +106,8 @@ def insert_batch(conn, batch: list[tuple]):
     - Si meta_hash identique → rien à faire
     - Si meta_hash différent → met à jour raw_data en préservant les authorships de la
       version en base si elle en a plus (cas des works >100 auteurs déjà re-fetchés)
+
+    Retourne le nombre de documents dont les métadonnées ont changé.
     """
     query = """
         INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, meta_hash)
@@ -140,21 +145,38 @@ def insert_batch(conn, batch: list[tuple]):
             last_seen_at = now()
     """
     with conn.cursor() as cur:
+        # Compter les documents existants avec un meta_hash différent
+        source_ids = [b[1] for b in batch]
+        cur.execute("""
+            SELECT source_id, meta_hash FROM staging
+            WHERE source = 'openalex' AND source_id = ANY(%s)
+        """, (source_ids,))
+        old_hashes = {r[0]: r[1] for r in cur.fetchall()}
+
         execute_values(
             cur, query, batch,
             template="(%s, %s, %s, %s::jsonb, %s, %s)"
         )
     conn.commit()
 
+    # Compter les mises à jour réelles (meta_hash différent, document existant)
+    updated = 0
+    for _, source_id, _, _, _, meta_hash in batch:
+        old = old_hashes.get(source_id)
+        if old is not None and old != meta_hash:
+            updated += 1
+    return updated
 
-def extract_year(year: int, conn, existing_ids: set, dry_run: bool = False) -> int:
+
+def extract_year(year: int, conn, existing_ids: set, dry_run: bool = False) -> tuple[int, int]:
     """
     Extrait toutes les publications d'une année.
-    Retourne le nombre de works insérés.
+    Retourne (nouveaux, mis_a_jour).
     """
     cursor = "*"
     total_fetched = 0
-    total_inserted = 0
+    total_new = 0
+    total_updated = 0
     page_num = 0
 
     # Premier appel pour avoir le count total
@@ -163,7 +185,7 @@ def extract_year(year: int, conn, existing_ids: set, dry_run: bool = False) -> i
     logger.info(f"Année {year} : {total_count} works trouvés sur OpenAlex")
 
     if dry_run:
-        return 0
+        return 0, 0
 
     while True:
         page_num += 1
@@ -191,15 +213,23 @@ def extract_year(year: int, conn, existing_ids: set, dry_run: bool = False) -> i
                 new_count += 1
 
         # Insérer / mettre à jour
+        updated_count = 0
         if batch:
-            insert_batch(conn, batch)
-            total_inserted += new_count
+            updated_count = insert_batch(conn, batch)
+            total_new += new_count
+            total_updated += updated_count
 
         total_fetched += len(results)
+        parts = []
+        if new_count:
+            parts.append(f"{new_count} nouveaux")
+        if updated_count:
+            parts.append(f"{updated_count} mis à jour")
+        if not parts:
+            parts.append("aucun changement")
         logger.info(
-            f"  Page {page_num} : {len(results)} works récupérés, "
-            f"{new_count} nouveaux "
-            f"({total_fetched}/{total_count} traités, {total_inserted} nouveaux au total)"
+            f"  Page {page_num} : {len(results)} works — {', '.join(parts)} "
+            f"({total_fetched}/{total_count})"
         )
 
         # Pagination cursor
@@ -211,10 +241,10 @@ def extract_year(year: int, conn, existing_ids: set, dry_run: bool = False) -> i
         time.sleep(OPENALEX["request_delay"])
 
     logger.info(
-        f"Année {year} terminée : {total_inserted} works insérés "
-        f"sur {total_fetched} récupérés ({total_count} au total sur OpenAlex)"
+        f"Année {year} terminée : {total_new} nouveaux, {total_updated} mis à jour "
+        f"(sur {total_fetched} récupérés, {total_count} sur OpenAlex)"
     )
-    return total_inserted
+    return total_new, total_updated
 
 
 def main():
@@ -232,19 +262,21 @@ def main():
 
     years = [args.year] if args.year else config_years
 
-    logger.info(f"=== Extraction OpenAlex démarrée ===")
+    logger.info(f"=== Extraction OpenAlex demarree ===")
     logger.info(f"Institutions OpenAlex : {', '.join(institution_ids)} (lineage OR)")
-    logger.info(f"Années : {years}")
+    logger.info(f"Annees : {years}")
     try:
         existing_ids = get_existing_ids(conn, "openalex")
-        logger.info(f"{len(existing_ids)} works déjà en staging")
+        logger.info(f"{len(existing_ids)} works deja en staging")
 
-        grand_total = 0
+        grand_new = 0
+        grand_updated = 0
         for year in years:
-            inserted = extract_year(year, conn, existing_ids, dry_run=args.dry_run)
-            grand_total += inserted
+            year_new, year_updated = extract_year(year, conn, existing_ids, dry_run=args.dry_run)
+            grand_new += year_new
+            grand_updated += year_updated
 
-        logger.info(f"=== Terminé : {grand_total} works insérés au total ===")
+        logger.info(f"=== Termine : {grand_new} nouveaux, {grand_updated} mis a jour ===")
 
     except requests.exceptions.HTTPError as e:
         logger.error(f"Erreur API : {e}")
