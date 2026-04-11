@@ -44,6 +44,7 @@
 		structure: Structure;
 		parents: RelatedStructure[];
 		children: RelatedStructure[];
+		theses_count: number;
 	}
 	interface Publication {
 		id: number;
@@ -100,6 +101,7 @@
 	let lab: Structure | null = $state(null);
 	let parents: RelatedStructure[] = $state([]);
 	let children: RelatedStructure[] = $state([]);
+	let thesesCount = $state(0);
 	let error = $state(false);
 
 	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'addresses'];
@@ -629,6 +631,7 @@
 			lab = profileData.structure;
 			parents = profileData.parents;
 			children = profileData.children;
+			thesesCount = profileData.theses_count;
 		} catch {
 			error = true;
 			return;
@@ -722,7 +725,7 @@
 		tabs={[
 			{ id: 'dashboard', label: 'Dashboard', showCount: false },
 			{ id: 'publications', label: 'Publications', count: pubs.total },
-			{ id: 'theses', label: 'Thèses', count: theses.loaded ? theses.total : undefined },
+			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses', count: thesesCount }] : []),
 			{ id: 'persons', label: 'Personnes', count: personsLoaded ? personsTotal : undefined },
 			{ id: 'addresses', label: 'Adresses', count: addrLoaded ? addrTotal : undefined },
 		]}

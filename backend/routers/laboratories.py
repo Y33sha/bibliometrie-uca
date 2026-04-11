@@ -68,10 +68,21 @@ async def get_laboratory(lab_id: int):
         """, (lab_id,))
         children = cur.fetchall()
 
+        # Nombre de thèses liées au labo
+        cur.execute("""
+            SELECT COUNT(*) AS count
+            FROM publications p
+            JOIN authorships a ON a.publication_id = p.id
+            WHERE p.doc_type IN ('thesis', 'ongoing_thesis')
+              AND %s = ANY(a.structure_ids)
+        """, (lab_id,))
+        theses_count = cur.fetchone()["count"]
+
         return {
             "structure": struct,
             "parents": parents,
             "children": children,
+            "theses_count": theses_count,
         }
 
 

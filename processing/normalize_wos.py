@@ -560,21 +560,27 @@ def upsert_journal(cur, rec: dict, publisher_id: int | None) -> int | None:
 # PUBLICATIONS (via services/publications.py)
 # =============================================================
 
-def upsert_publication(cur, rec: dict, journal_id: int | None) -> int | None:
-    """Insère/retrouve la publication canonique. Délègue au service publications."""
+def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
+    """Extrait les métadonnées de publication d'un record WoS.
+
+    Retourne un dict utilisable par find_or_create_publication.
+    """
     title = rec["title"]
-    pub_year = rec["pub_year"]
-
-    if not pub_year or not title or title == "(sans titre)":
-        return None
-
     container_title = rec.get("journal_title") if not journal_id else None
 
-    pub_id, _created = find_or_create_publication(
-        cur, title=title, title_normalized=normalize_text(title),
-        pub_year=pub_year, doc_type=rec["doc_type"], doi=rec["doi"],
-        oa_status=rec["oa_status"], journal_id=journal_id,
-        container_title=container_title, language=rec.get("language"))
+    return dict(title=title, title_normalized=normalize_text(title),
+                pub_year=rec["pub_year"], doc_type=rec["doc_type"],
+                doi=rec["doi"], oa_status=rec["oa_status"],
+                journal_id=journal_id, container_title=container_title,
+                language=rec.get("language"))
+
+
+def find_publication(cur, rec: dict, journal_id: int | None) -> int | None:
+    """Cherche une publication existante sans en créer. Retourne l'id ou None."""
+    meta = extract_pub_metadata(rec, journal_id)
+    if not meta["pub_year"] or not meta["title"] or meta["title"] == "(sans titre)":
+        return None
+    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
     return pub_id
 
 
@@ -583,20 +589,34 @@ def upsert_publication(cur, rec: dict, journal_id: int | None) -> int | None:
 # =============================================================
 
 def insert_wos_document(cur, rec: dict, staging_id: int,
-                        publication_id: int) -> int:
+                        publication_id: int | None,
+                        pub_meta: dict | None = None) -> int:
     """Crée/retrouve l'entrée source_documents pour WoS. Retourne source_documents.id."""
+    journal_id = pub_meta.get("journal_id") if pub_meta else None
+    oa_status = pub_meta.get("oa_status") if pub_meta else None
+    language = pub_meta.get("language") if pub_meta else None
+    container_title = pub_meta.get("container_title") if pub_meta else None
+
     cur.execute("""
         INSERT INTO source_documents
-            (source, source_id, doi, title, pub_year, doc_type, publication_id, staging_id)
-        VALUES ('wos', %s, %s, %s, %s, %s, %s, %s)
+            (source, source_id, doi, title, pub_year, doc_type,
+             publication_id, staging_id,
+             journal_id, oa_status, language, container_title)
+        VALUES ('wos', %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
             ),
-            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type)
+            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
+            journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
+            oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
+            language = COALESCE(EXCLUDED.language, source_documents.language),
+            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title)
         RETURNING id
     """, (rec["ut"], rec["doi"], rec["title"], rec["pub_year"],
-          rec["doc_type"], publication_id, staging_id))
+          rec["doc_type"], publication_id, staging_id,
+          journal_id, oa_status, language, container_title))
     return cur.fetchone()[0]
 
 
@@ -808,33 +828,36 @@ def process_record(cur, staging_row: tuple) -> bool:
         publisher_id = upsert_publisher(cur, rec.get("publisher_name"))
         journal_id = upsert_journal(cur, rec, publisher_id)
 
-        # Idempotence : si source_documents a déjà ce UT avec un publication_id,
-        # le réutiliser au lieu de risquer un doublon
+        # Métadonnées de publication (stockées sur source_documents)
+        pub_meta = extract_pub_metadata(rec, journal_id)
+
+        # Chercher une publication existante (sans créer)
+        publication_id = None
+
+        # Idempotence : réutiliser le publication_id existant
         cur.execute(
             "SELECT publication_id FROM source_documents WHERE source = 'wos' AND source_id = %s",
             (rec["ut"],))
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc[0]:
             publication_id = existing_doc[0]
-            # Re-traitement : enrichir avec les nouvelles métadonnées
-            container_title = rec.get("journal_title") if not journal_id else None
-            _enrich(cur, publication_id, doi=rec["doi"], doc_type=rec["doc_type"],
-                    oa_status=rec["oa_status"], journal_id=journal_id,
-                    container_title=container_title, language=rec.get("language"))
-        else:
-            publication_id = upsert_publication(cur, rec, journal_id)
-        if not publication_id:
-            logger.warning(f"Impossible d'insérer {ut} — titre ou année manquant")
-            # Marquer processed quand même pour ne pas reboucler
-            cur.execute(
-                "UPDATE staging SET processed = TRUE WHERE id = %s",
-                (staging_id,)
-            )
-            return False
 
-        # Document WoS (source_documents)
-        source_document_id = insert_wos_document(cur, rec, staging_id, publication_id)
-        update_sources(cur, publication_id)
+        # Recherche par DOI/titre (sans création)
+        if not publication_id:
+            publication_id = find_publication(cur, rec, journal_id)
+
+        # Enrichir la publication existante si trouvée
+        if publication_id:
+            _enrich(cur, publication_id, doi=pub_meta["doi"],
+                    doc_type=pub_meta["doc_type"], oa_status=pub_meta["oa_status"],
+                    journal_id=journal_id, container_title=pub_meta["container_title"],
+                    language=pub_meta["language"])
+            update_sources(cur, publication_id)
+
+        # Document WoS (source_documents) — publication_id peut être NULL
+        source_document_id = insert_wos_document(
+            cur, rec, staging_id, publication_id, pub_meta
+        )
 
         # Auteurs et authorships
         process_authorships(cur, rec, source_document_id)
