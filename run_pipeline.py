@@ -14,17 +14,22 @@ Usage:
     python3 run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
     python3 run_pipeline.py --only cross_imports --sources scanr --full-cross-import  # Cross-import ScanR complet
 
-Phases:
-    extract       Extraction des sources (staging) + refetch truncated
-    cross_imports Cross-imports entre sources (DOIs manquants, refs HAL)
-    normalize     Normalisation staging → tables sources + merge inter-sources
-    addresses     Adresses: extraction, résolution, pays
-    affiliations  Résolution affiliations sur authorships sources
-    identifiers   Moissonnage identifiants HAL (ORCID, IdRef)
-    persons       Création/mapping personnes + formes de noms
-    authorships   Reconstruction authorships (vérité) + propagation UCA
-    countries     Recalcul des pays des publications
-    enrich        Enrichissements optionnels (Unpaywall, APC)
+Phases (dans l'ordre d'execution):
+    extract        Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
+    cross_imports  Cross-imports entre sources (DOIs manquants, fetch HAL par hal-id/NNT)
+    normalize      Normalisation staging -> tables sources (source_documents, source_authors,
+                   source_authorships). Rattachement aux publications existantes par DOI/NNT/
+                   HAL-ID, mais PAS de creation de publications. Inclut enrichissement
+                   structures HAL et moissonnage identifiants HAL (ORCID, IdRef).
+                   Vide le raw_data du staging apres traitement + VACUUM.
+    addresses      Extraction des adresses depuis raw_affiliations, resolution structures, pays
+    affiliations   Resolution affiliations sur source_authorships (in_perimeter, structure_ids)
+    publications   Creation des publications pour les source_documents in-perimeter non
+                   rattaches + merges inter-sources (HAL-ID, NNT)
+    persons        Creation/mapping personnes + formes de noms
+    authorships    Reconstruction authorships canoniques (table de verite) + propagation UCA
+    countries      Detection pays des adresses + recalcul pays des publications
+    enrich         Enrichissements optionnels (statut OA via Unpaywall, APC revues)
 """
 
 import argparse
@@ -96,7 +101,13 @@ def phase_cross_imports(mode="full", sources=None, full_cross_import=False, **kw
 
 
 def phase_normalize(**kw):
-    """Phase 3 : Normalisation staging → tables sources (sans création de publications)."""
+    """Normalisation staging -> tables sources.
+
+    Rattache aux publications existantes (DOI/NNT/HAL-ID) sans en creer.
+    Stocke les metadonnees (abstract, keywords, topics, biblio, etc.) sur
+    source_documents. Vide le raw_data du staging apres traitement.
+    Pour HAL : enrichit les structures et moissonne les identifiants (ORCID, IdRef).
+    """
     sources = kw.get("sources", {"hal", "openalex", "wos", "scanr", "theses"})
     if "openalex" in sources:
         run_python("processing/normalize_openalex.py")
@@ -128,7 +139,11 @@ def _vacuum_staging():
 
 
 def phase_addresses(**kw):
-    """Phase 4 : Adresses — extraction, résolution structures, pays."""
+    """Extraction des adresses depuis raw_affiliations, resolution structures.
+
+    Ne traite que les source_authorships non encore extraites (addresses_extracted=FALSE).
+    Sources concernees : OpenAlex, WoS, ScanR, theses (pas HAL, qui utilise les structures).
+    """
     sources = kw.get("sources", {"openalex", "wos", "scanr", "theses"})
     address_sources = ["openalex", "wos", "scanr", "theses"]
     for src in address_sources:
@@ -138,14 +153,23 @@ def phase_addresses(**kw):
 
 
 def phase_affiliations(**kw):
-    """Phase 5 : Résolution affiliations sur authorships sources."""
+    """Resolution des affiliations UCA sur les source_authorships.
+
+    Determine in_perimeter et structure_ids a partir des structures HAL
+    (pour HAL) et des adresses resolues (pour les autres sources).
+    """
     sources = kw.get("sources", {"hal", "openalex", "wos", "scanr", "theses"})
     source_args = ",".join(sorted(sources))
     run_python("processing/populate_affiliations.py", "--sources", source_args)
 
 
 def phase_publications(**kw):
-    """Phase 5b : Création des publications pour les source_documents in-perimeter + merges."""
+    """Creation des publications canoniques.
+
+    Ne cree des publications que pour les source_documents ayant au moins
+    une source_authorship in_perimeter (evite de creer des publications
+    hors perimetre). Applique ensuite les merges inter-sources (HAL-ID, NNT).
+    """
     run_python("processing/create_publications.py")
     run_python("processing/merge_pubs_by_hal_id.py")
     run_python("processing/merge_pubs_by_nnt.py")
@@ -154,13 +178,23 @@ def phase_publications(**kw):
 
 
 def phase_persons(**kw):
-    """Phase 6 : Création/mapping personnes + formes de noms."""
+    """Creation et rattachement des personnes.
+
+    Cree des personnes a partir des source_authorships in_perimeter non rattachees.
+    Exclut les publications de type memoir (v_active_publications).
+    Rattache aussi les authorships theses hors-perimetre par IdRef.
+    """
     run_python("processing/create_persons_from_source_authorships.py")
     run_python("processing/populate_person_name_forms.py")
 
 
 def phase_authorships(**kw):
-    """Phase 7 : Construction authorships (vérité) + propagation UCA."""
+    """Construction de la table de verite authorships.
+
+    Consolide les source_authorships en authorships canoniques
+    (une entree par couple publication x personne), avec in_perimeter
+    et structure_ids propages.
+    """
     sources = kw.get("sources")
     if sources and sources != {"hal", "openalex", "wos", "scanr", "theses"}:
         run_python("processing/build_authorships.py", "--sources", ",".join(sorted(sources)))
@@ -169,14 +203,18 @@ def phase_authorships(**kw):
 
 
 def phase_countries(**kw):
-    """Phase 8 : Détection pays des adresses + recalcul pays des publications."""
+    """Detection des pays des adresses et recalcul sur les publications."""
     run_python("scripts/detect_address_countries.py", "--direct", "--apply")
     run_python("scripts/suggest_address_countries.py")
     run_python("processing/refresh_publication_countries.py")
 
 
 def phase_enrich(mode="full", **kw):
-    """Phase 9 : Enrichissements optionnels."""
+    """Enrichissements optionnels (mode full/monthly uniquement).
+
+    - Statut OA via Unpaywall
+    - APC revues (import fichiers budget)
+    """
     if mode in ("full", "monthly"):
         run_python("processing/enrich_oa_status.py")
         run_python("processing/enrich_journal_apc.py")

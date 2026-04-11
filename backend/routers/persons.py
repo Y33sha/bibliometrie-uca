@@ -1049,15 +1049,32 @@ async def merge_persons(person_id: int, body: dict):
 # ----- API: Authorships orphelines -----
 
 
+# Filtre commun pour les orphan authorships :
+# - in_perimeter, sans person_id, sources principales
+# - exclut les authorships sur des memoires (etudiants de master)
+# - exclut les authorships dont le source_author est rattache a une personne rejetee
+_ORPHAN_BASE = """
+    sa.person_id IS NULL AND sa.in_perimeter = TRUE
+    AND sa.source IN ('hal', 'openalex', 'wos')
+    AND p.doc_type NOT IN ('memoir', 'peer_review')
+    AND NOT EXISTS (
+        SELECT 1 FROM source_authorships sa2
+        JOIN persons pe ON pe.id = sa2.person_id AND pe.rejected = TRUE
+        WHERE sa2.source_author_id = sa.source_author_id
+    )
+"""
+
+
 @router.get("/api/orphan-authorships/count")
 async def orphan_authorships_count():
     """Nombre d'authorships UCA sans person_id."""
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        cur.execute(f"""
             SELECT COUNT(*) AS total
             FROM source_authorships sa
-            WHERE sa.person_id IS NULL AND sa.in_perimeter = TRUE
-              AND sa.source IN ('hal', 'openalex', 'wos')
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN publications p ON p.id = sd.publication_id
+            WHERE {_ORPHAN_BASE}
         """)
         return cur.fetchone()
 
@@ -1081,8 +1098,9 @@ async def list_orphan_authorships(
         cur.execute(f"""
             SELECT COUNT(*) FROM source_authorships sa
             JOIN source_authors sauth ON sauth.id = sa.source_author_id
-            WHERE sa.person_id IS NULL AND sa.in_perimeter = TRUE
-              AND sa.source IN ('hal', 'openalex', 'wos')
+            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN publications p ON p.id = sd.publication_id
+            WHERE {_ORPHAN_BASE}
               {search_cond}
         """, params)
         total = cur.fetchone()["count"]
@@ -1097,8 +1115,7 @@ async def list_orphan_authorships(
             JOIN source_authors sauth ON sauth.id = sa.source_author_id
             JOIN source_documents sd ON sd.id = sa.source_document_id
             JOIN publications p ON p.id = sd.publication_id
-            WHERE sa.person_id IS NULL AND sa.in_perimeter = TRUE
-              AND sa.source IN ('hal', 'openalex', 'wos')
+            WHERE {_ORPHAN_BASE}
               {search_cond}
             ORDER BY COALESCE(sa.source_data->>'raw_author_name', sauth.full_name), p.pub_year DESC
             LIMIT %s OFFSET %s

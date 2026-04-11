@@ -75,7 +75,7 @@ def process_document(cur, doc, dry_run):
         "wos": WOS_DOCTYPE_MAP,
         "scanr": SCANR_DOCTYPE_MAP,
     }
-    doc_type = doc_type_map.get(source, {}).get(raw_type, raw_type)
+    doc_type = doc_type_map.get(source, {}).get(raw_type, "other")
     journal_id = doc["journal_id"]
     oa_status = doc["oa_status"] or "unknown"
     language = doc["language"]
