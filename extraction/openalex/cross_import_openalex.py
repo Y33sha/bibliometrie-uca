@@ -26,29 +26,11 @@ from psycopg2.extras import Json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config.settings import OPENALEX
 from db.connection import get_connection
-from extraction.common import compute_hash, clean_doi, get_cross_import_dois, setup_logger
+from extraction.common import compute_hash, get_cross_import_dois, setup_logger
+from extraction.openalex import BASE_URL, SELECT_FIELDS, extract_openalex_id, extract_doi
 
 # ----- Logging -----
 logger = setup_logger("cross_import_openalex", os.path.join(os.path.dirname(__file__), "logs"))
-
-BASE_URL = "https://api.openalex.org/works"
-
-SELECT_FIELDS = ",".join([
-    "id", "doi", "title", "display_name", "publication_year",
-    "publication_date", "type", "language", "primary_location",
-    "locations", "authorships", "open_access", "cited_by_count",
-    "biblio", "is_retracted",
-    "topics", "keywords", "abstract_inverted_index",
-])
-
-
-
-def extract_openalex_id(work: dict) -> str:
-    return work["id"].replace("https://openalex.org/", "")
-
-
-def extract_doi(work: dict) -> str | None:
-    return clean_doi(work.get("doi"))
 
 
 def fetch_by_doi(doi: str) -> dict | None:

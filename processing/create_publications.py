@@ -23,7 +23,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import Json, RealDictCursor
 from utils.normalize import normalize_text
 from utils.nnt import normalize_nnt
 from services.publications import (
@@ -46,7 +46,8 @@ def get_orphan_source_documents(cur):
     cur.execute("""
         SELECT sd.id, sd.source, sd.source_id, sd.doi, sd.title, sd.pub_year,
                sd.doc_type, sd.journal_id, sd.oa_status, sd.language,
-               sd.container_title, sd.external_ids
+               sd.container_title, sd.external_ids,
+               sd.is_retracted, sd.biblio
         FROM source_documents sd
         WHERE sd.publication_id IS NULL
           AND EXISTS (
@@ -106,6 +107,17 @@ def process_document(cur, doc, dry_run):
         (pub_id, doc["id"]),
     )
     update_sources(cur, pub_id)
+
+    # Propager is_retracted et biblio vers la publication
+    if doc.get("is_retracted"):
+        cur.execute("UPDATE publications SET is_retracted = TRUE WHERE id = %s", (pub_id,))
+
+    biblio = doc.get("biblio")
+    if biblio:
+        cur.execute("""
+            UPDATE publications SET biblio = COALESCE(publications.biblio, '{}') || %s
+            WHERE id = %s
+        """, (Json(biblio), pub_id))
 
     return True
 

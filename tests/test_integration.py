@@ -77,7 +77,8 @@ class TestPublicationService:
         assert pub_id2 == pub_id1
         assert is_new is False
 
-    def test_find_by_title_year_journal(self, db):
+    def test_same_title_year_journal_no_merge_without_doi(self, db):
+        """Sans DOI commun, meme titre+annee+journal -> pas de fusion."""
         journal_id = create_journal(db, "Nature")
         pub_id1, _ = find_or_create(
             db, title="My Article", title_normalized="my article",
@@ -85,8 +86,8 @@ class TestPublicationService:
         pub_id2, is_new = find_or_create(
             db, title="My Article", title_normalized="my article",
             pub_year=2024, doc_type="article", journal_id=journal_id)
-        assert pub_id2 == pub_id1
-        assert is_new is False
+        assert pub_id2 != pub_id1
+        assert is_new is True
 
     def test_no_title_match_without_journal(self, db):
         """Sans journal_id, pas de dédup par titre — deux publications créées."""

@@ -23,23 +23,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from config.settings import OPENALEX
 from db.connection import get_connection
 from extraction.common import compute_hash, setup_logger
+from extraction.openalex import BASE_URL, SELECT_FIELDS, compute_meta_hash
 
 logger = setup_logger("refetch_truncated", os.path.join(os.path.dirname(__file__), "logs"))
-
-BASE_URL = "https://api.openalex.org/works"
-
-SELECT_FIELDS = ",".join([
-    "id", "doi", "title", "display_name", "publication_year",
-    "publication_date", "type", "language", "primary_location",
-    "locations", "authorships", "open_access", "cited_by_count",
-    "biblio", "is_retracted",
-])
-
-
-def compute_meta_hash(raw_data: dict) -> str:
-    """Hash des métadonnées hors authorships."""
-    filtered = {k: v for k, v in raw_data.items() if k != "authorships"}
-    return compute_hash(filtered)
 
 
 def fetch_work(openalex_id: str) -> dict | None:
