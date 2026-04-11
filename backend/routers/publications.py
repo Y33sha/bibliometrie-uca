@@ -45,7 +45,7 @@ async def publications_facets(
     def base_conds_params():
         """Conditions de base : publications UCA ou personne. Exclut peer_review + excluded_doc_type."""
         if person_id:
-            c, p = ["p.doc_type != 'peer_review'"], []
+            c, p = ["p.doc_type NOT IN ('peer_review', 'memoir')"], []
             apply_person_filter(c, p, person_id)
         else:
             c, p = [PUB_IS_UCA], []
@@ -404,7 +404,7 @@ async def export_publications_csv(
             conditions = [PUB_IS_UCA]
             params = []
 
-        conditions.append("p.doc_type != 'peer_review'")
+        conditions.append("p.doc_type NOT IN ('peer_review', 'memoir')")
         if excluded_types:
             conditions.append("p.doc_type::text != ALL(%s)")
             params.append(excluded_types)
@@ -813,7 +813,7 @@ async def list_publications(
             conditions = [PUB_IS_UCA]
             params = []
 
-        conditions.append("p.doc_type != 'peer_review'")
+        conditions.append("p.doc_type NOT IN ('peer_review', 'memoir')")
         if excluded_types:
             conditions.append("p.doc_type::text != ALL(%s)")
             params.append(excluded_types)

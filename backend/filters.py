@@ -9,7 +9,7 @@ PUB_IS_UCA = """(
     EXISTS (SELECT 1 FROM authorships a
             JOIN persons pe ON pe.id = a.person_id AND pe.rejected = FALSE
             WHERE a.publication_id = p.id AND a.in_perimeter = TRUE)
-    AND p.doc_type != 'peer_review'
+    AND p.doc_type NOT IN ('peer_review', 'memoir')
 )"""
 
 
