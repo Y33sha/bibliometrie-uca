@@ -29,7 +29,7 @@
 * [ ] création de publications: comment sont renseignés les champs mots clés, topics? fusion ou premier arrivé premier servi? Vérifier et backfiller si besoin.
 
 # Trucs techniques
-* [ ] chercher des moyens d'optimiser la taille de la base supprimer données qui ne sont plus utiles? ex.: supprimer *_authors et *_structures (sauf hal)?
+* [ ] chercher des moyens d'optimiser la taille de la base: supprimer données qui ne sont plus utiles? ex.: supprimer *_authors et *_structures (sauf hal)?
 * [ ] champs datetime: diminuer précision
 * [ ] finir transition des settings.py vers la config en base. (notamment api query parameters: renseigner dans un champ jsonb de la table structures, et déduire les structures à partir du périmètre)
 * [ ] cache pour améliorer la perf?
@@ -118,17 +118,15 @@
 ### Structures (public)
 * [ ] Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation?
 * [ ] liste publis: colonne "est dans la collection HAL du labo"
+* [ ] utiliser le critère "périmètre" pour définir la requête sur les structures à afficher
 
 ### Publications
 * [ ] ajouter filtre corresponding_is_uca?
 * [ ] relations entre publications (est traduction de, est preprint de..., fait partie de..., data paper décrit dataset, dataset référencé dans...)
-* [ ] afficher les abstracts dans la page publications/id
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
 * [ ] pages dédiées pour les types spéciaux: datasets?
 * [ ] filtre langue? (y a-t-il un code langue unique trans-sources? sinon, faire une table langues)
-
-### Pages "problèmes hal"
-* [ ] check marks: reprendre le style des autres pages
+* [ ] ajouter DOI dans les sources
 
 ### Mega-authorships et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap)
@@ -145,7 +143,6 @@
 
 ## Détails d'affichage
 * [ ] comportement de la flèche de tri sur page laboratoires, colonne co-tutelles; page publications, colonne Année
-* [ ] facette "auteur corresp.": compte toujours zéro
 * [ ] investiguer les erreurs TypeScript
 * [ ] décomptes sur les onglets: ne pas tenir compte des facettes
 
@@ -162,3 +159,5 @@
 * [ ] pb des auteurs openalex liés à une personne mais non listés dans les auteurs d'une publi: publi 12380
 * [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
 * erreur de parsing OA: publication 113652
+* 129259 pourquoi je n'ai pas le doct hal?
+* 53910 pays FR (pas MC?)
