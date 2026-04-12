@@ -459,11 +459,6 @@
 		text-transform: uppercase;
 		letter-spacing: 0.03em;
 	}
-	.rh-check {
-		color: #3b6b9e;
-		font-size: 0.85rem;
-		margin-left: 4px;
-	}
 	.person-rh {
 		font-size: 0.85rem;
 		color: var(--muted, #666);

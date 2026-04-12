@@ -370,6 +370,7 @@ async def export_publications_csv(
     doc_type: str = Query(""),
     sort: str = Query("year_desc"),
     person_id: int | None = Query(None),
+    excluded_doc_type: str = Query(""),
 ):
     """Export CSV des publications (mêmes filtres que list_publications)."""
     import csv
@@ -377,6 +378,7 @@ async def export_publications_csv(
 
     years = [int(v) for v in year.split(',') if v.strip()] if year else []
     doc_types = [v.strip() for v in doc_type.split(',') if v.strip()] if doc_type else []
+    excluded_types = [v.strip() for v in excluded_doc_type.split(',') if v.strip()] if excluded_doc_type else []
     lab_id_parts_csv = [v.strip() for v in lab_id.split(',') if v.strip()] if lab_id else []
     lab_none = "none" in lab_id_parts_csv
     lab_ids = [int(v) for v in lab_id_parts_csv if v != "none"] if lab_id_parts_csv else []

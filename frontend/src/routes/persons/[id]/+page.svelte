@@ -727,7 +727,7 @@
 	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: middle; }
 	.tab-content td a { color: var(--accent); text-decoration: none; }
 	.tab-content td a:hover { text-decoration: underline; }
-	.tab-content td a.struct-tag:hover { text-decoration: none; }
+	.tab-content td a.struct-tag:hover, .tab-content td a.id-badge:hover, .tab-content td a.lab-tag:hover { text-decoration: none; }
 
 	.source-tag-label { padding: 2px 7px; font-size: 0.8rem; }
 

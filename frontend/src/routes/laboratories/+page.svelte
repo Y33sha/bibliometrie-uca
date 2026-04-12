@@ -100,7 +100,7 @@
 			>
 				Laboratoire
 				<span class="sort-arrow"
-					>{sortCol === "name" ? (sortAsc ? "▲" : "▼") : "▲"}</span
+					>{sortCol === "name" ? (sortAsc ? "▲" : "▼") : ""}</span
 				>
 			</th>
 			<th
@@ -113,7 +113,7 @@
 						? sortAsc
 							? "▲"
 							: "▼"
-						: "▲"}</span
+						: ""}</span
 				>
 			</th>
 			<th>ROR</th>

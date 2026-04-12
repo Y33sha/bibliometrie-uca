@@ -167,11 +167,6 @@
   .person-link:hover {
     text-decoration: underline;
   }
-  .rh-check {
-    color: #3b82f6;
-    font-size: 0.8rem;
-    margin-left: 4px;
-  }
   .hal-accounts {
     display: flex;
     flex-direction: column;
