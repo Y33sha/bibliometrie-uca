@@ -9,7 +9,7 @@ import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
  *   - label_map  : { value, count }[]         → text = labels[value] || value
  *   - labeled    : { value, label, count }[]  → text = label
  *   - passthrough: { value, text, count }[]   → tel quel
- *   - boolean    : { yes: n, no: n }          → deux options yes/no
+ *   - boolean    : { value, count }[]         → deux options yes/no
  */
 
 // --- Facet definition types ---
@@ -103,12 +103,16 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 						def.transform ? def.transform(item) : { value: item.value, text: item.text, count: item.count },
 					);
 					break;
-				case 'boolean':
+				case 'boolean': {
+					const items = raw as { value: string; count: number }[];
+					const yesCount = items.find(i => i.value === 'yes')?.count ?? 0;
+					const noCount = items.find(i => i.value === 'no')?.count ?? 0;
 					newOpts[key] = [
-						{ value: 'yes', text: def.yesLabel, count: (raw as { yes: number }).yes ?? 0 },
-						{ value: 'no', text: def.noLabel, count: (raw as { no: number }).no ?? 0 },
+						{ value: 'yes', text: def.yesLabel, count: yesCount },
+						{ value: 'no', text: def.noLabel, count: noCount },
 					];
 					break;
+				}
 			}
 		}
 

@@ -85,8 +85,8 @@
 	});
 
 	// Sort display
-	const yearSortArrow = $derived(currentSort === 'year_asc' ? '↑' : '↓');
-	const titleSortArrow = $derived(currentSort === 'title_desc' ? '↓' : '↑');
+	const yearSortArrow = $derived(currentSort === 'year_asc' ? '↑' : currentSort === 'year_desc' ? '↓' : '');
+	const titleSortArrow = $derived(currentSort === 'title' ? '↑' : currentSort === 'title_desc' ? '↓' : '');
 	const yearSortActive = $derived(currentSort === 'year_desc' || currentSort === 'year_asc');
 	const titleSortActive = $derived(currentSort === 'title' || currentSort === 'title_desc');
 
