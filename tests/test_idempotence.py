@@ -954,3 +954,158 @@ class TestBuildAuthorshipsIdempotence:
             f"Compteurs différents après 2e passe !\n"
             f"  1ère : {counts_1}\n  2ème : {counts_2}"
         )
+
+
+# ══════════════════════════════════════════════════════════════════
+# populate_affiliations
+# ══════════════════════════════════════════════════════════════════
+
+def _setup_affiliations_test_data(db):
+    """Crée des données pour tester populate_affiliations :
+    structures + périmètres + adresses + source_authorships liées.
+
+    Scénario : une structure UCA (labo, id=80001) avec une relation
+    est_tutelle_de → UCA (id=80000). Un authorship HAL pointe vers
+    cette structure via source_structures. Un authorship OpenAlex
+    pointe via une adresse résolue.
+    """
+    # Config périmètre
+    db.execute("""
+        INSERT INTO config (key, value) VALUES
+            ('perimeter_affiliations', '"uca_wide"'),
+            ('perimeter_persons', '"uca"')
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    """)
+
+    # Périmètres : uca = UCA seule, uca_wide = UCA + partenaires
+    db.execute("""
+        INSERT INTO perimeters (code, name, structure_ids) VALUES
+            ('uca', 'UCA restreint', ARRAY[80000]),
+            ('uca_wide', 'UCA large', ARRAY[80000])
+        ON CONFLICT (code) DO UPDATE SET structure_ids = EXCLUDED.structure_ids
+    """)
+
+    # Structures
+    db.execute("""
+        INSERT INTO structures (id, code, name, acronym, structure_type)
+        VALUES (80000, 'UCA', 'Université Clermont Auvergne', 'UCA', 'universite'),
+               (80001, 'LABO-TEST', 'Laboratoire Test', 'LT', 'labo')
+    """)
+
+    # Relation tutelle : UCA → LABO-TEST
+    db.execute("""
+        INSERT INTO structure_relations (parent_id, child_id, relation_type)
+        VALUES (80000, 80001, 'est_tutelle_de')
+    """)
+
+    # Source structures HAL → structure réelle
+    db.execute("""
+        INSERT INTO source_structures (id, source, source_id, name, structure_id)
+        VALUES (80001, 'hal', 'hal-struct-80001', 'Labo Test HAL', 80001)
+    """)
+
+    # Publications
+    db.execute("""
+        INSERT INTO publications (id, title, title_normalized, doc_type, pub_year)
+        VALUES (80001, 'Pub Affiliation Test', 'pub affiliation test', 'article', 2024)
+    """)
+
+    # Source documents
+    db.execute("""
+        INSERT INTO source_documents (id, source, source_id, title, pub_year, doc_type, publication_id)
+        VALUES (80001, 'hal', 'hal-80000001', 'Pub Affiliation Test', 2024, 'ART', 80001),
+               (80002, 'openalex', 'W80000001', 'Pub Affiliation Test', 2024, 'article', 80001)
+    """)
+
+    # Source authors
+    db.execute("""
+        INSERT INTO source_authors (id, source, source_id, full_name, last_name, first_name)
+        VALUES (80001, 'hal', 'hal-author-80001', 'Alice Dupont', 'Dupont', 'Alice'),
+               (80002, 'openalex', 'A80001', 'Alice Dupont', 'Dupont', 'Alice')
+    """)
+
+    # HAL authorship (avec source_struct_ids pointant vers source_structures)
+    db.execute("""
+        INSERT INTO source_authorships
+            (id, source, source_document_id, source_author_id, author_position,
+             in_perimeter, source_struct_ids, author_name_normalized)
+        VALUES (80001, 'hal', 80001, 80001, 0, FALSE, ARRAY[80001], 'alice dupont')
+    """)
+
+    # OpenAlex authorship (sera résolu via adresses)
+    db.execute("""
+        INSERT INTO source_authorships
+            (id, source, source_document_id, source_author_id, author_position,
+             in_perimeter, author_name_normalized)
+        VALUES (80002, 'openalex', 80002, 80002, 0, FALSE, 'alice dupont')
+    """)
+
+    # Adresse résolue pour l'authorship OpenAlex
+    db.execute("""
+        INSERT INTO addresses (id, raw_text, normalized_text)
+        VALUES (80001, 'Laboratoire Test, UCA, Clermont-Ferrand', 'laboratoire test uca clermont ferrand')
+    """)
+    db.execute("""
+        INSERT INTO address_structures (address_id, structure_id, is_confirmed)
+        VALUES (80001, 80001, TRUE)
+    """)
+    db.execute("""
+        INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
+        VALUES (80002, 80001)
+    """)
+
+
+def _run_populate_affiliations(db):
+    """Exécute populate_affiliations sur le curseur de test."""
+    from processing.populate_affiliations import (
+        step1_hal_structure_ids, step2_hal_in_perimeter,
+        step3_openalex, step3b_wos, step3c_scanr, step3d_theses,
+    )
+    from utils.uca_perimeter import get_uca_structure_ids, get_uca_structure_ids_wide
+
+    uca_ids = get_uca_structure_ids(db)
+    uca_wide_ids = get_uca_structure_ids_wide(db)
+
+    step1_hal_structure_ids(db)
+    step2_hal_in_perimeter(db, uca_ids)
+    step3_openalex(db, uca_ids, uca_wide_ids)
+    step3b_wos(db, uca_ids, uca_wide_ids)
+    step3c_scanr(db, uca_ids, uca_wide_ids)
+    step3d_theses(db, uca_wide_ids)
+
+
+def _count_affiliations(db) -> dict:
+    counts = {}
+    for src in ["hal", "openalex"]:
+        db.execute(
+            "SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = %s AND in_perimeter = TRUE",
+            (src,))
+        counts[f"{src}_in_perimeter"] = db.fetchone()["cnt"]
+        db.execute(
+            "SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = %s AND structure_ids IS NOT NULL",
+            (src,))
+        counts[f"{src}_with_structs"] = db.fetchone()["cnt"]
+    return counts
+
+
+class TestPopulateAffiliationsIdempotence:
+    """populate_affiliations produit le même résultat si lancé deux fois."""
+
+    def test_double_run_same_counts(self, db):
+        _setup_affiliations_test_data(db)
+
+        _run_populate_affiliations(db)
+        counts_1 = _count_affiliations(db)
+
+        assert counts_1["hal_in_perimeter"] == 1, "L'authorship HAL doit être in_perimeter"
+        assert counts_1["hal_with_structs"] == 1, "L'authorship HAL doit avoir des structure_ids"
+        assert counts_1["openalex_in_perimeter"] == 1, "L'authorship OA doit être in_perimeter"
+        assert counts_1["openalex_with_structs"] == 1, "L'authorship OA doit avoir des structure_ids"
+
+        _run_populate_affiliations(db)
+        counts_2 = _count_affiliations(db)
+
+        assert counts_2 == counts_1, (
+            f"Compteurs différents après 2e passe !\n"
+            f"  1ère : {counts_1}\n  2ème : {counts_2}"
+        )

@@ -252,6 +252,93 @@ class TestRefreshFromSources:
         db.execute("SELECT oa_status FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["oa_status"] == "diamond"
 
+    def test_source_priority_hal_over_openalex(self, db):
+        """HAL est prioritaire sur OpenAlex pour les champs scalaires."""
+        id1, _ = _create(db, doi="10.1234/prio", pub_year=2024, doc_type="article")
+        self._insert_sd(db, id1, "openalex", language="en")
+        self._insert_sd(db, id1, "hal", language="fr")
+        refresh_from_sources(db, id1)
+
+        db.execute("SELECT language FROM publications WHERE id = %s", (id1,))
+        assert db.fetchone()["language"] == "fr"
+
+    def test_thesis_priority_theses_over_hal(self, db):
+        """Pour les thèses, theses.fr est prioritaire."""
+        id1, _ = _create(db, doi="10.1234/thesis-prio", pub_year=2024, doc_type="thesis")
+        self._insert_sd(db, id1, "hal", language="en", doc_type="THESE")
+        self._insert_sd(db, id1, "theses", language="fr", doc_type="thesis")
+        refresh_from_sources(db, id1)
+
+        db.execute("SELECT language FROM publications WHERE id = %s", (id1,))
+        assert db.fetchone()["language"] == "fr"
+
+    def test_doc_type_mapping(self, db):
+        """Les doc_types bruts sont mappés vers l'enum canonique."""
+        id1, _ = _create(db, pub_year=2024, doc_type="other")
+        self._insert_sd(db, id1, "hal", doc_type="ART")
+        refresh_from_sources(db, id1)
+
+        db.execute("SELECT doc_type FROM publications WHERE id = %s", (id1,))
+        assert db.fetchone()["doc_type"] == "article"
+
+    def test_ongoing_thesis_to_thesis(self, db):
+        """Un ongoing_thesis passe à thesis quand theses.fr le dit."""
+        id1, _ = _create(db, pub_year=2024, doc_type="ongoing_thesis")
+        self._insert_sd(db, id1, "theses", doc_type="thesis")
+        refresh_from_sources(db, id1)
+
+        db.execute("SELECT doc_type FROM publications WHERE id = %s", (id1,))
+        assert db.fetchone()["doc_type"] == "thesis"
+
+    def test_keywords_merged(self, db):
+        """Les keywords sont fusionnés sans doublons."""
+        id1, _ = _create(db, pub_year=2024, doc_type="article")
+        db.execute("""
+            INSERT INTO source_documents (source, source_id, title, pub_year, publication_id, keywords)
+            VALUES ('hal', 'hal-kw1', 'Test', 2024, %s, ARRAY['python', 'data']),
+                   ('openalex', 'oa-kw1', 'Test', 2024, %s, ARRAY['Data', 'machine learning'])
+        """, (id1, id1))
+        refresh_from_sources(db, id1)
+
+        db.execute("SELECT keywords FROM publications WHERE id = %s", (id1,))
+        kw = db.fetchone()["keywords"]
+        # 'data' et 'Data' sont dédupliqués (case-insensitive), 3 mots-clés
+        assert len(kw) == 3
+        lower_kw = [k.lower() for k in kw]
+        assert "python" in lower_kw
+        assert "data" in lower_kw
+        assert "machine learning" in lower_kw
+
+    def test_jsonb_merged(self, db):
+        """Les champs JSONB sont fusionnés, priorité au premier."""
+        id1, _ = _create(db, pub_year=2024, doc_type="article")
+        db.execute("""
+            INSERT INTO source_documents (source, source_id, title, pub_year, publication_id, topics)
+            VALUES ('hal', 'hal-tp1', 'Test', 2024, %s, '{"hal_domains": ["info"]}'),
+                   ('openalex', 'oa-tp1', 'Test', 2024, %s, '{"concepts": ["AI"], "hal_domains": ["math"]}')
+        """, (id1, id1))
+        refresh_from_sources(db, id1)
+
+        db.execute("SELECT topics FROM publications WHERE id = %s", (id1,))
+        topics = db.fetchone()["topics"]
+        # HAL est prioritaire : hal_domains vient de HAL
+        assert topics["hal_domains"] == ["info"]
+        # concepts vient d'OpenAlex (pas de conflit)
+        assert topics["concepts"] == ["AI"]
+
+    def test_is_retracted_or(self, db):
+        """is_retracted = True si au moins une source le dit."""
+        id1, _ = _create(db, pub_year=2024, doc_type="article")
+        db.execute("""
+            INSERT INTO source_documents (source, source_id, title, pub_year, publication_id, is_retracted)
+            VALUES ('hal', 'hal-ret1', 'Test', 2024, %s, FALSE),
+                   ('openalex', 'oa-ret1', 'Test', 2024, %s, TRUE)
+        """, (id1, id1))
+        refresh_from_sources(db, id1)
+
+        db.execute("SELECT is_retracted FROM publications WHERE id = %s", (id1,))
+        assert db.fetchone()["is_retracted"] is True
+
     def test_allow_create_false(self, db):
         """allow_create=False → retourne None si non trouvée."""
         result, _ = find_or_create(db, title="X", title_normalized="x",
