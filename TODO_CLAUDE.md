@@ -25,13 +25,10 @@ Note : les fallbacks dans `perimeter.py` contiennent encore `s.code = 'uca'` (li
 
 À vérifier au cas par cas : l'exclusion est-elle voulue (pas de raw_affiliations pour scanr/theses) ou accidentelle ?
 
-## Tests d'idempotence — phases restantes
+## ~~Tests d'idempotence~~ FAIT
 
-Phases couvertes : normalisation (4 sources + inter-sources, 11+ tests).
-Reste à couvrir :
-- `create_persons_from_source_authorships.py` (risque de doublons de personnes)
-- `build_authorships.py` (risque de doublons d'authorships vérité)
-- `populate_affiliations.py` (idempotent par construction, mais à vérifier)
+Toutes les phases sont couvertes (8 classes de tests dans test_idempotence.py) :
+normalisation (4 sources + inter-sources), create_persons, build_authorships, populate_affiliations.
 
 ## Uniformisation compatibilité de noms (Python vs SQL)
 
