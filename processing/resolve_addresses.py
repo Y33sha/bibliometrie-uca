@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from utils.log import setup_logger
 from utils.normalize import normalize_text as normalize
-from utils.uca_perimeter import get_uca_structure_ids
+from utils.perimeter import get_persons_structure_ids
 
 logger = setup_logger("resolve_addresses", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -67,9 +67,9 @@ def load_tutelles(cur):
     return tutelles
 
 
-def load_uca_perimeter(cur):
-    """Construit l'ensemble des structure_ids dans le périmètre UCA."""
-    return get_uca_structure_ids(cur)
+def load_perimeter(cur):
+    """Construit l'ensemble des structure_ids dans le périmètre."""
+    return get_persons_structure_ids(cur)
 
 
 # ─── Matching ────────────────────────────────────────────────────
@@ -255,9 +255,9 @@ def main():
     forms = load_forms(cur)
     forms_by_structure = build_forms_by_structure(forms)
     tutelles_map = load_tutelles(cur)
-    uca_perimeter = load_uca_perimeter(cur)
+    perimeter = load_perimeter(cur)
     logger.info(f"  {len(tutelles_map)} structures avec tutelles")
-    logger.info(f"  {len(uca_perimeter)} structures dans le périmètre UCA")
+    logger.info(f"  {len(perimeter)} structures dans le périmètre")
 
     # Toutes les adresses (l'upsert ne touche pas aux liens déjà confirmés/rejetés)
     cur.execute("""
@@ -271,7 +271,7 @@ def main():
     if total > 0:
         process_addresses(
             cur, conn, rows, forms, forms_by_structure, tutelles_map,
-            uca_perimeter
+            perimeter
         )
 
     show_stats(cur)
@@ -279,7 +279,7 @@ def main():
 
 
 def process_addresses(cur, conn, rows, forms, forms_by_structure, tutelles_map,
-                      uca_perimeter):
+                      perimeter):
     """Traite une liste d'adresses : détection + affiliations."""
     t_start = time.perf_counter()
     total = len(rows)
@@ -293,7 +293,7 @@ def process_addresses(cur, conn, rows, forms, forms_by_structure, tutelles_map,
         text_norm = normalize(raw_text)
         matches = resolve_address(text_norm, forms, forms_by_structure, tutelles_map)
 
-        in_perimeter = any(sid in uca_perimeter for sid, _ in matches)
+        in_perimeter = any(sid in perimeter for sid, _ in matches)
         if in_perimeter:
             uca_count += 1
 

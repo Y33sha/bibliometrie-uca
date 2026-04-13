@@ -159,9 +159,9 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
         return
 
     # 1. Périmètre UCA
-    from utils.uca_perimeter import get_uca_structure_ids_list
-    uca_ids = get_uca_structure_ids_list(cur)
-    if not uca_ids:
+    from utils.perimeter import get_persons_structure_ids_list
+    perimeter_ids = get_persons_structure_ids_list(cur)
+    if not perimeter_ids:
         return
 
     # 2. Trouver les source_authorships (openalex/wos/scanr) affectés
@@ -196,7 +196,7 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
         FROM affected af
         LEFT JOIN uca_per_authorship upa ON upa.sa_id = af.sa_id
         WHERE sa.id = af.sa_id
-    """, (affected_sa_ids, uca_ids))
+    """, (affected_sa_ids, perimeter_ids))
 
     # 4. Propager vers authorships (vérité) pour les person_id résolus
     cur.execute("""

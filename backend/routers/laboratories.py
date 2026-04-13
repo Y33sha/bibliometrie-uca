@@ -10,7 +10,7 @@ router = APIRouter()
 async def list_laboratories():
     """Liste des labos du périmètre."""
     with get_cursor() as (cur, conn):
-        from utils.uca_perimeter import get_persons_structure_ids
+        from utils.perimeter import get_persons_structure_ids
         from utils.app_config import _get_from_db
         perimeter_ids = list(get_persons_structure_ids(cur))
 

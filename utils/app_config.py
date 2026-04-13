@@ -58,14 +58,14 @@ def get_hal_collections(cur) -> dict[str, str]:
     """
     # 1. Depuis les structures du périmètre UCA
     try:
-        from utils.uca_perimeter import get_uca_structure_ids
-        uca_ids = get_uca_structure_ids(cur)
-        if uca_ids:
+        from utils.perimeter import get_persons_structure_ids
+        perimeter_ids = get_persons_structure_ids(cur)
+        if perimeter_ids:
             cur.execute("""
                 SELECT hal_collection, COALESCE(acronym, name) AS label
                 FROM structures
                 WHERE id = ANY(%s) AND hal_collection IS NOT NULL AND hal_collection != ''
-            """, (list(uca_ids),))
+            """, (list(perimeter_ids),))
             rows = cur.fetchall()
             if rows:
                 return {(r["hal_collection"] if isinstance(r, dict) else r[0]): (r["label"] if isinstance(r, dict) else r[1]) for r in rows}
@@ -136,7 +136,7 @@ def get_extraction_api_ids(cur, source: str) -> list[str]:
     perim_code = _get_from_db(cur, "perimeter_extraction")
     if perim_code and isinstance(perim_code, str):
         try:
-            from utils.uca_perimeter import get_perimeter_structure_ids
+            from utils.perimeter import get_perimeter_structure_ids
             struct_ids = get_perimeter_structure_ids(cur, perim_code)
             if struct_ids:
                 cur.execute("""

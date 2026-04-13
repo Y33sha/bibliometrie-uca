@@ -1061,17 +1061,17 @@ def _run_populate_affiliations(db):
         step1_hal_structure_ids, step2_hal_in_perimeter,
         step3_openalex, step3b_wos, step3c_scanr, step3d_theses,
     )
-    from utils.uca_perimeter import get_uca_structure_ids, get_uca_structure_ids_wide
+    from utils.perimeter import get_persons_structure_ids, get_affiliations_structure_ids
 
-    uca_ids = get_uca_structure_ids(db)
-    uca_wide_ids = get_uca_structure_ids_wide(db)
+    perimeter_ids = get_persons_structure_ids(db)
+    wide_ids = get_affiliations_structure_ids(db)
 
     step1_hal_structure_ids(db)
-    step2_hal_in_perimeter(db, uca_ids)
-    step3_openalex(db, uca_ids, uca_wide_ids)
-    step3b_wos(db, uca_ids, uca_wide_ids)
-    step3c_scanr(db, uca_ids, uca_wide_ids)
-    step3d_theses(db, uca_wide_ids)
+    step2_hal_in_perimeter(db, perimeter_ids)
+    step3_openalex(db, perimeter_ids, wide_ids)
+    step3b_wos(db, perimeter_ids, wide_ids)
+    step3c_scanr(db, perimeter_ids, wide_ids)
+    step3d_theses(db, wide_ids)
 
 
 def _count_affiliations(db) -> dict:

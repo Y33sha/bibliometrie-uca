@@ -1,26 +1,34 @@
-# Notes techniques et idées (Claude)
+# Notes techniques (Claude)
 
-## Renommage is_uca → in_perimeter
+## ~~Renommage uca_perimeter → perimeter~~ FAIT
 
-Renommer pour abstraire le code de l'institution spécifique (réutilisabilité).
+Fichier renommé `utils/perimeter.py`, alias `get_uca_*` supprimés, 8 appelants mis à jour.
 
-**Colonnes à renommer :**
-- `is_uca` → `in_perimeter` sur hal_authorships, openalex_authorships, wos_authorships, scanr_authorships, authorships
-- Index associés (`idx_*_uca` → `idx_*_perimeter`)
+Note : les fallbacks dans `perimeter.py` contiennent encore `s.code = 'uca'` (lignes ~109-127). Ce sont des fallbacks de sécurité si la table `perimeters` n'est pas configurée. À supprimer ou rendre configurable dans le cadre du point 1 (valeurs hardcodées).
 
-**Scripts à renommer :**
-- `utils/uca_perimeter.py` → `utils/perimeter.py` (fonctions `get_uca_structure_ids` → `get_perimeter_ids`)
+## Valeurs hardcodées `structure_id = 169`
 
-**Références à mettre à jour :**
-- `build_authorships.py` (propagation is_uca → in_perimeter)
-- Backend : routers qui filtrent sur is_uca
-- Frontend : filtres/facettes UCA
+`budget_structure_id = 169` (UCA) apparaît ~20 fois dans :
+- `backend/routers/publications.py` (facettes et listing APC)
+- `backend/routers/pub_stats.py` (constante `UCA_STRUCT_ID` + requêtes)
 
-**Note :** `populate_uca_flags.py` → `populate_affiliations.py` et la phase pipeline `uca_flags` → `affiliations` sont déjà faits. Reste le renommage des colonnes et de `uca_perimeter.py`.
+À remplacer par une lecture de la config (périmètre racine) ou un paramètre passé par le frontend.
+
+## Listes de sources hardcodées
+
+`IN ('hal', 'openalex', 'wos')` exclut scanr et theses dans ~11 requêtes :
+- `backend/routers/authorships.py` (3 occurrences)
+- `backend/routers/persons.py` (5 occurrences)
+- `services/persons.py` (1 occurrence)
+- `processing/create_persons_from_source_authorships.py` (1 occurrence)
+- `scripts/assign_orphans_by_name_form.py` (1 occurrence)
+
+À vérifier au cas par cas : l'exclusion est-elle voulue (pas de raw_affiliations pour scanr/theses) ou accidentelle ?
 
 ## Tests d'idempotence — phases restantes
 
-Les tests d'idempotence couvrent la normalisation (4 sources + inter-sources, 11 tests). Reste à couvrir :
+Phases couvertes : normalisation (4 sources + inter-sources, 11+ tests).
+Reste à couvrir :
 - `create_persons_from_source_authorships.py` (risque de doublons de personnes)
 - `build_authorships.py` (risque de doublons d'authorships vérité)
 - `populate_affiliations.py` (idempotent par construction, mais à vérifier)
@@ -31,37 +39,8 @@ Les fonctions de compatibilité de noms existent en deux versions :
 - Python : `utils/names.py` (`names_compatible`, `first_names_compatible`, etc.)
 - SQL : requêtes dans `backend/routers/admin_person_duplicates.py` (`PERSON_DUP_QUERIES`)
 
-Les deux implémentent la même logique mais indépendamment. Idéalement, le backend devrait utiliser les fonctions Python de `utils/names.py` pour la détection de doublons. Mais les requêtes SQL sont plus performantes pour le matching en masse (JOIN direct en base). À réévaluer si la logique diverge.
+Les deux implémentent la même logique mais indépendamment. À réévaluer si la logique diverge.
 
-## Authorships vérité : FK source-agnostiques
+## Sémantique `publications` → `documents`
 
-Les colonnes `hal_authorship_id`, `openalex_authorship_id`, `wos_authorship_id`, `scanr_authorship_id` sur `authorships` ne sont pas extensibles (ajouter une source = ajouter une colonne). Envisager une inversion des FK (les tables source pointent vers authorships) ou un tableau. Chantier structurel, à planifier.
-
-## Observabilité
-
-- [x] Health check endpoint (`/api/health`)
-- [ ] Rapport de synthèse pipeline : publis ajoutées/modifiées/erreurs par run, consultable côté admin (table `pipeline_runs` ?)
-
-## Refactoring normaliseurs — doc_types et find_publication
-
-Suite du commit 325bd76. Reste à faire :
-
-### ~~1. Supprimer les DOCTYPE_MAP locaux~~ — FAIT (commit 37ff9f2)
-### ~~2. Factoriser find_publication~~ — Non justifié (chaque source a ses spécificités)
-### ~~3. Tests~~ — FAIT (migrés vers map_doc_type, 254 tests passent)
-
-## Requêtes SQL avec listes de sources hardcodées
-
-Beaucoup de requêtes SQL contiennent `IN ('hal', 'openalex', 'wos')` en excluant scanr et theses. À vérifier au cas par cas :
-- `backend/routers/authorships.py` (lignes 30, 65, 146)
-- `backend/routers/persons.py` (lignes 834, 1068, 1266, 1313, 1350)
-- `services/persons.py` (ligne 456)
-- `processing/create_persons_from_source_authorships.py` (ligne 222)
-- `scripts/assign_orphans_by_name_form.py` (ligne 41)
-
-A priori l'exclusion n'est pas voulue, sauf si liée au traitement des raw_affiliations (HAL et theses n'en ont pas). Remplacer par `= ANY(%s)` avec la constante Python appropriée (`ALL_SOURCES` ou `BIBLIO_SOURCES` selon le cas).
-
-## Scalabilité
-
-- [ ] Connection pooling DB (remplacer `psycopg2.connect()` par un pool dans `get_cursor()` — changement localisé)
-
+Renommage envisagé dans TODO_LAURA. Si décidé, impacte : table, colonnes FK, routes API, frontend. Mieux vaut le faire avant transmission DSI.

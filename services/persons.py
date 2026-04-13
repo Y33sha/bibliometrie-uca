@@ -14,7 +14,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.normalize import normalize_name
 from utils.sources import ALL_SOURCES_SET
-from utils.uca_perimeter import get_uca_structure_ids_list
+from utils.perimeter import get_persons_structure_ids_list
 
 
 # ── Création ──
@@ -447,7 +447,7 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
     """, (pub_id, person_id))
 
     # 4. in_perimeter et structure_ids (union des sources)
-    uca_ids = get_uca_structure_ids_list(cur)
+    perimeter_ids = get_persons_structure_ids_list(cur)
     cur.execute("""
         WITH src AS (
             SELECT sa.in_perimeter AS uca, sa.structure_ids AS sids

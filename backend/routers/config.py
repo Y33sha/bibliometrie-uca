@@ -3,7 +3,7 @@
 import json
 from fastapi import APIRouter, HTTPException
 from backend.deps import get_cursor
-from utils.uca_perimeter import get_perimeter_structure_ids
+from utils.perimeter import get_perimeter_structure_ids
 
 router = APIRouter()
 
