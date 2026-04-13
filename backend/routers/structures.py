@@ -1,6 +1,7 @@
 """Auto-extracted router."""
 
 from fastapi import APIRouter, Query, HTTPException, Depends
+from psycopg2.extras import Json
 from backend.deps import get_cursor, require_admin
 from backend.models import (StructureCreate, StructureUpdate, RelationCreate,
     NameFormCreate, NameFormUpdate)
@@ -53,7 +54,7 @@ async def get_structure(structure_id: int):
     with get_cursor() as (cur, conn):
         cur.execute("""
             SELECT id, code, name, acronym, structure_type::text AS type,
-                   ror_id, rnsr_id, hal_collection
+                   ror_id, rnsr_id, hal_collection, api_ids
             FROM structures WHERE id = %s
         """, (structure_id,))
         structure = cur.fetchone()
@@ -102,12 +103,13 @@ async def get_structure(structure_id: int):
 async def create_structure(data: StructureCreate):
     with get_cursor() as (cur, conn):
         cur.execute("""
-            INSERT INTO structures (code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO structures (code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, code, name, acronym, structure_type::text AS type,
-                      ror_id, rnsr_id, hal_collection
+                      ror_id, rnsr_id, hal_collection, api_ids
         """, (data.code, data.name, data.acronym, data.type,
-              data.ror_id, data.rnsr_id, data.hal_collection))
+              data.ror_id, data.rnsr_id, data.hal_collection,
+              Json(data.api_ids) if data.api_ids else None))
         return cur.fetchone()
 
 
@@ -128,6 +130,11 @@ async def update_structure(structure_id: int, data: StructureUpdate):
                 updates.append(f"{col_name} = %s")
                 params.append(val)
 
+        # api_ids : JSONB, peut être {} (vider) ou un dict
+        if data.api_ids is not None:
+            updates.append("api_ids = %s")
+            params.append(Json(data.api_ids) if data.api_ids else None)
+
         if not updates:
             raise HTTPException(status_code=400, detail="Nothing to update")
 
@@ -135,7 +142,7 @@ async def update_structure(structure_id: int, data: StructureUpdate):
         cur.execute(f"""
             UPDATE structures SET {', '.join(updates)} WHERE id = %s
             RETURNING id, code, name, acronym, structure_type::text AS type,
-                      ror_id, rnsr_id, hal_collection
+                      ror_id, rnsr_id, hal_collection, api_ids
         """, params)
         return cur.fetchone()
 
