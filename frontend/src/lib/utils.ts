@@ -48,7 +48,7 @@ function renderLatex(s: string): string {
 
 	while ((m = re.exec(s)) !== null) {
 		parts.push(escapeHtml(s.slice(lastIdx, m.index)));
-		const tex = (m[1] || m[2]).trim();
+		const tex = (m[1] || m[2]).trim().replace(/\\\\/g, '\\');
 		try {
 			parts.push(katex.renderToString(tex, {
 				displayMode: false,

@@ -28,13 +28,9 @@ from utils.normalize import normalize_text
 from utils.nnt import normalize_nnt
 from services.publications import (
     find_or_create as find_or_create_publication,
-    _enrich, update_sources,
+    refresh_from_sources,
 )
-from processing.normalize_hal import DOCTYPE_MAP as HAL_DOCTYPE_MAP
-from processing.normalize_openalex import DOCTYPE_MAP as OA_DOCTYPE_MAP
-from processing.normalize_wos import DOCTYPE_MAP as WOS_DOCTYPE_MAP
-from processing.normalize_scanr import DOCTYPE_MAP as SCANR_DOCTYPE_MAP
-
+from utils.doc_types import map_doc_type
 from utils.log import setup_logger
 
 logger = setup_logger("create_publications", os.path.join(os.path.dirname(__file__), "logs"))
@@ -67,15 +63,8 @@ def process_document(cur, doc, dry_run):
         return False
 
     doi = doc["doi"]
-    raw_type = doc["doc_type"] or "other"
     source = doc["source"]
-    doc_type_map = {
-        "hal": HAL_DOCTYPE_MAP,
-        "openalex": OA_DOCTYPE_MAP,
-        "wos": WOS_DOCTYPE_MAP,
-        "scanr": SCANR_DOCTYPE_MAP,
-    }
-    doc_type = doc_type_map.get(source, {}).get(raw_type, "other")
+    doc_type = map_doc_type(doc["doc_type"], source)
     journal_id = doc["journal_id"]
     oa_status = doc["oa_status"] or "unknown"
     language = doc["language"]
@@ -106,15 +95,9 @@ def process_document(cur, doc, dry_run):
         "UPDATE source_documents SET publication_id = %s WHERE id = %s",
         (pub_id, doc["id"]),
     )
-    update_sources(cur, pub_id)
 
-    # Propager les metadonnees enrichies vers la publication
-    _enrich(cur, pub_id,
-            abstract=doc.get("abstract"),
-            keywords=doc.get("keywords"),
-            topics=doc.get("topics"),
-            biblio=doc.get("biblio"),
-            is_retracted=doc.get("is_retracted"))
+    # Recalcul complet des métadonnées depuis toutes les sources
+    refresh_from_sources(cur, pub_id)
 
     return True
 

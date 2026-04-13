@@ -12,6 +12,7 @@ indépendant du type de curseur (tuple ou RealDictCursor).
 from collections import namedtuple
 from psycopg2.extras import Json
 from utils.db_helpers import row_val as _val
+from utils.doc_types import map_doc_type
 
 PubByDoi = namedtuple("PubByDoi", ["id", "doc_type", "title_normalized"])
 PubByNnt = namedtuple("PubByNnt", ["id", "doc_type", "title_normalized"])
@@ -76,78 +77,30 @@ def find_thesis_by_title(cur, title_normalized: str, pub_year: int) -> list[PubT
     return [PubThesisCandidate(_val(row, 0), _val(row, 1)) for row in rows]
 
 
-def _enrich(cur, pub_id: int, *, doi: str | None = None,
-            doc_type: str | None = None, journal_id: int | None = None,
-            oa_status: str | None = None, container_title: str | None = None,
-            language: str | None = None,
-            abstract: str | None = None, keywords: list | None = None,
-            topics: dict | None = None, biblio: dict | None = None,
-            is_retracted: bool | None = None) -> int:
-    """Enrichit une publication existante avec des metadonnees complementaires.
+def try_merge_by_doi(cur, pub_id: int, doi: str | None) -> int:
+    """Tente de fusionner via DOI si la publication n'en a pas encore.
 
-    Regles de priorite (ne jamais degrader) :
-    - DOI : ne remplace pas un DOI existant
-    - doc_type : 'other' peut etre remplace par un type plus precis
-    - oa_status : 'green' gagne sur 'closed'/'unknown', 'diamond' gagne sur tout
-    - is_retracted : True gagne toujours
-    - Autres champs : COALESCE (premier arrive gagne)
+    Si pub_id n'a pas de DOI et qu'une autre publication porte ce DOI,
+    les deux sont fusionnées (l'autre absorbe pub_id).
+    Attribue le DOI à la publication si elle n'en a pas.
 
-    Si le DOI est deja pris par une autre publication, les deux sont fusionnees.
     Retourne le pub_id effectif (peut changer en cas de fusion).
     """
-    # Si on veut attribuer un DOI, verifier qu'il n'est pas deja pris
-    if doi:
-        cur.execute("SELECT doi FROM publications WHERE id = %s", (pub_id,))
-        row = cur.fetchone()
-        current_doi = row["doi"] if isinstance(row, dict) else row[0] if row else None
-        if row and not current_doi:
-            existing = find_by_doi(cur, doi)
-            if existing and existing.id != pub_id:
-                merge_publications(cur, existing.id, pub_id)
-                pub_id = existing.id
-
-    cur.execute("""
-        UPDATE publications SET
-            doi = CASE
-                WHEN publications.doi IS NOT NULL THEN publications.doi
-                ELSE %s
-            END,
-            journal_id = COALESCE(%s, publications.journal_id),
-            doc_type = CASE
-                WHEN publications.doc_type = 'other' AND %s IS NOT NULL AND %s != 'other'
-                    THEN %s::doc_type
-                ELSE COALESCE(publications.doc_type, %s::doc_type)
-            END,
-            oa_status = CASE
-                WHEN %s = 'green' AND publications.oa_status IN ('closed', 'unknown')
-                    THEN 'green'::oa_type
-                WHEN %s = 'diamond'
-                    THEN 'diamond'::oa_type
-                WHEN publications.oa_status = 'unknown' AND %s IS NOT NULL
-                    THEN %s::oa_type
-                ELSE publications.oa_status
-            END,
-            container_title = COALESCE(%s, publications.container_title),
-            language = COALESCE(%s, publications.language),
-            abstract = COALESCE(%s, publications.abstract),
-            keywords = COALESCE(%s, publications.keywords),
-            topics = COALESCE(%s, publications.topics),
-            biblio = COALESCE(publications.biblio, '{}'::jsonb) || COALESCE(%s, '{}'::jsonb),
-            is_retracted = publications.is_retracted OR COALESCE(%s, FALSE),
-            updated_at = now()
-        WHERE id = %s
-    """, (doi,
-          journal_id,
-          doc_type, doc_type, doc_type, doc_type,
-          oa_status, oa_status, oa_status, oa_status,
-          container_title,
-          language,
-          abstract,
-          keywords,
-          Json(topics) if topics else None,
-          Json(biblio) if biblio else None,
-          is_retracted or False,
-          pub_id))
+    if not doi:
+        return pub_id
+    cur.execute("SELECT doi FROM publications WHERE id = %s", (pub_id,))
+    row = cur.fetchone()
+    current_doi = row["doi"] if isinstance(row, dict) else row[0] if row else None
+    if current_doi:
+        return pub_id
+    # La pub n'a pas de DOI : vérifier si une autre l'a
+    existing = find_by_doi(cur, doi)
+    if existing and existing.id != pub_id:
+        merge_publications(cur, existing.id, pub_id)
+        return existing.id
+    # Attribuer le DOI
+    cur.execute("UPDATE publications SET doi = %s, updated_at = now() WHERE id = %s",
+                (doi, pub_id))
     return pub_id
 
 
@@ -218,18 +171,13 @@ def find_or_create(cur, *, title: str, title_normalized: str,
             doi, merge_id = resolve_doi_conflict(
                 cur, doi, doc_type, title_normalized, existing)
             if merge_id:
-                _enrich(cur, merge_id, doi=doi, doc_type=doc_type,
-                        journal_id=journal_id, oa_status=oa_status,
-                        container_title=container_title, language=language)
                 return merge_id, False
 
     # 1b. Chercher par NNT (theses uniquement)
     if nnt:
         existing = find_by_nnt(cur, nnt)
         if existing:
-            _enrich(cur, existing.id, doi=doi, doc_type=doc_type,
-                    journal_id=journal_id, oa_status=oa_status,
-                    container_title=container_title, language=language)
+            try_merge_by_doi(cur, existing.id, doi)
             return existing.id, False
 
     # 2. Creer
@@ -274,6 +222,166 @@ def update_sources(cur, pub_id: int):
         ) sub
         WHERE id = %s
     """, (pub_id, pub_id))
+
+
+# ── Recalcul complet des métadonnées depuis les source_documents ──────
+
+# Ordre de priorité des sources pour les champs scalaires.
+# Pour les thèses, theses.fr est toujours prioritaire.
+# Cas particulier : si un document OpenAlex référence un HAL-ID
+# (external_ids->>'hal'), HAL passe devant theses.fr même pour les thèses.
+_PRIORITY_THESIS = ["theses", "hal", "openalex", "wos", "scanr"]
+_PRIORITY_DEFAULT = ["hal", "openalex", "wos", "scanr", "theses"]
+_PRIORITY_THESIS_HAL_LINKED = ["hal", "theses", "openalex", "wos", "scanr"]
+
+# Classement des statuts OA : le plus ouvert gagne.
+_OA_RANK = {
+    "diamond": 7, "gold": 6, "hybrid": 5, "bronze": 4,
+    "green": 3, "closed": 2, "unknown": 1,
+}
+
+
+def refresh_from_sources(cur, pub_id: int):
+    """Recalcule les métadonnées d'une publication depuis ses source_documents.
+
+    Contrairement à l'ancien _enrich() qui faisait du COALESCE incrémental (premier arrivé
+    gagne, jamais de downgrade), cette fonction fait un recalcul complet :
+    elle lit TOUS les source_documents attachés et réapplique les règles de
+    priorité depuis zéro. Elle peut donc corriger des métadonnées obsolètes
+    (ex: ongoing_thesis → thesis après soutenance).
+
+    Règles de priorité entre sources :
+    ─────────────────────────────────
+    • Thèses (doc_type thesis/ongoing_thesis) : theses.fr > HAL > OA > WoS > ScanR
+    • Autres publications :                      HAL > OA > WoS > ScanR > theses.fr
+    • Si un document OpenAlex référence un HAL-ID (external_ids->>'hal'),
+      HAL passe prioritaire même pour les thèses.
+
+    Règles de fusion par type de champ :
+    ────────────────────────────────────
+    • Scalaires (doi, doc_type, pub_year, journal_id, container_title, language) :
+      premier non-null dans l'ordre de priorité.
+    • Texte (abstract) : idem, premier non-null.
+    • oa_status : le statut le plus ouvert parmi toutes les sources
+      (diamond > gold > hybrid > bronze > green > closed > unknown).
+    • Booléen (is_retracted) : True si au moins une source le dit.
+    • Listes (keywords, countries) : union de toutes les sources, dédupliquée.
+    • JSONB (topics, biblio, meta) : fusion des clés de toutes les sources ;
+      en cas de conflit sur une clé, la source prioritaire l'emporte.
+
+    Ne touche PAS à : title, title_normalized, notes, sources (utiliser
+    update_sources() séparément).
+    """
+    cur.execute("""
+        SELECT source, doi, doc_type, pub_year, journal_id, oa_status,
+               container_title, language, abstract, keywords, countries,
+               topics, biblio, meta, is_retracted, external_ids
+        FROM source_documents
+        WHERE publication_id = %s
+    """, (pub_id,))
+    rows = cur.fetchall()
+    if not rows:
+        return
+
+    # Déterminer si c'est une thèse et si un OA pointe vers HAL
+    has_hal_link = any(
+        r["source"] == "openalex"
+        and (r["external_ids"] or {}).get("hal")
+        for r in rows
+    )
+    is_thesis = any(
+        map_doc_type(r["doc_type"], r["source"]) in ("thesis", "ongoing_thesis")
+        for r in rows
+    )
+
+    if is_thesis and has_hal_link:
+        priority = _PRIORITY_THESIS_HAL_LINKED
+    elif is_thesis:
+        priority = _PRIORITY_THESIS
+    else:
+        priority = _PRIORITY_DEFAULT
+
+    # Trier les lignes par priorité de source
+    rank = {s: i for i, s in enumerate(priority)}
+    rows.sort(key=lambda r: rank.get(r["source"], 99))
+
+    # --- Helpers ---
+    def first_non_null(field):
+        for r in rows:
+            v = r[field]
+            if v is not None:
+                return v
+        return None
+
+    def merge_lists(field):
+        seen = set()
+        result = []
+        for r in rows:
+            for item in (r[field] or []):
+                key = item.lower() if isinstance(item, str) else item
+                if key not in seen:
+                    seen.add(key)
+                    result.append(item)
+        return result or None
+
+    def merge_jsonb(field):
+        merged = {}
+        for r in rows:
+            d = r[field]
+            if isinstance(d, dict):
+                for k, v in d.items():
+                    if k not in merged:
+                        merged[k] = v
+        return merged or None
+
+    def best_oa_status():
+        best, best_rank = None, 0
+        for r in rows:
+            s = r["oa_status"]
+            if s and _OA_RANK.get(s, 0) > best_rank:
+                best, best_rank = s, _OA_RANK[s]
+        return best
+
+    # --- Calcul des valeurs ---
+    new_doi = first_non_null("doi")
+    # doc_type : premier non-null mappé vers l'enum canonique
+    new_doc_type = "other"
+    for r in rows:
+        if r["doc_type"]:
+            new_doc_type = map_doc_type(r["doc_type"], r["source"])
+            break
+    new_pub_year = first_non_null("pub_year")
+    new_journal_id = first_non_null("journal_id")
+    new_container_title = first_non_null("container_title")
+    new_language = first_non_null("language")
+    new_abstract = first_non_null("abstract")
+    new_oa_status = best_oa_status()
+    new_is_retracted = any(r["is_retracted"] for r in rows if r["is_retracted"])
+    new_keywords = merge_lists("keywords")
+    new_countries = merge_lists("countries")
+    new_topics = merge_jsonb("topics")
+    new_biblio = merge_jsonb("biblio")
+    new_meta = merge_jsonb("meta")
+
+    cur.execute("""
+        UPDATE publications SET
+            doi = %s, doc_type = %s::doc_type, pub_year = %s,
+            journal_id = %s, oa_status = %s::oa_type,
+            container_title = %s, language = %s, abstract = %s,
+            keywords = %s, countries = %s,
+            topics = %s, biblio = %s, meta = %s,
+            is_retracted = %s, updated_at = now()
+        WHERE id = %s
+    """, (new_doi, new_doc_type, new_pub_year,
+          new_journal_id, new_oa_status,
+          new_container_title, new_language, new_abstract,
+          new_keywords, new_countries,
+          Json(new_topics) if new_topics else None,
+          Json(new_biblio) if new_biblio else None,
+          Json(new_meta) if new_meta else None,
+          new_is_retracted, pub_id))
+
+    update_sources(cur, pub_id)
 
 
 def merge_publications(cur, target_id: int, source_id: int):

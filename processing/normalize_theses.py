@@ -31,7 +31,7 @@ from psycopg2.extras import Json, RealDictCursor
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-from services.publications import find_or_create, find_thesis_by_title, _enrich, update_sources
+from services.publications import find_or_create, find_thesis_by_title, try_merge_by_doi, refresh_from_sources
 from utils.log import setup_logger
 from utils.normalize import normalize_text, normalize_name
 from utils.names import names_compatible
@@ -152,8 +152,8 @@ def find_publication(cur, these: dict) -> int | None:
             author = _extract_thesis_author(these)
             for cand in candidates:
                 if not author or _thesis_author_compatible(cur, cand.id, author):
-                    # Match trouvé → enrichir
-                    _enrich(cur, cand.id, doi=doi, doc_type=doc_type)
+                    # Match trouvé → attribuer le DOI si nécessaire
+                    try_merge_by_doi(cur, cand.id, doi)
                     return cand.id
 
     return None
@@ -455,26 +455,9 @@ def process_work(cur, row: dict) -> bool:
             publication_id = find_publication(cur, these)
 
         # Enrichir la publication existante si trouvée
+        # (try_merge_by_doi gère les fusions DOI, refresh_from_sources recalcule après)
         if publication_id:
-            # Keywords et topics depuis les sujets/discipline
-            sujets = these.get("sujets") or []
-            enrich_kw = [s.get("libelle") for s in sujets if s.get("libelle")] or None
-            enrich_topics = {}
-            discipline = these.get("discipline")
-            if discipline:
-                enrich_topics["discipline"] = discipline
-            rameau = these.get("sujetsRameau") or []
-            rameau_list = [r.get("libelle") for r in rameau if r.get("libelle")]
-            if rameau_list:
-                enrich_topics["rameau"] = rameau_list
-
-            publication_id = _enrich(cur, publication_id, doi=pub_meta["doi"],
-                    doc_type=pub_meta["doc_type"],
-                    keywords=enrich_kw,
-                    topics=enrich_topics or None)
-            update_sources(cur, publication_id)
-            # Dates de thèse → publications.meta
-            _update_thesis_meta(cur, publication_id, these)
+            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
 
         # Document (source_documents) — publication_id peut être NULL
         source_document_id = insert_source_document(
@@ -483,6 +466,11 @@ def process_work(cur, row: dict) -> bool:
 
         # Personnes et authorships (avec rôles)
         process_persons(cur, these, source_document_id)
+
+        # Recalcul complet des métadonnées depuis toutes les sources
+        if publication_id:
+            refresh_from_sources(cur, publication_id)
+            _update_thesis_meta(cur, publication_id, these)
 
         mark_staging_done(cur, staging_id)
 

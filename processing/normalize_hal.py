@@ -36,7 +36,8 @@ from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
 from utils.authorship_roles import map_role
-from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
+from utils.doc_types import map_doc_type
+from services.publications import find_or_create as find_or_create_publication, try_merge_by_doi, refresh_from_sources
 from utils.nnt import normalize_nnt
 from utils.db_helpers import mark_staging_done
 from services.journals import find_or_create_publisher, find_or_create_journal
@@ -49,46 +50,6 @@ logger = setup_logger("normalize_hal", os.path.join(os.path.dirname(__file__), "
 # MAPPINGS
 # =============================================================
 
-# HAL docType_s (ou docType_s_docSubType_s) -> notre enum doc_type
-# Les cles avec _ sont des combinaisons type_sous-type, testees en priorite.
-DOCTYPE_MAP = {
-    # Combinaisons type_sous-type (prioritaires)
-    "ART_ARTREV": "review",
-    "ART_BOOKREVIEW": "book_review",
-    "ART_DATAPAPER": "data_paper",
-    "UNDEFINED_PREPRINT": "preprint",
-    "UNDEFINED_WORKINGPAPER": "preprint",
-    "CREPORT_RESREPORT": "report",
-    # Types simples
-    "ART": "article",
-    "COMM": "conference_paper",
-    "POSTER": "poster",
-    "OUV": "book",
-    "COUV": "book_chapter",
-    "DOUV": "book_chapter",
-    "THESE": "thesis",
-    "HDR": "hdr",
-    "PREPRINT": "preprint",
-    "PREPUBLICATION": "preprint",
-    "UNDEFINED": "other",
-    "OTHER": "other",
-    "REPORT": "report",
-    "CREPORT": "report",
-    "MEM": "memoir",
-    "LECTURE": "other",
-    "IMG": "other",
-    "VIDEO": "other",
-    "SON": "other",
-    "MAP": "other",
-    "SOFTWARE": "software",
-    "PATENT": "patent",
-    "NOTE": "article",
-    "BLOG": "other",
-    "NOTICE": "other",
-    "ISSUE": "other",
-    "PROCEEDINGS": "proceedings",
-    "TRAD": "other",
-}
 
 
 # =============================================================
@@ -148,7 +109,11 @@ def _map_hal_doc_type(doc: dict) -> str:
     raw_type = doc.get("docType_s", "OTHER")
     raw_sub = doc.get("docSubType_s") or ""
     combo = f"{raw_type}_{raw_sub}" if raw_sub else ""
-    return DOCTYPE_MAP.get(combo) or DOCTYPE_MAP.get(raw_type, "other")
+    if combo:
+        result = map_doc_type(combo, "hal")
+        if result != "other":
+            return result
+    return map_doc_type(raw_type, "hal")
 
 
 def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
@@ -186,45 +151,6 @@ def find_publication(cur, doc: dict, journal_id: int | None) -> int | None:
         return None
     pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
     return pub_id
-
-
-def _enrich_existing(cur, pub_id: int, doc: dict, journal_id: int | None) -> int:
-    """Enrichit une publication existante lors d'un re-traitement HAL.
-
-    Appelé quand le source_document existe deja (raw_hash a change -> processed
-    remis a FALSE). Met a jour les metadonnees qui ont pu changer (oa_status, etc.).
-    Retourne le pub_id effectif (peut changer en cas de fusion DOI).
-    """
-    doi = clean_doi(as_str(doc.get("doiId_s")))
-    doc_type = _map_hal_doc_type(doc)
-    oa_status = "green" if doc.get("openAccess_bool") else "closed"
-    language_list = doc.get("language_s")
-    language = language_list[0] if isinstance(language_list, list) and language_list else None
-    container_title = None
-    if not journal_id:
-        container_title = as_str(doc.get("bookTitle_s")) or as_str(doc.get("conferenceTitle_s"))
-
-    abstract = as_str(doc.get("abstract_s"))
-    kw_raw = doc.get("keyword_s")
-    keywords = list(dict.fromkeys(kw_raw)) if isinstance(kw_raw, list) and kw_raw else None
-    domain_raw = doc.get("domain_s")
-    topics = {"hal_domains": domain_raw} if isinstance(domain_raw, list) and domain_raw else None
-
-    biblio = {}
-    vol = as_str(doc.get("volume_s"))
-    if vol:
-        biblio["volume"] = vol
-    issue = as_str(doc.get("issue_s"))
-    if issue:
-        biblio["issue"] = issue
-    page = as_str(doc.get("page_s"))
-    if page:
-        biblio["pages"] = page
-
-    return _enrich(cur, pub_id, doi=doi, doc_type=doc_type, oa_status=oa_status,
-            journal_id=journal_id, container_title=container_title, language=language,
-            abstract=abstract, keywords=keywords, topics=topics,
-            biblio=biblio or None)
 
 
 # =============================================================
@@ -717,9 +643,9 @@ def process_work(cur, staging_row: tuple) -> bool:
         timings["publication"] = time.perf_counter() - t0
 
         # Enrichir la publication existante si trouvée
+        # (try_merge_by_doi gère les fusions DOI, refresh_from_sources recalcule après)
         if publication_id:
-            publication_id = _enrich_existing(cur, publication_id, doc, journal_id)
-            update_sources(cur, publication_id)
+            publication_id = try_merge_by_doi(cur, publication_id, clean_doi(as_str(doc.get("doiId_s"))))
 
         # Document HAL (source_documents) — publication_id peut être NULL
         t0 = time.perf_counter()
@@ -732,6 +658,10 @@ def process_work(cur, staging_row: tuple) -> bool:
         t0 = time.perf_counter()
         process_authors(cur, doc, source_document_id)
         timings["authors"] = time.perf_counter() - t0
+
+        # Recalcul complet des métadonnées depuis toutes les sources
+        if publication_id:
+            refresh_from_sources(cur, publication_id)
 
         mark_staging_done(cur, staging_id)
 

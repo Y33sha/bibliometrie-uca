@@ -32,7 +32,7 @@ from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.authorship_roles import map_role
-from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
+from services.publications import find_or_create as find_or_create_publication, try_merge_by_doi, refresh_from_sources
 from utils.db_helpers import mark_staging_done
 from utils.nnt import normalize_nnt
 from services.journals import find_or_create_publisher, find_or_create_journal
@@ -463,12 +463,7 @@ def process_work(cur, staging_row) -> bool:
             topics_raw = doc.get("topics") or doc.get("domains")
             enrich_topics = {"scanr": topics_raw} if topics_raw else None
 
-            publication_id = _enrich(cur, publication_id, doi=pub_meta["doi"],
-                    doc_type=pub_meta["doc_type"], oa_status=pub_meta["oa_status"],
-                    journal_id=journal_id, container_title=pub_meta["container_title"],
-                    abstract=abstract, keywords=enrich_keywords,
-                    topics=enrich_topics)
-            update_sources(cur, publication_id)
+            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
 
         # Document ScanR (source_documents) — publication_id peut être NULL
         t0 = time.perf_counter()
@@ -481,6 +476,10 @@ def process_work(cur, staging_row) -> bool:
         t0 = time.perf_counter()
         process_authors(cur, doc, source_document_id)
         timings["authors"] = time.perf_counter() - t0
+
+        # Recalcul complet des métadonnées depuis toutes les sources
+        if publication_id:
+            refresh_from_sources(cur, publication_id)
 
         mark_staging_done(cur, staging_id)
 

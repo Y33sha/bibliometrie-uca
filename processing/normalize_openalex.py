@@ -31,7 +31,7 @@ from utils.hal import extract_hal_id_from_url
 from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
-from services.publications import find_or_create as find_or_create_publication, find_by_nnt, find_by_doi, resolve_doi_conflict, _enrich, update_sources
+from services.publications import find_or_create as find_or_create_publication, find_by_nnt, find_by_doi, resolve_doi_conflict, try_merge_by_doi, refresh_from_sources
 from utils.nnt import normalize_nnt, is_theses_fr_source, extract_nnt_from_openalex
 from utils.db_helpers import mark_staging_done
 from services.journals import find_or_create_publisher, find_or_create_journal
@@ -672,14 +672,7 @@ def process_work(cur, staging_row: tuple) -> bool:
             raw_biblio = work.get("biblio") or {}
             enrich_biblio = {k: raw_biblio[k] for k in ("volume", "issue", "first_page", "last_page") if raw_biblio.get(k)} or None
 
-            publication_id = _enrich(cur, publication_id, doi=enrich_doi,
-                    doc_type=pub_meta["doc_type"], oa_status=pub_meta["oa_status"],
-                    journal_id=journal_id, container_title=pub_meta["container_title"],
-                    language=pub_meta["language"],
-                    abstract=abstract, keywords=enrich_keywords,
-                    topics=enrich_topics, biblio=enrich_biblio,
-                    is_retracted=work.get("is_retracted"))
-            update_sources(cur, publication_id)
+            publication_id = try_merge_by_doi(cur, publication_id, enrich_doi)
 
         # Document OpenAlex (source_documents) — publication_id peut être NULL
         source_document_id = insert_openalex_document(
@@ -688,6 +681,10 @@ def process_work(cur, staging_row: tuple) -> bool:
 
         # Auteurs et authorships
         process_authorships(cur, work, source_document_id)
+
+        # Recalcul complet des métadonnées depuis toutes les sources
+        if publication_id:
+            refresh_from_sources(cur, publication_id)
 
         mark_staging_done(cur, staging_id)
 
