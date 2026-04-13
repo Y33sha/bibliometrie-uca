@@ -37,48 +37,68 @@ HAL_API = "https://api.archives-ouvertes.fr/search"
 REQUEST_DELAY = 0.3
 
 
-def find_hal_primary_locations(cur, all_staged: bool = False) -> list[dict]:
+def find_hal_primary_locations(cur) -> list[dict]:
     """
     Trouve les works OpenAlex dont la primary_location pointe vers HAL.
-    Parcourt staging_openalex.raw_data pour extraire le landing_page_url.
-    Par défaut, ne considère que les documents non encore normalisés (processed=FALSE).
-    Avec all_staged=True, considère tout le staging.
+
+    Deux sources :
+    - staging non normalisé (raw_data.primary_location) — nouveaux docs du run en cours
+    - source_documents déjà normalisés (external_ids->>'hal') — docs des runs précédents
+
     Retourne [{openalex_id, hal_id, landing_url}, ...]
     """
-    processed_filter = "" if all_staged else " AND processed = FALSE"
-    cur.execute(f"""
+    results = {}
+
+    # 1. Staging non normalisé (raw_data encore présent)
+    cur.execute("""
         SELECT source_id AS openalex_id, raw_data
         FROM staging
-        WHERE source = 'openalex'{processed_filter}
+        WHERE source = 'openalex' AND processed = FALSE
     """)
-
-    results = []
     for row in cur.fetchall():
-        openalex_id = row["openalex_id"]
         raw = row["raw_data"]
         loc = (raw.get("primary_location") or {})
         url = loc.get("landing_page_url") or ""
-
         if "hal.science" not in url and "hal.archives-ouvertes.fr" not in url:
             continue
-
         hal_id = extract_hal_id_from_url(url)
         if hal_id:
-            results.append({
-                "openalex_id": openalex_id,
+            results[hal_id] = {
+                "openalex_id": row["openalex_id"],
                 "hal_id": hal_id,
                 "landing_url": url,
-            })
+            }
 
-    return results
+    # 2. Source documents déjà normalisés (docs des runs précédents)
+    cur.execute("""
+        SELECT sd.source_id AS openalex_id, sd.external_ids->>'hal' AS hal_id
+        FROM source_documents sd
+        WHERE sd.source = 'openalex'
+          AND sd.external_ids->>'hal' IS NOT NULL
+    """)
+    for row in cur.fetchall():
+        hal_id = row["hal_id"]
+        if hal_id not in results:
+            results[hal_id] = {
+                "openalex_id": row["openalex_id"],
+                "hal_id": hal_id,
+                "landing_url": None,
+            }
+
+    return list(results.values())
 
 
 def find_hal_ids_from_scanr(cur) -> list[dict]:
     """
-    Trouve les HAL IDs référencés dans source_documents.external_ids->>'hal' (source='scanr')
-    mais absents de staging_hal.
+    Trouve les HAL IDs référencés par ScanR mais absents de staging HAL.
+
+    Deux sources :
+    - source_documents ScanR déjà normalisés (external_ids->>'hal')
+    - staging ScanR non encore normalisé (raw_data.externalIds type='hal')
+
     Retourne [{source: "scanr", hal_id, scanr_id}, ...]
     """
+    # 1. Source documents déjà normalisés
     cur.execute("""
         SELECT sd.source_id AS scanr_id, sd.external_ids->>'hal' AS hal_id
         FROM source_documents sd
@@ -88,10 +108,37 @@ def find_hal_ids_from_scanr(cur) -> list[dict]:
               SELECT 1 FROM staging sh WHERE sh.source = 'hal' AND sh.source_id = sd.external_ids->>'hal'
           )
     """)
-    return [
-        {"source": "scanr", "hal_id": row["hal_id"], "scanr_id": row["scanr_id"]}
+    results = {
+        row["hal_id"]: {"source": "scanr", "hal_id": row["hal_id"], "scanr_id": row["scanr_id"]}
         for row in cur.fetchall()
-    ]
+    }
+
+    # 2. Staging ScanR non normalisé (externalIds dans raw_data)
+    cur.execute("""
+        SELECT source_id AS scanr_id, raw_data
+        FROM staging
+        WHERE source = 'scanr' AND raw_data IS NOT NULL
+    """)
+    candidates = {}
+    for row in cur.fetchall():
+        for ext in (row["raw_data"] or {}).get("externalIds") or []:
+            if ext.get("type") == "hal":
+                hal_id = ext.get("id")
+                if hal_id and hal_id not in results and hal_id not in candidates:
+                    candidates[hal_id] = row["scanr_id"]
+
+    # Vérifier en batch quels hal_ids sont déjà en staging HAL
+    if candidates:
+        cur.execute(
+            "SELECT source_id FROM staging WHERE source = 'hal' AND source_id = ANY(%s)",
+            (list(candidates.keys()),)
+        )
+        already_staged = {r["source_id"] for r in cur.fetchall()}
+        for hal_id, scanr_id in candidates.items():
+            if hal_id not in already_staged:
+                results[hal_id] = {"source": "scanr", "hal_id": hal_id, "scanr_id": scanr_id}
+
+    return list(results.values())
 
 
 def find_nnt_without_hal(cur) -> list[dict]:
@@ -240,7 +287,7 @@ def main():
 
     # 1. Trouver les HAL IDs manquants depuis OpenAlex et ScanR
     log.info("Recherche des works OpenAlex avec primary_location HAL...")
-    hal_refs_oa = find_hal_primary_locations(cur, all_staged=args.all)
+    hal_refs_oa = find_hal_primary_locations(cur)
     log.info(f"  {len(hal_refs_oa)} works OpenAlex pointent vers HAL")
 
     log.info("Recherche des HAL IDs dans ScanR...")

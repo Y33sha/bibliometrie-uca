@@ -16,6 +16,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 ### Facile et/ou urgent
 * [ ] 3e mode du pipeline: daily (mode rapide, seulement nouveaux docts)
 * [ ] programmation cron pour le pipeline de traitement
+* [ ] vérifier que le staging n'est PLUS JAMAIS utilisé après normalisation
 ### Autres
 * [ ] structure_ids et in_perimeter des publis theses.fr: à quelle phase du pipeline sont-ils remplis et selon quelle logique? auditer
 * [ ] création de publications: comment sont renseignés les champs mots clés, topics? fusion ou premier arrivé premier servi? Vérifier et backfiller si besoin.
@@ -147,10 +148,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 
 # Cas particuliers, bizarreries à élucider, à examiner plus tard
 * openalex répète des auteurs : publi 77832
-* claire richard: pourquoi 0 publi UCA sur page admin?
-* publi 103567: structures identifiées sur HAL: UCA, Inserm: pourquoi?
-* personne 57907: comprendre comment Damien Boyer a pu devenir une de ses formes de nom
-* [ ] pb des auteurs openalex liés à une personne mais non listés dans les auteurs d'une publi: publi 12380
 * [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
 * erreur de parsing OA: publication 113652
 * 129259 pourquoi je n'ai pas le doct hal?
