@@ -39,8 +39,14 @@ REQUEST_DELAY = 0.5
 
 
 
-def build_query(years: list) -> str:
-    """Construit la requête HAL (paramètre q)."""
+def build_query(years: list, since: str = None) -> str:
+    """Construit la requête HAL (paramètre q).
+
+    Si since est fourni (format YYYY-MM-DD), filtre sur dateLastIndexed_tdate
+    au lieu de filtrer par années.
+    """
+    if since:
+        return f"dateLastIndexed_tdate:[{since}T00:00:00Z TO *]"
     year_min = min(years)
     year_max = max(years)
     return f"producedDateY_i:[{year_min} TO {year_max}]"
@@ -126,6 +132,7 @@ def extract_collection(
     existing_ids: set,
     base_url: str,
     years: list = None,
+    since: str = None,
     dry_run: bool = False,
 ) -> tuple[int, int]:
     """
@@ -133,7 +140,7 @@ def extract_collection(
     Retourne (nb_total, nb_nouveaux).
     """
     url = build_url(base_url)
-    query = build_query(years=years)
+    query = build_query(years=years, since=since)
 
     # Premier appel pour le count
     first_page = fetch_page(url, query, collection_code=collection_code, start=0)
@@ -184,6 +191,7 @@ def extract_portal(
     base_url: str,
     portal: str,
     years: list = None,
+    since: str = None,
     dry_run: bool = False,
 ) -> tuple[int, int]:
     """
@@ -191,7 +199,7 @@ def extract_portal(
     Retourne (nb_total, nb_nouveaux).
     """
     url = build_url(base_url, portal=portal)
-    query = build_query(years=years)
+    query = build_query(years=years, since=since)
 
     # Premier appel pour le count
     first_page = fetch_page(url, query, start=0)
@@ -262,6 +270,7 @@ def main():
                         help="Compter sans insérer")
     parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
     parser.add_argument("--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)")
+    parser.add_argument("--since", help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents modifiés depuis cette date")
     args = parser.parse_args()
 
     do_collections = not args.portal_only
@@ -276,10 +285,14 @@ def main():
     config_years = get_years(cur, mode=args.mode)
     cur.close()
 
+    since = args.since
     years = [args.year] if args.year else config_years
 
     logger.info("=== Extraction HAL démarrée ===")
-    logger.info(f"Années : {years}")
+    if since:
+        logger.info(f"Mode incrémental : documents modifiés depuis {since}")
+    else:
+        logger.info(f"Années : {years}")
     logger.info(f"Collections : {do_collections} ({len(collections)} labos + {len(extra_collections)} extra) | Portails : {do_portal} ({portals})")
 
     try:
@@ -298,7 +311,7 @@ def main():
             logger.info(f"\n--- Extraction par collection ({len(all_collections)} au total) ---")
             for code, label in all_collections.items():
                 total, new = extract_collection(
-                    code, label, conn, existing_ids, base_url, years=years, dry_run=args.dry_run
+                    code, label, conn, existing_ids, base_url, years=years, since=since, dry_run=args.dry_run
                 )
                 grand_total_new += new
                 if not args.dry_run and new > 0:
@@ -308,7 +321,7 @@ def main():
         if do_portal:
             for portal in portals:
                 logger.info(f"\n--- Extraction portail {portal} ---")
-                total, new = extract_portal(conn, existing_ids, base_url, portal, years=years, dry_run=args.dry_run)
+                total, new = extract_portal(conn, existing_ids, base_url, portal, years=years, since=since, dry_run=args.dry_run)
                 grand_total_new += new
                 if not args.dry_run:
                     logger.info(f"    ->{new} nouveaux (non couverts par les collections)")

@@ -33,16 +33,27 @@ REQUEST_DELAY = 0.2
 logger = setup_logger("extract_openalex", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def build_params(year: int, cursor: str = "*",
+def build_params(year: int = None, cursor: str = "*",
                  institution_ids: list[str] | None = None,
-                 email: str = "") -> dict:
-    """Construit les paramètres de requête pour l'API OpenAlex."""
+                 email: str = "", since: str = None) -> dict:
+    """Construit les paramètres de requête pour l'API OpenAlex.
+
+    Si since est fourni (YYYY-MM-DD), filtre sur from_updated_date
+    au lieu de filtrer par année.
+    """
     lineage_filter = "|".join(institution_ids or [])
-    return {
-        "filter": (
+    if since:
+        filter_str = (
+            f"authorships.institutions.lineage:{lineage_filter},"
+            f"from_updated_date:{since}"
+        )
+    else:
+        filter_str = (
             f"authorships.institutions.lineage:{lineage_filter},"
             f"publication_year:{year}"
-        ),
+        )
+    return {
+        "filter": filter_str,
         "select": SELECT_FIELDS,
         "per_page": PER_PAGE,
         "cursor": cursor,
@@ -50,10 +61,11 @@ def build_params(year: int, cursor: str = "*",
     }
 
 
-def fetch_page(base_url: str, year: int, cursor: str = "*",
-               institution_ids: list[str] = None, email: str = "") -> dict:
+def fetch_page(base_url: str, year: int = None, cursor: str = "*",
+               institution_ids: list[str] = None, email: str = "",
+               since: str = None) -> dict:
     """Récupère une page de résultats depuis l'API."""
-    params = build_params(year, cursor, institution_ids=institution_ids, email=email)
+    params = build_params(year, cursor, institution_ids=institution_ids, email=email, since=since)
     response = requests.get(base_url, params=params, timeout=30)
     response.raise_for_status()
     return response.json()
@@ -129,11 +141,12 @@ def insert_batch(conn, batch: list[tuple]) -> int:
     return updated
 
 
-def extract_year(year: int, conn, existing_ids: set,
+def extract_year(year: int = None, conn=None, existing_ids: set = None,
                  base_url: str = "", institution_ids: list[str] = None,
-                 email: str = "", dry_run: bool = False) -> tuple[int, int]:
+                 email: str = "", since: str = None,
+                 dry_run: bool = False) -> tuple[int, int]:
     """
-    Extrait toutes les publications d'une année.
+    Extrait des publications OpenAlex par année ou par date de modification.
     Retourne (nouveaux, mis_a_jour).
     """
     cursor = "*"
@@ -143,9 +156,10 @@ def extract_year(year: int, conn, existing_ids: set,
     page_num = 0
 
     # Premier appel pour avoir le count total
-    first_page = fetch_page(base_url, year, cursor, institution_ids=institution_ids, email=email)
+    first_page = fetch_page(base_url, year, cursor, institution_ids=institution_ids, email=email, since=since)
     total_count = first_page["meta"]["count"]
-    logger.info(f"Année {year} : {total_count} works trouvés sur OpenAlex")
+    label = f"depuis {since}" if since else f"année {year}"
+    logger.info(f"{label} : {total_count} works trouvés sur OpenAlex")
 
     if dry_run:
         return 0, 0
@@ -156,7 +170,7 @@ def extract_year(year: int, conn, existing_ids: set,
         if page_num == 1:
             data = first_page
         else:
-            data = fetch_page(base_url, year, cursor, institution_ids=institution_ids, email=email)
+            data = fetch_page(base_url, year, cursor, institution_ids=institution_ids, email=email, since=since)
 
         results = data.get("results", [])
         if not results:
@@ -214,6 +228,7 @@ def main():
     parser = argparse.ArgumentParser(description="Extraction OpenAlex → staging")
     parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
     parser.add_argument("--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)")
+    parser.add_argument("--since", help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents modifiés depuis cette date")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
     args = parser.parse_args()
 
@@ -225,21 +240,32 @@ def main():
     config_years = get_years(cur, mode=args.mode)
     cur.close()
 
+    since = args.since
     years = [args.year] if args.year else config_years
 
     logger.info(f"=== Extraction OpenAlex demarree ===")
     logger.info(f"Institutions OpenAlex : {', '.join(institution_ids)} (lineage OR)")
-    logger.info(f"Annees : {years}")
+    if since:
+        logger.info(f"Mode incrémental : documents modifiés depuis {since}")
+    else:
+        logger.info(f"Annees : {years}")
     try:
         existing_ids = get_existing_ids(conn, "openalex")
         logger.info(f"{len(existing_ids)} works deja en staging")
 
         grand_new = 0
         grand_updated = 0
-        for year in years:
-            year_new, year_updated = extract_year(year, conn, existing_ids,
+        if since:
+            year_new, year_updated = extract_year(conn=conn, existing_ids=existing_ids,
                 base_url=base_url, institution_ids=institution_ids,
-                email=email, dry_run=args.dry_run)
+                email=email, since=since, dry_run=args.dry_run)
+            grand_new += year_new
+            grand_updated += year_updated
+        else:
+            for year in years:
+                year_new, year_updated = extract_year(year, conn, existing_ids,
+                    base_url=base_url, institution_ids=institution_ids,
+                    email=email, dry_run=args.dry_run)
             grand_new += year_new
             grand_updated += year_updated
 

@@ -10,6 +10,24 @@ from pathlib import Path
 from db.connection import get_connection
 from utils.sources import ALL_SOURCES
 
+FALLBACK_DAYS = 7  # si pas de rapport précédent, remonter de N jours
+
+
+def get_last_run_date() -> datetime.date:
+    """Retourne la date du dernier run pipeline depuis les noms de rapports.
+
+    Fallback : date du jour - FALLBACK_DAYS si aucun rapport trouvé.
+    """
+    if REPORTS_DIR.exists():
+        reports = sorted(REPORTS_DIR.glob("*.md"), reverse=True)
+        if reports:
+            stem = reports[0].stem  # ex: 2026-04-13_120000
+            try:
+                return datetime.datetime.strptime(stem.split("_")[0], "%Y-%m-%d").date()
+            except (ValueError, IndexError):
+                pass
+    return datetime.date.today() - datetime.timedelta(days=FALLBACK_DAYS)
+
 REPORTS_DIR = Path(__file__).parent / "reports"
 
 

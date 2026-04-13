@@ -8,6 +8,7 @@ Usage:
     python run_pipeline.py --only extract     # Exécuter une seule phase
     python run_pipeline.py --list             # Lister les phases
     python run_pipeline.py --dry-run          # Afficher sans exécuter
+    python run_pipeline.py --mode daily       # Import quotidien (HAL + OpenAlex, depuis dernier run)
     python run_pipeline.py --mode weekly      # Import incrémental (6 derniers mois)
     python run_pipeline.py --mode monthly     # Repasse complète + cross-imports
     python run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement
@@ -60,11 +61,20 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
 
     Les années sont déterminées par la config DB (pipeline_years_full/weekly).
     Les scripts d'extraction lisent la config directement.
+    En mode daily, seules HAL et OpenAlex sont interrogées (filtre par date).
     En mode weekly, WoS est exclu pour économiser le crédit API.
     """
     sources = sources or set(ALL_SOURCES_SET)
     year_args = ["--year", str(year)] if year else []
-    if mode == "weekly":
+    if mode == "daily":
+        from pipeline.metrics import get_last_run_date
+        since = str(get_last_run_date())
+        log.info("Mode quotidien : HAL + OpenAlex depuis %s", since)
+        if "hal" in sources:
+            run_python("extraction/hal/extract_hal.py", "--since", since)
+        if "openalex" in sources:
+            run_python("extraction/openalex/extract_openalex.py", "--since", since)
+    elif mode == "weekly":
         log.info("Mode hebdomadaire (WoS exclu)")
         if "openalex" in sources:
             run_python("extraction/openalex/extract_openalex.py", "--mode", "weekly", *year_args)
@@ -83,8 +93,8 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
             run_python("extraction/scanr/extract_scanr.py", *year_args)
         if "theses" in sources:
             run_python("extraction/theses/extract_theses.py")
-    # Re-fetch des publications OA tronquées à 100 auteurs (lit le staging, pas les tables normalisées)
-    if "openalex" in (sources or {"openalex"}):
+    # Re-fetch des publications OA tronquées à 100 auteurs (sauf mode daily)
+    if mode != "daily" and "openalex" in (sources or {"openalex"}):
         run_python("extraction/openalex/refetch_truncated.py")
 
 
@@ -283,7 +293,7 @@ def main():
                         help="Lister les phases disponibles")
     parser.add_argument("--dry-run", action="store_true",
                         help="Afficher les étapes sans exécuter")
-    parser.add_argument("--mode", choices=["full", "weekly", "monthly"], default="full",
+    parser.add_argument("--mode", choices=["full", "weekly", "monthly", "daily"], default="full",
                         help="Mode d'exécution (défaut: full)")
     parser.add_argument("--sources", default=",".join(ALL_SOURCES_SET),
                         help="Sources, séparées par des virgules (défaut: hal,openalex,wos,scanr,theses)")
