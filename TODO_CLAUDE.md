@@ -50,6 +50,17 @@ Suite du commit 325bd76. Reste à faire :
 ### ~~2. Factoriser find_publication~~ — Non justifié (chaque source a ses spécificités)
 ### ~~3. Tests~~ — FAIT (migrés vers map_doc_type, 254 tests passent)
 
+## Requêtes SQL avec listes de sources hardcodées
+
+Beaucoup de requêtes SQL contiennent `IN ('hal', 'openalex', 'wos')` en excluant scanr et theses. À vérifier au cas par cas :
+- `backend/routers/authorships.py` (lignes 30, 65, 146)
+- `backend/routers/persons.py` (lignes 834, 1068, 1266, 1313, 1350)
+- `services/persons.py` (ligne 456)
+- `processing/create_persons_from_source_authorships.py` (ligne 222)
+- `scripts/assign_orphans_by_name_form.py` (ligne 41)
+
+A priori l'exclusion n'est pas voulue, sauf si liée au traitement des raw_affiliations (HAL et theses n'en ont pas). Remplacer par `= ANY(%s)` avec la constante Python appropriée (`ALL_SOURCES` ou `BIBLIO_SOURCES` selon le cas).
+
 ## Scalabilité
 
 - [ ] Connection pooling DB (remplacer `psycopg2.connect()` par un pool dans `get_cursor()` — changement localisé)

@@ -8,6 +8,7 @@ import datetime
 from pathlib import Path
 
 from db.connection import get_connection
+from utils.sources import ALL_SOURCES
 
 REPORTS_DIR = Path(__file__).parent / "reports"
 
@@ -39,7 +40,7 @@ def snapshot(conn) -> dict:
             counts[name] = 0
 
     # Compteurs par source
-    for source in ("hal", "openalex", "wos", "scanr", "theses"):
+    for source in ALL_SOURCES:
         cur.execute("SELECT COUNT(*) FROM source_documents WHERE source = %s", (source,))
         counts[f"sd_{source}"] = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM staging WHERE source = %s AND processed = FALSE", (source,))

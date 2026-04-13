@@ -13,6 +13,7 @@ Les auteurs sources sont dans la table unifiée `source_authors`
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.normalize import normalize_name
+from utils.sources import ALL_SOURCES_SET
 from utils.uca_perimeter import get_uca_structure_ids_list
 
 
@@ -41,7 +42,7 @@ def link_authorship(cur, person_id: int, source: str, authorship_id: int,
 
     Pour HAL, fait aussi le dual-write sur source_authors si c'est un compte HAL.
     """
-    if source not in ("hal", "openalex", "wos", "scanr", "theses"):
+    if source not in ALL_SOURCES_SET:
         return
 
     cur.execute("UPDATE source_authorships SET person_id = %s WHERE id = %s AND source = %s",
@@ -68,7 +69,7 @@ def link_authorships(cur, person_id: int, authorships: list[dict]):
 
 def unlink_authorship(cur, person_id: int, source: str, authorship_id: int):
     """Détache une authorship source d'une personne (met person_id à NULL)."""
-    if source in ("hal", "openalex", "wos", "scanr", "theses"):
+    if source in ALL_SOURCES_SET:
         cur.execute(
             "UPDATE source_authorships SET person_id = NULL WHERE id = %s AND person_id = %s AND source = %s",
             (authorship_id, person_id, source))

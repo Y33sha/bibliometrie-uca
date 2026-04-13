@@ -36,6 +36,8 @@ import argparse
 import logging
 import subprocess
 import sys
+
+from utils.sources import ALL_SOURCES_SET, BIBLIO_SOURCES_SET
 import time
 from pathlib import Path
 
@@ -60,7 +62,7 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
     Les scripts d'extraction lisent la config directement.
     En mode weekly, WoS est exclu pour économiser le crédit API.
     """
-    sources = sources or {"hal", "openalex", "wos", "scanr", "theses"}
+    sources = sources or set(ALL_SOURCES_SET)
     year_args = ["--year", str(year)] if year else []
     if mode == "weekly":
         log.info("Mode hebdomadaire (WoS exclu)")
@@ -89,7 +91,7 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
 def phase_cross_imports(mode="full", sources=None, full_cross_import=False, **kw):
     """Phase 2 : Cross-imports entre sources (lit le staging uniquement)."""
     if mode in ("full", "monthly"):
-        sources = sources or {"hal", "openalex", "wos", "scanr"}
+        sources = sources or set(BIBLIO_SOURCES_SET)
         full_flag = ["--all"] if full_cross_import else []
         if "hal" in sources:
             run_python("extraction/hal/fetch_missing_hal.py", *full_flag)
@@ -112,7 +114,7 @@ def phase_normalize(**kw):
     source_documents. Vide le raw_data du staging apres traitement.
     Pour HAL : enrichit les structures et moissonne les identifiants (ORCID, IdRef).
     """
-    sources = kw.get("sources", {"hal", "openalex", "wos", "scanr", "theses"})
+    sources = kw.get("sources", set(ALL_SOURCES_SET))
     if "openalex" in sources:
         run_python("processing/normalize_openalex.py")
     if "hal" in sources:
@@ -162,7 +164,7 @@ def phase_affiliations(**kw):
     Determine in_perimeter et structure_ids a partir des structures HAL
     (pour HAL) et des adresses resolues (pour les autres sources).
     """
-    sources = kw.get("sources", {"hal", "openalex", "wos", "scanr", "theses"})
+    sources = kw.get("sources", set(ALL_SOURCES_SET))
     source_args = ",".join(sorted(sources))
     run_python("processing/populate_affiliations.py", "--sources", source_args)
 
@@ -200,7 +202,7 @@ def phase_authorships(**kw):
     et structure_ids propages.
     """
     sources = kw.get("sources")
-    if sources and sources != {"hal", "openalex", "wos", "scanr", "theses"}:
+    if sources and sources != ALL_SOURCES_SET:
         run_python("processing/build_authorships.py", "--sources", ",".join(sorted(sources)))
     else:
         run_python("processing/build_authorships.py")
@@ -283,7 +285,7 @@ def main():
                         help="Afficher les étapes sans exécuter")
     parser.add_argument("--mode", choices=["full", "weekly", "monthly"], default="full",
                         help="Mode d'exécution (défaut: full)")
-    parser.add_argument("--sources", default="hal,openalex,wos,scanr,theses",
+    parser.add_argument("--sources", default=",".join(ALL_SOURCES_SET),
                         help="Sources, séparées par des virgules (défaut: hal,openalex,wos,scanr,theses)")
     parser.add_argument("--year", type=int,
                         help="Surcharger l'année d'extraction (une seule année)")

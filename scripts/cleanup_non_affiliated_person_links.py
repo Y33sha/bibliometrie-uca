@@ -25,7 +25,7 @@ from utils.log import setup_logger
 
 logger = setup_logger("cleanup_non_affiliated", os.path.join(os.path.dirname(__file__), "../processing/logs"))
 
-SOURCES = ["hal", "openalex", "wos", "scanr"]
+from utils.sources import BIBLIO_SOURCES as SOURCES
 
 
 def count_affected(cur):
