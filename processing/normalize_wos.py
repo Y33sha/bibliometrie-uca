@@ -46,44 +46,6 @@ logger = setup_logger("normalize_wos", os.path.join(os.path.dirname(__file__), "
 # =============================================================
 
 # WoS document type → notre enum doc_type
-DOCTYPE_MAP = {
-    "article": "article",
-    "review": "review",
-    "book": "book",
-    "book chapter": "book_chapter",
-    "proceedings paper": "conference_paper",
-    "editorial material": "editorial",
-    "letter": "letter",
-    "meeting abstract": "conference_paper",
-    "book review": "book_review",
-    "correction": "erratum",
-    "retraction": "retraction",
-    "news item": "other",
-    "reprint": "other",
-    "note": "article",
-    "data paper": "dataset",
-    "early access": "article",
-    "software review": "other",
-    "discussion": "other",
-    "biographical-item": "other",
-    "bibliography": "other",
-    "art exhibit review": "other",
-    "dance performance review": "other",
-    "film review": "other",
-    "music performance review": "other",
-    "music score review": "other",
-    "poetry": "other",
-    "record review": "other",
-    "theater review": "other",
-    "tv review, radio review": "other",
-    "hardware review": "other",
-    "database review": "other",
-    "chronology": "other",
-    "excerpt": "other",
-    "fiction, creative prose": "other",
-    "script": "other",
-    "item about an individual": "other",
-}
 
 
 # =============================================================
@@ -99,18 +61,13 @@ def detect_format(raw_data: dict) -> str:
 
 
 def map_doc_type(raw_type: str | None) -> str:
-    """Mappe un type de document WoS vers notre enum."""
-    if not raw_type:
-        return "other"
-    # WoS peut avoir des types composites : "Article; Proceedings Paper"
-    # On prend le premier type significatif
-    parts = [p.strip().lower() for p in raw_type.split(";")]
-    for part in parts:
-        mapped = DOCTYPE_MAP.get(part)
-        if mapped and mapped != "other":
-            return mapped
-    # Fallback sur le premier
-    return DOCTYPE_MAP.get(parts[0], "other")
+    """Mappe un type de document WoS vers notre enum.
+
+    Délègue à utils.doc_types.map_doc_type qui gère les types
+    composites (séparés par ';') et le mapping WoS.
+    """
+    from utils.doc_types import map_doc_type as _map
+    return _map(raw_type, "wos")
 
 
 def map_oa_status(raw_oa: str | None) -> str:
@@ -334,7 +291,7 @@ def extract_from_tsv(raw: dict, staging_doi: str | None) -> dict:
         "doi": doi,
         "title": title,
         "pub_year": pub_year,
-        "doc_type": map_doc_type(raw.get("DT")),
+        "doc_type": raw.get("DT") or "other",
         "language": raw.get("LA"),
         "oa_status": map_oa_status(raw.get("OA")),
         "journal_title": raw.get("SO"),
@@ -629,7 +586,7 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
         "doi": doi,
         "title": title,
         "pub_year": pub_year,
-        "doc_type": map_doc_type(raw_doc_type),
+        "doc_type": raw_doc_type or "other",
         "language": language,
         "oa_status": oa_status,
         "journal_title": journal_title,
@@ -691,6 +648,8 @@ def find_publication(cur, rec: dict, journal_id: int | None) -> int | None:
     meta = extract_pub_metadata(rec, journal_id)
     if not meta["pub_year"] or not meta["title"] or meta["title"] == "(sans titre)":
         return None
+    # Mapper le doc_type pour find_or_create (resolve_doi_conflict a besoin du type canonique)
+    meta["doc_type"] = map_doc_type(meta["doc_type"])
     pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
     return pub_id
 

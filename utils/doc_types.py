@@ -155,6 +155,9 @@ _VALID_DOC_TYPES = {
 def map_doc_type(raw: str | None, source: str | None = None) -> str:
     """Convertit un doc_type source en valeur canonique de l'enum doc_type.
 
+    Gère les types composites séparés par ";" (ex: WoS "Article; Proceedings Paper")
+    en prenant le premier type significatif (non "other").
+
     Lookup :
     1. Si source est fourni, cherche dans le mapping de cette source.
     2. Sinon (ou si non trouvé), cherche dans tous les mappings.
@@ -163,6 +166,18 @@ def map_doc_type(raw: str | None, source: str | None = None) -> str:
     """
     if not raw:
         return "other"
+
+    # Types composites (WoS) : "Article; Proceedings Paper"
+    if ";" in raw:
+        parts = [p.strip() for p in raw.split(";") if p.strip()]
+        best = "other"
+        for part in parts:
+            mapped = map_doc_type(part, source)
+            if mapped != "other":
+                return mapped
+            best = mapped
+        return best
+
     key = raw.strip().lower()
 
     # 1. Lookup dans la source spécifique
