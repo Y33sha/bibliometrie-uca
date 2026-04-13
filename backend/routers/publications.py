@@ -326,6 +326,70 @@ async def publications_facets(
         country_facets = [{"value": r["code"].strip(), "text": r["name"], "count": r["count"]}
                          for r in cur.fetchall() if r["code"].strip() != "xx"]
 
+        # --- Facette HAL STATUS (only meaningful with a single lab) ---
+        hal_status_facets = []
+        if len(lab_ids_clean) == 1:
+            cur.execute("SELECT hal_collection FROM structures WHERE id = %s", (lab_ids_clean[0],))
+            lab_row = cur.fetchone()
+            lab_hal_col = lab_row["hal_collection"] if lab_row else None
+
+            c, p = base_conds_params()
+            add_all_except(c, p, skip="hal_status")
+            w = where_sql(c)
+
+            if lab_hal_col:
+                cur.execute(f"""
+                    SELECT
+                        COUNT(*) FILTER (WHERE NOT EXISTS (
+                            SELECT 1 FROM source_documents sd
+                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                        )) AS hors_hal,
+                        COUNT(*) FILTER (WHERE EXISTS (
+                            SELECT 1 FROM source_documents sd
+                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                              AND (sd.collections IS NULL OR NOT sd.collections @> ARRAY[%s])
+                        )) AS hors_collection,
+                        COUNT(*) FILTER (WHERE EXISTS (
+                            SELECT 1 FROM source_documents sd
+                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                              AND sd.collections @> ARRAY[%s]
+                        ) AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown'))
+                        ) AS notice,
+                        COUNT(*) FILTER (WHERE EXISTS (
+                            SELECT 1 FROM source_documents sd
+                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                              AND sd.collections @> ARRAY[%s]
+                        ) AND p.oa_status IS NOT NULL
+                          AND p.oa_status::text NOT IN ('closed', 'unknown')
+                        ) AS ok
+                    FROM publications p
+                    WHERE {w}
+                """, [lab_hal_col, lab_hal_col, lab_hal_col] + p)
+            else:
+                # No collection configured: only hors_hal vs hors_collection
+                cur.execute(f"""
+                    SELECT
+                        COUNT(*) FILTER (WHERE NOT EXISTS (
+                            SELECT 1 FROM source_documents sd
+                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                        )) AS hors_hal,
+                        COUNT(*) FILTER (WHERE EXISTS (
+                            SELECT 1 FROM source_documents sd
+                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                        )) AS hors_collection,
+                        0 AS notice,
+                        0 AS ok
+                    FROM publications p
+                    WHERE {w}
+                """, p)
+            r = cur.fetchone()
+            hal_status_facets = [
+                {"value": "ok",              "text": "OK",              "count": r["ok"]},
+                {"value": "notice",          "text": "Notice",          "count": r["notice"]},
+                {"value": "hors_collection", "text": "Hors collection", "count": r["hors_collection"]},
+                {"value": "hors_hal",        "text": "Hors HAL",        "count": r["hors_hal"]},
+            ]
+
         return {
             "years": year_facets,
             "labs": lab_facets,
@@ -343,6 +407,7 @@ async def publications_facets(
             },
             "apc": apc_facets,
             "countries": country_facets,
+            "hal_status": hal_status_facets,
         }
 
 
@@ -778,6 +843,7 @@ async def list_publications(
     is_corresponding: str = Query(""),  # yes, no
     has_apc: str = Query(""),  # yes, no
     country: str = Query(""),  # comma-separated country codes
+    hal_status: str = Query(""),  # comma-separated: ok, notice, hors_collection, hors_hal
 ):
     """Liste les publications avec sources, labos, journal."""
     offset = (page - 1) * per_page
@@ -915,6 +981,53 @@ async def list_publications(
             conditions.append("p.countries && %s::text[]")
             params.append(country_values)
 
+        # HAL status filter (requires lab_id for collection check)
+        hal_status_values = [v.strip() for v in hal_status.split(',') if v.strip()] if hal_status else []
+        if hal_status_values and len(lab_ids) == 1:
+            # Fetch the hal_collection for this lab
+            cur.execute("SELECT hal_collection FROM structures WHERE id = %s", (lab_ids[0],))
+            lab_row = cur.fetchone()
+            lab_hal_col = lab_row["hal_collection"] if lab_row else None
+
+            hal_parts = []
+            for v in hal_status_values:
+                if v == 'hors_hal':
+                    hal_parts.append(
+                        "NOT EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal')"
+                    )
+                elif v == 'hors_collection':
+                    if lab_hal_col:
+                        hal_parts.append(
+                            "EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
+                            " AND (sd.collections IS NULL OR NOT sd.collections @> ARRAY[%s]))"
+                        )
+                        params.append(lab_hal_col)
+                    else:
+                        # No collection configured → all HAL docs are "hors collection"
+                        hal_parts.append(
+                            "EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal')"
+                        )
+                elif v == 'notice':
+                    if lab_hal_col:
+                        hal_parts.append(
+                            "(EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
+                            " AND sd.collections @> ARRAY[%s])"
+                            " AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))"
+                        )
+                        params.append(lab_hal_col)
+                elif v == 'ok':
+                    if lab_hal_col:
+                        hal_parts.append(
+                            "(EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
+                            " AND sd.collections @> ARRAY[%s])"
+                            " AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN ('closed', 'unknown'))"
+                        )
+                        params.append(lab_hal_col)
+            if len(hal_parts) == 1:
+                conditions.append(hal_parts[0])
+            elif len(hal_parts) > 1:
+                conditions.append("(" + " OR ".join(hal_parts) + ")")
+
         where_clause = " AND ".join(conditions) if conditions else "TRUE"
 
         order_map = {
@@ -942,7 +1055,7 @@ async def list_publications(
                 pub.name AS publisher_name,
                 -- Sources: tous les IDs en un seul lateral
                 src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
-                src_ids.wos_id, src_ids.theses_id,
+                src_ids.wos_id, src_ids.theses_id, src_ids.hal_collections,
                 -- Dates thèse (soutenance / inscription) depuis publications.meta
                 p.meta->>'date_soutenance' AS date_soutenance,
                 p.meta->>'date_inscription' AS date_inscription,
@@ -996,7 +1109,10 @@ async def list_publications(
                     max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
                     max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
                     max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
-                    max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id
+                    max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id,
+                    (SELECT sd2.collections FROM source_documents sd2
+                     WHERE sd2.publication_id = p.id AND sd2.source = 'hal'
+                     LIMIT 1) AS hal_collections
                 FROM source_documents sd WHERE sd.publication_id = p.id
             ) src_ids ON TRUE
             WHERE {where_clause}
@@ -1027,6 +1143,7 @@ async def list_publications(
                 "apc": row["apc_details"],
                 "is_corresponding": row["is_corresponding"],
                 "authorship_id": row["authorship_id"],
+                "hal_collections": row["hal_collections"],
             })
 
         return {

@@ -58,6 +58,7 @@
 		openalex_id: string | null;
 		scanr_id: string | null;
 		wos_id: string | null;
+		hal_collections: string[] | null;
 		labs: string | null;
 		lab_items: { id: number; label: string }[] | null;
 		apc: { amount: number; institution: string | null; lab_id: number | null; lab_acronym: string | null; budget_structure_id: number | null }[] | null;
@@ -114,16 +115,33 @@
 
 	// --- Column visibility ---
 	const cv = useColumnVisibility([
-		{ key: 'title',   label: 'Titre',    fixed: true },
-		{ key: 'journal', label: 'Revue' },
-		{ key: 'type',    label: 'Type' },
-		{ key: 'year',    label: 'Année' },
-		{ key: 'apc',     label: 'APC' },
-		{ key: 'oa',      label: 'OA' },
-		{ key: 'oa_path', label: 'Voie OA' },
-		{ key: 'links',   label: 'Liens',    fixed: true },
-	], ['apc', 'oa_path']);
+		{ key: 'title',      label: 'Titre',      fixed: true },
+		{ key: 'journal',    label: 'Revue' },
+		{ key: 'type',       label: 'Type' },
+		{ key: 'year',       label: 'Année' },
+		{ key: 'apc',        label: 'APC' },
+		{ key: 'oa',         label: 'OA' },
+		{ key: 'oa_path',    label: 'Voie OA' },
+		{ key: 'hal_status', label: 'Statut HAL' },
+		{ key: 'links',      label: 'Liens',      fixed: true },
+	], ['apc', 'oa_path', 'hal_status']);
 	const col = cv.col;
+
+	type HalStatus = 'ok' | 'notice' | 'hors_collection' | 'hors_hal';
+	const HAL_STATUS_META: Record<HalStatus, { label: string; css: string }> = {
+		ok:              { label: 'OK',              css: 'hal-ok' },
+		notice:          { label: 'Notice',          css: 'hal-notice' },
+		hors_collection: { label: 'Hors collection', css: 'hal-hors-collection' },
+		hors_hal:        { label: 'Hors HAL',        css: 'hal-hors-hal' },
+	};
+
+	function computeHalStatus(p: Publication): HalStatus {
+		if (!p.hal_id) return 'hors_hal';
+		const labCol = lab?.hal_collection;
+		if (!labCol || !p.hal_collections || !p.hal_collections.includes(labCol)) return 'hors_collection';
+		if (!p.oa_status || ['closed', 'unknown'].includes(p.oa_status)) return 'notice';
+		return 'ok';
+	}
 
 	// --- Publication filters ---
 	let pubSearch = $state('');
@@ -134,6 +152,7 @@
 	let selectedOa: string[] = $state([]);
 	let selectedApc: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
+	let selectedHalStatus: string[] = $state([]);
 	let pubSort = $state('year_desc');
 
 	function togglePubSortYear() {
@@ -286,6 +305,7 @@
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) params.set('has_apc', selectedApc.join(','));
 		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
+		if (selectedHalStatus.length) params.set('hal_status', selectedHalStatus.join(','));
 		return params;
 	}
 
@@ -315,6 +335,7 @@
 			access:    { type: 'passthrough', apiKey: 'access' },
 			oa:        { type: 'label_map',   apiKey: 'oa_statuses', labels: oaLabelsMap },
 			apc:       { type: 'passthrough', apiKey: 'apc' },
+			halStatus: { type: 'passthrough', apiKey: 'hal_status' },
 			countries: { type: 'passthrough', apiKey: 'countries',
 				transform: (c) => ({ value: c.value, text: `${c.text} (${c.value.toUpperCase()})`, count: c.count }) },
 		},
@@ -331,6 +352,7 @@
 			selectedOa:       { type: 'string_array',  urlKey: 'oa_status' },
 			selectedApc:      { type: 'string_array',  urlKey: 'has_apc' },
 			selectedCountries:{ type: 'string_array',  urlKey: 'country' },
+			selectedHalStatus:{ type: 'string_array',  urlKey: 'hal_status' },
 			pubSearch:        { type: 'single',        urlKey: 'search' },
 			pubSort:          { type: 'single',        urlKey: 'sort', defaultValue: 'year_desc' },
 			currentPage:      { type: 'page',          urlKey: 'page' },
@@ -348,7 +370,7 @@
 		url.syncUrl(() => ({
 			tab: activeTab,
 			selectedYears, sourceStates, selectedDocTypes,
-			selectedAccess, selectedOa, selectedApc, selectedCountries, pubSearch, pubSort,
+			selectedAccess, selectedOa, selectedApc, selectedCountries, selectedHalStatus, pubSearch, pubSort,
 			currentPage: pubs.page,
 			personsSort,
 			hasRh: selectedRh.length === 1 ? selectedRh[0] : 'all',
@@ -607,6 +629,7 @@
 		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
 		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
 		if (restored.selectedCountries) selectedCountries = restored.selectedCountries as string[];
+		if (restored.selectedHalStatus) selectedHalStatus = restored.selectedHalStatus as string[];
 		if (restored.pubSearch) pubSearch = restored.pubSearch as string;
 		if (restored.pubSort) pubSort = restored.pubSort as string;
 		if (restored.currentPage) pubs.page = restored.currentPage as number;
@@ -790,6 +813,7 @@
 				{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
 				{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
 				{#if col('oa_path')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
+				{#if col('hal_status')}<FacetDropdown label="Statut HAL" options={facets.options.halStatus} bind:selected={selectedHalStatus} onchange={onFilterChange} />{/if}
 				{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />{/if}
 				<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
 				<SourceFilterToggle bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
@@ -806,6 +830,7 @@
 						{#if col('apc')}<th style="width:60px">APC</th>{/if}
 						{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
 						{#if col('oa_path')}<th style="width:60px">Voie OA</th>{/if}
+						{#if col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
 						<th style="width:80px" class="col-menu-th">
 							<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
 								showMenu={cv.showMenu}
@@ -860,6 +885,11 @@
 										<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
 									{/if}
 								</td>{/if}
+								{#if col('hal_status')}
+									{@const hs = computeHalStatus(p)}
+									{@const meta = HAL_STATUS_META[hs]}
+									<td><span class="hal-badge {meta.css}">{meta.label}</span></td>
+								{/if}
 								<td class="links-cell">
 									{#if p.hal_id}
 										<a href={halDocUrl(p.hal_id)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
@@ -1183,6 +1213,20 @@
 	}
 	.status-tag.confirmed { background: #e6f4ec; color: #2a7d4f; }
 	.status-tag.pending { background: #f0efec; color: var(--muted); }
+	/* HAL status badges */
+	.hal-badge {
+		display: inline-block;
+		padding: 2px 7px;
+		border-radius: 3px;
+		font-size: 0.8rem;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+	.hal-ok              { background: #e6f4ec; color: #2a7d4f; }
+	.hal-notice          { background: #fff3e0; color: #c77c00; }
+	.hal-hors-collection { background: #ffe8d6; color: #d35400; }
+	.hal-hors-hal        { background: #fde8e8; color: #c0392b; }
+
 	.col-menu-th { position: relative; }
 	.date-cell { font-size: 0.85rem; white-space: nowrap; color: var(--muted); }
 	.status-badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 8px; }
