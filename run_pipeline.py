@@ -99,21 +99,30 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
 
 
 def phase_cross_imports(mode="full", sources=None, full_cross_import=False, **kw):
-    """Phase 2 : Cross-imports entre sources (lit le staging uniquement)."""
-    if mode in ("full", "monthly"):
+    """Phase 2 : Cross-imports entre sources (lit le staging uniquement).
+
+    - daily/weekly : cross-import sur les documents non normalisés (processed=FALSE)
+    - monthly : cross-import complet (--all)
+    - full : selon le flag --full-cross-import
+    """
+    if mode in ("daily", "weekly"):
         sources = sources or set(BIBLIO_SOURCES_SET)
-        full_flag = ["--all"] if full_cross_import else []
-        if "hal" in sources:
-            run_python("extraction/hal/fetch_missing_hal.py", *full_flag)
-            run_python("extraction/hal/cross_import_hal.py", *full_flag)
-        if "openalex" in sources:
-            run_python("extraction/openalex/cross_import_openalex.py", *full_flag)
-        if "wos" in sources:
-            run_python("extraction/wos/cross_import_wos.py", *full_flag)
-        if "scanr" in sources:
-            run_python("extraction/scanr/cross_import_scanr.py", *full_flag)
+        full_flag = []
+    elif mode in ("full", "monthly"):
+        sources = sources or set(BIBLIO_SOURCES_SET)
+        full_flag = ["--all"] if (full_cross_import or mode == "monthly") else []
     else:
-        log.info("Cross-imports ignorés en mode hebdomadaire")
+        return
+
+    if "hal" in sources:
+        run_python("extraction/hal/fetch_missing_hal.py", *full_flag)
+        run_python("extraction/hal/cross_import_hal.py", *full_flag)
+    if "openalex" in sources:
+        run_python("extraction/openalex/cross_import_openalex.py", *full_flag)
+    if "wos" in sources:
+        run_python("extraction/wos/cross_import_wos.py", *full_flag)
+    if "scanr" in sources:
+        run_python("extraction/scanr/cross_import_scanr.py", *full_flag)
 
 
 def phase_normalize(**kw):
