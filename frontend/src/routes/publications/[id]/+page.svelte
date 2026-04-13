@@ -400,14 +400,16 @@
           </dd>
         {/if}
 
-        {#if thesisMeta?.partenaires?.length}
+        {#if thesisMeta?.partenaires?.length || thesisAuthorStructures.length}
           <dt>Partenaire(s) de recherche</dt>
           <dd>
-            {#each thesisMeta.partenaires as pr, i}
-              <span>{pr.nom}{#if pr.type}&nbsp;({pr.type}){/if}</span>{#if i < thesisMeta.partenaires.length - 1},&nbsp;{/if}
-            {/each}
+            {#if thesisMeta?.partenaires?.length}
+              {#each thesisMeta.partenaires as pr, i}
+                <span>{pr.nom}{#if pr.type}&nbsp;({pr.type}){/if}</span>{#if i < thesisMeta.partenaires.length - 1},&nbsp;{/if}
+              {/each}
+            {/if}
             {#each thesisAuthorStructures as sid}
-              <a href="{base}/laboratories/{sid}" class="struct-tag">{structLabel(sid)}</a>
+              <a href="{base}/laboratories/{sid}?tab=theses" class="struct-tag">{structLabel(sid)}</a>
             {/each}
           </dd>
         {/if}

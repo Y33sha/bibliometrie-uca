@@ -16,9 +16,9 @@ Workflow HAL — position dans le pipeline :
   4. migrate_person_identifiers.py → person_identifiers
 
 Usage:
-    python3 harvest_hal_orcids.py              # moissonnage complet
-    python3 harvest_hal_orcids.py --dry-run    # rapport sans écriture
-    python3 harvest_hal_orcids.py --batch 50   # taille de batch API (défaut: 100)
+    python harvest_hal_orcids.py              # moissonnage complet
+    python harvest_hal_orcids.py --dry-run    # rapport sans écriture
+    python harvest_hal_orcids.py --batch 50   # taille de batch API (défaut: 100)
 """
 
 import argparse

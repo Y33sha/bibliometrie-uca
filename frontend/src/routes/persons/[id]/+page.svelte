@@ -60,6 +60,7 @@
 		pub_year: number | null;
 		doi: string | null;
 		author_name: string;
+		author_person_id: number | null;
 		structure_ids: number[];
 	}
 	interface ThesisSection {
@@ -552,7 +553,7 @@
 								<tr>
 									<td><a href="{base}/publications/{t.id}">{t.title}</a></td>
 									<td>{#each t.structure_ids as sid}<a href="{base}/laboratories/{sid}" class="struct-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
-									<td>{t.author_name}</td>
+									<td>{#if t.author_person_id}<a href="{base}/persons/{t.author_person_id}">{t.author_name}</a>{:else}{t.author_name}{/if}</td>
 									<td>{t.pub_year ?? ''}</td>
 								</tr>
 							{/each}
@@ -725,7 +726,7 @@
 	.tab-content tbody tr:last-child { border-bottom: none; }
 	.tab-content tbody tr:hover { background: #fafaf8; }
 	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: middle; }
-	.tab-content td a { color: var(--accent); text-decoration: none; }
+	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag) { color: var(--accent); text-decoration: none; }
 	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag):hover { text-decoration: underline; }
 
 	.source-tag-label { padding: 2px 7px; font-size: 0.8rem; }

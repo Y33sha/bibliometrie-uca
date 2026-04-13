@@ -173,7 +173,7 @@ def fix(conn, dry_run=False):
         conn.commit()
         log.info("\nTerminé.")
         log.info("Relancer build_authorships.py pour reconstruire les authorships vérité :")
-        log.info("  python3 processing/build_authorships.py")
+        log.info("  python processing/build_authorships.py")
     else:
         log.info("\n[DRY RUN] Aucune modification.")
         conn.rollback()

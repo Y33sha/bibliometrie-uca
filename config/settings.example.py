@@ -5,7 +5,7 @@ Copier ce fichier vers settings.py et adapter les valeurs.
 
 # ----- Authentification admin -----
 # Pour changer le mot de passe :
-#   python3 -c "import hashlib; s='VOTRE_SEL'; print(hashlib.sha256((s+'nouveau_mdp').encode()).hexdigest())"
+#   python -c "import hashlib; s='VOTRE_SEL'; print(hashlib.sha256((s+'nouveau_mdp').encode()).hexdigest())"
 ADMIN_USER = "admin"
 ADMIN_SALT = "VOTRE_SEL_ICI"
 ADMIN_HASH = "VOTRE_HASH_ICI"

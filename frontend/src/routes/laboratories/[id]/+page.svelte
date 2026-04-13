@@ -1179,7 +1179,7 @@
 	.tab-content tbody tr:last-child { border-bottom: none; }
 	.tab-content tbody tr:hover { background: #fafaf8; }
 	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
-	.tab-content td a { color: var(--accent); text-decoration: none; }
+	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag) { color: var(--accent); text-decoration: none; }
 	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag):hover { text-decoration: underline; }
 
 	/* Persons tab */

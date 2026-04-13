@@ -3,16 +3,16 @@
 Orchestrateur du pipeline bibliométrique UCA.
 
 Usage:
-    python3 run_pipeline.py                    # Pipeline complet
-    python3 run_pipeline.py --from normalize   # Reprendre depuis la normalisation
-    python3 run_pipeline.py --only extract     # Exécuter une seule phase
-    python3 run_pipeline.py --list             # Lister les phases
-    python3 run_pipeline.py --dry-run          # Afficher sans exécuter
-    python3 run_pipeline.py --mode weekly      # Import incrémental (6 derniers mois)
-    python3 run_pipeline.py --mode monthly     # Repasse complète + cross-imports
-    python3 run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement
-    python3 run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
-    python3 run_pipeline.py --only cross_imports --sources scanr --full-cross-import  # Cross-import ScanR complet
+    python run_pipeline.py                    # Pipeline complet
+    python run_pipeline.py --from normalize   # Reprendre depuis la normalisation
+    python run_pipeline.py --only extract     # Exécuter une seule phase
+    python run_pipeline.py --list             # Lister les phases
+    python run_pipeline.py --dry-run          # Afficher sans exécuter
+    python run_pipeline.py --mode weekly      # Import incrémental (6 derniers mois)
+    python run_pipeline.py --mode monthly     # Repasse complète + cross-imports
+    python run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement
+    python run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
+    python run_pipeline.py --only cross_imports --sources scanr --full-cross-import  # Cross-import ScanR complet
 
 Phases (dans l'ordre d'execution):
     extract        Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
@@ -60,7 +60,7 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
     Les scripts d'extraction lisent la config directement.
     En mode weekly, WoS est exclu pour économiser le crédit API.
     """
-    sources = sources or {"hal", "openalex", "wos", "scanr"}
+    sources = sources or {"hal", "openalex", "wos", "scanr", "theses"}
     year_args = ["--year", str(year)] if year else []
     if mode == "weekly":
         log.info("Mode hebdomadaire (WoS exclu)")
@@ -68,6 +68,8 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
             run_python("extraction/openalex/extract_openalex.py", "--mode", "weekly", *year_args)
         if "hal" in sources:
             run_python("extraction/hal/extract_hal.py", "--mode", "weekly", *year_args)
+        if "theses" in sources:
+            run_python("extraction/theses/extract_theses.py")
     else:
         if "openalex" in sources:
             run_python("extraction/openalex/extract_openalex.py", "--mode", mode, *year_args)
@@ -77,6 +79,8 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
             run_python("extraction/wos/extract_wos.py", "--mode", mode, *year_args)
         if "scanr" in sources:
             run_python("extraction/scanr/extract_scanr.py", *year_args)
+        if "theses" in sources:
+            run_python("extraction/theses/extract_theses.py")
     # Re-fetch des publications OA tronquées à 100 auteurs (lit le staging, pas les tables normalisées)
     if "openalex" in (sources or {"openalex"}):
         run_python("extraction/openalex/refetch_truncated.py")
@@ -334,7 +338,7 @@ def main():
                full_cross_import=args.full_cross_import)
         except RuntimeError as e:
             log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
-            log.error("Pour reprendre : python3 run_pipeline.py --from %s", name)
+            log.error("Pour reprendre : python run_pipeline.py --from %s", name)
             sys.exit(1)
 
     elapsed_total = time.time() - t0_total

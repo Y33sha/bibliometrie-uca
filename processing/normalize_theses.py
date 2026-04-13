@@ -192,6 +192,35 @@ def _update_thesis_meta(cur, pub_id: int, these: dict):
 # SOURCE DOCUMENTS
 # =============================================================
 
+def _build_source_meta(these: dict) -> dict | None:
+    """Construit le meta jsonb pour source_documents à partir des données brutes."""
+    meta = {}
+    ds = _parse_date_iso(these.get("dateSoutenance"))
+    di = _parse_date_iso(these.get("datePremiereInscriptionDoctorat"))
+    if ds:
+        meta["date_soutenance"] = ds
+    if di:
+        meta["date_inscription"] = di
+
+    discipline = these.get("discipline")
+    if discipline:
+        meta["discipline"] = discipline
+
+    ecoles = these.get("ecolesDoctorale") or []
+    ecoles_clean = [{"nom": e["nom"], "ppn": e.get("ppn")}
+                    for e in ecoles if e.get("nom")]
+    if ecoles_clean:
+        meta["ecoles_doctorales"] = ecoles_clean
+
+    partenaires = these.get("partenairesDeRecherche") or []
+    partenaires_clean = [{"nom": p["nom"], "type": p.get("type")}
+                         for p in partenaires if p.get("nom")]
+    if partenaires_clean:
+        meta["partenaires"] = partenaires_clean
+
+    return meta or None
+
+
 def insert_source_document(cur, these: dict, staging_id: int,
                            theses_id: str, publication_id: int | None,
                            pub_meta: dict | None = None) -> int:
@@ -232,6 +261,10 @@ def insert_source_document(cur, these: dict, staging_id: int,
         topics["rameau"] = rameau_list
     topics_json = Json(topics) if topics else None
 
+    # Meta spécifique thèse (discipline, écoles doctorales, partenaires, dates)
+    source_meta = _build_source_meta(these)
+    source_meta_json = Json(source_meta) if source_meta else None
+
     # Metadonnees de publication (pour creation differee)
     journal_id = pub_meta.get("journal_id") if pub_meta else None
     oa_status = pub_meta.get("oa_status") if pub_meta else None
@@ -243,10 +276,10 @@ def insert_source_document(cur, these: dict, staging_id: int,
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id, external_ids,
              journal_id, oa_status, language, container_title,
-             keywords, topics)
+             keywords, topics, meta)
         VALUES ('theses', %s, %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s,
-                %s, %s)
+                %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_documents.publication_id, EXCLUDED.publication_id
@@ -258,11 +291,12 @@ def insert_source_document(cur, these: dict, staging_id: int,
             language = COALESCE(EXCLUDED.language, source_documents.language),
             container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title),
             keywords = COALESCE(EXCLUDED.keywords, source_documents.keywords),
-            topics = COALESCE(EXCLUDED.topics, source_documents.topics)
+            topics = COALESCE(EXCLUDED.topics, source_documents.topics),
+            meta = COALESCE(EXCLUDED.meta, source_documents.meta)
         RETURNING id
     """, (theses_id, doi, title, pub_year, doc_type, publication_id, staging_id, external_ids,
           journal_id, oa_status, language, container_title,
-          keywords, topics_json))
+          keywords, topics_json, source_meta_json))
     return cur.fetchone()["id"]
 
 
