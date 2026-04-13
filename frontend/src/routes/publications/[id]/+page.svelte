@@ -302,7 +302,7 @@
     <!-- Sources -->
     <div class="pub-sources">
       {#if halSource}
-        <a href={halDocUrl(halSource.source_id)} target="_blank" rel="noopener" class="source-link source-hal-link">
+        <a href={halDocUrl(halSource.source_id, pub.oa_status)} target="_blank" rel="noopener" class="source-link source-hal-link">
           <img src="https://hal.science/favicon.ico" alt="" class="source-ico" />
           HAL : {halSource.source_id}
         </a>

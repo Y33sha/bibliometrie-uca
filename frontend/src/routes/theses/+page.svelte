@@ -202,10 +202,10 @@
     <FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={() => onFilterChange()} />
     <SourceFilterToggle
       sources={[
-        { key: 'theses', label: 'theses.fr' },
         { key: 'hal', label: 'HAL' },
         { key: 'oa', label: 'OpenAlex' },
         { key: 'scanr', label: 'ScanR' },
+        { key: 'theses', label: 'theses.fr' },
       ]}
       bind:states={sourceStates} counts={facets.sourceCounts} onchange={() => onFilterChange()} />
   </div>
@@ -238,7 +238,7 @@
         </td>
         <td class="col-labs">
           {#each pub.lab_items || [] as lab}
-            <a href="{base}/laboratories/{lab.id}" class="lab-tag">{lab.label}</a>
+            <a href="{base}/laboratories/{lab.id}?tab=theses" class="lab-tag">{lab.label}</a>
           {/each}
         </td>
         <td class="oa-lock-cell">
@@ -260,15 +260,8 @@
           {/if}
         </td>
         <td class="links-cell">
-          {#if pub.theses_id}
-            <a href="https://theses.fr/{pub.theses_id}" target="_blank" rel="noopener" class="source-tag source-theses" title="theses.fr: {pub.theses_id}">
-              <img src="https://theses.fr/favicon.ico" alt="theses.fr" />
-            </a>
-          {:else}
-            <span class="source-tag source-placeholder"></span>
-          {/if}
           {#if pub.hal_id}
-            <a href={halDocUrl(pub.hal_id)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {pub.hal_id}">
+            <a href={halDocUrl(pub.hal_id, pub.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {pub.hal_id}">
               <img src="https://hal.science/favicon.ico" alt="HAL" />
             </a>
           {:else}
@@ -284,6 +277,13 @@
           {#if pub.scanr_id}
             <a href={scanrPubUrl(pub.scanr_id)} target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {pub.scanr_id}">
               <img src="{base}/scanr-icon.svg" alt="ScanR" />
+            </a>
+          {:else}
+            <span class="source-tag source-placeholder"></span>
+          {/if}
+          {#if pub.theses_id}
+            <a href="https://theses.fr/{pub.theses_id}" target="_blank" rel="noopener" class="source-tag source-theses" title="theses.fr: {pub.theses_id}">
+              <img src="https://theses.fr/favicon.ico" alt="theses.fr" />
             </a>
           {:else}
             <span class="source-tag source-placeholder"></span>

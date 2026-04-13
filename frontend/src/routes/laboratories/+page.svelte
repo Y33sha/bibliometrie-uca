@@ -221,7 +221,7 @@
 		color: var(--accent);
 		text-decoration: none;
 	}
-	td a:hover {
+	td a:not(.id-badge, .lab-tag, .source-tag):hover {
 		text-decoration: underline;
 	}
 	.lab-link {

@@ -122,9 +122,9 @@ export function formatDate(d: string | null | undefined): string {
 	return d;
 }
 
-export function halDocUrl(halid: string): string {
+export function halDocUrl(halid: string, oaStatus?: string | null): string {
 	if (halid.startsWith('dumas-')) return `https://dumas.ccsd.cnrs.fr/${halid}`;
-	if (halid.startsWith('tel-')) return `https://theses.hal.science/${halid}`;
+	if (halid.startsWith('tel-') && oaStatus !== 'closed') return `https://theses.hal.science/${halid}`;
 	return `https://hal.science/${halid}`;
 }
 
