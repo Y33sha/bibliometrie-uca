@@ -80,6 +80,8 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
             run_python("extraction/openalex/extract_openalex.py", "--mode", "weekly", *year_args)
         if "hal" in sources:
             run_python("extraction/hal/extract_hal.py", "--mode", "weekly", *year_args)
+        if "scanr" in sources:
+            run_python("extraction/scanr/extract_scanr.py", *year_args)
         if "theses" in sources:
             run_python("extraction/theses/extract_theses.py")
     else:
