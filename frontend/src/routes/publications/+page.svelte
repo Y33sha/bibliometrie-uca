@@ -344,7 +344,7 @@
 					</td>{/if}
 					<td class="links-cell">
 						{#if p.hal_id}
-							<a href={halDocUrl(p.hal_id)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
+							<a href={halDocUrl(p.hal_id, p.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
 								<img src="https://hal.science/favicon.ico" alt="HAL" />
 							</a>
 						{:else}

@@ -892,7 +892,7 @@
 								{/if}
 								<td class="links-cell">
 									{#if p.hal_id}
-										<a href={halDocUrl(p.hal_id)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
+										<a href={halDocUrl(p.hal_id, p.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
 											<img src="https://hal.science/favicon.ico" alt="HAL" />
 										</a>
 									{:else}
@@ -1000,7 +1000,7 @@
 										<span class="source-tag source-placeholder"></span>
 									{/if}
 									{#if t.hal_id}
-										<a href={halDocUrl(t.hal_id)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {t.hal_id}">
+										<a href={halDocUrl(t.hal_id, t.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {t.hal_id}">
 											<img src="https://hal.science/favicon.ico" alt="HAL" />
 										</a>
 									{:else}
@@ -1180,8 +1180,7 @@
 	.tab-content tbody tr:hover { background: #fafaf8; }
 	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
 	.tab-content td a { color: var(--accent); text-decoration: none; }
-	.tab-content td a:hover { text-decoration: underline; }
-	.tab-content td a.source-tag:hover { text-decoration: none; }
+	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag):hover { text-decoration: underline; }
 
 	/* Persons tab */
 	.person-link { color: var(--accent); text-decoration: none; font-weight: 500; }
