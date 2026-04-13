@@ -458,7 +458,8 @@ async def export_publications_csv(
                 EXISTS (SELECT 1 FROM source_documents sd
                         JOIN source_authorships sa ON sa.source_document_id = sd.id
                         WHERE sd.publication_id = p.id AND sa.person_id = %s
-                          AND sa.excluded = FALSE)
+                          AND sa.excluded = FALSE
+                          AND sa.roles && ARRAY['author']::text[])
             """]
             params: list = [person_id]
         elif lab_none and not lab_ids:
@@ -867,7 +868,9 @@ async def list_publications(
             # (pas seulement UCA)
             conditions = ["""
                 EXISTS (SELECT 1 FROM authorships a
-                        WHERE a.publication_id = p.id AND a.person_id = %s)
+                        JOIN source_authorships sa ON sa.authorship_id = a.id
+                        WHERE a.publication_id = p.id AND a.person_id = %s
+                          AND sa.roles && ARRAY['author']::text[])
             """]
             params = [person_id]
         elif lab_none and not lab_ids:

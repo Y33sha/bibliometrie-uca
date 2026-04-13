@@ -101,10 +101,14 @@ def apply_source_filter(conditions: list, source_values: list[str]):
 
 
 def apply_person_filter(conditions: list, params: list, person_id: int):
-    """Ajoute le filtre personne via la table de vérité."""
-    conditions.append(
-        "EXISTS (SELECT 1 FROM authorships a WHERE a.publication_id = p.id AND a.person_id = %s AND NOT a.excluded)"
-    )
+    """Ajoute le filtre personne — uniquement les publications où la personne est auteur."""
+    conditions.append("""
+        EXISTS (SELECT 1 FROM authorships a
+                JOIN source_authorships sa ON sa.authorship_id = a.id
+                WHERE a.publication_id = p.id AND a.person_id = %s
+                  AND NOT a.excluded
+                  AND sa.roles && ARRAY['author']::text[])
+    """)
     params.append(person_id)
 
 
