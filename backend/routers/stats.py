@@ -9,11 +9,14 @@ router = APIRouter()
 async def get_stats(structure_id: int | None = Query(None)):
     """Compteurs d'adresses par détection/validation pour une structure."""
     with get_cursor() as (cur, conn):
-        # Résoudre la structure (défaut = UCA)
+        # Résoudre la structure (défaut = première racine du périmètre)
         if structure_id is None:
-            cur.execute("SELECT id FROM structures WHERE code = 'uca'")
+            from utils.app_config import _get_from_db
+            perim_code = _get_from_db(cur, "perimeter_persons") or "uca"
+            cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,))
             row = cur.fetchone()
-            structure_id = row["id"] if row else 0
+            root_ids = (row["structure_ids"] if isinstance(row, dict) else row[0]) if row else []
+            structure_id = root_ids[0] if root_ids else 0
 
         cur.execute("SELECT COUNT(*) AS total FROM addresses")
         total = cur.fetchone()["total"]
