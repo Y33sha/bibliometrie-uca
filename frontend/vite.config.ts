@@ -10,5 +10,8 @@ export default defineConfig({
 				rewrite: (path: string) => path.replace(/^\/bibliometrie/, '')
 			}
 		}
+	},
+	test: {
+		include: ['src/**/*.test.ts'],
 	}
 });
