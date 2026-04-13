@@ -101,20 +101,11 @@ flowchart LR
     C[API OpenAlex]-->B-->|normalize_openalex|G
     E[API WOS]-->B-->|normalize_wos|G
     K[API ScanR]-->B-->|normalize_scanr|G
-    G-->J@{ shape: processes, label: "Tables canoniques: 
-    publications, publishers, journals" }
     classDef new  fill:#bbf
-    class G,J new;
+    class G new;
 ```
 
-Le processus de normalisation peuple non seulement les tables sources, mais aussi la table canonique **publications** et ses tables satellites **publishers** et **journals**.
 
-Les publications sont fusionnées:
-- par **identité de DOI** (même DOI = même publi, sauf cas particuliers).
-- par **référence directe** (un document OpenAlex ou ScanR qui pointe vers un document HAL)
-- par **identité de métadonnées**, seulement pour les documents de type *article* (mêmes titre, journal, année…) (TODO compléter)
-
-Les cas douteux sont préservés et sont fusionnés manuellement via la page admin/duplicates.
 
 #### Relations internes des tables dans chaque source
 
@@ -178,23 +169,16 @@ Deux périmètres :
 Périmètre centralisé dans `utils/uca_perimeter.py`.
 
 
-### <span id="identifiers"></span>Phase 6 — `identifiers` : Moissonnage des identifiants liés aux comptes HAL
+### <span id="publications"></span>Phase 6 — `publications` : Peuplement de la table Publications
 
-Script : `processing/harvest_hal_identifiers.py`
+Les publications sources sont fusionnées:
+- par **identité de DOI** (même DOI = même publi, sauf cas particuliers).
+- par **référence directe** (un document OpenAlex ou ScanR qui pointe vers un document HAL)
 
-Interroge l'API `ref/author` de HAL pour récupérer les ORCID et IdRef des `hal_authors` dotés d'un `hal_person_id` (entités fiables). Met à jour `hal_authors` et `person_identifiers`.
-
-Placée avant la phase `persons` pour que la création de personnes dispose des identifiants. Les ORCID du staging HAL (`authOrcid_s`) sont déjà exploités à la normalisation (phase 2) ; ce script complète avec les ORCID qui ne sont pas dans les métadonnées des publications, + les identifiants IdRef. <!--TODO: vérifier s'il n'y a pas des idref dans le staging de HAL.-->
-
-Exécutée en mode `full` et `monthly` uniquement.
-
-L'opération équivalente ne serait pas pertinente sur les autres sources:
-- les `openalex_authors` et `wos_authors` sont des entités créées de manière algorithmique et peu fiable (fréquent saucissonnage d'un auteur en entités multiples; parfois fusion de plusieurs personnes dans la même entité). Les `hal_authors` moissonnés correspondent à des comptes HAL réels, et les identifiants qui y sont associés ont été ajoutés directement par les chercheurs.
-
-<!--TODO: Vérifier si l'API Personnes de ScanR apporte une plus-value par rapport aux données récupérées avec les métadonnées des documents.-->
+Les cas douteux (métadonnées identiques ou similaires) sont préservés et sont fusionnés manuellement via la page admin/duplicates.
 
 
-### <span id="creation-personnes"></span>Phase 7 — `persons` : Création de personnes
+### <span id="persons"></span>Phase 7 — `persons` : Création de personnes
 
 **`create_persons_from_source_authorships.py`** — algorithme en 4 étapes :
 
