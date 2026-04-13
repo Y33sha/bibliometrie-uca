@@ -2,7 +2,7 @@
 Fusionne les publications qui pointent vers le même document HAL.
 
 Sources de hal_id :
-- OpenAlex : primary_location pointant vers hal.science/hal-XXXXX
+- OpenAlex : source_documents.external_ids->>'hal' (extrait des URLs à la normalisation)
 - ScanR : source_documents.external_ids->>'hal' (extrait des externalIds)
 
 Deux cas :
@@ -21,7 +21,6 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-from utils.hal import extract_hal_id_from_url
 from psycopg2.extras import RealDictCursor
 from services.publications import merge_publications as _merge_pub, update_sources
 from utils.log import setup_logger
@@ -34,47 +33,24 @@ def find_duplicates(cur):
     Trouve les paires (document source, hal_document) qui pointent
     vers des publications différentes (ou HAL → NULL).
 
-    Sources :
-    - OpenAlex : primary_location → hal.science URL
-    - ScanR : source_documents.external_ids->>'hal'
+    Sources : source_documents.external_ids->>'hal' (OpenAlex + ScanR)
     """
-    # --- OpenAlex → HAL ---
+    # --- OpenAlex + ScanR → HAL ---
     cur.execute("""
-        SELECT od.id AS src_doc_id, od.source_id AS src_id,
-               od.publication_id AS src_pub_id,
-               so.raw_data->'primary_location'->>'landing_page_url' AS url
-        FROM source_documents od
-        JOIN staging so ON so.id = od.staging_id
-        WHERE od.source = 'openalex'
-          AND (so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.science%'
-           OR so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.archives-ouvertes.fr%')
+        SELECT sd.id AS src_doc_id, sd.source::text AS source,
+               sd.source_id AS src_id, sd.publication_id AS src_pub_id,
+               sd.external_ids->>'hal' AS hal_id
+        FROM source_documents sd
+        WHERE sd.source IN ('openalex', 'scanr')
+          AND sd.external_ids->>'hal' IS NOT NULL
     """)
 
     src_by_halid = {}
     for r in cur.fetchall():
-        hid = extract_hal_id_from_url(r['url'])
-        if hid:
-            src_by_halid[hid] = {
-                'source': 'openalex',
-                'src_doc_id': r['src_doc_id'],
-                'src_id': r['src_id'],
-                'src_pub_id': r['src_pub_id'],
-            }
-
-    # --- ScanR → HAL ---
-    cur.execute("""
-        SELECT sd.id AS src_doc_id, sd.source_id AS src_id,
-               sd.publication_id AS src_pub_id,
-               sd.external_ids->>'hal' AS hal_id
-        FROM source_documents sd
-        WHERE sd.source = 'scanr'
-          AND sd.external_ids->>'hal' IS NOT NULL
-    """)
-    for r in cur.fetchall():
         hid = r['hal_id']
         if hid not in src_by_halid:
             src_by_halid[hid] = {
-                'source': 'scanr',
+                'source': r['source'],
                 'src_doc_id': r['src_doc_id'],
                 'src_id': r['src_id'],
                 'src_pub_id': r['src_pub_id'],

@@ -1,9 +1,8 @@
 """
 Fusionne les publications dédoublonnées HAL/OpenAlex.
 
-Quand un work OpenAlex a sa primary_location pointant vers HAL
-(landing_page_url contient hal.science/hal-XXXXX) et qu'un hal_document
-existe pour ce halId mais pointe vers une publication différente,
+Quand un source_document OpenAlex a un external_ids->>'hal' correspondant
+à un hal_document qui pointe vers une publication différente,
 on fusionne les deux publications en une seule.
 
 Deux cas :
@@ -22,7 +21,6 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-from utils.hal import extract_hal_id_from_url
 from psycopg2.extras import RealDictCursor
 from services.publications import merge_publications as _merge_pub, update_sources
 from utils.log import setup_logger
@@ -36,25 +34,21 @@ def find_duplicates(cur):
     vers des publications différentes (ou HAL → NULL).
     """
     cur.execute("""
-        SELECT od.id AS oa_doc_id, od.source_id AS openalex_id, od.publication_id AS oa_pub_id,
-               so.raw_data->'primary_location'->>'landing_page_url' AS url
-        FROM source_documents od
-        JOIN staging so ON so.id = od.staging_id
-        WHERE od.source = 'openalex'
-          AND (so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.science%'
-           OR so.raw_data->'primary_location'->>'landing_page_url' LIKE '%hal.archives-ouvertes.fr%')
+        SELECT sd.id AS oa_doc_id, sd.source_id AS openalex_id,
+               sd.publication_id AS oa_pub_id,
+               sd.external_ids->>'hal' AS hal_id
+        FROM source_documents sd
+        WHERE sd.source = 'openalex'
+          AND sd.external_ids->>'hal' IS NOT NULL
     """)
-    oa_rows = cur.fetchall()
 
     oa_by_halid = {}
-    for r in oa_rows:
-        hid = extract_hal_id_from_url(r['url'])
-        if hid:
-            oa_by_halid[hid] = {
-                'oa_doc_id': r['oa_doc_id'],
-                'openalex_id': r['openalex_id'],
-                'oa_pub_id': r['oa_pub_id'],
-            }
+    for r in cur.fetchall():
+        oa_by_halid[r['hal_id']] = {
+            'oa_doc_id': r['oa_doc_id'],
+            'openalex_id': r['openalex_id'],
+            'oa_pub_id': r['oa_pub_id'],
+        }
 
     cur.execute("SELECT id AS hal_doc_id, source_id AS halid, publication_id AS hal_pub_id FROM source_documents WHERE source = 'hal'")
     hal_rows = cur.fetchall()
