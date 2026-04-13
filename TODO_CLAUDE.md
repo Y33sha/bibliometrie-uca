@@ -46,19 +46,9 @@ Les colonnes `hal_authorship_id`, `openalex_authorship_id`, `wos_authorship_id`,
 
 Suite du commit 325bd76. Reste à faire :
 
-### 1. Supprimer les DOCTYPE_MAP locaux des normaliseurs (OA, WoS, ScanR)
-Les normaliseurs mappent encore le doc_type avant stockage dans source_documents via leur `DOCTYPE_MAP` local. Il faudrait :
-- Stocker le doc_type **brut** (valeur source) dans source_documents
-- Supprimer les `DOCTYPE_MAP` de normalize_openalex, normalize_wos, normalize_scanr
-- Remplacer par `map_doc_type(raw, source)` aux seuls endroits où un type canonique est nécessaire (appels à `find_or_create` / `resolve_doi_conflict`)
-- Attention : la base existante a un mélange de valeurs brutes et mappées ; `map_doc_type` gère les deux cas (fallback identity)
-
-### 2. Factoriser find_publication / extract_pub_metadata
-Chaque normaliseur a sa propre version de `extract_pub_metadata` + `find_publication` qui font la même chose : extraire DOI/NNT/titre/année et chercher une publication existante. La seule différence est le parsing du format brut de chaque source. Factoriser en un `find_publication(cur, doi, nnt, title_normalized, pub_year, doc_type)` partagé dans services/publications.py, appelé par les normaliseurs après extraction des champs.
-
-### 3. Tests
-- Vérifier que les tests existants (test_reprocessing, test_idempotence, test_normalize) passent après ces changements — ils importent les `DOCTYPE_MAP` locaux
-- Migrer les tests vers `map_doc_type` de utils/doc_types.py
+### ~~1. Supprimer les DOCTYPE_MAP locaux~~ — FAIT (commit 37ff9f2)
+### ~~2. Factoriser find_publication~~ — Non justifié (chaque source a ses spécificités)
+### ~~3. Tests~~ — FAIT (migrés vers map_doc_type, 254 tests passent)
 
 ## Scalabilité
 

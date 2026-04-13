@@ -22,6 +22,7 @@ from backend.routers import (
     config,
     publishers,
     journals,
+    pipeline,
 )
 
 app = FastAPI(title="Bibliométrie UCA")
@@ -96,6 +97,7 @@ app.include_router(docs.router)
 app.include_router(config.router)
 app.include_router(publishers.router)
 app.include_router(journals.router)
+app.include_router(pipeline.router)
 
 
 if __name__ == "__main__":

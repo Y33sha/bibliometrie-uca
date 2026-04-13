@@ -60,6 +60,11 @@
 				class="nav-link"
 				class:active={isActive("/admin/structures")}>Structures</a
 			>
+			<a
+				href="{base}/admin/pipeline"
+				class="nav-link"
+				class:active={isActive("/admin/pipeline")}>Pipeline</a
+			>
 			<div
 				class="nav-dropdown"
 				role="navigation"
