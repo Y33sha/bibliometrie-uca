@@ -24,28 +24,27 @@ import requests
 from psycopg2.extras import Json, execute_values
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config.settings import WOS
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
-from utils.app_config import get_years, get_wos_affiliations
+from utils.app_config import get_years, get_wos_affiliations, get_wos_api_key, get_api_base_urls
 
 # ----- Logging -----
 logger = setup_logger("extract_wos", os.path.join(os.path.dirname(__file__), "logs"))
 
-# ----- Constantes API -----
-BASE_URL = WOS["base_url"]
-HEADERS = {
-    "X-ApiKey": WOS["api_key"],
-    "Accept": "application/json",
-}
+# ----- Constantes techniques -----
+PER_PAGE = 10           # recommandé par Clarivate (timeout fréquents au-delà)
+REQUEST_DELAY = 1.0     # 1 req/s (marge de sécurité)
+BREATHER_EVERY = 10     # pause longue toutes les N pages
+BREATHER_SECS = 15      # durée de la pause longue (secondes)
 
-BREATHER_EVERY = 10   # pause longue toutes les N pages
-BREATHER_SECS = 15    # durée de la pause longue (secondes)
+# Initialisées dans main() depuis la config DB
+BASE_URL = ""
+HEADERS = {}
 
 
 def build_query(year: int, affiliations: list[str] | None = None) -> str:
     """Construit la requête WoS Advanced Search pour une année."""
-    orgs = " OR ".join(affiliations or WOS["affiliations"])
+    orgs = " OR ".join(affiliations or [])
     return f"OG=({orgs}) AND PY=({year})"
 
 
@@ -119,7 +118,7 @@ def fetch_page(year: int, first_record: int) -> dict:
     params = {
         "databaseId": "WOS",
         "usrQuery": build_query(year),
-        "count": WOS["per_page"],
+        "count": PER_PAGE,
         "firstRecord": first_record,
     }
     return _fetch_with_retry(BASE_URL, params, label=f"({year}, rec {first_record})")
@@ -176,7 +175,7 @@ def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> i
     logger.info(f"Requête WoS : {build_query(year)}")
 
     # Premier appel
-    time.sleep(WOS["request_delay"])
+    time.sleep(REQUEST_DELAY)
     data = fetch_page(year, 1)
     if not data:
         logger.error(f"Impossible d'exécuter la requête pour {year}")
@@ -195,7 +194,7 @@ def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> i
     while first_record <= total_count:
         # Première page déjà récupérée
         if first_record > 1:
-            time.sleep(WOS["request_delay"])
+            time.sleep(REQUEST_DELAY)
             data = fetch_page(year, first_record)
 
         records = get_records(data)
@@ -230,7 +229,7 @@ def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> i
             insert_batch(conn, batch)
             total_inserted += len(batch)
 
-        page_num = (first_record - 1) // WOS["per_page"] + 1
+        page_num = (first_record - 1) // PER_PAGE + 1
         logger.info(
             f"  Page {page_num} : {len(records)} records, "
             f"{len(batch)} insérés "
@@ -273,9 +272,14 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
     args = parser.parse_args()
 
+    global BASE_URL, HEADERS
+
     conn = get_connection()
     cur = conn.cursor()
     affiliations = get_wos_affiliations(cur)
+    api_key = get_wos_api_key(cur)
+    BASE_URL = get_api_base_urls(cur).get("wos", "https://api.clarivate.com/api/wos")
+    HEADERS = {"X-ApiKey": api_key, "Accept": "application/json"}
     config_years = get_years(cur, mode=args.mode)
     cur.close()
 

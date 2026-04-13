@@ -27,11 +27,10 @@ from psycopg2.extras import Json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
-from utils.app_config import get_theses_etab_ppns
+from utils.app_config import get_theses_etab_ppns, get_api_base_urls
 
 logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
 
-BASE_URL = "https://theses.fr/api/v1/theses/recherche/"
 PER_PAGE = 500
 REQUEST_DELAY = 0.3
 
@@ -44,14 +43,14 @@ def build_query(ppn: str, status: str | None = None) -> str:
     return q
 
 
-def fetch_page(query: str, debut: int = 0, nombre: int = 500) -> dict:
+def fetch_page(base_url: str, query: str, debut: int = 0, nombre: int = 500) -> dict:
     """Récupère une page de résultats depuis l'API theses.fr."""
     params = {
         "q": query,
         "debut": debut,
         "nombre": nombre or PER_PAGE,
     }
-    resp = requests.get(BASE_URL, params=params, timeout=30)
+    resp = requests.get(base_url, params=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
 
@@ -75,7 +74,7 @@ def extract_doi(these: dict) -> str | None:
     return None
 
 
-def extract_ppn(ppn: str, conn, existing_ids: set,
+def extract_ppn(ppn: str, conn, existing_ids: set, base_url: str,
                 status: str | None = None, dry_run: bool = False) -> tuple[int, int, int]:
     """Extrait toutes les thèses d'un établissement (par PPN).
 
@@ -85,7 +84,7 @@ def extract_ppn(ppn: str, conn, existing_ids: set,
     status_label = status or "toutes"
 
     # Premier appel pour le total
-    data = fetch_page(query, debut=0, nombre=1)
+    data = fetch_page(base_url, query, debut=0, nombre=1)
     total = data["totalHits"]
     logger.info(f"  PPN {ppn} ({status_label}) : {total} thèses")
 
@@ -99,7 +98,7 @@ def extract_ppn(ppn: str, conn, existing_ids: set,
 
     with conn.cursor() as cur:
         while debut < total:
-            data = fetch_page(query, debut=debut, nombre=per_page)
+            data = fetch_page(base_url, query, debut=debut, nombre=per_page)
             theses = data.get("theses", [])
 
             if not theses:
@@ -171,6 +170,7 @@ def main():
     conn = get_connection()
     cur = conn.cursor()
     ppns = get_theses_etab_ppns(cur)
+    base_url = get_api_base_urls(cur).get("theses", "https://theses.fr/api/v1/theses/recherche/")
     cur.close()
 
     if not ppns:
@@ -193,7 +193,7 @@ def main():
         for ppn in ppns:
             for status in statuses:
                 total, inserted, updated = extract_ppn(
-                    ppn, conn, existing_ids,
+                    ppn, conn, existing_ids, base_url,
                     status=status, dry_run=args.dry_run
                 )
                 grand_total += total

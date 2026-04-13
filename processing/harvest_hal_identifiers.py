@@ -23,7 +23,6 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-from config.settings import HAL
 from services.persons import add_identifier
 from utils.log import setup_logger
 

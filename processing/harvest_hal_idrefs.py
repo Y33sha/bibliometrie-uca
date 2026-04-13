@@ -14,7 +14,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 sys.path.insert(0, ".")
-from config.settings import DB
+from db.connection import get_connection
 from services.persons import add_identifier
 
 HAL_AUTHOR_API = "https://api.archives-ouvertes.fr/ref/author/"
@@ -49,7 +49,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    conn = psycopg2.connect(**DB)
+    conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     # source_authors HAL avec hal_person_id + person_id, sans IdRef déjà connu

@@ -27,11 +27,7 @@ OPENALEX_PREFIX = "https://openalex.org/"
 BATCH_SIZE = 50          # max IDs par requête (API limit = 100, on reste prudent)
 REQUEST_DELAY = 0.15     # délai entre requêtes (politeness)
 COMMIT_EVERY = 500       # commit DB tous les N journals traités
-try:
-    from config.settings import OPENALEX
-    MAILTO = OPENALEX.get("email", "bibliometrie@uca.fr")
-except ImportError:
-    MAILTO = "bibliometrie@uca.fr"
+MAILTO = "bibliometrie@uca.fr"  # mis à jour dans main() depuis la config DB
 
 
 def to_full_id(short_id: str) -> str:

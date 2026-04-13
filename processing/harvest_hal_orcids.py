@@ -30,7 +30,6 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-from config.settings import HAL
 from services.persons import add_identifier
 from utils.log import setup_logger
 
@@ -168,7 +167,7 @@ def main():
                     f"{total_found} ORCID trouvés, {total_updated} source_authors mis à jour"
                 )
 
-            time.sleep(HAL["request_delay"])
+            time.sleep(0.5)
 
         if args.dry_run:
             conn.rollback()
