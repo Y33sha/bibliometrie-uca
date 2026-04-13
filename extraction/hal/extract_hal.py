@@ -46,7 +46,7 @@ def build_query(years: list, since: str = None) -> str:
     au lieu de filtrer par années.
     """
     if since:
-        return f"dateLastIndexed_tdate:[{since}T00:00:00Z TO *]"
+        return f"submittedDate_tdate:[{since}T00:00:00Z TO *]"
     year_min = min(years)
     year_max = max(years)
     return f"producedDateY_i:[{year_min} TO {year_max}]"
