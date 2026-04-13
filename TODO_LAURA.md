@@ -34,7 +34,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] audit complet du code pour retrouver tous les trucs hardcodés qu'on pourrait abstraire, ou le SQL à simplifier suite aux fusions des tables sources. / 'uca', structure id 169...; requêtes SQL avec sources hardcodées
 
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
-
+* [ ] transférer champ role des authorships sources aux authorships canoniques? auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques)
 * [ ] vérifier valeur ajoutée du mapping hal_structures *vs* utilisation des collections pour la phase affiliations du pipeline; ou mieux, prendre la chaîne de caractères "affiliation" et la vérifier comme une adresse? => pour pouvoir auditer, commencer par **backfill** les collections dans les publications HAL qui n'en ont pas.
 * [ ] normalize_wos: conserver le mapping addresses->structures dans le champ raw_affiliations? (modifier script + **backfill**) voir si ça vaut le coup
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
@@ -62,6 +62,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] hal_authors importés sans id par un script de cross-import: ça ne devrait pas être possible. Auditer.
 * [ ] publis OpenAlex avec date correspondant au dépôt dans HAL: ex. 8651 => si dates différentes, utiliser l'autre. Si OA cite HAL comme source, prendre métadonnées HAL
 * [ ] depuis que la déduplication automatique par identité de métadonnées a été abandonnée: passer en revue les cas concernés, auditer, re-dupliquer?
+* [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?)
 
 ### Problèmes spécifiques HAL
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
@@ -80,7 +81,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
 * [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou revue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); preprints en accès gold selon OpenAlex (?); data papers?
 * [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
-* [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?)
 * [ ] types wos composites: étudier, voir s'il s'agit de types/sous-types
 * "prépublication, document de travail" dans HAL apparaît comme other
 
@@ -112,7 +112,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 #### Urgent
 * [ ] filtre "publications avec authorship UCA": certains ont 500 publications mais une seule en tant qu'auteur UCA, ça aiderait à les retrouver pour les vérifier
 * [ ] ajouter dashboard personne
-* [ ] exclure thèses de l'onglet publications si pas auteur
 #### Autres
 * [ ] publications: indiquer si premier/dernier auteur ; + rôles autres que auteur?
 * [ ] signaler publis HAL non correctement reliées au compte HAL (dans la page problèmes-hal?)
