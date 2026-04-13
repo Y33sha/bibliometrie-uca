@@ -8,7 +8,7 @@ router = APIRouter()
 REPORTS_DIR = Path(__file__).resolve().parent.parent.parent / "pipeline" / "reports"
 
 
-@router.get("/api/pipeline/reports")
+@router.get("/api/admin/pipeline/reports")
 async def list_reports():
     """Liste les rapports pipeline disponibles (plus récent en premier)."""
     if not REPORTS_DIR.exists():
@@ -26,7 +26,7 @@ async def list_reports():
     return reports
 
 
-@router.get("/api/pipeline/reports/{filename}")
+@router.get("/api/admin/pipeline/reports/{filename}")
 async def get_report(filename: str):
     """Retourne le contenu d'un rapport pipeline."""
     # Sécurité : empêcher le path traversal

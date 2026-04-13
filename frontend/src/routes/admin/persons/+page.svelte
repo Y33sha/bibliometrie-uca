@@ -472,14 +472,14 @@
   /* ── Orphans ── */
 
   async function loadOrphanCount() {
-    const data = await api<{ total: number }>("/api/orphan-authorships/count");
+    const data = await api<{ total: number }>("/api/admin/orphan-authorships/count");
     orphanCount = data.total;
   }
 
   async function loadOrphans() {
     const params = new URLSearchParams({ page: String(orphanPage), per_page: "50" });
     if (orphanSearch.trim()) params.set("search", orphanSearch.trim());
-    const data = await api<{ total: number; page: number; pages: number; authorships: any[] }>("/api/orphan-authorships?" + params, { key: "orphans" });
+    const data = await api<{ total: number; page: number; pages: number; authorships: any[] }>("/api/admin/orphan-authorships?" + params, { key: "orphans" });
     orphans = data.authorships;
     orphanTotal = data.total;
     orphanPages = data.pages;
@@ -505,7 +505,7 @@
   }
 
   async function assignOrphan(orphan: any, personId: number) {
-    await fetch(`${base}/api/orphan-authorships/assign`, {
+    await fetch(`${base}/api/admin/orphan-authorships/assign`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source: orphan.source, authorship_id: orphan.authorship_id, person_id: personId }),
@@ -521,7 +521,7 @@
       : [orphan.full_name.split(" ").slice(-1)[0], orphan.full_name.split(" ").slice(0, -1).join(" ")];
     const lastName = parts[0] || orphan.full_name;
     const firstName = parts[1] || "";
-    await fetch(`${base}/api/orphan-authorships/assign`, {
+    await fetch(`${base}/api/admin/orphan-authorships/assign`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

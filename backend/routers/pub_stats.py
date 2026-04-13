@@ -38,7 +38,7 @@ def apply_apc_filter(conditions: list, has_apc: str):
         conditions.append("(" + " OR ".join(parts) + ")")
 
 
-@router.get("/api/pub-stats/publishers")
+@router.get("/api/stats/publishers")
 async def publisher_stats(
     lab_id: str = Query(""),
     year: str = Query(""),
@@ -122,7 +122,7 @@ async def publisher_stats(
         }
 
 
-@router.get("/api/pub-stats/journals")
+@router.get("/api/stats/journals")
 async def journal_stats(
     lab_id: str = Query(""),
     year: str = Query(""),
@@ -216,7 +216,7 @@ async def journal_stats(
         }
 
 
-@router.get("/api/pub-stats/by-year")
+@router.get("/api/stats/by-year")
 async def stats_by_year(
     lab_id: str = Query(""),
     year: str = Query(""),
@@ -275,7 +275,7 @@ async def stats_by_year(
         return cur.fetchall()
 
 
-@router.get("/api/pub-stats/summary")
+@router.get("/api/stats/summary")
 async def stats_summary(
     lab_id: str = Query(""),
     year: str = Query(""),
@@ -332,7 +332,7 @@ async def stats_summary(
         return cur.fetchone()
 
 
-@router.get("/api/pub-stats/labs")
+@router.get("/api/stats/labs")
 async def stats_labs(
     lab_id: str = Query(""),
     year: str = Query(""),
@@ -440,7 +440,7 @@ async def stats_labs(
         }
 
 
-@router.get("/api/pub-stats/years")
+@router.get("/api/stats/years")
 async def available_years():
     """Années disponibles (validées uniquement)."""
     with get_cursor() as (cur, conn):
@@ -453,7 +453,7 @@ async def available_years():
         return [r["pub_year"] for r in cur.fetchall()]
 
 
-@router.get("/api/pub-stats/facets")
+@router.get("/api/stats/facets")
 async def stats_facets(
     lab_id: str = Query(""),
     year: str = Query(""),

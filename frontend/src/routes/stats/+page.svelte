@@ -66,7 +66,7 @@
 
 	// --- Composables: paginated tables ---
 	const pubFetch = usePaginatedFetch<PublisherRow>({
-		endpoint: '/api/pub-stats/publishers',
+		endpoint: '/api/stats/publishers',
 		itemsKey: 'publishers',
 		perPage: 50,
 		apiKey: 'pub-stats-publishers',
@@ -79,7 +79,7 @@
 	});
 
 	const journalFetch = usePaginatedFetch<JournalRow>({
-		endpoint: '/api/pub-stats/journals',
+		endpoint: '/api/stats/journals',
 		itemsKey: 'journals',
 		perPage: 50,
 		apiKey: 'pub-stats-journals',
@@ -92,7 +92,7 @@
 	});
 
 	const labFetch = usePaginatedFetch<LabRow>({
-		endpoint: '/api/pub-stats/labs',
+		endpoint: '/api/stats/labs',
 		itemsKey: 'labs',
 		perPage: 50,
 		apiKey: 'pub-stats-labs',
@@ -105,7 +105,7 @@
 
 	// --- Composable: facets ---
 	const facets = useFacets<'years' | 'labs' | 'oa' | 'apc'>({
-		endpoint: '/api/pub-stats/facets',
+		endpoint: '/api/stats/facets',
 		apiKey: 'pub-stats-facets',
 		buildParams: chartParams,
 		facets: {
@@ -223,7 +223,7 @@
 	}
 
 	async function loadSummary() {
-		summary = await api<Summary>('/api/pub-stats/summary?' + chartParams());
+		summary = await api<Summary>('/api/stats/summary?' + chartParams());
 	}
 
 	async function loadTabContent() {
@@ -240,7 +240,7 @@
 	}
 
 	async function loadChart() {
-		const data = await api<YearData[]>('/api/pub-stats/by-year?' + chartParams());
+		const data = await api<YearData[]>('/api/stats/by-year?' + chartParams());
 		await tick();
 		if (yearChart) yearChart.destroy();
 		if (!data.length || !chartCanvas) { yearChart = null; return; }

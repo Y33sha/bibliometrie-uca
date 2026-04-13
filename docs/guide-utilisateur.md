@@ -141,7 +141,7 @@ Pour chaque paire, on peut :
 - **Marquer comme distinctes** : indiquer que ce n'est pas un doublon
 - **Passer** : reporter la décision
 
-### Doublons de personnes (`/admin/duplicates-persons`)
+### Doublons de personnes (`/admin/person-duplicates`)
 
 Paires de personnes potentiellement identiques. Même logique que les doublons de publications.
 

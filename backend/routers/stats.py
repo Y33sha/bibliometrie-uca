@@ -5,7 +5,7 @@ from backend.deps import get_cursor
 
 router = APIRouter()
 
-@router.get("/api/stats")
+@router.get("/api/admin/address-stats")
 async def get_stats(structure_id: int | None = Query(None)):
     """Compteurs d'adresses par détection/validation pour une structure."""
     with get_cursor() as (cur, conn):

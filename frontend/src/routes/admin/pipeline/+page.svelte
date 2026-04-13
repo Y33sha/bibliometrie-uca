@@ -14,13 +14,13 @@
   let loading = $state(false);
 
   async function loadList() {
-    reports = await api<Report[]>("/api/pipeline/reports");
+    reports = await api<Report[]>("/api/admin/pipeline/reports");
   }
 
   async function selectReport(filename: string) {
     loading = true;
     selectedReport = filename;
-    const data = await api<{ content: string }>(`/api/pipeline/reports/${filename}`);
+    const data = await api<{ content: string }>(`/api/admin/pipeline/reports/${filename}`);
     reportContent = data.content;
     renderedHtml = markdownToHtml(reportContent);
     loading = false;

@@ -70,7 +70,7 @@
 		if (mode !== 'name') p.set('mode', mode);
 		if (offset > 0) p.set('offset', String(offset));
 		const qs = p.toString();
-		replaceState(`${base}/admin/duplicates-persons${qs ? '?' + qs : ''}`, {});
+		replaceState(`${base}/admin/person-duplicates${qs ? '?' + qs : ''}`, {});
 	}
 
 	async function loadTotal() {

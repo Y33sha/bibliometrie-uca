@@ -169,7 +169,7 @@
 	async function loadStats(): Promise<void> {
 		const params = new URLSearchParams();
 		if (currentStructureId) params.set('structure_id', String(currentStructureId));
-		stats = await api<Stats>(`/api/stats?${params}`, { key: 'addr-stats' });
+		stats = await api<Stats>(`/api/admin/address-stats?${params}`, { key: 'addr-stats' });
 	}
 
 	async function loadAddresses(): Promise<void> {
