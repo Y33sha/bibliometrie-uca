@@ -33,6 +33,7 @@ from utils.normalize import normalize_text
 from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
 from services.publications import find_or_create as find_or_create_publication, find_by_nnt, find_by_doi, resolve_doi_conflict, try_merge_by_doi, refresh_from_sources
 from utils.nnt import normalize_nnt, is_theses_fr_source, extract_nnt_from_openalex
+from utils.doc_types import map_doc_type
 from utils.db_helpers import mark_staging_done
 from services.journals import find_or_create_publisher, find_or_create_journal
 
@@ -44,30 +45,6 @@ logger = setup_logger("normalize_openalex", os.path.join(os.path.dirname(__file_
 # MAPPINGS
 # =============================================================
 
-# OpenAlex type → notre enum doc_type
-DOCTYPE_MAP = {
-    "article": "article",
-    "review": "review",
-    "book": "book",
-    "book-chapter": "book_chapter",
-    "proceedings-article": "conference_paper",
-    "posted-content": "preprint",
-    "preprint": "preprint",
-    "dissertation": "thesis",
-    "editorial": "editorial",
-    "report": "report",
-    "letter": "letter",
-    "retraction": "retraction",
-    "erratum": "erratum",
-    "paratext": "other",
-    "peer-review": "peer_review",
-    "standard": "other",
-    "dataset": "dataset",
-    "grant": "other",
-    "supplementary-materials": "other",
-    "software": "software",
-    "other": "other",
-}
 
 # OpenAlex OA status → notre enum oa_type
 OA_MAP = {
@@ -276,7 +253,7 @@ def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
     pub_year = work.get("publication_year")
 
     raw_type = work.get("type") or "other"
-    doc_type = DOCTYPE_MAP.get(raw_type, "other")
+    doc_type = raw_type  # stocké brut dans source_documents
 
     nnt = None
     if is_theses_fr_source(work):
@@ -308,6 +285,8 @@ def find_publication(cur, work: dict, journal_id: int | None) -> int | None:
     meta = extract_pub_metadata(work, journal_id)
     if not meta["pub_year"] or not meta["title"]:
         return None
+    # Mapper le doc_type pour find_or_create (resolve_doi_conflict a besoin du type canonique)
+    meta["doc_type"] = map_doc_type(meta["doc_type"], "openalex")
     pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
     return pub_id
 

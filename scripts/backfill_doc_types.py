@@ -14,9 +14,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-from processing.normalize_hal import DOCTYPE_MAP as HAL_MAP
-from processing.normalize_openalex import DOCTYPE_MAP as OA_MAP
-from processing.normalize_wos import map_doc_type as wos_map_doc_type
+from utils.doc_types import map_doc_type
 
 # Priorité des types : plus le score est élevé, plus le type est "précis"
 # 'other' est le moins précis, les types spécifiques sont tous équivalents
@@ -82,16 +80,13 @@ def main():
         candidates = []
 
         for raw in (hal_types or []):
-            mapped = HAL_MAP.get(raw, "other")
-            candidates.append(mapped)
+            candidates.append(map_doc_type(raw, "hal"))
 
         for raw in (oa_types or []):
-            mapped = OA_MAP.get(raw, "other")
-            candidates.append(mapped)
+            candidates.append(map_doc_type(raw, "openalex"))
 
         for raw in (wos_types or []):
-            mapped = wos_map_doc_type(raw)
-            candidates.append(mapped)
+            candidates.append(map_doc_type(raw, "wos"))
 
         if not candidates:
             stats["unchanged"] += 1

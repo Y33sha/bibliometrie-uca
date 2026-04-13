@@ -45,17 +45,6 @@ logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__),
 # =============================================================
 
 # ScanR type → notre enum doc_type
-DOCTYPE_MAP = {
-    "journal-article": "article",
-    "book-chapter": "book_chapter",
-    "book": "book",
-    "proceedings": "proceedings",
-    "thesis": "thesis",
-    "ongoing_thesis": "ongoing_thesis",
-    "HDR": "hdr",
-    "preprint": "preprint",
-    "other": "other",
-}
 
 
 # =============================================================
@@ -135,8 +124,7 @@ def extract_pub_metadata(doc: dict, journal_id: int | None,
     title = get_title(doc)
     pub_year = doc.get("year")
 
-    raw_type = doc.get("type", "other")
-    doc_type = DOCTYPE_MAP.get(raw_type, "other")
+    doc_type = doc.get("type") or "other"
 
     oa_status = "green" if doc.get("isOa") else "closed"
 
@@ -156,9 +144,11 @@ def extract_pub_metadata(doc: dict, journal_id: int | None,
 def find_publication(cur, doc: dict, journal_id: int | None,
                      scanr_id: str | None = None) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None."""
+    from utils.doc_types import map_doc_type
     meta = extract_pub_metadata(doc, journal_id, scanr_id)
     if not meta["pub_year"] or not meta["title"]:
         return None
+    meta["doc_type"] = map_doc_type(meta["doc_type"], "scanr")
     pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
     return pub_id
 
