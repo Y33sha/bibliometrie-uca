@@ -8,8 +8,18 @@ router = APIRouter()
 
 @router.get("/api/laboratories")
 async def list_laboratories():
-    """Liste des labos ayant l'UCA pour tutelle."""
+    """Liste des labos du périmètre."""
     with get_cursor() as (cur, conn):
+        from utils.uca_perimeter import get_persons_structure_ids
+        from utils.app_config import _get_from_db
+        perimeter_ids = list(get_persons_structure_ids(cur))
+
+        # Structures racines du périmètre (ex: UCA) — à exclure de l'affichage des tutelles
+        perim_code = _get_from_db(cur, "perimeter_persons") or "uca"
+        cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,))
+        row = cur.fetchone()
+        root_ids = (row["structure_ids"] if isinstance(row, dict) else row[0]) if row else []
+
         cur.execute("""
             SELECT s.id, s.code, s.name, s.acronym,
                    s.ror_id, s.hal_collection,
@@ -20,17 +30,13 @@ async def list_laboratories():
                     JOIN structures sp ON sp.id = sr.parent_id
                     WHERE sr.child_id = s.id
                       AND sr.relation_type = 'est_tutelle_de'
-                      AND sp.code != 'uca'
+                      AND NOT (sp.id = ANY(%s))
                    ) AS tutelles
             FROM structures s
             WHERE s.structure_type = 'labo'
-              AND EXISTS (
-                  SELECT 1 FROM structure_relations sr
-                  JOIN structures uca ON uca.id = sr.parent_id AND uca.code = 'uca'
-                  WHERE sr.child_id = s.id AND sr.relation_type = 'est_tutelle_de'
-              )
+              AND s.id = ANY(%s)
             ORDER BY s.name
-        """)
+        """, (root_ids, perimeter_ids))
         return cur.fetchall()
 
 
