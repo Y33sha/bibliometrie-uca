@@ -1,37 +1,46 @@
 """Auto-extracted router."""
 
 from fastapi import APIRouter, Query
-from backend.deps import get_cursor
+from backend.deps import get_cursor, get_root_structure_id
 from backend.filters import (PUB_IS_UCA, parse_int_csv,
     apply_lab_filter, apply_year_filter, apply_oa_filter)
 
 router = APIRouter()
 
-# UCA structure id
-UCA_STRUCT_ID = 169
 
-# APC sum subquery (UCA budget only)
-APC_UCA_SUM = """
-    COALESCE((SELECT SUM(ap.amount_eur_ht)
+def _apc_root_exists():
+    rid = get_root_structure_id()
+    return f"EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {rid})"
+
+
+def _apc_root_not_exists():
+    rid = get_root_structure_id()
+    return f"NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {rid})"
+
+
+def _apc_root_sum():
+    rid = get_root_structure_id()
+    return f"""COALESCE((SELECT SUM(ap.amount_eur_ht)
      FROM apc_payments ap
-     WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169
-    ), 0)
-"""
+     WHERE ap.publication_id = p.id AND ap.budget_structure_id = {rid}
+    ), 0)"""
 
 
-APC_SQL = {
-    "uca": "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169)",
-    "non_uca": "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169))",
-    "none": "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
-}
+def _apc_sql():
+    return {
+        "uca": _apc_root_exists(),
+        "non_uca": f"(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND {_apc_root_not_exists()})",
+        "none": "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
+    }
 
 
 def apply_apc_filter(conditions: list, has_apc: str):
     """Ajoute le filtre APC aux conditions SQL. Supporte multi-sélection (virgule)."""
     if not has_apc:
         return
+    apc_sql = _apc_sql()
     values = [v.strip() for v in has_apc.split(',') if v.strip()]
-    parts = [APC_SQL[v] for v in values if v in APC_SQL]
+    parts = [apc_sql[v] for v in values if v in apc_sql]
     if len(parts) == 1:
         conditions.append(parts[0])
     elif len(parts) > 1:
@@ -89,7 +98,7 @@ async def publisher_stats(
                 pub.name AS publisher_name,
                 COUNT(DISTINCT j.id) AS journal_count,
                 COUNT(DISTINCT p.id) AS pub_count,
-                SUM({APC_UCA_SUM})::numeric(12,2) AS apc_uca,
+                SUM({_apc_root_sum()})::numeric(12,2) AS apc_uca,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
@@ -183,7 +192,7 @@ async def journal_stats(
                 j.is_predatory,
                 j.apc_amount,
                 COUNT(DISTINCT p.id) AS pub_count,
-                SUM({APC_UCA_SUM})::numeric(12,2) AS apc_uca,
+                SUM({_apc_root_sum()})::numeric(12,2) AS apc_uca,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
@@ -554,15 +563,16 @@ async def stats_facets(
         apc_params: list = []
         add_common(apc_conds, apc_params, skip="apc")
         apc_where = " AND ".join(apc_conds) if apc_conds else "TRUE"
+        rid = get_root_structure_id()
         cur.execute(f"""
             SELECT
                 COUNT(DISTINCT p.id) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169
+                    SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {rid}
                 )) AS apc_uca,
                 COUNT(DISTINCT p.id) FILTER (WHERE EXISTS (
                     SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
                 ) AND NOT EXISTS (
-                    SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169
+                    SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {rid}
                 )) AS apc_non_uca,
                 COUNT(DISTINCT p.id) FILTER (WHERE NOT EXISTS (
                     SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id

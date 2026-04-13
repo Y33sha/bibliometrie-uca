@@ -21,13 +21,9 @@ Fichier renomme, alias supprimes, 8 fichiers appelants mis a jour.
 - [ ] Documenter la configuration cron pour les modes daily/weekly/monthly
 - [ ] Ou fournir un exemple de crontab / systemd timer
 
-## 4. Tests d'idempotence des phases restantes
+## ~~4. Tests d'idempotence des phases restantes~~ FAIT
 
-**Impact : fiabilite du pipeline**
-
-- [ ] Tests pour `create_persons_from_source_authorships.py`
-- [ ] Tests pour `build_authorships.py`
-- [ ] Tests pour `populate_affiliations.py`
+Toutes les phases sont couvertes (8 classes dans test_idempotence.py).
 
 ## 5. Semantique publications → documents (optionnel)
 

@@ -5,7 +5,7 @@ import csv
 import sys, os
 from fastapi import APIRouter, Query, HTTPException, Response
 from fastapi.responses import StreamingResponse
-from backend.deps import get_cursor
+from backend.deps import get_cursor, get_root_structure_id
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from services.authorships import detach_source as _detach_source
 from backend.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, parse_int_csv, parse_str_csv,
@@ -41,6 +41,7 @@ async def publications_facets(
     excluded_types = parse_str_csv(excluded_doc_type)
     source_values = parse_str_csv(source_filter)
     country_values = parse_str_csv(country)
+    _rid = get_root_structure_id()
 
     def base_conds_params():
         """Conditions de base : publications UCA ou personne. Exclut peer_review + excluded_doc_type."""
@@ -82,10 +83,11 @@ async def publications_facets(
         if skip != "source":
             apply_source_filter(conds, source_values)
         if skip != "apc" and has_apc:
+            _rid = get_root_structure_id()
             APC_FACET_MAP = {
-                "uca": "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169)",
-                "other": "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169))",
-                "non_uca": "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169))",
+                "uca": f"EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {_rid})",
+                "other": f"(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {_rid}))",
+                "non_uca": f"(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {_rid}))",
                 "none": "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
             }
             apc_parts = []
@@ -96,7 +98,7 @@ async def publications_facets(
                     apc_parts.append("EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[]))")
                     params.append(lab_ids_clean)
                 elif v == "other_uca" and lab_ids_clean:
-                    apc_parts.append("(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[])))")
+                    apc_parts.append(f"(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {_rid}) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[])))")
                     params.append(lab_ids_clean)
             if len(apc_parts) == 1:
                 conds.append(apc_parts[0])
@@ -246,13 +248,13 @@ async def publications_facets(
             SELECT
                 COUNT(*) FILTER (WHERE EXISTS (
                     SELECT 1 FROM apc_payments ap
-                    WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169
+                    WHERE ap.publication_id = p.id AND ap.budget_structure_id = {_rid}
                 )) AS apc_uca,
                 COUNT(*) FILTER (WHERE EXISTS (
                     SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
                 ) AND NOT EXISTS (
                     SELECT 1 FROM apc_payments ap
-                    WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169
+                    WHERE ap.publication_id = p.id AND ap.budget_structure_id = {_rid}
                 )) AS apc_other,
                 COUNT(*) FILTER (WHERE NOT EXISTS (
                     SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
@@ -270,7 +272,7 @@ async def publications_facets(
                     )) AS apc_this_lab,
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM apc_payments ap
-                        WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169
+                        WHERE ap.publication_id = p.id AND ap.budget_structure_id = {_rid}
                     ) AND NOT EXISTS (
                         SELECT 1 FROM apc_payments ap
                         WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[])
@@ -279,7 +281,7 @@ async def publications_facets(
                         SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
                     ) AND NOT EXISTS (
                         SELECT 1 FROM apc_payments ap
-                        WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169
+                        WHERE ap.publication_id = p.id AND ap.budget_structure_id = {_rid}
                     )) AS apc_non_uca,
                     COUNT(*) FILTER (WHERE NOT EXISTS (
                         SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
@@ -953,11 +955,12 @@ async def list_publications(
 
         # APC filter (supports multi-select via comma)
         if has_apc:
+            _rid = get_root_structure_id()
             apc_values = [v.strip() for v in has_apc.split(',') if v.strip()]
             APC_MAP = {
-                "uca": "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169)",
-                "other": "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169))",
-                "non_uca": "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169))",
+                "uca": f"EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {_rid})",
+                "other": f"(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {_rid}))",
+                "non_uca": f"(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {_rid}))",
                 "none": "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
                 "yes": "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
                 "no": "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
@@ -970,7 +973,7 @@ async def list_publications(
                     parts.append("EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[]))")
                     params.append(lab_ids)
                 elif v == "other_uca" and lab_ids:
-                    parts.append("(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = 169) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[])))")
+                    parts.append(f"(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {_rid}) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[])))")
                     params.append(lab_ids)
             if len(parts) == 1:
                 conditions.append(parts[0])

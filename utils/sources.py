@@ -17,3 +17,8 @@ ALL_SOURCES_SET = frozenset(ALL_SOURCES)
 # Sources bibliographiques (hors theses.fr, qui a un traitement spécifique)
 BIBLIO_SOURCES = ("hal", "openalex", "wos", "scanr")
 BIBLIO_SOURCES_SET = frozenset(BIBLIO_SOURCES)
+
+# Sources avec des auteurs exploitables (noms, identifiants, affiliations)
+# Theses.fr est exclu : ses "auteurs" sont doctorants, jurys, directeurs, pas au sens classique
+AUTHOR_SOURCES = ("hal", "openalex", "wos", "scanr")
+AUTHOR_SOURCES_SQL = "('hal', 'openalex', 'wos', 'scanr')"

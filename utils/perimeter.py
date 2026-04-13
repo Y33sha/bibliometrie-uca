@@ -16,19 +16,12 @@ def get_perimeter_structure_ids(cur, perimeter_code: str) -> set[int]:
     Chaque structure listée dans perimeters.structure_ids est une racine.
     Ses descendants récursifs (via est_tutelle_de) sont inclus.
     """
-    try:
-        cur.execute(
-            "SELECT structure_ids FROM perimeters WHERE code = %s",
-            (perimeter_code,))
-        row = cur.fetchone()
-    except Exception:
-        return _fallback_uca(cur) if perimeter_code == "uca" else set()
+    cur.execute(
+        "SELECT structure_ids FROM perimeters WHERE code = %s",
+        (perimeter_code,))
+    row = cur.fetchone()
 
     if not row:
-        if perimeter_code == "uca":
-            return _fallback_uca(cur)
-        if perimeter_code == "uca_wide":
-            return _fallback_uca_wide(cur)
         return set()
 
     root_ids = row["structure_ids"] if isinstance(row, dict) else row[0]
@@ -83,28 +76,3 @@ def get_persons_structure_ids_list(cur) -> list[int]:
     return list(get_persons_structure_ids(cur))
 
 
-# ── Fallbacks ──
-
-def _val(r, key):
-    return r[key] if isinstance(r, dict) else r[0]
-
-
-def _fallback_uca(cur) -> set[int]:
-    cur.execute("""
-        SELECT s.id FROM structures s WHERE s.code = 'uca'
-        UNION
-        SELECT sr.child_id FROM structure_relations sr
-        JOIN structures s ON s.id = sr.parent_id
-        WHERE s.code = 'uca' AND sr.relation_type = 'est_tutelle_de'
-    """)
-    return {_val(r, "id") for r in cur.fetchall()}
-
-
-def _fallback_uca_wide(cur) -> set[int]:
-    restricted = _fallback_uca(cur)
-    cur.execute("""
-        SELECT sr.parent_id FROM structure_relations sr
-        JOIN structures s ON s.id = sr.child_id
-        WHERE s.code = 'uca' AND sr.relation_type = 'est_partenaire_de'
-    """)
-    return restricted | {_val(r, "parent_id") for r in cur.fetchall()}

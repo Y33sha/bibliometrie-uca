@@ -88,3 +88,32 @@ def get_cursor():
         raise
     finally:
         _pool.putconn(conn)
+
+
+# ----- Perimeter root -----
+
+_root_structure_id: int | None = None
+
+
+def get_root_structure_id() -> int:
+    """Retourne l'ID de la structure racine du périmètre principal.
+
+    Lit perimeters.structure_ids[1] pour le périmètre configuré dans
+    config.perimeter_persons. Valeur cachée après le premier appel.
+    """
+    global _root_structure_id
+    if _root_structure_id is not None:
+        return _root_structure_id
+    with get_cursor() as (cur, _):
+        cur.execute("""
+            SELECT p.structure_ids[1] AS root_id
+            FROM config c
+            JOIN perimeters p ON p.code = c.value #>> '{}'
+            WHERE c.key = 'perimeter_persons'
+        """)
+        row = cur.fetchone()
+        if row and row["root_id"]:
+            _root_structure_id = row["root_id"]
+        else:
+            _root_structure_id = 0  # Périmètre non configuré — les filtres APC seront sans effet
+    return _root_structure_id
