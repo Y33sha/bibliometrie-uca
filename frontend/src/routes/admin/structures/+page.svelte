@@ -14,7 +14,16 @@
 		ror_id: string | null;
 		rnsr_id: string | null;
 		hal_collection: string | null;
+		api_ids: Record<string, string[]> | null;
 	}
+
+	const API_SOURCES = ["openalex", "wos", "scanr", "theses"] as const;
+	const API_SOURCE_LABELS: Record<string, string> = {
+		openalex: "OpenAlex (institution lineage IDs)",
+		wos: "WoS (Organization-Enhanced)",
+		scanr: "ScanR (SIREN)",
+		theses: "theses.fr (PPN IdRef)",
+	};
 
 	interface RelatedStructure {
 		id: number;
@@ -104,6 +113,7 @@
 	let mType = $state("labo");
 	let mRor = $state("");
 	let mHal = $state("");
+	let mApiIds: Record<string, string> = $state({});  // source → valeurs séparées par virgule
 
 	// Forms data lookup (for context editing)
 	let formsData: Record<number, (number | string)[]> = $state({});
@@ -449,8 +459,25 @@
 		mType = s.type || "labo";
 		mRor = s.ror_id || "";
 		mHal = s.hal_collection || "";
+		mApiIds = {};
+		for (const src of API_SOURCES) {
+			mApiIds[src] = (s.api_ids?.[src] || []).join(", ");
+		}
 		editMode = true;
 		createModalOpen = true;
+	}
+
+	function buildApiIds(): Record<string, string[]> | null {
+		const result: Record<string, string[]> = {};
+		let hasAny = false;
+		for (const src of API_SOURCES) {
+			const raw = (mApiIds[src] || "").trim();
+			if (raw) {
+				result[src] = raw.split(",").map((s: string) => s.trim()).filter(Boolean);
+				hasAny = true;
+			}
+		}
+		return hasAny ? result : null;
 	}
 
 	async function submitEdit() {
@@ -462,6 +489,7 @@
 		if (mType) data.type = mType;
 		if (mRor.trim() !== (detail?.structure.ror_id || "")) data.ror_id = mRor.trim() || null;
 		if (mHal.trim() !== (detail?.structure.hal_collection || "")) data.hal_collection = mHal.trim() || null;
+		data.api_ids = buildApiIds();
 
 		try {
 			const res = await fetch(base + "/api/structures/" + selectedId, {
@@ -490,18 +518,21 @@
 		mType = "labo";
 		mRor = "";
 		mHal = "";
+		mApiIds = {};
+		for (const src of API_SOURCES) mApiIds[src] = "";
 		createModalOpen = true;
 	}
 
 	async function submitCreate() {
 		if (!normalizeRor()) return;
-		const data = {
+		const data: Record<string, any> = {
 			code: mCode.trim(),
 			name: mName.trim(),
 			acronym: mAcronym.trim() || null,
 			type: mType,
 			ror_id: mRor.trim() || null,
 			hal_collection: mHal.trim() || null,
+			api_ids: buildApiIds(),
 		};
 		if (!data.code || !data.name) {
 			alert("Code et nom requis");
@@ -651,6 +682,14 @@
 							<span class="detail-label">Collection HAL</span>
 							<a href={halCollectionUrl(s.hal_collection)} target="_blank" rel="noopener" class="id-badge">{s.hal_collection}</a>
 						</span>
+					{/if}
+					{#if s.api_ids}
+						{#each Object.entries(s.api_ids) as [src, ids]}
+							<span class="detail-item">
+								<span class="detail-label">API {src}</span>
+								<span class="id-badge">{(ids as string[]).join(", ")}</span>
+							</span>
+						{/each}
 					{/if}
 				</div>
 
@@ -1011,6 +1050,13 @@
 			<input placeholder="https://ror.org/0xxxxxxxxx" bind:value={mRor} />
 			<label>Collection HAL</label>
 			<input placeholder="ex: INSTITUT_PASCAL" bind:value={mHal} />
+			<details class="api-ids-section">
+				<summary>Identifiants API par source</summary>
+				{#each API_SOURCES as src}
+					<label class="api-id-label">{API_SOURCE_LABELS[src]}</label>
+					<input placeholder="ex: id1, id2" bind:value={mApiIds[src]} />
+				{/each}
+			</details>
 			<div class="actions">
 				<button class="btn" onclick={() => (createModalOpen = false)}>Annuler</button>
 				<button class="btn btn-primary" onclick={editMode ? submitEdit : submitCreate}>
@@ -1630,5 +1676,23 @@
 		gap: 8px;
 		justify-content: flex-end;
 		margin-top: 16px;
+	}
+	.api-ids-section {
+		margin-top: 10px;
+		padding: 8px;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: #fafaf8;
+	}
+	.api-ids-section summary {
+		cursor: pointer;
+		font-size: 0.85rem;
+		color: var(--muted);
+		font-weight: 500;
+	}
+	.api-id-label {
+		font-size: 0.8rem;
+		color: var(--muted);
+		margin-top: 6px;
 	}
 </style>
