@@ -6,12 +6,11 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] gérer le CRUD des périmètres dans l'interface admin/config
 
 # Workflow
-## Pérennité
-* [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?).
+## Robustesse du pipeline sur le long terme
 * [ ] Comment se met à jour le référentiel structures HAL en cas de changement entre deux imports? faut-il des champs `hash` et `last_seen_at` comme pour les publis?
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
 * [ ] authorships excluded: info perdue si réimport (grave?)
-* [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
+
 
 ## Pipeline
 ### Facile et/ou urgent
@@ -26,16 +25,15 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer)
 
 # Trucs techniques
-* [ ] champs datetime: diminuer précision? voir ce que ça fait gagner comme place
-* [ ] logging errors: UnicodeEncodeError: 'charmap' codec can't encode character '\u2194' in position 50: character maps to <undefined> => inoffensif mais CHIANT
 * [ ] ensure_truth_authorship: utilisé où? sert à quoi?
 * [ ] cache pour améliorer la perf?
-
 * [ ] faire une version bac à sable?
+
+## Chantiers au long cours
 * [ ] chercher des moyens d'optimiser la taille de la base: supprimer données qui ne sont plus utiles? ex.: supprimer *_authors et *_structures (sauf hal)?
 * [ ] audit complet du code pour retrouver tous les trucs hardcodés qu'on pourrait abstraire, ou le SQL à simplifier suite aux fusions des tables sources. / 'uca', structure id 169...; requêtes SQL avec sources hardcodées
 
-## Trucs où je me tâte
+## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
 
 * [ ] vérifier valeur ajoutée du mapping hal_structures *vs* utilisation des collections pour la phase affiliations du pipeline; ou mieux, prendre la chaîne de caractères "affiliation" et la vérifier comme une adresse? => pour pouvoir auditer, commencer par **backfill** les collections dans les publications HAL qui n'en ont pas.
 * [ ] normalize_wos: conserver le mapping addresses->structures dans le champ raw_affiliations? (modifier script + **backfill**) voir si ça vaut le coup
@@ -58,6 +56,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] sujets / mots-clés: exploiter
 
 ## Qualité des données
+* [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?).
 * [ ] contrôler données journal/doc_type via DOI? => DOI peut permettre de dédoublonner journals
 * [ ] utiliser DOAJ pour enrichir données journals et s'en servir pour contrôler oa_status?
 * [ ] hal_authors importés sans id par un script de cross-import: ça ne devrait pas être possible. Auditer.
@@ -65,13 +64,14 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] depuis que la déduplication automatique par identité de métadonnées a été abandonnée: passer en revue les cas concernés, auditer, re-dupliquer?
 
 ### Problèmes spécifiques HAL
+* [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
 * [ ] problème des documents où l'affiliation de l'authorship n'est pas résolue: cf https://hal.science/hal-04987032
 * [ ] revue Openalex 'HAL (Le Centre pour la Communication Scientifique Directe)' => parfois absents de HAL! Auditer docts source OpenAlex, ref HAL, HAL non trouvé => supprimer
 * [ ] https://hal.science/hal-03874894 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
 * [ ] DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
 * [ ] trous dans la numérotation des auteurs: diagnostiquer et résoudre
 * à quoi sert VRAIMENT la colonne collections du staging_hal?
-* [ ] embargos (HAL, theses.fr): afficher?
+* [ ] embargos (HAL, theses.fr): afficher dates (existent-elles dans le retour api)?
 * [ ] recherche par hal-id avec hal-id non trouvé dans hal (dédoublonné depuis?):  2026-04-11 08:55:58,660 [WARNING]   hal-03178520 non trouvé dans HAL => auditer, supprimer les hal-id erronés des external_ids
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis (authorship ok, author pas ok => vérifier que ce ne sera pas ré-écrasé)
 
@@ -82,6 +82,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?)
 * [ ] types wos composites: étudier, voir s'il s'agit de types/sous-types
+* "prépublication, document de travail" dans HAL apparaît comme other
 
 ### Chantier des méga-authorships et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap)
@@ -157,4 +158,3 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * 129259 pourquoi je n'ai pas le doct hal?
 * 53910 pays FR (pas MC?)
 * 150378 et 154490: pas dédupliquées alors que c'est le même hal-id modulo v1
-* "prépublication, document de travail" dans HAL apparaît comme other
