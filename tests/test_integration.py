@@ -127,6 +127,21 @@ class TestPublicationService:
         assert is_new is False
 
 
+# ── Cohérence enum sources ──
+
+class TestSourcesEnum:
+    def test_python_matches_db(self, db):
+        """utils.sources.ALL_SOURCES doit correspondre à l'enum source_type en base."""
+        from utils.sources import ALL_SOURCES_SET
+        db.execute("SELECT unnest(enum_range(NULL::source_type))::text")
+        db_sources = {row["unnest"] for row in db.fetchall()}
+        assert ALL_SOURCES_SET == db_sources, (
+            f"Désynchronisation Python/DB !\n"
+            f"  Python : {sorted(ALL_SOURCES_SET)}\n"
+            f"  DB     : {sorted(db_sources)}"
+        )
+
+
 # ── Merge persons ──
 
 class TestMergePersons:

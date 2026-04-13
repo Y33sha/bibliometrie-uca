@@ -9,7 +9,7 @@ Ce service encapsule les opérations ponctuelles utilisées par les routeurs
 et les scripts de correction.
 """
 
-VALID_SOURCES = ("hal", "openalex", "wos", "scanr")
+from utils.sources import BIBLIO_SOURCES as VALID_SOURCES
 
 
 def exclude_authorship(cur, authorship_id: int) -> dict | None:
