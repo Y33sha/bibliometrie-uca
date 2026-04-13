@@ -85,17 +85,105 @@ def get_hal_collections(cur) -> dict[str, str]:
         return {}
 
 
-def get_hal_portal(cur) -> str:
-    """Retourne le portail HAL global."""
+def get_hal_portals(cur) -> list[str]:
+    """Retourne la liste des portails HAL à interroger."""
+    val = _get_from_db(cur, "hal_portals")
+    if val and isinstance(val, list):
+        return val
+
+    # Fallback ancien format (scalar)
     val = _get_from_db(cur, "hal_portal")
     if val and isinstance(val, str):
-        return val
+        return [val]
 
     try:
         from config.settings import HAL
-        return HAL.get("portal", "clermont-univ")
+        portal = HAL.get("portal", "clermont-univ")
+        return [portal] if portal else []
     except ImportError:
-        return "clermont-univ"
+        return ["clermont-univ"]
+
+
+def get_hal_extra_collections(cur) -> list[str]:
+    """Retourne les collections HAL supplémentaires (hors structures du périmètre)."""
+    val = _get_from_db(cur, "hal_extra_collections")
+    if val and isinstance(val, list):
+        return val
+    return []
+
+
+def get_api_base_urls(cur) -> dict[str, str]:
+    """Retourne les URLs de base des API par source."""
+    val = _get_from_db(cur, "api_base_urls")
+    if val and isinstance(val, dict):
+        return val
+    return {
+        "hal": "https://api.archives-ouvertes.fr/search/",
+        "openalex": "https://api.openalex.org/works",
+        "wos": "https://api.clarivate.com/api/wos",
+        "scanr": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
+        "theses": "https://theses.fr/api/v1/theses/recherche/",
+    }
+
+
+def get_extraction_api_ids(cur, source: str) -> list[str]:
+    """Retourne les identifiants API pour une source, déduits du périmètre d'extraction.
+
+    Lit perimeter_extraction → structures du périmètre → api_ids[source].
+    Fallback sur les anciennes clés config (openalex_institution_ids, etc.).
+    """
+    # 1. Depuis les structures du périmètre
+    perim_code = _get_from_db(cur, "perimeter_extraction")
+    if perim_code and isinstance(perim_code, str):
+        try:
+            from utils.uca_perimeter import get_perimeter_structure_ids
+            struct_ids = get_perimeter_structure_ids(cur, perim_code)
+            if struct_ids:
+                cur.execute("""
+                    SELECT api_ids->%s AS ids
+                    FROM structures
+                    WHERE id = ANY(%s) AND api_ids ? %s
+                """, (source, list(struct_ids), source))
+                result = []
+                for row in cur.fetchall():
+                    ids = row["ids"] if isinstance(row, dict) else row[0]
+                    if isinstance(ids, list):
+                        result.extend(ids)
+                    elif isinstance(ids, str):
+                        result.append(ids)
+                if result:
+                    return list(dict.fromkeys(result))  # dédupliqué, ordre préservé
+        except Exception as e:
+            logger.warning(f"Impossible de dériver api_ids depuis le périmètre : {e}")
+
+    # 2. Fallback anciennes clés config
+    fallback_keys = {
+        "openalex": "openalex_institution_ids",
+        "wos": "wos_affiliations",
+        "scanr": "scanr_affiliation_ids",
+        "theses": "theses_etab_ppns",
+    }
+    fallback_key = fallback_keys.get(source)
+    if fallback_key:
+        val = _get_from_db(cur, fallback_key)
+        if val and isinstance(val, list):
+            return val
+
+    # 3. Fallback settings.py
+    settings_map = {
+        "openalex": lambda: __import__("config.settings", fromlist=["OPENALEX"]).OPENALEX.get("institution_ids", []),
+        "wos": lambda: __import__("config.settings", fromlist=["WOS"]).WOS.get("affiliations", []),
+        "scanr": lambda: __import__("config.settings", fromlist=["SCANR"]).SCANR.get("affiliation_ids", []),
+        "theses": lambda: __import__("config.settings", fromlist=["THESES"]).THESES.get("etab_ppns", []),
+    }
+    try:
+        getter = settings_map.get(source)
+        if getter:
+            return getter()
+    except ImportError:
+        pass
+
+    return []
 
 
 def get_openalex_institution_ids(cur) -> list[str]:
