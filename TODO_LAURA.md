@@ -15,10 +15,6 @@
 * [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer)
 
 ## Pipeline
-* [x] dédoublonnage DOI versionnés (.v1...)
-* [x] déplacer création des publications *après* phase affiliations? (permet d'éviter des créations inutiles)
-* [x] phase identifiers dans normalize_hal, comme enrich_hal_structures => enrichir source_authors, pas directement persons
-* [x] pour raccourcir la phase addresses: pointer authorships quand adresses extraites et traitées?
 * [ ] imports quotidiens (mode rapide, seulement nouveaux docts)
 * [ ] vérifier valeur ajoutée du mapping hal_structures *vs* utilisation des collections pour la phase affiliations du pipeline; ou mieux, prendre la chaîne de caractères "affiliation" et la vérifier comme une adresse? => pour pouvoir auditer, commencer par **backfill** les collections dans les publications HAL qui n'en ont pas.
 * [ ] normalize_wos: conserver le mapping addresses->structures dans le champ raw_affiliations? (modifier script + **backfill**)
@@ -62,15 +58,14 @@
 ## Qualité des données
 * [ ] utiliser DOAJ pour enrichir données journals et s'en servir pour contrôler oa_status?
 * [ ] hal_authors importés sans id par un script de cross-import: ça ne devrait pas être possible. Auditer.
-* [ ] publis OpenAlex avec date correspondant au dépôt dans HAL: ex. 8651 => si dates différentes, utiliser l'autre.
+* [ ] publis OpenAlex avec date correspondant au dépôt dans HAL: ex. 8651 => si dates différentes, utiliser l'autre. Si OA cite HAL comme source, prendre métadonnées HAL
 * [ ] contrôler données journal/doc_type via DOI? => DOI peut permettre de dédoublonner journals
 
 ### Types de documents
 * [ ] types parfois non fiables sur OpenAlex: https://openalex.org/works/W4225722715 (utiliser Unpaywall aussi pour corriger type doc?)
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
-* [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou reue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); preprints en accès gold selon OpenAlex (?); data papers?
+* [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou revue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); preprints en accès gold selon OpenAlex (?); data papers?
 * [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
-* [ ] mémoires de master: quoi faire? cacher, séparer? (vérifier d'abord ce qu'on trouve en doc_type memoir, à part les trucs sur dumas)
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?)
 
 ### Problèmes spécifiques HAL
@@ -81,9 +76,9 @@
 * [ ] trous dans la numérotation des auteurs: diagnostiquer et résoudre
 * à quoi sert VRAIMENT la colonne collections du staging_hal?
 * [ ] documents tel-* sans document déposé: non visibles dans TEL. Rediriger vers hal.science
-* [ ] embargos (articles, thèses): afficher?
+* [ ] embargos (HAL, theses.fr): afficher?
 * [ ] recherche par hal-id avec hal-id non trouvé dans hal (dédoublonné depuis?):  2026-04-11 08:55:58,660 [WARNING]   hal-03178520 non trouvé dans HAL => auditer, supprimer les hal-id erronés des external_ids
-
+* [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis (authorship ok, author pas ok => vérifier que ce ne sera pas ré-écrasé)
 
 # Interface
 
@@ -111,13 +106,11 @@
 ### Personnes (public)
 * [ ] publications: indiquer si premier/dernier auteur ; + rôles autres que auteur?
 * [ ] ajouter dashboard personne
-* [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis (authorship ok, author pas ok => vérifier que ce ne sera pas ré-écrasé)
 * [ ] signaler publis HAL non correctement reliées au compte HAL (dans la page problèmes-hal?)
 * [ ] filtre "publications avec authorship UCA": certains ont 500 publications mais une seule en tant qu'auteur UCA, ça aiderait à les retrouver pour les vérifier
 
 ### Structures (public)
 * [ ] Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation?
-* [ ] liste publis: colonne "est dans la collection HAL du labo"
 * [ ] utiliser le critère "périmètre" pour définir la requête sur les structures à afficher
 
 ### Publications
@@ -126,7 +119,7 @@
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
 * [ ] pages dédiées pour les types spéciaux: datasets?
 * [ ] filtre langue? (y a-t-il un code langue unique trans-sources? sinon, faire une table langues)
-* [ ] ajouter DOI dans les sources
+* [ ] ajouter DOI dans les facettes sources
 
 ### Mega-authorships et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap)
@@ -142,9 +135,9 @@
 * [ ] accessibilité, responsivité de l'interface
 
 ## Détails d'affichage
-* [ ] comportement de la flèche de tri sur page laboratoires, colonne co-tutelles; page publications, colonne Année
 * [ ] investiguer les erreurs TypeScript
 * [ ] décomptes sur les onglets: ne pas tenir compte des facettes
+* [ ] décomptes facettes: toujours aligné à droite
 
 # Trucs pour plus tard
 * compte fractionnaire des publications?
