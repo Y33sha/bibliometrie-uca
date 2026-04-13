@@ -317,7 +317,7 @@
   {#each [
     { key: "perimeter_extraction", label: "Phase extraction", hint: "Structures interrogées par les API (identifiants dans api_ids + collections HAL)" },
     { key: "perimeter_affiliations", label: "Phase affiliations", hint: "Résolution structure_ids sur les authorships sources" },
-    { key: "perimeter_persons", label: "Phase persons", hint: "Sélection des authorships génératrices de personnes (in_perimeter)" },
+    { key: "perimeter_persons", label: "Phases publications + persons", hint: "Détermine in_perimeter : seuls les documents avec au moins une authorship in_perimeter génèrent des publications et des personnes" },
   ] as role}
     {@const item = configByKey(role.key)}
     {#if item}
