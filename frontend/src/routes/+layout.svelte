@@ -296,7 +296,7 @@
 		height: 46px;
 		position: sticky;
 		top: 0;
-		z-index: 20;
+		z-index: 100;
 	}
 	.site-header.admin {
 		background: #3d7a7c;

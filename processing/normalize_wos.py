@@ -33,7 +33,7 @@ from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.normalize import normalize_text
 from utils.authorship_roles import map_role
-from services.publications import find_or_create as find_or_create_publication, _enrich, update_sources
+from services.publications import find_or_create as find_or_create_publication, try_merge_by_doi, refresh_from_sources
 from utils.db_helpers import mark_staging_done
 from services.journals import find_or_create_publisher, find_or_create_journal
 
@@ -980,15 +980,9 @@ def process_record(cur, staging_row: tuple) -> bool:
             publication_id = find_publication(cur, rec, journal_id)
 
         # Enrichir la publication existante si trouvée
+        # (try_merge_by_doi gère les fusions DOI, refresh_from_sources recalcule après)
         if publication_id:
-            publication_id = _enrich(cur, publication_id, doi=pub_meta["doi"],
-                    doc_type=pub_meta["doc_type"], oa_status=pub_meta["oa_status"],
-                    journal_id=journal_id, container_title=pub_meta["container_title"],
-                    language=pub_meta["language"],
-                    abstract=rec.get("abstract"), keywords=rec.get("keywords"),
-                    topics=rec.get("topics"), biblio=rec.get("biblio"),
-                    is_retracted=rec.get("is_retracted"))
-            update_sources(cur, publication_id)
+            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
 
         # Document WoS (source_documents) — publication_id peut être NULL
         source_document_id = insert_wos_document(
@@ -997,6 +991,10 @@ def process_record(cur, staging_row: tuple) -> bool:
 
         # Auteurs et authorships
         process_authorships(cur, rec, source_document_id)
+
+        # Recalcul complet des métadonnées depuis toutes les sources
+        if publication_id:
+            refresh_from_sources(cur, publication_id)
 
         mark_staging_done(cur, staging_id)
         return True
