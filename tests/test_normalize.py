@@ -2,13 +2,6 @@
 
 import pytest
 
-VALID_DOC_TYPES = {
-    "article", "review", "book", "book_chapter", "conference_paper",
-    "preprint", "thesis", "ongoing_thesis", "editorial", "report",
-    "peer_review", "other", "dataset", "software", "patent", "hdr",
-    "memoir", "poster", "letter", "erratum", "retraction",
-    "book_review", "data_paper", "proceedings",
-}
 
 # ── OpenAlex ─────────────────────────────────────────────────────
 
@@ -16,9 +9,9 @@ from processing.normalize_openalex import (
     extract_short_id,
     is_hal_primary_location,
     is_repository_source,
-    DOCTYPE_MAP as OA_DOCTYPE_MAP,
     OA_MAP,
 )
+from utils.doc_types import map_doc_type, _SOURCE_MAPS, _VALID_DOC_TYPES as VALID_DOC_TYPES_SET
 from utils.hal import extract_hal_id_from_url
 
 
@@ -118,12 +111,11 @@ class TestOADocTypeMap:
     def test_covers_common_types(self):
         for t in ["article", "review", "book", "book-chapter",
                    "proceedings-article", "preprint", "dissertation"]:
-            assert t in OA_DOCTYPE_MAP
+            assert map_doc_type(t, "openalex") != "other", f"{t} non mappé"
 
     def test_all_values_valid(self):
-        valid = VALID_DOC_TYPES
-        for v in OA_DOCTYPE_MAP.values():
-            assert v in valid, f"Type inconnu : {v}"
+        for v in _SOURCE_MAPS["openalex"].values():
+            assert v in VALID_DOC_TYPES_SET, f"Type inconnu : {v}"
 
 
 # ── HAL ──────────────────────────────────────────────────────────
@@ -132,7 +124,6 @@ from processing.normalize_hal import (
     as_str,
     get_title,
     parse_author_structures,
-    DOCTYPE_MAP as HAL_DOCTYPE_MAP,
 )
 
 
@@ -218,24 +209,22 @@ class TestHALParseAuthorStructures:
 class TestHALDocTypeMap:
     def test_covers_common_types(self):
         for t in ["ART", "COMM", "OUV", "COUV", "THESE", "HDR"]:
-            assert t in HAL_DOCTYPE_MAP
+            assert map_doc_type(t, "hal") != "other", f"{t} non mappé"
 
     def test_all_values_valid(self):
-        valid = VALID_DOC_TYPES
-        for v in HAL_DOCTYPE_MAP.values():
-            assert v in valid, f"Type inconnu : {v}"
+        for v in _SOURCE_MAPS["hal"].values():
+            assert v in VALID_DOC_TYPES_SET, f"Type inconnu : {v}"
 
 
 # ── WoS ──────────────────────────────────────────────────────────
 
 from processing.normalize_wos import (
     detect_format,
-    map_doc_type,
+    map_doc_type as wos_map_doc_type,
     map_oa_status,
     _parse_c1_field,
     _safe_list,
     _get_api_title,
-    DOCTYPE_MAP as WOS_DOCTYPE_MAP,
 )
 
 
@@ -249,24 +238,24 @@ class TestWoSDetectFormat:
 
 class TestWoSMapDocType:
     def test_simple(self):
-        assert map_doc_type("Article") == "article"
-        assert map_doc_type("Review") == "review"
+        assert wos_map_doc_type("Article") == "article"
+        assert wos_map_doc_type("Review") == "review"
 
     def test_composite(self):
-        assert map_doc_type("Article; Proceedings Paper") == "article"
+        assert wos_map_doc_type("Article; Proceedings Paper") == "article"
 
     def test_composite_other_first(self):
         """Si le premier type est 'erratum', cherche un type plus significatif."""
-        assert map_doc_type("Correction; Article") == "erratum"
+        assert wos_map_doc_type("Correction; Article") == "erratum"
 
     def test_none(self):
-        assert map_doc_type(None) == "other"
+        assert wos_map_doc_type(None) == "other"
 
     def test_unknown(self):
-        assert map_doc_type("Unknown Type XYZ") == "other"
+        assert wos_map_doc_type("Unknown Type XYZ") == "other"
 
     def test_case_insensitive(self):
-        assert map_doc_type("ARTICLE") == "article"
+        assert wos_map_doc_type("ARTICLE") == "article"
 
 
 class TestWoSMapOaStatus:
@@ -354,7 +343,7 @@ class TestWoSDocTypeMap:
     def test_covers_common_types(self):
         for t in ["article", "review", "book", "book chapter",
                    "proceedings paper", "editorial material"]:
-            assert t in WOS_DOCTYPE_MAP
+            assert map_doc_type(t, "wos") != "other", f"{t} non mappé"
 
 
 # ── NNT ─────────────────────────────────────────────────────────

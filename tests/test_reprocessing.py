@@ -14,9 +14,7 @@ from psycopg2.extras import Json
 from utils.normalize import normalize_text
 from utils.nnt import normalize_nnt
 from services.publications import find_or_create as find_or_create_publication, update_sources
-from processing.normalize_hal import DOCTYPE_MAP as HAL_DOCTYPE_MAP
-
-_DOC_TYPE_MAPS = {"hal": HAL_DOCTYPE_MAP}
+from utils.doc_types import map_doc_type
 
 
 def _create_all_publications(cur):
@@ -33,7 +31,7 @@ def _create_all_publications(cur):
         if not title or not pub_year:
             continue
         raw_type = doc["doc_type"] or "other"
-        doc_type = _DOC_TYPE_MAPS.get(doc["source"], {}).get(raw_type, raw_type)
+        doc_type = map_doc_type(raw_type, doc["source"])
         ext_ids = doc["external_ids"] or {}
         nnt = ext_ids.get("nnt")
         if nnt:
@@ -148,9 +146,12 @@ class TestHalReprocessingUpdatesOaStatus:
 
         assert _get_pub_oa_status(db, hal_id) == "green"
 
-    def test_green_not_downgraded(self, db):
-        """Un re-traitement avec openAccess_bool=false ne doit pas
-        rétrograder une publication déjà en green."""
+    def test_closed_replaces_green_on_reprocessing(self, db):
+        """Un re-traitement avec openAccess_bool=false met à jour le statut.
+
+        Avec refresh_from_sources, le statut est recalculé depuis les
+        source_documents : si HAL dit maintenant 'closed', c'est closed.
+        """
         hal_id = HAL_DOC_CLOSED["halId_s"]
 
         # 1. Premier traitement avec green
@@ -162,9 +163,8 @@ class TestHalReprocessingUpdatesOaStatus:
 
         assert _get_pub_oa_status(db, hal_id) == "green"
 
-        # 2. Re-traitement avec false (ne devrait pas rétrograder)
+        # 2. Re-traitement avec false → refresh_from_sources recalcule
         _insert_hal_staging(db, HAL_DOC_CLOSED)
         _run_normalize_hal(db)
 
-        # _enrich ne dégrade pas : green reste green
-        assert _get_pub_oa_status(db, hal_id) == "green"
+        assert _get_pub_oa_status(db, hal_id) == "closed"

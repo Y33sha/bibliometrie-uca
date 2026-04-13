@@ -5,7 +5,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 import pytest
 from services.persons import merge_person
-from services.publications import find_or_create, find_by_doi
+from services.publications import find_or_create, find_by_doi, refresh_from_sources
 
 
 # ── Helpers ──
@@ -100,20 +100,20 @@ class TestPublicationService:
         assert pub_id2 != pub_id1
         assert is_new is True
 
-    def test_enrich_on_doi_match(self, db):
-        """Quand on retrouve par DOI, les métadonnées manquantes sont enrichies."""
+    def test_enrich_via_refresh(self, db):
+        """refresh_from_sources enrichit les métadonnées depuis les source_documents."""
         journal_id = create_journal(db, "Science")
         pub_id, _ = find_or_create(
             db, title="Pub", title_normalized="pub",
             pub_year=2024, doi="10.5555/enrich-test",
             oa_status="unknown")
-        # Deuxième appel avec plus d'info
-        pub_id2, is_new = find_or_create(
-            db, title="Pub", title_normalized="pub",
-            pub_year=2024, doi="10.5555/enrich-test",
-            oa_status="gold", journal_id=journal_id)
-        assert pub_id2 == pub_id
-        assert is_new is False
+        # Créer un source_document avec plus d'info
+        db.execute("""
+            INSERT INTO source_documents (source, source_id, title, pub_year,
+                                          publication_id, oa_status, journal_id)
+            VALUES ('openalex', 'W999enrich', 'Pub', 2024, %s, 'gold', %s)
+        """, (pub_id, journal_id))
+        refresh_from_sources(db, pub_id)
         db.execute("SELECT oa_status, journal_id FROM publications WHERE id = %s", (pub_id,))
         row = db.fetchone()
         assert row["journal_id"] == journal_id
