@@ -7,7 +7,7 @@ Chaque test tourne dans une transaction rollbackée (isolation complète).
 
 import pytest
 from psycopg2.extras import Json
-from services.publications import find_or_create, find_by_doi, find_by_nnt
+from services.publications import find_or_create, find_by_doi, find_by_nnt, refresh_from_sources
 
 
 # ── Helpers ──────────────────────────────────────────────────────
@@ -208,22 +208,36 @@ class TestNoDoi:
 
 # ── Enrichissement ───────────────────────────────────────────────
 
-class TestEnrich:
-    def test_doi_enriches_existing(self, db):
-        """Un 2e appel avec le meme DOI enrichit la publication existante."""
+class TestRefreshFromSources:
+    """Teste refresh_from_sources : recalcul des métadonnées depuis source_documents."""
+
+    def _insert_sd(self, db, pub_id, source, **kwargs):
+        """Insère un source_document rattaché à pub_id."""
+        db.execute("""
+            INSERT INTO source_documents (source, source_id, title, pub_year, publication_id,
+                                          doc_type, oa_status, language, journal_id)
+            VALUES (%s, %s, 'Test', 2024, %s, %s, %s, %s, %s)
+        """, (source, f"{source}-{pub_id}-{kwargs.get('oa_status', '')}",
+              pub_id,
+              kwargs.get("doc_type"), kwargs.get("oa_status"),
+              kwargs.get("language"), kwargs.get("journal_id")))
+
+    def test_language_from_source(self, db):
+        """refresh_from_sources propage les métadonnées des source_documents."""
         id1, _ = _create(db, doi="10.1234/enrich", oa_status="closed",
                          pub_year=2024, doc_type="article")
-        id2, _ = _create(db, doi="10.1234/enrich", oa_status="closed",
-                         pub_year=2024, doc_type="article", language="en")
+        self._insert_sd(db, id1, "hal", language="en", oa_status="closed")
+        refresh_from_sources(db, id1)
 
-        assert id1 == id2
         db.execute("SELECT language FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["language"] == "en"
 
     def test_oa_status_upgrade(self, db):
-        """Le statut OA s'améliore (closed → green)."""
+        """Le statut OA le plus ouvert gagne (closed + green → green)."""
         id1, _ = _create(db, doi="10.1234/oa", oa_status="closed")
-        _create(db, doi="10.1234/oa", oa_status="green")
+        self._insert_sd(db, id1, "hal", oa_status="closed")
+        self._insert_sd(db, id1, "openalex", oa_status="green")
+        refresh_from_sources(db, id1)
 
         db.execute("SELECT oa_status FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["oa_status"] == "green"
@@ -231,7 +245,9 @@ class TestEnrich:
     def test_diamond_always_wins(self, db):
         """Diamond prime sur tout."""
         id1, _ = _create(db, doi="10.1234/dia", oa_status="gold")
-        _create(db, doi="10.1234/dia", oa_status="diamond")
+        self._insert_sd(db, id1, "hal", oa_status="gold")
+        self._insert_sd(db, id1, "openalex", oa_status="diamond")
+        refresh_from_sources(db, id1)
 
         db.execute("SELECT oa_status FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["oa_status"] == "diamond"

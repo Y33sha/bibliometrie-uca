@@ -272,14 +272,19 @@ def refresh_from_sources(cur, pub_id: int):
     Ne touche PAS à : title, title_normalized, notes, sources (utiliser
     update_sources() séparément).
     """
-    cur.execute("""
+    # Utiliser un RealDictCursor pour accès par nom de colonne,
+    # quel que soit le type de curseur passé par l'appelant.
+    from psycopg2.extras import RealDictCursor
+    dict_cur = cur.connection.cursor(cursor_factory=RealDictCursor)
+    dict_cur.execute("""
         SELECT source, doi, doc_type, pub_year, journal_id, oa_status,
                container_title, language, abstract, keywords, countries,
                topics, biblio, meta, is_retracted, external_ids
         FROM source_documents
         WHERE publication_id = %s
     """, (pub_id,))
-    rows = cur.fetchall()
+    rows = dict_cur.fetchall()
+    dict_cur.close()
     if not rows:
         return
 

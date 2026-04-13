@@ -14,17 +14,7 @@ from psycopg2.extras import Json
 from utils.normalize import normalize_text
 from utils.nnt import normalize_nnt
 from services.publications import find_or_create as find_or_create_publication, update_sources
-from processing.normalize_hal import DOCTYPE_MAP as HAL_DOCTYPE_MAP
-from processing.normalize_openalex import DOCTYPE_MAP as OA_DOCTYPE_MAP
-from processing.normalize_wos import DOCTYPE_MAP as WOS_DOCTYPE_MAP
-from processing.normalize_scanr import DOCTYPE_MAP as SCANR_DOCTYPE_MAP
-
-_DOC_TYPE_MAPS = {
-    "hal": HAL_DOCTYPE_MAP,
-    "openalex": OA_DOCTYPE_MAP,
-    "wos": WOS_DOCTYPE_MAP,
-    "scanr": SCANR_DOCTYPE_MAP,
-}
+from utils.doc_types import map_doc_type
 
 
 def _create_all_publications(cur):
@@ -44,7 +34,7 @@ def _create_all_publications(cur):
         if not title or not pub_year:
             continue
         raw_type = doc["doc_type"] or "other"
-        doc_type = _DOC_TYPE_MAPS.get(doc["source"], {}).get(raw_type, raw_type)
+        doc_type = map_doc_type(raw_type, doc["source"])
         ext_ids = doc["external_ids"] or {}
         nnt = ext_ids.get("nnt")
         if nnt:
