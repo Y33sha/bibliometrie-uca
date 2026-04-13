@@ -328,20 +328,52 @@ def main():
     sources = set(s.strip() for s in args.sources.split(",") if s.strip())
     log.info("Sources : %s", ", ".join(sorted(sources)))
 
+    # Métriques pipeline
+    from db.connection import get_connection
+    from pipeline.metrics import snapshot, compute_deltas, generate_report
+    metrics_conn = get_connection()
+    phase_results = []  # [(name, duration, deltas)]
+
     t0_total = time.time()
     for name, fn in phases_to_run:
         log.info("─" * 40)
         log.info("PHASE : %s", name)
         log.info("─" * 40)
+
+        before = snapshot(metrics_conn)
+        t0_phase = time.time()
         try:
             fn(mode=args.mode, sources=sources, year=args.year,
                full_cross_import=args.full_cross_import)
         except RuntimeError as e:
             log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
             log.error("Pour reprendre : python run_pipeline.py --from %s", name)
+            # Générer le rapport partiel avant de quitter
+            after = snapshot(metrics_conn)
+            phase_results.append((name + " (ERREUR)", time.time() - t0_phase,
+                                  compute_deltas(before, after)))
+            report_path = generate_report(args.mode, sources, phase_results,
+                                          time.time() - t0_total)
+            log.info("Rapport partiel : %s", report_path)
+            metrics_conn.close()
             sys.exit(1)
 
+        duration = time.time() - t0_phase
+        after = snapshot(metrics_conn)
+        deltas = compute_deltas(before, after)
+        phase_results.append((name, duration, deltas))
+
+        if deltas:
+            for key, vals in sorted(deltas.items()):
+                log.info("  %s : %d → %d (%+d)", key, vals["before"], vals["after"], vals["delta"])
+
     elapsed_total = time.time() - t0_total
+
+    # Générer le rapport
+    report_path = generate_report(args.mode, sources, phase_results, elapsed_total)
+    log.info("Rapport : %s", report_path)
+
+    metrics_conn.close()
     log.info("=" * 60)
     log.info("PIPELINE TERMINÉ en %.0fs (%.1f min)", elapsed_total, elapsed_total / 60)
     log.info("=" * 60)
