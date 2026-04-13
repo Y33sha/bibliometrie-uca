@@ -31,7 +31,8 @@ def is_theses_fr_source(work: dict) -> bool:
     return False
 
 
-_PMH_NNT_RE = re.compile(r"^pmh:(.+)$", re.IGNORECASE)
+# NNT via PMH : "pmh:{NNT}" — exclut les identifiants OAI (oai:HAL:...)
+_PMH_NNT_RE = re.compile(r"^pmh:([A-Za-z0-9]+)$", re.IGNORECASE)
 _THESES_FR_URL_RE = re.compile(r"theses\.fr/([A-Za-z0-9]+)")
 
 

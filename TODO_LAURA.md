@@ -30,7 +30,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] faire une version bac à sable?
 
 ## Chantiers au long cours
-* [ ] chercher des moyens d'optimiser la taille de la base: supprimer données qui ne sont plus utiles? ex.: supprimer *_authors et *_structures (sauf hal)?
+* [ ] chercher des moyens d'optimiser la taille de la base: supprimer données qui ne sont plus utiles? ex.: supprimer *_authors et *_structures (sauf hal)? chercher colonnes jamais utilisées.
 * [ ] audit complet du code pour retrouver tous les trucs hardcodés qu'on pourrait abstraire, ou le SQL à simplifier suite aux fusions des tables sources. / 'uca', structure id 169...; requêtes SQL avec sources hardcodées
 
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
@@ -45,7 +45,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] collections => hal_collections
 
 # Données
-
 ## Explorer autres sources possibles
 * [ ] pour les publis: CrossRef, ArXiv, Pubmed
 * [ ] pour les jeux de données: DataCite, autres?
@@ -156,4 +155,3 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * erreur de parsing OA: publication 113652
 * 129259 pourquoi je n'ai pas le doct hal?
 * 53910 pays FR (pas MC?)
-* 150378 et 154490: pas dédupliquées alors que c'est le même hal-id modulo v1

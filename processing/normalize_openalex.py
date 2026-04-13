@@ -312,9 +312,10 @@ def insert_openalex_document(cur, work: dict, staging_id: int,
     urls, location_ids = extract_locations_data(work)
 
     # NNT depuis la structure du work (prioritaire sur celui extrait des URLs)
-    nnt = extract_nnt_from_openalex(work)
-    if nnt:
-        location_ids["nnt"] = nnt
+    if is_theses_fr_source(work):
+        nnt = extract_nnt_from_openalex(work)
+        if nnt:
+            location_ids["nnt"] = nnt
 
     # Conserver le DOI original si retiré lors d'un conflit chapitre/ouvrage
     if pub_meta and pub_meta.get("source_doi"):
