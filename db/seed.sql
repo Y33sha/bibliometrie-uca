@@ -6,21 +6,19 @@
 
 BEGIN;
 
--- config (14 lignes)
+-- config (12 lignes)
 DELETE FROM config;
-INSERT INTO config (key, value, description) VALUES ('hal_collections', '{"ND": "NEURO-DOL", "CMH": "CMH", "ICC": "ICCF", "LMV": "LMV", "LRL": "LRL", "UNH": "UNH", "ACTE": "ACTé", "CHEC": "CHEC", "CROC": "CROC", "GDEC": "GDEC", "GRED": "iGReD", "LAMP": "LaMP", "LMGE": "LMGE", "MSHC": "MSH", "OPGC": "OPGC", "PIAF": "PIAF", "UMRF": "UMRF", "AME2P": "AME2P", "CELIS": "CELIS", "CERDI": "CERDI", "IMOST": "IMoST", "LABCS": "ComSocs", "LIMOS": "LIMOS", "M2ISH": "M2iSH", "MEDIS": "MEDIS", "PHIER": "PHIER", "CERHAC": "IHRIM", "CLERMA": "CleRMa", "GEOLAB": "GEOLAB", "LAPSCO": "LAPSCO", "ACCEPPT": "ACCePPT", "CHELTER": "CHELTER", "UMR6620": "LMBP", "LESCORES": "LESCORES", "RESSOURCES": "Ressources", "TERRITOIRES": "Territoires", "LPC-CLERMONT": "LPCA", "INSTITUT_PASCAL": "IP"}', 'Collections HAL par labo (code HAL → label)');
-INSERT INTO config (key, value, description) VALUES ('hal_portal', '"clermont-univ"', 'Portail HAL global');
+INSERT INTO config (key, value, description) VALUES ('api_base_urls', '{"hal": "https://api.archives-ouvertes.fr/search/", "wos": "https://api.clarivate.com/api/wos", "scanr": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search", "theses": "https://theses.fr/api/v1/theses/recherche/", "openalex": "https://api.openalex.org/works"}', 'URLs de base des API par source (clés = enum source_type)');
+INSERT INTO config (key, value, description) VALUES ('hal_extra_collections', '[]', 'Collections HAL à interroger en plus de celles dérivées des structures du périmètre');
+INSERT INTO config (key, value, description) VALUES ('hal_portals', '["clermont-univ"]', 'Portails HAL à interroger (en plus des collections labo)');
 INSERT INTO config (key, value, description) VALUES ('openalex_email', '"votre@email.fr"', 'Email pour le polite pool OpenAlex');
-INSERT INTO config (key, value, description) VALUES ('openalex_institution_ids', '["i198244214", "i4210143836", "i4210128870", "i4387154249"]', 'IDs institution OpenAlex (filtre lineage)');
 INSERT INTO config (key, value, description) VALUES ('perimeter_affiliations', '"uca_wide"', 'Périmètre pour la résolution des affiliations (structure_ids sur authorships sources)');
+INSERT INTO config (key, value, description) VALUES ('perimeter_extraction', '"uca_wide"', 'Périmètre pour déterminer les structures à interroger lors de l''extraction');
 INSERT INTO config (key, value, description) VALUES ('perimeter_persons', '"uca"', 'Périmètre pour la création des personnes (authorships is_uca)');
 INSERT INTO config (key, value, description) VALUES ('pipeline_years_full', '6', 'Mode full/monthly : extraire depuis (année courante - N)');
 INSERT INTO config (key, value, description) VALUES ('pipeline_years_weekly', '1', 'Mode weekly : extraire depuis (année courante - N)');
-INSERT INTO config (key, value, description) VALUES ('scanr_affiliation_ids', '["130028061", "266307461", "130021918"]', 'IDs SIREN des structures ScanR (UCA, CHU, INP)');
 INSERT INTO config (key, value, description) VALUES ('scanr_password', '"VOTRE_MOT_DE_PASSE_SCANR"', 'Mot de passe API ScanR');
 INSERT INTO config (key, value, description) VALUES ('scanr_username', '"VOTRE_IDENTIFIANT_SCANR"', 'Identifiant API ScanR (Elasticsearch)');
-INSERT INTO config (key, value, description) VALUES ('theses_etab_ppns', '["252404955", "196200032"]', 'PPN IdRef des établissements de soutenance UCA pour theses.fr');
-INSERT INTO config (key, value, description) VALUES ('wos_affiliations', '["Univ Clermont Auvergne", "CHU Clermont Ferrand", "Clermont Auvergne INP", "Sigma Clermont"]', 'Noms Organisation-Enhanced WoS');
 INSERT INTO config (key, value, description) VALUES ('wos_api_key', '"VOTRE_CLE_WOS"', 'Clé API Web of Science (Clarivate)');
 
 -- countries (175 lignes)
@@ -526,7 +524,7 @@ SELECT setval(pg_get_serial_sequence('country_name_forms', 'id'), (SELECT COALES
 DELETE FROM structures;
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (169, 'uca', 'Université Clermont Auvergne', 'UCA', 'universite', 'https://ror.org/01a8ajp46', NULL, 'PRES_CLERMONT');
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (170, 'site_clermont', 'Site clermontois', NULL, 'site', NULL, NULL, NULL);
-INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (172, 'inp_clermont', 'Clermont Auvergne INP', 'INP', 'ecole', 'https://ror.org/001f39w38', NULL, NULL);
+INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (172, 'inp_clermont', 'Clermont Auvergne INP', 'INP', 'ecole', 'https://ror.org/001f39w38', NULL, 'CLERMONT-AUVERGNE-INP');
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (173, 'cnrs', 'Centre National de la Recherche Scientifique', 'CNRS', 'onr', 'https://ror.org/02feahw73', NULL, NULL);
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (174, 'inrae', 'Institut National de Recherche pour l''Agriculture, l''Alimentation et l''Environnement', 'INRAE', 'onr', 'https://ror.org/003vg9w96', NULL, NULL);
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (175, 'inserm', 'Institut National de la Santé et de la Recherche Médicale', 'Inserm', 'onr', 'https://ror.org/02vjkv261', NULL, NULL);
@@ -540,7 +538,7 @@ INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (183, 'emse', 'Mines Saint-Etienne', 'EMSE', 'ecole', 'https://ror.org/05a1dws80', NULL, NULL);
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (184, 'esc_clermont_business_school', 'ESC Clermont Business School', NULL, 'ecole', 'https://ror.org/02141gz69', NULL, NULL);
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (185, 'ensacf', 'Ecole nationale supérieure d''architecture de Clermont-Ferrand', 'ENSACF', 'ecole', 'https://ror.org/04dw8vw47', NULL, NULL);
-INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (186, 'chu_clermont', 'CHU Clermont-Ferrand', 'CHU', 'chu', 'https://ror.org/02tcf7a68', NULL, NULL);
+INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (186, 'chu_clermont', 'CHU Clermont-Ferrand', 'CHU', 'chu', 'https://ror.org/02tcf7a68', NULL, 'CHU-CLERMONTFERRAND');
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (187, 'ip', 'Institut Pascal', 'IP', 'labo', 'https://ror.org/03vgfxd91', NULL, 'INSTITUT_PASCAL');
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (188, 'unh', 'Unité de nutrition humaine', 'UNH', 'labo', 'https://ror.org/003qhrc72', NULL, 'UNH');
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection) VALUES (189, 'geolab', 'Laboratoire de Géographie Physique et Environnementale', 'GEOLAB', 'labo', 'https://ror.org/00e4pqm50', NULL, 'GEOLAB');

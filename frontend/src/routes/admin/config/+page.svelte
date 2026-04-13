@@ -205,95 +205,47 @@
   {/each}
 </div>
 
-<!-- ═══ AFFILIATIONS ═══ -->
-<h3 class="section-title">Paramètres de requête API</h3>
+<!-- ═══ HAL ═══ -->
+<h3 class="section-title">HAL</h3>
 <div class="config-grid">
-  {#if configByKey("openalex_institution_ids")}
-    <div class="config-row">
-      <span class="config-label">OpenAlex — Institutions</span>
-      {#if editingKey === "openalex_institution_ids"}
-        <textarea class="config-editor" bind:value={editValue} rows={3}></textarea>
-        <div class="config-actions">
-          <button class="btn btn-sm btn-primary" onclick={() => save("openalex_institution_ids")} disabled={saving}>OK</button>
-          <button
-            class="btn btn-sm"
-            onclick={() => {
-              editingKey = null;
-            }}>Annuler</button
-          >
-        </div>
-      {:else}
-        <span class="config-value-inline"
-          >{Array.isArray(configByKey("openalex_institution_ids")?.value) ? configByKey("openalex_institution_ids")?.value.join(", ") : configByKey("openalex_institution_ids")?.value}</span
-        >
-        <button class="btn btn-sm" onclick={() => startEdit("openalex_institution_ids")}>Modifier</button>
-      {/if}
-    </div>
-  {/if}
-  {#if configByKey("wos_affiliations")}
-    <div class="config-row">
-      <span class="config-label">WoS — Affiliations OG</span>
-      {#if editingKey === "wos_affiliations"}
-        <textarea class="config-editor" bind:value={editValue} rows={4}></textarea>
-        <div class="config-actions">
-          <button class="btn btn-sm btn-primary" onclick={() => save("wos_affiliations")} disabled={saving}>OK</button>
-          <button
-            class="btn btn-sm"
-            onclick={() => {
-              editingKey = null;
-            }}>Annuler</button
-          >
-        </div>
-      {:else}
-        <span class="config-value-inline">{Array.isArray(configByKey("wos_affiliations")?.value) ? configByKey("wos_affiliations")?.value.join(", ") : configByKey("wos_affiliations")?.value}</span>
-        <button class="btn btn-sm" onclick={() => startEdit("wos_affiliations")}>Modifier</button>
-      {/if}
-    </div>
-  {/if}
-  {#if configByKey("scanr_affiliation_ids")}
-    <div class="config-row">
-      <span class="config-label">ScanR — Affiliations SIREN</span>
-      {#if editingKey === "scanr_affiliation_ids"}
-        <textarea class="config-editor" bind:value={editValue} rows={3}></textarea>
-        <div class="config-actions">
-          <button class="btn btn-sm btn-primary" onclick={() => save("scanr_affiliation_ids")} disabled={saving}>OK</button>
-          <button
-            class="btn btn-sm"
-            onclick={() => {
-              editingKey = null;
-            }}>Annuler</button
-          >
-        </div>
-      {:else}
-        <span class="config-value-inline"
-          >{Array.isArray(configByKey("scanr_affiliation_ids")?.value) ? configByKey("scanr_affiliation_ids")?.value.join(", ") : configByKey("scanr_affiliation_ids")?.value}</span
-        >
-        <button class="btn btn-sm" onclick={() => startEdit("scanr_affiliation_ids")}>Modifier</button>
-      {/if}
-    </div>
-  {/if}
-  {#if configByKey("theses_etab_ppns")}
-    <div class="config-row">
-      <span class="config-label">theses.fr — Établissements (PPN IdRef)</span>
-      {#if editingKey === "theses_etab_ppns"}
-        <textarea class="config-editor" bind:value={editValue} rows={3}></textarea>
-        <div class="config-actions">
-          <button class="btn btn-sm btn-primary" onclick={() => save("theses_etab_ppns")} disabled={saving}>OK</button>
-          <button
-            class="btn btn-sm"
-            onclick={() => {
-              editingKey = null;
-            }}>Annuler</button
-          >
-        </div>
-      {:else}
-        <span class="config-value-inline">{Array.isArray(configByKey("theses_etab_ppns")?.value) ? configByKey("theses_etab_ppns")?.value.join(", ") : configByKey("theses_etab_ppns")?.value}</span>
-        <button class="btn btn-sm" onclick={() => startEdit("theses_etab_ppns")}>Modifier</button>
-      {/if}
-    </div>
-  {/if}
+  {#each [{ key: "hal_portals", label: "Portails HAL" }] as field}
+    {@const item = configByKey(field.key)}
+    {#if item}
+      <div class="config-row">
+        <span class="config-label">{field.label}</span>
+        {#if editingKey === field.key}
+          <input class="config-editor-inline" bind:value={editValue} onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(field.key); } }} />
+          <span class="config-actions-inline">
+            <button class="btn btn-sm btn-primary" onclick={() => save(field.key)} disabled={saving}>OK</button>
+            <button class="btn btn-sm" onclick={() => { editingKey = null; }}>Annuler</button>
+          </span>
+        {:else}
+          <span class="config-value-inline">{Array.isArray(item.value) ? item.value.join(", ") : item.value}</span>
+          <button class="btn btn-sm" onclick={() => startEdit(field.key)}>Modifier</button>
+        {/if}
+      </div>
+    {/if}
+  {/each}
+  {#each [{ key: "hal_extra_collections", label: "Collections supplémentaires" }] as field}
+    {@const item = configByKey(field.key)}
+    {#if item}
+      <div class="config-row">
+        <span class="config-label">{field.label}</span>
+        {#if editingKey === field.key}
+          <input class="config-editor-inline" bind:value={editValue} onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(field.key); } }} />
+          <span class="config-actions-inline">
+            <button class="btn btn-sm btn-primary" onclick={() => save(field.key)} disabled={saving}>OK</button>
+            <button class="btn btn-sm" onclick={() => { editingKey = null; }}>Annuler</button>
+          </span>
+        {:else}
+          <span class="config-value-inline">{Array.isArray(item.value) && item.value.length ? item.value.join(", ") : "(aucune)"}</span>
+          <button class="btn btn-sm" onclick={() => startEdit(field.key)}>Modifier</button>
+        {/if}
+      </div>
+    {/if}
+  {/each}
   <div class="config-row" style="flex-wrap: wrap;">
-    <span class="config-label">HAL — Collections</span>
+    <span class="config-label">Collections (périmètre)</span>
     <div class="hal-coll-list">
       {#each Object.entries(halCollections.collections) as [code, label]}
         <span class="hal-coll-tag">{code} <span class="hal-coll-label">({label})</span></span>
@@ -302,7 +254,7 @@
         <span class="none-text">Aucune collection</span>
       {/if}
     </div>
-    <span class="config-hint">Dérivées des structures du périmètre UCA ayant un champ "Collection HAL" renseigné (<a href="{base}/admin/structures">structures</a>).</span>
+    <span class="config-hint">Dérivées des structures du périmètre ayant un champ "Collection HAL" renseigné (<a href="{base}/admin/structures">structures</a>).</span>
   </div>
 </div>
 
@@ -362,7 +314,11 @@
 
 <h4 class="subsection-title">Rôle des périmètres</h4>
 <div class="config-grid">
-  {#each [{ key: "perimeter_affiliations", label: "Phase affiliations", hint: "Résolution structure_ids sur les authorships sources" }, { key: "perimeter_persons", label: "Phase persons", hint: "Sélection des authorships génératrices de personnes (in_perimeter)" }] as role}
+  {#each [
+    { key: "perimeter_extraction", label: "Phase extraction", hint: "Structures interrogées par les API (identifiants dans api_ids + collections HAL)" },
+    { key: "perimeter_affiliations", label: "Phase affiliations", hint: "Résolution structure_ids sur les authorships sources" },
+    { key: "perimeter_persons", label: "Phase persons", hint: "Sélection des authorships génératrices de personnes (in_perimeter)" },
+  ] as role}
     {@const item = configByKey(role.key)}
     {#if item}
       <div class="config-row" style="flex-wrap: wrap;">
@@ -467,21 +423,6 @@
     display: flex;
     gap: 4px;
     margin-left: auto;
-  }
-  .config-editor {
-    width: 100%;
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.85rem;
-    padding: 6px 8px;
-    border: 1px solid var(--accent);
-    border-radius: 3px;
-    resize: vertical;
-    margin-top: 4px;
-  }
-  .config-actions {
-    display: flex;
-    gap: 4px;
-    margin-top: 4px;
   }
 
   .hal-coll-list {
