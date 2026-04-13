@@ -88,7 +88,25 @@ docker compose exec backend bash   # Shell dans le conteneur backend
 ```bash
 createdb bibliometrie
 psql -d bibliometrie -f db/schema.sql
+python db/migrate.py
 ```
+
+Deux options pour initialiser les données :
+
+**Option A — Restaurer un dump complet** (base existante) :
+```bash
+pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
+```
+
+**Option B — Démarrer de zéro** (seed minimal) :
+```bash
+psql -d bibliometrie -f db/seed.sql
+```
+Le seed contient les données de référence (structures, relations, pays, config).
+Les credentials API (clés WoS, ScanR, etc.) sont remplacés par des placeholders :
+les renseigner dans la table `config` avant de lancer le pipeline.
+
+Pour régénérer le seed depuis une base existante : `python scripts/generate_seed.py`
 
 ### Backend
 

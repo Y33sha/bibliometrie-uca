@@ -1,6 +1,10 @@
+# Memo
+pg_dump -U lalecoz -d bibliometrie -Fc -f bibliometrie.dump
+pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
+
 # Workflow
 ## Automatisation
-* [ ] dumps automatisés sur le cloud (Backblaze B2 + rclone + GPG)
+* [x] dumps automatisés sur le cloud (Backblaze B2 + rclone + GPG)
 * [ ] programmation cron pour le pipeline de traitement
 
 ## Transmissibilité
@@ -60,6 +64,7 @@
 * [ ] hal_authors importés sans id par un script de cross-import: ça ne devrait pas être possible. Auditer.
 * [ ] publis OpenAlex avec date correspondant au dépôt dans HAL: ex. 8651 => si dates différentes, utiliser l'autre. Si OA cite HAL comme source, prendre métadonnées HAL
 * [ ] contrôler données journal/doc_type via DOI? => DOI peut permettre de dédoublonner journals
+* [ ] depuis que la déduplication automatique par identité de métadonnées a été abandonnée: passer en revue les cas concernés
 
 ### Types de documents
 * [ ] types parfois non fiables sur OpenAlex: https://openalex.org/works/W4225722715 (utiliser Unpaywall aussi pour corriger type doc?)
@@ -121,7 +126,7 @@
 * [ ] filtre langue? (y a-t-il un code langue unique trans-sources? sinon, faire une table langues)
 * [ ] ajouter DOI dans les facettes sources
 
-### Mega-authorships et alignement inter-sources
+### Chantier des méga-authorships et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap)
 * [ ] en attendant, le mode "conflit de sources" dans la dédup personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`)
 * [ ] vérifier pourquoi Openalex contient parfois beaucoup plus d'auteurs : ex. 21105 (OpenAlex semble résoudre les noms d'équipes en listes de noms de personnes, mais je ne sais pas comment)
@@ -138,6 +143,7 @@
 * [ ] investiguer les erreurs TypeScript
 * [ ] décomptes sur les onglets: ne pas tenir compte des facettes
 * [ ] décomptes facettes: toujours aligné à droite
+* [ ] page stats: flèches de tri ne fonctionnent pas
 
 # Trucs pour plus tard
 * compte fractionnaire des publications?

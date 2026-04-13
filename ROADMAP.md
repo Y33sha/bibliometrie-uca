@@ -1,12 +1,24 @@
 # Roadmap — Bibliométrie UCA
 
-## Programme du 11 avril
+2. Seed de démarrage (TODO_LAURA: générer un seed de novo)
+Sans ça, impossible de redéployer le projet. Quelqu'un qui clone le repo ne peut pas lancer l'application — il manque les données de référence (structures UCA, relations, périmètres). C'est bloquant pour la transmissibilité.
 
-* [ ] Exploiter les nouvelles données: abstract, topics, keywords, oa_url
-* [ ] Optimiser taille de la base en supprimant au fur et à mesure les trucs non utilisés (raw staging):
-* [ ] réfléchir à un mode quotidien pour le pipeline (interrogation minimale des API: "quoi de neuf depuis hier"? pas de réimport+comparaison de hash, pas d'enrichissements)
-* [ ] log post-pipeline (publications ajoutées, personnes créées, formes de nom rattachées, erreurs...)
+3. Tests (TODO_CLAUDE: tests d'idempotence phases restantes + TODO_LAURA: creuser les types de tests)
+Le pipeline touche à toute la base. Sans couverture de test sur create_persons, build_authorships et les phases critiques, chaque modification est un risque. La DSI ne pourra pas faire évoluer le code en confiance.
 
+4. Finir la transition config en base (TODO_LAURA: settings.py → config DB)
+Des paramètres hardcodés dans des fichiers Python locaux = pas déployable facilement. La DSI ne pourra pas configurer l'instance sans toucher au code.
+
+5. Refactoring des normaliseurs (TODO_CLAUDE: DOCTYPE_MAP, factoriser find_publication)
+5 scripts qui dupliquent la même logique avec des variantes subtiles. En cas de bug ou d'évolution, il faut modifier 5 fichiers en gardant la cohérence. C'est le principal risque de maintenabilité.
+
+6. Observabilité pipeline (TODO_CLAUDE: rapport de synthèse + TODO_LAURA: logs post-pipeline)
+Sans logs exploitables, la DSI ne saura pas si un run s'est bien passé ni quoi faire en cas de problème.
+
+7. Réimport et pérennité des données (TODO_LAURA: hash structures, authorships au réimport, excluded perdus)
+Ce sont des bombes à retardement : tout fonctionne tant qu'on ne re-importe pas, mais un full re-run pourrait casser des données manuellement corrigées.
+
+Les points 1-2 sont existentiels (pas de projet sans eux). Les points 3-5 sont la maintenabilité quotidienne. Les points 6-7 sont la fiabilité opérationnelle.
 
 ## Quick wins
 
@@ -25,25 +37,11 @@ Si les abstracts sont déjà en base, c'est juste un affichage supplémentaire c
 6. Filtre corresponding_is_uca (TODO_LAURA l.93)
 Si is_corresponding et is_uca existent déjà sur les authorships, c'est un filtre backend + une checkbox frontend.
 
-## Chantiers moyens (quelques heures)
-
-### Automatisation pays des adresses (country_name_forms)
-Table `country_name_forms` avec les formes de noms de pays (français, anglais, variantes). Script de parsing des adresses pour détecter les pays automatiquement → `suggested_countries`, validables manuellement. Voir TODO_CLAUDE pour le détail.
-
-### Cron imports + dumps
-Automatiser les imports périodiques (hebdomadaires) et les dumps de sauvegarde. Docker cron ou systemd timer.
-
-### Tests d'idempotence du pipeline
-Vérifier que lancer deux fois chaque phase produit le même résultat. Fixtures + double exécution + compteurs. Voir TODO_CLAUDE pour le détail.
-
 
 ## Gros chantiers (à planifier)
 
 ### Mega-authorships et alignement inter-sources
 Publications > 50 auteurs : désalignement des positions entre HAL/OpenAlex/WoS → faux conflits. Table `authorship_alignments` + algorithme de matching par noms. En attendant, exclusion des publis > 50 auteurs du mode "conflit de sources".
-
-### Nouvelles sources
-ArXiv, PubMed, ScanR, theses.fr. Chaque source = extraction + normalisation + intégration au pipeline.
 
 ### Relations entre publications
 Modéliser les relations : est traduction de, est preprint de, fait partie de (chapitre → ouvrage), corrigendum, etc.
@@ -54,28 +52,3 @@ Sujets, éditeurs, revues (avec liens DOAJ, APC). Évaluer la pertinence avant d
 ### Uniformisation compatibilité noms (Python vs SQL)
 Les fonctions `names_compatible` existent en Python (utils/names.py) et en SQL (admin_person_duplicates.py). Idéalement unifier, mais les requêtes SQL sont plus performantes pour le matching en masse.
 
-
-## Bugs et bizarreries à investiguer
-
-- openalex répète des auteurs : publi 77832
-- claire richard : pourquoi 0 publi UCA sur page admin?
-- publi 103567 : structures identifiées sur HAL (UCA, Inserm) → pourquoi?
-- personne 57907 : comprendre comment "Damien Boyer" est devenu une forme de nom
-- publi 79637 : authorship source rejetée → la rejeter de l'authorship vérité
-- trous dans la numérotation des auteurs HAL : diagnostiquer et résoudre
-- HAL compte-rendu → type "autre" au lieu d'article
-- publications "article" avec source OA et revue inconnue → souvent des preprints
-- document dumas : ouvrir sur dumas, pas HAL
-- preprints en accès gold → corriger
-- authorship supprimée mais publi apparaît toujours (julie gardette)
-
-
-## Améliorations d'interface (non prioritaires)
-
-- Mémoriser filtres et les rétablir au rechargement
-- Rendre les filtres sticky
-- Rendre tous les tableaux triables
-- Interface pour afficher le staging JSON (pour vérification)
-- Différencier interfaces à usage interne vs externe (rôles)
-- Groupes de pays (UE, continents) pour la recherche par facettes
-- Afficher les abstracts
