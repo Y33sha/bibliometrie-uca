@@ -51,6 +51,11 @@
 		</div>
 		<nav class="site-nav">
 			<a
+				href="{base}/admin/pipeline"
+				class="nav-link"
+				class:active={isActive("/admin/pipeline")}>Pipeline</a
+			>
+			<a
 				href="{base}/admin/config"
 				class="nav-link"
 				class:active={isActive("/admin/config")}>Config</a
@@ -59,11 +64,6 @@
 				href="{base}/admin/structures"
 				class="nav-link"
 				class:active={isActive("/admin/structures")}>Structures</a
-			>
-			<a
-				href="{base}/admin/pipeline"
-				class="nav-link"
-				class:active={isActive("/admin/pipeline")}>Pipeline</a
 			>
 			<div
 				class="nav-dropdown"
@@ -240,7 +240,7 @@
 					/><line x1="12" y1="17" x2="12.01" y2="17" /></svg
 				></a
 			>
-			<a href="{base}/admin/config" class="nav-link nav-switch-link"
+			<a href="{base}/admin/pipeline" class="nav-link nav-switch-link"
 				>Admin</a
 			>
 		</nav>
