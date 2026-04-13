@@ -655,10 +655,19 @@ async def person_theses(person_id: int):
                       AND sa2.roles && ARRAY['author']::text[]
                     LIMIT 1
                    ) AS author_name,
-                   (SELECT a.structure_ids
-                    FROM authorships a
-                    WHERE a.publication_id = p.id AND a.in_perimeter
+                   (SELECT sa2.person_id
+                    FROM source_authorships sa2
+                    WHERE sa2.source_document_id = sd.id
+                      AND sa2.source = 'theses'
+                      AND sa2.roles && ARRAY['author']::text[]
                     LIMIT 1
+                   ) AS author_person_id,
+                   (SELECT ARRAY_AGG(DISTINCT sid)
+                    FROM authorships a,
+                         UNNEST(a.structure_ids) AS sid
+                    JOIN structures st ON st.id = sid
+                    WHERE a.publication_id = p.id AND a.in_perimeter
+                      AND st.structure_type = 'labo'
                    ) AS structure_ids
             FROM source_authorships sa
             JOIN source_documents sd ON sd.id = sa.source_document_id
@@ -707,6 +716,7 @@ async def person_theses(person_id: int):
                 "pub_year": row["pub_year"],
                 "doi": row["doi"],
                 "author_name": row["author_name"],
+                "author_person_id": row["author_person_id"],
                 "structure_ids": row["structure_ids"] or [],
             })
 

@@ -725,24 +725,22 @@ async def get_publication(pub_id: int):
         thesis_meta = None
         if pub["doc_type"] in ("thesis", "ongoing_thesis"):
             cur.execute("""
-                SELECT st.raw_data->>'discipline' AS discipline,
-                       st.raw_data->'ecolesDoctorale' AS ecoles_doctorales,
-                       st.raw_data->'partenairesDeRecherche' AS partenaires,
-                       p.meta
+                SELECT sd.meta AS sd_meta, p.meta AS pub_meta
                 FROM publications p
                 LEFT JOIN source_documents sd ON sd.publication_id = p.id AND sd.source = 'theses'
-                LEFT JOIN staging st ON st.id = sd.staging_id
                 WHERE p.id = %s
                 LIMIT 1
             """, (pub_id,))
             row = cur.fetchone()
             if row:
+                sd_meta = row["sd_meta"] or {}
+                pub_meta = row["pub_meta"] or {}
                 thesis_meta = {
-                    "discipline": row["discipline"],
-                    "ecoles_doctorales": row["ecoles_doctorales"],
-                    "partenaires": row["partenaires"],
-                    "date_soutenance": (row["meta"] or {}).get("date_soutenance"),
-                    "date_inscription": (row["meta"] or {}).get("date_inscription"),
+                    "discipline": sd_meta.get("discipline"),
+                    "ecoles_doctorales": sd_meta.get("ecoles_doctorales"),
+                    "partenaires": sd_meta.get("partenaires"),
+                    "date_soutenance": sd_meta.get("date_soutenance") or pub_meta.get("date_soutenance"),
+                    "date_inscription": sd_meta.get("date_inscription") or pub_meta.get("date_inscription"),
                 }
 
         # g) Resolve all structure_ids → names

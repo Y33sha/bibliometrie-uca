@@ -11,10 +11,10 @@ start_date, end_date) sont stockés dans le champ JSONB source_data.
 enriched_at est une colonne réelle de source_structures.
 
 Usage:
-    python3 enrich_hal_structures.py                # enrichir les structures non-enrichies
-    python3 enrich_hal_structures.py --all           # ré-enrichir toutes les structures
-    python3 enrich_hal_structures.py --crawl         # + découvrir et enrichir les parents récursivement
-    python3 enrich_hal_structures.py --children 1063463  # lister tous les enfants d'une structure
+    python enrich_hal_structures.py                # enrichir les structures non-enrichies
+    python enrich_hal_structures.py --all           # ré-enrichir toutes les structures
+    python enrich_hal_structures.py --crawl         # + découvrir et enrichir les parents récursivement
+    python enrich_hal_structures.py --children 1063463  # lister tous les enfants d'une structure
 """
 
 import argparse
