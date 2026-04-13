@@ -15,7 +15,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 ### Facile et/ou urgent
 * [ ] 3e mode du pipeline: daily (mode rapide, seulement nouveaux docts)
 * [ ] programmation cron pour le pipeline de traitement
-* [ ] vérifier que le staging n'est PLUS JAMAIS utilisé après normalisation
 ### Autres
 * [ ] structure_ids et in_perimeter des publis theses.fr: à quelle phase du pipeline sont-ils remplis et selon quelle logique? auditer
 * [ ] création de publications: comment sont renseignés les champs mots clés, topics? fusion ou premier arrivé premier servi? Vérifier et backfiller si besoin.
