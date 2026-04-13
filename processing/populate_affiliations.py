@@ -2,7 +2,7 @@
 Résolution des affiliations sur les authorships sources.
 
 Peuple in_perimeter et structure_ids sur source_authorships
-en utilisant les périmètres configurés (utils/uca_perimeter.py).
+en utilisant les périmètres configurés (utils/perimeter.py).
 
 Deux périmètres :
   - restreint : UCA + labos tutellés → sert pour in_perimeter
@@ -20,7 +20,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-from utils.uca_perimeter import get_uca_structure_ids, get_uca_structure_ids_wide
+from utils.perimeter import get_persons_structure_ids, get_affiliations_structure_ids
 from utils.log import setup_logger
 
 logger = setup_logger("populate_affiliations", os.path.join(os.path.dirname(__file__), "logs"))
@@ -46,7 +46,7 @@ def step1_hal_structure_ids(cur):
     logger.info(f"Étape 1 — HAL structure_ids mappés : {cur.rowcount} authorships")
 
 
-def step2_hal_in_perimeter(cur, uca_ids):
+def step2_hal_in_perimeter(cur, perimeter_ids):
     """Étape 2 : HAL — recalculer in_perimeter."""
     cur.execute("UPDATE source_authorships SET in_perimeter = FALSE WHERE source = 'hal'")
     logger.info(f"Étape 2 — HAL in_perimeter reset : {cur.rowcount} authorships")
@@ -60,11 +60,11 @@ def step2_hal_in_perimeter(cur, uca_ids):
             SELECT 1 FROM unnest(sa.structure_ids) AS sid
             WHERE sid = ANY(%s)
           )
-    """, (list(uca_ids),))
+    """, (list(perimeter_ids),))
     logger.info(f"Étape 2 — HAL in_perimeter = TRUE : {cur.rowcount} authorships")
 
 
-def step3_openalex(cur, uca_ids, uca_wide_ids):
+def step3_openalex(cur, perimeter_ids, wide_ids):
     """Étape 3 : OpenAlex — calculer in_perimeter + structure_ids."""
     cur.execute("UPDATE source_authorships SET in_perimeter = FALSE, structure_ids = NULL WHERE source = 'openalex'")
     logger.info(f"Étape 3 — OA reset : {cur.rowcount} authorships")
@@ -82,7 +82,7 @@ def step3_openalex(cur, uca_ids, uca_wide_ids):
               AND ast.structure_id = ANY(%s)
               AND ast.is_confirmed IS DISTINCT FROM FALSE
         )
-    """, (list(uca_ids),))
+    """, (list(perimeter_ids),))
     logger.info(f"Étape 3 — OA in_perimeter = TRUE : {cur.rowcount} authorships")
 
     # structure_ids via périmètre large
@@ -103,11 +103,11 @@ def step3_openalex(cur, uca_ids, uca_wide_ids):
         FROM oa_structs os
         WHERE sa.source = 'openalex'
           AND sa.id = os.source_authorship_id
-    """, (list(uca_wide_ids),))
+    """, (list(wide_ids),))
     logger.info(f"Étape 3 — OA structure_ids : {cur.rowcount} authorships")
 
 
-def step3b_wos(cur, uca_ids, uca_wide_ids):
+def step3b_wos(cur, perimeter_ids, wide_ids):
     """Étape 3b : WoS — calculer in_perimeter + structure_ids."""
     cur.execute("UPDATE source_authorships SET in_perimeter = FALSE, structure_ids = NULL WHERE source = 'wos'")
     logger.info(f"Étape 3b — WoS reset : {cur.rowcount} authorships")
@@ -125,7 +125,7 @@ def step3b_wos(cur, uca_ids, uca_wide_ids):
               AND ast.structure_id = ANY(%s)
               AND ast.is_confirmed IS DISTINCT FROM FALSE
         )
-    """, (list(uca_ids),))
+    """, (list(perimeter_ids),))
     logger.info(f"Étape 3b — WoS in_perimeter = TRUE : {cur.rowcount} authorships")
 
     # structure_ids via périmètre large
@@ -146,11 +146,11 @@ def step3b_wos(cur, uca_ids, uca_wide_ids):
         FROM wos_structs ws
         WHERE sa.source = 'wos'
           AND sa.id = ws.source_authorship_id
-    """, (list(uca_wide_ids),))
+    """, (list(wide_ids),))
     logger.info(f"Étape 3b — WoS structure_ids : {cur.rowcount} authorships")
 
 
-def step3c_scanr(cur, uca_ids, uca_wide_ids):
+def step3c_scanr(cur, perimeter_ids, wide_ids):
     """Étape 3c : ScanR — calculer in_perimeter + structure_ids."""
     cur.execute("UPDATE source_authorships SET in_perimeter = FALSE, structure_ids = NULL WHERE source = 'scanr'")
     logger.info(f"Étape 3c — ScanR reset : {cur.rowcount} authorships")
@@ -168,7 +168,7 @@ def step3c_scanr(cur, uca_ids, uca_wide_ids):
               AND ast.structure_id = ANY(%s)
               AND ast.is_confirmed IS DISTINCT FROM FALSE
         )
-    """, (list(uca_ids),))
+    """, (list(perimeter_ids),))
     logger.info(f"Étape 3c — ScanR in_perimeter = TRUE : {cur.rowcount} authorships")
 
     # structure_ids via périmètre large
@@ -189,11 +189,11 @@ def step3c_scanr(cur, uca_ids, uca_wide_ids):
         FROM scanr_structs ss
         WHERE sa.source = 'scanr'
           AND sa.id = ss.source_authorship_id
-    """, (list(uca_wide_ids),))
+    """, (list(wide_ids),))
     logger.info(f"Étape 3c — ScanR structure_ids : {cur.rowcount} authorships")
 
 
-def step3d_theses(cur, uca_wide_ids):
+def step3d_theses(cur, wide_ids):
     """Étape 3d : theses.fr — résoudre structure_ids via adresses.
 
     in_perimeter est déjà à TRUE (posé par normalize_theses), on ne le reset pas.
@@ -217,7 +217,7 @@ def step3d_theses(cur, uca_wide_ids):
         FROM theses_structs ts
         WHERE sa.source = 'theses'
           AND sa.id = ts.source_authorship_id
-    """, (list(uca_wide_ids),))
+    """, (list(wide_ids),))
     logger.info(f"Étape 3d — theses.fr structure_ids : {cur.rowcount} authorships")
 
 
@@ -255,24 +255,24 @@ def main():
 
     t0 = time.perf_counter()
 
-    # Charger les périmètres UCA une seule fois
-    uca_ids = get_uca_structure_ids(cur)
-    uca_wide_ids = get_uca_structure_ids_wide(cur)
-    logger.info(f"Périmètre UCA restreint : {len(uca_ids)} structures")
-    logger.info(f"Périmètre UCA large     : {len(uca_wide_ids)} structures")
+    # Charger les périmètres une seule fois
+    perimeter_ids = get_persons_structure_ids(cur)
+    wide_ids = get_affiliations_structure_ids(cur)
+    logger.info(f"Périmètre restreint : {len(perimeter_ids)} structures")
+    logger.info(f"Périmètre large     : {len(wide_ids)} structures")
     logger.info(f"Sources : {', '.join(sorted(sources))}")
 
     if "hal" in sources:
         step1_hal_structure_ids(cur)
-        step2_hal_in_perimeter(cur, uca_ids)
+        step2_hal_in_perimeter(cur, perimeter_ids)
     if "openalex" in sources:
-        step3_openalex(cur, uca_ids, uca_wide_ids)
+        step3_openalex(cur, perimeter_ids, wide_ids)
     if "wos" in sources:
-        step3b_wos(cur, uca_ids, uca_wide_ids)
+        step3b_wos(cur, perimeter_ids, wide_ids)
     if "scanr" in sources:
-        step3c_scanr(cur, uca_ids, uca_wide_ids)
+        step3c_scanr(cur, perimeter_ids, wide_ids)
     if "theses" in sources:
-        step3d_theses(cur, uca_wide_ids)
+        step3d_theses(cur, wide_ids)
 
     conn.commit()
     elapsed = time.perf_counter() - t0

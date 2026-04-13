@@ -17,9 +17,10 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 
     # Force UTF-8 sur la console pour éviter les UnicodeEncodeError Windows (cp1252)
-    console = logging.StreamHandler(
-        stream=io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-    )
+    # On wrape stdout.buffer sans en prendre ownership (line_buffering pour flush immédiat)
+    utf8_stream = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", line_buffering=True)
+    utf8_stream.close = lambda: None  # Empêcher la fermeture de stdout.buffer
+    console = logging.StreamHandler(stream=utf8_stream)
     console.setFormatter(fmt)
 
     file_handler = logging.FileHandler(log_file, encoding="utf-8")

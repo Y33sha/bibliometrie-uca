@@ -83,23 +83,6 @@ def get_persons_structure_ids_list(cur) -> list[int]:
     return list(get_persons_structure_ids(cur))
 
 
-# ── Aliases de compatibilité ──
-
-def get_uca_structure_ids(cur) -> set[int]:
-    """Alias → get_persons_structure_ids."""
-    return get_persons_structure_ids(cur)
-
-
-def get_uca_structure_ids_wide(cur) -> set[int]:
-    """Alias → get_affiliations_structure_ids."""
-    return get_affiliations_structure_ids(cur)
-
-
-def get_uca_structure_ids_list(cur) -> list[int]:
-    """Alias → get_persons_structure_ids_list."""
-    return get_persons_structure_ids_list(cur)
-
-
 # ── Fallbacks ──
 
 def _val(r, key):
