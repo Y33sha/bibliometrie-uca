@@ -159,7 +159,7 @@ class TestLaboratories:
 
 class TestStats:
     def test_summary(self, client):
-        r = client.get("/api/pub-stats/summary")
+        r = client.get("/api/stats/summary")
         assert r.status_code == 200
 
 

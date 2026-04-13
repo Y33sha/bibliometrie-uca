@@ -25,7 +25,7 @@
 		const params = new URLSearchParams({ page: String(currentPage), per_page: '50' });
 		if (search.trim()) params.set('search', search.trim());
 		const data = await api<{ total: number; page: number; pages: number; authorships: any[] }>(
-			'/api/orphan-authorships?' + params, { key: 'orphans' }
+			'/api/admin/orphan-authorships?' + params, { key: 'orphans' }
 		);
 		orphans = data.authorships;
 		total = data.total;
@@ -52,7 +52,7 @@
 	}
 
 	async function assign(orphan: any, personId: number) {
-		await fetch(`${base}/api/orphan-authorships/assign`, {
+		await fetch(`${base}/api/admin/orphan-authorships/assign`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ source: orphan.source, authorship_id: orphan.authorship_id, person_id: personId })
@@ -101,7 +101,7 @@
 
 	async function batchAssign(personId: number) {
 		const items = orphans.filter(o => selectedIds.has(`${o.source}-${o.authorship_id}`));
-		await fetch(`${base}/api/orphan-authorships/batch-assign`, {
+		await fetch(`${base}/api/admin/orphan-authorships/batch-assign`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
@@ -133,7 +133,7 @@
 		if (!createModal) return;
 		const { lastName, firstName, items } = createModal;
 		// Créer la personne avec la première authorship
-		const resp = await fetch(`${base}/api/orphan-authorships/assign`, {
+		const resp = await fetch(`${base}/api/admin/orphan-authorships/assign`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
@@ -146,7 +146,7 @@
 		// Attribuer le reste
 		const remaining = items.slice(1);
 		if (remaining.length) {
-			await fetch(`${base}/api/orphan-authorships/batch-assign`, {
+			await fetch(`${base}/api/admin/orphan-authorships/batch-assign`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({

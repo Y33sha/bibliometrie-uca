@@ -16,7 +16,7 @@
 	);
 	const isDuplicates = $derived(
 		$page.url.pathname === base + "/admin/duplicates" ||
-			$page.url.pathname === base + "/admin/duplicates-persons",
+			$page.url.pathname === base + "/admin/person-duplicates",
 	);
 	const isHalProblems = $derived(
 		$page.url.pathname.startsWith(base + "/hal-problems"),
@@ -138,8 +138,8 @@
 							>Publications</a
 						>
 						<a
-							href="{base}/admin/duplicates-persons"
-							class:active={isActive("/admin/duplicates-persons")}
+							href="{base}/admin/person-duplicates"
+							class:active={isActive("/admin/person-duplicates")}
 							>Personnes</a
 						>
 					</div>

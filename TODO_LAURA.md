@@ -11,7 +11,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
 * [ ] authorships excluded: info perdue si réimport (grave?)
 
-
 ## Pipeline
 ### Facile et/ou urgent
 * [ ] 3e mode du pipeline: daily (mode rapide, seulement nouveaux docts)
@@ -26,8 +25,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer)
 
 # Trucs techniques
-* [ ] ensure_truth_authorship: utilisé où? sert à quoi?
-* [ ] cache pour améliorer la perf?
 * [ ] faire une version bac à sable?
 
 ## Chantiers au long cours
@@ -41,8 +38,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
 
 # Sémantique
-* [ ] harmoniser les noms de routes API avec les url frontend
-* [ ] publications => plutôt documents
+* [ ] publications => plutôt documents?
 * [ ] collections => hal_collections
 
 # Données
@@ -150,5 +146,4 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * openalex répète des auteurs : publi 77832
 * [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
 * erreur de parsing OA: publication 113652
-* 129259 pourquoi je n'ai pas le doct hal?
 * 53910 pays FR (pas MC?)

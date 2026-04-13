@@ -1075,7 +1075,7 @@ _ORPHAN_BASE = """
 """
 
 
-@router.get("/api/orphan-authorships/count")
+@router.get("/api/admin/orphan-authorships/count")
 async def orphan_authorships_count():
     """Nombre d'authorships UCA sans person_id."""
     with get_cursor() as (cur, conn):
@@ -1089,7 +1089,7 @@ async def orphan_authorships_count():
         return cur.fetchone()
 
 
-@router.get("/api/orphan-authorships")
+@router.get("/api/admin/orphan-authorships")
 async def list_orphan_authorships(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
@@ -1144,7 +1144,7 @@ async def list_orphan_authorships(
 # _add_name_form et _ensure_truth_authorship sont dans services.persons
 
 
-@router.post("/api/orphan-authorships/assign")
+@router.post("/api/admin/orphan-authorships/assign")
 async def assign_orphan_authorship_endpoint(body: dict):
     """Attribue une authorship orpheline à une personne existante ou nouvelle."""
     source = body.get("source")
@@ -1177,7 +1177,7 @@ async def assign_orphan_authorship_endpoint(body: dict):
         return {"ok": True, "person_id": person_id}
 
 
-@router.post("/api/orphan-authorships/batch-assign")
+@router.post("/api/admin/orphan-authorships/batch-assign")
 async def batch_assign_orphan_authorships(body: dict):
     """Attribue plusieurs authorships orphelines a une meme personne.
 

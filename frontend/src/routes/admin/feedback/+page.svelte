@@ -175,13 +175,13 @@
 
   async function loadStats() {
     if (!currentStructureId) return;
-    stats = await api<FeedbackStats>(`/api/feedback/stats?structure_id=${currentStructureId}`, { key: "feedback-stats" });
+    stats = await api<FeedbackStats>(`/api/admin/feedback/stats?structure_id=${currentStructureId}`, { key: "feedback-stats" });
   }
 
   async function loadTable() {
     if (!currentStructureId) return;
     syncUrl();
-    const endpoint = currentTab === "fn" ? "/api/feedback/false-negatives" : "/api/feedback/false-positives";
+    const endpoint = currentTab === "fn" ? "/api/admin/feedback/false-negatives" : "/api/admin/feedback/false-positives";
     const params = new URLSearchParams({
       structure_id: String(currentStructureId),
       page: String(currentPage),
@@ -291,7 +291,7 @@
     rerunState = "running";
     rerunLines = [];
 
-    const evtSource = new EventSource(base + "/api/feedback/rerun");
+    const evtSource = new EventSource(base + "/api/admin/feedback/rerun");
 
     evtSource.onmessage = (event) => {
       const text: string = event.data;

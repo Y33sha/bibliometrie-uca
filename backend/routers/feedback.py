@@ -9,7 +9,7 @@ from backend.models import AssignStructureAction
 router = APIRouter()
 
 
-@router.get("/api/feedback/stats")
+@router.get("/api/admin/feedback/stats")
 async def feedback_stats(structure_id: int = Query(...)):
     """Statistiques de qualité de la détection pour une structure donnée."""
     with get_cursor() as (cur, conn):
@@ -40,7 +40,7 @@ async def feedback_stats(structure_id: int = Query(...)):
         }
 
 
-@router.get("/api/feedback/false-negatives")
+@router.get("/api/admin/feedback/false-negatives")
 async def feedback_false_negatives(
     structure_id: int = Query(...),
     page: int = Query(1, ge=1),
@@ -100,7 +100,7 @@ async def feedback_false_negatives(
         }
 
 
-@router.get("/api/feedback/false-positives")
+@router.get("/api/admin/feedback/false-positives")
 async def feedback_false_positives(
     structure_id: int = Query(...),
     page: int = Query(1, ge=1),
@@ -197,7 +197,7 @@ async def assign_structure(addr_id: int, action: AssignStructureAction):
         return {"id": addr_id, "structure_id": action.structure_id, "status": "assigned"}
 
 
-@router.get("/api/feedback/rerun")
+@router.get("/api/admin/feedback/rerun")
 async def feedback_rerun():
     """Lance resolve_addresses en SSE (détection complète sur toutes les adresses)."""
     import asyncio
