@@ -19,18 +19,15 @@ import requests
 from psycopg2.extras import Json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config.settings import WOS
 from db.connection import get_connection
 from extraction.common import compute_hash, get_cross_import_dois, setup_logger
+from utils.app_config import get_wos_api_key, get_api_base_urls
 
 # ----- Logging -----
 logger = setup_logger("cross_import_wos", os.path.join(os.path.dirname(__file__), "logs"))
 
-BASE_URL = WOS["base_url"]
-HEADERS = {
-    "X-ApiKey": WOS["api_key"],
-    "Accept": "application/json",
-}
+BASE_URL = ""
+HEADERS = {}
 PER_PAGE = 10  # recommandation Clarivate
 BATCH_SIZE = 20  # nombre de DOIs par requête WoS (réduit pour éviter URLs trop longues)
 PAUSE_BETWEEN_REQUESTS = 1  # secondes entre chaque requête
@@ -173,8 +170,11 @@ def main():
                         help="Considérer tout le staging (pas seulement les non-normalisés)")
     args = parser.parse_args()
 
+    global BASE_URL, HEADERS
     conn = get_connection()
     cur = conn.cursor()
+    BASE_URL = get_api_base_urls(cur).get("wos", "https://api.clarivate.com/api/wos")
+    HEADERS = {"X-ApiKey": get_wos_api_key(cur), "Accept": "application/json"}
 
     all_dois = get_cross_import_dois(conn, "wos", all_staged=args.all)
     logger.info(f"{len(all_dois)} DOIs sans source WoS")

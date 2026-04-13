@@ -19,10 +19,12 @@ import requests
 from psycopg2.extras import Json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config.settings import SCANR
 from db.connection import get_connection
 from extraction.common import compute_hash, clean_doi, get_existing_ids, setup_logger
-from utils.app_config import get_years, get_scanr_affiliation_ids, get_scanr_credentials
+from utils.app_config import get_years, get_scanr_affiliation_ids, get_scanr_credentials, get_api_base_urls
+
+PER_PAGE = 500
+REQUEST_DELAY = 0.3
 
 logger = setup_logger("extract_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -31,7 +33,7 @@ def build_query(year: int, affiliation_ids: list[str],
                 search_after: list | None = None) -> dict:
     """Construit la requête Elasticsearch pour ScanR."""
     query = {
-        "size": SCANR.get("per_page", 500),
+        "size": PER_PAGE,
         "track_total_hits": True,
         "query": {
             "bool": {
@@ -134,7 +136,7 @@ def extract_year(conn, url: str, auth: tuple, year: int,
             conn.commit()
             logger.info(f"    {seen}/{total} traités ({inserted} nouveaux, {updated} mis à jour)")
 
-        time.sleep(SCANR.get("request_delay", 0.3))
+        time.sleep(REQUEST_DELAY)
 
     conn.commit()
     return total, inserted, updated
@@ -152,8 +154,8 @@ def main():
     years = [args.year] if args.year else get_years(cur)
     affiliation_ids = get_scanr_affiliation_ids(cur)
     username, password = get_scanr_credentials(cur)
-    url = SCANR.get("base_url",
-                     "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search")
+    url = get_api_base_urls(cur).get("scanr",
+          "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search")
     auth = (username, password)
 
     logger.info(f"=== Extraction ScanR : années {years}, {len(affiliation_ids)} structures ===")

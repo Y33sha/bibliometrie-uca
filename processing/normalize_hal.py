@@ -29,7 +29,6 @@ import psycopg2
 from psycopg2.extras import Json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.settings import HAL
 from db.connection import get_connection
 from utils.doi import clean_doi
 from utils.log import setup_logger

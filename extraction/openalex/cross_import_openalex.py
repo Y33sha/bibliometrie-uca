@@ -24,13 +24,15 @@ import requests
 from psycopg2.extras import Json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config.settings import OPENALEX
 from db.connection import get_connection
+from utils.app_config import get_openalex_email
 from extraction.common import compute_hash, get_cross_import_dois, setup_logger
 from extraction.openalex import BASE_URL, SELECT_FIELDS, extract_openalex_id, extract_doi
 
 # ----- Logging -----
 logger = setup_logger("cross_import_openalex", os.path.join(os.path.dirname(__file__), "logs"))
+
+_email = ""  # initialisé dans main()
 
 
 def fetch_by_doi(doi: str) -> dict | None:
@@ -38,7 +40,7 @@ def fetch_by_doi(doi: str) -> dict | None:
     params = {
         "filter": f"doi:{doi}",
         "select": SELECT_FIELDS,
-        "mailto": OPENALEX["email"],
+        "mailto": _email,
     }
     try:
         resp = requests.get(BASE_URL, params=params, timeout=30)
@@ -81,7 +83,11 @@ def main():
                         help="Considérer tout le staging (pas seulement les non-normalisés)")
     args = parser.parse_args()
 
+    global _email
     conn = get_connection()
+    cur = conn.cursor()
+    _email = get_openalex_email(cur)
+    cur.close()
     try:
         dois = get_cross_import_dois(conn, "openalex", all_staged=args.all)
         logger.info(f"{len(dois)} DOI à chercher sur OpenAlex")
@@ -112,7 +118,7 @@ def main():
                     f"{found} trouvés, {not_found} absents"
                 )
 
-            time.sleep(OPENALEX["request_delay"])
+            time.sleep(0.2)
 
         logger.info(
             f"=== Terminé : {found} works importés, "

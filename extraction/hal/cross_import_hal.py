@@ -24,7 +24,6 @@ import requests
 from psycopg2.extras import Json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config.settings import HAL
 from db.connection import get_connection
 from extraction.common import compute_hash, get_cross_import_dois, setup_logger
 from utils.hal import HAL_FIELDS_STR
@@ -144,7 +143,7 @@ def main():
                     f"{found} trouvés, {not_found} absents"
                 )
 
-            time.sleep(HAL["request_delay"])
+            time.sleep(0.5)
 
         logger.info(
             f"=== Terminé : {found} documents importés, "
