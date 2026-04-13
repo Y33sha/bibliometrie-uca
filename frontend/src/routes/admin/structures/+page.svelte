@@ -683,15 +683,17 @@
 							<a href={halCollectionUrl(s.hal_collection)} target="_blank" rel="noopener" class="id-badge">{s.hal_collection}</a>
 						</span>
 					{/if}
-					{#if s.api_ids}
+				</div>
+				{#if s.api_ids && Object.keys(s.api_ids).length}
+					<div class="api-ids-display">
+						<span class="detail-label">Paramètres requête API :</span>
 						{#each Object.entries(s.api_ids) as [src, ids]}
-							<span class="detail-item">
-								<span class="detail-label">API {src}</span>
-								<span class="id-badge">{(ids as string[]).join(", ")}</span>
+							<span class="api-id-item">
+								<span class="api-id-source">{src}</span> {(ids as string[]).join(", ")}
 							</span>
 						{/each}
-					{/if}
-				</div>
+					</div>
+				{/if}
 
 				<!-- ═══ SECTION RELATIONS ═══ -->
 				<h3 class="section-title">Relations</h3>
@@ -1676,6 +1678,24 @@
 		gap: 8px;
 		justify-content: flex-end;
 		margin-top: 16px;
+	}
+	.api-ids-display {
+		margin-top: 8px;
+		font-size: 0.85rem;
+		color: var(--muted);
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 12px;
+		align-items: baseline;
+	}
+	.api-id-item {
+		color: var(--text);
+	}
+	.api-id-source {
+		font-weight: 600;
+		text-transform: uppercase;
+		font-size: 0.75rem;
+		color: var(--muted);
 	}
 	.api-ids-section {
 		margin-top: 10px;
