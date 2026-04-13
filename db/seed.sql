@@ -8,19 +8,19 @@ BEGIN;
 
 -- config (14 lignes)
 DELETE FROM config;
-INSERT INTO config (key, value, description) VALUES ('hal_collections', '{''ND'': ''NEURO-DOL'', ''CMH'': ''CMH'', ''ICC'': ''ICCF'', ''LMV'': ''LMV'', ''LRL'': ''LRL'', ''UNH'': ''UNH'', ''ACTE'': ''ACTé'', ''CHEC'': ''CHEC'', ''CROC'': ''CROC'', ''GDEC'': ''GDEC'', ''GRED'': ''iGReD'', ''LAMP'': ''LaMP'', ''LMGE'': ''LMGE'', ''MSHC'': ''MSH'', ''OPGC'': ''OPGC'', ''PIAF'': ''PIAF'', ''UMRF'': ''UMRF'', ''AME2P'': ''AME2P'', ''CELIS'': ''CELIS'', ''CERDI'': ''CERDI'', ''IMOST'': ''IMoST'', ''LABCS'': ''ComSocs'', ''LIMOS'': ''LIMOS'', ''M2ISH'': ''M2iSH'', ''MEDIS'': ''MEDIS'', ''PHIER'': ''PHIER'', ''CERHAC'': ''IHRIM'', ''CLERMA'': ''CleRMa'', ''GEOLAB'': ''GEOLAB'', ''LAPSCO'': ''LAPSCO'', ''ACCEPPT'': ''ACCePPT'', ''CHELTER'': ''CHELTER'', ''UMR6620'': ''LMBP'', ''LESCORES'': ''LESCORES'', ''RESSOURCES'': ''Ressources'', ''TERRITOIRES'': ''Territoires'', ''LPC-CLERMONT'': ''LPCA'', ''INSTITUT_PASCAL'': ''IP''}', 'Collections HAL par labo (code HAL → label)');
-INSERT INTO config (key, value, description) VALUES ('hal_portal', 'clermont-univ', 'Portail HAL global');
+INSERT INTO config (key, value, description) VALUES ('hal_collections', '{"ND": "NEURO-DOL", "CMH": "CMH", "ICC": "ICCF", "LMV": "LMV", "LRL": "LRL", "UNH": "UNH", "ACTE": "ACTé", "CHEC": "CHEC", "CROC": "CROC", "GDEC": "GDEC", "GRED": "iGReD", "LAMP": "LaMP", "LMGE": "LMGE", "MSHC": "MSH", "OPGC": "OPGC", "PIAF": "PIAF", "UMRF": "UMRF", "AME2P": "AME2P", "CELIS": "CELIS", "CERDI": "CERDI", "IMOST": "IMoST", "LABCS": "ComSocs", "LIMOS": "LIMOS", "M2ISH": "M2iSH", "MEDIS": "MEDIS", "PHIER": "PHIER", "CERHAC": "IHRIM", "CLERMA": "CleRMa", "GEOLAB": "GEOLAB", "LAPSCO": "LAPSCO", "ACCEPPT": "ACCePPT", "CHELTER": "CHELTER", "UMR6620": "LMBP", "LESCORES": "LESCORES", "RESSOURCES": "Ressources", "TERRITOIRES": "Territoires", "LPC-CLERMONT": "LPCA", "INSTITUT_PASCAL": "IP"}', 'Collections HAL par labo (code HAL → label)');
+INSERT INTO config (key, value, description) VALUES ('hal_portal', '"clermont-univ"', 'Portail HAL global');
 INSERT INTO config (key, value, description) VALUES ('openalex_email', '"votre@email.fr"', 'Email pour le polite pool OpenAlex');
-INSERT INTO config (key, value, description) VALUES ('openalex_institution_ids', '[''i198244214'', ''i4210143836'', ''i4210128870'', ''i4387154249'']', 'IDs institution OpenAlex (filtre lineage)');
-INSERT INTO config (key, value, description) VALUES ('perimeter_affiliations', 'uca_wide', 'Périmètre pour la résolution des affiliations (structure_ids sur authorships sources)');
-INSERT INTO config (key, value, description) VALUES ('perimeter_persons', 'uca', 'Périmètre pour la création des personnes (authorships is_uca)');
-INSERT INTO config (key, value, description) VALUES ('pipeline_years_full', 6, 'Mode full/monthly : extraire depuis (année courante - N)');
-INSERT INTO config (key, value, description) VALUES ('pipeline_years_weekly', 1, 'Mode weekly : extraire depuis (année courante - N)');
-INSERT INTO config (key, value, description) VALUES ('scanr_affiliation_ids', '[''130028061'', ''266307461'', ''130021918'']', 'IDs SIREN des structures ScanR (UCA, CHU, INP)');
+INSERT INTO config (key, value, description) VALUES ('openalex_institution_ids', '["i198244214", "i4210143836", "i4210128870", "i4387154249"]', 'IDs institution OpenAlex (filtre lineage)');
+INSERT INTO config (key, value, description) VALUES ('perimeter_affiliations', '"uca_wide"', 'Périmètre pour la résolution des affiliations (structure_ids sur authorships sources)');
+INSERT INTO config (key, value, description) VALUES ('perimeter_persons', '"uca"', 'Périmètre pour la création des personnes (authorships is_uca)');
+INSERT INTO config (key, value, description) VALUES ('pipeline_years_full', '6', 'Mode full/monthly : extraire depuis (année courante - N)');
+INSERT INTO config (key, value, description) VALUES ('pipeline_years_weekly', '1', 'Mode weekly : extraire depuis (année courante - N)');
+INSERT INTO config (key, value, description) VALUES ('scanr_affiliation_ids', '["130028061", "266307461", "130021918"]', 'IDs SIREN des structures ScanR (UCA, CHU, INP)');
 INSERT INTO config (key, value, description) VALUES ('scanr_password', '"VOTRE_MOT_DE_PASSE_SCANR"', 'Mot de passe API ScanR');
 INSERT INTO config (key, value, description) VALUES ('scanr_username', '"VOTRE_IDENTIFIANT_SCANR"', 'Identifiant API ScanR (Elasticsearch)');
-INSERT INTO config (key, value, description) VALUES ('theses_etab_ppns', '[''252404955'', ''196200032'']', 'PPN IdRef des établissements de soutenance UCA pour theses.fr');
-INSERT INTO config (key, value, description) VALUES ('wos_affiliations', '[''Univ Clermont Auvergne'', ''CHU Clermont Ferrand'', ''Clermont Auvergne INP'', ''Sigma Clermont'']', 'Noms Organisation-Enhanced WoS');
+INSERT INTO config (key, value, description) VALUES ('theses_etab_ppns', '["252404955", "196200032"]', 'PPN IdRef des établissements de soutenance UCA pour theses.fr');
+INSERT INTO config (key, value, description) VALUES ('wos_affiliations', '["Univ Clermont Auvergne", "CHU Clermont Ferrand", "Clermont Auvergne INP", "Sigma Clermont"]', 'Noms Organisation-Enhanced WoS');
 INSERT INTO config (key, value, description) VALUES ('wos_api_key', '"VOTRE_CLE_WOS"', 'Clé API Web of Science (Clarivate)');
 
 -- countries (175 lignes)
@@ -786,16 +786,16 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1342, 187, 'umr 6602', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1343, 187, 'ip', '[169, 170]', TRUE, NULL, TRUE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1344, 187, 'u6602', NULL, TRUE, NULL, TRUE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1345, 188, 'unh', '[''tutelles'']', TRUE, NULL, TRUE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1346, 188, 'unite de nutrition humaine', '[''tutelles'']', TRUE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1347, 188, 'human nutrition unit', '[''tutelles'']', TRUE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1348, 188, 'human nutr unit', '[''tutelles'']', TRUE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1349, 188, 'un nutr humaine', '[''tutelles'']', TRUE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1350, 188, 'unite nutr humaine', '[''tutelles'']', TRUE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1345, 188, 'unh', '["tutelles"]', TRUE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1346, 188, 'unite de nutrition humaine', '["tutelles"]', TRUE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1347, 188, 'human nutrition unit', '["tutelles"]', TRUE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1348, 188, 'human nutr unit', '["tutelles"]', TRUE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1349, 188, 'un nutr humaine', '["tutelles"]', TRUE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1350, 188, 'unite nutr humaine', '["tutelles"]', TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1351, 188, 'umr 1019', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1352, 188, 'umr1019', NULL, TRUE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1353, 188, 'u1019', '[''tutelles'']', TRUE, NULL, TRUE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1354, 189, 'geolab', '[''tutelles'', 170]', TRUE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1353, 188, 'u1019', '["tutelles"]', TRUE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1354, 189, 'geolab', '["tutelles", 170]', TRUE, NULL, TRUE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1355, 189, 'laboratoire de geographie physique et environnementale', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1356, 189, 'umr 6042', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1357, 189, 'umr6042', NULL, TRUE, NULL, FALSE);
@@ -906,7 +906,7 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1470, 204, 'genet divers ecophysiol cereals', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1472, 204, 'umr 1095', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1473, 204, 'umr1095', NULL, TRUE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1474, 204, '1095', '[''tutelles'']', TRUE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1474, 204, '1095', '["tutelles"]', TRUE, NULL, TRUE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1475, 204, 'u1095', NULL, TRUE, NULL, TRUE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1476, 205, 'lmbp', NULL, TRUE, NULL, TRUE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1477, 205, 'laboratoire de mathematiques blaise pascal', NULL, TRUE, NULL, FALSE);
@@ -953,7 +953,7 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1518, 210, 'umr 1240', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1519, 210, 'umr1240', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1520, 210, 'u1240', NULL, TRUE, NULL, TRUE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1521, 210, '1240', '[''tutelles'']', TRUE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1521, 210, '1240', '["tutelles"]', TRUE, NULL, TRUE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1522, 210, 'unite mixte de recherche umr 1240', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1523, 211, 'acceppt', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1524, 211, 'accompagnement pluriprofessionnel patient', NULL, TRUE, NULL, FALSE);
@@ -1079,7 +1079,7 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1660, 203, 'physiologie integrative de l arbre', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1661, 203, 'physiologie integratives de l arbre', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1662, 197, 'u 1107', NULL, TRUE, NULL, TRUE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1663, 197, '1107', '[''tutelles'']', TRUE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1663, 197, '1107', '["tutelles"]', TRUE, NULL, TRUE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1664, 195, 'genome and environment microorganisms laboratory', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1665, 195, 'microorganism laboratory genome and environment', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1666, 195, 'microorganismes genome et environnement', NULL, TRUE, NULL, FALSE);
@@ -1103,7 +1103,7 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1685, 223, 'maison des sciences de l homme', '[169, 170]', TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1686, 223, 'msh', '[169, 170]', TRUE, NULL, TRUE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1687, 226, 'lab of engineering for complex systems', NULL, TRUE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1688, 226, 'lisc', '[170, ''tutelles'']', TRUE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1688, 226, 'lisc', '[170, "tutelles"]', TRUE, NULL, TRUE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1689, 226, 'laboratoire d ingenierie des systemes complexes', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1690, 226, 'ur 1465', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1691, 226, 'ur1465', NULL, TRUE, NULL, TRUE);

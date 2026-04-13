@@ -31,6 +31,7 @@ TABLES = [
         "table": "config",
         "columns": ["key", "value", "description"],
         "order": "key",
+        "jsonb_columns": ["value"],
         # Clés contenant des credentials — remplacées par des placeholders
         "redact": {
             "wos_api_key": "VOTRE_CLE_WOS",
@@ -63,18 +64,30 @@ TABLES = [
         "table": "structure_name_forms",
         "columns": ["id", "structure_id", "form_text", "requires_context_of", "is_active", "notes", "is_word_boundary"],
         "order": "id",
+        "jsonb_columns": ["requires_context_of"],
     },
 ]
 
 
-def escape_sql(value) -> str:
-    """Échappe une valeur pour insertion SQL."""
+def escape_sql(value, is_jsonb=False) -> str:
+    """Échappe une valeur pour insertion SQL.
+
+    Si is_jsonb=True, la valeur est sérialisée en JSON valide
+    (nécessaire pour les colonnes JSONB de PostgreSQL).
+    """
+    import json
     if value is None:
         return "NULL"
+    if is_jsonb:
+        s = json.dumps(value, ensure_ascii=False).replace("'", "''")
+        return f"'{s}'"
     if isinstance(value, bool):
         return "TRUE" if value else "FALSE"
     if isinstance(value, (int, float)):
         return str(value)
+    if isinstance(value, (dict, list)):
+        s = json.dumps(value, ensure_ascii=False).replace("'", "''")
+        return f"'{s}'"
     s = str(value).replace("'", "''")
     return f"'{s}'"
 
@@ -108,6 +121,7 @@ def generate_seed(cur, output_path: str):
         lines.append(f"DELETE FROM {table};")
 
         redact = spec.get("redact", {})
+        jsonb_cols = set(spec.get("jsonb_columns", []))
         key_idx = columns.index("key") if "key" in columns else None
         value_idx = columns.index("value") if "value" in columns else None
 
@@ -117,8 +131,11 @@ def generate_seed(cur, output_path: str):
             if redact and key_idx is not None and value_idx is not None:
                 row_key = row_values[key_idx]
                 if row_key in redact:
-                    row_values[value_idx] = f'"{redact[row_key]}"'
-            values = ", ".join(escape_sql(row_values[i]) for i in range(len(columns)))
+                    row_values[value_idx] = redact[row_key]
+            values = ", ".join(
+                escape_sql(row_values[i], is_jsonb=(columns[i] in jsonb_cols))
+                for i in range(len(columns))
+            )
             lines.append(f"INSERT INTO {table} ({col_list}) VALUES ({values});")
 
         # Recaler les séquences pour les tables avec id serial
