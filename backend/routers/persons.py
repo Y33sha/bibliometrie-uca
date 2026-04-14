@@ -1673,7 +1673,7 @@ def _hal_pub_detail(cur, pub_id):
     if not pub:
         return None
     cur.execute("""
-        SELECT sd.source_id AS halid, sd.collections, sd.doc_type AS hal_doc_type, sd.pub_year AS hal_pub_year, sd.title AS hal_title,
+        SELECT sd.source_id AS halid, sd.hal_collections, sd.doc_type AS hal_doc_type, sd.pub_year AS hal_pub_year, sd.title AS hal_title,
                (SELECT COUNT(*) FROM source_authorships sa2 WHERE sa2.source = 'hal' AND sa2.source_document_id = sd.id AND NOT sa2.excluded) AS author_count
         FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'hal'
     """, (pub_id,))
@@ -1805,7 +1805,7 @@ async def hal_missing_collections(
             JOIN authorships a ON a.publication_id = p.id AND a.structure_ids && %s::int[]
             WHERE EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal')
               AND NOT EXISTS (SELECT 1 FROM source_documents sd
-                              WHERE sd.publication_id = p.id AND sd.source = 'hal' AND %s = ANY(sd.collections))
+                              WHERE sd.publication_id = p.id AND sd.source = 'hal' AND %s = ANY(sd.hal_collections))
         """
         params = [lab_arr, col]
 
@@ -1816,7 +1816,7 @@ async def hal_missing_collections(
             SELECT DISTINCT p.id, p.title, p.pub_year, p.doc_type::text, p.doi,
                    (SELECT array_agg(sd2.source_id) FROM source_documents sd2 WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
                    NOT EXISTS (SELECT 1 FROM source_documents sd2
-                               WHERE sd2.publication_id = p.id AND sd2.source = 'hal' AND 'PRES_CLERMONT' = ANY(sd2.collections)) AS hors_uca
+                               WHERE sd2.publication_id = p.id AND sd2.source = 'hal' AND 'PRES_CLERMONT' = ANY(sd2.hal_collections)) AS hors_uca
             {base_where}
             ORDER BY p.pub_year DESC NULLS LAST, p.id DESC
             LIMIT %s OFFSET %s

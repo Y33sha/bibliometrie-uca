@@ -157,12 +157,12 @@ def find_publication(cur, doc: dict, journal_id: int | None) -> int | None:
 # =============================================================
 
 def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
-                        collection: str | None,
+                        hal_collections_staging: list | None,
                         publication_id: int | None,
                         pub_meta: dict | None = None) -> int:
     """
     Crée/retrouve l'entrée source_documents pour HAL.
-    Le champ collections agrège toutes les collections vues.
+    Le champ hal_collections agrège toutes les collections vues.
     Retourne source_documents.id.
     """
     doi = clean_doi(as_str(doc.get("doiId_s")))
@@ -174,14 +174,10 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
     raw_sub = doc.get("docSubType_s") or ""
     doc_type = f"{raw_type}_{raw_sub}" if raw_sub else raw_type
 
-    # Collections : depuis le staging (peut être "COL1,COL2") +
-    # collCode_s du raw_data
+    # Collections : depuis le staging (text[]) + collCode_s du raw_data
     collections = set()
-    if collection:
-        for c in collection.split(","):
-            c = c.strip()
-            if c:
-                collections.add(c)
+    if hal_collections_staging:
+        collections.update(hal_collections_staging)
     coll_codes = doc.get("collCode_s") or []
     if isinstance(coll_codes, list):
         collections.update(coll_codes)
@@ -229,7 +225,7 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
     cur.execute("""
         INSERT INTO source_documents
             (source, source_id, doi, title, pub_year, doc_type,
-             collections, publication_id, staging_id, external_ids,
+             hal_collections, publication_id, staging_id, external_ids,
              journal_id, oa_status, language, container_title,
              abstract, keywords, topics, biblio, urls)
         VALUES ('hal', %s, %s, %s, %s, %s, %s, %s, %s, %s,
@@ -241,11 +237,11 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
             ),
             doi = COALESCE(source_documents.doi, EXCLUDED.doi),
             doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
-            collections = (
+            hal_collections = (
                 SELECT array_agg(DISTINCT c ORDER BY c)
                 FROM unnest(
-                    COALESCE(source_documents.collections, '{}') ||
-                    COALESCE(EXCLUDED.collections, '{}')
+                    COALESCE(source_documents.hal_collections, '{}') ||
+                    COALESCE(EXCLUDED.hal_collections, '{}')
                 ) AS c
             ),
             external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
@@ -577,7 +573,7 @@ def process_authors(cur, doc: dict, source_document_id: int):
 
 def process_work(cur, staging_row: tuple) -> bool:
     """Traite un work du staging HAL."""
-    staging_id, hal_id, doi, raw_data, collection = staging_row
+    staging_id, hal_id, doi, raw_data, hal_collections_staging = staging_row
     doc = raw_data
     timings = {}
 
@@ -649,7 +645,7 @@ def process_work(cur, staging_row: tuple) -> bool:
         # Document HAL (source_documents) — publication_id peut être NULL
         t0 = time.perf_counter()
         source_document_id = insert_hal_document(
-            cur, doc, staging_id, hal_id, collection, publication_id, pub_meta
+            cur, doc, staging_id, hal_id, hal_collections_staging, publication_id, pub_meta
         )
         timings["hal_doc"] = time.perf_counter() - t0
 
@@ -711,7 +707,7 @@ def main():
         logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
 
         cur.execute("""
-            SELECT id, source_id, doi, raw_data, collection
+            SELECT id, source_id, doi, raw_data, hal_collections
             FROM staging
             WHERE source = 'hal' AND processed = FALSE
             ORDER BY id

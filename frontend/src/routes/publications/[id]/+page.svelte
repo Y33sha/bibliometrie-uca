@@ -37,7 +37,7 @@
     source: string;
     source_id: string;
     doi: string | null;
-    collections: string[] | null;
+    hal_collections: string[] | null;
     countries: string[] | null;
   }
   interface Authorship {
@@ -333,10 +333,10 @@
     </div>
 
     <!-- HAL Collections -->
-    {#if halSource?.collections && halSource.collections.length > 0}
+    {#if halSource?.hal_collections && halSource.hal_collections.length > 0}
       <div class="collections-line">
         <span class="collections-label">Collections HAL :</span>
-        {#each halSource.collections as col}
+        {#each halSource.hal_collections as col}
           <span class="collection-tag">{col}</span>
         {/each}
       </div>

@@ -101,14 +101,14 @@ def upsert_work(conn, hal_id: str, doi: str | None, raw_data: dict, collection: 
     raw_hash = compute_hash(raw_data)
     with conn.cursor() as cur:
         cur.execute("""
-            INSERT INTO staging (source, source_id, doi, raw_data, collection, raw_hash)
-            VALUES ('hal', %s, %s, %s::jsonb, %s, %s)
+            INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, raw_hash)
+            VALUES ('hal', %s, %s, %s::jsonb, ARRAY[%s], %s)
             ON CONFLICT (source, source_id) DO UPDATE SET
-                collection = CASE
-                    WHEN staging.collection IS NULL THEN EXCLUDED.collection
-                    WHEN EXCLUDED.collection = ANY(string_to_array(staging.collection, ','))
-                        THEN staging.collection
-                    ELSE staging.collection || ',' || EXCLUDED.collection
+                hal_collections = CASE
+                    WHEN staging.hal_collections IS NULL THEN ARRAY[EXCLUDED.hal_collections[1]]
+                    WHEN EXCLUDED.hal_collections[1] = ANY(staging.hal_collections)
+                        THEN staging.hal_collections
+                    ELSE staging.hal_collections || EXCLUDED.hal_collections[1]
                 END,
                 raw_data = CASE
                     WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
