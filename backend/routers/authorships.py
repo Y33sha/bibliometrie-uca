@@ -138,7 +138,7 @@ async def authorships_facets(
         # Labs (cross-filtered, excluding lab filter itself)
         where, p = build_where(skip="lab")
         lab_cte, lab_params = _uca_authors_cte(lab_id=0)
-        lab_cte += """,
+        lab_cte += f""",
             author_structs AS (
                 SELECT sauth.id AS author_id, sauth.source, unnest(sa2.structure_ids) AS struct_id
                 FROM source_authors sauth

@@ -1064,7 +1064,7 @@ async def merge_persons(person_id: int, body: dict):
 # - in_perimeter, sans person_id, sources principales
 # - exclut les authorships sur des memoires (etudiants de master)
 # - exclut les authorships dont le source_author est rattache a une personne rejetee
-_ORPHAN_BASE = """
+_ORPHAN_BASE = f"""
     sa.person_id IS NULL AND sa.in_perimeter = TRUE
     AND sa.source IN {AUTHOR_SOURCES_SQL}
     AND p.doc_type NOT IN ('memoir', 'peer_review')
@@ -1258,7 +1258,7 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
     name_form est la forme normalisée (lowercase, unaccent) depuis person_name_forms.
     Retourne aussi les autres personnes partageant cette forme de nom."""
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        cur.execute(f"""
             SELECT sa.source, sa.id AS authorship_id,
                    sd.publication_id AS pub_id, sd.title, sd.pub_year, sd.doi
             FROM source_authorships sa
@@ -1308,7 +1308,7 @@ async def detach_authorships(person_id: int, body: dict):
         # Nettoyer la forme de nom si plus aucune authorship ne la porte
         cleaned_form = False
         if name_form:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT COUNT(*) FROM source_authorships sa
                 WHERE sa.person_id = %s AND sa.author_name_normalized = %s
                   AND sa.source IN {AUTHOR_SOURCES_SQL}
@@ -1345,7 +1345,7 @@ async def detach_name_form(person_id: int, body: dict):
 
     with get_cursor() as (cur, conn):
         # Vérifier qu'il n'y a aucune authorship liée
-        cur.execute("""
+        cur.execute(f"""
             SELECT COUNT(*) FROM source_authorships sa
             WHERE sa.person_id = %s AND sa.author_name_normalized = %s
               AND sa.source IN {AUTHOR_SOURCES_SQL}
