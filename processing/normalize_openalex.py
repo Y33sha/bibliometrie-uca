@@ -758,20 +758,11 @@ def main():
 
         conn.commit()
 
-        # Stats finales
         logger.info(f"\n=== Terminé ===")
         logger.info(f"Traités avec succès : {processed}")
         if skipped:
             logger.info(f"Ignorés (Zenodo, etc.) : {skipped}")
         logger.info(f"Erreurs : {errors}")
-
-        for table in ["publications", "journals", "publishers"]:
-            cur.execute(f"SELECT COUNT(*) FROM {table}")
-            count = cur.fetchone()["count"]
-            logger.info(f"  {table} : {count} enregistrements")
-        cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = 'openalex'")
-        count = cur.fetchone()["count"]
-        logger.info(f"  source_authorships (openalex) : {count} enregistrements")
         cur.execute("SELECT COUNT(*) FROM source_structures WHERE source = 'openalex'")
         count = cur.fetchone()["count"]
         logger.info(f"  source_structures (openalex) : {count} enregistrements")

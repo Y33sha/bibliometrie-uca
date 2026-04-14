@@ -174,33 +174,6 @@ def build(cur, sources=None):
     elapsed = time.perf_counter() - t0
     logger.info(f"\nTerminé en {elapsed:.1f}s")
 
-    # Stats finales
-    cur.execute("SELECT COUNT(*) FROM authorships")
-    total = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM source_authorships WHERE authorship_id IS NOT NULL AND source = 'hal'")
-    hal_total = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM source_authorships WHERE authorship_id IS NOT NULL AND source = 'openalex'")
-    oa_total = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM source_authorships WHERE authorship_id IS NOT NULL AND source = 'wos'")
-    wos_total = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM source_authorships WHERE authorship_id IS NOT NULL AND source = 'scanr'")
-    scanr_total = cur.fetchone()[0]
-    cur.execute("""
-        SELECT COUNT(DISTINCT a.id) FROM authorships a
-        WHERE EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'hal')
-          AND EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'openalex')
-    """)
-    both = cur.fetchone()[0]
-
-    logger.info(f"\n--- Statistiques authorships ---")
-    logger.info(f"  Total                  : {total}")
-    logger.info(f"  Avec HAL FK            : {hal_total}")
-    logger.info(f"  Avec OpenAlex FK       : {oa_total}")
-    logger.info(f"  Avec ScanR FK          : {scanr_total}")
-    logger.info(f"  Avec WoS FK            : {wos_total}")
-    logger.info(f"  HAL + OpenAlex         : {both}")
-    logger.info(f"  dont in_perimeter      : {total_uca}")
-
 
 def main():
     parser = argparse.ArgumentParser()

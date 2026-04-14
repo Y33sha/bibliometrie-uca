@@ -277,7 +277,6 @@ def main():
     conn.commit()
     elapsed = time.perf_counter() - t0
     logger.info(f"\nTerminé en {elapsed:.1f}s")
-    show_stats(cur)
     conn.close()
 
 
