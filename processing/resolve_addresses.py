@@ -161,64 +161,6 @@ def resolve_address(text_normalized, forms, forms_by_structure, tutelles_map):
     return matches
 
 
-# ─── Statistiques ────────────────────────────────────────────────
-
-def show_stats(cur):
-    cur.execute("SELECT COUNT(*) FROM addresses")
-    total = cur.fetchone()[0]
-
-    cur.execute("""
-        SELECT COUNT(DISTINCT a.id)
-        FROM addresses a
-        JOIN address_structures ast ON ast.address_id = a.id
-    """)
-    with_struct = cur.fetchone()[0]
-
-    cur.execute("""
-        SELECT COUNT(DISTINCT a.id)
-        FROM addresses a
-        JOIN address_structures ast ON ast.address_id = a.id
-        WHERE ast.matched_form_id IS NOT NULL
-    """)
-    auto_detected = cur.fetchone()[0]
-
-    logger.info(f"\n--- Statistiques adresses ---")
-    logger.info(f"  Total             : {total}")
-    logger.info(f"  Avec structure(s) : {with_struct}")
-    logger.info(f"  Auto-détectées    : {auto_detected}")
-    logger.info(f"  Sans structure    : {total - with_struct}")
-
-    cur.execute("""
-        SELECT
-            COUNT(*) AS total,
-            COUNT(*) FILTER (WHERE matched_form_id IS NOT NULL) AS auto,
-            COUNT(*) FILTER (WHERE matched_form_id IS NULL AND is_confirmed = TRUE) AS manual
-        FROM address_structures
-    """)
-    row = cur.fetchone()
-    logger.info(f"\n--- Affiliations (address_structures) ---")
-    logger.info(f"  Total         : {row[0]}")
-    logger.info(f"  Auto          : {row[1]}")
-    logger.info(f"  Manuelles     : {row[2]}")
-
-    cur.execute("""
-        SELECT COALESCE(s.acronym, s.name, '?') AS label,
-               s.structure_type::text AS stype,
-               COUNT(*) AS nb
-        FROM address_structures ast
-        JOIN structures s ON s.id = ast.structure_id
-        WHERE ast.matched_form_id IS NOT NULL
-        GROUP BY 1, 2
-        ORDER BY nb DESC
-        LIMIT 20
-    """)
-    rows = cur.fetchall()
-    if rows:
-        logger.info(f"\n  Top structures (auto) :")
-        for row in rows:
-            logger.info(f"    {row[0]:<30s} [{row[1]}]  {row[2]}")
-
-
 # ─── Main ────────────────────────────────────────────────────────
 
 def main():
@@ -227,18 +169,11 @@ def main():
                         help="Supprime les affiliations auto")
     parser.add_argument("--rerun", action="store_true",
                         help="Reset auto puis relance la résolution complète")
-    parser.add_argument("--stats", action="store_true",
-                        help="Affiche les statistiques")
     args = parser.parse_args()
 
     conn = get_connection()
     conn.autocommit = False
     cur = conn.cursor()
-
-    if args.stats:
-        show_stats(cur)
-        conn.close()
-        return
 
     if args.reset or args.rerun:
         # Supprimer les affiliations auto-détectées (matched_form_id IS NOT NULL)
@@ -274,7 +209,6 @@ def main():
             perimeter
         )
 
-    show_stats(cur)
     conn.close()
 
 

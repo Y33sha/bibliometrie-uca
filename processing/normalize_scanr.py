@@ -554,19 +554,6 @@ def main():
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Erreurs : {errors}")
 
-        for table in ["publications", "journals", "publishers"]:
-            cur.execute(f"SELECT COUNT(*) AS cnt FROM {table}")
-            count = cur.fetchone()["cnt"]
-            logger.info(f"  {table} : {count} enregistrements")
-        cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'scanr'")
-        count = cur.fetchone()["cnt"]
-        logger.info(f"  source_authorships (scanr) : {count} enregistrements")
-        cur.execute("SELECT COUNT(*) AS cnt FROM source_authors WHERE source = 'scanr'")
-        count = cur.fetchone()["cnt"]
-        logger.info(f"  source_authors (scanr) : {count} enregistrements")
-        cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'scanr'")
-        count = cur.fetchone()["cnt"]
-        logger.info(f"  source_documents (scanr) : {count} enregistrements")
 
     except KeyboardInterrupt:
         conn.commit()
