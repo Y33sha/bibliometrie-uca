@@ -49,6 +49,9 @@ def snapshot(conn) -> dict:
         ("person_name_forms", "SELECT COUNT(*) FROM person_name_forms"),
         ("person_identifiers", "SELECT COUNT(*) FROM person_identifiers"),
         ("addresses", "SELECT COUNT(*) FROM addresses"),
+        ("addresses_with_countries", "SELECT COUNT(*) FROM addresses WHERE countries IS NOT NULL"),
+        ("sd_with_countries", "SELECT COUNT(*) FROM source_documents WHERE countries IS NOT NULL"),
+        ("publications_with_countries", "SELECT COUNT(*) FROM publications WHERE countries IS NOT NULL"),
     ]
     for name, query in tables:
         try:
