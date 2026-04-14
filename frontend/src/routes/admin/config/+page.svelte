@@ -207,59 +207,6 @@
   {/each}
 </div>
 
-<!-- ═══ HAL ═══ -->
-<h3 class="section-title">HAL</h3>
-<div class="config-grid">
-  {#each [{ key: "hal_portals", label: "Portails HAL" }] as field}
-    {@const item = configByKey(field.key)}
-    {#if item}
-      <div class="config-row">
-        <span class="config-label">{field.label}</span>
-        {#if editingKey === field.key}
-          <input class="config-editor-inline" bind:value={editValue} onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(field.key); } }} />
-          <span class="config-actions-inline">
-            <button class="btn btn-sm btn-primary" onclick={() => save(field.key)} disabled={saving}>OK</button>
-            <button class="btn btn-sm" onclick={() => { editingKey = null; }}>Annuler</button>
-          </span>
-        {:else}
-          <span class="config-value-inline">{Array.isArray(item.value) ? item.value.join(", ") : item.value}</span>
-          <button class="btn btn-sm" onclick={() => startEdit(field.key)}>Modifier</button>
-        {/if}
-      </div>
-    {/if}
-  {/each}
-  {#each [{ key: "hal_extra_collections", label: "Collections supplémentaires" }] as field}
-    {@const item = configByKey(field.key)}
-    {#if item}
-      <div class="config-row">
-        <span class="config-label">{field.label}</span>
-        {#if editingKey === field.key}
-          <input class="config-editor-inline" bind:value={editValue} onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(field.key); } }} />
-          <span class="config-actions-inline">
-            <button class="btn btn-sm btn-primary" onclick={() => save(field.key)} disabled={saving}>OK</button>
-            <button class="btn btn-sm" onclick={() => { editingKey = null; }}>Annuler</button>
-          </span>
-        {:else}
-          <span class="config-value-inline">{Array.isArray(item.value) && item.value.length ? item.value.join(", ") : "(aucune)"}</span>
-          <button class="btn btn-sm" onclick={() => startEdit(field.key)}>Modifier</button>
-        {/if}
-      </div>
-    {/if}
-  {/each}
-  <div class="config-row" style="flex-wrap: wrap;">
-    <span class="config-label">Collections (périmètre)</span>
-    <div class="hal-coll-list">
-      {#each Object.entries(halCollections.collections) as [code, label]}
-        <span class="hal-coll-tag">{code} <span class="hal-coll-label">({label})</span></span>
-      {/each}
-      {#if Object.keys(halCollections.collections).length === 0}
-        <span class="none-text">Aucune collection</span>
-      {/if}
-    </div>
-    <span class="config-hint">Dérivées des structures du périmètre ayant un champ "Collection HAL" renseigné (<a href="{base}/admin/structures">structures</a>).</span>
-  </div>
-</div>
-
 <!-- ═══ PÉRIMÈTRES ═══ -->
 <h3 class="section-title">Périmètres</h3>
 
@@ -348,34 +295,91 @@
   {/each}
 </div>
 
+<!-- ═══ HAL ═══ -->
+<h3 class="section-title">HAL</h3>
+<div class="config-grid">
+  {#each [{ key: "hal_portals", label: "Portails HAL" }] as field}
+    {@const item = configByKey(field.key)}
+    {#if item}
+      <div class="config-row">
+        <span class="config-label">{field.label}</span>
+        {#if editingKey === field.key}
+          <input class="config-editor-inline" bind:value={editValue} onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(field.key); } }} />
+          <span class="config-actions-inline">
+            <button class="btn btn-sm btn-primary" onclick={() => save(field.key)} disabled={saving}>OK</button>
+            <button class="btn btn-sm" onclick={() => { editingKey = null; }}>Annuler</button>
+          </span>
+        {:else}
+          <span class="config-value-inline">{Array.isArray(item.value) ? item.value.join(", ") : item.value}</span>
+          <button class="btn btn-sm" onclick={() => startEdit(field.key)}>Modifier</button>
+        {/if}
+      </div>
+    {/if}
+  {/each}
+  {#each [{ key: "hal_extra_collections", label: "Collections supplémentaires" }] as field}
+    {@const item = configByKey(field.key)}
+    {#if item}
+      <div class="config-row">
+        <span class="config-label">{field.label}</span>
+        {#if editingKey === field.key}
+          <input class="config-editor-inline" bind:value={editValue} onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(field.key); } }} />
+          <span class="config-actions-inline">
+            <button class="btn btn-sm btn-primary" onclick={() => save(field.key)} disabled={saving}>OK</button>
+            <button class="btn btn-sm" onclick={() => { editingKey = null; }}>Annuler</button>
+          </span>
+        {:else}
+          <span class="config-value-inline">{Array.isArray(item.value) && item.value.length ? item.value.join(", ") : "(aucune)"}</span>
+          <button class="btn btn-sm" onclick={() => startEdit(field.key)}>Modifier</button>
+        {/if}
+      </div>
+    {/if}
+  {/each}
+  <div class="config-row" style="flex-wrap: wrap;">
+    <span class="config-label">Collections (périmètre)</span>
+    <div class="hal-coll-list">
+      {#each Object.entries(halCollections.collections) as [code, label]}
+        <span class="hal-coll-tag">{code} <span class="hal-coll-label">({label})</span></span>
+      {/each}
+      {#if Object.keys(halCollections.collections).length === 0}
+        <span class="none-text">Aucune collection</span>
+      {/if}
+    </div>
+    <span class="config-hint">Dérivées des structures du périmètre ayant un champ "Collection HAL" renseigné (<a href="{base}/admin/structures">structures</a>).</span>
+  </div>
+</div>
+
 <style>
   h2 {
     font-size: 1.2rem;
     font-weight: 600;
-    margin: 0 0 4px;
+    margin: 0 auto 4px;
+    max-width: 800px;
   }
   .subtitle {
     color: var(--muted);
     font-size: 0.9rem;
-    margin: 0 0 20px;
+    margin: 0 auto 20px;
+    max-width: 800px;
   }
   .section-title {
-    margin: 24px 0 8px;
-    padding: 6px 14px;
-    background: #5b9ea0;
-    color: white;
-    font-size: 0.75rem;
-    font-weight: 600;
+    margin: 24px auto 8px;
+    padding: 4px 10px;
+    background: none;
+    color: #5b9ea0;
+    font-size: 0.8rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-radius: 3px;
+    border-bottom: 2px solid #5b9ea0;
+    max-width: 800px;
   }
   .help-text {
     background: var(--accent-light);
     border: 1px solid #c4d8ed;
     border-radius: 5px;
     padding: 8px 12px;
-    margin: 4px 0 12px;
+    margin: 4px auto 12px;
+    max-width: 800px;
     font-size: 0.85rem;
     color: #2c3e50;
     line-height: 1.5;
@@ -384,7 +388,8 @@
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--muted);
-    margin: 16px 0 6px;
+    margin: 16px auto 6px;
+    max-width: 800px;
   }
 
   .config-grid {
@@ -392,7 +397,7 @@
     flex-direction: column;
     gap: 8px;
     max-width: 800px;
-    margin-bottom: 8px;
+    margin: 0 auto 8px;
   }
   .config-row {
     display: flex;
@@ -449,7 +454,7 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 12px 16px;
-    margin-bottom: 10px;
+    margin: 0 auto 10px;
     max-width: 800px;
   }
   .perimeter-header {
