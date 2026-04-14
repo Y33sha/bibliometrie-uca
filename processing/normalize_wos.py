@@ -601,8 +601,12 @@ def process_authorships(cur, rec: dict, source_document_id: int):
     from psycopg2.extras import execute_values
     from utils.normalize import normalize_name_form
 
-    values = []
+    values = {}  # clé = (source_document_id, source_author_id), dédupliqué
     for author, source_author_id in author_ids:
+        key = (source_document_id, source_author_id)
+        if key in values:
+            continue  # même auteur déjà traité pour ce document
+
         institution_ids = []
         for org in author.get("organizations", []):
             name = org.get("name")
@@ -613,11 +617,11 @@ def process_authorships(cur, rec: dict, source_document_id: int):
         raw_affiliations = Json([raw_affil_text]) if raw_affil_text else None
         name_norm = normalize_name_form(author["full_name"])
 
-        values.append((
+        values[key] = (
             'wos', source_document_id, source_author_id, author["position"],
             author["is_corresponding"], raw_affiliations, name_norm,
             institution_ids or None, author.get("roles"),
-        ))
+        )
 
     execute_values(cur, """
         INSERT INTO source_authorships
@@ -641,7 +645,7 @@ def process_authorships(cur, rec: dict, source_document_id: int):
             ),
             roles = EXCLUDED.roles,
             addresses_extracted = FALSE
-    """, values)
+    """, list(values.values()))
 
     # Phase 3 : batch adresses (source_authorship_addresses)
     # Collecter les auteurs qui ont des adresses
