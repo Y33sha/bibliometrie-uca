@@ -783,25 +783,10 @@ def main():
         conn.commit()
         struct_cache.clear()
 
-        # Stats finales
         logger.info(f"\n=== Terminé ===")
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Hors périmètre (enrichissement seul) : {skipped_hors_perimetre}")
         logger.info(f"Erreurs : {errors}")
-
-        for table in ["publications", "journals", "publishers"]:
-            cur.execute(f"SELECT COUNT(*) FROM {table}")
-            count = cur.fetchone()[0]
-            logger.info(f"  {table} : {count} enregistrements")
-        cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = 'hal'")
-        count = cur.fetchone()[0]
-        logger.info(f"  source_authorships (hal) : {count} enregistrements")
-        cur.execute("SELECT COUNT(*) FROM source_authors WHERE source = 'hal'")
-        count = cur.fetchone()[0]
-        logger.info(f"  source_authors (hal) : {count} enregistrements")
-        cur.execute("SELECT COUNT(*) FROM source_documents WHERE source = 'hal'")
-        count = cur.fetchone()[0]
-        logger.info(f"  source_documents (hal) : {count} enregistrements")
 
         # Stats de recouvrement (publications dans les deux sources)
         cur.execute("""
