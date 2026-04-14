@@ -277,6 +277,8 @@ def main():
                         help="Statistiques uniquement")
     parser.add_argument("--all", action="store_true",
                         help="Considérer tout le staging (pas seulement les non-normalisés)")
+    parser.add_argument("--mode", choices=["full", "weekly", "monthly", "daily"], default="full",
+                        help="Mode pipeline (NNT ignoré en daily/weekly)")
     args = parser.parse_args()
 
     conn = get_connection()
@@ -291,9 +293,13 @@ def main():
     hal_refs_scanr = find_hal_ids_from_scanr(cur)
     log.info(f"  {len(hal_refs_scanr)} HAL IDs ScanR absents de staging_hal")
 
-    log.info("Recherche des NNT sans document HAL...")
-    nnt_refs = find_nnt_without_hal(cur)
-    log.info(f"  {len(nnt_refs)} NNT (thèses soutenues) sans HAL")
+    if args.mode in ("full", "monthly"):
+        log.info("Recherche des NNT sans document HAL...")
+        nnt_refs = find_nnt_without_hal(cur)
+        log.info(f"  {len(nnt_refs)} NNT (thèses soutenues) sans HAL")
+    else:
+        nnt_refs = []
+        log.info("NNT ignoré en mode %s", args.mode)
 
     # 2. Identifier ceux absents de staging_hal (OpenAlex)
     missing_oa = find_missing_hal_ids(cur, hal_refs_oa)
