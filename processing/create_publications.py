@@ -126,14 +126,14 @@ def run(dry_run=False):
             if (i + 1) % 500 == 0:
                 if not dry_run:
                     conn.commit()
-                logger.info("  %d/%d traites...", i + 1, len(docs))
+                logger.info("  %d/%d traités...", i + 1, len(docs))
 
         if dry_run:
-            logger.info("DRY-RUN : %d publications a creer, %d ignorees", created, skipped)
+            logger.info("DRY-RUN : %d publications à creer, %d ignorées", created, skipped)
             conn.rollback()
         else:
             conn.commit()
-            logger.info("Termine : %d publications creees/rattachees, %d ignorees",
+            logger.info("Terminé : %d publications créées/rattachées, %d ignorées",
                         created, skipped)
 
         cur.close()

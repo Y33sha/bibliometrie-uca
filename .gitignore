@@ -30,3 +30,4 @@ db/backup/
 
 # Claude Code
 .claude/
+pipeline/reports/*.md

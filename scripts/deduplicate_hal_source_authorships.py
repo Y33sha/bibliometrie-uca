@@ -289,7 +289,7 @@ def run(dry_run=True):
                     logger.info("  %-25s : %d cas", field, count)
 
             logger.info(
-                "Source_authorships : %d supprimes, %d groupes avec conflits",
+                "Source_authorships : %d supprimés, %d groupes avec conflits",
                 sa_deleted,
                 len(all_conflicts),
             )
@@ -308,7 +308,7 @@ def run(dry_run=True):
                             authors_deleted_p1 += 1
 
             logger.info(
-                "Source_authors (phase 1) : %d a fusionner, %d supprimes",
+                "Source_authors (phase 1) : %d a fusionner, %d supprimés",
                 len(authors_to_merge),
                 authors_deleted_p1,
             )
@@ -323,15 +323,15 @@ def run(dry_run=True):
                 authors_deleted_p2 += merge_duplicate_authors(cur, group, dry_run)
 
             logger.info(
-                "Source_authors (phase 2) : %d supprimes", authors_deleted_p2
+                "Source_authors (phase 2) : %d supprimés", authors_deleted_p2
             )
 
             if dry_run:
-                logger.info("DRY-RUN -- aucune modification appliquee")
+                logger.info("DRY-RUN -- aucune modification appliquée")
                 conn.rollback()
             else:
                 conn.commit()
-                logger.info("Modifications appliquees avec succes")
+                logger.info("Modifications appliquées avec succes")
 
     except Exception:
         conn.rollback()

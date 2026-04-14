@@ -759,10 +759,10 @@ def main():
         conn.commit()
 
         # Stats finales
-        logger.info(f"\n=== Termine ===")
-        logger.info(f"Traites avec succes : {processed}")
+        logger.info(f"\n=== Terminé ===")
+        logger.info(f"Traités avec succès : {processed}")
         if skipped:
-            logger.info(f"Ignores (Zenodo, etc.) : {skipped}")
+            logger.info(f"Ignorés (Zenodo, etc.) : {skipped}")
         logger.info(f"Erreurs : {errors}")
 
         for table in ["publications", "journals", "publishers"]:
