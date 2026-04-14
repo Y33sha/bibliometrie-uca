@@ -50,6 +50,7 @@ async def list_journals(
                    j.publisher_id, p.name AS pub_name,
                    j.openalex_id, j.is_in_doaj, j.is_predatory,
                    j.apc_amount, j.apc_currency, j.oa_model,
+                   j.journal_type, j.is_academic, j.doi_prefix, j.notes,
                    (SELECT COUNT(*) FROM publications pub
                     WHERE pub.journal_id = j.id) AS pub_count
             FROM journals j
