@@ -173,24 +173,10 @@ def main():
             conn.rollback()
             logger.info(f"\n[DRY RUN] {total_found} ORCID trouvés (aucune modification)")
         else:
-            # Stats finales
-            cur.execute("SELECT COUNT(*) FROM source_authors WHERE source = 'hal' AND orcid IS NOT NULL")
-            with_orcid = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM source_authors WHERE source = 'hal'")
-            total_authors = cur.fetchone()[0]
-
-            cur.execute("""
-                SELECT COUNT(*) FROM person_identifiers
-                WHERE id_type = 'orcid' AND source = 'hal'
-            """)
-            pi_hal_orcid = cur.fetchone()[0]
-
             logger.info(f"\n=== Terminé ===")
             logger.info(f"ORCID trouvés via API : {total_found}")
             logger.info(f"source_authors mis à jour : {total_updated}")
             logger.info(f"person_identifiers ajoutés : {total_pi_inserted}")
-            logger.info(f"source_authors avec ORCID : {with_orcid}/{total_authors}")
-            logger.info(f"person_identifiers (orcid, hal) : {pi_hal_orcid}")
 
     except KeyboardInterrupt:
         conn.commit()

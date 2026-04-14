@@ -182,13 +182,8 @@ def populate(conn):
 
     conn.commit()
 
-    # Stats
-    cur.execute("SELECT COUNT(*) AS total FROM person_name_forms")
-    total = cur.fetchone()["total"]
-    cur.execute("SELECT COUNT(*) AS ambiguous FROM person_name_forms WHERE array_length(person_ids, 1) > 1")
-    ambiguous = cur.fetchone()["ambiguous"]
-    log.info(f"Terminé : {total} formes ({inserted} ajoutées, {updated} mises à jour, "
-             f"{deleted} supprimées, {preserved} préservées), dont {ambiguous} ambiguës")
+    log.info(f"Terminé : {inserted} ajoutées, {updated} mises à jour, "
+             f"{deleted} supprimées, {preserved} préservées")
 
 
 if __name__ == "__main__":

@@ -113,46 +113,17 @@ def refresh(cur):
     return updated
 
 
-def show_stats(cur):
-    cur.execute("SELECT COUNT(*) FROM publications")
-    total = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM publications WHERE countries IS NOT NULL")
-    with_countries = cur.fetchone()[0]
-    cur.execute("""
-        SELECT unnest(countries) AS c, COUNT(*) AS n
-        FROM publications
-        WHERE countries IS NOT NULL
-        GROUP BY c ORDER BY n DESC LIMIT 10
-    """)
-    top = cur.fetchall()
-
-    logger.info(f"\n--- Statistiques pays ---")
-    logger.info(f"  Publications totales       : {total}")
-    logger.info(f"  Avec pays                  : {with_countries} ({100*with_countries//max(total,1)}%)")
-    logger.info(f"  Sans pays                  : {total - with_countries}")
-    if top:
-        logger.info(f"  Top 10 pays :")
-        for row in top:
-            logger.info(f"    {row[0]} : {row[1]}")
-
-
 def main():
     parser = argparse.ArgumentParser(description="Recalcul des pays des publications")
-    parser.add_argument("--stats", action="store_true", help="Stats uniquement")
     args = parser.parse_args()
 
     conn = get_connection()
     conn.autocommit = False
     cur = conn.cursor()
 
-    if args.stats:
-        show_stats(cur)
-        conn.close()
-        return
-
     refresh(cur)
     conn.commit()
-    show_stats(cur)
+    logger.info("Terminé")
     conn.close()
 
 

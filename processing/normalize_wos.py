@@ -900,24 +900,9 @@ def main():
         _wos_institution_cache.clear()
         _wos_author_cache.clear()
 
-        # Stats finales
         logger.info(f"\n=== Terminé ===")
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Erreurs : {errors}")
-
-        for table in ["publications", "journals", "publishers"]:
-            cur.execute(f"SELECT COUNT(*) FROM {table}")
-            count = cur.fetchone()[0]
-            logger.info(f"  {table} : {count} enregistrements")
-        cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = 'wos'")
-        count = cur.fetchone()[0]
-        logger.info(f"  source_authorships (wos) : {count} enregistrements")
-        cur.execute("SELECT COUNT(*) FROM source_authors WHERE source = 'wos'")
-        count = cur.fetchone()[0]
-        logger.info(f"  source_authors (wos) : {count} enregistrements")
-        cur.execute("SELECT COUNT(*) FROM source_documents WHERE source = 'wos'")
-        count = cur.fetchone()[0]
-        logger.info(f"  source_documents (wos) : {count} enregistrements")
 
     except KeyboardInterrupt:
         conn.commit()

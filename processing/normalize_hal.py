@@ -788,14 +788,6 @@ def main():
         logger.info(f"Hors périmètre (enrichissement seul) : {skipped_hors_perimetre}")
         logger.info(f"Erreurs : {errors}")
 
-        # Stats de recouvrement (publications dans les deux sources)
-        cur.execute("""
-            SELECT COUNT(*) FROM publications p
-            WHERE EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal')
-              AND EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'openalex')
-        """)
-        overlap = cur.fetchone()[0]
-        logger.info(f"\nPublications dans les deux sources : {overlap}")
 
     except KeyboardInterrupt:
         conn.commit()

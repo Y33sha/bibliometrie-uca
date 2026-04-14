@@ -43,29 +43,6 @@ SOURCES = {
 }
 
 
-def show_stats(cur):
-    cur.execute("SELECT COUNT(*) FROM addresses")
-    total_addr = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(DISTINCT address_id) FROM address_structures WHERE is_confirmed IS NOT NULL")
-    reviewed = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM address_structures")
-    affils = cur.fetchone()[0]
-
-    logger.info(f"\n--- Statistiques addresses ---")
-    logger.info(f"  Adresses distinctes              : {total_addr}")
-    logger.info(f"  Revues (non pending)             : {reviewed}")
-    logger.info(f"  Affiliations (address_structures) : {affils}")
-
-    for name, cfg in SOURCES.items():
-        cur.execute("""
-            SELECT COUNT(*) FROM source_authorship_addresses saa
-            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-            WHERE sa.source = %s
-        """, (cfg["source_filter"],))
-        links = cur.fetchone()[0]
-        logger.info(f"  Liens {name:10s} ↔ address    : {links}")
-
-
 def process_source(conn, cur, source_name: str):
     """Traite une source : extraction, insertion, liaison."""
     cfg = SOURCES[source_name]
@@ -230,7 +207,6 @@ def _insert_links(cur, batch):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stats", action="store_true")
     parser.add_argument("--source", choices=list(SOURCES.keys()),
                         help="Source spécifique (sinon toutes)")
     args = parser.parse_args()
@@ -238,11 +214,6 @@ def main():
     conn = get_connection()
     conn.autocommit = False
     cur = conn.cursor()
-
-    if args.stats:
-        show_stats(cur)
-        conn.close()
-        return
 
     sources = [args.source] if args.source else list(SOURCES.keys())
 
@@ -267,8 +238,7 @@ def main():
     conn.commit()
     logger.info(f"  {cur.rowcount} pub_count mis à jour")
 
-    logger.info("\n=== Résumé final ===")
-    show_stats(cur)
+    logger.info("\n=== Terminé ===")
     conn.close()
 
 
