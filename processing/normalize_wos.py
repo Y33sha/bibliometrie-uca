@@ -536,17 +536,27 @@ def upsert_wos_author(cur, author: dict) -> int | None:
 # WOS AUTHORSHIPS
 # =============================================================
 
-def _get_or_create_address(cur, raw_text: str) -> int:
-    """Retourne l'id de l'adresse, en la créant si nécessaire."""
-    normalized = normalize_text(raw_text)
-    cur.execute("SELECT id FROM addresses WHERE raw_text = %s", (raw_text,))
-    row = cur.fetchone()
-    if row:
-        return row[0]
-    cur.execute(
-        "INSERT INTO addresses (raw_text, normalized_text) VALUES (%s, %s) RETURNING id",
-        (raw_text, normalized))
-    return cur.fetchone()[0]
+def _resolve_addresses_batch(cur, raw_texts: set) -> dict[str, int]:
+    """Résout un ensemble d'adresses en batch. Retourne {raw_text: id}.
+
+    Insère les adresses inconnues en un seul batch, puis récupère tous les IDs.
+    """
+    if not raw_texts:
+        return {}
+    from psycopg2.extras import execute_values as _ev
+
+    # Batch INSERT (ON CONFLICT sur md5(raw_text) pour les existantes)
+    values = [(t, normalize_text(t)) for t in raw_texts]
+    _ev(cur, """
+        INSERT INTO addresses (raw_text, normalized_text)
+        VALUES %s
+        ON CONFLICT (md5(raw_text)) DO NOTHING
+    """, values)
+
+    # Récupérer tous les IDs en un seul SELECT
+    cur.execute("SELECT raw_text, id FROM addresses WHERE raw_text = ANY(%s)",
+                (list(raw_texts),))
+    return {r[0]: r[1] for r in cur.fetchall()}
 
 
 _wos_institution_cache: dict[str, int] = {}
@@ -694,10 +704,17 @@ def process_authorships(cur, rec: dict, source_document_id: int):
     """, list(values.values()))
 
     # Phase 3 : batch adresses (source_authorship_addresses)
-    # Collecter les auteurs qui ont des adresses
     authors_with_addrs = [(a, said) for a, said in author_ids if a.get("addresses")]
     if authors_with_addrs:
-        # Récupérer les sa_id depuis la base (le batch INSERT ne retourne pas les IDs)
+        # Collecter toutes les adresses uniques du document
+        all_addr_texts = set()
+        for author, _ in authors_with_addrs:
+            all_addr_texts.update(author["addresses"])
+
+        # Résoudre en batch (INSERT + SELECT)
+        addr_id_map = _resolve_addresses_batch(cur, all_addr_texts)
+
+        # Récupérer les sa_id
         sa_ids_needed = [said for _, said in authors_with_addrs]
         cur.execute("""
             SELECT source_author_id, id FROM source_authorships
@@ -705,14 +722,16 @@ def process_authorships(cur, rec: dict, source_document_id: int):
         """, (source_document_id, sa_ids_needed))
         sa_id_map = {r[0]: r[1] for r in cur.fetchall()}
 
+        # Construire les liens
         addr_values = []
         for author, source_author_id in authors_with_addrs:
             sa_id = sa_id_map.get(source_author_id)
             if not sa_id:
                 continue
             for addr_text in author["addresses"]:
-                addr_id = _get_or_create_address(cur, addr_text)
-                addr_values.append((sa_id, addr_id))
+                addr_id = addr_id_map.get(addr_text)
+                if addr_id:
+                    addr_values.append((sa_id, addr_id))
 
         if addr_values:
             _ev(cur, """
