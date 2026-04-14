@@ -38,7 +38,7 @@ def main():
         WHERE sa.person_id IS NULL AND sa.in_perimeter = TRUE AND NOT sa.excluded
           AND sa.author_name_normalized IS NOT NULL
           AND sa.author_name_normalized != ''
-          AND sa.source IN ('hal', 'openalex', 'wos')
+          AND sa.source IN ('hal', 'openalex', 'wos', 'scanr', 'theses')
     """)
 
     # Filtrer celles qui matchent une forme unique

@@ -210,8 +210,9 @@ def load_linked_authorships_by_pub(cur):
     """
     index = defaultdict(list)
 
-    # HAL, WoS, ScanR : noms depuis source_authors
-    cur.execute("""
+    # Sources avec noms structurés dans source_authors (tout sauf OpenAlex)
+    from utils.sources import SOURCES_WITH_STRUCTURED_NAMES_SQL
+    cur.execute(f"""
         SELECT sa_auth.person_id, sa_auth.author_position,
                sd.publication_id,
                sa.last_name, sa.first_name, sa.full_name,
@@ -219,7 +220,7 @@ def load_linked_authorships_by_pub(cur):
         FROM source_authorships sa_auth
         JOIN source_authors sa ON sa.id = sa_auth.source_author_id
         JOIN source_documents sd ON sd.id = sa_auth.source_document_id
-        WHERE sa_auth.source IN ('hal', 'wos', 'scanr')
+        WHERE sa_auth.source IN {SOURCES_WITH_STRUCTURED_NAMES_SQL}
           AND sa_auth.person_id IS NOT NULL
           AND sd.publication_id IS NOT NULL
     """)
