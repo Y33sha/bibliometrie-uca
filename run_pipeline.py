@@ -152,18 +152,23 @@ def phase_normalize(**kw):
         run_python("processing/enrich_hal_structures.py")
         if kw.get("mode", "full") in ("full", "monthly"):
             run_python("processing/harvest_hal_identifiers.py")
-    # Liberer l'espace TOAST du staging (raw_data vide apres normalisation)
-    log.info("VACUUM FULL staging...")
-    _vacuum_staging()
+    # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
+    mode = kw.get("mode", "full")
+    if mode in ("full", "monthly"):
+        log.info("VACUUM FULL staging...")
+        _vacuum_staging(full=True)
+    else:
+        log.info("VACUUM staging...")
+        _vacuum_staging(full=False)
 
 
-def _vacuum_staging():
-    """VACUUM FULL sur staging pour liberer l'espace TOAST."""
+def _vacuum_staging(full: bool = False):
+    """VACUUM sur staging. FULL en mode full/monthly, simple sinon."""
     from db.connection import get_connection
     conn = get_connection()
     conn.autocommit = True
     with conn.cursor() as cur:
-        cur.execute("VACUUM FULL staging")
+        cur.execute("VACUUM FULL staging" if full else "VACUUM staging")
     conn.close()
 
 
