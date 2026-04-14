@@ -922,9 +922,11 @@ def process_authorships(cur, rec: dict, source_document_id: int):
 
 def process_record(cur, staging_row: tuple) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
+    from utils.timings import StepTimer
     staging_id, ut, staging_doi, raw_data = staging_row
 
     try:
+        t = StepTimer()
         fmt = detect_format(raw_data)
         if fmt == "tsv":
             rec = extract_from_tsv(raw_data, staging_doi)
@@ -938,6 +940,7 @@ def process_record(cur, staging_row: tuple) -> bool:
         # Publisher & Journal
         publisher_id = upsert_publisher(cur, rec.get("publisher_name"))
         journal_id = upsert_journal(cur, rec, publisher_id)
+        t.mark("publisher+journal")
 
         # Métadonnées de publication (stockées sur source_documents)
         pub_meta = extract_pub_metadata(rec, journal_id)
@@ -956,25 +959,29 @@ def process_record(cur, staging_row: tuple) -> bool:
         # Recherche par DOI/titre (sans création)
         if not publication_id:
             publication_id = find_publication(cur, rec, journal_id)
+        t.mark("publication")
 
         # Enrichir la publication existante si trouvée
-        # (try_merge_by_doi gère les fusions DOI, refresh_from_sources recalcule après)
         if publication_id:
             publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
 
-        # Document WoS (source_documents) — publication_id peut être NULL
+        # Document WoS (source_documents)
         source_document_id = insert_wos_document(
             cur, rec, staging_id, publication_id, pub_meta
         )
+        t.mark("wos_doc")
 
         # Auteurs et authorships
         process_authorships(cur, rec, source_document_id)
+        t.mark("authors")
 
         # Recalcul complet des métadonnées depuis toutes les sources
         if publication_id:
             refresh_from_sources(cur, publication_id)
+        t.mark("refresh")
 
         mark_staging_done(cur, staging_id)
+        t.log_if_slow(ut, logger)
         return True
 
     except Exception as e:

@@ -577,11 +577,12 @@ def process_authors(cur, doc: dict, source_document_id: int,
 
 def process_work(cur, staging_row: tuple, struct_cache: dict | None = None) -> bool:
     """Traite un work du staging HAL."""
+    from utils.timings import StepTimer
     staging_id, hal_id, doi, raw_data, hal_collections_staging = staging_row
     doc = raw_data
-    timings = {}
 
     try:
+        t = StepTimer()
         title = get_title(doc)
         pub_year = doc.get("producedDateY_i")
         if not title or not pub_year:
@@ -603,19 +604,14 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None) -> b
                     mark_staging_done(cur, staging_id)
                     return False
 
-        t0 = time.perf_counter()
         publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
         publisher_id = upsert_publisher(cur, publisher_name)
-        timings["publisher"] = time.perf_counter() - t0
-
-        t0 = time.perf_counter()
         journal_id = upsert_journal(cur, doc, publisher_id)
-        timings["journal"] = time.perf_counter() - t0
+        t.mark("publisher+journal")
 
         # Métadonnées de publication (stockées sur source_documents)
         pub_meta = extract_pub_metadata(doc, journal_id)
 
-        t0 = time.perf_counter()
         # Chercher une publication existante (sans créer)
         publication_id = None
 
@@ -639,7 +635,7 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None) -> b
         else:
             # Recherche par DOI/NNT/titre (sans création)
             publication_id = find_publication(cur, doc, journal_id)
-        timings["publication"] = time.perf_counter() - t0
+        t.mark("publication")
 
         # Enrichir la publication existante si trouvée
         # (try_merge_by_doi gère les fusions DOI, refresh_from_sources recalcule après)
@@ -647,27 +643,22 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None) -> b
             publication_id = try_merge_by_doi(cur, publication_id, clean_doi(as_str(doc.get("doiId_s"))))
 
         # Document HAL (source_documents) — publication_id peut être NULL
-        t0 = time.perf_counter()
         source_document_id = insert_hal_document(
             cur, doc, staging_id, hal_id, hal_collections_staging, publication_id, pub_meta
         )
-        timings["hal_doc"] = time.perf_counter() - t0
+        t.mark("hal_doc")
 
         # Auteurs et authorships (avec source_struct_ids)
-        t0 = time.perf_counter()
         process_authors(cur, doc, source_document_id, struct_cache=struct_cache)
-        timings["authors"] = time.perf_counter() - t0
+        t.mark("authors")
 
         # Recalcul complet des métadonnées depuis toutes les sources
         if publication_id:
             refresh_from_sources(cur, publication_id)
+        t.mark("refresh")
 
         mark_staging_done(cur, staging_id)
-
-        total = sum(timings.values())
-        if total > 0.5:
-            breakdown = " | ".join(f"{k}:{v:.3f}s" for k, v in timings.items())
-            logger.info(f"  SLOW {hal_id} ({total:.3f}s) : {breakdown}")
+        t.log_if_slow(hal_id, logger)
 
         return True
 
