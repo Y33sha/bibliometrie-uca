@@ -41,6 +41,7 @@ def fetch_by_doi(doi: str) -> dict | None:
         "filter": f"doi:{doi}",
         "select": SELECT_FIELDS,
         "mailto": _email,
+        "include_xpac": "true",
     }
     try:
         resp = requests.get(BASE_URL, params=params, timeout=30)
