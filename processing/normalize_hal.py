@@ -453,7 +453,8 @@ def parse_author_structures(doc: dict) -> dict[int, set[int]]:
     return form_structs
 
 
-def process_authors(cur, doc: dict, source_document_id: int):
+def process_authors(cur, doc: dict, source_document_id: int,
+                    struct_cache: dict | None = None):
     """
     Traite les auteurs d'un document HAL :
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
@@ -541,13 +542,16 @@ def process_authors(cur, doc: dict, source_document_id: int):
         source_struct_ids = None
         if form_id and form_id in form_struct_map:
             raw_hal_ids = sorted(form_struct_map[form_id])
-            cur.execute("""
-                SELECT id FROM source_structures
-                WHERE source = 'hal' AND source_id = ANY(%s)
-            """, ([str(hid) for hid in raw_hal_ids],))
-            rows = cur.fetchall()
-            if rows:
-                source_struct_ids = sorted(r[0] for r in rows)
+            if struct_cache is not None:
+                resolved = [struct_cache[str(hid)] for hid in raw_hal_ids if str(hid) in struct_cache]
+            else:
+                cur.execute("""
+                    SELECT id FROM source_structures
+                    WHERE source = 'hal' AND source_id = ANY(%s)
+                """, ([str(hid) for hid in raw_hal_ids],))
+                resolved = [r[0] for r in cur.fetchall()]
+            if resolved:
+                source_struct_ids = sorted(resolved)
 
         cur.execute("""
             INSERT INTO source_authorships
@@ -571,7 +575,7 @@ def process_authors(cur, doc: dict, source_document_id: int):
 # BOUCLE PRINCIPALE
 # =============================================================
 
-def process_work(cur, staging_row: tuple) -> bool:
+def process_work(cur, staging_row: tuple, struct_cache: dict | None = None) -> bool:
     """Traite un work du staging HAL."""
     staging_id, hal_id, doi, raw_data, hal_collections_staging = staging_row
     doc = raw_data
@@ -651,7 +655,7 @@ def process_work(cur, staging_row: tuple) -> bool:
 
         # Auteurs et authorships (avec source_struct_ids)
         t0 = time.perf_counter()
-        process_authors(cur, doc, source_document_id)
+        process_authors(cur, doc, source_document_id, struct_cache=struct_cache)
         timings["authors"] = time.perf_counter() - t0
 
         # Recalcul complet des métadonnées depuis toutes les sources
@@ -719,10 +723,15 @@ def main():
         errors = 0
         skipped_hors_perimetre = 0
 
+        # Cache source_structures HAL (source_id → id) pour éviter une requête par auteur
+        cur.execute("SELECT source_id, id FROM source_structures WHERE source = 'hal'")
+        struct_cache = {r[0]: r[1] for r in cur.fetchall()}
+        logger.info(f"Cache source_structures : {len(struct_cache)} entrées")
+
         for row in rows:
             try:
                 cur.execute("SAVEPOINT normalize_work")
-                success = process_work(cur, row)
+                success = process_work(cur, row, struct_cache=struct_cache)
                 cur.execute("RELEASE SAVEPOINT normalize_work")
                 if success:
                     processed += 1
@@ -781,6 +790,7 @@ def main():
             logger.info(f"Source_authors orphelins supprimés : {orphans_deleted}")
 
         conn.commit()
+        struct_cache.clear()
 
         # Stats finales
         logger.info(f"\n=== Terminé ===")
