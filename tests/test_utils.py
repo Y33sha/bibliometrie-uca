@@ -38,6 +38,19 @@ class TestNormalizeName:
     def test_multiple_spaces(self):
         assert normalize_name("  Jean   Dupont  ") == "jean dupont"
 
+    def test_unicode_hyphen(self):
+        """Les tirets Unicode (U+2010, U+2013, etc.) doivent être traités
+        comme le tiret ASCII — sinon les mots sont collés et les formes
+        de nom divergent (bug doublons Abeywickrama‐Samarakoon)."""
+        assert normalize_name("Abeywickrama\u2010Samarakoon") == "abeywickrama samarakoon"
+        assert normalize_name("Abeywickrama\u2013Samarakoon") == "abeywickrama samarakoon"
+        assert normalize_name("Abeywickrama-Samarakoon") == "abeywickrama samarakoon"
+
+    def test_unicode_apostrophe(self):
+        """Les apostrophes typographiques doivent être traitées comme l'apostrophe ASCII."""
+        assert normalize_name("O\u2019Brien") == "o brien"
+        assert normalize_name("O'Brien") == "o brien"
+
 
 # ── clean_doi ──
 

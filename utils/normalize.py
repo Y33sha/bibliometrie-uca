@@ -11,19 +11,41 @@ import re
 import unicodedata
 
 
+# Caractères Unicode qui doivent être remplacés par leur équivalent ASCII
+# avant la suppression des non-ASCII (sinon ils disparaissent silencieusement
+# et collent les mots : "Abeywickrama‐Samarakoon" → "abeywickramasamarakoon")
+_UNICODE_TO_ASCII = str.maketrans({
+    '\u2010': '-',  # HYPHEN
+    '\u2011': '-',  # NON-BREAKING HYPHEN
+    '\u2012': '-',  # FIGURE DASH
+    '\u2013': '-',  # EN DASH
+    '\u2014': '-',  # EM DASH
+    '\u2015': '-',  # HORIZONTAL BAR
+    '\u2018': "'",  # LEFT SINGLE QUOTATION MARK
+    '\u2019': "'",  # RIGHT SINGLE QUOTATION MARK (apostrophe typographique)
+    '\u201A': "'",  # SINGLE LOW-9 QUOTATION MARK
+    '\u201C': '"',  # LEFT DOUBLE QUOTATION MARK
+    '\u201D': '"',  # RIGHT DOUBLE QUOTATION MARK
+    '\u2032': "'",  # PRIME
+    '\u00AD': '-',  # SOFT HYPHEN
+})
+
+
 def normalize_text(text: str) -> str:
     """Normalise un texte pour comparaison / dédoublonnage / matching.
 
     Pipeline :
       1. minuscules + strip
-      2. NFKD (décompose les accents)
-      3. ASCII encode/ignore (supprime les combining marks)
-      4. tout sauf [a-z0-9] → espaces
-      5. collapse espaces multiples
+      2. remplacer les tirets/apostrophes Unicode par ASCII
+      3. NFKD (décompose les accents)
+      4. ASCII encode/ignore (supprime les combining marks)
+      5. tout sauf [a-z0-9] → espaces
+      6. collapse espaces multiples
     """
     if not text:
         return ""
     text = text.lower().strip()
+    text = text.translate(_UNICODE_TO_ASCII)
     text = unicodedata.normalize("NFKD", text)
     text = text.encode("ascii", "ignore").decode("ascii")
     text = re.sub(r"[^a-z0-9]+", " ", text)
