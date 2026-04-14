@@ -117,6 +117,8 @@ async def publisher_stats(
                     "-name": "pub.name DESC",
                     "pubs": "COUNT(DISTINCT p.id) ASC",
                     "-pubs": "COUNT(DISTINCT p.id) DESC",
+                    "apc": "apc_uca ASC NULLS FIRST",
+                    "-apc": "apc_uca DESC NULLS LAST",
                 }.get(sort, "COUNT(DISTINCT p.id) DESC")
             }
             LIMIT %s OFFSET %s
@@ -211,6 +213,8 @@ async def journal_stats(
                     "-name": "j.title DESC",
                     "pubs": "COUNT(DISTINCT p.id) ASC",
                     "-pubs": "COUNT(DISTINCT p.id) DESC",
+                    "apc": "apc_uca ASC NULLS FIRST",
+                    "-apc": "apc_uca DESC NULLS LAST",
                 }.get(sort, "COUNT(DISTINCT p.id) DESC")
             }
             LIMIT %s OFFSET %s
@@ -435,6 +439,8 @@ async def stats_labs(
                     "-name": "COALESCE(s.acronym, s.name) DESC",
                     "pubs": "COUNT(DISTINCT p.id) ASC",
                     "-pubs": "COUNT(DISTINCT p.id) DESC",
+                    "apc": "apc_uca ASC NULLS FIRST",
+                    "-apc": "apc_uca DESC NULLS LAST",
                 }.get(sort, "COUNT(DISTINCT p.id) DESC")
             }
             LIMIT %s OFFSET %s
