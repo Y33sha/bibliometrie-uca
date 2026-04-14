@@ -52,6 +52,14 @@ export function useColumnVisibility(columns: ColumnDef[], defaultHidden: string[
 		return visibleColumns.includes(key);
 	}
 
+	function ensure(keys: string[]) {
+		const toAdd = keys.filter(k => allKeys.includes(k) && !visibleColumns.includes(k));
+		if (toAdd.length) {
+			visibleColumns = allKeys.filter(k => visibleColumns.includes(k) || toAdd.includes(k));
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(visibleColumns));
+		}
+	}
+
 	return {
 		get columns() { return columns; },
 		get visibleColumns() { return visibleColumns; },
@@ -59,5 +67,6 @@ export function useColumnVisibility(columns: ColumnDef[], defaultHidden: string[
 		set showMenu(v: boolean) { showMenu = v; },
 		toggle,
 		col,
+		ensure,
 	};
 }
