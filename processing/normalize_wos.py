@@ -824,13 +824,19 @@ def _get_or_create_address(cur, raw_text: str) -> int:
     return cur.fetchone()[0]
 
 
+_wos_institution_cache: dict[str, int] = {}
+
+
 def upsert_wos_institution(cur, org: dict) -> int | None:
     """Insère/retrouve une organisation WoS dans source_structures. Retourne source_structures.id."""
     name = org.get("name")
     if not name:
         return None
-    ror_id = org.get("ror_id")
 
+    if name in _wos_institution_cache:
+        return _wos_institution_cache[name]
+
+    ror_id = org.get("ror_id")
     cur.execute("""
         INSERT INTO source_structures (source, source_id, name, ror_id)
         VALUES ('wos', %s, %s, %s)
@@ -838,7 +844,9 @@ def upsert_wos_institution(cur, org: dict) -> int | None:
             ror_id = COALESCE(source_structures.ror_id, EXCLUDED.ror_id)
         RETURNING id
     """, (name, name, ror_id))
-    return cur.fetchone()[0]
+    result = cur.fetchone()[0]
+    _wos_institution_cache[name] = result
+    return result
 
 
 def process_authorships(cur, rec: dict, source_document_id: int):
@@ -1006,6 +1014,12 @@ def main():
         """, (limit,))
         work_ids = [r[0] for r in cur.fetchall()]
 
+        # Pré-charger le cache des institutions WoS
+        cur.execute("SELECT source_id, id FROM source_structures WHERE source = 'wos'")
+        for r in cur.fetchall():
+            _wos_institution_cache[r[0]] = r[1]
+        logger.info(f"Cache institutions WoS : {len(_wos_institution_cache)} entrées")
+
         processed = 0
         errors = 0
         FETCH_BATCH = 50
@@ -1041,6 +1055,7 @@ def main():
                     logger.info(f"  {processed}/{limit} traités ({errors} erreurs)")
 
         conn.commit()
+        _wos_institution_cache.clear()
 
         # Stats finales
         logger.info(f"\n=== Terminé ===")
