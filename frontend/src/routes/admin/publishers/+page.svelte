@@ -238,7 +238,7 @@
 	.predatory td { background: #fff0f0; }
 	.badge-pred { font-size: 0.7rem; padding: 1px 5px; background: #d32f2f; color: white; border-radius: 8px; margin-left: 6px; }
 
-	.actions { white-space: nowrap; position: relative; }
+	.actions { white-space: nowrap; position: relative; text-align: right; }
 	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; padding: 2px 8px; }
 	.btn-merge:hover { background: var(--accent-light); }
 
