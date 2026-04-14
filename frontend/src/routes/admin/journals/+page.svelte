@@ -18,6 +18,10 @@
 		apc_amount: number | null;
 		apc_currency: string | null;
 		oa_model: string | null;
+		journal_type: string | null;
+		is_academic: boolean | null;
+		doi_prefix: string | null;
+		notes: string | null;
 		pub_count: number;
 	}
 
@@ -74,11 +78,12 @@
 		editModal = {
 			id: j.id, title: j.title,
 			issn: j.issn || '', eissn: j.eissn || '', issnl: j.issnl || '',
-			doi_prefix: '', oa_model: j.oa_model || '',
-			journal_type: 'journal', is_academic: true,
+			doi_prefix: j.doi_prefix || '', oa_model: j.oa_model || '',
+			journal_type: j.journal_type || 'journal',
+			is_academic: j.is_academic ?? true,
 			is_predatory: j.is_predatory, is_in_doaj: j.is_in_doaj,
 			apc_amount: j.apc_amount ? String(j.apc_amount) : '',
-			notes: '',
+			notes: j.notes || '',
 		};
 	}
 
