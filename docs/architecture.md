@@ -59,64 +59,68 @@ Chaque table a un **service propriétaire** qui est le seul autorisé à y écri
 (INSERT/UPDATE/DELETE). Les autres composants lisent via SELECT mais passent par
 le service pour écrire.
 
-### Référentiel Publications — `services/publications.py`
-
-| Table | Propriétaire | Violations actuelles |
-|-------|-------------|---------------------|
-| `publications` | `services/publications.py` | addresses.py (batch pays — toléré) |
-| `distinct_publications` | API admin | — |
-| `apc_payments` | import APC | — |
-
-### Référentiel Bibliographique — `services/journals.py`
-
-| Table | Propriétaire | Violations actuelles |
-|-------|-------------|---------------------|
-| `journals` | `services/journals.py` | — |
-| `publishers` | `services/journals.py` | — |
-
-### Référentiel Personnes — `services/persons.py`
-
-| Table | Propriétaire | Violations actuelles |
-|-------|-------------|---------------------|
-| `persons` | `services/persons.py` | import_persons (HR — toléré) |
-| `persons_rh` | import RH | — |
-| `person_identifiers` | `services/persons.py` | — |
-| `person_name_forms` | `services/persons.py` | populate_person_name_forms (recalcul bulk — toléré) |
-
-### Structures — pas de service (maintenu manuellement)
+### Staging — scripts d'extraction
 
 | Table | Propriétaire |
 |-------|-------------|
-| `structures`, `structure_relations`, `structure_name_forms` | admin / SQL |
-| `countries` | référentiel statique |
+| `staging` | extracteurs (`extraction/*/extract_*.py`, cross-imports) |
+
+Table unique pour toutes les sources. Colonnes notables : `source` (enum), `source_id`, `raw_data` (JSONB, vidé après normalisation), `hal_collections` (text[], HAL uniquement), `not_found` (documents disparus).
 
 ### Sources bibliographiques — scripts de normalisation
 
 | Table | Propriétaire |
 |-------|-------------|
-| `staging_hal` | extract_hal |
-| `hal_documents`, `hal_authors`, `hal_authorships` | normalize_hal |
-| `staging_openalex` | extract_openalex |
-| `openalex_documents`, `openalex_authors`, `openalex_authorships` | normalize_openalex |
-| `staging_wos` | extract_wos |
-| `wos_documents`, `wos_authors`, `wos_authorships` | normalize_wos |
+| `source_documents` | `processing/normalize_*.py` |
+| `source_authors` | `processing/normalize_*.py` |
+| `source_authorships` | `processing/normalize_*.py` |
+| `source_structures` | `processing/normalize_hal.py`, `enrich_hal_structures.py` |
 
-Note : `person_id` sur les `*_authorships` est écrit par `services/persons.py`
-(rattachement), pas par les normalizers.
+Note : `person_id` sur `source_authorships` est écrit par `services/persons.py` (rattachement), pas par les normaliseurs. `in_perimeter` et `structure_ids` sont écrits par `populate_affiliations.py`.
 
-### Authorships canoniques
+### Référentiel Publications — `services/publications.py`
 
-| Table | Propriétaire | Violations actuelles |
-|-------|-------------|---------------------|
-| `authorships` | `services/authorships.py` + `build_authorships.py` (batch) | — |
+| Table | Propriétaire | Notes |
+|-------|-------------|-------|
+| `publications` | `services/publications.py` | `refresh_from_sources()` recalcule les métadonnées depuis les source_documents |
+| `distinct_publications` | API admin | paires marquées distinctes malgré titre identique |
+| `apc_payments` | import APC (CSV) | — |
+| `journals` | `services/journals.py` | — |
+| `publishers` | `services/journals.py` | — |
 
-### Adresses
+### Référentiel Personnes — `services/persons.py`
+
+| Table | Propriétaire | Notes |
+|-------|-------------|-------|
+| `persons` | `services/persons.py` | import RH écrit aussi (toléré) |
+| `persons_rh` | import RH (CSV) | table satellite |
+| `person_identifiers` | `services/persons.py` | ORCID, idHAL, IdRef |
+| `person_name_forms` | `services/persons.py` | recalcul bulk par `populate_person_name_forms.py` |
+
+### Authorships canoniques — `build_authorships.py`
+
+| Table | Propriétaire | Notes |
+|-------|-------------|-------|
+| `authorships` | `build_authorships.py` + `services/authorships.py` | dédupliqué (person_id, publication_id), consolide in_perimeter et structure_ids depuis les sources |
+
+### Structures — admin (pas de service)
 
 | Table | Propriétaire |
 |-------|-------------|
-| `addresses`, `address_structures` | populate_addresses, resolve_addresses |
-| `openalex_authorship_addresses` | populate_addresses (source OA) |
-| `wos_authorship_addresses` | populate_addresses (source WoS) |
+| `structures` | admin / API |
+| `structure_relations` | admin / API |
+| `structure_name_forms` | admin / API |
+| `perimeters` | admin / API |
+| `countries`, `country_name_forms` | référentiel statique |
+| `config` | admin / API |
+
+### Adresses — scripts pipeline
+
+| Table | Propriétaire |
+|-------|-------------|
+| `addresses` | `populate_addresses.py` |
+| `address_structures` | `resolve_addresses.py`, admin (confirmation manuelle) |
+| `source_authorship_addresses` | `populate_addresses.py` |
 
 
 ## Détail des tables
@@ -254,7 +258,6 @@ Table de laison recensant les contributions individuelles aux publications. Chaq
 - `in_perimeter` : TRUE si l'auteur est affilié UCA sur cette publication
 - `author_position` : position dans la liste d'auteurs
 - `is_corresponding` : auteur correspondant
-- `source_hal`, `source_openalex`, `source_wos`, `source_manual` : booléens traçant   quelles sources ont contribué à cet authorship; (TODO: remplacer par champ liste pour éviter d'ajouter une colonne chaque fois que j'ajoute une source)
 - `excluded` : lien erroné (homonyme, etc.)
 
 
@@ -262,5 +265,10 @@ Table de laison recensant les contributions individuelles aux publications. Chaq
 
 ### Tables source
 
-A réécrire entièrement
+Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses).
+
+- **`source_documents`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées brutes (doc_type non mappé, oa_status) et les métadonnées enrichies (abstract, keywords, topics, biblio, meta). Le champ `hal_collections` (text[]) est spécifique à HAL.
+- **`source_authors`** : un enregistrement par auteur par source. Déduplication par `(source, source_id)`. Pour HAL, le `source_id` est le PPN IdRef ou le hal_person_id ; pour les autres sources, c'est l'identifiant de l'entité auteur dans la source.
+- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `in_perimeter`, `structure_ids` (affiliation résolue), `roles` (auteur, directeur, rapporteur — theses.fr), `excluded` (authorship rejetée manuellement).
+- **`source_structures`** : structures HAL (mapping vers `structures` canoniques via `structure_id`). Utilisée par `populate_affiliations` pour résoudre les affiliations HAL.
 
