@@ -119,7 +119,7 @@ def phase_cross_imports(mode="full", sources=None, full_cross_import=False, **kw
         return
 
     if "hal" in sources:
-        run_python("extraction/hal/fetch_missing_hal.py", *full_flag)
+        run_python("extraction/hal/fetch_missing_hal.py", *full_flag, "--mode", mode)
         run_python("extraction/hal/cross_import_hal.py", *full_flag)
     if "openalex" in sources:
         run_python("extraction/openalex/cross_import_openalex.py", *full_flag)
