@@ -123,7 +123,7 @@ def phase_cross_imports(mode="full", sources=None, full_cross_import=False, **kw
         run_python("extraction/hal/cross_import_hal.py", *full_flag)
     if "openalex" in sources:
         run_python("extraction/openalex/cross_import_openalex.py", *full_flag)
-    if "wos" in sources:
+    if "wos" in sources and mode not in ("daily", "weekly"):
         run_python("extraction/wos/cross_import_wos.py", *full_flag)
     if "scanr" in sources:
         run_python("extraction/scanr/cross_import_scanr.py", *full_flag)
