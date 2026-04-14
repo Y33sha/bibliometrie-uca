@@ -21,7 +21,6 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 
 import argparse
 import os
-import re
 import sys
 
 import psycopg2
@@ -53,13 +52,6 @@ logger = setup_logger("normalize_wos", os.path.join(os.path.dirname(__file__), "
 # =============================================================
 
 
-def detect_format(raw_data: dict) -> str:
-    """Détecte le format : 'tsv' ou 'api'."""
-    if "static_data" in raw_data:
-        return "api"
-    return "tsv"
-
-
 def map_doc_type(raw_type: str | None) -> str:
     """Mappe un type de document WoS vers notre enum.
 
@@ -88,230 +80,6 @@ def map_oa_status(raw_oa: str | None) -> str:
         return "green"
     return "unknown"
 
-
-# =============================================================
-# EXTRACTION DEPUIS FORMAT TSV
-# =============================================================
-
-def _parse_tsv_authors(raw: dict) -> list[dict]:
-    """Extrait les auteurs depuis le format TSV."""
-    # AF = full names ("LastName, FirstName; ..."), AU = abbreviated
-    af_str = raw.get("AF", "")
-    au_str = raw.get("AU", "")
-
-    if af_str:
-        af_names = [n.strip() for n in af_str.split(";") if n.strip()]
-    elif au_str:
-        af_names = [n.strip() for n in au_str.split(";") if n.strip()]
-    else:
-        return []
-
-    # OI = ORCID ("Name/0000-0001-...; Name2/0000-...")
-    orcid_map = {}
-    oi_str = raw.get("OI", "")
-    if oi_str:
-        for entry in oi_str.split(";"):
-            entry = entry.strip()
-            if "/" in entry:
-                name_part, orcid = entry.rsplit("/", 1)
-                orcid = orcid.strip()
-                if re.match(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$", orcid):
-                    orcid_map[name_part.strip().lower()] = orcid
-
-    # RI = ResearcherID ("Name/RID; ...")
-    rid_map = {}
-    ri_str = raw.get("RI", "")
-    if ri_str:
-        for entry in ri_str.split(";"):
-            entry = entry.strip()
-            if "/" in entry:
-                name_part, rid = entry.rsplit("/", 1)
-                rid_map[name_part.strip().lower()] = rid.strip()
-
-    # RP = reprint/corresponding author address
-    rp_str = raw.get("RP", "")
-    corresponding_name = None
-    if rp_str:
-        match = re.match(r"^([^(]+)\(corresponding", rp_str)
-        if match:
-            corresponding_name = match.group(1).strip().lower()
-
-    # C1 = affiliations : "[Author1; Author2] Address; [Author3] Address2"
-    c1_str = raw.get("C1", "")
-    author_affiliations, author_addresses = _parse_c1_field(c1_str, af_names)
-
-    authors = []
-    for i, full_name in enumerate(af_names):
-        # Séparer nom/prénom ("LastName, FirstName")
-        if "," in full_name:
-            parts = full_name.split(",", 1)
-            last_name = parts[0].strip()
-            first_name = parts[1].strip()
-        else:
-            last_name = full_name.strip()
-            first_name = None
-
-        name_lower = full_name.strip().lower()
-        orcid = orcid_map.get(name_lower)
-        rid = rid_map.get(name_lower)
-
-        # Matching souple pour ORCID/RID (nom de famille seul)
-        if not orcid and last_name:
-            for key, val in orcid_map.items():
-                if last_name.lower() in key:
-                    orcid = val
-                    break
-        if not rid and last_name:
-            for key, val in rid_map.items():
-                if last_name.lower() in key:
-                    rid = val
-                    break
-
-        is_corresponding = False
-        if corresponding_name and last_name:
-            is_corresponding = last_name.lower() in corresponding_name
-
-        raw_affiliation = author_affiliations.get(i)
-
-        authors.append({
-            "position": i,
-            "full_name": full_name.strip(),
-            "last_name": last_name,
-            "first_name": first_name,
-            "orcid": orcid,
-            "researcher_id": rid,
-            "daisng_id": None,
-            "is_corresponding": is_corresponding,
-            "raw_affiliation": raw_affiliation,
-            "addresses": author_addresses.get(i, []),
-            "organizations": [],
-        })
-
-    return authors
-
-
-def _parse_c1_field(c1_str: str, author_names: list[str]) -> tuple[dict[int, str], dict[int, list[str]]]:
-    """Parse le champ C1 WoS.
-
-    Retourne :
-    - dict {position_auteur: affiliation concaténée} (pour raw_affiliation)
-    - dict {position_auteur: [adresses individuelles]} (pour source_authorship_addresses)
-
-    Format C1 :
-        [Author1; Author2] Address1; [Author3] Address2
-    """
-    if not c1_str:
-        return {}, {}
-
-    # Normaliser les noms d'auteurs pour le matching
-    name_to_idx = {}
-    for i, name in enumerate(author_names):
-        name_to_idx[name.strip().lower()] = i
-        if "," in name:
-            last = name.split(",", 1)[0].strip().lower()
-            if last not in name_to_idx:
-                name_to_idx[last] = i
-
-    concat_result: dict[int, str] = {}
-    list_result: dict[int, list[str]] = {}
-
-    blocks = re.findall(r'\[([^\]]+)\]\s*([^[]*)', c1_str)
-
-    for author_block, address in blocks:
-        address = address.strip().rstrip(";").strip()
-        if not address:
-            continue
-
-        names_in_block = [n.strip() for n in author_block.split(";")]
-        for name in names_in_block:
-            name_lower = name.strip().lower()
-            idx = name_to_idx.get(name_lower)
-            if idx is None:
-                if "," in name:
-                    last = name.split(",", 1)[0].strip().lower()
-                    idx = name_to_idx.get(last)
-            if idx is not None:
-                if idx in concat_result:
-                    concat_result[idx] += " | " + address
-                else:
-                    concat_result[idx] = address
-                list_result.setdefault(idx, []).append(address)
-
-    return concat_result, list_result
-
-
-def extract_from_tsv(raw: dict, staging_doi: str | None) -> dict:
-    """Extrait un record structuré depuis le format TSV."""
-    doi = clean_doi(raw.get("DI")) or clean_doi(staging_doi)
-    title = raw.get("TI", "").strip() or "(sans titre)"
-
-    pub_year = None
-    py_str = raw.get("PY", "")
-    if py_str:
-        try:
-            pub_year = int(py_str)
-        except ValueError:
-            pass
-
-    # Biblio
-    biblio = {}
-    if raw.get("VL"):
-        biblio["volume"] = raw["VL"]
-    if raw.get("IS"):
-        biblio["issue"] = raw["IS"]
-    if raw.get("BP"):
-        biblio["first_page"] = raw["BP"]
-    if raw.get("EP"):
-        biblio["last_page"] = raw["EP"]
-    if raw.get("AR"):
-        biblio["article_number"] = raw["AR"]
-
-    # Keywords : ID = author keywords, DE = KeyWords Plus
-    keywords = []
-    for field in ("DE", "ID"):
-        val = raw.get(field)
-        if val:
-            keywords.extend(k.strip() for k in val.split(";") if k.strip())
-    keywords = list(dict.fromkeys(keywords)) or None  # dedup en preservant l'ordre
-
-    # Topics : subject categories + WoS categories
-    topics = {}
-    if raw.get("SC"):
-        topics["subjects"] = [s.strip() for s in raw["SC"].split(";") if s.strip()]
-    if raw.get("WC"):
-        topics["categories"] = [s.strip() for s in raw["WC"].split(";") if s.strip()]
-
-    # External IDs
-    external_ids = {}
-    if raw.get("PM"):
-        external_ids["pmid"] = raw["PM"]
-
-    return {
-        "ut": raw.get("UT", ""),
-        "doi": doi,
-        "title": title,
-        "pub_year": pub_year,
-        "doc_type": raw.get("DT") or "other",
-        "language": raw.get("LA"),
-        "oa_status": map_oa_status(raw.get("OA")),
-        "journal_title": raw.get("SO"),
-        "issn": raw.get("SN"),
-        "eissn": raw.get("EI"),
-        "publisher_name": raw.get("PU"),
-        "authors": _parse_tsv_authors(raw),
-        "abstract": raw.get("AB"),
-        "cited_by_count": int(raw["TC"]) if raw.get("TC") else None,
-        "biblio": biblio or None,
-        "keywords": keywords,
-        "topics": topics or None,
-        "urls": [raw["DL"]] if raw.get("DL") else None,
-        "external_ids": external_ids or None,
-    }
-
-
-# =============================================================
-# EXTRACTION DEPUIS FORMAT API
-# =============================================================
 
 def _safe_list(obj) -> list:
     """WoS API retourne parfois un dict au lieu d'une liste."""
@@ -715,96 +483,53 @@ def insert_wos_document(cur, rec: dict, staging_id: int,
 # WOS AUTHORS (source_authors, source='wos')
 # =============================================================
 
+_wos_author_cache: dict[str, int] = {}
+
+
 def upsert_wos_author(cur, author: dict) -> int | None:
     """Insère/retrouve un auteur WoS dans source_authors (source='wos').
-    Retourne source_authors.id."""
-    full_name = author["full_name"]
+
+    Utilise le daisng_id comme clé unique (format API).
+    Cache en mémoire pour éviter les requêtes répétées.
+    Retourne source_authors.id.
+    """
+    full_name = author.get("full_name")
     if not full_name:
         return None
 
+    daisng_id = author.get("daisng_id")
+    if not daisng_id:
+        # Sans daisng_id, on ne peut pas dédupliquer proprement
+        logger.warning(f"Auteur WoS sans daisng_id : {full_name}")
+        return None
+
+    if daisng_id in _wos_author_cache:
+        return _wos_author_cache[daisng_id]
+
     last_name = author.get("last_name")
     first_name = author.get("first_name")
-    daisng_id = author.get("daisng_id")
     orcid = author.get("orcid")
     researcher_id = author.get("researcher_id")
 
-    # Construire le JSONB source_ids pour les IDs spécifiques WoS
     source_ids = {}
-    if daisng_id:
-        source_ids["daisng_id"] = daisng_id
     if researcher_id:
         source_ids["researcher_id"] = researcher_id
     source_ids_json = Json(source_ids) if source_ids else None
 
-    # 1. Par daisng_id (clé unique, format API uniquement)
-    #    source_id = COALESCE(daisng_id, 'wos-{old_id}')
-    if daisng_id:
-        source_id = daisng_id
-        cur.execute("""
-            INSERT INTO source_authors
-                (source, source_id, full_name, last_name, first_name, orcid,
-                 source_ids)
-            VALUES ('wos', %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (source, source_id) DO UPDATE SET
-                orcid = COALESCE(source_authors.orcid, EXCLUDED.orcid),
-                full_name = EXCLUDED.full_name,
-                source_ids = COALESCE(source_authors.source_ids, '{}') ||
-                             COALESCE(EXCLUDED.source_ids, '{}')
-            RETURNING id
-        """, (source_id, full_name, last_name, first_name, orcid,
-              source_ids_json))
-        return cur.fetchone()[0]
-
-    # 2. Par ORCID (si disponible et déjà connu)
-    if orcid:
-        cur.execute("""
-            SELECT id FROM source_authors
-            WHERE source = 'wos' AND orcid = %s
-            LIMIT 1
-        """, (orcid,))
-        row = cur.fetchone()
-        if row:
-            cur.execute("""
-                UPDATE source_authors SET
-                    source_ids = COALESCE(source_authors.source_ids, '{}') ||
-                                 COALESCE(%s::jsonb, '{}')
-                WHERE id = %s
-            """, (source_ids_json, row[0]))
-            return row[0]
-
-    # 3. Par nom exact (last_name + first_name)
-    if last_name and first_name:
-        cur.execute("""
-            SELECT id FROM source_authors
-            WHERE source = 'wos'
-              AND last_name = %s AND first_name = %s
-              AND source_id LIKE 'wos-%%'
-            LIMIT 1
-        """, (last_name, first_name))
-        row = cur.fetchone()
-        if row:
-            cur.execute("""
-                UPDATE source_authors SET
-                    orcid = COALESCE(source_authors.orcid, %s),
-                    source_ids = COALESCE(source_authors.source_ids, '{}') ||
-                                 COALESCE(%s::jsonb, '{}')
-                WHERE id = %s
-            """, (orcid, source_ids_json, row[0]))
-            return row[0]
-
-    # 4. Créer — on génère un source_id séquentiel
-    cur.execute("SELECT nextval('source_authors_id_seq')")
-    next_id = cur.fetchone()[0]
-    source_id = f"wos-{next_id}"
     cur.execute("""
         INSERT INTO source_authors
-            (id, source, source_id, full_name, last_name, first_name, orcid,
-             source_ids)
-        VALUES (%s, 'wos', %s, %s, %s, %s, %s, %s)
+            (source, source_id, full_name, last_name, first_name, orcid, source_ids)
+        VALUES ('wos', %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (source, source_id) DO UPDATE SET
+            orcid = COALESCE(source_authors.orcid, EXCLUDED.orcid),
+            full_name = EXCLUDED.full_name,
+            source_ids = COALESCE(source_authors.source_ids, '{}') ||
+                         COALESCE(EXCLUDED.source_ids, '{}')
         RETURNING id
-    """, (next_id, source_id, full_name, last_name, first_name, orcid,
-          source_ids_json))
-    return cur.fetchone()[0]
+    """, (daisng_id, full_name, last_name, first_name, orcid, source_ids_json))
+    result = cur.fetchone()[0]
+    _wos_author_cache[daisng_id] = result
+    return result
 
 
 # =============================================================
@@ -927,11 +652,7 @@ def process_record(cur, staging_row: tuple) -> bool:
 
     try:
         t = StepTimer()
-        fmt = detect_format(raw_data)
-        if fmt == "tsv":
-            rec = extract_from_tsv(raw_data, staging_doi)
-        else:
-            rec = extract_from_api(raw_data, staging_doi)
+        rec = extract_from_api(raw_data, staging_doi)
 
         # Forcer le UT depuis le staging si absent du raw_data
         if not rec["ut"]:
@@ -1032,11 +753,14 @@ def main():
         """, (limit,))
         work_ids = [r[0] for r in cur.fetchall()]
 
-        # Pré-charger le cache des institutions WoS
+        # Pré-charger les caches WoS
         cur.execute("SELECT source_id, id FROM source_structures WHERE source = 'wos'")
         for r in cur.fetchall():
             _wos_institution_cache[r[0]] = r[1]
-        logger.info(f"Cache institutions WoS : {len(_wos_institution_cache)} entrées")
+        cur.execute("SELECT source_id, id FROM source_authors WHERE source = 'wos' AND source_id NOT LIKE 'wos-%%'")
+        for r in cur.fetchall():
+            _wos_author_cache[r[0]] = r[1]
+        logger.info(f"Cache WoS : {len(_wos_institution_cache)} institutions, {len(_wos_author_cache)} auteurs")
 
         processed = 0
         errors = 0
@@ -1074,6 +798,7 @@ def main():
 
         conn.commit()
         _wos_institution_cache.clear()
+        _wos_author_cache.clear()
 
         # Stats finales
         logger.info(f"\n=== Terminé ===")

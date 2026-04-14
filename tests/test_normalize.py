@@ -219,21 +219,11 @@ class TestHALDocTypeMap:
 # ── WoS ──────────────────────────────────────────────────────────
 
 from processing.normalize_wos import (
-    detect_format,
     map_doc_type as wos_map_doc_type,
     map_oa_status,
-    _parse_c1_field,
     _safe_list,
     _get_api_title,
 )
-
-
-class TestWoSDetectFormat:
-    def test_api(self):
-        assert detect_format({"static_data": {}, "dynamic_data": {}}) == "api"
-
-    def test_tsv(self):
-        assert detect_format({"TI": "Title", "AU": "Author"}) == "tsv"
 
 
 class TestWoSMapDocType:
@@ -282,41 +272,6 @@ class TestWoSSafeList:
 
     def test_none(self):
         assert _safe_list(None) == []
-
-
-class TestWoSParseC1Field:
-    def test_single_author_single_address(self):
-        c1 = "[Dupont, J] Univ Clermont Auvergne, LIMOS, Clermont Ferrand, France"
-        names = ["Dupont, Jean"]
-        concat, addrs = _parse_c1_field(c1, names)
-        assert 0 in concat
-        assert "LIMOS" in concat[0]
-        assert len(addrs[0]) == 1
-
-    def test_multiple_authors_same_address(self):
-        c1 = "[Dupont, J; Martin, P] Univ Clermont Auvergne, France"
-        names = ["Dupont, Jean", "Martin, Pierre"]
-        concat, addrs = _parse_c1_field(c1, names)
-        assert 0 in concat
-        assert 1 in concat
-
-    def test_author_multiple_addresses(self):
-        c1 = ("[Dupont, J] Univ A, France; "
-              "[Dupont, J] Univ B, Germany")
-        names = ["Dupont, Jean"]
-        concat, addrs = _parse_c1_field(c1, names)
-        assert " | " in concat[0]
-        assert len(addrs[0]) == 2
-
-    def test_empty(self):
-        concat, addrs = _parse_c1_field("", [])
-        assert concat == {}
-        assert addrs == {}
-
-    def test_no_brackets(self):
-        """C1 sans crochets → pas de parsing possible."""
-        concat, addrs = _parse_c1_field("Some random text", ["Author"])
-        assert concat == {}
 
 
 class TestWoSGetApiTitle:
