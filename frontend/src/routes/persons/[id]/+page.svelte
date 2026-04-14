@@ -288,12 +288,17 @@
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
 	}
 
-	onMount(async () => {
-		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
-		// Check admin status (non-blocking)
-		fetch(base + '/api/auth/check').then(r => r.json()).then(d => { isAdmin = !!d.authenticated; }).catch(() => {});
+	let lastLoadedId = $state("");
+
+	async function loadProfile(id: string) {
+		if (id === lastLoadedId) return;
+		lastLoadedId = id;
+		error = false;
+		profile = null;
+		thesesLoaded = false;
+		addrLoaded = false;
 		try {
-			const profileData = await api<ProfileResponse>(`/api/persons/${personId}/profile`);
+			const profileData = await api<ProfileResponse>(`/api/persons/${id}/profile`);
 			profile = profileData.person;
 			identifiers = profileData.identifiers;
 			authors = profileData.authors;
@@ -302,10 +307,20 @@
 			error = true;
 			return;
 		}
-		// Load data for active tab
 		if (activeTab === 'addresses') loadAddresses();
 		else if (activeTab === 'theses') loadTheses();
 		else if (activeTab === 'publications') { facets.load(); pubs.load(); }
+	}
+
+	onMount(async () => {
+		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
+		fetch(base + '/api/auth/check').then(r => r.json()).then(d => { isAdmin = !!d.authenticated; }).catch(() => {});
+		await loadProfile(personId);
+	});
+
+	// Recharger quand personId change (navigation client-side)
+	$effect(() => {
+		loadProfile(personId);
 	});
 </script>
 
