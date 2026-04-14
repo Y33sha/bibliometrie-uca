@@ -498,7 +498,7 @@
 				<th class="sortable" class:active={pubSort === 'name' || pubSort === '-name'} onclick={() => { pubSort = toggleSort(pubSort, 'name'); pubFetch.page = 1; pubFetch.load(); }}>Éditeur {pubSort === 'name' ? '▲' : pubSort === '-name' ? '▼' : ''}</th>
 				<th class="num">Revues</th>
 				<th class="num sortable" class:active={pubSort === 'pubs' || pubSort === '-pubs'} onclick={() => { pubSort = toggleSort(pubSort, 'pubs'); pubFetch.page = 1; pubFetch.load(); }}>Articles {pubSort === 'pubs' ? '▲' : pubSort === '-pubs' ? '▼' : ''}</th>
-				<th class="num">APC UCA</th>
+				<th class="num sortable" class:active={pubSort === 'apc' || pubSort === '-apc'} onclick={() => { pubSort = toggleSort(pubSort, 'apc'); pubFetch.page = 1; pubFetch.load(); }}>APC UCA {pubSort === 'apc' ? '▲' : pubSort === '-apc' ? '▼' : ''}</th>
 				<th style="min-width:100px">OA</th>
 				<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
 				<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>
@@ -547,7 +547,7 @@
 				<th class="sortable" class:active={journalSort === 'name' || journalSort === '-name'} onclick={() => { journalSort = toggleSort(journalSort, 'name'); journalFetch.page = 1; journalFetch.load(); }}>Revue {journalSort === 'name' ? '▲' : journalSort === '-name' ? '▼' : ''}</th>
 				{#if !publisherId}<th>Éditeur</th>{/if}
 				<th class="num sortable" class:active={journalSort === 'pubs' || journalSort === '-pubs'} onclick={() => { journalSort = toggleSort(journalSort, 'pubs'); journalFetch.page = 1; journalFetch.load(); }}>Articles {journalSort === 'pubs' ? '▲' : journalSort === '-pubs' ? '▼' : ''}</th>
-				<th class="num">APC UCA</th>
+				<th class="num sortable" class:active={journalSort === 'apc' || journalSort === '-apc'} onclick={() => { journalSort = toggleSort(journalSort, 'apc'); journalFetch.page = 1; journalFetch.load(); }}>APC UCA {journalSort === 'apc' ? '▲' : journalSort === '-apc' ? '▼' : ''}</th>
 				<th style="min-width:100px">OA</th>
 				<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
 				<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>
@@ -598,7 +598,7 @@
 				<tr>
 					<th class="sortable" class:active={labSort === 'name' || labSort === '-name'} onclick={() => { labSort = toggleSort(labSort, 'name'); labFetch.page = 1; labFetch.load(); }}>Laboratoire {labSort === 'name' ? '▲' : labSort === '-name' ? '▼' : ''}</th>
 					<th class="num sortable" class:active={labSort === 'pubs' || labSort === '-pubs'} onclick={() => { labSort = toggleSort(labSort, 'pubs'); labFetch.page = 1; labFetch.load(); }}>Articles {labSort === 'pubs' ? '▲' : labSort === '-pubs' ? '▼' : ''}</th>
-					<th class="num">APC UCA</th>
+					<th class="num sortable" class:active={labSort === 'apc' || labSort === '-apc'} onclick={() => { labSort = toggleSort(labSort, 'apc'); labFetch.page = 1; labFetch.load(); }}>APC UCA {labSort === 'apc' ? '▲' : labSort === '-apc' ? '▼' : ''}</th>
 					<th style="min-width:100px">OA</th>
 					<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
 					<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>
