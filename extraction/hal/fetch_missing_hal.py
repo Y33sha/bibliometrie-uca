@@ -362,10 +362,14 @@ def main():
                     doi_str = doi_str[0] if doi_str else None
                 insert_staging_hal(cur, hal_id, doi_str, doc)
                 fetched += 1
-            elif doc is None:
-                not_found += 1
             else:
-                errors += 1
+                # Marquer comme not_found dans staging pour ne plus le re-chercher
+                cur.execute("""
+                    INSERT INTO staging (source, source_id, raw_data, not_found, processed)
+                    VALUES ('hal', %s, '{}', TRUE, TRUE)
+                    ON CONFLICT (source, source_id) DO UPDATE SET not_found = TRUE
+                """, (hal_id,))
+                not_found += 1
 
             if (i + 1) % 50 == 0:
                 conn.commit()
