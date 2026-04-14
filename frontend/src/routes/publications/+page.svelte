@@ -233,6 +233,14 @@
 		if (restored.filterPublisherName) filterPublisherName = restored.filterPublisherName as string;
 		if (restored.filterJournalName) filterJournalName = restored.filterJournalName as string;
 
+		// Forcer l'affichage des colonnes liées aux filtres actifs
+		const needed: string[] = [];
+		if (selectedOa.length || selectedAccess.length) needed.push('oa', 'oa_path');
+		if (selectedApc.length) needed.push('apc');
+		if (filterPublisherId || filterJournalId) needed.push('journal');
+		if (selectedDocTypes.length) needed.push('type');
+		if (needed.length) cv.ensure(needed);
+
 		await facets.load();
 		pubs.load();
 	});
