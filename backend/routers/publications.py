@@ -533,11 +533,14 @@ async def export_publications_csv(
 
         where_clause = " AND ".join(conditions) if conditions else "TRUE"
 
+        _apc_sort = "(SELECT COALESCE(SUM(ap.amount_eur_ht), 0) FROM apc_payments ap WHERE ap.publication_id = p.id)"
         order_map = {
             "year_desc": "p.pub_year DESC, p.title",
             "year_asc": "p.pub_year ASC, p.title",
             "title": "p.title ASC",
             "title_desc": "p.title DESC",
+            "apc_desc": f"{_apc_sort} DESC, p.title",
+            "apc_asc": f"{_apc_sort} ASC, p.title",
             "soutenance_desc": "p.meta->>'date_soutenance' DESC NULLS LAST, p.title",
             "soutenance_asc": "p.meta->>'date_soutenance' ASC NULLS LAST, p.title",
             "inscription_desc": "p.meta->>'date_inscription' DESC NULLS LAST, p.title",
@@ -1034,11 +1037,14 @@ async def list_publications(
 
         where_clause = " AND ".join(conditions) if conditions else "TRUE"
 
+        _apc_sort = "(SELECT COALESCE(SUM(ap.amount_eur_ht), 0) FROM apc_payments ap WHERE ap.publication_id = p.id)"
         order_map = {
             "year_desc": "p.pub_year DESC, p.title",
             "year_asc": "p.pub_year ASC, p.title",
             "title": "p.title ASC",
             "title_desc": "p.title DESC",
+            "apc_desc": f"{_apc_sort} DESC, p.title",
+            "apc_asc": f"{_apc_sort} ASC, p.title",
             "soutenance_desc": "p.meta->>'date_soutenance' DESC NULLS LAST, p.title",
             "soutenance_asc": "p.meta->>'date_soutenance' ASC NULLS LAST, p.title",
             "inscription_desc": "p.meta->>'date_inscription' DESC NULLS LAST, p.title",
