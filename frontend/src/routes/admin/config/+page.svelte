@@ -36,10 +36,94 @@
   let editValue = $state("");
   let saving = $state(false);
 
-  // Perimeter structure add
-  let addStructPerimeterId: number | null = $state(null);
-  let structSearch = $state("");
-  let structResults: any[] = $state([]);
+  // Perimeter CRUD
+  let perimModal: {
+    mode: 'create' | 'edit';
+    id: number | null;
+    code: string;
+    name: string;
+    description: string;
+    structSearch: string;
+    structResults: any[];
+    structure_ids: number[];
+    structures: PerimeterStructure[];
+  } | null = $state(null);
+
+  function openPerimCreate() {
+    perimModal = { mode: 'create', id: null, code: '', name: '', description: '',
+                   structSearch: '', structResults: [], structure_ids: [], structures: [] };
+  }
+
+  function openPerimEdit(p: Perimeter) {
+    perimModal = { mode: 'edit', id: p.id, code: p.code, name: p.name,
+                   description: p.description || '',
+                   structSearch: '', structResults: [],
+                   structure_ids: [...p.structure_ids],
+                   structures: [...p.structures] };
+  }
+
+  async function savePerimeter() {
+    if (!perimModal) return;
+    try {
+      if (perimModal.mode === 'create') {
+        const res = await fetch(base + '/api/perimeters', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: perimModal.code, name: perimModal.name,
+                                 description: perimModal.description }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Erreur');
+        const { id } = await res.json();
+        // Ajouter les structures
+        for (const sid of perimModal.structure_ids) {
+          await fetch(base + `/api/perimeters/${id}/structures`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ structure_id: sid }),
+          });
+        }
+      } else {
+        const res = await fetch(base + `/api/perimeters/${perimModal.id}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: perimModal.name, description: perimModal.description,
+                                 structure_ids: perimModal.structure_ids }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Erreur');
+      }
+      perimModal = null;
+      await load();
+    } catch (e: any) { alert(e.message); }
+  }
+
+  async function deletePerimeter(id: number) {
+    if (!confirm('Supprimer ce périmètre ?')) return;
+    try {
+      const res = await fetch(base + `/api/perimeters/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).detail || 'Erreur');
+      await load();
+    } catch (e: any) { alert(e.message); }
+  }
+
+  async function perimSearchStructures() {
+    if (!perimModal || perimModal.structSearch.length < 2) {
+      if (perimModal) perimModal.structResults = [];
+      return;
+    }
+    perimModal.structResults = await api<any[]>(`/api/structures?search=${encodeURIComponent(perimModal.structSearch)}`);
+  }
+
+  function perimAddStruct(s: any) {
+    if (!perimModal || perimModal.structure_ids.includes(s.id)) return;
+    perimModal.structure_ids = [...perimModal.structure_ids, s.id];
+    perimModal.structures = [...perimModal.structures, { id: s.id, name: s.name, acronym: s.acronym, code: s.code }];
+    perimModal.structSearch = '';
+    perimModal.structResults = [];
+  }
+
+  function perimRemoveStruct(sid: number) {
+    if (!perimModal) return;
+    perimModal.structure_ids = perimModal.structure_ids.filter(id => id !== sid);
+    perimModal.structures = perimModal.structures.filter(s => s.id !== sid);
+  }
+
 
   function currentYear(): number {
     return new Date().getFullYear();
@@ -88,28 +172,6 @@
       alert("Erreur : " + e.message);
     }
     saving = false;
-  }
-
-  async function searchStructures() {
-    if (structSearch.length < 2) {
-      structResults = [];
-      return;
-    }
-    structResults = await api<any[]>(`/api/structures?search=${encodeURIComponent(structSearch)}`);
-  }
-
-  async function addPerimeterStructure(structureId: number) {
-    if (!addStructPerimeterId) return;
-    await fetch(base + `/api/perimeters/${addStructPerimeterId}/structures`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ structure_id: structureId }) });
-    addStructPerimeterId = null;
-    structSearch = "";
-    structResults = [];
-    await load();
-  }
-
-  async function removePerimeterStructure(perimeterId: number, structureId: number) {
-    await fetch(base + `/api/perimeters/${perimeterId}/structures/${structureId}`, { method: "DELETE" });
-    await load();
   }
 
   onMount(load);
@@ -218,48 +280,22 @@
       <strong>{perim.name}</strong>
       <span class="perimeter-code">{perim.code}</span>
       <span class="perimeter-count">{perim.structure_count} structures</span>
+      <span style="margin-left:auto; display:flex; gap:4px;">
+        <button class="btn btn-sm" onclick={() => openPerimEdit(perim)}>Modifier</button>
+        <button class="btn btn-sm btn-danger" onclick={() => deletePerimeter(perim.id)}>Supprimer</button>
+      </span>
     </div>
     {#if perim.description}
       <p class="perimeter-desc">{perim.description}</p>
     {/if}
     <div class="perimeter-rules">
       {#each perim.structures as struct (struct.id)}
-        <span class="tag">
-          {struct.acronym || struct.name}
-          <button class="remove" onclick={() => removePerimeterStructure(perim.id, struct.id)} title="Retirer">x</button>
-        </span>
+        <span class="tag">{struct.acronym || struct.name}</span>
       {/each}
     </div>
-    {#if addStructPerimeterId === perim.id}
-      <div class="rule-add-form">
-        <input type="text" placeholder="Rechercher une structure..." bind:value={structSearch} oninput={searchStructures} autocomplete="off" />
-        <button
-          class="btn btn-sm"
-          onclick={() => {
-            addStructPerimeterId = null;
-          }}>Annuler</button
-        >
-        {#if structResults.length > 0}
-          <div class="rule-results">
-            {#each structResults.slice(0, 10) as s (s.id)}
-              <button class="picker-item" onclick={() => addPerimeterStructure(s.id)}>{s.acronym ? s.acronym + " — " : ""}{s.name}</button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    {:else}
-      <button
-        class="btn btn-sm"
-        style="margin-top: 6px;"
-        onclick={() => {
-          addStructPerimeterId = perim.id;
-          structSearch = "";
-          structResults = [];
-        }}>Ajouter</button
-      >
-    {/if}
   </div>
 {/each}
+<button class="btn btn-sm" style="margin: 0 auto; display:block; max-width:800px;" onclick={openPerimCreate}>+ Nouveau périmètre</button>
 
 <h4 class="subsection-title">Rôle des périmètres</h4>
 <div class="config-grid">
@@ -347,6 +383,48 @@
     <span class="config-hint">Dérivées des structures du périmètre ayant un champ "Collection HAL" renseigné (<a href="{base}/admin/structures">structures</a>).</span>
   </div>
 </div>
+
+{#if perimModal}
+<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+<div class="modal-bg" onclick={() => perimModal = null}>
+  <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+  <div class="modal" onclick={(e) => e.stopPropagation()}>
+    <h3>{perimModal.mode === 'create' ? 'Nouveau périmètre' : 'Modifier le périmètre'}</h3>
+    <label>Code</label>
+    <input bind:value={perimModal.code} disabled={perimModal.mode === 'edit'} placeholder="ex: uca_wide" />
+    <label>Nom</label>
+    <input bind:value={perimModal.name} placeholder="ex: UCA large" />
+    <label>Description</label>
+    <input bind:value={perimModal.description} />
+    <label>Structures racines</label>
+    <div class="perimeter-rules" style="margin: 4px 0 8px;">
+      {#each perimModal.structures as struct (struct.id)}
+        <span class="tag">
+          {struct.acronym || struct.name}
+          <button class="remove" onclick={() => perimRemoveStruct(struct.id)}>x</button>
+        </span>
+      {/each}
+    </div>
+    <input type="text" placeholder="Rechercher une structure..." bind:value={perimModal.structSearch}
+      oninput={perimSearchStructures} autocomplete="off" />
+    {#if perimModal.structResults.length > 0}
+      <div class="perim-search-results">
+        {#each perimModal.structResults.slice(0, 8) as s (s.id)}
+          <button class="picker-item" onclick={() => perimAddStruct(s)}>
+            {s.acronym ? s.acronym + ' — ' : ''}{s.name}
+          </button>
+        {/each}
+      </div>
+    {/if}
+    <div class="modal-actions">
+      <button class="btn" onclick={() => perimModal = null}>Annuler</button>
+      <button class="btn btn-primary" onclick={savePerimeter}>
+        {perimModal.mode === 'create' ? 'Créer' : 'Enregistrer'}
+      </button>
+    </div>
+  </div>
+</div>
+{/if}
 
 <style>
   h2 {
@@ -502,19 +580,7 @@
     padding: 0;
     font-family: inherit;
   }
-
-  .rule-add-form {
-    margin-top: 8px;
-  }
-  .rule-add-form input[type="text"] {
-    width: 250px;
-    padding: 4px 8px;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    font-size: 0.9rem;
-    font-family: inherit;
-  }
-  .rule-results {
+  .perim-search-results {
     border: 1px solid var(--border);
     border-radius: 4px;
     margin-top: 4px;

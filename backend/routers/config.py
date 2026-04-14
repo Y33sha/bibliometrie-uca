@@ -105,3 +105,67 @@ async def remove_perimeter_structure(perimeter_id: int, structure_id: int):
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Périmètre introuvable")
         return {"status": "removed"}
+
+
+@router.post("/api/perimeters")
+async def create_perimeter(data: dict):
+    """Crée un nouveau périmètre."""
+    code = (data.get("code") or "").strip()
+    name = (data.get("name") or "").strip()
+    if not code or not name:
+        raise HTTPException(status_code=400, detail="Code et nom requis")
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id FROM perimeters WHERE code = %s", (code,))
+        if cur.fetchone():
+            raise HTTPException(status_code=409, detail="Ce code existe déjà")
+        cur.execute("""
+            INSERT INTO perimeters (code, name, description, structure_ids)
+            VALUES (%s, %s, %s, '{}')
+            RETURNING id
+        """, (code, name, (data.get("description") or "").strip() or None))
+        return {"id": cur.fetchone()["id"]}
+
+
+@router.put("/api/perimeters/{perimeter_id}")
+async def update_perimeter(perimeter_id: int, data: dict):
+    """Met à jour un périmètre (nom, description, structures)."""
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id FROM perimeters WHERE id = %s", (perimeter_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Périmètre introuvable")
+        fields = {}
+        if "name" in data:
+            fields["name"] = data["name"].strip()
+        if "description" in data:
+            fields["description"] = data["description"].strip() or None
+        if "structure_ids" in data:
+            fields["structure_ids"] = data["structure_ids"]
+        if not fields:
+            raise HTTPException(status_code=400, detail="Rien à modifier")
+        sets = ", ".join(f"{k} = %s" for k in fields)
+        cur.execute(f"UPDATE perimeters SET {sets} WHERE id = %s",
+                    list(fields.values()) + [perimeter_id])
+        return {"ok": True}
+
+
+@router.delete("/api/perimeters/{perimeter_id}")
+async def delete_perimeter(perimeter_id: int):
+    """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT code FROM perimeters WHERE id = %s", (perimeter_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Périmètre introuvable")
+        code = row["code"]
+        # Vérifier qu'il n'est pas utilisé
+        cur.execute("""
+            SELECT key FROM config
+            WHERE key LIKE 'perimeter_%%' AND value #>> '{}' = %s
+        """, (code,))
+        used_by = cur.fetchall()
+        if used_by:
+            phases = ", ".join(r["key"] for r in used_by)
+            raise HTTPException(status_code=409,
+                detail=f"Ce périmètre est utilisé par : {phases}")
+        cur.execute("DELETE FROM perimeters WHERE id = %s", (perimeter_id,))
+        return {"ok": True}
