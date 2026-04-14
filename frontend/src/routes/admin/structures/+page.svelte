@@ -1633,52 +1633,7 @@
 	}
 
 	/* ── Modal ── */
-	.modal-bg {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.3);
-		z-index: 200;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-	.modal {
-		background: white;
-		border-radius: 8px;
-		padding: 20px;
-		width: 420px;
-		max-width: 90vw;
-		box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-	}
-	.modal h3 {
-		margin: 0 0 14px;
-		font-size: 1.15rem;
-		color: var(--text);
-		text-transform: none;
-		letter-spacing: normal;
-	}
-	.modal label {
-		display: block;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--text-muted);
-		margin: 8px 0 3px;
-	}
-	.modal input,
-	.modal select {
-		width: 100%;
-		padding: 6px 8px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		font-size: 0.95rem;
-		font-family: inherit;
-	}
-	.modal .actions {
-		display: flex;
-		gap: 8px;
-		justify-content: flex-end;
-		margin-top: 16px;
-	}
+	/* modal styles dans shared.css */
 	.api-ids-display {
 		margin-top: 8px;
 		font-size: 0.85rem;

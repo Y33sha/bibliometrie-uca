@@ -67,6 +67,34 @@ async def list_journals(
         }
 
 
+@router.put("/api/journals/{journal_id}")
+async def update_journal(journal_id: int, body: dict):
+    """Met à jour une revue."""
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id FROM journals WHERE id = %s", (journal_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Revue introuvable")
+
+        fields = {}
+        for key in ("title", "issn", "eissn", "issnl", "doi_prefix",
+                     "oa_model", "journal_type", "is_academic",
+                     "is_predatory", "is_in_doaj", "apc_amount", "notes"):
+            if key in body:
+                fields[key] = body[key]
+        if "title" in fields:
+            from utils.normalize import normalize_text
+            fields["title_normalized"] = normalize_text(fields["title"])
+
+        if not fields:
+            raise HTTPException(status_code=400, detail="Rien à modifier")
+
+        sets = ", ".join(f"{k} = %s" for k in fields)
+        cur.execute(
+            f"UPDATE journals SET {sets}, updated_at = now() WHERE id = %s",
+            list(fields.values()) + [journal_id])
+        return {"ok": True}
+
+
 @router.post("/api/journals/{journal_id}/merge")
 async def merge(journal_id: int, body: dict):
     source_id = body.get("source_id")
