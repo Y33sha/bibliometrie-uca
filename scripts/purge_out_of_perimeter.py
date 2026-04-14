@@ -125,25 +125,25 @@ def run(dry_run=True):
                 DELETE FROM source_authorship_addresses
                 WHERE source_authorship_id IN (SELECT id FROM purge_sa)
             """)
-            logger.info("  source_authorship_addresses supprimees : %d", cur.rowcount)
+            logger.info("  source_authorship_addresses supprimées : %d", cur.rowcount)
 
             cur.execute("""
                 DELETE FROM source_authorships
                 WHERE source_document_id IN (SELECT id FROM purge_sd)
             """)
-            logger.info("  source_authorships supprimees : %d", cur.rowcount)
+            logger.info("  source_authorships supprimées : %d", cur.rowcount)
 
             cur.execute("""
                 DELETE FROM authorships
                 WHERE publication_id IN (SELECT id FROM purge_pubs)
             """)
-            logger.info("  authorships supprimees : %d", cur.rowcount)
+            logger.info("  authorships supprimées : %d", cur.rowcount)
 
             cur.execute("""
                 DELETE FROM apc_payments
                 WHERE publication_id IN (SELECT id FROM purge_pubs)
             """)
-            logger.info("  apc_payments supprimees : %d", cur.rowcount)
+            logger.info("  apc_payments supprimées : %d", cur.rowcount)
 
             # Vider raw_data du staging (conserver la ligne pour eviter re-import)
             cur.execute("""
@@ -158,22 +158,22 @@ def run(dry_run=True):
                 WHERE pub_id_a IN (SELECT id FROM purge_pubs)
                    OR pub_id_b IN (SELECT id FROM purge_pubs)
             """)
-            logger.info("  distinct_publications supprimees : %d", cur.rowcount)
+            logger.info("  distinct_publications supprimées : %d", cur.rowcount)
 
             cur.execute("""
                 DELETE FROM source_documents
                 WHERE publication_id IN (SELECT id FROM purge_pubs)
             """)
-            logger.info("  source_documents supprimees : %d", cur.rowcount)
+            logger.info("  source_documents supprimées : %d", cur.rowcount)
 
             cur.execute("""
                 DELETE FROM publications
                 WHERE id IN (SELECT id FROM purge_pubs)
             """)
-            logger.info("  publications supprimees : %d", cur.rowcount)
+            logger.info("  publications supprimées : %d", cur.rowcount)
 
             conn.commit()
-            logger.info("Purge terminee avec succes.")
+            logger.info("Purge terminée avec succès.")
 
     except Exception:
         conn.rollback()

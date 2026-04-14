@@ -10,26 +10,26 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] authorships excluded: info perdue si réimport (grave?)
 ## Pipeline
 ### Facile et/ou urgent
-* [ ] 3e mode du pipeline: daily (mode rapide, seulement nouveaux docts)
+* [x] 3e mode du pipeline: daily (mode rapide, seulement nouveaux docts)
 * [ ] programmation cron pour le pipeline de traitement
 ### Autres
 * [ ] structure_ids et in_perimeter des publis theses.fr: à quelle phase du pipeline sont-ils remplis et selon quelle logique? auditer
-* [ ] création de publications: comment sont renseignés les champs mots clés, topics? fusion ou premier arrivé premier servi? Vérifier et backfiller si besoin.
+* [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
 * [ ] faire une version bac à sable pour retester le pipeline *de novo* après seed.
+* [ ] y aura-t-il un cross-import sur le cross-import au run suivant?
 ## Imports csv
 * [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer)
 ## Chantiers au long cours
 * [ ] chercher des moyens d'optimiser la taille de la base: supprimer données qui ne sont plus utiles? ex.: supprimer *_authors et *_structures (sauf hal)? chercher colonnes jamais utilisées.
-* [ ] audit complet du code pour retrouver tous les trucs hardcodés qu'on pourrait abstraire, ou le SQL à simplifier suite aux fusions des tables sources. / 'uca', structure id 169...; requêtes SQL avec sources hardcodées
+* [ ] audit complet du code pour retrouver tous les trucs hardcodés qu'on pourrait abstraire, ou le SQL à simplifier suite aux fusions des tables sources. 
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
 * [ ] transférer champ role des authorships sources aux authorships canoniques? auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques)
 * [ ] vérifier valeur ajoutée du mapping hal_structures *vs* utilisation des collections pour la phase affiliations du pipeline; ou mieux, prendre la chaîne de caractères "affiliation" et la vérifier comme une adresse? => pour pouvoir auditer, commencer par **backfill** les collections dans les publications HAL qui n'en ont pas.
 * [ ] normalize_wos: conserver le mapping addresses->structures dans le champ raw_affiliations? (modifier script + **backfill**) voir si ça vaut le coup
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
 # Sémantique
-* [ ] publications => plutôt documents?
-* [ ] collections => hal_collections
+* [ ] publications => documents, source_authors => source_persons
 # Données
 ## Explorer autres sources possibles
 * [ ] pour les publis: CrossRef, ArXiv, Pubmed
@@ -54,7 +54,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] trous dans la numérotation des auteurs: diagnostiquer et résoudre
 * à quoi sert VRAIMENT la colonne collections du staging_hal?
 * [ ] embargos (HAL, theses.fr): afficher dates (existent-elles dans le retour api)?
-* [ ] recherche par hal-id avec hal-id non trouvé dans hal (dédoublonné depuis?):  2026-04-11 08:55:58,660 [WARNING]   hal-03178520 non trouvé dans HAL => auditer, supprimer les hal-id erronés des external_ids
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis (authorship ok, author pas ok => vérifier que ce ne sera pas ré-écrasé)
 ### Chantier "Types de documents"
 * [ ] types parfois non fiables sur OpenAlex: https://openalex.org/works/W4225722715 (utiliser Unpaywall aussi pour corriger type doc?)
@@ -95,7 +94,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] relations entre publications (est traduction de, est preprint de..., fait partie de..., data paper décrit dataset, dataset référencé dans...)
 * [ ] ajouter filtre corresponding_is_uca?
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
-* [ ] pages dédiées pour les types spéciaux: datasets?
 ## Général (interface)
 * [ ] Toujours mémoriser filtres et les rétablir au rechargement
 * [ ] Rendre tous les filtres sticky
@@ -106,7 +104,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 ## Détails d'affichage
 * [ ] décomptes sur les onglets: ne pas tenir compte des facettes en place
 * [ ] décomptes facettes: toujours aligné à droite
-* [ ] page stats: flèches de tri ne fonctionnent pas
 # Trucs pour plus tard
 * compte fractionnaire des publications?
 * collaborations nationales et internationales: identification structures? compliqué, je pense que pour ça il vaut mieux réutiliser les sources directement
@@ -116,4 +113,3 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * openalex répète des auteurs : publi 77832
 * [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
 * erreur de parsing OA: publication 113652
-* 53910 pays FR (pas MC?)

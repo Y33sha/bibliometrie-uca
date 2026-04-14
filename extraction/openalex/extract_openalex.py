@@ -249,15 +249,15 @@ def main():
     since = args.since
     years = [args.year] if args.year else config_years
 
-    logger.info(f"=== Extraction OpenAlex demarree ===")
+    logger.info(f"=== Extraction OpenAlex démarrée ===")
     logger.info(f"Institutions OpenAlex : {', '.join(institution_ids)} (lineage OR)")
     if since:
         logger.info(f"Mode incrémental : documents modifiés depuis {since}")
     else:
-        logger.info(f"Annees : {years}")
+        logger.info(f"Années : {years}")
     try:
         existing_ids = get_existing_ids(conn, "openalex")
-        logger.info(f"{len(existing_ids)} works deja en staging")
+        logger.info(f"{len(existing_ids)} works déjà en staging")
 
         grand_new = 0
         grand_updated = 0
@@ -275,7 +275,7 @@ def main():
             grand_new += year_new
             grand_updated += year_updated
 
-        logger.info(f"=== Termine : {grand_new} nouveaux, {grand_updated} mis a jour ===")
+        logger.info(f"=== Terminé : {grand_new} nouveaux, {grand_updated} mis à jour ===")
 
     except requests.exceptions.HTTPError as e:
         logger.error(f"Erreur API : {e}")

@@ -765,7 +765,7 @@ def main():
         """)
         dup_deleted = cur.rowcount
         if dup_deleted:
-            logger.info(f"Doublons de position supprimes : {dup_deleted}")
+            logger.info(f"Doublons de position supprimés : {dup_deleted}")
 
         # Nettoyage : supprimer les source_authors HAL orphelins
         cur.execute("""
@@ -778,12 +778,12 @@ def main():
         """)
         orphans_deleted = cur.rowcount
         if orphans_deleted:
-            logger.info(f"Source_authors orphelins supprimes : {orphans_deleted}")
+            logger.info(f"Source_authors orphelins supprimés : {orphans_deleted}")
 
         conn.commit()
 
         # Stats finales
-        logger.info(f"\n=== Termine ===")
+        logger.info(f"\n=== Terminé ===")
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Hors périmètre (enrichissement seul) : {skipped_hors_perimetre}")
         logger.info(f"Erreurs : {errors}")

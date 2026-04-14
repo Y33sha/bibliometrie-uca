@@ -1033,7 +1033,7 @@ def main():
 
                 if processed % args.batch_size == 0 and processed > 0:
                     conn.commit()
-                    logger.info(f"  {processed}/{limit} traites ({errors} erreurs)")
+                    logger.info(f"  {processed}/{limit} traités ({errors} erreurs)")
 
         conn.commit()
 
