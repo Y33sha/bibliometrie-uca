@@ -22,21 +22,16 @@ from psycopg2.extras import Json, RealDictCursor
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from db.connection import get_connection
 from extraction.common import compute_hash, setup_logger
-from extraction.openalex import BASE_URL, SELECT_FIELDS, compute_meta_hash
-from utils.app_config import get_openalex_email
+from extraction.openalex import BASE_URL, SELECT_FIELDS, compute_meta_hash, init_auth, auth_params
+from utils.app_config import get_openalex_email, get_openalex_api_key
 
 logger = setup_logger("refetch_truncated", os.path.join(os.path.dirname(__file__), "logs"))
-
-_email = ""  # initialisé dans main()
 
 
 def fetch_work(openalex_id: str) -> dict | None:
     """Fetch un work individuel par son ID OpenAlex (retourne tous les auteurs)."""
     url = f"{BASE_URL}/{openalex_id}"
-    params = {
-        "select": SELECT_FIELDS,
-        "mailto": _email,
-    }
+    params = {"select": SELECT_FIELDS, **auth_params()}
     try:
         resp = requests.get(url, params=params, timeout=30)
         resp.raise_for_status()
@@ -56,10 +51,9 @@ def main():
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
     args = parser.parse_args()
 
-    global _email
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    _email = get_openalex_email(cur)
+    init_auth(api_key=get_openalex_api_key(cur), email=get_openalex_email(cur))
 
     # Détecter les works avec exactement 100 authorships dans le staging
     cur.execute("""

@@ -4,6 +4,27 @@ from extraction.common import clean_doi, compute_hash
 
 BASE_URL = "https://api.openalex.org/works"
 
+# Paramètres d'authentification — initialisés par le premier script lancé
+_api_key = None
+_email = ""
+
+
+def init_auth(api_key: str | None = None, email: str = ""):
+    """Initialise les paramètres d'authentification OpenAlex."""
+    global _api_key, _email
+    _api_key = api_key
+    _email = email
+
+
+def auth_params() -> dict:
+    """Retourne les paramètres d'authentification pour une requête OpenAlex."""
+    params = {"include_xpac": "true"}
+    if _api_key:
+        params["api_key"] = _api_key
+    elif _email:
+        params["mailto"] = _email
+    return params
+
 SELECT_FIELDS = ",".join([
     "id", "doi", "title", "display_name", "publication_year",
     "publication_date", "type", "language", "primary_location",
