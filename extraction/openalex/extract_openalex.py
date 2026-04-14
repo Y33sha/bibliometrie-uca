@@ -58,6 +58,7 @@ def build_params(year: int = None, cursor: str = "*",
         "select": SELECT_FIELDS,
         "per_page": PER_PAGE,
         "cursor": cursor,
+        "include_xpac": "true",  # inclure DataCite, dépôts institutionnels, datasets
     }
     if api_key:
         params["api_key"] = api_key
