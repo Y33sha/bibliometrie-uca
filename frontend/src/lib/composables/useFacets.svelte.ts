@@ -104,9 +104,9 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 					);
 					break;
 				case 'boolean': {
-					const items = raw as { value: string; count: number }[];
-					const yesCount = items.find(i => i.value === 'yes')?.count ?? 0;
-					const noCount = items.find(i => i.value === 'no')?.count ?? 0;
+					const counts = raw as Record<string, number>;
+					const yesCount = counts['yes'] ?? 0;
+					const noCount = counts['no'] ?? 0;
 					newOpts[key] = [
 						{ value: 'yes', text: def.yesLabel, count: yesCount },
 						{ value: 'no', text: def.noLabel, count: noCount },
