@@ -115,7 +115,7 @@ def main():
             logger.info(f"  {min(i + BATCH_SIZE, len(missing))}/{len(missing)} "
                         f"({inserted} insérés, {not_found} non trouvés)")
 
-        time.sleep(SCANR.get("request_delay", 0.3))
+        time.sleep(0.3)
 
     conn.commit()
     logger.info(f"\n=== Terminé : {inserted} insérés, {not_found} non trouvés ===")
