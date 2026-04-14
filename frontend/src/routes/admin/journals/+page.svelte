@@ -62,6 +62,52 @@
 		return parts.join(' / ');
 	}
 
+	// Modal édition
+	let editModal: {
+		id: number; title: string; issn: string; eissn: string; issnl: string;
+		doi_prefix: string; oa_model: string; journal_type: string;
+		is_academic: boolean; is_predatory: boolean; is_in_doaj: boolean;
+		apc_amount: string; notes: string;
+	} | null = $state(null);
+
+	function openEdit(j: Journal) {
+		editModal = {
+			id: j.id, title: j.title,
+			issn: j.issn || '', eissn: j.eissn || '', issnl: j.issnl || '',
+			doi_prefix: '', oa_model: j.oa_model || '',
+			journal_type: 'journal', is_academic: true,
+			is_predatory: j.is_predatory, is_in_doaj: j.is_in_doaj,
+			apc_amount: j.apc_amount ? String(j.apc_amount) : '',
+			notes: '',
+		};
+	}
+
+	async function saveEdit() {
+		if (!editModal) return;
+		const body: Record<string, any> = {};
+		body.title = editModal.title.trim();
+		body.issn = editModal.issn.trim() || null;
+		body.eissn = editModal.eissn.trim() || null;
+		body.issnl = editModal.issnl.trim() || null;
+		body.doi_prefix = editModal.doi_prefix.trim() || null;
+		body.oa_model = editModal.oa_model || null;
+		body.journal_type = editModal.journal_type;
+		body.is_academic = editModal.is_academic;
+		body.is_predatory = editModal.is_predatory;
+		body.is_in_doaj = editModal.is_in_doaj;
+		body.apc_amount = editModal.apc_amount ? parseFloat(editModal.apc_amount) : null;
+		if (editModal.notes.trim()) body.notes = editModal.notes.trim();
+		try {
+			const res = await fetch(base + '/api/journals/' + editModal.id, {
+				method: 'PUT', headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body),
+			});
+			if (!res.ok) throw new Error(await res.text());
+			editModal = null;
+			await load();
+		} catch (e: any) { alert('Erreur : ' + e.message); }
+	}
+
 	// Merge
 	function openMerge(id: number) {
 		mergeTargetId = id;
@@ -166,6 +212,7 @@
 							{/if}
 						</div>
 					{:else}
+						<button class="btn btn-sm" onclick={() => openEdit(j)}>Modifier</button>
 						<button class="btn btn-sm btn-merge" onclick={() => openMerge(j.id)}>Fusionner…</button>
 					{/if}
 				</td>
@@ -175,6 +222,60 @@
 </table>
 
 <Pagination {page} {pages} onchange={(p) => { page = p; load(); }} />
+
+{#if editModal}
+<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+<div class="modal-bg" onclick={() => editModal = null}>
+	<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+	<div class="modal" onclick={(e) => e.stopPropagation()}>
+		<h3>Modifier la revue</h3>
+		<label>Titre</label>
+		<input bind:value={editModal.title} />
+		<div style="display:flex;gap:8px">
+			<div style="flex:1"><label>ISSN</label><input bind:value={editModal.issn} placeholder="1234-5678" /></div>
+			<div style="flex:1"><label>eISSN</label><input bind:value={editModal.eissn} /></div>
+			<div style="flex:1"><label>ISSN-L</label><input bind:value={editModal.issnl} /></div>
+		</div>
+		<label>DOI prefix</label>
+		<input bind:value={editModal.doi_prefix} placeholder="ex: 10.1038/s41586" />
+		<div style="display:flex;gap:8px">
+			<div style="flex:1">
+				<label>Modèle OA</label>
+				<select bind:value={editModal.oa_model}>
+					<option value="">(non renseigné)</option>
+					<option value="subscription">Abonnement</option>
+					<option value="full_oa">Full OA (gold/diamond)</option>
+					<option value="repository">Archive/dépôt</option>
+				</select>
+			</div>
+			<div style="flex:1">
+				<label>Type</label>
+				<select bind:value={editModal.journal_type}>
+					<option value="journal">Revue</option>
+					<option value="proceedings">Proceedings</option>
+					<option value="repository">Archive/dépôt</option>
+					<option value="book_series">Série d'ouvrages</option>
+					<option value="preprint_server">Serveur de preprints</option>
+					<option value="media">Média</option>
+				</select>
+			</div>
+		</div>
+		<div style="display:flex;gap:12px;margin-top:8px">
+			<label><input type="checkbox" bind:checked={editModal.is_academic} /> Académique</label>
+			<label><input type="checkbox" bind:checked={editModal.is_predatory} /> Prédateur</label>
+			<label><input type="checkbox" bind:checked={editModal.is_in_doaj} /> DOAJ</label>
+		</div>
+		<label>APC (€)</label>
+		<input bind:value={editModal.apc_amount} placeholder="ex: 2500" type="number" />
+		<label>Notes</label>
+		<textarea bind:value={editModal.notes} rows="2"></textarea>
+		<div class="modal-actions">
+			<button class="btn" onclick={() => editModal = null}>Annuler</button>
+			<button class="btn btn-primary" onclick={saveEdit}>Enregistrer</button>
+		</div>
+	</div>
+</div>
+{/if}
 
 <style>
 	h2 { font-size: 1.2rem; font-weight: 600; margin: 0 0 12px; }

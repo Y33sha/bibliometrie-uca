@@ -9,9 +9,43 @@
 		name: string;
 		openalex_id: string | null;
 		country: string | null;
+		doi_prefix: string | null;
 		is_predatory: boolean;
 		journal_count: number;
 		pub_count: number;
+	}
+
+	// Modal édition
+	let editModal: { id: number; name: string; country: string; doi_prefix: string; is_predatory: boolean; notes: string } | null = $state(null);
+
+	function openEdit(pub: Publisher) {
+		editModal = {
+			id: pub.id,
+			name: pub.name,
+			country: pub.country || '',
+			doi_prefix: pub.doi_prefix || '',
+			is_predatory: pub.is_predatory,
+			notes: '',
+		};
+	}
+
+	async function saveEdit() {
+		if (!editModal) return;
+		const body: Record<string, any> = {};
+		if (editModal.name.trim()) body.name = editModal.name.trim();
+		body.country = editModal.country.trim() || null;
+		body.doi_prefix = editModal.doi_prefix.trim() || null;
+		body.is_predatory = editModal.is_predatory;
+		if (editModal.notes.trim()) body.notes = editModal.notes.trim();
+		try {
+			const res = await fetch(base + '/api/publishers/' + editModal.id, {
+				method: 'PUT', headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body),
+			});
+			if (!res.ok) throw new Error(await res.text());
+			editModal = null;
+			await load();
+		} catch (e: any) { alert('Erreur : ' + e.message); }
 	}
 
 	let publishers: Publisher[] = $state([]);
@@ -107,6 +141,7 @@
 				Nom {sort === 'name' ? '▲' : sort === '-name' ? '▼' : ''}
 			</th>
 			<th>Pays</th>
+			<th>DOI prefix</th>
 			<th class="sortable num" onclick={() => setSort(sort === '-journals' ? 'journals' : '-journals')}>
 				Revues {sort === '-journals' ? '▲' : sort === 'journals' ? '▼' : ''}
 			</th>
@@ -124,6 +159,7 @@
 					{#if pub.is_predatory}<span class="badge-pred">prédateur</span>{/if}
 				</td>
 				<td class="muted">{pub.country || ''}</td>
+				<td class="muted">{pub.doi_prefix || ''}</td>
 				<td class="num">{pub.journal_count}</td>
 				<td class="num">{pub.pub_count}</td>
 				<td class="actions">
@@ -148,6 +184,7 @@
 							{/if}
 						</div>
 					{:else}
+						<button class="btn btn-sm" onclick={() => openEdit(pub)}>Modifier</button>
 						<button class="btn btn-sm btn-merge" onclick={() => openMerge(pub.id)}>Fusionner…</button>
 					{/if}
 				</td>
@@ -157,6 +194,31 @@
 </table>
 
 <Pagination {page} {pages} onchange={(p) => { page = p; load(); }} />
+
+{#if editModal}
+<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+<div class="modal-bg" onclick={() => editModal = null}>
+	<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+	<div class="modal" onclick={(e) => e.stopPropagation()}>
+		<h3>Modifier l'éditeur</h3>
+		<label>Nom</label>
+		<input bind:value={editModal.name} />
+		<label>Pays</label>
+		<input bind:value={editModal.country} placeholder="ex: FR, US" />
+		<label>DOI prefix</label>
+		<input bind:value={editModal.doi_prefix} placeholder="ex: 10.1038" />
+		<label>
+			<input type="checkbox" bind:checked={editModal.is_predatory} /> Prédateur
+		</label>
+		<label>Notes</label>
+		<textarea bind:value={editModal.notes} rows="2"></textarea>
+		<div class="modal-actions">
+			<button class="btn" onclick={() => editModal = null}>Annuler</button>
+			<button class="btn btn-primary" onclick={saveEdit}>Enregistrer</button>
+		</div>
+	</div>
+</div>
+{/if}
 
 <style>
 	h2 { font-size: 1.2rem; font-weight: 600; margin: 0 0 12px; }
@@ -185,4 +247,5 @@
 	.merge-results { position: absolute; right: 0; top: 100%; z-index: 10; border: 1px solid var(--border); border-radius: 4px; margin-top: 2px; max-height: 200px; overflow-y: auto; background: white; min-width: 350px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
 	.merge-result { display: block; width: 100%; padding: 5px 8px; font-size: 0.85rem; cursor: pointer; background: none; border: none; text-align: left; font-family: inherit; }
 	.merge-result:hover { background: var(--warning-light, #fff3e0); }
+
 </style>

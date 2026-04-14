@@ -42,7 +42,7 @@ async def list_publishers(
         offset = (page - 1) * per_page
         cur.execute(f"""
             SELECT p.id, p.name, p.openalex_id, p.country,
-                   p.is_predatory,
+                   p.doi_prefix, p.is_predatory,
                    (SELECT COUNT(*) FROM journals j WHERE j.publisher_id = p.id) AS journal_count,
                    (SELECT COUNT(*) FROM publications pub
                     JOIN journals j2 ON j2.id = pub.journal_id
@@ -59,6 +59,32 @@ async def list_publishers(
             "pages": (total + per_page - 1) // per_page,
             "publishers": cur.fetchall(),
         }
+
+
+@router.put("/api/publishers/{publisher_id}")
+async def update_publisher(publisher_id: int, body: dict):
+    """Met à jour un éditeur."""
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id FROM publishers WHERE id = %s", (publisher_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Éditeur introuvable")
+
+        fields = {}
+        for key in ("name", "country", "doi_prefix", "is_predatory", "notes"):
+            if key in body:
+                fields[key] = body[key]
+        if "name" in fields:
+            from utils.normalize import normalize_text
+            fields["name_normalized"] = normalize_text(fields["name"])
+
+        if not fields:
+            raise HTTPException(status_code=400, detail="Rien à modifier")
+
+        sets = ", ".join(f"{k} = %s" for k in fields)
+        cur.execute(
+            f"UPDATE publishers SET {sets}, updated_at = now() WHERE id = %s",
+            list(fields.values()) + [publisher_id])
+        return {"ok": True}
 
 
 @router.post("/api/publishers/{publisher_id}/merge")
