@@ -1021,13 +1021,15 @@ def main():
 
             for row in batch_rows:
                 try:
+                    cur.execute("SAVEPOINT normalize_wos_work")
                     success = process_record(cur, row)
+                    cur.execute("RELEASE SAVEPOINT normalize_wos_work")
                     if success:
                         processed += 1
                     else:
                         errors += 1
                 except Exception:
-                    conn.rollback()
+                    cur.execute("ROLLBACK TO SAVEPOINT normalize_wos_work")
                     errors += 1
                     continue
 
