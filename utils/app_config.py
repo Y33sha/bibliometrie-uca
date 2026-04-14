@@ -112,6 +112,14 @@ def get_hal_extra_collections(cur) -> list[str]:
     return []
 
 
+def get_openalex_api_key(cur) -> str | None:
+    """Retourne la clé API OpenAlex (None si non configurée)."""
+    val = _get_from_db(cur, "openalex_api_key")
+    if val and isinstance(val, str):
+        return val
+    return None
+
+
 def get_api_base_urls(cur) -> dict[str, str]:
     """Retourne les URLs de base des API par source."""
     val = _get_from_db(cur, "api_base_urls")
