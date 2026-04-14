@@ -1,11 +1,10 @@
 """
 Recalcule publications.countries à partir des 3 sources.
 
-Sources des pays :
-  - HAL : source_documents.countries (via source_structures.country)
-  - OpenAlex/WoS/ScanR : addresses.countries (via source_authorship_addresses)
-
-On n'utilise PAS les countries des source_documents OpenAlex (données staging OA non fiables).
+Trois étapes :
+  1. HAL : source_structures.country → source_documents.countries
+  2. OA/WoS/ScanR : addresses.countries → source_documents.countries
+  3. Union de tous les source_documents.countries → publications.countries
 
 Usage:
     python refresh_publication_countries.py              # recalculer
@@ -28,25 +27,13 @@ REFRESH_QUERY = """
     UPDATE publications p
     SET countries = sub.all_countries
     FROM (
-        SELECT pub_id,
+        SELECT sd.publication_id AS pub_id,
                array_agg(DISTINCT c ORDER BY c) AS all_countries
-        FROM (
-            -- HAL : pays des structures HAL
-            SELECT sd.publication_id AS pub_id, unnest(sd.countries) AS c
-            FROM source_documents sd
-            WHERE sd.source = 'hal' AND sd.countries IS NOT NULL
-
-            UNION ALL
-
-            -- OpenAlex + WoS + ScanR : pays des adresses résolues
-            SELECT sd.publication_id AS pub_id, unnest(a.countries) AS c
-            FROM source_authorship_addresses saa
-            JOIN addresses a ON a.id = saa.address_id
-            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-            JOIN source_documents sd ON sd.id = sa.source_document_id
-            WHERE a.countries IS NOT NULL AND sd.publication_id IS NOT NULL
-        ) src
-        GROUP BY pub_id
+        FROM source_documents sd,
+        LATERAL unnest(sd.countries) AS c
+        WHERE sd.countries IS NOT NULL
+          AND sd.publication_id IS NOT NULL
+        GROUP BY sd.publication_id
     ) sub
     WHERE p.id = sub.pub_id
       AND p.countries IS DISTINCT FROM sub.all_countries
@@ -81,13 +68,44 @@ def refresh_hal_document_countries(cur):
     return updated
 
 
+def refresh_address_document_countries(cur):
+    """Propager addresses.countries → source_documents.countries (OA, WoS, ScanR).
+
+    Pour chaque document non-HAL, collecte les pays des adresses de ses auteurs
+    (via source_authorship_addresses → addresses.countries).
+    """
+    cur.execute("""
+        UPDATE source_documents sd
+        SET countries = sub.doc_countries
+        FROM (
+            SELECT sa.source_document_id,
+                   array_agg(DISTINCT c::text ORDER BY c::text) AS doc_countries
+            FROM source_authorships sa
+            JOIN source_authorship_addresses saa ON saa.source_authorship_id = sa.id
+            JOIN addresses a ON a.id = saa.address_id,
+            LATERAL unnest(a.countries) AS c
+            WHERE sa.source IN ('openalex', 'wos', 'scanr')
+              AND a.countries IS NOT NULL
+            GROUP BY sa.source_document_id
+        ) sub
+        WHERE sd.id = sub.source_document_id
+          AND sd.countries IS DISTINCT FROM sub.doc_countries
+    """)
+    updated = cur.rowcount
+    logger.info(f"OA/WoS/ScanR documents countries : {updated} mis à jour")
+    return updated
+
+
 def refresh(cur):
     t0 = time.perf_counter()
 
-    # 1. D'abord propager les pays HAL (structures → documents)
+    # 1. Propager les pays HAL (structures → documents)
     refresh_hal_document_countries(cur)
 
-    # 2. Puis recalculer les pays des publications (union des 3 sources)
+    # 2. Propager les pays OA/WoS/ScanR (adresses → documents)
+    refresh_address_document_countries(cur)
+
+    # 3. Recalculer les pays des publications (union de toutes les sources)
     cur.execute(REFRESH_QUERY)
     updated = cur.rowcount
     elapsed = time.perf_counter() - t0

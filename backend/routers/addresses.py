@@ -43,8 +43,7 @@ def propagate_countries_for_addresses(cur, address_ids: list[int]):
     addr_docs = cur.rowcount
 
     # 2. Recalculer publications.countries pour les publications touchées
-    #    Même logique que refresh_publication_countries.py : HAL (structures) + adresses (OA + WoS + ScanR)
-    #    On n'utilise PAS source_documents.countries pour OA (données staging OA non fiables)
+    #    Maintenant que source_documents.countries est à jour, on lit tout depuis là
     cur.execute("""
         WITH affected_pubs AS (
             SELECT DISTINCT sd.publication_id
@@ -58,18 +57,10 @@ def propagate_countries_for_addresses(cur, address_ids: list[int]):
         FROM (
             SELECT ap.publication_id,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM (
-                        SELECT unnest(sd.countries) AS c
-                        FROM source_documents sd
-                        WHERE sd.publication_id = ap.publication_id AND sd.countries IS NOT NULL
-                        UNION ALL
-                        SELECT unnest(a.countries) AS c
-                        FROM source_authorship_addresses saa
-                        JOIN addresses a ON a.id = saa.address_id
-                        JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-                        JOIN source_documents sd ON sd.id = sa.source_document_id
-                        WHERE sd.publication_id = ap.publication_id AND a.countries IS NOT NULL
-                    ) src
+                    FROM source_documents sd,
+                    LATERAL unnest(sd.countries) AS c
+                    WHERE sd.publication_id = ap.publication_id
+                      AND sd.countries IS NOT NULL
                    ) AS all_countries
             FROM affected_pubs ap
         ) sub
