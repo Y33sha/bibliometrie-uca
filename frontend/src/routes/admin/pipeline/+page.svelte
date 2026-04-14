@@ -168,18 +168,29 @@
     border-collapse: collapse;
     font-size: 0.85rem;
     margin: 4px 0 12px;
+    table-layout: fixed;
   }
   :global(.report-table th) {
-    text-align: left;
     padding: 4px 8px;
     border-bottom: 2px solid var(--border);
     font-size: 0.75rem;
     color: var(--muted);
     text-transform: uppercase;
   }
+  :global(.report-table th:first-child) {
+    text-align: left;
+    width: 45%;
+  }
+  :global(.report-table th:nth-child(n+2)) {
+    text-align: right;
+    width: 18%;
+  }
   :global(.report-table td) {
     padding: 3px 8px;
     border-bottom: 1px solid var(--border);
+  }
+  :global(.report-table td:first-child) {
+    text-align: left;
   }
   :global(.report-table td:nth-child(n+2)) {
     text-align: right;
