@@ -69,11 +69,13 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
     if mode == "daily":
         from pipeline.metrics import get_last_run_date
         since = str(get_last_run_date())
-        log.info("Mode quotidien : HAL + OpenAlex depuis %s", since)
+        log.info("Mode quotidien : HAL depuis %s", since)
         if "hal" in sources:
             run_python("extraction/hal/extract_hal.py", "--since", since)
-        if "openalex" in sources:
-            run_python("extraction/openalex/extract_openalex.py", "--since", since)
+        # OpenAlex : le filtre from_updated_date requiert un plan payant
+        # (429 "Plan upgrade required"). Les changefiles couvrent tout OA
+        # (plusieurs Go/jour), pas filtrable par institution.
+        # OpenAlex est rattrapé par le mode weekly (année en cours + hash).
     elif mode == "weekly":
         log.info("Mode hebdomadaire (WoS exclu)")
         if "openalex" in sources:
