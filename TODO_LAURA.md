@@ -10,14 +10,16 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] authorships excluded: info perdue si réimport (grave?)
 ## Pipeline
 ### Facile et/ou urgent
-* [x] 3e mode du pipeline: daily (mode rapide, seulement nouveaux docts)
-* [ ] programmation cron pour le pipeline de traitement
+* [ ] programmation cron pour le pipeline de traitement (daily, weekly, monthly)
 ### Autres
+* [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation
 * [ ] structure_ids et in_perimeter des publis theses.fr: à quelle phase du pipeline sont-ils remplis et selon quelle logique? auditer
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
 * [ ] faire une version bac à sable pour retester le pipeline *de novo* après seed.
 * [ ] y aura-t-il un cross-import sur le cross-import au run suivant?
+* [ ] investiguer les erreurs de normalisation wos: Erreur sur WOS:000475662000018: ERREUR:  syntaxe en entrée invalide pour le type integer : « 5-Bis(pyridin-2-yl)-1 » LINE 10: ...rst_page": "7773", "last_page": "7783"}', ARRAY[2,'5-Bis(pyr
+* [ ] revues, éditeurs, adresses avec zéro publi: ?
 ## Imports csv
 * [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer)
 ## Chantiers au long cours
@@ -40,15 +42,12 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] sujets / mots-clés: exploiter
 ## Qualité des données
 * [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?).
-* [ ] contrôler données journal/doc_type via DOI? => DOI peut permettre de dédoublonner journals
-* [ ] utiliser DOAJ pour enrichir données journals et s'en servir pour contrôler oa_status?
 * [ ] hal_authors importés sans id par un script de cross-import: ça ne devrait pas être possible. Auditer.
 * [ ] publis OpenAlex avec date correspondant au dépôt dans HAL: ex. 8651 => si dates différentes, utiliser l'autre. Si OA cite HAL comme source, prendre métadonnées HAL
 * [ ] depuis que la déduplication automatique par identité de métadonnées a été abandonnée: passer en revue les cas concernés, auditer, re-dupliquer?
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?)
 ### Problèmes spécifiques HAL
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
-* [ ] revue Openalex 'HAL (Le Centre pour la Communication Scientifique Directe)' => parfois absents de HAL! Auditer docts source OpenAlex, ref HAL, HAL non trouvé => supprimer
 * [ ] https://hal.science/hal-03874894 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
 * [ ] DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
 * [ ] trous dans la numérotation des auteurs: diagnostiquer et résoudre
@@ -59,13 +58,16 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] types parfois non fiables sur OpenAlex: https://openalex.org/works/W4225722715 (utiliser Unpaywall aussi pour corriger type doc?)
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
 * [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou revue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); preprints en accès gold selon OpenAlex (?); data papers?
-* [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
 * [ ] types wos composites: étudier, voir s'il s'agit de types/sous-types
 * "prépublication, document de travail" dans HAL apparaît comme other
 ### Chantier des méga-authorships et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap)
 * [ ] en attendant, le mode "conflit de sources" dans la dédup personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`)
 * [ ] vérifier pourquoi Openalex contient parfois beaucoup plus d'auteurs : ex. 21105 (OpenAlex semble résoudre les noms d'équipes en listes de noms de personnes, mais je ne sais pas comment)
+### Chantier Journals/Publishers
+* [ ] contrôler données journal/doc_type via DOI? => DOI peut permettre de dédoublonner journals
+* [ ] utiliser DOAJ pour enrichir données journals et s'en servir pour contrôler oa_status?
+* [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
 # Interface
 ## Admin
 ### Structures
@@ -100,10 +102,13 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] Rendre tous les tableaux triables
 * [ ] différencier interfaces à usage interne vs externe (users, roles)
 * [ ] accessibilité, responsivité de l'interface
+* [ ] tableaux personnes remplacer les identifiants par des icônes (hal orcid idref)
 * [ ] étoffer tests frontend
 ## Détails d'affichage
 * [ ] décomptes sur les onglets: ne pas tenir compte des facettes en place
 * [ ] décomptes facettes: toujours aligné à droite
+* [ ] titres 30% minimum de la largeur du tableau; diminuer taille titre revue
+* [ ] dropdown titres revues: tronquer, sinon parfois plus large que la page
 # Trucs pour plus tard
 * compte fractionnaire des publications?
 * collaborations nationales et internationales: identification structures? compliqué, je pense que pour ça il vaut mieux réutiliser les sources directement
