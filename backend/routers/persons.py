@@ -8,6 +8,7 @@ from backend.deps import get_cursor, require_admin
 from backend.models import LinkPersonAuthor, AddIdentifier
 from backend.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, persons_sort_clause,
     parse_int_csv, parse_str_csv, apply_source_filter)
+from utils.sources import AUTHOR_SOURCES_SQL
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.normalize import normalize_text
@@ -831,7 +832,7 @@ async def person_author_candidates(person_id: int, limit: int = Query(10, ge=1, 
                        (SELECT COUNT(*) FROM source_authorships sas
                         WHERE sas.source = sa.source AND sas.source_author_id = sa.id) AS pub_count
                 FROM source_authors sa
-                WHERE sa.source IN ('hal', 'openalex', 'wos')
+                WHERE sa.source IN {AUTHOR_SOURCES_SQL}
                   AND ({word_conditions_sa} {orcid_cond})
                   AND EXISTS (SELECT 1 FROM source_authorships sas
                               WHERE sas.source = sa.source AND sas.source_author_id = sa.id
@@ -1065,7 +1066,7 @@ async def merge_persons(person_id: int, body: dict):
 # - exclut les authorships dont le source_author est rattache a une personne rejetee
 _ORPHAN_BASE = """
     sa.person_id IS NULL AND sa.in_perimeter = TRUE
-    AND sa.source IN ('hal', 'openalex', 'wos')
+    AND sa.source IN {AUTHOR_SOURCES_SQL}
     AND p.doc_type NOT IN ('memoir', 'peer_review')
     AND NOT EXISTS (
         SELECT 1 FROM source_authorships sa2
@@ -1263,7 +1264,7 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
             FROM source_authorships sa
             JOIN source_documents sd ON sd.id = sa.source_document_id
             WHERE sa.person_id = %s AND sa.author_name_normalized = %s
-              AND sa.source IN ('hal', 'openalex', 'wos')
+              AND sa.source IN {AUTHOR_SOURCES_SQL}
             ORDER BY sd.pub_year DESC, sd.title
         """, (person_id, name_form))
         authorships = cur.fetchall()
@@ -1310,7 +1311,7 @@ async def detach_authorships(person_id: int, body: dict):
             cur.execute("""
                 SELECT COUNT(*) FROM source_authorships sa
                 WHERE sa.person_id = %s AND sa.author_name_normalized = %s
-                  AND sa.source IN ('hal', 'openalex', 'wos')
+                  AND sa.source IN {AUTHOR_SOURCES_SQL}
             """, (person_id, name_form))
             remaining = cur.fetchone()["count"]
             if remaining == 0:
@@ -1347,7 +1348,7 @@ async def detach_name_form(person_id: int, body: dict):
         cur.execute("""
             SELECT COUNT(*) FROM source_authorships sa
             WHERE sa.person_id = %s AND sa.author_name_normalized = %s
-              AND sa.source IN ('hal', 'openalex', 'wos')
+              AND sa.source IN {AUTHOR_SOURCES_SQL}
         """, (person_id, name_form))
         remaining = cur.fetchone()["count"]
         if remaining > 0:

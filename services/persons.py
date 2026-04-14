@@ -13,7 +13,7 @@ Les auteurs sources sont dans la table unifiée `source_authors`
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.normalize import normalize_name
-from utils.sources import ALL_SOURCES_SET
+from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
 from utils.perimeter import get_persons_structure_ids_list
 
 
@@ -448,18 +448,18 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
 
     # 4. in_perimeter et structure_ids (union des sources)
     perimeter_ids = get_persons_structure_ids_list(cur)
-    cur.execute("""
+    cur.execute(f"""
         WITH src AS (
             SELECT sa.in_perimeter AS uca, sa.structure_ids AS sids
             FROM source_authorships sa
             JOIN source_documents sd ON sd.id = sa.source_document_id
-            WHERE sa.source IN ('hal', 'openalex', 'wos')
+            WHERE sa.source IN {AUTHOR_SOURCES_SQL}
               AND sd.publication_id = %s AND sa.person_id = %s AND NOT sa.excluded
         ),
         agg AS (
             SELECT bool_or(uca) AS in_perimeter,
                    array_agg(DISTINCT sid) FILTER (WHERE sid IS NOT NULL) AS all_sids
-            FROM src, LATERAL unnest(COALESCE(sids, '{}')) AS sid
+            FROM src, LATERAL unnest(COALESCE(sids, '{{}}'::int[])) AS sid
         )
         UPDATE authorships a
         SET in_perimeter = COALESCE(agg.in_perimeter, FALSE),

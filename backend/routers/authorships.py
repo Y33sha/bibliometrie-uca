@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Query, HTTPException
 from backend.deps import get_cursor
 from backend.filters import PUB_IS_UCA
+from utils.sources import AUTHOR_SOURCES_SQL
 
 router = APIRouter()
 
@@ -27,7 +28,7 @@ async def authorships_stats(lab_id: int = Query(0)):
                     SELECT 1 FROM source_authorships sa
                     WHERE sa.source_author_id = sauth.id AND sa.in_perimeter = TRUE{lab_filter}
                 )
-                AND sauth.source IN ('hal', 'openalex', 'wos')
+                AND sauth.source IN {AUTHOR_SOURCES_SQL}
             )
             SELECT
                 COUNT(*) AS total_uca_authors,
@@ -62,7 +63,7 @@ def _uca_authors_cte(lab_id: int = 0, with_pub_count: bool = False) -> tuple[str
                    (SELECT sa3.person_id FROM source_authorships sa3
                     WHERE sa3.source_author_id = sauth.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id{pub_count_col}
             FROM source_authors sauth
-            WHERE sauth.source IN ('hal', 'openalex', 'wos')
+            WHERE sauth.source IN {AUTHOR_SOURCES_SQL}
               AND EXISTS (
                   SELECT 1 FROM source_authorships sa
                   WHERE sa.source_author_id = sauth.id AND sa.in_perimeter = TRUE{lab_filter}
@@ -143,7 +144,7 @@ async def authorships_facets(
                 FROM source_authors sauth
                 JOIN source_authorships sa2 ON sa2.source_author_id = sauth.id
                 WHERE sa2.in_perimeter = TRUE AND sa2.structure_ids IS NOT NULL
-                  AND sauth.source IN ('hal', 'openalex', 'wos')
+                  AND sauth.source IN {AUTHOR_SOURCES_SQL}
             )
         """
         cur.execute(f"""{lab_cte}
