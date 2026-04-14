@@ -64,11 +64,19 @@ def build_params(year: int = None, cursor: str = "*",
 def fetch_page(base_url: str, year: int = None, cursor: str = "*",
                institution_ids: list[str] = None, email: str = "",
                since: str = None) -> dict:
-    """Récupère une page de résultats depuis l'API."""
+    """Récupère une page de résultats depuis l'API (avec retry sur 429)."""
     params = build_params(year, cursor, institution_ids=institution_ids, email=email, since=since)
-    response = requests.get(base_url, params=params, timeout=30)
-    response.raise_for_status()
-    return response.json()
+    for attempt in range(5):
+        response = requests.get(base_url, params=params, timeout=30)
+        if response.status_code == 429:
+            wait = 2 ** attempt  # 1, 2, 4, 8, 16 secondes
+            logger.warning(f"429 Too Many Requests — pause {wait}s (tentative {attempt + 1}/5)")
+            time.sleep(wait)
+            continue
+        response.raise_for_status()
+        return response.json()
+    response.raise_for_status()  # lève l'erreur après 5 tentatives
+    return {}
 
 
 def insert_batch(conn, batch: list[tuple]) -> int:
