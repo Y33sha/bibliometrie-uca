@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
 from extraction.openalex import SELECT_FIELDS, extract_openalex_id, extract_doi, compute_meta_hash
-from utils.app_config import get_years, get_openalex_institution_ids, get_openalex_email, get_api_base_urls
+from utils.app_config import get_years, get_openalex_institution_ids, get_openalex_email, get_openalex_api_key, get_api_base_urls
 
 PER_PAGE = 200
 REQUEST_DELAY = 0.2
@@ -35,7 +35,8 @@ logger = setup_logger("extract_openalex", os.path.join(os.path.dirname(__file__)
 
 def build_params(year: int = None, cursor: str = "*",
                  institution_ids: list[str] | None = None,
-                 email: str = "", since: str = None) -> dict:
+                 email: str = "", api_key: str = None,
+                 since: str = None) -> dict:
     """Construit les paramètres de requête pour l'API OpenAlex.
 
     Si since est fourni (YYYY-MM-DD), filtre sur from_updated_date
@@ -52,20 +53,24 @@ def build_params(year: int = None, cursor: str = "*",
             f"authorships.institutions.lineage:{lineage_filter},"
             f"publication_year:{year}"
         )
-    return {
+    params = {
         "filter": filter_str,
         "select": SELECT_FIELDS,
         "per_page": PER_PAGE,
         "cursor": cursor,
-        "mailto": email,
     }
+    if api_key:
+        params["api_key"] = api_key
+    elif email:
+        params["mailto"] = email
+    return params
 
 
 def fetch_page(base_url: str, year: int = None, cursor: str = "*",
                institution_ids: list[str] = None, email: str = "",
-               since: str = None) -> dict:
+               api_key: str = None, since: str = None) -> dict:
     """Récupère une page de résultats depuis l'API (avec retry sur 429)."""
-    params = build_params(year, cursor, institution_ids=institution_ids, email=email, since=since)
+    params = build_params(year, cursor, institution_ids=institution_ids, email=email, api_key=api_key, since=since)
     for attempt in range(5):
         response = requests.get(base_url, params=params, timeout=30)
         if response.status_code == 429:
@@ -151,7 +156,7 @@ def insert_batch(conn, batch: list[tuple]) -> int:
 
 def extract_year(year: int = None, conn=None, existing_ids: set = None,
                  base_url: str = "", institution_ids: list[str] = None,
-                 email: str = "", since: str = None,
+                 email: str = "", api_key: str = None, since: str = None,
                  dry_run: bool = False) -> tuple[int, int]:
     """
     Extrait des publications OpenAlex par année ou par date de modification.
@@ -164,7 +169,7 @@ def extract_year(year: int = None, conn=None, existing_ids: set = None,
     page_num = 0
 
     # Premier appel pour avoir le count total
-    first_page = fetch_page(base_url, year, cursor, institution_ids=institution_ids, email=email, since=since)
+    first_page = fetch_page(base_url, year, cursor, institution_ids=institution_ids, email=email, api_key=api_key, since=since)
     total_count = first_page["meta"]["count"]
     label = f"depuis {since}" if since else f"année {year}"
     logger.info(f"{label} : {total_count} works trouvés sur OpenAlex")
@@ -178,7 +183,7 @@ def extract_year(year: int = None, conn=None, existing_ids: set = None,
         if page_num == 1:
             data = first_page
         else:
-            data = fetch_page(base_url, year, cursor, institution_ids=institution_ids, email=email, since=since)
+            data = fetch_page(base_url, year, cursor, institution_ids=institution_ids, email=email, api_key=api_key, since=since)
 
         results = data.get("results", [])
         if not results:
@@ -244,6 +249,7 @@ def main():
     cur = conn.cursor()
     institution_ids = get_openalex_institution_ids(cur)
     email = get_openalex_email(cur)
+    api_key = get_openalex_api_key(cur)
     base_url = get_api_base_urls(cur).get("openalex", "https://api.openalex.org/works")
     config_years = get_years(cur, mode=args.mode)
     cur.close()
@@ -266,14 +272,14 @@ def main():
         if since:
             year_new, year_updated = extract_year(conn=conn, existing_ids=existing_ids,
                 base_url=base_url, institution_ids=institution_ids,
-                email=email, since=since, dry_run=args.dry_run)
+                email=email, api_key=api_key, since=since, dry_run=args.dry_run)
             grand_new += year_new
             grand_updated += year_updated
         else:
             for year in years:
                 year_new, year_updated = extract_year(year, conn, existing_ids,
                     base_url=base_url, institution_ids=institution_ids,
-                    email=email, dry_run=args.dry_run)
+                    email=email, api_key=api_key, dry_run=args.dry_run)
             grand_new += year_new
             grand_updated += year_updated
 
