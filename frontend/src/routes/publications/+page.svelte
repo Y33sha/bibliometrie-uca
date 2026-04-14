@@ -87,8 +87,10 @@
 	// Sort display
 	const yearSortArrow = $derived(currentSort === 'year_asc' ? '↑' : currentSort === 'year_desc' ? '↓' : '');
 	const titleSortArrow = $derived(currentSort === 'title' ? '↑' : currentSort === 'title_desc' ? '↓' : '');
+	const apcSortArrow = $derived(currentSort === 'apc_asc' ? '↑' : currentSort === 'apc_desc' ? '↓' : '');
 	const yearSortActive = $derived(currentSort === 'year_desc' || currentSort === 'year_asc');
 	const titleSortActive = $derived(currentSort === 'title' || currentSort === 'title_desc');
+	const apcSortActive = $derived(currentSort === 'apc_desc' || currentSort === 'apc_asc');
 
 	// --- Shared filter params builder ---
 	function buildFilterParams(): URLSearchParams {
@@ -208,6 +210,11 @@
 		onFilterChange();
 	}
 
+	function toggleSortApc() {
+		currentSort = currentSort === 'apc_desc' ? 'apc_asc' : 'apc_desc';
+		onFilterChange();
+	}
+
 	function exportCsvUrl(): string {
 		const params = buildFilterParams();
 		params.set('sort', currentSort);
@@ -289,7 +296,9 @@
 				An. <span class="sort-arrow">{yearSortArrow}</span>
 			</th>{/if}
 			{#if col('labs')}<th style="width:80px">Labo(s)</th>{/if}
-			{#if col('apc')}<th style="width:60px">APC</th>{/if}
+			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSortActive} onclick={toggleSortApc}>
+				APC <span class="sort-arrow">{apcSortArrow}</span>
+			</th>{/if}
 			{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
 			{#if col('oa_path')}<th style="width:60px">Voie OA</th>{/if}
 			<th style="width:80px" class="col-menu-th">
