@@ -349,18 +349,18 @@ async def publications_facets(
                         COUNT(*) FILTER (WHERE EXISTS (
                             SELECT 1 FROM source_documents sd
                             WHERE sd.publication_id = p.id AND sd.source = 'hal'
-                              AND (sd.collections IS NULL OR NOT sd.collections @> ARRAY[%s])
+                              AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s])
                         )) AS hors_collection,
                         COUNT(*) FILTER (WHERE EXISTS (
                             SELECT 1 FROM source_documents sd
                             WHERE sd.publication_id = p.id AND sd.source = 'hal'
-                              AND sd.collections @> ARRAY[%s]
+                              AND sd.hal_collections @> ARRAY[%s]
                         ) AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown'))
                         ) AS notice,
                         COUNT(*) FILTER (WHERE EXISTS (
                             SELECT 1 FROM source_documents sd
                             WHERE sd.publication_id = p.id AND sd.source = 'hal'
-                              AND sd.collections @> ARRAY[%s]
+                              AND sd.hal_collections @> ARRAY[%s]
                         ) AND p.oa_status IS NOT NULL
                           AND p.oa_status::text NOT IN ('closed', 'unknown')
                         ) AS ok
@@ -634,7 +634,7 @@ async def get_publication(pub_id: int):
 
         # b) Sources — countries depuis le document
         cur.execute("""
-            SELECT sd.source, sd.source_id, sd.doi, sd.collections, sd.countries
+            SELECT sd.source, sd.source_id, sd.doi, sd.hal_collections, sd.countries
             FROM source_documents sd WHERE sd.publication_id = %s
         """, (pub_id,))
         sources = cur.fetchall()
@@ -1003,7 +1003,7 @@ async def list_publications(
                     if lab_hal_col:
                         hal_parts.append(
                             "EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
-                            " AND (sd.collections IS NULL OR NOT sd.collections @> ARRAY[%s]))"
+                            " AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s]))"
                         )
                         params.append(lab_hal_col)
                     else:
@@ -1015,7 +1015,7 @@ async def list_publications(
                     if lab_hal_col:
                         hal_parts.append(
                             "(EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
-                            " AND sd.collections @> ARRAY[%s])"
+                            " AND sd.hal_collections @> ARRAY[%s])"
                             " AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))"
                         )
                         params.append(lab_hal_col)
@@ -1023,7 +1023,7 @@ async def list_publications(
                     if lab_hal_col:
                         hal_parts.append(
                             "(EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
-                            " AND sd.collections @> ARRAY[%s])"
+                            " AND sd.hal_collections @> ARRAY[%s])"
                             " AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN ('closed', 'unknown'))"
                         )
                         params.append(lab_hal_col)
@@ -1114,7 +1114,7 @@ async def list_publications(
                     max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
                     max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
                     max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id,
-                    (SELECT sd2.collections FROM source_documents sd2
+                    (SELECT sd2.hal_collections FROM source_documents sd2
                      WHERE sd2.publication_id = p.id AND sd2.source = 'hal'
                      LIMIT 1) AS hal_collections
                 FROM source_documents sd WHERE sd.publication_id = p.id

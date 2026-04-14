@@ -313,7 +313,7 @@ HAL_STAGING_DOCS = [
     {
         "halid": "hal-99000001",
         "doi": "10.9999/hal-test-001",
-        "collection": "TEST",
+        "hal_collections": ["TEST"],
         "raw_data": {
             "docType_s": "ART",
             "title_s": ["A HAL Article on Tectonics"],
@@ -328,7 +328,7 @@ HAL_STAGING_DOCS = [
     {
         "halid": "hal-99000002",
         "doi": "10.9999/hal-test-002",
-        "collection": "TEST",
+        "hal_collections": ["TEST"],
         "raw_data": {
             "docType_s": "COUV",
             "title_s": ["A Chapter in a Book"],
@@ -342,7 +342,7 @@ HAL_STAGING_DOCS = [
     {
         "halid": "hal-99000003",
         "doi": None,
-        "collection": "TEST",
+        "hal_collections": ["TEST"],
         "raw_data": {
             "docType_s": "THESE",
             "title_s": ["Une thèse sans DOI sur la géologie"],
@@ -356,10 +356,10 @@ HAL_STAGING_DOCS = [
 def _insert_hal_staging(cur, docs):
     for doc in docs:
         cur.execute("""
-            INSERT INTO staging (source, source_id, doi, raw_data, collection, processed)
+            INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed)
             VALUES ('hal', %s, %s, %s, %s, FALSE)
             ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
-        """, (doc["halid"], doc["doi"], Json(doc["raw_data"]), doc["collection"]))
+        """, (doc["halid"], doc["doi"], Json(doc["raw_data"]), doc["hal_collections"]))
 
 
 def _run_normalize_hal(cur):
@@ -367,7 +367,7 @@ def _run_normalize_hal(cur):
     plain_cur = cur.connection.cursor()
     from processing.normalize_hal import process_work
     plain_cur.execute("""
-        SELECT id, source_id AS halid, doi, raw_data, collection
+        Select id, source_id AS halid, doi, raw_data, hal_collections
         FROM staging WHERE source = 'hal' AND processed = FALSE ORDER BY id
     """)
     rows = plain_cur.fetchall()
@@ -650,7 +650,7 @@ INTER_HAL_DOCS = [
     {
         "halid": "hal-99100001",
         "doi": SHARED_DOI,
-        "collection": "TEST",
+        "hal_collections": ["TEST"],
         "raw_data": {
             "docType_s": "ART",
             "title_s": ["Shared Article on Geochemistry"],
@@ -666,7 +666,7 @@ INTER_HAL_DOCS = [
     {
         "halid": "hal-99100002",
         "doi": None,
-        "collection": "TEST",
+        "hal_collections": ["TEST"],
         "raw_data": {
             "docType_s": "REPORT",
             "title_s": ["Un rapport sans DOI"],

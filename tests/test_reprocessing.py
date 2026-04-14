@@ -71,15 +71,17 @@ HAL_DOC_CLOSED = {
 }
 
 
-def _insert_hal_staging(cur, doc, collection="TEST_COLL"):
+def _insert_hal_staging(cur, doc, hal_collections=None):
     """Insère un document HAL dans staging."""
+    if hal_collections is None:
+        hal_collections = ["TEST_COLL"]
     cur.execute("""
-        INSERT INTO staging (source, source_id, doi, raw_data, collection, processed)
+        INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed)
         VALUES ('hal', %s, %s, %s, %s, FALSE)
         ON CONFLICT (source, source_id) DO UPDATE SET
             raw_data = EXCLUDED.raw_data,
             processed = FALSE
-    """, (doc["halId_s"], doc.get("doiId_s"), Json(doc), collection))
+    """, (doc["halId_s"], doc.get("doiId_s"), Json(doc), hal_collections))
 
 
 def _run_normalize_hal(dict_cur):
@@ -94,7 +96,7 @@ def _run_normalize_hal(dict_cur):
     tuple_cur = conn.cursor()  # curseur standard (tuple)
     try:
         tuple_cur.execute("""
-            SELECT id, source_id, doi, raw_data, collection
+            SELECT id, source_id, doi, raw_data, hal_collections
             FROM staging
             WHERE source = 'hal' AND processed = FALSE
             ORDER BY id
