@@ -587,58 +587,89 @@ def process_authorships(cur, rec: dict, source_document_id: int):
         if org_name not in _wos_institution_cache:
             upsert_wos_institution(cur, {"name": org_name})
 
+    # Phase 1 : résoudre tous les auteurs (upsert source_authors)
+    author_ids = []  # [(author_dict, source_author_id)]
     for author in rec.get("authors", []):
         source_author_id = upsert_wos_author(cur, author)
-        if not source_author_id:
-            continue
+        if source_author_id:
+            author_ids.append((author, source_author_id))
 
-        # Institutions WoS (lookup cache, plus de requête SQL)
+    if not author_ids:
+        return
+
+    # Phase 2 : batch INSERT source_authorships via execute_values
+    from psycopg2.extras import execute_values
+    from utils.normalize import normalize_name_form
+
+    values = []
+    for author, source_author_id in author_ids:
         institution_ids = []
         for org in author.get("organizations", []):
             name = org.get("name")
             if name and name in _wos_institution_cache:
                 institution_ids.append(_wos_institution_cache[name])
 
-        # raw_affiliations : JSONB array wrapping the text
         raw_affil_text = author.get("raw_affiliation")
-        raw_affiliations_json = Json([raw_affil_text]) if raw_affil_text else None
+        raw_affiliations = Json([raw_affil_text]) if raw_affil_text else None
+        name_norm = normalize_name_form(author["full_name"])
 
+        values.append((
+            'wos', source_document_id, source_author_id, author["position"],
+            author["is_corresponding"], raw_affiliations, name_norm,
+            institution_ids or None, author.get("roles"),
+        ))
+
+    execute_values(cur, """
+        INSERT INTO source_authorships
+            (source, source_document_id, source_author_id, author_position,
+             is_corresponding, raw_affiliations, author_name_normalized,
+             source_struct_ids, roles)
+        VALUES %s
+        ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
+            raw_affiliations = COALESCE(
+                EXCLUDED.raw_affiliations,
+                source_authorships.raw_affiliations
+            ),
+            is_corresponding = EXCLUDED.is_corresponding OR source_authorships.is_corresponding,
+            author_name_normalized = COALESCE(
+                EXCLUDED.author_name_normalized,
+                source_authorships.author_name_normalized
+            ),
+            source_struct_ids = COALESCE(
+                EXCLUDED.source_struct_ids,
+                source_authorships.source_struct_ids
+            ),
+            roles = EXCLUDED.roles,
+            addresses_extracted = FALSE
+    """, values)
+
+    # Phase 3 : batch adresses (source_authorship_addresses)
+    # Collecter les auteurs qui ont des adresses
+    authors_with_addrs = [(a, said) for a, said in author_ids if a.get("addresses")]
+    if authors_with_addrs:
+        # Récupérer les sa_id depuis la base (le batch INSERT ne retourne pas les IDs)
+        sa_ids_needed = [said for _, said in authors_with_addrs]
         cur.execute("""
-            INSERT INTO source_authorships
-                (source, source_document_id, source_author_id, author_position,
-                 is_corresponding, raw_affiliations, author_name_normalized,
-                 source_struct_ids, roles)
-            VALUES ('wos', %s, %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
-            ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
-                raw_affiliations = COALESCE(
-                    EXCLUDED.raw_affiliations,
-                    source_authorships.raw_affiliations
-                ),
-                is_corresponding = EXCLUDED.is_corresponding OR source_authorships.is_corresponding,
-                author_name_normalized = COALESCE(
-                    EXCLUDED.author_name_normalized,
-                    source_authorships.author_name_normalized
-                ),
-                source_struct_ids = COALESCE(
-                    EXCLUDED.source_struct_ids,
-                    source_authorships.source_struct_ids
-                ),
-                roles = EXCLUDED.roles,
-                addresses_extracted = FALSE
-            RETURNING id
-        """, (source_document_id, source_author_id, author["position"],
-              author["is_corresponding"], raw_affiliations_json,
-              author["full_name"], institution_ids or None, author.get("roles")))
-        sa_id = cur.fetchone()[0]
+            SELECT source_author_id, id FROM source_authorships
+            WHERE source_document_id = %s AND source_author_id = ANY(%s)
+        """, (source_document_id, sa_ids_needed))
+        sa_id_map = {r[0]: r[1] for r in cur.fetchall()}
 
-        # Créer les liens adresses individuelles
-        for addr_text in author.get("addresses", []):
-            addr_id = _get_or_create_address(cur, addr_text)
-            cur.execute("""
+        addr_values = []
+        for author, source_author_id in authors_with_addrs:
+            sa_id = sa_id_map.get(source_author_id)
+            if not sa_id:
+                continue
+            for addr_text in author["addresses"]:
+                addr_id = _get_or_create_address(cur, addr_text)
+                addr_values.append((sa_id, addr_id))
+
+        if addr_values:
+            execute_values(cur, """
                 INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
-                VALUES (%s, %s)
+                VALUES %s
                 ON CONFLICT (source_authorship_id, address_id) DO NOTHING
-            """, (sa_id, addr_id))
+            """, addr_values)
 
 
 # =============================================================
