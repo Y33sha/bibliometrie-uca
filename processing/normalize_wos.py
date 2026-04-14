@@ -851,17 +851,28 @@ def upsert_wos_institution(cur, org: dict) -> int | None:
 
 def process_authorships(cur, rec: dict, source_document_id: int):
     """Traite les authorships d'un record WoS + crée les liens adresses et institutions."""
+    # Résoudre toutes les organisations du document en un seul pass
+    all_orgs = set()
+    for author in rec.get("authors", []):
+        for org in author.get("organizations", []):
+            name = org.get("name")
+            if name:
+                all_orgs.add(name)
+    for org_name in all_orgs:
+        if org_name not in _wos_institution_cache:
+            upsert_wos_institution(cur, {"name": org_name})
+
     for author in rec.get("authors", []):
         source_author_id = upsert_wos_author(cur, author)
         if not source_author_id:
             continue
 
-        # Institutions WoS
+        # Institutions WoS (lookup cache, plus de requête SQL)
         institution_ids = []
         for org in author.get("organizations", []):
-            inst_id = upsert_wos_institution(cur, org)
-            if inst_id:
-                institution_ids.append(inst_id)
+            name = org.get("name")
+            if name and name in _wos_institution_cache:
+                institution_ids.append(_wos_institution_cache[name])
 
         # raw_affiliations : JSONB array wrapping the text
         raw_affil_text = author.get("raw_affiliation")
