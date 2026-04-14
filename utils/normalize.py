@@ -33,3 +33,6 @@ def normalize_text(text: str) -> str:
 # Alias — normalize_name est identique à normalize_text.
 # Les deux noms sont conservés pour la lisibilité du code appelant.
 normalize_name = normalize_text
+
+# Équivalent Python de la fonction SQL normalize_name_form()
+normalize_name_form = normalize_text
