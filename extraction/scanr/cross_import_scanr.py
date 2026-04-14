@@ -54,9 +54,12 @@ def main():
     args = parser.parse_args()
 
     conn = get_connection()
-    username, password = get_scanr_credentials(conn.cursor())
-    url = SCANR.get("base_url",
-                     "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search")
+    cur = conn.cursor()
+    username, password = get_scanr_credentials(cur)
+    from utils.app_config import get_api_base_urls
+    url = get_api_base_urls(cur).get("scanr",
+          "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search")
+    cur.close()
     auth = (username, password)
 
     missing = get_cross_import_dois(conn, "scanr", all_staged=args.all)
