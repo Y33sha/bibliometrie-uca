@@ -1028,8 +1028,11 @@ def main():
                         processed += 1
                     else:
                         errors += 1
-                except Exception:
-                    cur.execute("ROLLBACK TO SAVEPOINT normalize_wos_work")
+                except Exception as e:
+                    try:
+                        cur.execute("ROLLBACK TO SAVEPOINT normalize_wos_work")
+                    except Exception:
+                        conn.rollback()
                     errors += 1
                     continue
 
