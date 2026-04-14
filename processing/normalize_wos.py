@@ -587,18 +587,64 @@ def process_authorships(cur, rec: dict, source_document_id: int):
         if org_name not in _wos_institution_cache:
             upsert_wos_institution(cur, {"name": org_name})
 
-    # Phase 1 : résoudre tous les auteurs (upsert source_authors)
-    author_ids = []  # [(author_dict, source_author_id)]
-    for author in rec.get("authors", []):
-        source_author_id = upsert_wos_author(cur, author)
-        if source_author_id:
-            author_ids.append((author, source_author_id))
+    # Phase 1 : résoudre tous les auteurs (batch upsert source_authors)
+    from psycopg2.extras import execute_values as _ev
 
+    # Séparer les auteurs déjà en cache de ceux à insérer
+    authors_resolved = []  # [(author_dict, source_author_id)]
+    authors_to_insert = []  # [(author_dict, daisng_id, ...)]
+    for author in rec.get("authors", []):
+        daisng_id = author.get("daisng_id")
+        if not daisng_id or not author.get("full_name"):
+            continue
+        if daisng_id in _wos_author_cache:
+            authors_resolved.append((author, _wos_author_cache[daisng_id]))
+        else:
+            authors_to_insert.append(author)
+
+    # Batch INSERT les auteurs nouveaux
+    if authors_to_insert:
+        # Dédupliquer par daisng_id dans le batch
+        seen = set()
+        deduped = []
+        for a in authors_to_insert:
+            if a["daisng_id"] not in seen:
+                seen.add(a["daisng_id"])
+                source_ids = {}
+                if a.get("researcher_id"):
+                    source_ids["researcher_id"] = a["researcher_id"]
+                deduped.append((
+                    'wos', a["daisng_id"], a["full_name"],
+                    a.get("last_name"), a.get("first_name"),
+                    a.get("orcid"),
+                    Json(source_ids) if source_ids else None,
+                ))
+
+        _ev(cur, """
+            INSERT INTO source_authors
+                (source, source_id, full_name, last_name, first_name, orcid, source_ids)
+            VALUES %s
+            ON CONFLICT (source, source_id) DO UPDATE SET
+                orcid = COALESCE(source_authors.orcid, EXCLUDED.orcid),
+                full_name = EXCLUDED.full_name,
+                source_ids = COALESCE(source_authors.source_ids, '{}'::jsonb) ||
+                             COALESCE(EXCLUDED.source_ids, '{}'::jsonb)
+            RETURNING id, source_id
+        """, deduped)
+        for row in cur.fetchall():
+            _wos_author_cache[row[1]] = row[0]
+
+        # Résoudre les auteurs insérés
+        for a in authors_to_insert:
+            aid = _wos_author_cache.get(a["daisng_id"])
+            if aid:
+                authors_resolved.append((a, aid))
+
+    author_ids = authors_resolved
     if not author_ids:
         return
 
-    # Phase 2 : batch INSERT source_authorships via execute_values
-    from psycopg2.extras import execute_values
+    # Phase 2 : batch INSERT source_authorships
     from utils.normalize import normalize_name_form
 
     values = {}  # clé = (source_document_id, source_author_id), dédupliqué
@@ -623,7 +669,7 @@ def process_authorships(cur, rec: dict, source_document_id: int):
             institution_ids or None, author.get("roles"),
         )
 
-    execute_values(cur, """
+    _ev(cur, """
         INSERT INTO source_authorships
             (source, source_document_id, source_author_id, author_position,
              is_corresponding, raw_affiliations, author_name_normalized,
@@ -669,7 +715,7 @@ def process_authorships(cur, rec: dict, source_document_id: int):
                 addr_values.append((sa_id, addr_id))
 
         if addr_values:
-            execute_values(cur, """
+            _ev(cur, """
                 INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
                 VALUES %s
                 ON CONFLICT (source_authorship_id, address_id) DO NOTHING
