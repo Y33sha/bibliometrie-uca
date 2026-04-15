@@ -1,5 +1,6 @@
 """Auto-extracted router."""
 
+import datetime
 from fastapi import APIRouter, Query
 from backend.deps import get_cursor
 from backend.filters import persons_sort_clause
@@ -311,7 +312,7 @@ async def get_laboratory_dashboard(lab_id: int):
     """Données du dashboard labo : publications par an + répartition OA."""
     with get_cursor() as (cur, conn):
         lab_arr = [lab_id]
-        current_year = 2026  # TODO: dynamic
+        current_year = datetime.date.today().year
 
         # Publications par an (n-6 à n)
         cur.execute("""
