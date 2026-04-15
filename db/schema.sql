@@ -899,7 +899,8 @@ CREATE TABLE public.source_authorships (
     roles text[],
     raw_affiliations jsonb,
     source_data jsonb,
-    authorship_id integer
+    authorship_id integer,
+    raw_author_name text
 );
 
 

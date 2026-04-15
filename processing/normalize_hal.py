@@ -556,8 +556,8 @@ def process_authors(cur, doc: dict, source_document_id: int,
         cur.execute("""
             INSERT INTO source_authorships
                 (source, source_document_id, source_author_id, author_position, source_struct_ids,
-                 author_name_normalized, is_corresponding, roles)
-            VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
+                 author_name_normalized, is_corresponding, roles, raw_author_name)
+            VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
             ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
                 source_struct_ids = COALESCE(
                     EXCLUDED.source_struct_ids,
@@ -566,9 +566,10 @@ def process_authors(cur, doc: dict, source_document_id: int,
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 is_corresponding = EXCLUDED.is_corresponding,
                 roles = EXCLUDED.roles,
+                raw_author_name = EXCLUDED.raw_author_name,
                 addresses_extracted = FALSE
         """, (source_document_id, source_author_id, position,
-              source_struct_ids, name, is_corresponding, roles or None))
+              source_struct_ids, name, is_corresponding, roles or None, name))
 
 
 # =============================================================

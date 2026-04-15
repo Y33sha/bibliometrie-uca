@@ -66,7 +66,7 @@ def get_all_unlinked_authorships(cur):
     # HAL
     cur.execute("""
         SELECT sa_auth.id AS authorship_id, 'hal' AS source,
-               sa.full_name, sa.last_name, sa.first_name,
+               sa_auth.raw_author_name AS full_name, sa.last_name, sa.first_name,
                sa.orcid,
                sa.source_ids->>'idhal' AS idhal,
                sa.idref,
@@ -92,7 +92,7 @@ def get_all_unlinked_authorships(cur):
     # des personnes différentes, attribuant un ORCID erroné).
     cur.execute("""
         SELECT sa_auth.id AS authorship_id, 'openalex' AS source,
-               sa_auth.source_data->>'raw_author_name' AS full_name,
+               sa_auth.raw_author_name AS full_name,
                NULL::text AS last_name, NULL::text AS first_name,
                sa.orcid AS oa_orcid, sa.full_name AS oa_full_name,
                NULL::text AS idhal,
@@ -108,7 +108,7 @@ def get_all_unlinked_authorships(cur):
         WHERE sa_auth.source = 'openalex'
           AND sa_auth.person_id IS NULL
           AND sa_auth.in_perimeter = TRUE
-          AND sa_auth.source_data->>'raw_author_name' IS NOT NULL
+          AND sa_auth.raw_author_name IS NOT NULL
           AND sd.publication_id IS NOT NULL
     """)
     oa_rows = cur.fetchall()
@@ -116,7 +116,7 @@ def get_all_unlinked_authorships(cur):
     # WoS
     cur.execute("""
         SELECT sa_auth.id AS authorship_id, 'wos' AS source,
-               sa.full_name, sa.last_name, sa.first_name,
+               sa_auth.raw_author_name AS full_name, sa.last_name, sa.first_name,
                sa.orcid, NULL::text AS idhal,
                NULL::int AS source_author_id,
                FALSE AS has_hal_person_id,
@@ -137,7 +137,7 @@ def get_all_unlinked_authorships(cur):
     # ScanR
     cur.execute("""
         SELECT sa_auth.id AS authorship_id, 'scanr' AS source,
-               sa.full_name, sa.last_name, sa.first_name,
+               sa_auth.raw_author_name AS full_name, sa.last_name, sa.first_name,
                sa.orcid, NULL::text AS idhal, sa.idref,
                NULL::int AS source_author_id,
                FALSE AS has_hal_person_id,
@@ -158,7 +158,7 @@ def get_all_unlinked_authorships(cur):
     # theses.fr (même structure que ScanR : idref comme clé)
     cur.execute("""
         SELECT sa_auth.id AS authorship_id, 'theses' AS source,
-               sa.full_name, sa.last_name, sa.first_name,
+               sa_auth.raw_author_name AS full_name, sa.last_name, sa.first_name,
                sa.orcid, NULL::text AS idhal, sa.idref,
                NULL::int AS source_author_id,
                FALSE AS has_hal_person_id,
@@ -215,7 +215,7 @@ def load_linked_authorships_by_pub(cur):
     cur.execute(f"""
         SELECT sa_auth.person_id, sa_auth.author_position,
                sd.publication_id,
-               sa.last_name, sa.first_name, sa.full_name,
+               sa.last_name, sa.first_name, sa_auth.raw_author_name AS full_name,
                sa_auth.source
         FROM source_authorships sa_auth
         JOIN source_authors sa ON sa.id = sa_auth.source_author_id
@@ -237,7 +237,7 @@ def load_linked_authorships_by_pub(cur):
     cur.execute("""
         SELECT sa_auth.person_id, sa_auth.author_position,
                sd.publication_id,
-               sa_auth.source_data->>'raw_author_name' AS full_name,
+               sa_auth.raw_author_name AS full_name,
                'openalex' AS source
         FROM source_authorships sa_auth
         JOIN source_documents sd ON sd.id = sa_auth.source_document_id
@@ -530,7 +530,7 @@ def step4_theses_non_authors(cur, dry_run):
     idref_map = load_idref_person_map(cur)
 
     cur.execute("""
-        SELECT sa_auth.id AS authorship_id, sa.idref, sa.full_name
+        SELECT sa_auth.id AS authorship_id, sa.idref, sa_auth.raw_author_name AS full_name
         FROM source_authorships sa_auth
         JOIN source_authors sa ON sa.id = sa_auth.source_author_id
         JOIN source_documents sd ON sd.id = sa_auth.source_document_id

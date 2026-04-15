@@ -659,10 +659,9 @@ async def get_publication(pub_id: int):
 
         # d) HAL authorships
         cur.execute("""
-            SELECT sa.id, sa.author_position, sauth.full_name, sa.person_id,
+            SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                    sa.in_perimeter, sa.structure_ids, sa.excluded, sa.countries
             FROM source_authorships sa
-            JOIN source_authors sauth ON sauth.id = sa.source_author_id
             JOIN source_documents sd ON sd.id = sa.source_document_id
             WHERE sa.source = 'hal' AND sd.publication_id = %s
             ORDER BY sa.author_position
@@ -672,7 +671,7 @@ async def get_publication(pub_id: int):
         # e) OpenAlex authorships — pays depuis sa.countries ou adresses
         cur.execute("""
             SELECT sa.id, sa.author_position,
-                   COALESCE(sa.source_data->>'raw_author_name', sauth.full_name) AS full_name,
+                   sa.raw_author_name AS full_name,
                    sa.person_id,
                    sa.in_perimeter, sa.structure_ids,
                    (SELECT string_agg(CASE jsonb_typeof(e) WHEN 'string' THEN e #>> '{}' ELSE e->>'name' END, ' | ') FROM jsonb_array_elements(sa.raw_affiliations) AS e) AS raw_affiliation,
@@ -686,7 +685,6 @@ async def get_publication(pub_id: int):
                           AND addr.countries IS NOT NULL)
                    ) AS countries
             FROM source_authorships sa
-            JOIN source_authors sauth ON sauth.id = sa.source_author_id
             JOIN source_documents sd ON sd.id = sa.source_document_id
             WHERE sa.source = 'openalex' AND sd.publication_id = %s
             ORDER BY sa.author_position
@@ -695,7 +693,7 @@ async def get_publication(pub_id: int):
 
         # e2) WoS authorships — pays depuis sa.countries ou adresses
         cur.execute("""
-            SELECT sa.id, sa.author_position, sauth.full_name, sa.person_id,
+            SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                    sa.in_perimeter, sa.structure_ids,
                    (SELECT string_agg(CASE jsonb_typeof(e) WHEN 'string' THEN e #>> '{}' ELSE e->>'name' END, ' | ') FROM jsonb_array_elements(sa.raw_affiliations) AS e) AS raw_affiliation,
                    sa.excluded,
@@ -708,7 +706,6 @@ async def get_publication(pub_id: int):
                           AND addr.countries IS NOT NULL)
                    ) AS countries
             FROM source_authorships sa
-            JOIN source_authors sauth ON sauth.id = sa.source_author_id
             JOIN source_documents sd ON sd.id = sa.source_document_id
             WHERE sa.source = 'wos' AND sd.publication_id = %s
             ORDER BY sa.author_position
@@ -717,13 +714,12 @@ async def get_publication(pub_id: int):
 
         # f) Theses.fr authorships (avec rôles)
         cur.execute("""
-            SELECT sa.id, sa.author_position, sauth.full_name, sa.person_id,
+            SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                    sa.roles, sa.in_perimeter
             FROM source_authorships sa
-            JOIN source_authors sauth ON sauth.id = sa.source_author_id
             JOIN source_documents sd ON sd.id = sa.source_document_id
             WHERE sa.source = 'theses' AND sd.publication_id = %s
-            ORDER BY sa.author_position NULLS LAST, sauth.full_name
+            ORDER BY sa.author_position NULLS LAST, sa.raw_author_name
         """, (pub_id,))
         theses_authorships = cur.fetchall()
 

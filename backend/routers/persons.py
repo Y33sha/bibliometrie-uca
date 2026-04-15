@@ -527,17 +527,15 @@ async def get_person(person_id: int):
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh,
                 (SELECT json_agg(x) FROM (
-                    SELECT DISTINCT ON (sa.source, sauth.id)
-                           sauth.id, sa.source,
-                           CASE WHEN sa.source = 'openalex'
-                                THEN COALESCE(sa.source_data->>'raw_author_name', sauth.full_name)
-                                ELSE sauth.full_name END AS full_name,
+                    SELECT DISTINCT ON (sa.source, sa.source_author_id)
+                           sa.source_author_id AS id, sa.source,
+                           sa.raw_author_name AS full_name,
                            sauth.orcid,
                            sauth.source_ids->>'idhal' AS idhal
                     FROM source_authorships sa
                     JOIN source_authors sauth ON sauth.id = sa.source_author_id
                     WHERE sa.person_id = p.id AND NOT sa.excluded
-                    ORDER BY sa.source, sauth.id
+                    ORDER BY sa.source, sa.source_author_id
                 ) x) AS linked_authors,
                 (SELECT json_agg(json_build_object(
                     'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
@@ -593,23 +591,22 @@ async def person_profile(person_id: int):
         """, (person_id,))
         hal_authors = cur.fetchall()
 
-        # Auteurs liés OpenAlex : formes de noms distinctes (raw_author_name)
+        # Auteurs liés OpenAlex : formes de noms distinctes
         cur.execute("""
             SELECT MIN(sa.id) AS id,
-                   COALESCE(sa.source_data->>'raw_author_name', sauth.full_name) AS full_name,
+                   sa.raw_author_name AS full_name,
                    'openalex' AS source,
                    NULL::text AS orcid, NULL::text AS idhal, NULL::text AS openalex_id,
                    COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
             FROM source_authorships sa
-            JOIN source_authors sauth ON sauth.id = sa.source_author_id
             WHERE sa.source = 'openalex' AND sa.person_id = %s
-            GROUP BY COALESCE(sa.source_data->>'raw_author_name', sauth.full_name)
+            GROUP BY sa.raw_author_name
         """, (person_id,))
         oa_authors = cur.fetchall()
 
         # Auteurs liés WoS + compte publis UCA
         cur.execute("""
-            SELECT sauth.id, 'wos' AS source, sauth.full_name, sauth.orcid,
+            SELECT sauth.id, 'wos' AS source, sa.raw_author_name AS full_name, sauth.orcid,
                    NULL::text AS idhal, NULL::text AS openalex_id,
                    (SELECT COUNT(*) FROM source_authorships sa2
                     WHERE sa2.source = 'wos' AND sa2.source_author_id = sauth.id
@@ -617,7 +614,7 @@ async def person_profile(person_id: int):
             FROM source_authors sauth
             JOIN source_authorships sa ON sa.source = 'wos' AND sa.source_author_id = sauth.id
             WHERE sa.person_id = %s
-            GROUP BY sauth.id, sauth.full_name, sauth.orcid
+            GROUP BY sauth.id, sa.raw_author_name, sauth.orcid
         """, (person_id,))
         wos_authors = cur.fetchall()
 
@@ -648,9 +645,8 @@ async def person_theses(person_id: int):
         cur.execute("""
             SELECT p.id, p.title, p.pub_year, p.doi,
                    sa.roles,
-                   (SELECT sauth2.full_name
+                   (SELECT sa2.raw_author_name
                     FROM source_authorships sa2
-                    JOIN source_authors sauth2 ON sauth2.id = sa2.source_author_id
                     WHERE sa2.source_document_id = sd.id
                       AND sa2.source = 'theses'
                       AND sa2.roles && ARRAY['author']::text[]
@@ -1102,13 +1098,12 @@ async def list_orphan_authorships(
     params: list = []
     if search.strip():
         params.append(f"%{search.strip()}%")
-        search_cond = "AND unaccent(lower(COALESCE(sa.source_data->>'raw_author_name', sauth.full_name))) LIKE unaccent(lower(%s))"
+        search_cond = "AND unaccent(lower(sa.raw_author_name)) LIKE unaccent(lower(%s))"
 
     with get_cursor() as (cur, conn):
         # Count
         cur.execute(f"""
             SELECT COUNT(*) FROM source_authorships sa
-            JOIN source_authors sauth ON sauth.id = sa.source_author_id
             JOIN source_documents sd ON sd.id = sa.source_document_id
             JOIN publications p ON p.id = sd.publication_id
             WHERE {_ORPHAN_BASE}
@@ -1119,16 +1114,15 @@ async def list_orphan_authorships(
         # List
         cur.execute(f"""
             SELECT sa.source, sa.id AS authorship_id,
-                   COALESCE(sa.source_data->>'raw_author_name', sauth.full_name) AS full_name,
+                   sa.raw_author_name AS full_name,
                    sd.publication_id,
                    p.title AS pub_title, p.pub_year
             FROM source_authorships sa
-            JOIN source_authors sauth ON sauth.id = sa.source_author_id
             JOIN source_documents sd ON sd.id = sa.source_document_id
             JOIN publications p ON p.id = sd.publication_id
             WHERE {_ORPHAN_BASE}
               {search_cond}
-            ORDER BY COALESCE(sa.source_data->>'raw_author_name', sauth.full_name), p.pub_year DESC
+            ORDER BY sa.raw_author_name, p.pub_year DESC
             LIMIT %s OFFSET %s
         """, params + [per_page, offset])
         rows = cur.fetchall()

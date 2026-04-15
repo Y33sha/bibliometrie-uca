@@ -26,7 +26,7 @@ def _to_sql(sources: tuple) -> str:
 AUTHOR_SOURCES = ALL_SOURCES
 AUTHOR_SOURCES_SQL = _to_sql(AUTHOR_SOURCES)
 
-# Sources où les noms d'auteurs sont dans source_authors (last_name, first_name).
-# OpenAlex est exclu : les noms viennent de source_data->>'raw_author_name'.
+# Sources où les noms d'auteurs sont structurés dans source_authors (last_name, first_name).
+# OpenAlex est exclu : les noms viennent de source_authorships.raw_author_name.
 SOURCES_WITH_STRUCTURED_NAMES = tuple(s for s in ALL_SOURCES if s != "openalex")
 SOURCES_WITH_STRUCTURED_NAMES_SQL = _to_sql(SOURCES_WITH_STRUCTURED_NAMES)
