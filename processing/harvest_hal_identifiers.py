@@ -23,7 +23,6 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
-from services.persons import add_identifier
 from utils.log import setup_logger
 
 logger = setup_logger("harvest_hal_identifiers", os.path.join(os.path.dirname(__file__), "logs"))
@@ -127,8 +126,7 @@ def main():
             logger.info("Rien à faire.")
             return
 
-        stats = {"orcid_found": 0, "idref_found": 0,
-                 "ha_updated": 0, "pi_inserted": 0}
+        stats = {"orcid_found": 0, "idref_found": 0, "ha_updated": 0}
         batch_size = args.batch
 
         for i in range(0, len(rows), batch_size):
@@ -151,9 +149,6 @@ def main():
                         """, (ids["orcid"], ha_id))
                         if cur.rowcount:
                             stats["ha_updated"] += 1
-                        if person_id:
-                            add_identifier(cur, person_id, "orcid", ids["orcid"], source="hal")
-                            stats["pi_inserted"] += 1
                         stats["orcid_found"] += 1
 
                     if "idref" in ids:
@@ -164,9 +159,6 @@ def main():
                         """, (ids["idref"], ha_id))
                         if cur.rowcount:
                             stats["ha_updated"] += 1
-                        if person_id:
-                            add_identifier(cur, person_id, "idref", ids["idref"], source="hal")
-                            stats["pi_inserted"] += 1
                         stats["idref_found"] += 1
 
                 conn.commit()
@@ -195,7 +187,6 @@ def main():
             logger.info(f"  ORCID trouvés : {stats['orcid_found']}")
             logger.info(f"  IdRef trouvés : {stats['idref_found']}")
             logger.info(f"  source_authors mis à jour : {stats['ha_updated']}")
-            logger.info(f"  person_identifiers ajoutés : {stats['pi_inserted']}")
 
     except KeyboardInterrupt:
         conn.commit()
