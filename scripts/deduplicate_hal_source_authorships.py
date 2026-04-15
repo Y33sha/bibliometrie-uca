@@ -8,7 +8,7 @@ produisant des source_authorships en double pour le même (source_document, posi
 Ce script en deux phases :
 
 Phase 1 — Source_authorships en double :
-  1. Détecte les groupes de doublons (même source_document_id + author_position, source='hal')
+  1. Détecte les groupes de doublons (même source_publication_id + author_position, source='hal')
   2. Fusionne chaque groupe : garde le plus récent (id max), transfère les champs
      non-null de l'ancien vers le nouveau si celui-ci est null
   3. Supprime les source_authorships obsolètes
@@ -60,14 +60,14 @@ AUTHOR_TRANSFER_FIELDS = ["orcid", "idref", "person_id"]
 def find_duplicate_groups(cur):
     """Trouve tous les groupes de source_authorships HAL en double."""
     cur.execute("""
-        SELECT source_document_id, author_position,
+        SELECT source_publication_id, author_position,
                array_agg(id ORDER BY id) AS sa_ids,
                array_agg(source_person_id ORDER BY id) AS author_ids
         FROM source_authorships
         WHERE source = 'hal'
-        GROUP BY source_document_id, author_position
+        GROUP BY source_publication_id, author_position
         HAVING count(*) > 1
-        ORDER BY source_document_id, author_position
+        ORDER BY source_publication_id, author_position
     """)
     return cur.fetchall()
 
@@ -200,7 +200,7 @@ def merge_duplicate_authors(cur, group, dry_run):
     old_ids = author_ids[:-1]
 
     # Migrer les source_authorships des anciens vers le nouveau
-    # Supprimer celles qui créeraient un doublon (source_document_id, source_person_id)
+    # Supprimer celles qui créeraient un doublon (source_publication_id, source_person_id)
     if not dry_run:
         for old_id in old_ids:
             # Supprimer les authorships qui existent déjà pour le nouveau source_author
@@ -210,7 +210,7 @@ def merge_duplicate_authors(cur, group, dry_run):
                     SELECT sa_old.id
                     FROM source_authorships sa_old
                     JOIN source_authorships sa_new
-                      ON sa_new.source_document_id = sa_old.source_document_id
+                      ON sa_new.source_publication_id = sa_old.source_publication_id
                      AND sa_new.source_person_id = %s
                     WHERE sa_old.source_person_id = %s
                 )
@@ -220,7 +220,7 @@ def merge_duplicate_authors(cur, group, dry_run):
                 USING source_authorships sa_new
                 WHERE sa_old.source_person_id = %s
                   AND sa_new.source_person_id = %s
-                  AND sa_new.source_document_id = sa_old.source_document_id
+                  AND sa_new.source_publication_id = sa_old.source_publication_id
             """, (old_id, keep_id))
             # Migrer les restantes
             cur.execute(
@@ -267,7 +267,7 @@ def run(dry_run=True):
                 sa_deleted += len(delete_ids)
                 if conflicts:
                     all_conflicts[
-                        (group["source_document_id"], group["author_position"])
+                        (group["source_publication_id"], group["author_position"])
                     ] = conflicts
 
                 # Collecter les fusions d'auteurs

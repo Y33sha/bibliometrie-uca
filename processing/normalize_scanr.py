@@ -8,7 +8,7 @@ Usage:
 
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
-    source_documents                        (lien staging ↔ publication, source='scanr')
+    source_publications                        (lien staging ↔ publication, source='scanr')
     source_persons                          (auteurs unifiés, source='scanr')
     source_authorships                      (lien document × auteur, source='scanr', avec affiliations)
 
@@ -160,7 +160,7 @@ def find_publication(cur, doc: dict, journal_id: int | None,
 def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
                           publication_id: int | None,
                           pub_meta: dict | None = None) -> int:
-    """Crée/retrouve l'entrée source_documents pour ScanR. Retourne source_documents.id."""
+    """Crée/retrouve l'entrée source_publications pour ScanR. Retourne source_publications.id."""
     doi = extract_doi(doc)
     hal_id = extract_hal_id(doc)
     title = get_title(doc) or ""
@@ -232,7 +232,7 @@ def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
     container_title = pub_meta.get("container_title") if pub_meta else None
 
     cur.execute("""
-        INSERT INTO source_documents
+        INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id, external_ids,
              journal_id, oa_status, language, container_title,
@@ -242,20 +242,20 @@ def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
                 %s, %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
-                source_documents.publication_id, EXCLUDED.publication_id
+                source_publications.publication_id, EXCLUDED.publication_id
             ),
-            doi = COALESCE(source_documents.doi, EXCLUDED.doi),
-            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
-            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
-            journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
-            oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
-            language = COALESCE(EXCLUDED.language, source_documents.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title),
-            abstract = COALESCE(EXCLUDED.abstract, source_documents.abstract),
-            keywords = COALESCE(EXCLUDED.keywords, source_documents.keywords),
-            topics = COALESCE(EXCLUDED.topics, source_documents.topics),
-            cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_documents.cited_by_count, 0)),
-            urls = COALESCE(EXCLUDED.urls, source_documents.urls)
+            doi = COALESCE(source_publications.doi, EXCLUDED.doi),
+            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
+            doc_type = COALESCE(EXCLUDED.doc_type, source_publications.doc_type),
+            journal_id = COALESCE(EXCLUDED.journal_id, source_publications.journal_id),
+            oa_status = COALESCE(EXCLUDED.oa_status, source_publications.oa_status),
+            language = COALESCE(EXCLUDED.language, source_publications.language),
+            container_title = COALESCE(EXCLUDED.container_title, source_publications.container_title),
+            abstract = COALESCE(EXCLUDED.abstract, source_publications.abstract),
+            keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
+            topics = COALESCE(EXCLUDED.topics, source_publications.topics),
+            cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_publications.cited_by_count, 0)),
+            urls = COALESCE(EXCLUDED.urls, source_publications.urls)
         RETURNING id
     """, (scanr_id, doi, title, pub_year, doc_type, publication_id, staging_id, external_ids,
           journal_id, oa_status, language, container_title,
@@ -334,7 +334,7 @@ def upsert_scanr_author(cur, author: dict) -> int | None:
 # SCANR AUTHORSHIPS
 # =============================================================
 
-def process_authors(cur, doc: dict, source_document_id: int):
+def process_authors(cur, doc: dict, source_publication_id: int):
     """Traite les auteurs d'un document ScanR."""
     authors = doc.get("authors") or []
 
@@ -373,11 +373,11 @@ def process_authors(cur, doc: dict, source_document_id: int):
 
         cur.execute("""
             INSERT INTO source_authorships
-                (source, source_document_id, source_person_id, author_position, roles,
+                (source, source_publication_id, source_person_id, author_position, roles,
                  raw_affiliations, source_data,
                  author_name_normalized, raw_author_name)
             VALUES ('scanr', %s, %s, %s, %s, %s, %s, normalize_name_form(%s), %s)
-            ON CONFLICT (source_document_id, source_person_id) DO UPDATE SET
+            ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
                 raw_affiliations = COALESCE(EXCLUDED.raw_affiliations,
                     source_authorships.raw_affiliations),
                 source_data = COALESCE(source_authorships.source_data, '{}') ||
@@ -386,7 +386,7 @@ def process_authors(cur, doc: dict, source_document_id: int):
                 roles = EXCLUDED.roles,
                 raw_author_name = EXCLUDED.raw_author_name,
                 addresses_extracted = FALSE
-        """, (source_document_id, source_person_id, position, roles or None,
+        """, (source_publication_id, source_person_id, position, roles or None,
               Json(raw_affiliations) if raw_affiliations else None,
               source_data_json,
               author_full_name, author_full_name))
@@ -420,7 +420,7 @@ def process_work(cur, staging_row) -> bool:
         journal_id = upsert_journal(cur, doc, publisher_id)
         timings["journal"] = time.perf_counter() - t0
 
-        # Métadonnées de publication (stockées sur source_documents)
+        # Métadonnées de publication (stockées sur source_publications)
         pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
 
         t0 = time.perf_counter()
@@ -429,7 +429,7 @@ def process_work(cur, staging_row) -> bool:
 
         # Idempotence : réutiliser le publication_id existant
         cur.execute(
-            "SELECT publication_id FROM source_documents WHERE source = 'scanr' AND source_id = %s",
+            "SELECT publication_id FROM source_publications WHERE source = 'scanr' AND source_id = %s",
             (scanr_id,))
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc["publication_id"]:
@@ -458,16 +458,16 @@ def process_work(cur, staging_row) -> bool:
 
             publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
 
-        # Document ScanR (source_documents) — publication_id peut être NULL
+        # Document ScanR (source_publications) — publication_id peut être NULL
         t0 = time.perf_counter()
-        source_document_id = insert_scanr_document(
+        source_publication_id = insert_scanr_document(
             cur, doc, staging_id, scanr_id, publication_id, pub_meta
         )
         timings["scanr_doc"] = time.perf_counter() - t0
 
         # Auteurs et authorships
         t0 = time.perf_counter()
-        process_authors(cur, doc, source_document_id)
+        process_authors(cur, doc, source_publication_id)
         timings["authors"] = time.perf_counter() - t0
 
         # Recalcul complet des métadonnées depuis toutes les sources

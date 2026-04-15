@@ -58,7 +58,7 @@ def get_thesis_author(cur, pub_id):
     cur.execute("""
         SELECT sa.last_name, sa.first_name
         FROM source_authorships sas
-        JOIN source_documents sd ON sd.id = sas.source_document_id
+        JOIN source_publications sd ON sd.id = sas.source_publication_id
         JOIN source_persons sa ON sa.id = sas.source_person_id
         WHERE sd.publication_id = %s
           AND 'author' = ANY(sas.roles)
@@ -76,16 +76,16 @@ def get_thesis_author(cur, pub_id):
 def choose_target(cur, pub_ids):
     """Choisit la publication cible (celle à garder).
 
-    Priorité : celle avec DOI > celle avec le plus de source_documents > id le plus bas.
+    Priorité : celle avec DOI > celle avec le plus de source_publications > id le plus bas.
     """
     cur.execute("""
         SELECT p.id, p.doi,
-               (SELECT COUNT(*) FROM source_documents sd WHERE sd.publication_id = p.id) AS sd_count
+               (SELECT COUNT(*) FROM source_publications sd WHERE sd.publication_id = p.id) AS sd_count
         FROM publications p
         WHERE p.id = ANY(%s)
         ORDER BY
             (p.doi IS NOT NULL) DESC,
-            (SELECT COUNT(*) FROM source_documents sd WHERE sd.publication_id = p.id) DESC,
+            (SELECT COUNT(*) FROM source_publications sd WHERE sd.publication_id = p.id) DESC,
             p.id ASC
     """, (pub_ids,))
     return cur.fetchall()

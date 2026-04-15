@@ -46,10 +46,10 @@ conflict_pairs AS (
         LEAST(sa1.person_id, sa2.person_id) AS id_a,
         GREATEST(sa1.person_id, sa2.person_id) AS id_b
     FROM source_authorships sa1
-    JOIN source_documents sd1 ON sd1.id = sa1.source_document_id
-    JOIN source_documents sd2 ON sd2.publication_id = sd1.publication_id
+    JOIN source_publications sd1 ON sd1.id = sa1.source_publication_id
+    JOIN source_publications sd2 ON sd2.publication_id = sd1.publication_id
         AND sd2.source != sd1.source
-    JOIN source_authorships sa2 ON sa2.source_document_id = sd2.id
+    JOIN source_authorships sa2 ON sa2.source_publication_id = sd2.id
         AND sa2.author_position = sa1.author_position
     WHERE sa1.person_id IS NOT NULL AND sa2.person_id IS NOT NULL
       AND sa1.person_id <> sa2.person_id

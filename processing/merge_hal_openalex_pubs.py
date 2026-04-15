@@ -37,7 +37,7 @@ def find_duplicates(cur):
         SELECT sd.id AS oa_doc_id, sd.source_id AS openalex_id,
                sd.publication_id AS oa_pub_id,
                sd.external_ids->>'hal' AS hal_id
-        FROM source_documents sd
+        FROM source_publications sd
         WHERE sd.source = 'openalex'
           AND sd.external_ids->>'hal' IS NOT NULL
     """)
@@ -50,7 +50,7 @@ def find_duplicates(cur):
             'oa_pub_id': r['oa_pub_id'],
         }
 
-    cur.execute("SELECT id AS hal_doc_id, source_id AS halid, publication_id AS hal_pub_id FROM source_documents WHERE source = 'hal'")
+    cur.execute("SELECT id AS hal_doc_id, source_id AS halid, publication_id AS hal_pub_id FROM source_publications WHERE source = 'hal'")
     hal_rows = cur.fetchall()
     hal_by_id = {r['halid']: r for r in hal_rows}
 
@@ -84,7 +84,7 @@ def link_hal_to_oa_publication(cur, items, dry_run=False):
             continue
 
         cur.execute(
-            "UPDATE source_documents SET publication_id = %s WHERE id = %s",
+            "UPDATE source_publications SET publication_id = %s WHERE id = %s",
             (oa_pub_id, hal_doc_id)
         )
         update_sources(cur, oa_pub_id)
@@ -148,7 +148,7 @@ def main():
         if link_only:
             log.info(f"\n--- Liaison HAL → publication existante ---")
             n = link_hal_to_oa_publication(cur, link_only, dry_run=args.dry_run)
-            log.info(f"  {n} source_documents HAL reliés")
+            log.info(f"  {n} source_publications HAL reliés")
 
         if merge_needed:
             log.info(f"\n--- Fusion de publications ---")

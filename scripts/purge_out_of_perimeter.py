@@ -6,7 +6,7 @@ ainsi que toutes les données liées :
   - source_authorship_addresses
   - source_authorships
   - authorships
-  - source_documents (+ détachement du staging)
+  - source_publications (+ détachement du staging)
   - apc_payments sans lab_structure_id
   - distinct_publications
   - publications
@@ -64,7 +64,7 @@ def run(dry_run=True):
             cur.execute("""
                 CREATE TEMP TABLE purge_sd AS
                 SELECT sd.id, sd.staging_id
-                FROM source_documents sd
+                FROM source_publications sd
                 WHERE sd.publication_id IN (SELECT id FROM purge_pubs)
             """)
             cur.execute("SELECT count(*) AS cnt FROM purge_sd")
@@ -74,7 +74,7 @@ def run(dry_run=True):
             cur.execute("""
                 CREATE TEMP TABLE purge_sa AS
                 SELECT sa.id FROM source_authorships sa
-                WHERE sa.source_document_id IN (SELECT id FROM purge_sd)
+                WHERE sa.source_publication_id IN (SELECT id FROM purge_sd)
             """)
             cur.execute("SELECT count(*) AS cnt FROM purge_sa")
             sa_count = cur.fetchone()["cnt"]
@@ -110,7 +110,7 @@ def run(dry_run=True):
             logger.info("  source_authorships          : %d", sa_count)
             logger.info("  authorships                 : %d", auth_count)
             logger.info("  apc_payments                : %d", apc_count)
-            logger.info("  source_documents            : %d", sd_count)
+            logger.info("  source_publications            : %d", sd_count)
             logger.info("  staging raw_data a vider    : %d", staging_count)
             logger.info("  publications                : %d", pub_count)
 
@@ -129,7 +129,7 @@ def run(dry_run=True):
 
             cur.execute("""
                 DELETE FROM source_authorships
-                WHERE source_document_id IN (SELECT id FROM purge_sd)
+                WHERE source_publication_id IN (SELECT id FROM purge_sd)
             """)
             logger.info("  source_authorships supprimées : %d", cur.rowcount)
 
@@ -161,10 +161,10 @@ def run(dry_run=True):
             logger.info("  distinct_publications supprimées : %d", cur.rowcount)
 
             cur.execute("""
-                DELETE FROM source_documents
+                DELETE FROM source_publications
                 WHERE publication_id IN (SELECT id FROM purge_pubs)
             """)
-            logger.info("  source_documents supprimées : %d", cur.rowcount)
+            logger.info("  source_publications supprimées : %d", cur.rowcount)
 
             cur.execute("""
                 DELETE FROM publications

@@ -67,7 +67,7 @@ def main():
                array_agg(DISTINCT sd.doc_type) FILTER (WHERE sd.source = 'openalex' AND sd.doc_type IS NOT NULL) AS oa_types,
                array_agg(DISTINCT sd.doc_type) FILTER (WHERE sd.source = 'wos' AND sd.doc_type IS NOT NULL) AS wos_types
         FROM publications p
-        LEFT JOIN source_documents sd ON sd.publication_id = p.id
+        LEFT JOIN source_publications sd ON sd.publication_id = p.id
         GROUP BY p.id, p.doc_type
     """)
 

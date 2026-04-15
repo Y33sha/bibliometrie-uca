@@ -4,7 +4,7 @@ Le NNT est un identifiant national attribué aux thèses soutenues en France.
 Format typique : 2023UCFA0069 (année + code établissement + numéro séquentiel).
 
 Il est distinct du DOI et ne doit jamais être stocké dans publications.doi.
-Il est stocké dans source_documents.external_ids sous la clé "nnt".
+Il est stocké dans source_publications.external_ids sous la clé "nnt".
 """
 
 import re

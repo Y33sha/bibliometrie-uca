@@ -8,7 +8,7 @@ Usage:
 
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
-    source_documents                        (lien staging ↔ publication, source='hal')
+    source_publications                        (lien staging ↔ publication, source='hal')
     source_persons                          (auteurs unifiés, source='hal')
     source_authorships                      (lien document × auteur, source='hal', avec source_struct_ids)
 
@@ -161,9 +161,9 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
                         publication_id: int | None,
                         pub_meta: dict | None = None) -> int:
     """
-    Crée/retrouve l'entrée source_documents pour HAL.
+    Crée/retrouve l'entrée source_publications pour HAL.
     Le champ hal_collections agrège toutes les collections vues.
-    Retourne source_documents.id.
+    Retourne source_publications.id.
     """
     doi = clean_doi(as_str(doc.get("doiId_s")))
     title = get_title(doc)
@@ -223,7 +223,7 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
     urls = [uri] if uri else None
 
     cur.execute("""
-        INSERT INTO source_documents
+        INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
              hal_collections, publication_id, staging_id, external_ids,
              journal_id, oa_status, language, container_title,
@@ -233,27 +233,27 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
                 %s, %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
-                source_documents.publication_id, EXCLUDED.publication_id
+                source_publications.publication_id, EXCLUDED.publication_id
             ),
-            doi = COALESCE(source_documents.doi, EXCLUDED.doi),
-            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
+            doi = COALESCE(source_publications.doi, EXCLUDED.doi),
+            doc_type = COALESCE(EXCLUDED.doc_type, source_publications.doc_type),
             hal_collections = (
                 SELECT array_agg(DISTINCT c ORDER BY c)
                 FROM unnest(
-                    COALESCE(source_documents.hal_collections, '{}') ||
+                    COALESCE(source_publications.hal_collections, '{}') ||
                     COALESCE(EXCLUDED.hal_collections, '{}')
                 ) AS c
             ),
-            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
-            journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
-            oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
-            language = COALESCE(EXCLUDED.language, source_documents.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title),
-            abstract = COALESCE(EXCLUDED.abstract, source_documents.abstract),
-            keywords = COALESCE(EXCLUDED.keywords, source_documents.keywords),
-            topics = COALESCE(EXCLUDED.topics, source_documents.topics),
-            biblio = COALESCE(EXCLUDED.biblio, source_documents.biblio),
-            urls = COALESCE(EXCLUDED.urls, source_documents.urls)
+            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
+            journal_id = COALESCE(EXCLUDED.journal_id, source_publications.journal_id),
+            oa_status = COALESCE(EXCLUDED.oa_status, source_publications.oa_status),
+            language = COALESCE(EXCLUDED.language, source_publications.language),
+            container_title = COALESCE(EXCLUDED.container_title, source_publications.container_title),
+            abstract = COALESCE(EXCLUDED.abstract, source_publications.abstract),
+            keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
+            topics = COALESCE(EXCLUDED.topics, source_publications.topics),
+            biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
+            urls = COALESCE(EXCLUDED.urls, source_publications.urls)
         RETURNING id
     """, (hal_id, doi, title, pub_year, doc_type,
           collections_array, publication_id, staging_id, external_ids,
@@ -453,7 +453,7 @@ def parse_author_structures(doc: dict) -> dict[int, set[int]]:
     return form_structs
 
 
-def process_authors(cur, doc: dict, source_document_id: int,
+def process_authors(cur, doc: dict, source_publication_id: int,
                     struct_cache: dict | None = None):
     """
     Traite les auteurs d'un document HAL :
@@ -555,10 +555,10 @@ def process_authors(cur, doc: dict, source_document_id: int,
 
         cur.execute("""
             INSERT INTO source_authorships
-                (source, source_document_id, source_person_id, author_position, source_struct_ids,
+                (source, source_publication_id, source_person_id, author_position, source_struct_ids,
                  author_name_normalized, is_corresponding, roles, raw_author_name)
             VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
-            ON CONFLICT (source_document_id, source_person_id) DO UPDATE SET
+            ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
                 source_struct_ids = COALESCE(
                     EXCLUDED.source_struct_ids,
                     source_authorships.source_struct_ids
@@ -568,7 +568,7 @@ def process_authors(cur, doc: dict, source_document_id: int,
                 roles = EXCLUDED.roles,
                 raw_author_name = EXCLUDED.raw_author_name,
                 addresses_extracted = FALSE
-        """, (source_document_id, source_person_id, position,
+        """, (source_publication_id, source_person_id, position,
               source_struct_ids, name, is_corresponding, roles or None, name))
 
 
@@ -610,16 +610,16 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None) -> b
         journal_id = upsert_journal(cur, doc, publisher_id)
         t.mark("publisher+journal")
 
-        # Métadonnées de publication (stockées sur source_documents)
+        # Métadonnées de publication (stockées sur source_publications)
         pub_meta = extract_pub_metadata(doc, journal_id)
 
         # Chercher une publication existante (sans créer)
         publication_id = None
 
-        # Idempotence : si source_documents a déjà ce source_id avec un publication_id,
+        # Idempotence : si source_publications a déjà ce source_id avec un publication_id,
         # le réutiliser au lieu de risquer un doublon
         cur.execute(
-            "SELECT publication_id FROM source_documents WHERE source = 'hal' AND source_id = %s",
+            "SELECT publication_id FROM source_publications WHERE source = 'hal' AND source_id = %s",
             (hal_id,))
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc[0]:
@@ -643,14 +643,14 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None) -> b
         if publication_id:
             publication_id = try_merge_by_doi(cur, publication_id, clean_doi(as_str(doc.get("doiId_s"))))
 
-        # Document HAL (source_documents) — publication_id peut être NULL
-        source_document_id = insert_hal_document(
+        # Document HAL (source_publications) — publication_id peut être NULL
+        source_publication_id = insert_hal_document(
             cur, doc, staging_id, hal_id, hal_collections_staging, publication_id, pub_meta
         )
         t.mark("hal_doc")
 
         # Auteurs et authorships (avec source_struct_ids)
-        process_authors(cur, doc, source_document_id, struct_cache=struct_cache)
+        process_authors(cur, doc, source_publication_id, struct_cache=struct_cache)
         t.mark("authors")
 
         # Recalcul complet des métadonnées depuis toutes les sources
@@ -747,7 +747,7 @@ def main():
             WHERE source_authorship_id IN (
                 SELECT sa1.id FROM source_authorships sa1
                 JOIN source_authorships sa2
-                  ON sa2.source_document_id = sa1.source_document_id
+                  ON sa2.source_publication_id = sa1.source_publication_id
                  AND sa2.author_position = sa1.author_position
                  AND sa2.id > sa1.id
                 WHERE sa1.source = 'hal' AND sa1.author_position IS NOT NULL
@@ -758,7 +758,7 @@ def main():
             WHERE source = 'hal' AND id IN (
                 SELECT sa1.id FROM source_authorships sa1
                 JOIN source_authorships sa2
-                  ON sa2.source_document_id = sa1.source_document_id
+                  ON sa2.source_publication_id = sa1.source_publication_id
                  AND sa2.author_position = sa1.author_position
                  AND sa2.id > sa1.id
                 WHERE sa1.source = 'hal' AND sa1.author_position IS NOT NULL

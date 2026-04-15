@@ -2,8 +2,8 @@
 Fusionne les publications qui pointent vers le même document HAL.
 
 Sources de hal_id :
-- OpenAlex : source_documents.external_ids->>'hal' (extrait des URLs à la normalisation)
-- ScanR : source_documents.external_ids->>'hal' (extrait des externalIds)
+- OpenAlex : source_publications.external_ids->>'hal' (extrait des URLs à la normalisation)
+- ScanR : source_publications.external_ids->>'hal' (extrait des externalIds)
 
 Deux cas :
 1. HAL doc a publication_id = NULL → on le relie à la publication source
@@ -33,14 +33,14 @@ def find_duplicates(cur):
     Trouve les paires (document source, hal_document) qui pointent
     vers des publications différentes (ou HAL → NULL).
 
-    Sources : source_documents.external_ids->>'hal' (OpenAlex + ScanR)
+    Sources : source_publications.external_ids->>'hal' (OpenAlex + ScanR)
     """
     # --- OpenAlex + ScanR → HAL ---
     cur.execute("""
         SELECT sd.id AS src_doc_id, sd.source::text AS source,
                sd.source_id AS src_id, sd.publication_id AS src_pub_id,
                sd.external_ids->>'hal' AS hal_id
-        FROM source_documents sd
+        FROM source_publications sd
         WHERE sd.source IN ('openalex', 'scanr')
           AND sd.external_ids->>'hal' IS NOT NULL
     """)
@@ -57,7 +57,7 @@ def find_duplicates(cur):
             }
 
     # --- HAL documents ---
-    cur.execute("SELECT id AS hal_doc_id, source_id AS halid, publication_id AS hal_pub_id FROM source_documents WHERE source = 'hal'")
+    cur.execute("SELECT id AS hal_doc_id, source_id AS halid, publication_id AS hal_pub_id FROM source_publications WHERE source = 'hal'")
     hal_by_id = {r['halid']: r for r in cur.fetchall()}
 
     # --- Croiser ---
@@ -91,7 +91,7 @@ def link_hal_to_publication(cur, items, dry_run=False):
             continue
 
         cur.execute(
-            "UPDATE source_documents SET publication_id = %s WHERE id = %s",
+            "UPDATE source_publications SET publication_id = %s WHERE id = %s",
             (src_pub_id, hal_doc_id)
         )
         update_sources(cur, src_pub_id)
@@ -171,7 +171,7 @@ def main():
         if link_only:
             log.info(f"\n--- Liaison HAL → publication existante ---")
             n = link_hal_to_publication(cur, link_only, dry_run=args.dry_run)
-            log.info(f"  {n} source_documents HAL reliés")
+            log.info(f"  {n} source_publications HAL reliés")
 
         if merge_needed:
             log.info(f"\n--- Fusion de publications ---")

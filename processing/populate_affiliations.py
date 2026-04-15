@@ -41,7 +41,7 @@ def step1_hal_structure_ids(cur, daily=False):
                 SELECT sa2.id,
                        array_agg(DISTINCT ss.structure_id) AS struct_ids
                 FROM source_authorships sa2
-                JOIN source_documents sd ON sd.id = sa2.source_document_id
+                JOIN source_publications sd ON sd.id = sa2.source_publication_id
                      AND {DAILY_FILTER},
                      LATERAL unnest(sa2.source_struct_ids) AS ssid(val)
                 JOIN source_structures ss ON ss.id = ssid.val
@@ -80,9 +80,9 @@ def step2_hal_in_perimeter(cur, perimeter_ids, daily=False):
         cur.execute(f"""
             UPDATE source_authorships sa
             SET in_perimeter = TRUE
-            FROM source_documents sd
+            FROM source_publications sd
             WHERE sa.source = 'hal'
-              AND sd.id = sa.source_document_id
+              AND sd.id = sa.source_publication_id
               AND {DAILY_FILTER}
               AND sa.structure_ids IS NOT NULL
               AND EXISTS (
@@ -120,9 +120,9 @@ def _step_address_source(cur, source, perimeter_ids, wide_ids, daily=False):
         cur.execute(f"""
             UPDATE source_authorships sa
             SET in_perimeter = TRUE
-            FROM source_documents sd
+            FROM source_publications sd
             WHERE sa.source = %s
-              AND sd.id = sa.source_document_id
+              AND sd.id = sa.source_publication_id
               AND {DAILY_FILTER}
               AND EXISTS (
                 SELECT 1
@@ -158,7 +158,7 @@ def _step_address_source(cur, source, perimeter_ids, wide_ids, daily=False):
                 FROM source_authorship_addresses saa
                 JOIN address_structures ast ON ast.address_id = saa.address_id
                 JOIN source_authorships sa2 ON sa2.id = saa.source_authorship_id
-                JOIN source_documents sd ON sd.id = sa2.source_document_id
+                JOIN source_publications sd ON sd.id = sa2.source_publication_id
                      AND {DAILY_FILTER}
                 WHERE sa2.source = %s
                   AND ast.structure_id = ANY(%s)
@@ -205,7 +205,7 @@ def step3d_theses(cur, wide_ids, daily=False):
                 FROM source_authorship_addresses saa
                 JOIN address_structures ast ON ast.address_id = saa.address_id
                 JOIN source_authorships sa2 ON sa2.id = saa.source_authorship_id
-                JOIN source_documents sd ON sd.id = sa2.source_document_id
+                JOIN source_publications sd ON sd.id = sa2.source_publication_id
                      AND {DAILY_FILTER}
                 WHERE sa2.source = 'theses'
                   AND ast.structure_id = ANY(%s)

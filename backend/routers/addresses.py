@@ -13,29 +13,29 @@ logger = logging.getLogger(__name__)
 def propagate_countries_for_addresses(cur, address_ids: list[int]):
     """Propage les pays des adresses modifiées vers les documents sources et publications.
 
-    Chaîne : addresses.countries → source_documents.countries → publications.countries
+    Chaîne : addresses.countries → source_publications.countries → publications.countries
     """
     if not address_ids:
         return
 
-    # 1. Recalculer countries des source_documents (OA + WoS + ScanR) concernés
+    # 1. Recalculer countries des source_publications (OA + WoS + ScanR) concernés
     cur.execute("""
-        UPDATE source_documents sd
+        UPDATE source_publications sd
         SET countries = sub.new_countries
         FROM (
-            SELECT sa.source_document_id AS doc_id,
+            SELECT sa.source_publication_id AS doc_id,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
                     FROM source_authorship_addresses saa2
                     JOIN addresses a2 ON a2.id = saa2.address_id
                     JOIN source_authorships sa2 ON sa2.id = saa2.source_authorship_id,
                     LATERAL unnest(a2.countries) AS c
-                    WHERE sa2.source_document_id = sa.source_document_id
+                    WHERE sa2.source_publication_id = sa.source_publication_id
                       AND a2.countries IS NOT NULL
                    ) AS new_countries
             FROM source_authorship_addresses saa
             JOIN source_authorships sa ON sa.id = saa.source_authorship_id
             WHERE saa.address_id = ANY(%s)
-            GROUP BY sa.source_document_id
+            GROUP BY sa.source_publication_id
         ) sub
         WHERE sd.id = sub.doc_id
           AND sd.countries IS DISTINCT FROM sub.new_countries
@@ -43,13 +43,13 @@ def propagate_countries_for_addresses(cur, address_ids: list[int]):
     addr_docs = cur.rowcount
 
     # 2. Recalculer publications.countries pour les publications touchées
-    #    Maintenant que source_documents.countries est à jour, on lit tout depuis là
+    #    Maintenant que source_publications.countries est à jour, on lit tout depuis là
     cur.execute("""
         WITH affected_pubs AS (
             SELECT DISTINCT sd.publication_id
             FROM source_authorship_addresses saa
             JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE saa.address_id = ANY(%s) AND sd.publication_id IS NOT NULL
         )
         UPDATE publications p
@@ -57,7 +57,7 @@ def propagate_countries_for_addresses(cur, address_ids: list[int]):
         FROM (
             SELECT ap.publication_id,
                    (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM source_documents sd,
+                    FROM source_publications sd,
                     LATERAL unnest(sd.countries) AS c
                     WHERE sd.publication_id = ap.publication_id
                       AND sd.countries IS NOT NULL
@@ -226,7 +226,7 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)):
                 sd.source_id
             FROM source_authorship_addresses saa
             JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             JOIN publications p ON p.id = sd.publication_id
             LEFT JOIN journals j ON j.id = p.journal_id
             WHERE saa.address_id = %s AND sd.publication_id IS NOT NULL

@@ -51,7 +51,7 @@ def _uca_authors_cte(lab_id: int = 0, with_pub_count: bool = False) -> tuple[str
     pub_count_col = ""
     if with_pub_count:
         pub_count_col = """,
-                   (SELECT COUNT(DISTINCT sa2.source_document_id)
+                   (SELECT COUNT(DISTINCT sa2.source_publication_id)
                     FROM source_authorships sa2
                     WHERE sa2.source_person_id = sauth.id AND sa2.in_perimeter = TRUE) AS uca_pub_count"""
 

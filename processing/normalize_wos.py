@@ -8,7 +8,7 @@ Usage:
 
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
-    source_documents                        (lien staging ↔ publication, source='wos')
+    source_publications                        (lien staging ↔ publication, source='wos')
     source_persons                          (auteurs unifiés, source='wos')
     source_authorships                      (lien document × auteur, source='wos')
 
@@ -429,7 +429,7 @@ def find_publication(cur, rec: dict, journal_id: int | None) -> int | None:
 def insert_wos_document(cur, rec: dict, staging_id: int,
                         publication_id: int | None,
                         pub_meta: dict | None = None) -> int:
-    """Crée/retrouve l'entrée source_documents pour WoS. Retourne source_documents.id."""
+    """Crée/retrouve l'entrée source_publications pour WoS. Retourne source_publications.id."""
     journal_id = pub_meta.get("journal_id") if pub_meta else None
     oa_status = pub_meta.get("oa_status") if pub_meta else None
     language = pub_meta.get("language") if pub_meta else None
@@ -444,7 +444,7 @@ def insert_wos_document(cur, rec: dict, staging_id: int,
     external_ids = Json(rec["external_ids"]) if rec.get("external_ids") else None
 
     cur.execute("""
-        INSERT INTO source_documents
+        INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id,
              journal_id, oa_status, language, container_title,
@@ -456,20 +456,20 @@ def insert_wos_document(cur, rec: dict, staging_id: int,
                 %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
-                source_documents.publication_id, EXCLUDED.publication_id
+                source_publications.publication_id, EXCLUDED.publication_id
             ),
-            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
-            journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
-            oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
-            language = COALESCE(EXCLUDED.language, source_documents.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title),
-            abstract = COALESCE(EXCLUDED.abstract, source_documents.abstract),
-            cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_documents.cited_by_count, 0)),
-            biblio = COALESCE(EXCLUDED.biblio, source_documents.biblio),
-            keywords = COALESCE(EXCLUDED.keywords, source_documents.keywords),
-            topics = COALESCE(EXCLUDED.topics, source_documents.topics),
-            urls = COALESCE(EXCLUDED.urls, source_documents.urls),
-            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
+            doc_type = COALESCE(EXCLUDED.doc_type, source_publications.doc_type),
+            journal_id = COALESCE(EXCLUDED.journal_id, source_publications.journal_id),
+            oa_status = COALESCE(EXCLUDED.oa_status, source_publications.oa_status),
+            language = COALESCE(EXCLUDED.language, source_publications.language),
+            container_title = COALESCE(EXCLUDED.container_title, source_publications.container_title),
+            abstract = COALESCE(EXCLUDED.abstract, source_publications.abstract),
+            cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_publications.cited_by_count, 0)),
+            biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
+            keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
+            topics = COALESCE(EXCLUDED.topics, source_publications.topics),
+            urls = COALESCE(EXCLUDED.urls, source_publications.urls),
+            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
         RETURNING id
     """, (rec["ut"], rec["doi"], rec["title"], rec["pub_year"],
           rec["doc_type"], publication_id, staging_id,
@@ -584,7 +584,7 @@ def upsert_wos_institution(cur, org: dict) -> int | None:
     return result
 
 
-def process_authorships(cur, rec: dict, source_document_id: int):
+def process_authorships(cur, rec: dict, source_publication_id: int):
     """Traite les authorships d'un record WoS + crée les liens adresses et institutions."""
     # Résoudre toutes les organisations du document en un seul pass
     all_orgs = set()
@@ -657,9 +657,9 @@ def process_authorships(cur, rec: dict, source_document_id: int):
     # Phase 2 : batch INSERT source_authorships
     from utils.normalize import normalize_name_form
 
-    values = {}  # clé = (source_document_id, source_person_id), dédupliqué
+    values = {}  # clé = (source_publication_id, source_person_id), dédupliqué
     for author, source_person_id in author_ids:
-        key = (source_document_id, source_person_id)
+        key = (source_publication_id, source_person_id)
         if key in values:
             continue  # même auteur déjà traité pour ce document
 
@@ -674,18 +674,18 @@ def process_authorships(cur, rec: dict, source_document_id: int):
         name_norm = normalize_name_form(author["full_name"])
 
         values[key] = (
-            'wos', source_document_id, source_person_id, author["position"],
+            'wos', source_publication_id, source_person_id, author["position"],
             author["is_corresponding"], raw_affiliations, name_norm,
             institution_ids or None, author.get("roles"), author["full_name"],
         )
 
     _ev(cur, """
         INSERT INTO source_authorships
-            (source, source_document_id, source_person_id, author_position,
+            (source, source_publication_id, source_person_id, author_position,
              is_corresponding, raw_affiliations, author_name_normalized,
              source_struct_ids, roles, raw_author_name)
         VALUES %s
-        ON CONFLICT (source_document_id, source_person_id) DO UPDATE SET
+        ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
             raw_affiliations = COALESCE(
                 EXCLUDED.raw_affiliations,
                 source_authorships.raw_affiliations
@@ -719,8 +719,8 @@ def process_authorships(cur, rec: dict, source_document_id: int):
         sa_ids_needed = [said for _, said in authors_with_addrs]
         cur.execute("""
             SELECT source_person_id, id FROM source_authorships
-            WHERE source_document_id = %s AND source_person_id = ANY(%s)
-        """, (source_document_id, sa_ids_needed))
+            WHERE source_publication_id = %s AND source_person_id = ANY(%s)
+        """, (source_publication_id, sa_ids_needed))
         sa_id_map = {r[0]: r[1] for r in cur.fetchall()}
 
         # Construire les liens
@@ -764,7 +764,7 @@ def process_record(cur, staging_row: tuple) -> bool:
         journal_id = upsert_journal(cur, rec, publisher_id)
         t.mark("publisher+journal")
 
-        # Métadonnées de publication (stockées sur source_documents)
+        # Métadonnées de publication (stockées sur source_publications)
         pub_meta = extract_pub_metadata(rec, journal_id)
 
         # Chercher une publication existante (sans créer)
@@ -772,7 +772,7 @@ def process_record(cur, staging_row: tuple) -> bool:
 
         # Idempotence : réutiliser le publication_id existant
         cur.execute(
-            "SELECT publication_id FROM source_documents WHERE source = 'wos' AND source_id = %s",
+            "SELECT publication_id FROM source_publications WHERE source = 'wos' AND source_id = %s",
             (rec["ut"],))
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc[0]:
@@ -787,14 +787,14 @@ def process_record(cur, staging_row: tuple) -> bool:
         if publication_id:
             publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
 
-        # Document WoS (source_documents)
-        source_document_id = insert_wos_document(
+        # Document WoS (source_publications)
+        source_publication_id = insert_wos_document(
             cur, rec, staging_id, publication_id, pub_meta
         )
         t.mark("wos_doc")
 
         # Auteurs et authorships
-        process_authorships(cur, rec, source_document_id)
+        process_authorships(cur, rec, source_publication_id)
         t.mark("authors")
 
         # Recalcul complet des métadonnées depuis toutes les sources

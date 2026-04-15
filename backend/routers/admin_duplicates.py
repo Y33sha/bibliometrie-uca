@@ -25,12 +25,12 @@ async def next_duplicate_candidate(
               AND NOT (
                   (p1.doc_type IN ('article', 'review') AND p2.doc_type = 'conference_paper')
                   OR (p2.doc_type IN ('article', 'review') AND p1.doc_type = 'conference_paper'))
-              AND NOT (EXISTS (SELECT 1 FROM source_documents WHERE publication_id = p1.id AND source = 'hal')
-                       AND EXISTS (SELECT 1 FROM source_documents WHERE publication_id = p2.id AND source = 'hal'))
-              AND NOT (EXISTS (SELECT 1 FROM source_documents WHERE publication_id = p1.id AND source = 'openalex')
-                       AND EXISTS (SELECT 1 FROM source_documents WHERE publication_id = p2.id AND source = 'openalex'))
-              AND NOT (EXISTS (SELECT 1 FROM source_documents WHERE publication_id = p1.id AND source = 'wos')
-                       AND EXISTS (SELECT 1 FROM source_documents WHERE publication_id = p2.id AND source = 'wos'))
+              AND NOT (EXISTS (SELECT 1 FROM source_publications WHERE publication_id = p1.id AND source = 'hal')
+                       AND EXISTS (SELECT 1 FROM source_publications WHERE publication_id = p2.id AND source = 'hal'))
+              AND NOT (EXISTS (SELECT 1 FROM source_publications WHERE publication_id = p1.id AND source = 'openalex')
+                       AND EXISTS (SELECT 1 FROM source_publications WHERE publication_id = p2.id AND source = 'openalex'))
+              AND NOT (EXISTS (SELECT 1 FROM source_publications WHERE publication_id = p1.id AND source = 'wos')
+                       AND EXISTS (SELECT 1 FROM source_publications WHERE publication_id = p2.id AND source = 'wos'))
               AND NOT EXISTS (
                   SELECT 1 FROM distinct_publications dp
                   WHERE dp.pub_id_a = LEAST(p1.id, p2.id) AND dp.pub_id_b = GREATEST(p1.id, p2.id))
@@ -64,7 +64,7 @@ async def next_duplicate_candidate(
                 return None
 
             sources = []
-            cur.execute("SELECT source, source_id FROM source_documents WHERE publication_id = %s", (pub_id,))
+            cur.execute("SELECT source, source_id FROM source_publications WHERE publication_id = %s", (pub_id,))
             for r in cur.fetchall():
                 sources.append({"source": r["source"], "source_id": r["source_id"]})
 

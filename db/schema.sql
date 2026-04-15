@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jn33O35AbKa4etrjF2rctKT5Wa1cdNXdxKz8HIsFjB5abQ05Lg91z2sJ5Oh6vrZ
+\restrict E9UdhTDQHl1P1s14leY6e9PeZFDMS7LPbZq867XXcVARCCfVMGXfSDAoywTEu5v
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -72,7 +72,10 @@ CREATE TYPE public.doc_type AS ENUM (
     'poster',
     'letter',
     'erratum',
-    'retraction'
+    'retraction',
+    'book_review',
+    'data_paper',
+    'proceedings'
 );
 
 
@@ -137,10 +140,31 @@ CREATE TYPE public.structure_type AS ENUM (
 --
 
 CREATE FUNCTION public.normalize_name_form(text) RETURNS text
-    LANGUAGE sql IMMUTABLE STRICT
+    LANGUAGE sql IMMUTABLE
     AS $_$
-  SELECT trim(regexp_replace(unaccent(lower(trim($1))), '[^a-z0-9]+', ' ', 'g'));
+  SELECT trim(regexp_replace(
+    unaccent(lower(trim(
+      translate($1,
+        E'\u2010\u2011\u2012\u2013\u2014\u2015\u00AD\u2018\u2019\u201A\u2032\u201C\u201D',
+        E'---------\x27\x27\x27\x27""')
+    ))),
+    '[^a-z0-9]+', ' ', 'g'));
 $_$;
+
+
+--
+-- Name: reset_addresses_extracted(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.reset_addresses_extracted() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    UPDATE source_authorships SET addresses_extracted = FALSE
+    WHERE id = OLD.source_authorship_id;
+    RETURN OLD;
+END;
+$$;
 
 
 SET default_tablespace = '';
@@ -189,7 +213,6 @@ CREATE TABLE public.addresses (
     raw_text text NOT NULL,
     normalized_text text CONSTRAINT addresses_raw_text_normalized_not_null NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
-    country text,
     pub_count integer DEFAULT 0,
     countries character(2)[],
     suggested_countries character(2)[],
@@ -485,7 +508,10 @@ CREATE TABLE public.journals (
     oa_model text,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    journal_type text DEFAULT 'journal'::text,
+    is_academic boolean DEFAULT true,
+    doi_prefix text
 );
 
 
@@ -706,7 +732,13 @@ CREATE TABLE public.publications (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     countries text[],
-    sources public.source_type[] DEFAULT '{}'::public.source_type[] NOT NULL
+    sources public.source_type[] DEFAULT '{}'::public.source_type[] NOT NULL,
+    meta jsonb,
+    is_retracted boolean DEFAULT false NOT NULL,
+    abstract text,
+    keywords text[],
+    topics jsonb,
+    biblio jsonb
 );
 
 
@@ -775,7 +807,8 @@ CREATE TABLE public.publishers (
     is_predatory boolean DEFAULT false,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    doi_prefix text
 );
 
 
@@ -807,6 +840,84 @@ CREATE TABLE public.schema_migrations (
     version text NOT NULL,
     applied_at timestamp with time zone DEFAULT now()
 );
+
+
+--
+-- Name: source_authorship_addresses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_authorship_addresses (
+    id integer NOT NULL,
+    source_authorship_id integer NOT NULL,
+    address_id integer NOT NULL
+);
+
+
+--
+-- Name: source_authorship_addresses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.source_authorship_addresses_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: source_authorship_addresses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.source_authorship_addresses_id_seq OWNED BY public.source_authorship_addresses.id;
+
+
+--
+-- Name: source_authorships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_authorships (
+    id integer NOT NULL,
+    source text NOT NULL,
+    source_publication_id integer NOT NULL,
+    source_person_id integer CONSTRAINT source_authorships_source_author_id_not_null NOT NULL,
+    author_position smallint,
+    in_perimeter boolean DEFAULT false,
+    excluded boolean DEFAULT false,
+    structure_ids integer[],
+    source_struct_ids integer[],
+    countries text[],
+    person_id integer,
+    author_name_normalized text,
+    is_corresponding boolean DEFAULT false,
+    roles text[] DEFAULT ARRAY['author'::text],
+    raw_affiliations jsonb,
+    source_data jsonb,
+    authorship_id integer,
+    addresses_extracted boolean DEFAULT false NOT NULL,
+    raw_author_name text
+);
+
+
+--
+-- Name: source_authorships_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.source_authorships_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: source_authorships_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.source_authorships_id_seq OWNED BY public.source_authorships.id;
 
 
 --
@@ -849,87 +960,10 @@ ALTER SEQUENCE public.source_persons_id_seq OWNED BY public.source_persons.id;
 
 
 --
--- Name: source_authorship_addresses; Type: TABLE; Schema: public; Owner: -
+-- Name: source_publications; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.source_authorship_addresses (
-    id integer NOT NULL,
-    source_authorship_id integer NOT NULL,
-    address_id integer NOT NULL
-);
-
-
---
--- Name: source_authorship_addresses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.source_authorship_addresses_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: source_authorship_addresses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.source_authorship_addresses_id_seq OWNED BY public.source_authorship_addresses.id;
-
-
---
--- Name: source_authorships; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.source_authorships (
-    id integer NOT NULL,
-    source text NOT NULL,
-    source_document_id integer NOT NULL,
-    source_person_id integer NOT NULL,
-    author_position smallint,
-    in_perimeter boolean DEFAULT false,
-    excluded boolean DEFAULT false,
-    structure_ids integer[],
-    source_struct_ids integer[],
-    countries text[],
-    person_id integer,
-    author_name_normalized text,
-    is_corresponding boolean DEFAULT false,
-    roles text[],
-    raw_affiliations jsonb,
-    source_data jsonb,
-    authorship_id integer,
-    raw_author_name text
-);
-
-
---
--- Name: source_authorships_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.source_authorships_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: source_authorships_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.source_authorships_id_seq OWNED BY public.source_authorships.id;
-
-
---
--- Name: source_documents; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.source_documents (
+CREATE TABLE public.source_publications (
     id integer NOT NULL,
     source text NOT NULL,
     source_id text NOT NULL,
@@ -941,16 +975,28 @@ CREATE TABLE public.source_documents (
     staging_id integer,
     created_at timestamp with time zone DEFAULT now(),
     countries text[],
-    collections text[],
-    external_ids jsonb
+    hal_collections text[],
+    external_ids jsonb,
+    urls text[],
+    cited_by_count integer,
+    journal_id integer,
+    oa_status text,
+    language text,
+    container_title text,
+    is_retracted boolean,
+    abstract text,
+    keywords text[],
+    topics jsonb,
+    biblio jsonb,
+    meta jsonb
 );
 
 
 --
--- Name: source_documents_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: source_publications_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE public.source_documents_id_seq
+CREATE SEQUENCE public.source_publications_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -960,10 +1006,10 @@ CREATE SEQUENCE public.source_documents_id_seq
 
 
 --
--- Name: source_documents_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: source_publications_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.source_documents_id_seq OWNED BY public.source_documents.id;
+ALTER SEQUENCE public.source_publications_id_seq OWNED BY public.source_publications.id;
 
 
 --
@@ -1020,7 +1066,8 @@ CREATE TABLE public.staging (
     raw_hash text,
     last_seen_at timestamp with time zone DEFAULT now(),
     meta_hash text,
-    collection text
+    not_found boolean DEFAULT false,
+    hal_collections text[]
 );
 
 
@@ -1125,7 +1172,8 @@ CREATE TABLE public.structures (
     ror_id text,
     rnsr_id text,
     hal_collection text,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    api_ids jsonb
 );
 
 
@@ -1156,7 +1204,7 @@ ALTER SEQUENCE public.structures_id_seq OWNED BY public.structures.id;
 CREATE VIEW public.v_active_publications AS
  SELECT id
    FROM public.publications
-  WHERE (doc_type <> 'peer_review'::public.doc_type);
+  WHERE (doc_type <> ALL (ARRAY['peer_review'::public.doc_type, 'memoir'::public.doc_type]));
 
 
 --
@@ -1279,13 +1327,6 @@ ALTER TABLE ONLY public.publishers ALTER COLUMN id SET DEFAULT nextval('public.p
 
 
 --
--- Name: source_persons id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_persons ALTER COLUMN id SET DEFAULT nextval('public.source_persons_id_seq'::regclass);
-
-
---
 -- Name: source_authorship_addresses id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1300,10 +1341,17 @@ ALTER TABLE ONLY public.source_authorships ALTER COLUMN id SET DEFAULT nextval('
 
 
 --
--- Name: source_documents id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: source_persons id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.source_documents ALTER COLUMN id SET DEFAULT nextval('public.source_documents_id_seq'::regclass);
+ALTER TABLE ONLY public.source_persons ALTER COLUMN id SET DEFAULT nextval('public.source_persons_id_seq'::regclass);
+
+
+--
+-- Name: source_publications id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_publications ALTER COLUMN id SET DEFAULT nextval('public.source_publications_id_seq'::regclass);
 
 
 --
@@ -1606,22 +1654,6 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
--- Name: source_persons source_persons_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_persons
-    ADD CONSTRAINT source_persons_pkey PRIMARY KEY (id);
-
-
---
--- Name: source_persons source_persons_source_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_persons
-    ADD CONSTRAINT source_persons_source_source_id_key UNIQUE (source, source_id);
-
-
---
 -- Name: source_authorship_addresses source_authorship_addresses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1646,27 +1678,43 @@ ALTER TABLE ONLY public.source_authorships
 
 
 --
--- Name: source_authorships source_authorships_source_document_id_source_person_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: source_authorships source_authorships_source_publication_id_source_person_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_authorships
-    ADD CONSTRAINT source_authorships_source_document_id_source_person_id_key UNIQUE (source_document_id, source_person_id);
+    ADD CONSTRAINT source_authorships_source_publication_id_source_person_id_key UNIQUE (source_publication_id, source_person_id);
 
 
 --
--- Name: source_documents source_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: source_persons source_persons_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.source_documents
-    ADD CONSTRAINT source_documents_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.source_persons
+    ADD CONSTRAINT source_persons_pkey PRIMARY KEY (id);
 
 
 --
--- Name: source_documents source_documents_source_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: source_persons source_persons_source_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.source_documents
-    ADD CONSTRAINT source_documents_source_source_id_key UNIQUE (source, source_id);
+ALTER TABLE ONLY public.source_persons
+    ADD CONSTRAINT source_persons_source_source_id_key UNIQUE (source, source_id);
+
+
+--
+-- Name: source_publications source_publications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_publications
+    ADD CONSTRAINT source_publications_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: source_publications source_publications_source_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_publications
+    ADD CONSTRAINT source_publications_source_source_id_key UNIQUE (source, source_id);
 
 
 --
@@ -1754,13 +1802,6 @@ ALTER TABLE ONLY public.structure_name_forms
 --
 
 CREATE UNIQUE INDEX addresses_raw_text_key ON public.addresses USING btree (md5(raw_text));
-
-
---
--- Name: idx_addr_norm_trgm; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_addr_norm_trgm ON public.addresses USING gin (normalized_text public.gin_trgm_ops);
 
 
 --
@@ -1904,6 +1945,13 @@ CREATE INDEX idx_jnl_nf_journal ON public.journal_name_forms USING btree (journa
 
 
 --
+-- Name: idx_journals_doi_prefix; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_journals_doi_prefix ON public.journals USING btree (doi_prefix) WHERE (doi_prefix IS NOT NULL);
+
+
+--
 -- Name: idx_journals_eissn; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2002,13 +2050,6 @@ CREATE INDEX idx_pub_title_trgm ON public.publications USING gin (title_normaliz
 
 
 --
--- Name: idx_publications_doi; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_publications_doi ON public.publications USING btree (lower(doi)) WHERE (doi IS NOT NULL);
-
-
---
 -- Name: idx_publications_journal; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2016,17 +2057,17 @@ CREATE INDEX idx_publications_journal ON public.publications USING btree (journa
 
 
 --
+-- Name: idx_publications_meta; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publications_meta ON public.publications USING gin (meta) WHERE (meta IS NOT NULL);
+
+
+--
 -- Name: idx_publications_sources; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_publications_sources ON public.publications USING gin (sources);
-
-
---
--- Name: idx_publications_title_norm; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_publications_title_norm ON public.publications USING btree (title_normalized);
 
 
 --
@@ -2051,6 +2092,13 @@ CREATE INDEX idx_publications_year_type ON public.publications USING btree (pub_
 
 
 --
+-- Name: idx_publishers_doi_prefix; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publishers_doi_prefix ON public.publishers USING btree (doi_prefix) WHERE (doi_prefix IS NOT NULL);
+
+
+--
 -- Name: idx_publishers_name_norm; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2072,20 +2120,6 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 
 
 --
--- Name: idx_sa_doc_perimeter; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sa_doc_perimeter ON public.source_authorships USING btree (source_document_id) INCLUDE (structure_ids) WHERE (in_perimeter = true);
-
-
---
--- Name: idx_sa_doc_pos_affil; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sa_doc_pos_affil ON public.source_authorships USING btree (source_document_id, author_position) WHERE ((in_perimeter = false) AND (raw_affiliations IS NOT NULL));
-
-
---
 -- Name: idx_sa_excluded; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2093,10 +2127,10 @@ CREATE INDEX idx_sa_excluded ON public.source_authorships USING btree (excluded)
 
 
 --
--- Name: idx_sa_in_perimeter; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_sa_orphan_perimeter; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_in_perimeter ON public.source_authorships USING btree (in_perimeter) WHERE (in_perimeter = true);
+CREATE INDEX idx_sa_orphan_perimeter ON public.source_authorships USING btree (source_publication_id, source_person_id) WHERE ((person_id IS NULL) AND (in_perimeter = true));
 
 
 --
@@ -2107,24 +2141,10 @@ CREATE INDEX idx_sa_person ON public.source_authorships USING btree (person_id) 
 
 
 --
--- Name: idx_sa_source; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_sa_source_person; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_source ON public.source_authorships USING btree (source);
-
-
---
--- Name: idx_sa_source_author; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sa_source_author ON public.source_authorships USING btree (source_person_id);
-
-
---
--- Name: idx_sa_source_doc; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sa_source_doc ON public.source_authorships USING btree (source_document_id);
+CREATE INDEX idx_sa_source_person ON public.source_authorships USING btree (source_person_id);
 
 
 --
@@ -2132,13 +2152,6 @@ CREATE INDEX idx_sa_source_doc ON public.source_authorships USING btree (source_
 --
 
 CREATE INDEX idx_saa_address ON public.source_authorship_addresses USING btree (address_id);
-
-
---
--- Name: idx_saa_authorship; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_saa_authorship ON public.source_authorship_addresses USING btree (source_authorship_id);
 
 
 --
@@ -2163,59 +2176,45 @@ CREATE INDEX idx_source_persons_person ON public.source_persons USING btree (per
 
 
 --
--- Name: idx_source_persons_source; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_pubs_countries; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_persons_source ON public.source_persons USING btree (source);
-
-
---
--- Name: idx_source_docs_collections; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_docs_collections ON public.source_documents USING gin (collections) WHERE (collections IS NOT NULL);
+CREATE INDEX idx_source_pubs_countries ON public.source_publications USING gin (countries) WHERE (countries IS NOT NULL);
 
 
 --
--- Name: idx_source_docs_countries; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_pubs_doi; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_docs_countries ON public.source_documents USING gin (countries) WHERE (countries IS NOT NULL);
-
-
---
--- Name: idx_source_docs_doi; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_docs_doi ON public.source_documents USING btree (doi) WHERE (doi IS NOT NULL);
+CREATE INDEX idx_source_pubs_doi ON public.source_publications USING btree (doi) WHERE (doi IS NOT NULL);
 
 
 --
--- Name: idx_source_docs_external_ids; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_pubs_external_ids; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_docs_external_ids ON public.source_documents USING gin (external_ids) WHERE (external_ids IS NOT NULL);
-
-
---
--- Name: idx_source_docs_pub; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_docs_pub ON public.source_documents USING btree (publication_id) WHERE (publication_id IS NOT NULL);
+CREATE INDEX idx_source_pubs_external_ids ON public.source_publications USING gin (external_ids) WHERE (external_ids IS NOT NULL);
 
 
 --
--- Name: idx_source_docs_source; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_pubs_hal_collections; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_docs_source ON public.source_documents USING btree (source);
+CREATE INDEX idx_source_pubs_hal_collections ON public.source_publications USING gin (hal_collections) WHERE (hal_collections IS NOT NULL);
 
 
 --
--- Name: idx_source_docs_staging; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_pubs_pub; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_docs_staging ON public.source_documents USING btree (staging_id) WHERE (staging_id IS NOT NULL);
+CREATE INDEX idx_source_pubs_pub ON public.source_publications USING btree (publication_id) WHERE (publication_id IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_staging; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_staging ON public.source_publications USING btree (staging_id) WHERE (staging_id IS NOT NULL);
 
 
 --
@@ -2258,6 +2257,13 @@ CREATE INDEX idx_source_structs_structure ON public.source_structures USING btre
 --
 
 CREATE INDEX idx_staging_doi ON public.staging USING btree (doi) WHERE (doi IS NOT NULL);
+
+
+--
+-- Name: idx_staging_not_found; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_staging_not_found ON public.staging USING btree (source, source_id) WHERE (not_found = true);
 
 
 --
@@ -2314,6 +2320,13 @@ CREATE INDEX idx_structures_type ON public.structures USING btree (structure_typ
 --
 
 CREATE UNIQUE INDEX publications_doi_lower_key ON public.publications USING btree (lower(doi)) WHERE (doi IS NOT NULL);
+
+
+--
+-- Name: source_authorship_addresses trg_reset_addresses_extracted; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_reset_addresses_extracted AFTER DELETE ON public.source_authorship_addresses FOR EACH ROW EXECUTE FUNCTION public.reset_addresses_extracted();
 
 
 --
@@ -2501,14 +2514,6 @@ ALTER TABLE ONLY public.publisher_name_forms
 
 
 --
--- Name: source_persons source_persons_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_persons
-    ADD CONSTRAINT source_persons_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE SET NULL;
-
-
---
 -- Name: source_authorship_addresses source_authorship_addresses_address_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2549,27 +2554,43 @@ ALTER TABLE ONLY public.source_authorships
 
 
 --
--- Name: source_authorships source_authorships_source_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: source_authorships source_authorships_source_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_authorships
-    ADD CONSTRAINT source_authorships_source_document_id_fkey FOREIGN KEY (source_document_id) REFERENCES public.source_documents(id) ON DELETE CASCADE;
+    ADD CONSTRAINT source_authorships_source_publication_id_fkey FOREIGN KEY (source_publication_id) REFERENCES public.source_publications(id) ON DELETE CASCADE;
 
 
 --
--- Name: source_documents source_documents_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: source_persons source_persons_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.source_documents
-    ADD CONSTRAINT source_documents_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES public.publications(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.source_persons
+    ADD CONSTRAINT source_persons_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE SET NULL;
 
 
 --
--- Name: source_documents source_documents_staging_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: source_publications source_publications_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.source_documents
-    ADD CONSTRAINT source_documents_staging_id_fkey FOREIGN KEY (staging_id) REFERENCES public.staging(id);
+ALTER TABLE ONLY public.source_publications
+    ADD CONSTRAINT source_publications_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES public.journals(id);
+
+
+--
+-- Name: source_publications source_publications_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_publications
+    ADD CONSTRAINT source_publications_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES public.publications(id) ON DELETE SET NULL;
+
+
+--
+-- Name: source_publications source_publications_staging_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_publications
+    ADD CONSTRAINT source_publications_staging_id_fkey FOREIGN KEY (staging_id) REFERENCES public.staging(id);
 
 
 --
@@ -2600,5 +2621,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jn33O35AbKa4etrjF2rctKT5Wa1cdNXdxKz8HIsFjB5abQ05Lg91z2sJ5Oh6vrZ
+\unrestrict E9UdhTDQHl1P1s14leY6e9PeZFDMS7LPbZq867XXcVARCCfVMGXfSDAoywTEu5v
 

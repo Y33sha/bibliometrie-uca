@@ -120,7 +120,7 @@ def get_person_details(cur, person_ids):
                (prh.id IS NOT NULL) AS has_rh,
                (SELECT COUNT(DISTINCT sd.publication_id)
                 FROM source_authorships sa2
-                JOIN source_documents sd ON sd.id = sa2.source_document_id
+                JOIN source_publications sd ON sd.id = sa2.source_publication_id
                 WHERE sa2.person_id = p.id AND sd.publication_id IS NOT NULL
                ) AS pub_count,
                (SELECT array_agg(DISTINCT pi.id_type || ':' || pi.id_value)
@@ -135,7 +135,7 @@ def get_person_details(cur, person_ids):
             (prh.id IS NOT NULL) DESC,
             (SELECT COUNT(DISTINCT sd.publication_id)
              FROM source_authorships sa2
-             JOIN source_documents sd ON sd.id = sa2.source_document_id
+             JOIN source_publications sd ON sd.id = sa2.source_publication_id
              WHERE sa2.person_id = p.id AND sd.publication_id IS NOT NULL
             ) DESC,
             p.id ASC

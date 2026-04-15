@@ -1,7 +1,7 @@
 """
 Fusionne les publications qui partagent le même NNT dans external_ids.
 
-Quand plusieurs source_documents (theses.fr, OpenAlex, ScanR) pointent vers
+Quand plusieurs source_publications (theses.fr, OpenAlex, ScanR) pointent vers
 des publications différentes mais ont le même NNT, on fusionne ces publications
 en une seule.
 
@@ -29,7 +29,7 @@ def find_duplicates(cur):
         SELECT sd.external_ids->>'nnt' AS nnt,
                array_agg(DISTINCT sd.publication_id ORDER BY sd.publication_id) AS pub_ids,
                array_agg(DISTINCT sd.source::text ORDER BY sd.source::text) AS sources
-        FROM source_documents sd
+        FROM source_publications sd
         WHERE sd.external_ids->>'nnt' IS NOT NULL
           AND sd.publication_id IS NOT NULL
         GROUP BY sd.external_ids->>'nnt'
@@ -42,16 +42,16 @@ def find_duplicates(cur):
 def choose_target(cur, pub_ids):
     """Choisit la publication à garder.
 
-    Priorité : celle avec DOI > celle avec le plus de source_documents > id le plus bas.
+    Priorité : celle avec DOI > celle avec le plus de source_publications > id le plus bas.
     """
     cur.execute("""
         SELECT p.id, p.doi,
-               (SELECT COUNT(*) FROM source_documents sd WHERE sd.publication_id = p.id) AS sd_count
+               (SELECT COUNT(*) FROM source_publications sd WHERE sd.publication_id = p.id) AS sd_count
         FROM publications p
         WHERE p.id = ANY(%s)
         ORDER BY
             (p.doi IS NOT NULL AND p.doi ~ '^10\\.') DESC,
-            (SELECT COUNT(*) FROM source_documents sd WHERE sd.publication_id = p.id) DESC,
+            (SELECT COUNT(*) FROM source_publications sd WHERE sd.publication_id = p.id) DESC,
             p.id ASC
     """, (pub_ids,))
     return cur.fetchall()

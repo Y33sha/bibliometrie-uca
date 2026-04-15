@@ -343,22 +343,22 @@ async def publications_facets(
                 cur.execute(f"""
                     SELECT
                         COUNT(*) FILTER (WHERE NOT EXISTS (
-                            SELECT 1 FROM source_documents sd
+                            SELECT 1 FROM source_publications sd
                             WHERE sd.publication_id = p.id AND sd.source = 'hal'
                         )) AS hors_hal,
                         COUNT(*) FILTER (WHERE EXISTS (
-                            SELECT 1 FROM source_documents sd
+                            SELECT 1 FROM source_publications sd
                             WHERE sd.publication_id = p.id AND sd.source = 'hal'
                               AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s])
                         )) AS hors_collection,
                         COUNT(*) FILTER (WHERE EXISTS (
-                            SELECT 1 FROM source_documents sd
+                            SELECT 1 FROM source_publications sd
                             WHERE sd.publication_id = p.id AND sd.source = 'hal'
                               AND sd.hal_collections @> ARRAY[%s]
                         ) AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown'))
                         ) AS notice,
                         COUNT(*) FILTER (WHERE EXISTS (
-                            SELECT 1 FROM source_documents sd
+                            SELECT 1 FROM source_publications sd
                             WHERE sd.publication_id = p.id AND sd.source = 'hal'
                               AND sd.hal_collections @> ARRAY[%s]
                         ) AND p.oa_status IS NOT NULL
@@ -372,11 +372,11 @@ async def publications_facets(
                 cur.execute(f"""
                     SELECT
                         COUNT(*) FILTER (WHERE NOT EXISTS (
-                            SELECT 1 FROM source_documents sd
+                            SELECT 1 FROM source_publications sd
                             WHERE sd.publication_id = p.id AND sd.source = 'hal'
                         )) AS hors_hal,
                         COUNT(*) FILTER (WHERE EXISTS (
-                            SELECT 1 FROM source_documents sd
+                            SELECT 1 FROM source_publications sd
                             WHERE sd.publication_id = p.id AND sd.source = 'hal'
                         )) AS hors_collection,
                         0 AS notice,
@@ -457,8 +457,8 @@ async def export_publications_csv(
 
         if person_id:
             conditions = ["""
-                EXISTS (SELECT 1 FROM source_documents sd
-                        JOIN source_authorships sa ON sa.source_document_id = sd.id
+                EXISTS (SELECT 1 FROM source_publications sd
+                        JOIN source_authorships sa ON sa.source_publication_id = sd.id
                         WHERE sd.publication_id = p.id AND sa.person_id = %s
                           AND sa.excluded = FALSE
                           AND sa.roles && ARRAY['author']::text[])
@@ -574,7 +574,7 @@ async def export_publications_csv(
                     max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
                     max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
                     max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id
-                FROM source_documents sd WHERE sd.publication_id = p.id
+                FROM source_publications sd WHERE sd.publication_id = p.id
             ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}
@@ -638,7 +638,7 @@ async def get_publication(pub_id: int):
         # b) Sources — countries depuis le document
         cur.execute("""
             SELECT sd.source, sd.source_id, sd.doi, sd.hal_collections, sd.countries
-            FROM source_documents sd WHERE sd.publication_id = %s
+            FROM source_publications sd WHERE sd.publication_id = %s
         """, (pub_id,))
         sources = cur.fetchall()
 
@@ -662,7 +662,7 @@ async def get_publication(pub_id: int):
             SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                    sa.in_perimeter, sa.structure_ids, sa.excluded, sa.countries
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.source = 'hal' AND sd.publication_id = %s
             ORDER BY sa.author_position
         """, (pub_id,))
@@ -685,7 +685,7 @@ async def get_publication(pub_id: int):
                           AND addr.countries IS NOT NULL)
                    ) AS countries
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.source = 'openalex' AND sd.publication_id = %s
             ORDER BY sa.author_position
         """, (pub_id,))
@@ -706,7 +706,7 @@ async def get_publication(pub_id: int):
                           AND addr.countries IS NOT NULL)
                    ) AS countries
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.source = 'wos' AND sd.publication_id = %s
             ORDER BY sa.author_position
         """, (pub_id,))
@@ -717,7 +717,7 @@ async def get_publication(pub_id: int):
             SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                    sa.roles, sa.in_perimeter
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.source = 'theses' AND sd.publication_id = %s
             ORDER BY sa.author_position NULLS LAST, sa.raw_author_name
         """, (pub_id,))
@@ -729,7 +729,7 @@ async def get_publication(pub_id: int):
             cur.execute("""
                 SELECT sd.meta AS sd_meta, p.meta AS pub_meta
                 FROM publications p
-                LEFT JOIN source_documents sd ON sd.publication_id = p.id AND sd.source = 'theses'
+                LEFT JOIN source_publications sd ON sd.publication_id = p.id AND sd.source = 'theses'
                 WHERE p.id = %s
                 LIMIT 1
             """, (pub_id,))
@@ -996,24 +996,24 @@ async def list_publications(
             for v in hal_status_values:
                 if v == 'hors_hal':
                     hal_parts.append(
-                        "NOT EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal')"
+                        "NOT EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal')"
                     )
                 elif v == 'hors_collection':
                     if lab_hal_col:
                         hal_parts.append(
-                            "EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
+                            "EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
                             " AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s]))"
                         )
                         params.append(lab_hal_col)
                     else:
                         # No collection configured → all HAL docs are "hors collection"
                         hal_parts.append(
-                            "EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal')"
+                            "EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal')"
                         )
                 elif v == 'notice':
                     if lab_hal_col:
                         hal_parts.append(
-                            "(EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
+                            "(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
                             " AND sd.hal_collections @> ARRAY[%s])"
                             " AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))"
                         )
@@ -1021,7 +1021,7 @@ async def list_publications(
                 elif v == 'ok':
                     if lab_hal_col:
                         hal_parts.append(
-                            "(EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
+                            "(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
                             " AND sd.hal_collections @> ARRAY[%s])"
                             " AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN ('closed', 'unknown'))"
                         )
@@ -1116,10 +1116,10 @@ async def list_publications(
                     max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
                     max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
                     max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id,
-                    (SELECT sd2.hal_collections FROM source_documents sd2
+                    (SELECT sd2.hal_collections FROM source_publications sd2
                      WHERE sd2.publication_id = p.id AND sd2.source = 'hal'
                      LIMIT 1) AS hal_collections
-                FROM source_documents sd WHERE sd.publication_id = p.id
+                FROM source_publications sd WHERE sd.publication_id = p.id
             ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}

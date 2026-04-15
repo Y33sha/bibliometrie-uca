@@ -8,7 +8,7 @@ Usage:
 
 Tables peuplées :
     publications                (table de vérité)
-    source_documents            (source='theses')
+    source_publications            (source='theses')
     source_persons              (source='theses')
     source_authorships          (source='theses', avec roles)
 
@@ -62,7 +62,7 @@ def _thesis_author_compatible(cur, pub_id: int, author: tuple[str, str]) -> bool
     cur.execute("""
         SELECT sa.last_name, sa.first_name
         FROM source_authorships sas
-        JOIN source_documents sd ON sd.id = sas.source_document_id
+        JOIN source_publications sd ON sd.id = sas.source_publication_id
         JOIN source_persons sa ON sa.id = sas.source_person_id
         WHERE sd.publication_id = %s
           AND 'author' = ANY(sas.roles)
@@ -193,7 +193,7 @@ def _update_thesis_meta(cur, pub_id: int, these: dict):
 # =============================================================
 
 def _build_source_meta(these: dict) -> dict | None:
-    """Construit le meta jsonb pour source_documents à partir des données brutes."""
+    """Construit le meta jsonb pour source_publications à partir des données brutes."""
     meta = {}
     ds = _parse_date_iso(these.get("dateSoutenance"))
     di = _parse_date_iso(these.get("datePremiereInscriptionDoctorat"))
@@ -224,7 +224,7 @@ def _build_source_meta(these: dict) -> dict | None:
 def insert_source_document(cur, these: dict, staging_id: int,
                            theses_id: str, publication_id: int | None,
                            pub_meta: dict | None = None) -> int:
-    """Crée/retrouve l'entrée source_documents pour theses.fr."""
+    """Crée/retrouve l'entrée source_publications pour theses.fr."""
     title = these.get("titrePrincipal") or ""
     doc_type = "thesis" if these.get("dateSoutenance") else "ongoing_thesis"
 
@@ -272,7 +272,7 @@ def insert_source_document(cur, these: dict, staging_id: int,
     container_title = pub_meta.get("container_title") if pub_meta else None
 
     cur.execute("""
-        INSERT INTO source_documents
+        INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id, external_ids,
              journal_id, oa_status, language, container_title,
@@ -282,17 +282,17 @@ def insert_source_document(cur, these: dict, staging_id: int,
                 %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
-                source_documents.publication_id, EXCLUDED.publication_id
+                source_publications.publication_id, EXCLUDED.publication_id
             ),
-            doc_type = COALESCE(EXCLUDED.doc_type, source_documents.doc_type),
-            external_ids = COALESCE(source_documents.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
-            journal_id = COALESCE(EXCLUDED.journal_id, source_documents.journal_id),
-            oa_status = COALESCE(EXCLUDED.oa_status, source_documents.oa_status),
-            language = COALESCE(EXCLUDED.language, source_documents.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_documents.container_title),
-            keywords = COALESCE(EXCLUDED.keywords, source_documents.keywords),
-            topics = COALESCE(EXCLUDED.topics, source_documents.topics),
-            meta = COALESCE(EXCLUDED.meta, source_documents.meta)
+            doc_type = COALESCE(EXCLUDED.doc_type, source_publications.doc_type),
+            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
+            journal_id = COALESCE(EXCLUDED.journal_id, source_publications.journal_id),
+            oa_status = COALESCE(EXCLUDED.oa_status, source_publications.oa_status),
+            language = COALESCE(EXCLUDED.language, source_publications.language),
+            container_title = COALESCE(EXCLUDED.container_title, source_publications.container_title),
+            keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
+            topics = COALESCE(EXCLUDED.topics, source_publications.topics),
+            meta = COALESCE(EXCLUDED.meta, source_publications.meta)
         RETURNING id
     """, (theses_id, doi, title, pub_year, doc_type, publication_id, staging_id, external_ids,
           journal_id, oa_status, language, container_title,
@@ -354,7 +354,7 @@ def upsert_source_author(cur, person: dict) -> int | None:
 # SOURCE AUTHORSHIPS
 # =============================================================
 
-def process_persons(cur, these: dict, source_document_id: int):
+def process_persons(cur, these: dict, source_publication_id: int):
     """Traite tous les rôles d'une thèse : auteurs, directeurs, rapporteurs, etc.
 
     Une même personne peut apparaître dans plusieurs champs (ex: directeur + jury).
@@ -404,18 +404,18 @@ def process_persons(cur, these: dict, source_document_id: int):
 
         cur.execute("""
             INSERT INTO source_authorships
-                (source, source_document_id, source_person_id, author_position,
+                (source, source_publication_id, source_person_id, author_position,
                  author_name_normalized, roles, in_perimeter, raw_affiliations,
                  raw_author_name)
             VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s, %s, %s)
-            ON CONFLICT (source_document_id, source_person_id) DO UPDATE SET
+            ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
                 roles = EXCLUDED.roles,
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 in_perimeter = EXCLUDED.in_perimeter,
                 raw_affiliations = EXCLUDED.raw_affiliations,
                 raw_author_name = EXCLUDED.raw_author_name,
                 addresses_extracted = FALSE
-        """, (source_document_id, source_person_id,
+        """, (source_publication_id, source_person_id,
               position if is_author else None,
               author_full_name,
               roles, is_author,
@@ -441,7 +441,7 @@ def process_work(cur, row: dict) -> bool:
             logger.warning(f"Thèse {theses_id} sans titre — skip")
             return False
 
-        # Métadonnées de publication (stockées sur source_documents)
+        # Métadonnées de publication (stockées sur source_publications)
         pub_meta = extract_pub_metadata(these)
 
         # Chercher une publication existante (sans créer)
@@ -449,7 +449,7 @@ def process_work(cur, row: dict) -> bool:
 
         # Idempotence : réutiliser le publication_id existant
         cur.execute(
-            "SELECT publication_id FROM source_documents WHERE source = 'theses' AND source_id = %s",
+            "SELECT publication_id FROM source_publications WHERE source = 'theses' AND source_id = %s",
             (theses_id,))
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc["publication_id"]:
@@ -464,13 +464,13 @@ def process_work(cur, row: dict) -> bool:
         if publication_id:
             publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
 
-        # Document (source_documents) — publication_id peut être NULL
-        source_document_id = insert_source_document(
+        # Document (source_publications) — publication_id peut être NULL
+        source_publication_id = insert_source_document(
             cur, these, staging_id, theses_id, publication_id, pub_meta
         )
 
         # Personnes et authorships (avec rôles)
-        process_persons(cur, these, source_document_id)
+        process_persons(cur, these, source_publication_id)
 
         # Recalcul complet des métadonnées depuis toutes les sources
         if publication_id:
@@ -548,8 +548,8 @@ def main():
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Erreurs : {errors}")
 
-        cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'theses'")
-        logger.info(f"  source_documents (theses) : {cur.fetchone()['cnt']}")
+        cur.execute("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'theses'")
+        logger.info(f"  source_publications (theses) : {cur.fetchone()['cnt']}")
         cur.execute("SELECT COUNT(*) AS cnt FROM source_persons WHERE source = 'theses'")
         logger.info(f"  source_persons (theses) : {cur.fetchone()['cnt']}")
         cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'theses'")

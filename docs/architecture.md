@@ -8,7 +8,7 @@ Le schéma repose sur une distinction entre des tables "sources" et des tables "
 flowchart LR
     subgraph sources
     direction LR
-        source_documents---source_authorships
+        source_publications---source_authorships
         source_persons---source_authorships
         source_authorships---source_structures
     end
@@ -18,14 +18,14 @@ flowchart LR
         persons---authorships
         authorships---structures
     end
-    source_documents--->publications
+    source_publications--->publications
     source_authorships--->persons
     
 ```
 
 ### Entités principales et relations
 
-Les tables sources s'organisent selon un schéma en quatre tables: `source_documents`, `source_persons`, `source_authorships`, `source_structures`. Une `authorship` représente la contribution d'**un** auteur à **une** publication. C'est elle qui porte l'information d'affiliation (`structure_ids`).
+Les tables sources s'organisent selon un schéma en quatre tables: `source_publications`, `source_persons`, `source_authorships`, `source_structures`. Une `authorship` représente la contribution d'**un** auteur à **une** publication. C'est elle qui porte l'information d'affiliation (`structure_ids`).
 
 ```mermaid
 erDiagram 
@@ -71,7 +71,7 @@ Table unique pour toutes les sources. Colonnes notables : `source` (enum), `sour
 
 | Table | Propriétaire |
 |-------|-------------|
-| `source_documents` | `processing/normalize_*.py` |
+| `source_publications` | `processing/normalize_*.py` |
 | `source_persons` | `processing/normalize_*.py` |
 | `source_authorships` | `processing/normalize_*.py` |
 | `source_structures` | `processing/normalize_hal.py`, `enrich_hal_structures.py` |
@@ -82,7 +82,7 @@ Note : `person_id` sur `source_authorships` est écrit par `services/persons.py`
 
 | Table | Propriétaire | Notes |
 |-------|-------------|-------|
-| `publications` | `services/publications.py` | `refresh_from_sources()` recalcule les métadonnées depuis les source_documents |
+| `publications` | `services/publications.py` | `refresh_from_sources()` recalcule les métadonnées depuis les source_publications |
 | `distinct_publications` | API admin | paires marquées distinctes malgré titre identique |
 | `apc_payments` | import APC (CSV) | — |
 | `journals` | `services/journals.py` | — |
@@ -195,7 +195,7 @@ flowchart LR
     authorships --- persons
     structures --- apc_payments
     apc_payments ---|DOI| publications
-    source_documents-->|normalize|publications
+    source_publications-->|normalize|publications
     publications---journals
     journals---publishers
         
@@ -204,7 +204,7 @@ flowchart LR
     classDef csv fill:#fa5
     class apc_payments csv
     classDef auto fill:#adf,stroke:#58c
-    class source_documents,publications,journals,publishers,authorships,persons auto
+    class source_publications,publications,journals,publishers,authorships,persons auto
     classDef main stroke-width:4px,font-weight:bold
     class structures,publications,persons,authorships main
 
@@ -267,7 +267,7 @@ Table de laison recensant les contributions individuelles aux publications. Chaq
 
 Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses).
 
-- **`source_documents`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées brutes (doc_type non mappé, oa_status) et les métadonnées enrichies (abstract, keywords, topics, biblio, meta). Le champ `hal_collections` (text[]) est spécifique à HAL.
+- **`source_publications`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées brutes (doc_type non mappé, oa_status) et les métadonnées enrichies (abstract, keywords, topics, biblio, meta). Le champ `hal_collections` (text[]) est spécifique à HAL.
 - **`source_persons`** : un enregistrement par auteur par source. Déduplication par `(source, source_id)`. Pour HAL, le `source_id` est le PPN IdRef ou le hal_person_id ; pour les autres sources, c'est l'identifiant de l'entité auteur dans la source.
 - **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `in_perimeter`, `structure_ids` (affiliation résolue), `roles` (auteur, directeur, rapporteur — theses.fr), `excluded` (authorship rejetée manuellement).
 - **`source_structures`** : structures HAL (mapping vers `structures` canoniques via `structure_id`). Utilisée par `populate_affiliations` pour résoudre les affiliations HAL.

@@ -101,7 +101,7 @@ class TestPublicationService:
         assert is_new is True
 
     def test_enrich_via_refresh(self, db):
-        """refresh_from_sources enrichit les métadonnées depuis les source_documents."""
+        """refresh_from_sources enrichit les métadonnées depuis les source_publications."""
         journal_id = create_journal(db, "Science")
         pub_id, _ = find_or_create(
             db, title="Pub", title_normalized="pub",
@@ -109,7 +109,7 @@ class TestPublicationService:
             oa_status="unknown")
         # Créer un source_document avec plus d'info
         db.execute("""
-            INSERT INTO source_documents (source, source_id, title, pub_year,
+            INSERT INTO source_publications (source, source_id, title, pub_year,
                                           publication_id, oa_status, journal_id)
             VALUES ('openalex', 'W999enrich', 'Pub', 2024, %s, 'gold', %s)
         """, (pub_id, journal_id))

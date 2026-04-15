@@ -18,14 +18,14 @@ Usage:
 Phases (dans l'ordre d'execution):
     extract        Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
     cross_imports  Cross-imports entre sources (DOIs manquants, fetch HAL par hal-id/NNT)
-    normalize      Normalisation staging -> tables sources (source_documents, source_persons,
+    normalize      Normalisation staging -> tables sources (source_publications, source_persons,
                    source_authorships). Rattachement aux publications existantes par DOI/NNT/
                    HAL-ID, mais PAS de creation de publications. Inclut enrichissement
                    structures HAL et moissonnage identifiants HAL (ORCID, IdRef).
                    Vide le raw_data du staging apres traitement + VACUUM.
     addresses      Extraction des adresses depuis raw_affiliations, resolution structures, pays
     affiliations   Resolution affiliations sur source_authorships (in_perimeter, structure_ids)
-    publications   Creation des publications pour les source_documents in-perimeter non
+    publications   Creation des publications pour les source_publications in-perimeter non
                    rattaches + merges inter-sources (HAL-ID, NNT)
     persons        Creation/mapping personnes + formes de noms
     authorships    Reconstruction authorships canoniques (table de verite) + propagation UCA
@@ -154,7 +154,7 @@ def phase_normalize(**kw):
 
     Rattache aux publications existantes (DOI/NNT/HAL-ID) sans en creer.
     Stocke les metadonnees (abstract, keywords, topics, biblio, etc.) sur
-    source_documents. Vide le raw_data du staging apres traitement.
+    source_publications. Vide le raw_data du staging apres traitement.
     Pour HAL : enrichit les structures et moissonne les identifiants (ORCID, IdRef).
     """
     sources = kw.get("sources", set(ALL_SOURCES_SET))
@@ -222,7 +222,7 @@ def phase_affiliations(**kw):
 def phase_publications(**kw):
     """Creation des publications canoniques.
 
-    Ne cree des publications que pour les source_documents ayant au moins
+    Ne cree des publications que pour les source_publications ayant au moins
     une source_authorship in_perimeter (evite de creer des publications
     hors perimetre). Applique ensuite les merges inter-sources (HAL-ID, NNT).
     """

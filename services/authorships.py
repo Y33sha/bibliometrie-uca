@@ -96,7 +96,7 @@ def delete_orphan_authorships(cur, person_id: int) -> int:
         DELETE FROM authorships a
         WHERE a.person_id = %s
           AND NOT EXISTS (SELECT 1 FROM source_authorships sa
-                          JOIN source_documents sd ON sd.id = sa.source_document_id
+                          JOIN source_publications sd ON sd.id = sa.source_publication_id
                           WHERE sa.person_id = %s AND sd.publication_id = a.publication_id
                             AND NOT sa.excluded)
     """, (person_id, person_id))
@@ -203,7 +203,7 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
         WITH affected_pubs AS (
             SELECT DISTINCT sd.publication_id, sa.person_id
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.id = ANY(%s)
               AND sa.source IN ('openalex', 'wos', 'scanr')
               AND sd.publication_id IS NOT NULL
@@ -213,8 +213,8 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
             SELECT sd.publication_id, sa.person_id, sa.source,
                    sa.structure_ids AS struct_ids
             FROM affected_pubs ap
-            JOIN source_documents sd ON sd.publication_id = ap.publication_id
-            JOIN source_authorships sa ON sa.source_document_id = sd.id
+            JOIN source_publications sd ON sd.publication_id = ap.publication_id
+            JOIN source_authorships sa ON sa.source_publication_id = sd.id
                 AND sa.person_id = ap.person_id
                 AND sa.source = sd.source
             WHERE sa.in_perimeter = TRUE AND sa.structure_ids IS NOT NULL

@@ -342,12 +342,12 @@ def merge_journals(cur, target_id: int, source_id: int):
     if target_id == source_id:
         raise RuntimeError("Impossible de fusionner un journal avec lui-même")
 
-    # 1. Transférer les publications et source_documents
+    # 1. Transférer les publications et source_publications
     cur.execute(
         "UPDATE publications SET journal_id = %s WHERE journal_id = %s",
         (target_id, source_id))
     cur.execute(
-        "UPDATE source_documents SET journal_id = %s WHERE journal_id = %s",
+        "UPDATE source_publications SET journal_id = %s WHERE journal_id = %s",
         (target_id, source_id))
 
     # 2. Transférer les formes de nom

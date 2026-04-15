@@ -209,12 +209,12 @@ class TestNoDoi:
 # ── Enrichissement ───────────────────────────────────────────────
 
 class TestRefreshFromSources:
-    """Teste refresh_from_sources : recalcul des métadonnées depuis source_documents."""
+    """Teste refresh_from_sources : recalcul des métadonnées depuis source_publications."""
 
     def _insert_sd(self, db, pub_id, source, **kwargs):
         """Insère un source_document rattaché à pub_id."""
         db.execute("""
-            INSERT INTO source_documents (source, source_id, title, pub_year, publication_id,
+            INSERT INTO source_publications (source, source_id, title, pub_year, publication_id,
                                           doc_type, oa_status, language, journal_id)
             VALUES (%s, %s, 'Test', 2024, %s, %s, %s, %s, %s)
         """, (source, f"{source}-{pub_id}-{kwargs.get('oa_status', '')}",
@@ -223,7 +223,7 @@ class TestRefreshFromSources:
               kwargs.get("language"), kwargs.get("journal_id")))
 
     def test_language_from_source(self, db):
-        """refresh_from_sources propage les métadonnées des source_documents."""
+        """refresh_from_sources propage les métadonnées des source_publications."""
         id1, _ = _create(db, doi="10.1234/enrich", oa_status="closed",
                          pub_year=2024, doc_type="article")
         self._insert_sd(db, id1, "hal", language="en", oa_status="closed")
@@ -294,7 +294,7 @@ class TestRefreshFromSources:
         """Les keywords sont fusionnés sans doublons."""
         id1, _ = _create(db, pub_year=2024, doc_type="article")
         db.execute("""
-            INSERT INTO source_documents (source, source_id, title, pub_year, publication_id, keywords)
+            INSERT INTO source_publications (source, source_id, title, pub_year, publication_id, keywords)
             VALUES ('hal', 'hal-kw1', 'Test', 2024, %s, ARRAY['python', 'data']),
                    ('openalex', 'oa-kw1', 'Test', 2024, %s, ARRAY['Data', 'machine learning'])
         """, (id1, id1))
@@ -313,7 +313,7 @@ class TestRefreshFromSources:
         """Les champs JSONB sont fusionnés, priorité au premier."""
         id1, _ = _create(db, pub_year=2024, doc_type="article")
         db.execute("""
-            INSERT INTO source_documents (source, source_id, title, pub_year, publication_id, topics)
+            INSERT INTO source_publications (source, source_id, title, pub_year, publication_id, topics)
             VALUES ('hal', 'hal-tp1', 'Test', 2024, %s, '{"hal_domains": ["info"]}'),
                    ('openalex', 'oa-tp1', 'Test', 2024, %s, '{"concepts": ["AI"], "hal_domains": ["math"]}')
         """, (id1, id1))
@@ -330,7 +330,7 @@ class TestRefreshFromSources:
         """is_retracted = True si au moins une source le dit."""
         id1, _ = _create(db, pub_year=2024, doc_type="article")
         db.execute("""
-            INSERT INTO source_documents (source, source_id, title, pub_year, publication_id, is_retracted)
+            INSERT INTO source_publications (source, source_id, title, pub_year, publication_id, is_retracted)
             VALUES ('hal', 'hal-ret1', 'Test', 2024, %s, FALSE),
                    ('openalex', 'oa-ret1', 'Test', 2024, %s, TRUE)
         """, (id1, id1))
@@ -351,7 +351,7 @@ class TestRefreshFromSources:
 def _create_source_doc_with_nnt(db, pub_id, source, source_id, nnt):
     """Helper : crée un source_document avec NNT dans external_ids."""
     db.execute("""
-        INSERT INTO source_documents
+        INSERT INTO source_publications
             (source, source_id, title, pub_year, publication_id, external_ids)
         VALUES (%s, %s, 'Thesis', 2023, %s, %s)
     """, (source, source_id, pub_id, Json({"nnt": nnt})))
