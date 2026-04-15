@@ -169,6 +169,9 @@ def main():
                         help="Supprime les affiliations auto")
     parser.add_argument("--rerun", action="store_true",
                         help="Reset auto puis relance la résolution complète")
+    parser.add_argument("--mode", choices=["full", "weekly", "monthly", "daily"],
+                        default="full",
+                        help="Mode d'exécution (daily = incrémental)")
     args = parser.parse_args()
 
     conn = get_connection()
@@ -179,6 +182,8 @@ def main():
         # Supprimer les affiliations auto-détectées (matched_form_id IS NOT NULL)
         cur.execute("DELETE FROM address_structures WHERE matched_form_id IS NOT NULL")
         affils = cur.rowcount
+        # Remettre resolved_at à NULL pour forcer le recalcul
+        cur.execute("UPDATE addresses SET resolved_at = NULL")
         conn.commit()
         logger.info(f"Reset : {affils} affiliations auto supprimées")
         if args.reset and not args.rerun:
@@ -194,11 +199,20 @@ def main():
     logger.info(f"  {len(tutelles_map)} structures avec tutelles")
     logger.info(f"  {len(perimeter)} structures dans le périmètre")
 
-    # Toutes les adresses (l'upsert ne touche pas aux liens déjà confirmés/rejetés)
-    cur.execute("""
-        SELECT a.id, a.raw_text FROM addresses a
-        ORDER BY a.id
-    """)
+    # En mode daily : uniquement les adresses jamais résolues
+    if args.mode == "daily":
+        cur.execute("""
+            SELECT a.id, a.raw_text FROM addresses a
+            WHERE a.resolved_at IS NULL
+            ORDER BY a.id
+        """)
+        logger.info("Mode incrémental : adresses non résolues uniquement")
+    else:
+        cur.execute("""
+            SELECT a.id, a.raw_text FROM addresses a
+            ORDER BY a.id
+        """)
+
     rows = cur.fetchall()
     total = len(rows)
     logger.info(f"  {total} adresses à résoudre")
@@ -273,6 +287,7 @@ def process_addresses(cur, conn, rows, forms, forms_by_structure, tutelles_map,
                     DO UPDATE SET matched_form_id = EXCLUDED.matched_form_id
             """, (addr_id, structure_id, form_id))
 
+        cur.execute("UPDATE addresses SET resolved_at = now() WHERE id = %s", (addr_id,))
         processed += 1
         if processed % BATCH_SIZE == 0:
             conn.commit()

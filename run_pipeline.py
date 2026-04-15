@@ -203,7 +203,8 @@ def phase_addresses(**kw):
     for src in address_sources:
         if src in sources:
             run_python("processing/populate_addresses.py", "--source", src)
-    run_python("processing/resolve_addresses.py")
+    mode = kw.get("mode", "full")
+    run_python("processing/resolve_addresses.py", "--mode", mode)
 
 
 def phase_affiliations(**kw):
