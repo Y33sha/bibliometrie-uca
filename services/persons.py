@@ -254,6 +254,16 @@ _SOURCE_CONFIG = {
         "id_fields": ["orcid"],
         "source_ids_fields": {},
     },
+    "scanr": {
+        "author_fk": "source_author_id",
+        "id_fields": ["orcid", "idref"],
+        "source_ids_fields": {},
+    },
+    "theses": {
+        "author_fk": "source_author_id",
+        "id_fields": ["orcid", "idref"],
+        "source_ids_fields": {},
+    },
 }
 
 
