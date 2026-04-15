@@ -56,10 +56,11 @@ def get_hal_collections(cur) -> dict[str, str]:
     Dérivé des structures du périmètre UCA qui ont un hal_collection renseigné.
     Fallback sur la table config, puis sur settings.py.
     """
-    # 1. Depuis les structures du périmètre UCA
+    # 1. Depuis les structures du périmètre d'extraction
     try:
-        from utils.perimeter import get_persons_structure_ids
-        perimeter_ids = get_persons_structure_ids(cur)
+        from utils.perimeter import get_perimeter_structure_ids
+        perim_code = _get_from_db(cur, "perimeter_extraction") or "uca_wide"
+        perimeter_ids = get_perimeter_structure_ids(cur, perim_code)
         if perimeter_ids:
             cur.execute("""
                 SELECT hal_collection, COALESCE(acronym, name) AS label
@@ -85,23 +86,9 @@ def get_hal_collections(cur) -> dict[str, str]:
         return {}
 
 
-def get_hal_portals(cur) -> list[str]:
-    """Retourne la liste des portails HAL à interroger."""
-    val = _get_from_db(cur, "hal_portals")
-    if val and isinstance(val, list):
-        return val
 
-    # Fallback ancien format (scalar)
-    val = _get_from_db(cur, "hal_portal")
-    if val and isinstance(val, str):
-        return [val]
-
-    try:
-        from config.settings import HAL
-        portal = HAL.get("portal", "clermont-univ")
-        return [portal] if portal else []
-    except ImportError:
-        return ["clermont-univ"]
+# get_hal_portals supprimé — l'extraction par portail a été retirée,
+# seules les collections sont utilisées.
 
 
 def get_hal_extra_collections(cur) -> list[str]:

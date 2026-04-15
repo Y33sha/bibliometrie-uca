@@ -2,18 +2,13 @@
 Extraction des publications UCA depuis l'API HAL.
 
 Usage:
-    python extract_hal.py                    # extraction complète (collections + portail)
-    python extract_hal.py --collections-only # collections labo uniquement
-    python extract_hal.py --portal-only      # portail global uniquement
+    python extract_hal.py                    # extraction complète
     python extract_hal.py --dry-run          # compter sans insérer
 
-Stratégie en deux passes :
-1. Par collection labo → chaque work est tagué avec sa/ses collection(s)
-2. Via le portail global clermont-univ → attrape ce qui n'est dans aucune collection
-
+Extraction par collection labo : chaque work est tagué avec sa/ses collection(s).
 Les résultats bruts sont stockés dans staging (JSONB).
-Un même halId peut apparaître dans plusieurs collections ; le champ `collection`
-stocke la liste séparée par des virgules.
+Un même halId peut apparaître dans plusieurs collections ; le champ `hal_collections`
+stocke la liste.
 """
 
 import argparse
@@ -28,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from db.connection import get_connection
 from extraction.common import compute_hash, clean_doi, get_existing_ids, setup_logger
 from utils.hal import HAL_FIELDS
-from utils.app_config import get_years, get_hal_collections, get_hal_portals, get_hal_extra_collections, get_api_base_urls
+from utils.app_config import get_years, get_hal_collections, get_hal_extra_collections, get_api_base_urls
 
 # ----- Logging -----
 logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))
@@ -52,10 +47,8 @@ def build_query(years: list, since: str = None) -> str:
     return f"producedDateY_i:[{year_min} TO {year_max}]"
 
 
-def build_url(base_url: str, portal: str = None) -> str:
-    """Construit l'URL de base (avec ou sans portail)."""
-    if portal:
-        return f"{base_url}/{portal}/"
+def build_url(base_url: str) -> str:
+    """Construit l'URL de base."""
     return f"{base_url}/"
 
 
@@ -185,76 +178,6 @@ def extract_collection(
     return total_count, total_new
 
 
-def extract_portal(
-    conn,
-    existing_ids: set,
-    base_url: str,
-    portal: str,
-    years: list = None,
-    since: str = None,
-    dry_run: bool = False,
-) -> tuple[int, int]:
-    """
-    Extrait tous les works du portail global.
-    Retourne (nb_total, nb_nouveaux).
-    """
-    url = build_url(base_url, portal=portal)
-    query = build_query(years=years, since=since)
-
-    # Premier appel pour le count
-    first_page = fetch_page(url, query, start=0)
-    total_count = first_page["response"]["numFound"]
-    logger.info(f"  Portail {portal} : {total_count} docs")
-
-    if dry_run or total_count == 0:
-        return total_count, 0
-
-    start = 0
-    total_new = 0
-    page_num = 0
-
-    while start < total_count:
-        page_num += 1
-
-        if start == 0:
-            data = first_page
-        else:
-            data = fetch_page(url, query, start=start)
-
-        docs = data["response"]["docs"]
-        new_in_page = 0
-
-        for doc in docs:
-            hal_id = extract_hal_id(doc)
-            if not hal_id:
-                continue
-
-            doi = extract_doi(doc)
-            is_new = hal_id not in existing_ids
-
-            # Tag "portail" pour les works trouvés uniquement via le portail global
-            collection_tag = f"_portail_{portal}"
-            upsert_work(conn, hal_id, doi, doc, collection_tag)
-
-            if is_new:
-                existing_ids.add(hal_id)
-                new_in_page += 1
-
-        conn.commit()
-        total_new += new_in_page
-        start += len(docs)
-
-        if page_num % 5 == 0:
-            logger.info(
-                f"    Page {page_num} : {start}/{total_count} traités, "
-                f"{total_new} nouveaux"
-            )
-
-        time.sleep(REQUEST_DELAY)
-
-    return total_count, total_new
-
-
 def get_existing_hal_ids(conn) -> set:
     """Récupère les halId déjà en base."""
     return get_existing_ids(conn, "hal")
@@ -262,25 +185,17 @@ def get_existing_hal_ids(conn) -> set:
 
 def main():
     parser = argparse.ArgumentParser(description="Extraction HAL → staging")
-    parser.add_argument("--collections-only", action="store_true",
-                        help="Extraire uniquement les collections labo")
-    parser.add_argument("--portal-only", action="store_true",
-                        help="Extraire uniquement le portail global")
     parser.add_argument("--dry-run", action="store_true",
                         help="Compter sans insérer")
     parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
     parser.add_argument("--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)")
-    parser.add_argument("--since", help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents modifiés depuis cette date")
+    parser.add_argument("--since", help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents soumis depuis cette date")
     args = parser.parse_args()
-
-    do_collections = not args.portal_only
-    do_portal = not args.collections_only
 
     conn = get_connection()
     cur = conn.cursor()
     collections = get_hal_collections(cur)
     extra_collections = get_hal_extra_collections(cur)
-    portals = get_hal_portals(cur)
     base_url = get_api_base_urls(cur).get("hal", "https://api.archives-ouvertes.fr/search/")
     config_years = get_years(cur, mode=args.mode)
     cur.close()
@@ -290,10 +205,15 @@ def main():
 
     logger.info("=== Extraction HAL démarrée ===")
     if since:
-        logger.info(f"Mode incrémental : documents modifiés depuis {since}")
+        logger.info(f"Mode incrémental : documents soumis depuis {since}")
     else:
         logger.info(f"Années : {years}")
-    logger.info(f"Collections : {do_collections} ({len(collections)} labos + {len(extra_collections)} extra) | Portails : {do_portal} ({portals})")
+
+    all_collections = dict(collections)
+    for code in extra_collections:
+        if code not in all_collections:
+            all_collections[code] = code
+    logger.info(f"Collections : {len(all_collections)} ({len(collections)} labos + {len(extra_collections)} extra)")
 
     try:
         existing_ids = get_existing_hal_ids(conn)
@@ -301,30 +221,13 @@ def main():
 
         grand_total_new = 0
 
-        # --- Passe 1 : collections labo ---
-        if do_collections:
-            all_collections = dict(collections)
-            # Ajouter les collections supplémentaires (hors structures)
-            for code in extra_collections:
-                if code not in all_collections:
-                    all_collections[code] = code
-            logger.info(f"\n--- Extraction par collection ({len(all_collections)} au total) ---")
-            for code, label in all_collections.items():
-                total, new = extract_collection(
-                    code, label, conn, existing_ids, base_url, years=years, since=since, dry_run=args.dry_run
-                )
-                grand_total_new += new
-                if not args.dry_run and new > 0:
-                    logger.info(f"    ->{new} nouveaux insérés")
-
-        # --- Passe 2 : portails ---
-        if do_portal:
-            for portal in portals:
-                logger.info(f"\n--- Extraction portail {portal} ---")
-                total, new = extract_portal(conn, existing_ids, base_url, portal, years=years, since=since, dry_run=args.dry_run)
-                grand_total_new += new
-                if not args.dry_run:
-                    logger.info(f"    ->{new} nouveaux (non couverts par les collections)")
+        for code, label in all_collections.items():
+            total, new = extract_collection(
+                code, label, conn, existing_ids, base_url, years=years, since=since, dry_run=args.dry_run
+            )
+            grand_total_new += new
+            if not args.dry_run and new > 0:
+                logger.info(f"    ->{new} nouveaux insérés")
 
         logger.info(f"\n=== Terminé : {grand_total_new} works insérés au total ===")
         logger.info(f"Total en staging : {len(existing_ids)} works HAL")
