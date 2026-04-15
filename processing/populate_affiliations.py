@@ -259,8 +259,8 @@ def main():
     parser.add_argument("--stats", action="store_true", help="Stats uniquement")
     parser.add_argument("--sources", default="hal,openalex,wos,scanr,theses",
                         help="Sources à traiter (défaut: toutes)")
-    parser.add_argument("--mode", default="full", choices=["full", "daily"],
-                        help="Mode d'exécution (daily: traite uniquement les authorships récentes)")
+    parser.add_argument("--mode", default="full", choices=["full", "weekly", "monthly", "daily"],
+                        help="Mode d'exécution (daily: incrémental, autres: complet)")
     args = parser.parse_args()
 
     sources = set(s.strip() for s in args.sources.split(",") if s.strip())
