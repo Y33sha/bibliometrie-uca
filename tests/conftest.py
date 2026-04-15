@@ -85,6 +85,21 @@ def pytest_configure(config):
     """
     _create_test_db()
 
+    # Empêcher les scripts importés par les tests d'écrire dans les
+    # fichiers log de production (processing/logs/*.log)
+    import utils.log as _log_module
+    _original_setup = _log_module.setup_logger
+
+    def _test_setup_logger(name, log_dir):
+        import logging
+        logger = logging.getLogger(name)
+        logger.setLevel(logging.INFO)
+        if not logger.handlers:
+            logger.addHandler(logging.NullHandler())
+        return logger
+
+    _log_module.setup_logger = _test_setup_logger
+
 
 @pytest.fixture
 def db():
