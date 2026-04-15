@@ -1059,7 +1059,7 @@ def _run_populate_affiliations(db):
     """Exécute populate_affiliations sur le curseur de test."""
     from processing.populate_affiliations import (
         step1_hal_structure_ids, step2_hal_in_perimeter,
-        step3_openalex, step3b_wos, step3c_scanr, step3d_theses,
+        _step_address_source, step3d_theses,
     )
     from utils.perimeter import get_persons_structure_ids, get_affiliations_structure_ids
 
@@ -1068,9 +1068,9 @@ def _run_populate_affiliations(db):
 
     step1_hal_structure_ids(db)
     step2_hal_in_perimeter(db, perimeter_ids)
-    step3_openalex(db, perimeter_ids, wide_ids)
-    step3b_wos(db, perimeter_ids, wide_ids)
-    step3c_scanr(db, perimeter_ids, wide_ids)
+    _step_address_source(db, "openalex", perimeter_ids, wide_ids)
+    _step_address_source(db, "wos", perimeter_ids, wide_ids)
+    _step_address_source(db, "scanr", perimeter_ids, wide_ids)
     step3d_theses(db, wide_ids)
 
 
