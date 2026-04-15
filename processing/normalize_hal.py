@@ -33,7 +33,7 @@ from db.connection import get_connection
 from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.normalize import normalize_text
-from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
+from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi, ZenodoResolutionError
 from utils.authorship_roles import map_role
 from utils.doc_types import map_doc_type
 from services.publications import find_or_create as find_or_create_publication, try_merge_by_doi, refresh_from_sources
@@ -594,7 +594,11 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None) -> b
         # est déjà en staging → skip pour éviter les doublons
         raw_doi = clean_doi(as_str(doc.get("doiId_s")))
         if is_zenodo_doi(raw_doi):
-            version_doi = resolve_zenodo_doi(raw_doi)
+            try:
+                version_doi = resolve_zenodo_doi(raw_doi)
+            except ZenodoResolutionError as e:
+                logger.warning(f"  {hal_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
+                return False  # ne pas marquer processed
             if version_doi:
                 cur.execute(
                     "SELECT id FROM staging WHERE source = 'hal' AND lower(doi) = lower(%s)",
