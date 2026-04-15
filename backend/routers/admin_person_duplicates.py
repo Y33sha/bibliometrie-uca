@@ -164,7 +164,7 @@ def _get_person_dedup_detail(cur, person_id):
                        WHEN 'wos' THEN 'WoS'
                        WHEN 'scanr' THEN 'ScanR'
                    END
-                ) FROM source_documents sd WHERE sd.publication_id = pub.id
+                ) FROM source_publications sd WHERE sd.publication_id = pub.id
                ) AS sources
         FROM authorships a
         JOIN publications pub ON pub.id = a.publication_id
@@ -315,14 +315,14 @@ CONFLICT_PAIRS_SQL = """
 WITH pub_author_counts AS (
     SELECT publication_id, MAX(cnt) AS max_authors FROM (
         SELECT sd.publication_id, COUNT(*) AS cnt
-        FROM source_documents sd JOIN source_authorships sa ON sa.source_document_id = sd.id
+        FROM source_publications sd JOIN source_authorships sa ON sa.source_publication_id = sd.id
         WHERE NOT sa.excluded GROUP BY sd.publication_id, sa.source
     ) sub GROUP BY publication_id
 ),
 author_positions AS (
     SELECT DISTINCT sd.publication_id, sa.author_position, sa.person_id
-    FROM source_documents sd
-    JOIN source_authorships sa ON sa.source_document_id = sd.id
+    FROM source_publications sd
+    JOIN source_authorships sa ON sa.source_publication_id = sd.id
     JOIN pub_author_counts pac ON pac.publication_id = sd.publication_id
     WHERE sa.person_id IS NOT NULL AND NOT sa.excluded
       AND pac.max_authors <= {max_authors}

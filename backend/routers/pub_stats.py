@@ -394,7 +394,7 @@ async def stats_labs(
             pub_structs AS (
                 SELECT sd.publication_id, sa.structure_ids AS struct_ids
                 FROM source_authorships sa
-                JOIN source_documents sd ON sd.id = sa.source_document_id
+                JOIN source_publications sd ON sd.id = sa.source_publication_id
                 WHERE sa.in_perimeter = TRUE AND sa.structure_ids IS NOT NULL
                   AND sd.publication_id IS NOT NULL
             )

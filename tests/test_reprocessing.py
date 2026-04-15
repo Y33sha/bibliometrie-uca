@@ -18,11 +18,11 @@ from utils.doc_types import map_doc_type
 
 
 def _create_all_publications(cur):
-    """Crée les publications pour tous les source_documents orphelins."""
+    """Crée les publications pour tous les source_publications orphelins."""
     cur.execute("""
         SELECT id, source, doi, title, pub_year, doc_type, journal_id,
                oa_status, language, container_title, external_ids
-        FROM source_documents WHERE publication_id IS NULL
+        FROM source_publications WHERE publication_id IS NULL
         ORDER BY id
     """)
     for doc in cur.fetchall():
@@ -47,7 +47,7 @@ def _create_all_publications(cur):
             allow_create=True,
         )
         if pub_id:
-            cur.execute("UPDATE source_documents SET publication_id = %s WHERE id = %s",
+            cur.execute("UPDATE source_publications SET publication_id = %s WHERE id = %s",
                         (pub_id, doc["id"]))
             update_sources(cur, pub_id)
 
@@ -116,7 +116,7 @@ def _get_pub_oa_status(cur, hal_id):
     cur.execute("""
         SELECT p.oa_status::text
         FROM publications p
-        JOIN source_documents sd ON sd.publication_id = p.id
+        JOIN source_publications sd ON sd.publication_id = p.id
         WHERE sd.source = 'hal' AND sd.source_id = %s
     """, (hal_id,))
     row = cur.fetchone()
@@ -152,7 +152,7 @@ class TestHalReprocessingUpdatesOaStatus:
         """Un re-traitement avec openAccess_bool=false met à jour le statut.
 
         Avec refresh_from_sources, le statut est recalculé depuis les
-        source_documents : si HAL dit maintenant 'closed', c'est closed.
+        source_publications : si HAL dit maintenant 'closed', c'est closed.
         """
         hal_id = HAL_DOC_CLOSED["halId_s"]
 

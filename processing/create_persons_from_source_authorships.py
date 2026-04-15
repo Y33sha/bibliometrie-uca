@@ -74,7 +74,7 @@ def get_all_unlinked_authorships(cur):
                sa_auth.author_position
         FROM source_authorships sa_auth
         JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
+        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE sa_auth.source = 'hal'
           AND sa_auth.person_id IS NULL
@@ -100,7 +100,7 @@ def get_all_unlinked_authorships(cur):
                sa_auth.author_position
         FROM source_authorships sa_auth
         JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
+        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE sa_auth.source = 'openalex'
           AND sa_auth.person_id IS NULL
@@ -122,7 +122,7 @@ def get_all_unlinked_authorships(cur):
                sa_auth.author_position
         FROM source_authorships sa_auth
         JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
+        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE sa_auth.source = 'wos'
           AND sa_auth.person_id IS NULL
@@ -143,7 +143,7 @@ def get_all_unlinked_authorships(cur):
                sa_auth.author_position
         FROM source_authorships sa_auth
         JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
+        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE sa_auth.source = 'scanr'
           AND sa_auth.person_id IS NULL
@@ -164,7 +164,7 @@ def get_all_unlinked_authorships(cur):
                sa_auth.author_position
         FROM source_authorships sa_auth
         JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
+        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE sa_auth.source = 'theses'
           AND sa_auth.person_id IS NULL
@@ -216,7 +216,7 @@ def load_linked_authorships_by_pub(cur):
                sa_auth.source
         FROM source_authorships sa_auth
         JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
+        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
         WHERE sa_auth.source IN {SOURCES_WITH_STRUCTURED_NAMES_SQL}
           AND sa_auth.person_id IS NOT NULL
           AND sd.publication_id IS NOT NULL
@@ -237,7 +237,7 @@ def load_linked_authorships_by_pub(cur):
                sa_auth.raw_author_name AS full_name,
                'openalex' AS source
         FROM source_authorships sa_auth
-        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
+        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
         WHERE sa_auth.source = 'openalex'
           AND sa_auth.person_id IS NOT NULL
           AND sd.publication_id IS NOT NULL
@@ -530,7 +530,7 @@ def step4_theses_non_authors(cur, dry_run):
         SELECT sa_auth.id AS authorship_id, sa.idref, sa_auth.raw_author_name AS full_name
         FROM source_authorships sa_auth
         JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_documents sd ON sd.id = sa_auth.source_document_id
+        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
         WHERE sa_auth.source = 'theses'
           AND sa_auth.person_id IS NULL
           AND sa_auth.in_perimeter = FALSE

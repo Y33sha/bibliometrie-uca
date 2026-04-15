@@ -229,7 +229,7 @@ def main():
             SELECT saa.address_id, COUNT(DISTINCT sd.publication_id) AS cnt
             FROM source_authorship_addresses saa
             JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sd.publication_id IS NOT NULL
             GROUP BY saa.address_id
         ) sub

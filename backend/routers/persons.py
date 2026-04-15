@@ -575,7 +575,7 @@ async def person_profile(person_id: int):
         cur.execute("""
             SELECT COUNT(*) AS count
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.person_id = %s
               AND sa.source = 'theses'
               AND NOT (sa.roles && ARRAY['author']::text[])
@@ -600,14 +600,14 @@ async def person_theses(person_id: int):
                    sa.roles,
                    (SELECT sa2.raw_author_name
                     FROM source_authorships sa2
-                    WHERE sa2.source_document_id = sd.id
+                    WHERE sa2.source_publication_id = sd.id
                       AND sa2.source = 'theses'
                       AND sa2.roles && ARRAY['author']::text[]
                     LIMIT 1
                    ) AS author_name,
                    (SELECT sa2.person_id
                     FROM source_authorships sa2
-                    WHERE sa2.source_document_id = sd.id
+                    WHERE sa2.source_publication_id = sd.id
                       AND sa2.source = 'theses'
                       AND sa2.roles && ARRAY['author']::text[]
                     LIMIT 1
@@ -620,7 +620,7 @@ async def person_theses(person_id: int):
                       AND st.structure_type = 'labo'
                    ) AS structure_ids
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             JOIN publications p ON p.id = sd.publication_id
             WHERE sa.person_id = %s
               AND sa.source = 'theses'
@@ -931,7 +931,7 @@ async def orphan_authorships_count():
         cur.execute(f"""
             SELECT COUNT(*) AS total
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             JOIN publications p ON p.id = sd.publication_id
             WHERE {_ORPHAN_BASE}
         """)
@@ -956,7 +956,7 @@ async def list_orphan_authorships(
         # Count
         cur.execute(f"""
             SELECT COUNT(*) FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             JOIN publications p ON p.id = sd.publication_id
             WHERE {_ORPHAN_BASE}
               {search_cond}
@@ -970,7 +970,7 @@ async def list_orphan_authorships(
                    sd.publication_id,
                    p.title AS pub_title, p.pub_year
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             JOIN publications p ON p.id = sd.publication_id
             WHERE {_ORPHAN_BASE}
               {search_cond}
@@ -1065,7 +1065,7 @@ async def batch_assign_orphan_authorships(body: dict):
                 sd.publication_id, %s,
                 sa.author_position, sa.in_perimeter, sa.is_corresponding, sa.structure_ids
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.id = ANY(%s) AND sd.publication_id IS NOT NULL
             ORDER BY sd.publication_id,
                 CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 WHEN 'wos' THEN 3 END
@@ -1075,9 +1075,9 @@ async def batch_assign_orphan_authorships(body: dict):
         # 3. Mettre les FK authorship_id
         cur.execute("""
             UPDATE source_authorships sa SET authorship_id = a.id
-            FROM source_documents sd, authorships a
+            FROM source_publications sd, authorships a
             WHERE sa.id = ANY(%s)
-              AND sd.id = sa.source_document_id
+              AND sd.id = sa.source_publication_id
               AND a.publication_id = sd.publication_id
               AND a.person_id = %s
               AND sa.authorship_id IS NULL
@@ -1108,7 +1108,7 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
             SELECT sa.source, sa.id AS authorship_id,
                    sd.publication_id AS pub_id, sd.title, sd.pub_year, sd.doi
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.person_id = %s AND sa.author_name_normalized = %s
               AND sa.source IN {AUTHOR_SOURCES_SQL}
             ORDER BY sd.pub_year DESC, sd.title
@@ -1355,7 +1355,7 @@ def _get_person_dedup_detail(cur, person_id):
                        WHEN 'wos' THEN 'WoS'
                        WHEN 'scanr' THEN 'ScanR'
                    END
-                ) FROM source_documents sd WHERE sd.publication_id = pub.id
+                ) FROM source_publications sd WHERE sd.publication_id = pub.id
                ) AS sources
         FROM authorships a
         JOIN publications pub ON pub.id = a.publication_id
@@ -1520,8 +1520,8 @@ def _hal_pub_detail(cur, pub_id):
         return None
     cur.execute("""
         SELECT sd.source_id AS halid, sd.hal_collections, sd.doc_type AS hal_doc_type, sd.pub_year AS hal_pub_year, sd.title AS hal_title,
-               (SELECT COUNT(*) FROM source_authorships sa2 WHERE sa2.source = 'hal' AND sa2.source_document_id = sd.id AND NOT sa2.excluded) AS author_count
-        FROM source_documents sd WHERE sd.publication_id = %s AND sd.source = 'hal'
+               (SELECT COUNT(*) FROM source_authorships sa2 WHERE sa2.source = 'hal' AND sa2.source_publication_id = sd.id AND NOT sa2.excluded) AS author_count
+        FROM source_publications sd WHERE sd.publication_id = %s AND sd.source = 'hal'
     """, (pub_id,))
     hal_docs = [dict(r) for r in cur.fetchall()]
     return {**dict(pub), "hal_docs": hal_docs}
@@ -1538,7 +1538,7 @@ async def hal_duplicate_pubs_by_doi(
         cur.execute("""
             SELECT COUNT(*) FROM (
                 SELECT sd.publication_id, LOWER(sd.doi)
-                FROM source_documents sd
+                FROM source_publications sd
                 WHERE sd.source = 'hal' AND sd.doi IS NOT NULL AND sd.doi != ''
                 GROUP BY sd.publication_id, LOWER(sd.doi)
                 HAVING COUNT(*) >= 2
@@ -1550,7 +1550,7 @@ async def hal_duplicate_pubs_by_doi(
             SELECT LOWER(sd.doi) AS doi,
                    sd.publication_id AS pub_id,
                    array_agg(sd.source_id ORDER BY sd.source_id) AS halids
-            FROM source_documents sd
+            FROM source_publications sd
             WHERE sd.source = 'hal' AND sd.doi IS NOT NULL AND sd.doi != ''
             GROUP BY sd.publication_id, LOWER(sd.doi)
             HAVING COUNT(*) >= 2
@@ -1585,15 +1585,15 @@ async def hal_duplicate_pubs_by_metadata(
         dup_query = """
             FROM publications p1
             JOIN publications p2 ON p1.title_normalized = p2.title_normalized AND p1.id < p2.id
-            JOIN source_documents hd1 ON hd1.publication_id = p1.id AND hd1.source = 'hal'
-            JOIN source_documents hd2 ON hd2.publication_id = p2.id AND hd2.source = 'hal'
+            JOIN source_publications hd1 ON hd1.publication_id = p1.id AND hd1.source = 'hal'
+            JOIN source_publications hd2 ON hd2.publication_id = p2.id AND hd2.source = 'hal'
             WHERE LENGTH(p1.title_normalized) > 30
               AND p1.pub_year = p2.pub_year
               AND p1.doc_type = p2.doc_type
               AND NOT (p1.doi IS NOT NULL AND p2.doi IS NOT NULL AND LOWER(p1.doi) <> LOWER(p2.doi))
               AND ABS(
-                  (SELECT COUNT(*) FROM source_authorships sa1 WHERE sa1.source = 'hal' AND sa1.source_document_id = hd1.id AND NOT sa1.excluded)
-                  - (SELECT COUNT(*) FROM source_authorships sa2 WHERE sa2.source = 'hal' AND sa2.source_document_id = hd2.id AND NOT sa2.excluded)
+                  (SELECT COUNT(*) FROM source_authorships sa1 WHERE sa1.source = 'hal' AND sa1.source_publication_id = hd1.id AND NOT sa1.excluded)
+                  - (SELECT COUNT(*) FROM source_authorships sa2 WHERE sa2.source = 'hal' AND sa2.source_publication_id = hd2.id AND NOT sa2.excluded)
               ) <= 2
               AND NOT EXISTS (SELECT 1 FROM distinct_publications dp
                               WHERE dp.pub_id_a = LEAST(p1.id, p2.id) AND dp.pub_id_b = GREATEST(p1.id, p2.id))
@@ -1649,8 +1649,8 @@ async def hal_missing_collections(
         base_where = """
             FROM publications p
             JOIN authorships a ON a.publication_id = p.id AND a.structure_ids && %s::int[]
-            WHERE EXISTS (SELECT 1 FROM source_documents sd WHERE sd.publication_id = p.id AND sd.source = 'hal')
-              AND NOT EXISTS (SELECT 1 FROM source_documents sd
+            WHERE EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal')
+              AND NOT EXISTS (SELECT 1 FROM source_publications sd
                               WHERE sd.publication_id = p.id AND sd.source = 'hal' AND %s = ANY(sd.hal_collections))
         """
         params = [lab_arr, col]
@@ -1660,8 +1660,8 @@ async def hal_missing_collections(
 
         cur.execute(f"""
             SELECT DISTINCT p.id, p.title, p.pub_year, p.doc_type::text, p.doi,
-                   (SELECT array_agg(sd2.source_id) FROM source_documents sd2 WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
-                   NOT EXISTS (SELECT 1 FROM source_documents sd2
+                   (SELECT array_agg(sd2.source_id) FROM source_publications sd2 WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
+                   NOT EXISTS (SELECT 1 FROM source_publications sd2
                                WHERE sd2.publication_id = p.id AND sd2.source = 'hal' AND 'PRES_CLERMONT' = ANY(sd2.hal_collections)) AS hors_uca
             {base_where}
             ORDER BY p.pub_year DESC NULLS LAST, p.id DESC
@@ -1727,7 +1727,7 @@ async def hal_affiliation_conflicts(
                   -- Même position dans OA: adresse présente mais pas dans le périmètre
                   EXISTS (
                       SELECT 1 FROM source_authorships sa
-                      JOIN source_documents sd ON sd.id = sa.source_document_id
+                      JOIN source_publications sd ON sd.id = sa.source_publication_id
                       WHERE sd.publication_id = p.id
                         AND sa.source = 'openalex'
                         AND sa.author_position = a.author_position
@@ -1736,7 +1736,7 @@ async def hal_affiliation_conflicts(
                   )
                   OR EXISTS (
                       SELECT 1 FROM source_authorships sa
-                      JOIN source_documents sd ON sd.id = sa.source_document_id
+                      JOIN source_publications sd ON sd.id = sa.source_publication_id
                       WHERE sd.publication_id = p.id
                         AND sa.source = 'wos'
                         AND sa.author_position = a.author_position
@@ -1751,7 +1751,7 @@ async def hal_affiliation_conflicts(
 
         cur.execute(f"""
             SELECT DISTINCT p.id, p.title, p.pub_year, p.doc_type::text, p.doi,
-                   (SELECT array_agg(sd2.source_id) FROM source_documents sd2 WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
+                   (SELECT array_agg(sd2.source_id) FROM source_publications sd2 WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
                    (SELECT string_agg(DISTINCT s.acronym, ', ' ORDER BY s.acronym)
                     FROM structures s WHERE s.id = ANY(a.structure_ids) AND s.structure_type = 'labo') AS labs
             {base_where}

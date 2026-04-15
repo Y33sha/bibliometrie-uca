@@ -30,13 +30,13 @@ def find_by_doi(cur, doi: str) -> PubByDoi | None:
 
 
 def find_by_nnt(cur, nnt: str) -> PubByNnt | None:
-    """Cherche une publication via NNT stocké dans source_documents.external_ids."""
+    """Cherche une publication via NNT stocké dans source_publications.external_ids."""
     if not nnt:
         return None
     cur.execute("""
         SELECT p.id, p.doc_type, p.title_normalized
         FROM publications p
-        JOIN source_documents sd ON sd.publication_id = p.id
+        JOIN source_publications sd ON sd.publication_id = p.id
         WHERE sd.external_ids->>'nnt' = %s
         LIMIT 1
     """, (nnt.upper(),))
@@ -155,7 +155,7 @@ def find_or_create(cur, *, title: str, title_normalized: str,
 
     Logique de deduplication par identifiant unique :
     1. Par DOI (case-insensitive)
-    1b. Par NNT (via source_documents.external_ids, theses uniquement)
+    1b. Par NNT (via source_publications.external_ids, theses uniquement)
     2. Creation
 
     Retourne (publication_id, is_new).
@@ -212,19 +212,19 @@ def update_countries(cur, pub_id: int, countries: list[str]):
 
 
 def update_sources(cur, pub_id: int):
-    """Recalcule publications.sources depuis source_documents."""
+    """Recalcule publications.sources depuis source_publications."""
     cur.execute("""
         UPDATE publications SET sources = COALESCE(sub.srcs, '{}'), updated_at = now()
         FROM (
             SELECT array_agg(DISTINCT source::source_type ORDER BY source::source_type) AS srcs
-            FROM source_documents
+            FROM source_publications
             WHERE publication_id = %s
         ) sub
         WHERE id = %s
     """, (pub_id, pub_id))
 
 
-# ── Recalcul complet des métadonnées depuis les source_documents ──────
+# ── Recalcul complet des métadonnées depuis les source_publications ──────
 
 # Ordre de priorité des sources pour les champs scalaires.
 # Pour les thèses, theses.fr est toujours prioritaire.
@@ -242,11 +242,11 @@ _OA_RANK = {
 
 
 def refresh_from_sources(cur, pub_id: int):
-    """Recalcule les métadonnées d'une publication depuis ses source_documents.
+    """Recalcule les métadonnées d'une publication depuis ses source_publications.
 
     Contrairement à l'ancien _enrich() qui faisait du COALESCE incrémental (premier arrivé
     gagne, jamais de downgrade), cette fonction fait un recalcul complet :
-    elle lit TOUS les source_documents attachés et réapplique les règles de
+    elle lit TOUS les source_publications attachés et réapplique les règles de
     priorité depuis zéro. Elle peut donc corriger des métadonnées obsolètes
     (ex: ongoing_thesis → thesis après soutenance).
 
@@ -280,7 +280,7 @@ def refresh_from_sources(cur, pub_id: int):
         SELECT source, doi, doc_type, pub_year, journal_id, oa_status,
                container_title, language, abstract, keywords, countries,
                topics, biblio, meta, is_retracted, external_ids
-        FROM source_documents
+        FROM source_publications
         WHERE publication_id = %s
     """, (pub_id,))
     rows = dict_cur.fetchall()
@@ -398,7 +398,7 @@ def merge_publications(cur, target_id: int, source_id: int):
     4. Supprime la source et les distinct_publications associées
     """
     # 1. Transférer les documents sources
-    cur.execute("UPDATE source_documents SET publication_id = %s WHERE publication_id = %s",
+    cur.execute("UPDATE source_publications SET publication_id = %s WHERE publication_id = %s",
                 (target_id, source_id))
 
     # 2. Transférer les authorships vérité (supprimer doublons par person_id)

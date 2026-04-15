@@ -18,14 +18,14 @@ from utils.doc_types import map_doc_type
 
 
 def _create_all_publications(cur):
-    """Crée les publications pour tous les source_documents orphelins.
+    """Crée les publications pour tous les source_publications orphelins.
 
     Simule la phase 'publications' du pipeline dans les tests.
     """
     cur.execute("""
         SELECT id, source, doi, title, pub_year, doc_type, journal_id,
                oa_status, language, container_title, external_ids
-        FROM source_documents WHERE publication_id IS NULL
+        FROM source_publications WHERE publication_id IS NULL
         ORDER BY id
     """)
     for doc in cur.fetchall():
@@ -50,7 +50,7 @@ def _create_all_publications(cur):
             allow_create=True,
         )
         if pub_id:
-            cur.execute("UPDATE source_documents SET publication_id = %s WHERE id = %s",
+            cur.execute("UPDATE source_publications SET publication_id = %s WHERE id = %s",
                         (pub_id, doc["id"]))
             update_sources(cur, pub_id)
 
@@ -181,7 +181,7 @@ def _count_tables(cur) -> dict:
         counts[t] = cur.fetchone()["cnt"]
     cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'scanr'")
     counts["scanr_authorships"] = cur.fetchone()["cnt"]
-    cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'scanr'")
+    cur.execute("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'scanr'")
     counts["scanr_documents"] = cur.fetchone()["cnt"]
     return counts
 
@@ -281,7 +281,7 @@ class TestNormalizeScanrIdempotence:
         db.execute("SELECT count(*) AS cnt FROM publications WHERE lower(doi) = '10.1234/test-article-001'")
         assert db.fetchone()["cnt"] == 1, "Le DOI devrait être dédupliqué"
 
-        db.execute("SELECT count(*) AS cnt FROM source_documents WHERE source = 'scanr'")
+        db.execute("SELECT count(*) AS cnt FROM source_publications WHERE source = 'scanr'")
         assert db.fetchone()["cnt"] == 4, "4 scanr_documents (3 originaux + 1 bis)"
 
     def test_journal_dedup(self, db):
@@ -385,7 +385,7 @@ def _count_hal_tables(cur) -> dict:
         counts[t] = cur.fetchone()["cnt"]
     cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'hal'")
     counts["hal_authorships"] = cur.fetchone()["cnt"]
-    cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'hal'")
+    cur.execute("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'hal'")
     counts["hal_documents"] = cur.fetchone()["cnt"]
     return counts
 
@@ -509,7 +509,7 @@ def _count_oa_tables(cur) -> dict:
         counts[t] = cur.fetchone()["cnt"]
     cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'openalex'")
     counts["openalex_authorships"] = cur.fetchone()["cnt"]
-    cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'openalex'")
+    cur.execute("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'openalex'")
     counts["openalex_documents"] = cur.fetchone()["cnt"]
     return counts
 
@@ -617,7 +617,7 @@ def _count_wos_tables(cur) -> dict:
         counts[t] = cur.fetchone()["cnt"]
     cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'wos'")
     counts["wos_authorships"] = cur.fetchone()["cnt"]
-    cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'wos'")
+    cur.execute("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'wos'")
     counts["wos_documents"] = cur.fetchone()["cnt"]
     return counts
 
@@ -789,7 +789,7 @@ class TestNormalizeInterSourceIdempotence:
 
 def _setup_persons_test_data(db):
     """Crée une chaîne complète de données pour tester create_persons :
-    publications → source_documents (hal) → source_persons → source_authorships (in_perimeter=TRUE)
+    publications → source_publications (hal) → source_persons → source_authorships (in_perimeter=TRUE)
     """
     # Publications
     db.execute("""
@@ -798,9 +798,9 @@ def _setup_persons_test_data(db):
                (90002, 'Test Pub Beta', 'test pub beta', 'thesis', 2024)
     """)
 
-    # HAL documents (source_documents)
+    # HAL documents (source_publications)
     db.execute("""
-        INSERT INTO source_documents (id, source, source_id, title, pub_year, doc_type, publication_id)
+        INSERT INTO source_publications (id, source, source_id, title, pub_year, doc_type, publication_id)
         VALUES (90001, 'hal', 'hal-90000001', 'Test Pub Alpha', 2024, 'ART', 90001),
                (90002, 'hal', 'hal-90000002', 'Test Pub Beta', 2024, 'THESE', 90002)
     """)
@@ -816,7 +816,7 @@ def _setup_persons_test_data(db):
     # HAL authorships (in_perimeter=TRUE, person_id=NULL)
     db.execute("""
         INSERT INTO source_authorships
-            (id, source, source_document_id, source_person_id, author_position, in_perimeter,
+            (id, source, source_publication_id, source_person_id, author_position, in_perimeter,
              person_id, author_name_normalized)
         VALUES
             (90001, 'hal', 90001, 90001, 0, TRUE, NULL, 'eve leroy'),
@@ -1012,7 +1012,7 @@ def _setup_affiliations_test_data(db):
 
     # Source documents
     db.execute("""
-        INSERT INTO source_documents (id, source, source_id, title, pub_year, doc_type, publication_id)
+        INSERT INTO source_publications (id, source, source_id, title, pub_year, doc_type, publication_id)
         VALUES (80001, 'hal', 'hal-80000001', 'Pub Affiliation Test', 2024, 'ART', 80001),
                (80002, 'openalex', 'W80000001', 'Pub Affiliation Test', 2024, 'article', 80001)
     """)
@@ -1027,7 +1027,7 @@ def _setup_affiliations_test_data(db):
     # HAL authorship (avec source_struct_ids pointant vers source_structures)
     db.execute("""
         INSERT INTO source_authorships
-            (id, source, source_document_id, source_person_id, author_position,
+            (id, source, source_publication_id, source_person_id, author_position,
              in_perimeter, source_struct_ids, author_name_normalized)
         VALUES (80001, 'hal', 80001, 80001, 0, FALSE, ARRAY[80001], 'alice dupont')
     """)
@@ -1035,7 +1035,7 @@ def _setup_affiliations_test_data(db):
     # OpenAlex authorship (sera résolu via adresses)
     db.execute("""
         INSERT INTO source_authorships
-            (id, source, source_document_id, source_person_id, author_position,
+            (id, source, source_publication_id, source_person_id, author_position,
              in_perimeter, author_name_normalized)
         VALUES (80002, 'openalex', 80002, 80002, 0, FALSE, 'alice dupont')
     """)

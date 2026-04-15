@@ -97,7 +97,7 @@ Transforme les données brutes (staging) en tables structurées par source.
 ```mermaid
 flowchart LR
     A[API HAL]-->B[staging]-->|normalize_hal|G@{ shape: processes, label: "Tables sources: 
-    source_documents, source_persons, source_authorships, source_structures" }
+    source_publications, source_persons, source_authorships, source_structures" }
     C[API OpenAlex]-->B-->|normalize_openalex|G
     E[API WOS]-->B-->|normalize_wos|G
     K[API ScanR]-->B-->|normalize_scanr|G
@@ -249,7 +249,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    source_documents-->A
+    source_publications-->A
 
     subgraph vérité
     direction LR
@@ -265,8 +265,8 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    source_documents-->A
-    source_authorships---source_documents
+    source_publications-->A
+    source_authorships---source_publications
     source_authorships-->C
 
     subgraph vérité
@@ -285,8 +285,8 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    source_documents---A
-    source_authorships---source_documents
+    source_publications---A
+    source_authorships---source_publications
     source_authorships---C
 
     subgraph vérité

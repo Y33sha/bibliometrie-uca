@@ -69,23 +69,9 @@ def _create_test_db():
     )
     cur.execute(schema_sql)
 
-    # Appliquer les migrations une par une (chaque migration dans sa propre transaction)
-    migrations_dir = SCHEMA.parent / "migrations"
-    if migrations_dir.exists():
-        for migration_file in sorted(migrations_dir.glob("*.sql")):
-            conn2 = psycopg2.connect(**_db_connect_args())
-            conn2.autocommit = True
-            cur2 = conn2.cursor()
-            migration_sql = "\n".join(
-                line for line in migration_file.read_text(encoding="utf-8").splitlines()
-                if not line.strip().startswith("\\")
-            )
-            try:
-                cur2.execute(migration_sql)
-            except Exception:
-                pass
-            cur2.close()
-            conn2.close()
+    # schema.sql est un dump complet et à jour — les migrations sont déjà
+    # incluses dedans. On ne les réapplique pas (elles échoueraient sur les
+    # tables déjà renommées ou les colonnes déjà présentes).
 
     cur.close()
     conn.close()

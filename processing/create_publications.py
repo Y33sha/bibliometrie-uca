@@ -1,5 +1,5 @@
 """
-Crée les publications pour les source_documents in-perimeter non rattachés.
+Crée les publications pour les source_publications in-perimeter non rattachés.
 
 Phase du pipeline qui s'exécute APRÈS affiliations (quand in_perimeter est
 déterminé sur les source_authorships) et AVANT persons/authorships.
@@ -10,7 +10,7 @@ source_authorship in_perimeter :
   2. Si trouvée : rattache et enrichit
   3. Si non trouvée : crée la publication
 
-Les source_documents hors périmètre restent sans publication_id.
+Les source_publications hors périmètre restent sans publication_id.
 
 Usage:
     python create_publications.py              # exécuter
@@ -36,19 +36,19 @@ from utils.log import setup_logger
 logger = setup_logger("create_publications", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def get_orphan_source_documents(cur):
-    """Récupère les source_documents sans publication_id ayant au moins
+def get_orphan_source_publications(cur):
+    """Récupère les source_publications sans publication_id ayant au moins
     un source_authorship in_perimeter."""
     cur.execute("""
         SELECT sd.id, sd.source, sd.source_id, sd.doi, sd.title, sd.pub_year,
                sd.doc_type, sd.journal_id, sd.oa_status, sd.language,
                sd.container_title, sd.external_ids,
                sd.is_retracted, sd.biblio, sd.abstract, sd.keywords, sd.topics
-        FROM source_documents sd
+        FROM source_publications sd
         WHERE sd.publication_id IS NULL
           AND EXISTS (
               SELECT 1 FROM source_authorships sa
-              WHERE sa.source_document_id = sd.id AND sa.in_perimeter = TRUE
+              WHERE sa.source_publication_id = sd.id AND sa.in_perimeter = TRUE
           )
         ORDER BY sd.id
     """)
@@ -92,7 +92,7 @@ def process_document(cur, doc, dry_run):
 
     # Rattacher le source_document
     cur.execute(
-        "UPDATE source_documents SET publication_id = %s WHERE id = %s",
+        "UPDATE source_publications SET publication_id = %s WHERE id = %s",
         (pub_id, doc["id"]),
     )
 
@@ -107,8 +107,8 @@ def run(dry_run=False):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        docs = get_orphan_source_documents(cur)
-        logger.info("%d source_documents in-perimeter sans publication", len(docs))
+        docs = get_orphan_source_publications(cur)
+        logger.info("%d source_publications in-perimeter sans publication", len(docs))
 
         if not docs:
             logger.info("Rien a faire.")
@@ -147,7 +147,7 @@ def run(dry_run=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Cree les publications pour les source_documents in-perimeter orphelins"
+        description="Cree les publications pour les source_publications in-perimeter orphelins"
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

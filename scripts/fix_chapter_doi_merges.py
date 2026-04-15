@@ -44,7 +44,7 @@ def find_bad_merges(cur):
                    sd.source AS src, sd.id AS doc_id, sd.doc_type, sd.title,
                    sd.pub_year, sd.doi AS doc_doi
             FROM publications p
-            JOIN source_documents sd ON sd.publication_id = p.id
+            JOIN source_publications sd ON sd.publication_id = p.id
             WHERE p.doi IS NOT NULL
         )
         SELECT pub_id, doi, array_agg(DISTINCT doc_type) AS types
@@ -66,11 +66,11 @@ def get_pub_documents(cur, pub_id):
     """Récupère tous les documents sources d'une publication."""
     cur.execute("""
         SELECT id, source AS src, title, doc_type, pub_year, doi
-        FROM source_documents WHERE publication_id = %s
+        FROM source_publications WHERE publication_id = %s
     """, (pub_id,))
     docs = []
     for r in cur.fetchall():
-        docs.append({**r, 'table': 'source_documents'})
+        docs.append({**r, 'table': 'source_publications'})
     return docs
 
 

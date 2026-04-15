@@ -48,7 +48,7 @@ def build(cur, sources=None):
         WITH all_pairs AS (
             SELECT DISTINCT sd.publication_id, sa.person_id
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             JOIN v_active_publications vap ON vap.id = sd.publication_id
             WHERE sa.person_id IS NOT NULL AND NOT sa.excluded
         )
@@ -71,9 +71,9 @@ def build(cur, sources=None):
         cur.execute("""
             UPDATE source_authorships sa
             SET authorship_id = a.id
-            FROM source_documents sd
+            FROM source_publications sd
             JOIN authorships a ON a.publication_id = sd.publication_id
-            WHERE sd.id = sa.source_document_id
+            WHERE sd.id = sa.source_publication_id
               AND sa.source = %s
               AND sa.person_id IS NOT NULL
               AND a.person_id = sa.person_id
@@ -144,7 +144,7 @@ def build(cur, sources=None):
                 SELECT sd.publication_id, sa.person_id,
                        sa.structure_ids AS struct_ids, sa.in_perimeter AS src_in_perimeter
                 FROM source_authorships sa
-                JOIN source_documents sd ON sd.id = sa.source_document_id
+                JOIN source_publications sd ON sd.id = sa.source_publication_id
                 JOIN v_active_publications vap ON vap.id = sd.publication_id
                 WHERE sa.source = %s
                   AND (sa.structure_ids IS NOT NULL OR sa.in_perimeter = TRUE)

@@ -60,7 +60,7 @@ def main():
         FROM publications p
         WHERE p.doi IS NOT NULL
           AND p.oa_status != 'unknown'
-          AND EXISTS (SELECT 1 FROM source_documents sd
+          AND EXISTS (SELECT 1 FROM source_publications sd
                       WHERE sd.publication_id = p.id AND sd.source = 'openalex')
         ORDER BY p.id
     """

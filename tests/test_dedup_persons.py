@@ -45,20 +45,20 @@ def _insert_hal_author(db, full_name, hal_person_id=None, orcid=None, idhal=None
 def _insert_hal_document(db, halid, publication_id):
     """Crée un source_document minimal (source='hal')."""
     db.execute("""
-        INSERT INTO source_documents (source, source_id, title, pub_year, publication_id)
+        INSERT INTO source_publications (source, source_id, title, pub_year, publication_id)
         VALUES ('hal', %s, 'Test', 2024, %s) RETURNING id
     """, (halid, publication_id))
     return db.fetchone()["id"]
 
 
-def _insert_hal_authorship(db, source_document_id, source_person_id, position=0,
+def _insert_hal_authorship(db, source_publication_id, source_person_id, position=0,
                            in_perimeter=True, person_id=None):
     """Crée une source_authorship HAL."""
     db.execute("""
         INSERT INTO source_authorships
-            (source, source_document_id, source_person_id, author_position, in_perimeter, person_id)
+            (source, source_publication_id, source_person_id, author_position, in_perimeter, person_id)
         VALUES ('hal', %s, %s, %s, %s, %s) RETURNING id
-    """, (source_document_id, source_person_id, position, in_perimeter, person_id))
+    """, (source_publication_id, source_person_id, position, in_perimeter, person_id))
     return db.fetchone()["id"]
 
 
@@ -77,7 +77,7 @@ def _insert_oa_author(db, full_name, openalex_id, orcid=None):
 def _insert_oa_document(db, openalex_id, publication_id):
     """Crée un source_document minimal (source='openalex')."""
     db.execute("""
-        INSERT INTO source_documents (source, source_id, title, pub_year, publication_id)
+        INSERT INTO source_publications (source, source_id, title, pub_year, publication_id)
         VALUES ('openalex', %s, 'Test', 2024, %s) RETURNING id
     """, (openalex_id, publication_id))
     return db.fetchone()["id"]
@@ -88,7 +88,7 @@ def _insert_oa_authorship(db, oa_document_id, oa_author_id, position=0,
     """Crée une source_authorship OpenAlex."""
     db.execute("""
         INSERT INTO source_authorships
-            (source, source_document_id, source_person_id, author_position,
+            (source, source_publication_id, source_person_id, author_position,
              in_perimeter, person_id, raw_author_name)
         VALUES ('openalex', %s, %s, %s, %s, %s, %s) RETURNING id
     """, (oa_document_id, oa_author_id, position, in_perimeter, person_id,

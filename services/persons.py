@@ -330,10 +330,10 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
     """
     cfg = _SOURCE_CONFIG[source]
 
-    # Trouver la publication_id via source_documents
+    # Trouver la publication_id via source_publications
     cur.execute("""
         SELECT d.publication_id FROM source_authorships sa
-        JOIN source_documents d ON d.id = sa.source_document_id
+        JOIN source_publications d ON d.id = sa.source_publication_id
         WHERE sa.id = %s AND sa.source = %s
     """, (authorship_id, source))
     row = cur.fetchone()
@@ -352,8 +352,8 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
     cur.execute("""
         UPDATE source_authorships sa
         SET authorship_id = a.id
-        FROM source_documents sd, authorships a
-        WHERE sd.id = sa.source_document_id
+        FROM source_publications sd, authorships a
+        WHERE sd.id = sa.source_publication_id
           AND a.publication_id = sd.publication_id
           AND a.person_id = sa.person_id
           AND sd.publication_id = %s
@@ -389,7 +389,7 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
         WITH src AS (
             SELECT sa.in_perimeter AS uca, sa.structure_ids AS sids
             FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.source IN {AUTHOR_SOURCES_SQL}
               AND sd.publication_id = %s AND sa.person_id = %s AND NOT sa.excluded
         ),
