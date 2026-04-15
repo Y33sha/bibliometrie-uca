@@ -35,6 +35,7 @@ Phases (dans l'ordre d'execution):
 
 import argparse
 import datetime
+import json
 import logging
 import subprocess
 import sys
@@ -51,6 +52,25 @@ logging.basicConfig(
 log = logging.getLogger("pipeline")
 
 BASE = Path(__file__).resolve().parent
+STATUS_FILE = BASE / "pipeline" / "status.json"
+
+
+def _write_status(mode: str, phase: str, started_at: str, phases_done: int, phases_total: int):
+    """Écrit le fichier de statut pour le suivi en temps réel."""
+    STATUS_FILE.write_text(json.dumps({
+        "running": True,
+        "mode": mode,
+        "phase": phase,
+        "started_at": started_at,
+        "phase_started_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "phases_done": phases_done,
+        "phases_total": phases_total,
+    }), encoding="utf-8")
+
+
+def _clear_status():
+    """Supprime le fichier de statut à la fin du pipeline."""
+    STATUS_FILE.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------
@@ -359,19 +379,18 @@ def main():
     log.info("Sources : %s", ", ".join(sorted(sources)))
 
     # Métriques pipeline
-    from db.connection import get_connection
-    from pipeline.metrics import (snapshot, compute_deltas, generate_report,
-                                    capture_log_offsets, read_new_logs)
-    metrics_conn = get_connection()
-    phase_results = []  # [(name, duration, deltas, logs)]
+    from pipeline.metrics import (generate_report, capture_log_offsets, read_new_logs)
+    phase_results = []  # [(name, duration, logs)]
 
     t0_total = time.time()
-    for name, fn in phases_to_run:
+    pipeline_started_at = datetime.datetime.now().isoformat(timespec="seconds")
+    for i, (name, fn) in enumerate(phases_to_run):
         log.info("─" * 40)
         log.info("PHASE : %s", name)
         log.info("─" * 40)
 
-        before = snapshot(metrics_conn)
+        _write_status(args.mode, name, pipeline_started_at, i, len(phases_to_run))
+
         log_offsets = capture_log_offsets()
         t0_phase = time.time()
         try:
@@ -380,26 +399,17 @@ def main():
         except RuntimeError as e:
             log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
             log.error("Pour reprendre : python run_pipeline.py --from %s", name)
-            # Générer le rapport partiel avant de quitter
-            after = snapshot(metrics_conn)
             phase_logs = read_new_logs(log_offsets)
-            phase_results.append((name + " (ERREUR)", time.time() - t0_phase,
-                                  compute_deltas(before, after), phase_logs))
+            phase_results.append((name + " (ERREUR)", time.time() - t0_phase, phase_logs))
             report_path = generate_report(args.mode, sources, phase_results,
                                           time.time() - t0_total)
             log.info("Rapport partiel : %s", report_path)
-            metrics_conn.close()
+            _clear_status()
             sys.exit(1)
 
         duration = time.time() - t0_phase
-        after = snapshot(metrics_conn)
-        deltas = compute_deltas(before, after)
         phase_logs = read_new_logs(log_offsets)
-        phase_results.append((name, duration, deltas, phase_logs))
-
-        if deltas:
-            for key, vals in sorted(deltas.items()):
-                log.info("  %s : %d → %d (%+d)", key, vals["before"], vals["after"], vals["delta"])
+        phase_results.append((name, duration, phase_logs))
 
     elapsed_total = time.time() - t0_total
 
@@ -407,6 +417,7 @@ def main():
     report_path = generate_report(args.mode, sources, phase_results, elapsed_total)
     log.info("Rapport : %s", report_path)
 
+    _clear_status()
     metrics_conn.close()
     log.info("=" * 60)
     log.info("PIPELINE TERMINÉ en %.0fs (%.1f min)", elapsed_total, elapsed_total / 60)

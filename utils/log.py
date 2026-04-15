@@ -10,9 +10,17 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     """Configure un logger avec sortie console + fichier.
 
     Crée le répertoire de logs si nécessaire.
+    Configure uniquement le logger nommé (pas le root logger).
     """
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, f"{name}.log")
+
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+
+    # Éviter les doublons si le logger est configuré plusieurs fois
+    if logger.handlers:
+        return logger
 
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 
@@ -26,8 +34,7 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setFormatter(fmt)
 
-    logging.basicConfig(
-        level=logging.INFO,
-        handlers=[console, file_handler],
-    )
-    return logging.getLogger(name)
+    logger.addHandler(console)
+    logger.addHandler(file_handler)
+
+    return logger
