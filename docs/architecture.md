@@ -9,7 +9,7 @@ flowchart LR
     subgraph sources
     direction LR
         source_documents---source_authorships
-        source_authors---source_authorships
+        source_persons---source_authorships
         source_authorships---source_structures
     end
     subgraph vérité
@@ -25,7 +25,7 @@ flowchart LR
 
 ### Entités principales et relations
 
-Les tables sources s'organisent selon un schéma en quatre tables: `source_documents`, `source_authors`, `source_authorships`, `source_structures`. Une `authorship` représente la contribution d'**un** auteur à **une** publication. C'est elle qui porte l'information d'affiliation (`structure_ids`).
+Les tables sources s'organisent selon un schéma en quatre tables: `source_documents`, `source_persons`, `source_authorships`, `source_structures`. Une `authorship` représente la contribution d'**un** auteur à **une** publication. C'est elle qui porte l'information d'affiliation (`structure_ids`).
 
 ```mermaid
 erDiagram 
@@ -72,7 +72,7 @@ Table unique pour toutes les sources. Colonnes notables : `source` (enum), `sour
 | Table | Propriétaire |
 |-------|-------------|
 | `source_documents` | `processing/normalize_*.py` |
-| `source_authors` | `processing/normalize_*.py` |
+| `source_persons` | `processing/normalize_*.py` |
 | `source_authorships` | `processing/normalize_*.py` |
 | `source_structures` | `processing/normalize_hal.py`, `enrich_hal_structures.py` |
 
@@ -268,7 +268,7 @@ Table de laison recensant les contributions individuelles aux publications. Chaq
 Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses).
 
 - **`source_documents`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées brutes (doc_type non mappé, oa_status) et les métadonnées enrichies (abstract, keywords, topics, biblio, meta). Le champ `hal_collections` (text[]) est spécifique à HAL.
-- **`source_authors`** : un enregistrement par auteur par source. Déduplication par `(source, source_id)`. Pour HAL, le `source_id` est le PPN IdRef ou le hal_person_id ; pour les autres sources, c'est l'identifiant de l'entité auteur dans la source.
+- **`source_persons`** : un enregistrement par auteur par source. Déduplication par `(source, source_id)`. Pour HAL, le `source_id` est le PPN IdRef ou le hal_person_id ; pour les autres sources, c'est l'identifiant de l'entité auteur dans la source.
 - **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `in_perimeter`, `structure_ids` (affiliation résolue), `roles` (auteur, directeur, rapporteur — theses.fr), `excluded` (authorship rejetée manuellement).
 - **`source_structures`** : structures HAL (mapping vers `structures` canoniques via `structure_id`). Utilisée par `populate_affiliations` pour résoudre les affiliations HAL.
 

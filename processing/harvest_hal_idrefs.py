@@ -1,4 +1,4 @@
-"""Récupère les IdRef depuis l'API HAL ref/author pour les source_authors HAL avec idhal.
+"""Récupère les IdRef depuis l'API HAL ref/author pour les source_persons HAL avec idhal.
 
 Pour chaque hal_author ayant un idhal et un person_id, interroge l'API HAL
 et insère l'IdRef dans person_identifiers.
@@ -52,13 +52,13 @@ def main():
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    # source_authors HAL avec hal_person_id + person_id, sans IdRef déjà connu
+    # source_persons HAL avec hal_person_id + person_id, sans IdRef déjà connu
     cur.execute("""
         SELECT sa.id AS ha_id,
                (sa.source_ids->>'hal_person_id')::int AS hal_person_id,
                sa.source_ids->>'idhal' AS idhal,
                sa.person_id, sa.full_name
-        FROM source_authors sa
+        FROM source_persons sa
         WHERE sa.source = 'hal'
           AND (sa.source_ids->>'hal_person_id') IS NOT NULL
           AND sa.person_id IS NOT NULL
@@ -74,8 +74,8 @@ def main():
         if idref:
             found += 1
             if not args.dry_run:
-                # Stocker dans source_authors
-                cur.execute("UPDATE source_authors SET idref = %s WHERE id = %s",
+                # Stocker dans source_persons
+                cur.execute("UPDATE source_persons SET idref = %s WHERE id = %s",
                             (idref, a["ha_id"]))
                 # Stocker dans person_identifiers
                 add_identifier(cur, a["person_id"], "idref", idref, source="hal")

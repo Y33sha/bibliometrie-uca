@@ -9,7 +9,7 @@ Usage:
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_documents                        (lien staging ↔ publication, source='wos')
-    source_authors                          (auteurs unifiés, source='wos')
+    source_persons                          (auteurs unifiés, source='wos')
     source_authorships                      (lien document × auteur, source='wos')
 
 Gère deux formats de raw_data :
@@ -480,18 +480,18 @@ def insert_wos_document(cur, rec: dict, staging_id: int,
 
 
 # =============================================================
-# WOS AUTHORS (source_authors, source='wos')
+# WOS AUTHORS (source_persons, source='wos')
 # =============================================================
 
 _wos_author_cache: dict[str, int] = {}
 
 
 def upsert_wos_author(cur, author: dict) -> int | None:
-    """Insère/retrouve un auteur WoS dans source_authors (source='wos').
+    """Insère/retrouve un auteur WoS dans source_persons (source='wos').
 
     Utilise le daisng_id comme clé unique (format API).
     Cache en mémoire pour éviter les requêtes répétées.
-    Retourne source_authors.id.
+    Retourne source_persons.id.
     """
     full_name = author.get("full_name")
     if not full_name:
@@ -517,13 +517,13 @@ def upsert_wos_author(cur, author: dict) -> int | None:
     source_ids_json = Json(source_ids) if source_ids else None
 
     cur.execute("""
-        INSERT INTO source_authors
+        INSERT INTO source_persons
             (source, source_id, full_name, last_name, first_name, orcid, source_ids)
         VALUES ('wos', %s, %s, %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
-            orcid = COALESCE(source_authors.orcid, EXCLUDED.orcid),
+            orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
             full_name = EXCLUDED.full_name,
-            source_ids = COALESCE(source_authors.source_ids, '{}') ||
+            source_ids = COALESCE(source_persons.source_ids, '{}') ||
                          COALESCE(EXCLUDED.source_ids, '{}')
         RETURNING id
     """, (daisng_id, full_name, last_name, first_name, orcid, source_ids_json))
@@ -597,11 +597,11 @@ def process_authorships(cur, rec: dict, source_document_id: int):
         if org_name not in _wos_institution_cache:
             upsert_wos_institution(cur, {"name": org_name})
 
-    # Phase 1 : résoudre tous les auteurs (batch upsert source_authors)
+    # Phase 1 : résoudre tous les auteurs (batch upsert source_persons)
     from psycopg2.extras import execute_values as _ev
 
     # Séparer les auteurs déjà en cache de ceux à insérer
-    authors_resolved = []  # [(author_dict, source_author_id)]
+    authors_resolved = []  # [(author_dict, source_person_id)]
     authors_to_insert = []  # [(author_dict, daisng_id, ...)]
     for author in rec.get("authors", []):
         daisng_id = author.get("daisng_id")
@@ -631,13 +631,13 @@ def process_authorships(cur, rec: dict, source_document_id: int):
                 ))
 
         _ev(cur, """
-            INSERT INTO source_authors
+            INSERT INTO source_persons
                 (source, source_id, full_name, last_name, first_name, orcid, source_ids)
             VALUES %s
             ON CONFLICT (source, source_id) DO UPDATE SET
-                orcid = COALESCE(source_authors.orcid, EXCLUDED.orcid),
+                orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
                 full_name = EXCLUDED.full_name,
-                source_ids = COALESCE(source_authors.source_ids, '{}'::jsonb) ||
+                source_ids = COALESCE(source_persons.source_ids, '{}'::jsonb) ||
                              COALESCE(EXCLUDED.source_ids, '{}'::jsonb)
             RETURNING id, source_id
         """, deduped)
@@ -657,9 +657,9 @@ def process_authorships(cur, rec: dict, source_document_id: int):
     # Phase 2 : batch INSERT source_authorships
     from utils.normalize import normalize_name_form
 
-    values = {}  # clé = (source_document_id, source_author_id), dédupliqué
-    for author, source_author_id in author_ids:
-        key = (source_document_id, source_author_id)
+    values = {}  # clé = (source_document_id, source_person_id), dédupliqué
+    for author, source_person_id in author_ids:
+        key = (source_document_id, source_person_id)
         if key in values:
             continue  # même auteur déjà traité pour ce document
 
@@ -674,18 +674,18 @@ def process_authorships(cur, rec: dict, source_document_id: int):
         name_norm = normalize_name_form(author["full_name"])
 
         values[key] = (
-            'wos', source_document_id, source_author_id, author["position"],
+            'wos', source_document_id, source_person_id, author["position"],
             author["is_corresponding"], raw_affiliations, name_norm,
             institution_ids or None, author.get("roles"), author["full_name"],
         )
 
     _ev(cur, """
         INSERT INTO source_authorships
-            (source, source_document_id, source_author_id, author_position,
+            (source, source_document_id, source_person_id, author_position,
              is_corresponding, raw_affiliations, author_name_normalized,
              source_struct_ids, roles, raw_author_name)
         VALUES %s
-        ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
+        ON CONFLICT (source_document_id, source_person_id) DO UPDATE SET
             raw_affiliations = COALESCE(
                 EXCLUDED.raw_affiliations,
                 source_authorships.raw_affiliations
@@ -718,15 +718,15 @@ def process_authorships(cur, rec: dict, source_document_id: int):
         # Récupérer les sa_id
         sa_ids_needed = [said for _, said in authors_with_addrs]
         cur.execute("""
-            SELECT source_author_id, id FROM source_authorships
-            WHERE source_document_id = %s AND source_author_id = ANY(%s)
+            SELECT source_person_id, id FROM source_authorships
+            WHERE source_document_id = %s AND source_person_id = ANY(%s)
         """, (source_document_id, sa_ids_needed))
         sa_id_map = {r[0]: r[1] for r in cur.fetchall()}
 
         # Construire les liens
         addr_values = []
-        for author, source_author_id in authors_with_addrs:
-            sa_id = sa_id_map.get(source_author_id)
+        for author, source_person_id in authors_with_addrs:
+            sa_id = sa_id_map.get(source_person_id)
             if not sa_id:
                 continue
             for addr_text in author["addresses"]:
@@ -858,7 +858,7 @@ def main():
         cur.execute("SELECT source_id, id FROM source_structures WHERE source = 'wos'")
         for r in cur.fetchall():
             _wos_institution_cache[r[0]] = r[1]
-        cur.execute("SELECT source_id, id FROM source_authors WHERE source = 'wos' AND source_id NOT LIKE 'wos-%%'")
+        cur.execute("SELECT source_id, id FROM source_persons WHERE source = 'wos' AND source_id NOT LIKE 'wos-%%'")
         for r in cur.fetchall():
             _wos_author_cache[r[0]] = r[1]
         logger.info(f"Cache WoS : {len(_wos_institution_cache)} institutions, {len(_wos_author_cache)} auteurs")

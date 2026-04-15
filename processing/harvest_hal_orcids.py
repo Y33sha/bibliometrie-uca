@@ -3,16 +3,16 @@
 harvest_hal_orcids.py — Moissonnage des ORCID depuis l'API personnes HAL
 ========================================================================
 Interroge l'API ref/author de HAL pour récupérer les ORCID associés
-aux hal_person_id présents dans source_authors.
+aux hal_person_id présents dans source_persons.
 
 Met à jour :
-  - source_authors.orcid  (enrichissement direct)
+  - source_persons.orcid  (enrichissement direct)
   - person_identifiers  (ajout d'entrées orcid source='hal')
 
 Workflow HAL — position dans le pipeline :
   1. extract_hal.py           → staging (source='hal')
-  2. migrate_hal.py           → hal_documents, source_authors, source_authorships
-  3. harvest_hal_orcids.py    → enrichit source_authors.orcid (CE SCRIPT)
+  2. migrate_hal.py           → hal_documents, source_persons, source_authorships
+  3. harvest_hal_orcids.py    → enrichit source_persons.orcid (CE SCRIPT)
   4. migrate_person_identifiers.py → person_identifiers
 
 Usage:
@@ -101,10 +101,10 @@ def main():
     try:
         cur = conn.cursor()
 
-        # Récupérer les source_authors HAL avec un hal_person_id mais sans ORCID
+        # Récupérer les source_persons HAL avec un hal_person_id mais sans ORCID
         cur.execute("""
             SELECT id, (source_ids->>'hal_person_id')::int AS hal_person_id
-            FROM source_authors
+            FROM source_persons
             WHERE source = 'hal'
               AND (source_ids->>'hal_person_id') IS NOT NULL
               AND orcid IS NULL
@@ -112,7 +112,7 @@ def main():
         """)
         rows = cur.fetchall()
         logger.info(f"=== Moissonnage ORCID depuis HAL ===")
-        logger.info(f"{len(rows)} source_authors HAL avec hal_person_id mais sans ORCID")
+        logger.info(f"{len(rows)} source_persons HAL avec hal_person_id mais sans ORCID")
 
         if not rows:
             logger.info("Rien à faire.")
@@ -126,7 +126,7 @@ def main():
 
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i + batch_size]
-            id_map = {pid: aid for aid, pid in batch}  # {hal_person_id: source_authors.id}
+            id_map = {pid: aid for aid, pid in batch}  # {hal_person_id: source_persons.id}
             person_ids = list(id_map.keys())
 
             orcids = fetch_orcids_batch(person_ids)
@@ -134,9 +134,9 @@ def main():
 
             if orcids and not args.dry_run:
                 for pid, orcid in orcids.items():
-                    # 1. Mettre à jour source_authors.orcid
+                    # 1. Mettre à jour source_persons.orcid
                     cur.execute("""
-                        UPDATE source_authors
+                        UPDATE source_persons
                         SET orcid = %s, updated_at = now()
                         WHERE source = 'hal'
                           AND (source_ids->>'hal_person_id')::int = %s
@@ -146,7 +146,7 @@ def main():
 
                     # 2. Insérer dans person_identifiers (si person_id résolu)
                     cur.execute("""
-                        SELECT person_id FROM source_authors
+                        SELECT person_id FROM source_persons
                         WHERE source = 'hal'
                           AND (source_ids->>'hal_person_id')::int = %s
                           AND person_id IS NOT NULL
@@ -164,7 +164,7 @@ def main():
             if batch_num % 10 == 0 or batch_num == total_batches:
                 logger.info(
                     f"  Batch {batch_num}/{total_batches} — "
-                    f"{total_found} ORCID trouvés, {total_updated} source_authors mis à jour"
+                    f"{total_found} ORCID trouvés, {total_updated} source_persons mis à jour"
                 )
 
             time.sleep(0.5)
@@ -175,7 +175,7 @@ def main():
         else:
             logger.info(f"\n=== Terminé ===")
             logger.info(f"ORCID trouvés via API : {total_found}")
-            logger.info(f"source_authors mis à jour : {total_updated}")
+            logger.info(f"source_persons mis à jour : {total_updated}")
             logger.info(f"person_identifiers ajoutés : {total_pi_inserted}")
 
     except KeyboardInterrupt:

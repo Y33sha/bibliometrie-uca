@@ -173,7 +173,7 @@ def _count_tables(cur) -> dict:
     """Retourne les compteurs des tables normalisées."""
     tables = [
         "publications", "journals", "publishers",
-        "source_authors",
+        "source_persons",
     ]
     counts = {}
     for t in tables:
@@ -221,7 +221,7 @@ class TestNormalizeScanrIdempotence:
 
         assert processed_1 == 3, f"Première passe : {processed_1} traités (attendu 3)"
         assert counts_1["scanr_documents"] == 3
-        assert counts_1["source_authors"] >= 3  # Alice apparaît 2 fois mais dédupliquée par idref
+        assert counts_1["source_persons"] >= 3  # Alice apparaît 2 fois mais dédupliquée par idref
         assert counts_1["publications"] >= 3
 
         # Reset processed flags
@@ -243,10 +243,10 @@ class TestNormalizeScanrIdempotence:
         _insert_staging(db, SCANR_STAGING_DOCS)
         _run_normalize_scanr(db)
 
-        db.execute("SELECT count(*) AS cnt FROM source_authors WHERE idref = '000000001'")
+        db.execute("SELECT count(*) AS cnt FROM source_persons WHERE idref = '000000001'")
         assert db.fetchone()["cnt"] == 1, "Alice Dupont devrait être dédupliquée par idref"
 
-        db.execute("SELECT count(*) AS cnt FROM source_authorships WHERE source = 'scanr' AND source_author_id = (SELECT id FROM source_authors WHERE idref = '000000001')")
+        db.execute("SELECT count(*) AS cnt FROM source_authorships WHERE source = 'scanr' AND source_person_id = (SELECT id FROM source_persons WHERE idref = '000000001')")
         assert db.fetchone()["cnt"] == 2, "Alice devrait avoir 2 authorships (article + chapitre)"
 
     def test_author_without_idref(self, db):
@@ -254,7 +254,7 @@ class TestNormalizeScanrIdempotence:
         _insert_staging(db, SCANR_STAGING_DOCS)
         _run_normalize_scanr(db)
 
-        db.execute("SELECT count(*) AS cnt FROM source_authors WHERE idref IS NULL")
+        db.execute("SELECT count(*) AS cnt FROM source_persons WHERE idref IS NULL")
         count = db.fetchone()["cnt"]
         assert count >= 2, "Charlie Noid et Diana Durand n'ont pas d'idref"
 
@@ -380,7 +380,7 @@ def _run_normalize_hal(cur):
 
 def _count_hal_tables(cur) -> dict:
     counts = {}
-    for t in ["publications", "source_authors"]:
+    for t in ["publications", "source_persons"]:
         cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
         counts[t] = cur.fetchone()["cnt"]
     cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'hal'")
@@ -504,7 +504,7 @@ def _run_normalize_oa(cur):
 
 def _count_oa_tables(cur) -> dict:
     counts = {}
-    for t in ["publications", "source_authors"]:
+    for t in ["publications", "source_persons"]:
         cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
         counts[t] = cur.fetchone()["cnt"]
     cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'openalex'")
@@ -612,7 +612,7 @@ def _run_normalize_wos(cur):
 
 def _count_wos_tables(cur) -> dict:
     counts = {}
-    for t in ["publications", "source_authors"]:
+    for t in ["publications", "source_persons"]:
         cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
         counts[t] = cur.fetchone()["cnt"]
     cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'wos'")
@@ -789,7 +789,7 @@ class TestNormalizeInterSourceIdempotence:
 
 def _setup_persons_test_data(db):
     """Crée une chaîne complète de données pour tester create_persons :
-    publications → source_documents (hal) → source_authors → source_authorships (in_perimeter=TRUE)
+    publications → source_documents (hal) → source_persons → source_authorships (in_perimeter=TRUE)
     """
     # Publications
     db.execute("""
@@ -805,9 +805,9 @@ def _setup_persons_test_data(db):
                (90002, 'hal', 'hal-90000002', 'Test Pub Beta', 2024, 'THESE', 90002)
     """)
 
-    # HAL authors (source_authors, avec hal_person_id dans source_ids pour l'étape 0)
+    # HAL authors (source_persons, avec hal_person_id dans source_ids pour l'étape 0)
     db.execute("""
-        INSERT INTO source_authors (id, source, source_id, full_name, last_name, first_name, orcid, source_ids)
+        INSERT INTO source_persons (id, source, source_id, full_name, last_name, first_name, orcid, source_ids)
         VALUES (90001, 'hal', 'hal-author-90001', 'Eve Leroy', 'Leroy', 'Eve', '0000-0001-9999-0001', '{"hal_person_id": 900001}'),
                (90002, 'hal', 'hal-author-90002', 'Frank Moreau', 'Moreau', 'Frank', NULL, '{"hal_person_id": 900002}'),
                (90003, 'hal', 'hal-author-90003', 'Grace Petit', 'Petit', 'Grace', NULL, NULL)
@@ -816,7 +816,7 @@ def _setup_persons_test_data(db):
     # HAL authorships (in_perimeter=TRUE, person_id=NULL)
     db.execute("""
         INSERT INTO source_authorships
-            (id, source, source_document_id, source_author_id, author_position, in_perimeter,
+            (id, source, source_document_id, source_person_id, author_position, in_perimeter,
              person_id, author_name_normalized)
         VALUES
             (90001, 'hal', 90001, 90001, 0, TRUE, NULL, 'eve leroy'),
@@ -872,7 +872,7 @@ class TestCreatePersonsIdempotence:
         assert counts_1["hal_as_linked"] == 4
 
         # Reset : remettre person_id à NULL sur les authorships
-        # (mais PAS sur source_authors — en production, source_authors.person_id
+        # (mais PAS sur source_persons — en production, source_persons.person_id
         # persiste entre les relances via le dual-write)
         db.execute("UPDATE source_authorships SET person_id = NULL WHERE source = 'hal'")
 
@@ -893,7 +893,7 @@ class TestCreatePersonsIdempotence:
         # Eve Leroy (hal_person_id=900001) apparaît sur 2 documents
         db.execute("""
             SELECT DISTINCT person_id FROM source_authorships
-            WHERE source = 'hal' AND source_author_id = 90001 AND person_id IS NOT NULL
+            WHERE source = 'hal' AND source_person_id = 90001 AND person_id IS NOT NULL
         """)
         rows = db.fetchall()
         assert len(rows) == 1, "Eve Leroy devrait être une seule personne"
@@ -1019,7 +1019,7 @@ def _setup_affiliations_test_data(db):
 
     # Source authors
     db.execute("""
-        INSERT INTO source_authors (id, source, source_id, full_name, last_name, first_name)
+        INSERT INTO source_persons (id, source, source_id, full_name, last_name, first_name)
         VALUES (80001, 'hal', 'hal-author-80001', 'Alice Dupont', 'Dupont', 'Alice'),
                (80002, 'openalex', 'A80001', 'Alice Dupont', 'Dupont', 'Alice')
     """)
@@ -1027,7 +1027,7 @@ def _setup_affiliations_test_data(db):
     # HAL authorship (avec source_struct_ids pointant vers source_structures)
     db.execute("""
         INSERT INTO source_authorships
-            (id, source, source_document_id, source_author_id, author_position,
+            (id, source, source_document_id, source_person_id, author_position,
              in_perimeter, source_struct_ids, author_name_normalized)
         VALUES (80001, 'hal', 80001, 80001, 0, FALSE, ARRAY[80001], 'alice dupont')
     """)
@@ -1035,7 +1035,7 @@ def _setup_affiliations_test_data(db):
     # OpenAlex authorship (sera résolu via adresses)
     db.execute("""
         INSERT INTO source_authorships
-            (id, source, source_document_id, source_author_id, author_position,
+            (id, source, source_document_id, source_person_id, author_position,
              in_perimeter, author_name_normalized)
         VALUES (80002, 'openalex', 80002, 80002, 0, FALSE, 'alice dupont')
     """)

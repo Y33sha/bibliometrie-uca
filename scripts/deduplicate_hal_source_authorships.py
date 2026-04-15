@@ -1,7 +1,7 @@
 """
-Dédoublonnage des source_authorships et source_authors HAL en double.
+Dédoublonnage des source_authorships et source_persons HAL en double.
 
-Après une restructuration de la table source_authors, certains auteurs HAL
+Après une restructuration de la table source_persons, certains auteurs HAL
 ont été recréés avec un source_id de format différent (person_id_ -> person_id_formId),
 produisant des source_authorships en double pour le même (source_document, position).
 
@@ -12,10 +12,10 @@ Phase 1 — Source_authorships en double :
   2. Fusionne chaque groupe : garde le plus récent (id max), transfère les champs
      non-null de l'ancien vers le nouveau si celui-ci est null
   3. Supprime les source_authorships obsolètes
-  4. Supprime les source_authors devenus orphelins
+  4. Supprime les source_persons devenus orphelins
 
 Phase 2 — Source_authors en double (même hal_person_id) :
-  Pour les source_authors HAL restants avec le même hal_person_id mais des ids différents
+  Pour les source_persons HAL restants avec le même hal_person_id mais des ids différents
   (cas où les authorships n'étaient pas en double mais pointaient vers des auteurs distincts),
   migrer les source_authorships vers le nouveau, transférer les champs manquants,
   supprimer l'ancien.
@@ -50,7 +50,7 @@ SA_CONFLICT_RULES = {
     "in_perimeter": "old",       # false est le default, l'ancien a la vraie valeur
     "is_corresponding": "new",   # false est le default, le nouveau a la vraie valeur (renseigné avec roles)
     "excluded": "true",          # si l'un des deux est exclu, c'est vrai
-    "author_name_normalized": "new",  # dérivé du source_author_id, doit être cohérent avec le nouveau
+    "author_name_normalized": "new",  # dérivé du source_person_id, doit être cohérent avec le nouveau
 }
 
 # Champs transférables de l'ancien source_author vers le nouveau (si nouveau est null)
@@ -62,7 +62,7 @@ def find_duplicate_groups(cur):
     cur.execute("""
         SELECT source_document_id, author_position,
                array_agg(id ORDER BY id) AS sa_ids,
-               array_agg(source_author_id ORDER BY id) AS author_ids
+               array_agg(source_person_id ORDER BY id) AS author_ids
         FROM source_authorships
         WHERE source = 'hal'
         GROUP BY source_document_id, author_position
@@ -140,14 +140,14 @@ def merge_source_authorships(cur, group, dry_run):
     return keep_id, delete_ids, conflicts
 
 
-def merge_source_authors(cur, keep_author_id, old_author_ids, dry_run):
-    """Fusionne les source_authors : transfère les champs manquants, supprime les anciens."""
-    cur.execute("SELECT * FROM source_authors WHERE id = %s", (keep_author_id,))
+def merge_source_persons(cur, keep_author_id, old_author_ids, dry_run):
+    """Fusionne les source_persons : transfère les champs manquants, supprime les anciens."""
+    cur.execute("SELECT * FROM source_persons WHERE id = %s", (keep_author_id,))
     keep = cur.fetchone()
 
     transfers = {}
     for old_id in old_author_ids:
-        cur.execute("SELECT * FROM source_authors WHERE id = %s", (old_id,))
+        cur.execute("SELECT * FROM source_persons WHERE id = %s", (old_id,))
         old = cur.fetchone()
         if not old:
             continue
@@ -159,27 +159,27 @@ def merge_source_authors(cur, keep_author_id, old_author_ids, dry_run):
         set_clause = ", ".join(f"{f} = %({f})s" for f in transfers)
         transfers["id"] = keep_author_id
         cur.execute(
-            f"UPDATE source_authors SET {set_clause} WHERE id = %(id)s",
+            f"UPDATE source_persons SET {set_clause} WHERE id = %(id)s",
             transfers,
         )
 
-    # Supprimer les anciens source_authors s'ils n'ont plus de source_authorships
+    # Supprimer les anciens source_persons s'ils n'ont plus de source_authorships
     if not dry_run:
         for old_id in old_author_ids:
             cur.execute(
-                "SELECT EXISTS(SELECT 1 FROM source_authorships WHERE source_author_id = %s)",
+                "SELECT EXISTS(SELECT 1 FROM source_authorships WHERE source_person_id = %s)",
                 (old_id,),
             )
             if not cur.fetchone()["exists"]:
-                cur.execute("DELETE FROM source_authors WHERE id = %s", (old_id,))
+                cur.execute("DELETE FROM source_persons WHERE id = %s", (old_id,))
 
 
 def find_duplicate_authors(cur):
-    """Trouve les groupes de source_authors HAL avec le même hal_person_id."""
+    """Trouve les groupes de source_persons HAL avec le même hal_person_id."""
     cur.execute("""
         SELECT (source_ids->>'hal_person_id')::int AS hal_person_id,
                array_agg(id ORDER BY id) AS author_ids
-        FROM source_authors
+        FROM source_persons
         WHERE source = 'hal' AND source_ids->>'hal_person_id' IS NOT NULL
         GROUP BY (source_ids->>'hal_person_id')::int
         HAVING count(*) > 1
@@ -189,7 +189,7 @@ def find_duplicate_authors(cur):
 
 
 def merge_duplicate_authors(cur, group, dry_run):
-    """Fusionne un groupe de source_authors avec le même hal_person_id.
+    """Fusionne un groupe de source_persons avec le même hal_person_id.
 
     Garde le plus récent (id max), migre les source_authorships, transfère
     les champs manquants, supprime les anciens.
@@ -200,7 +200,7 @@ def merge_duplicate_authors(cur, group, dry_run):
     old_ids = author_ids[:-1]
 
     # Migrer les source_authorships des anciens vers le nouveau
-    # Supprimer celles qui créeraient un doublon (source_document_id, source_author_id)
+    # Supprimer celles qui créeraient un doublon (source_document_id, source_person_id)
     if not dry_run:
         for old_id in old_ids:
             # Supprimer les authorships qui existent déjà pour le nouveau source_author
@@ -211,35 +211,35 @@ def merge_duplicate_authors(cur, group, dry_run):
                     FROM source_authorships sa_old
                     JOIN source_authorships sa_new
                       ON sa_new.source_document_id = sa_old.source_document_id
-                     AND sa_new.source_author_id = %s
-                    WHERE sa_old.source_author_id = %s
+                     AND sa_new.source_person_id = %s
+                    WHERE sa_old.source_person_id = %s
                 )
             """, (keep_id, old_id))
             cur.execute("""
                 DELETE FROM source_authorships sa_old
                 USING source_authorships sa_new
-                WHERE sa_old.source_author_id = %s
-                  AND sa_new.source_author_id = %s
+                WHERE sa_old.source_person_id = %s
+                  AND sa_new.source_person_id = %s
                   AND sa_new.source_document_id = sa_old.source_document_id
             """, (old_id, keep_id))
             # Migrer les restantes
             cur.execute(
-                "UPDATE source_authorships SET source_author_id = %s WHERE source_author_id = %s",
+                "UPDATE source_authorships SET source_person_id = %s WHERE source_person_id = %s",
                 (keep_id, old_id),
             )
 
     # Transférer les champs manquants et supprimer
-    merge_source_authors(cur, keep_id, old_ids, dry_run)
+    merge_source_persons(cur, keep_id, old_ids, dry_run)
 
     deleted = 0
     if not dry_run:
         for old_id in old_ids:
             cur.execute(
-                "SELECT EXISTS(SELECT 1 FROM source_authorships WHERE source_author_id = %s)",
+                "SELECT EXISTS(SELECT 1 FROM source_authorships WHERE source_person_id = %s)",
                 (old_id,),
             )
             if not cur.fetchone()["exists"]:
-                cur.execute("DELETE FROM source_authors WHERE id = %s", (old_id,))
+                cur.execute("DELETE FROM source_persons WHERE id = %s", (old_id,))
                 deleted += 1
     else:
         deleted = len(old_ids)
@@ -294,14 +294,14 @@ def run(dry_run=True):
                 len(all_conflicts),
             )
 
-            # Fusion des source_authors orphelins (phase 1)
+            # Fusion des source_persons orphelins (phase 1)
             authors_deleted_p1 = 0
             for keep_id, old_ids in authors_to_merge.items():
-                merge_source_authors(cur, keep_id, list(old_ids), dry_run)
+                merge_source_persons(cur, keep_id, list(old_ids), dry_run)
                 if not dry_run:
                     for old_id in old_ids:
                         cur.execute(
-                            "SELECT EXISTS(SELECT 1 FROM source_authors WHERE id = %s)",
+                            "SELECT EXISTS(SELECT 1 FROM source_persons WHERE id = %s)",
                             (old_id,),
                         )
                         if not cur.fetchone()["exists"]:
@@ -313,10 +313,10 @@ def run(dry_run=True):
                 authors_deleted_p1,
             )
 
-            # ── Phase 2 : source_authors en double (même hal_person_id) ──
-            logger.info("=== Phase 2 : source_authors en double (meme hal_person_id) ===")
+            # ── Phase 2 : source_persons en double (même hal_person_id) ──
+            logger.info("=== Phase 2 : source_persons en double (meme hal_person_id) ===")
             author_groups = find_duplicate_authors(cur)
-            logger.info("Groupes de source_authors en double : %d", len(author_groups))
+            logger.info("Groupes de source_persons en double : %d", len(author_groups))
 
             authors_deleted_p2 = 0
             for group in author_groups:

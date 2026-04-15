@@ -6,8 +6,8 @@ Gère aussi le rattachement/détachement des authorships sources
 (source_authorships) puisque le person_id y est la source de vérité
 du lien personne.
 
-Les auteurs sources sont dans la table unifiée `source_authors`
-(UNIQUE(source, source_id)), les authorships utilisent `source_author_id`.
+Les auteurs sources sont dans la table unifiée `source_persons`
+(UNIQUE(source, source_id)), les authorships utilisent `source_person_id`.
 """
 
 import sys, os
@@ -36,11 +36,11 @@ def create_person(cur, last_name: str, first_name: str = "") -> int:
 # ── Rattachement / détachement authorships ──
 
 def link_authorship(cur, person_id: int, source: str, authorship_id: int,
-                    *, source_author_id: int | None = None,
+                    *, source_person_id: int | None = None,
                     has_hal_person_id: bool = False):
     """Rattache une authorship source à une personne (pipeline).
 
-    Pour HAL, fait aussi le dual-write sur source_authors si c'est un
+    Pour HAL, fait aussi le dual-write sur source_persons si c'est un
     compte HAL (hal_person_id renseigné). Ceci permet à l'étape 0 du
     pipeline de propager aux autres authorships du même compte.
     """
@@ -50,22 +50,22 @@ def link_authorship(cur, person_id: int, source: str, authorship_id: int,
     cur.execute("UPDATE source_authorships SET person_id = %s WHERE id = %s AND source = %s",
                 (person_id, authorship_id, source))
 
-    if source == "hal" and source_author_id and has_hal_person_id:
+    if source == "hal" and source_person_id and has_hal_person_id:
         cur.execute("""
-            UPDATE source_authors SET person_id = %s
+            UPDATE source_persons SET person_id = %s
             WHERE id = %s AND (source_ids->>'hal_person_id') IS NOT NULL
-        """, (person_id, source_author_id))
+        """, (person_id, source_person_id))
 
 
 def link_authorships(cur, person_id: int, authorships: list[dict]):
     """Rattache un groupe d'authorships à une personne (pipeline).
 
     Chaque dict doit avoir 'source' et 'authorship_id',
-    et optionnellement 'source_author_id' et 'has_hal_person_id'.
+    et optionnellement 'source_person_id' et 'has_hal_person_id'.
     """
     for a in authorships:
         link_authorship(cur, person_id, a["source"], a["authorship_id"],
-                        source_author_id=a.get("source_author_id"),
+                        source_person_id=a.get("source_person_id"),
                         has_hal_person_id=a.get("has_hal_person_id", False))
 
 
@@ -100,7 +100,7 @@ def add_identifier(cur, person_id: int, id_type: str, id_value: str,
     # Attribution d'un idhal → rattacher le compte HAL correspondant
     if id_type == "idhal":
         cur.execute("""
-            UPDATE source_authors SET person_id = %s
+            UPDATE source_persons SET person_id = %s
             WHERE source = 'hal'
               AND source_ids->>'idhal' = %s
               AND (person_id IS NULL OR person_id != %s)
@@ -258,27 +258,27 @@ def detach_name_form(cur, person_id: int, name_form: str):
 # Config par source
 _SOURCE_CONFIG = {
     "hal": {
-        "author_fk": "source_author_id",
+        "author_fk": "source_person_id",
         "id_fields": ["orcid"],
         "source_ids_fields": {"idhal": "idhal"},
     },
     "openalex": {
-        "author_fk": "source_author_id",
+        "author_fk": "source_person_id",
         "id_fields": ["orcid"],
         "source_ids_fields": {},
     },
     "wos": {
-        "author_fk": "source_author_id",
+        "author_fk": "source_person_id",
         "id_fields": ["orcid"],
         "source_ids_fields": {},
     },
     "scanr": {
-        "author_fk": "source_author_id",
+        "author_fk": "source_person_id",
         "id_fields": ["orcid", "idref"],
         "source_ids_fields": {},
     },
     "theses": {
-        "author_fk": "source_author_id",
+        "author_fk": "source_person_id",
         "id_fields": ["orcid", "idref"],
         "source_ids_fields": {},
     },
@@ -429,7 +429,7 @@ def merge_person(cur, target_id: int, source_id: int):
         )
 
     # 1. Transférer les auteurs sources (comptes HAL/ScanR avec person_id)
-    cur.execute("UPDATE source_authors SET person_id = %s WHERE person_id = %s",
+    cur.execute("UPDATE source_persons SET person_id = %s WHERE person_id = %s",
                 (target_id, source_id))
 
     # 1b. Transférer les source_authorships

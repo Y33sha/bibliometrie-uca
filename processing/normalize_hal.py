@@ -9,7 +9,7 @@ Usage:
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_documents                        (lien staging ↔ publication, source='hal')
-    source_authors                          (auteurs unifiés, source='hal')
+    source_persons                          (auteurs unifiés, source='hal')
     source_authorships                      (lien document × auteur, source='hal', avec source_struct_ids)
 
 La résolution UCA (source_authorships.structure_ids, in_perimeter) se fait en post-traitement
@@ -263,7 +263,7 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
 
 
 # =============================================================
-# HAL AUTHORS (source_authors, source='hal')
+# HAL AUTHORS (source_persons, source='hal')
 # =============================================================
 
 def _hal_source_id(hal_person_id: int | None, hal_form_id: int | None,
@@ -285,12 +285,12 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
                       idhal: str | None, hal_form_id: int | None = None,
                       orcid: str | None = None) -> int | None:
     """
-    Insère/retrouve un auteur HAL dans source_authors (source='hal').
+    Insère/retrouve un auteur HAL dans source_persons (source='hal').
     Déduplique par :
       1. hal_person_id (clé unique via source_id, auteurs avec compte HAL)
       2. hal_form_id (clé unique via source_id, auteurs sans compte HAL)
       3. nom exact (dernier recours)
-    Retourne source_authors.id ou None.
+    Retourne source_persons.id ou None.
     """
     if not full_name:
         return None
@@ -319,14 +319,14 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
     if hal_person_id and hal_person_id > 0:
         src_id = _hal_source_id(hal_person_id, hal_form_id)
         cur.execute("""
-            INSERT INTO source_authors
+            INSERT INTO source_persons
                 (source, source_id, full_name, last_name, first_name, orcid,
                  source_ids)
             VALUES ('hal', %s, %s, %s, %s, %s, %s)
             ON CONFLICT (source, source_id) DO UPDATE SET
-                orcid = COALESCE(source_authors.orcid, EXCLUDED.orcid),
+                orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
                 full_name = EXCLUDED.full_name,
-                source_ids = COALESCE(source_authors.source_ids, '{}') ||
+                source_ids = COALESCE(source_persons.source_ids, '{}') ||
                              COALESCE(EXCLUDED.source_ids, '{}')
             RETURNING id
         """, (src_id, full_name, last_name, first_name, orcid,
@@ -337,17 +337,17 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
     if hal_form_id:
         src_id = _hal_source_id(None, hal_form_id)
         cur.execute("""
-            SELECT id FROM source_authors
+            SELECT id FROM source_persons
             WHERE source = 'hal' AND source_id = %s
             LIMIT 1
         """, (src_id,))
         row = cur.fetchone()
         if row:
             cur.execute("""
-                UPDATE source_authors SET
-                    orcid = COALESCE(source_authors.orcid, %s),
+                UPDATE source_persons SET
+                    orcid = COALESCE(source_persons.orcid, %s),
                     full_name = %s,
-                    source_ids = COALESCE(source_authors.source_ids, '{}') ||
+                    source_ids = COALESCE(source_persons.source_ids, '{}') ||
                                  COALESCE(%s::jsonb, '{}')
                 WHERE id = %s
             """, (orcid, full_name, source_ids_json, row[0]))
@@ -355,7 +355,7 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
 
         # Nouveau avec form_id
         cur.execute("""
-            INSERT INTO source_authors
+            INSERT INTO source_persons
                 (source, source_id, full_name, last_name, first_name, orcid,
                  source_ids)
             VALUES ('hal', %s, %s, %s, %s, %s, %s)
@@ -366,7 +366,7 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
 
     # 3. Pas de hal_person_id ni form_id → chercher par nom exact
     cur.execute("""
-        SELECT id FROM source_authors
+        SELECT id FROM source_persons
         WHERE source = 'hal'
           AND source_id LIKE 'nokey-%%'
           AND full_name = %s
@@ -377,20 +377,20 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
     if row:
         if orcid or source_ids_json:
             cur.execute("""
-                UPDATE source_authors SET
-                    orcid = COALESCE(source_authors.orcid, %s),
-                    source_ids = COALESCE(source_authors.source_ids, '{}') ||
+                UPDATE source_persons SET
+                    orcid = COALESCE(source_persons.orcid, %s),
+                    source_ids = COALESCE(source_persons.source_ids, '{}') ||
                                  COALESCE(%s::jsonb, '{}')
                 WHERE id = %s
             """, (orcid, source_ids_json, row[0]))
         return row[0]
 
     # 4. Nouveau sans identifiant — on génère un source_id séquentiel
-    cur.execute("SELECT nextval('source_authors_id_seq')")
+    cur.execute("SELECT nextval('source_persons_id_seq')")
     next_id = cur.fetchone()[0]
     src_id = f"nokey-{next_id}"
     cur.execute("""
-        INSERT INTO source_authors
+        INSERT INTO source_persons
             (id, source, source_id, full_name, last_name, first_name, orcid,
              source_ids)
         VALUES (%s, 'hal', %s, %s, %s, %s, %s, %s)
@@ -459,7 +459,7 @@ def process_authors(cur, doc: dict, source_document_id: int,
     Traite les auteurs d'un document HAL :
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
     - Parse authIdHasStructure_fs pour les affiliations (clé = form_id)
-    - Crée/retrouve chaque auteur dans source_authors (source='hal')
+    - Crée/retrouve chaque auteur dans source_persons (source='hal')
     - Crée les source_authorships (source='hal') avec source_struct_ids (source_structures.id)
     """
     names = doc.get("authFullName_s") or []
@@ -531,10 +531,10 @@ def process_authors(cur, doc: dict, source_document_id: int,
         roles, is_corresponding_from_role = map_role("hal", quality)
         is_corresponding = is_corresponding_from_role
 
-        source_author_id = upsert_hal_author(
+        source_person_id = upsert_hal_author(
             cur, name, hal_person_id, idhal, form_id, orcid=orcid
         )
-        if not source_author_id:
+        if not source_person_id:
             continue
 
         # Structures affiliées à cet auteur sur ce document (par form_id)
@@ -555,10 +555,10 @@ def process_authors(cur, doc: dict, source_document_id: int,
 
         cur.execute("""
             INSERT INTO source_authorships
-                (source, source_document_id, source_author_id, author_position, source_struct_ids,
+                (source, source_document_id, source_person_id, author_position, source_struct_ids,
                  author_name_normalized, is_corresponding, roles, raw_author_name)
             VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
-            ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
+            ON CONFLICT (source_document_id, source_person_id) DO UPDATE SET
                 source_struct_ids = COALESCE(
                     EXCLUDED.source_struct_ids,
                     source_authorships.source_struct_ids
@@ -568,7 +568,7 @@ def process_authors(cur, doc: dict, source_document_id: int,
                 roles = EXCLUDED.roles,
                 raw_author_name = EXCLUDED.raw_author_name,
                 addresses_extracted = FALSE
-        """, (source_document_id, source_author_id, position,
+        """, (source_document_id, source_person_id, position,
               source_struct_ids, name, is_corresponding, roles or None, name))
 
 
@@ -768,13 +768,13 @@ def main():
         if dup_deleted:
             logger.info(f"Doublons de position supprimés : {dup_deleted}")
 
-        # Nettoyage : supprimer les source_authors HAL orphelins
+        # Nettoyage : supprimer les source_persons HAL orphelins
         cur.execute("""
-            DELETE FROM source_authors
+            DELETE FROM source_persons
             WHERE source = 'hal'
               AND NOT EXISTS (
                   SELECT 1 FROM source_authorships sa
-                  WHERE sa.source_author_id = source_authors.id
+                  WHERE sa.source_person_id = source_persons.id
               )
         """)
         orphans_deleted = cur.rowcount

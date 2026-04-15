@@ -21,12 +21,12 @@ async def authorships_stats(lab_id: int = Query(0)):
             WITH uca_authors AS (
                 SELECT sauth.id, sa.source,
                        (SELECT sa3.person_id FROM source_authorships sa3
-                        WHERE sa3.source_author_id = sauth.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id,
+                        WHERE sa3.source_person_id = sauth.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id,
                        sauth.orcid, sauth.source_ids->>'idhal' AS idhal
-                FROM source_authors sauth
+                FROM source_persons sauth
                 WHERE EXISTS (
                     SELECT 1 FROM source_authorships sa
-                    WHERE sa.source_author_id = sauth.id AND sa.in_perimeter = TRUE{lab_filter}
+                    WHERE sa.source_person_id = sauth.id AND sa.in_perimeter = TRUE{lab_filter}
                 )
                 AND sauth.source IN {AUTHOR_SOURCES_SQL}
             )
@@ -53,7 +53,7 @@ def _uca_authors_cte(lab_id: int = 0, with_pub_count: bool = False) -> tuple[str
         pub_count_col = """,
                    (SELECT COUNT(DISTINCT sa2.source_document_id)
                     FROM source_authorships sa2
-                    WHERE sa2.source_author_id = sauth.id AND sa2.in_perimeter = TRUE) AS uca_pub_count"""
+                    WHERE sa2.source_person_id = sauth.id AND sa2.in_perimeter = TRUE) AS uca_pub_count"""
 
     cte = f"""
         WITH uca_authors AS (
@@ -61,12 +61,12 @@ def _uca_authors_cte(lab_id: int = 0, with_pub_count: bool = False) -> tuple[str
                    sauth.orcid, sauth.source_ids->>'idhal' AS idhal,
                    CASE WHEN sauth.source = 'openalex' THEN sauth.source_id ELSE NULL END AS openalex_id,
                    (SELECT sa3.person_id FROM source_authorships sa3
-                    WHERE sa3.source_author_id = sauth.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id{pub_count_col}
-            FROM source_authors sauth
+                    WHERE sa3.source_person_id = sauth.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id{pub_count_col}
+            FROM source_persons sauth
             WHERE sauth.source IN {AUTHOR_SOURCES_SQL}
               AND EXISTS (
                   SELECT 1 FROM source_authorships sa
-                  WHERE sa.source_author_id = sauth.id AND sa.in_perimeter = TRUE{lab_filter}
+                  WHERE sa.source_person_id = sauth.id AND sa.in_perimeter = TRUE{lab_filter}
               )
         )
     """
@@ -141,8 +141,8 @@ async def authorships_facets(
         lab_cte += f""",
             author_structs AS (
                 SELECT sauth.id AS author_id, sauth.source, unnest(sa2.structure_ids) AS struct_id
-                FROM source_authors sauth
-                JOIN source_authorships sa2 ON sa2.source_author_id = sauth.id
+                FROM source_persons sauth
+                JOIN source_authorships sa2 ON sa2.source_person_id = sauth.id
                 WHERE sa2.in_perimeter = TRUE AND sa2.structure_ids IS NOT NULL
                   AND sauth.source IN {AUTHOR_SOURCES_SQL}
             )

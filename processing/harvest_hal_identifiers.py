@@ -1,11 +1,11 @@
 """
 Moissonnage des identifiants (ORCID, IdRef) depuis l'API personnes HAL.
 
-Interroge l'API ref/author de HAL pour les source_authors HAL avec hal_person_id
+Interroge l'API ref/author de HAL pour les source_persons HAL avec hal_person_id
 et récupère ORCID et IdRef en une seule passe.
 
 Met à jour :
-  - source_authors.orcid, source_authors.idref
+  - source_persons.orcid, source_persons.idref
   - person_identifiers (source='hal')
 
 Usage:
@@ -110,17 +110,17 @@ def main():
     try:
         cur = conn.cursor()
 
-        # source_authors HAL avec hal_person_id mais sans ORCID ou sans idRef
+        # source_persons HAL avec hal_person_id mais sans ORCID ou sans idRef
         cur.execute("""
             SELECT id, (source_ids->>'hal_person_id')::int AS hal_person_id, person_id
-            FROM source_authors
+            FROM source_persons
             WHERE source = 'hal'
               AND (source_ids->>'hal_person_id') IS NOT NULL
               AND (orcid IS NULL OR idref IS NULL)
             ORDER BY id
         """)
         rows = cur.fetchall()
-        logger.info(f"{len(rows)} source_authors HAL à interroger (ORCID ou IdRef manquant)")
+        logger.info(f"{len(rows)} source_persons HAL à interroger (ORCID ou IdRef manquant)")
 
         if not rows:
             logger.info("Rien à faire.")
@@ -131,7 +131,7 @@ def main():
 
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i + batch_size]
-            # {hal_person_id: (source_authors.id, person_id)}
+            # {hal_person_id: (source_persons.id, person_id)}
             id_map = {row[1]: (row[0], row[2]) for row in batch}
             person_ids = list(id_map.keys())
 
@@ -143,7 +143,7 @@ def main():
 
                     if "orcid" in ids:
                         cur.execute("""
-                            UPDATE source_authors
+                            UPDATE source_persons
                             SET orcid = COALESCE(orcid, %s), updated_at = now()
                             WHERE id = %s AND orcid IS NULL
                         """, (ids["orcid"], ha_id))
@@ -153,7 +153,7 @@ def main():
 
                     if "idref" in ids:
                         cur.execute("""
-                            UPDATE source_authors
+                            UPDATE source_persons
                             SET idref = COALESCE(idref, %s), updated_at = now()
                             WHERE id = %s AND idref IS NULL
                         """, (ids["idref"], ha_id))
@@ -186,7 +186,7 @@ def main():
             logger.info(f"\n=== Terminé ===")
             logger.info(f"  ORCID trouvés : {stats['orcid_found']}")
             logger.info(f"  IdRef trouvés : {stats['idref_found']}")
-            logger.info(f"  source_authors mis à jour : {stats['ha_updated']}")
+            logger.info(f"  source_persons mis à jour : {stats['ha_updated']}")
 
     except KeyboardInterrupt:
         conn.commit()

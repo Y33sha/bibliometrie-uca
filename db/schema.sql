@@ -810,10 +810,10 @@ CREATE TABLE public.schema_migrations (
 
 
 --
--- Name: source_authors; Type: TABLE; Schema: public; Owner: -
+-- Name: source_persons; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.source_authors (
+CREATE TABLE public.source_persons (
     id integer NOT NULL,
     source text NOT NULL,
     source_id text NOT NULL,
@@ -829,10 +829,10 @@ CREATE TABLE public.source_authors (
 
 
 --
--- Name: source_authors_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: source_persons_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE public.source_authors_id_seq
+CREATE SEQUENCE public.source_persons_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -842,10 +842,10 @@ CREATE SEQUENCE public.source_authors_id_seq
 
 
 --
--- Name: source_authors_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: source_persons_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.source_authors_id_seq OWNED BY public.source_authors.id;
+ALTER SEQUENCE public.source_persons_id_seq OWNED BY public.source_persons.id;
 
 
 --
@@ -887,7 +887,7 @@ CREATE TABLE public.source_authorships (
     id integer NOT NULL,
     source text NOT NULL,
     source_document_id integer NOT NULL,
-    source_author_id integer NOT NULL,
+    source_person_id integer NOT NULL,
     author_position smallint,
     in_perimeter boolean DEFAULT false,
     excluded boolean DEFAULT false,
@@ -1279,10 +1279,10 @@ ALTER TABLE ONLY public.publishers ALTER COLUMN id SET DEFAULT nextval('public.p
 
 
 --
--- Name: source_authors id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: source_persons id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.source_authors ALTER COLUMN id SET DEFAULT nextval('public.source_authors_id_seq'::regclass);
+ALTER TABLE ONLY public.source_persons ALTER COLUMN id SET DEFAULT nextval('public.source_persons_id_seq'::regclass);
 
 
 --
@@ -1606,19 +1606,19 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
--- Name: source_authors source_authors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: source_persons source_persons_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.source_authors
-    ADD CONSTRAINT source_authors_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.source_persons
+    ADD CONSTRAINT source_persons_pkey PRIMARY KEY (id);
 
 
 --
--- Name: source_authors source_authors_source_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: source_persons source_persons_source_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.source_authors
-    ADD CONSTRAINT source_authors_source_source_id_key UNIQUE (source, source_id);
+ALTER TABLE ONLY public.source_persons
+    ADD CONSTRAINT source_persons_source_source_id_key UNIQUE (source, source_id);
 
 
 --
@@ -1646,11 +1646,11 @@ ALTER TABLE ONLY public.source_authorships
 
 
 --
--- Name: source_authorships source_authorships_source_document_id_source_author_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: source_authorships source_authorships_source_document_id_source_person_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_authorships
-    ADD CONSTRAINT source_authorships_source_document_id_source_author_id_key UNIQUE (source_document_id, source_author_id);
+    ADD CONSTRAINT source_authorships_source_document_id_source_person_id_key UNIQUE (source_document_id, source_person_id);
 
 
 --
@@ -2117,7 +2117,7 @@ CREATE INDEX idx_sa_source ON public.source_authorships USING btree (source);
 -- Name: idx_sa_source_author; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_source_author ON public.source_authorships USING btree (source_author_id);
+CREATE INDEX idx_sa_source_author ON public.source_authorships USING btree (source_person_id);
 
 
 --
@@ -2142,31 +2142,31 @@ CREATE INDEX idx_saa_authorship ON public.source_authorship_addresses USING btre
 
 
 --
--- Name: idx_source_authors_idref; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_persons_idref; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_authors_idref ON public.source_authors USING btree (idref) WHERE (idref IS NOT NULL);
-
-
---
--- Name: idx_source_authors_orcid; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_authors_orcid ON public.source_authors USING btree (orcid) WHERE (orcid IS NOT NULL);
+CREATE INDEX idx_source_persons_idref ON public.source_persons USING btree (idref) WHERE (idref IS NOT NULL);
 
 
 --
--- Name: idx_source_authors_person; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_persons_orcid; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_authors_person ON public.source_authors USING btree (person_id) WHERE (person_id IS NOT NULL);
+CREATE INDEX idx_source_persons_orcid ON public.source_persons USING btree (orcid) WHERE (orcid IS NOT NULL);
 
 
 --
--- Name: idx_source_authors_source; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_persons_person; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_authors_source ON public.source_authors USING btree (source);
+CREATE INDEX idx_source_persons_person ON public.source_persons USING btree (person_id) WHERE (person_id IS NOT NULL);
+
+
+--
+-- Name: idx_source_persons_source; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_persons_source ON public.source_persons USING btree (source);
 
 
 --
@@ -2501,11 +2501,11 @@ ALTER TABLE ONLY public.publisher_name_forms
 
 
 --
--- Name: source_authors source_authors_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: source_persons source_persons_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.source_authors
-    ADD CONSTRAINT source_authors_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.source_persons
+    ADD CONSTRAINT source_persons_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE SET NULL;
 
 
 --
@@ -2541,11 +2541,11 @@ ALTER TABLE ONLY public.source_authorships
 
 
 --
--- Name: source_authorships source_authorships_source_author_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: source_authorships source_authorships_source_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_authorships
-    ADD CONSTRAINT source_authorships_source_author_id_fkey FOREIGN KEY (source_author_id) REFERENCES public.source_authors(id) ON DELETE CASCADE;
+    ADD CONSTRAINT source_authorships_source_person_id_fkey FOREIGN KEY (source_person_id) REFERENCES public.source_persons(id) ON DELETE CASCADE;
 
 
 --
