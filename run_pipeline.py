@@ -34,6 +34,7 @@ Phases (dans l'ordre d'execution):
 """
 
 import argparse
+import datetime
 import logging
 import subprocess
 import sys
@@ -67,8 +68,7 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
     sources = sources or set(ALL_SOURCES_SET)
     year_args = ["--year", str(year)] if year else []
     if mode == "daily":
-        from pipeline.metrics import get_last_run_date
-        since = str(get_last_run_date())
+        since = str((datetime.datetime.now() - datetime.timedelta(hours=36)).date())
         log.info("Mode quotidien : HAL depuis %s", since)
         if "hal" in sources:
             run_python("extraction/hal/extract_hal.py", "--since", since)
