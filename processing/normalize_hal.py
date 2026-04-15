@@ -281,6 +281,9 @@ def _hal_source_id(hal_person_id: int | None, hal_form_id: int | None,
     return f"nokey-{old_id}" if old_id else "_"
 
 
+_hal_author_cache: dict[str, int] = {}
+
+
 def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
                       idhal: str | None, hal_form_id: int | None = None,
                       orcid: str | None = None) -> int | None:
@@ -291,6 +294,7 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
       2. hal_form_id (clé unique via source_id, auteurs sans compte HAL)
       3. nom exact (dernier recours)
     Retourne source_persons.id ou None.
+    Utilise un cache mémoire pour éviter les SELECTs redondants.
     """
     if not full_name:
         return None
@@ -315,9 +319,10 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
     source_ids_json = Json(source_ids) if source_ids else None
 
     # 1. Par hal_person_id (clé fiable) — 0 signifie non identifié
-    #    hal_form_id est réservé aux auteurs sans compte HAL → ignoré ici
     if hal_person_id and hal_person_id > 0:
         src_id = _hal_source_id(hal_person_id, hal_form_id)
+        if src_id in _hal_author_cache:
+            return _hal_author_cache[src_id]
         cur.execute("""
             INSERT INTO source_persons
                 (source, source_id, full_name, last_name, first_name, orcid,
@@ -331,40 +336,37 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
             RETURNING id
         """, (src_id, full_name, last_name, first_name, orcid,
               source_ids_json))
-        return cur.fetchone()[0]
+        result = cur.fetchone()[0]
+        _hal_author_cache[src_id] = result
+        return result
 
     # 2. Par hal_form_id (auteurs sans compte HAL mais avec form_id)
     if hal_form_id:
         src_id = _hal_source_id(None, hal_form_id)
-        cur.execute("""
-            SELECT id FROM source_persons
-            WHERE source = 'hal' AND source_id = %s
-            LIMIT 1
-        """, (src_id,))
-        row = cur.fetchone()
-        if row:
-            cur.execute("""
-                UPDATE source_persons SET
-                    orcid = COALESCE(source_persons.orcid, %s),
-                    full_name = %s,
-                    source_ids = COALESCE(source_persons.source_ids, '{}') ||
-                                 COALESCE(%s::jsonb, '{}')
-                WHERE id = %s
-            """, (orcid, full_name, source_ids_json, row[0]))
-            return row[0]
-
-        # Nouveau avec form_id
+        if src_id in _hal_author_cache:
+            return _hal_author_cache[src_id]
         cur.execute("""
             INSERT INTO source_persons
                 (source, source_id, full_name, last_name, first_name, orcid,
                  source_ids)
             VALUES ('hal', %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (source, source_id) DO UPDATE SET
+                orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
+                full_name = EXCLUDED.full_name,
+                source_ids = COALESCE(source_persons.source_ids, '{}') ||
+                             COALESCE(EXCLUDED.source_ids, '{}')
             RETURNING id
         """, (src_id, full_name, last_name, first_name, orcid,
               source_ids_json))
-        return cur.fetchone()[0]
+        result = cur.fetchone()[0]
+        _hal_author_cache[src_id] = result
+        return result
 
     # 3. Pas de hal_person_id ni form_id → chercher par nom exact
+    cache_key = f"nokey:{full_name}:{first_name}"
+    if cache_key in _hal_author_cache:
+        return _hal_author_cache[cache_key]
+
     cur.execute("""
         SELECT id FROM source_persons
         WHERE source = 'hal'
@@ -383,6 +385,7 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
                                  COALESCE(%s::jsonb, '{}')
                 WHERE id = %s
             """, (orcid, source_ids_json, row[0]))
+        _hal_author_cache[cache_key] = row[0]
         return row[0]
 
     # 4. Nouveau sans identifiant — on génère un source_id séquentiel
@@ -397,7 +400,9 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
         RETURNING id
     """, (next_id, src_id, full_name, last_name, first_name, orcid,
           source_ids_json))
-    return cur.fetchone()[0]
+    result = cur.fetchone()[0]
+    _hal_author_cache[cache_key] = result
+    return result
 
 
 # =============================================================
@@ -787,6 +792,7 @@ def main():
 
         conn.commit()
         struct_cache.clear()
+        _hal_author_cache.clear()
 
         logger.info(f"\n=== Terminé ===")
         logger.info(f"Traités avec succès : {processed}")
