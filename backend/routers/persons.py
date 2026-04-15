@@ -8,7 +8,7 @@ from backend.deps import get_cursor, require_admin
 from backend.models import LinkPersonAuthor, AddIdentifier
 from backend.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, persons_sort_clause,
     parse_int_csv, parse_str_csv, apply_source_filter)
-from utils.sources import AUTHOR_SOURCES_SQL
+from utils.sources import AUTHOR_SOURCES_SQL, ALL_SOURCES_SET
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.normalize import normalize_text
@@ -498,7 +498,7 @@ async def persons_stats():
 async def author_details(source: str, author_id: int, max_pubs: int = Query(10, ge=1, le=50)):
     """Détails d'un auteur source : ses publications récentes."""
     with get_cursor() as (cur, conn):
-        if source not in ("hal", "openalex", "wos"):
+        if source not in ALL_SOURCES_SET:
             raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
 
         cur.execute("""
@@ -851,7 +851,7 @@ async def link_person_to_author(person_id: int, data: LinkPersonAuthor):
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Person not found")
 
-        if data.source not in ("hal", "openalex", "wos"):
+        if data.source not in ALL_SOURCES_SET:
             raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
 
         author = _link_author_to_person(cur, person_id, data.source, data.author_id)
@@ -866,7 +866,7 @@ async def link_person_to_author(person_id: int, data: LinkPersonAuthor):
 async def unlink_person_from_author(person_id: int, source: str, author_id: int):
     """Détache un auteur source d'une personne."""
     with get_cursor() as (cur, conn):
-        if source not in ("hal", "openalex", "wos"):
+        if source not in ALL_SOURCES_SET:
             raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
 
         _unlink_author_from_person(cur, person_id, source, author_id)
@@ -1149,7 +1149,7 @@ async def assign_orphan_authorship_endpoint(body: dict):
 
     if not source or not authorship_id:
         raise HTTPException(status_code=400, detail="source et authorship_id requis")
-    if source not in ("hal", "openalex", "wos"):
+    if source not in ALL_SOURCES_SET:
         raise HTTPException(status_code=400, detail=f"Source inconnue: {source}")
 
     with get_cursor() as (cur, conn):
@@ -1188,7 +1188,7 @@ async def batch_assign_orphan_authorships(body: dict):
         raise HTTPException(status_code=400, detail="authorships et person_id requis")
 
     sa_ids = [a["authorship_id"] for a in authorships
-              if a.get("source") in ("hal", "openalex", "wos")]
+              if a.get("source") in ALL_SOURCES_SET]
     if not sa_ids:
         return {"ok": True, "assigned": 0}
 
