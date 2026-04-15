@@ -47,6 +47,8 @@ def read_new_logs(offsets: dict[str, int]) -> str:
         if not log_dir.exists():
             continue
         for f in sorted(log_dir.glob("*.log")):
+            if f.name in _EXCLUDED_LOGS:
+                continue
             path = str(f)
             prev_size = offsets.get(path, 0)
             current_size = f.stat().st_size
