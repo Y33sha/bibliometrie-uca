@@ -31,3 +31,4 @@ db/backup/
 # Claude Code
 .claude/
 pipeline/reports/*.md
+pipeline/reports/sandbox/
