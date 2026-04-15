@@ -9,7 +9,7 @@ Usage:
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_documents                        (lien staging ↔ publication, source='scanr')
-    source_authors                          (auteurs unifiés, source='scanr')
+    source_persons                          (auteurs unifiés, source='scanr')
     source_authorships                      (lien document × auteur, source='scanr', avec affiliations)
 
 La résolution UCA (source_authorships.structure_ids, in_perimeter) se fait en post-traitement
@@ -264,11 +264,11 @@ def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
 
 
 # =============================================================
-# SCANR AUTHORS (source_authors, source='scanr')
+# SCANR AUTHORS (source_persons, source='scanr')
 # =============================================================
 
 def upsert_scanr_author(cur, author: dict) -> int | None:
-    """Insère/retrouve un auteur ScanR dans source_authors (source='scanr').
+    """Insère/retrouve un auteur ScanR dans source_persons (source='scanr').
     Déduplique par idref (via source_id). L'idref va dans BOTH source_id et idref."""
     full_name = author.get("fullName")
     if not full_name:
@@ -289,24 +289,24 @@ def upsert_scanr_author(cur, author: dict) -> int | None:
 
     # 1. Par idref (clé fiable)
     #    source_id = COALESCE(idref, 'scanr-{old_id}')
-    #    idref va aussi dans la colonne idref de source_authors
+    #    idref va aussi dans la colonne idref de source_persons
     if idref:
         source_id = idref
         cur.execute("""
-            INSERT INTO source_authors
+            INSERT INTO source_persons
                 (source, source_id, full_name, last_name, first_name, orcid, idref)
             VALUES ('scanr', %s, %s, %s, %s, %s, %s)
             ON CONFLICT (source, source_id) DO UPDATE SET
-                orcid = COALESCE(source_authors.orcid, EXCLUDED.orcid),
+                orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
                 full_name = EXCLUDED.full_name,
-                idref = COALESCE(source_authors.idref, EXCLUDED.idref)
+                idref = COALESCE(source_persons.idref, EXCLUDED.idref)
             RETURNING id
         """, (source_id, full_name, last_name, first_name, orcid, idref))
         return cur.fetchone()["id"]
 
     # 2. Par nom exact (auteurs sans idref)
     cur.execute("""
-        SELECT id FROM source_authors
+        SELECT id FROM source_persons
         WHERE source = 'scanr'
           AND source_id LIKE 'scanr-%%'
           AND full_name = %s
@@ -318,11 +318,11 @@ def upsert_scanr_author(cur, author: dict) -> int | None:
         return row["id"]
 
     # 3. Nouveau sans identifiant — on génère un source_id séquentiel
-    cur.execute("SELECT nextval('source_authors_id_seq')")
+    cur.execute("SELECT nextval('source_persons_id_seq')")
     next_id = cur.fetchone()["nextval"]
     source_id = f"scanr-{next_id}"
     cur.execute("""
-        INSERT INTO source_authors
+        INSERT INTO source_persons
             (id, source, source_id, full_name, last_name, first_name, orcid)
         VALUES (%s, 'scanr', %s, %s, %s, %s, %s)
         RETURNING id
@@ -339,8 +339,8 @@ def process_authors(cur, doc: dict, source_document_id: int):
     authors = doc.get("authors") or []
 
     for position, author_data in enumerate(authors):
-        source_author_id = upsert_scanr_author(cur, author_data)
-        if not source_author_id:
+        source_person_id = upsert_scanr_author(cur, author_data)
+        if not source_person_id:
             continue
 
         raw_role = author_data.get("role")
@@ -373,11 +373,11 @@ def process_authors(cur, doc: dict, source_document_id: int):
 
         cur.execute("""
             INSERT INTO source_authorships
-                (source, source_document_id, source_author_id, author_position, roles,
+                (source, source_document_id, source_person_id, author_position, roles,
                  raw_affiliations, source_data,
                  author_name_normalized, raw_author_name)
             VALUES ('scanr', %s, %s, %s, %s, %s, %s, normalize_name_form(%s), %s)
-            ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
+            ON CONFLICT (source_document_id, source_person_id) DO UPDATE SET
                 raw_affiliations = COALESCE(EXCLUDED.raw_affiliations,
                     source_authorships.raw_affiliations),
                 source_data = COALESCE(source_authorships.source_data, '{}') ||
@@ -386,7 +386,7 @@ def process_authors(cur, doc: dict, source_document_id: int):
                 roles = EXCLUDED.roles,
                 raw_author_name = EXCLUDED.raw_author_name,
                 addresses_extracted = FALSE
-        """, (source_document_id, source_author_id, position, roles or None,
+        """, (source_document_id, source_person_id, position, roles or None,
               Json(raw_affiliations) if raw_affiliations else None,
               source_data_json,
               author_full_name, author_full_name))

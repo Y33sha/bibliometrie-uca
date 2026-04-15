@@ -1,17 +1,9 @@
 # Memo
 pg_dump -U lalecoz -d bibliometrie -Fc -f bibliometrie.dump
 pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
-# Trucs nécessaires avant transmission DSI
-* [ ] gérer le CRUD des périmètres dans l'interface admin/config
 # Workflow
-## Robustesse du pipeline sur le long terme
-* [ ] Comment se met à jour le référentiel structures HAL en cas de changement entre deux imports? faut-il des champs `hash` et `last_seen_at` comme pour les publis?
-* [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
-* [ ] authorships excluded: info perdue si réimport (grave?)
+* [x] programmation cron pour le pipeline de traitement (daily, weekly, monthly)
 ## Pipeline
-### Facile et/ou urgent
-* [ ] programmation cron pour le pipeline de traitement (daily, weekly, monthly)
-### Autres
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation
 * [ ] structure_ids et in_perimeter des publis theses.fr: à quelle phase du pipeline sont-ils remplis et selon quelle logique? auditer
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
@@ -19,19 +11,21 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] faire une version bac à sable pour retester le pipeline *de novo* après seed.
 * [ ] y aura-t-il un cross-import sur le cross-import au run suivant?
 * [ ] investiguer les erreurs de normalisation wos: Erreur sur WOS:000475662000018: ERREUR:  syntaxe en entrée invalide pour le type integer : « 5-Bis(pyridin-2-yl)-1 » LINE 10: ...rst_page": "7773", "last_page": "7783"}', ARRAY[2,'5-Bis(pyr
-* [ ] revues, éditeurs, adresses avec zéro publi: ?
+* [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes
+## Robustesse du pipeline sur le long terme
+* [ ] Comment se met à jour le référentiel structures HAL en cas de changement entre deux imports? faut-il des champs `hash` et `last_seen_at` comme pour les publis?
+* [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
+* [ ] authorships excluded: info perdue si réimport (grave?)
 ## Imports csv
 * [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer)
 ## Chantiers au long cours
-* [ ] chercher des moyens d'optimiser la taille de la base: supprimer données qui ne sont plus utiles? ex.: supprimer *_authors et *_structures (sauf hal)? chercher colonnes jamais utilisées.
+* [ ] chercher des moyens d'optimiser la taille de la base: supprimer données qui ne sont plus utiles? ex.: supprimer *_authors et *_structures (sauf hal)? chercher colonnes jamais utilisées. Externaliser dans des fichiers json par publi les authorships sources.
 * [ ] audit complet du code pour retrouver tous les trucs hardcodés qu'on pourrait abstraire, ou le SQL à simplifier suite aux fusions des tables sources. 
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
 * [ ] transférer champ role des authorships sources aux authorships canoniques? auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques)
 * [ ] vérifier valeur ajoutée du mapping hal_structures *vs* utilisation des collections pour la phase affiliations du pipeline; ou mieux, prendre la chaîne de caractères "affiliation" et la vérifier comme une adresse? => pour pouvoir auditer, commencer par **backfill** les collections dans les publications HAL qui n'en ont pas.
 * [ ] normalize_wos: conserver le mapping addresses->structures dans le champ raw_affiliations? (modifier script + **backfill**) voir si ça vaut le coup
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
-# Sémantique
-* [ ] publications => documents, source_authors => source_persons
 # Données
 ## Explorer autres sources possibles
 * [ ] pour les publis: CrossRef, ArXiv, Pubmed
@@ -46,7 +40,8 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] publis OpenAlex avec date correspondant au dépôt dans HAL: ex. 8651 => si dates différentes, utiliser l'autre. Si OA cite HAL comme source, prendre métadonnées HAL
 * [ ] depuis que la déduplication automatique par identité de métadonnées a été abandonnée: passer en revue les cas concernés, auditer, re-dupliquer?
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?)
-* [ ] investiguer les 388k doublons de position WoS
+* [ ] investiguer les 388k doublons de position WoS (source_authorships, même publi, même position)
+* [ ] rôles hors auteur liés aux thèses: reconnaissance par idref; traiter les authorships sans idref
 ### Problèmes spécifiques HAL
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
 * [ ] https://hal.science/hal-03874894 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
@@ -81,6 +76,9 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 ### Personnes (admin)
 * [ ] quoi faire des entités fausses? a minima, rejeter leurs authorships et s'assurer qu'elles n'apparaissent pas dans orphan-authorships
 * [ ] si source erronée: rejeter authorship source + recalculer affiliations de l'authorship à partir des sources non rejetées / caveat: Clarifier la sémantique de `excluded` sur les authorships sources: est-ce l'authorship qui est fausse, ou son affiliation? (allons plus loin: pourrait-on déclarer fausses certaines colonnes et pas d'autres? via un champ jsonb par exemple)
+### Publishers / Journals
+* [ ] Tri facettes
+* [ ] publishers: distinguer types d'entités (établissements d'enseignement, sociétés savantes, éditeurs commerciaux)
 ## Publique
 ### Personnes (public)
 #### Urgent
@@ -106,10 +104,11 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] tableaux personnes remplacer les identifiants par des icônes (hal orcid idref)
 * [ ] étoffer tests frontend
 ## Détails d'affichage
-* [ ] décomptes sur les onglets: ne pas tenir compte des facettes en place
-* [ ] décomptes facettes: toujours aligné à droite
 * [ ] titres 30% minimum de la largeur du tableau; diminuer taille titre revue
 * [ ] dropdown titres revues: tronquer, sinon parfois plus large que la page
+* [ ] décomptes sur les onglets: ne pas tenir compte des facettes en place
+* [ ] décomptes facettes: toujours aligné à droite
+* [ ] ordre des sources pour les thèses: harmoniser page laboratoire avec page thèses
 # Trucs pour plus tard
 * compte fractionnaire des publications?
 * collaborations nationales et internationales: identification structures? compliqué, je pense que pour ça il vaut mieux réutiliser les sources directement

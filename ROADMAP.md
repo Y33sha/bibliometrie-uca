@@ -1,17 +1,17 @@
 # Roadmap transmission DSI
 
-Taches prioritaires pour rendre le code transmissible et institution-agnostique.
+1. Maintenabilité / transmissibilité
 
-## 1. Programmation cron du pipeline
+* Le renommage sémantique (publications → documents, source_persons → source_persons) — si c'est prévu, le faire avant transmission, pas après. Plus on attend, plus c'est lourd.
 
-**Impact : operationnel en prod**
+2. Robustesse en production
 
-- [ ] Documenter la configuration cron pour les modes daily/weekly/monthly
-- [ ] Ou fournir un exemple de crontab / systemd timer
+* La version bac à sable pour retester le pipeline de novo — sans ça, impossible de valider que le seed + schema + migrations = base fonctionnelle. Personne ne reprendra un outil qu'il ne peut pas réinstaller.
+* Le processus de détection des publications disparues — sans ça, la base accumule des fantômes.
 
-## 2. Semantique publications → documents (optionnel)
+3. Pérennité des données
 
-**Impact : coherence du vocabulaire metier**
+* L'archivage des raw JSON (json.gz par document) — ça sécurise à la fois l'auditabilité et la future purge du bloat. C'est le prérequis pour toute optimisation de taille.
 
-- [ ] Decider si le renommage est justifie
-- [ ] Si oui : table, colonnes FK, routes API, frontend, docs
+* Les 388k doublons de position WoS — c'est de la dette de données qui grossit à chaque run.
+

@@ -9,7 +9,7 @@ Usage:
 Tables peuplées :
     publications                (table de vérité)
     source_documents            (source='theses')
-    source_authors              (source='theses')
+    source_persons              (source='theses')
     source_authorships          (source='theses', avec roles)
 
 Particularités theses.fr :
@@ -63,7 +63,7 @@ def _thesis_author_compatible(cur, pub_id: int, author: tuple[str, str]) -> bool
         SELECT sa.last_name, sa.first_name
         FROM source_authorships sas
         JOIN source_documents sd ON sd.id = sas.source_document_id
-        JOIN source_authors sa ON sa.id = sas.source_author_id
+        JOIN source_persons sa ON sa.id = sas.source_person_id
         WHERE sd.publication_id = %s
           AND 'author' = ANY(sas.roles)
         ORDER BY sd.id, sas.author_position
@@ -317,19 +317,19 @@ def upsert_source_author(cur, person: dict) -> int | None:
     # Par PPN (clé fiable)
     if ppn:
         cur.execute("""
-            INSERT INTO source_authors
+            INSERT INTO source_persons
                 (source, source_id, full_name, last_name, first_name, idref)
             VALUES ('theses', %s, %s, %s, %s, %s)
             ON CONFLICT (source, source_id) DO UPDATE SET
                 full_name = EXCLUDED.full_name,
-                idref = COALESCE(source_authors.idref, EXCLUDED.idref)
+                idref = COALESCE(source_persons.idref, EXCLUDED.idref)
             RETURNING id
         """, (ppn, full_name, nom, prenom, ppn))
         return cur.fetchone()["id"]
 
     # Sans PPN : dédup par nom exact
     cur.execute("""
-        SELECT id FROM source_authors
+        SELECT id FROM source_persons
         WHERE source = 'theses'
           AND source_id LIKE 'nokey-%%'
           AND full_name = %s
@@ -342,9 +342,9 @@ def upsert_source_author(cur, person: dict) -> int | None:
 
     # Nouveau sans identifiant
     cur.execute("""
-        INSERT INTO source_authors
+        INSERT INTO source_persons
             (source, source_id, full_name, last_name, first_name)
-        VALUES ('theses', 'nokey-' || nextval('source_authors_id_seq'), %s, %s, %s)
+        VALUES ('theses', 'nokey-' || nextval('source_persons_id_seq'), %s, %s, %s)
         RETURNING id
     """, (full_name, nom, prenom))
     return cur.fetchone()["id"]
@@ -393,8 +393,8 @@ def process_persons(cur, these: dict, source_document_id: int):
     # Insérer les authorships avec rôles fusionnés
     position = 0
     for key, info in person_roles.items():
-        source_author_id = upsert_source_author(cur, info["person"])
-        if not source_author_id:
+        source_person_id = upsert_source_author(cur, info["person"])
+        if not source_person_id:
             continue
 
         roles = merge_roles([info["roles"]])
@@ -404,18 +404,18 @@ def process_persons(cur, these: dict, source_document_id: int):
 
         cur.execute("""
             INSERT INTO source_authorships
-                (source, source_document_id, source_author_id, author_position,
+                (source, source_document_id, source_person_id, author_position,
                  author_name_normalized, roles, in_perimeter, raw_affiliations,
                  raw_author_name)
             VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s, %s, %s)
-            ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
+            ON CONFLICT (source_document_id, source_person_id) DO UPDATE SET
                 roles = EXCLUDED.roles,
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 in_perimeter = EXCLUDED.in_perimeter,
                 raw_affiliations = EXCLUDED.raw_affiliations,
                 raw_author_name = EXCLUDED.raw_author_name,
                 addresses_extracted = FALSE
-        """, (source_document_id, source_author_id,
+        """, (source_document_id, source_person_id,
               position if is_author else None,
               author_full_name,
               roles, is_author,
@@ -550,8 +550,8 @@ def main():
 
         cur.execute("SELECT COUNT(*) AS cnt FROM source_documents WHERE source = 'theses'")
         logger.info(f"  source_documents (theses) : {cur.fetchone()['cnt']}")
-        cur.execute("SELECT COUNT(*) AS cnt FROM source_authors WHERE source = 'theses'")
-        logger.info(f"  source_authors (theses) : {cur.fetchone()['cnt']}")
+        cur.execute("SELECT COUNT(*) AS cnt FROM source_persons WHERE source = 'theses'")
+        logger.info(f"  source_persons (theses) : {cur.fetchone()['cnt']}")
         cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'theses'")
         logger.info(f"  source_authorships (theses) : {cur.fetchone()['cnt']}")
 

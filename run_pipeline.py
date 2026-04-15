@@ -18,7 +18,7 @@ Usage:
 Phases (dans l'ordre d'execution):
     extract        Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
     cross_imports  Cross-imports entre sources (DOIs manquants, fetch HAL par hal-id/NNT)
-    normalize      Normalisation staging -> tables sources (source_documents, source_authors,
+    normalize      Normalisation staging -> tables sources (source_documents, source_persons,
                    source_authorships). Rattachement aux publications existantes par DOI/NNT/
                    HAL-ID, mais PAS de creation de publications. Inclut enrichissement
                    structures HAL et moissonnage identifiants HAL (ORCID, IdRef).

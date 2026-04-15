@@ -59,7 +59,7 @@ def get_thesis_author(cur, pub_id):
         SELECT sa.last_name, sa.first_name
         FROM source_authorships sas
         JOIN source_documents sd ON sd.id = sas.source_document_id
-        JOIN source_authors sa ON sa.id = sas.source_author_id
+        JOIN source_persons sa ON sa.id = sas.source_person_id
         WHERE sd.publication_id = %s
           AND 'author' = ANY(sas.roles)
         ORDER BY sd.id, sas.author_position

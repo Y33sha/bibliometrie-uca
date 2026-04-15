@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Backfill : insère dans person_identifiers les identifiants (idHAL, ORCID, IdRef)
-présents dans source_authors mais absents de person_identifiers.
+présents dans source_persons mais absents de person_identifiers.
 
 Les conflits (même identifiant attribué à une autre personne avec statut
 pending ou confirmed) sont ignorés et loggés.
@@ -19,7 +19,7 @@ from utils.log import setup_logger
 
 log = setup_logger("backfill_identifiers", os.path.join(os.path.dirname(__file__), "../processing/logs"))
 
-# (id_type, colonne source_authors, filtre source optionnel)
+# (id_type, colonne source_persons, filtre source optionnel)
 IDENTIFIERS = [
     ("idhal", "sa.source_ids->>'idhal'", "sa.source = 'hal'"),
     ("orcid", "sa.orcid", None),
@@ -33,7 +33,7 @@ def backfill_identifier(cur, conn, id_type, column, source_filter):
 
     cur.execute(f"""
         SELECT DISTINCT sa.person_id, {column} AS id_value
-        FROM source_authors sa
+        FROM source_persons sa
         WHERE sa.person_id IS NOT NULL
           AND {column} IS NOT NULL
           {where_source}
@@ -61,7 +61,7 @@ def backfill_identifier(cur, conn, id_type, column, source_filter):
 
     # Vérification des restants (conflits)
     cur.execute(f"""
-        SELECT COUNT(*) FROM source_authors sa
+        SELECT COUNT(*) FROM source_persons sa
         WHERE sa.person_id IS NOT NULL
           AND {column} IS NOT NULL
           {where_source}

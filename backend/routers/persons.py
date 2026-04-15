@@ -483,12 +483,12 @@ async def get_person(person_id: int):
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh,
                 (SELECT json_agg(x) FROM (
-                    SELECT DISTINCT ON (sa.source, sa.source_author_id)
-                           sa.source_author_id AS id, sa.source,
+                    SELECT DISTINCT ON (sa.source, sa.source_person_id)
+                           sa.source_person_id AS id, sa.source,
                            sa.raw_author_name AS full_name
                     FROM source_authorships sa
                     WHERE sa.person_id = p.id AND NOT sa.excluded
-                    ORDER BY sa.source, sa.source_author_id
+                    ORDER BY sa.source, sa.source_person_id
                 ) x) AS linked_authors,
                 (SELECT json_agg(json_build_object(
                     'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
@@ -536,10 +536,10 @@ async def person_profile(person_id: int):
                    (sauth.source_ids->>'hal_person_id')::int AS hal_person_id,
                    NULL::text AS openalex_id,
                    (SELECT COUNT(*) FROM source_authorships sa2
-                    WHERE sa2.source = 'hal' AND sa2.source_author_id = sauth.id
+                    WHERE sa2.source = 'hal' AND sa2.source_person_id = sauth.id
                       AND sa2.in_perimeter = TRUE AND NOT sa2.excluded) AS uca_pub_count
-            FROM source_authors sauth
-            JOIN source_authorships sa ON sa.source = 'hal' AND sa.source_author_id = sauth.id
+            FROM source_persons sauth
+            JOIN source_authorships sa ON sa.source = 'hal' AND sa.source_person_id = sauth.id
             WHERE sa.person_id = %s AND NOT sa.excluded
         """, (person_id,))
         hal_authors = cur.fetchall()
@@ -562,10 +562,10 @@ async def person_profile(person_id: int):
             SELECT sauth.id, 'wos' AS source, sa.raw_author_name AS full_name, sauth.orcid,
                    NULL::text AS idhal, NULL::text AS openalex_id,
                    (SELECT COUNT(*) FROM source_authorships sa2
-                    WHERE sa2.source = 'wos' AND sa2.source_author_id = sauth.id
+                    WHERE sa2.source = 'wos' AND sa2.source_person_id = sauth.id
                       AND sa2.in_perimeter = TRUE) AS uca_pub_count
-            FROM source_authors sauth
-            JOIN source_authorships sa ON sa.source = 'wos' AND sa.source_author_id = sauth.id
+            FROM source_persons sauth
+            JOIN source_authorships sa ON sa.source = 'wos' AND sa.source_person_id = sauth.id
             WHERE sa.person_id = %s
             GROUP BY sauth.id, sa.raw_author_name, sauth.orcid
         """, (person_id,))
@@ -919,7 +919,7 @@ _ORPHAN_BASE = f"""
     AND NOT EXISTS (
         SELECT 1 FROM source_authorships sa2
         JOIN persons pe ON pe.id = sa2.person_id AND pe.rejected = TRUE
-        WHERE sa2.source_author_id = sa.source_author_id
+        WHERE sa2.source_person_id = sa.source_person_id
     )
 """
 
@@ -1459,7 +1459,7 @@ async def hal_duplicate_accounts(
         cur.execute("""
             SELECT COUNT(*) FROM (
                 SELECT person_id
-                FROM source_authors
+                FROM source_persons
                 WHERE source = 'hal' AND person_id IS NOT NULL
                   AND (source_ids->>'hal_person_id') IS NOT NULL
                 GROUP BY person_id
@@ -1477,9 +1477,9 @@ async def hal_duplicate_accounts(
                        'idhal', sa.source_ids->>'idhal',
                        'orcid', sa.orcid,
                        'pub_count', (SELECT COUNT(*) FROM source_authorships sa2
-                                     WHERE sa2.source = 'hal' AND sa2.source_author_id = sa.id)
+                                     WHERE sa2.source = 'hal' AND sa2.source_person_id = sa.id)
                    ) ORDER BY (sa.source_ids->>'hal_person_id')::int)
-                    FROM source_authors sa
+                    FROM source_persons sa
                     WHERE sa.source = 'hal' AND sa.person_id = p.id
                       AND (sa.source_ids->>'hal_person_id') IS NOT NULL
                    ) AS hal_accounts
@@ -1487,7 +1487,7 @@ async def hal_duplicate_accounts(
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             WHERE p.id IN (
                 SELECT person_id
-                FROM source_authors
+                FROM source_persons
                 WHERE source = 'hal' AND person_id IS NOT NULL
                   AND (source_ids->>'hal_person_id') IS NOT NULL
                 GROUP BY person_id

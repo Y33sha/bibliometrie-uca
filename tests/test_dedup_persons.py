@@ -34,7 +34,7 @@ def _insert_hal_author(db, full_name, hal_person_id=None, orcid=None, idhal=None
     if idhal is not None:
         source_ids["idhal"] = idhal
     db.execute("""
-        INSERT INTO source_authors (source, source_id, full_name, last_name, first_name,
+        INSERT INTO source_persons (source, source_id, full_name, last_name, first_name,
                                     orcid, source_ids)
         VALUES ('hal', %s, %s, %s, %s, %s, %s) RETURNING id
     """, (f"hal-{full_name}", full_name, last, first, orcid,
@@ -51,14 +51,14 @@ def _insert_hal_document(db, halid, publication_id):
     return db.fetchone()["id"]
 
 
-def _insert_hal_authorship(db, source_document_id, source_author_id, position=0,
+def _insert_hal_authorship(db, source_document_id, source_person_id, position=0,
                            in_perimeter=True, person_id=None):
     """Crée une source_authorship HAL."""
     db.execute("""
         INSERT INTO source_authorships
-            (source, source_document_id, source_author_id, author_position, in_perimeter, person_id)
+            (source, source_document_id, source_person_id, author_position, in_perimeter, person_id)
         VALUES ('hal', %s, %s, %s, %s, %s) RETURNING id
-    """, (source_document_id, source_author_id, position, in_perimeter, person_id))
+    """, (source_document_id, source_person_id, position, in_perimeter, person_id))
     return db.fetchone()["id"]
 
 
@@ -68,7 +68,7 @@ def _insert_oa_author(db, full_name, openalex_id, orcid=None):
     last = parts[-1] if len(parts) >= 2 else full_name
     first = " ".join(parts[:-1]) if len(parts) >= 2 else None
     db.execute("""
-        INSERT INTO source_authors (source, source_id, full_name, last_name, first_name, orcid)
+        INSERT INTO source_persons (source, source_id, full_name, last_name, first_name, orcid)
         VALUES ('openalex', %s, %s, %s, %s, %s) RETURNING id
     """, (openalex_id, full_name, last, first, orcid))
     return db.fetchone()["id"]
@@ -88,7 +88,7 @@ def _insert_oa_authorship(db, oa_document_id, oa_author_id, position=0,
     """Crée une source_authorship OpenAlex."""
     db.execute("""
         INSERT INTO source_authorships
-            (source, source_document_id, source_author_id, author_position,
+            (source, source_document_id, source_person_id, author_position,
              in_perimeter, person_id, raw_author_name)
         VALUES ('openalex', %s, %s, %s, %s, %s, %s) RETURNING id
     """, (oa_document_id, oa_author_id, position, in_perimeter, person_id,
@@ -130,7 +130,7 @@ class TestStep0HalAccounts:
         # Personne existante + hal_author rattaché
         person_id = create_person(db, "Dupont", "Jean")
         ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=12345)
-        db.execute("UPDATE source_authors SET person_id = %s WHERE id = %s",
+        db.execute("UPDATE source_persons SET person_id = %s WHERE id = %s",
                    (person_id, ha))
 
         hd1 = _insert_hal_document(db, "hal-001", pub1)
@@ -317,7 +317,7 @@ class TestStep2Orcid:
         ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=None,
                                 orcid="0000-0001-2345-6789")
         # Ajouter idref manuellement (helper ne le gère pas)
-        db.execute("UPDATE source_authors SET idref = %s WHERE id = %s",
+        db.execute("UPDATE source_persons SET idref = %s WHERE id = %s",
                    ("123456789", ha))
 
         hd = _insert_hal_document(db, "hal-orcid-idref", pub)
