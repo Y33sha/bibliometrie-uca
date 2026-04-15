@@ -192,7 +192,8 @@ CREATE TABLE public.addresses (
     country text,
     pub_count integer DEFAULT 0,
     countries character(2)[],
-    suggested_countries character(2)[]
+    suggested_countries character(2)[],
+    resolved_at timestamp with time zone
 );
 
 
