@@ -30,7 +30,7 @@ from utils.doi import clean_doi
 from utils.hal import extract_hal_id_from_url
 from utils.log import setup_logger
 from utils.normalize import normalize_text
-from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi
+from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi, ZenodoResolutionError
 from services.publications import find_or_create as find_or_create_publication, find_by_nnt, find_by_doi, resolve_doi_conflict, try_merge_by_doi, refresh_from_sources
 from utils.nnt import normalize_nnt, is_theses_fr_source, extract_nnt_from_openalex
 from utils.doc_types import map_doc_type
@@ -569,7 +569,11 @@ def process_work(cur, staging_row: tuple) -> bool:
         # est déjà en staging → skip pour éviter les doublons
         raw_doi = clean_doi(doi)
         if is_zenodo_doi(raw_doi):
-            version_doi = resolve_zenodo_doi(raw_doi)
+            try:
+                version_doi = resolve_zenodo_doi(raw_doi)
+            except ZenodoResolutionError as e:
+                logger.warning(f"  {openalex_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
+                return None  # ne pas marquer processed
             if version_doi:
                 cur.execute(
                     "SELECT id FROM staging WHERE source = 'openalex' AND lower(doi) = lower(%s)",
