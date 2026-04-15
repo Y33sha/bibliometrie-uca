@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { api } from "$lib/api";
 
   interface Report {
@@ -7,11 +7,57 @@
     label: string;
   }
 
+  interface PipelineStatus {
+    running: boolean;
+    mode: string;
+    phase: string;
+    started_at: string;
+    phase_started_at: string;
+    phases_done: number;
+    phases_total: number;
+  }
+
   let reports: Report[] = $state([]);
   let selectedReport: string | null = $state(null);
   let reportContent: string = $state("");
   let renderedHtml: string = $state("");
   let loading = $state(false);
+  let pipelineStatus: PipelineStatus | null = $state(null);
+  let statusInterval: ReturnType<typeof setInterval> | null = null;
+  let activeTab: "reports" | "logs" = $state("reports");
+  let cronLog: string = $state("");
+  let logInterval: ReturnType<typeof setInterval> | null = null;
+
+  async function pollStatus() {
+    try {
+      pipelineStatus = await api<PipelineStatus | null>("/api/admin/pipeline/status");
+    } catch { pipelineStatus = null; }
+  }
+
+  async function loadLogs() {
+    try {
+      const data = await api<{ content: string }>("/api/admin/pipeline/logs?lines=200");
+      cronLog = data.content;
+    } catch { cronLog = ""; }
+  }
+
+  function switchTab(tab: "reports" | "logs") {
+    activeTab = tab;
+    if (tab === "logs") {
+      loadLogs();
+      logInterval = setInterval(loadLogs, 5000);
+    } else {
+      if (logInterval) { clearInterval(logInterval); logInterval = null; }
+    }
+  }
+
+  function elapsed(isoDate: string): string {
+    const seconds = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m} min ${s}s`;
+  }
 
   async function loadList() {
     reports = await api<Report[]>("/api/admin/pipeline/reports");
@@ -37,13 +83,30 @@
       // Lignes vides
       if (line.trim() === "") { i++; continue; }
 
-      // <details> / <summary> — passer tel quel
+      // <details> / <summary> — parser le contenu Markdown à l'intérieur
       if (line.trim().startsWith("<details")) {
+        out.push(lines[i]); i++; // <details>
+        // Passer les lignes HTML telles quelles (<summary>, etc.)
         while (i < lines.length && !lines[i].includes("</details>")) {
-          out.push(lines[i]);
+          const inner = lines[i];
+          if (inner.trim().startsWith("<summary") || inner.trim().startsWith("</summary")) {
+            out.push(inner);
+          } else if (inner.trim().startsWith("```")) {
+            const codeLines: string[] = [];
+            i++;
+            while (i < lines.length && !lines[i].trim().startsWith("```")) {
+              codeLines.push(escapeHtml(lines[i]));
+              i++;
+            }
+            out.push(`<pre class="log-block">${codeLines.join("\n")}</pre>`);
+          } else if (inner.startsWith("### ")) {
+            out.push(`<h4>${inner.slice(4)}</h4>`);
+          } else if (inner.trim() !== "") {
+            out.push(`<p>${formatInline(inner)}</p>`);
+          }
           i++;
         }
-        if (i < lines.length) { out.push(lines[i]); i++; }
+        if (i < lines.length) { out.push(lines[i]); i++; } // </details>
         continue;
       }
 
@@ -107,50 +170,105 @@
     return s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   }
 
-  onMount(loadList);
+  onMount(() => {
+    loadList();
+    pollStatus();
+    statusInterval = setInterval(pollStatus, 10000);
+  });
+
+  onDestroy(() => {
+    if (statusInterval) clearInterval(statusInterval);
+    if (logInterval) clearInterval(logInterval);
+  });
 </script>
 
 <svelte:head><title>Pipeline — Bibliométrie UCA</title></svelte:head>
 
 <div class="page-header">
-  <h2>Rapports pipeline</h2>
-</div>
-
-<div class="layout">
-  <div class="report-list">
-    {#if reports.length === 0}
-      <p class="empty">Aucun rapport disponible.</p>
-    {:else}
-      {#each reports as r (r.filename)}
-        <button
-          class="report-item"
-          class:active={selectedReport === r.filename}
-          onclick={() => selectReport(r.filename)}
-        >
-          {r.label}
-        </button>
-      {/each}
-    {/if}
-  </div>
-
-  <div class="report-content">
-    {#if loading}
-      <p class="loading">Chargement...</p>
-    {:else if renderedHtml}
-      {@html renderedHtml}
-    {:else}
-      <p class="empty">Sélectionner un rapport dans la liste.</p>
-    {/if}
+  <h2>Pipeline</h2>
+  <div class="tabs">
+    <button class="tab" class:active={activeTab === "reports"} onclick={() => switchTab("reports")}>Rapports</button>
+    <button class="tab" class:active={activeTab === "logs"} onclick={() => switchTab("logs")}>Logs</button>
   </div>
 </div>
+
+{#if pipelineStatus?.running}
+  <div class="status-banner">
+    <span class="status-dot"></span>
+    Pipeline <strong>{pipelineStatus.mode}</strong> en cours
+    — phase <strong>{pipelineStatus.phase}</strong>
+    ({pipelineStatus.phases_done}/{pipelineStatus.phases_total})
+    — depuis {elapsed(pipelineStatus.started_at)}
+  </div>
+{/if}
+
+{#if activeTab === "reports"}
+  <div class="layout">
+    <div class="report-list">
+      {#if reports.length === 0}
+        <p class="empty">Aucun rapport disponible.</p>
+      {:else}
+        {#each reports as r (r.filename)}
+          <button
+            class="report-item"
+            class:active={selectedReport === r.filename}
+            onclick={() => selectReport(r.filename)}
+          >
+            {r.label}
+          </button>
+        {/each}
+      {/if}
+    </div>
+
+    <div class="report-content">
+      {#if loading}
+        <p class="loading">Chargement...</p>
+      {:else if renderedHtml}
+        {@html renderedHtml}
+      {:else}
+        <p class="empty">Sélectionner un rapport dans la liste.</p>
+      {/if}
+    </div>
+  </div>
+{:else}
+  <div class="log-container">
+    {#if cronLog}
+      <pre class="cron-log">{cronLog}</pre>
+    {:else}
+      <p class="empty">Aucun log disponible.</p>
+    {/if}
+  </div>
+{/if}
 
 <style>
   .page-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
     margin-bottom: 12px;
   }
   .page-header h2 {
     font-size: 1.2rem;
     margin: 0;
+  }
+  .tabs {
+    display: flex;
+    gap: 4px;
+  }
+  .tab {
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--card);
+    cursor: pointer;
+  }
+  .tab:hover { background: var(--hover); }
+  .tab.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
   }
   .layout {
     display: flex;
@@ -281,6 +399,43 @@
     overflow-x: auto;
     white-space: pre-wrap;
     word-break: break-all;
+  }
+  .status-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    background: var(--accent-light, #e8f4f8);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    font-size: 0.85rem;
+  }
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .log-container {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    min-height: 300px;
+  }
+  .cron-log {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
   }
   .empty, .loading {
     color: var(--muted);
