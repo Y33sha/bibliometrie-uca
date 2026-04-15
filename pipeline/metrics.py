@@ -1,7 +1,8 @@
 """Collecte de métriques pour le rapport pipeline.
 
 Prend des snapshots de la base avant/après chaque phase
-et calcule les deltas. Génère un rapport Markdown.
+et calcule les deltas. Capture les logs détaillés.
+Génère un rapport Markdown.
 """
 
 import datetime
@@ -9,6 +10,8 @@ from pathlib import Path
 
 from db.connection import get_connection
 from utils.sources import ALL_SOURCES
+
+BASE = Path(__file__).resolve().parent.parent
 
 FALLBACK_DAYS = 7  # si pas de rapport précédent, remonter de N jours
 
@@ -29,6 +32,55 @@ def get_last_run_date() -> datetime.date:
     return datetime.date.today() - datetime.timedelta(days=FALLBACK_DAYS)
 
 REPORTS_DIR = Path(__file__).parent / "reports"
+
+LOG_DIRS = [
+    BASE / "processing" / "logs",
+    BASE / "extraction" / "hal" / "logs",
+    BASE / "extraction" / "openalex" / "logs",
+    BASE / "extraction" / "wos" / "logs",
+    BASE / "extraction" / "scanr" / "logs",
+    BASE / "extraction" / "theses" / "logs",
+]
+
+
+def capture_log_offsets() -> dict[str, int]:
+    """Note la taille actuelle de chaque fichier .log.
+
+    Retourne un dict {chemin_absolu: byte_offset} pour pouvoir
+    lire uniquement le contenu ajouté après cet instant.
+    """
+    offsets = {}
+    for log_dir in LOG_DIRS:
+        if not log_dir.exists():
+            continue
+        for f in log_dir.glob("*.log"):
+            offsets[str(f)] = f.stat().st_size
+    return offsets
+
+
+def read_new_logs(offsets: dict[str, int]) -> str:
+    """Lit le contenu ajouté dans les fichiers .log depuis les offsets.
+
+    Retourne le texte concaténé (avec en-têtes par fichier).
+    """
+    parts = []
+    for log_dir in LOG_DIRS:
+        if not log_dir.exists():
+            continue
+        for f in sorted(log_dir.glob("*.log")):
+            path = str(f)
+            prev_size = offsets.get(path, 0)
+            current_size = f.stat().st_size
+            if current_size <= prev_size:
+                continue
+            with open(f, "r", encoding="utf-8", errors="replace") as fh:
+                fh.seek(prev_size)
+                content = fh.read().rstrip()
+            if content:
+                # En-tête relatif au projet
+                rel = f.relative_to(BASE)
+                parts.append(f"### {rel}\n```\n{content}\n```")
+    return "\n\n".join(parts)
 
 
 def snapshot(conn) -> dict:
@@ -91,7 +143,7 @@ def _fmt_delta(d: int) -> str:
 def generate_report(
     mode: str,
     sources: set[str],
-    phases: list[tuple[str, float, dict]],  # [(name, duration_s, deltas)]
+    phases: list[tuple[str, float, dict, str]],  # [(name, duration_s, deltas, logs)]
     total_duration: float,
 ) -> str:
     """Génère le rapport Markdown et l'écrit dans pipeline/reports/."""
@@ -108,7 +160,7 @@ def generate_report(
         "",
     ]
 
-    for phase_name, duration, deltas in phases:
+    for phase_name, duration, deltas, logs in phases:
         lines.append(f"## {phase_name} ({duration:.1f}s)")
         lines.append("")
         if not deltas:
@@ -120,6 +172,15 @@ def generate_report(
                 label = key.replace("_", " ").replace("sd ", "docs ").replace("staging ", "staging ")
                 lines.append(f"| {label} | {vals['before']} | {vals['after']} | {_fmt_delta(vals['delta'])} |")
         lines.append("")
+
+        if logs:
+            lines.append("<details>")
+            lines.append(f"<summary>Logs détaillés — {phase_name}</summary>")
+            lines.append("")
+            lines.append(logs)
+            lines.append("")
+            lines.append("</details>")
+            lines.append("")
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     filepath = REPORTS_DIR / filename
