@@ -524,31 +524,27 @@ def process_authorships(cur, work: dict, source_document_id: int):
 
         # raw_affiliations : JSONB array wrapping the text
         raw_affiliations_json = Json([raw_affil_text]) if raw_affil_text else None
-        # source_data : raw_author_name stocké en JSONB
-        source_data_json = Json({"raw_author_name": raw_author_name}) if raw_author_name else None
-
         cur.execute("""
             INSERT INTO source_authorships
                 (source, source_document_id, source_author_id, author_position,
                  raw_affiliations, source_struct_ids,
-                 source_data, author_name_normalized, is_corresponding)
-            VALUES ('openalex', %s, %s, %s, %s, %s, %s, normalize_name_form(%s), %s)
+                 author_name_normalized, is_corresponding, raw_author_name)
+            VALUES ('openalex', %s, %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
             ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
                 raw_affiliations = COALESCE(
                     EXCLUDED.raw_affiliations,
                     source_authorships.raw_affiliations
                 ),
-                source_data = COALESCE(source_authorships.source_data, '{}') ||
-                              COALESCE(EXCLUDED.source_data, '{}'),
                 author_name_normalized = COALESCE(
                     EXCLUDED.author_name_normalized,
                     source_authorships.author_name_normalized
                 ),
                 is_corresponding = EXCLUDED.is_corresponding,
+                raw_author_name = EXCLUDED.raw_author_name,
                 addresses_extracted = FALSE
         """, (source_document_id, source_author_id, position,
               raw_affiliations_json, source_struct_ids or None,
-              source_data_json, raw_author_name, is_corresponding))
+              raw_author_name, is_corresponding, raw_author_name))
 
 
 # =============================================================

@@ -222,12 +222,11 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)):
                 p.doi,
                 p.doc_type::text AS doc_type,
                 j.title AS journal_title,
-                COALESCE(sa.source_data->>'raw_author_name', auth.full_name) AS author_name,
+                sa.raw_author_name AS author_name,
                 sd.source_id
             FROM source_authorship_addresses saa
             JOIN source_authorships sa ON sa.id = saa.source_authorship_id
             JOIN source_documents sd ON sd.id = sa.source_document_id
-            JOIN source_authors auth ON auth.id = sa.source_author_id
             JOIN publications p ON p.id = sd.publication_id
             LEFT JOIN journals j ON j.id = p.journal_id
             WHERE saa.address_id = %s AND sd.publication_id IS NOT NULL

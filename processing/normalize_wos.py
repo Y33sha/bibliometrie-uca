@@ -676,14 +676,14 @@ def process_authorships(cur, rec: dict, source_document_id: int):
         values[key] = (
             'wos', source_document_id, source_author_id, author["position"],
             author["is_corresponding"], raw_affiliations, name_norm,
-            institution_ids or None, author.get("roles"),
+            institution_ids or None, author.get("roles"), author["full_name"],
         )
 
     _ev(cur, """
         INSERT INTO source_authorships
             (source, source_document_id, source_author_id, author_position,
              is_corresponding, raw_affiliations, author_name_normalized,
-             source_struct_ids, roles)
+             source_struct_ids, roles, raw_author_name)
         VALUES %s
         ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
             raw_affiliations = COALESCE(
@@ -700,6 +700,7 @@ def process_authorships(cur, rec: dict, source_document_id: int):
                 source_authorships.source_struct_ids
             ),
             roles = EXCLUDED.roles,
+            raw_author_name = EXCLUDED.raw_author_name,
             addresses_extracted = FALSE
     """, list(values.values()))
 

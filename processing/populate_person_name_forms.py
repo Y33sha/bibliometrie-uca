@@ -2,7 +2,7 @@
 Peuplement de person_name_forms à partir des sources existantes.
 
 Mode incrémental :
-- Recalcule les formes depuis les sources (persons, hal, wos, openalex)
+- Recalcule les formes depuis les sources (persons + source_authorships)
 - Met à jour les formes existantes (person_ids, sources)
 - Ajoute les nouvelles formes
 - Supprime les formes obsolètes UNIQUEMENT si elles n'ont que des sources
@@ -11,9 +11,7 @@ Mode incrémental :
 
 Sources :
 1. persons.last_name + persons.first_name (source: 'persons')
-2. source_authors.full_name via source_authorships (source: 'hal')
-3. source_authors.full_name via source_authorships (source: 'wos')
-4. source_authorships.source_data->>'raw_author_name' (source: 'openalex')
+2. source_authorships.author_name_normalized (toutes sources)
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -50,62 +48,19 @@ def populate(conn):
         for form in compute_person_name_forms(ln, fn):
             triples.append((form, r["id"], "persons"))
 
-    # 2. source_authors.full_name via source_authorships (HAL)
-    log.info("Source 2 : source_authors (HAL) full_name")
+    # 2. Formes normalisées depuis source_authorships.author_name_normalized (toutes sources)
+    log.info("Source 2 : source_authorships.author_name_normalized (toutes sources)")
     cur.execute("""
-        SELECT DISTINCT sa.full_name, sa_auth.person_id
-        FROM source_authorships sa_auth
-        JOIN source_authors sa ON sa.id = sa_auth.source_author_id
-        WHERE sa_auth.source = 'hal'
-          AND sa_auth.person_id IS NOT NULL AND NOT sa_auth.excluded
-          AND sa.full_name IS NOT NULL AND sa.full_name != ''
-    """)
-    for r in cur.fetchall():
-        triples.append((r["full_name"], r["person_id"], "hal"))
-
-    # 3. source_authors.full_name via source_authorships (WoS)
-    log.info("Source 3 : source_authors (WoS) full_name")
-    cur.execute("""
-        SELECT DISTINCT sa.full_name, sa_auth.person_id
-        FROM source_authors sa
-        JOIN source_authorships sa_auth ON sa_auth.source_author_id = sa.id
-        WHERE sa_auth.source = 'wos'
-          AND sa_auth.person_id IS NOT NULL AND NOT sa_auth.excluded
-          AND sa.full_name IS NOT NULL AND sa.full_name != ''
-    """)
-    for r in cur.fetchall():
-        triples.append((r["full_name"], r["person_id"], "wos"))
-
-    # 4. source_authorships.source_data->>'raw_author_name' (OpenAlex)
-    log.info("Source 4 : source_authorships source_data raw_author_name (OpenAlex)")
-    cur.execute("""
-        SELECT DISTINCT sa.source_data->>'raw_author_name' AS raw_author_name, sa.person_id
+        SELECT DISTINCT sa.author_name_normalized AS name_form, sa.person_id, sa.source
         FROM source_authorships sa
-        WHERE sa.source = 'openalex'
-          AND sa.person_id IS NOT NULL AND NOT sa.excluded
-          AND sa.source_data->>'raw_author_name' IS NOT NULL
-          AND sa.source_data->>'raw_author_name' != ''
+        WHERE sa.person_id IS NOT NULL AND NOT sa.excluded
+          AND sa.author_name_normalized IS NOT NULL AND sa.author_name_normalized != ''
     """)
-    for r in cur.fetchall():
-        triples.append((r["raw_author_name"], r["person_id"], "openalex"))
+    source_forms = cur.fetchall()
+    log.info(f"  {len(triples)} triplets persons + {len(source_forms)} formes source_authorships")
 
-    # 5. source_authors.full_name via source_authorships (theses.fr)
-    log.info("Source 5 : source_authors (theses.fr) full_name")
-    cur.execute("""
-        SELECT DISTINCT sa.full_name, sa_auth.person_id
-        FROM source_authorships sa_auth
-        JOIN source_authors sa ON sa.id = sa_auth.source_author_id
-        WHERE sa_auth.source = 'theses'
-          AND sa_auth.person_id IS NOT NULL AND NOT sa_auth.excluded
-          AND sa.full_name IS NOT NULL AND sa.full_name != ''
-    """)
-    for r in cur.fetchall():
-        triples.append((r["full_name"], r["person_id"], "theses"))
-
-    log.info(f"  {len(triples)} triplets collectés")
-
-    # Normaliser via PostgreSQL et regrouper
-    log.info("Normalisation et regroupement...")
+    # Normaliser les triplets persons via PostgreSQL
+    log.info("Normalisation des formes persons...")
     cur.execute("CREATE TEMP TABLE _raw_forms (raw_text TEXT, person_id INT, source TEXT)")
     batch = []
     for raw, pid, src in triples:
@@ -125,9 +80,27 @@ def populate(conn):
         GROUP BY normalize_name_form(raw_text)
     """)
     new_forms = {r["name_form"]: r for r in cur.fetchall() if r["name_form"]}
-    log.info(f"  {len(new_forms)} formes distinctes depuis les sources")
 
     cur.execute("DROP TABLE _raw_forms")
+
+    # Fusionner les formes déjà normalisées des source_authorships
+    for r in source_forms:
+        nf = r["name_form"]
+        if nf in new_forms:
+            pids = set(new_forms[nf]["person_ids"])
+            pids.add(r["person_id"])
+            new_forms[nf]["person_ids"] = sorted(pids)
+            srcs = set(new_forms[nf]["sources"])
+            srcs.add(r["source"])
+            new_forms[nf]["sources"] = sorted(srcs)
+        else:
+            new_forms[nf] = {
+                "name_form": nf,
+                "person_ids": [r["person_id"]],
+                "sources": [r["source"]],
+            }
+
+    log.info(f"  {len(new_forms)} formes distinctes après fusion")
 
     # Charger les formes existantes
     cur.execute("SELECT id, name_form, person_ids, sources FROM person_name_forms")

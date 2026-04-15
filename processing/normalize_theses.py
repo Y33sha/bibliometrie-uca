@@ -400,22 +400,27 @@ def process_persons(cur, these: dict, source_document_id: int):
         roles = merge_roles([info["roles"]])
         is_author = "author" in roles
 
+        author_full_name = (info["person"].get("prenom", "") + " " + info["person"].get("nom", "")).strip()
+
         cur.execute("""
             INSERT INTO source_authorships
                 (source, source_document_id, source_author_id, author_position,
-                 author_name_normalized, roles, in_perimeter, raw_affiliations)
-            VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
+                 author_name_normalized, roles, in_perimeter, raw_affiliations,
+                 raw_author_name)
+            VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s, %s, %s)
             ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
                 roles = EXCLUDED.roles,
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 in_perimeter = EXCLUDED.in_perimeter,
                 raw_affiliations = EXCLUDED.raw_affiliations,
+                raw_author_name = EXCLUDED.raw_author_name,
                 addresses_extracted = FALSE
         """, (source_document_id, source_author_id,
               position if is_author else None,
-              info["person"].get("prenom", "") + " " + info["person"].get("nom", ""),
+              author_full_name,
               roles, is_author,
-              Json(raw_affiliations) if is_author and raw_affiliations else None))
+              Json(raw_affiliations) if is_author and raw_affiliations else None,
+              author_full_name))
         if is_author:
             position += 1
 

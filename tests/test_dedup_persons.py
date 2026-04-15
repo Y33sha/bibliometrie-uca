@@ -86,15 +86,13 @@ def _insert_oa_document(db, openalex_id, publication_id):
 def _insert_oa_authorship(db, oa_document_id, oa_author_id, position=0,
                           in_perimeter=True, person_id=None, raw_author_name=None):
     """Crée une source_authorship OpenAlex."""
-    import json
-    source_data = json.dumps({"raw_author_name": raw_author_name}) if raw_author_name else None
     db.execute("""
         INSERT INTO source_authorships
             (source, source_document_id, source_author_id, author_position,
-             in_perimeter, person_id, source_data)
+             in_perimeter, person_id, raw_author_name)
         VALUES ('openalex', %s, %s, %s, %s, %s, %s) RETURNING id
     """, (oa_document_id, oa_author_id, position, in_perimeter, person_id,
-          source_data))
+          raw_author_name))
     return db.fetchone()["id"]
 
 

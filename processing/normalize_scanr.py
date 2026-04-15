@@ -369,12 +369,14 @@ def process_authors(cur, doc: dict, source_document_id: int):
             source_data["detected_countries"] = detected_countries
         source_data_json = Json(source_data) if source_data else None
 
+        author_full_name = author_data.get("fullName")
+
         cur.execute("""
             INSERT INTO source_authorships
                 (source, source_document_id, source_author_id, author_position, roles,
                  raw_affiliations, source_data,
-                 author_name_normalized)
-            VALUES ('scanr', %s, %s, %s, %s, %s, %s, normalize_name_form(%s))
+                 author_name_normalized, raw_author_name)
+            VALUES ('scanr', %s, %s, %s, %s, %s, %s, normalize_name_form(%s), %s)
             ON CONFLICT (source_document_id, source_author_id) DO UPDATE SET
                 raw_affiliations = COALESCE(EXCLUDED.raw_affiliations,
                     source_authorships.raw_affiliations),
@@ -382,11 +384,12 @@ def process_authors(cur, doc: dict, source_document_id: int):
                               COALESCE(EXCLUDED.source_data, '{}'),
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 roles = EXCLUDED.roles,
+                raw_author_name = EXCLUDED.raw_author_name,
                 addresses_extracted = FALSE
         """, (source_document_id, source_author_id, position, roles or None,
               Json(raw_affiliations) if raw_affiliations else None,
               source_data_json,
-              author_data.get("fullName")))
+              author_full_name, author_full_name))
 
 
 # =============================================================
