@@ -4,11 +4,11 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 # Workflow
 * [x] programmation cron pour le pipeline de traitement (daily, weekly, monthly)
 ## Pipeline
+* [x] faire une version bac à sable pour retester le pipeline *de novo* après seed.
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation
 * [ ] structure_ids et in_perimeter des publis theses.fr: à quelle phase du pipeline sont-ils remplis et selon quelle logique? auditer
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
-* [ ] faire une version bac à sable pour retester le pipeline *de novo* après seed.
 * [ ] y aura-t-il un cross-import sur le cross-import au run suivant?
 * [ ] investiguer les erreurs de normalisation wos: Erreur sur WOS:000475662000018: ERREUR:  syntaxe en entrée invalide pour le type integer : « 5-Bis(pyridin-2-yl)-1 » LINE 10: ...rst_page": "7773", "last_page": "7783"}', ARRAY[2,'5-Bis(pyr
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes
