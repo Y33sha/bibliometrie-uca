@@ -7,6 +7,7 @@ Tables exportées :
   - country_name_forms  (formes de noms de pays)
   - structures          (structures UCA, labos, partenaires)
   - structure_relations  (relations entre structures)
+  - perimeters          (périmètres UCA, UCA élargi)
   - structure_name_forms (formes de noms pour le matching d'adresses)
 
 Usage :
@@ -61,6 +62,11 @@ TABLES = [
         "order": "id",
     },
     {
+        "table": "perimeters",
+        "columns": ["id", "code", "name", "description", "structure_ids"],
+        "order": "id",
+    },
+    {
         "table": "structure_name_forms",
         "columns": ["id", "structure_id", "form_text", "requires_context_of", "is_active", "notes", "is_word_boundary"],
         "order": "id",
@@ -85,7 +91,11 @@ def escape_sql(value, is_jsonb=False) -> str:
         return "TRUE" if value else "FALSE"
     if isinstance(value, (int, float)):
         return str(value)
-    if isinstance(value, (dict, list)):
+    if isinstance(value, list):
+        # Arrays PostgreSQL : '{1,2,3}' ou '{"a","b"}'
+        elements = ", ".join(str(v).replace("'", "''") for v in value)
+        return "'{" + elements + "}'"
+    if isinstance(value, dict):
         s = json.dumps(value, ensure_ascii=False).replace("'", "''")
         return f"'{s}'"
     s = str(value).replace("'", "''")

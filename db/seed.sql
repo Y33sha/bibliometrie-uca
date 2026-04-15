@@ -6,11 +6,12 @@
 
 BEGIN;
 
--- config (12 lignes)
+-- config (13 lignes)
 DELETE FROM config;
 INSERT INTO config (key, value, description) VALUES ('api_base_urls', '{"hal": "https://api.archives-ouvertes.fr/search/", "wos": "https://api.clarivate.com/api/wos", "scanr": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search", "theses": "https://theses.fr/api/v1/theses/recherche/", "openalex": "https://api.openalex.org/works"}', 'URLs de base des API par source (clés = enum source_type)');
 INSERT INTO config (key, value, description) VALUES ('hal_extra_collections', '[]', 'Collections HAL à interroger en plus de celles dérivées des structures du périmètre');
 INSERT INTO config (key, value, description) VALUES ('hal_portals', '["clermont-univ"]', 'Portails HAL à interroger (en plus des collections labo)');
+INSERT INTO config (key, value, description) VALUES ('openalex_api_key', '"VOTRE_CLE_OPENALEX"', 'Clé API OpenAlex (remplace le polite pool par email)');
 INSERT INTO config (key, value, description) VALUES ('openalex_email', '"votre@email.fr"', 'Email pour le polite pool OpenAlex');
 INSERT INTO config (key, value, description) VALUES ('perimeter_affiliations', '"uca_wide"', 'Périmètre pour la résolution des affiliations (structure_ids sur authorships sources)');
 INSERT INTO config (key, value, description) VALUES ('perimeter_extraction', '"uca_wide"', 'Périmètre pour déterminer les structures à interroger lors de l''extraction');
@@ -668,6 +669,12 @@ INSERT INTO structure_relations (id, parent_id, child_id, relation_type) VALUES 
 INSERT INTO structure_relations (id, parent_id, child_id, relation_type) VALUES (298, 169, 224, 'est_tutelle_de');
 SELECT setval(pg_get_serial_sequence('structure_relations', 'id'), (SELECT COALESCE(MAX(id), 0) FROM structure_relations));
 
+-- perimeters (2 lignes)
+DELETE FROM perimeters;
+INSERT INTO perimeters (id, code, name, description, structure_ids) VALUES (1, 'uca', 'UCA', 'UCA + labos en tutelle directe.', '{169}');
+INSERT INTO perimeters (id, code, name, description, structure_ids) VALUES (2, 'uca_wide', 'UCA élargi', 'UCA + CHU + INP', '{169, 172, 186}');
+SELECT setval(pg_get_serial_sequence('perimeters', 'id'), (SELECT COALESCE(MAX(id), 0) FROM perimeters));
+
 -- structure_name_forms (436 lignes)
 DELETE FROM structure_name_forms;
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1210, 170, 'clermont ferrand', NULL, TRUE, NULL, FALSE);
@@ -1101,7 +1108,7 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1685, 223, 'maison des sciences de l homme', '[169, 170]', TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1686, 223, 'msh', '[169, 170]', TRUE, NULL, TRUE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1687, 226, 'lab of engineering for complex systems', NULL, TRUE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1688, 226, 'lisc', '[170, "tutelles"]', TRUE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1688, 226, 'lisc', '[170, 174, 169]', TRUE, NULL, TRUE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1689, 226, 'laboratoire d ingenierie des systemes complexes', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1690, 226, 'ur 1465', NULL, TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, requires_context_of, is_active, notes, is_word_boundary) VALUES (1691, 226, 'ur1465', NULL, TRUE, NULL, TRUE);

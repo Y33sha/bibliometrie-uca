@@ -37,6 +37,7 @@ import argparse
 import datetime
 import json
 import logging
+import os
 import subprocess
 import sys
 
@@ -341,7 +342,13 @@ def main():
                         help="Surcharger l'année d'extraction (une seule année)")
     parser.add_argument("--full-cross-import", action="store_true",
                         help="Cross-imports sur tout le staging (pas seulement les non-normalisés)")
+    parser.add_argument("--sandbox", action="store_true",
+                        help="Utiliser la base bibliometrie_sandbox")
     args = parser.parse_args()
+
+    if args.sandbox:
+        os.environ["BIBLIOMETRIE_SANDBOX"] = "1"
+        log.info("MODE SANDBOX — base bibliometrie_sandbox")
 
     if args.list:
         print("Phases disponibles :")
