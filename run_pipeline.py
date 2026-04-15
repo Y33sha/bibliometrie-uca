@@ -215,7 +215,8 @@ def phase_affiliations(**kw):
     """
     sources = kw.get("sources", set(ALL_SOURCES_SET))
     source_args = ",".join(sorted(sources))
-    run_python("processing/populate_affiliations.py", "--sources", source_args)
+    mode = kw.get("mode", "full")
+    run_python("processing/populate_affiliations.py", "--sources", source_args, "--mode", mode)
 
 
 def phase_publications(**kw):
