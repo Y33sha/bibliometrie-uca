@@ -38,9 +38,11 @@ def create_person(cur, last_name: str, first_name: str = "") -> int:
 def link_authorship(cur, person_id: int, source: str, authorship_id: int,
                     *, source_author_id: int | None = None,
                     has_hal_person_id: bool = False):
-    """Rattache une authorship source à une personne.
+    """Rattache une authorship source à une personne (pipeline).
 
-    Pour HAL, fait aussi le dual-write sur source_authors si c'est un compte HAL.
+    Pour HAL, fait aussi le dual-write sur source_authors si c'est un
+    compte HAL (hal_person_id renseigné). Ceci permet à l'étape 0 du
+    pipeline de propager aux autres authorships du même compte.
     """
     if source not in ALL_SOURCES_SET:
         return
@@ -48,15 +50,15 @@ def link_authorship(cur, person_id: int, source: str, authorship_id: int,
     cur.execute("UPDATE source_authorships SET person_id = %s WHERE id = %s AND source = %s",
                 (person_id, authorship_id, source))
 
-    # Dual-write sur source_authors pour les comptes HAL
     if source == "hal" and source_author_id and has_hal_person_id:
         cur.execute("""
-            UPDATE source_authors SET person_id = %s            WHERE id = %s AND (source_ids->>'hal_person_id') IS NOT NULL
+            UPDATE source_authors SET person_id = %s
+            WHERE id = %s AND (source_ids->>'hal_person_id') IS NOT NULL
         """, (person_id, source_author_id))
 
 
 def link_authorships(cur, person_id: int, authorships: list[dict]):
-    """Rattache un groupe d'authorships à une personne.
+    """Rattache un groupe d'authorships à une personne (pipeline).
 
     Chaque dict doit avoir 'source' et 'authorship_id',
     et optionnellement 'source_author_id' et 'has_hal_person_id'.
@@ -94,6 +96,15 @@ def add_identifier(cur, person_id: int, id_type: str, id_value: str,
             status = 'pending'
         WHERE person_identifiers.status = 'rejected'
     """, (person_id, id_type, id_value, source, status))
+
+    # Attribution d'un idhal → rattacher le compte HAL correspondant
+    if id_type == "idhal":
+        cur.execute("""
+            UPDATE source_authors SET person_id = %s
+            WHERE source = 'hal'
+              AND source_ids->>'idhal' = %s
+              AND (person_id IS NULL OR person_id != %s)
+        """, (person_id, id_value, person_id))
 
 
 def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict]):
