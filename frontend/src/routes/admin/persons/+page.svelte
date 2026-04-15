@@ -887,46 +887,6 @@
 {/if}
 
 <style>
-  /* ── Stats row ── */
-  .stats-row {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-  }
-  .stat-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 12px 18px;
-    text-align: center;
-    flex: 1;
-    min-width: 120px;
-  }
-  .stat-card .value {
-    font-size: 1.55rem;
-    font-weight: 700;
-    line-height: 1.2;
-  }
-  .stat-card .label {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  .stat-card.hl-success {
-    border-left: 3px solid var(--success);
-  }
-  .stat-card.hl-warning {
-    border-left: 3px solid var(--warning);
-  }
-  .value-success {
-    color: var(--success);
-  }
-  .value-warning {
-    color: var(--warning);
-  }
-
   /* ── Toolbar ── */
   .toolbar {
     margin-bottom: 16px;
@@ -938,11 +898,6 @@
   .data-table {
     overflow: visible;
   }
-  .period-cell {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-  }
-
   /* ── Tags ── */
   .tag {
     display: inline-block;
@@ -952,17 +907,9 @@
     font-weight: 500;
     margin: 1px 2px;
   }
-  .tag-linked {
-    background: var(--success-light);
-    color: var(--success);
-  }
   .tag-unlinked {
     background: var(--warning-light);
     color: #8a6d10;
-  }
-  .tag-role {
-    background: #eee;
-    color: #555;
   }
   .tag-id {
     background: var(--accent-light);
@@ -975,41 +922,6 @@
     color: #555;
     font-size: 0.7rem;
   }
-  .tag-small {
-    font-size: 0.7rem;
-  }
-
-  /* ── Linked authors toggle ── */
-  .btn-toggle-authors {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 0.8rem;
-    color: var(--accent);
-    padding: 2px 4px;
-    font-family: inherit;
-    font-weight: 500;
-  }
-  .btn-toggle-authors:hover {
-    text-decoration: underline;
-  }
-  .toggle-arrow {
-    font-size: 0.7rem;
-    margin-left: 2px;
-  }
-  .linked-authors-list {
-    margin-top: 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .linked-author {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin: 1px 0;
-  }
-
   /* ── Merge search ── */
   .btn-merge-inline {
     padding: 2px 8px;
@@ -1079,15 +991,6 @@
   }
 
   /* ── Buttons ── */
-  .btn-expand {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 1rem;
-    padding: 2px 6px;
-    color: var(--accent);
-    font-family: inherit;
-  }
   .btn-link {
     border-color: var(--success);
     color: var(--success);
@@ -1095,83 +998,6 @@
   .btn-link:hover {
     background: var(--success);
     color: white;
-  }
-  .btn-unlink {
-    border: 1px solid var(--danger);
-    color: var(--danger);
-    font-size: 0.7rem;
-    background: none;
-    border-radius: 4px;
-    cursor: pointer;
-    padding: 1px 5px;
-    font-family: inherit;
-  }
-  .btn-unlink:hover {
-    background: var(--danger);
-    color: white;
-  }
-  .btn-detail {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 0.8rem;
-    color: var(--accent);
-    padding: 2px 4px;
-    text-decoration: underline;
-    font-family: inherit;
-  }
-
-  /* ── Publications ── */
-  .pub-list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .pub-list li {
-    padding: 3px 0;
-    border-bottom: 1px solid #f0efec;
-  }
-  .pub-list li:last-child {
-    border-bottom: none;
-  }
-  .pub-year {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    font-weight: 600;
-    margin-right: 4px;
-  }
-  .btn-reassign {
-    color: var(--accent);
-  }
-  .reassign-inline {
-    display: inline-flex;
-    gap: 4px;
-    align-items: center;
-    margin-left: 4px;
-  }
-  .reassign-input {
-    width: 80px;
-    padding: 2px 6px;
-    font-size: 0.8rem;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-  }
-  .pub-title {
-    color: #333;
-  }
-  .pub-uca {
-    color: var(--success);
-    font-size: 0.7rem;
-    font-weight: 600;
-  }
-  .pub-doi {
-    font-size: 0.7rem;
-    color: var(--accent);
-    text-decoration: none;
-    margin-left: 4px;
-  }
-  .pub-doi:hover {
-    text-decoration: underline;
   }
 
   /* ── Identifiers ── */
@@ -1295,10 +1121,6 @@
   .person-last {
     font-weight: 600;
   }
-  .uca-count {
-    font-size: 0.85em;
-    color: var(--muted);
-  }
   /* ── Misc ── */
   .loading-text {
     color: var(--text-muted);
@@ -1336,10 +1158,6 @@
   .name-form-tag.ambiguous:hover {
     background: #ffe8cc;
     border-color: #d0a050;
-  }
-  .nf-sources {
-    color: #888;
-    font-size: 0.7rem;
   }
 
   /* ── Modal ── */
@@ -1497,54 +1315,5 @@
   }
   .orphan-link:hover {
     background: #ffe0b2;
-  }
-  .orphan-panel {
-    margin-bottom: 16px;
-  }
-  .orphan-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-  }
-  .orphan-header h2 {
-    margin: 0;
-    font-size: 1.1rem;
-  }
-  .orphan-toolbar {
-    margin-bottom: 10px;
-  }
-  .orphan-toolbar input {
-    padding: 6px 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    width: 300px;
-  }
-  .orphan-assign {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    align-items: flex-start;
-  }
-  .orphan-assign input {
-    padding: 4px 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    width: 180px;
-  }
-  .orphan-results {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    width: 100%;
-  }
-  .pub-link {
-    color: var(--accent);
-    text-decoration: none;
-    font-size: 0.85rem;
-  }
-  .pub-link:hover {
-    text-decoration: underline;
   }
 </style>
