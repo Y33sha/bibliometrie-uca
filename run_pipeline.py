@@ -360,9 +360,10 @@ def main():
 
     # Métriques pipeline
     from db.connection import get_connection
-    from pipeline.metrics import snapshot, compute_deltas, generate_report
+    from pipeline.metrics import (snapshot, compute_deltas, generate_report,
+                                    capture_log_offsets, read_new_logs)
     metrics_conn = get_connection()
-    phase_results = []  # [(name, duration, deltas)]
+    phase_results = []  # [(name, duration, deltas, logs)]
 
     t0_total = time.time()
     for name, fn in phases_to_run:
@@ -371,6 +372,7 @@ def main():
         log.info("─" * 40)
 
         before = snapshot(metrics_conn)
+        log_offsets = capture_log_offsets()
         t0_phase = time.time()
         try:
             fn(mode=args.mode, sources=sources, year=args.year,
@@ -380,8 +382,9 @@ def main():
             log.error("Pour reprendre : python run_pipeline.py --from %s", name)
             # Générer le rapport partiel avant de quitter
             after = snapshot(metrics_conn)
+            phase_logs = read_new_logs(log_offsets)
             phase_results.append((name + " (ERREUR)", time.time() - t0_phase,
-                                  compute_deltas(before, after)))
+                                  compute_deltas(before, after), phase_logs))
             report_path = generate_report(args.mode, sources, phase_results,
                                           time.time() - t0_total)
             log.info("Rapport partiel : %s", report_path)
@@ -391,7 +394,8 @@ def main():
         duration = time.time() - t0_phase
         after = snapshot(metrics_conn)
         deltas = compute_deltas(before, after)
-        phase_results.append((name, duration, deltas))
+        phase_logs = read_new_logs(log_offsets)
+        phase_results.append((name, duration, deltas, phase_logs))
 
         if deltas:
             for key, vals in sorted(deltas.items()):

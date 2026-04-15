@@ -315,12 +315,12 @@
 	onMount(async () => {
 		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
 		fetch(base + '/api/auth/check').then(r => r.json()).then(d => { isAdmin = !!d.authenticated; }).catch(() => {});
-		await loadProfile(personId);
+		if (personId) await loadProfile(personId);
 	});
 
 	// Recharger quand personId change (navigation client-side)
 	$effect(() => {
-		loadProfile(personId);
+		if (personId) loadProfile(personId);
 	});
 </script>
 

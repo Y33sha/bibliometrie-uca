@@ -27,30 +27,80 @@
   }
 
   function markdownToHtml(md: string): string {
-    // Rendu markdown simple (titres, tableaux, listes, gras, italique)
-    return md
-      .split("\n\n")
-      .map((block) => {
-        // Titres
-        if (block.startsWith("# ")) return `<h2>${block.slice(2)}</h2>`;
-        if (block.startsWith("## ")) return `<h3>${block.slice(3)}</h3>`;
-        // Tableau
-        if (block.includes("|") && block.includes("---")) {
-          const rows = block.split("\n").filter((r) => r.trim() && !r.includes("---"));
-          if (rows.length === 0) return "";
+    const lines = md.split("\n");
+    const out: string[] = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      // Lignes vides
+      if (line.trim() === "") { i++; continue; }
+
+      // <details> / <summary> — passer tel quel
+      if (line.trim().startsWith("<details")) {
+        while (i < lines.length && !lines[i].includes("</details>")) {
+          out.push(lines[i]);
+          i++;
+        }
+        if (i < lines.length) { out.push(lines[i]); i++; }
+        continue;
+      }
+
+      // Blocs de code (```)
+      if (line.trim().startsWith("```")) {
+        const codeLines: string[] = [];
+        i++; // sauter la ligne d'ouverture
+        while (i < lines.length && !lines[i].trim().startsWith("```")) {
+          codeLines.push(escapeHtml(lines[i]));
+          i++;
+        }
+        if (i < lines.length) i++; // sauter la ligne de fermeture
+        out.push(`<pre class="log-block">${codeLines.join("\n")}</pre>`);
+        continue;
+      }
+
+      // Titres
+      if (line.startsWith("# ")) { out.push(`<h2>${line.slice(2)}</h2>`); i++; continue; }
+      if (line.startsWith("## ")) { out.push(`<h3>${line.slice(3)}</h3>`); i++; continue; }
+      if (line.startsWith("### ")) { out.push(`<h4>${line.slice(4)}</h4>`); i++; continue; }
+
+      // Tableau (collecte toutes les lignes consécutives avec |)
+      if (line.includes("|")) {
+        const tableLines: string[] = [];
+        while (i < lines.length && lines[i].includes("|")) {
+          tableLines.push(lines[i]);
+          i++;
+        }
+        const rows = tableLines.filter((r) => r.trim() && !r.includes("---"));
+        if (rows.length > 0) {
           const header = rows[0].split("|").filter(Boolean).map((c) => c.trim());
           const body = rows.slice(1).map((r) => r.split("|").filter(Boolean).map((c) => c.trim()));
-          return `<table class="report-table"><thead><tr>${header.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+          out.push(`<table class="report-table"><thead><tr>${header.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
         }
-        // Liste
-        if (block.startsWith("- ")) {
-          const items = block.split("\n").map((l) => l.replace(/^- /, ""));
-          return `<ul>${items.map((i) => `<li>${formatInline(i)}</li>`).join("")}</ul>`;
+        continue;
+      }
+
+      // Liste
+      if (line.startsWith("- ")) {
+        const items: string[] = [];
+        while (i < lines.length && lines[i].startsWith("- ")) {
+          items.push(lines[i].slice(2));
+          i++;
         }
-        // Paragraphe
-        return `<p>${formatInline(block)}</p>`;
-      })
-      .join("\n");
+        out.push(`<ul>${items.map((it) => `<li>${formatInline(it)}</li>`).join("")}</ul>`);
+        continue;
+      }
+
+      // Paragraphe
+      out.push(`<p>${formatInline(line)}</p>`);
+      i++;
+    }
+    return out.join("\n");
+  }
+
+  function escapeHtml(s: string): string {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
   function formatInline(s: string): string {
@@ -196,6 +246,41 @@
     text-align: right;
     font-family: "JetBrains Mono", monospace;
     font-size: 0.8rem;
+  }
+  .report-content :global(details) {
+    margin: 8px 0 16px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  .report-content :global(summary) {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--hover);
+    border-radius: 4px;
+  }
+  .report-content :global(details[open] > summary) {
+    border-bottom: 1px solid var(--border);
+    border-radius: 4px 4px 0 0;
+  }
+  .report-content :global(h4) {
+    font-size: 0.85rem;
+    margin: 12px 10px 4px;
+    color: var(--muted);
+  }
+  .report-content :global(.log-block) {
+    margin: 4px 10px 12px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
   }
   .empty, .loading {
     color: var(--muted);
