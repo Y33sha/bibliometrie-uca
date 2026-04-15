@@ -1,9 +1,5 @@
 # Roadmap transmission DSI
 
-1. Maintenabilité / transmissibilité
-
-* Le renommage sémantique (publications → documents, source_persons → source_persons) — si c'est prévu, le faire avant transmission, pas après. Plus on attend, plus c'est lourd.
-
 2. Robustesse en production
 
 * La version bac à sable pour retester le pipeline de novo — sans ça, impossible de valider que le seed + schema + migrations = base fonctionnelle. Personne ne reprendra un outil qu'il ne peut pas réinstaller.
