@@ -71,11 +71,14 @@ def generate_report(
     total_duration: float,
 ) -> str:
     """Génère le rapport Markdown et l'écrit dans pipeline/reports/."""
+    import os
     now = datetime.datetime.now()
     filename = now.strftime("%Y-%m-%d_%H%M%S") + ".md"
+    is_sandbox = os.environ.get("BIBLIOMETRIE_SANDBOX") == "1"
 
+    sandbox_label = " (SANDBOX)" if is_sandbox else ""
     lines = [
-        f"# Rapport pipeline — {now.strftime('%d/%m/%Y %H:%M')}",
+        f"# Rapport pipeline{sandbox_label} — {now.strftime('%d/%m/%Y %H:%M')}",
         "",
         f"- **Mode** : {mode}",
         f"- **Sources** : {', '.join(sorted(sources))}",
@@ -97,7 +100,8 @@ def generate_report(
             lines.append("</details>")
             lines.append("")
 
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    filepath = REPORTS_DIR / filename
+    reports_dir = REPORTS_DIR / "sandbox" if is_sandbox else REPORTS_DIR
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    filepath = reports_dir / filename
     filepath.write_text("\n".join(lines), encoding="utf-8")
     return str(filepath)
