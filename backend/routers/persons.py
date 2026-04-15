@@ -5,7 +5,7 @@ import re
 import sys
 from fastapi import APIRouter, Query, HTTPException, Depends
 from backend.deps import get_cursor, require_admin
-from backend.models import LinkPersonAuthor, AddIdentifier
+from backend.models import AddIdentifier
 from backend.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, persons_sort_clause,
     parse_int_csv, parse_str_csv, apply_source_filter)
 from utils.sources import AUTHOR_SOURCES_SQL, ALL_SOURCES_SET
@@ -20,8 +20,6 @@ from services.persons import (
     merge_person as _merge_person,
     link_authorship as _link_authorship,
     unlink_authorship as _unlink_authorship,
-    link_author_to_person as _link_author_to_person,
-    unlink_author_from_person as _unlink_author_from_person,
     assign_orphan_authorship as _assign_orphan,
     add_identifier as _add_identifier,
     add_name_form as _add_name_form,
@@ -475,29 +473,6 @@ async def persons_stats():
         return cur.fetchone()
 
 
-@router.get("/api/authors/{source}/{author_id}/details")
-async def author_details(source: str, author_id: int, max_pubs: int = Query(10, ge=1, le=50)):
-    """Détails d'un auteur source : ses publications récentes."""
-    with get_cursor() as (cur, conn):
-        if source not in ALL_SOURCES_SET:
-            raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
-
-        cur.execute("""
-            SELECT p.id, p.title, p.pub_year, p.doi,
-                   sa.in_perimeter,
-                   %s AS source
-            FROM source_authorships sa
-            JOIN source_documents sd ON sd.id = sa.source_document_id
-            LEFT JOIN publications p ON p.id = sd.publication_id
-            WHERE sa.source = %s AND sa.source_author_id = %s AND sa.in_perimeter = TRUE
-            ORDER BY COALESCE(p.pub_year, sd.pub_year) DESC
-            LIMIT %s
-        """, (source, source, author_id, max_pubs))
-
-        publications = cur.fetchall()
-        return {"signatures": [], "publications": publications}
-
-
 @router.get("/api/persons/{person_id}")
 async def get_person(person_id: int):
     """Retourne une personne avec ses auteurs lies."""
@@ -510,11 +485,8 @@ async def get_person(person_id: int):
                 (SELECT json_agg(x) FROM (
                     SELECT DISTINCT ON (sa.source, sa.source_author_id)
                            sa.source_author_id AS id, sa.source,
-                           sa.raw_author_name AS full_name,
-                           sauth.orcid,
-                           sauth.source_ids->>'idhal' AS idhal
+                           sa.raw_author_name AS full_name
                     FROM source_authorships sa
-                    JOIN source_authors sauth ON sauth.id = sa.source_author_id
                     WHERE sa.person_id = p.id AND NOT sa.excluded
                     ORDER BY sa.source, sa.source_author_id
                 ) x) AS linked_authors,
@@ -751,107 +723,6 @@ async def person_addresses(
             "pages": pages,
             "addresses": cur.fetchall(),
         }
-
-
-@router.get("/api/persons/{person_id}/candidates")
-async def person_author_candidates(person_id: int, limit: int = Query(10, ge=1, le=50)):
-    """Cherche des auteurs candidats pour une personne (matching par nom ou ORCID)."""
-    with get_cursor() as (cur, conn):
-        cur.execute("SELECT * FROM persons WHERE id = %s", (person_id,))
-        person = cur.fetchone()
-        if not person:
-            raise HTTPException(status_code=404, detail="Person not found")
-
-        last_norm = person["last_name_normalized"]
-        first_norm = person["first_name_normalized"]
-        first_initial = first_norm[:1] if first_norm else ""
-        # Build full name words for robust matching (handles compound names
-        # like "Le Bras" where source may split name differently)
-        full_words = sorted(set((last_norm + " " + first_norm).split()))
-
-        # Person's ORCID (if any)
-        cur.execute("""
-            SELECT id_value FROM person_identifiers
-            WHERE person_id = %s AND id_type = 'orcid' LIMIT 1
-        """, (person_id,))
-        orcid_row = cur.fetchone()
-        person_orcid = orcid_row["id_value"] if orcid_row else None
-
-        # Build SQL condition: each word from the person's full name must
-        # appear in the author's full_name (accent-insensitive)
-        word_conditions_sa = " AND ".join(
-            "lower(unaccent(sa.full_name)) LIKE %s" for _ in full_words
-        )
-        word_params = [f"%{w}%" for w in full_words]
-
-        # Add ORCID matching condition
-        if person_orcid:
-            orcid_cond = "OR sa.orcid = %s"
-            orcid_params = [person_orcid]
-        else:
-            orcid_cond = ""
-            orcid_params = []
-
-        cur.execute(f"""
-            WITH candidates AS (
-                SELECT sa.id, sa.source, sa.full_name, sa.last_name, sa.first_name,
-                       sa.orcid,
-                       CASE WHEN sa.source = 'hal' THEN sa.source_ids->>'idhal' END AS idhal,
-                       CASE WHEN sa.source = 'openalex' THEN sa.source_id END AS openalex_id,
-                       CASE WHEN sa.source = 'openalex' THEN sa.person_id
-                            ELSE (SELECT sas.person_id FROM source_authorships sas
-                                  WHERE sas.source = sa.source AND sas.source_author_id = sa.id
-                                    AND sas.person_id IS NOT NULL LIMIT 1)
-                       END AS person_id,
-                       (SELECT COUNT(*) FROM source_authorships sas
-                        WHERE sas.source = sa.source AND sas.source_author_id = sa.id
-                          AND sas.in_perimeter = TRUE) AS uca_pub_count,
-                       (SELECT COUNT(*) FROM source_authorships sas
-                        WHERE sas.source = sa.source AND sas.source_author_id = sa.id) AS pub_count
-                FROM source_authors sa
-                WHERE sa.source IN {AUTHOR_SOURCES_SQL}
-                  AND ({word_conditions_sa} {orcid_cond})
-                  AND EXISTS (SELECT 1 FROM source_authorships sas
-                              WHERE sas.source = sa.source AND sas.source_author_id = sa.id
-                                AND sas.in_perimeter = TRUE)
-            )
-            SELECT * FROM candidates
-            WHERE uca_pub_count > 0
-            ORDER BY uca_pub_count DESC, pub_count DESC
-            LIMIT %s
-        """, word_params + orcid_params + [limit])
-
-        return cur.fetchall()
-
-
-@router.post("/api/persons/{person_id}/link")
-async def link_person_to_author(person_id: int, data: LinkPersonAuthor):
-    """Rattache un auteur source à une personne."""
-    with get_cursor() as (cur, conn):
-        cur.execute("SELECT id FROM persons WHERE id = %s", (person_id,))
-        if not cur.fetchone():
-            raise HTTPException(status_code=404, detail="Person not found")
-
-        if data.source not in ALL_SOURCES_SET:
-            raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
-
-        author = _link_author_to_person(cur, person_id, data.source, data.author_id)
-        if not author:
-            raise HTTPException(status_code=404, detail=f"{data.source} author not found")
-
-        return {"linked": True, "person_id": person_id,
-                "author_id": data.author_id, "source": data.source}
-
-
-@router.delete("/api/persons/{person_id}/link/{source}/{author_id}")
-async def unlink_person_from_author(person_id: int, source: str, author_id: int):
-    """Détache un auteur source d'une personne."""
-    with get_cursor() as (cur, conn):
-        if source not in ALL_SOURCES_SET:
-            raise HTTPException(status_code=400, detail="Source must be 'hal', 'openalex' or 'wos'")
-
-        _unlink_author_from_person(cur, person_id, source, author_id)
-        return {"unlinked": True}
 
 
 # ----- Identifier management -----

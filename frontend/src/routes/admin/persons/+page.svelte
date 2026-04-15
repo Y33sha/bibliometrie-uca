@@ -61,35 +61,6 @@
     persons: Person[];
   }
 
-  interface Candidate {
-    id: number;
-    source: string;
-    full_name: string;
-    orcid?: string;
-    idhal?: string;
-    openalex_id?: string;
-    pub_count: number;
-    uca_pub_count: number;
-    person_id: number | null;
-  }
-
-  interface Signature {
-    source: string;
-    raw_affiliation: string;
-  }
-
-  interface Publication {
-    pub_year: number | null;
-    title: string;
-    doi?: string;
-    in_perimeter?: boolean;
-  }
-
-  interface AuthorDetails {
-    signatures: Signature[];
-    publications: Publication[];
-  }
-
   /* ── State ── */
 
   let stats = $state<PersonStats | null>(null);
@@ -139,12 +110,7 @@
 
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  /* Expanded candidates per person id */
-  let expandedPersons: Record<number, Candidate[] | "loading"> = $state({});
-
   /* Expanded author details keyed by "source-authorId" */
-  let expandedDetails: Record<string, AuthorDetails | "loading"> = $state({});
-
   /* Identifier add form state: personId → { open, id_type, id_value, error } */
   let idForms: Record<number, { id_type: string; id_value: string; error: string }> = $state({});
 
@@ -329,70 +295,6 @@
     currentPage = p;
     loadTable();
     window.scrollTo(0, 0);
-  }
-
-  /* ── Candidates expand/collapse ── */
-
-  async function toggleCandidates(personId: number) {
-    if (personId in expandedPersons) {
-      const next = { ...expandedPersons };
-      delete next[personId];
-      expandedPersons = next;
-      return;
-    }
-    expandedPersons = { ...expandedPersons, [personId]: "loading" };
-    const candidates = await api<Candidate[]>(`/api/persons/${personId}/candidates`);
-    expandedPersons = { ...expandedPersons, [personId]: candidates };
-  }
-
-  /* ── Author detail expand/collapse ── */
-
-  function detailKey(source: string, authorId: number): string {
-    return `${source}-${authorId}`;
-  }
-
-  async function toggleAuthorDetail(source: string, authorId: number) {
-    const key = detailKey(source, authorId);
-    if (key in expandedDetails) {
-      const next = { ...expandedDetails };
-      delete next[key];
-      expandedDetails = next;
-      return;
-    }
-    expandedDetails = { ...expandedDetails, [key]: "loading" };
-    const details = await api<AuthorDetails>(`/api/authors/${source}/${authorId}/details`);
-    expandedDetails = { ...expandedDetails, [key]: details };
-  }
-
-  /* ── Link / Unlink ── */
-
-  async function linkAuthor(personId: number, source: string, authorId: number) {
-    await fetch(`${base}/api/persons/${personId}/link`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ author_id: authorId, source }),
-    });
-    loadStats();
-    await refreshPersonRow(personId);
-  }
-
-  async function unlinkAuthor(personId: number, source: string, authorId: number) {
-    await fetch(`${base}/api/persons/${personId}/link/${source}/${authorId}`, {
-      method: "DELETE",
-    });
-    loadStats();
-    await refreshPersonRow(personId);
-  }
-
-  async function refreshPersonRow(personId: number) {
-    const updated = await api<Person>(`/api/persons/${personId}`);
-    persons = persons.map((p) => (p.id === personId ? updated : p));
-
-    /* If candidates panel is open, refresh it so "Rattacher" buttons update */
-    if (personId in expandedPersons && expandedPersons[personId] !== "loading") {
-      const candidates = await api<Candidate[]>(`/api/persons/${personId}/candidates`);
-      expandedPersons = { ...expandedPersons, [personId]: candidates };
-    }
   }
 
   /* ── Identifiers ── */
@@ -676,18 +578,6 @@
       parts.push(p.end_date ? p.end_date.substring(0, 10) : "\u2026");
     }
     return parts.join(" ");
-  }
-
-  function isAlreadyLinked(candidate: Candidate): boolean {
-    return candidate.person_id !== null;
-  }
-
-  function candidateIds(c: Candidate): string[] {
-    const ids: string[] = [];
-    if (c.orcid) ids.push("ORCID: " + c.orcid);
-    if (c.idhal) ids.push("idHAL: " + c.idhal);
-    if (c.openalex_id) ids.push("OA: " + c.openalex_id);
-    return ids;
   }
 
   /* ── Lifecycle ── */
@@ -1229,67 +1119,6 @@
     padding: 2px 4px;
     text-decoration: underline;
     font-family: inherit;
-  }
-
-  /* ── Candidates panel ── */
-  .candidates-row {
-    background: #f5f7fa;
-  }
-  .candidates-row td {
-    padding: 10px 20px;
-  }
-  .candidates-row:hover td {
-    background: #f5f7fa;
-  }
-  .candidates-panel {
-    font-size: 0.85rem;
-  }
-  .candidates-panel h4 {
-    margin: 0 0 8px;
-    font-size: 0.95rem;
-    color: var(--accent);
-  }
-  .candidate-card {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    padding: 6px 10px;
-    margin: 4px 0;
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-  }
-  .candidate-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .candidate-card .info {
-    flex: 1;
-  }
-  .candidate-card .name {
-    font-weight: 600;
-  }
-  .candidate-card .meta {
-    color: var(--text-muted);
-    font-size: 0.8rem;
-  }
-
-  /* ── Author detail sub-panel ── */
-  .author-detail {
-    margin-top: 6px;
-    padding: 8px 10px;
-    background: #f8f9fb;
-    border: 1px solid #e8eaed;
-    border-radius: 4px;
-    font-size: 0.85rem;
-  }
-  .author-detail h5 {
-    margin: 0 0 4px;
-    font-size: 0.8rem;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
   }
 
   /* ── Publications ── */
