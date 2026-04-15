@@ -334,24 +334,6 @@
 <!-- ═══ HAL ═══ -->
 <h3 class="section-title">HAL</h3>
 <div class="config-grid">
-  {#each [{ key: "hal_portals", label: "Portails HAL" }] as field}
-    {@const item = configByKey(field.key)}
-    {#if item}
-      <div class="config-row">
-        <span class="config-label">{field.label}</span>
-        {#if editingKey === field.key}
-          <input class="config-editor-inline" bind:value={editValue} onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(field.key); } }} />
-          <span class="config-actions-inline">
-            <button class="btn btn-sm btn-primary" onclick={() => save(field.key)} disabled={saving}>OK</button>
-            <button class="btn btn-sm" onclick={() => { editingKey = null; }}>Annuler</button>
-          </span>
-        {:else}
-          <span class="config-value-inline">{Array.isArray(item.value) ? item.value.join(", ") : item.value}</span>
-          <button class="btn btn-sm" onclick={() => startEdit(field.key)}>Modifier</button>
-        {/if}
-      </div>
-    {/if}
-  {/each}
   {#each [{ key: "hal_extra_collections", label: "Collections supplémentaires" }] as field}
     {@const item = configByKey(field.key)}
     {#if item}
