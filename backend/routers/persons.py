@@ -70,15 +70,11 @@ async def persons_directory(
         conditions.append(
             "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')")
     if has_idhal == "yes":
-        conditions.append("""(
-            EXISTS (SELECT 1 FROM source_authors sa WHERE sa.person_id = p.id AND sa.source = 'hal' AND (sa.source_ids->>'idhal') IS NOT NULL)
-            OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
-        )""")
+        conditions.append(
+            "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')")
     elif has_idhal == "no":
-        conditions.append("""(
-            NOT EXISTS (SELECT 1 FROM source_authors sa WHERE sa.person_id = p.id AND sa.source = 'hal' AND (sa.source_ids->>'idhal') IS NOT NULL)
-            AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
-        )""")
+        conditions.append(
+            "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')")
     if has_rh == "yes":
         conditions.append("prh.id IS NOT NULL")
     elif has_rh == "no":
@@ -99,19 +95,10 @@ async def persons_directory(
                  FROM person_identifiers pi
                  WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
                 ) AS orcids,
-                (SELECT json_agg(json_build_object('value', sub.v, 'confirmed', sub.confirmed)) FROM (
-                    SELECT DISTINCT ON (v) v, confirmed FROM (
-                        SELECT sa.source_ids->>'idhal' AS v, false AS confirmed FROM source_authors sa
-                        WHERE sa.person_id = p.id AND sa.source = 'hal'
-                          AND (sa.source_ids->>'idhal') IS NOT NULL
-                          AND NOT EXISTS (SELECT 1 FROM person_identifiers pi2
-                              WHERE pi2.person_id = p.id AND pi2.id_type = 'idhal'
-                                AND pi2.id_value = sa.source_ids->>'idhal' AND pi2.status = 'rejected')
-                        UNION ALL
-                        SELECT pi.id_value, (pi.status = 'confirmed') FROM person_identifiers pi
-                        WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
-                    ) raw ORDER BY v, confirmed DESC
-                ) sub) AS idhals
+                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
+                 FROM person_identifiers pi
+                 WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
+                ) AS idhals
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             {where}
@@ -335,15 +322,11 @@ async def persons_facets(
                 conds.append("NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')")
         if skip != "has_idhal":
             if has_idhal == "yes":
-                conds.append("""(
-                    EXISTS (SELECT 1 FROM source_authors sa WHERE sa.person_id = p.id AND sa.source = 'hal' AND (sa.source_ids->>'idhal') IS NOT NULL)
-                    OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
-                )""")
+                conds.append(
+                    "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')")
             elif has_idhal == "no":
-                conds.append("""(
-                    NOT EXISTS (SELECT 1 FROM source_authors sa WHERE sa.person_id = p.id AND sa.source = 'hal' AND (sa.source_ids->>'idhal') IS NOT NULL)
-                    AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
-                )""")
+                conds.append(
+                    "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')")
         if skip != "has_rh":
             if has_rh == "yes":
                 conds.append("prh.id IS NOT NULL")
@@ -403,12 +386,10 @@ async def persons_facets(
         cur.execute(f"""
             SELECT
                 COUNT(*) FILTER (WHERE
-                    EXISTS (SELECT 1 FROM source_authors sa WHERE sa.person_id = p.id AND sa.source = 'hal' AND (sa.source_ids->>'idhal') IS NOT NULL)
-                    OR EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
+                    EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
                 ) AS yes,
                 COUNT(*) FILTER (WHERE
-                    NOT EXISTS (SELECT 1 FROM source_authors sa WHERE sa.person_id = p.id AND sa.source = 'hal' AND (sa.source_ids->>'idhal') IS NOT NULL)
-                    AND NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
+                    NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
                 ) AS no
             FROM {base_from} {where}
         """, p)

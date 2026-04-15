@@ -80,12 +80,19 @@ def unlink_authorship(cur, person_id: int, source: str, authorship_id: int):
 def add_identifier(cur, person_id: int, id_type: str, id_value: str,
                    source: str = "auto", status: str = "pending"):
     """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
-    Ne fait rien si l'identifiant existe déjà (ON CONFLICT DO NOTHING).
+
+    Si l'identifiant existe avec statut 'rejected', le réattribue
+    (nouveau person_id, statut pending).
+    Si 'pending' ou 'confirmed', ne fait rien.
     """
     cur.execute("""
         INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
         VALUES (%s, %s, %s, %s, %s::identifier_status)
-        ON CONFLICT (id_type, id_value) DO NOTHING
+        ON CONFLICT (id_type, id_value) DO UPDATE SET
+            person_id = EXCLUDED.person_id,
+            source = EXCLUDED.source,
+            status = 'pending'
+        WHERE person_identifiers.status = 'rejected'
     """, (person_id, id_type, id_value, source, status))
 
 

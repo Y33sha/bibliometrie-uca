@@ -25,11 +25,8 @@ Algorithme en 4 étapes + 1 étape complémentaire :
     - Mappé à >1 personnes → orphelin (traitement manuel)
     - Forme inconnue → créer nouvelle personne
 
-  Étape 4 : Thèses hors-périmètre (directeurs, rapporteurs, jury)
-    Les rôles non-auteur des thèses sont hors périmètre (in_perimeter=false)
-    et ne passent pas par les étapes 0-3. Si leur source_author a un IdRef
-    correspondant à une personne connue, on rattache sans modifier
-    in_perimeter ni créer de personne.
+  Étape 4 : Presonnes liées aux thèses (directeurs, rapporteurs, jury)
+    Les rôles non-auteur des thèses sont hors périmètre (in_perimeter=false: pas de signatures ni de structure_ids) et ne passent pas par les étapes 0-3. Si leur source_author a un IdRef correspondant à une personne connue, on rattache sans modifier in_perimeter ni créer de personne.
 
 Usage:
     python create_persons_from_source_authorships.py              # exécuter
@@ -551,7 +548,7 @@ def step4_theses_non_authors(cur, dry_run):
                 add_name_form(cur, pid, c["full_name"])
             linked += 1
 
-    logger.info(f"  {linked} authorships thèses hors-périmètre rattachées par IdRef "
+    logger.info(f"  {linked} rôles thèses hors périmètre (directeurs, rapporteurs…) rattachés par IdRef "
                 f"(sur {len(candidates)} avec IdRef)")
     return linked
 
