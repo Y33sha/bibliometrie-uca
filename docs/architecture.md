@@ -2,7 +2,9 @@
 
 ## Principes de conception
 
-Le schéma repose sur une distinction entre des tables "sources" et des tables "canoniques" (= vérité). Les tables sources contiennent les *records* non dédupliqués exportés depuis les API. Les tables canoniques contiennent les référentiels **publications** et **personnes** dédupliqués et mappés depuis les sources, ainsi que le référentiel **structures** (endogène).
+Le schéma repose sur une distinction entre des tables "sources" et des tables "canoniques" (= vérité).
+    - Les tables sources contiennent les *records* non dédupliqués importés depuis les API. 
+    - Les tables canoniques contiennent les référentiels **publications** et **personnes** dédupliqués et mappés depuis les sources (de manière automatisée avec possibilité de curation manuelle), ainsi que le référentiel **structures** (endogène, renseigné manuellement).
 
 ```mermaid
 flowchart LR
@@ -25,32 +27,23 @@ flowchart LR
 
 ### Entités principales et relations
 
+#### Tables sources
 Les tables sources s'organisent selon un schéma en quatre tables: `source_publications`, `source_persons`, `source_authorships`, `source_structures`. Une `authorship` représente la contribution d'**un** auteur à **une** publication. C'est elle qui porte l'information d'affiliation (`structure_ids`).
 
 ```mermaid
 erDiagram 
     direction LR
-    Documents ||--|{ Authorships : a_pour_auteurs
-    Authors ||--|{ Authorships : est_auteur_de
+    Publications ||--|{ Authorships : a_pour_auteurs
+    Persons ||--|{ Authorships : est_auteur_de
     Authorships }o--|{ Structures : est_affilie_a
 
 ```
 
 Les tables sources sont toutes peuplées lors de la [phase 3](pipeline#normalize) du pipeline (`normalize`).
 
-### Tables “canoniques”
+#### Tables “canoniques”
 
 Les tables canoniques obéissent au même schéma et sont peuplées progressivement au cours du [pipeline](pipeline#tables-canoniques) de traitement.
-
-
-| Entité     |  Vérité        |
-|------------|----------------|
-| Documents  | `publications` |
-| Auteurs    | `persons`      |
-| Authorship | `authorships`  |
-| Structures | `structures`   |
-
-
 
 
 ## Zones fonctionnelles et propriétaires de données
@@ -114,7 +107,7 @@ Note : `person_id` sur `source_authorships` est écrit par `services/persons.py`
 | `countries`, `country_name_forms` | référentiel statique |
 | `config` | admin / API |
 
-### Adresses — scripts pipeline
+### Adresses — scripts du pipeline
 
 | Table | Propriétaire |
 |-------|-------------|
@@ -129,12 +122,14 @@ Note : `person_id` sur `source_authorships` est écrit par `services/persons.py`
 
 #### <span id="structures"></span>Domaine fonctionnel `structures`
 
-Référentiel institutionnel maintenu manuellement. Contient l'UCA, ses laboratoires, les tutelles (CNRS, INRAE...), composantes (INP, VetAgro Sup...), CHU, etc.
+Référentiel institutionnel maintenu manuellement. Contient l'UCA, ses laboratoires, les co-tutelles (CNRS, INRAE...), d'autres établissements partenaires (INP, VetAgro Sup, le CHU), etc.
 
 - `code` : identifiant court stable (`uca`, `cnrs`, `lpc`, `ip`)
-- `type` : `universite`, `onr`, `chu`, `ecole`, `labo`, `equipe`, `site`, `autre`
-- `ror_id`, `rnsr_id` : identifiants externes (optionnels)
-- `hal_collection` : collection HAL associée (labos uniquement)
+- `structure_type` : `universite`, `onr`, `chu`, `ecole`, `labo`, `equipe`, `site`, `autre`
+- `ror_id` : identifiant ROR
+- `rnsr_id` : identifiant RNSR
+- `hal_collection` : collection HAL associée
+- `api_ids` : identifiants dans les sources API (OpenAlex, etc.)
 
 ```mermaid
 flowchart LR
@@ -165,27 +160,27 @@ Légende:
 - **bleu**: tables peuplées automatiquement par le pipeline à partir des imports API.
 
 Tables associées :
-- `perimeters` : un périmètre est un ensemble de structures, incluant récursivement les sous-structures. Actuellement deux périmètres sont définis: **UCA strict** et **UCA large** (UCA + CHU + INP). Impacte:
-    - Les authorships sources dont le champ `structure_ids` sera peuplé par le pipeline ([phase 5](pipeline#affiliations) du pipeline), et qui serviront à générer les `personnes` ([phase 7](pipeline#creation-personnes)). Une *authorship* hors périmètre UCA strict n'est pas génératrice d'entités personnes.
-    - (à terme: les appels API devront être déduits du périmètre. Pour l'instant les critères de requête sont écrits en dur dans la config.) <!--TODO: mapper structures aux identifiants de chaque source, supprimer les identifiants hardcoded dans la config des appels API et les déduire du périmètre UCA -->
+- `perimeters` : un périmètre est un ensemble de structures, incluant récursivement les sous-structures. Actuellement deux périmètres sont définis: **UCA** et **UCA élargi** (UCA + CHU + INP). Impacte:
+    - les critères d'affiliation utilisés en paramètre des requêtes API;
+    - les authorships sources dont le champ `structure_ids` sera peuplé par le pipeline ([phase 5](pipeline#affiliations) du pipeline), et qui serviront à générer des `publications` et des `personnes` dans les tables canoniques.
+
 - `structure_relations` : définit les relations entre structures. Deux relations existent: **tutelle** (asymétrique), **partenariat** (symétrique, non transitif). La relation "partenariat" est purement informative (elle réplique l'information présente dans le [référentiel ROR](glossaire#ror)); la relation "tutelle" a une conséquence sur les **structures incluses dans un périmètre** donné.
-- `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: *LMV* reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `addresses` du [pipeline](pipeline#addresses) pour peupler la table de liaison `adress_structures`.
+- `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: `LMV` reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `addresses` du [pipeline](pipeline#addresses) pour peupler la table de liaison `address_structures`.
 - `address_structures`: table de liaison. Les adresses proviennent des authorships sources (phase 4 `addresses` du pipeline). Les structures identifiées sont ensuite propagées aux authorships sources.
 - `apc_payments`: données provenant d'un import CSV, voir [doc sources](sources#donnees-apc).
 
-
 La page [**admin/structures**](guide-utilisateur#admin-structures) permet de gérer le CRUD des structures ainsi que leurs relations et formes de noms.
 
-La page [**admin/config**](guide-utilisateur#admin-config) permet de gérer la définition des périmètres et quel périmètre est pris en compte à différentes étapes du *pipeline*.
-
-
+La page [**admin/config**](guide-utilisateur#admin-config) permet de gérer le CRUD des périmètres et quel périmètre est pris en compte à différentes étapes du *pipeline*.
 
 #### <span id="publications"></span>Domaine fonctionnel  `publications`
 
 Référentiel dédupliqué. Hiérarchie de déduplication :
-1. **DOI identique** (case-insensitive) → même publication
-2. **Lien explicite** source→source (ex: OpenAlex cite HAL comme primary_location)
-3. **Métadonnées** : titre normalisé + année + même journal
+1. **DOI identique** (case-insensitive) → même publication (sauf cas particuliers)
+2. **NNT identique** (pour les thèses)
+3. **hal-id identique** (OpenAlex ou ScanR citant HAL comme source)
+4. **Métadonnées** : rien en place pour l'instant, algorithme à mettre en place <!--TODO: algo de déduplication par identité de métadonnées-->
+5. Interface de dédoublonnage manuel `admin/duplicates` <!--TODO: améliorer l'interface de déduplication; à terme, autoriser un user à signaler un doublon-->
 
 
 ```mermaid
@@ -245,30 +240,25 @@ flowchart LR
 
 Tables associées :
 - `persons_rh`: Table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](sources#donnees-rh).
-- `person_identifiers`: Identifiants persistants : ORCID, idHAL, IdRef, etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` trace la provenance (`hr`, `hal`, `openalex`, `manual`, `auto` TODO: revoir enum). La relation *many-to-one* permet de gérer les quelques cas d'ORCID multiples confirmés, et les nombreux cas d'identifiants (vrais ou erronés) en attente de vérification moissonnés dans les sources. 
+- `person_identifiers`: Identifiants persistants : ORCID, idHAL, IdRef, etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` trace la provenance (`hal`, `openalex`, `scanr`, `theses`, `manual`, `auto`). La relation *many-to-one* permet de gérer les quelques cas d'ORCID multiples confirmés, et les nombreux cas d'identifiants (corrects ou erronés) en attente de vérification moissonnés dans les sources. 
 - `person_name_forms`: Formes de noms normalisées, utilisées pour le matching lors de la création de personnes. Chaque forme pointe vers un tableau de `person_ids`. Lorsqu'une authorship source est reliée à une personne, la forme de nom est ajoutée (si absente) aux name_forms de cette personne.
-
 
 #### `authorships`
 
-Table de laison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures. Construite par `build_authorships.py` à partir des *authorships* sources.
+Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures. Construite par `build_authorships.py` à partir des *authorships* sources.
 
-- `person_id` : peut être NULL si la personne n'est pas encore identifiée
-- `structure_id` : structure UCA (NULL si non UCA ou non résolu)
+- `person_id` 
+- `structure_ids`
 - `in_perimeter` : TRUE si l'auteur est affilié UCA sur cette publication
 - `author_position` : position dans la liste d'auteurs
 - `is_corresponding` : auteur correspondant
-- `excluded` : lien erroné (homonyme, etc.)
-
-
-
 
 ### Tables source
 
 Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses).
 
-- **`source_publications`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées brutes (doc_type non mappé, oa_status) et les métadonnées enrichies (abstract, keywords, topics, biblio, meta). Le champ `hal_collections` (text[]) est spécifique à HAL.
-- **`source_persons`** : un enregistrement par auteur par source. Déduplication par `(source, source_id)`. Pour HAL, le `source_id` est le PPN IdRef ou le hal_person_id ; pour les autres sources, c'est l'identifiant de l'entité auteur dans la source.
-- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `in_perimeter`, `structure_ids` (affiliation résolue), `roles` (auteur, directeur, rapporteur — theses.fr), `excluded` (authorship rejetée manuellement).
-- **`source_structures`** : structures HAL (mapping vers `structures` canoniques via `structure_id`). Utilisée par `populate_affiliations` pour résoudre les affiliations HAL.
+- **`source_publications`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées (doc_type non mappé, oa_status, abstract, keywords, topics, biblio, meta). Le champ `hal_collections` (text[]) est spécifique à HAL.
+- **`source_persons`** : un enregistrement par auteur par source. Déduplication par `(source, source_id)`. Le `source_id` est l'identifiant interne de l'entité auteur dans la source. Porte aussi `orcid`, `idref` et `source_ids` (JSONB, identifiants propres à la source : idhal, hal_person_id, etc.).
+- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `structure_ids` (affiliation résolue), `raw_author_name`, `raw_affiliations` (affiliations textuelles brutes issues de la source), `roles` (auteur, directeur, rapporteur — theses.fr), `excluded` (authorship rejetée manuellement).
+- **`source_structures`** : structures importées depuis HAL, OpenAlex et WoS. Mapping vers `structures` canoniques via `structure_id`. Utilisée par `populate_affiliations` pour résoudre les affiliations.
 

@@ -2,8 +2,8 @@
 
 2. Robustesse en production
 
-* La version bac à sable pour retester le pipeline de novo — sans ça, impossible de valider que le seed + schema + migrations = base fonctionnelle. Personne ne reprendra un outil qu'il ne peut pas réinstaller.
-* Le processus de détection des publications disparues — sans ça, la base accumule des fantômes.
+* [x] La version bac à sable pour retester le pipeline de novo — sans ça, impossible de valider que le seed + schema + migrations = base fonctionnelle. Personne ne reprendra un outil qu'il ne peut pas réinstaller.
+* [ ] Le processus de détection des publications disparues — sans ça, la base accumule des fantômes.
 
 3. Pérennité des données
 
