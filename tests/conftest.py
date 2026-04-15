@@ -42,9 +42,8 @@ def _db_connect_args() -> dict:
     return args
 
 
-@pytest.fixture(scope="session", autouse=True)
 def _create_test_db():
-    """Recrée la base de test depuis schema.sql (une fois par session pytest)."""
+    """Recrée la base de test depuis schema.sql."""
     conn = psycopg2.connect(**_admin_connect_args())
     conn.autocommit = True
     cur = conn.cursor()
@@ -90,6 +89,15 @@ def _create_test_db():
 
     cur.close()
     conn.close()
+
+
+def pytest_configure(config):
+    """Crée la base de test avant la collecte des modules.
+
+    S'exécute avant l'import des fichiers de test, ce qui permet
+    à test_api.py de créer son pool de connexions au module-level.
+    """
+    _create_test_db()
 
 
 @pytest.fixture
