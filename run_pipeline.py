@@ -420,7 +420,6 @@ def main():
     log.info("Rapport : %s", report_path)
 
     _clear_status()
-    metrics_conn.close()
     log.info("=" * 60)
     log.info("PIPELINE TERMINÉ en %.0fs (%.1f min)", elapsed_total, elapsed_total / 60)
     log.info("=" * 60)
