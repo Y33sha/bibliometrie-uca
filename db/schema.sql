@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bxEKuOgckEO1jzeyinqN083CbnROPa8HS2MOgXkZgasjV7jWxLuywgNW8OXC14Q
+\restrict 57vNWpq5JgoCf1i2WeTAhBUjflH2XkQwVgYOdEbI700eHour5o9cMLUwSSqmTsn
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -1004,11 +1004,9 @@ CREATE TABLE public.source_structures (
     source text NOT NULL,
     source_id text NOT NULL,
     name text NOT NULL,
-    acronym text,
     country text,
     ror_id text,
     structure_id integer,
-    enriched_at timestamp with time zone,
     source_data jsonb,
     created_at timestamp with time zone DEFAULT now()
 );
@@ -2201,13 +2199,6 @@ CREATE INDEX idx_source_pubs_staging ON public.source_publications USING btree (
 
 
 --
--- Name: idx_source_structs_enriched; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_structs_enriched ON public.source_structures USING btree (enriched_at) WHERE (enriched_at IS NULL);
-
-
---
 -- Name: idx_source_structs_name; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2597,5 +2588,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bxEKuOgckEO1jzeyinqN083CbnROPa8HS2MOgXkZgasjV7jWxLuywgNW8OXC14Q
+\unrestrict 57vNWpq5JgoCf1i2WeTAhBUjflH2XkQwVgYOdEbI700eHour5o9cMLUwSSqmTsn
 
