@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 57vNWpq5JgoCf1i2WeTAhBUjflH2XkQwVgYOdEbI700eHour5o9cMLUwSSqmTsn
+\restrict vu86bzgavAJ89JLSl6oWV33QEKfmWemZ9QWNVX4zxXhEqDWeVKl39NZr3Jq7G1k
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -1080,11 +1080,11 @@ CREATE TABLE public.structure_name_forms (
     id integer CONSTRAINT name_forms_id_not_null NOT NULL,
     structure_id integer CONSTRAINT name_forms_structure_id_not_null NOT NULL,
     form_text text CONSTRAINT name_forms_form_text_not_null NOT NULL,
-    requires_context_of jsonb,
     is_active boolean DEFAULT true,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
-    is_word_boundary boolean DEFAULT false NOT NULL
+    is_word_boundary boolean DEFAULT false NOT NULL,
+    requires_context_of integer[]
 );
 
 
@@ -2588,5 +2588,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 57vNWpq5JgoCf1i2WeTAhBUjflH2XkQwVgYOdEbI700eHour5o9cMLUwSSqmTsn
+\unrestrict vu86bzgavAJ89JLSl6oWV33QEKfmWemZ9QWNVX4zxXhEqDWeVKl39NZr3Jq7G1k
 

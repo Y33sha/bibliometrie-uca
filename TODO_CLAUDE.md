@@ -1,10 +1,5 @@
 # Notes techniques (Claude)
 
-## ~~Listes de sources hardcodées~~ TERMINÉ
-
-Toutes les sources utilisent le circuit adresses unifié.
-Les listes `('openalex', 'wos', 'scanr')` qui excluaient HAL ont été supprimées.
-
 ## Uniformisation compatibilité de noms (Python vs SQL)
 
 Les fonctions de compatibilité de noms existent en deux versions :
