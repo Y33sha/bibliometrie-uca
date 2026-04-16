@@ -317,6 +317,10 @@
     ctxPickerSearch = "";
     ctxPickerOpen = true;
     relationPickerOpen = false;
+    // Scroller vers le picker après ouverture
+    requestAnimationFrame(() => {
+      ctxPickerEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
   }
 
   async function pickCtx(item: number | string) {
@@ -1316,6 +1320,7 @@
   .btn-icon:hover {
     background: var(--hover);
     color: var(--accent);
+    border-color: var(--accent);
   }
   .btn-icon-danger:hover {
     color: var(--danger, #d32f2f);
