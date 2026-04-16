@@ -793,7 +793,9 @@
                   </td>
                   <td class="form-text">{f.form_text}</td>
                   <td>
-                    {#if f.requires_context_of?.length}
+                    {#if f.is_excluding}
+                      <span class="sufficient-label">—</span>
+                    {:else if f.requires_context_of?.length}
                       {#each f.requires_context_of as x}
                         <span class="ctx-tag">
                           {ctxLabel(x)}
