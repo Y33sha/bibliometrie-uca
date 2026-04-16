@@ -64,10 +64,12 @@ async def strip_prefix(request: Request, call_next):
 @app.get("/api/health")
 async def health():
     """Vérifie que l'API est opérationnelle et la DB accessible."""
+    import os
+    sandbox = os.environ.get("BIBLIOMETRIE_SANDBOX") == "1"
     try:
         with get_cursor() as (cur, conn):
             cur.execute("SELECT 1")
-        return {"status": "ok", "db": "ok"}
+        return {"status": "ok", "db": "ok", "sandbox": sandbox}
     except Exception as e:
         return JSONResponse(status_code=503, content={"status": "error", "db": str(e)})
 
