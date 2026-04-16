@@ -459,7 +459,8 @@ def parse_author_structures(doc: dict) -> dict[int, set[int]]:
 
 
 def process_authors(cur, doc: dict, source_publication_id: int,
-                    struct_cache: dict | None = None):
+                    struct_cache: dict | None = None,
+                    struct_name_cache: dict | None = None):
     """
     Traite les auteurs d'un document HAL :
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
@@ -558,11 +559,19 @@ def process_authors(cur, doc: dict, source_publication_id: int,
             if resolved:
                 source_struct_ids = sorted(resolved)
 
+        # raw_affiliations : noms des structures liées (pour populate_addresses)
+        raw_affiliations = None
+        if source_struct_ids and struct_name_cache:
+            struct_names = [struct_name_cache[sid] for sid in source_struct_ids
+                           if sid in struct_name_cache and struct_name_cache[sid].strip()]
+            if struct_names:
+                raw_affiliations = Json(struct_names)
+
         cur.execute("""
             INSERT INTO source_authorships
                 (source, source_publication_id, source_person_id, author_position, source_struct_ids,
-                 author_name_normalized, is_corresponding, roles, raw_author_name)
-            VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
+                 author_name_normalized, is_corresponding, roles, raw_author_name, raw_affiliations)
+            VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s, %s)
             ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
                 source_struct_ids = COALESCE(
                     EXCLUDED.source_struct_ids,
@@ -572,16 +581,19 @@ def process_authors(cur, doc: dict, source_publication_id: int,
                 is_corresponding = EXCLUDED.is_corresponding,
                 roles = EXCLUDED.roles,
                 raw_author_name = EXCLUDED.raw_author_name,
+                raw_affiliations = EXCLUDED.raw_affiliations,
                 addresses_extracted = FALSE
         """, (source_publication_id, source_person_id, position,
-              source_struct_ids, name, is_corresponding, roles or None, name))
+              source_struct_ids, name, is_corresponding, roles or None, name,
+              raw_affiliations))
 
 
 # =============================================================
 # BOUCLE PRINCIPALE
 # =============================================================
 
-def process_work(cur, staging_row: tuple, struct_cache: dict | None = None) -> bool:
+def process_work(cur, staging_row: tuple, struct_cache: dict | None = None,
+                 struct_name_cache: dict | None = None) -> bool:
     """Traite un work du staging HAL."""
     from utils.timings import StepTimer
     staging_id, hal_id, doi, raw_data, hal_collections_staging = staging_row
@@ -659,7 +671,8 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None) -> b
         t.mark("hal_doc")
 
         # Auteurs et authorships (avec source_struct_ids)
-        process_authors(cur, doc, source_publication_id, struct_cache=struct_cache)
+        process_authors(cur, doc, source_publication_id,
+                        struct_cache=struct_cache, struct_name_cache=struct_name_cache)
         t.mark("authors")
 
         # Recalcul complet des métadonnées depuis toutes les sources
@@ -724,15 +737,22 @@ def main():
         errors = 0
         skipped_hors_perimetre = 0
 
-        # Cache source_structures HAL (source_id → id) pour éviter une requête par auteur
-        cur.execute("SELECT source_id, id FROM source_structures WHERE source = 'hal'")
-        struct_cache = {r[0]: r[1] for r in cur.fetchall()}
+        # Cache source_structures HAL (source_id → id + nom) pour éviter une requête par auteur
+        cur.execute("""
+            SELECT source_id, id,
+                   COALESCE(name, '') || CASE WHEN acronym IS NOT NULL THEN ' ' || acronym ELSE '' END
+            FROM source_structures WHERE source = 'hal'
+        """)
+        _struct_rows = cur.fetchall()
+        struct_cache = {r[0]: r[1] for r in _struct_rows}
+        struct_name_cache = {r[1]: r[2] for r in _struct_rows}
         logger.info(f"Cache source_structures : {len(struct_cache)} entrées")
 
         for row in rows:
             try:
                 cur.execute("SAVEPOINT normalize_work")
-                success = process_work(cur, row, struct_cache=struct_cache)
+                success = process_work(cur, row, struct_cache=struct_cache,
+                                       struct_name_cache=struct_name_cache)
                 cur.execute("RELEASE SAVEPOINT normalize_work")
                 if success:
                     processed += 1

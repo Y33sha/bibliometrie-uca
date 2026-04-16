@@ -19,6 +19,8 @@ DB = {
     "host":   os.environ.get("DB_HOST", "db"),
     "port":   int(os.environ.get("DB_PORT", "5432")),
 }
+DB_POOL_MIN = 1
+DB_POOL_MAX = 5
 
 # ----- OpenAlex -----
 OPENALEX = {

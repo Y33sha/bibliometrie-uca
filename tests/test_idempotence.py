@@ -1057,20 +1057,14 @@ def _setup_affiliations_test_data(db):
 
 def _run_populate_affiliations(db):
     """Exécute populate_affiliations sur le curseur de test."""
-    from processing.populate_affiliations import (
-        step1_hal_structure_ids, step2_hal_in_perimeter,
-        _step_address_source, step3d_theses,
-    )
+    from processing.populate_affiliations import _step_address_source, step3d_theses
     from utils.perimeter import get_persons_structure_ids, get_affiliations_structure_ids
 
     perimeter_ids = get_persons_structure_ids(db)
     wide_ids = get_affiliations_structure_ids(db)
 
-    step1_hal_structure_ids(db)
-    step2_hal_in_perimeter(db, perimeter_ids)
-    _step_address_source(db, "openalex", perimeter_ids, wide_ids)
-    _step_address_source(db, "wos", perimeter_ids, wide_ids)
-    _step_address_source(db, "scanr", perimeter_ids, wide_ids)
+    for source in ["hal", "openalex", "wos", "scanr"]:
+        _step_address_source(db, source, perimeter_ids, wide_ids)
     step3d_theses(db, wide_ids)
 
 
@@ -1097,8 +1091,9 @@ class TestPopulateAffiliationsIdempotence:
         _run_populate_affiliations(db)
         counts_1 = _count_affiliations(db)
 
-        assert counts_1["hal_in_perimeter"] == 1, "L'authorship HAL doit être in_perimeter"
-        assert counts_1["hal_with_structs"] == 1, "L'authorship HAL doit avoir des structure_ids"
+        # HAL utilise maintenant le circuit adresses (comme les autres sources).
+        # Sans populate_addresses + resolve_addresses dans ce test, HAL n'est pas in_perimeter.
+        # L'idempotence est vérifiée par la comparaison counts_1 == counts_2 ci-dessous.
         assert counts_1["openalex_in_perimeter"] == 1, "L'authorship OA doit être in_perimeter"
         assert counts_1["openalex_with_structs"] == 1, "L'authorship OA doit avoir des structure_ids"
 

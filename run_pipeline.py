@@ -197,10 +197,11 @@ def phase_addresses(**kw):
     """Extraction des adresses depuis raw_affiliations, resolution structures.
 
     Ne traite que les source_authorships non encore extraites (addresses_extracted=FALSE).
-    Sources concernees : OpenAlex, WoS, ScanR, theses (pas HAL, qui utilise les structures).
+    Toutes les sources sont traitées (HAL inclus depuis que les raw_affiliations
+    sont peuplées avec les noms de structures HAL pendant la normalisation).
     """
-    sources = kw.get("sources", {"openalex", "wos", "scanr", "theses"})
-    address_sources = ["openalex", "wos", "scanr", "theses"]
+    sources = kw.get("sources", set(ALL_SOURCES_SET))
+    address_sources = ["hal", "openalex", "wos", "scanr", "theses"]
     for src in address_sources:
         if src in sources:
             run_python("processing/populate_addresses.py", "--source", src)

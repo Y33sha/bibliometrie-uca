@@ -2,7 +2,12 @@
 Résolution des affiliations sur les authorships sources.
 
 Peuple in_perimeter et structure_ids sur source_authorships
-en utilisant les périmètres configurés (utils/perimeter.py).
+en utilisant les adresses résolues (address_structures) et les
+périmètres configurés (utils/perimeter.py).
+
+Circuit unifié pour toutes les sources (HAL, OpenAlex, WoS, ScanR, theses.fr) :
+les raw_affiliations de chaque source sont extraites en adresses par populate_addresses,
+résolues par resolve_addresses, puis ce script lit les résultats.
 
 Deux périmètres :
   - restreint : UCA + labos tutellés → sert pour in_perimeter
@@ -29,79 +34,6 @@ logger = setup_logger("populate_affiliations", os.path.join(os.path.dirname(__fi
 # Filtre temporel pour le mode daily : authorships dont le source_document
 # a été créé dans les dernières 24h (= insérées pendant ce pipeline run).
 DAILY_FILTER = "sd.created_at >= NOW() - INTERVAL '24 hours'"
-
-
-def step1_hal_structure_ids(cur, daily=False):
-    """Étape 1 : HAL — mapper source_struct_ids → structure_ids (réels)."""
-    if daily:
-        cur.execute(f"""
-            UPDATE source_authorships sa
-            SET structure_ids = mapped.struct_ids
-            FROM (
-                SELECT sa2.id,
-                       array_agg(DISTINCT ss.structure_id) AS struct_ids
-                FROM source_authorships sa2
-                JOIN source_publications sd ON sd.id = sa2.source_publication_id
-                     AND {DAILY_FILTER},
-                     LATERAL unnest(sa2.source_struct_ids) AS ssid(val)
-                JOIN source_structures ss ON ss.id = ssid.val
-                WHERE sa2.source = 'hal'
-                  AND ss.structure_id IS NOT NULL
-                GROUP BY sa2.id
-            ) mapped
-            WHERE sa.id = mapped.id
-        """)
-    else:
-        cur.execute("""
-            UPDATE source_authorships sa
-            SET structure_ids = mapped.struct_ids
-            FROM (
-                SELECT sa2.id,
-                       array_agg(DISTINCT ss.structure_id) AS struct_ids
-                FROM source_authorships sa2,
-                     LATERAL unnest(sa2.source_struct_ids) AS ssid(val)
-                JOIN source_structures ss ON ss.id = ssid.val
-                WHERE sa2.source = 'hal'
-                  AND ss.structure_id IS NOT NULL
-                GROUP BY sa2.id
-            ) mapped
-            WHERE sa.id = mapped.id
-        """)
-    logger.info(f"Étape 1 — HAL structure_ids mappés : {cur.rowcount} authorships")
-
-
-def step2_hal_in_perimeter(cur, perimeter_ids, daily=False):
-    """Étape 2 : HAL — recalculer in_perimeter."""
-    if not daily:
-        cur.execute("UPDATE source_authorships SET in_perimeter = FALSE WHERE source = 'hal'")
-        logger.info(f"Étape 2 — HAL in_perimeter reset : {cur.rowcount} authorships")
-
-    if daily:
-        cur.execute(f"""
-            UPDATE source_authorships sa
-            SET in_perimeter = TRUE
-            FROM source_publications sd
-            WHERE sa.source = 'hal'
-              AND sd.id = sa.source_publication_id
-              AND {DAILY_FILTER}
-              AND sa.structure_ids IS NOT NULL
-              AND EXISTS (
-                SELECT 1 FROM unnest(sa.structure_ids) AS sid
-                WHERE sid = ANY(%s)
-              )
-        """, (list(perimeter_ids),))
-    else:
-        cur.execute("""
-            UPDATE source_authorships sa
-            SET in_perimeter = TRUE
-            WHERE sa.source = 'hal'
-              AND sa.structure_ids IS NOT NULL
-              AND EXISTS (
-                SELECT 1 FROM unnest(sa.structure_ids) AS sid
-                WHERE sid = ANY(%s)
-              )
-        """, (list(perimeter_ids),))
-    logger.info(f"Étape 2 — HAL in_perimeter = TRUE : {cur.rowcount} authorships")
 
 
 def _step_address_source(cur, source, perimeter_ids, wide_ids, daily=False):
@@ -286,15 +218,10 @@ def main():
     if daily:
         logger.info("Mode daily : traitement des authorships récentes uniquement")
 
-    if "hal" in sources:
-        step1_hal_structure_ids(cur, daily=daily)
-        step2_hal_in_perimeter(cur, perimeter_ids, daily=daily)
-    if "openalex" in sources:
-        _step_address_source(cur, "openalex", perimeter_ids, wide_ids, daily=daily)
-    if "wos" in sources:
-        _step_address_source(cur, "wos", perimeter_ids, wide_ids, daily=daily)
-    if "scanr" in sources:
-        _step_address_source(cur, "scanr", perimeter_ids, wide_ids, daily=daily)
+    # Toutes les sources utilisent le même circuit (adresses résolues)
+    for source in ["hal", "openalex", "wos", "scanr"]:
+        if source in sources:
+            _step_address_source(cur, source, perimeter_ids, wide_ids, daily=daily)
     if "theses" in sources:
         step3d_theses(cur, wide_ids, daily=daily)
 
