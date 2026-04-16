@@ -127,10 +127,8 @@
 			selectedOa: { type: 'string_array', urlKey: 'oa_status' },
 			selectedApc: { type: 'string_array', urlKey: 'has_apc' },
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
-			publisherName: { type: 'single', urlKey: 'publisher_name' },
-			journalId: { type: 'single', urlKey: 'journal_id' },
-			journalName: { type: 'single', urlKey: 'journal_name' },
-			search: { type: 'single', urlKey: 'search' },
+				journalId: { type: 'single', urlKey: 'journal_id' },
+				search: { type: 'single', urlKey: 'search' },
 			page: { type: 'page', urlKey: 'page' },
 			labPage: { type: 'page', urlKey: 'lab_page' },
 		},
@@ -145,9 +143,7 @@
 			selectedOa,
 			selectedApc,
 			publisherId: publisherId ? String(publisherId) : '',
-			publisherName,
 			journalId: journalId ? String(journalId) : '',
-			journalName,
 			search,
 			page: pubFetch.page,
 			labPage: labFetch.page,
@@ -161,8 +157,8 @@
 		if (selectedYears.length) p.set('year', selectedYears.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
-		if (publisherId) { p.set('publisher_id', String(publisherId)); p.set('publisher_name', publisherName); }
-		if (journalId) { p.set('journal_id', String(journalId)); p.set('journal_name', journalName); }
+		if (publisherId) { p.set('publisher_id', String(publisherId)); }
+		if (journalId) { p.set('journal_id', String(journalId)); }
 		p.set('doc_type', 'article,review');
 		return base + '/publications?' + p.toString();
 	});
@@ -377,8 +373,20 @@
 		if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
 		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
 		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
-		if (restored.publisherId) { publisherId = parseInt(restored.publisherId as string); publisherName = (restored.publisherName as string) || ''; }
-		if (restored.journalId) { journalId = parseInt(restored.journalId as string); journalName = (restored.journalName as string) || ''; }
+		if (restored.publisherId) {
+			publisherId = parseInt(restored.publisherId as string);
+			try {
+				const pub = await api<{id: number, name: string}>(`/api/publishers/${publisherId}`);
+				publisherName = pub.name;
+			} catch { publisherName = `#${publisherId}`; }
+		}
+		if (restored.journalId) {
+			journalId = parseInt(restored.journalId as string);
+			try {
+				const j = await api<{id: number, title: string}>(`/api/journals/${journalId}`);
+				journalName = j.title;
+			} catch { journalName = `#${journalId}`; }
+		}
 		if (restored.search) search = restored.search as string;
 		if (restored.page) pubFetch.page = restored.page as number;
 		if (restored.labPage) labFetch.page = restored.labPage as number;

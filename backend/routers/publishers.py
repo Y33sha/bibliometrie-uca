@@ -61,6 +61,16 @@ async def list_publishers(
         }
 
 
+@router.get("/api/publishers/{publisher_id}")
+async def get_publisher(publisher_id: int):
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id, name FROM publishers WHERE id = %s", (publisher_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Éditeur introuvable")
+        return row
+
+
 @router.put("/api/publishers/{publisher_id}")
 async def update_publisher(publisher_id: int, body: dict):
     """Met à jour un éditeur."""
