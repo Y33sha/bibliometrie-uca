@@ -1,10 +1,7 @@
 # Memo
 pg_dump -U lalecoz -d bibliometrie -Fc -f bibliometrie.dump
 pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
-# Workflow
-* [x] programmation cron pour le pipeline de traitement (daily, weekly, monthly)
 ## Pipeline
-* [x] faire une version bac à sable pour retester le pipeline *de novo* après seed.
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation
 * [ ] structure_ids et in_perimeter des publis theses.fr: à quelle phase du pipeline sont-ils remplis et selon quelle logique? auditer
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
@@ -17,18 +14,17 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
 * [ ] authorships excluded: info perdue si réimport (grave?)
 ## Imports csv
-* [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer)
+* [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer) => pas urgent, pas d'imports csv à terme en prod
 ## Chantiers au long cours
 * [ ] chercher des moyens d'optimiser la taille de la base: supprimer données qui ne sont plus utiles? ex.: supprimer *_authors et *_structures (sauf hal)? chercher colonnes jamais utilisées. Externaliser dans des fichiers json par publi les authorships sources.
 * [ ] audit complet du code pour retrouver tous les trucs hardcodés qu'on pourrait abstraire, ou le SQL à simplifier suite aux fusions des tables sources. 
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
 * [ ] transférer champ role des authorships sources aux authorships canoniques? auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques)
-* [ ] vérifier valeur ajoutée du mapping hal_structures *vs* utilisation des collections pour la phase affiliations du pipeline; ou mieux, prendre la chaîne de caractères "affiliation" et la vérifier comme une adresse? => pour pouvoir auditer, commencer par **backfill** les collections dans les publications HAL qui n'en ont pas.
 * [ ] normalize_wos: conserver le mapping addresses->structures dans le champ raw_affiliations? (modifier script + **backfill**) voir si ça vaut le coup
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
 # Données
 ## Explorer autres sources possibles
-* [ ] pour les publis: CrossRef, ArXiv, Pubmed
+* [ ] pour les publis: CrossRef, ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression)
 * [ ] pour les jeux de données: DataCite, autres?
 * [ ] brevets?
 * [ ] divers: ORCID, IdRef, OpenAPC, DOAJ, scraping sites éditeurs pour les adresses manquantes? (soyons fous)

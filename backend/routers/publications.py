@@ -674,7 +674,7 @@ async def get_publication(pub_id: int):
                    sa.raw_author_name AS full_name,
                    sa.person_id,
                    sa.in_perimeter, sa.structure_ids,
-                   (SELECT string_agg(CASE jsonb_typeof(e) WHEN 'string' THEN e #>> '{}' ELSE e->>'name' END, ' | ') FROM jsonb_array_elements(sa.raw_affiliations) AS e) AS raw_affiliation,
+                   (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id) FROM source_authorship_addresses saa2 JOIN addresses addr ON addr.id = saa2.address_id WHERE saa2.source_authorship_id = sa.id) AS raw_affiliation,
                    sa.excluded,
                    COALESCE(sa.countries,
                        (SELECT array_agg(DISTINCT c ORDER BY c)
@@ -695,7 +695,7 @@ async def get_publication(pub_id: int):
         cur.execute("""
             SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                    sa.in_perimeter, sa.structure_ids,
-                   (SELECT string_agg(CASE jsonb_typeof(e) WHEN 'string' THEN e #>> '{}' ELSE e->>'name' END, ' | ') FROM jsonb_array_elements(sa.raw_affiliations) AS e) AS raw_affiliation,
+                   (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id) FROM source_authorship_addresses saa2 JOIN addresses addr ON addr.id = saa2.address_id WHERE saa2.source_authorship_id = sa.id) AS raw_affiliation,
                    sa.excluded,
                    COALESCE(sa.countries,
                        (SELECT array_agg(DISTINCT c ORDER BY c)

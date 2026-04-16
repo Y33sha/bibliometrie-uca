@@ -29,7 +29,6 @@ MODULES = [
     "processing.create_persons_from_source_authorships",
     "processing.build_authorships",
     "processing.populate_affiliations",
-    "processing.populate_addresses",
     "processing.populate_person_name_forms",
     "services.publications",
     "services.persons",

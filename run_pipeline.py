@@ -23,7 +23,7 @@ Phases (dans l'ordre d'execution):
                    HAL-ID, mais PAS de creation de publications. Inclut enrichissement
                    structures HAL et moissonnage identifiants HAL (ORCID, IdRef).
                    Vide le raw_data du staging apres traitement + VACUUM.
-    addresses      Extraction des adresses depuis raw_affiliations, resolution structures, pays
+    addresses      Résolution des adresses vers les structures connues
     affiliations   Resolution affiliations sur source_authorships (in_perimeter, structure_ids)
     publications   Creation des publications pour les source_publications in-perimeter non
                    rattaches + merges inter-sources (HAL-ID, NNT)
