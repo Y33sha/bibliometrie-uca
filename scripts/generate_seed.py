@@ -68,7 +68,7 @@ TABLES = [
     },
     {
         "table": "structure_name_forms",
-        "columns": ["id", "structure_id", "form_text", "requires_context_of", "is_active", "notes", "is_word_boundary"],
+        "columns": ["id", "structure_id", "form_text", "requires_context_of", "is_word_boundary", "is_excluding"],
         "order": "id",
     },
 ]

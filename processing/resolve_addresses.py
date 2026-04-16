@@ -38,19 +38,19 @@ BATCH_SIZE = 1000
 # ─── Chargement des données ──────────────────────────────────────
 
 def load_forms(cur):
-    """Charge toutes les formes actives depuis structure_name_forms."""
+    """Charge toutes les formes depuis structure_name_forms."""
     cur.execute("""
         SELECT nf.id, nf.structure_id, nf.form_text,
                nf.is_word_boundary, nf.requires_context_of,
+               nf.is_excluding,
                s.code AS struct_code, s.structure_type::text AS struct_type
         FROM structure_name_forms nf
         JOIN structures s ON s.id = nf.structure_id
-        WHERE nf.is_active = TRUE
         ORDER BY nf.id
     """)
     columns = [desc[0] for desc in cur.description]
     forms = [dict(zip(columns, row)) for row in cur.fetchall()]
-    logger.info(f"  {len(forms)} formes actives chargées")
+    logger.info(f"  {len(forms)} formes chargées")
     return forms
 
 
@@ -99,14 +99,26 @@ def has_form_match_for_structure(struct_id, text_normalized, forms_by_structure)
 def resolve_address(text_normalized, forms, forms_by_structure):
     """Résout une adresse : trouve toutes les structures identifiées.
 
+    Les formes excluantes (is_excluding=True) retirent la structure
+    des résultats si elles matchent.
+
     Retourne une liste de (structure_id, form_id).
     """
     matches = []
     seen_structures = set()
+    excluded_structures = set()
 
+    # Passe 1 : détecter les exclusions
+    for f in forms:
+        if f.get("is_excluding") and match_form_in_text(f, text_normalized):
+            excluded_structures.add(f["structure_id"])
+
+    # Passe 2 : matcher les formes normales
     for f in forms:
         sid = f["structure_id"]
-        if sid in seen_structures:
+        if sid in seen_structures or sid in excluded_structures:
+            continue
+        if f.get("is_excluding"):
             continue
 
         if not match_form_in_text(f, text_normalized):

@@ -60,16 +60,15 @@ class NameFormCreate(BaseModel):
     structure_id: int
     form_text: str
     is_word_boundary: bool = False
-    requires_context_of: list | None = None
-    notes: str | None = None
+    is_excluding: bool = False
+    requires_context_of: list[int] | None = None
 
 
 class NameFormUpdate(BaseModel):
     form_text: str | None = None
     is_word_boundary: bool | None = None
-    requires_context_of: list | None = None
-    is_active: bool | None = None
-    notes: str | None = None
+    is_excluding: bool | None = None
+    requires_context_of: list[int] | None = None
 
 
 # ----- Persons -----
