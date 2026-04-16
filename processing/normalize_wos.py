@@ -320,7 +320,7 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
     kw_list = kw_data.get("keyword", []) if isinstance(kw_data, dict) else []
     if isinstance(kw_list, str):
         kw_list = [kw_list]
-    keywords = [k for k in kw_list if k] or None
+    keywords = [str(k) for k in kw_list if k] or None
 
     # Topics : categories
     cat = frm.get("category_info", {})
