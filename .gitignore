@@ -32,3 +32,4 @@ db/backup/
 .claude/
 pipeline/reports/*.md
 pipeline/reports/sandbox/
+pipeline/status.json
