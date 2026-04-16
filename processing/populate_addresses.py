@@ -28,6 +28,9 @@ BATCH_SIZE = 5000
 
 # Configuration par source
 SOURCES = {
+    "hal": {
+        "source_filter": "hal",
+    },
     "openalex": {
         "source_filter": "openalex",
     },

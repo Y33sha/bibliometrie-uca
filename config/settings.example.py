@@ -19,6 +19,8 @@ DB = {
     "host": "localhost",
     "port": 5432,
 }
+DB_POOL_MIN = 1
+DB_POOL_MAX = 5
 
 # ----- OpenAlex -----
 OPENALEX = {
