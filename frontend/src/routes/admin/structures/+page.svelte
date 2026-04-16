@@ -39,8 +39,8 @@
     id: number;
     form_text: string;
     is_word_boundary: boolean;
-    is_active: boolean;
-    requires_context_of: (number | string)[] | null;
+    is_excluding: boolean;
+    requires_context_of: number[] | null;
   }
 
   interface StructureDetail {
@@ -81,7 +81,8 @@
   // New form state
   let addFormText = $state("");
   let addFormWordBoundary = $state(false);
-  let editFormModal: { id: number; form_text: string; is_word_boundary: boolean } | null = $state(null);
+  let addFormExcluding = $state(false);
+  let editFormModal: { id: number; form_text: string; is_word_boundary: boolean; is_excluding: boolean } | null = $state(null);
   let newFormCtx: (number | string)[] = $state([]);
 
   let formsHelpOpen = $state(false);
@@ -248,6 +249,7 @@
         structure_id: structId,
         form_text: text,
         is_word_boundary: addFormWordBoundary || text.length <= 6,
+        is_excluding: addFormExcluding,
         requires_context_of: ctx,
       }),
     });
@@ -258,16 +260,17 @@
     }
     addFormText = "";
     addFormWordBoundary = false;
+    addFormExcluding = false;
     newFormCtx = [];
     await selectStructure(structId);
     loadList();
   }
 
-  async function toggleForm(formId: number, active: boolean) {
+  async function toggleExcluding(formId: number, excluding: boolean) {
     await fetch(base + "/api/name-forms/" + formId, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ is_active: active }),
+      body: JSON.stringify({ is_excluding: excluding }),
     });
     if (selectedId) await selectStructure(selectedId);
   }
@@ -286,7 +289,7 @@
   }
 
   function openEditFormModal(f: NameForm) {
-    editFormModal = { id: f.id, form_text: f.form_text, is_word_boundary: f.is_word_boundary };
+    editFormModal = { id: f.id, form_text: f.form_text, is_word_boundary: f.is_word_boundary, is_excluding: f.is_excluding };
   }
 
   async function saveEditForm() {
@@ -298,6 +301,7 @@
       body: JSON.stringify({
         form_text: text,
         is_word_boundary: editFormModal.is_word_boundary || text.length <= 6,
+        is_excluding: editFormModal.is_excluding,
       }),
     });
     editFormModal = null;
@@ -776,12 +780,13 @@
               </tr>
             {:else}
               {#each detail.forms as f (f.id)}
-                <tr class:inactive={!f.is_active}>
-                  <td class="col-badge"
-                    >{#if f.is_word_boundary || f.form_text.length <= 6}<span class="match-badge word" title="Mot entier">mot entier</span>{:else}<span class="match-badge substr" title="Sous-chaîne"
-                        >sous-chaîne</span
-                      >{/if}</td
-                  >
+                <tr class:excluding={f.is_excluding}>
+                  <td class="col-badge">
+                    {#if f.is_excluding}<span class="match-badge excluding" title="Excluante">excluante</span>
+                    {:else if f.is_word_boundary || f.form_text.length <= 6}<span class="match-badge word" title="Mot entier">mot entier</span>
+                    {:else}<span class="match-badge substr" title="Sous-chaîne">sous-chaîne</span>
+                    {/if}
+                  </td>
                   <td class="form-text">{f.form_text}</td>
                   <td>
                     {#if f.requires_context_of?.length}
@@ -798,8 +803,12 @@
                     {/if}
                   </td>
                   <td style="white-space:nowrap">
-                    <button class="btn btn-sm" onclick={() => openEditFormModal(f)} title="Modifier">✎</button>
-                    <button class="btn btn-sm btn-danger-outline" onclick={() => deleteForm(f.id)} title="Supprimer">x</button>
+                    <button class="btn-icon" onclick={() => openEditFormModal(f)} title="Modifier">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+                    </button>
+                    <button class="btn-icon btn-icon-danger" onclick={() => deleteForm(f.id)} title="Supprimer">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
                   </td>
                 </tr>
               {/each}
@@ -810,7 +819,7 @@
         <!-- Add form row -->
         <div class="add-row">
           <input placeholder="Nouvelle forme..." bind:value={addFormText} />
-          <label class="regex-label">
+          <label class="checkbox-label">
             <input
               type="checkbox"
               checked={addFormWordBoundary || addFormText.length <= 6}
@@ -819,6 +828,9 @@
                 addFormWordBoundary = (e.target as HTMLInputElement).checked;
               }}
             /> mot entier
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" bind:checked={addFormExcluding} /> excluante
           </label>
           <button class="btn btn-sm btn-primary" onclick={() => addForm(s.id)}> Ajouter </button>
         </div>
@@ -881,7 +893,7 @@
       <label>Texte</label>
       <input bind:value={editFormModal.form_text} />
       <div class="modal-options">
-        <label>
+        <label class="checkbox-label">
           <input
             type="checkbox"
             checked={editFormModal.is_word_boundary || editFormModal.form_text.length <= 6}
@@ -890,6 +902,15 @@
               if (editFormModal) editFormModal.is_word_boundary = (e.target as HTMLInputElement).checked;
             }}
           /> Mot entier
+        </label>
+        <label class="checkbox-label">
+          <input
+            type="checkbox"
+            checked={editFormModal.is_excluding}
+            onchange={(e) => {
+              if (editFormModal) editFormModal.is_excluding = (e.target as HTMLInputElement).checked;
+            }}
+          /> Excluante
         </label>
       </div>
       <div class="actions">
@@ -1275,16 +1296,37 @@
     border-bottom: 1px solid #f0efec;
     vertical-align: middle;
   }
-  .forms-table tr:hover td {
-    background: #fafaf8;
-  }
-  .forms-table td:last-child,
-  .hal-table td:last-child {
-    width: 36px;
+  .forms-table td:last-child {
+    width: 60px;
     text-align: right;
   }
-  .forms-table .inactive {
-    opacity: 0.45;
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .btn-icon:hover {
+    background: var(--hover);
+    color: var(--accent);
+  }
+  .btn-icon-danger:hover {
+    color: var(--danger, #d32f2f);
+    border-color: var(--danger, #d32f2f);
+  }
+  .forms-table .excluding {
+    background: #fff3e0;
+  }
+  .match-badge.excluding {
+    background: #e65100;
+    color: white;
   }
   .modal-options {
     display: flex;
@@ -1428,13 +1470,14 @@
     font-size: 0.85rem;
     font-family: inherit;
   }
-  .regex-label {
+  .checkbox-label {
     font-size: 0.8rem;
     display: flex;
     align-items: center;
     gap: 3px;
     margin: 0;
     cursor: pointer;
+    white-space: nowrap;
   }
 
   /* ── New form context ── */
