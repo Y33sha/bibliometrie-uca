@@ -153,6 +153,7 @@ def get_all_unlinked_authorships(cur):
     scanr_rows = cur.fetchall()
 
     # theses.fr (même structure que ScanR : idref comme clé)
+    # Les rôles non-auteur (directeur, rapporteur, jury) ne créent pas de personne.
     cur.execute("""
         SELECT sa_auth.id AS authorship_id, 'theses' AS source,
                sa_auth.raw_author_name AS full_name, sa.last_name, sa.first_name,
@@ -161,7 +162,8 @@ def get_all_unlinked_authorships(cur):
                FALSE AS has_hal_person_id,
                NULL::int AS hal_person_id,
                sd.publication_id,
-               sa_auth.author_position
+               sa_auth.author_position,
+               sa_auth.roles
         FROM source_authorships sa_auth
         JOIN source_persons sa ON sa.id = sa_auth.source_person_id
         JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
@@ -181,6 +183,10 @@ def get_all_unlinked_authorships(cur):
             r["last_name"], r["first_name"] = parse_raw_author_name(r["full_name"])
         r["last_norm"] = normalize_name(r["last_name"])
         r["first_norm"] = normalize_name(r["first_name"])
+
+        # Les rôles non-auteur des thèses ne créent pas de personne
+        roles = r.get("roles") or []
+        r["allow_create"] = not (r["source"] == "theses" and "author" not in roles)
 
         # ORCID OpenAlex : ne garder que si le nom de l'entité auteur OA
         # est compatible avec le raw_author_name de l'authorship
@@ -490,7 +496,10 @@ def step3_name_forms(cur, all_authorships, linked_ids, name_form_map, dry_run):
                 # Ambigu → orphelin
                 ambiguous += 1
         else:
-            # Forme inconnue → créer personne
+            # Forme inconnue → créer personne (sauf si création interdite)
+            if not a.get("allow_create", True):
+                ambiguous += 1  # comptabilisé comme orphelin
+                continue
             last = a["last_name"] or a["full_name"] or "?"
             first = a["first_name"] or ""
             if not dry_run:
@@ -512,45 +521,6 @@ def step3_name_forms(cur, all_authorships, linked_ids, name_form_map, dry_run):
 
     logger.info(f"  {created} personnes créées, {linked} rattachées, {ambiguous} ambiguës (orphelines)")
     return created, linked, ambiguous
-
-
-# ---------------------------------------------------------------------------
-# Étape 4 : Thèses hors-périmètre — rattachement par IdRef
-# ---------------------------------------------------------------------------
-
-def step4_theses_non_authors(cur, dry_run):
-    """Rattache les source_authorships thèses hors-périmètre (directeurs,
-    rapporteurs, jury) à des personnes connues via leur IdRef.
-
-    Ne crée pas de personne, ne modifie pas in_perimeter.
-    """
-    idref_map = load_idref_person_map(cur)
-
-    cur.execute("""
-        SELECT sa_auth.id AS authorship_id, sa.idref, sa_auth.raw_author_name AS full_name
-        FROM source_authorships sa_auth
-        JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-        WHERE sa_auth.source = 'theses'
-          AND sa_auth.person_id IS NULL
-          AND sa_auth.in_perimeter = FALSE
-          AND sa.idref IS NOT NULL
-          AND sd.publication_id IS NOT NULL
-    """)
-    candidates = cur.fetchall()
-
-    linked = 0
-    for c in candidates:
-        pid = idref_map.get(c["idref"])
-        if pid:
-            if not dry_run:
-                link_authorship(cur, pid, "theses", c["authorship_id"])
-                add_name_form(cur, pid, c["full_name"])
-            linked += 1
-
-    logger.info(f"  {linked} rôles thèses hors périmètre (directeurs, rapporteurs…) rattachés par IdRef "
-                f"(sur {len(candidates)} avec IdRef)")
-    return linked
 
 
 # ---------------------------------------------------------------------------
@@ -594,9 +564,6 @@ def run(dry_run=False):
     s3_created, s3_linked, s3_ambiguous = step3_name_forms(
         cur, all_authorships, linked_ids, name_form_map, dry_run)
 
-    # ── Étape 4 : Thèses hors-périmètre ──
-    logger.info("\n--- Étape 4 : thèses hors-périmètre (IdRef) ---")
-    s4 = step4_theses_non_authors(cur, dry_run)
 
     # ── Résumé ──
     total_linked = len(linked_ids)

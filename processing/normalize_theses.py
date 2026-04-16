@@ -406,24 +406,23 @@ def process_persons(cur, these: dict, source_publication_id: int):
         cur.execute("""
             INSERT INTO source_authorships
                 (source, source_publication_id, source_person_id, author_position,
-                 author_name_normalized, roles, in_perimeter,
+                 author_name_normalized, roles,
                  raw_author_name)
-            VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
+            VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s)
             ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
                 roles = EXCLUDED.roles,
                 author_name_normalized = EXCLUDED.author_name_normalized,
-                in_perimeter = EXCLUDED.in_perimeter,
                 raw_author_name = EXCLUDED.raw_author_name
             RETURNING id
         """, (source_publication_id, source_person_id,
               position if is_author else None,
               author_full_name,
-              roles, is_author,
+              roles,
               author_full_name))
         row = cur.fetchone()
         sa_id = row[0] if isinstance(row, tuple) else row["id"]
 
-        if is_author and addr_parts:
+        if addr_parts:
             link_addresses(cur, sa_id, addr_parts)
         if is_author:
             position += 1
