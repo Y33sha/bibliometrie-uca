@@ -575,7 +575,6 @@ def run(dry_run=False):
     logger.info(f"  Étape 1b (IdRef connu)   : {s1b} rattachées")
     logger.info(f"  Étape 2 (ORCID connu)    : {s2} rattachées")
     logger.info(f"  Étape 3 (name_forms)     : {s3_created} créées, {s3_linked} rattachées, {s3_ambiguous} ambiguës")
-    logger.info(f"  Étape 4 (thèses h-p)     : {s4} rattachées")
     logger.info(f"  Non résolues             : {unlinked}")
 
     if dry_run:
