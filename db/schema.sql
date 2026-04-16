@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict E9UdhTDQHl1P1s14leY6e9PeZFDMS7LPbZq867XXcVARCCfVMGXfSDAoywTEu5v
+\restrict bxEKuOgckEO1jzeyinqN083CbnROPa8HS2MOgXkZgasjV7jWxLuywgNW8OXC14Q
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -150,21 +150,6 @@ CREATE FUNCTION public.normalize_name_form(text) RETURNS text
     ))),
     '[^a-z0-9]+', ' ', 'g'));
 $_$;
-
-
---
--- Name: reset_addresses_extracted(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.reset_addresses_extracted() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    UPDATE source_authorships SET addresses_extracted = FALSE
-    WHERE id = OLD.source_authorship_id;
-    RETURN OLD;
-END;
-$$;
 
 
 SET default_tablespace = '';
@@ -892,10 +877,8 @@ CREATE TABLE public.source_authorships (
     author_name_normalized text,
     is_corresponding boolean DEFAULT false,
     roles text[] DEFAULT ARRAY['author'::text],
-    raw_affiliations jsonb,
     source_data jsonb,
     authorship_id integer,
-    addresses_extracted boolean DEFAULT false NOT NULL,
     raw_author_name text
 );
 
@@ -2323,13 +2306,6 @@ CREATE UNIQUE INDEX publications_doi_lower_key ON public.publications USING btre
 
 
 --
--- Name: source_authorship_addresses trg_reset_addresses_extracted; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER trg_reset_addresses_extracted AFTER DELETE ON public.source_authorship_addresses FOR EACH ROW EXECUTE FUNCTION public.reset_addresses_extracted();
-
-
---
 -- Name: address_structures address_structures_address_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2621,5 +2597,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict E9UdhTDQHl1P1s14leY6e9PeZFDMS7LPbZq867XXcVARCCfVMGXfSDAoywTEu5v
+\unrestrict bxEKuOgckEO1jzeyinqN083CbnROPa8HS2MOgXkZgasjV7jWxLuywgNW8OXC14Q
 

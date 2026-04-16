@@ -1,41 +1,11 @@
-"""Utilitaire d'extraction d'adresses depuis les affiliations brutes.
+"""Utilitaire de gestion des adresses.
 
 Utilisé par les scripts de normalisation pour créer les adresses
 et les liens source_authorship_addresses au moment de l'INSERT
-des source_authorships (plus de phase populate_addresses séparée).
+des source_authorships.
 """
 
 from utils.normalize import normalize_text
-
-
-def parse_raw_affiliations(raw_affiliations) -> list[str]:
-    """Extrait les textes d'adresses individuels depuis raw_affiliations.
-
-    raw_affiliations est du JSONB :
-    - HAL/OA/WoS : ["string", "string"]  (peut contenir " | " comme séparateur)
-    - ScanR : [{"name": "...", ...}, ...]
-
-    Retourne une liste de textes dédupliqués.
-    """
-    if not raw_affiliations or not isinstance(raw_affiliations, list):
-        return []
-
-    parts = []
-    seen = set()
-    for item in raw_affiliations:
-        if isinstance(item, str):
-            for sub in item.split(" | "):
-                sub = sub.strip()
-                if sub and sub not in seen:
-                    parts.append(sub)
-                    seen.add(sub)
-        elif isinstance(item, dict):
-            text = (item.get("name") or "").strip()
-            if text and text not in seen:
-                parts.append(text)
-                seen.add(text)
-
-    return parts
 
 
 # Cache module-level pour éviter les lookups répétés dans un même run

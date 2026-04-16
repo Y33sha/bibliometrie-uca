@@ -41,7 +41,7 @@ logger = setup_logger("dedup_hal_sa", os.path.join(os.path.dirname(__file__), ".
 SA_TRANSFER_FIELDS = [
     "in_perimeter", "excluded", "structure_ids", "source_struct_ids",
     "countries", "person_id", "author_name_normalized", "is_corresponding",
-    "roles", "raw_affiliations", "source_data", "authorship_id",
+    "roles", "source_data", "authorship_id",
 ]
 
 # Règles de résolution de conflits (les deux non-null et différents)

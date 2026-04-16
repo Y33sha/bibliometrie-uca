@@ -6,8 +6,8 @@ en utilisant les adresses résolues (address_structures) et les
 périmètres configurés (utils/perimeter.py).
 
 Circuit unifié pour toutes les sources (HAL, OpenAlex, WoS, ScanR, theses.fr) :
-les raw_affiliations de chaque source sont extraites en adresses par populate_addresses,
-résolues par resolve_addresses, puis ce script lit les résultats.
+les adresses sont créées pendant la normalisation, résolues par resolve_addresses,
+puis ce script lit les résultats.
 
 Deux périmètres :
   - restreint : UCA + labos tutellés → sert pour in_perimeter
@@ -127,7 +127,7 @@ def step3d_theses(cur, wide_ids, daily=False):
     """Étape 3d : theses.fr — résoudre structure_ids via adresses.
 
     in_perimeter est déjà à TRUE (posé par normalize_theses), on ne le reset pas.
-    On résout uniquement les structure_ids via les noms de labos dans raw_affiliations.
+    On résout uniquement les structure_ids via les adresses résolues.
     """
     if daily:
         cur.execute(f"""

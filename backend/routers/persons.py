@@ -1732,7 +1732,7 @@ async def hal_affiliation_conflicts(
                         AND sa.source = 'openalex'
                         AND sa.author_position = a.author_position
                         AND sa.in_perimeter = FALSE
-                        AND sa.raw_affiliations IS NOT NULL AND sa.raw_affiliations != '[]'::jsonb
+                        AND EXISTS (SELECT 1 FROM source_authorship_addresses saa WHERE saa.source_authorship_id = sa.id)
                   )
                   OR EXISTS (
                       SELECT 1 FROM source_authorships sa
@@ -1741,7 +1741,7 @@ async def hal_affiliation_conflicts(
                         AND sa.source = 'wos'
                         AND sa.author_position = a.author_position
                         AND sa.in_perimeter = FALSE
-                        AND sa.raw_affiliations IS NOT NULL AND sa.raw_affiliations != '[]'::jsonb
+                        AND EXISTS (SELECT 1 FROM source_authorship_addresses saa WHERE saa.source_authorship_id = sa.id)
                   )
               )
         """
