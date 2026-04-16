@@ -30,6 +30,7 @@ async def publications_facets(
     is_corresponding: str = Query(""),
     has_apc: str = Query(""),
     country: str = Query(""),
+    hal_status: str = Query(""),
 ):
     """Facettes dynamiques pour la page publications.
     Chaque facette exclut son propre filtre mais applique tous les autres."""
@@ -41,6 +42,7 @@ async def publications_facets(
     excluded_types = parse_str_csv(excluded_doc_type)
     source_values = parse_str_csv(source_filter)
     country_values = parse_str_csv(country)
+    hal_status_values = parse_str_csv(hal_status)
     _rid = get_root_structure_id()
 
     def base_conds_params():
@@ -54,6 +56,32 @@ async def publications_facets(
             c.append("p.doc_type::text != ALL(%s)")
             p.append(excluded_types)
         return c, p
+
+    def _apply_hal_status_filter(conds, params, values, lab_hal_col):
+        """Applique le filtre hal_status aux conditions."""
+        if not values or not lab_hal_col:
+            return
+        hal_parts = []
+        for v in values:
+            if v == 'hors_hal':
+                hal_parts.append("NOT EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal')")
+            elif v == 'hors_collection':
+                hal_parts.append("EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal' AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s]))")
+                params.append(lab_hal_col)
+            elif v == 'notice':
+                hal_parts.append("(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal' AND sd.hal_collections @> ARRAY[%s]) AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))")
+                params.append(lab_hal_col)
+            elif v == 'ok':
+                hal_parts.append("(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal' AND sd.hal_collections @> ARRAY[%s]) AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN ('closed', 'unknown'))")
+                params.append(lab_hal_col)
+        if len(hal_parts) == 1:
+            conds.append(hal_parts[0])
+        elif len(hal_parts) > 1:
+            conds.append("(" + " OR ".join(hal_parts) + ")")
+
+    # Pré-charger la collection HAL du labo (si un seul labo sélectionné)
+    # Utilise une liste mutable pour permettre la modification dans les closures
+    _lab_hal_col = [None]
 
     def add_all_except(conds, params, *, skip: str):
         """Ajoute tous les filtres sauf celui indiqué par skip."""
@@ -108,12 +136,20 @@ async def publications_facets(
         if skip != "country" and country_values:
             conds.append("p.countries && %s::text[]")
             params.append(country_values)
+        if skip != "hal_status" and hal_status_values:
+            _apply_hal_status_filter(conds, params, hal_status_values, _lab_hal_col[0])
 
     def where_sql(conds: list) -> str:
         return " AND ".join(conds) if conds else "TRUE"
 
     with get_cursor() as (cur, conn):
         cur.execute("SET LOCAL jit = off")
+
+        # Pré-charger la collection HAL du labo
+        if len(lab_ids_clean) == 1:
+            cur.execute("SELECT hal_collection FROM structures WHERE id = %s", (lab_ids_clean[0],))
+            row = cur.fetchone()
+            _lab_hal_col[0] = row["hal_collection"] if row else None
 
         # --- Facette ANNÉES ---
         c, p = base_conds_params()
