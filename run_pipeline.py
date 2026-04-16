@@ -35,6 +35,7 @@ Phases (dans l'ordre d'execution):
 """
 
 import argparse
+import atexit
 import datetime
 import json
 import logging
@@ -73,6 +74,10 @@ def _write_status(mode: str, phase: str, started_at: str, phases_done: int, phas
 def _clear_status():
     """Supprime le fichier de statut à la fin du pipeline."""
     STATUS_FILE.unlink(missing_ok=True)
+
+
+# Garantir le nettoyage même en cas de Ctrl+C ou crash
+atexit.register(_clear_status)
 
 
 # ---------------------------------------------------------------------------
@@ -390,6 +395,16 @@ def main():
         try:
             fn(mode=args.mode, sources=sources, year=args.year,
                full_cross_import=args.full_cross_import)
+        except KeyboardInterrupt:
+            log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
+            log.info("Pour reprendre : python run_pipeline.py --from %s", name)
+            phase_logs = read_new_logs(log_offsets)
+            phase_results.append((name + " (INTERROMPU)", time.time() - t0_phase, phase_logs))
+            report_path = generate_report(args.mode, sources, phase_results,
+                                          time.time() - t0_total)
+            log.info("Rapport partiel : %s", report_path)
+            _clear_status()
+            sys.exit(130)
         except RuntimeError as e:
             log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
             log.error("Pour reprendre : python run_pipeline.py --from %s", name)
