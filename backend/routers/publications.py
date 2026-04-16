@@ -31,6 +31,7 @@ async def publications_facets(
     has_apc: str = Query(""),
     country: str = Query(""),
     hal_status: str = Query(""),
+    in_perimeter: str = Query(""),
 ):
     """Facettes dynamiques pour la page publications.
     Chaque facette exclut son propre filtre mais applique tous les autres."""
@@ -138,6 +139,15 @@ async def publications_facets(
             params.append(country_values)
         if skip != "hal_status" and hal_status_values:
             _apply_hal_status_filter(conds, params, hal_status_values, _lab_hal_col[0])
+        if skip != "in_perimeter" and in_perimeter and person_id:
+            flag = in_perimeter == "yes"
+            op = "" if flag else "NOT "
+            conds.append(f"""
+                {op}EXISTS (SELECT 1 FROM authorships a
+                        WHERE a.publication_id = p.id AND a.person_id = %s
+                          AND a.in_perimeter = TRUE AND NOT a.excluded)
+            """)
+            params.append(person_id)
 
     def where_sql(conds: list) -> str:
         return " AND ".join(conds) if conds else "TRUE"
@@ -428,6 +438,33 @@ async def publications_facets(
                 {"value": "hors_hal",        "text": "Hors HAL",        "count": r["hors_hal"]},
             ]
 
+        # --- Facette IN_PERIMETER (seulement si person_id) ---
+        perimeter_facets = []
+        if person_id:
+            c, p = base_conds_params()
+            add_all_except(c, p, skip="in_perimeter")
+            w = where_sql(c)
+            cur.execute(f"""
+                SELECT
+                    COUNT(*) FILTER (WHERE EXISTS (
+                        SELECT 1 FROM authorships a
+                        WHERE a.publication_id = p.id AND a.person_id = %s
+                          AND a.in_perimeter = TRUE AND NOT a.excluded
+                    )) AS yes,
+                    COUNT(*) FILTER (WHERE NOT EXISTS (
+                        SELECT 1 FROM authorships a
+                        WHERE a.publication_id = p.id AND a.person_id = %s
+                          AND a.in_perimeter = TRUE AND NOT a.excluded
+                    )) AS no
+                FROM publications p
+                WHERE {w}
+            """, [person_id, person_id] + p)
+            r = cur.fetchone()
+            perimeter_facets = [
+                {"value": "yes", "text": "UCA", "count": r["yes"]},
+                {"value": "no", "text": "Hors périmètre", "count": r["no"]},
+            ]
+
         return {
             "years": year_facets,
             "labs": lab_facets,
@@ -446,6 +483,7 @@ async def publications_facets(
             "apc": apc_facets,
             "countries": country_facets,
             "hal_status": hal_status_facets,
+            "in_perimeter": perimeter_facets,
         }
 
 
@@ -880,6 +918,7 @@ async def list_publications(
     has_apc: str = Query(""),  # yes, no
     country: str = Query(""),  # comma-separated country codes
     hal_status: str = Query(""),  # comma-separated: ok, notice, hors_collection, hors_hal
+    in_perimeter: str = Query(""),  # yes, no — filtre sur in_perimeter de l'authorship person_id
 ):
     """Liste les publications avec sources, labos, journal."""
     offset = (page - 1) * per_page
@@ -1066,6 +1105,23 @@ async def list_publications(
                 conditions.append(hal_parts[0])
             elif len(hal_parts) > 1:
                 conditions.append("(" + " OR ".join(hal_parts) + ")")
+
+        # Filtre périmètre (in_perimeter de l'authorship de cette personne)
+        if in_perimeter and person_id:
+            if in_perimeter == "yes":
+                conditions.append("""
+                    EXISTS (SELECT 1 FROM authorships a
+                            WHERE a.publication_id = p.id AND a.person_id = %s
+                              AND a.in_perimeter = TRUE AND NOT a.excluded)
+                """)
+                params.append(person_id)
+            elif in_perimeter == "no":
+                conditions.append("""
+                    NOT EXISTS (SELECT 1 FROM authorships a
+                                WHERE a.publication_id = p.id AND a.person_id = %s
+                                  AND a.in_perimeter = TRUE AND NOT a.excluded)
+                """)
+                params.append(person_id)
 
         where_clause = " AND ".join(conditions) if conditions else "TRUE"
 

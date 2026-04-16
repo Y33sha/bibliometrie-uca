@@ -132,6 +132,7 @@
 	let selectedAccess: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
 	let selectedCorr: string[] = $state([]);
+	let selectedPerimeter: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
 	let sourceStates = $state<Record<string, 'all' | 'yes' | 'no'>>({});
 	let currentSort = $state('year_desc');
@@ -153,6 +154,7 @@
 		if (selectedAccess.length) params.set('access', selectedAccess.join(','));
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
 		if (selectedCorr.length) params.set('is_corresponding', selectedCorr.join(','));
+		if (selectedPerimeter.length) params.set('in_perimeter', selectedPerimeter.join(','));
 		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
 		const sf = Object.entries(sourceStates).filter(([, v]) => v === 'yes' || v === 'no').map(([k, v]) => `${k}_${v}`).join(',');
 		if (sf) params.set('source_filter', sf);
@@ -173,7 +175,7 @@
 	});
 
 	// Facets
-	const facets = useFacets<'years' | 'docTypes' | 'access' | 'oa' | 'corresponding' | 'countries'>({
+	const facets = useFacets<'years' | 'docTypes' | 'access' | 'oa' | 'corresponding' | 'perimeter' | 'countries'>({
 		endpoint: '/api/publications/facets',
 		apiKey: 'person-detail-facets',
 		buildParams: () => buildFilterParams(),
@@ -183,6 +185,7 @@
 			access: { type: 'passthrough', apiKey: 'access' },
 			oa: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
 			corresponding: { type: 'boolean', apiKey: 'corresponding', yesLabel: 'Oui', noLabel: 'Non' },
+			perimeter: { type: 'passthrough', apiKey: 'in_perimeter' },
 			countries: {
 				type: 'passthrough',
 				apiKey: 'countries',
@@ -406,6 +409,9 @@
 				{#if col('oa_path')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
 				{#if col('corr') && facets.options.corresponding.length}
 					<FacetDropdown label="Corresp." options={facets.options.corresponding} bind:selected={selectedCorr} onchange={onFilterChange} />
+				{/if}
+				{#if facets.options.perimeter.length}
+					<FacetDropdown label="UCA" options={facets.options.perimeter} bind:selected={selectedPerimeter} onchange={onFilterChange} />
 				{/if}
 				<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
 				<SourceFilterToggle bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
