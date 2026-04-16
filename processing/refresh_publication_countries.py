@@ -84,7 +84,7 @@ def refresh_address_document_countries(cur):
             JOIN source_authorship_addresses saa ON saa.source_authorship_id = sa.id
             JOIN addresses a ON a.id = saa.address_id,
             LATERAL unnest(a.countries) AS c
-            WHERE sa.source IN ('openalex', 'wos', 'scanr')
+            WHERE TRUE  -- toutes les sources utilisent les adresses
               AND a.countries IS NOT NULL
             GROUP BY sa.source_publication_id
         ) sub

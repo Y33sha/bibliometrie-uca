@@ -205,7 +205,7 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
             FROM source_authorships sa
             JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.id = ANY(%s)
-              AND sa.source IN ('openalex', 'wos', 'scanr')
+              -- toutes les sources utilisent les adresses
               AND sd.publication_id IS NOT NULL
               AND sa.person_id IS NOT NULL
         ),
