@@ -731,7 +731,6 @@
 		background: var(--card);
 		border: 1px solid var(--border);
 		border-radius: 6px;
-		overflow: hidden;
 	}
 	.tab-content thead th {
 		background: #f5f4f1;
