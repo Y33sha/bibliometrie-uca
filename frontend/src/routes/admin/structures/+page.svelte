@@ -84,25 +84,7 @@
 	let editFormModal: { id: number; form_text: string; is_word_boundary: boolean } | null = $state(null);
 	let newFormCtx: (number | string)[] = $state([]);
 
-	// HAL mappings
-	interface HalMapping {
-		hal_struct_id: number;
-		name: string;
-		acronym: string | null;
-		type: string;
-		doc_count: number;
-		valid: string | null;
-		country: string | null;
-		start_date: string | null;
-		end_date: string | null;
-	}
-	let halMappings: HalMapping[] = $state([]);
-	let halHelpOpen = $state(false);
 	let formsHelpOpen = $state(false);
-	let halSearchOpen = $state(false);
-	let halSearch = $state("");
-	let halSearchResults: any[] = $state([]);
-	let halPickerEl: HTMLDivElement | undefined = $state();
 
 	// Create/Edit modal state
 	let editMode = $state(false);
@@ -202,14 +184,9 @@
 		const exclude = new Set<number>([...data.parents.map((p) => p.id), ...data.children.map((c) => c.id), data.structure.id]);
 		pickerExclude = exclude;
 
-		// HAL mappings
-		halMappings = await api<HalMapping[]>("/api/structures/" + id + "/hal-mappings");
-
 		// Reset pickers et help
 		relationPickerOpen = false;
 		ctxPickerOpen = false;
-		halSearchOpen = false;
-		halHelpOpen = false;
 		formsHelpOpen = false;
 		newFormCtx = [];
 	}
@@ -406,34 +383,6 @@
 
 	/* ── HAL mapping ── */
 
-	async function searchHalStructures() {
-		if (halSearch.length < 2) {
-			halSearchResults = [];
-			return;
-		}
-		halSearchResults = await api<any[]>(`/api/hal-structures?unmapped=true&search=${encodeURIComponent(halSearch)}&limit=15`);
-	}
-
-	async function mapHalStructure(halStructId: number) {
-		if (!selectedId) return;
-		await fetch(base + "/api/hal-structures/" + halStructId + "/map", {
-			method: "PUT",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ structure_id: selectedId }),
-		});
-		halSearchOpen = false;
-		halSearch = "";
-		halSearchResults = [];
-		await selectStructure(selectedId);
-	}
-
-	async function unmapHalStructure(halStructId: number) {
-		await fetch(base + "/api/hal-structures/" + halStructId + "/map", {
-			method: "DELETE",
-		});
-		if (selectedId) await selectStructure(selectedId);
-	}
-
 	function normalizeRor(): boolean {
 		let ror = mRor.trim();
 		if (!ror) return true;
@@ -565,9 +514,6 @@
 		}
 		if (ctxPickerOpen && ctxPickerEl && !ctxPickerEl.contains(target) && !target.classList.contains("btn-add-tiny")) {
 			ctxPickerOpen = false;
-		}
-		if (halSearchOpen && halPickerEl && !halPickerEl.contains(target) && !target.closest(".btn-hal-add")) {
-			halSearchOpen = false;
 		}
 	}
 
@@ -784,101 +730,6 @@
 				<!-- ═══ SECTION IDENTIFICATION DANS LES PUBLICATIONS ═══ -->
 				<h3 class="section-title">Identification dans les publications</h3>
 
-				<!-- HAL structures mappées -->
-				<h3>
-					Structures HAL ({halMappings.length})
-					<button
-						class="btn-help-icon"
-						onclick={() => {
-							halHelpOpen = !halHelpOpen;
-						}}
-						title="Aide"
-						><svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="14"
-							height="14"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg
-						></button
-					>
-				</h3>
-				{#if halHelpOpen}
-					<p class="help-text">
-						Le mapping avec les structures HAL permet d'identifier les affiliations des publications issues de HAL. Les changements seront pris en compte à la prochaine exécution du
-						pipeline. Pour une prise en compte immédiate, relancer le pipeline à partir de l'étape `affiliations` : <code>python run_pipeline.py --from affiliations</code>
-					</p>
-				{/if}
-				{#if halMappings.length === 0 && !halSearchOpen}
-					<span class="none-text">Aucune structure HAL mappée</span>
-				{:else}
-					<table class="hal-table">
-						<thead>
-							<tr>
-								<th>ID HAL</th>
-								<th>Nom</th>
-								<th>Sigle</th>
-								<th>Type</th>
-								<th>Début</th>
-								<th>Fin</th>
-								<th>Publis</th>
-								<th></th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each halMappings as hm (hm.hal_struct_id)}
-								<tr class:hal-valid={hm.valid === "VALID"} class:hal-old={hm.valid === "OLD"} class:hal-incoming={hm.valid === "INCOMING"}>
-									<td><a href="https://aurehal.archives-ouvertes.fr/structure/read/id/{hm.hal_struct_id}" target="_blank" rel="noopener" class="id-badge">{hm.hal_struct_id}</a></td>
-									<td>{hm.name || ""}</td>
-									<td>{hm.acronym || ""}</td>
-									<td>{hm.type || ""}</td>
-									<td>{hm.start_date || ""}</td>
-									<td>{hm.end_date || ""}</td>
-									<td>{hm.doc_count || 0}</td>
-									<td>
-										<button class="btn btn-sm btn-danger-outline" onclick={() => unmapHalStructure(hm.hal_struct_id)} title="Supprimer le mapping">x</button>
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				{/if}
-				<button
-					class="btn btn-sm btn-hal-add"
-					style="margin-top: 6px;"
-					onclick={() => {
-						halSearchOpen = !halSearchOpen;
-						halSearch = "";
-						halSearchResults = [];
-					}}>{halSearchOpen ? "Annuler" : "Ajouter"}</button
-				>
-				{#if halSearchOpen}
-					<!-- svelte-ignore a11y_click_events_have_key_events -->
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="picker-container" style="margin-top: 8px;" bind:this={halPickerEl} onclick={(e) => e.stopPropagation()}>
-						<input type="text" placeholder="Rechercher une structure HAL non mappée..." bind:value={halSearch} oninput={searchHalStructures} autocomplete="off" />
-						<div class="picker-results">
-							{#if halSearchResults.length === 0}
-								<div class="picker-item disabled">
-									{halSearch.length < 2 ? "Tapez au moins 2 caractères" : "Aucun résultat"}
-								</div>
-							{:else}
-								{#each halSearchResults as hs (hs.hal_struct_id)}
-									<button class="picker-item" onclick={() => mapHalStructure(hs.hal_struct_id)}>
-										{hs.acronym ? hs.acronym + " — " : ""}{hs.name}
-										<span style="color: var(--muted); font-size: 0.8rem; margin-left: auto;">
-											{hs.type} · {hs.doc_count || 0} docs
-										</span>
-									</button>
-								{/each}
-							{/if}
-						</div>
-					</div>
-				{/if}
-
 				<!-- Forms table -->
 				<h3>
 					Formes de noms ({detail.forms.length})
@@ -903,7 +754,7 @@
 				</h3>
 				{#if formsHelpOpen}
 					<p class="help-text">
-						Les formes de nom servent à identifier les affiliations des publications issues d'OpenAlex et WoS, via les adresses associées aux publications. Les changements seront pris en compte à la prochaine exécution du pipeline. Pour une prise en compte immédiate, relancer à partir de l'étape `addresses` : <code>python run_pipeline.py --from addresses</code>
+						Les formes de nom servent à identifier les affiliations des publications de toutes les sources (HAL, OpenAlex, WoS, ScanR, theses.fr), via les adresses associées aux publications. Les changements seront pris en compte à la prochaine exécution du pipeline. Pour une prise en compte immédiate, relancer à partir de l'étape <code>addresses</code> : <code>python run_pipeline.py --from addresses</code>
 					</p>
 				{/if}
 				<table class="forms-table">
