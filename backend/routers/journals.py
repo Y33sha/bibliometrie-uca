@@ -69,6 +69,17 @@ async def list_journals(
 
 
 @router.put("/api/journals/{journal_id}")
+@router.get("/api/journals/{journal_id}")
+async def get_journal(journal_id: int):
+    with get_cursor() as (cur, conn):
+        cur.execute("SELECT id, title FROM journals WHERE id = %s", (journal_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Revue introuvable")
+        return row
+
+
+@router.put("/api/journals/{journal_id}")
 async def update_journal(journal_id: int, body: dict):
     """Met à jour une revue."""
     with get_cursor() as (cur, conn):
