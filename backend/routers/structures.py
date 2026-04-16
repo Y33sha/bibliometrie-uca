@@ -87,7 +87,7 @@ async def get_structure(structure_id: int):
         cur.execute("""
             SELECT * FROM structure_name_forms
             WHERE structure_id = %s
-            ORDER BY is_active DESC, form_text
+            ORDER BY form_text
         """, (structure_id,))
         forms = cur.fetchall()
 
