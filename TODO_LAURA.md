@@ -2,7 +2,6 @@
 pg_dump -U lalecoz -d bibliometrie -Fc -f bibliometrie.dump
 pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 ## Pipeline
-* [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation
 * [ ] structure_ids et in_perimeter des publis theses.fr: à quelle phase du pipeline sont-ils remplis et selon quelle logique? auditer
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
@@ -10,7 +9,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] investiguer les erreurs de normalisation wos: Erreur sur WOS:000475662000018: ERREUR:  syntaxe en entrée invalide pour le type integer : « 5-Bis(pyridin-2-yl)-1 » LINE 10: ...rst_page": "7773", "last_page": "7783"}', ARRAY[2,'5-Bis(pyr
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes
 ## Robustesse du pipeline sur le long terme
-* [ ] Comment se met à jour le référentiel structures HAL en cas de changement entre deux imports? faut-il des champs `hash` et `last_seen_at` comme pour les publis?
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
 * [ ] authorships excluded: info perdue si réimport (grave?)
 ## Imports csv
@@ -19,6 +17,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] chercher des moyens d'optimiser la taille de la base: supprimer données qui ne sont plus utiles? ex.: supprimer *_authors et *_structures (sauf hal)? chercher colonnes jamais utilisées. Externaliser dans des fichiers json par publi les authorships sources.
 * [ ] audit complet du code pour retrouver tous les trucs hardcodés qu'on pourrait abstraire, ou le SQL à simplifier suite aux fusions des tables sources. 
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
+* [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
 * [ ] transférer champ role des authorships sources aux authorships canoniques? auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques)
 * [ ] normalize_wos: conserver le mapping addresses->structures dans le champ raw_affiliations? (modifier script + **backfill**) voir si ça vaut le coup
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?

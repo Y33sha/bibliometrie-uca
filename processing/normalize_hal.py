@@ -410,19 +410,16 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
 # HAL AUTHORSHIPS
 # =============================================================
 
-def parse_author_structures(doc: dict) -> dict[int, set[int]]:
+def parse_author_structures(doc: dict, cur=None,
+                            struct_cache: dict | None = None,
+                            struct_name_cache: dict | None = None) -> dict[int, set[int]]:
     """
     Parse authIdHasStructure_fs pour extraire le mapping
     form_id → {hal_struct_id bruts (entiers HAL, résolus en source_struct_ids ensuite)}.
 
     Format : "formId-personId_FacetSep_Nom_JoinSep_structId_FacetSep_StructNom"
 
-    On utilise le form_id (et non le person_id) comme clé, car le form_id
-    est toujours présent, y compris pour les auteurs sans compte HAL
-    (personId = 0).
-
-    Note : retourne les hal_struct_id bruts (entiers HAL). La résolution
-    vers source_structures.id se fait dans process_authors via lookup SQL.
+    Crée les source_structures HAL à la volée si elles n'existent pas encore.
     """
     entries = doc.get("authIdHasStructure_fs") or []
     form_structs: dict[int, set[int]] = {}
@@ -453,8 +450,24 @@ def parse_author_structures(doc: dict) -> dict[int, set[int]]:
             struct_id = int(right_parts[0])
         except ValueError:
             continue
+        struct_name = right_parts[1].strip() if len(right_parts) > 1 else ""
 
         form_structs.setdefault(form_id, set()).add(struct_id)
+
+        # Créer la source_structure si pas encore en cache
+        if cur and struct_cache is not None and str(struct_id) not in struct_cache:
+            cur.execute("""
+                INSERT INTO source_structures (source, source_id, name)
+                VALUES ('hal', %s, %s)
+                ON CONFLICT (source, source_id) DO UPDATE SET
+                    name = COALESCE(NULLIF(source_structures.name, ''), EXCLUDED.name)
+                RETURNING id
+            """, (str(struct_id), struct_name[:500] if struct_name else str(struct_id)))
+            row = cur.fetchone()
+            ss_id = row[0] if isinstance(row, tuple) else row["id"]
+            struct_cache[str(struct_id)] = ss_id
+            if struct_name_cache is not None:
+                struct_name_cache[ss_id] = struct_name
 
     return form_structs
 
@@ -522,7 +535,9 @@ def process_authors(cur, doc: dict, source_publication_id: int,
                     pass
 
     # authIdHasStructure_fs → {form_id: set of hal_struct_id bruts}
-    form_struct_map = parse_author_structures(doc)
+    form_struct_map = parse_author_structures(doc, cur=cur,
+                                              struct_cache=struct_cache,
+                                              struct_name_cache=struct_name_cache)
 
     for position, name in enumerate(names):
         idhal = idhal_by_pos.get(position)
@@ -742,7 +757,7 @@ def main():
         # Cache source_structures HAL (source_id → id + nom) pour éviter une requête par auteur
         cur.execute("""
             SELECT source_id, id,
-                   COALESCE(name, '') || CASE WHEN acronym IS NOT NULL THEN ' ' || acronym ELSE '' END
+                   COALESCE(name, '')
             FROM source_structures WHERE source = 'hal'
         """)
         _struct_rows = cur.fetchall()

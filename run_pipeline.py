@@ -171,7 +171,6 @@ def phase_normalize(**kw):
     if "theses" in sources:
         run_python("processing/normalize_theses.py")
     if "hal" in sources:
-        run_python("processing/enrich_hal_structures.py")
         if kw.get("mode", "full") in ("full", "monthly"):
             run_python("processing/harvest_hal_identifiers.py")
     # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
