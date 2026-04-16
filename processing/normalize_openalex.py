@@ -35,6 +35,7 @@ from services.publications import find_or_create as find_or_create_publication, 
 from utils.nnt import normalize_nnt, is_theses_fr_source, extract_nnt_from_openalex
 from utils.doc_types import map_doc_type
 from utils.db_helpers import mark_staging_done
+from utils.addresses import link_addresses
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -522,29 +523,33 @@ def process_authorships(cur, work: dict, source_publication_id: int):
             if ss_id:
                 source_struct_ids.append(ss_id)
 
-        # raw_affiliations : JSONB array wrapping the text
-        raw_affiliations_json = Json([raw_affil_text]) if raw_affil_text else None
+        # Adresses individuelles pour link_addresses
+        addr_parts = raw_strings if raw_strings else (
+            [n for n in (i.get("display_name") for i in (authorship.get("institutions") or [])) if n]
+        )
+
         cur.execute("""
             INSERT INTO source_authorships
                 (source, source_publication_id, source_person_id, author_position,
-                 raw_affiliations, source_struct_ids,
+                 source_struct_ids,
                  author_name_normalized, is_corresponding, raw_author_name)
-            VALUES ('openalex', %s, %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
+            VALUES ('openalex', %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
             ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
-                raw_affiliations = COALESCE(
-                    EXCLUDED.raw_affiliations,
-                    source_authorships.raw_affiliations
-                ),
                 author_name_normalized = COALESCE(
                     EXCLUDED.author_name_normalized,
                     source_authorships.author_name_normalized
                 ),
                 is_corresponding = EXCLUDED.is_corresponding,
-                raw_author_name = EXCLUDED.raw_author_name,
-                addresses_extracted = FALSE
+                raw_author_name = EXCLUDED.raw_author_name
+            RETURNING id
         """, (source_publication_id, source_person_id, position,
-              raw_affiliations_json, source_struct_ids or None,
+              source_struct_ids or None,
               raw_author_name, is_corresponding, raw_author_name))
+        row = cur.fetchone()
+        sa_id = row[0] if isinstance(row, tuple) else row["id"]
+
+        if addr_parts:
+            link_addresses(cur, sa_id, addr_parts)
 
 
 # =============================================================

@@ -101,6 +101,20 @@ def pytest_configure(config):
     _log_module.setup_logger = _test_setup_logger
 
 
+@pytest.fixture(autouse=True)
+def _clear_caches():
+    """Vide les caches module-level entre chaque test (rollback-safe)."""
+    yield
+    from utils.addresses import clear_cache as clear_addr_cache
+    clear_addr_cache()
+    # HAL author cache
+    try:
+        from processing.normalize_hal import _hal_author_cache
+        _hal_author_cache.clear()
+    except ImportError:
+        pass
+
+
 @pytest.fixture
 def db():
     """Connexion à la base de test, dans une transaction rollbackée à la fin.

@@ -37,6 +37,8 @@ from utils.db_helpers import mark_staging_done
 from utils.nnt import normalize_nnt
 from services.journals import find_or_create_publisher, find_or_create_journal
 
+from utils.addresses import link_addresses
+
 logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 
 
@@ -346,50 +348,38 @@ def process_authors(cur, doc: dict, source_publication_id: int):
         raw_role = author_data.get("role")
         roles, _ = map_role("scanr", raw_role)
 
-        # Affiliations par auteur
+        # Affiliations par auteur : extraire noms (adresses) et pays
         author_affiliations = author_data.get("affiliations") or []
-        affiliation_ids = []
+        addr_parts = []
         detected_countries = []
-        raw_affiliations = author_affiliations if author_affiliations else None
 
         for aff in author_affiliations:
-            for aid in aff.get("ids") or []:
-                aid_val = aid.get("id")
-                if aid_val:
-                    affiliation_ids.append(aid_val)
+            name = (aff.get("name") or "").strip()
+            if name:
+                addr_parts.append(name)
             for c in aff.get("detected_countries") or []:
                 if c not in detected_countries:
                     detected_countries.append(c)
-
-        # source_data : affiliation_ids et detected_countries en JSONB
-        source_data = {}
-        if affiliation_ids:
-            source_data["affiliation_ids"] = affiliation_ids
-        if detected_countries:
-            source_data["detected_countries"] = detected_countries
-        source_data_json = Json(source_data) if source_data else None
 
         author_full_name = author_data.get("fullName")
 
         cur.execute("""
             INSERT INTO source_authorships
                 (source, source_publication_id, source_person_id, author_position, roles,
-                 raw_affiliations, source_data,
                  author_name_normalized, raw_author_name)
-            VALUES ('scanr', %s, %s, %s, %s, %s, %s, normalize_name_form(%s), %s)
+            VALUES ('scanr', %s, %s, %s, %s, normalize_name_form(%s), %s)
             ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
-                raw_affiliations = COALESCE(EXCLUDED.raw_affiliations,
-                    source_authorships.raw_affiliations),
-                source_data = COALESCE(source_authorships.source_data, '{}') ||
-                              COALESCE(EXCLUDED.source_data, '{}'),
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 roles = EXCLUDED.roles,
-                raw_author_name = EXCLUDED.raw_author_name,
-                addresses_extracted = FALSE
+                raw_author_name = EXCLUDED.raw_author_name
+            RETURNING id
         """, (source_publication_id, source_person_id, position, roles or None,
-              Json(raw_affiliations) if raw_affiliations else None,
-              source_data_json,
               author_full_name, author_full_name))
+        row = cur.fetchone()
+        sa_id = row[0] if isinstance(row, tuple) else row["id"]
+
+        if addr_parts:
+            link_addresses(cur, sa_id, addr_parts, countries=detected_countries or None)
 
 
 # =============================================================

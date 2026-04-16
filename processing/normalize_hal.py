@@ -39,6 +39,7 @@ from utils.doc_types import map_doc_type
 from services.publications import find_or_create as find_or_create_publication, try_merge_by_doi, refresh_from_sources
 from utils.nnt import normalize_nnt
 from utils.db_helpers import mark_staging_done
+from utils.addresses import link_addresses
 from services.journals import find_or_create_publisher, find_or_create_journal
 
 # ----- Logging -----
@@ -559,19 +560,17 @@ def process_authors(cur, doc: dict, source_publication_id: int,
             if resolved:
                 source_struct_ids = sorted(resolved)
 
-        # raw_affiliations : noms des structures liées (pour populate_addresses)
-        raw_affiliations = None
+        # Noms des structures pour les adresses
+        addr_parts = []
         if source_struct_ids and struct_name_cache:
-            struct_names = [struct_name_cache[sid] for sid in source_struct_ids
-                           if sid in struct_name_cache and struct_name_cache[sid].strip()]
-            if struct_names:
-                raw_affiliations = Json(struct_names)
+            addr_parts = [struct_name_cache[sid] for sid in source_struct_ids
+                          if sid in struct_name_cache and struct_name_cache[sid].strip()]
 
         cur.execute("""
             INSERT INTO source_authorships
                 (source, source_publication_id, source_person_id, author_position, source_struct_ids,
-                 author_name_normalized, is_corresponding, roles, raw_author_name, raw_affiliations)
-            VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s, %s)
+                 author_name_normalized, is_corresponding, roles, raw_author_name)
+            VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
             ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
                 source_struct_ids = COALESCE(
                     EXCLUDED.source_struct_ids,
@@ -580,12 +579,15 @@ def process_authors(cur, doc: dict, source_publication_id: int,
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 is_corresponding = EXCLUDED.is_corresponding,
                 roles = EXCLUDED.roles,
-                raw_author_name = EXCLUDED.raw_author_name,
-                raw_affiliations = EXCLUDED.raw_affiliations,
-                addresses_extracted = FALSE
+                raw_author_name = EXCLUDED.raw_author_name
+            RETURNING id
         """, (source_publication_id, source_person_id, position,
-              source_struct_ids, name, is_corresponding, roles or None, name,
-              raw_affiliations))
+              source_struct_ids, name, is_corresponding, roles or None, name))
+        row = cur.fetchone()
+        sa_id = row[0] if isinstance(row, tuple) else row["id"]
+
+        if addr_parts:
+            link_addresses(cur, sa_id, addr_parts)
 
 
 # =============================================================

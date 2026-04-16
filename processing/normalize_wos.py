@@ -669,27 +669,21 @@ def process_authorships(cur, rec: dict, source_publication_id: int):
             if name and name in _wos_institution_cache:
                 institution_ids.append(_wos_institution_cache[name])
 
-        raw_affil_text = author.get("raw_affiliation")
-        raw_affiliations = Json([raw_affil_text]) if raw_affil_text else None
         name_norm = normalize_name_form(author["full_name"])
 
         values[key] = (
             'wos', source_publication_id, source_person_id, author["position"],
-            author["is_corresponding"], raw_affiliations, name_norm,
+            author["is_corresponding"], name_norm,
             institution_ids or None, author.get("roles"), author["full_name"],
         )
 
     _ev(cur, """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
-             is_corresponding, raw_affiliations, author_name_normalized,
+             is_corresponding, author_name_normalized,
              source_struct_ids, roles, raw_author_name)
         VALUES %s
         ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
-            raw_affiliations = COALESCE(
-                EXCLUDED.raw_affiliations,
-                source_authorships.raw_affiliations
-            ),
             is_corresponding = EXCLUDED.is_corresponding OR source_authorships.is_corresponding,
             author_name_normalized = COALESCE(
                 EXCLUDED.author_name_normalized,
@@ -700,8 +694,7 @@ def process_authorships(cur, rec: dict, source_publication_id: int):
                 source_authorships.source_struct_ids
             ),
             roles = EXCLUDED.roles,
-            raw_author_name = EXCLUDED.raw_author_name,
-            addresses_extracted = FALSE
+            raw_author_name = EXCLUDED.raw_author_name
     """, list(values.values()))
 
     # Phase 3 : batch adresses (source_authorship_addresses)

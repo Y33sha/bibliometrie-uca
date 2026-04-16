@@ -194,17 +194,11 @@ def _vacuum_staging(full: bool = False):
 
 
 def phase_addresses(**kw):
-    """Extraction des adresses depuis raw_affiliations, resolution structures.
+    """Résolution des adresses vers les structures connues.
 
-    Ne traite que les source_authorships non encore extraites (addresses_extracted=FALSE).
-    Toutes les sources sont traitées (HAL inclus depuis que les raw_affiliations
-    sont peuplées avec les noms de structures HAL pendant la normalisation).
+    Les adresses sont créées pendant la normalisation (plus de populate_addresses).
+    Cette phase ne fait que la résolution adresses → structures.
     """
-    sources = kw.get("sources", set(ALL_SOURCES_SET))
-    address_sources = ["hal", "openalex", "wos", "scanr", "theses"]
-    for src in address_sources:
-        if src in sources:
-            run_python("processing/populate_addresses.py", "--source", src)
     mode = kw.get("mode", "full")
     run_python("processing/resolve_addresses.py", "--mode", mode)
 
