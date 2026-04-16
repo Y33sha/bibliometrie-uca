@@ -37,6 +37,7 @@ from utils.normalize import normalize_text, normalize_name
 from utils.names import names_compatible
 from utils.nnt import normalize_nnt
 from utils.db_helpers import mark_staging_done
+from utils.addresses import link_addresses
 from utils.authorship_roles import THESES_FIELD_ROLES, merge_roles
 
 logger = setup_logger("normalize_theses", os.path.join(os.path.dirname(__file__), "logs"))
@@ -388,7 +389,7 @@ def process_persons(cur, these: dict, source_publication_id: int):
 
     # Affiliations auteur : partenaires de recherche (labos)
     partenaires = these.get("partenairesDeRecherche") or []
-    raw_affiliations = [p["nom"] for p in partenaires if p.get("nom")] or None
+    addr_parts = [p["nom"] for p in partenaires if p.get("nom")] or []
 
     # Insérer les authorships avec rôles fusionnés
     position = 0
@@ -405,22 +406,25 @@ def process_persons(cur, these: dict, source_publication_id: int):
         cur.execute("""
             INSERT INTO source_authorships
                 (source, source_publication_id, source_person_id, author_position,
-                 author_name_normalized, roles, in_perimeter, raw_affiliations,
+                 author_name_normalized, roles, in_perimeter,
                  raw_author_name)
-            VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s, %s, %s)
+            VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
             ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
                 roles = EXCLUDED.roles,
                 author_name_normalized = EXCLUDED.author_name_normalized,
                 in_perimeter = EXCLUDED.in_perimeter,
-                raw_affiliations = EXCLUDED.raw_affiliations,
-                raw_author_name = EXCLUDED.raw_author_name,
-                addresses_extracted = FALSE
+                raw_author_name = EXCLUDED.raw_author_name
+            RETURNING id
         """, (source_publication_id, source_person_id,
               position if is_author else None,
               author_full_name,
               roles, is_author,
-              Json(raw_affiliations) if is_author and raw_affiliations else None,
               author_full_name))
+        row = cur.fetchone()
+        sa_id = row[0] if isinstance(row, tuple) else row["id"]
+
+        if is_author and addr_parts:
+            link_addresses(cur, sa_id, addr_parts)
         if is_author:
             position += 1
 
