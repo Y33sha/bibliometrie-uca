@@ -73,7 +73,10 @@ def require_admin(session: str | None = Cookie(None, alias="session")):
 
 from psycopg2.pool import ThreadedConnectionPool
 
-_pool = ThreadedConnectionPool(minconn=DB_POOL_MIN, maxconn=DB_POOL_MAX, **DB)
+_db_args = dict(DB)
+if os.environ.get("BIBLIOMETRIE_SANDBOX") == "1":
+    _db_args["dbname"] = "bibliometrie_sandbox"
+_pool = ThreadedConnectionPool(minconn=DB_POOL_MIN, maxconn=DB_POOL_MAX, **_db_args)
 
 
 @contextmanager
