@@ -192,23 +192,21 @@ async def get_name_form(form_id: int):
 
 @router.post("/api/name-forms")
 async def create_name_form(data: NameFormCreate):
-    import json as _json
     with get_cursor() as (cur, conn):
         form_text = normalize_text(data.form_text)
-        ctx_json = _json.dumps(data.requires_context_of) if data.requires_context_of else None
+        ctx = data.requires_context_of or None
         cur.execute("""
             INSERT INTO structure_name_forms (structure_id, form_text,
                                     is_word_boundary, requires_context_of, notes)
-            VALUES (%s, %s, %s, %s::jsonb, %s)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING *
         """, (data.structure_id, form_text, data.is_word_boundary,
-              ctx_json, data.notes))
+              ctx, data.notes))
         return cur.fetchone()
 
 
 @router.put("/api/name-forms/{form_id}")
 async def update_name_form(form_id: int, data: NameFormUpdate):
-    import json as _json
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id FROM structure_name_forms WHERE id = %s", (form_id,))
         if not cur.fetchone():
@@ -224,8 +222,8 @@ async def update_name_form(form_id: int, data: NameFormUpdate):
             updates.append("is_word_boundary = %s")
             params.append(data.is_word_boundary)
         if data.requires_context_of is not None:
-            updates.append("requires_context_of = %s::jsonb")
-            params.append(_json.dumps(data.requires_context_of) if data.requires_context_of else None)
+            updates.append("requires_context_of = %s")
+            params.append(data.requires_context_of or None)
         if data.is_active is not None:
             updates.append("is_active = %s")
             params.append(data.is_active)

@@ -54,17 +54,6 @@ def load_forms(cur):
     return forms
 
 
-def load_tutelles(cur):
-    """Charge le mapping structure_id → set(tutelle_ids)."""
-    cur.execute("""
-        SELECT child_id, parent_id
-        FROM structure_relations
-        WHERE relation_type = 'est_tutelle_de'
-    """)
-    tutelles = {}
-    for child_id, parent_id in cur.fetchall():
-        tutelles.setdefault(child_id, set()).add(parent_id)
-    return tutelles
 
 
 def load_perimeter(cur):
@@ -107,25 +96,7 @@ def has_form_match_for_structure(struct_id, text_normalized, forms_by_structure)
     return False
 
 
-def resolve_context(requires_context_of, structure_id, tutelles_map):
-    """Résout requires_context_of en un set d'IDs de structures.
-
-    - Entiers → IDs directs
-    - "tutelles" → tutelles de la structure via structure_relations
-    """
-    if not requires_context_of:
-        return set()
-
-    result = set()
-    for item in requires_context_of:
-        if item == "tutelles":
-            result.update(tutelles_map.get(structure_id, set()))
-        elif isinstance(item, int):
-            result.add(item)
-    return result
-
-
-def resolve_address(text_normalized, forms, forms_by_structure, tutelles_map):
+def resolve_address(text_normalized, forms, forms_by_structure):
     """Résout une adresse : trouve toutes les structures identifiées.
 
     Retourne une liste de (structure_id, form_id).
@@ -141,16 +112,12 @@ def resolve_address(text_normalized, forms, forms_by_structure, tutelles_map):
         if not match_form_in_text(f, text_normalized):
             continue
 
-        # Vérifier le contexte
+        # Vérifier le contexte (requires_context_of = integer[])
         ctx = f["requires_context_of"]
         if ctx:
-            context_ids = resolve_context(ctx, sid, tutelles_map)
-            if not context_ids:
-                continue
-
             context_satisfied = any(
                 has_form_match_for_structure(cid, text_normalized, forms_by_structure)
-                for cid in context_ids
+                for cid in ctx
             )
             if not context_satisfied:
                 continue
@@ -194,9 +161,7 @@ def main():
     logger.info("Chargement des structures et formes...")
     forms = load_forms(cur)
     forms_by_structure = build_forms_by_structure(forms)
-    tutelles_map = load_tutelles(cur)
     perimeter = load_perimeter(cur)
-    logger.info(f"  {len(tutelles_map)} structures avec tutelles")
     logger.info(f"  {len(perimeter)} structures dans le périmètre")
 
     # En mode daily : uniquement les adresses jamais résolues
@@ -219,15 +184,13 @@ def main():
 
     if total > 0:
         process_addresses(
-            cur, conn, rows, forms, forms_by_structure, tutelles_map,
-            perimeter
+            cur, conn, rows, forms, forms_by_structure, perimeter
         )
 
     conn.close()
 
 
-def process_addresses(cur, conn, rows, forms, forms_by_structure, tutelles_map,
-                      perimeter):
+def process_addresses(cur, conn, rows, forms, forms_by_structure, perimeter):
     """Traite une liste d'adresses : détection + affiliations."""
     t_start = time.perf_counter()
     total = len(rows)
@@ -239,7 +202,7 @@ def process_addresses(cur, conn, rows, forms, forms_by_structure, tutelles_map,
 
     for addr_id, raw_text in rows:
         text_norm = normalize(raw_text)
-        matches = resolve_address(text_norm, forms, forms_by_structure, tutelles_map)
+        matches = resolve_address(text_norm, forms, forms_by_structure)
 
         in_perimeter = any(sid in perimeter for sid, _ in matches)
         if in_perimeter:

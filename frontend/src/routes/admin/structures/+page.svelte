@@ -366,7 +366,6 @@
   }
 
   function ctxLabel(x: number | string): string {
-    if (x === "tutelles") return "tutelles";
     return structLookup[x as number] || "id:" + x;
   }
 
@@ -788,7 +787,7 @@
                     {#if f.requires_context_of?.length}
                       {#each f.requires_context_of as x}
                         <span class="ctx-tag">
-                          {#if x === "tutelles"}tutelles{:else}{ctxLabel(x)}{/if}
+                          {ctxLabel(x)}
                           <button class="ctx-remove" onclick={() => removeCtx(f.id, x)}>x</button>
                         </span>
                       {/each}
@@ -829,7 +828,7 @@
           <span class="ctx-label-text">Contexte :</span>
           {#each newFormCtx as x}
             <span class="ctx-tag">
-              {#if x === "tutelles"}tutelles{:else}{ctxLabel(x)}{/if}
+              {ctxLabel(x)}
               <button class="ctx-remove" onclick={() => removeNewCtx(x)}>x</button>
             </span>
           {/each}
@@ -845,7 +844,7 @@
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="picker-container ctx-picker" bind:this={ctxPickerEl} onclick={(e) => e.stopPropagation()}>
             <div class="ctx-picker-shortcuts">
-              <button class="btn btn-sm" onclick={() => pickCtx("tutelles")}> tutelles </button>
+              <button class="btn btn-sm" onclick={() => { for (const t of tutelles) pickCtx(t.id); }}> tutelles </button>
               <button class="btn btn-sm" onclick={pickCtxClear}> &#x2715; suffisant </button>
             </div>
             <input type="text" placeholder="Rechercher une structure..." bind:value={ctxPickerSearch} autocomplete="off" />

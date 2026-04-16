@@ -5,7 +5,6 @@ import pytest
 from processing.resolve_addresses import (
     match_form_in_text,
     resolve_address,
-    resolve_context,
     build_forms_by_structure,
 )
 
@@ -69,45 +68,19 @@ class TestMatchFormInText:
 
 # ── resolve_context ──────────────────────────────────────────────
 
-class TestResolveContext:
-    def test_integer_ids(self):
-        result = resolve_context([10, 20], 1, {})
-        assert result == {10, 20}
-
-    def test_tutelles_keyword(self):
-        tutelles_map = {5: {100, 200}}
-        result = resolve_context(["tutelles"], 5, tutelles_map)
-        assert result == {100, 200}
-
-    def test_tutelles_unknown_structure(self):
-        result = resolve_context(["tutelles"], 999, {})
-        assert result == set()
-
-    def test_mixed(self):
-        tutelles_map = {5: {100}}
-        result = resolve_context([42, "tutelles"], 5, tutelles_map)
-        assert result == {42, 100}
-
-    def test_none(self):
-        assert resolve_context(None, 1, {}) == set()
-
-    def test_empty(self):
-        assert resolve_context([], 1, {}) == set()
-
-
 # ── resolve_address ──────────────────────────────────────────────
 
 class TestResolveAddress:
     def test_simple_match(self):
         forms = [_form(1, "limos", "limos", form_id=10)]
         fbs = build_forms_by_structure(forms)
-        result = resolve_address("lab limos clermont", forms, fbs, {})
+        result = resolve_address("lab limos clermont", forms, fbs)
         assert result == [(1, 10)]
 
     def test_no_match(self):
         forms = [_form(1, "grenoble", "grenoble")]
         fbs = build_forms_by_structure(forms)
-        result = resolve_address("lab limos clermont", forms, fbs, {})
+        result = resolve_address("lab limos clermont", forms, fbs)
         assert result == []
 
     def test_multiple_structures(self):
@@ -116,7 +89,7 @@ class TestResolveAddress:
             _form(2, "clermont", "clermont", form_id=20),
         ]
         fbs = build_forms_by_structure(forms)
-        result = resolve_address("limos clermont ferrand", forms, fbs, {})
+        result = resolve_address("limos clermont ferrand", forms, fbs)
         assert len(result) == 2
         structure_ids = {sid for sid, _ in result}
         assert structure_ids == {1, 2}
@@ -128,7 +101,7 @@ class TestResolveAddress:
             _form(1, "laboratoire limos", "laboratoire limos", form_id=11),
         ]
         fbs = build_forms_by_structure(forms)
-        result = resolve_address("laboratoire limos clermont", forms, fbs, {})
+        result = resolve_address("laboratoire limos clermont", forms, fbs)
         assert len(result) == 1
         assert result[0][0] == 1
 
@@ -140,7 +113,7 @@ class TestResolveAddress:
             _form(2, "clermont", "clermont", form_id=20),
         ]
         fbs = build_forms_by_structure(forms)
-        result = resolve_address("limos clermont", forms, fbs, {})
+        result = resolve_address("limos clermont", forms, fbs)
         structure_ids = {sid for sid, _ in result}
         assert 1 in structure_ids
 
@@ -152,7 +125,7 @@ class TestResolveAddress:
             _form(2, "grenoble", "grenoble", form_id=20),
         ]
         fbs = build_forms_by_structure(forms)
-        result = resolve_address("limos clermont", forms, fbs, {})
+        result = resolve_address("limos clermont", forms, fbs)
         structure_ids = {sid for sid, _ in result}
         assert 1 not in structure_ids
 
@@ -172,7 +145,7 @@ class TestResolveAddress:
                 "centre constitutif cardiopathies congenitales complexes m3c "
                 "groupe hospitalier paris saint joseph hopital marie lannelongue "
                 "inserm u999 universite paris saclay")
-        result = resolve_address(text, forms, fbs, {})
+        result = resolve_address(text, forms, fbs)
         matched_ids = {sid for sid, _ in result}
         assert 217 not in matched_ids  # LRL ne doit PAS matcher
 
@@ -185,20 +158,19 @@ class TestResolveAddress:
         ]
         fbs = build_forms_by_structure(forms)
         text = "inserm u999 universite clermont auvergne"
-        result = resolve_address(text, forms, fbs, {})
+        result = resolve_address(text, forms, fbs)
         matched_ids = {sid for sid, _ in result}
         assert 217 in matched_ids  # LRL doit matcher
         assert 169 in matched_ids  # UCA aussi
 
     def test_context_tutelles(self):
-        """requires_context_of = ["tutelles"] → résolu via tutelles_map."""
+        """requires_context_of = [99] (IDs directs)."""
         forms = [
             _form(1, "limos", "limos", form_id=10,
-                  requires_context_of=["tutelles"]),
+                  requires_context_of=[99]),
             _form(99, "uca", "uca", form_id=99),
         ]
         fbs = build_forms_by_structure(forms)
-        tutelles_map = {1: {99}}  # structure 99 est tutelle de 1
-        result = resolve_address("limos uca", forms, fbs, tutelles_map)
+        result = resolve_address("limos uca", forms, fbs)
         structure_ids = {sid for sid, _ in result}
         assert 1 in structure_ids

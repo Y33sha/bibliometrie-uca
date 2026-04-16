@@ -70,7 +70,6 @@ TABLES = [
         "table": "structure_name_forms",
         "columns": ["id", "structure_id", "form_text", "requires_context_of", "is_active", "notes", "is_word_boundary"],
         "order": "id",
-        "jsonb_columns": ["requires_context_of"],
     },
 ]
 
