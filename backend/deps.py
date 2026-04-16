@@ -73,15 +73,23 @@ def require_admin(session: str | None = Cookie(None, alias="session")):
 
 from psycopg2.pool import ThreadedConnectionPool
 
-_db_args = dict(DB)
-if os.environ.get("BIBLIOMETRIE_SANDBOX") == "1":
-    _db_args["dbname"] = "bibliometrie_sandbox"
-_pool = ThreadedConnectionPool(minconn=DB_POOL_MIN, maxconn=DB_POOL_MAX, **_db_args)
+_pool = None
+
+
+def _get_pool():
+    global _pool
+    if _pool is None:
+        db_args = dict(DB)
+        if os.environ.get("BIBLIOMETRIE_SANDBOX") == "1":
+            db_args["dbname"] = "bibliometrie_sandbox"
+        _pool = ThreadedConnectionPool(minconn=DB_POOL_MIN, maxconn=DB_POOL_MAX, **db_args)
+    return _pool
 
 
 @contextmanager
 def get_cursor():
-    conn = _pool.getconn()
+    pool = _get_pool()
+    conn = pool.getconn()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             yield cur, conn
@@ -90,7 +98,7 @@ def get_cursor():
         conn.rollback()
         raise
     finally:
-        _pool.putconn(conn)
+        pool.putconn(conn)
 
 
 # ----- Perimeter root -----
