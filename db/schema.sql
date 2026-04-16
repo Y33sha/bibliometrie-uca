@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict D5hTMN3fpfh2raFanHz7jJQQDfxRgVuMICl6LHsz8qa3sekEebBwXGTw8LRe7xa
+\restrict tUrrFoAl7aDjIjtNcrrbJ2gRwrFzOg2LYM1fr0RoGnxesKTHJO9TbfCpohUruYB
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -296,7 +296,8 @@ CREATE TABLE public.authorships (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     structure_ids integer[],
-    is_corresponding boolean
+    is_corresponding boolean,
+    roles text[]
 );
 
 
@@ -2580,5 +2581,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict D5hTMN3fpfh2raFanHz7jJQQDfxRgVuMICl6LHsz8qa3sekEebBwXGTw8LRe7xa
+\unrestrict tUrrFoAl7aDjIjtNcrrbJ2gRwrFzOg2LYM1fr0RoGnxesKTHJO9TbfCpohUruYB
 

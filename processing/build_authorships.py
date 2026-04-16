@@ -125,6 +125,24 @@ def build(cur, sources=None):
     corr_count = cur.rowcount
     logger.info(f"  {corr_count} is_corresponding mises à jour")
 
+    # ── Étape 3b : Propagation roles ──
+    cur.execute("""
+        UPDATE authorships a
+        SET roles = sub.merged_roles
+        FROM (
+            SELECT sa.authorship_id,
+                   array_agg(DISTINCT r ORDER BY r) AS merged_roles
+            FROM source_authorships sa,
+                 LATERAL unnest(sa.roles) AS r
+            WHERE sa.authorship_id IS NOT NULL
+              AND sa.roles IS NOT NULL
+            GROUP BY sa.authorship_id
+        ) sub
+        WHERE a.id = sub.authorship_id
+          AND a.roles IS DISTINCT FROM sub.merged_roles
+    """)
+    logger.info(f"  {cur.rowcount} roles mises à jour")
+
     # ── Étape 4 : Propagation in_perimeter et structure_ids ──
     # Les sources ont déjà in_perimeter et structure_ids peuplés par
     # populate_affiliations.py → on fait l'union des sources.

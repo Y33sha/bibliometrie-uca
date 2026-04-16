@@ -82,6 +82,7 @@ async def get_laboratory(lab_id: int):
             JOIN authorships a ON a.publication_id = p.id
             WHERE p.doc_type IN ('thesis', 'ongoing_thesis')
               AND %s = ANY(a.structure_ids)
+              AND a.roles && ARRAY['author']::text[]
         """, (lab_id,))
         theses_count = cur.fetchone()["count"]
 
@@ -157,6 +158,7 @@ async def get_laboratory_persons(
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             WHERE a.person_id IS NOT NULL
               AND a.structure_ids && %s::int[]
+              AND a.roles && ARRAY['author']::text[]
               {extra_where}
         """, [lab_arr] + extra_params)
         total_persons = cur.fetchone()["count"]
@@ -179,6 +181,7 @@ async def get_laboratory_persons(
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             WHERE a.person_id IS NOT NULL
               AND a.structure_ids && %s::int[]
+              AND a.roles && ARRAY['author']::text[]
               {extra_where}
             GROUP BY p.id, p.last_name, p.first_name,
                      prh.id, prh.role_title, prh.department_name
@@ -193,13 +196,14 @@ async def get_laboratory_persons(
             FROM authorships a
             WHERE a.person_id IS NULL
               AND a.structure_ids && %s::int[]
+              AND a.roles && ARRAY['author']::text[]
         """, (lab_arr,))
         orphan_total = cur.fetchone()["count"]
 
         # ---- Facettes (chacune exclut son propre filtre) ----
         def facet_base(*, skip: str) -> tuple[str, list]:
             """Conditions de base pour les facettes, en excluant le filtre `skip`."""
-            conds = ["a.person_id IS NOT NULL", "a.structure_ids && %s::int[]"]
+            conds = ["a.person_id IS NOT NULL", "a.structure_ids && %s::int[]", "a.roles && ARRAY['author']::text[]"]
             p: list = [lab_arr]
             if skip != "search" and search:
                 conds.append("(unaccent(per.last_name) ILIKE unaccent(%s) OR unaccent(per.first_name) ILIKE unaccent(%s))")
@@ -321,6 +325,7 @@ async def get_laboratory_dashboard(lab_id: int):
             JOIN authorships a ON a.publication_id = p.id
             WHERE a.in_perimeter = TRUE
               AND a.structure_ids && %s::int[]
+              AND a.roles && ARRAY['author']::text[]
               AND p.pub_year IS NOT NULL
               AND p.pub_year >= %s
             GROUP BY p.pub_year
@@ -339,6 +344,7 @@ async def get_laboratory_dashboard(lab_id: int):
             JOIN authorships a ON a.publication_id = p.id
             WHERE a.in_perimeter = TRUE
               AND a.structure_ids && %s::int[]
+              AND a.roles && ARRAY['author']::text[]
         """, (lab_arr,))
         oa = cur.fetchone()
 
@@ -354,6 +360,7 @@ async def get_laboratory_dashboard(lab_id: int):
             JOIN authorships a ON a.publication_id = p.id
             WHERE a.in_perimeter = TRUE
               AND a.structure_ids && %s::int[]
+              AND a.roles && ARRAY['author']::text[]
               AND p.doc_type = 'article'
         """, (lab_arr,))
         collab = cur.fetchone()
@@ -367,6 +374,7 @@ async def get_laboratory_dashboard(lab_id: int):
             JOIN countries co ON co.code = cc
             WHERE a.in_perimeter = TRUE
               AND a.structure_ids && %s::int[]
+              AND a.roles && ARRAY['author']::text[]
               AND p.doc_type = 'article'
               AND cc <> 'fr'
             GROUP BY co.code, co.name

@@ -98,7 +98,22 @@ def main():
             sys.exit(1)
 
     print(f"\n{len(pending)} migration(s) appliquée(s).")
+
+    # Régénérer schema.sql depuis la base à jour
+    db_name = conn.info.dbname
+    db_user = conn.info.user
     conn.close()
+
+    schema_path = Path(__file__).parent / "schema.sql"
+    import subprocess
+    result = subprocess.run(
+        ["pg_dump", "--schema-only", "--no-owner", "--no-privileges",
+         "-d", db_name, "-U", db_user],
+        capture_output=True, text=True
+    )
+    if result.returncode == 0:
+        schema_path.write_text(result.stdout, encoding="utf-8")
+        print("schema.sql régénéré.")
 
 
 if __name__ == "__main__":

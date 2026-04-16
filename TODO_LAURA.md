@@ -16,7 +16,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] audit complet du code pour retrouver tous les trucs hardcodés qu'on pourrait abstraire, ou le SQL à simplifier suite aux fusions des tables sources. 
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
-* [ ] transférer champ role des authorships sources aux authorships canoniques? auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques)
+* [ ] auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques)
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
 # Données
 ## Explorer autres sources possibles
@@ -91,6 +91,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] accessibilité, responsivité de l'interface
 * [ ] tableaux personnes remplacer les identifiants par des icônes (hal orcid idref)
 * [ ] étoffer tests frontend
+* [ ] export csv tableaux thèses
 ## Détails d'affichage
 * [ ] titres 30% minimum de la largeur du tableau; diminuer taille titre revue
 * [ ] dropdown titres revues: tronquer, sinon parfois plus large que la page
@@ -106,3 +107,4 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * openalex répète des auteurs : publi 77832
 * [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
 * erreur de parsing OA: publication 113652
+* thèses CHELTER: 3 ou 4?
