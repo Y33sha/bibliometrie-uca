@@ -841,20 +841,22 @@
           <button class="btn btn-sm btn-primary" onclick={() => addForm(s.id)}> Ajouter </button>
         </div>
 
-        <!-- New form context tags -->
-        <div class="new-form-ctx">
-          <span class="ctx-label-text">Contexte :</span>
-          {#each newFormCtx as x}
-            <span class="ctx-tag">
-              {ctxLabel(x)}
-              <button class="ctx-remove" onclick={() => removeNewCtx(x)}>x</button>
-            </span>
-          {/each}
-          <button class="btn-add-tiny" onclick={() => openCtxPicker(null)}>+</button>
-          {#if newFormCtx.length === 0}
-            <span class="ctx-hint">(suffisant)</span>
-          {/if}
-        </div>
+        <!-- New form context tags (masqué si excluante) -->
+        {#if !addFormExcluding}
+          <div class="new-form-ctx">
+            <span class="ctx-label-text">Contexte :</span>
+            {#each newFormCtx as x}
+              <span class="ctx-tag">
+                {ctxLabel(x)}
+                <button class="ctx-remove" onclick={() => removeNewCtx(x)}>x</button>
+              </span>
+            {/each}
+            <button class="btn-add-tiny" onclick={() => openCtxPicker(null)}>+</button>
+            {#if newFormCtx.length === 0}
+              <span class="ctx-hint">(suffisant)</span>
+            {/if}
+          </div>
+        {/if}
 
         <!-- Context picker -->
         {#if ctxPickerOpen}
