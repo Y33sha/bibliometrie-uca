@@ -22,9 +22,10 @@ Phases (dans l'ordre d'execution):
                    source_authorships). Rattachement aux publications existantes par DOI/NNT/
                    HAL-ID, mais PAS de creation de publications. Inclut enrichissement
                    structures HAL et moissonnage identifiants HAL (ORCID, IdRef).
+                   Crée les adresses et liens source_authorship_addresses.
                    Vide le raw_data du staging apres traitement + VACUUM.
-    addresses      Résolution des adresses vers les structures connues
-    affiliations   Resolution affiliations sur source_authorships (in_perimeter, structure_ids)
+    affiliations   Résolution adresses → structures, puis propagation
+                   in_perimeter et structure_ids sur source_authorships
     publications   Creation des publications pour les source_publications in-perimeter non
                    rattaches + merges inter-sources (HAL-ID, NNT)
     persons        Creation/mapping personnes + formes de noms
@@ -193,25 +194,16 @@ def _vacuum_staging(full: bool = False):
     conn.close()
 
 
-def phase_addresses(**kw):
-    """Résolution des adresses vers les structures connues.
-
-    Les adresses sont créées pendant la normalisation (plus de populate_addresses).
-    Cette phase ne fait que la résolution adresses → structures.
-    """
-    mode = kw.get("mode", "full")
-    run_python("processing/resolve_addresses.py", "--mode", mode)
-
-
 def phase_affiliations(**kw):
-    """Resolution des affiliations UCA sur les source_authorships.
+    """Résolution des affiliations UCA sur les source_authorships.
 
-    Determine in_perimeter et structure_ids a partir des structures HAL
-    (pour HAL) et des adresses resolues (pour les autres sources).
+    1. resolve_addresses : matche les adresses vers les structures connues
+    2. populate_affiliations : propage in_perimeter et structure_ids
     """
     sources = kw.get("sources", set(ALL_SOURCES_SET))
     source_args = ",".join(sorted(sources))
     mode = kw.get("mode", "full")
+    run_python("processing/resolve_addresses.py", "--mode", mode)
     run_python("processing/populate_affiliations.py", "--sources", source_args, "--mode", mode)
 
 
@@ -279,7 +271,6 @@ PHASES = [
     ("extract", phase_extract),
     ("cross_imports", phase_cross_imports),
     ("normalize", phase_normalize),
-    ("addresses", phase_addresses),
     ("affiliations", phase_affiliations),
     ("publications", phase_publications),
     ("persons", phase_persons),
