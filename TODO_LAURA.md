@@ -57,8 +57,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
 # Interface
 ## Admin
-### Structures
-* [ ] créer formes de noms excluantes? ex. "Zone Ateliers Territoires Uranifères" => reconnaît à tort UMR Territoires à cause du contexte Clermont
 ### Adresses
 * [ ] interface de repérage des adresses: ajouter filtres sur la base des autres structures reconnues dans l'adresse
 * [ ] pays des adresses: aller plus loin dans l'automatisation de la détection (GeoNames? index n-gram des adresses avec pays associés et degré de certitude?)

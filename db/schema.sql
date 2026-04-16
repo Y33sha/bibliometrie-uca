@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vu86bzgavAJ89JLSl6oWV33QEKfmWemZ9QWNVX4zxXhEqDWeVKl39NZr3Jq7G1k
+\restrict D5hTMN3fpfh2raFanHz7jJQQDfxRgVuMICl6LHsz8qa3sekEebBwXGTw8LRe7xa
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -1080,11 +1080,10 @@ CREATE TABLE public.structure_name_forms (
     id integer CONSTRAINT name_forms_id_not_null NOT NULL,
     structure_id integer CONSTRAINT name_forms_structure_id_not_null NOT NULL,
     form_text text CONSTRAINT name_forms_form_text_not_null NOT NULL,
-    is_active boolean DEFAULT true,
-    notes text,
     created_at timestamp with time zone DEFAULT now(),
     is_word_boundary boolean DEFAULT false NOT NULL,
-    requires_context_of integer[]
+    requires_context_of integer[],
+    is_excluding boolean DEFAULT false NOT NULL
 );
 
 
@@ -2269,13 +2268,6 @@ CREATE INDEX idx_struct_rel_parent ON public.structure_relations USING btree (pa
 
 
 --
--- Name: idx_structure_name_forms_active; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_structure_name_forms_active ON public.structure_name_forms USING btree (is_active) WHERE (is_active = true);
-
-
---
 -- Name: idx_structure_name_forms_structure; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2588,5 +2580,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vu86bzgavAJ89JLSl6oWV33QEKfmWemZ9QWNVX4zxXhEqDWeVKl39NZr3Jq7G1k
+\unrestrict D5hTMN3fpfh2raFanHz7jJQQDfxRgVuMICl6LHsz8qa3sekEebBwXGTw8LRe7xa
 

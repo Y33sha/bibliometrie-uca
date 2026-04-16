@@ -197,11 +197,11 @@ async def create_name_form(data: NameFormCreate):
         ctx = data.requires_context_of or None
         cur.execute("""
             INSERT INTO structure_name_forms (structure_id, form_text,
-                                    is_word_boundary, requires_context_of, notes)
+                                    is_word_boundary, is_excluding, requires_context_of)
             VALUES (%s, %s, %s, %s, %s)
             RETURNING *
         """, (data.structure_id, form_text, data.is_word_boundary,
-              ctx, data.notes))
+              data.is_excluding, ctx))
         return cur.fetchone()
 
 
@@ -221,15 +221,12 @@ async def update_name_form(form_id: int, data: NameFormUpdate):
         if data.is_word_boundary is not None:
             updates.append("is_word_boundary = %s")
             params.append(data.is_word_boundary)
+        if data.is_excluding is not None:
+            updates.append("is_excluding = %s")
+            params.append(data.is_excluding)
         if data.requires_context_of is not None:
             updates.append("requires_context_of = %s")
             params.append(data.requires_context_of or None)
-        if data.is_active is not None:
-            updates.append("is_active = %s")
-            params.append(data.is_active)
-        if data.notes is not None:
-            updates.append("notes = %s")
-            params.append(data.notes)
 
         if not updates:
             raise HTTPException(status_code=400, detail="Nothing to update")
