@@ -21,7 +21,7 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import clean_doi, compute_hash, get_existing_ids, setup_logger
-from utils.api_limits import HAL_DELAY
+from utils.api_limits import HAL_DELAY, HAL_PER_PAGE
 from utils.app_config import (
     get_api_base_urls,
     get_hal_collections,
@@ -33,8 +33,6 @@ from utils.hal import HAL_FIELDS
 # ----- Logging -----
 logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))
 
-# ----- Constantes API -----
-PER_PAGE = 500
 
 
 
@@ -66,7 +64,7 @@ def fetch_page(
     params = {
         "q": query,
         "fl": ",".join(HAL_FIELDS),
-        "rows": PER_PAGE,
+        "rows": HAL_PER_PAGE,
         "start": start,
         "sort": "docid asc",
         "wt": "json",

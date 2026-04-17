@@ -29,7 +29,7 @@ from extraction.openalex import (
     extract_openalex_id,
     init_auth,
 )
-from utils.api_limits import OPENALEX_DELAY
+from utils.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
 from utils.app_config import (
     get_api_base_urls,
     get_openalex_api_key,
@@ -38,7 +38,6 @@ from utils.app_config import (
     get_years,
 )
 
-PER_PAGE = 200
 
 # ----- Logging -----
 logger = setup_logger("extract_openalex", os.path.join(os.path.dirname(__file__), "logs"))
@@ -66,7 +65,7 @@ def build_params(year: int = None, cursor: str = "*",
     return {
         "filter": filter_str,
         "select": SELECT_FIELDS,
-        "per_page": PER_PAGE,
+        "per_page": OPENALEX_PER_PAGE,
         "cursor": cursor,
         **auth_params(),
     }

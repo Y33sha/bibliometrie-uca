@@ -25,14 +25,13 @@ from psycopg2.extras import Json, execute_values
 
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
-from utils.api_limits import WOS_DELAY
+from utils.api_limits import WOS_DELAY, WOS_PER_PAGE
 from utils.app_config import get_api_base_urls, get_wos_affiliations, get_wos_api_key, get_years
 
 # ----- Logging -----
 logger = setup_logger("extract_wos", os.path.join(os.path.dirname(__file__), "logs"))
 
 # ----- Constantes techniques -----
-PER_PAGE = 10           # recommandé par Clarivate (timeout fréquents au-delà)
 BREATHER_EVERY = 10     # pause longue toutes les N pages
 BREATHER_SECS = 15      # durée de la pause longue (secondes)
 
@@ -117,7 +116,7 @@ def fetch_page(year: int, first_record: int) -> dict:
     params = {
         "databaseId": "WOS",
         "usrQuery": build_query(year),
-        "count": PER_PAGE,
+        "count": WOS_PER_PAGE,
         "firstRecord": first_record,
     }
     return _fetch_with_retry(BASE_URL, params, label=f"({year}, rec {first_record})")
@@ -228,7 +227,7 @@ def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> i
             insert_batch(conn, batch)
             total_inserted += len(batch)
 
-        page_num = (first_record - 1) // PER_PAGE + 1
+        page_num = (first_record - 1) // WOS_PER_PAGE + 1
         logger.info(
             f"  Page {page_num} : {len(records)} records, "
             f"{len(batch)} insérés "
