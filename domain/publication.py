@@ -234,3 +234,138 @@ class ExternalIds(BaseModel):
         Préserve les clés supplémentaires (extra="allow").
         """
         return self.model_dump(exclude_none=True)
+
+
+# ── PublicationBiblio : colonne biblio ─────────────────────────────
+
+
+class PublicationBiblio(BaseModel):
+    """Modèle de la colonne JSONB `biblio` (sur source_publications ET
+    publications).
+
+    Contient les infos bibliographiques d'un article (volume, issue,
+    numéro de page). **Schéma hétérogène selon la source** :
+    - HAL → `pages` (range ex. "123-456", potentiellement avec préfixe
+      genre "S123-S145" pour supplément)
+    - OpenAlex, WoS → `first_page` + `last_page` (décomposé)
+
+    Les deux peuvent coexister dans la même ligne après fusion (le
+    merge shallow de refresh_from_sources ne dédoublonne pas). Les
+    champs sont **tous optionnels** — on accepte toutes les clés
+    rencontrées sans chercher à les unifier, tant qu'on n'a pas tranché.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    volume: str | None = None
+    issue: str | None = None
+    pages: str | None = None       # HAL : range "123-456"
+    first_page: str | None = None  # OpenAlex, WoS
+    last_page: str | None = None   # OpenAlex, WoS
+
+    def to_dict(self) -> dict:
+        return self.model_dump(exclude_none=True)
+
+
+# ── PublicationMeta : colonne meta ─────────────────────────────────
+
+
+class EcoleDoctorale(BaseModel):
+    """École doctorale d'une thèse (metadata theses.fr)."""
+    model_config = ConfigDict(extra="allow")
+    nom: str
+    ppn: str | None = None  # IdRef de l'ED quand disponible
+
+
+class Partenaire(BaseModel):
+    """Partenaire de recherche d'une thèse (metadata theses.fr)."""
+    model_config = ConfigDict(extra="allow")
+    nom: str
+    type: str | None = None  # ex: "etablissement", "laboratoire", …
+
+
+class PublicationMeta(BaseModel):
+    """Modèle de la colonne JSONB `meta` (sur source_publications ET
+    publications).
+
+    Aujourd'hui peuplée uniquement par theses.fr (champs thèse :
+    dates de soutenance/inscription, discipline, écoles doctorales,
+    partenaires). Le modèle reste ouvert (extra="allow") pour
+    accueillir d'autres types de métadonnées plus tard sans migration.
+
+    `discipline` est la source de vérité pour la discipline d'une
+    thèse (par convention dans le projet) — `topics.theses.discipline`
+    en contient aussi une copie historique qu'il faudra purger.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    # Dates au format ISO 8601 (YYYY-MM-DD) — stockées en string dans
+    # le JSONB, pas de type date Pydantic pour simplifier la sérialisation.
+    date_soutenance: str | None = None
+    date_inscription: str | None = None
+
+    discipline: str | None = None
+    ecoles_doctorales: list[EcoleDoctorale] | None = None
+    partenaires: list[Partenaire] | None = None
+
+    def to_dict(self) -> dict:
+        return self.model_dump(exclude_none=True)
+
+
+# ── PublicationTopics : colonne topics ─────────────────────────────
+
+
+class OpenAlexTopic(BaseModel):
+    """Un élément de la hiérarchie thématique OpenAlex.
+
+    Un document a plusieurs lignes de ce type (une liste de OpenAlexTopic)
+    car OpenAlex classe souvent en plusieurs sujets avec des scores.
+    Tous les champs sont optionnels par défensivité (données réelles
+    parfois incomplètes).
+    """
+    model_config = ConfigDict(extra="allow")
+
+    domain: str | None = None
+    field: str | None = None
+    subfield: str | None = None
+    topic: str | None = None
+    score: float | None = None
+
+
+class ThesesTopics(BaseModel):
+    """Topics au format theses.fr : discipline + termes Rameau.
+
+    `discipline` est une copie de `meta.discipline` — il est redondant
+    mais présent dans les données historiques. Voir PublicationMeta.
+    """
+    model_config = ConfigDict(extra="allow")
+
+    discipline: str | None = None
+    rameau: list[str] | None = None
+
+
+class PublicationTopics(BaseModel):
+    """Modèle de la colonne JSONB `topics` (sur publications,
+    reconstituée par refresh_from_sources).
+
+    **Container composite par source** — chaque source garde sa forme
+    native, rien n'est perdu (cf. commit précédent qui a corrigé
+    la perte silencieuse des topics OpenAlex) :
+    - openalex : liste de OpenAlexTopic (hiérarchie thématique)
+    - theses   : dict discipline+rameau
+    - scanr    : dict non contrôlé (structure variable)
+
+    Sur `source_publications.topics`, chaque ligne contient UNE seule
+    forme (la forme native de la source). Sur `publications.topics`,
+    le dict indexé par source est reconstitué à partir des sources.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    openalex: list[OpenAlexTopic] | None = None
+    theses: ThesesTopics | None = None
+    scanr: dict | None = None  # format variable, pas de sous-modèle
+
+    def to_dict(self) -> dict:
+        return self.model_dump(exclude_none=True)

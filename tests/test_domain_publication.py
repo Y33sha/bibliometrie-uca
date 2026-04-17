@@ -5,7 +5,19 @@ import pytest
 from pydantic import ValidationError as PydanticValidationError
 
 from domain.errors import ValidationError
-from domain.publication import DOI, NNT, ExternalIds, HALId
+from domain.publication import (
+    DOI,
+    NNT,
+    EcoleDoctorale,
+    ExternalIds,
+    HALId,
+    OpenAlexTopic,
+    Partenaire,
+    PublicationBiblio,
+    PublicationMeta,
+    PublicationTopics,
+    ThesesTopics,
+)
 
 
 # ── DOI ────────────────────────────────────────────────────────────
@@ -226,3 +238,136 @@ class TestExternalIdsParsing:
         ids = ExternalIds(**from_db)
         back = ids.to_dict()
         assert back == from_db
+
+
+# ── PublicationBiblio ──────────────────────────────────────────────
+
+
+class TestPublicationBiblio:
+    def test_hal_style_pages_range(self):
+        b = PublicationBiblio(volume="42", issue="3", pages="123-145")
+        assert b.to_dict() == {"volume": "42", "issue": "3", "pages": "123-145"}
+
+    def test_openalex_style_decomposed(self):
+        b = PublicationBiblio(volume="42", issue="3", first_page="123", last_page="145")
+        assert b.to_dict() == {
+            "volume": "42",
+            "issue": "3",
+            "first_page": "123",
+            "last_page": "145",
+        }
+
+    def test_mixed_schemas_tolerated(self):
+        """Après fusion entre HAL et OpenAlex, les deux schémas peuvent
+        coexister dans le même enregistrement. Le modèle le tolère."""
+        b = PublicationBiblio(pages="123-145", first_page="123", last_page="145")
+        d = b.to_dict()
+        assert "pages" in d and "first_page" in d and "last_page" in d
+
+    def test_allows_extra_keys(self):
+        b = PublicationBiblio(volume="42", article_number="e12345")
+        assert b.to_dict()["article_number"] == "e12345"
+
+    def test_empty(self):
+        assert PublicationBiblio().to_dict() == {}
+
+
+# ── PublicationMeta ────────────────────────────────────────────────
+
+
+class TestPublicationMeta:
+    def test_thesis_minimal(self):
+        m = PublicationMeta(
+            date_soutenance="2023-06-15",
+            discipline="Informatique",
+        )
+        d = m.to_dict()
+        assert d["date_soutenance"] == "2023-06-15"
+        assert d["discipline"] == "Informatique"
+
+    def test_with_structured_sub_objects(self):
+        m = PublicationMeta(
+            discipline="Mathématiques",
+            ecoles_doctorales=[{"nom": "ED SPI", "ppn": "123456789"}],
+            partenaires=[{"nom": "CNRS", "type": "etablissement"}],
+        )
+        d = m.to_dict()
+        assert d["ecoles_doctorales"][0]["nom"] == "ED SPI"
+        assert d["ecoles_doctorales"][0]["ppn"] == "123456789"
+        assert d["partenaires"][0]["type"] == "etablissement"
+
+    def test_ecole_doctorale_without_ppn(self):
+        ed = EcoleDoctorale(nom="ED SPI")
+        # Le ppn est optionnel
+        assert ed.ppn is None
+
+    def test_ecole_doctorale_requires_nom(self):
+        from pydantic import ValidationError as PVE
+        with pytest.raises(PVE):
+            EcoleDoctorale()  # nom obligatoire
+
+    def test_partenaire_requires_nom(self):
+        from pydantic import ValidationError as PVE
+        with pytest.raises(PVE):
+            Partenaire()  # nom obligatoire
+
+
+# ── PublicationTopics ──────────────────────────────────────────────
+
+
+class TestPublicationTopics:
+    def test_openalex_list_preserved(self):
+        """La liste OpenAlex est conservée telle quelle sous la clé openalex."""
+        t = PublicationTopics(
+            openalex=[
+                {"domain": "SS", "field": "Eco", "subfield": "Micro",
+                 "topic": "Behav", "score": 0.95},
+                {"domain": "CS", "field": "AI", "subfield": "ML",
+                 "topic": "DL", "score": 0.87},
+            ]
+        )
+        d = t.to_dict()
+        assert isinstance(d["openalex"], list)
+        assert len(d["openalex"]) == 2
+        assert d["openalex"][0]["domain"] == "SS"
+        assert d["openalex"][0]["score"] == 0.95
+
+    def test_theses_dict_preserved(self):
+        t = PublicationTopics(
+            theses={"discipline": "Informatique", "rameau": ["Algorithmes"]}
+        )
+        d = t.to_dict()
+        assert d["theses"]["discipline"] == "Informatique"
+        assert d["theses"]["rameau"] == ["Algorithmes"]
+
+    def test_composite_multiple_sources(self):
+        """Le cas principal : OpenAlex + theses coexistent sans collision."""
+        t = PublicationTopics(
+            openalex=[{"topic": "Behav", "score": 0.9}],
+            theses={"discipline": "Info", "rameau": ["Algo"]},
+        )
+        d = t.to_dict()
+        assert "openalex" in d
+        assert "theses" in d
+
+    def test_scanr_arbitrary(self):
+        """ScanR a une structure variable — on accepte dict brut."""
+        t = PublicationTopics(scanr={"domains": ["cs", "math"], "weird_key": "ok"})
+        d = t.to_dict()
+        assert d["scanr"]["domains"] == ["cs", "math"]
+
+    def test_openalex_topic_optional_fields(self):
+        """Les champs OpenAlex sont tous optionnels — données réelles parfois
+        incomplètes."""
+        topic = OpenAlexTopic(domain="Sciences")
+        assert topic.domain == "Sciences"
+        assert topic.field is None
+        assert topic.score is None
+
+    def test_theses_topics_minimal(self):
+        t = ThesesTopics()
+        assert t.discipline is None
+        assert t.rameau is None
+
+    def test_empty(self):
+        assert PublicationTopics().to_dict() == {}
