@@ -258,7 +258,7 @@ class TestNormalizeScanrIdempotence:
         db.execute("UPDATE staging SET processed = FALSE WHERE source = 'scanr'")
 
         # Deuxième passe
-        processed_2 = _run_normalize_scanr(db)
+        _run_normalize_scanr(db)
         _create_all_publications(db)
         counts_2 = _count_tables(db)
 

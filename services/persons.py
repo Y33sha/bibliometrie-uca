@@ -377,7 +377,7 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
     (publication_id, person_id) : FK, author_position, is_corresponding,
     in_perimeter, structure_ids.
     """
-    cfg = _SOURCE_CONFIG[source]
+    _SOURCE_CONFIG[source]
 
     # Trouver la publication_id via source_publications
     cur.execute(
@@ -445,7 +445,7 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
     )
 
     # 4. in_perimeter et structure_ids (union des sources)
-    perimeter_ids = get_persons_structure_ids_list(cur)
+    get_persons_structure_ids_list(cur)
     cur.execute(
         f"""
         WITH src AS (

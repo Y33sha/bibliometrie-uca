@@ -115,7 +115,7 @@ def refresh(cur):
 
 def main():
     parser = argparse.ArgumentParser(description="Recalcul des pays des publications")
-    args = parser.parse_args()
+    parser.parse_args()
 
     conn = get_connection()
     conn.autocommit = False

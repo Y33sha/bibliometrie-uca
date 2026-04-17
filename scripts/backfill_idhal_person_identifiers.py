@@ -53,7 +53,6 @@ def backfill_identifier(cur, conn, id_type, column, source_filter):
         return
 
     inserted = 0
-    skipped = 0
     for person_id, id_value in rows:
         add_identifier(cur, person_id, id_type, id_value, source="hal")
         inserted += 1

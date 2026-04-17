@@ -441,7 +441,7 @@ def process_work(cur, staging_row) -> bool:
     """Traite un work du staging ScanR."""
     staging_id = staging_row["id"]
     scanr_id = staging_row["scanr_id"]
-    doi = staging_row["doi"]
+    staging_row["doi"]
     raw_data = staging_row["raw_data"]
     doc = raw_data
     timings = {}
@@ -486,17 +486,16 @@ def process_work(cur, staging_row) -> bool:
         if publication_id:
             # Extraire les champs enrichis
             summary = doc.get("summary") or {}
-            abstract = summary.get("default") or summary.get("en") or summary.get("fr")
+            summary.get("default") or summary.get("en") or summary.get("fr")
             kw_raw = doc.get("keywords") or {}
             kw_val = kw_raw.get("default") or kw_raw.get("en") or kw_raw.get("fr")
             if isinstance(kw_val, list):
-                enrich_keywords = [str(k).strip() for k in kw_val if k] or None
+                [str(k).strip() for k in kw_val if k] or None
             elif isinstance(kw_val, str) and kw_val:
-                enrich_keywords = [k.strip() for k in kw_val.split(",") if k.strip()] or None
+                [k.strip() for k in kw_val.split(",") if k.strip()] or None
             else:
-                enrich_keywords = None
-            topics_raw = doc.get("topics") or doc.get("domains")
-            enrich_topics = {"scanr": topics_raw} if topics_raw else None
+                pass
+            doc.get("topics") or doc.get("domains")
 
             publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
 

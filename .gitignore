@@ -10,6 +10,8 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+.coverage
+htmlcov/
 
 # Frontend (SvelteKit)
 frontend/node_modules/

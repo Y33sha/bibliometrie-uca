@@ -47,7 +47,7 @@ def load_forms(cur):
         ORDER BY nf.id
     """)
     columns = [desc[0] for desc in cur.description]
-    forms = [dict(zip(columns, row)) for row in cur.fetchall()]
+    forms = [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
     logger.info(f"  {len(forms)} formes chargées")
     return forms
 

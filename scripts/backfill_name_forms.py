@@ -255,7 +255,7 @@ def main():
                 all_issnls.add(r["issnl"])
 
         # Vérifier qu'il y a un recouvrement entre les ISSN des différentes entrées
-        all_identifiers = all_issns | all_eissns | all_issnls
+        all_issns | all_eissns | all_issnls
         has_cross_match = bool(
             (all_issns & all_eissns)  # issn de l'un = eissn de l'autre
             or (all_issns & all_issnls)  # issn de l'un = issnl de l'autre
