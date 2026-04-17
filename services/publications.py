@@ -61,18 +61,16 @@ def try_merge_by_doi(cur, pub_id: int, doi: str | None) -> int:
     """
     if not doi:
         return pub_id
-    cur.execute("SELECT doi FROM publications WHERE id = %s", (pub_id,))
-    row = cur.fetchone()
-    current_doi = row["doi"] if isinstance(row, dict) else row[0] if row else None
-    if current_doi:
+    repo = PgPublicationRepository(cur)
+    if repo.get_doi(pub_id):
         return pub_id
     # La pub n'a pas de DOI : vérifier si une autre l'a
-    existing = find_by_doi(cur, doi)
+    existing = repo.find_by_doi(doi)
     if existing and existing.id != pub_id:
         merge_publications(cur, existing.id, pub_id)
         return existing.id
     # Attribuer le DOI
-    cur.execute("UPDATE publications SET doi = %s, updated_at = now() WHERE id = %s", (doi, pub_id))
+    repo.set_doi(pub_id, doi)
     return pub_id
 
 
@@ -88,6 +86,7 @@ def resolve_doi_conflict(
     - doi_corrige : le DOI a utiliser pour le nouveau document (None si retire)
     - publication_id_si_fusion : l'id de la publication existante si fusion, None sinon
     """
+    repo = PgPublicationRepository(cur)
     ex_type = existing.doc_type or ""
     chapter_types = ("book_chapter", "book-chapter", "chapter")
     book_types = ("book",)
@@ -97,22 +96,16 @@ def resolve_doi_conflict(
         return None, None
 
     if doc_type in book_types and ex_type in chapter_types:
-        cur.execute(
-            "UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s", (existing.id,)
-        )
+        repo.clear_doi(existing.id)
         return doi, None
 
     # Deux chapitres avec titres differents : DOI errone des deux cotes
     if doc_type in chapter_types and ex_type in chapter_types:
         ex_title = existing.title_normalized or ""
         if title_normalized != ex_title:
-            cur.execute(
-                "UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s",
-                (existing.id,),
-            )
+            repo.clear_doi(existing.id)
             return None, None
-        else:
-            return doi, existing.id
+        return doi, existing.id
 
     # Cas normal : meme DOI, types compatibles -> fusion
     return doi, existing.id
@@ -146,9 +139,11 @@ def find_or_create(
     if not pub_year or not title:
         return None, False
 
+    repo = PgPublicationRepository(cur)
+
     # 1. Chercher par DOI
     if doi:
-        existing = find_by_doi(cur, doi)
+        existing = repo.find_by_doi(doi)
         if existing:
             doi, merge_id = resolve_doi_conflict(cur, doi, doc_type, title_normalized, existing)
             if merge_id:
@@ -156,7 +151,7 @@ def find_or_create(
 
     # 1b. Chercher par NNT (theses uniquement)
     if nnt:
-        existing = find_by_nnt(cur, nnt)
+        existing = repo.find_by_nnt(nnt)
         if existing:
             try_merge_by_doi(cur, existing.id, doi)
             return existing.id, False
@@ -165,27 +160,13 @@ def find_or_create(
     if not allow_create:
         return None, False
 
-    cur.execute(
-        """
-        INSERT INTO publications
-            (title, title_normalized, doc_type, pub_year, doi,
-             oa_status, journal_id, container_title, language)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-    """,
-        (
-            title,
-            title_normalized,
-            doc_type,
-            pub_year,
-            doi,
-            oa_status,
-            journal_id,
-            container_title,
-            language,
-        ),
+    pub_id = repo.create(
+        title=title, title_normalized=title_normalized,
+        doc_type=doc_type, pub_year=pub_year, doi=doi,
+        oa_status=oa_status, journal_id=journal_id,
+        container_title=container_title, language=language,
     )
-    return _val(cur.fetchone(), 0), True
+    return pub_id, True
 
 
 def update_oa_status(cur, pub_id: int, oa_status: str) -> None:
