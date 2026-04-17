@@ -26,12 +26,11 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
-from utils.api_limits import THESES_DELAY
+from utils.api_limits import THESES_DELAY, THESES_PER_PAGE
 from utils.app_config import get_api_base_urls, get_theses_etab_ppns
 
 logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
 
-PER_PAGE = 500
 
 
 def build_query(ppn: str, status: str | None = None) -> str:
@@ -47,7 +46,7 @@ def fetch_page(base_url: str, query: str, debut: int = 0, nombre: int = 500) -> 
     params = {
         "q": query,
         "debut": debut,
-        "nombre": nombre or PER_PAGE,
+        "nombre": nombre or THESES_PER_PAGE,
     }
     resp = requests.get(base_url, params=params, timeout=30)
     resp.raise_for_status()
@@ -93,7 +92,7 @@ def extract_ppn(ppn: str, conn, existing_ids: set, base_url: str,
     inserted = 0
     updated = 0
     debut = 0
-    per_page = PER_PAGE
+    per_page = THESES_PER_PAGE
 
     with conn.cursor() as cur:
         while debut < total:

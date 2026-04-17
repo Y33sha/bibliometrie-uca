@@ -19,7 +19,7 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import clean_doi, compute_hash, get_existing_ids, setup_logger
-from utils.api_limits import SCANR_DELAY
+from utils.api_limits import SCANR_DELAY, SCANR_PER_PAGE
 from utils.app_config import (
     get_api_base_urls,
     get_scanr_affiliation_ids,
@@ -27,7 +27,6 @@ from utils.app_config import (
     get_years,
 )
 
-PER_PAGE = 500
 
 logger = setup_logger("extract_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -36,7 +35,7 @@ def build_query(year: int, affiliation_ids: list[str],
                 search_after: list | None = None) -> dict:
     """Construit la requête Elasticsearch pour ScanR."""
     query = {
-        "size": PER_PAGE,
+        "size": SCANR_PER_PAGE,
         "track_total_hits": True,
         "query": {
             "bool": {

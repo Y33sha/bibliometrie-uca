@@ -19,7 +19,7 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import compute_hash, get_cross_import_dois, setup_logger
-from utils.api_limits import WOS_DELAY
+from utils.api_limits import WOS_DELAY, WOS_PER_PAGE
 from utils.app_config import get_api_base_urls, get_wos_api_key
 
 # ----- Logging -----
@@ -27,7 +27,6 @@ logger = setup_logger("cross_import_wos", os.path.join(os.path.dirname(__file__)
 
 BASE_URL = ""
 HEADERS = {}
-PER_PAGE = 10  # recommandation Clarivate
 BATCH_SIZE = 20  # nombre de DOIs par requête WoS (réduit pour éviter URLs trop longues)
 
 
@@ -127,7 +126,7 @@ def search_by_dois(dois: list[str]) -> list[dict]:
         params = {
             "databaseId": "WOS",
             "usrQuery": query,
-            "count": PER_PAGE,
+            "count": WOS_PER_PAGE,
             "firstRecord": first_record,
         }
         data = _fetch_with_retry(BASE_URL, params, label=f"batch DOIs (rec {first_record})")
@@ -152,9 +151,9 @@ def search_by_dois(dois: list[str]) -> list[dict]:
         all_records.extend(records)
 
         total = int(data.get("QueryResult", {}).get("RecordsFound", 0))
-        if first_record + PER_PAGE - 1 >= total:
+        if first_record + WOS_PER_PAGE - 1 >= total:
             break
-        first_record += PER_PAGE
+        first_record += WOS_PER_PAGE
         time.sleep(WOS_DELAY)
 
     return all_records
