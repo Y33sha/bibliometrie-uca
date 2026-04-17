@@ -1,6 +1,6 @@
 """Pydantic models shared across routers."""
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -203,3 +203,27 @@ class DetachAuthorships(BaseModel):
 
 class DetachNameForm(BaseModel):
     name_form: str
+
+
+# ----- Config / Perimeters -----
+
+
+class ConfigValueUpdate(BaseModel):
+    """Corps de PUT /api/config/{key} : value JSON-sérialisable arbitraire."""
+    value: Any
+
+
+class AddPerimeterStructure(BaseModel):
+    structure_id: int
+
+
+class PerimeterCreate(BaseModel):
+    code: str
+    name: str
+    description: str | None = None
+
+
+class PerimeterUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    structure_ids: list[int] | None = None
