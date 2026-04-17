@@ -10,6 +10,7 @@ from services.publications import (
     find_by_nnt,
     find_by_title,
     find_thesis_by_title,
+    mark_distinct,
     merge_publications,
     resolve_doi_conflict,
     try_merge_by_doi,
@@ -335,6 +336,29 @@ class TestMergePublications:
 
         db.execute("SELECT doi FROM publications WHERE id = %s", (target,))
         assert db.fetchone()["doi"] == "10.1234/target"
+
+
+class TestMarkDistinct:
+    def test_inserts_ordered_pair(self, db):
+        p1 = _insert_publication(db, title="A")
+        p2 = _insert_publication(db, title="B")
+        mark_distinct(db, p2, p1)  # ordre inverse exprès
+        db.execute(
+            "SELECT pub_id_a, pub_id_b FROM distinct_publications WHERE pub_id_a = %s AND pub_id_b = %s",
+            (min(p1, p2), max(p1, p2)),
+        )
+        assert db.fetchone() is not None
+
+    def test_idempotent(self, db):
+        p1 = _insert_publication(db, title="A")
+        p2 = _insert_publication(db, title="B")
+        mark_distinct(db, p1, p2)
+        mark_distinct(db, p1, p2)  # ON CONFLICT DO NOTHING
+        db.execute(
+            "SELECT COUNT(*) AS n FROM distinct_publications WHERE pub_id_a = %s AND pub_id_b = %s",
+            (min(p1, p2), max(p1, p2)),
+        )
+        assert db.fetchone()["n"] == 1
 
     def test_oa_status_upgrade_diamond_wins(self, db):
         """Si source est diamond, la cible devient diamond même si elle avait gold."""

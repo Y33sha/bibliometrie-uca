@@ -676,6 +676,22 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
 # ── Fusion ──
 
 
+def mark_distinct(cur, person_id_a: int, person_id_b: int):
+    """Marque deux personnes comme distinctes (non-doublon) dans
+    `distinct_persons`. Idempotent (ON CONFLICT DO NOTHING).
+
+    Les IDs sont triés (LEAST/GREATEST) pour garantir l'unicité de la paire.
+    """
+    cur.execute(
+        """
+        INSERT INTO distinct_persons (person_id_a, person_id_b)
+        VALUES (LEAST(%s, %s), GREATEST(%s, %s))
+        ON CONFLICT DO NOTHING
+        """,
+        (person_id_a, person_id_b, person_id_a, person_id_b),
+    )
+
+
 def merge_person(cur, target_id: int, source_id: int):
     """Fusionne la personne source_id dans target_id.
 

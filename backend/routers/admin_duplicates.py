@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from backend.deps import get_cursor
 from backend.models import MarkDistinctPublications, MergePublications
+from services.publications import mark_distinct as _mark_pubs_distinct
 from services.publications import merge_publications
 
 router = APIRouter()
@@ -165,16 +166,8 @@ async def mark_publications_distinct(body: MarkDistinctPublications):
     """Marque deux publications comme distinctes (non-doublon)."""
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
-
     with get_cursor() as (cur, conn):
-        cur.execute(
-            """
-            INSERT INTO distinct_publications (pub_id_a, pub_id_b)
-            VALUES (LEAST(%s, %s), GREATEST(%s, %s))
-            ON CONFLICT DO NOTHING
-        """,
-            (body.pub_id_a, body.pub_id_b, body.pub_id_a, body.pub_id_b),
-        )
+        _mark_pubs_distinct(cur, body.pub_id_a, body.pub_id_b)
         return {"ok": True}
 
 

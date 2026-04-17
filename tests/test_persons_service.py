@@ -14,6 +14,7 @@ from services.persons import (
     detach_authorships,
     detach_name_form,
     link_authorship,
+    mark_distinct,
     reassign_identifier,
     remove_identifier,
     set_rejected,
@@ -435,6 +436,29 @@ class TestDetachAuthorships:
                                      name_form="dupont jean")
 
         assert result["cleaned_form"] is False
+
+
+class TestMarkDistinctPersons:
+    def test_inserts_ordered_pair(self, db):
+        p1 = _insert_person(db, "A", "A")
+        p2 = _insert_person(db, "B", "B")
+        mark_distinct(db, p2, p1)  # ordre inverse
+        db.execute(
+            "SELECT COUNT(*) AS n FROM distinct_persons WHERE person_id_a = %s AND person_id_b = %s",
+            (min(p1, p2), max(p1, p2)),
+        )
+        assert db.fetchone()["n"] == 1
+
+    def test_idempotent(self, db):
+        p1 = _insert_person(db, "A", "A")
+        p2 = _insert_person(db, "B", "B")
+        mark_distinct(db, p1, p2)
+        mark_distinct(db, p1, p2)  # ON CONFLICT DO NOTHING
+        db.execute(
+            "SELECT COUNT(*) AS n FROM distinct_persons WHERE person_id_a = %s AND person_id_b = %s",
+            (min(p1, p2), max(p1, p2)),
+        )
+        assert db.fetchone()["n"] == 1
 
 
 class TestAddIdentifiersFromAuthorships:

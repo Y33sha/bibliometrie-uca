@@ -450,6 +450,22 @@ def refresh_from_sources(cur, pub_id: int):
     update_sources(cur, pub_id)
 
 
+def mark_distinct(cur, pub_id_a: int, pub_id_b: int):
+    """Marque deux publications comme distinctes (non-doublon) dans
+    `distinct_publications`. Idempotent (ON CONFLICT DO NOTHING).
+
+    Les IDs sont triés (LEAST/GREATEST) pour garantir l'unicité de la paire.
+    """
+    cur.execute(
+        """
+        INSERT INTO distinct_publications (pub_id_a, pub_id_b)
+        VALUES (LEAST(%s, %s), GREATEST(%s, %s))
+        ON CONFLICT DO NOTHING
+        """,
+        (pub_id_a, pub_id_b, pub_id_a, pub_id_b),
+    )
+
+
 def merge_publications(cur, target_id: int, source_id: int):
     """Fusionne la publication source_id dans target_id.
 
