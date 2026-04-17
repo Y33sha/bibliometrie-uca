@@ -16,6 +16,7 @@ import requests
 
 from db.connection import get_connection
 from services.journals import reset_journal_apc, update_journal_apc
+from utils.api_limits import DOAJ_DELAY
 from utils.log import setup_logger
 
 logger = setup_logger("enrich_journal_apc", os.path.join(os.path.dirname(__file__), "logs"))
@@ -23,7 +24,6 @@ logger = setup_logger("enrich_journal_apc", os.path.join(os.path.dirname(__file_
 OPENALEX_API = "https://api.openalex.org/sources"
 OPENALEX_PREFIX = "https://openalex.org/"
 BATCH_SIZE = 50          # max IDs par requête (API limit = 100, on reste prudent)
-REQUEST_DELAY = 0.15     # délai entre requêtes (politeness)
 COMMIT_EVERY = 500       # commit DB tous les N journals traités
 MAILTO = "bibliometrie@uca.fr"  # mis à jour dans main() depuis la config DB
 
@@ -157,7 +157,7 @@ def main():
             id_map = {row[1]: row[0] for row in batch}  # openalex_id → journal_id
 
             sources = fetch_sources_batch(oa_ids)
-            time.sleep(REQUEST_DELAY)
+            time.sleep(DOAJ_DELAY)
 
             for oa_id, journal_id in id_map.items():
                 source = sources.get(oa_id)

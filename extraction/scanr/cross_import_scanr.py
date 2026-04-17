@@ -22,6 +22,7 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import clean_doi, compute_hash, get_cross_import_dois, setup_logger
+from utils.api_limits import SCANR_DELAY
 from utils.app_config import get_scanr_credentials
 
 logger = setup_logger("cross_import_scanr", os.path.join(os.path.dirname(__file__), "logs"))
@@ -113,7 +114,7 @@ def main():
             logger.info(f"  {min(i + BATCH_SIZE, len(missing))}/{len(missing)} "
                         f"({inserted} insérés, {not_found} non trouvés)")
 
-        time.sleep(0.3)
+        time.sleep(SCANR_DELAY)
 
     conn.commit()
     logger.info(f"\n=== Terminé : {inserted} insérés, {not_found} non trouvés ===")

@@ -16,10 +16,10 @@ import requests
 from psycopg2.extras import RealDictCursor
 
 from config.settings import settings
+from utils.api_limits import UNPAYWALL_DELAY
 
 EMAIL = "laurent.le-coz@uca.fr"
 UNPAYWALL_URL = "https://api.unpaywall.org/v2/{doi}?email={email}"
-REQUEST_DELAY = 0.12  # ~8 req/s
 
 OA_MAP = {
     "gold": "gold",
@@ -91,7 +91,7 @@ def main():
                 print(f"  {i}/{total} — {divergences} divergences, "
                       f"{matches} identiques, {not_found} non trouvés")
 
-            time.sleep(REQUEST_DELAY)
+            time.sleep(UNPAYWALL_DELAY)
             upw = fetch_unpaywall(pub["doi"])
 
             if upw is None:

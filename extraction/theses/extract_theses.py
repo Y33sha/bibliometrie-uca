@@ -26,12 +26,12 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
+from utils.api_limits import THESES_DELAY
 from utils.app_config import get_api_base_urls, get_theses_etab_ppns
 
 logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
 
 PER_PAGE = 500
-REQUEST_DELAY = 0.3
 
 
 def build_query(ppn: str, status: str | None = None) -> str:
@@ -141,7 +141,7 @@ def extract_ppn(ppn: str, conn, existing_ids: set, base_url: str,
             if debut % 1000 == 0 or debut >= total:
                 logger.info(f"    {debut}/{total} traités ({inserted} nouveaux, {updated} mis à jour)")
 
-            time.sleep(REQUEST_DELAY)
+            time.sleep(THESES_DELAY)
 
     return total, inserted, updated
 

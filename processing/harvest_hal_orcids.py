@@ -29,6 +29,7 @@ import requests
 
 from db.connection import get_connection
 from services.persons import add_identifier
+from utils.api_limits import HAL_DELAY
 from utils.log import setup_logger
 
 logger = setup_logger("harvest_hal_orcids", os.path.join(os.path.dirname(__file__), "logs"))
@@ -165,7 +166,7 @@ def main():
                     f"{total_found} ORCID trouvés, {total_updated} source_persons mis à jour"
                 )
 
-            time.sleep(0.5)
+            time.sleep(HAL_DELAY)
 
         if args.dry_run:
             conn.rollback()

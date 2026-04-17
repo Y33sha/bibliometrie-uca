@@ -14,6 +14,7 @@ from psycopg2.extras import RealDictCursor
 
 from db.connection import get_connection
 from services.persons import add_identifier
+from utils.api_limits import HAL_DELAY
 
 HAL_AUTHOR_API = "https://api.archives-ouvertes.fr/ref/author/"
 
@@ -83,7 +84,7 @@ def main():
             if not args.dry_run:
                 conn.commit()
             print(f"  {i+1}/{len(authors)} traités, {found} IdRef trouvés")
-            time.sleep(0.5)  # politesse API
+            time.sleep(HAL_DELAY)
 
     if not args.dry_run:
         conn.commit()
