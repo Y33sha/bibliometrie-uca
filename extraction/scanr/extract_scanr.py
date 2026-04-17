@@ -19,6 +19,7 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import clean_doi, compute_hash, get_existing_ids, setup_logger
+from utils.api_limits import SCANR_DELAY
 from utils.app_config import (
     get_api_base_urls,
     get_scanr_affiliation_ids,
@@ -27,7 +28,6 @@ from utils.app_config import (
 )
 
 PER_PAGE = 500
-REQUEST_DELAY = 0.3
 
 logger = setup_logger("extract_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -139,7 +139,7 @@ def extract_year(conn, url: str, auth: tuple, year: int,
             conn.commit()
             logger.info(f"    {seen}/{total} traités ({inserted} nouveaux, {updated} mis à jour)")
 
-        time.sleep(REQUEST_DELAY)
+        time.sleep(SCANR_DELAY)
 
     conn.commit()
     return total, inserted, updated

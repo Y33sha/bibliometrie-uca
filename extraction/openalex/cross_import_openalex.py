@@ -33,6 +33,7 @@ from extraction.openalex import (
     extract_openalex_id,
     init_auth,
 )
+from utils.api_limits import OPENALEX_DELAY
 from utils.app_config import get_openalex_api_key, get_openalex_email
 
 # ----- Logging -----
@@ -121,7 +122,7 @@ def main():
                     f"{found} trouvés, {not_found} absents"
                 )
 
-            time.sleep(0.2)
+            time.sleep(OPENALEX_DELAY)
 
         logger.info(
             f"=== Terminé : {found} works importés, "

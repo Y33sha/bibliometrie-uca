@@ -5,6 +5,7 @@ import time
 
 import requests
 
+from utils.api_limits import ZENODO_DELAY
 from utils.log import setup_logger
 
 logger = setup_logger("zenodo", "processing/logs")
@@ -13,7 +14,6 @@ _ZENODO_DOI_RE = re.compile(r"10\.5281/zenodo\.(\d+)", re.IGNORECASE)
 _API_BASE = "https://zenodo.org/api/records"
 _MAX_RETRIES = 3
 _INITIAL_BACKOFF = 2  # secondes
-_REQUEST_DELAY = 0.5  # délai de politesse entre requêtes
 _last_request_time = 0.0
 
 
@@ -48,8 +48,8 @@ def resolve_zenodo_doi(doi: str) -> str | None:
         try:
             # Délai de politesse
             elapsed = time.time() - _last_request_time
-            if elapsed < _REQUEST_DELAY:
-                time.sleep(_REQUEST_DELAY - elapsed)
+            if elapsed < ZENODO_DELAY:
+                time.sleep(ZENODO_DELAY - elapsed)
 
             resp = requests.get(f"{_API_BASE}/{record_id}", timeout=10,
                                 allow_redirects=True)

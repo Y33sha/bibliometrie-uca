@@ -21,6 +21,7 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import clean_doi, compute_hash, get_existing_ids, setup_logger
+from utils.api_limits import HAL_DELAY
 from utils.app_config import (
     get_api_base_urls,
     get_hal_collections,
@@ -34,7 +35,6 @@ logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "lo
 
 # ----- Constantes API -----
 PER_PAGE = 500
-REQUEST_DELAY = 0.5
 
 
 
@@ -177,7 +177,7 @@ def extract_collection(
         total_new += new_in_page
         start += len(docs)
 
-        time.sleep(REQUEST_DELAY)
+        time.sleep(HAL_DELAY)
 
     return total_count, total_new
 

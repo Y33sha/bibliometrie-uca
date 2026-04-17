@@ -25,6 +25,7 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import compute_hash, get_cross_import_dois, setup_logger
+from utils.api_limits import HAL_DELAY
 from utils.hal import HAL_FIELDS_STR
 
 # ----- Logging -----
@@ -139,7 +140,7 @@ def main():
                     f"{found} trouvés, {not_found} absents"
                 )
 
-            time.sleep(0.5)
+            time.sleep(HAL_DELAY)
 
         logger.info(
             f"=== Terminé : {found} documents importés, "

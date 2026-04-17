@@ -29,6 +29,7 @@ from extraction.openalex import (
     extract_openalex_id,
     init_auth,
 )
+from utils.api_limits import OPENALEX_DELAY
 from utils.app_config import (
     get_api_base_urls,
     get_openalex_api_key,
@@ -38,7 +39,6 @@ from utils.app_config import (
 )
 
 PER_PAGE = 200
-REQUEST_DELAY = 0.2
 
 # ----- Logging -----
 logger = setup_logger("extract_openalex", os.path.join(os.path.dirname(__file__), "logs"))
@@ -232,7 +232,7 @@ def extract_year(year: int = None, conn=None, existing_ids: set = None,
             break
         cursor = next_cursor
 
-        time.sleep(REQUEST_DELAY)
+        time.sleep(OPENALEX_DELAY)
 
     logger.info(
         f"Année {year} terminée : {total_new} nouveaux, {total_updated} mis à jour "

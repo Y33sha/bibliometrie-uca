@@ -25,6 +25,7 @@ from psycopg2.extras import Json, execute_values
 
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
+from utils.api_limits import WOS_DELAY
 from utils.app_config import get_api_base_urls, get_wos_affiliations, get_wos_api_key, get_years
 
 # ----- Logging -----
@@ -32,7 +33,6 @@ logger = setup_logger("extract_wos", os.path.join(os.path.dirname(__file__), "lo
 
 # ----- Constantes techniques -----
 PER_PAGE = 10           # recommandé par Clarivate (timeout fréquents au-delà)
-REQUEST_DELAY = 1.0     # 1 req/s (marge de sécurité)
 BREATHER_EVERY = 10     # pause longue toutes les N pages
 BREATHER_SECS = 15      # durée de la pause longue (secondes)
 
@@ -174,7 +174,7 @@ def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> i
     logger.info(f"Requête WoS : {build_query(year)}")
 
     # Premier appel
-    time.sleep(REQUEST_DELAY)
+    time.sleep(WOS_DELAY)
     data = fetch_page(year, 1)
     if not data:
         logger.error(f"Impossible d'exécuter la requête pour {year}")
@@ -193,7 +193,7 @@ def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> i
     while first_record <= total_count:
         # Première page déjà récupérée
         if first_record > 1:
-            time.sleep(REQUEST_DELAY)
+            time.sleep(WOS_DELAY)
             data = fetch_page(year, first_record)
 
         records = get_records(data)

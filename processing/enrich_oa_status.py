@@ -22,6 +22,7 @@ import requests
 
 from db.connection import get_connection
 from services.publications import update_oa_status
+from utils.api_limits import UNPAYWALL_DELAY
 from utils.log import setup_logger
 
 log = setup_logger("enrich_oa_unpaywall", os.path.join(os.path.dirname(__file__), "logs"))
@@ -40,7 +41,6 @@ OA_MAP = {
 }
 
 BATCH_SIZE = 50
-REQUEST_DELAY = 0.12  # ~8 req/s, conservateur
 
 
 def fetch_oa_status(doi: str) -> str | None:
@@ -117,13 +117,13 @@ def main():
             # Ne pas écraser diamond par gold (Unpaywall ne connaît pas diamond)
             if current_status == "diamond" and status == "gold":
                 skipped += 1
-                time.sleep(REQUEST_DELAY)
+                time.sleep(UNPAYWALL_DELAY)
                 continue
 
             # Ne pas mettre à jour si le statut est identique
             if status == current_status:
                 skipped += 1
-                time.sleep(REQUEST_DELAY)
+                time.sleep(UNPAYWALL_DELAY)
                 continue
 
             if args.dry_run:
@@ -136,7 +136,7 @@ def main():
         else:
             errors += 1
 
-        time.sleep(REQUEST_DELAY)
+        time.sleep(UNPAYWALL_DELAY)
 
     if not args.dry_run:
         conn.commit()

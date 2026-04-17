@@ -19,6 +19,7 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import compute_hash, get_cross_import_dois, setup_logger
+from utils.api_limits import WOS_DELAY
 from utils.app_config import get_api_base_urls, get_wos_api_key
 
 # ----- Logging -----
@@ -28,7 +29,6 @@ BASE_URL = ""
 HEADERS = {}
 PER_PAGE = 10  # recommandation Clarivate
 BATCH_SIZE = 20  # nombre de DOIs par requête WoS (réduit pour éviter URLs trop longues)
-PAUSE_BETWEEN_REQUESTS = 1  # secondes entre chaque requête
 
 
 def _fetch_with_retry(url: str, params: dict, label: str = "") -> dict:
@@ -155,7 +155,7 @@ def search_by_dois(dois: list[str]) -> list[dict]:
         if first_record + PER_PAGE - 1 >= total:
             break
         first_record += PER_PAGE
-        time.sleep(PAUSE_BETWEEN_REQUESTS)
+        time.sleep(WOS_DELAY)
 
     return all_records
 
@@ -198,7 +198,7 @@ def main():
             found_total += len(records)
 
         if args.dry_run:
-            time.sleep(PAUSE_BETWEEN_REQUESTS)
+            time.sleep(WOS_DELAY)
             continue
 
         for rec in records:
@@ -231,7 +231,7 @@ def main():
                 skipped_total += 1
 
         conn.commit()
-        time.sleep(PAUSE_BETWEEN_REQUESTS)
+        time.sleep(WOS_DELAY)
 
     logger.info(f"Terminé: {found_total} trouvés, {inserted_total} insérés, {skipped_total} déjà présents")
     conn.close()

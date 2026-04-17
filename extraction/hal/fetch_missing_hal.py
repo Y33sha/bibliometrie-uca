@@ -26,13 +26,13 @@ from psycopg2.extras import Json, RealDictCursor
 
 from db.connection import get_connection
 from extraction.common import compute_hash
+from utils.api_limits import HAL_DELAY
 from utils.hal import HAL_FIELDS_STR, extract_hal_id_from_url
 from utils.log import setup_logger
 
 log = setup_logger("fetch_missing_hal", os.path.join(os.path.dirname(__file__), "logs"))
 
 HAL_API = "https://api.archives-ouvertes.fr/search"
-REQUEST_DELAY = 0.3
 
 
 def find_hal_primary_locations(cur) -> list[dict]:
@@ -376,7 +376,7 @@ def main():
                 conn.commit()
                 log.info(f"  {i + 1}/{len(missing)} — {fetched} récupérés")
 
-            time.sleep(REQUEST_DELAY)
+            time.sleep(HAL_DELAY)
 
         conn.commit()
 
@@ -410,7 +410,7 @@ def main():
                 conn.commit()
                 log.info(f"  {i + 1}/{len(nnt_refs)} — {nnt_fetched} récupérés, {nnt_not_found} absents de HAL")
 
-            time.sleep(REQUEST_DELAY)
+            time.sleep(HAL_DELAY)
 
         conn.commit()
         log.info(f"  NNT : {nnt_fetched} récupérés, {nnt_not_found} absents de HAL")
