@@ -133,6 +133,168 @@ def apply_corresponding_filter(conditions: list, params: list, person_id: int, c
         params.append(person_id)
 
 
+def apply_hal_status_filter(
+    conditions: list, params: list, values: list[str], lab_hal_col: str | None
+) -> None:
+    """Filtre sur l'état d'une publication dans HAL, par rapport à la collection
+    d'un labo donné.
+
+    Valeurs possibles dans `values` :
+      - "hors_hal"         : la publication n'a pas de source HAL
+      - "hors_collection"  : présente dans HAL mais hors de la collection du labo
+      - "notice"           : dans la collection mais OA fermé/inconnu (simple notice)
+      - "ok"               : dans la collection ET OA ouvert
+
+    No-op si `values` est vide ou `lab_hal_col` est None.
+    """
+    if not values or not lab_hal_col:
+        return
+    parts = []
+    for v in values:
+        if v == "hors_hal":
+            parts.append(
+                "NOT EXISTS (SELECT 1 FROM source_publications sd "
+                "WHERE sd.publication_id = p.id AND sd.source = 'hal')"
+            )
+        elif v == "hors_collection":
+            parts.append(
+                "EXISTS (SELECT 1 FROM source_publications sd "
+                "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
+                "AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s]))"
+            )
+            params.append(lab_hal_col)
+        elif v == "notice":
+            parts.append(
+                "(EXISTS (SELECT 1 FROM source_publications sd "
+                "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
+                "AND sd.hal_collections @> ARRAY[%s]) "
+                "AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))"
+            )
+            params.append(lab_hal_col)
+        elif v == "ok":
+            parts.append(
+                "(EXISTS (SELECT 1 FROM source_publications sd "
+                "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
+                "AND sd.hal_collections @> ARRAY[%s]) "
+                "AND p.oa_status IS NOT NULL "
+                "AND p.oa_status::text NOT IN ('closed', 'unknown'))"
+            )
+            params.append(lab_hal_col)
+    if len(parts) == 1:
+        conditions.append(parts[0])
+    elif len(parts) > 1:
+        conditions.append("(" + " OR ".join(parts) + ")")
+
+
+def apply_apc_filter(
+    conditions: list,
+    params: list,
+    has_apc: str,
+    root_structure_id: int,
+    lab_ids: list[int] | None = None,
+) -> None:
+    """Filtre sur l'existence et le payeur des frais APC (Article Processing Charges).
+
+    Valeurs possibles dans `has_apc` (CSV, ex: "uca,none") :
+      - "uca"       : payé par un budget UCA (racine du périmètre)
+      - "non_uca"   : payé hors UCA (mais des APC existent)
+      - "other"     : alias de "non_uca" (ancien nom)
+      - "none"      : aucun APC enregistré
+      - "this_lab"  : payé par le labo sélectionné (nécessite lab_ids)
+      - "other_uca" : payé par UCA mais pas par ce labo (nécessite lab_ids)
+    """
+    if not has_apc:
+        return
+    lab_ids = lab_ids or []
+    apc_map = {
+        "uca": (
+            "EXISTS (SELECT 1 FROM apc_payments ap "
+            "WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s)",
+            1,
+        ),
+        "other": (
+            "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) "
+            "AND NOT EXISTS (SELECT 1 FROM apc_payments ap "
+            "WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))",
+            1,
+        ),
+        "non_uca": (
+            "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) "
+            "AND NOT EXISTS (SELECT 1 FROM apc_payments ap "
+            "WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))",
+            1,
+        ),
+        "none": (
+            "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
+            0,
+        ),
+    }
+    parts = []
+    for v in [x.strip() for x in has_apc.split(",") if x.strip()]:
+        if v in apc_map:
+            sql, rid_count = apc_map[v]
+            parts.append(sql)
+            params.extend([root_structure_id] * rid_count)
+        elif v == "this_lab" and lab_ids:
+            parts.append(
+                "EXISTS (SELECT 1 FROM apc_payments ap "
+                "WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[]))"
+            )
+            params.append(lab_ids)
+        elif v == "other_uca" and lab_ids:
+            parts.append(
+                "(EXISTS (SELECT 1 FROM apc_payments ap "
+                "WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s) "
+                "AND NOT EXISTS (SELECT 1 FROM apc_payments ap "
+                "WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[])))"
+            )
+            params.extend([root_structure_id, lab_ids])
+    if len(parts) == 1:
+        conditions.append(parts[0])
+    elif len(parts) > 1:
+        conditions.append("(" + " OR ".join(parts) + ")")
+
+
+def apply_in_perimeter_person_filter(
+    conditions: list, params: list, in_perimeter: str, person_id: int | None
+) -> None:
+    """Filtre : la personne donnée a-t-elle un authorship in_perimeter sur la publication ?
+
+    - in_perimeter = "yes" : au moins un authorship in_perimeter pour person_id
+    - in_perimeter = "no"  : aucun authorship in_perimeter pour person_id
+    - autre / vide         : no-op
+    No-op aussi si person_id est None.
+    """
+    if not in_perimeter or not person_id:
+        return
+    negate = "" if in_perimeter == "yes" else "NOT "
+    conditions.append(
+        f"""
+        {negate}EXISTS (SELECT 1 FROM authorships a
+                WHERE a.publication_id = p.id AND a.person_id = %s
+                  AND a.in_perimeter = TRUE AND NOT a.excluded)
+    """
+    )
+    params.append(person_id)
+
+
+def apply_no_lab_filter(conditions: list, params: list) -> None:
+    """Filtre : la publication n'a aucun authorship rattaché à un labo du périmètre.
+    Équivaut au filtre "lab_id=none" dans l'API.
+    """
+    conditions.append(
+        """
+        NOT EXISTS (
+            SELECT 1 FROM authorships a
+            JOIN structures s ON s.id = ANY(a.structure_ids)
+            WHERE a.publication_id = p.id
+              AND NOT a.excluded
+              AND s.structure_type = 'labo'
+        )
+    """
+    )
+
+
 def apply_publisher_journal_filter(
     conditions: list, params: list, publisher_id: int | None, journal_id: int | None
 ):

@@ -11,9 +11,13 @@ from backend.filters import (
     OA_OPEN_STATUSES,
     PUB_IS_UCA,
     apply_access_filter,
+    apply_apc_filter,
     apply_corresponding_filter,
     apply_doc_type_filter,
+    apply_hal_status_filter,
+    apply_in_perimeter_person_filter,
     apply_lab_filter,
+    apply_no_lab_filter,
     apply_oa_filter,
     apply_person_filter,
     apply_publisher_journal_filter,
@@ -72,38 +76,8 @@ async def publications_facets(
             p.append(excluded_types)
         return c, p
 
-    def _apply_hal_status_filter(conds, params, values, lab_hal_col):
-        """Applique le filtre hal_status aux conditions."""
-        if not values or not lab_hal_col:
-            return
-        hal_parts = []
-        for v in values:
-            if v == "hors_hal":
-                hal_parts.append(
-                    "NOT EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal')"
-                )
-            elif v == "hors_collection":
-                hal_parts.append(
-                    "EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal' AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s]))"
-                )
-                params.append(lab_hal_col)
-            elif v == "notice":
-                hal_parts.append(
-                    "(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal' AND sd.hal_collections @> ARRAY[%s]) AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))"
-                )
-                params.append(lab_hal_col)
-            elif v == "ok":
-                hal_parts.append(
-                    "(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal' AND sd.hal_collections @> ARRAY[%s]) AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN ('closed', 'unknown'))"
-                )
-                params.append(lab_hal_col)
-        if len(hal_parts) == 1:
-            conds.append(hal_parts[0])
-        elif len(hal_parts) > 1:
-            conds.append("(" + " OR ".join(hal_parts) + ")")
-
-    # Pré-charger la collection HAL du labo (si un seul labo sélectionné)
-    # Utilise une liste mutable pour permettre la modification dans les closures
+    # Collection HAL du labo — utilisée par apply_hal_status_filter.
+    # Chargée après ouverture du curseur (liste mutable pour référence dans la closure).
     _lab_hal_col = [None]
 
     def add_all_except(conds, params, *, skip: str):
@@ -114,15 +88,7 @@ async def publications_facets(
             apply_corresponding_filter(conds, params, person_id, is_corresponding)
         if skip != "lab":
             if lab_none and not lab_ids_clean:
-                conds.append("""
-                    NOT EXISTS (
-                        SELECT 1 FROM authorships a
-                        JOIN structures s ON s.id = ANY(a.structure_ids)
-                        WHERE a.publication_id = p.id
-                          AND NOT a.excluded
-                          AND s.structure_type = 'labo'
-                    )
-                """)
+                apply_no_lab_filter(conds, params)
             elif lab_ids_clean:
                 apply_lab_filter(conds, params, lab_ids_clean)
         if skip != "doc_type":
@@ -133,60 +99,16 @@ async def publications_facets(
             apply_oa_filter(conds, params, oa_status)
         if skip != "source":
             apply_source_filter(conds, source_values)
-        if skip != "apc" and has_apc:
-            APC_FACET_MAP = {
-                "uca": (
-                    "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s)",
-                    1,
-                ),
-                "other": (
-                    "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))",
-                    1,
-                ),
-                "non_uca": (
-                    "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))",
-                    1,
-                ),
-                "none": (
-                    "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
-                    0,
-                ),
-            }
-            apc_parts = []
-            for v in [x.strip() for x in has_apc.split(",") if x.strip()]:
-                if v in APC_FACET_MAP:
-                    sql, rid_count = APC_FACET_MAP[v]
-                    apc_parts.append(sql)
-                    params.extend([_rid] * rid_count)
-                elif v == "this_lab" and lab_ids_clean:
-                    apc_parts.append(
-                        "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[]))"
-                    )
-                    params.append(lab_ids_clean)
-                elif v == "other_uca" and lab_ids_clean:
-                    apc_parts.append(
-                        "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[])))"
-                    )
-                    params.extend([_rid, lab_ids_clean])
-            if len(apc_parts) == 1:
-                conds.append(apc_parts[0])
-            elif len(apc_parts) > 1:
-                conds.append("(" + " OR ".join(apc_parts) + ")")
+        if skip != "apc":
+            apply_apc_filter(conds, params, has_apc, _rid, lab_ids=lab_ids_clean)
         apply_publisher_journal_filter(conds, params, publisher_id, journal_id)
         if skip != "country" and country_values:
             conds.append("p.countries && %s::text[]")
             params.append(country_values)
-        if skip != "hal_status" and hal_status_values:
-            _apply_hal_status_filter(conds, params, hal_status_values, _lab_hal_col[0])
-        if skip != "in_perimeter" and in_perimeter and person_id:
-            flag = in_perimeter == "yes"
-            op = "" if flag else "NOT "
-            conds.append(f"""
-                {op}EXISTS (SELECT 1 FROM authorships a
-                        WHERE a.publication_id = p.id AND a.person_id = %s
-                          AND a.in_perimeter = TRUE AND NOT a.excluded)
-            """)
-            params.append(person_id)
+        if skip != "hal_status":
+            apply_hal_status_filter(conds, params, hal_status_values, _lab_hal_col[0])
+        if skip != "in_perimeter":
+            apply_in_perimeter_person_filter(conds, params, in_perimeter, person_id)
 
     def where_sql(conds: list) -> str:
         return " AND ".join(conds) if conds else "TRUE"
