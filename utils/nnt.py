@@ -6,13 +6,13 @@ Format typique : 2023UCFA0069 (année + code établissement + numéro séquentie
 Il est distinct du DOI et ne doit jamais être stocké dans publications.doi.
 Il est stocké dans source_publications.external_ids sous la clé "nnt".
 
-La logique de normalisation vit dans `domain.identifiers` ; ce module
+La logique de normalisation vit dans `domain.publication` ; ce module
 conserve `normalize_nnt` pour les sites d'appel existants.
 """
 
 import re
 
-from domain.identifiers import _normalize_nnt
+from domain.publication import _normalize_nnt
 
 
 def normalize_nnt(nnt: str | None) -> str | None:

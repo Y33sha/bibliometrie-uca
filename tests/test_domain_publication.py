@@ -1,9 +1,12 @@
-"""Tests des value objects d'identifiants dans domain/identifiers.py."""
+"""Tests des value objects de domain/publication.py (DOI, HALId, NNT)."""
 
 import pytest
 
 from domain.errors import ValidationError
-from domain.identifiers import DOI, NNT, ORCID, IdRef
+from domain.publication import DOI, NNT, HALId
+
+
+# ── DOI ────────────────────────────────────────────────────────────
 
 
 class TestDOIConstruction:
@@ -86,97 +89,56 @@ class TestDOIImmutable:
         assert DOI("10.1234/test") == DOI("  10.1234/test.v2  ")
 
 
-# ── ORCID ──────────────────────────────────────────────────────────
+# ── HALId ──────────────────────────────────────────────────────────
 
 
-class TestORCIDConstruction:
-    def test_accepts_canonical_form(self):
-        o = ORCID("0000-0001-2345-6789")
-        assert o.value == "0000-0001-2345-6789"
+class TestHALIdConstruction:
+    def test_accepts_plain_hal_id(self):
+        assert HALId("hal-04123456").value == "hal-04123456"
 
-    def test_accepts_with_checksum_X(self):
-        o = ORCID("0000-0001-2345-678X")
-        assert o.value == "0000-0001-2345-678X"
+    def test_accepts_other_portals(self):
+        assert HALId("tel-02345678").value == "tel-02345678"
+        assert HALId("halshs-01234567").value == "halshs-01234567"
+        assert HALId("inserm-09876543").value == "inserm-09876543"
+        assert HALId("pasteur-11111111").value == "pasteur-11111111"
+        assert HALId("cea-22222222").value == "cea-22222222"
+        assert HALId("ineris-33333333").value == "ineris-33333333"
 
-    def test_lowercases_x_to_uppercase(self):
-        assert ORCID("0000-0001-2345-678x").value == "0000-0001-2345-678X"
+    def test_strips_version_suffix(self):
+        assert HALId("hal-04123456v2").value == "hal-04123456"
 
-    def test_strips_https_prefix(self):
-        assert ORCID("https://orcid.org/0000-0001-2345-6789").value == "0000-0001-2345-6789"
+    def test_lowercases(self):
+        assert HALId("HAL-04123456").value == "hal-04123456"
 
-    def test_strips_http_prefix(self):
-        assert ORCID("http://orcid.org/0000-0001-2345-6789").value == "0000-0001-2345-6789"
-
-    def test_strips_bare_orcid_org_prefix(self):
-        assert ORCID("orcid.org/0000-0001-2345-6789").value == "0000-0001-2345-6789"
-
-    def test_adds_hyphens_if_missing(self):
-        assert ORCID("0000000123456789").value == "0000-0001-2345-6789"
+    def test_accepts_url(self):
+        assert HALId("https://hal.science/hal-04123456").value == "hal-04123456"
+        assert HALId("https://hal.science/hal-04123456v2").value == "hal-04123456"
+        assert HALId("https://tel.archives-ouvertes.fr/tel-02345678").value == "tel-02345678"
 
 
-class TestORCIDInvalid:
+class TestHALIdInvalid:
     def test_raises_on_empty(self):
         with pytest.raises(ValidationError):
-            ORCID("")
+            HALId("")
 
-    def test_raises_on_too_short(self):
+    def test_raises_on_unknown_prefix(self):
         with pytest.raises(ValidationError):
-            ORCID("0000-0001-2345")
+            HALId("other-12345")
 
-    def test_raises_on_non_numeric_body(self):
+    def test_raises_on_no_digits(self):
         with pytest.raises(ValidationError):
-            ORCID("0000-000A-2345-6789")
-
-    def test_raises_on_wrong_shape(self):
-        with pytest.raises(ValidationError):
-            ORCID("garbage")
+            HALId("hal-")
 
 
-class TestORCIDTryParse:
+class TestHALIdTryParse:
     def test_none(self):
-        assert ORCID.try_parse(None) is None
+        assert HALId.try_parse(None) is None
 
     def test_invalid(self):
-        assert ORCID.try_parse("not an orcid") is None
+        assert HALId.try_parse("garbage") is None
 
     def test_valid(self):
-        assert ORCID.try_parse("0000-0001-2345-6789") is not None
-
-
-# ── IdRef ──────────────────────────────────────────────────────────
-
-
-class TestIdRefConstruction:
-    def test_accepts_canonical_ppn(self):
-        assert IdRef("252404955").value == "252404955"
-
-    def test_accepts_ppn_with_X(self):
-        assert IdRef("05547854X").value == "05547854X"
-
-    def test_lowercases_x_to_uppercase(self):
-        assert IdRef("05547854x").value == "05547854X"
-
-    def test_strips_idref_url(self):
-        assert IdRef("https://www.idref.fr/252404955/id").value == "252404955"
-        assert IdRef("idref.fr/252404955").value == "252404955"
-
-
-class TestIdRefInvalid:
-    def test_raises_on_empty(self):
-        with pytest.raises(ValidationError):
-            IdRef("")
-
-    def test_raises_on_too_short(self):
-        with pytest.raises(ValidationError):
-            IdRef("12345678")  # 8 chiffres, il manque la clé
-
-    def test_raises_on_too_long(self):
-        with pytest.raises(ValidationError):
-            IdRef("1234567890")
-
-    def test_raises_on_letters_in_body(self):
-        with pytest.raises(ValidationError):
-            IdRef("12A456789")
+        assert HALId.try_parse("https://hal.science/hal-04123456v1").value == "hal-04123456"
 
 
 # ── NNT ────────────────────────────────────────────────────────────
