@@ -3,7 +3,7 @@
 import pytest
 
 from domain.errors import ValidationError
-from domain.identifiers import DOI
+from domain.identifiers import DOI, NNT, ORCID, IdRef
 
 
 class TestDOIConstruction:
@@ -84,3 +84,125 @@ class TestDOIImmutable:
     def test_equality_by_normalized_value(self):
         """Deux DOI avec le même canon sont égaux même si écrits différemment."""
         assert DOI("10.1234/test") == DOI("  10.1234/test.v2  ")
+
+
+# ── ORCID ──────────────────────────────────────────────────────────
+
+
+class TestORCIDConstruction:
+    def test_accepts_canonical_form(self):
+        o = ORCID("0000-0001-2345-6789")
+        assert o.value == "0000-0001-2345-6789"
+
+    def test_accepts_with_checksum_X(self):
+        o = ORCID("0000-0001-2345-678X")
+        assert o.value == "0000-0001-2345-678X"
+
+    def test_lowercases_x_to_uppercase(self):
+        assert ORCID("0000-0001-2345-678x").value == "0000-0001-2345-678X"
+
+    def test_strips_https_prefix(self):
+        assert ORCID("https://orcid.org/0000-0001-2345-6789").value == "0000-0001-2345-6789"
+
+    def test_strips_http_prefix(self):
+        assert ORCID("http://orcid.org/0000-0001-2345-6789").value == "0000-0001-2345-6789"
+
+    def test_strips_bare_orcid_org_prefix(self):
+        assert ORCID("orcid.org/0000-0001-2345-6789").value == "0000-0001-2345-6789"
+
+    def test_adds_hyphens_if_missing(self):
+        assert ORCID("0000000123456789").value == "0000-0001-2345-6789"
+
+
+class TestORCIDInvalid:
+    def test_raises_on_empty(self):
+        with pytest.raises(ValidationError):
+            ORCID("")
+
+    def test_raises_on_too_short(self):
+        with pytest.raises(ValidationError):
+            ORCID("0000-0001-2345")
+
+    def test_raises_on_non_numeric_body(self):
+        with pytest.raises(ValidationError):
+            ORCID("0000-000A-2345-6789")
+
+    def test_raises_on_wrong_shape(self):
+        with pytest.raises(ValidationError):
+            ORCID("garbage")
+
+
+class TestORCIDTryParse:
+    def test_none(self):
+        assert ORCID.try_parse(None) is None
+
+    def test_invalid(self):
+        assert ORCID.try_parse("not an orcid") is None
+
+    def test_valid(self):
+        assert ORCID.try_parse("0000-0001-2345-6789") is not None
+
+
+# ── IdRef ──────────────────────────────────────────────────────────
+
+
+class TestIdRefConstruction:
+    def test_accepts_canonical_ppn(self):
+        assert IdRef("252404955").value == "252404955"
+
+    def test_accepts_ppn_with_X(self):
+        assert IdRef("05547854X").value == "05547854X"
+
+    def test_lowercases_x_to_uppercase(self):
+        assert IdRef("05547854x").value == "05547854X"
+
+    def test_strips_idref_url(self):
+        assert IdRef("https://www.idref.fr/252404955/id").value == "252404955"
+        assert IdRef("idref.fr/252404955").value == "252404955"
+
+
+class TestIdRefInvalid:
+    def test_raises_on_empty(self):
+        with pytest.raises(ValidationError):
+            IdRef("")
+
+    def test_raises_on_too_short(self):
+        with pytest.raises(ValidationError):
+            IdRef("12345678")  # 8 chiffres, il manque la clé
+
+    def test_raises_on_too_long(self):
+        with pytest.raises(ValidationError):
+            IdRef("1234567890")
+
+    def test_raises_on_letters_in_body(self):
+        with pytest.raises(ValidationError):
+            IdRef("12A456789")
+
+
+# ── NNT ────────────────────────────────────────────────────────────
+
+
+class TestNNT:
+    def test_uppercases(self):
+        assert NNT("2021clfa0030").value == "2021CLFA0030"
+
+    def test_strips_whitespace(self):
+        assert NNT("  2021CLFA0030  ").value == "2021CLFA0030"
+
+    def test_raises_on_empty(self):
+        with pytest.raises(ValidationError):
+            NNT("")
+
+    def test_raises_on_whitespace(self):
+        with pytest.raises(ValidationError):
+            NNT("   ")
+
+    def test_raises_on_non_alnum(self):
+        with pytest.raises(ValidationError):
+            NNT("2021-CLFA-0030")
+
+    def test_try_parse_none(self):
+        assert NNT.try_parse(None) is None
+
+    def test_try_parse_invalid(self):
+        assert NNT.try_parse("") is None
