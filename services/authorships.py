@@ -55,6 +55,35 @@ def exclude_authorship(cur, authorship_id: int) -> dict | None:
     return result
 
 
+def set_source_authorship_excluded(
+    cur, source_authorship_id: int, source: str, excluded: bool
+) -> bool:
+    """Marque ou démarque une authorship source comme exclue.
+
+    Si `excluded=True`, détache aussi la FK vers l'authorship vérité et
+    supprime cette dernière si plus aucune source non-exclue ne l'atteste.
+
+    Retourne True si la source existe, False sinon.
+    """
+    if source not in VALID_SOURCES:
+        raise ValueError(f"Source inconnue : {source}")
+
+    cur.execute(
+        """
+        UPDATE source_authorships SET excluded = %s
+        WHERE id = %s AND source = %s RETURNING id
+        """,
+        (excluded, source_authorship_id, source),
+    )
+    if not cur.fetchone():
+        return False
+
+    if excluded:
+        detach_source(cur, source_authorship_id, source)
+
+    return True
+
+
 def detach_source(cur, source_authorship_id: int, source: str):
     """Détache une authorship source de son authorship vérité.
     Si plus aucune source ne l'atteste, supprime l'authorship vérité.

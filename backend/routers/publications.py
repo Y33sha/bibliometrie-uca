@@ -23,7 +23,7 @@ from backend.filters import (
     parse_str_csv,
 )
 from backend.models import ExcludeSourceAuthorship
-from services.authorships import detach_source as _detach_source
+from services.authorships import set_source_authorship_excluded as _set_source_authorship_excluded
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1001,12 +1001,6 @@ async def get_publication(pub_id: int):
 
 # ----- API: Exclude source authorship -----
 
-VALID_SOURCE_TABLES = {
-    "hal": "source_authorships",
-    "openalex": "source_authorships",
-    "wos": "source_authorships",
-}
-
 
 @router.post("/api/source-authorships/{source}/{authorship_id}/exclude")
 async def exclude_source_authorship(
@@ -1017,26 +1011,14 @@ async def exclude_source_authorship(
     Si aucune source non exclue n'atteste plus l'authorship consolidée,
     celle-ci est supprimée.
     """
-    if source not in VALID_SOURCE_TABLES:
-        raise HTTPException(status_code=400, detail="Source invalide")
-
-    excluded = body.excluded
-
     with get_cursor() as (cur, conn):
-        # 1. Toggler excluded sur l'authorship source
-        cur.execute(
-            "UPDATE source_authorships SET excluded = %s WHERE id = %s AND source = %s RETURNING id",
-            (excluded, authorship_id, source),
-        )
-        if not cur.fetchone():
+        try:
+            found = _set_source_authorship_excluded(cur, authorship_id, source, body.excluded)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        if not found:
             raise HTTPException(status_code=404, detail="Authorship source introuvable")
-
-        # 2. Si on exclut : détacher la FK source de l'authorship consolidée
-        #    (et supprimer l'authorship si plus aucune source ne l'atteste)
-        if excluded:
-            _detach_source(cur, authorship_id, source)
-
-        return {"ok": True, "excluded": excluded}
+        return {"ok": True, "excluded": body.excluded}
 
 
 # ----- API: Publications list -----

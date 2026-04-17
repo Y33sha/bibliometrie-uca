@@ -14,6 +14,7 @@ from services.authorships import (
     exclude_authorship,
     move_authorships_for_source,
     propagate_uca_for_addresses,
+    set_source_authorship_excluded,
     sync_person_id_from_source,
 )
 
@@ -580,3 +581,59 @@ class TestPropagateUcaForAddresses:
         sa = db.fetchone()
         assert sa["in_perimeter"] is False
         assert sa["structure_ids"] is None
+
+
+# ── set_source_authorship_excluded ────────────────────────────────
+
+class TestSetSourceAuthorshipExcluded:
+    def test_raises_on_invalid_source(self, db):
+        with pytest.raises(ValueError, match="Source inconnue"):
+            set_source_authorship_excluded(db, 1, "invalid", True)
+
+    def test_returns_false_if_not_found(self, db):
+        assert set_source_authorship_excluded(db, 999999, "hal", True) is False
+
+    def test_marks_excluded(self, db):
+        person_id = _create_person(db)
+        pub_id = _create_publication(db)
+        sp_id = _create_source_publication(db, pub_id)
+        src_person_id = _create_source_person(db)
+        sa_id = _create_source_authorship(db, sp_id, src_person_id, person_id=person_id)
+
+        assert set_source_authorship_excluded(db, sa_id, "hal", True) is True
+
+        db.execute("SELECT excluded FROM source_authorships WHERE id = %s", (sa_id,))
+        assert db.fetchone()["excluded"] is True
+
+    def test_unmark_excluded_does_not_touch_authorship(self, db):
+        """Remettre excluded=False ne doit pas toucher à l'authorship vérité."""
+        person_id = _create_person(db)
+        pub_id = _create_publication(db)
+        sp_id = _create_source_publication(db, pub_id)
+        src_person_id = _create_source_person(db)
+        authorship_id = _create_authorship(db, pub_id, person_id)
+        sa_id = _create_source_authorship(
+            db, sp_id, src_person_id, person_id=person_id,
+            authorship_id=authorship_id, excluded=True,
+        )
+
+        set_source_authorship_excluded(db, sa_id, "hal", False)
+
+        db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
+        assert db.fetchone() is not None  # authorship vérité toujours là
+
+    def test_exclude_triggers_detach_source(self, db):
+        """Exclure la seule source attestante doit supprimer l'authorship vérité."""
+        person_id = _create_person(db)
+        pub_id = _create_publication(db)
+        sp_id = _create_source_publication(db, pub_id)
+        src_person_id = _create_source_person(db)
+        authorship_id = _create_authorship(db, pub_id, person_id)
+        sa_id = _create_source_authorship(
+            db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
+        )
+
+        set_source_authorship_excluded(db, sa_id, "hal", True)
+
+        db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
+        assert db.fetchone() is None  # authorship vérité supprimée
