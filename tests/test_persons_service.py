@@ -12,7 +12,12 @@ from services.persons import (
     create_person,
     detach_name_form,
     link_authorship,
+    reassign_identifier,
+    remove_identifier,
+    set_rejected,
     unlink_authorship,
+    update_identifier_status,
+    update_name,
 )
 
 
@@ -197,6 +202,99 @@ class TestAddIdentifier:
 
         db.execute("SELECT person_id FROM source_persons WHERE id = %s", (sp,))
         assert db.fetchone()["person_id"] == person_id
+
+
+class TestRemoveIdentifier:
+    def test_removes_existing(self, db):
+        p = _insert_person(db)
+        add_identifier(db, p, "orcid", "0000-0001")
+        assert remove_identifier(db, p, "orcid", "0000-0001") is True
+        db.execute(
+            "SELECT id FROM person_identifiers WHERE id_value = '0000-0001'"
+        )
+        assert db.fetchone() is None
+
+    def test_returns_false_if_not_found(self, db):
+        p = _insert_person(db)
+        assert remove_identifier(db, p, "orcid", "unknown") is False
+
+
+class TestUpdateIdentifierStatus:
+    def test_sets_status(self, db):
+        p = _insert_person(db)
+        add_identifier(db, p, "orcid", "0000-0001")
+        db.execute("SELECT id FROM person_identifiers WHERE id_value='0000-0001'")
+        ident_id = db.fetchone()["id"]
+
+        row = update_identifier_status(db, ident_id, "confirmed")
+
+        assert row["status"] == "confirmed"
+
+    def test_returns_none_if_not_found(self, db):
+        assert update_identifier_status(db, 999999, "confirmed") is None
+
+
+class TestReassignIdentifier:
+    def test_reassigns(self, db):
+        p1 = _insert_person(db, "A", "A")
+        p2 = _insert_person(db, "B", "B")
+        add_identifier(db, p1, "orcid", "0000-0001")
+        db.execute("SELECT id FROM person_identifiers WHERE id_value='0000-0001'")
+        ident_id = db.fetchone()["id"]
+
+        assert reassign_identifier(db, ident_id, p2) is True
+
+        db.execute(
+            "SELECT person_id, status::text AS status FROM person_identifiers WHERE id = %s",
+            (ident_id,),
+        )
+        row = db.fetchone()
+        assert row["person_id"] == p2
+        assert row["status"] == "pending"
+
+    def test_returns_false_if_not_found(self, db):
+        p = _insert_person(db)
+        assert reassign_identifier(db, 999999, p) is False
+
+
+class TestSetRejected:
+    def test_marks_rejected(self, db):
+        p = _insert_person(db)
+        assert set_rejected(db, p, True) is True
+        db.execute("SELECT rejected FROM persons WHERE id = %s", (p,))
+        assert db.fetchone()["rejected"] is True
+
+    def test_unmarks(self, db):
+        p = _insert_person(db)
+        set_rejected(db, p, True)
+        set_rejected(db, p, False)
+        db.execute("SELECT rejected FROM persons WHERE id = %s", (p,))
+        assert db.fetchone()["rejected"] is False
+
+    def test_returns_false_if_not_found(self, db):
+        assert set_rejected(db, 999999, True) is False
+
+
+class TestUpdateName:
+    def test_updates_name_and_refreshes_forms(self, db):
+        p = create_person(db, "Dupont", "Jean")
+        # La forme 'dupont jean' existe après create_person
+        db.execute("SELECT id FROM person_name_forms WHERE name_form = 'dupont jean'")
+        assert db.fetchone() is not None
+
+        assert update_name(db, p, "Martin", "Sophie") is True
+
+        db.execute("SELECT last_name, first_name FROM persons WHERE id = %s", (p,))
+        row = db.fetchone()
+        assert row["last_name"] == "Martin"
+        assert row["first_name"] == "Sophie"
+
+        # Nouvelle forme créée
+        db.execute("SELECT id FROM person_name_forms WHERE name_form = 'martin sophie'")
+        assert db.fetchone() is not None
+
+    def test_returns_false_if_not_found(self, db):
+        assert update_name(db, 999999, "X", "X") is False
 
 
 class TestAddIdentifiersFromAuthorships:

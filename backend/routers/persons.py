@@ -28,6 +28,9 @@ from services.authorships import (
     exclude_authorship as _exclude_authorship,
 )
 from services.persons import (
+    add_identifier as _add_identifier,
+)
+from services.persons import (
     add_name_form as _add_name_form,
 )
 from services.persons import (
@@ -43,10 +46,25 @@ from services.persons import (
     merge_person as _merge_person,
 )
 from services.persons import (
+    reassign_identifier as _reassign_identifier,
+)
+from services.persons import (
     refresh_person_name_forms as _refresh_person_name_forms,
 )
 from services.persons import (
+    remove_identifier as _remove_identifier,
+)
+from services.persons import (
+    set_rejected as _set_rejected,
+)
+from services.persons import (
     unlink_authorship as _unlink_authorship,
+)
+from services.persons import (
+    update_identifier_status as _update_identifier_status,
+)
+from services.persons import (
+    update_name as _update_name,
 )
 from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
 
@@ -873,53 +891,29 @@ async def add_person_identifier(person_id: int, data: AddIdentifier):
             (data.id_type, id_value),
         )
         existing = cur.fetchone()
+        was_reassigned = False
         if existing:
             if existing["person_id"] == person_id:
                 return {"added": False, "reason": "already_exists"}
-            if existing["status"] == "rejected":
-                # Réattribuer l'identifiant rejeté à cette personne
-                cur.execute(
-                    """
-                    UPDATE person_identifiers
-                    SET person_id = %s, status = 'pending'::identifier_status, source = 'manual'
-                    WHERE id = %s
-                """,
-                    (person_id, existing["id"]),
+            if existing["status"] != "rejected":
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Cet identifiant est déjà attribué à la personne #{existing['person_id']}",
                 )
-                return {
-                    "added": True,
-                    "reassigned": True,
-                    "id_type": data.id_type,
-                    "id_value": id_value,
-                }
-            raise HTTPException(
-                status_code=409,
-                detail=f"Cet identifiant est déjà attribué à la personne #{existing['person_id']}",
-            )
+            was_reassigned = True
 
-        cur.execute(
-            """
-            INSERT INTO person_identifiers (person_id, id_type, id_value, source)
-            VALUES (%s, %s, %s, 'manual')
-        """,
-            (person_id, data.id_type, id_value),
-        )
-
-        return {"added": True, "id_type": data.id_type, "id_value": id_value}
+        _add_identifier(cur, person_id, data.id_type, id_value, source="manual")
+        result = {"added": True, "id_type": data.id_type, "id_value": id_value}
+        if was_reassigned:
+            result["reassigned"] = True
+        return result
 
 
 @router.delete("/api/persons/{person_id}/identifier/{id_type}/{id_value:path}")
 async def remove_person_identifier(person_id: int, id_type: str, id_value: str):
     """Supprime un identifiant d'une personne."""
     with get_cursor() as (cur, conn):
-        cur.execute(
-            """
-            DELETE FROM person_identifiers
-            WHERE person_id = %s AND id_type = %s AND id_value = %s
-        """,
-            (person_id, id_type, id_value),
-        )
-        if cur.rowcount == 0:
+        if not _remove_identifier(cur, person_id, id_type, id_value):
             raise HTTPException(status_code=404, detail="Identifiant introuvable")
         return {"removed": True}
 
@@ -928,15 +922,8 @@ async def remove_person_identifier(person_id: int, id_type: str, id_value: str):
 async def update_identifier_status(ident_id: int, body: UpdateIdentifierStatus):
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
     with get_cursor() as (cur, conn):
-        cur.execute(
-            """
-            UPDATE person_identifiers SET status = %s::identifier_status
-            WHERE id = %s RETURNING id, status
-        """,
-            (body.status, ident_id),
-        )
-        row = cur.fetchone()
-        if not row:
+        row = _update_identifier_status(cur, ident_id, body.status)
+        if row is None:
             raise HTTPException(status_code=404, detail="Identifiant introuvable")
         return {"id": row["id"], "status": row["status"]}
 
@@ -946,21 +933,11 @@ async def reassign_identifier(ident_id: int, body: ReassignIdentifier):
     """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
     target_person_id = body.person_id
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT id, status FROM person_identifiers WHERE id = %s", (ident_id,))
-        ident = cur.fetchone()
-        if not ident:
-            raise HTTPException(status_code=404, detail="Identifiant introuvable")
         cur.execute("SELECT id FROM persons WHERE id = %s", (target_person_id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Personne cible introuvable")
-        cur.execute(
-            """
-            UPDATE person_identifiers
-            SET person_id = %s, status = 'pending'::identifier_status
-            WHERE id = %s
-        """,
-            (target_person_id, ident_id),
-        )
+        if not _reassign_identifier(cur, ident_id, target_person_id):
+            raise HTTPException(status_code=404, detail="Identifiant introuvable")
         return {"id": ident_id, "person_id": target_person_id, "status": "pending"}
 
 
@@ -977,13 +954,8 @@ async def toggle_authorship_excluded(authorship_id: int):
 @router.patch("/api/persons/{person_id}/reject")
 async def reject_person(person_id: int, body: RejectPerson):
     """Marque/démarque une personne comme rejetée (fausse entité)."""
-    rejected = body.rejected
     with get_cursor() as (cur, conn):
-        cur.execute(
-            "UPDATE persons SET rejected = %s, updated_at = now() WHERE id = %s",
-            (rejected, person_id),
-        )
-        if cur.rowcount == 0:
+        if not _set_rejected(cur, person_id, body.rejected):
             raise HTTPException(status_code=404, detail="Personne introuvable")
         return {"ok": True}
 
@@ -996,20 +968,8 @@ async def update_person_name(person_id: int, body: UpdatePersonName):
     if not last_name:
         raise HTTPException(status_code=400, detail="Le nom est requis")
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT id FROM persons WHERE id = %s", (person_id,))
-        if not cur.fetchone():
+        if not _update_name(cur, person_id, last_name, first_name):
             raise HTTPException(status_code=404, detail="Personne introuvable")
-        cur.execute(
-            """
-            UPDATE persons SET last_name = %s, first_name = %s,
-                   last_name_normalized = unaccent(lower(trim(%s))),
-                   first_name_normalized = unaccent(lower(trim(%s))),
-                   updated_at = now()
-            WHERE id = %s
-        """,
-            (last_name, first_name, last_name, first_name, person_id),
-        )
-        _refresh_person_name_forms(cur, person_id, last_name, first_name)
         return {"ok": True}
 
 
