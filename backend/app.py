@@ -71,14 +71,33 @@ app.add_middleware(
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    """Protège les endpoints d'écriture (POST/PUT/DELETE/PATCH) sauf auth."""
-    if request.method in ("POST", "PUT", "DELETE", "PATCH"):
-        path = request.scope["path"]
-        if not path.startswith("/api/auth/"):
-            token = request.cookies.get("session")
-            if not token or not _verify_token(token):
-                return JSONResponse(status_code=401, content={"detail": "Non authentifié"})
-    return await call_next(request)
+    """Protège les endpoints d'écriture (POST/PUT/DELETE/PATCH) sauf auth.
+
+    Log aussi les actions admin réussies (status < 400) pour traçabilité —
+    format key=value parseable : `admin_action user=admin method=POST
+    path=/api/... status=200`.
+    """
+    if request.method not in ("POST", "PUT", "DELETE", "PATCH"):
+        return await call_next(request)
+
+    path = request.scope["path"]
+    if path.startswith("/api/auth/"):
+        return await call_next(request)
+
+    token = request.cookies.get("session")
+    payload = _verify_token(token) if token else None
+    if not payload:
+        return JSONResponse(status_code=401, content={"detail": "Non authentifié"})
+
+    # Payload format : "admin_user|timestamp"
+    admin_user = payload.split("|", 1)[0] if "|" in payload else payload
+    response = await call_next(request)
+    if response.status_code < 400:
+        logger.info(
+            "admin_action user=%s method=%s path=%s status=%d",
+            admin_user, request.method, path, response.status_code,
+        )
+    return response
 
 
 @app.middleware("http")
