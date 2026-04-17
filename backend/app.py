@@ -20,6 +20,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from backend.deps import _get_pool, _verify_token, get_cursor
+from domain.errors import (
+    ConflictError,
+    DomainError,
+    NotFoundError,
+    UnauthorizedError,
+    ValidationError,
+)
 from utils.log import configure_root_logging
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
@@ -51,7 +58,37 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Bibliométrie UCA")
 
 
-# ----- Exception handler global -----
+# ----- Exception handlers -----
+#
+# Les services lèvent des exceptions métier (domain.errors) sans connaître HTTP.
+# Ces handlers sont le SEUL endroit qui traduit une erreur métier en code HTTP.
+
+
+@app.exception_handler(NotFoundError)
+async def not_found_handler(request: Request, exc: NotFoundError):
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+
+@app.exception_handler(ValidationError)
+async def validation_handler(request: Request, exc: ValidationError):
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(ConflictError)
+async def conflict_handler(request: Request, exc: ConflictError):
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
+@app.exception_handler(UnauthorizedError)
+async def unauthorized_handler(request: Request, exc: UnauthorizedError):
+    return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+
+@app.exception_handler(DomainError)
+async def domain_error_handler(request: Request, exc: DomainError):
+    # Filet de sécurité pour une DomainError non spécialisée ci-dessus.
+    logger.warning("DomainError non mappée : %s", exc)
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.exception_handler(Exception)
