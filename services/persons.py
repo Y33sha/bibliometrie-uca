@@ -23,17 +23,9 @@ from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
 
 def create_person(cur, last_name: str, first_name: str = "") -> int:
     """Crée une personne et retourne son id."""
-    cur.execute(
-        """
-        INSERT INTO persons (last_name, first_name,
-                             last_name_normalized, first_name_normalized)
-        VALUES (%s, %s, %s, %s)
-        RETURNING id
-    """,
-        (last_name, first_name, normalize_name(last_name), normalize_name(first_name)),
-    )
-    person_id = cur.fetchone()["id"]
-    refresh_person_name_forms(cur, person_id, last_name, first_name)
+    repo = PgPersonRepository(cur)
+    person_id = repo.create(last_name, first_name)
+    repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
     return person_id
 
 
@@ -51,25 +43,9 @@ def update_name(cur, person_id: int, last_name: str, first_name: str) -> None:
 
     Lève NotFoundError si la personne n'existe pas.
     """
-    cur.execute("SELECT id FROM persons WHERE id = %s", (person_id,))
-    if not cur.fetchone():
-        raise NotFoundError(f"Personne {person_id} introuvable")
-
-    cur.execute(
-        """
-        UPDATE persons SET last_name = %s, first_name = %s,
-               last_name_normalized = %s,
-               first_name_normalized = %s,
-               updated_at = now()
-        WHERE id = %s
-        """,
-        (
-            last_name, first_name,
-            normalize_name(last_name), normalize_name(first_name),
-            person_id,
-        ),
-    )
-    refresh_person_name_forms(cur, person_id, last_name, first_name)
+    repo = PgPersonRepository(cur)
+    repo.update_name(person_id, last_name, first_name)
+    repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
 
 
 # ── Rattachement / détachement authorships ──
@@ -294,109 +270,21 @@ def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
 def refresh_person_name_forms(cur, person_id: int, last_name: str, first_name: str) -> None:
     """Recalcule les formes de nom source 'persons' d'une personne.
 
-    Supprime les anciennes formes 'persons' de cette personne, puis insère
-    les nouvelles. Les formes partagées avec d'autres personnes ou d'autres
-    sources sont préservées (seul le person_id et la source sont retirés/ajoutés).
+    Shim : calcule les formes via le domaine et délègue au repository.
     """
-    # 1a. Formes dont 'persons' est la seule source : retirer le person_id
-    cur.execute(
-        """
-        UPDATE person_name_forms
-        SET person_ids = array_remove(person_ids, %s)
-        WHERE %s = ANY(person_ids)
-          AND sources = ARRAY['persons']
-    """,
-        (person_id, person_id),
-    )
-    # 1b. Formes multi-sources : retirer 'persons' de sources, garder person_id
-    cur.execute(
-        """
-        UPDATE person_name_forms
-        SET sources = array_remove(sources, 'persons'),
-            updated_at = now()
-        WHERE %s = ANY(person_ids)
-          AND 'persons' = ANY(sources)
-          AND array_length(sources, 1) > 1
-    """,
-        (person_id,),
-    )
-    # 1c. Nettoyer les formes devenues vides
-    cur.execute("""
-        DELETE FROM person_name_forms
-        WHERE person_ids = '{}' OR person_ids IS NULL
-    """)
-
-    # 2. Ajouter les nouvelles formes
-    for form in compute_person_name_forms(last_name, first_name):
-        add_name_form(cur, person_id, form, source="persons")
+    forms = compute_person_name_forms(last_name, first_name)
+    PgPersonRepository(cur).refresh_name_forms(person_id, forms)
 
 
 def add_name_form(cur, person_id: int, full_name: str, source: str | None = None) -> None:
-    """Ajoute une forme de nom à person_name_forms si elle n'existe pas déjà.
-
-    Si source est fourni (ex: 'hal', 'openalex', 'persons'), il est ajouté
-    au tableau sources de la forme de nom.
-    """
-    if not full_name or not full_name.strip():
-        return
-    norm = normalize_name(full_name)
-    if not norm:
-        return
-    if source:
-        cur.execute(
-            """
-            INSERT INTO person_name_forms (name_form, person_ids, sources)
-            VALUES (%s, ARRAY[%s], ARRAY[%s])
-            ON CONFLICT (name_form) DO UPDATE
-            SET person_ids = (
-                    SELECT array_agg(DISTINCT x)
-                    FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
-                ),
-                sources = (
-                    SELECT array_agg(DISTINCT x ORDER BY x)
-                    FROM unnest(COALESCE(person_name_forms.sources, '{}') || ARRAY[%s]) AS x
-                ),
-                updated_at = now()
-        """,
-            (norm, person_id, source, person_id, source),
-        )
-    else:
-        cur.execute(
-            """
-            INSERT INTO person_name_forms (name_form, person_ids)
-            VALUES (%s, ARRAY[%s])
-            ON CONFLICT (name_form) DO UPDATE
-            SET person_ids = (
-                SELECT array_agg(DISTINCT x)
-                FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
-            )
-        """,
-            (norm, person_id, person_id),
-        )
+    """Ajoute une forme de nom à person_name_forms si elle n'existe pas déjà."""
+    PgPersonRepository(cur).add_name_form(person_id, full_name, source=source)
 
 
-def detach_name_form(cur, person_id: int, name_form: str) -> bool:
-    """Détache une personne d'une forme de nom.
-
-    Retire person_id de person_ids. Supprime la forme si person_ids devient vide.
-    Retourne True si le détachement a eu lieu.
-    """
-    cur.execute(
-        """
-        UPDATE person_name_forms
-        SET person_ids = array_remove(person_ids, %s)
-        WHERE name_form = %s
-    """,
-        (person_id, name_form),
-    )
-    cur.execute(
-        """
-        DELETE FROM person_name_forms
-        WHERE name_form = %s AND person_ids = '{}'
-    """,
-        (name_form,),
-    )
-    return True
+def detach_name_form(cur, person_id: int, name_form: str) -> None:
+    """Détache une personne d'une forme de nom. Supprime la forme si
+    person_ids devient vide."""
+    PgPersonRepository(cur).detach_name_form(person_id, name_form)
 
 
 # ── Rattachement / détachement par auteur source ──
