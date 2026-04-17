@@ -7,6 +7,9 @@ from fastapi import APIRouter, HTTPException, Query
 
 from backend.deps import get_cursor
 from backend.filters import (
+    apply_person_has_identifier_filter,
+    apply_person_has_rh_filter,
+    apply_person_linked_filter,
     parse_str_csv,
 )
 from backend.models import (
@@ -244,34 +247,10 @@ async def list_persons(
     if role:
         conditions.append("prh.role_title = %s")
         params.append(role)
-    if linked == "yes":
-        conditions.append("EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)")
-    elif linked == "no":
-        conditions.append("NOT EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)")
-    if has_orcid == "yes":
-        conditions.append("""EXISTS (
-            SELECT 1 FROM person_identifiers pi
-            WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
-        )""")
-    elif has_orcid == "no":
-        conditions.append("""NOT EXISTS (
-            SELECT 1 FROM person_identifiers pi
-            WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
-        )""")
-    if has_idhal == "yes":
-        conditions.append("""EXISTS (
-            SELECT 1 FROM person_identifiers pi
-            WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
-        )""")
-    elif has_idhal == "no":
-        conditions.append("""NOT EXISTS (
-            SELECT 1 FROM person_identifiers pi
-            WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
-        )""")
-    if has_rh == "yes":
-        conditions.append("prh.id IS NOT NULL")
-    elif has_rh == "no":
-        conditions.append("prh.id IS NULL")
+    apply_person_linked_filter(conditions, linked)
+    apply_person_has_identifier_filter(conditions, "orcid", has_orcid)
+    apply_person_has_identifier_filter(conditions, "idhal", has_idhal)
+    apply_person_has_rh_filter(conditions, has_rh)
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 

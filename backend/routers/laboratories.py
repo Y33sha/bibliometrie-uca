@@ -6,7 +6,11 @@ import logging
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.deps import get_cursor
-from backend.filters import persons_sort_clause
+from backend.filters import (
+    apply_person_has_identifier_filter,
+    apply_person_has_rh_filter,
+    persons_sort_clause,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -141,26 +145,9 @@ async def get_laboratory_persons(
             )""")
             s = f"%{search}%"
             extra_params.extend([s, s])
-        if has_rh == "yes":
-            extra_conds.append("prh.id IS NOT NULL")
-        elif has_rh == "no":
-            extra_conds.append("prh.id IS NULL")
-        if has_orcid == "yes":
-            extra_conds.append(
-                "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')"
-            )
-        elif has_orcid == "no":
-            extra_conds.append(
-                "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')"
-            )
-        if has_idhal == "yes":
-            extra_conds.append(
-                "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')"
-            )
-        elif has_idhal == "no":
-            extra_conds.append(
-                "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')"
-            )
+        apply_person_has_rh_filter(extra_conds, has_rh)
+        apply_person_has_identifier_filter(extra_conds, "orcid", has_orcid)
+        apply_person_has_identifier_filter(extra_conds, "idhal", has_idhal)
 
         extra_where = (" AND " + " AND ".join(extra_conds)) if extra_conds else ""
 
