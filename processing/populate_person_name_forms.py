@@ -13,8 +13,7 @@ Sources :
 1. persons.last_name + persons.first_name (source: 'persons')
 2. source_authorships.author_name_normalized (toutes sources)
 """
-import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import os
 
 from psycopg2.extras import RealDictCursor
 from db.connection import get_connection

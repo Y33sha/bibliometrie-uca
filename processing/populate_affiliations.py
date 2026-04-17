@@ -21,10 +21,7 @@ Usage:
 
 import argparse
 import os
-import sys
 import time
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from utils.perimeter import get_persons_structure_ids, get_affiliations_structure_ids
 from utils.log import setup_logger

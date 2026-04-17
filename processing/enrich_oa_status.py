@@ -16,11 +16,8 @@ Rate limit: 100 000 req/jour, ~10 req/s recommandé
 
 import argparse
 import os
-import sys
 import time
 import requests
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from services.publications import update_oa_status
 from utils.log import setup_logger

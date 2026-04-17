@@ -7,13 +7,10 @@ Usage:
     python processing/harvest_hal_idrefs.py [--dry-run]
 """
 import argparse
-import sys
 import time
 import requests
 import psycopg2
 from psycopg2.extras import RealDictCursor
-
-sys.path.insert(0, ".")
 from db.connection import get_connection
 from services.persons import add_identifier
 

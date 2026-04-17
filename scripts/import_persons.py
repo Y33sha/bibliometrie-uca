@@ -21,8 +21,6 @@ from datetime import datetime
 
 import psycopg2
 from psycopg2.extras import execute_values
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from utils.normalize import normalize_name
 from services.persons import refresh_person_name_forms

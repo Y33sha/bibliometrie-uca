@@ -1,10 +1,8 @@
 """Auto-extracted router."""
 
-import sys, os
 from fastapi import APIRouter, Query, HTTPException
 from backend.deps import get_cursor
 from backend.models import MergePublications, MarkDistinctPublications
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from services.publications import merge_publications
 
 router = APIRouter()
@@ -113,7 +111,7 @@ async def next_duplicate_candidate(
 async def merge_duplicate_publications(body: MergePublications):
     """Fusionne source_id dans target_id."""
     if body.target_id == body.source_id:
-        raise HTTPException(status_code=400, detail="target_id et source_id requis et différents")
+        raise HTTPException(status_code=400, detail="target_id et source_id doivent être différents")
 
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id, doi, journal_id, oa_status::text, language, container_title FROM publications WHERE id IN (%s, %s)", (body.target_id, body.source_id))
@@ -136,7 +134,7 @@ async def merge_duplicate_publications(body: MergePublications):
 async def mark_publications_distinct(body: MarkDistinctPublications):
     """Marque deux publications comme distinctes (non-doublon)."""
     if body.pub_id_a == body.pub_id_b:
-        raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b requis et différents")
+        raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
 
     with get_cursor() as (cur, conn):
         cur.execute("""

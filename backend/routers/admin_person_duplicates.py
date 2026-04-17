@@ -1,14 +1,11 @@
 """Admin person duplicates router."""
 
-import os
-import sys
 import psycopg2.extras
 from fastapi import APIRouter, Query, HTTPException
 from backend.deps import get_cursor
 from backend.filters import parse_str_csv
 from backend.models import MarkPersonsDistinct
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from services.persons import merge_person as _merge_person
 
 router = APIRouter()
@@ -297,7 +294,7 @@ async def next_person_duplicate(
 async def mark_persons_distinct(body: MarkPersonsDistinct):
     """Marque deux personnes comme distinctes (non-doublon)."""
     if body.person_id_a == body.person_id_b:
-        raise HTTPException(status_code=400, detail="person_id_a et person_id_b requis et différents")
+        raise HTTPException(status_code=400, detail="person_id_a et person_id_b doivent être différents")
 
     with get_cursor() as (cur, conn):
         cur.execute("""

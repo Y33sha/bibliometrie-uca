@@ -6,10 +6,8 @@ Usage:
     python analysis/audit_oa_unpaywall.py --dry-run    # rapport CSV sans modifier la base
 """
 
-import sys, os, time, argparse, csv
+import os, time, argparse, csv
 import requests
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from config.settings import DB

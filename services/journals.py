@@ -6,8 +6,6 @@ Toute création ou recherche de journal/éditeur passe par ce module.
 Compatible avec les curseurs tuples (standard) et RealDictCursor.
 """
 
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.normalize import normalize_text
 from utils.db_helpers import row_val as _val
 

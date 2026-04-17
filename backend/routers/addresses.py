@@ -4,7 +4,8 @@ import logging
 from fastapi import APIRouter, Query, HTTPException, Depends, BackgroundTasks
 from backend.deps import get_cursor, require_admin
 from services.authorships import propagate_uca_for_addresses
-from backend.models import ReviewAction, BatchReviewAction, AssignStructureAction, SetCountry, BatchSetCountry
+from backend.models import (ReviewAction, BatchReviewAction, AssignStructureAction,
+    SetCountry, BatchSetCountry)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -519,13 +520,7 @@ async def set_address_country(addr_id: int, body: SetCountry, bg: BackgroundTask
 
 @router.post("/api/addresses/batch-country")
 async def batch_set_country(body: BatchSetCountry, bg: BackgroundTasks, _=Depends(require_admin)):
-    """Ajoute un pays à des adresses — par IDs ou par filtre.
-
-    body.country_code: code pays à ajouter
-    body.address_ids: liste d'IDs (sélection manuelle)
-    body.search: filtre texte (appliqué à toutes les adresses matching)
-    body.has_country: "yes" ou "no" (filtre additionnel)
-    """
+    """Ajoute un pays à des adresses — par IDs ou par filtre."""
     country_code = body.country_code
     address_ids = body.address_ids
     filter_search = body.search
