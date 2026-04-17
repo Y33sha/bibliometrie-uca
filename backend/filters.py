@@ -295,6 +295,61 @@ def apply_no_lab_filter(conditions: list, params: list) -> None:
     )
 
 
+# ── Filtres "persons" (listes de personnes) ──────────────────────
+
+
+def apply_person_has_identifier_filter(
+    conditions: list, id_type: str, value: str
+) -> None:
+    """Filtre : la personne a-t-elle un identifiant donné (orcid, idhal, idref)
+    avec un statut différent de 'rejected' ?
+
+    `value` : "yes" pour présent, "no" pour absent, autre/vide → no-op.
+    Utilisé dans `list_persons` et `get_laboratory_persons`.
+    """
+    if value == "yes":
+        conditions.append(
+            f"""EXISTS (
+                SELECT 1 FROM person_identifiers pi
+                WHERE pi.person_id = p.id
+                  AND pi.id_type = '{id_type}'
+                  AND pi.status != 'rejected'
+            )"""
+        )
+    elif value == "no":
+        conditions.append(
+            f"""NOT EXISTS (
+                SELECT 1 FROM person_identifiers pi
+                WHERE pi.person_id = p.id
+                  AND pi.id_type = '{id_type}'
+                  AND pi.status != 'rejected'
+            )"""
+        )
+
+
+def apply_person_linked_filter(conditions: list, value: str) -> None:
+    """Filtre : la personne est-elle liée à au moins une authorship ?
+
+    `value` : "yes" / "no" / autre (no-op).
+    """
+    if value == "yes":
+        conditions.append("EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)")
+    elif value == "no":
+        conditions.append("NOT EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)")
+
+
+def apply_person_has_rh_filter(conditions: list, value: str) -> None:
+    """Filtre : la personne a-t-elle une fiche RH (persons_rh) ?
+
+    Suppose que la requête contient déjà `LEFT JOIN persons_rh prh ON ...`.
+    `value` : "yes" / "no" / autre (no-op).
+    """
+    if value == "yes":
+        conditions.append("prh.id IS NOT NULL")
+    elif value == "no":
+        conditions.append("prh.id IS NULL")
+
+
 def apply_publisher_journal_filter(
     conditions: list, params: list, publisher_id: int | None, journal_id: int | None
 ):
