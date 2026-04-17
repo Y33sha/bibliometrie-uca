@@ -19,7 +19,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from backend.deps import _verify_token, get_cursor
-from backend.routers import (
+from utils.log import configure_root_logging
+
+# Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
+# À faire AVANT l'import des routers qui peuvent créer leur propre logger.
+configure_root_logging()
+
+from backend.routers import (  # noqa: E402
     addresses,
     admin_duplicates,
     admin_person_duplicates,
