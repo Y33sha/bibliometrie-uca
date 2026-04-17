@@ -138,6 +138,67 @@ class PgPublicationRepository:
             (pub_id, pub_id),
         )
 
+    # ── Accès bas niveau au champ doi ──────────────────────────────
+
+    def get_doi(self, pub_id: int) -> str | None:
+        """Retourne le DOI courant d'une publication, ou None."""
+        self._cur.execute("SELECT doi FROM publications WHERE id = %s", (pub_id,))
+        row = self._cur.fetchone()
+        if row is None:
+            return None
+        return row["doi"] if isinstance(row, dict) else row[0]
+
+    def set_doi(self, pub_id: int, doi: str) -> None:
+        """Attribue un DOI à une publication (ne vérifie pas les conflits
+        d'unicité — le caller doit l'avoir fait via find_by_doi)."""
+        self._cur.execute(
+            "UPDATE publications SET doi = %s, updated_at = now() WHERE id = %s",
+            (doi, pub_id),
+        )
+
+    def clear_doi(self, pub_id: int) -> None:
+        """Retire le DOI d'une publication (utilisé lors des conflits
+        chapitre/ouvrage)."""
+        self._cur.execute(
+            "UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s",
+            (pub_id,),
+        )
+
+    # ── Création ───────────────────────────────────────────────────
+
+    def create(
+        self,
+        *,
+        title: str,
+        title_normalized: str,
+        doc_type: str,
+        pub_year: int,
+        doi: str | None,
+        oa_status: str,
+        journal_id: int | None,
+        container_title: str | None,
+        language: str | None,
+    ) -> int:
+        """Insère une publication et retourne son id.
+
+        Le caller est responsable du tier de déduplication avant
+        d'appeler `create` — le repo ne fait que le INSERT brut.
+        """
+        self._cur.execute(
+            """
+            INSERT INTO publications
+                (title, title_normalized, doc_type, pub_year, doi,
+                 oa_status, journal_id, container_title, language)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+            """,
+            (
+                title, title_normalized, doc_type, pub_year, doi,
+                oa_status, journal_id, container_title, language,
+            ),
+        )
+        return _val(self._cur.fetchone(), 0)
+
     # ── distinct_publications ──────────────────────────────────────
 
     def mark_distinct(self, pub_id_a: int, pub_id_b: int) -> tuple[int, int] | None:
