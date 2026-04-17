@@ -376,91 +376,16 @@ def mark_distinct(cur, pub_id_a: int, pub_id_b: int) -> None:
 
 
 def merge_publications(cur, target_id: int, source_id: int) -> None:
-    """Fusionne la publication source_id dans target_id.
+    """Fusionne la publication `source_id` dans `target_id`.
 
-    1. Transfère les documents sources (HAL, OA, WoS)
-    2. Transfère les authorships vérité (supprime doublons)
-    3. Enrichit la cible avec les métadonnées de la source
-    4. Supprime la source et les distinct_publications associées
+    Orchestration :
+    1. Délègue la séquence de transferts/suppressions au repository
+    2. Recalcule le tableau `sources` de la cible
+    3. Émet l'événement d'audit (silencieusement no-op hors contexte HTTP)
     """
-    # 1. Transférer les documents sources
-    cur.execute(
-        "UPDATE source_publications SET publication_id = %s WHERE publication_id = %s",
-        (target_id, source_id),
-    )
-
-    # 2. Transférer les authorships vérité (supprimer doublons par person_id)
-    cur.execute(
-        """
-        DELETE FROM authorships
-        WHERE publication_id = %s
-          AND person_id IN (
-              SELECT person_id FROM authorships WHERE publication_id = %s
-          )
-    """,
-        (source_id, target_id),
-    )
-    cur.execute(
-        "UPDATE authorships SET publication_id = %s WHERE publication_id = %s",
-        (target_id, source_id),
-    )
-
-    # 3. Enrichir la cible avec les métadonnées de la source
-    # Ordre : capturer les valeurs src → NULL-er doi src (pour libérer la
-    # contrainte UNIQUE lower(doi)) → enrichir target avec les valeurs capturées.
-    cur.execute(
-        """
-        SELECT doi, journal_id, oa_status::text AS oa_status,
-               language, container_title, countries
-        FROM publications WHERE id = %s
-    """,
-        (source_id,),
-    )
-    src = cur.fetchone()
-    cur.execute("UPDATE publications SET doi = NULL WHERE id = %s", (source_id,))
-    cur.execute(
-        """
-        UPDATE publications SET
-            doi = COALESCE(doi, LOWER(%s)),
-            journal_id = COALESCE(journal_id, %s),
-            oa_status = CASE
-                WHEN %s = 'diamond' THEN 'diamond'::oa_type
-                WHEN oa_status IN ('unknown', 'closed')
-                    AND %s NOT IN ('unknown', 'closed')
-                THEN %s::oa_type ELSE oa_status END,
-            language = COALESCE(language, %s),
-            container_title = COALESCE(container_title, %s),
-            countries = CASE
-                WHEN countries IS NULL THEN %s
-                WHEN %s IS NULL THEN countries
-                ELSE (SELECT array_agg(DISTINCT c ORDER BY c)
-                      FROM unnest(countries || %s) AS c)
-                END,
-            updated_at = now()
-        WHERE id = %s
-    """,
-        (
-            src["doi"], src["journal_id"],
-            src["oa_status"], src["oa_status"], src["oa_status"],
-            src["language"], src["container_title"],
-            src["countries"], src["countries"], src["countries"],
-            target_id,
-        ),
-    )
-
-    # 4. Nettoyer distinct_publications et supprimer la source
-    cur.execute(
-        """
-        DELETE FROM distinct_publications
-        WHERE pub_id_a = %s OR pub_id_b = %s
-    """,
-        (source_id, source_id),
-    )
-    cur.execute("DELETE FROM publications WHERE id = %s", (source_id,))
-
-    # 5. Recalculer les sources de la cible
-    update_sources(cur, target_id)
-
+    repo = PgPublicationRepository(cur)
+    repo.merge_into(target_id, source_id)
+    repo.update_sources(target_id)
     emit_event(
         cur, "publication.merged", "publication", target_id,
         {"source_id": source_id},
