@@ -37,7 +37,13 @@ from services.persons import (
     assign_orphan_authorship as _assign_orphan,
 )
 from services.persons import (
+    batch_assign_orphan_authorships as _batch_assign_orphan,
+)
+from services.persons import (
     create_person as _create_person,
+)
+from services.persons import (
+    detach_authorships as _detach_authorships_service,
 )
 from services.persons import (
     detach_name_form as _detach_name_form,
@@ -1136,61 +1142,7 @@ async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships):
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Personne introuvable")
 
-        # 1. Rattacher les source_authorships
-        cur.execute(
-            """
-            UPDATE source_authorships SET person_id = %s
-            WHERE id = ANY(%s) AND person_id IS NULL
-            RETURNING id
-        """,
-            (person_id, sa_ids),
-        )
-        assigned = cur.rowcount
-
-        # 2. Creer les authorships canoniques manquantes
-        cur.execute(
-            """
-            INSERT INTO authorships (publication_id, person_id,
-                author_position, in_perimeter, is_corresponding, structure_ids)
-            SELECT DISTINCT ON (sd.publication_id)
-                sd.publication_id, %s,
-                sa.author_position, sa.in_perimeter, sa.is_corresponding, sa.structure_ids
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            WHERE sa.id = ANY(%s) AND sd.publication_id IS NOT NULL
-            ORDER BY sd.publication_id,
-                CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 WHEN 'wos' THEN 3 END
-            ON CONFLICT (publication_id, person_id) DO NOTHING
-        """,
-            (person_id, sa_ids),
-        )
-
-        # 3. Mettre les FK authorship_id
-        cur.execute(
-            """
-            UPDATE source_authorships sa SET authorship_id = a.id
-            FROM source_publications sd, authorships a
-            WHERE sa.id = ANY(%s)
-              AND sd.id = sa.source_publication_id
-              AND a.publication_id = sd.publication_id
-              AND a.person_id = %s
-              AND sa.authorship_id IS NULL
-        """,
-            (sa_ids, person_id),
-        )
-
-        # 4. Ajouter les formes de noms
-        cur.execute(
-            """
-            SELECT DISTINCT author_name_normalized
-            FROM source_authorships
-            WHERE id = ANY(%s) AND author_name_normalized IS NOT NULL AND NOT excluded
-        """,
-            (sa_ids,),
-        )
-        for row in cur.fetchall():
-            _add_name_form(cur, person_id, row["author_name_normalized"])
-
+        assigned = _batch_assign_orphan(cur, person_id, sa_ids)
         return {"ok": True, "assigned": assigned}
 
 
@@ -1242,53 +1194,14 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
 @router.post("/api/persons/{person_id}/detach-authorships")
 async def detach_authorships(person_id: int, body: DetachAuthorships):
     """Détache des authorships sources d'une personne et nettoie les formes de noms."""
-    name_form = body.name_form
-
     with get_cursor() as (cur, conn):
-        for a in body.authorships:
-            _unlink_authorship(cur, person_id, a.source, a.authorship_id)
-
-        # Supprimer les authorships vérité orphelines
-        deleted_authorships = _delete_orphan_authorships(cur, person_id)
-
-        # Nettoyer la forme de nom si plus aucune authorship ne la porte
-        cleaned_form = False
-        if name_form:
-            cur.execute(
-                f"""
-                SELECT COUNT(*) FROM source_authorships sa
-                WHERE sa.person_id = %s AND sa.author_name_normalized = %s
-                  AND sa.source IN {AUTHOR_SOURCES_SQL}
-            """,
-                (person_id, name_form),
-            )
-            remaining = cur.fetchone()["count"]
-            if remaining == 0:
-                norm = name_form  # déjà normalisé
-                if norm:
-                    cur.execute(
-                        """
-                        UPDATE person_name_forms
-                        SET person_ids = array_remove(person_ids, %s)
-                        WHERE name_form = %s
-                    """,
-                        (person_id, norm),
-                    )
-                    # Supprimer la forme si person_ids est vide
-                    cur.execute(
-                        """
-                        DELETE FROM person_name_forms
-                        WHERE name_form = %s AND person_ids = '{}'
-                    """,
-                        (norm,),
-                    )
-                    cleaned_form = True
-
-        return {
-            "detached": len(body.authorships),
-            "deleted_authorships": deleted_authorships,
-            "cleaned_form": cleaned_form,
-        }
+        return _detach_authorships_service(
+            cur,
+            person_id,
+            authorships=[{"source": a.source, "authorship_id": a.authorship_id}
+                         for a in body.authorships],
+            name_form=body.name_form,
+        )
 
 
 @router.post("/api/persons/{person_id}/detach-name-form")

@@ -9,7 +9,9 @@ from services.persons import (
     add_identifier,
     add_identifiers_from_authorships,
     assign_orphan_authorship,
+    batch_assign_orphan_authorships,
     create_person,
+    detach_authorships,
     detach_name_form,
     link_authorship,
     reassign_identifier,
@@ -295,6 +297,144 @@ class TestUpdateName:
 
     def test_returns_false_if_not_found(self, db):
         assert update_name(db, 999999, "X", "X") is False
+
+
+# ── batch_assign_orphan_authorships ─────────────────────────────────
+
+class TestBatchAssignOrphanAuthorships:
+    def _setup_uca(self, db):
+        import json
+        db.execute(
+            """
+            INSERT INTO structures (code, name, structure_type)
+            VALUES ('UCA', 'UCA', 'universite'::structure_type)
+            RETURNING id
+            """
+        )
+        uca = db.fetchone()["id"]
+        db.execute(
+            "INSERT INTO perimeters (code, name, structure_ids) VALUES ('uca', 'UCA', %s)",
+            ([uca],),
+        )
+        db.execute(
+            "INSERT INTO config (key, value) VALUES ('perimeter_persons', %s::jsonb)",
+            (json.dumps("uca"),),
+        )
+
+    def test_empty_list_returns_zero(self, db):
+        self._setup_uca(db)
+        person_id = _insert_person(db)
+        assert batch_assign_orphan_authorships(db, person_id, []) == 0
+
+    def test_assigns_and_creates_truth(self, db):
+        self._setup_uca(db)
+        person_id = _insert_person(db)
+        pub_id = _insert_publication(db)
+        sp_hal = _insert_source_publication(db, pub_id, source="hal", source_id="h-1")
+        sp_oa = _insert_source_publication(db, pub_id, source="openalex", source_id="W1")
+        sp_person_hal = _insert_source_person(db, source="hal", source_id="hal-p-1")
+        sp_person_oa = _insert_source_person(db, source="openalex", source_id="oa-p-1")
+        sa1 = _insert_source_authorship(db, sp_hal, sp_person_hal, source="hal",
+                                        author_name_normalized="jean dupont")
+        sa2 = _insert_source_authorship(db, sp_oa, sp_person_oa, source="openalex",
+                                        author_name_normalized="jean dupont")
+
+        assigned = batch_assign_orphan_authorships(db, person_id, [sa1, sa2])
+
+        assert assigned == 2
+        # authorship vérité créée pour la publication
+        db.execute(
+            "SELECT id FROM authorships WHERE publication_id = %s AND person_id = %s",
+            (pub_id, person_id),
+        )
+        assert db.fetchone() is not None
+        # FK posée sur les 2 source_authorships
+        db.execute(
+            "SELECT authorship_id FROM source_authorships WHERE id = ANY(%s)",
+            ([sa1, sa2],),
+        )
+        rows = db.fetchall()
+        assert all(r["authorship_id"] is not None for r in rows)
+
+    def test_skips_already_assigned(self, db):
+        self._setup_uca(db)
+        p1 = _insert_person(db, "A", "A")
+        p2 = _insert_person(db, "B", "B")
+        pub_id = _insert_publication(db)
+        sp_id = _insert_source_publication(db, pub_id)
+        sp_person = _insert_source_person(db)
+        # sa1 déjà assignée à p1
+        sa1 = _insert_source_authorship(db, sp_id, sp_person, person_id=p1)
+
+        assigned = batch_assign_orphan_authorships(db, p2, [sa1])
+
+        assert assigned == 0  # pas d'orpheline à rattacher
+        db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa1,))
+        assert db.fetchone()["person_id"] == p1  # inchangé
+
+
+# ── detach_authorships ─────────────────────────────────────────────
+
+class TestDetachAuthorships:
+    def test_detaches_and_removes_truth_if_orphan(self, db):
+        person_id = _insert_person(db)
+        pub_id = _insert_publication(db)
+        sp_id = _insert_source_publication(db, pub_id)
+        sp_person = _insert_source_person(db)
+        auth_id = db.execute(
+            "INSERT INTO authorships (publication_id, person_id) VALUES (%s, %s) RETURNING id",
+            (pub_id, person_id),
+        )
+        db.execute(
+            "SELECT id FROM authorships WHERE publication_id = %s AND person_id = %s",
+            (pub_id, person_id),
+        )
+        auth_id = db.fetchone()["id"]
+        sa_id = _insert_source_authorship(db, sp_id, sp_person, person_id=person_id)
+
+        result = detach_authorships(
+            db, person_id,
+            authorships=[{"source": "hal", "authorship_id": sa_id}],
+        )
+
+        assert result["detached"] == 1
+        assert result["deleted_authorships"] == 1
+        # source_authorship détaché
+        db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa_id,))
+        assert db.fetchone()["person_id"] is None
+        # authorship vérité supprimée (orpheline)
+        db.execute("SELECT id FROM authorships WHERE id = %s", (auth_id,))
+        assert db.fetchone() is None
+
+    def test_cleans_name_form_when_no_remaining(self, db):
+        person_id = create_person(db, "Dupont", "Jean")
+        # add_name_form simulé via create_person
+
+        # Pas de source_authorship portant "dupont jean" → la forme est nettoyée
+        result = detach_authorships(db, person_id, authorships=[],
+                                     name_form="dupont jean")
+        assert result["cleaned_form"] is True
+
+        db.execute("SELECT id FROM person_name_forms WHERE name_form = 'dupont jean'")
+        # La forme a été retirée ou la person_id a été enlevée
+        row = db.fetchone()
+        if row:
+            db.execute("SELECT person_ids FROM person_name_forms WHERE name_form = 'dupont jean'")
+            assert person_id not in (db.fetchone()["person_ids"] or [])
+
+    def test_keeps_name_form_if_another_authorship_uses_it(self, db):
+        person_id = create_person(db, "Dupont", "Jean")
+        pub_id = _insert_publication(db)
+        sp_id = _insert_source_publication(db, pub_id)
+        sp_person = _insert_source_person(db)
+        # source_authorship portant la forme "dupont jean"
+        _insert_source_authorship(db, sp_id, sp_person, person_id=person_id,
+                                  author_name_normalized="dupont jean")
+
+        result = detach_authorships(db, person_id, authorships=[],
+                                     name_form="dupont jean")
+
+        assert result["cleaned_form"] is False
 
 
 class TestAddIdentifiersFromAuthorships:
