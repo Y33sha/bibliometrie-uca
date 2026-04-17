@@ -1,7 +1,7 @@
 """Utilitaire de mesure de performance pour les normaliseurs."""
 
-import time
 import logging
+import time
 
 
 class StepTimer:

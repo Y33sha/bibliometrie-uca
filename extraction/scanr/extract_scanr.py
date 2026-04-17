@@ -18,8 +18,13 @@ import requests
 from psycopg2.extras import Json
 
 from db.connection import get_connection
-from extraction.common import compute_hash, clean_doi, get_existing_ids, setup_logger
-from utils.app_config import get_years, get_scanr_affiliation_ids, get_scanr_credentials, get_api_base_urls
+from extraction.common import clean_doi, compute_hash, get_existing_ids, setup_logger
+from utils.app_config import (
+    get_api_base_urls,
+    get_scanr_affiliation_ids,
+    get_scanr_credentials,
+    get_years,
+)
 
 PER_PAGE = 500
 REQUEST_DELAY = 0.3
@@ -178,7 +183,7 @@ def main():
         grand_updated += updated
         logger.info(f"  {year} terminé : {inserted} nouveaux, {updated} mis à jour")
 
-    logger.info(f"\n=== Terminé ===")
+    logger.info("\n=== Terminé ===")
     logger.info(f"Total API : {grand_total}")
     logger.info(f"Nouveaux : {grand_inserted}")
     logger.info(f"Mis à jour : {grand_updated}")

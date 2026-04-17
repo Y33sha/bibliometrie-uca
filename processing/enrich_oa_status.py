@@ -17,7 +17,9 @@ Rate limit: 100 000 req/jour, ~10 req/s recommandé
 import argparse
 import os
 import time
+
 import requests
+
 from db.connection import get_connection
 from services.publications import update_oa_status
 from utils.log import setup_logger

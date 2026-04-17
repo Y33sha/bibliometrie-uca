@@ -13,10 +13,11 @@ Usage:
 import argparse
 import os
 import time
+
 from db.connection import get_connection
+from services.publications import merge_publications
 from utils.log import setup_logger
 from utils.zenodo import resolve_zenodo_doi
-from services.publications import merge_publications
 
 logger = setup_logger("cleanup_zenodo", os.path.join(os.path.dirname(__file__), "../processing/logs"))
 
@@ -29,7 +30,7 @@ def find_consecutive_pairs(cur):
     cur.execute("""
         WITH zenodo_pubs AS (
             SELECT id, doi,
-                   (regexp_match(doi, 'zenodo\\.(\d+)'))[1]::bigint AS zid,
+                   (regexp_match(doi, 'zenodo\\.(\\d+)'))[1]::bigint AS zid,
                    title_normalized
             FROM publications
             WHERE doi ~* 'zenodo\\.\\d+'
@@ -145,11 +146,11 @@ def main():
             conn.commit()
 
     # --- Résumé ---
-    print(f"\nRésumé :")
+    print("\nRésumé :")
     print(f"  Fusionnées : {merged}")
     print(f"  Erreurs : {errors}")
     if not args.apply and merged:
-        print(f"\nDry-run — ajouter --apply pour appliquer.")
+        print("\nDry-run — ajouter --apply pour appliquer.")
 
     cur.close()
     conn.close()

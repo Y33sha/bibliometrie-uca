@@ -17,9 +17,12 @@ Usage:
 
 import argparse
 import os
-from db.connection import get_connection
+
 from psycopg2.extras import RealDictCursor
-from services.publications import merge_publications as _merge_pub, update_sources
+
+from db.connection import get_connection
+from services.publications import merge_publications as _merge_pub
+from services.publications import update_sources
 from utils.log import setup_logger
 
 log = setup_logger("merge_pubs_by_hal_id", os.path.join(os.path.dirname(__file__), "logs"))
@@ -166,12 +169,12 @@ def main():
             return
 
         if link_only:
-            log.info(f"\n--- Liaison HAL → publication existante ---")
+            log.info("\n--- Liaison HAL → publication existante ---")
             n = link_hal_to_publication(cur, link_only, dry_run=args.dry_run)
             log.info(f"  {n} source_publications HAL reliés")
 
         if merge_needed:
-            log.info(f"\n--- Fusion de publications ---")
+            log.info("\n--- Fusion de publications ---")
             n, errs = merge_publications(cur, merge_needed, dry_run=args.dry_run)
             log.info(f"  {n} publications fusionnées, {errs} erreurs")
 

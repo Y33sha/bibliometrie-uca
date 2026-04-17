@@ -1,13 +1,11 @@
 """Tests pour la résolution d'adresses (processing/resolve_addresses.py)."""
 
-import pytest
 
 from processing.resolve_addresses import (
+    build_forms_by_structure,
     match_form_in_text,
     resolve_address,
-    build_forms_by_structure,
 )
-
 
 # ── Helpers pour construire des formes de test ───────────────────
 

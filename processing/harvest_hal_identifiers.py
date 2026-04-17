@@ -19,6 +19,7 @@ import os
 import time
 
 import requests
+
 from db.connection import get_connection
 from utils.log import setup_logger
 
@@ -180,7 +181,7 @@ def main():
             conn.rollback()
             logger.info(f"\n[DRY RUN] {stats['orcid_found']} ORCID, {stats['idref_found']} IdRef trouvés")
         else:
-            logger.info(f"\n=== Terminé ===")
+            logger.info("\n=== Terminé ===")
             logger.info(f"  ORCID trouvés : {stats['orcid_found']}")
             logger.info(f"  IdRef trouvés : {stats['idref_found']}")
             logger.info(f"  source_persons mis à jour : {stats['ha_updated']}")

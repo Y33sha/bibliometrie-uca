@@ -10,10 +10,9 @@ Ces tests vérifient :
 """
 
 import os
-import pytest
 from contextlib import contextmanager
 
-import psycopg2
+import pytest
 from psycopg2.extras import RealDictCursor
 
 # Recréer le pool DB sur bibliometrie_test avant d'importer l'app
@@ -28,6 +27,7 @@ if DB_PASSWORD:
     _test_db_args["password"] = DB_PASSWORD
 
 from psycopg2.pool import ThreadedConnectionPool
+
 _test_pool = ThreadedConnectionPool(minconn=1, maxconn=3, **_test_db_args)
 
 
@@ -47,11 +47,13 @@ def _test_get_cursor():
 
 # Patcher get_cursor AVANT l'import de l'app
 import backend.deps
+
 backend.deps.get_cursor = _test_get_cursor
 
 from fastapi.testclient import TestClient
-from backend.app import app
+
 import backend.app as _app_module
+from backend.app import app
 
 # Patcher aussi les copies locales dans les modules qui font
 # "from backend.deps import get_cursor" (copie dans leur namespace)
@@ -78,8 +80,9 @@ def client():
 @pytest.fixture(scope="module")
 def auth_client():
     """Client authentifié séparé (cookie session valide)."""
-    from backend.deps import _sign_token
     import time
+
+    from backend.deps import _sign_token
     with TestClient(app, raise_server_exceptions=False) as c:
         token = _sign_token(f"{_settings.admin_user}|{int(time.time())}")
         c.cookies.set("session", token)

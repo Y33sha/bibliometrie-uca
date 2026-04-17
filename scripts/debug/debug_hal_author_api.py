@@ -1,8 +1,9 @@
 """
 Debug : inspecte la réponse brute de l'API ref auteur HAL.
 """
-import requests
 import json
+
+import requests
 
 # Quelques IDs numériques HAL connus depuis les tests précédents
 TEST_IDS = [179576, 740464, 179323, 180901, 21937]
@@ -35,7 +36,7 @@ for hid in TEST_IDS:
         if docs:
             print(f"  Doc: {json.dumps(docs[0], indent=2, ensure_ascii=False)}")
         else:
-            print(f"  Pas de résultat")
+            print("  Pas de résultat")
     except Exception as e:
         print(f"  Parse error: {e}")
         print(f"  Body: {r2.text[:300]}")

@@ -10,7 +10,6 @@ La normalisation Python est alignée sur la fonction SQL normalize_name_form() :
 import re
 import unicodedata
 
-
 # Caractères Unicode qui doivent être remplacés par leur équivalent ASCII
 # avant la suppression des non-ASCII (sinon ils disparaissent silencieusement
 # et collent les mots : "Abeywickrama‐Samarakoon" → "abeywickramasamarakoon")

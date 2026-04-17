@@ -2,9 +2,9 @@
 
 import logging
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query
+
 from backend.deps import get_cursor
-from backend.filters import PUB_IS_UCA
 from utils.sources import AUTHOR_SOURCES_SQL
 
 router = APIRouter()

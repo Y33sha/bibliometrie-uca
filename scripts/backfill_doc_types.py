@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+
 from db.connection import get_connection
 from utils.doc_types import map_doc_type
 
@@ -104,7 +105,7 @@ def main():
     print(f"Inchangées : {stats['unchanged']}")
 
     if change_details:
-        print(f"\nDétail des changements :")
+        print("\nDétail des changements :")
         for (old, new), count in sorted(change_details.items(), key=lambda x: -x[1]):
             print(f"  {old:20s} → {new:20s}  ({count})")
 

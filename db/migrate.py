@@ -13,7 +13,6 @@ La table schema_migrations stocke les migrations déjà appliquées.
 
 import argparse
 import io
-import os
 import sys
 from pathlib import Path
 

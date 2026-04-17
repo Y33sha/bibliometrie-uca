@@ -10,7 +10,9 @@ indépendant du type de curseur (tuple ou RealDictCursor).
 """
 
 from collections import namedtuple
+
 from psycopg2.extras import Json
+
 from utils.db_helpers import row_val as _val
 from utils.doc_types import map_doc_type
 

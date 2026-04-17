@@ -6,9 +6,8 @@ Toute création ou recherche de journal/éditeur passe par ce module.
 Compatible avec les curseurs tuples (standard) et RealDictCursor.
 """
 
-from utils.normalize import normalize_text
 from utils.db_helpers import row_val as _val
-
+from utils.normalize import normalize_text
 
 # ── Publishers ──
 

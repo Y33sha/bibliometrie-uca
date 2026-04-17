@@ -5,7 +5,6 @@ Utilisées par :
 - admin_person_duplicates (backend)
 """
 
-from utils.normalize import normalize_name
 
 
 def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:

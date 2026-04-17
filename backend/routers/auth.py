@@ -3,11 +3,13 @@
 import logging
 import time
 
-from fastapi import APIRouter, Response, Cookie
+from fastapi import APIRouter, Cookie, Response
 
 from backend.deps import (
-    _sign_token, _verify_token, _check_password,
     SESSION_MAX_AGE,
+    _check_password,
+    _sign_token,
+    _verify_token,
 )
 from backend.models import LoginRequest
 from config.settings import settings

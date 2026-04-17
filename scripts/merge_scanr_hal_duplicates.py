@@ -15,9 +15,10 @@ import argparse
 import os
 
 from psycopg2.extras import RealDictCursor
+
 from db.connection import get_connection
-from utils.log import setup_logger
 from services.publications import merge_publications
+from utils.log import setup_logger
 
 logger = setup_logger("merge_scanr_hal_dups", os.path.join(os.path.dirname(__file__), "../processing/logs"))
 

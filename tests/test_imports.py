@@ -5,8 +5,8 @@ Détecte les NameError, ImportError et SyntaxError au niveau module
 """
 
 import importlib
-import pytest
 
+import pytest
 
 MODULES = [
     "extraction.hal.extract_hal",

@@ -7,14 +7,13 @@ compter les résultats, relancer, vérifier que les compteurs n'ont pas bougé.
 Ces tests tournent sur la base bibliometrie_test (cf. conftest.py).
 """
 
-import json
-import pytest
 from psycopg2.extras import Json
 
-from utils.normalize import normalize_text
-from utils.nnt import normalize_nnt
-from services.publications import find_or_create as find_or_create_publication, update_sources
+from services.publications import find_or_create as find_or_create_publication
+from services.publications import update_sources
 from utils.doc_types import map_doc_type
+from utils.nnt import normalize_nnt
+from utils.normalize import normalize_text
 
 
 def _create_all_publications(cur):
@@ -829,9 +828,13 @@ def _setup_persons_test_data(db):
 def _run_create_persons(db):
     """Exécute create_persons sur le curseur de test."""
     from processing.create_persons_from_source_authorships import (
-        get_all_unlinked_authorships, load_linked_authorships_by_pub,
-        load_name_form_map, step0_hal_accounts, step1_cross_source,
-        step2_orcid, step3_name_forms,
+        get_all_unlinked_authorships,
+        load_linked_authorships_by_pub,
+        load_name_form_map,
+        step0_hal_accounts,
+        step1_cross_source,
+        step2_orcid,
+        step3_name_forms,
     )
 
     all_authorships = get_all_unlinked_authorships(db)
@@ -1058,7 +1061,7 @@ def _setup_affiliations_test_data(db):
 def _run_populate_affiliations(db):
     """Exécute populate_affiliations sur le curseur de test."""
     from processing.populate_affiliations import _step_address_source, step3d_theses
-    from utils.perimeter import get_persons_structure_ids, get_affiliations_structure_ids
+    from utils.perimeter import get_affiliations_structure_ids, get_persons_structure_ids
 
     perimeter_ids = get_persons_structure_ids(db)
     wide_ids = get_affiliations_structure_ids(db)

@@ -4,6 +4,7 @@ import datetime
 import logging
 
 from fastapi import APIRouter, Query
+
 from backend.deps import get_cursor
 from backend.filters import persons_sort_clause
 
@@ -14,8 +15,8 @@ logger = logging.getLogger(__name__)
 async def list_laboratories():
     """Liste des labos du périmètre."""
     with get_cursor() as (cur, conn):
-        from utils.perimeter import get_persons_structure_ids
         from utils.app_config import _get_from_db
+        from utils.perimeter import get_persons_structure_ids
         perimeter_ids = list(get_persons_structure_ids(cur))
 
         # Structures racines du périmètre (ex: UCA) — à exclure de l'affichage des tutelles

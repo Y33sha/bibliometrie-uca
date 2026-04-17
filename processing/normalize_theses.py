@@ -24,18 +24,23 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 
 import argparse
 import os
-import time
 
 from psycopg2.extras import Json, RealDictCursor
+
 from db.connection import get_connection
-from services.publications import find_or_create, find_thesis_by_title, try_merge_by_doi, refresh_from_sources
-from utils.log import setup_logger
-from utils.normalize import normalize_text, normalize_name
-from utils.names import names_compatible
-from utils.nnt import normalize_nnt
-from utils.db_helpers import mark_staging_done
+from services.publications import (
+    find_or_create,
+    find_thesis_by_title,
+    refresh_from_sources,
+    try_merge_by_doi,
+)
 from utils.addresses import link_addresses
 from utils.authorship_roles import THESES_FIELD_ROLES, merge_roles
+from utils.db_helpers import mark_staging_done
+from utils.log import setup_logger
+from utils.names import names_compatible
+from utils.nnt import normalize_nnt
+from utils.normalize import normalize_name, normalize_text
 
 logger = setup_logger("normalize_theses", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -544,7 +549,7 @@ def main():
 
         conn.commit()
 
-        logger.info(f"\n=== Terminé ===")
+        logger.info("\n=== Terminé ===")
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Erreurs : {errors}")
 

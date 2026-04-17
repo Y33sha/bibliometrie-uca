@@ -1,8 +1,8 @@
 """
 Explore les champs composés HAL qui pourraient lier auteurs et structures.
 """
+
 import requests
-import json
 
 # Quelques halId avec peu d'auteurs pour lire facilement
 TEST_IDS = [
@@ -51,7 +51,7 @@ for halid in TEST_IDS:
             else:
                 print(f"  {field}: {val}")
         # ne rien afficher si absent, pour réduire le bruit
-    
+
     # Chercher TOUT champ contenant "auth" qu'on n'a pas demandé
     # (HAL peut renvoyer des champs supplémentaires)
     print()

@@ -8,8 +8,10 @@ Usage:
 """
 
 import argparse
-from db.connection import get_connection
+
 from psycopg2.extras import RealDictCursor
+
+from db.connection import get_connection
 from utils.log import setup_logger
 
 logger = setup_logger("backfill_name_forms", "processing/logs")
@@ -238,7 +240,7 @@ def main():
     if args.apply:
         conn.commit()
 
-    print(f"\nRésumé :")
+    print("\nRésumé :")
     print(f"  Publishers fusionnés : {pub_merged}")
     print(f"  Journals fusionnés : {jnl_merged}")
     print(f"  Journals ignorés (ISSN divergents) : {jnl_skipped}")

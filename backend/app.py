@@ -14,19 +14,27 @@ import traceback
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from backend.deps import _verify_token, get_cursor
-
 from backend.routers import (
-    auth, pub_stats, publications, admin_duplicates,
-    addresses, feedback, laboratories, stats,
-    structures, authorships, persons, admin_person_duplicates,
-    docs,
+    addresses,
+    admin_duplicates,
+    admin_person_duplicates,
+    auth,
+    authorships,
     config,
-    publishers,
+    docs,
+    feedback,
     journals,
+    laboratories,
+    persons,
     pipeline,
+    pub_stats,
+    publications,
+    publishers,
+    stats,
+    structures,
 )
 
 logger = logging.getLogger(__name__)

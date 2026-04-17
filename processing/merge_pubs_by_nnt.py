@@ -12,9 +12,11 @@ Usage:
 
 import argparse
 import os
-from db.connection import get_connection
+
 from psycopg2.extras import RealDictCursor
-from services.publications import merge_publications as _merge_pub, update_sources
+
+from db.connection import get_connection
+from services.publications import merge_publications as _merge_pub
 from utils.log import setup_logger
 
 log = setup_logger("merge_pubs_by_nnt", os.path.join(os.path.dirname(__file__), "logs"))
@@ -112,7 +114,7 @@ def main():
             conn.commit()
             log.info("Commit OK.")
 
-        log.info(f"\n=== Résumé ===")
+        log.info("\n=== Résumé ===")
         log.info(f"  Fusions {'(dry-run)' if args.dry_run else 'appliquées'} : {merged}")
         log.info(f"  Erreurs : {errors}")
         if args.dry_run and merged:

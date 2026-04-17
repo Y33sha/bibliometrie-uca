@@ -36,17 +36,23 @@ Usage:
 import argparse
 import os
 from collections import defaultdict
-from db.connection import get_connection
-from psycopg2.extras import RealDictCursor
-from utils.normalize import normalize_name
-from utils.names import parse_raw_author_name, names_compatible
-from services.persons import (
-    create_person, link_authorship, link_authorships as link_to_person,
-    add_identifiers_from_authorships as add_identifiers,
-    add_name_form,
-)
 
+from psycopg2.extras import RealDictCursor
+
+from db.connection import get_connection
+from services.persons import (
+    add_identifiers_from_authorships as add_identifiers,
+)
+from services.persons import (
+    add_name_form,
+    create_person,
+)
+from services.persons import (
+    link_authorships as link_to_person,
+)
 from utils.log import setup_logger
+from utils.names import names_compatible, parse_raw_author_name
+from utils.normalize import normalize_name
 
 logger = setup_logger("create_persons", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -566,7 +572,7 @@ def run(dry_run=False):
     total_linked = len(linked_ids)
     unlinked = len(all_authorships) - total_linked
 
-    logger.info(f"\n=== Résumé ===")
+    logger.info("\n=== Résumé ===")
     logger.info(f"  Étape 0 (comptes HAL)    : {s0} rattachées")
     logger.info(f"  Étape 1 (cross-source)   : {s1} rattachées")
     logger.info(f"  Étape 1b (IdRef connu)   : {s1b} rattachées")

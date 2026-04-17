@@ -14,8 +14,10 @@ Usage:
 
 import argparse
 import logging
-from db.connection import get_connection
+
 from psycopg2.extras import RealDictCursor
+
+from db.connection import get_connection
 from services.persons import merge_person
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -321,7 +323,7 @@ def run(dry_run=False):
                 if has_orcid_conflict:
                     print(c(f"\n  ⚠ Interversion — ORCIDs différents ({', '.join(orcids)})", "red"))
                 else:
-                    print(f"\n  Interversion :")
+                    print("\n  Interversion :")
                 display_person(target, is_target=True)
                 for s in sources:
                     display_person(s)

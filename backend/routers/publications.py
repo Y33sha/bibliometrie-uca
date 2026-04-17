@@ -4,15 +4,26 @@ import csv
 import io
 import logging
 
-from fastapi import APIRouter, Query, HTTPException, Response
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Query, Response
+
 from backend.deps import get_cursor, get_root_structure_id
+from backend.filters import (
+    OA_OPEN_STATUSES,
+    PUB_IS_UCA,
+    apply_access_filter,
+    apply_corresponding_filter,
+    apply_doc_type_filter,
+    apply_lab_filter,
+    apply_oa_filter,
+    apply_person_filter,
+    apply_publisher_journal_filter,
+    apply_source_filter,
+    apply_year_filter,
+    parse_int_csv,
+    parse_str_csv,
+)
 from backend.models import ExcludeSourceAuthorship
 from services.authorships import detach_source as _detach_source
-from backend.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, parse_int_csv, parse_str_csv,
-    apply_lab_filter, apply_year_filter, apply_doc_type_filter, apply_source_filter,
-    apply_access_filter, apply_oa_filter, apply_person_filter, apply_corresponding_filter,
-    apply_publisher_journal_filter)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -517,8 +528,6 @@ async def export_publications_csv(
     excluded_doc_type: str = Query(""),
 ):
     """Export CSV des publications (mêmes filtres que list_publications)."""
-    import csv
-    import io
 
     years = [int(v) for v in year.split(',') if v.strip()] if year else []
     doc_types = [v.strip() for v in doc_type.split(',') if v.strip()] if doc_type else []

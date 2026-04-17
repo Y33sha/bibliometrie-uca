@@ -4,12 +4,12 @@ Usage:
     python processing/import_apc.py
 """
 
-import os
 import csv
-import re
+import os
 
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
+
 from config.settings import settings
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

@@ -1,6 +1,6 @@
 """Inspecte l'API ref/structure HAL pour voir les champs disponibles."""
+
 import requests
-import json
 
 # Chercher une structure connue (Institut Pascal = 1063693)
 TEST_IDS = [1063693, 184846, 1063666]
@@ -15,7 +15,7 @@ for sid in TEST_IDS:
     resp = requests.get(url, params=params, timeout=10)
     data = resp.json()
     docs = data.get("response", {}).get("docs", [])
-    
+
     if docs:
         doc = docs[0]
         print(f"=== HAL structure #{sid} ===")

@@ -3,6 +3,7 @@
 import logging
 
 from fastapi import APIRouter, Query
+
 from backend.deps import get_cursor
 
 router = APIRouter()

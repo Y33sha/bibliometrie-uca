@@ -20,8 +20,9 @@ Usage:
 import argparse
 import logging
 
-from db.connection import get_connection
 from psycopg2.extras import RealDictCursor
+
+from db.connection import get_connection
 from services.publications import find_or_create, update_sources
 from utils.normalize import normalize_text
 
@@ -128,7 +129,7 @@ def fix(conn, dry_run=False):
 
             if dry_run:
                 if is_chapter and (has_book or has_diff_titles):
-                    log.info(f"    → retirerait le DOI du chapitre")
+                    log.info("    → retirerait le DOI du chapitre")
                 log.info(f"    → détacherait de la publication {pub_id}")
                 continue
 

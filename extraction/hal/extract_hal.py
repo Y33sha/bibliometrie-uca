@@ -20,9 +20,14 @@ import requests
 from psycopg2.extras import Json
 
 from db.connection import get_connection
-from extraction.common import compute_hash, clean_doi, get_existing_ids, setup_logger
+from extraction.common import clean_doi, compute_hash, get_existing_ids, setup_logger
+from utils.app_config import (
+    get_api_base_urls,
+    get_hal_collections,
+    get_hal_extra_collections,
+    get_years,
+)
 from utils.hal import HAL_FIELDS
-from utils.app_config import get_years, get_hal_collections, get_hal_extra_collections, get_api_base_urls
 
 # ----- Logging -----
 logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))

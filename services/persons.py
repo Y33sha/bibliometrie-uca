@@ -11,9 +11,8 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 """
 
 from utils.normalize import normalize_name
-from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
 from utils.perimeter import get_persons_structure_ids_list
-
+from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
 
 # ── Création ──
 

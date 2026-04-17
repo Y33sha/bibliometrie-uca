@@ -2,9 +2,9 @@
 Utilitaire de connexion PostgreSQL.
 """
 
-import psycopg2
-from psycopg2.extras import Json, execute_values
 import os
+
+import psycopg2
 
 from config.settings import settings
 

@@ -26,7 +26,7 @@ from psycopg2.extras import Json, RealDictCursor
 
 from db.connection import get_connection
 from extraction.common import compute_hash
-from utils.hal import extract_hal_id_from_url, HAL_FIELDS_STR
+from utils.hal import HAL_FIELDS_STR, extract_hal_id_from_url
 from utils.log import setup_logger
 
 log = setup_logger("fetch_missing_hal", os.path.join(os.path.dirname(__file__), "logs"))
@@ -416,7 +416,7 @@ def main():
         log.info(f"  NNT : {nnt_fetched} récupérés, {nnt_not_found} absents de HAL")
 
     log.info(f"\nTerminé : {fetched} récupérés, {not_found} introuvables, {errors} erreurs")
-    log.info(f"Relancer normalize_hal.py pour les integrer")
+    log.info("Relancer normalize_hal.py pour les integrer")
     conn.close()
 
 

@@ -20,20 +20,27 @@ import argparse
 import os
 import re
 
-import psycopg2
 from psycopg2.extras import Json, RealDictCursor
+
 from db.connection import get_connection
+from services.journals import find_or_create_journal, find_or_create_publisher
+from services.publications import (
+    find_by_doi,
+    find_by_nnt,
+    refresh_from_sources,
+    resolve_doi_conflict,
+    try_merge_by_doi,
+)
+from services.publications import find_or_create as find_or_create_publication
+from utils.addresses import link_addresses
+from utils.db_helpers import mark_staging_done
+from utils.doc_types import map_doc_type
 from utils.doi import clean_doi
 from utils.hal import extract_hal_id_from_url
 from utils.log import setup_logger
+from utils.nnt import extract_nnt_from_openalex, is_theses_fr_source
 from utils.normalize import normalize_text
-from utils.zenodo import is_zenodo_doi, resolve_zenodo_doi, ZenodoResolutionError
-from services.publications import find_or_create as find_or_create_publication, find_by_nnt, find_by_doi, resolve_doi_conflict, try_merge_by_doi, refresh_from_sources
-from utils.nnt import normalize_nnt, is_theses_fr_source, extract_nnt_from_openalex
-from utils.doc_types import map_doc_type
-from utils.db_helpers import mark_staging_done
-from utils.addresses import link_addresses
-from services.journals import find_or_create_publisher, find_or_create_journal
+from utils.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
 
 # ----- Logging -----
 logger = setup_logger("normalize_openalex", os.path.join(os.path.dirname(__file__), "logs"))
@@ -760,7 +767,7 @@ def main():
 
         conn.commit()
 
-        logger.info(f"\n=== Terminé ===")
+        logger.info("\n=== Terminé ===")
         logger.info(f"Traités avec succès : {processed}")
         if skipped:
             logger.info(f"Ignorés (Zenodo, etc.) : {skipped}")

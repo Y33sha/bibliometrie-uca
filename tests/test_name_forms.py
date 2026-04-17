@@ -6,7 +6,6 @@ y compris pour les prénoms composés (tiret, espaces), les accents,
 et les cas limites.
 """
 
-import pytest
 from services.persons import compute_person_name_forms
 
 

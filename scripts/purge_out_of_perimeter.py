@@ -24,8 +24,10 @@ Usage:
 
 import argparse
 import os
-from db.connection import get_connection
+
 from psycopg2.extras import RealDictCursor
+
+from db.connection import get_connection
 from utils.log import setup_logger
 
 logger = setup_logger("purge_oop", os.path.join(os.path.dirname(__file__), "../processing/logs"))
