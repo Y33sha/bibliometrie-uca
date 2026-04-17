@@ -278,6 +278,58 @@ def find_or_create_journal(
     return journal_id
 
 
+def update_journal(cur, journal_id: int, *, fields: dict) -> bool:
+    """Met à jour une revue. Le `title` est automatiquement normalisé en
+    `title_normalized`.
+
+    Retourne True si la revue existe et a été mise à jour, False si introuvable.
+    Lève ValueError si `fields` est vide.
+    """
+    if not fields:
+        raise ValueError("Aucun champ à mettre à jour")
+
+    cur.execute("SELECT id FROM journals WHERE id = %s", (journal_id,))
+    if not cur.fetchone():
+        return False
+
+    fields = dict(fields)
+    if "title" in fields:
+        fields["title_normalized"] = normalize_text(fields["title"])
+
+    sets = ", ".join(f"{k} = %s" for k in fields)
+    cur.execute(
+        f"UPDATE journals SET {sets}, updated_at = now() WHERE id = %s",
+        list(fields.values()) + [journal_id],
+    )
+    return True
+
+
+def update_publisher(cur, publisher_id: int, *, fields: dict) -> bool:
+    """Met à jour un éditeur. Le `name` est automatiquement normalisé en
+    `name_normalized`.
+
+    Retourne True si l'éditeur existe et a été mis à jour, False si introuvable.
+    Lève ValueError si `fields` est vide.
+    """
+    if not fields:
+        raise ValueError("Aucun champ à mettre à jour")
+
+    cur.execute("SELECT id FROM publishers WHERE id = %s", (publisher_id,))
+    if not cur.fetchone():
+        return False
+
+    fields = dict(fields)
+    if "name" in fields:
+        fields["name_normalized"] = normalize_text(fields["name"])
+
+    sets = ", ".join(f"{k} = %s" for k in fields)
+    cur.execute(
+        f"UPDATE publishers SET {sets}, updated_at = now() WHERE id = %s",
+        list(fields.values()) + [publisher_id],
+    )
+    return True
+
+
 def update_journal_apc(
     cur,
     journal_id: int,

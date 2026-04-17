@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from backend.deps import get_cursor
 from backend.models import MergeRequest, PublisherUpdate
-from services.journals import merge_publishers
+from services.journals import merge_publishers, update_publisher as _update_publisher
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -82,25 +82,14 @@ async def get_publisher(publisher_id: int):
 @router.put("/api/publishers/{publisher_id}")
 async def update_publisher(publisher_id: int, body: PublisherUpdate):
     """Met à jour un éditeur."""
+    fields = body.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT id FROM publishers WHERE id = %s", (publisher_id,))
-        if not cur.fetchone():
+        try:
+            found = _update_publisher(cur, publisher_id, fields=fields)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        if not found:
             raise HTTPException(status_code=404, detail="Éditeur introuvable")
-
-        fields = {k: v for k, v in body.model_dump(exclude_unset=True).items()}
-        if "name" in fields:
-            from utils.normalize import normalize_text
-
-            fields["name_normalized"] = normalize_text(fields["name"])
-
-        if not fields:
-            raise HTTPException(status_code=400, detail="Rien à modifier")
-
-        sets = ", ".join(f"{k} = %s" for k in fields)
-        cur.execute(
-            f"UPDATE publishers SET {sets}, updated_at = now() WHERE id = %s",
-            list(fields.values()) + [publisher_id],
-        )
         return {"ok": True}
 
 
