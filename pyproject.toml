@@ -12,3 +12,63 @@ py-modules = []
 
 [tool.setuptools.packages.find]
 include = ["backend*", "config*", "db*", "extraction*", "processing*", "services*", "utils*", "scripts*"]
+
+# ----------------------------------------------------------------------
+# Ruff : linter + formateur (remplace flake8, isort, pyupgrade, black)
+# Mode permissif au début — voir `ruff check .` et `ruff format --check .`
+# ----------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = [
+    "frontend",
+    "bibliometrie_uca.egg-info",
+    ".venv",
+    "venv",
+]
+
+[tool.ruff.lint]
+# Règles activées — on démarre permissif, à durcir au fil du temps.
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes (undefined names, unused imports, etc.)
+    "I",    # isort (ordre des imports)
+    "UP",   # pyupgrade (syntaxe obsolète)
+    "B",    # flake8-bugbear (pièges courants)
+]
+# Ignorés le temps d'assainir progressivement
+ignore = [
+    "E501",   # ligne trop longue — à durcir plus tard
+    "E402",   # module-level import not at top — quelques cas légitimes
+    "B008",   # function call in default argument — FastAPI Depends() idiomatique
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]       # imports après setup de conftest
+"scripts/*" = ["E402"]
+"backend/routers/*" = ["E402"]  # imports tardifs fréquents
+
+# ----------------------------------------------------------------------
+# Pytest + coverage
+# ----------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+branch = true
+source = ["backend", "services", "utils", "config", "db", "processing", "extraction"]
+omit = [
+    "tests/*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+skip_empty = true
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
