@@ -123,7 +123,7 @@ def main():
             version_ids = []
             concept_ids = []
 
-            for pub_id, doi in zip(pub_ids, dois):
+            for pub_id, doi in zip(pub_ids, dois, strict=True):
                 time.sleep(API_POLITE_DELAY)
                 version_doi = resolve_zenodo_doi(doi)
                 if version_doi is None:

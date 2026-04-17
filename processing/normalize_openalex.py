@@ -570,11 +570,11 @@ def process_authorships(cur, work: dict, source_publication_id: int):
         # Affiliations brutes
         raw_strings = authorship.get("raw_affiliation_strings") or []
         if raw_strings:
-            raw_affil_text = " | ".join(raw_strings)
+            " | ".join(raw_strings)
         else:
             institutions = authorship.get("institutions") or []
             inst_names = [i.get("display_name") for i in institutions if i.get("display_name")]
-            raw_affil_text = " | ".join(inst_names) if inst_names else None
+            " | ".join(inst_names) if inst_names else None
 
         # Institutions OpenAlex → source_structures.id
         source_struct_ids = []
@@ -733,15 +733,15 @@ def process_work(cur, staging_row: tuple) -> bool:
                     if enrich_doi != original_doi:
                         pub_meta["source_doi"] = original_doi
             # Extraire les champs enrichis depuis le work
-            abstract = reconstruct_abstract(work.get("abstract_inverted_index"))
+            reconstruct_abstract(work.get("abstract_inverted_index"))
             kw_raw = work.get("keywords")
             enrich_keywords = None
             if isinstance(kw_raw, list):
                 enrich_keywords = [k.get("keyword") if isinstance(k, dict) else k for k in kw_raw]
                 enrich_keywords = [k for k in enrich_keywords if k] or None
-            enrich_topics = extract_topics(work)
+            extract_topics(work)
             raw_biblio = work.get("biblio") or {}
-            enrich_biblio = {
+            {
                 k: raw_biblio[k]
                 for k in ("volume", "issue", "first_page", "last_page")
                 if raw_biblio.get(k)

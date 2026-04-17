@@ -80,7 +80,6 @@ def main():
     matches = 0
     divergences = 0
     not_found = 0
-    errors = 0
     updates = 0
 
     with open(report_path, "w", newline="") as f:
