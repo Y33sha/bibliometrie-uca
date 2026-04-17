@@ -7,6 +7,7 @@ Compatible avec les curseurs tuples (standard) et RealDictCursor.
 """
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
+from services.audit import emit_event
 from utils.db_helpers import row_val as _val
 from utils.normalize import normalize_text
 
@@ -473,6 +474,8 @@ def merge_publishers(cur, target_id: int, source_id: int) -> None:
     # 6. Supprimer la source
     cur.execute("DELETE FROM publishers WHERE id = %s", (source_id,))
 
+    emit_event(cur, "publisher.merged", "publisher", target_id, {"source_id": source_id})
+
 
 def merge_journals(cur, target_id: int, source_id: int) -> None:
     """Fusionne le journal source dans le journal cible.
@@ -537,3 +540,5 @@ def merge_journals(cur, target_id: int, source_id: int) -> None:
 
     # 5. Supprimer la source
     cur.execute("DELETE FROM journals WHERE id = %s", (source_id,))
+
+    emit_event(cur, "journal.merged", "journal", target_id, {"source_id": source_id})

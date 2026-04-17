@@ -10,6 +10,7 @@ et les scripts de correction.
 """
 
 from domain.errors import NotFoundError, ValidationError
+from services.audit import emit_event
 from utils.sources import BIBLIO_SOURCES as VALID_SOURCES
 
 
@@ -55,6 +56,10 @@ def exclude_authorship(cur, authorship_id: int) -> dict:
             (authorship_id, person_id),
         )
 
+    emit_event(
+        cur, "authorship.excluded", "authorship", authorship_id,
+        {"person_id": person_id},
+    )
     return result
 
 
@@ -84,6 +89,11 @@ def set_source_authorship_excluded(
 
     if excluded:
         detach_source(cur, source_authorship_id, source)
+
+    emit_event(
+        cur, "source_authorship.excluded", "source_authorship", source_authorship_id,
+        {"source": source, "excluded": excluded},
+    )
 
 
 def detach_source(cur, source_authorship_id: int, source: str) -> bool:

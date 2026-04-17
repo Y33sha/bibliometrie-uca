@@ -8,6 +8,7 @@ restent autorisées dans les routers (convention du projet).
 import json
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
+from services.audit import emit_event
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
@@ -162,3 +163,7 @@ def delete_perimeter(cur, perimeter_id: int) -> None:
         raise ConflictError(f"Ce périmètre est utilisé par : {', '.join(used_by)}")
 
     cur.execute("DELETE FROM perimeters WHERE id = %s", (perimeter_id,))
+    emit_event(
+        cur, "perimeter.deleted", "perimeter", perimeter_id,
+        {"code": row["code"]},
+    )
