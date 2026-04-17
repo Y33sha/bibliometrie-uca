@@ -33,6 +33,45 @@ def create_person(cur, last_name: str, first_name: str = "") -> int:
     return person_id
 
 
+def set_rejected(cur, person_id: int, rejected: bool) -> bool:
+    """Marque ou démarque une personne comme rejetée (fausse entité).
+
+    Retourne True si l'UPDATE a touché une ligne, False si introuvable.
+    """
+    cur.execute(
+        "UPDATE persons SET rejected = %s, updated_at = now() WHERE id = %s",
+        (rejected, person_id),
+    )
+    return cur.rowcount > 0
+
+
+def update_name(cur, person_id: int, last_name: str, first_name: str) -> bool:
+    """Met à jour le nom/prénom d'une personne et rafraîchit ses formes de nom.
+
+    Retourne True si la personne existe, False sinon.
+    """
+    cur.execute("SELECT id FROM persons WHERE id = %s", (person_id,))
+    if not cur.fetchone():
+        return False
+
+    cur.execute(
+        """
+        UPDATE persons SET last_name = %s, first_name = %s,
+               last_name_normalized = %s,
+               first_name_normalized = %s,
+               updated_at = now()
+        WHERE id = %s
+        """,
+        (
+            last_name, first_name,
+            normalize_name(last_name), normalize_name(first_name),
+            person_id,
+        ),
+    )
+    refresh_person_name_forms(cur, person_id, last_name, first_name)
+    return True
+
+
 # ── Rattachement / détachement authorships ──
 
 
@@ -131,6 +170,53 @@ def add_identifier(
         """,
             (person_id, id_value, person_id),
         )
+
+
+def remove_identifier(cur, person_id: int, id_type: str, id_value: str) -> bool:
+    """Supprime un identifiant d'une personne.
+
+    Retourne True si un enregistrement a été supprimé, False sinon.
+    """
+    cur.execute(
+        """
+        DELETE FROM person_identifiers
+        WHERE person_id = %s AND id_type = %s AND id_value = %s
+        """,
+        (person_id, id_type, id_value),
+    )
+    return cur.rowcount > 0
+
+
+def update_identifier_status(cur, ident_id: int, status: str) -> dict | None:
+    """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
+
+    Retourne la ligne {id, status} mise à jour, ou None si introuvable.
+    """
+    cur.execute(
+        """
+        UPDATE person_identifiers SET status = %s::identifier_status
+        WHERE id = %s RETURNING id, status::text AS status
+        """,
+        (status, ident_id),
+    )
+    return cur.fetchone()
+
+
+def reassign_identifier(cur, ident_id: int, target_person_id: int) -> bool:
+    """Réattribue un identifiant à une autre personne (status → pending).
+
+    Retourne True si la réattribution a eu lieu, False si l'identifiant
+    n'existe pas.
+    """
+    cur.execute(
+        """
+        UPDATE person_identifiers
+        SET person_id = %s, status = 'pending'::identifier_status
+        WHERE id = %s
+        """,
+        (target_person_id, ident_id),
+    )
+    return cur.rowcount > 0
 
 
 def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict]):
