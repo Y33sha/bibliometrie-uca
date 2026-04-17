@@ -11,6 +11,7 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 """
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
+from services.audit import emit_event
 from services.authorships import delete_orphan_authorships
 from utils.normalize import normalize_name
 from utils.perimeter import get_persons_structure_ids_list
@@ -46,6 +47,7 @@ def set_rejected(cur, person_id: int, rejected: bool) -> None:
     )
     if cur.rowcount == 0:
         raise NotFoundError(f"Personne {person_id} introuvable")
+    emit_event(cur, "person.rejected", "person", person_id, {"rejected": rejected})
 
 
 def update_name(cur, person_id: int, last_name: str, first_name: str) -> None:
@@ -188,6 +190,10 @@ def remove_identifier(cur, person_id: int, id_type: str, id_value: str) -> None:
     )
     if cur.rowcount == 0:
         raise NotFoundError("Identifiant introuvable")
+    emit_event(
+        cur, "person_identifier.removed", "person", person_id,
+        {"id_type": id_type, "id_value": id_value},
+    )
 
 
 def update_identifier_status(cur, ident_id: int, status: str) -> dict:
@@ -199,14 +205,19 @@ def update_identifier_status(cur, ident_id: int, status: str) -> dict:
     cur.execute(
         """
         UPDATE person_identifiers SET status = %s::identifier_status
-        WHERE id = %s RETURNING id, status::text AS status
+        WHERE id = %s RETURNING id, status::text AS status, person_id
         """,
         (status, ident_id),
     )
     row = cur.fetchone()
     if not row:
         raise NotFoundError(f"Identifiant {ident_id} introuvable")
-    return row
+    emit_event(
+        cur, "person_identifier.status_changed", "person", row["person_id"],
+        {"ident_id": ident_id, "status": status},
+    )
+    # Retire person_id du retour pour préserver le contrat existant
+    return {"id": row["id"], "status": row["status"]}
 
 
 def reassign_identifier(cur, ident_id: int, target_person_id: int) -> None:
@@ -224,6 +235,10 @@ def reassign_identifier(cur, ident_id: int, target_person_id: int) -> None:
     )
     if cur.rowcount == 0:
         raise NotFoundError(f"Identifiant {ident_id} introuvable")
+    emit_event(
+        cur, "person_identifier.reassigned", "person", target_person_id,
+        {"ident_id": ident_id},
+    )
 
 
 def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict]) -> None:
@@ -693,9 +708,17 @@ def mark_distinct(cur, person_id_a: int, person_id_b: int) -> None:
         INSERT INTO distinct_persons (person_id_a, person_id_b)
         VALUES (LEAST(%s, %s), GREATEST(%s, %s))
         ON CONFLICT DO NOTHING
+        RETURNING person_id_a, person_id_b
         """,
         (person_id_a, person_id_b, person_id_a, person_id_b),
     )
+    # Audit seulement si une ligne a été insérée (la paire n'existait pas déjà)
+    row = cur.fetchone()
+    if row:
+        emit_event(
+            cur, "person.marked_distinct", "person", row["person_id_a"],
+            {"other_id": row["person_id_b"]},
+        )
 
 
 def merge_person(cur, target_id: int, source_id: int) -> None:
@@ -792,3 +815,5 @@ def merge_person(cur, target_id: int, source_id: int) -> None:
 
     # 8. Supprimer la personne source
     cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))
+
+    emit_event(cur, "person.merged", "person", target_id, {"source_id": source_id})

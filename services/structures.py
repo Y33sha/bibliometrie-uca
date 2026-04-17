@@ -9,6 +9,7 @@ restent autorisées dans les routers (convention du projet).
 from psycopg2.extras import Json
 
 from domain.errors import NotFoundError, ValidationError
+from services.audit import emit_event
 from utils.normalize import normalize_text
 
 # ── Mapping des champs UI → colonnes SQL pour la table structures ──
@@ -93,9 +94,17 @@ def update_structure(cur, structure_id: int, *, fields: dict) -> dict:
 
 def delete_structure(cur, structure_id: int) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas."""
-    cur.execute("DELETE FROM structures WHERE id = %s", (structure_id,))
-    if cur.rowcount == 0:
+    cur.execute(
+        "DELETE FROM structures WHERE id = %s RETURNING code, name",
+        (structure_id,),
+    )
+    row = cur.fetchone()
+    if not row:
         raise NotFoundError(f"Structure {structure_id} introuvable")
+    emit_event(
+        cur, "structure.deleted", "structure", structure_id,
+        {"code": row["code"], "name": row["name"]},
+    )
 
 
 # ── structure_relations ───────────────────────────────────────────
@@ -117,9 +126,23 @@ def create_relation(cur, *, parent_id: int, child_id: int, relation_type: str) -
 
 def delete_relation(cur, relation_id: int) -> None:
     """Supprime une relation. Lève NotFoundError si elle n'existe pas."""
-    cur.execute("DELETE FROM structure_relations WHERE id = %s", (relation_id,))
-    if cur.rowcount == 0:
+    cur.execute(
+        """DELETE FROM structure_relations WHERE id = %s
+           RETURNING parent_id, child_id, relation_type::text AS relation_type""",
+        (relation_id,),
+    )
+    row = cur.fetchone()
+    if not row:
         raise NotFoundError(f"Relation {relation_id} introuvable")
+    emit_event(
+        cur, "structure_relation.deleted", "structure", row["parent_id"],
+        {
+            "relation_id": relation_id,
+            "parent_id": row["parent_id"],
+            "child_id": row["child_id"],
+            "relation_type": row["relation_type"],
+        },
+    )
 
 
 # ── structure_name_forms ──────────────────────────────────────────
@@ -195,6 +218,15 @@ def update_name_form(cur, form_id: int, *, fields: dict) -> dict:
 
 def delete_name_form(cur, form_id: int) -> None:
     """Supprime une forme de nom. Lève NotFoundError si elle n'existe pas."""
-    cur.execute("DELETE FROM structure_name_forms WHERE id = %s", (form_id,))
-    if cur.rowcount == 0:
+    cur.execute(
+        """DELETE FROM structure_name_forms WHERE id = %s
+           RETURNING structure_id, form_text""",
+        (form_id,),
+    )
+    row = cur.fetchone()
+    if not row:
         raise NotFoundError(f"Forme {form_id} introuvable")
+    emit_event(
+        cur, "structure_name_form.deleted", "structure", row["structure_id"],
+        {"form_id": form_id, "form_text": row["form_text"]},
+    )

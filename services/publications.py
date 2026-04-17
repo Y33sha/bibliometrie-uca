@@ -13,6 +13,7 @@ from collections import namedtuple
 
 from psycopg2.extras import Json
 
+from services.audit import emit_event
 from utils.db_helpers import row_val as _val
 from utils.doc_types import map_doc_type
 
@@ -461,9 +462,16 @@ def mark_distinct(cur, pub_id_a: int, pub_id_b: int) -> None:
         INSERT INTO distinct_publications (pub_id_a, pub_id_b)
         VALUES (LEAST(%s, %s), GREATEST(%s, %s))
         ON CONFLICT DO NOTHING
+        RETURNING pub_id_a, pub_id_b
         """,
         (pub_id_a, pub_id_b, pub_id_a, pub_id_b),
     )
+    row = cur.fetchone()
+    if row:
+        emit_event(
+            cur, "publication.marked_distinct", "publication", row["pub_id_a"],
+            {"other_id": row["pub_id_b"]},
+        )
 
 
 def merge_publications(cur, target_id: int, source_id: int) -> None:
@@ -551,3 +559,8 @@ def merge_publications(cur, target_id: int, source_id: int) -> None:
 
     # 5. Recalculer les sources de la cible
     update_sources(cur, target_id)
+
+    emit_event(
+        cur, "publication.merged", "publication", target_id,
+        {"source_id": source_id},
+    )
