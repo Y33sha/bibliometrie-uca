@@ -15,8 +15,7 @@ from infrastructure.repositories.person_repository import PgPersonRepository
 from services.audit import emit_event
 from services.authorships import delete_orphan_authorships
 from utils.normalize import normalize_name
-from utils.perimeter import get_persons_structure_ids_list
-from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
+from utils.sources import ALL_SOURCES_SET
 
 # ── Création ──
 
@@ -62,26 +61,16 @@ def link_authorship(
 ) -> None:
     """Rattache une authorship source à une personne (pipeline).
 
-    Pour HAL, fait aussi le dual-write sur source_persons si c'est un
-    compte HAL (hal_person_id renseigné). Ceci permet à l'étape 0 du
-    pipeline de propager aux autres authorships du même compte.
+    Pour HAL avec un compte HAL, fait aussi le dual-write sur source_persons
+    (propagation attendue par l'étape 0 du pipeline).
     """
     if source not in ALL_SOURCES_SET:
         return
-
-    cur.execute(
-        "UPDATE source_authorships SET person_id = %s WHERE id = %s AND source = %s",
-        (person_id, authorship_id, source),
+    PgPersonRepository(cur).link_authorship(
+        person_id, source, authorship_id,
+        source_person_id=source_person_id,
+        has_hal_person_id=has_hal_person_id,
     )
-
-    if source == "hal" and source_person_id and has_hal_person_id:
-        cur.execute(
-            """
-            UPDATE source_persons SET person_id = %s
-            WHERE id = %s AND (source_ids->>'hal_person_id') IS NOT NULL
-        """,
-            (person_id, source_person_id),
-        )
 
 
 def link_authorships(cur, person_id: int, authorships: list[dict]) -> None:
@@ -104,10 +93,7 @@ def link_authorships(cur, person_id: int, authorships: list[dict]) -> None:
 def unlink_authorship(cur, person_id: int, source: str, authorship_id: int) -> None:
     """Détache une authorship source d'une personne (met person_id à NULL)."""
     if source in ALL_SOURCES_SET:
-        cur.execute(
-            "UPDATE source_authorships SET person_id = NULL WHERE id = %s AND person_id = %s AND source = %s",
-            (authorship_id, person_id, source),
-        )
+        PgPersonRepository(cur).unlink_authorship(person_id, source, authorship_id)
 
 
 # ── Identifiants ──
@@ -278,114 +264,37 @@ _SOURCE_CONFIG = {
 def assign_orphan_authorship(cur, person_id: int, source: str, authorship_id: int) -> bool:
     """Attribue une authorship orpheline (person_id IS NULL) à une personne.
 
-    1. Met person_id sur l'authorship source (seulement si NULL)
-    2. Récupère le nom de l'auteur
+    1. Valide la source
+    2. Met person_id sur l'authorship source (seulement si elle est orpheline)
     3. Ajoute la forme de nom (si authorship non exclue)
     4. Crée/met à jour l'authorship vérité + FK source
 
     Retourne True si l'authorship a été attribuée, False sinon.
     """
-    cfg = _SOURCE_CONFIG.get(source)
-    if not cfg:
+    if source not in _SOURCE_CONFIG:
         raise ValidationError(f"Source inconnue : {source}")
 
-    # 1. Rattacher et récupérer le nom normalisé + statut excluded
-    cur.execute(
-        """
-        UPDATE source_authorships SET person_id = %s WHERE id = %s AND source = %s AND person_id IS NULL
-        RETURNING excluded, author_name_normalized
-    """,
-        (person_id, authorship_id, source),
-    )
-
-    row = cur.fetchone()
+    repo = PgPersonRepository(cur)
+    row = repo.assign_orphan_sa(person_id, source, authorship_id)
     if not row:
         return False
 
-    # 2. Ajouter la forme de nom (sauf si authorship exclue)
+    # Ajouter la forme de nom (sauf si authorship exclue)
     if row["author_name_normalized"] and not row.get("excluded"):
-        add_name_form(cur, person_id, row["author_name_normalized"], source=source)
+        repo.add_name_form(person_id, row["author_name_normalized"], source=source)
 
-    # 3. Créer/mettre à jour l'authorship vérité
-    _ensure_truth_authorship(cur, person_id, source, authorship_id)
-
+    # Créer/mettre à jour l'authorship vérité
+    repo.ensure_truth_authorship(person_id, source, authorship_id)
     return True
 
 
 def batch_assign_orphan_authorships(cur, person_id: int, sa_ids: list[int]) -> int:
     """Attribue en batch plusieurs authorships sources orphelines à une personne.
 
-    Plus efficace que boucler sur `assign_orphan_authorship` quand on a
-    plusieurs dizaines d'authorships à rattacher à la même personne :
-    1. SET person_id sur les source_authorships (seulement si NULL)
-    2. Crée les authorships vérité manquantes (une par publication)
-    3. Pose les FK source_authorships.authorship_id
-    4. Ajoute les formes de nom observées (auteur normalisé)
-
     Retourne le nombre de source_authorships effectivement rattachées
     (celles qui étaient orphelines).
     """
-    if not sa_ids:
-        return 0
-
-    # 1. Rattacher les source_authorships orphelines
-    cur.execute(
-        """
-        UPDATE source_authorships SET person_id = %s
-        WHERE id = ANY(%s) AND person_id IS NULL
-        RETURNING id
-        """,
-        (person_id, sa_ids),
-    )
-    assigned = cur.rowcount
-
-    # 2. Créer les authorships vérité manquantes
-    cur.execute(
-        """
-        INSERT INTO authorships (publication_id, person_id,
-            author_position, in_perimeter, is_corresponding, structure_ids)
-        SELECT DISTINCT ON (sd.publication_id)
-            sd.publication_id, %s,
-            sa.author_position, sa.in_perimeter, sa.is_corresponding, sa.structure_ids
-        FROM source_authorships sa
-        JOIN source_publications sd ON sd.id = sa.source_publication_id
-        WHERE sa.id = ANY(%s) AND sd.publication_id IS NOT NULL
-        ORDER BY sd.publication_id,
-            CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 WHEN 'wos' THEN 3 END
-        ON CONFLICT (publication_id, person_id) DO NOTHING
-        """,
-        (person_id, sa_ids),
-    )
-
-    # 3. Poser les FK authorship_id sur les source_authorships
-    cur.execute(
-        """
-        UPDATE source_authorships sa SET authorship_id = a.id
-        FROM source_publications sd, authorships a
-        WHERE sa.id = ANY(%s)
-          AND sd.id = sa.source_publication_id
-          AND a.publication_id = sd.publication_id
-          AND a.person_id = %s
-          AND sa.authorship_id IS NULL
-        """,
-        (sa_ids, person_id),
-    )
-
-    # 4. Ajouter les formes de noms observées
-    cur.execute(
-        """
-        SELECT DISTINCT author_name_normalized
-        FROM source_authorships
-        WHERE id = ANY(%s)
-          AND author_name_normalized IS NOT NULL
-          AND NOT excluded
-        """,
-        (sa_ids,),
-    )
-    for row in cur.fetchall():
-        add_name_form(cur, person_id, row["author_name_normalized"])
-
-    return assigned
+    return PgPersonRepository(cur).batch_assign_orphans(person_id, sa_ids)
 
 
 def detach_authorships(cur, person_id: int, authorships: list[dict],
@@ -396,136 +305,25 @@ def detach_authorships(cur, person_id: int, authorships: list[dict],
     Si `name_form` est fourni, supprime aussi la forme de nom de la personne
     lorsque plus aucune authorship ne la porte.
 
-    `authorships` : liste de dicts {source, authorship_id}.
-
     Retourne {"detached": N, "deleted_authorships": M, "cleaned_form": bool}.
     """
+    repo = PgPersonRepository(cur)
     for a in authorships:
-        unlink_authorship(cur, person_id, a["source"], a["authorship_id"])
+        if a["source"] in ALL_SOURCES_SET:
+            repo.unlink_authorship(person_id, a["source"], a["authorship_id"])
 
     deleted = delete_orphan_authorships(cur, person_id)
 
     cleaned_form = False
-    if name_form:
-        # Ne nettoyer la forme que si plus aucune source_authorship ne la porte
-        cur.execute(
-            f"""
-            SELECT COUNT(*) FROM source_authorships sa
-            WHERE sa.person_id = %s AND sa.author_name_normalized = %s
-              AND sa.source IN {AUTHOR_SOURCES_SQL}
-            """,
-            (person_id, name_form),
-        )
-        if cur.fetchone()["count"] == 0:
-            detach_name_form(cur, person_id, name_form)
-            cleaned_form = True
+    if name_form and repo.count_authorships_with_name_form(person_id, name_form) == 0:
+        repo.detach_name_form(person_id, name_form)
+        cleaned_form = True
 
     return {
         "detached": len(authorships),
         "deleted_authorships": deleted,
         "cleaned_form": cleaned_form,
     }
-
-
-def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: int) -> None:
-    """Crée/synchronise l'authorship vérité à partir des authorships sources.
-
-    Même logique que build_authorships.py mais pour une seule paire
-    (publication_id, person_id) : FK, author_position, is_corresponding,
-    in_perimeter, structure_ids.
-    """
-    _SOURCE_CONFIG[source]
-
-    # Trouver la publication_id via source_publications
-    cur.execute(
-        """
-        SELECT d.publication_id FROM source_authorships sa
-        JOIN source_publications d ON d.id = sa.source_publication_id
-        WHERE sa.id = %s AND sa.source = %s
-    """,
-        (authorship_id, source),
-    )
-    row = cur.fetchone()
-    if not row or not row["publication_id"]:
-        return
-    pub_id = row["publication_id"]
-
-    # 1. INSERT si pas déjà existant
-    cur.execute(
-        """
-        INSERT INTO authorships (publication_id, person_id)
-        VALUES (%s, %s)
-        ON CONFLICT (publication_id, person_id) DO NOTHING
-    """,
-        (pub_id, person_id),
-    )
-
-    # 2. FK sources (source_authorships.authorship_id → authorships.id)
-    cur.execute(
-        """
-        UPDATE source_authorships sa
-        SET authorship_id = a.id
-        FROM source_publications sd, authorships a
-        WHERE sd.id = sa.source_publication_id
-          AND a.publication_id = sd.publication_id
-          AND a.person_id = sa.person_id
-          AND sd.publication_id = %s
-          AND sa.person_id = %s
-          AND NOT sa.excluded
-          AND sa.authorship_id IS NULL
-    """,
-        (pub_id, person_id),
-    )
-
-    # 3. author_position et is_corresponding
-    cur.execute(
-        """
-        UPDATE authorships a
-        SET author_position = sub.pos,
-            is_corresponding = COALESCE(a.is_corresponding, sub.corr)
-        FROM (
-            SELECT sa.authorship_id,
-                   (array_agg(sa.author_position ORDER BY
-                       CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 WHEN 'wos' THEN 3 END
-                   ))[1] AS pos,
-                   (array_agg(sa.is_corresponding ORDER BY
-                       CASE sa.source WHEN 'wos' THEN 1 WHEN 'openalex' THEN 2 WHEN 'hal' THEN 3 END
-                   ))[1] AS corr
-            FROM source_authorships sa
-            WHERE sa.authorship_id IS NOT NULL AND NOT sa.excluded
-            GROUP BY sa.authorship_id
-        ) sub
-        WHERE a.id = sub.authorship_id
-          AND a.publication_id = %s AND a.person_id = %s
-    """,
-        (pub_id, person_id),
-    )
-
-    # 4. in_perimeter et structure_ids (union des sources)
-    get_persons_structure_ids_list(cur)
-    cur.execute(
-        f"""
-        WITH src AS (
-            SELECT sa.in_perimeter AS uca, sa.structure_ids AS sids
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            WHERE sa.source IN {AUTHOR_SOURCES_SQL}
-              AND sd.publication_id = %s AND sa.person_id = %s AND NOT sa.excluded
-        ),
-        agg AS (
-            SELECT bool_or(uca) AS in_perimeter,
-                   array_agg(DISTINCT sid) FILTER (WHERE sid IS NOT NULL) AS all_sids
-            FROM src, LATERAL unnest(COALESCE(sids, '{{}}'::int[])) AS sid
-        )
-        UPDATE authorships a
-        SET in_perimeter = COALESCE(agg.in_perimeter, FALSE),
-            structure_ids = NULLIF(agg.all_sids, ARRAY[]::int[]),
-            updated_at = now()
-        FROM agg
-        WHERE a.publication_id = %s AND a.person_id = %s
-    """,
-        (pub_id, person_id, pub_id, person_id),
-    )
 
 
 # ── Fusion ──
