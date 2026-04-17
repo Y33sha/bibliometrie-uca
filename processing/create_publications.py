@@ -19,16 +19,20 @@ Usage:
 
 import argparse
 import os
+
+from psycopg2.extras import RealDictCursor
+
 from db.connection import get_connection
-from psycopg2.extras import Json, RealDictCursor
-from utils.normalize import normalize_text
-from utils.nnt import normalize_nnt
 from services.publications import (
     find_or_create as find_or_create_publication,
+)
+from services.publications import (
     refresh_from_sources,
 )
 from utils.doc_types import map_doc_type
 from utils.log import setup_logger
+from utils.nnt import normalize_nnt
+from utils.normalize import normalize_text
 
 logger = setup_logger("create_publications", os.path.join(os.path.dirname(__file__), "logs"))
 

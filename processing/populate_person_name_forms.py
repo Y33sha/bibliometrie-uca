@@ -16,6 +16,7 @@ Sources :
 import os
 
 from psycopg2.extras import RealDictCursor
+
 from db.connection import get_connection
 from services.persons import compute_person_name_forms
 from utils.log import setup_logger

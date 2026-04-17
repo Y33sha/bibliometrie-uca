@@ -54,7 +54,7 @@ def read_new_logs(offsets: dict[str, int]) -> str:
             current_size = f.stat().st_size
             if current_size <= prev_size:
                 continue
-            with open(f, "r", encoding="utf-8", errors="replace") as fh:
+            with open(f, encoding="utf-8", errors="replace") as fh:
                 fh.seek(prev_size)
                 content = fh.read().rstrip()
             if content:

@@ -21,6 +21,7 @@ import argparse
 import os
 import re
 import time
+
 from db.connection import get_connection
 from utils.log import setup_logger
 from utils.normalize import normalize_text as normalize

@@ -25,7 +25,7 @@ from psycopg2.extras import Json, execute_values
 
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
-from utils.app_config import get_years, get_wos_affiliations, get_wos_api_key, get_api_base_urls
+from utils.app_config import get_api_base_urls, get_wos_affiliations, get_wos_api_key, get_years
 
 # ----- Logging -----
 logger = setup_logger("extract_wos", os.path.join(os.path.dirname(__file__), "logs"))
@@ -245,8 +245,8 @@ def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> i
         # Limite API : firstRecord ne peut pas dépasser 100 000
         if first_record > 100_000:
             logger.warning(
-                f"Limite API atteinte (100 000 records). "
-                f"Réduire la requête si des résultats manquent."
+                "Limite API atteinte (100 000 records). "
+                "Réduire la requête si des résultats manquent."
             )
             break
 

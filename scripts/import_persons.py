@@ -13,17 +13,14 @@ Colonnes attendues (noms flexibles, détection automatique) :
 
 import argparse
 import csv
-import io
 import logging
 import os
 import sys
 from datetime import datetime
 
-import psycopg2
-from psycopg2.extras import execute_values
 from db.connection import get_connection
-from utils.normalize import normalize_name
 from services.persons import refresh_person_name_forms
+from utils.normalize import normalize_name
 
 logging.basicConfig(
     level=logging.INFO,
@@ -95,7 +92,7 @@ def resolve_columns(headers: list[str]) -> dict[str, int]:
 
 def read_csv_tsv(filepath: str) -> list[dict]:
     """Lit un fichier CSV ou TSV et retourne une liste de dicts."""
-    with open(filepath, "r", encoding="utf-8-sig") as f:
+    with open(filepath, encoding="utf-8-sig") as f:
         sample = f.read(4096)
         f.seek(0)
         # Détecter le séparateur

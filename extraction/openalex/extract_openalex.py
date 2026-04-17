@@ -12,7 +12,6 @@ Les works déjà présents (même openalex_id) sont ignorés.
 """
 
 import argparse
-import json
 import os
 import sys
 import time
@@ -22,8 +21,21 @@ from psycopg2.extras import Json, execute_values
 
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
-from extraction.openalex import SELECT_FIELDS, extract_openalex_id, extract_doi, compute_meta_hash, init_auth, auth_params
-from utils.app_config import get_years, get_openalex_institution_ids, get_openalex_email, get_openalex_api_key, get_api_base_urls
+from extraction.openalex import (
+    SELECT_FIELDS,
+    auth_params,
+    compute_meta_hash,
+    extract_doi,
+    extract_openalex_id,
+    init_auth,
+)
+from utils.app_config import (
+    get_api_base_urls,
+    get_openalex_api_key,
+    get_openalex_email,
+    get_openalex_institution_ids,
+    get_years,
+)
 
 PER_PAGE = 200
 REQUEST_DELAY = 0.2
@@ -248,7 +260,7 @@ def main():
     since = args.since
     years = [args.year] if args.year else config_years
 
-    logger.info(f"=== Extraction OpenAlex démarrée ===")
+    logger.info("=== Extraction OpenAlex démarrée ===")
     logger.info(f"Institutions OpenAlex : {', '.join(institution_ids)} (lineage OR)")
     if since:
         logger.info(f"Mode incrémental : documents modifiés depuis {since}")

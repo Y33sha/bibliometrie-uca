@@ -5,10 +5,9 @@ avec une vraie base PostgreSQL (bibliometrie_test).
 Chaque test tourne dans une transaction rollbackée (isolation complète).
 """
 
-import pytest
 from psycopg2.extras import Json
-from services.publications import find_or_create, find_by_doi, find_by_nnt, refresh_from_sources
 
+from services.publications import find_by_nnt, find_or_create, refresh_from_sources
 
 # ── Helpers ──────────────────────────────────────────────────────
 

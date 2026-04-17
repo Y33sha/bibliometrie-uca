@@ -8,9 +8,10 @@ Usage:
 """
 import argparse
 import time
+
 import requests
-import psycopg2
 from psycopg2.extras import RealDictCursor
+
 from db.connection import get_connection
 from services.persons import add_identifier
 

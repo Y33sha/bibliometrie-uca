@@ -42,10 +42,10 @@ import logging
 import os
 import subprocess
 import sys
-
-from utils.sources import ALL_SOURCES_SET, BIBLIO_SOURCES_SET
 import time
 from pathlib import Path
+
+from utils.sources import ALL_SOURCES_SET, BIBLIO_SOURCES_SET
 
 logging.basicConfig(
     level=logging.INFO,
@@ -378,7 +378,7 @@ def main():
     log.info("Sources : %s", ", ".join(sorted(sources)))
 
     # Métriques pipeline
-    from pipeline.metrics import (generate_report, capture_log_offsets, read_new_logs)
+    from pipeline.metrics import capture_log_offsets, generate_report, read_new_logs
     phase_results = []  # [(name, duration, logs)]
 
     t0_total = time.time()

@@ -3,9 +3,15 @@
 import logging
 
 from fastapi import APIRouter, Query
+
 from backend.deps import get_cursor, get_root_structure_id
-from backend.filters import (PUB_IS_UCA, parse_int_csv,
-    apply_lab_filter, apply_year_filter, apply_oa_filter)
+from backend.filters import (
+    PUB_IS_UCA,
+    apply_lab_filter,
+    apply_oa_filter,
+    apply_year_filter,
+    parse_int_csv,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

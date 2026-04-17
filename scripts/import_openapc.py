@@ -41,7 +41,7 @@ def main():
     inserted = 0
     skipped_existing = 0
 
-    with open(args.csv_file, "r", encoding="utf-8") as f:
+    with open(args.csv_file, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             doi = clean_doi(row.get("doi"))

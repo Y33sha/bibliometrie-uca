@@ -6,9 +6,9 @@ Affiche un résumé puis demande confirmation avant d'appliquer.
 À supprimer après exécution.
 """
 from psycopg2.extras import RealDictCursor
+
 from db.connection import get_connection
 from services.persons import add_name_form
-from services.authorships import delete_orphan_authorships
 
 
 def main():

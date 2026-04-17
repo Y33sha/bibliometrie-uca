@@ -19,8 +19,8 @@ Usage :
 
 import argparse
 
-import psycopg2
 from psycopg2.extras import RealDictCursor
+
 from db.connection import get_connection
 
 SOURCES = [

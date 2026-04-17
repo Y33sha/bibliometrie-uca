@@ -13,12 +13,14 @@ Usage:
 
 import argparse
 import os
-from db.connection import get_connection
+
 from psycopg2.extras import RealDictCursor
+
+from db.connection import get_connection
 from services.publications import merge_publications
 from utils.log import setup_logger
-from utils.normalize import normalize_name
 from utils.names import names_compatible
+from utils.normalize import normalize_name
 
 logger = setup_logger("merge_dup_theses", os.path.join(os.path.dirname(__file__), "../processing/logs"))
 
@@ -176,13 +178,13 @@ def main():
         if args.apply:
             conn.commit()
 
-        logger.info(f"\n=== Résumé ===")
+        logger.info("\n=== Résumé ===")
         logger.info(f"  Groupes analysés : {len(groups)}")
         logger.info(f"  Fusions {'appliquées' if args.apply else '(dry-run)'} : {merged_total}")
         logger.info(f"  Ignorés (auteurs incompatibles/absents) : {skipped}")
         logger.info(f"  Erreurs : {errors}")
         if not args.apply and merged_total:
-            logger.info(f"\nDry-run — ajouter --apply pour appliquer.")
+            logger.info("\nDry-run — ajouter --apply pour appliquer.")
 
     except Exception as e:
         conn.rollback()

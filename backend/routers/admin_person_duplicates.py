@@ -3,12 +3,10 @@
 import logging
 
 import psycopg2.extras
-from fastapi import APIRouter, Query, HTTPException
-from backend.deps import get_cursor
-from backend.filters import parse_str_csv
-from backend.models import MarkPersonsDistinct
+from fastapi import APIRouter, HTTPException, Query
 
-from services.persons import merge_person as _merge_person
+from backend.deps import get_cursor
+from backend.models import MarkPersonsDistinct
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -310,7 +308,7 @@ async def mark_persons_distinct(body: MarkPersonsDistinct):
 
 MAX_AUTHORS_CONFLICT = 50  # Exclure les mega-authorships (physique des particules, etc.)
 
-CONFLICT_PAIRS_SQL = """
+CONFLICT_PAIRS_SQL = f"""
 WITH pub_author_counts AS (
     SELECT publication_id, MAX(cnt) AS max_authors FROM (
         SELECT sd.publication_id, COUNT(*) AS cnt
@@ -324,7 +322,7 @@ author_positions AS (
     JOIN source_authorships sa ON sa.source_publication_id = sd.id
     JOIN pub_author_counts pac ON pac.publication_id = sd.publication_id
     WHERE sa.person_id IS NOT NULL AND NOT sa.excluded
-      AND pac.max_authors <= {max_authors}
+      AND pac.max_authors <= {MAX_AUTHORS_CONFLICT}
 )
 SELECT LEAST(a1.person_id, a2.person_id) AS id_a,
        GREATEST(a1.person_id, a2.person_id) AS id_b,
@@ -344,7 +342,7 @@ WHERE NOT EXISTS (
 )
 GROUP BY LEAST(a1.person_id, a2.person_id), GREATEST(a1.person_id, a2.person_id)
 ORDER BY COUNT(*) DESC, LEAST(a1.person_id, a2.person_id)
-""".format(max_authors=MAX_AUTHORS_CONFLICT)
+"""
 
 
 @router.get("/api/admin/person-duplicates/conflicts/count")

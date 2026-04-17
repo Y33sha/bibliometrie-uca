@@ -6,10 +6,15 @@ Usage:
     python analysis/audit_oa_unpaywall.py --dry-run    # rapport CSV sans modifier la base
 """
 
-import os, time, argparse, csv
-import requests
+import argparse
+import csv
+import os
+import time
+
 import psycopg2
+import requests
 from psycopg2.extras import RealDictCursor
+
 from config.settings import settings
 
 EMAIL = "laurent.le-coz@uca.fr"
@@ -130,7 +135,7 @@ def main():
 
     # Matrice de confusion
     if divergences > 0:
-        print(f"\nDétail des divergences (top transitions) :")
+        print("\nDétail des divergences (top transitions) :")
         transitions: dict[tuple[str, str], int] = {}
         with open(report_path) as f:
             reader = csv.DictReader(f)

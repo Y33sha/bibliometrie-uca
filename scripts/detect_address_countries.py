@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+
 from db.connection import get_connection
 from utils.log import setup_logger
 from utils.normalize import normalize_text
@@ -48,7 +49,7 @@ def show_stats(cur):
         FROM addresses WHERE pub_count > 0
     """)
     r = cur.fetchone()
-    logger.info(f"Adresses (pub_count > 0) :")
+    logger.info("Adresses (pub_count > 0) :")
     logger.info(f"  Total            : {r[0]}")
     logger.info(f"  Avec pays        : {r[1]}")
     logger.info(f"  Avec suggestion  : {r[2]}")
@@ -109,10 +110,10 @@ def main():
             last_seg = extract_last_segment(raw_text)
             if last_seg and last_seg not in country_forms:
                 unknown[last_seg] += 1
-        logger.info(f"\nTop 20 formes non reconnues :")
+        logger.info("\nTop 20 formes non reconnues :")
         for form, cnt in unknown.most_common(20):
             logger.info(f"  {cnt:>5}  {form}")
-        logger.info(f"\nDry-run — ajouter --apply pour appliquer.")
+        logger.info("\nDry-run — ajouter --apply pour appliquer.")
         conn.close()
         return
 

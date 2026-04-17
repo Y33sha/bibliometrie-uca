@@ -19,7 +19,7 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import compute_hash, get_cross_import_dois, setup_logger
-from utils.app_config import get_wos_api_key, get_api_base_urls
+from utils.app_config import get_api_base_urls, get_wos_api_key
 
 # ----- Logging -----
 logger = setup_logger("cross_import_wos", os.path.join(os.path.dirname(__file__), "logs"))

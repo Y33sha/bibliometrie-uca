@@ -24,9 +24,16 @@ import requests
 from psycopg2.extras import Json
 
 from db.connection import get_connection
-from utils.app_config import get_openalex_email, get_openalex_api_key
 from extraction.common import compute_hash, get_cross_import_dois, setup_logger
-from extraction.openalex import BASE_URL, SELECT_FIELDS, extract_openalex_id, extract_doi, init_auth, auth_params
+from extraction.openalex import (
+    BASE_URL,
+    SELECT_FIELDS,
+    auth_params,
+    extract_doi,
+    extract_openalex_id,
+    init_auth,
+)
+from utils.app_config import get_openalex_api_key, get_openalex_email
 
 # ----- Logging -----
 logger = setup_logger("cross_import_openalex", os.path.join(os.path.dirname(__file__), "logs"))

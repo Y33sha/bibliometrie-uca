@@ -13,8 +13,9 @@ import os
 import time
 
 import requests
+
 from db.connection import get_connection
-from services.journals import update_journal_apc, reset_journal_apc
+from services.journals import reset_journal_apc, update_journal_apc
 from utils.log import setup_logger
 
 logger = setup_logger("enrich_journal_apc", os.path.join(os.path.dirname(__file__), "logs"))

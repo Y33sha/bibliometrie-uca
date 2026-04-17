@@ -26,7 +26,7 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
-from utils.app_config import get_theses_etab_ppns, get_api_base_urls
+from utils.app_config import get_api_base_urls, get_theses_etab_ppns
 
 logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -199,7 +199,7 @@ def main():
                 grand_inserted += inserted
                 grand_updated += updated
 
-        logger.info(f"\n=== Terminé ===")
+        logger.info("\n=== Terminé ===")
         logger.info(f"Total API : {grand_total}")
         logger.info(f"Nouveaux : {grand_inserted}")
         logger.info(f"Mis à jour : {grand_updated}")

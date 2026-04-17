@@ -22,19 +22,19 @@ import argparse
 import os
 import time
 
-import psycopg2
 from psycopg2.extras import Json, RealDictCursor
+
 from db.connection import get_connection
+from services.journals import find_or_create_journal, find_or_create_publisher
+from services.publications import find_or_create as find_or_create_publication
+from services.publications import refresh_from_sources, try_merge_by_doi
+from utils.addresses import link_addresses
+from utils.authorship_roles import map_role
+from utils.db_helpers import mark_staging_done
 from utils.doi import clean_doi
 from utils.log import setup_logger
-from utils.normalize import normalize_text
-from utils.authorship_roles import map_role
-from services.publications import find_or_create as find_or_create_publication, try_merge_by_doi, refresh_from_sources
-from utils.db_helpers import mark_staging_done
 from utils.nnt import normalize_nnt
-from services.journals import find_or_create_publisher, find_or_create_journal
-
-from utils.addresses import link_addresses
+from utils.normalize import normalize_text
 
 logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -540,7 +540,7 @@ def main():
 
         conn.commit()
 
-        logger.info(f"\n=== Terminé ===")
+        logger.info("\n=== Terminé ===")
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Erreurs : {errors}")
 

@@ -21,7 +21,7 @@ import requests
 from psycopg2.extras import Json
 
 from db.connection import get_connection
-from extraction.common import compute_hash, clean_doi, get_cross_import_dois, setup_logger
+from extraction.common import clean_doi, compute_hash, get_cross_import_dois, setup_logger
 from utils.app_config import get_scanr_credentials
 
 logger = setup_logger("cross_import_scanr", os.path.join(os.path.dirname(__file__), "logs"))

@@ -26,6 +26,7 @@ import os
 import time
 
 import requests
+
 from db.connection import get_connection
 from services.persons import add_identifier
 from utils.log import setup_logger
@@ -108,7 +109,7 @@ def main():
             ORDER BY id
         """)
         rows = cur.fetchall()
-        logger.info(f"=== Moissonnage ORCID depuis HAL ===")
+        logger.info("=== Moissonnage ORCID depuis HAL ===")
         logger.info(f"{len(rows)} source_persons HAL avec hal_person_id mais sans ORCID")
 
         if not rows:
@@ -170,7 +171,7 @@ def main():
             conn.rollback()
             logger.info(f"\n[DRY RUN] {total_found} ORCID trouvés (aucune modification)")
         else:
-            logger.info(f"\n=== Terminé ===")
+            logger.info("\n=== Terminé ===")
             logger.info(f"ORCID trouvés via API : {total_found}")
             logger.info(f"source_persons mis à jour : {total_updated}")
             logger.info(f"person_identifiers ajoutés : {total_pi_inserted}")

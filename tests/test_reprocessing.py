@@ -8,13 +8,14 @@ la mise à jour des métadonnées lors d'un re-traitement.
 """
 
 import copy
-import pytest
+
 from psycopg2.extras import Json
 
-from utils.normalize import normalize_text
-from utils.nnt import normalize_nnt
-from services.publications import find_or_create as find_or_create_publication, update_sources
+from services.publications import find_or_create as find_or_create_publication
+from services.publications import update_sources
 from utils.doc_types import map_doc_type
+from utils.nnt import normalize_nnt
+from utils.normalize import normalize_text
 
 
 def _create_all_publications(cur):

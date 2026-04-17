@@ -1,21 +1,17 @@
 """Shared dependencies: DB connection, auth helpers."""
 
-import os
 import hashlib
 import hmac
+import os
 import time
-
-import bcrypt
 from contextlib import contextmanager
 
+import bcrypt
 from fastapi import Cookie, HTTPException
 from fastapi.staticfiles import StaticFiles
-
-import psycopg2
 from psycopg2.extras import RealDictCursor
 
 from config.settings import settings
-
 
 # ----- SPA Static Files -----
 

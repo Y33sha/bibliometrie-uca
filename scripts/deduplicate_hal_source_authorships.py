@@ -29,6 +29,7 @@ import argparse
 import os
 
 from psycopg2.extras import RealDictCursor
+
 from db.connection import get_connection
 from utils.log import setup_logger
 

@@ -1,9 +1,9 @@
 """Tests pour extraction/common.py — fonctions partagées d'extraction."""
 
 import pytest
+
 from extraction.common import compute_hash, get_existing_ids
 from utils.doi import clean_doi
-
 
 # ── compute_hash ─────────────────────────────────────────────────
 

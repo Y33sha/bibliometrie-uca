@@ -2,11 +2,17 @@
 
 import logging
 
-from fastapi import APIRouter, Query, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Query
 from psycopg2.extras import Json
-from backend.deps import get_cursor, require_admin
-from backend.models import (StructureCreate, StructureUpdate, RelationCreate,
-    NameFormCreate, NameFormUpdate)
+
+from backend.deps import get_cursor
+from backend.models import (
+    NameFormCreate,
+    NameFormUpdate,
+    RelationCreate,
+    StructureCreate,
+    StructureUpdate,
+)
 from utils.normalize import normalize_text
 
 router = APIRouter()

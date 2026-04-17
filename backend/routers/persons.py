@@ -3,31 +3,52 @@
 import logging
 import re
 
-from fastapi import APIRouter, Query, HTTPException, Depends
-from backend.deps import get_cursor, require_admin
-from backend.models import (AddIdentifier, UpdateIdentifierStatus, ReassignIdentifier,
-    RejectPerson, UpdatePersonName, MergePersons, AssignOrphanAuthorship,
-    BatchAssignOrphanAuthorships, DetachAuthorships, DetachNameForm)
-from backend.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, persons_sort_clause,
-    parse_int_csv, parse_str_csv, apply_source_filter)
-from utils.sources import AUTHOR_SOURCES_SQL, ALL_SOURCES_SET
+from fastapi import APIRouter, HTTPException, Query
 
-from utils.normalize import normalize_text
+from backend.deps import get_cursor
+from backend.filters import (
+    parse_str_csv,
+)
+from backend.models import (
+    AddIdentifier,
+    AssignOrphanAuthorship,
+    BatchAssignOrphanAuthorships,
+    DetachAuthorships,
+    DetachNameForm,
+    MergePersons,
+    ReassignIdentifier,
+    RejectPerson,
+    UpdateIdentifierStatus,
+    UpdatePersonName,
+)
+from services.authorships import (
+    delete_orphan_authorships as _delete_orphan_authorships,
+)
 from services.authorships import (
     exclude_authorship as _exclude_authorship,
-    delete_orphan_authorships as _delete_orphan_authorships,
+)
+from services.persons import (
+    add_name_form as _add_name_form,
+)
+from services.persons import (
+    assign_orphan_authorship as _assign_orphan,
+)
+from services.persons import (
+    create_person as _create_person,
+)
+from services.persons import (
+    detach_name_form as _detach_name_form,
 )
 from services.persons import (
     merge_person as _merge_person,
-    link_authorship as _link_authorship,
-    unlink_authorship as _unlink_authorship,
-    assign_orphan_authorship as _assign_orphan,
-    add_identifier as _add_identifier,
-    add_name_form as _add_name_form,
-    detach_name_form as _detach_name_form,
-    create_person as _create_person,
+)
+from services.persons import (
     refresh_person_name_forms as _refresh_person_name_forms,
 )
+from services.persons import (
+    unlink_authorship as _unlink_authorship,
+)
+from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

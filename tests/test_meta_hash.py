@@ -12,8 +12,6 @@ Scénarios testés :
 3. meta_hash différent et moins d'auteurs en base → remplacement complet
 """
 
-import json
-import pytest
 from psycopg2.extras import Json
 
 from extraction.common import compute_hash

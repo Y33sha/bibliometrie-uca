@@ -7,7 +7,6 @@ des source_authorships.
 
 from utils.normalize import normalize_text
 
-
 # Cache module-level pour éviter les lookups répétés dans un même run
 _addr_cache: dict[str, int] = {}
 

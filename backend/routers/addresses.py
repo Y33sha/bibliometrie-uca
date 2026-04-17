@@ -1,11 +1,17 @@
 """Auto-extracted router."""
 
 import logging
-from fastapi import APIRouter, Query, HTTPException, Depends, BackgroundTasks
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+
 from backend.deps import get_cursor, require_admin
+from backend.models import (
+    BatchReviewAction,
+    BatchSetCountry,
+    ReviewAction,
+    SetCountry,
+)
 from services.authorships import propagate_uca_for_addresses
-from backend.models import (ReviewAction, BatchReviewAction, AssignStructureAction,
-    SetCountry, BatchSetCountry)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

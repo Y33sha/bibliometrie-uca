@@ -1,6 +1,5 @@
 """Tests des fonctions de parsing des normaliseurs (pas besoin de DB)."""
 
-import pytest
 
 
 # ── OpenAlex ─────────────────────────────────────────────────────
@@ -9,9 +8,9 @@ from processing.normalize_openalex import (
     extract_short_id,
     is_hal_primary_location,
     is_repository_source,
-    OA_MAP,
 )
-from utils.doc_types import map_doc_type, _SOURCE_MAPS, _VALID_DOC_TYPES as VALID_DOC_TYPES_SET
+from utils.doc_types import _SOURCE_MAPS, map_doc_type
+from utils.doc_types import _VALID_DOC_TYPES as VALID_DOC_TYPES_SET
 from utils.hal import extract_hal_id_from_url
 
 
@@ -219,10 +218,12 @@ class TestHALDocTypeMap:
 # ── WoS ──────────────────────────────────────────────────────────
 
 from processing.normalize_wos import (
-    map_doc_type as wos_map_doc_type,
-    map_oa_status,
-    _safe_list,
     _get_api_title,
+    _safe_list,
+    map_oa_status,
+)
+from processing.normalize_wos import (
+    map_doc_type as wos_map_doc_type,
 )
 
 
@@ -303,7 +304,7 @@ class TestWoSDocTypeMap:
 
 # ── NNT ─────────────────────────────────────────────────────────
 
-from utils.nnt import normalize_nnt, is_theses_fr_source, extract_nnt_from_openalex
+from utils.nnt import extract_nnt_from_openalex, is_theses_fr_source, normalize_nnt
 
 
 class TestNormalizeNnt:

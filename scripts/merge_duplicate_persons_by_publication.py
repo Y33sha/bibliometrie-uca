@@ -15,11 +15,11 @@ Usage:
 """
 
 import argparse
-from db.connection import get_connection
-from psycopg2.extras import RealDictCursor
-from utils.normalize import normalize_name
-from services.persons import merge_person
 
+from psycopg2.extras import RealDictCursor
+
+from db.connection import get_connection
+from services.persons import merge_person
 
 PAIRS_SQL = """
 WITH name_candidates AS (
