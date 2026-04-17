@@ -1,8 +1,6 @@
 """Persons router: directory, search, list, profile, merge, identifiers, authors."""
 
-import os
 import re
-import sys
 from fastapi import APIRouter, Query, HTTPException, Depends
 from backend.deps import get_cursor, require_admin
 from backend.models import (AddIdentifier, UpdateIdentifierStatus, ReassignIdentifier,
@@ -12,7 +10,6 @@ from backend.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, persons_sort_clause,
     parse_int_csv, parse_str_csv, apply_source_filter)
 from utils.sources import AUTHOR_SOURCES_SQL, ALL_SOURCES_SET
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.normalize import normalize_text
 from services.authorships import (
     exclude_authorship as _exclude_authorship,
@@ -991,13 +988,10 @@ async def list_orphan_authorships(
 @router.post("/api/admin/orphan-authorships/assign")
 async def assign_orphan_authorship_endpoint(body: AssignOrphanAuthorship):
     """Attribue une authorship orpheline à une personne existante ou nouvelle."""
-    source = body.source
-    authorship_id = body.authorship_id
+    if body.source not in ALL_SOURCES_SET:
+        raise HTTPException(status_code=400, detail=f"Source inconnue: {body.source}")
+
     person_id = body.person_id
-
-    if source not in ALL_SOURCES_SET:
-        raise HTTPException(status_code=400, detail=f"Source inconnue: {source}")
-
     with get_cursor() as (cur, conn):
         if body.create_person:
             ln = body.create_person.last_name.strip()
@@ -1013,7 +1007,7 @@ async def assign_orphan_authorship_endpoint(body: AssignOrphanAuthorship):
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Personne introuvable")
 
-        _assign_orphan(cur, person_id, source, authorship_id)
+        _assign_orphan(cur, person_id, body.source, body.authorship_id)
 
         return {"ok": True, "person_id": person_id}
 
@@ -1127,11 +1121,7 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
 
 @router.post("/api/persons/{person_id}/detach-authorships")
 async def detach_authorships(person_id: int, body: DetachAuthorships):
-    """Détache des authorships sources d'une personne et nettoie les formes de noms.
-
-    body.authorships: [{ source: 'hal'|'openalex'|'wos', authorship_id: int }, ...]
-    body.name_form: str — forme de nom à supprimer si toutes ses authorships sont détachées
-    """
+    """Détache des authorships sources d'une personne et nettoie les formes de noms."""
     name_form = body.name_form
 
     with get_cursor() as (cur, conn):

@@ -13,9 +13,6 @@ Usage:
 
 import argparse
 import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from psycopg2.extras import RealDictCursor
 from services.publications import merge_publications

@@ -2,12 +2,10 @@
 
 import io
 import csv
-import sys, os
 from fastapi import APIRouter, Query, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from backend.deps import get_cursor, get_root_structure_id
 from backend.models import ExcludeSourceAuthorship
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from services.authorships import detach_source as _detach_source
 from backend.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, parse_int_csv, parse_str_csv,
     apply_lab_filter, apply_year_filter, apply_doc_type_filter, apply_source_filter,
@@ -122,8 +120,8 @@ async def publications_facets(
             apc_parts = []
             for v in [x.strip() for x in has_apc.split(',') if x.strip()]:
                 if v in APC_FACET_MAP:
-                    sql_frag, rid_count = APC_FACET_MAP[v]
-                    apc_parts.append(sql_frag)
+                    sql, rid_count = APC_FACET_MAP[v]
+                    apc_parts.append(sql)
                     params.extend([_rid] * rid_count)
                 elif v == "this_lab" and lab_ids_clean:
                     apc_parts.append("EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[]))")
@@ -1044,8 +1042,8 @@ async def list_publications(
             parts = []
             for v in apc_values:
                 if v in APC_MAP:
-                    sql_frag, rid_count = APC_MAP[v]
-                    parts.append(sql_frag)
+                    sql, rid_count = APC_MAP[v]
+                    parts.append(sql)
                     params.extend([_rid2] * rid_count)
                 elif v == "this_lab" and lab_ids:
                     parts.append("EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[]))")

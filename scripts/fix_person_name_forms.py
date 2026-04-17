@@ -17,9 +17,7 @@ Usage :
   python scripts/fix_person_name_forms.py [--dry-run] [--person-id ID]
 """
 
-import os, sys, argparse
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import argparse
 
 import psycopg2
 from psycopg2.extras import RealDictCursor

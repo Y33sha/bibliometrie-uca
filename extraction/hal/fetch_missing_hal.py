@@ -19,13 +19,11 @@ Usage:
 
 import argparse
 import os
-import sys
 import time
 
 import requests
 from psycopg2.extras import Json, RealDictCursor
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from db.connection import get_connection
 from extraction.common import compute_hash
 from utils.hal import extract_hal_id_from_url, HAL_FIELDS_STR

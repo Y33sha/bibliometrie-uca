@@ -5,14 +5,11 @@ Usage:
 """
 
 import os
-import sys
 import csv
 import re
 
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import DB
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

@@ -1,7 +1,5 @@
 """Tests d'intégration — nécessitent la base bibliometrie_test."""
 
-import sys, pathlib
-sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 import pytest
 from services.persons import merge_person

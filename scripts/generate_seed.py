@@ -21,9 +21,6 @@ via db/schema.sql + migrations.
 
 import argparse
 import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 
 # Tables à exporter, dans l'ordre d'insertion (respect des FK)

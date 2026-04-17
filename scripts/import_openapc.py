@@ -10,9 +10,6 @@ Usage:
 import argparse
 import csv
 import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db.connection import get_connection
 from utils.doi import clean_doi

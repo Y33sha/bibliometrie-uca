@@ -34,6 +34,8 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Bibliométrie UCA")
 
 
+# ----- Exception handler global -----
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Renvoie du JSON 500 au lieu de HTML pour les erreurs non gérées."""
@@ -44,7 +46,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
                         content={"detail": "Erreur interne du serveur"})
 
 
-# ----- CORS (frontend SvelteKit sur port séparé) -----
+# ----- CORS -----
 
 _DEFAULT_ORIGINS = "http://localhost:5176,http://localhost:5173,http://127.0.0.1:5176"
 _cors_origins = [o.strip() for o in

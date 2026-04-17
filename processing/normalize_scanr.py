@@ -20,13 +20,10 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 
 import argparse
 import os
-import sys
 import time
 
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from utils.doi import clean_doi
 from utils.log import setup_logger

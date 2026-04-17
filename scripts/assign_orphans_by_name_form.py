@@ -5,10 +5,6 @@ normalisée pointe vers une personne unique dans person_name_forms.
 Affiche un résumé puis demande confirmation avant d'appliquer.
 À supprimer après exécution.
 """
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from psycopg2.extras import RealDictCursor
 from db.connection import get_connection
 from services.persons import add_name_form

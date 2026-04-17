@@ -12,13 +12,11 @@ Usage:
 
 import argparse
 import os
-import sys
 import time
 
 import requests
 from psycopg2.extras import Json
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from db.connection import get_connection
 from extraction.common import compute_hash, get_cross_import_dois, setup_logger
 from utils.app_config import get_wos_api_key, get_api_base_urls

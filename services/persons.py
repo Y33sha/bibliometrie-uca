@@ -10,8 +10,6 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 (UNIQUE(source, source_id)), les authorships utilisent `source_person_id`.
 """
 
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.normalize import normalize_name
 from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
 from utils.perimeter import get_persons_structure_ids_list

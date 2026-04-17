@@ -1,13 +1,12 @@
 """Shared dependencies: DB connection, auth helpers."""
 
 import os
-import sys
 import hashlib
 import hmac
 import time
-from contextlib import contextmanager
 
 import bcrypt
+from contextlib import contextmanager
 
 from fastapi import Cookie, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -15,7 +14,6 @@ from fastapi.staticfiles import StaticFiles
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import DB, DB_POOL_MIN, DB_POOL_MAX, ADMIN_USER, ADMIN_HASH, SESSION_SECRET
 
 

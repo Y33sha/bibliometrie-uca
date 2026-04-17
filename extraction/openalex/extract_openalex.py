@@ -20,7 +20,6 @@ import time
 import requests
 from psycopg2.extras import Json, execute_values
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
 from extraction.openalex import SELECT_FIELDS, extract_openalex_id, extract_doi, compute_meta_hash, init_auth, auth_params

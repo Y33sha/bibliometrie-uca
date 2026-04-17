@@ -23,7 +23,6 @@ import time
 import requests
 from psycopg2.extras import Json, execute_values
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
 from utils.app_config import get_years, get_wos_affiliations, get_wos_api_key, get_api_base_urls

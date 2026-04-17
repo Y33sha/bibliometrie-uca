@@ -1,6 +1,7 @@
 """Pydantic models shared across routers."""
 
 from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -30,6 +31,7 @@ class AssignStructureAction(BaseModel):
 
 class SetCountry(BaseModel):
     countries: list[str] | None = None
+
 
 class BatchSetCountry(BaseModel):
     country_code: str
@@ -100,6 +102,7 @@ class JournalUpdate(BaseModel):
     apc_amount: float | None = None
     notes: str | None = None
 
+
 class PublisherUpdate(BaseModel):
     name: str | None = None
     country: str | None = None
@@ -107,8 +110,10 @@ class PublisherUpdate(BaseModel):
     is_predatory: bool | None = None
     notes: str | None = None
 
+
 class MergeRequest(BaseModel):
     source_id: int
+
 
 # ----- Publications -----
 
@@ -116,9 +121,11 @@ class MergePublications(BaseModel):
     target_id: int
     source_id: int
 
+
 class MarkDistinctPublications(BaseModel):
     pub_id_a: int
     pub_id_b: int
+
 
 class ExcludeSourceAuthorship(BaseModel):
     excluded: bool = True
@@ -135,33 +142,42 @@ class AddIdentifier(BaseModel):
     id_type: str   # 'orcid' or 'idhal'
     id_value: str
 
+
 class UpdateIdentifierStatus(BaseModel):
     status: Literal["pending", "confirmed", "rejected"]
+
 
 class ReassignIdentifier(BaseModel):
     person_id: int
 
+
 class RejectPerson(BaseModel):
     rejected: bool = True
+
 
 class UpdatePersonName(BaseModel):
     last_name: str
     first_name: str = ""
 
+
 class MergePersons(BaseModel):
     source_id: int
+
 
 class MarkPersonsDistinct(BaseModel):
     person_id_a: int
     person_id_b: int
 
+
 class CreatePersonName(BaseModel):
     last_name: str
     first_name: str = ""
 
+
 class SourceAuthorshipRef(BaseModel):
     source: str
     authorship_id: int
+
 
 class AssignOrphanAuthorship(BaseModel):
     source: str
@@ -169,13 +185,16 @@ class AssignOrphanAuthorship(BaseModel):
     person_id: int | None = None
     create_person: CreatePersonName | None = None
 
+
 class BatchAssignOrphanAuthorships(BaseModel):
     authorships: list[SourceAuthorshipRef]
     person_id: int
 
+
 class DetachAuthorships(BaseModel):
     authorships: list[SourceAuthorshipRef]
     name_form: str = ""
+
 
 class DetachNameForm(BaseModel):
     name_form: str

@@ -13,13 +13,11 @@ Usage:
 
 import argparse
 import os
-import sys
 import time
 
 import requests
 from psycopg2.extras import Json, RealDictCursor
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from db.connection import get_connection
 from extraction.common import compute_hash, setup_logger
 from extraction.openalex import BASE_URL, SELECT_FIELDS, compute_meta_hash, init_auth, auth_params

@@ -2,11 +2,11 @@
 
 ## 1. Sécurité — Bloquant
 
-- [ ] Purger les credentials du repo (rewrite git history ou nouveau repo propre)
 - [ ] Passer tous les secrets en variables d'environnement (`.env` en `.gitignore`, `.env.example` versionné)
-- [x] Auditer et corriger les injections SQL par f-string (routers : addresses, admin_duplicates, structures, feedback, journals)
-- [x] Remplacer SHA256 par bcrypt pour le hash admin, générer un vrai session secret
-- [x] Rendre CORS configurable par environnement (origins, methods, headers)
+Secrets restants en variables d'environnement (section 1) — On a fait l'auth, mais settings.py contient encore en dur : la clé API WoS, les credentials ScanR, le mot de passe DB. Il faut les externaliser comme on a fait pour ADMIN_HASH. ~15 min.
+
+- [ ] Purger les credentials du repo (rewrite git history ou nouveau repo propre)
+Purger les credentials de l'historique git (section 1) — filter-repo sur config/settings.py pour virer les anciens hashes SHA256, la clé WoS, le mot de passe ScanR des commits passés. Mais cette fois on commit avant.
 
 ## 2. Résilience pipeline — Bloquant
 
@@ -17,15 +17,11 @@
 ## 3. Observabilité API — Bloquant pour opérer
 
 - [ ] Ajouter le logging dans tous les routers (seul `addresses.py` utilise le logger aujourd'hui)
+Logging dans les routers (section 3) — Ajouter logger = logging.getLogger(__name__) dans chaque router. Mécanique.
+
 - [ ] Logger structuré (JSON) pour permettre l'agrégation
 - [ ] Traçabilité admin : loguer qui fait quoi sur les endpoints d'écriture
 - [ ] Métriques basiques (temps de réponse, état du pool DB)
-
-## 4. Qualité code backend
-
-- [x] Remplacer les `body: dict` par des modèles Pydantic sur les endpoints POST/PUT
-- [ ] Remplacer les `sys.path.insert` par un packaging propre
-- [x] Ajouter un middleware catch-all pour les erreurs inattendues (JSON 500 au lieu de HTML)
 
 ## 5. Base de données
 

@@ -35,10 +35,7 @@ Usage:
 
 import argparse
 import os
-import sys
 from collections import defaultdict
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.connection import get_connection
 from psycopg2.extras import RealDictCursor
 from utils.normalize import normalize_name

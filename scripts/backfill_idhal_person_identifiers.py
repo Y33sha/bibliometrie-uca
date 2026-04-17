@@ -9,9 +9,6 @@ Les identifiants avec statut rejected sont réattribués (via add_identifier).
 """
 
 import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db.connection import get_connection
 from services.persons import add_identifier
