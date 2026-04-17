@@ -7,7 +7,15 @@ commit séparé (Phase B).
 
 import json
 
-from services.addresses import batch_review_structure_link, review_structure_link
+from services.addresses import (
+    batch_review_structure_link,
+    batch_set_country_by_filter,
+    batch_set_country_by_ids,
+    propagate_countries_to_publications,
+    propagate_countries_to_similar,
+    review_structure_link,
+    set_country,
+)
 
 
 # ── Helpers ────────────────────────────────────────────────────────
@@ -185,3 +193,186 @@ class TestBatchReviewStructureLink:
         # Les 2 liens manuels ont été supprimés
         assert _get_link(db, a1, uca) is None
         assert _get_link(db, a2, uca) is None
+
+
+# ── set_country ─────────────────────────────────────────────────────
+
+def _ensure_country(db, code, name="Test"):
+    db.execute(
+        "INSERT INTO countries (code, name) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+        (code, name),
+    )
+
+
+def _get_countries(db, address_id):
+    db.execute("SELECT countries FROM addresses WHERE id = %s", (address_id,))
+    return db.fetchone()["countries"]
+
+
+class TestSetCountry:
+    def test_assigns_countries(self, db):
+        _ensure_country(db, "FR")
+        addr = _create_address(db)
+        affected = set_country(db, addr, ["FR"])
+        assert affected == [addr]
+        assert _get_countries(db, addr) == ["FR"]
+
+    def test_none_clears_countries(self, db):
+        _ensure_country(db, "FR")
+        addr = _create_address(db)
+        set_country(db, addr, ["FR"])
+        set_country(db, addr, None)
+        assert _get_countries(db, addr) is None
+
+    def test_propagates_to_same_normalized_text(self, db):
+        """Les adresses avec même normalized_text héritent des countries."""
+        _ensure_country(db, "FR")
+        a1 = _create_address(db, raw_text="UCA A")
+        a2 = _create_address(db, raw_text="UCA B")
+        # Forcer le même normalized_text (simule le pipeline de normalisation)
+        db.execute(
+            "UPDATE addresses SET normalized_text = 'universite clermont auvergne' WHERE id IN (%s, %s)",
+            (a1, a2),
+        )
+        set_country(db, a1, ["FR"])
+        assert _get_countries(db, a1) == ["FR"]
+        assert _get_countries(db, a2) == ["FR"]  # propagé
+
+    def test_no_propagation_on_short_normalized(self, db):
+        """Pas de propagation si normalized_text < 5 chars."""
+        _ensure_country(db, "FR")
+        a1 = _create_address(db, raw_text="addr short A")
+        a2 = _create_address(db, raw_text="addr short B")
+        db.execute(
+            "UPDATE addresses SET normalized_text = 'abc' WHERE id IN (%s, %s)",
+            (a1, a2),
+        )
+        set_country(db, a1, ["FR"])
+        assert _get_countries(db, a2) is None
+
+
+# ── batch_set_country_by_ids ────────────────────────────────────────
+
+class TestBatchSetCountryByIds:
+    def test_adds_to_empty_countries(self, db):
+        _ensure_country(db, "FR")
+        addrs = [_create_address(db, raw_text=f"a{i}") for i in range(3)]
+        modified = batch_set_country_by_ids(db, "FR", addrs)
+        assert set(modified) == set(addrs)
+        for a in addrs:
+            assert _get_countries(db, a) == ["FR"]
+
+    def test_appends_to_existing_countries(self, db):
+        _ensure_country(db, "FR")
+        _ensure_country(db, "US")
+        addr = _create_address(db)
+        set_country(db, addr, ["FR"])
+        batch_set_country_by_ids(db, "US", [addr])
+        countries = _get_countries(db, addr)
+        assert "FR" in countries and "US" in countries
+
+    def test_idempotent_if_already_present(self, db):
+        _ensure_country(db, "FR")
+        addr = _create_address(db)
+        set_country(db, addr, ["FR"])
+        batch_set_country_by_ids(db, "FR", [addr])
+        assert _get_countries(db, addr) == ["FR"]  # pas de doublon
+
+
+# ── batch_set_country_by_filter ─────────────────────────────────────
+
+class TestBatchSetCountryByFilter:
+    def test_filter_by_search(self, db):
+        _ensure_country(db, "FR")
+        match = _create_address(db, raw_text="Université Clermont")
+        other = _create_address(db, raw_text="MIT Boston")
+        modified = batch_set_country_by_filter(db, "FR", search="Clermont")
+        assert match in modified
+        assert other not in modified
+
+    def test_filter_has_country_no(self, db):
+        _ensure_country(db, "FR")
+        _ensure_country(db, "US")
+        addr_no = _create_address(db, raw_text="sans pays")
+        addr_yes = _create_address(db, raw_text="avec pays")
+        set_country(db, addr_yes, ["US"])
+        modified = batch_set_country_by_filter(db, "FR", has_country="no")
+        assert addr_no in modified
+        assert addr_yes not in modified
+
+
+# ── propagate_countries_to_similar ──────────────────────────────────
+
+class TestPropagateCountriesToSimilar:
+    def test_propagates_divergent_values(self, db):
+        """Deux adresses de même normalized_text avec countries différents :
+        la 2e reçoit les countries de la 1ère."""
+        _ensure_country(db, "FR")
+        a1 = _create_address(db, raw_text="UCA AA")
+        a2 = _create_address(db, raw_text="UCA BB")
+        db.execute(
+            "UPDATE addresses SET normalized_text = 'universite clermont auvergne' WHERE id IN (%s, %s)",
+            (a1, a2),
+        )
+        # a1 a FR, a2 n'a rien
+        db.execute("UPDATE addresses SET countries = %s WHERE id = %s", (["FR"], a1))
+
+        propagated = propagate_countries_to_similar(db)
+
+        assert a2 in propagated
+        assert _get_countries(db, a2) == ["FR"]
+
+
+# ── propagate_countries_to_publications ─────────────────────────────
+
+class TestPropagateCountriesToPublications:
+    def test_empty_is_noop(self, db):
+        propagate_countries_to_publications(db, [])  # pas d'exception
+
+    def test_propagates_to_source_pub_and_publication(self, db):
+        """Test d'intégration minimal : une adresse avec countries liée à
+        une source_authorship, le pays doit remonter jusqu'à publications.countries."""
+        _ensure_country(db, "FR")
+        # Setup minimal : publication + source_publication + source_authorship + adresse liée
+        db.execute(
+            "INSERT INTO publications (title, pub_year) VALUES ('Test', 2024) RETURNING id"
+        )
+        pub_id = db.fetchone()["id"]
+        db.execute(
+            """
+            INSERT INTO source_publications (source, source_id, title, publication_id)
+            VALUES ('hal', 'h-1', 'Test', %s) RETURNING id
+            """,
+            (pub_id,),
+        )
+        sp_id = db.fetchone()["id"]
+        db.execute(
+            """
+            INSERT INTO source_persons (source, source_id, full_name)
+            VALUES ('hal', 'p-1', 'J D') RETURNING id
+            """
+        )
+        sperson_id = db.fetchone()["id"]
+        db.execute(
+            """
+            INSERT INTO source_authorships (source, source_publication_id, source_person_id)
+            VALUES ('hal', %s, %s) RETURNING id
+            """,
+            (sp_id, sperson_id),
+        )
+        sa_id = db.fetchone()["id"]
+        addr = _create_address(db)
+        db.execute("UPDATE addresses SET countries = %s WHERE id = %s", (["FR"], addr))
+        db.execute(
+            "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) VALUES (%s, %s)",
+            (sa_id, addr),
+        )
+
+        propagate_countries_to_publications(db, [addr])
+
+        # source_publications.countries mis à jour
+        db.execute("SELECT countries FROM source_publications WHERE id = %s", (sp_id,))
+        assert db.fetchone()["countries"] == ["FR"]
+        # publications.countries mis à jour
+        db.execute("SELECT countries FROM publications WHERE id = %s", (pub_id,))
+        assert db.fetchone()["countries"] == ["FR"]
