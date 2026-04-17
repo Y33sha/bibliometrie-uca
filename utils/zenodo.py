@@ -24,6 +24,7 @@ def is_zenodo_doi(doi: str | None) -> bool:
 
 class ZenodoResolutionError(Exception):
     """Erreur temporaire de résolution Zenodo (rate-limit, timeout)."""
+
     pass
 
 
@@ -51,11 +52,10 @@ def resolve_zenodo_doi(doi: str) -> str | None:
             if elapsed < ZENODO_DELAY:
                 time.sleep(ZENODO_DELAY - elapsed)
 
-            resp = requests.get(f"{_API_BASE}/{record_id}", timeout=10,
-                                allow_redirects=True)
+            resp = requests.get(f"{_API_BASE}/{record_id}", timeout=10, allow_redirects=True)
             _last_request_time = time.time()
             if resp.status_code == 429:
-                wait = backoff * (2 ** attempt)
+                wait = backoff * (2**attempt)
                 logger.info(f"Zenodo 429 pour {doi}, attente {wait}s...")
                 time.sleep(wait)
                 continue

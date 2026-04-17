@@ -63,7 +63,7 @@ def fetch_orcids_batch(person_ids: list[int]) -> dict[int, str]:
         except (requests.RequestException, ValueError) as e:
             if attempt < 2:
                 wait = 2 ** (attempt + 1)
-                logger.warning(f"Erreur API (tentative {attempt+1}/3): {e} — attente {wait}s")
+                logger.warning(f"Erreur API (tentative {attempt + 1}/3): {e} — attente {wait}s")
                 time.sleep(wait)
             else:
                 logger.error(f"Échec après 3 tentatives: {e}")
@@ -85,13 +85,11 @@ def fetch_orcids_batch(person_ids: list[int]) -> dict[int, str]:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Moissonnage des ORCID depuis l'API personnes HAL"
+    parser = argparse.ArgumentParser(description="Moissonnage des ORCID depuis l'API personnes HAL")
+    parser.add_argument("--dry-run", action="store_true", help="Rapport sans écriture en base")
+    parser.add_argument(
+        "--batch", type=int, default=100, help="Nombre de person_ids par requête API (défaut: 100)"
     )
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Rapport sans écriture en base")
-    parser.add_argument("--batch", type=int, default=100,
-                        help="Nombre de person_ids par requête API (défaut: 100)")
     args = parser.parse_args()
 
     conn = get_connection()
@@ -124,7 +122,7 @@ def main():
         batch_size = args.batch
 
         for i in range(0, len(rows), batch_size):
-            batch = rows[i:i + batch_size]
+            batch = rows[i : i + batch_size]
             id_map = {pid: aid for aid, pid in batch}  # {hal_person_id: source_persons.id}
             person_ids = list(id_map.keys())
 
@@ -134,23 +132,29 @@ def main():
             if orcids and not args.dry_run:
                 for pid, orcid in orcids.items():
                     # 1. Mettre à jour source_persons.orcid
-                    cur.execute("""
+                    cur.execute(
+                        """
                         UPDATE source_persons
                         SET orcid = %s, updated_at = now()
                         WHERE source = 'hal'
                           AND (source_ids->>'hal_person_id')::int = %s
                           AND orcid IS NULL
-                    """, (orcid, pid))
+                    """,
+                        (orcid, pid),
+                    )
                     total_updated += cur.rowcount
 
                     # 2. Insérer dans person_identifiers (si person_id résolu)
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT person_id FROM source_persons
                         WHERE source = 'hal'
                           AND (source_ids->>'hal_person_id')::int = %s
                           AND person_id IS NOT NULL
                         LIMIT 1
-                    """, (pid,))
+                    """,
+                        (pid,),
+                    )
                     ha_row = cur.fetchone()
                     if ha_row:
                         add_identifier(cur, ha_row[0], "orcid", orcid, source="hal")

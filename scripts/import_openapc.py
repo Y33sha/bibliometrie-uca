@@ -81,25 +81,36 @@ def main():
             institution = row.get("institution") or None
             is_hybrid = row.get("is_hybrid", "").upper() == "TRUE"
 
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO apc_payments
                     (doi, amount_eur_ht, billing_year, pub_year,
                      publisher_name, journal_name, issn,
                      institution, source_file, publication_id,
                      remarks)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (doi, amount, billing_year, billing_year,
-                  publisher, journal, issn,
-                  institution, os.path.basename(args.csv_file), pub_id,
-                  "hybrid" if is_hybrid else None))
+            """,
+                (
+                    doi,
+                    amount,
+                    billing_year,
+                    billing_year,
+                    publisher,
+                    journal,
+                    issn,
+                    institution,
+                    os.path.basename(args.csv_file),
+                    pub_id,
+                    "hybrid" if is_hybrid else None,
+                ),
+            )
             inserted += 1
             existing_apc_dois.add(doi_lower)
 
     if not args.dry_run:
         conn.commit()
 
-    log.info("Matched : %d, Insérés : %d, Déjà existants : %d",
-             matched, inserted, skipped_existing)
+    log.info("Matched : %d, Insérés : %d, Déjà existants : %d", matched, inserted, skipped_existing)
     conn.close()
 
 

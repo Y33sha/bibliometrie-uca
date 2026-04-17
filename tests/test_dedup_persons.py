@@ -9,13 +9,18 @@ from services.persons import add_identifier, add_name_form, create_person
 
 # ── Helpers ──────────────────────────────────────────────────────
 
+
 def _insert_publication(db, title="Test Pub", pub_year=2024):
     """Crée une publication minimale."""
     from utils.normalize import normalize_text
-    db.execute("""
+
+    db.execute(
+        """
         INSERT INTO publications (title, title_normalized, doc_type, pub_year)
         VALUES (%s, %s, 'article', %s) RETURNING id
-    """, (title, normalize_text(title), pub_year))
+    """,
+        (title, normalize_text(title), pub_year),
+    )
     return db.fetchone()["id"]
 
 
@@ -25,37 +30,54 @@ def _insert_hal_author(db, full_name, hal_person_id=None, orcid=None, idhal=None
     last = parts[-1] if len(parts) >= 2 else full_name
     first = " ".join(parts[:-1]) if len(parts) >= 2 else None
     import json
+
     source_ids = {}
     if hal_person_id is not None:
         source_ids["hal_person_id"] = hal_person_id
     if idhal is not None:
         source_ids["idhal"] = idhal
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO source_persons (source, source_id, full_name, last_name, first_name,
                                     orcid, source_ids)
         VALUES ('hal', %s, %s, %s, %s, %s, %s) RETURNING id
-    """, (f"hal-{full_name}", full_name, last, first, orcid,
-          json.dumps(source_ids) if source_ids else None))
+    """,
+        (
+            f"hal-{full_name}",
+            full_name,
+            last,
+            first,
+            orcid,
+            json.dumps(source_ids) if source_ids else None,
+        ),
+    )
     return db.fetchone()["id"]
 
 
 def _insert_hal_document(db, halid, publication_id):
     """Crée un source_document minimal (source='hal')."""
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO source_publications (source, source_id, title, pub_year, publication_id)
         VALUES ('hal', %s, 'Test', 2024, %s) RETURNING id
-    """, (halid, publication_id))
+    """,
+        (halid, publication_id),
+    )
     return db.fetchone()["id"]
 
 
-def _insert_hal_authorship(db, source_publication_id, source_person_id, position=0,
-                           in_perimeter=True, person_id=None):
+def _insert_hal_authorship(
+    db, source_publication_id, source_person_id, position=0, in_perimeter=True, person_id=None
+):
     """Crée une source_authorship HAL."""
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position, in_perimeter, person_id)
         VALUES ('hal', %s, %s, %s, %s, %s) RETURNING id
-    """, (source_publication_id, source_person_id, position, in_perimeter, person_id))
+    """,
+        (source_publication_id, source_person_id, position, in_perimeter, person_id),
+    )
     return db.fetchone()["id"]
 
 
@@ -64,32 +86,47 @@ def _insert_oa_author(db, full_name, openalex_id, orcid=None):
     parts = full_name.strip().split()
     last = parts[-1] if len(parts) >= 2 else full_name
     first = " ".join(parts[:-1]) if len(parts) >= 2 else None
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO source_persons (source, source_id, full_name, last_name, first_name, orcid)
         VALUES ('openalex', %s, %s, %s, %s, %s) RETURNING id
-    """, (openalex_id, full_name, last, first, orcid))
+    """,
+        (openalex_id, full_name, last, first, orcid),
+    )
     return db.fetchone()["id"]
 
 
 def _insert_oa_document(db, openalex_id, publication_id):
     """Crée un source_document minimal (source='openalex')."""
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO source_publications (source, source_id, title, pub_year, publication_id)
         VALUES ('openalex', %s, 'Test', 2024, %s) RETURNING id
-    """, (openalex_id, publication_id))
+    """,
+        (openalex_id, publication_id),
+    )
     return db.fetchone()["id"]
 
 
-def _insert_oa_authorship(db, oa_document_id, oa_author_id, position=0,
-                          in_perimeter=True, person_id=None, raw_author_name=None):
+def _insert_oa_authorship(
+    db,
+    oa_document_id,
+    oa_author_id,
+    position=0,
+    in_perimeter=True,
+    person_id=None,
+    raw_author_name=None,
+):
     """Crée une source_authorship OpenAlex."""
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              in_perimeter, person_id, raw_author_name)
         VALUES ('openalex', %s, %s, %s, %s, %s, %s) RETURNING id
-    """, (oa_document_id, oa_author_id, position, in_perimeter, person_id,
-          raw_author_name))
+    """,
+        (oa_document_id, oa_author_id, position, in_perimeter, person_id, raw_author_name),
+    )
     return db.fetchone()["id"]
 
 
@@ -108,12 +145,13 @@ def _get_person_id_of_oa_authorship(db, authorship_id):
 def _get_person_identifiers(db, person_id):
     """Retourne les identifiants d'une personne : {(id_type, id_value), ...}"""
     db.execute(
-        "SELECT id_type, id_value FROM person_identifiers WHERE person_id = %s",
-        (person_id,))
+        "SELECT id_type, id_value FROM person_identifiers WHERE person_id = %s", (person_id,)
+    )
     return {(r["id_type"], r["id_value"]) for r in db.fetchall()}
 
 
 # ── Étape 0 : Comptes HAL ───────────────────────────────────────
+
 
 class TestStep0HalAccounts:
     def test_existing_person_propagates(self, db):
@@ -122,14 +160,14 @@ class TestStep0HalAccounts:
             get_all_unlinked_authorships,
             step0_hal_accounts,
         )
+
         pub1 = _insert_publication(db, "Pub 1")
         pub2 = _insert_publication(db, "Pub 2")
 
         # Personne existante + hal_author rattaché
         person_id = create_person(db, "Dupont", "Jean")
         ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=12345)
-        db.execute("UPDATE source_persons SET person_id = %s WHERE id = %s",
-                   (person_id, ha))
+        db.execute("UPDATE source_persons SET person_id = %s WHERE id = %s", (person_id, ha))
 
         hd1 = _insert_hal_document(db, "hal-001", pub1)
         hd2 = _insert_hal_document(db, "hal-002", pub2)
@@ -149,6 +187,7 @@ class TestStep0HalAccounts:
             get_all_unlinked_authorships,
             step0_hal_accounts,
         )
+
         pub = _insert_publication(db, "Pub vierge")
         ha = _insert_hal_author(db, "Népomucène Bensoussan", hal_person_id=99999)
         hd = _insert_hal_document(db, "hal-virgin", pub)
@@ -171,14 +210,16 @@ class TestStep0HalAccounts:
             step0_hal_accounts,
             step3_name_forms,
         )
+
         pub = _insert_publication(db)
 
         # Personne existante (créée par un import précédent)
         person_id = create_person(db, "Bensoussan", "Népomucène")
 
         # Nouveau hal_author vierge, même nom
-        ha = _insert_hal_author(db, "Népomucène Bensoussan",
-                                hal_person_id=88888, orcid="0000-0001-1111-2222")
+        ha = _insert_hal_author(
+            db, "Népomucène Bensoussan", hal_person_id=88888, orcid="0000-0001-1111-2222"
+        )
         hd = _insert_hal_document(db, "hal-nepo", pub)
         has_id = _insert_hal_authorship(db, hd, ha, position=0)
 
@@ -197,6 +238,7 @@ class TestStep0HalAccounts:
 
 # ── Étape 1 : Cross-source ──────────────────────────────────────
 
+
 class TestStep1CrossSource:
     def test_same_pub_same_position_compatible_name(self, db):
         """Même publi, même position, nom compatible → rattache à la même personne."""
@@ -205,6 +247,7 @@ class TestStep1CrossSource:
             load_linked_authorships_by_pub,
             step1_cross_source,
         )
+
         pub = _insert_publication(db, "Shared Publication")
 
         # Personne existante rattachée via HAL
@@ -216,8 +259,7 @@ class TestStep1CrossSource:
         # Authorship OA non rattachée, même publi, même position
         oa_author = _insert_oa_author(db, "J Dupont", "A111")
         oa_doc = _insert_oa_document(db, "W111", pub)
-        oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=3,
-                                      raw_author_name="J Dupont")
+        oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=3, raw_author_name="J Dupont")
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
@@ -233,6 +275,7 @@ class TestStep1CrossSource:
             load_linked_authorships_by_pub,
             step1_cross_source,
         )
+
         pub = _insert_publication(db)
 
         person_id = create_person(db, "Dupont", "Jean")
@@ -241,11 +284,9 @@ class TestStep1CrossSource:
         _insert_hal_authorship(db, hd, ha, position=0, person_id=person_id)
 
         # OA authorship avec ORCID, même publi, même position
-        oa_author = _insert_oa_author(db, "J Dupont", "A-id1",
-                                      orcid="0000-0001-9999-8888")
+        oa_author = _insert_oa_author(db, "J Dupont", "A-id1", orcid="0000-0001-9999-8888")
         oa_doc = _insert_oa_document(db, "W-id1", pub)
-        _insert_oa_authorship(db, oa_doc, oa_author, position=0,
-                              raw_author_name="J Dupont")
+        _insert_oa_authorship(db, oa_doc, oa_author, position=0, raw_author_name="J Dupont")
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
@@ -262,6 +303,7 @@ class TestStep1CrossSource:
             load_linked_authorships_by_pub,
             step1_cross_source,
         )
+
         pub = _insert_publication(db)
 
         person_id = create_person(db, "Dupont", "Jean")
@@ -271,8 +313,7 @@ class TestStep1CrossSource:
 
         oa_author = _insert_oa_author(db, "J Dupont", "A222")
         oa_doc = _insert_oa_document(db, "W222", pub)
-        oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=5,
-                                      raw_author_name="J Dupont")
+        oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=5, raw_author_name="J Dupont")
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
@@ -284,6 +325,7 @@ class TestStep1CrossSource:
 
 # ── Étape 2 : ORCID connu ───────────────────────────────────────
 
+
 class TestStep2Orcid:
     def test_known_orcid_links(self, db):
         """ORCID déjà en base (confirmed) → rattache à la bonne personne."""
@@ -291,16 +333,22 @@ class TestStep2Orcid:
             get_all_unlinked_authorships,
             step2_orcid,
         )
+
         pub = _insert_publication(db)
         person_id = create_person(db, "Dupont", "Jean")
-        add_identifier(db, person_id, "orcid", "0000-0001-2345-6789",
-                       source="hal", status="confirmed")
+        add_identifier(
+            db, person_id, "orcid", "0000-0001-2345-6789", source="hal", status="confirmed"
+        )
 
         oa_author = _insert_oa_author(db, "J Dupont", "A333", orcid="0000-0001-2345-6789")
         oa_doc = _insert_oa_document(db, "W333", pub)
-        oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=0,
-                                      raw_author_name="J Dupont",
-)
+        oa_as = _insert_oa_authorship(
+            db,
+            oa_doc,
+            oa_author,
+            position=0,
+            raw_author_name="J Dupont",
+        )
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
@@ -314,17 +362,17 @@ class TestStep2Orcid:
             get_all_unlinked_authorships,
             step2_orcid,
         )
+
         pub = _insert_publication(db)
         person_id = create_person(db, "Dupont", "Jean")
-        add_identifier(db, person_id, "orcid", "0000-0001-2345-6789",
-                       source="hal", status="confirmed")
+        add_identifier(
+            db, person_id, "orcid", "0000-0001-2345-6789", source="hal", status="confirmed"
+        )
 
         # HAL author avec même ORCID + un IdRef
-        ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=None,
-                                orcid="0000-0001-2345-6789")
+        ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=None, orcid="0000-0001-2345-6789")
         # Ajouter idref manuellement (helper ne le gère pas)
-        db.execute("UPDATE source_persons SET idref = %s WHERE id = %s",
-                   ("123456789", ha))
+        db.execute("UPDATE source_persons SET idref = %s WHERE id = %s", ("123456789", ha))
 
         hd = _insert_hal_document(db, "hal-orcid-idref", pub)
         _insert_hal_authorship(db, hd, ha, position=0)
@@ -342,16 +390,22 @@ class TestStep2Orcid:
             get_all_unlinked_authorships,
             step2_orcid,
         )
+
         pub = _insert_publication(db)
         person_id = create_person(db, "Dupont", "Jean")
-        add_identifier(db, person_id, "orcid", "0000-0001-9999-0000",
-                       source="hal", status="rejected")
+        add_identifier(
+            db, person_id, "orcid", "0000-0001-9999-0000", source="hal", status="rejected"
+        )
 
         oa_author = _insert_oa_author(db, "J Dupont", "A444")
         oa_doc = _insert_oa_document(db, "W444", pub)
-        oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=0,
-                                      raw_author_name="J Dupont",
-)
+        oa_as = _insert_oa_authorship(
+            db,
+            oa_doc,
+            oa_author,
+            position=0,
+            raw_author_name="J Dupont",
+        )
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
@@ -365,12 +419,17 @@ class TestStep2Orcid:
             get_all_unlinked_authorships,
             step2_orcid,
         )
+
         pub = _insert_publication(db)
         oa_author = _insert_oa_author(db, "Nobody", "A555", orcid="0000-9999-9999-9999")
         oa_doc = _insert_oa_document(db, "W555", pub)
-        oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=0,
-                                      raw_author_name="Nobody",
-)
+        oa_as = _insert_oa_authorship(
+            db,
+            oa_doc,
+            oa_author,
+            position=0,
+            raw_author_name="Nobody",
+        )
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
@@ -381,6 +440,7 @@ class TestStep2Orcid:
 
 # ── Étape 3 : Name forms ────────────────────────────────────────
 
+
 class TestStep3NameForms:
     def test_known_name_form_links(self, db):
         """Forme de nom connue, mappée à 1 personne → rattache."""
@@ -389,14 +449,16 @@ class TestStep3NameForms:
             load_name_form_map,
             step3_name_forms,
         )
+
         pub = _insert_publication(db)
         person_id = create_person(db, "Martin", "Pierre")
         # create_person crée déjà les name_forms via refresh_person_name_forms
 
         oa_author = _insert_oa_author(db, "Pierre Martin", "A666")
         oa_doc = _insert_oa_document(db, "W666", pub)
-        oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=0,
-                                      raw_author_name="Pierre Martin")
+        oa_as = _insert_oa_authorship(
+            db, oa_doc, oa_author, position=0, raw_author_name="Pierre Martin"
+        )
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
@@ -412,6 +474,7 @@ class TestStep3NameForms:
             load_name_form_map,
             step3_name_forms,
         )
+
         pub = _insert_publication(db)
         pid1 = create_person(db, "Dupont", "Jean")
         pid2 = create_person(db, "Dupont", "Jacques")
@@ -421,8 +484,7 @@ class TestStep3NameForms:
 
         oa_author = _insert_oa_author(db, "J Dupont", "A777")
         oa_doc = _insert_oa_document(db, "W777", pub)
-        oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=0,
-                                      raw_author_name="J Dupont")
+        oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=0, raw_author_name="J Dupont")
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
@@ -439,11 +501,13 @@ class TestStep3NameForms:
             load_name_form_map,
             step3_name_forms,
         )
+
         pub = _insert_publication(db)
         oa_author = _insert_oa_author(db, "Inconnu Nouveau", "A888")
         oa_doc = _insert_oa_document(db, "W888", pub)
-        oa_as = _insert_oa_authorship(db, oa_doc, oa_author, position=0,
-                                      raw_author_name="Inconnu Nouveau")
+        oa_as = _insert_oa_authorship(
+            db, oa_doc, oa_author, position=0, raw_author_name="Inconnu Nouveau"
+        )
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()

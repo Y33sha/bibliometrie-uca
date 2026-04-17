@@ -21,6 +21,7 @@ BUILD_DIR = os.path.join(PROJECT_ROOT, "frontend", "build")
 
 class SPAStaticFiles(StaticFiles):
     """Sert les fichiers statiques avec fallback index.html pour le routage SPA."""
+
     async def get_response(self, path, scope):
         try:
             return await super().get_response(path, scope)
@@ -42,7 +43,9 @@ def _verify_token(token: str) -> str | None:
     if not token or "." not in token:
         return None
     payload, sig = token.rsplit(".", 1)
-    expected = hmac.new(settings.session_secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    expected = hmac.new(
+        settings.session_secret.encode(), payload.encode(), hashlib.sha256
+    ).hexdigest()
     if not hmac.compare_digest(sig, expected):
         return None
     try:
@@ -80,9 +83,9 @@ def _get_pool():
         db_args = settings.db_args
         if os.environ.get("BIBLIOMETRIE_SANDBOX") == "1":
             db_args["dbname"] = "bibliometrie_sandbox"
-        _pool = ThreadedConnectionPool(minconn=settings.db_pool_min,
-                                       maxconn=settings.db_pool_max,
-                                       **db_args)
+        _pool = ThreadedConnectionPool(
+            minconn=settings.db_pool_min, maxconn=settings.db_pool_max, **db_args
+        )
     return _pool
 
 

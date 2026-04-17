@@ -13,21 +13,23 @@ import unicodedata
 # Caractères Unicode qui doivent être remplacés par leur équivalent ASCII
 # avant la suppression des non-ASCII (sinon ils disparaissent silencieusement
 # et collent les mots : "Abeywickrama‐Samarakoon" → "abeywickramasamarakoon")
-_UNICODE_TO_ASCII = str.maketrans({
-    '\u2010': '-',  # HYPHEN
-    '\u2011': '-',  # NON-BREAKING HYPHEN
-    '\u2012': '-',  # FIGURE DASH
-    '\u2013': '-',  # EN DASH
-    '\u2014': '-',  # EM DASH
-    '\u2015': '-',  # HORIZONTAL BAR
-    '\u2018': "'",  # LEFT SINGLE QUOTATION MARK
-    '\u2019': "'",  # RIGHT SINGLE QUOTATION MARK (apostrophe typographique)
-    '\u201A': "'",  # SINGLE LOW-9 QUOTATION MARK
-    '\u201C': '"',  # LEFT DOUBLE QUOTATION MARK
-    '\u201D': '"',  # RIGHT DOUBLE QUOTATION MARK
-    '\u2032': "'",  # PRIME
-    '\u00AD': '-',  # SOFT HYPHEN
-})
+_UNICODE_TO_ASCII = str.maketrans(
+    {
+        "\u2010": "-",  # HYPHEN
+        "\u2011": "-",  # NON-BREAKING HYPHEN
+        "\u2012": "-",  # FIGURE DASH
+        "\u2013": "-",  # EN DASH
+        "\u2014": "-",  # EM DASH
+        "\u2015": "-",  # HORIZONTAL BAR
+        "\u2018": "'",  # LEFT SINGLE QUOTATION MARK
+        "\u2019": "'",  # RIGHT SINGLE QUOTATION MARK (apostrophe typographique)
+        "\u201a": "'",  # SINGLE LOW-9 QUOTATION MARK
+        "\u201c": '"',  # LEFT DOUBLE QUOTATION MARK
+        "\u201d": '"',  # RIGHT DOUBLE QUOTATION MARK
+        "\u2032": "'",  # PRIME
+        "\u00ad": "-",  # SOFT HYPHEN
+    }
+)
 
 
 def normalize_text(text: str) -> str:

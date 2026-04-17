@@ -52,7 +52,16 @@ TABLES = [
     },
     {
         "table": "structures",
-        "columns": ["id", "code", "name", "acronym", "structure_type", "ror_id", "rnsr_id", "hal_collection"],
+        "columns": [
+            "id",
+            "code",
+            "name",
+            "acronym",
+            "structure_type",
+            "ror_id",
+            "rnsr_id",
+            "hal_collection",
+        ],
         "order": "id",
     },
     {
@@ -67,7 +76,14 @@ TABLES = [
     },
     {
         "table": "structure_name_forms",
-        "columns": ["id", "structure_id", "form_text", "requires_context_of", "is_word_boundary", "is_excluding"],
+        "columns": [
+            "id",
+            "structure_id",
+            "form_text",
+            "requires_context_of",
+            "is_word_boundary",
+            "is_excluding",
+        ],
         "order": "id",
     },
 ]
@@ -80,6 +96,7 @@ def escape_sql(value, is_jsonb=False) -> str:
     (nécessaire pour les colonnes JSONB de PostgreSQL).
     """
     import json
+
     if value is None:
         return "NULL"
     if is_jsonb:
@@ -148,7 +165,9 @@ def generate_seed(cur, output_path: str):
 
         # Recaler les séquences pour les tables avec id serial
         if "id" in columns:
-            lines.append(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), (SELECT COALESCE(MAX(id), 0) FROM {table}));")
+            lines.append(
+                f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), (SELECT COALESCE(MAX(id), 0) FROM {table}));"
+            )
 
         lines.append("")
 
@@ -167,8 +186,12 @@ def generate_seed(cur, output_path: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Génère db/seed.sql depuis la base courante")
-    parser.add_argument("--output", default=os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "db", "seed.sql"))
+    parser.add_argument(
+        "--output",
+        default=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "db", "seed.sql"
+        ),
+    )
     args = parser.parse_args()
 
     conn = get_connection()

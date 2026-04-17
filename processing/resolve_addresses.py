@@ -32,8 +32,8 @@ logger = setup_logger("resolve_addresses", os.path.join(os.path.dirname(__file__
 BATCH_SIZE = 1000
 
 
-
 # ─── Chargement des données ──────────────────────────────────────
+
 
 def load_forms(cur):
     """Charge toutes les formes depuis structure_name_forms."""
@@ -52,14 +52,13 @@ def load_forms(cur):
     return forms
 
 
-
-
 def load_perimeter(cur):
     """Construit l'ensemble des structure_ids dans le périmètre."""
     return get_persons_structure_ids(cur)
 
 
 # ─── Matching ────────────────────────────────────────────────────
+
 
 def match_form_in_text(form, text_normalized):
     """Vérifie si une forme matche dans le texte normalisé.
@@ -140,15 +139,19 @@ def resolve_address(text_normalized, forms, forms_by_structure):
 
 # ─── Main ────────────────────────────────────────────────────────
 
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--reset", action="store_true",
-                        help="Supprime les affiliations auto")
-    parser.add_argument("--rerun", action="store_true",
-                        help="Reset auto puis relance la résolution complète")
-    parser.add_argument("--mode", choices=["full", "weekly", "monthly", "daily"],
-                        default="full",
-                        help="Mode d'exécution (daily = incrémental)")
+    parser.add_argument("--reset", action="store_true", help="Supprime les affiliations auto")
+    parser.add_argument(
+        "--rerun", action="store_true", help="Reset auto puis relance la résolution complète"
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["full", "weekly", "monthly", "daily"],
+        default="full",
+        help="Mode d'exécution (daily = incrémental)",
+    )
     args = parser.parse_args()
 
     conn = get_connection()
@@ -193,9 +196,7 @@ def main():
     logger.info(f"  {total} adresses à résoudre")
 
     if total > 0:
-        process_addresses(
-            cur, conn, rows, forms, forms_by_structure, perimeter
-        )
+        process_addresses(cur, conn, rows, forms, forms_by_structure, perimeter)
 
     conn.close()
 
@@ -236,29 +237,38 @@ def process_addresses(cur, conn, rows, forms, forms_by_structure, perimeter):
             obsolete_params = (addr_id,)
 
         # Non confirmés : supprimer
-        cur.execute(f"""
+        cur.execute(
+            f"""
             DELETE FROM address_structures
             WHERE {obsolete_condition} AND is_confirmed IS NULL
-        """, obsolete_params)
+        """,
+            obsolete_params,
+        )
         removed_count += cur.rowcount
 
         # Confirmés/rejetés : retirer le flag de détection auto
-        cur.execute(f"""
+        cur.execute(
+            f"""
             UPDATE address_structures
             SET matched_form_id = NULL
             WHERE {obsolete_condition} AND is_confirmed IS NOT NULL
-        """, obsolete_params)
+        """,
+            obsolete_params,
+        )
 
         # Insérer/mettre à jour les structures détectées
         for structure_id, form_id in matches:
             affil_count += 1
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO address_structures
                     (address_id, structure_id, matched_form_id)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (address_id, structure_id)
                     DO UPDATE SET matched_form_id = EXCLUDED.matched_form_id
-            """, (addr_id, structure_id, form_id))
+            """,
+                (addr_id, structure_id, form_id),
+            )
 
         cur.execute("UPDATE addresses SET resolved_at = now() WHERE id = %s", (addr_id,))
         processed += 1
@@ -279,7 +289,7 @@ def process_addresses(cur, conn, rows, forms, forms_by_structure, perimeter):
     if total > 0:
         logger.info(f"\n=== Terminé en {elapsed:.1f}s ===")
         logger.info(f"  Adresses traitées    : {processed}")
-        logger.info(f"  UCA                  : {uca_count} ({100*uca_count/processed:.1f}%)")
+        logger.info(f"  UCA                  : {uca_count} ({100 * uca_count / processed:.1f}%)")
         logger.info(f"  Affiliations créées  : {affil_count}")
         logger.info(f"  Obsolètes supprimés  : {removed_count}")
 

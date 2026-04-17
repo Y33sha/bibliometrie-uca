@@ -68,13 +68,17 @@ def find_duplicate_journals(cur):
 def merge_publishers(cur, target_id: int, source_id: int):
     """Fusionne un publisher source dans un publisher cible."""
     # Transférer les journaux
-    cur.execute("UPDATE journals SET publisher_id = %s WHERE publisher_id = %s",
-                (target_id, source_id))
+    cur.execute(
+        "UPDATE journals SET publisher_id = %s WHERE publisher_id = %s", (target_id, source_id)
+    )
     # Transférer les apc_payments
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE apc_payments SET publisher_id = %s
         WHERE publisher_id = %s
-    """, (target_id, source_id))
+    """,
+        (target_id, source_id),
+    )
     # Récupérer l'openalex_id de la source avant de le supprimer
     cur.execute("SELECT openalex_id FROM publishers WHERE id = %s", (source_id,))
     source_oaid = cur.fetchone()["openalex_id"]
@@ -82,35 +86,50 @@ def merge_publishers(cur, target_id: int, source_id: int):
     cur.execute("UPDATE publishers SET openalex_id = NULL WHERE id = %s", (source_id,))
     # Enrichir la cible avec openalex_id (seulement si la cible n'en a pas)
     if source_oaid:
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE publishers SET openalex_id = %s
             WHERE id = %s AND openalex_id IS NULL
-        """, (source_oaid, target_id))
+        """,
+            (source_oaid, target_id),
+        )
     # Transférer les name forms (supprimer les doublons d'abord)
-    cur.execute("""
+    cur.execute(
+        """
         DELETE FROM publisher_name_forms
         WHERE publisher_id = %s AND form_normalized IN (
             SELECT form_normalized FROM publisher_name_forms WHERE publisher_id = %s
         )
-    """, (source_id, target_id))
-    cur.execute("""
+    """,
+        (source_id, target_id),
+    )
+    cur.execute(
+        """
         UPDATE publisher_name_forms SET publisher_id = %s
         WHERE publisher_id = %s
-    """, (target_id, source_id))
+    """,
+        (target_id, source_id),
+    )
     # Transférer les journal_name_forms qui référencent ce publisher
     # Supprimer celles qui créeraient un conflit unique
-    cur.execute("""
+    cur.execute(
+        """
         DELETE FROM journal_name_forms
         WHERE publisher_id = %s
           AND (form_normalized, %s::integer) IN (
               SELECT form_normalized, publisher_id
               FROM journal_name_forms WHERE publisher_id = %s
           )
-    """, (source_id, target_id, target_id))
-    cur.execute("""
+    """,
+        (source_id, target_id, target_id),
+    )
+    cur.execute(
+        """
         UPDATE journal_name_forms SET publisher_id = %s
         WHERE publisher_id = %s
-    """, (target_id, source_id))
+    """,
+        (target_id, source_id),
+    )
     # Supprimer la source
     cur.execute("DELETE FROM publishers WHERE id = %s", (source_id,))
 
@@ -118,20 +137,25 @@ def merge_publishers(cur, target_id: int, source_id: int):
 def merge_journals(cur, target_id: int, source_id: int):
     """Fusionne un journal source dans un journal cible."""
     # Transférer les publications
-    cur.execute("UPDATE publications SET journal_id = %s WHERE journal_id = %s",
-                (target_id, source_id))
+    cur.execute(
+        "UPDATE publications SET journal_id = %s WHERE journal_id = %s", (target_id, source_id)
+    )
     # Transférer les apc_payments
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE apc_payments SET journal_id = %s
         WHERE journal_id = %s
-    """, (target_id, source_id))
+    """,
+        (target_id, source_id),
+    )
     # Récupérer les métadonnées de la source avant de supprimer son openalex_id
     cur.execute("SELECT openalex_id FROM journals WHERE id = %s", (source_id,))
     source_oaid = cur.fetchone()["openalex_id"]
     # Supprimer l'openalex_id de la source pour éviter le conflit unique
     cur.execute("UPDATE journals SET openalex_id = NULL WHERE id = %s", (source_id,))
     # Enrichir la cible
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE journals dest SET
             issn = COALESCE(dest.issn, src.issn),
             eissn = COALESCE(dest.eissn, src.eissn),
@@ -140,24 +164,35 @@ def merge_journals(cur, target_id: int, source_id: int):
             oa_model = COALESCE(dest.oa_model, src.oa_model)
         FROM journals src
         WHERE dest.id = %s AND src.id = %s
-    """, (target_id, source_id))
+    """,
+        (target_id, source_id),
+    )
     if source_oaid:
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE journals SET openalex_id = %s
             WHERE id = %s AND openalex_id IS NULL
-        """, (source_oaid, target_id))
+        """,
+            (source_oaid, target_id),
+        )
     # Transférer les name forms (supprimer celles qui créeraient un conflit)
-    cur.execute("""
+    cur.execute(
+        """
         DELETE FROM journal_name_forms
         WHERE journal_id = %s AND (form_normalized, publisher_id) IN (
             SELECT form_normalized, publisher_id
             FROM journal_name_forms WHERE journal_id = %s
         )
-    """, (source_id, target_id))
-    cur.execute("""
+    """,
+        (source_id, target_id),
+    )
+    cur.execute(
+        """
         UPDATE journal_name_forms SET journal_id = %s
         WHERE journal_id = %s
-    """, (target_id, source_id))
+    """,
+        (target_id, source_id),
+    )
     # Supprimer la source
     cur.execute("DELETE FROM journals WHERE id = %s", (source_id,))
 
@@ -182,7 +217,9 @@ def main():
     for name_norm, ids in dup_pubs:
         target = ids[0]
         for source in ids[1:]:
-            print(f"  {'MERGE' if args.apply else 'DRY'} publisher {source} → {target} ({name_norm})")
+            print(
+                f"  {'MERGE' if args.apply else 'DRY'} publisher {source} → {target} ({name_norm})"
+            )
             if args.apply:
                 merge_publishers(cur, target, source)
             pub_merged += 1
@@ -195,9 +232,12 @@ def main():
 
     for title_norm, ids in dup_jnls:
         # Récupérer les ISSN de chaque journal du groupe
-        cur.execute("""
+        cur.execute(
+            """
             SELECT id, issn, eissn, issnl, openalex_id FROM journals WHERE id = ANY(%s) ORDER BY id
-        """, (list(ids),))
+        """,
+            (list(ids),),
+        )
         rows = cur.fetchall()
 
         # Fusionner si :
@@ -207,17 +247,20 @@ def main():
         all_eissns = set()
         all_issnls = set()
         for r in rows:
-            if r["issn"]: all_issns.add(r["issn"])
-            if r["eissn"]: all_eissns.add(r["eissn"])
-            if r["issnl"]: all_issnls.add(r["issnl"])
+            if r["issn"]:
+                all_issns.add(r["issn"])
+            if r["eissn"]:
+                all_eissns.add(r["eissn"])
+            if r["issnl"]:
+                all_issnls.add(r["issnl"])
 
         # Vérifier qu'il y a un recouvrement entre les ISSN des différentes entrées
         all_identifiers = all_issns | all_eissns | all_issnls
         has_cross_match = bool(
-            (all_issns & all_eissns) or   # issn de l'un = eissn de l'autre
-            (all_issns & all_issnls) or    # issn de l'un = issnl de l'autre
-            (all_eissns & all_issnls) or   # eissn de l'un = issnl de l'autre
-            len(all_issns) <= 1            # même issn ou un seul renseigné
+            (all_issns & all_eissns)  # issn de l'un = eissn de l'autre
+            or (all_issns & all_issnls)  # issn de l'un = issnl de l'autre
+            or (all_eissns & all_issnls)  # eissn de l'un = issnl de l'autre
+            or len(all_issns) <= 1  # même issn ou un seul renseigné
         )
 
         if not has_cross_match and len(all_issns) > 1:
@@ -226,13 +269,17 @@ def main():
 
         safe_merges.append((title_norm, ids))
 
-    print(f"\n=== Journals : {len(safe_merges)} groupes fusionnables "
-          f"({jnl_skipped} ignorés car ISSN divergents) ===")
+    print(
+        f"\n=== Journals : {len(safe_merges)} groupes fusionnables "
+        f"({jnl_skipped} ignorés car ISSN divergents) ==="
+    )
 
     for title_norm, ids in safe_merges:
         target = ids[0]
         for source in ids[1:]:
-            print(f"  {'MERGE' if args.apply else 'DRY'} journal {source} → {target} ({title_norm[:50]})")
+            print(
+                f"  {'MERGE' if args.apply else 'DRY'} journal {source} → {target} ({title_norm[:50]})"
+            )
             if args.apply:
                 merge_journals(cur, target, source)
             jnl_merged += 1

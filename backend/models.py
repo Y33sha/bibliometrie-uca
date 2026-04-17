@@ -6,12 +6,14 @@ from pydantic import BaseModel
 
 # ----- Auth -----
 
+
 class LoginRequest(BaseModel):
     username: str
     password: str
 
 
 # ----- Addresses -----
+
 
 class ReviewAction(BaseModel):
     structure_id: int
@@ -42,6 +44,7 @@ class BatchSetCountry(BaseModel):
 
 
 # ----- Structures -----
+
 
 class StructureCreate(BaseModel):
     code: str
@@ -87,6 +90,7 @@ class NameFormUpdate(BaseModel):
 
 # ----- Journals / Publishers -----
 
+
 class JournalUpdate(BaseModel):
     title: str | None = None
     issn: str | None = None
@@ -116,6 +120,7 @@ class MergeRequest(BaseModel):
 
 # ----- Publications -----
 
+
 class MergePublications(BaseModel):
     target_id: int
     source_id: int
@@ -132,13 +137,14 @@ class ExcludeSourceAuthorship(BaseModel):
 
 # ----- Persons -----
 
+
 class LinkPersonAuthor(BaseModel):
     author_id: int
     source: str  # 'hal' or 'openalex'
 
 
 class AddIdentifier(BaseModel):
-    id_type: str   # 'orcid' or 'idhal'
+    id_type: str  # 'orcid' or 'idhal'
     id_value: str
 
 

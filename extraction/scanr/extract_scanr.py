@@ -31,8 +31,7 @@ from utils.app_config import (
 logger = setup_logger("extract_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def build_query(year: int, affiliation_ids: list[str],
-                search_after: list | None = None) -> dict:
+def build_query(year: int, affiliation_ids: list[str], search_after: list | None = None) -> dict:
     """Construit la requête Elasticsearch pour ScanR."""
     query = {
         "size": SCANR_PER_PAGE,
@@ -40,10 +39,7 @@ def build_query(year: int, affiliation_ids: list[str],
         "query": {
             "bool": {
                 "must": [{"term": {"year": year}}],
-                "should": [
-                    {"term": {"affiliations.id.keyword": aid}}
-                    for aid in affiliation_ids
-                ],
+                "should": [{"term": {"affiliations.id.keyword": aid}} for aid in affiliation_ids],
                 "minimum_should_match": 1,
             }
         },
@@ -74,9 +70,15 @@ def fetch_page(url: str, auth: tuple, query: dict) -> dict:
     return resp.json()
 
 
-def extract_year(conn, url: str, auth: tuple, year: int,
-                 affiliation_ids: list[str], existing_ids: set,
-                 dry_run: bool = False) -> tuple[int, int, int]:
+def extract_year(
+    conn,
+    url: str,
+    auth: tuple,
+    year: int,
+    affiliation_ids: list[str],
+    existing_ids: set,
+    dry_run: bool = False,
+) -> tuple[int, int, int]:
     """Extrait toutes les publications d'une année. Retourne (total, insérés, mis à jour)."""
     search_after = None
     inserted = 0
@@ -114,19 +116,25 @@ def extract_year(conn, url: str, auth: tuple, year: int,
 
             if scanr_id in existing_ids:
                 # Mettre à jour si le hash a changé
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE staging
                     SET raw_data = %s, doi = %s, raw_hash = %s, last_seen_at = now()
                     WHERE source = 'scanr' AND source_id = %s AND (raw_hash IS DISTINCT FROM %s)
-                """, (Json(doc), doi, raw_hash, scanr_id, raw_hash))
+                """,
+                    (Json(doc), doi, raw_hash, scanr_id, raw_hash),
+                )
                 if cur.rowcount:
                     updated += 1
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
                     VALUES ('scanr', %s, %s, %s, %s)
                     ON CONFLICT (source, source_id) DO NOTHING
-                """, (scanr_id, doi, Json(doc), raw_hash))
+                """,
+                    (scanr_id, doi, Json(doc), raw_hash),
+                )
                 if cur.rowcount:
                     inserted += 1
                     existing_ids.add(scanr_id)
@@ -156,8 +164,9 @@ def main():
     years = [args.year] if args.year else get_years(cur)
     affiliation_ids = get_scanr_affiliation_ids(cur)
     username, password = get_scanr_credentials(cur)
-    url = get_api_base_urls(cur).get("scanr",
-          "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search")
+    url = get_api_base_urls(cur).get(
+        "scanr", "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search"
+    )
     auth = (username, password)
 
     logger.info(f"=== Extraction ScanR : années {years}, {len(affiliation_ids)} structures ===")
@@ -174,8 +183,7 @@ def main():
 
     for year in years:
         total, inserted, updated = extract_year(
-            conn, url, auth, year, affiliation_ids, existing_ids,
-            dry_run=args.dry_run
+            conn, url, auth, year, affiliation_ids, existing_ids, dry_run=args.dry_run
         )
         grand_total += total
         grand_inserted += inserted

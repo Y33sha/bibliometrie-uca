@@ -18,9 +18,11 @@ ALL_SOURCES_SET = frozenset(ALL_SOURCES)
 BIBLIO_SOURCES = ("hal", "openalex", "wos", "scanr")
 BIBLIO_SOURCES_SET = frozenset(BIBLIO_SOURCES)
 
+
 def _to_sql(sources: tuple) -> str:
     """Construit une clause SQL IN à partir d'un tuple de sources."""
     return "(" + ", ".join(f"'{s}'" for s in sources) + ")"
+
 
 # Sources avec des auteurs exploitables (noms, identifiants, affiliations)
 AUTHOR_SOURCES = ALL_SOURCES

@@ -43,7 +43,8 @@ def choose_target(cur, pub_ids):
 
     Priorité : celle avec DOI > celle avec le plus de source_publications > id le plus bas.
     """
-    cur.execute("""
+    cur.execute(
+        """
         SELECT p.id, p.doi,
                (SELECT COUNT(*) FROM source_publications sd WHERE sd.publication_id = p.id) AS sd_count
         FROM publications p
@@ -52,16 +53,15 @@ def choose_target(cur, pub_ids):
             (p.doi IS NOT NULL AND p.doi ~ '^10\\.') DESC,
             (SELECT COUNT(*) FROM source_publications sd WHERE sd.publication_id = p.id) DESC,
             p.id ASC
-    """, (pub_ids,))
+    """,
+        (pub_ids,),
+    )
     return cur.fetchall()
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Fusionne les publications par NNT (cross-source)"
-    )
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Lister sans fusionner")
+    parser = argparse.ArgumentParser(description="Fusionne les publications par NNT (cross-source)")
+    parser.add_argument("--dry-run", action="store_true", help="Lister sans fusionner")
     args = parser.parse_args()
 
     conn = get_connection()

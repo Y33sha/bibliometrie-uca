@@ -50,8 +50,9 @@ def fetch_unpaywall(doi: str) -> str | None:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=0, help="Limiter le nombre de DOI")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Rapport CSV uniquement, sans modifier la base")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Rapport CSV uniquement, sans modifier la base"
+    )
     args = parser.parse_args()
 
     conn = psycopg2.connect(**settings.db_args)
@@ -88,8 +89,10 @@ def main():
 
         for i, pub in enumerate(pubs):
             if i > 0 and i % 500 == 0:
-                print(f"  {i}/{total} — {divergences} divergences, "
-                      f"{matches} identiques, {not_found} non trouvés")
+                print(
+                    f"  {i}/{total} — {divergences} divergences, "
+                    f"{matches} identiques, {not_found} non trouvés"
+                )
 
             time.sleep(UNPAYWALL_DELAY)
             upw = fetch_unpaywall(pub["doi"])
@@ -114,21 +117,26 @@ def main():
                     if updates % 200 == 0:
                         conn.commit()
 
-            writer.writerow([
-                pub["id"], pub["doi"], pub["oa_status"], upw,
-                "ok" if is_match else "DIFF",
-            ])
+            writer.writerow(
+                [
+                    pub["id"],
+                    pub["doi"],
+                    pub["oa_status"],
+                    upw,
+                    "ok" if is_match else "DIFF",
+                ]
+            )
 
     if not args.dry_run:
         conn.commit()
 
     conn.close()
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"Résultats audit ({total} publications)")
-    print(f"  Identiques       : {matches:>6d}  ({100*matches/total:.1f}%)")
-    print(f"  Divergences      : {divergences:>6d}  ({100*divergences/total:.1f}%)")
-    print(f"  Non trouvés      : {not_found:>6d}  ({100*not_found/total:.1f}%)")
+    print(f"  Identiques       : {matches:>6d}  ({100 * matches / total:.1f}%)")
+    print(f"  Divergences      : {divergences:>6d}  ({100 * divergences / total:.1f}%)")
+    print(f"  Non trouvés      : {not_found:>6d}  ({100 * not_found / total:.1f}%)")
     if not args.dry_run:
         print(f"  Mis à jour       : {updates:>6d}")
     print(f"\nRapport CSV : {report_path}")

@@ -23,12 +23,15 @@ def _get_or_create_address(cur, text: str) -> int | None:
         return addr_id
 
     norm = normalize_text(text)
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO addresses (raw_text, normalized_text)
         VALUES (%s, %s)
         ON CONFLICT (md5(raw_text)) DO NOTHING
         RETURNING id
-    """, (text, norm))
+    """,
+        (text, norm),
+    )
     row = cur.fetchone()
     if row:
         addr_id = row[0] if isinstance(row, tuple) else row["id"]
@@ -42,8 +45,9 @@ def _get_or_create_address(cur, text: str) -> int | None:
     return addr_id
 
 
-def link_addresses(cur, authorship_id: int, addr_texts: list[str],
-                   countries: list[str] | None = None) -> int:
+def link_addresses(
+    cur, authorship_id: int, addr_texts: list[str], countries: list[str] | None = None
+) -> int:
     """Crée les adresses et les liens pour une authorship.
 
     addr_texts : liste de textes d'adresses individuels (déjà splittés).
@@ -67,16 +71,22 @@ def link_addresses(cur, authorship_id: int, addr_texts: list[str],
 
         # Propager les pays si fournis et pas encore renseignés
         if countries:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE addresses SET countries = %s
                 WHERE id = %s AND countries IS NULL
-            """, (countries, addr_id))
+            """,
+                (countries, addr_id),
+            )
 
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
             VALUES (%s, %s)
             ON CONFLICT (source_authorship_id, address_id) DO NOTHING
-        """, (authorship_id, addr_id))
+        """,
+            (authorship_id, addr_id),
+        )
         links += 1
 
     return links

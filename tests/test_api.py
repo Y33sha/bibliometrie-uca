@@ -21,8 +21,7 @@ DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
 DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
 DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
-_test_db_args = {"dbname": "bibliometrie_test", "user": DB_USER,
-                 "host": DB_HOST, "port": DB_PORT}
+_test_db_args = {"dbname": "bibliometrie_test", "user": DB_USER, "host": DB_HOST, "port": DB_PORT}
 if DB_PASSWORD:
     _test_db_args["password"] = DB_PASSWORD
 
@@ -60,10 +59,24 @@ from backend.app import app
 _app_module.get_cursor = _test_get_cursor
 for router_module in [
     getattr(__import__(f"backend.routers.{name}", fromlist=[name]), name, None)
-    for name in ["publications", "persons", "laboratories", "structures",
-                 "addresses", "authorships", "admin_duplicates",
-                 "admin_person_duplicates", "pub_stats", "stats",
-                 "feedback", "config", "publishers", "journals", "docs", "auth"]
+    for name in [
+        "publications",
+        "persons",
+        "laboratories",
+        "structures",
+        "addresses",
+        "authorships",
+        "admin_duplicates",
+        "admin_person_duplicates",
+        "pub_stats",
+        "stats",
+        "feedback",
+        "config",
+        "publishers",
+        "journals",
+        "docs",
+        "auth",
+    ]
 ]:
     if router_module and hasattr(router_module, "get_cursor"):
         router_module.get_cursor = _test_get_cursor
@@ -83,6 +96,7 @@ def auth_client():
     import time
 
     from backend.deps import _sign_token
+
     with TestClient(app, raise_server_exceptions=False) as c:
         token = _sign_token(f"{_settings.admin_user}|{int(time.time())}")
         c.cookies.set("session", token)
@@ -90,6 +104,7 @@ def auth_client():
 
 
 # ── Health ──────────────────────────────────────────────────────
+
 
 class TestHealth:
     def test_health(self, client):
@@ -101,6 +116,7 @@ class TestHealth:
 
 
 # ── Publications ────────────────────────────────────────────────
+
 
 class TestPublications:
     def test_list(self, client):
@@ -122,6 +138,7 @@ class TestPublications:
 
 
 # ── Personnes ───────────────────────────────────────────────────
+
 
 class TestPersons:
     def test_list(self, client):
@@ -146,6 +163,7 @@ class TestPersons:
 
 # ── Laboratoires ────────────────────────────────────────────────
 
+
 class TestLaboratories:
     def test_list(self, client):
         r = client.get("/api/laboratories")
@@ -160,6 +178,7 @@ class TestLaboratories:
 
 # ── Stats ───────────────────────────────────────────────────────
 
+
 class TestStats:
     def test_summary(self, client):
         r = client.get("/api/stats/summary")
@@ -167,6 +186,7 @@ class TestStats:
 
 
 # ── Auth ────────────────────────────────────────────────────────
+
 
 class TestAuth:
     def test_check_unauthenticated(self, client):
@@ -188,6 +208,7 @@ class TestAuth:
 
 # ── Config ──────────────────────────────────────────────────────
 
+
 class TestConfig:
     def test_get_config(self, client):
         r = client.get("/api/config")
@@ -200,6 +221,7 @@ class TestConfig:
 
 
 # ── Adresses ────────────────────────────────────────────────────
+
 
 class TestAddresses:
     def test_countries(self, client):

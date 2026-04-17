@@ -38,9 +38,13 @@ def _create_all_publications(cur):
         if nnt:
             nnt = normalize_nnt(nnt)
         pub_id, _ = find_or_create_publication(
-            cur, title=title, title_normalized=normalize_text(title),
-            pub_year=pub_year, doc_type=doc_type,
-            doi=doc["doi"], nnt=nnt,
+            cur,
+            title=title,
+            title_normalized=normalize_text(title),
+            pub_year=pub_year,
+            doc_type=doc_type,
+            doi=doc["doi"],
+            nnt=nnt,
             oa_status=doc["oa_status"] or "unknown",
             journal_id=doc["journal_id"],
             container_title=doc["container_title"],
@@ -48,8 +52,10 @@ def _create_all_publications(cur):
             allow_create=True,
         )
         if pub_id:
-            cur.execute("UPDATE source_publications SET publication_id = %s WHERE id = %s",
-                        (pub_id, doc["id"]))
+            cur.execute(
+                "UPDATE source_publications SET publication_id = %s WHERE id = %s",
+                (pub_id, doc["id"]),
+            )
             update_sources(cur, pub_id)
 
 
@@ -76,13 +82,16 @@ def _insert_hal_staging(cur, doc, hal_collections=None):
     """Insère un document HAL dans staging."""
     if hal_collections is None:
         hal_collections = ["TEST_COLL"]
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed)
         VALUES ('hal', %s, %s, %s, %s, FALSE)
         ON CONFLICT (source, source_id) DO UPDATE SET
             raw_data = EXCLUDED.raw_data,
             processed = FALSE
-    """, (doc["halId_s"], doc.get("doiId_s"), Json(doc), hal_collections))
+    """,
+        (doc["halId_s"], doc.get("doiId_s"), Json(doc), hal_collections),
+    )
 
 
 def _run_normalize_hal(dict_cur):
@@ -114,12 +123,15 @@ def _run_normalize_hal(dict_cur):
 
 def _get_pub_oa_status(cur, hal_id):
     """Retourne le oa_status de la publication liée à un source_document HAL."""
-    cur.execute("""
+    cur.execute(
+        """
         SELECT p.oa_status::text
         FROM publications p
         JOIN source_publications sd ON sd.publication_id = p.id
         WHERE sd.source = 'hal' AND sd.source_id = %s
-    """, (hal_id,))
+    """,
+        (hal_id,),
+    )
     row = cur.fetchone()
     return row["oa_status"] if row else None
 

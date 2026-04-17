@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 # ── Config clé/valeur ──
 
+
 @router.get("/api/config")
 async def list_config():
     with get_cursor() as (cur, conn):
@@ -26,6 +27,7 @@ async def get_hal_collections():
     """Retourne les collections HAL dérivées des structures du périmètre UCA."""
     with get_cursor() as (cur, conn):
         from utils.app_config import get_hal_collections as _get
+
         collections = _get(cur)
         return {"collections": collections, "count": len(collections)}
 
@@ -43,15 +45,19 @@ async def update_config(key: str, data: dict):
         cur.execute("SELECT key FROM config WHERE key = %s", (key,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail=f"Paramètre '{key}' introuvable")
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE config SET value = %s::jsonb, updated_at = now()
             WHERE key = %s
             RETURNING key, value, description, updated_at
-        """, (value_json, key))
+        """,
+            (value_json, key),
+        )
         return cur.fetchone()
 
 
 # ── Périmètres ──
+
 
 @router.get("/api/perimeters")
 async def list_perimeters():
@@ -62,10 +68,13 @@ async def list_perimeters():
             # Résoudre les noms des structures racines
             root_ids = p["structure_ids"] or []
             if root_ids:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id, name, acronym, code FROM structures
                     WHERE id = ANY(%s) ORDER BY name
-                """, (root_ids,))
+                """,
+                    (root_ids,),
+                )
                 p["structures"] = cur.fetchall()
             else:
                 p["structures"] = []
@@ -81,12 +90,15 @@ async def add_perimeter_structure(perimeter_id: int, data: dict):
         raise HTTPException(status_code=400, detail="structure_id requis")
 
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE perimeters
             SET structure_ids = array_append(structure_ids, %s)
             WHERE id = %s AND NOT structure_ids @> ARRAY[%s]
             RETURNING id
-        """, (structure_id, perimeter_id, structure_id))
+        """,
+            (structure_id, perimeter_id, structure_id),
+        )
         if not cur.fetchone():
             # Vérifier si le périmètre existe
             cur.execute("SELECT id FROM perimeters WHERE id = %s", (perimeter_id,))
@@ -100,12 +112,15 @@ async def add_perimeter_structure(perimeter_id: int, data: dict):
 @router.delete("/api/perimeters/{perimeter_id}/structures/{structure_id}")
 async def remove_perimeter_structure(perimeter_id: int, structure_id: int):
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE perimeters
             SET structure_ids = array_remove(structure_ids, %s)
             WHERE id = %s
             RETURNING id
-        """, (structure_id, perimeter_id))
+        """,
+            (structure_id, perimeter_id),
+        )
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Périmètre introuvable")
         return {"status": "removed"}
@@ -122,11 +137,14 @@ async def create_perimeter(data: dict):
         cur.execute("SELECT id FROM perimeters WHERE code = %s", (code,))
         if cur.fetchone():
             raise HTTPException(status_code=409, detail="Ce code existe déjà")
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO perimeters (code, name, description, structure_ids)
             VALUES (%s, %s, %s, '{}')
             RETURNING id
-        """, (code, name, (data.get("description") or "").strip() or None))
+        """,
+            (code, name, (data.get("description") or "").strip() or None),
+        )
         return {"id": cur.fetchone()["id"]}
 
 
@@ -147,8 +165,9 @@ async def update_perimeter(perimeter_id: int, data: dict):
         if not fields:
             raise HTTPException(status_code=400, detail="Rien à modifier")
         sets = ", ".join(f"{k} = %s" for k in fields)
-        cur.execute(f"UPDATE perimeters SET {sets} WHERE id = %s",
-                    list(fields.values()) + [perimeter_id])
+        cur.execute(
+            f"UPDATE perimeters SET {sets} WHERE id = %s", list(fields.values()) + [perimeter_id]
+        )
         return {"ok": True}
 
 
@@ -162,14 +181,16 @@ async def delete_perimeter(perimeter_id: int):
             raise HTTPException(status_code=404, detail="Périmètre introuvable")
         code = row["code"]
         # Vérifier qu'il n'est pas utilisé
-        cur.execute("""
+        cur.execute(
+            """
             SELECT key FROM config
             WHERE key LIKE 'perimeter_%%' AND value #>> '{}' = %s
-        """, (code,))
+        """,
+            (code,),
+        )
         used_by = cur.fetchall()
         if used_by:
             phases = ", ".join(r["key"] for r in used_by)
-            raise HTTPException(status_code=409,
-                detail=f"Ce périmètre est utilisé par : {phases}")
+            raise HTTPException(status_code=409, detail=f"Ce périmètre est utilisé par : {phases}")
         cur.execute("DELETE FROM perimeters WHERE id = %s", (perimeter_id,))
         return {"ok": True}

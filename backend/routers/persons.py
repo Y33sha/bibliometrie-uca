@@ -53,29 +53,32 @@ from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
 @router.get("/api/persons/directory")
 async def persons_directory(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
-    department: str = Query(""),      # comma-separated
-    role: str = Query(""),            # comma-separated
-    has_orcid: str = Query(""),       # "yes" or "no"
-    has_idhal: str = Query(""),       # "yes" or "no"
-    has_rh: str = Query(""),          # "yes" or "no"
-    sort: str = Query("name"),       # name, -name
+    department: str = Query(""),  # comma-separated
+    role: str = Query(""),  # comma-separated
+    has_orcid: str = Query(""),  # "yes" or "no"
+    has_idhal: str = Query(""),  # "yes" or "no"
+    has_rh: str = Query(""),  # "yes" or "no"
+    sort: str = Query("name"),  # name, -name
 ):
     """Annuaire public des personnes UCA avec ORCID et idHAL."""
     offset = (page - 1) * per_page
 
-    departments = [v.strip() for v in department.split(',') if v.strip()] if department else []
-    roles = [v.strip() for v in role.split(',') if v.strip()] if role else []
+    departments = [v.strip() for v in department.split(",") if v.strip()] if department else []
+    roles = [v.strip() for v in role.split(",") if v.strip()] if role else []
 
     conditions = ["p.rejected = FALSE"]
     params = []
 
     if search:
-        conditions.append("(unaccent(p.last_name) ILIKE unaccent(%s) OR unaccent(p.first_name) ILIKE unaccent(%s))")
+        conditions.append(
+            "(unaccent(p.last_name) ILIKE unaccent(%s) OR unaccent(p.first_name) ILIKE unaccent(%s))"
+        )
         s = f"%{search}%"
         params.extend([s, s])
     if departments:
@@ -86,16 +89,20 @@ async def persons_directory(
         params.append(roles)
     if has_orcid == "yes":
         conditions.append(
-            "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')")
+            "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')"
+        )
     elif has_orcid == "no":
         conditions.append(
-            "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')")
+            "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')"
+        )
     if has_idhal == "yes":
         conditions.append(
-            "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')")
+            "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')"
+        )
     elif has_idhal == "no":
         conditions.append(
-            "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')")
+            "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')"
+        )
     if has_rh == "yes":
         conditions.append("prh.id IS NOT NULL")
     elif has_rh == "no":
@@ -104,10 +111,14 @@ async def persons_directory(
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
     with get_cursor() as (cur, conn):
-        cur.execute(f"SELECT COUNT(*) FROM persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id {where}", params)
+        cur.execute(
+            f"SELECT COUNT(*) FROM persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id {where}",
+            params,
+        )
         total = cur.fetchone()["count"]
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 p.id, p.last_name, p.first_name,
                 prh.role_title, prh.department_name,
@@ -130,7 +141,9 @@ async def persons_directory(
                 }.get(sort, "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC")
             }
             LIMIT %s OFFSET %s
-        """, params + [per_page, offset])
+        """,
+            params + [per_page, offset],
+        )
 
         return {
             "total": total,
@@ -155,11 +168,14 @@ async def search_persons(q: str = Query("", min_length=2), limit: int = Query(10
     params: list = []
     for w in words:
         s = f"%{w}%"
-        conditions.append("(unaccent(p.last_name) ILIKE unaccent(%s) OR unaccent(p.first_name) ILIKE unaccent(%s))")
+        conditions.append(
+            "(unaccent(p.last_name) ILIKE unaccent(%s) OR unaccent(p.first_name) ILIKE unaccent(%s))"
+        )
         params.extend([s, s])
     params.append(limit)
     with get_cursor() as (cur, conn):
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT p.id, p.last_name, p.first_name, prh.department_name,
                    (prh.id IS NOT NULL) AS has_rh
             FROM persons p
@@ -167,7 +183,9 @@ async def search_persons(q: str = Query("", min_length=2), limit: int = Query(10
             WHERE {" AND ".join(conditions)}
             ORDER BY LOWER(p.last_name), LOWER(p.first_name)
             LIMIT %s
-        """, params)
+        """,
+            params,
+        )
         return cur.fetchall()
 
 
@@ -181,7 +199,7 @@ async def list_persons(
     linked: str = Query(""),  # "yes", "no", ""
     has_orcid: str = Query(""),  # "yes", "no", ""
     has_idhal: str = Query(""),  # "yes", "no", ""
-    has_rh: str = Query(""),    # "yes", "no", ""
+    has_rh: str = Query(""),  # "yes", "no", ""
     sort: str = Query("name"),  # name, -name, pubs, -pubs
 ):
     """Liste des personnes avec filtres."""
@@ -234,11 +252,15 @@ async def list_persons(
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
     with get_cursor() as (cur, conn):
-        cur.execute(f"SELECT COUNT(*) FROM persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id {where}", params)
+        cur.execute(
+            f"SELECT COUNT(*) FROM persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id {where}",
+            params,
+        )
         total = cur.fetchone()["count"]
 
         # Requête principale : données personne + counts (rapide)
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT p.id, p.last_name, p.first_name,
                 p.last_name_normalized, p.first_name_normalized,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
@@ -259,14 +281,17 @@ async def list_persons(
                 }.get(sort, "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC")
             }
             LIMIT %s OFFSET %s
-        """, params + [per_page, offset])
+        """,
+            params + [per_page, offset],
+        )
         persons_rows = cur.fetchall()
         person_ids = [p["id"] for p in persons_rows]
 
         # Identifiants : une seule requête pour les 50 personnes
         identifiers_map: dict = {}
         if person_ids:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT pi.person_id,
                        json_agg(json_build_object(
                            'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
@@ -275,14 +300,17 @@ async def list_persons(
                 FROM person_identifiers pi
                 WHERE pi.person_id = ANY(%s)
                 GROUP BY pi.person_id
-            """, (person_ids,))
+            """,
+                (person_ids,),
+            )
             for r in cur.fetchall():
                 identifiers_map[r["person_id"]] = r["identifiers"]
 
         # Formes de noms avec sources : depuis person_name_forms
         name_forms_map: dict = {}
         if person_ids:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT pid AS person_id,
                        json_agg(json_build_object(
                            'name_form', pnf.name_form,
@@ -295,7 +323,9 @@ async def list_persons(
                   AND pnf.sources IS NOT NULL
                   AND NOT (pnf.sources = ARRAY['persons']::text[])
                 GROUP BY pid
-            """, (person_ids,))
+            """,
+                (person_ids,),
+            )
             for r in cur.fetchall():
                 name_forms_map[r["person_id"]] = r["name_forms"]
 
@@ -338,16 +368,22 @@ async def persons_facets(
             params.append(roles)
         if skip != "has_orcid":
             if has_orcid == "yes":
-                conds.append("EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')")
+                conds.append(
+                    "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')"
+                )
             elif has_orcid == "no":
-                conds.append("NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')")
+                conds.append(
+                    "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')"
+                )
         if skip != "has_idhal":
             if has_idhal == "yes":
                 conds.append(
-                    "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')")
+                    "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')"
+                )
             elif has_idhal == "no":
                 conds.append(
-                    "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')")
+                    "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')"
+                )
         if skip != "has_rh":
             if has_rh == "yes":
                 conds.append("prh.id IS NOT NULL")
@@ -366,29 +402,36 @@ async def persons_facets(
         # --- Facette DÉPARTEMENTS ---
         c, p = base_filters(skip="department")
         where = ("WHERE " + " AND ".join(c)) if c else ""
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT prh.department_name AS value, COUNT(*) AS count
             FROM {base_from}
             {where} {"AND" if c else "WHERE"} prh.department_name IS NOT NULL
             GROUP BY prh.department_name ORDER BY count DESC
-        """, p)
+        """,
+            p,
+        )
         dept_facets = cur.fetchall()
 
         # --- Facette RÔLES ---
         c, p = base_filters(skip="role")
         where = ("WHERE " + " AND ".join(c)) if c else ""
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT prh.role_title AS value, COUNT(*) AS count
             FROM {base_from}
             {where} {"AND" if c else "WHERE"} prh.role_title IS NOT NULL
             GROUP BY prh.role_title ORDER BY count DESC
-        """, p)
+        """,
+            p,
+        )
         role_facets = cur.fetchall()
 
         # --- Facettes booléennes (orcid, idhal, rh) : comptages yes/no ---
         c, p = base_filters(skip="has_orcid")
         where = ("WHERE " + " AND ".join(c)) if c else ""
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 COUNT(*) FILTER (WHERE EXISTS (
                     SELECT 1 FROM person_identifiers pi
@@ -399,12 +442,15 @@ async def persons_facets(
                     WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
                 )) AS no
             FROM {base_from} {where}
-        """, p)
+        """,
+            p,
+        )
         orcid_counts = cur.fetchone()
 
         c, p = base_filters(skip="has_idhal")
         where = ("WHERE " + " AND ".join(c)) if c else ""
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 COUNT(*) FILTER (WHERE
                     EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
@@ -413,17 +459,22 @@ async def persons_facets(
                     NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
                 ) AS no
             FROM {base_from} {where}
-        """, p)
+        """,
+            p,
+        )
         idhal_counts = cur.fetchone()
 
         c, p = base_filters(skip="has_rh")
         where = ("WHERE " + " AND ".join(c)) if c else ""
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 COUNT(*) FILTER (WHERE prh.id IS NOT NULL) AS yes,
                 COUNT(*) FILTER (WHERE prh.id IS NULL) AS no
             FROM {base_from} {where}
-        """, p)
+        """,
+            p,
+        )
         rh_counts = cur.fetchone()
 
         # --- Facette LINKED (admin uniquement) ---
@@ -431,7 +482,8 @@ async def persons_facets(
         if linked or True:  # toujours calculer pour que l'admin puisse l'utiliser
             c, p = base_filters(skip="linked")
             where = ("WHERE " + " AND ".join(c)) if c else ""
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                     COUNT(*) FILTER (WHERE
                         EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)
@@ -440,7 +492,9 @@ async def persons_facets(
                         NOT EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)
                     ) AS no
                 FROM {base_from} {where}
-            """, p)
+            """,
+                p,
+            )
             linked_counts = cur.fetchone()
 
         return {
@@ -449,7 +503,9 @@ async def persons_facets(
             "orcid": {"yes": orcid_counts["yes"], "no": orcid_counts["no"]},
             "idhal": {"yes": idhal_counts["yes"], "no": idhal_counts["no"]},
             "rh": {"yes": rh_counts["yes"], "no": rh_counts["no"]},
-            "linked": {"yes": linked_counts["yes"], "no": linked_counts["no"]} if linked_counts else None,
+            "linked": {"yes": linked_counts["yes"], "no": linked_counts["no"]}
+            if linked_counts
+            else None,
         }
 
 
@@ -500,7 +556,8 @@ async def persons_stats():
 async def get_person(person_id: int):
     """Retourne une personne avec ses auteurs lies."""
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        cur.execute(
+            """
             SELECT p.id, p.last_name, p.first_name,
                 p.last_name_normalized, p.first_name_normalized,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
@@ -521,7 +578,9 @@ async def get_person(person_id: int):
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             WHERE p.id = %s
-        """, (person_id,))
+        """,
+            (person_id,),
+        )
         person = cur.fetchone()
         if not person:
             raise HTTPException(status_code=404, detail="Person not found")
@@ -533,27 +592,34 @@ async def person_profile(person_id: int):
     """Profil public complet d'une personne : infos, identifiants, auteurs liés."""
     with get_cursor() as (cur, conn):
         # Infos personne
-        cur.execute("""
+        cur.execute(
+            """
             SELECT p.id, p.last_name, p.first_name,
                    prh.role_title, prh.department_name,
                    prh.start_date, prh.end_date
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             WHERE p.id = %s
-        """, (person_id,))
+        """,
+            (person_id,),
+        )
         person = cur.fetchone()
         if not person:
             raise HTTPException(status_code=404, detail="Person not found")
 
         # Identifiants
-        cur.execute("""
+        cur.execute(
+            """
             SELECT id, id_type, id_value, source, status
             FROM person_identifiers WHERE person_id = %s
-        """, (person_id,))
+        """,
+            (person_id,),
+        )
         identifiers = cur.fetchall()
 
         # Auteurs liés HAL + compte publis UCA (exclut les authorships rejetées)
-        cur.execute("""
+        cur.execute(
+            """
             SELECT DISTINCT sauth.id, 'hal' AS source, sauth.full_name, sauth.orcid,
                    sauth.source_ids->>'idhal' AS idhal,
                    (sauth.source_ids->>'hal_person_id')::int AS hal_person_id,
@@ -564,11 +630,14 @@ async def person_profile(person_id: int):
             FROM source_persons sauth
             JOIN source_authorships sa ON sa.source = 'hal' AND sa.source_person_id = sauth.id
             WHERE sa.person_id = %s AND NOT sa.excluded
-        """, (person_id,))
+        """,
+            (person_id,),
+        )
         hal_authors = cur.fetchall()
 
         # Auteurs liés OpenAlex : formes de noms distinctes
-        cur.execute("""
+        cur.execute(
+            """
             SELECT MIN(sa.id) AS id,
                    sa.raw_author_name AS full_name,
                    'openalex' AS source,
@@ -577,11 +646,14 @@ async def person_profile(person_id: int):
             FROM source_authorships sa
             WHERE sa.source = 'openalex' AND sa.person_id = %s
             GROUP BY sa.raw_author_name
-        """, (person_id,))
+        """,
+            (person_id,),
+        )
         oa_authors = cur.fetchall()
 
         # Auteurs liés WoS + compte publis UCA
-        cur.execute("""
+        cur.execute(
+            """
             SELECT sauth.id, 'wos' AS source, sa.raw_author_name AS full_name, sauth.orcid,
                    NULL::text AS idhal, NULL::text AS openalex_id,
                    (SELECT COUNT(*) FROM source_authorships sa2
@@ -591,11 +663,14 @@ async def person_profile(person_id: int):
             JOIN source_authorships sa ON sa.source = 'wos' AND sa.source_person_id = sauth.id
             WHERE sa.person_id = %s
             GROUP BY sauth.id, sa.raw_author_name, sauth.orcid
-        """, (person_id,))
+        """,
+            (person_id,),
+        )
         wos_authors = cur.fetchall()
 
         # Nombre de thèses avec rôle non-auteur
-        cur.execute("""
+        cur.execute(
+            """
             SELECT COUNT(*) AS count
             FROM source_authorships sa
             JOIN source_publications sd ON sd.id = sa.source_publication_id
@@ -603,7 +678,9 @@ async def person_profile(person_id: int):
               AND sa.source = 'theses'
               AND NOT (sa.roles && ARRAY['author']::text[])
               AND sd.publication_id IS NOT NULL
-        """, (person_id,))
+        """,
+            (person_id,),
+        )
         theses_count = cur.fetchone()["count"]
 
         return {
@@ -618,7 +695,8 @@ async def person_profile(person_id: int):
 async def person_theses(person_id: int):
     """Thèses liées à cette personne avec un rôle non-auteur (directeur, rapporteur, jury)."""
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        cur.execute(
+            """
             SELECT p.id, p.title, p.pub_year, p.doi,
                    sa.roles,
                    (SELECT sa2.raw_author_name
@@ -649,13 +727,15 @@ async def person_theses(person_id: int):
               AND sa.source = 'theses'
               AND NOT (sa.roles && ARRAY['author']::text[])
             ORDER BY p.pub_year DESC NULLS LAST, p.title
-        """, (person_id,))
+        """,
+            (person_id,),
+        )
         rows = cur.fetchall()
 
         # Collecter tous les structure_ids pour résolution
         all_struct_ids = set()
         for row in rows:
-            for sid in (row["structure_ids"] or []):
+            for sid in row["structure_ids"] or []:
                 all_struct_ids.add(sid)
 
         structures = {}
@@ -683,25 +763,29 @@ async def person_theses(person_id: int):
                 if r in roles:
                     role = r
                     break
-            by_role.setdefault(role, []).append({
-                "id": row["id"],
-                "title": row["title"],
-                "pub_year": row["pub_year"],
-                "doi": row["doi"],
-                "author_name": row["author_name"],
-                "author_person_id": row["author_person_id"],
-                "structure_ids": row["structure_ids"] or [],
-            })
+            by_role.setdefault(role, []).append(
+                {
+                    "id": row["id"],
+                    "title": row["title"],
+                    "pub_year": row["pub_year"],
+                    "doi": row["doi"],
+                    "author_name": row["author_name"],
+                    "author_person_id": row["author_person_id"],
+                    "structure_ids": row["structure_ids"] or [],
+                }
+            )
 
         # Ordonner les sections
         sections = []
         for role_key in ("thesis_director", "rapporteur", "jury_president", "jury_member"):
             if role_key in by_role:
-                sections.append({
-                    "role": role_key,
-                    "label": role_labels.get(role_key, role_key),
-                    "theses": by_role[role_key],
-                })
+                sections.append(
+                    {
+                        "role": role_key,
+                        "label": role_labels.get(role_key, role_key),
+                        "theses": by_role[role_key],
+                    }
+                )
 
         return {"sections": sections, "total": len(rows), "structures": structures}
 
@@ -726,7 +810,8 @@ async def person_addresses(
         page = min(page, pages)
         offset = (page - 1) * per_page
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT a.id, a.raw_text,
                    (SELECT jsonb_agg(jsonb_build_object(
                         'id', s.id, 'acronym', s.acronym, 'name', s.name))
@@ -739,7 +824,9 @@ async def person_addresses(
             WHERE {base_where}
             ORDER BY a.raw_text
             LIMIT %s OFFSET %s
-        """, (person_id, per_page, offset))
+        """,
+            (person_id, per_page, offset),
+        )
         return {
             "total": total,
             "page": page,
@@ -763,11 +850,13 @@ async def add_person_identifier(person_id: int, data: AddIdentifier):
 
     # Nettoyage ORCID
     if data.id_type == "orcid":
-        id_value = id_value.replace("https://orcid.org/", "").replace("http://orcid.org/", "").strip()
+        id_value = (
+            id_value.replace("https://orcid.org/", "").replace("http://orcid.org/", "").strip()
+        )
         if not ORCID_RE.match(id_value):
             raise HTTPException(
                 status_code=400,
-                detail=f"Format ORCID invalide : '{id_value}'. Attendu : 0000-0000-0000-000X"
+                detail=f"Format ORCID invalide : '{id_value}'. Attendu : 0000-0000-0000-000X",
             )
 
     if not id_value:
@@ -781,7 +870,7 @@ async def add_person_identifier(person_id: int, data: AddIdentifier):
         # Vérifier si déjà attribué
         cur.execute(
             "SELECT id, person_id, status::text FROM person_identifiers WHERE id_type = %s AND id_value = %s",
-            (data.id_type, id_value)
+            (data.id_type, id_value),
         )
         existing = cur.fetchone()
         if existing:
@@ -789,21 +878,32 @@ async def add_person_identifier(person_id: int, data: AddIdentifier):
                 return {"added": False, "reason": "already_exists"}
             if existing["status"] == "rejected":
                 # Réattribuer l'identifiant rejeté à cette personne
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE person_identifiers
                     SET person_id = %s, status = 'pending'::identifier_status, source = 'manual'
                     WHERE id = %s
-                """, (person_id, existing["id"]))
-                return {"added": True, "reassigned": True, "id_type": data.id_type, "id_value": id_value}
+                """,
+                    (person_id, existing["id"]),
+                )
+                return {
+                    "added": True,
+                    "reassigned": True,
+                    "id_type": data.id_type,
+                    "id_value": id_value,
+                }
             raise HTTPException(
                 status_code=409,
-                detail=f"Cet identifiant est déjà attribué à la personne #{existing['person_id']}"
+                detail=f"Cet identifiant est déjà attribué à la personne #{existing['person_id']}",
             )
 
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO person_identifiers (person_id, id_type, id_value, source)
             VALUES (%s, %s, %s, 'manual')
-        """, (person_id, data.id_type, id_value))
+        """,
+            (person_id, data.id_type, id_value),
+        )
 
         return {"added": True, "id_type": data.id_type, "id_value": id_value}
 
@@ -812,10 +912,13 @@ async def add_person_identifier(person_id: int, data: AddIdentifier):
 async def remove_person_identifier(person_id: int, id_type: str, id_value: str):
     """Supprime un identifiant d'une personne."""
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        cur.execute(
+            """
             DELETE FROM person_identifiers
             WHERE person_id = %s AND id_type = %s AND id_value = %s
-        """, (person_id, id_type, id_value))
+        """,
+            (person_id, id_type, id_value),
+        )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Identifiant introuvable")
         return {"removed": True}
@@ -825,10 +928,13 @@ async def remove_person_identifier(person_id: int, id_type: str, id_value: str):
 async def update_identifier_status(ident_id: int, body: UpdateIdentifierStatus):
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE person_identifiers SET status = %s::identifier_status
             WHERE id = %s RETURNING id, status
-        """, (body.status, ident_id))
+        """,
+            (body.status, ident_id),
+        )
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Identifiant introuvable")
@@ -847,11 +953,14 @@ async def reassign_identifier(ident_id: int, body: ReassignIdentifier):
         cur.execute("SELECT id FROM persons WHERE id = %s", (target_person_id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Personne cible introuvable")
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE person_identifiers
             SET person_id = %s, status = 'pending'::identifier_status
             WHERE id = %s
-        """, (target_person_id, ident_id))
+        """,
+            (target_person_id, ident_id),
+        )
         return {"id": ident_id, "person_id": target_person_id, "status": "pending"}
 
 
@@ -870,8 +979,10 @@ async def reject_person(person_id: int, body: RejectPerson):
     """Marque/démarque une personne comme rejetée (fausse entité)."""
     rejected = body.rejected
     with get_cursor() as (cur, conn):
-        cur.execute("UPDATE persons SET rejected = %s, updated_at = now() WHERE id = %s",
-                    (rejected, person_id))
+        cur.execute(
+            "UPDATE persons SET rejected = %s, updated_at = now() WHERE id = %s",
+            (rejected, person_id),
+        )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Personne introuvable")
         return {"ok": True}
@@ -888,13 +999,16 @@ async def update_person_name(person_id: int, body: UpdatePersonName):
         cur.execute("SELECT id FROM persons WHERE id = %s", (person_id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Personne introuvable")
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE persons SET last_name = %s, first_name = %s,
                    last_name_normalized = unaccent(lower(trim(%s))),
                    first_name_normalized = unaccent(lower(trim(%s))),
                    updated_at = now()
             WHERE id = %s
-        """, (last_name, first_name, last_name, first_name, person_id))
+        """,
+            (last_name, first_name, last_name, first_name, person_id),
+        )
         _refresh_person_name_forms(cur, person_id, last_name, first_name)
         return {"ok": True}
 
@@ -972,17 +1086,21 @@ async def list_orphan_authorships(
 
     with get_cursor() as (cur, conn):
         # Count
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT COUNT(*) FROM source_authorships sa
             JOIN source_publications sd ON sd.id = sa.source_publication_id
             JOIN publications p ON p.id = sd.publication_id
             WHERE {_ORPHAN_BASE}
               {search_cond}
-        """, params)
+        """,
+            params,
+        )
         total = cur.fetchone()["count"]
 
         # List
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT sa.source, sa.id AS authorship_id,
                    sa.raw_author_name AS full_name,
                    sd.publication_id,
@@ -994,7 +1112,9 @@ async def list_orphan_authorships(
               {search_cond}
             ORDER BY sa.raw_author_name, p.pub_year DESC
             LIMIT %s OFFSET %s
-        """, params + [per_page, offset])
+        """,
+            params + [per_page, offset],
+        )
         rows = cur.fetchall()
 
         return {
@@ -1003,7 +1123,6 @@ async def list_orphan_authorships(
             "pages": (total + per_page - 1) // per_page or 1,
             "authorships": rows,
         }
-
 
 
 # _add_name_form et _ensure_truth_authorship sont dans services.persons
@@ -1048,8 +1167,7 @@ async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships):
     """
     person_id = body.person_id
 
-    sa_ids = [a.authorship_id for a in body.authorships
-              if a.source in ALL_SOURCES_SET]
+    sa_ids = [a.authorship_id for a in body.authorships if a.source in ALL_SOURCES_SET]
     if not sa_ids:
         return {"ok": True, "assigned": 0}
 
@@ -1059,15 +1177,19 @@ async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships):
             raise HTTPException(status_code=404, detail="Personne introuvable")
 
         # 1. Rattacher les source_authorships
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE source_authorships SET person_id = %s
             WHERE id = ANY(%s) AND person_id IS NULL
             RETURNING id
-        """, (person_id, sa_ids))
+        """,
+            (person_id, sa_ids),
+        )
         assigned = cur.rowcount
 
         # 2. Creer les authorships canoniques manquantes
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO authorships (publication_id, person_id,
                 author_position, in_perimeter, is_corresponding, structure_ids)
             SELECT DISTINCT ON (sd.publication_id)
@@ -1079,10 +1201,13 @@ async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships):
             ORDER BY sd.publication_id,
                 CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 WHEN 'wos' THEN 3 END
             ON CONFLICT (publication_id, person_id) DO NOTHING
-        """, (person_id, sa_ids))
+        """,
+            (person_id, sa_ids),
+        )
 
         # 3. Mettre les FK authorship_id
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE source_authorships sa SET authorship_id = a.id
             FROM source_publications sd, authorships a
             WHERE sa.id = ANY(%s)
@@ -1090,14 +1215,19 @@ async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships):
               AND a.publication_id = sd.publication_id
               AND a.person_id = %s
               AND sa.authorship_id IS NULL
-        """, (sa_ids, person_id))
+        """,
+            (sa_ids, person_id),
+        )
 
         # 4. Ajouter les formes de noms
-        cur.execute("""
+        cur.execute(
+            """
             SELECT DISTINCT author_name_normalized
             FROM source_authorships
             WHERE id = ANY(%s) AND author_name_normalized IS NOT NULL AND NOT excluded
-        """, (sa_ids,))
+        """,
+            (sa_ids,),
+        )
         for row in cur.fetchall():
             _add_name_form(cur, person_id, row["author_name_normalized"])
 
@@ -1113,7 +1243,8 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
     name_form est la forme normalisée (lowercase, unaccent) depuis person_name_forms.
     Retourne aussi les autres personnes partageant cette forme de nom."""
     with get_cursor() as (cur, conn):
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT sa.source, sa.id AS authorship_id,
                    sd.publication_id AS pub_id, sd.title, sd.pub_year, sd.doi
             FROM source_authorships sa
@@ -1121,11 +1252,14 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
             WHERE sa.person_id = %s AND sa.author_name_normalized = %s
               AND sa.source IN {AUTHOR_SOURCES_SQL}
             ORDER BY sd.pub_year DESC, sd.title
-        """, (person_id, name_form))
+        """,
+            (person_id, name_form),
+        )
         authorships = cur.fetchall()
 
         # Autres personnes partageant cette forme de nom
-        cur.execute("""
+        cur.execute(
+            """
             SELECT p.id, p.first_name, p.last_name,
                    pr.department_name,
                    EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh
@@ -1137,7 +1271,9 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
               AND pid <> %s
               AND p.rejected = FALSE
             ORDER BY p.last_name, p.first_name
-        """, (name_form, person_id))
+        """,
+            (name_form, person_id),
+        )
         other_persons = cur.fetchall()
 
         return {"authorships": authorships, "other_persons": other_persons}
@@ -1158,25 +1294,34 @@ async def detach_authorships(person_id: int, body: DetachAuthorships):
         # Nettoyer la forme de nom si plus aucune authorship ne la porte
         cleaned_form = False
         if name_form:
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT COUNT(*) FROM source_authorships sa
                 WHERE sa.person_id = %s AND sa.author_name_normalized = %s
                   AND sa.source IN {AUTHOR_SOURCES_SQL}
-            """, (person_id, name_form))
+            """,
+                (person_id, name_form),
+            )
             remaining = cur.fetchone()["count"]
             if remaining == 0:
                 norm = name_form  # déjà normalisé
                 if norm:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         UPDATE person_name_forms
                         SET person_ids = array_remove(person_ids, %s)
                         WHERE name_form = %s
-                    """, (person_id, norm))
+                    """,
+                        (person_id, norm),
+                    )
                     # Supprimer la forme si person_ids est vide
-                    cur.execute("""
+                    cur.execute(
+                        """
                         DELETE FROM person_name_forms
                         WHERE name_form = %s AND person_ids = '{}'
-                    """, (norm,))
+                    """,
+                        (norm,),
+                    )
                     cleaned_form = True
 
         return {
@@ -1193,20 +1338,26 @@ async def detach_name_form(person_id: int, body: DetachNameForm):
 
     with get_cursor() as (cur, conn):
         # Vérifier qu'il n'y a aucune authorship liée
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT COUNT(*) FROM source_authorships sa
             WHERE sa.person_id = %s AND sa.author_name_normalized = %s
               AND sa.source IN {AUTHOR_SOURCES_SQL}
-        """, (person_id, name_form))
+        """,
+            (person_id, name_form),
+        )
         remaining = cur.fetchone()["count"]
         if remaining > 0:
-            raise HTTPException(status_code=400, detail="Cette forme a encore des authorships liées")
+            raise HTTPException(
+                status_code=400, detail="Cette forme a encore des authorships liées"
+            )
 
         _detach_name_form(cur, person_id, name_form)
         return {"detached": True}
 
 
 # ----- API: Doublons personnes -----
+
 
 def _person_name_tokens(ln_norm: str, fn_norm: str) -> set[str]:
     """Tokens du nom complet normalisé (last + first), tirets éclatés en espaces."""
@@ -1264,7 +1415,6 @@ PERSON_DUP_QUERIES = [
           AND LENGTH(p2.first_name_normalized) >= 1
         {_DUP_NOT_EXISTS}
         ORDER BY p1.id, p2.id""",
-
     # Priorité 1b : nom composé vs nom simple
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
                p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
@@ -1290,7 +1440,6 @@ PERSON_DUP_QUERIES = [
           )
         {_DUP_NOT_EXISTS}
         ORDER BY p1.id, p2.id""",
-
     # Priorité 1c : inversion nom/prénom
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
                p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
@@ -1304,7 +1453,6 @@ PERSON_DUP_QUERIES = [
           AND p1.last_name_normalized <> p1.first_name_normalized
         {_DUP_NOT_EXISTS}
         ORDER BY p1.id, p2.id""",
-
     # Priorité 2 : même nom, prénoms compatibles (pas initiale)
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
                p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
@@ -1328,7 +1476,8 @@ PERSON_DUP_QUERIES = [
 
 def _get_person_dedup_detail(cur, person_id):
     """Détail d'une personne pour la page de déduplication."""
-    cur.execute("""
+    cur.execute(
+        """
         SELECT p.id, p.last_name, p.first_name,
                p.last_name_normalized, p.first_name_normalized,
                prh.role_title, prh.department_name,
@@ -1336,19 +1485,25 @@ def _get_person_dedup_detail(cur, person_id):
         FROM persons p
         LEFT JOIN persons_rh prh ON prh.person_id = p.id
         WHERE p.id = %s
-    """, (person_id,))
+    """,
+        (person_id,),
+    )
     person = cur.fetchone()
     if not person:
         return None
 
-    cur.execute("""
+    cur.execute(
+        """
         SELECT id, id_type, id_value, source, status::text
         FROM person_identifiers WHERE person_id = %s
         ORDER BY id_type, id_value
-    """, (person_id,))
+    """,
+        (person_id,),
+    )
     identifiers = [dict(r) for r in cur.fetchall()]
 
-    cur.execute("""
+    cur.execute(
+        """
         SELECT pub.id, pub.title, pub.pub_year, pub.doi, pub.doc_type::text,
                (SELECT array_agg(DISTINCT
                    CASE sd.source
@@ -1363,11 +1518,14 @@ def _get_person_dedup_detail(cur, person_id):
         JOIN publications pub ON pub.id = a.publication_id
         WHERE a.person_id = %s AND NOT a.excluded
         ORDER BY pub.pub_year DESC NULLS LAST, pub.id DESC
-    """, (person_id,))
+    """,
+        (person_id,),
+    )
     publications = [dict(r) for r in cur.fetchall()]
 
     # Laboratoires associés (via authorships sources)
-    cur.execute("""
+    cur.execute(
+        """
         SELECT DISTINCT s.id, s.acronym, s.name
         FROM structures s
         WHERE s.structure_type = 'labo' AND s.id IN (
@@ -1376,7 +1534,9 @@ def _get_person_dedup_detail(cur, person_id):
             WHERE sa.person_id = %s AND sa.structure_ids IS NOT NULL
         )
         ORDER BY s.acronym NULLS LAST, s.name
-    """, (person_id,))
+    """,
+        (person_id,),
+    )
     labs = [{"id": r["id"], "acronym": r["acronym"], "name": r["name"]} for r in cur.fetchall()]
 
     return {
@@ -1450,6 +1610,7 @@ def _scan_dup_query(cur, sql, skip_pairs=None, stop_at_first=False, skip_n=0):
 
 # ----- HAL problems: duplicate accounts -----
 
+
 @router.get("/api/hal-problems/duplicate-accounts")
 async def hal_duplicate_accounts(
     page: int = Query(1, ge=1),
@@ -1470,7 +1631,8 @@ async def hal_duplicate_accounts(
         """)
         total = cur.fetchone()["count"]
 
-        cur.execute("""
+        cur.execute(
+            """
             SELECT p.id AS person_id, p.last_name, p.first_name,
                    (prh.id IS NOT NULL) AS has_rh,
                    (SELECT json_agg(json_build_object(
@@ -1497,7 +1659,9 @@ async def hal_duplicate_accounts(
             )
             ORDER BY LOWER(p.last_name), LOWER(p.first_name)
             LIMIT %s OFFSET %s
-        """, (per_page, offset))
+        """,
+            (per_page, offset),
+        )
         persons = [dict(r) for r in cur.fetchall()]
 
         return {
@@ -1511,20 +1675,27 @@ async def hal_duplicate_accounts(
 
 # ----- HAL problems: duplicate publications -----
 
+
 def _hal_pub_detail(cur, pub_id):
     """Détail d'une publication pour la page doublons HAL."""
-    cur.execute("""
+    cur.execute(
+        """
         SELECT p.id, p.title, p.pub_year, p.doc_type::text, p.doi, p.container_title
         FROM publications p WHERE p.id = %s
-    """, (pub_id,))
+    """,
+        (pub_id,),
+    )
     pub = cur.fetchone()
     if not pub:
         return None
-    cur.execute("""
+    cur.execute(
+        """
         SELECT sd.source_id AS halid, sd.hal_collections, sd.doc_type AS hal_doc_type, sd.pub_year AS hal_pub_year, sd.title AS hal_title,
                (SELECT COUNT(*) FROM source_authorships sa2 WHERE sa2.source = 'hal' AND sa2.source_publication_id = sd.id AND NOT sa2.excluded) AS author_count
         FROM source_publications sd WHERE sd.publication_id = %s AND sd.source = 'hal'
-    """, (pub_id,))
+    """,
+        (pub_id,),
+    )
     hal_docs = [dict(r) for r in cur.fetchall()]
     return {**dict(pub), "hal_docs": hal_docs}
 
@@ -1548,7 +1719,8 @@ async def hal_duplicate_pubs_by_doi(
         """)
         total = cur.fetchone()["count"]
 
-        cur.execute("""
+        cur.execute(
+            """
             SELECT LOWER(sd.doi) AS doi,
                    sd.publication_id AS pub_id,
                    array_agg(sd.source_id ORDER BY sd.source_id) AS halids
@@ -1558,7 +1730,9 @@ async def hal_duplicate_pubs_by_doi(
             HAVING COUNT(*) >= 2
             ORDER BY LOWER(sd.doi)
             LIMIT %s OFFSET %s
-        """, (per_page, offset))
+        """,
+            (per_page, offset),
+        )
         rows = cur.fetchall()
 
         pairs = []
@@ -1604,12 +1778,15 @@ async def hal_duplicate_pubs_by_metadata(
         cur.execute(f"SELECT COUNT(*) {dup_query}")
         total = cur.fetchone()["count"]
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT p1.id AS id_a, p2.id AS id_b
             {dup_query}
             ORDER BY p1.id
             LIMIT %s OFFSET %s
-        """, (per_page, offset))
+        """,
+            (per_page, offset),
+        )
         rows = cur.fetchall()
 
         pairs = []
@@ -1629,6 +1806,7 @@ async def hal_duplicate_pubs_by_metadata(
 
 
 # ----- HAL problems: missing collections -----
+
 
 @router.get("/api/hal-problems/missing-collections")
 async def hal_missing_collections(
@@ -1660,7 +1838,8 @@ async def hal_missing_collections(
         cur.execute(f"SELECT COUNT(DISTINCT p.id) {base_where}", params)
         total = cur.fetchone()["count"]
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT DISTINCT p.id, p.title, p.pub_year, p.doc_type::text, p.doi,
                    (SELECT array_agg(sd2.source_id) FROM source_publications sd2 WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
                    NOT EXISTS (SELECT 1 FROM source_publications sd2
@@ -1668,7 +1847,9 @@ async def hal_missing_collections(
             {base_where}
             ORDER BY p.pub_year DESC NULLS LAST, p.id DESC
             LIMIT %s OFFSET %s
-        """, params + [per_page, offset])
+        """,
+            params + [per_page, offset],
+        )
         pubs = [dict(r) for r in cur.fetchall()]
 
         return {
@@ -1698,15 +1879,33 @@ async def hal_missing_collections_labs():
 # ----- HAL problems: affiliation conflicts -----
 
 SHS_LAB_CODES = (
-    'cmh', 'clerma', 'cerdi', 'chec', 'celis', 'phier', 'ihrim', 'lapsco',
-    'comsoc', 'umr_territoires', 'umr_ressources', 'acte', 'lrl', 'lescores', 'msh',
+    "cmh",
+    "clerma",
+    "cerdi",
+    "chec",
+    "celis",
+    "phier",
+    "ihrim",
+    "lapsco",
+    "comsoc",
+    "umr_territoires",
+    "umr_ressources",
+    "acte",
+    "lrl",
+    "lescores",
+    "msh",
 )
+
 
 def _affiliation_pub_row(r):
     return {
-        "id": r["id"], "title": r["title"], "pub_year": r["pub_year"],
-        "doc_type": r["doc_type"], "doi": r["doi"],
-        "halids": r["halids"], "labs": r["labs"],
+        "id": r["id"],
+        "title": r["title"],
+        "pub_year": r["pub_year"],
+        "doc_type": r["doc_type"],
+        "doi": r["doi"],
+        "halids": r["halids"],
+        "labs": r["labs"],
     }
 
 
@@ -1751,7 +1950,8 @@ async def hal_affiliation_conflicts(
         cur.execute(f"SELECT COUNT(DISTINCT p.id) {base_where}")
         total = cur.fetchone()["count"]
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT DISTINCT p.id, p.title, p.pub_year, p.doc_type::text, p.doi,
                    (SELECT array_agg(sd2.source_id) FROM source_publications sd2 WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
                    (SELECT string_agg(DISTINCT s.acronym, ', ' ORDER BY s.acronym)
@@ -1759,13 +1959,15 @@ async def hal_affiliation_conflicts(
             {base_where}
             ORDER BY p.pub_year DESC NULLS LAST, p.id DESC
             LIMIT %s OFFSET %s
-        """, (per_page, offset))
+        """,
+            (per_page, offset),
+        )
         pubs = [_affiliation_pub_row(r) for r in cur.fetchall()]
 
         return {
-            "total": total, "page": page, "per_page": per_page,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
             "pages": (total + per_page - 1) // per_page or 1,
             "publications": pubs,
         }
-
-

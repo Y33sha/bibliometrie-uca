@@ -27,10 +27,14 @@ logger = setup_logger("suggest_countries", "processing/logs")
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch-size", type=int, default=5000)
-    parser.add_argument("--direct", action="store_true",
-                        help="Écrire dans countries au lieu de suggested_countries")
-    parser.add_argument("--reset", action="store_true",
-                        help="Remettre à NULL les suggested_countries avant de relancer")
+    parser.add_argument(
+        "--direct", action="store_true", help="Écrire dans countries au lieu de suggested_countries"
+    )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Remettre à NULL les suggested_countries avant de relancer",
+    )
     args = parser.parse_args()
 
     conn = get_connection()
@@ -66,27 +70,33 @@ def main():
     t0 = time.time()
 
     while True:
-        cur.execute("""
+        cur.execute(
+            """
             SELECT id, normalized_text FROM addresses
             WHERE countries IS NULL
               AND suggested_countries IS NULL
               AND LENGTH(normalized_text) >= 5
             ORDER BY pub_count DESC, id
             LIMIT %s
-        """, (args.batch_size,))
+        """,
+            (args.batch_size,),
+        )
         batch = cur.fetchall()
         if not batch:
             break
 
         for addr_id, norm_text in batch:
             # Chercher les adresses similaires avec pays
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT c, COUNT(*) AS cnt
                 FROM addresses a2, unnest(a2.countries) AS c
                 WHERE a2.countries IS NOT NULL
                   AND a2.normalized_text LIKE '%%' || %s || '%%'
                 GROUP BY c ORDER BY cnt DESC
-            """, (norm_text,))
+            """,
+                (norm_text,),
+            )
             rows = cur.fetchall()
 
             if rows:

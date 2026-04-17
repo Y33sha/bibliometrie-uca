@@ -13,8 +13,10 @@ class TestSimpleName:
     def test_basic(self):
         forms = compute_person_name_forms("Dupont", "Jean")
         assert forms == {
-            "jean dupont", "dupont jean",
-            "j dupont", "dupont j",
+            "jean dupont",
+            "dupont jean",
+            "j dupont",
+            "dupont j",
         }
 
     def test_accents(self):
@@ -30,9 +32,12 @@ class TestCompoundFirstName:
         """Jean-Michel Blanquer → 6 formes."""
         forms = compute_person_name_forms("Blanquer", "Jean-Michel")
         expected = {
-            "jean michel blanquer", "blanquer jean michel",
-            "j m blanquer", "blanquer j m",
-            "jm blanquer", "blanquer jm",
+            "jean michel blanquer",
+            "blanquer jean michel",
+            "j m blanquer",
+            "blanquer j m",
+            "jm blanquer",
+            "blanquer jm",
         }
         assert forms == expected
 

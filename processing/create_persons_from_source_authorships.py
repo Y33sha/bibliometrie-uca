@@ -61,6 +61,7 @@ logger = setup_logger("create_persons", os.path.join(os.path.dirname(__file__), 
 # Data loading
 # ---------------------------------------------------------------------------
 
+
 def get_all_unlinked_authorships(cur):
     """Récupère toutes les authorships UCA sans person_id, toutes sources."""
     # HAL
@@ -195,8 +196,9 @@ def get_all_unlinked_authorships(cur):
         # est compatible avec le raw_author_name de l'authorship
         if r.get("oa_orcid"):
             oa_ln, oa_fn = parse_raw_author_name(r.get("oa_full_name", ""))
-            if names_compatible(r["last_norm"], r["first_norm"],
-                               normalize_name(oa_ln), normalize_name(oa_fn)):
+            if names_compatible(
+                r["last_norm"], r["first_norm"], normalize_name(oa_ln), normalize_name(oa_fn)
+            ):
                 r["orcid"] = r["oa_orcid"]
             else:
                 r["orcid"] = None
@@ -218,6 +220,7 @@ def load_linked_authorships_by_pub(cur):
 
     # Sources avec noms structurés dans source_persons (tout sauf OpenAlex)
     from utils.sources import SOURCES_WITH_STRUCTURED_NAMES_SQL
+
     cur.execute(f"""
         SELECT sa_auth.person_id, sa_auth.author_position,
                sd.publication_id,
@@ -237,7 +240,8 @@ def load_linked_authorships_by_pub(cur):
             last, first = parse_raw_author_name(r["full_name"])
             ln, fn = normalize_name(last), normalize_name(first)
         index[(r["publication_id"], r["author_position"])].append(
-            (r["person_id"], ln, fn, r["source"]))
+            (r["person_id"], ln, fn, r["source"])
+        )
 
     # OpenAlex : nom depuis raw_author_name
     cur.execute("""
@@ -255,7 +259,8 @@ def load_linked_authorships_by_pub(cur):
         last, first = parse_raw_author_name(r["full_name"])
         ln, fn = normalize_name(last), normalize_name(first)
         index[(r["publication_id"], r["author_position"])].append(
-            (r["person_id"], ln, fn, r["source"]))
+            (r["person_id"], ln, fn, r["source"])
+        )
 
     return index
 
@@ -272,6 +277,7 @@ def load_name_form_map(cur):
 # ---------------------------------------------------------------------------
 # Étape 0 : Comptes HAL
 # ---------------------------------------------------------------------------
+
 
 def step0_hal_accounts(cur, all_authorships, linked_ids, dry_run):
     """Propagation des comptes HAL déjà rattachés à une personne.
@@ -310,13 +316,16 @@ def step0_hal_accounts(cur, all_authorships, linked_ids, dry_run):
             # Compte HAL non rattaché → laisser aux passes suivantes
             skipped += len(group)
 
-    logger.info(f"  {linked} authorships rattachées, {skipped} ignorées (comptes HAL non rattachés)")
+    logger.info(
+        f"  {linked} authorships rattachées, {skipped} ignorées (comptes HAL non rattachés)"
+    )
     return linked
 
 
 # ---------------------------------------------------------------------------
 # Étape 1 : Cross-source (même publication + même position)
 # ---------------------------------------------------------------------------
+
 
 def step1_cross_source(cur, all_authorships, linked_ids, linked_index, dry_run):
     """Pour chaque authorship sans person_id, chercher sur la même publication
@@ -355,8 +364,7 @@ def step1_cross_source(cur, all_authorships, linked_ids, linked_index, dry_run):
             linked_ids.add((a["source"], a["authorship_id"]))
             # Mettre à jour l'index pour les passes suivantes
             ln, fn = a["last_norm"], a["first_norm"]
-            linked_index[(pub_id, position)].append(
-                (matched_pid, ln, fn, a["source"]))
+            linked_index[(pub_id, position)].append((matched_pid, ln, fn, a["source"]))
             linked += 1
 
     logger.info(f"  {linked} authorships rattachées par cross-source")
@@ -366,6 +374,7 @@ def step1_cross_source(cur, all_authorships, linked_ids, linked_index, dry_run):
 # ---------------------------------------------------------------------------
 # Étape 1b : IdRef connu
 # ---------------------------------------------------------------------------
+
 
 def load_idref_person_map(cur):
     """Charge les IdRef déjà mappés à une personne (status != rejected).
@@ -413,6 +422,7 @@ def step1b_idref(cur, all_authorships, linked_ids, dry_run):
 # Étape 2 : ORCID connu
 # ---------------------------------------------------------------------------
 
+
 def load_orcid_person_map(cur):
     """Charge les ORCID déjà mappés à une personne (status != rejected).
 
@@ -458,6 +468,7 @@ def step2_orcid(cur, all_authorships, linked_ids, dry_run):
 # ---------------------------------------------------------------------------
 # Étape 3 : Lookup person_name_forms
 # ---------------------------------------------------------------------------
+
 
 def step3_name_forms(cur, all_authorships, linked_ids, name_form_map, dry_run):
     """Lookup par author_name_normalized dans person_name_forms.
@@ -522,13 +533,16 @@ def step3_name_forms(cur, all_authorships, linked_ids, name_form_map, dry_run):
             linked_ids.add((a["source"], a["authorship_id"]))
             created += 1
 
-    logger.info(f"  {created} personnes créées, {linked} rattachées, {ambiguous} ambiguës (orphelines)")
+    logger.info(
+        f"  {created} personnes créées, {linked} rattachées, {ambiguous} ambiguës (orphelines)"
+    )
     return created, linked, ambiguous
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def run(dry_run=False):
     conn = get_connection()
@@ -565,8 +579,8 @@ def run(dry_run=False):
     logger.info("\n--- Étape 3 : person_name_forms ---")
     name_form_map = load_name_form_map(cur)
     s3_created, s3_linked, s3_ambiguous = step3_name_forms(
-        cur, all_authorships, linked_ids, name_form_map, dry_run)
-
+        cur, all_authorships, linked_ids, name_form_map, dry_run
+    )
 
     # ── Résumé ──
     total_linked = len(linked_ids)
@@ -577,7 +591,9 @@ def run(dry_run=False):
     logger.info(f"  Étape 1 (cross-source)   : {s1} rattachées")
     logger.info(f"  Étape 1b (IdRef connu)   : {s1b} rattachées")
     logger.info(f"  Étape 2 (ORCID connu)    : {s2} rattachées")
-    logger.info(f"  Étape 3 (name_forms)     : {s3_created} créées, {s3_linked} rattachées, {s3_ambiguous} ambiguës")
+    logger.info(
+        f"  Étape 3 (name_forms)     : {s3_created} créées, {s3_linked} rattachées, {s3_ambiguous} ambiguës"
+    )
     logger.info(f"  Non résolues             : {unlinked}")
 
     if dry_run:
@@ -596,8 +612,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Crée des personnes à partir des authorships sources UCA"
     )
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Simuler sans modifier la base")
+    parser.add_argument("--dry-run", action="store_true", help="Simuler sans modifier la base")
     args = parser.parse_args()
     run(dry_run=args.dry_run)
 

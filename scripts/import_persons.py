@@ -29,7 +29,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-
 def parse_date(val) -> str | None:
     """Parse une date depuis différents formats possibles."""
     if not val or str(val).strip() == "":
@@ -45,6 +44,7 @@ def parse_date(val) -> str | None:
         n = int(float(val))
         if 30000 < n < 60000:
             from datetime import timedelta
+
             base = datetime(1899, 12, 30)
             return (base + timedelta(days=n)).date().isoformat()
     except (ValueError, OverflowError):
@@ -59,17 +59,41 @@ def parse_date(val) -> str | None:
 
 # Mapping flexible des noms de colonnes
 COLUMN_ALIASES = {
-    "last_name":        ["nom", "last_name", "lastname", "name", "family_name"],
-    "first_name":       ["prenom", "prénom", "first_name", "firstname", "given_name"],
-    "email":            ["email", "mail", "e-mail", "courriel"],
-    "department_name":  ["department-name", "department_name", "departement", "département",
-                         "department", "labo", "laboratoire", "composante", "unit"],
-    "role_title":       ["role-title", "role_title", "role", "titre", "grade", "fonction",
-                         "title", "statut"],
-    "start_date":       ["start-date", "start_date", "date_debut", "date-debut",
-                         "début", "debut", "date_arrivee", "arrivee"],
-    "end_date":         ["end-date", "end_date", "date_fin", "date-fin", "fin",
-                         "date_depart", "depart"],
+    "last_name": ["nom", "last_name", "lastname", "name", "family_name"],
+    "first_name": ["prenom", "prénom", "first_name", "firstname", "given_name"],
+    "email": ["email", "mail", "e-mail", "courriel"],
+    "department_name": [
+        "department-name",
+        "department_name",
+        "departement",
+        "département",
+        "department",
+        "labo",
+        "laboratoire",
+        "composante",
+        "unit",
+    ],
+    "role_title": [
+        "role-title",
+        "role_title",
+        "role",
+        "titre",
+        "grade",
+        "fonction",
+        "title",
+        "statut",
+    ],
+    "start_date": [
+        "start-date",
+        "start_date",
+        "date_debut",
+        "date-debut",
+        "début",
+        "debut",
+        "date_arrivee",
+        "arrivee",
+    ],
+    "end_date": ["end-date", "end_date", "date_fin", "date-fin", "fin", "date_depart", "depart"],
 }
 
 
@@ -182,8 +206,10 @@ def read_file(filepath: str) -> list[dict]:
 # IMPORT EN BASE
 # =============================================================
 
-def import_persons(conn, records: list[dict], dry_run: bool = False,
-                   export_date: str = None) -> int:
+
+def import_persons(
+    conn, records: list[dict], dry_run: bool = False, export_date: str = None
+) -> int:
     """Insère les personnes en base. Retourne le nombre d'insertions."""
     cur = conn.cursor()
     inserted = 0
@@ -212,33 +238,42 @@ def import_persons(conn, records: list[dict], dry_run: bool = False,
             continue
 
         # Vérifier doublon (même nom normalisé + même department + même role)
-        cur.execute("""
+        cur.execute(
+            """
             SELECT p.id FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             WHERE p.last_name_normalized = %s
               AND p.first_name_normalized = %s
               AND prh.department_name IS NOT DISTINCT FROM %s
               AND prh.role_title IS NOT DISTINCT FROM %s
-        """, (last_norm, first_norm, department, role))
+        """,
+            (last_norm, first_norm, department, role),
+        )
         if cur.fetchone():
             duplicates += 1
             continue
 
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO persons
                 (last_name, first_name, last_name_normalized, first_name_normalized)
             VALUES (%s, %s, %s, %s)
             RETURNING id
-        """, (last_name, first_name, last_norm, first_norm))
+        """,
+            (last_name, first_name, last_norm, first_norm),
+        )
         person_id = cur.fetchone()["id"]
         refresh_person_name_forms(cur, person_id, last_name, first_name)
 
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO persons_rh
                 (person_id, email, role_title, department_name,
                  start_date, end_date, hr_export_date)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (person_id, email, role, department, start, end, export_dt))
+        """,
+            (person_id, email, role, department, start, end, export_dt),
+        )
         inserted += 1
 
         if inserted % 500 == 0:
@@ -260,15 +295,18 @@ def import_persons(conn, records: list[dict], dry_run: bool = False,
 # MAIN
 # =============================================================
 
+
 def main():
     parser = argparse.ArgumentParser(description="Import personnes RH → base")
     parser.add_argument("file", help="Fichier RH (CSV, TSV, ou Excel)")
-    parser.add_argument("--export-date", type=str, default=None,
-                        help="Date de l'export RH (YYYY-MM-DD), ex: 2025-12-15")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Lire et valider sans insérer")
-    parser.add_argument("--clear", action="store_true",
-                        help="Vider la table persons avant import")
+    parser.add_argument(
+        "--export-date",
+        type=str,
+        default=None,
+        help="Date de l'export RH (YYYY-MM-DD), ex: 2025-12-15",
+    )
+    parser.add_argument("--dry-run", action="store_true", help="Lire et valider sans insérer")
+    parser.add_argument("--clear", action="store_true", help="Vider la table persons avant import")
     args = parser.parse_args()
 
     if not os.path.exists(args.file):

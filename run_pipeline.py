@@ -60,15 +60,20 @@ STATUS_FILE = BASE / "pipeline" / "status.json"
 
 def _write_status(mode: str, phase: str, started_at: str, phases_done: int, phases_total: int):
     """Écrit le fichier de statut pour le suivi en temps réel."""
-    STATUS_FILE.write_text(json.dumps({
-        "running": True,
-        "mode": mode,
-        "phase": phase,
-        "started_at": started_at,
-        "phase_started_at": datetime.datetime.now().isoformat(timespec="seconds"),
-        "phases_done": phases_done,
-        "phases_total": phases_total,
-    }), encoding="utf-8")
+    STATUS_FILE.write_text(
+        json.dumps(
+            {
+                "running": True,
+                "mode": mode,
+                "phase": phase,
+                "started_at": started_at,
+                "phase_started_at": datetime.datetime.now().isoformat(timespec="seconds"),
+                "phases_done": phases_done,
+                "phases_total": phases_total,
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def _clear_status():
@@ -83,6 +88,7 @@ atexit.register(_clear_status)
 # ---------------------------------------------------------------------------
 # Définition des phases
 # ---------------------------------------------------------------------------
+
 
 def phase_extract(mode="full", sources=None, year=None, **kw):
     """Phase 1 : Extraction des sources vers staging + refetch truncated.
@@ -191,6 +197,7 @@ def phase_normalize(**kw):
 def _vacuum_staging(full: bool = False):
     """VACUUM sur staging. FULL en mode full/monthly, simple sinon."""
     from db.connection import get_connection
+
     conn = get_connection()
     conn.autocommit = True
     with conn.cursor() as cur:
@@ -221,8 +228,6 @@ def phase_publications(**kw):
     run_python("processing/create_publications.py")
     run_python("processing/merge_pubs_by_hal_id.py")
     run_python("processing/merge_pubs_by_nnt.py")
-
-
 
 
 def phase_persons(**kw):
@@ -290,6 +295,7 @@ PHASE_NAMES = [name for name, _ in PHASES]
 # Helpers d'exécution
 # ---------------------------------------------------------------------------
 
+
 def run_python(script: str, *args):
     """Lance un script Python du projet."""
     path = BASE / script
@@ -306,7 +312,6 @@ def run_python(script: str, *args):
         raise RuntimeError(f"{script} a échoué (code {result.returncode})")
     log.info("✓ %s terminé en %.1fs", script, elapsed)
 
-
     # run_sql supprimé — tous les scripts SQL ont été convertis en Python
 
 
@@ -314,26 +319,37 @@ def run_python(script: str, *args):
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(description="Orchestrateur pipeline bibliométrique UCA")
-    parser.add_argument("--from", dest="from_phase", metavar="PHASE",
-                        help="Reprendre depuis cette phase")
-    parser.add_argument("--only", metavar="PHASE",
-                        help="Exécuter uniquement cette phase")
-    parser.add_argument("--list", action="store_true",
-                        help="Lister les phases disponibles")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Afficher les étapes sans exécuter")
-    parser.add_argument("--mode", choices=["full", "weekly", "monthly", "daily"], default="full",
-                        help="Mode d'exécution (défaut: full)")
-    parser.add_argument("--sources", default=",".join(ALL_SOURCES_SET),
-                        help="Sources, séparées par des virgules (défaut: hal,openalex,wos,scanr,theses)")
-    parser.add_argument("--year", type=int,
-                        help="Surcharger l'année d'extraction (une seule année)")
-    parser.add_argument("--full-cross-import", action="store_true",
-                        help="Cross-imports sur tout le staging (pas seulement les non-normalisés)")
-    parser.add_argument("--sandbox", action="store_true",
-                        help="Utiliser la base bibliometrie_sandbox")
+    parser.add_argument(
+        "--from", dest="from_phase", metavar="PHASE", help="Reprendre depuis cette phase"
+    )
+    parser.add_argument("--only", metavar="PHASE", help="Exécuter uniquement cette phase")
+    parser.add_argument("--list", action="store_true", help="Lister les phases disponibles")
+    parser.add_argument("--dry-run", action="store_true", help="Afficher les étapes sans exécuter")
+    parser.add_argument(
+        "--mode",
+        choices=["full", "weekly", "monthly", "daily"],
+        default="full",
+        help="Mode d'exécution (défaut: full)",
+    )
+    parser.add_argument(
+        "--sources",
+        default=",".join(ALL_SOURCES_SET),
+        help="Sources, séparées par des virgules (défaut: hal,openalex,wos,scanr,theses)",
+    )
+    parser.add_argument(
+        "--year", type=int, help="Surcharger l'année d'extraction (une seule année)"
+    )
+    parser.add_argument(
+        "--full-cross-import",
+        action="store_true",
+        help="Cross-imports sur tout le staging (pas seulement les non-normalisés)",
+    )
+    parser.add_argument(
+        "--sandbox", action="store_true", help="Utiliser la base bibliometrie_sandbox"
+    )
     args = parser.parse_args()
 
     if args.sandbox:
@@ -379,6 +395,7 @@ def main():
 
     # Métriques pipeline
     from pipeline.metrics import capture_log_offsets, generate_report, read_new_logs
+
     phase_results = []  # [(name, duration, logs)]
 
     t0_total = time.time()
@@ -393,15 +410,18 @@ def main():
         log_offsets = capture_log_offsets()
         t0_phase = time.time()
         try:
-            fn(mode=args.mode, sources=sources, year=args.year,
-               full_cross_import=args.full_cross_import)
+            fn(
+                mode=args.mode,
+                sources=sources,
+                year=args.year,
+                full_cross_import=args.full_cross_import,
+            )
         except KeyboardInterrupt:
             log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
             log.info("Pour reprendre : python run_pipeline.py --from %s", name)
             phase_logs = read_new_logs(log_offsets)
             phase_results.append((name + " (INTERROMPU)", time.time() - t0_phase, phase_logs))
-            report_path = generate_report(args.mode, sources, phase_results,
-                                          time.time() - t0_total)
+            report_path = generate_report(args.mode, sources, phase_results, time.time() - t0_total)
             log.info("Rapport partiel : %s", report_path)
             _clear_status()
             sys.exit(130)
@@ -410,8 +430,7 @@ def main():
             log.error("Pour reprendre : python run_pipeline.py --from %s", name)
             phase_logs = read_new_logs(log_offsets)
             phase_results.append((name + " (ERREUR)", time.time() - t0_phase, phase_logs))
-            report_path = generate_report(args.mode, sources, phase_results,
-                                          time.time() - t0_total)
+            report_path = generate_report(args.mode, sources, phase_results, time.time() - t0_total)
             log.info("Rapport partiel : %s", report_path)
             _clear_status()
             sys.exit(1)

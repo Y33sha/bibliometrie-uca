@@ -25,13 +25,29 @@ def auth_params() -> dict:
         params["mailto"] = _email
     return params
 
-SELECT_FIELDS = ",".join([
-    "id", "doi", "title", "display_name", "publication_year",
-    "publication_date", "type", "language", "primary_location",
-    "locations", "authorships", "open_access", "cited_by_count",
-    "biblio", "is_retracted",
-    "topics", "keywords", "abstract_inverted_index",
-])
+
+SELECT_FIELDS = ",".join(
+    [
+        "id",
+        "doi",
+        "title",
+        "display_name",
+        "publication_year",
+        "publication_date",
+        "type",
+        "language",
+        "primary_location",
+        "locations",
+        "authorships",
+        "open_access",
+        "cited_by_count",
+        "biblio",
+        "is_retracted",
+        "topics",
+        "keywords",
+        "abstract_inverted_index",
+    ]
+)
 
 
 def extract_openalex_id(work: dict) -> str:

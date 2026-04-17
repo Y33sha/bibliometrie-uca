@@ -85,8 +85,7 @@ def main():
         try:
             cur.execute(sql)
             cur.execute(
-                "INSERT INTO schema_migrations (version) VALUES (%s)",
-                (migration_file.name,)
+                "INSERT INTO schema_migrations (version) VALUES (%s)", (migration_file.name,)
             )
             conn.commit()
             print("OK")
@@ -104,10 +103,11 @@ def main():
 
     schema_path = Path(__file__).parent / "schema.sql"
     import subprocess
+
     result = subprocess.run(
-        ["pg_dump", "--schema-only", "--no-owner", "--no-privileges",
-         "-d", db_name, "-U", db_user],
-        capture_output=True, text=True
+        ["pg_dump", "--schema-only", "--no-owner", "--no-privileges", "-d", db_name, "-U", db_user],
+        capture_output=True,
+        text=True,
     )
     if result.returncode == 0:
         schema_path.write_text(result.stdout, encoding="utf-8")

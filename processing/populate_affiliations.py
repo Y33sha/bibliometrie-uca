@@ -41,13 +41,14 @@ def _step_address_source(cur, source, perimeter_ids, wide_ids, daily=False):
     if not daily:
         cur.execute(
             "UPDATE source_authorships SET in_perimeter = FALSE, structure_ids = NULL WHERE source = %s",
-            (source,)
+            (source,),
         )
         logger.info(f"  {label} reset : {cur.rowcount} authorships")
 
     # in_perimeter via périmètre restreint
     if daily:
-        cur.execute(f"""
+        cur.execute(
+            f"""
             UPDATE source_authorships sa
             SET in_perimeter = TRUE
             FROM source_publications sd
@@ -62,9 +63,12 @@ def _step_address_source(cur, source, perimeter_ids, wide_ids, daily=False):
                   AND ast.structure_id = ANY(%s)
                   AND ast.is_confirmed IS DISTINCT FROM FALSE
             )
-        """, (source, list(perimeter_ids)))
+        """,
+            (source, list(perimeter_ids)),
+        )
     else:
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE source_authorships sa
             SET in_perimeter = TRUE
             WHERE sa.source = %s
@@ -76,12 +80,15 @@ def _step_address_source(cur, source, perimeter_ids, wide_ids, daily=False):
                   AND ast.structure_id = ANY(%s)
                   AND ast.is_confirmed IS DISTINCT FROM FALSE
             )
-        """, (source, list(perimeter_ids)))
+        """,
+            (source, list(perimeter_ids)),
+        )
     logger.info(f"  {label} in_perimeter = TRUE : {cur.rowcount} authorships")
 
     # structure_ids via périmètre large
     if daily:
-        cur.execute(f"""
+        cur.execute(
+            f"""
             WITH src_structs AS (
                 SELECT saa.source_authorship_id,
                        array_agg(DISTINCT ast.structure_id) AS struct_ids
@@ -99,9 +106,12 @@ def _step_address_source(cur, source, perimeter_ids, wide_ids, daily=False):
             SET structure_ids = ss.struct_ids
             FROM src_structs ss
             WHERE sa.id = ss.source_authorship_id
-        """, (source, list(wide_ids)))
+        """,
+            (source, list(wide_ids)),
+        )
     else:
-        cur.execute("""
+        cur.execute(
+            """
             WITH src_structs AS (
                 SELECT saa.source_authorship_id,
                        array_agg(DISTINCT ast.structure_id) AS struct_ids
@@ -117,7 +127,9 @@ def _step_address_source(cur, source, perimeter_ids, wide_ids, daily=False):
             SET structure_ids = ss.struct_ids
             FROM src_structs ss
             WHERE sa.id = ss.source_authorship_id
-        """, (source, list(wide_ids)))
+        """,
+            (source, list(wide_ids)),
+        )
     logger.info(f"  {label} structure_ids : {cur.rowcount} authorships")
 
 
@@ -128,7 +140,8 @@ def step3d_theses(cur, wide_ids, daily=False):
     On résout uniquement les structure_ids via les adresses résolues.
     """
     if daily:
-        cur.execute(f"""
+        cur.execute(
+            f"""
             WITH theses_structs AS (
                 SELECT saa.source_authorship_id,
                        array_agg(DISTINCT ast.structure_id) AS struct_ids
@@ -147,9 +160,12 @@ def step3d_theses(cur, wide_ids, daily=False):
             FROM theses_structs ts
             WHERE sa.source = 'theses'
               AND sa.id = ts.source_authorship_id
-        """, (list(wide_ids),))
+        """,
+            (list(wide_ids),),
+        )
     else:
-        cur.execute("""
+        cur.execute(
+            """
             WITH theses_structs AS (
                 SELECT saa.source_authorship_id,
                        array_agg(DISTINCT ast.structure_id) AS struct_ids
@@ -166,31 +182,52 @@ def step3d_theses(cur, wide_ids, daily=False):
             FROM theses_structs ts
             WHERE sa.source = 'theses'
               AND sa.id = ts.source_authorship_id
-        """, (list(wide_ids),))
+        """,
+            (list(wide_ids),),
+        )
     logger.info(f"Étape 3d — theses.fr structure_ids : {cur.rowcount} authorships")
 
 
 def show_stats(cur):
     """Affiche les compteurs in_perimeter par source."""
-    for source_name, source_value in [("HAL", "hal"), ("OpenAlex", "openalex"),
-                                       ("WoS", "wos"), ("ScanR", "scanr"),
-                                       ("theses.fr", "theses")]:
+    for source_name, source_value in [
+        ("HAL", "hal"),
+        ("OpenAlex", "openalex"),
+        ("WoS", "wos"),
+        ("ScanR", "scanr"),
+        ("theses.fr", "theses"),
+    ]:
         cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = %s", (source_value,))
         total = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = %s AND in_perimeter = TRUE", (source_value,))
+        cur.execute(
+            "SELECT COUNT(*) FROM source_authorships WHERE source = %s AND in_perimeter = TRUE",
+            (source_value,),
+        )
         uca = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = %s AND structure_ids IS NOT NULL", (source_value,))
+        cur.execute(
+            "SELECT COUNT(*) FROM source_authorships WHERE source = %s AND structure_ids IS NOT NULL",
+            (source_value,),
+        )
         with_structs = cur.fetchone()[0]
-        logger.info(f"  {source_name:10s} : {total} total, {uca} in_perimeter, {with_structs} avec structure_ids")
+        logger.info(
+            f"  {source_name:10s} : {total} total, {uca} in_perimeter, {with_structs} avec structure_ids"
+        )
 
 
 def main():
     parser = argparse.ArgumentParser(description="Peuplement in_perimeter et structure_ids")
     parser.add_argument("--stats", action="store_true", help="Stats uniquement")
-    parser.add_argument("--sources", default="hal,openalex,wos,scanr,theses",
-                        help="Sources à traiter (défaut: toutes)")
-    parser.add_argument("--mode", default="full", choices=["full", "weekly", "monthly", "daily"],
-                        help="Mode d'exécution (daily: incrémental, autres: complet)")
+    parser.add_argument(
+        "--sources",
+        default="hal,openalex,wos,scanr,theses",
+        help="Sources à traiter (défaut: toutes)",
+    )
+    parser.add_argument(
+        "--mode",
+        default="full",
+        choices=["full", "weekly", "monthly", "daily"],
+        help="Mode d'exécution (daily: incrémental, autres: complet)",
+    )
     args = parser.parse_args()
 
     sources = set(s.strip() for s in args.sources.split(",") if s.strip())

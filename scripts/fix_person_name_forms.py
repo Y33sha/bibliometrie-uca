@@ -24,30 +24,39 @@ from psycopg2.extras import RealDictCursor
 from db.connection import get_connection
 
 SOURCES = [
-    ("hal", """
+    (
+        "hal",
+        """
         SELECT DISTINCT author_name_normalized AS name_form, person_id
         FROM source_authorships
         WHERE source = 'hal' AND in_perimeter AND NOT excluded
           AND person_id IS NOT NULL
           AND author_name_normalized IS NOT NULL
           AND author_name_normalized != ''
-    """),
-    ("openalex", """
+    """,
+    ),
+    (
+        "openalex",
+        """
         SELECT DISTINCT author_name_normalized AS name_form, person_id
         FROM source_authorships
         WHERE source = 'openalex' AND in_perimeter AND NOT excluded
           AND person_id IS NOT NULL
           AND author_name_normalized IS NOT NULL
           AND author_name_normalized != ''
-    """),
-    ("wos", """
+    """,
+    ),
+    (
+        "wos",
+        """
         SELECT DISTINCT author_name_normalized AS name_form, person_id
         FROM source_authorships
         WHERE source = 'wos' AND in_perimeter AND NOT excluded
           AND person_id IS NOT NULL
           AND author_name_normalized IS NOT NULL
           AND author_name_normalized != ''
-    """),
+    """,
+    ),
 ]
 
 
@@ -106,15 +115,19 @@ def fix(conn, dry_run=False, person_id=None):
                     source_added += 1
 
             if needs_update and not dry_run:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE person_name_forms
                     SET person_ids = %s, sources = %s, updated_at = now()
                     WHERE id = %s
-                """, (new_pids, new_sources, row["id"]))
+                """,
+                    (new_pids, new_sources, row["id"]),
+                )
         else:
             added += 1
             if not dry_run:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO person_name_forms (name_form, person_ids, sources)
                     VALUES (%s, ARRAY[%s], %s)
                     ON CONFLICT (name_form) DO UPDATE
@@ -127,7 +140,9 @@ def fix(conn, dry_run=False, person_id=None):
                             FROM unnest(COALESCE(person_name_forms.sources, '{}') || EXCLUDED.sources) AS x
                         ),
                         updated_at = now()
-                """, (name_form, pid, list(sources), pid))
+                """,
+                    (name_form, pid, list(sources), pid),
+                )
             # Ajouter au cache pour les itérations suivantes
             existing[name_form] = {
                 "id": None,
@@ -137,7 +152,9 @@ def fix(conn, dry_run=False, person_id=None):
             }
 
     prefix = "[DRY RUN] " if dry_run else ""
-    print(f"{prefix}{added} formes créées, {pid_added} person_ids ajoutés, {source_added} sources ajoutées")
+    print(
+        f"{prefix}{added} formes créées, {pid_added} person_ids ajoutés, {source_added} sources ajoutées"
+    )
 
     if not dry_run:
         conn.commit()

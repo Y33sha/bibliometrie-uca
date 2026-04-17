@@ -72,6 +72,7 @@ def generate_report(
 ) -> str:
     """Génère le rapport Markdown et l'écrit dans pipeline/reports/."""
     import os
+
     now = datetime.datetime.now()
     filename = now.strftime("%Y-%m-%d_%H%M%S") + ".md"
     is_sandbox = os.environ.get("BIBLIOMETRIE_SANDBOX") == "1"
@@ -82,7 +83,7 @@ def generate_report(
         "",
         f"- **Mode** : {mode}",
         f"- **Sources** : {', '.join(sorted(sources))}",
-        f"- **Durée totale** : {total_duration:.0f}s ({total_duration/60:.1f} min)",
+        f"- **Durée totale** : {total_duration:.0f}s ({total_duration / 60:.1f} min)",
         f"- **Phases** : {len(phases)}",
         "",
     ]

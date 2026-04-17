@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 # ----- API: Doublons personnes -----
 
+
 def _person_name_tokens(ln_norm: str, fn_norm: str) -> set[str]:
     """Tokens du nom complet normalisé (last + first), tirets éclatés en espaces."""
     return set((ln_norm + " " + fn_norm).replace("-", " ").split()) - {""}
@@ -70,7 +71,6 @@ PERSON_DUP_QUERIES = [
           AND LENGTH(p2.first_name_normalized) >= 1
         {_DUP_NOT_EXISTS}
         ORDER BY p1.id, p2.id""",
-
     # Priorité 1b : nom composé vs nom simple
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
                p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
@@ -96,7 +96,6 @@ PERSON_DUP_QUERIES = [
           )
         {_DUP_NOT_EXISTS}
         ORDER BY p1.id, p2.id""",
-
     # Priorité 1c : inversion nom/prénom
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
                p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
@@ -110,7 +109,6 @@ PERSON_DUP_QUERIES = [
           AND p1.last_name_normalized <> p1.first_name_normalized
         {_DUP_NOT_EXISTS}
         ORDER BY p1.id, p2.id""",
-
     # Priorité 2 : même nom, prénoms compatibles (pas initiale)
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
                p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
@@ -134,7 +132,8 @@ PERSON_DUP_QUERIES = [
 
 def _get_person_dedup_detail(cur, person_id):
     """Détail d'une personne pour la page de déduplication."""
-    cur.execute("""
+    cur.execute(
+        """
         SELECT p.id, p.last_name, p.first_name,
                p.last_name_normalized, p.first_name_normalized,
                prh.role_title, prh.department_name,
@@ -142,19 +141,25 @@ def _get_person_dedup_detail(cur, person_id):
         FROM persons p
         LEFT JOIN persons_rh prh ON prh.person_id = p.id
         WHERE p.id = %s
-    """, (person_id,))
+    """,
+        (person_id,),
+    )
     person = cur.fetchone()
     if not person:
         return None
 
-    cur.execute("""
+    cur.execute(
+        """
         SELECT id, id_type, id_value, source, status::text
         FROM person_identifiers WHERE person_id = %s
         ORDER BY id_type, id_value
-    """, (person_id,))
+    """,
+        (person_id,),
+    )
     identifiers = [dict(r) for r in cur.fetchall()]
 
-    cur.execute("""
+    cur.execute(
+        """
         SELECT pub.id, pub.title, pub.pub_year, pub.doi, pub.doc_type::text,
                (SELECT array_agg(DISTINCT
                    CASE sd.source
@@ -169,11 +174,14 @@ def _get_person_dedup_detail(cur, person_id):
         JOIN publications pub ON pub.id = a.publication_id
         WHERE a.person_id = %s AND NOT a.excluded
         ORDER BY pub.pub_year DESC NULLS LAST, pub.id DESC
-    """, (person_id,))
+    """,
+        (person_id,),
+    )
     publications = [dict(r) for r in cur.fetchall()]
 
     # Laboratoires associés (via authorships sources)
-    cur.execute("""
+    cur.execute(
+        """
         SELECT DISTINCT s.id, s.acronym, s.name
         FROM structures s
         WHERE s.structure_type = 'labo' AND s.id IN (
@@ -182,7 +190,9 @@ def _get_person_dedup_detail(cur, person_id):
             WHERE sa.person_id = %s AND sa.structure_ids IS NOT NULL
         )
         ORDER BY s.acronym NULLS LAST, s.name
-    """, (person_id,))
+    """,
+        (person_id,),
+    )
     labs = [{"id": r["id"], "acronym": r["acronym"], "name": r["name"]} for r in cur.fetchall()]
 
     return {
@@ -277,7 +287,9 @@ async def next_person_duplicate(
     with get_cursor() as (cur, conn):
         remaining_skip = offset
         for sql in PERSON_DUP_QUERIES:
-            found, cnt, actual_skipped = _scan_dup_query(cur, sql, skip_pairs, stop_at_first=True, skip_n=remaining_skip)
+            found, cnt, actual_skipped = _scan_dup_query(
+                cur, sql, skip_pairs, stop_at_first=True, skip_n=remaining_skip
+            )
             if found:
                 return {
                     "pair": {
@@ -295,14 +307,19 @@ async def next_person_duplicate(
 async def mark_persons_distinct(body: MarkPersonsDistinct):
     """Marque deux personnes comme distinctes (non-doublon)."""
     if body.person_id_a == body.person_id_b:
-        raise HTTPException(status_code=400, detail="person_id_a et person_id_b doivent être différents")
+        raise HTTPException(
+            status_code=400, detail="person_id_a et person_id_b doivent être différents"
+        )
 
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO distinct_persons (person_id_a, person_id_b)
             VALUES (LEAST(%s, %s), GREATEST(%s, %s))
             ON CONFLICT DO NOTHING
-        """, (body.person_id_a, body.person_id_b, body.person_id_a, body.person_id_b))
+        """,
+            (body.person_id_a, body.person_id_b, body.person_id_a, body.person_id_b),
+        )
         return {"ok": True}
 
 
@@ -377,18 +394,23 @@ async def next_person_conflict(
             for c in row["conflicts"]:
                 pub_id = c["pub_id"]
                 cur2 = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-                cur2.execute("""
+                cur2.execute(
+                    """
                     SELECT id, title, pub_year, doc_type::text FROM publications WHERE id = %s
-                """, (pub_id,))
+                """,
+                    (pub_id,),
+                )
                 pub = cur2.fetchone()
                 if pub:
-                    conflict_pubs.append({
-                        "id": pub["id"],
-                        "title": pub["title"],
-                        "pub_year": pub["pub_year"],
-                        "doc_type": pub["doc_type"],
-                        "position": c["position"],
-                    })
+                    conflict_pubs.append(
+                        {
+                            "id": pub["id"],
+                            "title": pub["title"],
+                            "pub_year": pub["pub_year"],
+                            "doc_type": pub["doc_type"],
+                            "position": c["position"],
+                        }
+                    )
                 cur2.close()
 
             return {

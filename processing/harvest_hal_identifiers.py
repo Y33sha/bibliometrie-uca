@@ -54,7 +54,7 @@ def fetch_identifiers_batch(person_ids: list[int]) -> dict[int, dict]:
         except (requests.RequestException, ValueError) as e:
             if attempt < 2:
                 wait = 2 ** (attempt + 1)
-                logger.warning(f"Erreur API (tentative {attempt+1}/3): {e} — attente {wait}s")
+                logger.warning(f"Erreur API (tentative {attempt + 1}/3): {e} — attente {wait}s")
                 time.sleep(wait)
             else:
                 logger.error(f"Échec après 3 tentatives: {e}")
@@ -99,8 +99,9 @@ def main():
         description="Moissonnage ORCID + IdRef depuis l'API personnes HAL"
     )
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--batch", type=int, default=100,
-                        help="Nombre de person_ids par requête API (défaut: 100)")
+    parser.add_argument(
+        "--batch", type=int, default=100, help="Nombre de person_ids par requête API (défaut: 100)"
+    )
     args = parser.parse_args()
 
     conn = get_connection()
@@ -129,7 +130,7 @@ def main():
         batch_size = args.batch
 
         for i in range(0, len(rows), batch_size):
-            batch = rows[i:i + batch_size]
+            batch = rows[i : i + batch_size]
             # {hal_person_id: (source_persons.id, person_id)}
             id_map = {row[1]: (row[0], row[2]) for row in batch}
             person_ids = list(id_map.keys())
@@ -141,21 +142,27 @@ def main():
                     ha_id, person_id = id_map[pid]
 
                     if "orcid" in ids:
-                        cur.execute("""
+                        cur.execute(
+                            """
                             UPDATE source_persons
                             SET orcid = COALESCE(orcid, %s), updated_at = now()
                             WHERE id = %s AND orcid IS NULL
-                        """, (ids["orcid"], ha_id))
+                        """,
+                            (ids["orcid"], ha_id),
+                        )
                         if cur.rowcount:
                             stats["ha_updated"] += 1
                         stats["orcid_found"] += 1
 
                     if "idref" in ids:
-                        cur.execute("""
+                        cur.execute(
+                            """
                             UPDATE source_persons
                             SET idref = COALESCE(idref, %s), updated_at = now()
                             WHERE id = %s AND idref IS NULL
-                        """, (ids["idref"], ha_id))
+                        """,
+                            (ids["idref"], ha_id),
+                        )
                         if cur.rowcount:
                             stats["ha_updated"] += 1
                         stats["idref_found"] += 1
@@ -180,7 +187,9 @@ def main():
 
         if args.dry_run:
             conn.rollback()
-            logger.info(f"\n[DRY RUN] {stats['orcid_found']} ORCID, {stats['idref_found']} IdRef trouvés")
+            logger.info(
+                f"\n[DRY RUN] {stats['orcid_found']} ORCID, {stats['idref_found']} IdRef trouvés"
+            )
         else:
             logger.info("\n=== Terminé ===")
             logger.info(f"  ORCID trouvés : {stats['orcid_found']}")

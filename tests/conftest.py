@@ -64,7 +64,8 @@ def _create_test_db():
     conn.autocommit = True
     cur = conn.cursor()
     schema_sql = "\n".join(
-        line for line in SCHEMA.read_text(encoding="utf-8").splitlines()
+        line
+        for line in SCHEMA.read_text(encoding="utf-8").splitlines()
         if not line.strip().startswith("\\")
     )
     cur.execute(schema_sql)
@@ -88,10 +89,12 @@ def pytest_configure(config):
     # Empêcher les scripts importés par les tests d'écrire dans les
     # fichiers log de production (processing/logs/*.log)
     import utils.log as _log_module
+
     _original_setup = _log_module.setup_logger
 
     def _test_setup_logger(name, log_dir):
         import logging
+
         logger = logging.getLogger(name)
         logger.setLevel(logging.INFO)
         if not logger.handlers:
@@ -106,10 +109,12 @@ def _clear_caches():
     """Vide les caches module-level entre chaque test (rollback-safe)."""
     yield
     from utils.addresses import clear_cache as clear_addr_cache
+
     clear_addr_cache()
     # HAL author cache
     try:
         from processing.normalize_hal import _hal_author_cache
+
         _hal_author_cache.clear()
     except ImportError:
         pass

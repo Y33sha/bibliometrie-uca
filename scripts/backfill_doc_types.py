@@ -76,13 +76,13 @@ def main():
     for pub_id, current_type, hal_types, oa_types, wos_types in rows:
         candidates = []
 
-        for raw in (hal_types or []):
+        for raw in hal_types or []:
             candidates.append(map_doc_type(raw, "hal"))
 
-        for raw in (oa_types or []):
+        for raw in oa_types or []:
             candidates.append(map_doc_type(raw, "openalex"))
 
-        for raw in (wos_types or []):
+        for raw in wos_types or []:
             candidates.append(map_doc_type(raw, "wos"))
 
         if not candidates:
@@ -117,13 +117,13 @@ def main():
             if len(batch) >= 500:
                 cur.executemany(
                     "UPDATE publications SET doc_type = %s::doc_type, updated_at = now() WHERE id = %s",
-                    batch
+                    batch,
                 )
                 batch = []
         if batch:
             cur.executemany(
                 "UPDATE publications SET doc_type = %s::doc_type, updated_at = now() WHERE id = %s",
-                batch
+                batch,
             )
         conn.commit()
         print("Fait.")

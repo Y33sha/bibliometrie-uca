@@ -23,8 +23,8 @@ logger = setup_logger("enrich_journal_apc", os.path.join(os.path.dirname(__file_
 
 OPENALEX_API = "https://api.openalex.org/sources"
 OPENALEX_PREFIX = "https://openalex.org/"
-BATCH_SIZE = 50          # max IDs par requête (API limit = 100, on reste prudent)
-COMMIT_EVERY = 500       # commit DB tous les N journals traités
+BATCH_SIZE = 50  # max IDs par requête (API limit = 100, on reste prudent)
+COMMIT_EVERY = 500  # commit DB tous les N journals traités
 MAILTO = "bibliometrie@uca.fr"  # mis à jour dans main() depuis la config DB
 
 
@@ -38,7 +38,7 @@ def to_full_id(short_id: str) -> str:
 def to_short_id(full_id: str) -> str:
     """Convertit 'https://openalex.org/S20400310' → 'S20400310'."""
     if full_id.startswith(OPENALEX_PREFIX):
-        return full_id[len(OPENALEX_PREFIX):]
+        return full_id[len(OPENALEX_PREFIX) :]
     return full_id
 
 
@@ -70,7 +70,7 @@ def fetch_sources_batch(openalex_ids: list[str]) -> dict[str, dict]:
             return results
         except requests.RequestException as e:
             if attempt < 2:
-                logger.warning(f"Erreur requête (tentative {attempt+1}/3): {e}")
+                logger.warning(f"Erreur requête (tentative {attempt + 1}/3): {e}")
                 time.sleep(2 ** (attempt + 1))
             else:
                 logger.error(f"Échec après 3 tentatives: {e}")
@@ -107,12 +107,13 @@ def main():
     parser = argparse.ArgumentParser(
         description="Enrichir les revues avec les APC depuis OpenAlex (prix catalogue DOAJ)"
     )
-    parser.add_argument("--limit", type=int, default=0,
-                        help="Limiter le nombre de revues traitées (0 = toutes)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Aperçu sans modifier la base")
-    parser.add_argument("--reset", action="store_true",
-                        help="Réinitialiser apc_amount/is_in_doaj pour retraiter")
+    parser.add_argument(
+        "--limit", type=int, default=0, help="Limiter le nombre de revues traitées (0 = toutes)"
+    )
+    parser.add_argument("--dry-run", action="store_true", help="Aperçu sans modifier la base")
+    parser.add_argument(
+        "--reset", action="store_true", help="Réinitialiser apc_amount/is_in_doaj pour retraiter"
+    )
     args = parser.parse_args()
 
     conn = get_connection()
@@ -152,7 +153,7 @@ def main():
 
         # Traiter par lots
         for i in range(0, total, BATCH_SIZE):
-            batch = journals[i:i + BATCH_SIZE]
+            batch = journals[i : i + BATCH_SIZE]
             oa_ids = [row[1] for row in batch]
             id_map = {row[1]: row[0] for row in batch}  # openalex_id → journal_id
 
@@ -169,10 +170,13 @@ def main():
                 apc_amount, apc_currency = extract_apc(source)
 
                 if not args.dry_run:
-                    update_journal_apc(cur, journal_id,
-                                       apc_amount=apc_amount,
-                                       apc_currency=apc_currency,
-                                       is_in_doaj=is_in_doaj)
+                    update_journal_apc(
+                        cur,
+                        journal_id,
+                        apc_amount=apc_amount,
+                        apc_currency=apc_currency,
+                        is_in_doaj=is_in_doaj,
+                    )
 
                 updated += 1
                 if is_in_doaj:
@@ -186,8 +190,7 @@ def main():
                 conn.commit()
 
             logger.info(
-                f"  {min(i + BATCH_SIZE, total)}/{total} — "
-                f"{with_apc} avec APC, {doaj_count} DOAJ"
+                f"  {min(i + BATCH_SIZE, total)}/{total} — {with_apc} avec APC, {doaj_count} DOAJ"
             )
 
         if not args.dry_run:

@@ -32,7 +32,6 @@ from utils.app_config import get_api_base_urls, get_theses_etab_ppns
 logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-
 def build_query(ppn: str, status: str | None = None) -> str:
     """Construit la chaîne de recherche pour l'API theses.fr."""
     q = f"etabSoutenancePpn:({ppn})"
@@ -72,8 +71,14 @@ def extract_doi(these: dict) -> str | None:
     return None
 
 
-def extract_ppn(ppn: str, conn, existing_ids: set, base_url: str,
-                status: str | None = None, dry_run: bool = False) -> tuple[int, int, int]:
+def extract_ppn(
+    ppn: str,
+    conn,
+    existing_ids: set,
+    base_url: str,
+    status: str | None = None,
+    dry_run: bool = False,
+) -> tuple[int, int, int]:
     """Extrait toutes les thèses d'un établissement (par PPN).
 
     Retourne (total, insérés, mis à jour).
@@ -112,7 +117,8 @@ def extract_ppn(ppn: str, conn, existing_ids: set, base_url: str,
 
                 if theses_id in existing_ids:
                     # Mettre à jour si le hash a changé
-                    cur.execute("""
+                    cur.execute(
+                        """
                         UPDATE staging
                         SET raw_data = %s, doi = %s, raw_hash = %s, last_seen_at = now(),
                             processed = CASE
@@ -121,15 +127,20 @@ def extract_ppn(ppn: str, conn, existing_ids: set, base_url: str,
                             END
                         WHERE source = 'theses' AND source_id = %s
                           AND (raw_hash IS DISTINCT FROM %s)
-                    """, (Json(these), doi, raw_hash, raw_hash, theses_id, raw_hash))
+                    """,
+                        (Json(these), doi, raw_hash, raw_hash, theses_id, raw_hash),
+                    )
                     if cur.rowcount:
                         updated += 1
                 else:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
                         VALUES ('theses', %s, %s, %s, %s)
                         ON CONFLICT (source, source_id) DO NOTHING
-                    """, (theses_id, doi, Json(these), raw_hash))
+                    """,
+                        (theses_id, doi, Json(these), raw_hash),
+                    )
                     if cur.rowcount:
                         inserted += 1
                         existing_ids.add(theses_id)
@@ -138,7 +149,9 @@ def extract_ppn(ppn: str, conn, existing_ids: set, base_url: str,
             debut += len(theses)
 
             if debut % 1000 == 0 or debut >= total:
-                logger.info(f"    {debut}/{total} traités ({inserted} nouveaux, {updated} mis à jour)")
+                logger.info(
+                    f"    {debut}/{total} traités ({inserted} nouveaux, {updated} mis à jour)"
+                )
 
             time.sleep(THESES_DELAY)
 
@@ -147,12 +160,9 @@ def extract_ppn(ppn: str, conn, existing_ids: set, base_url: str,
 
 def main():
     parser = argparse.ArgumentParser(description="Extraction theses.fr → staging")
-    parser.add_argument("--soutenues", action="store_true",
-                        help="Thèses soutenues uniquement")
-    parser.add_argument("--en-cours", action="store_true",
-                        help="Thèses en cours uniquement")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Compter sans insérer")
+    parser.add_argument("--soutenues", action="store_true", help="Thèses soutenues uniquement")
+    parser.add_argument("--en-cours", action="store_true", help="Thèses en cours uniquement")
+    parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
     args = parser.parse_args()
 
     # Déterminer les statuts à extraire
@@ -191,8 +201,7 @@ def main():
         for ppn in ppns:
             for status in statuses:
                 total, inserted, updated = extract_ppn(
-                    ppn, conn, existing_ids, base_url,
-                    status=status, dry_run=args.dry_run
+                    ppn, conn, existing_ids, base_url, status=status, dry_run=args.dry_run
                 )
                 grand_total += total
                 grand_inserted += inserted

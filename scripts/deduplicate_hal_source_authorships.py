@@ -37,17 +37,25 @@ logger = setup_logger("dedup_hal_sa", os.path.join(os.path.dirname(__file__), ".
 
 # Champs transférables de l'ancien source_authorship vers le nouveau (si nouveau est null)
 SA_TRANSFER_FIELDS = [
-    "in_perimeter", "excluded", "structure_ids", "source_struct_ids",
-    "countries", "person_id", "author_name_normalized", "is_corresponding",
-    "roles", "source_data", "authorship_id",
+    "in_perimeter",
+    "excluded",
+    "structure_ids",
+    "source_struct_ids",
+    "countries",
+    "person_id",
+    "author_name_normalized",
+    "is_corresponding",
+    "roles",
+    "source_data",
+    "authorship_id",
 ]
 
 # Règles de résolution de conflits (les deux non-null et différents)
 # "old" = garder la valeur de l'ancien, "new" = garder le nouveau, "true" = garder True
 SA_CONFLICT_RULES = {
-    "in_perimeter": "old",       # false est le default, l'ancien a la vraie valeur
-    "is_corresponding": "new",   # false est le default, le nouveau a la vraie valeur (renseigné avec roles)
-    "excluded": "true",          # si l'un des deux est exclu, c'est vrai
+    "in_perimeter": "old",  # false est le default, l'ancien a la vraie valeur
+    "is_corresponding": "new",  # false est le default, le nouveau a la vraie valeur (renseigné avec roles)
+    "excluded": "true",  # si l'un des deux est exclu, c'est vrai
     "author_name_normalized": "new",  # dérivé du source_person_id, doit être cohérent avec le nouveau
 }
 
@@ -202,7 +210,8 @@ def merge_duplicate_authors(cur, group, dry_run):
     if not dry_run:
         for old_id in old_ids:
             # Supprimer les authorships qui existent déjà pour le nouveau source_author
-            cur.execute("""
+            cur.execute(
+                """
                 DELETE FROM source_authorship_addresses
                 WHERE source_authorship_id IN (
                     SELECT sa_old.id
@@ -212,14 +221,19 @@ def merge_duplicate_authors(cur, group, dry_run):
                      AND sa_new.source_person_id = %s
                     WHERE sa_old.source_person_id = %s
                 )
-            """, (keep_id, old_id))
-            cur.execute("""
+            """,
+                (keep_id, old_id),
+            )
+            cur.execute(
+                """
                 DELETE FROM source_authorships sa_old
                 USING source_authorships sa_new
                 WHERE sa_old.source_person_id = %s
                   AND sa_new.source_person_id = %s
                   AND sa_new.source_publication_id = sa_old.source_publication_id
-            """, (old_id, keep_id))
+            """,
+                (old_id, keep_id),
+            )
             # Migrer les restantes
             cur.execute(
                 "UPDATE source_authorships SET source_person_id = %s WHERE source_person_id = %s",
@@ -259,14 +273,12 @@ def run(dry_run=True):
             authors_to_merge = {}  # keep_author_id -> set(old_author_ids)
 
             for group in groups:
-                keep_id, delete_ids, conflicts = merge_source_authorships(
-                    cur, group, dry_run
-                )
+                keep_id, delete_ids, conflicts = merge_source_authorships(cur, group, dry_run)
                 sa_deleted += len(delete_ids)
                 if conflicts:
-                    all_conflicts[
-                        (group["source_publication_id"], group["author_position"])
-                    ] = conflicts
+                    all_conflicts[(group["source_publication_id"], group["author_position"])] = (
+                        conflicts
+                    )
 
                 # Collecter les fusions d'auteurs
                 keep_author = group["author_ids"][-1]
@@ -320,9 +332,7 @@ def run(dry_run=True):
             for group in author_groups:
                 authors_deleted_p2 += merge_duplicate_authors(cur, group, dry_run)
 
-            logger.info(
-                "Source_authors (phase 2) : %d supprimés", authors_deleted_p2
-            )
+            logger.info("Source_authors (phase 2) : %d supprimés", authors_deleted_p2)
 
             if dry_run:
                 logger.info("DRY-RUN -- aucune modification appliquée")

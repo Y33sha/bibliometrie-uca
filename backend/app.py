@@ -44,21 +44,19 @@ app = FastAPI(title="Bibliométrie UCA")
 
 # ----- Exception handler global -----
 
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Renvoie du JSON 500 au lieu de HTML pour les erreurs non gérées."""
-    logger.error("Erreur non gérée sur %s %s\n%s",
-                 request.method, request.url.path,
-                 traceback.format_exc())
-    return JSONResponse(status_code=500,
-                        content={"detail": "Erreur interne du serveur"})
+    logger.error(
+        "Erreur non gérée sur %s %s\n%s", request.method, request.url.path, traceback.format_exc()
+    )
+    return JSONResponse(status_code=500, content={"detail": "Erreur interne du serveur"})
 
 
 # ----- CORS -----
 # CORS_ORIGINS est obligatoire (défini dans .env en dev, injecté en prod).
-_cors_origins = [o.strip() for o in
-                 os.environ.get("CORS_ORIGINS", "").split(",")
-                 if o.strip()]
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
@@ -69,6 +67,7 @@ app.add_middleware(
 )
 
 # ----- Middleware -----
+
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
@@ -86,16 +85,18 @@ async def auth_middleware(request: Request, call_next):
 async def strip_prefix(request: Request, call_next):
     """Strip /bibliometrie prefix pour que les routes /api/* fonctionnent en accès direct."""
     if request.url.path.startswith("/bibliometrie/api/"):
-        request.scope["path"] = request.url.path[len("/bibliometrie"):]
+        request.scope["path"] = request.url.path[len("/bibliometrie") :]
     return await call_next(request)
 
 
 # ----- Health check -----
 
+
 @app.get("/api/health")
 async def health():
     """Vérifie que l'API est opérationnelle et la DB accessible."""
     import os
+
     sandbox = os.environ.get("BIBLIOMETRIE_SANDBOX") == "1"
     try:
         with get_cursor() as (cur, conn):
@@ -106,6 +107,7 @@ async def health():
 
 
 # ----- Root redirect -----
+
 
 @app.get("/")
 async def root():
@@ -135,5 +137,6 @@ app.include_router(pipeline.router)
 
 if __name__ == "__main__":
     import uvicorn
+
     print("Démarrage du serveur sur http://localhost:8003")
     uvicorn.run(app, host="127.0.0.1", port=8003)

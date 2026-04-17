@@ -1,7 +1,6 @@
 """Shared SQL filter helpers and constants."""
 
-
-OA_OPEN_STATUSES = ('gold', 'hybrid', 'bronze', 'green', 'diamond')
+OA_OPEN_STATUSES = ("gold", "hybrid", "bronze", "green", "diamond")
 
 # Filtre SQL : la publication a au moins un authorship dans le périmètre.
 # Exclut les peer_review et les personnes rejetées (fausses entités).
@@ -21,19 +20,21 @@ def apply_access_filter(conditions: list, params: list, access: str | None):
         conditions.append("p.oa_status::text = ANY(%s)")
         params.append(list(OA_OPEN_STATUSES))
     elif access == "closed":
-        conditions.append("(p.oa_status::text = 'closed' OR p.oa_status IS NULL OR p.oa_status::text = 'unknown')")
+        conditions.append(
+            "(p.oa_status::text = 'closed' OR p.oa_status IS NULL OR p.oa_status::text = 'unknown')"
+        )
 
 
 def apply_oa_filter(conditions: list, params: list, oa_status: str | None):
     """Ajoute le filtre OA status aux conditions SQL."""
     if not oa_status:
         return
-    values = [v.strip() for v in oa_status.split(',') if v.strip()]
+    values = [v.strip() for v in oa_status.split(",") if v.strip()]
     if not values:
         return
     expanded = []
     for v in values:
-        if v == 'oa':
+        if v == "oa":
             expanded.extend(OA_OPEN_STATUSES)
         else:
             expanded.append(v)
@@ -112,8 +113,7 @@ def apply_person_filter(conditions: list, params: list, person_id: int):
     params.append(person_id)
 
 
-def apply_corresponding_filter(conditions: list, params: list,
-                                person_id: int, corr_filter: str):
+def apply_corresponding_filter(conditions: list, params: list, person_id: int, corr_filter: str):
     """Filtre sur is_corresponding pour une personne donnée."""
     if not corr_filter or not person_id:
         return
@@ -133,8 +133,9 @@ def apply_corresponding_filter(conditions: list, params: list,
         params.append(person_id)
 
 
-def apply_publisher_journal_filter(conditions: list, params: list,
-                                   publisher_id: int | None, journal_id: int | None):
+def apply_publisher_journal_filter(
+    conditions: list, params: list, publisher_id: int | None, journal_id: int | None
+):
     """Ajoute les filtres éditeur et revue."""
     if publisher_id:
         conditions.append("""
@@ -149,12 +150,12 @@ def apply_publisher_journal_filter(conditions: list, params: list,
 
 def parse_int_csv(s: str) -> list[int]:
     """Parse une chaîne CSV d'entiers (ex: '1,2,3')."""
-    return [int(v) for v in s.split(',') if v.strip()] if s else []
+    return [int(v) for v in s.split(",") if v.strip()] if s else []
 
 
 def parse_str_csv(s: str) -> list[str]:
     """Parse une chaîne CSV de strings."""
-    return [v.strip() for v in s.split(',') if v.strip()] if s else []
+    return [v.strip() for v in s.split(",") if v.strip()] if s else []
 
 
 def persons_sort_clause(sort: str) -> str:

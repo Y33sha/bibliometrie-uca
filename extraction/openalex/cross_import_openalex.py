@@ -70,11 +70,14 @@ def insert_work(conn, work: dict):
     raw_hash = compute_hash(work)
 
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
             VALUES ('openalex', %s, %s, %s::jsonb, %s, FALSE)
             ON CONFLICT (source, source_id) DO NOTHING
-        """, (oa_id, doi, Json(work), raw_hash))
+        """,
+            (oa_id, doi, Json(work), raw_hash),
+        )
     conn.commit()
 
 
@@ -82,10 +85,14 @@ def main():
     parser = argparse.ArgumentParser(description="Import croisé DOI → OpenAlex")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans importer")
     parser.add_argument("--limit", type=int, help="Nombre max de DOI à traiter")
-    parser.add_argument("--normalize", action="store_true",
-                        help="Lancer la normalisation après import")
-    parser.add_argument("--all", action="store_true",
-                        help="Considérer tout le staging (pas seulement les non-normalisés)")
+    parser.add_argument(
+        "--normalize", action="store_true", help="Lancer la normalisation après import"
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Considérer tout le staging (pas seulement les non-normalisés)",
+    )
     args = parser.parse_args()
 
     conn = get_connection()
@@ -101,7 +108,7 @@ def main():
             return
 
         if args.limit:
-            dois = dois[:args.limit]
+            dois = dois[: args.limit]
             logger.info(f"Limité à {len(dois)} DOI")
 
         found = 0
@@ -117,10 +124,7 @@ def main():
                 not_found += 1
 
             if (i + 1) % 100 == 0:
-                logger.info(
-                    f"  {i+1}/{len(dois)} traités — "
-                    f"{found} trouvés, {not_found} absents"
-                )
+                logger.info(f"  {i + 1}/{len(dois)} traités — {found} trouvés, {not_found} absents")
 
             time.sleep(OPENALEX_DELAY)
 
@@ -134,9 +138,15 @@ def main():
             conn.close()
             os.execvp(
                 sys.executable,
-                [sys.executable,
-                 os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                              "..", "processing", "normalize_openalex.py")]
+                [
+                    sys.executable,
+                    os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "..",
+                        "processing",
+                        "normalize_openalex.py",
+                    ),
+                ],
             )
 
     except KeyboardInterrupt:

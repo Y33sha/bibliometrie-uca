@@ -62,5 +62,5 @@ def extract_hal_id_from_url(url: str | None) -> str | None:
     """
     if not url:
         return None
-    match = re.search(r'((?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+)', url)
+    match = re.search(r"((?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+)", url)
     return match.group(1) if match else None

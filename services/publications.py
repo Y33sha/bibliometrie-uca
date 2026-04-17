@@ -26,7 +26,10 @@ def find_by_doi(cur, doi: str) -> PubByDoi | None:
     """Cherche une publication par DOI (case-insensitive)."""
     if not doi:
         return None
-    cur.execute("SELECT id, doc_type, title_normalized FROM publications WHERE lower(doi) = lower(%s)", (doi,))
+    cur.execute(
+        "SELECT id, doc_type, title_normalized FROM publications WHERE lower(doi) = lower(%s)",
+        (doi,),
+    )
     row = cur.fetchone()
     return PubByDoi(_val(row, 0), _val(row, 1), _val(row, 2)) if row else None
 
@@ -35,13 +38,16 @@ def find_by_nnt(cur, nnt: str) -> PubByNnt | None:
     """Cherche une publication via NNT stocké dans source_publications.external_ids."""
     if not nnt:
         return None
-    cur.execute("""
+    cur.execute(
+        """
         SELECT p.id, p.doc_type, p.title_normalized
         FROM publications p
         JOIN source_publications sd ON sd.publication_id = p.id
         WHERE sd.external_ids->>'nnt' = %s
         LIMIT 1
-    """, (nnt.upper(),))
+    """,
+        (nnt.upper(),),
+    )
     row = cur.fetchone()
     return PubByNnt(_val(row, 0), _val(row, 1), _val(row, 2)) if row else None
 
@@ -52,11 +58,14 @@ def find_by_title(cur, title_normalized: str, pub_year: int, journal_id: int) ->
     """
     if not title_normalized or not journal_id:
         return None
-    cur.execute("""
+    cur.execute(
+        """
         SELECT id, doi FROM publications
         WHERE title_normalized = %s AND pub_year = %s AND journal_id = %s
         LIMIT 1
-    """, (title_normalized, pub_year, journal_id))
+    """,
+        (title_normalized, pub_year, journal_id),
+    )
     row = cur.fetchone()
     return PubByTitle(_val(row, 0), _val(row, 1)) if row else None
 
@@ -69,12 +78,15 @@ def find_thesis_by_title(cur, title_normalized: str, pub_year: int) -> list[PubT
     """
     if not title_normalized or not pub_year:
         return []
-    cur.execute("""
+    cur.execute(
+        """
         SELECT id, doi FROM publications
         WHERE title_normalized = %s AND pub_year = %s
           AND doc_type IN ('thesis', 'ongoing_thesis')
         ORDER BY id
-    """, (title_normalized, pub_year))
+    """,
+        (title_normalized, pub_year),
+    )
     rows = cur.fetchall()
     return [PubThesisCandidate(_val(row, 0), _val(row, 1)) for row in rows]
 
@@ -101,13 +113,13 @@ def try_merge_by_doi(cur, pub_id: int, doi: str | None) -> int:
         merge_publications(cur, existing.id, pub_id)
         return existing.id
     # Attribuer le DOI
-    cur.execute("UPDATE publications SET doi = %s, updated_at = now() WHERE id = %s",
-                (doi, pub_id))
+    cur.execute("UPDATE publications SET doi = %s, updated_at = now() WHERE id = %s", (doi, pub_id))
     return pub_id
 
 
-def resolve_doi_conflict(cur, doi: str, doc_type: str, title_normalized: str,
-                         existing) -> tuple[str | None, int | None]:
+def resolve_doi_conflict(
+    cur, doi: str, doc_type: str, title_normalized: str, existing
+) -> tuple[str | None, int | None]:
     """Gere les conflits de DOI entre chapitres et ouvrages.
 
     Quand un DOI existe deja sur une publication d'un type incompatible
@@ -126,16 +138,19 @@ def resolve_doi_conflict(cur, doi: str, doc_type: str, title_normalized: str,
         return None, None
 
     if doc_type in book_types and ex_type in chapter_types:
-        cur.execute("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s",
-                    (existing.id,))
+        cur.execute(
+            "UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s", (existing.id,)
+        )
         return doi, None
 
     # Deux chapitres avec titres differents : DOI errone des deux cotes
     if doc_type in chapter_types and ex_type in chapter_types:
         ex_title = existing.title_normalized or ""
         if title_normalized != ex_title:
-            cur.execute("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s",
-                        (existing.id,))
+            cur.execute(
+                "UPDATE publications SET doi = NULL, updated_at = now() WHERE id = %s",
+                (existing.id,),
+            )
             return None, None
         else:
             return doi, existing.id
@@ -144,15 +159,21 @@ def resolve_doi_conflict(cur, doi: str, doc_type: str, title_normalized: str,
     return doi, existing.id
 
 
-def find_or_create(cur, *, title: str, title_normalized: str,
-                   pub_year: int, doc_type: str = "other",
-                   doi: str | None = None,
-                   nnt: str | None = None,
-                   oa_status: str = "unknown",
-                   journal_id: int | None = None,
-                   container_title: str | None = None,
-                   language: str | None = None,
-                   allow_create: bool = True) -> tuple[int | None, bool]:
+def find_or_create(
+    cur,
+    *,
+    title: str,
+    title_normalized: str,
+    pub_year: int,
+    doc_type: str = "other",
+    doi: str | None = None,
+    nnt: str | None = None,
+    oa_status: str = "unknown",
+    journal_id: int | None = None,
+    container_title: str | None = None,
+    language: str | None = None,
+    allow_create: bool = True,
+) -> tuple[int | None, bool]:
     """Trouve ou cree une publication.
 
     Logique de deduplication par identifiant unique :
@@ -170,8 +191,7 @@ def find_or_create(cur, *, title: str, title_normalized: str,
     if doi:
         existing = find_by_doi(cur, doi)
         if existing:
-            doi, merge_id = resolve_doi_conflict(
-                cur, doi, doc_type, title_normalized, existing)
+            doi, merge_id = resolve_doi_conflict(cur, doi, doc_type, title_normalized, existing)
             if merge_id:
                 return merge_id, False
 
@@ -186,36 +206,55 @@ def find_or_create(cur, *, title: str, title_normalized: str,
     if not allow_create:
         return None, False
 
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO publications
             (title, title_normalized, doc_type, pub_year, doi,
              oa_status, journal_id, container_title, language)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
-    """, (title, title_normalized, doc_type, pub_year, doi,
-          oa_status, journal_id, container_title, language))
+    """,
+        (
+            title,
+            title_normalized,
+            doc_type,
+            pub_year,
+            doi,
+            oa_status,
+            journal_id,
+            container_title,
+            language,
+        ),
+    )
     return _val(cur.fetchone(), 0), True
 
 
 def update_oa_status(cur, pub_id: int, oa_status: str):
     """Met à jour le statut OA d'une publication."""
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE publications SET oa_status = %s::oa_type, updated_at = now()
         WHERE id = %s
-    """, (oa_status, pub_id))
+    """,
+        (oa_status, pub_id),
+    )
 
 
 def update_countries(cur, pub_id: int, countries: list[str]):
     """Met à jour les pays d'une publication."""
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE publications SET countries = %s, updated_at = now()
         WHERE id = %s
-    """, (countries, pub_id))
+    """,
+        (countries, pub_id),
+    )
 
 
 def update_sources(cur, pub_id: int):
     """Recalcule publications.sources depuis source_publications."""
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE publications SET sources = COALESCE(sub.srcs, '{}'), updated_at = now()
         FROM (
             SELECT array_agg(DISTINCT source::source_type ORDER BY source::source_type) AS srcs
@@ -223,7 +262,9 @@ def update_sources(cur, pub_id: int):
             WHERE publication_id = %s
         ) sub
         WHERE id = %s
-    """, (pub_id, pub_id))
+    """,
+        (pub_id, pub_id),
+    )
 
 
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
@@ -238,8 +279,13 @@ _PRIORITY_THESIS_HAL_LINKED = ["hal", "theses", "openalex", "wos", "scanr"]
 
 # Classement des statuts OA : le plus ouvert gagne.
 _OA_RANK = {
-    "diamond": 7, "gold": 6, "hybrid": 5, "bronze": 4,
-    "green": 3, "closed": 2, "unknown": 1,
+    "diamond": 7,
+    "gold": 6,
+    "hybrid": 5,
+    "bronze": 4,
+    "green": 3,
+    "closed": 2,
+    "unknown": 1,
 }
 
 
@@ -277,14 +323,18 @@ def refresh_from_sources(cur, pub_id: int):
     # Utiliser un RealDictCursor pour accès par nom de colonne,
     # quel que soit le type de curseur passé par l'appelant.
     from psycopg2.extras import RealDictCursor
+
     dict_cur = cur.connection.cursor(cursor_factory=RealDictCursor)
-    dict_cur.execute("""
+    dict_cur.execute(
+        """
         SELECT source, doi, doc_type, pub_year, journal_id, oa_status,
                container_title, language, abstract, keywords, countries,
                topics, biblio, meta, is_retracted, external_ids
         FROM source_publications
         WHERE publication_id = %s
-    """, (pub_id,))
+    """,
+        (pub_id,),
+    )
     rows = dict_cur.fetchall()
     dict_cur.close()
     if not rows:
@@ -292,13 +342,10 @@ def refresh_from_sources(cur, pub_id: int):
 
     # Déterminer si c'est une thèse et si un OA pointe vers HAL
     has_hal_link = any(
-        r["source"] == "openalex"
-        and (r["external_ids"] or {}).get("hal")
-        for r in rows
+        r["source"] == "openalex" and (r["external_ids"] or {}).get("hal") for r in rows
     )
     is_thesis = any(
-        map_doc_type(r["doc_type"], r["source"]) in ("thesis", "ongoing_thesis")
-        for r in rows
+        map_doc_type(r["doc_type"], r["source"]) in ("thesis", "ongoing_thesis") for r in rows
     )
 
     if is_thesis and has_hal_link:
@@ -324,7 +371,7 @@ def refresh_from_sources(cur, pub_id: int):
         seen = set()
         result = []
         for r in rows:
-            for item in (r[field] or []):
+            for item in r[field] or []:
                 key = item.lower() if isinstance(item, str) else item
                 if key not in seen:
                     seen.add(key)
@@ -370,7 +417,8 @@ def refresh_from_sources(cur, pub_id: int):
     new_biblio = merge_jsonb("biblio")
     new_meta = merge_jsonb("meta")
 
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE publications SET
             doi = %s, doc_type = %s::doc_type, pub_year = %s,
             journal_id = %s, oa_status = %s::oa_type,
@@ -379,14 +427,25 @@ def refresh_from_sources(cur, pub_id: int):
             topics = %s, biblio = %s, meta = %s,
             is_retracted = %s, updated_at = now()
         WHERE id = %s
-    """, (new_doi, new_doc_type, new_pub_year,
-          new_journal_id, new_oa_status,
-          new_container_title, new_language, new_abstract,
-          new_keywords, new_countries,
-          Json(new_topics) if new_topics else None,
-          Json(new_biblio) if new_biblio else None,
-          Json(new_meta) if new_meta else None,
-          new_is_retracted, pub_id))
+    """,
+        (
+            new_doi,
+            new_doc_type,
+            new_pub_year,
+            new_journal_id,
+            new_oa_status,
+            new_container_title,
+            new_language,
+            new_abstract,
+            new_keywords,
+            new_countries,
+            Json(new_topics) if new_topics else None,
+            Json(new_biblio) if new_biblio else None,
+            Json(new_meta) if new_meta else None,
+            new_is_retracted,
+            pub_id,
+        ),
+    )
 
     update_sources(cur, pub_id)
 
@@ -400,22 +459,30 @@ def merge_publications(cur, target_id: int, source_id: int):
     4. Supprime la source et les distinct_publications associées
     """
     # 1. Transférer les documents sources
-    cur.execute("UPDATE source_publications SET publication_id = %s WHERE publication_id = %s",
-                (target_id, source_id))
+    cur.execute(
+        "UPDATE source_publications SET publication_id = %s WHERE publication_id = %s",
+        (target_id, source_id),
+    )
 
     # 2. Transférer les authorships vérité (supprimer doublons par person_id)
-    cur.execute("""
+    cur.execute(
+        """
         DELETE FROM authorships
         WHERE publication_id = %s
           AND person_id IN (
               SELECT person_id FROM authorships WHERE publication_id = %s
           )
-    """, (source_id, target_id))
-    cur.execute("UPDATE authorships SET publication_id = %s WHERE publication_id = %s",
-                (target_id, source_id))
+    """,
+        (source_id, target_id),
+    )
+    cur.execute(
+        "UPDATE authorships SET publication_id = %s WHERE publication_id = %s",
+        (target_id, source_id),
+    )
 
     # 3. Enrichir la cible avec les métadonnées de la source
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE publications dest SET
             doi = CASE
                 WHEN dest.doi IS NOT NULL THEN dest.doi
@@ -441,13 +508,18 @@ def merge_publications(cur, target_id: int, source_id: int):
             updated_at = now()
         FROM publications src
         WHERE dest.id = %s AND src.id = %s
-    """, (target_id, source_id))
+    """,
+        (target_id, source_id),
+    )
 
     # 4. Nettoyer distinct_publications et supprimer la source
-    cur.execute("""
+    cur.execute(
+        """
         DELETE FROM distinct_publications
         WHERE pub_id_a = %s OR pub_id_b = %s
-    """, (source_id, source_id))
+    """,
+        (source_id, source_id),
+    )
     cur.execute("DELETE FROM publications WHERE id = %s", (source_id,))
 
     # 5. Recalculer les sources de la cible

@@ -58,7 +58,9 @@ LAB_PERSONS_CTE = """
 
 def get_labs_with_duplicates(cur):
     """Retourne les labos ayant des personnes homonymes."""
-    cur.execute(LAB_PERSONS_CTE + """
+    cur.execute(
+        LAB_PERSONS_CTE
+        + """
         SELECT lab_id, lab_name,
                regexp_replace(last_name_normalized, '[-\\s]+', ' ', 'g') AS last_norm,
                regexp_replace(first_name_normalized, '[-\\s]+', ' ', 'g') AS first_norm,
@@ -68,14 +70,17 @@ def get_labs_with_duplicates(cur):
         GROUP BY lab_id, lab_name, last_norm, first_norm
         HAVING COUNT(*) > 1
         ORDER BY lab_name, last_norm, first_norm
-    """)
+    """
+    )
     return cur.fetchall()
 
 
 def get_swapped_name_duplicates(cur, lab_id):
     """Retourne les paires (personne A, personne B) dans un labo
     où nom_A = prénom_B et prénom_A = nom_B (interversion nom/prénom)."""
-    cur.execute(LAB_PERSONS_CTE + """
+    cur.execute(
+        LAB_PERSONS_CTE
+        + """
         SELECT DISTINCT LEAST(a.person_id, b.person_id) AS id1,
                GREATEST(a.person_id, b.person_id) AS id2
         FROM lab_persons a
@@ -88,13 +93,17 @@ def get_swapped_name_duplicates(cur, lab_id):
         WHERE a.lab_id = %s
           AND a.last_name_normalized != '' AND a.first_name_normalized != ''
           AND b.last_name_normalized != '' AND b.first_name_normalized != ''
-    """, (lab_id,))
+    """,
+        (lab_id,),
+    )
     return cur.fetchall()
 
 
 def get_labs_with_swaps(cur):
     """Retourne les labos ayant des interversions nom/prénom."""
-    cur.execute(LAB_PERSONS_CTE + """
+    cur.execute(
+        LAB_PERSONS_CTE
+        + """
         SELECT DISTINCT a.lab_id, s.name AS lab_name
         FROM lab_persons a
         JOIN lab_persons b ON a.lab_id = b.lab_id
@@ -106,13 +115,15 @@ def get_labs_with_swaps(cur):
         JOIN structures s ON s.id = a.lab_id
         WHERE a.last_name_normalized != '' AND a.first_name_normalized != ''
           AND b.last_name_normalized != '' AND b.first_name_normalized != ''
-    """)
+    """
+    )
     return {row["lab_id"]: row["lab_name"] for row in cur.fetchall()}
 
 
 def get_person_details(cur, person_ids):
     """Récupère les détails des personnes pour affichage."""
-    cur.execute("""
+    cur.execute(
+        """
         SELECT p.id, p.last_name, p.first_name,
                prh.department_name, prh.role_title,
                (prh.id IS NOT NULL) AS has_rh,
@@ -137,7 +148,9 @@ def get_person_details(cur, person_ids):
              WHERE sa2.person_id = p.id AND sd.publication_id IS NOT NULL
             ) DESC,
             p.id ASC
-    """, (person_ids,))
+    """,
+        (person_ids,),
+    )
     return cur.fetchall()
 
 
@@ -160,10 +173,12 @@ def display_person(p, is_target=False):
     dept = f" ({p['department_name']})" if p["department_name"] else ""
     role = f" [{p['role_title']}]" if p["role_title"] else ""
 
-    print(f"    #{p['id']:>5d}  {p['last_name']} {p['first_name']}"
-          f"{rh}{dept}{role}"
-          f"  — {p['pub_count']} publis, {p['hal_authors']} HAL, {p['oa_authors']} OA"
-          f"{ids}{marker}")
+    print(
+        f"    #{p['id']:>5d}  {p['last_name']} {p['first_name']}"
+        f"{rh}{dept}{role}"
+        f"  — {p['pub_count']} publis, {p['hal_authors']} HAL, {p['oa_authors']} OA"
+        f"{ids}{marker}"
+    )
 
 
 def run(dry_run=False):
@@ -198,11 +213,11 @@ def run(dry_run=False):
         # Dédupliquer les groupes (une même paire peut apparaître dans plusieurs labos)
         # On garde tous les groupes pour ce labo
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(c(f"  {lab_data['name']}", "bold") + c(f"  (id={lab_id})", "dim"))
         if groups:
             print(f"  {len(groups)} groupe(s) d'homonymes")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
 
         # Afficher tous les groupes de ce labo
         merge_plan = []  # list of (target, sources)
@@ -215,7 +230,12 @@ def run(dry_run=False):
             # Vérifier si plusieurs personnes ont une fiche RH distincte → fusion interdite
             rh_persons = [p for p in persons if p["has_rh"]]
             if len(rh_persons) >= 2:
-                print(c(f"\n  ⛔ Groupe {i+1}: {len(rh_persons)} personnes avec fiche RH — fusion interdite", "red"))
+                print(
+                    c(
+                        f"\n  ⛔ Groupe {i + 1}: {len(rh_persons)} personnes avec fiche RH — fusion interdite",
+                        "red",
+                    )
+                )
                 for p in persons:
                     display_person(p)
                 print(c("    → Ignoré (fiches RH distinctes).", "dim"))
@@ -235,16 +255,25 @@ def run(dry_run=False):
             sources = [p for p in persons if p["id"] != target["id"]]
 
             if has_orcid_conflict:
-                print(c(f"\n  ⚠ Groupe {i+1}: ORCIDs différents ({', '.join(orcids)})", "red"))
+                print(c(f"\n  ⚠ Groupe {i + 1}: ORCIDs différents ({', '.join(orcids)})", "red"))
             else:
-                print(f"\n  Groupe {i+1}:")
+                print(f"\n  Groupe {i + 1}:")
             display_person(target, is_target=True)
             for s in sources:
                 display_person(s)
 
             if has_orcid_conflict:
                 try:
-                    ans = input(c("    Fusionner malgré les ORCIDs différents ? [o]ui / [N]on : ", "yellow")).strip().lower()
+                    ans = (
+                        input(
+                            c(
+                                "    Fusionner malgré les ORCIDs différents ? [o]ui / [N]on : ",
+                                "yellow",
+                            )
+                        )
+                        .strip()
+                        .lower()
+                    )
                 except (EOFError, KeyboardInterrupt):
                     print("\nInterrompu.")
                     return
@@ -261,7 +290,16 @@ def run(dry_run=False):
             # Demander confirmation passe 1
             print()
             try:
-                answer = input(c(f"  Fusionner ces {len(merge_plan)} groupe(s) d'homonymes ? [O]ui / [n]on / [q]uitter : ", "yellow")).strip().lower()
+                answer = (
+                    input(
+                        c(
+                            f"  Fusionner ces {len(merge_plan)} groupe(s) d'homonymes ? [O]ui / [n]on / [q]uitter : ",
+                            "yellow",
+                        )
+                    )
+                    .strip()
+                    .lower()
+                )
             except (EOFError, KeyboardInterrupt):
                 print("\nInterrompu.")
                 break
@@ -277,11 +315,15 @@ def run(dry_run=False):
                     for source in sources:
                         if not dry_run:
                             do_merge(cur, target["id"], source["id"])
-                            logger.info(f"  Fusionné #{source['id']} → #{target['id']} "
-                                        f"({source['last_name']} {source['first_name']})")
+                            logger.info(
+                                f"  Fusionné #{source['id']} → #{target['id']} "
+                                f"({source['last_name']} {source['first_name']})"
+                            )
                         else:
-                            logger.info(f"  [dry-run] Fusionnerait #{source['id']} → #{target['id']} "
-                                        f"({source['last_name']} {source['first_name']})")
+                            logger.info(
+                                f"  [dry-run] Fusionnerait #{source['id']} → #{target['id']} "
+                                f"({source['last_name']} {source['first_name']})"
+                            )
                         total_merged += 1
                 if not dry_run:
                     conn.commit()
@@ -290,7 +332,12 @@ def run(dry_run=False):
         swapped = get_swapped_name_duplicates(cur, lab_id)
         if swapped:
             swap_plan = []
-            print(c(f"\n  --- Passe 2 : interversions nom/prénom ({len(swapped)} paire(s)) ---", "bold"))
+            print(
+                c(
+                    f"\n  --- Passe 2 : interversions nom/prénom ({len(swapped)} paire(s)) ---",
+                    "bold",
+                )
+            )
 
             for row in swapped:
                 pair_ids = [row["id1"], row["id2"]]
@@ -301,7 +348,12 @@ def run(dry_run=False):
                 # Vérifier si les deux personnes ont une fiche RH → fusion interdite
                 rh_persons = [p for p in persons if p["has_rh"]]
                 if len(rh_persons) >= 2:
-                    print(c(f"\n  ⛔ Interversion — {len(rh_persons)} personnes avec fiche RH — fusion interdite", "red"))
+                    print(
+                        c(
+                            f"\n  ⛔ Interversion — {len(rh_persons)} personnes avec fiche RH — fusion interdite",
+                            "red",
+                        )
+                    )
                     for p in persons:
                         display_person(p)
                     print(c("    → Ignoré (fiches RH distinctes).", "dim"))
@@ -330,7 +382,16 @@ def run(dry_run=False):
 
                 if has_orcid_conflict:
                     try:
-                        ans = input(c("    Fusionner malgré les ORCIDs différents ? [o]ui / [N]on : ", "yellow")).strip().lower()
+                        ans = (
+                            input(
+                                c(
+                                    "    Fusionner malgré les ORCIDs différents ? [o]ui / [N]on : ",
+                                    "yellow",
+                                )
+                            )
+                            .strip()
+                            .lower()
+                        )
                     except (EOFError, KeyboardInterrupt):
                         print("\nInterrompu.")
                         return
@@ -344,7 +405,16 @@ def run(dry_run=False):
             if swap_plan:
                 print()
                 try:
-                    answer = input(c(f"  Fusionner ces {len(swap_plan)} interversion(s) ? [O]ui / [n]on / [q]uitter : ", "yellow")).strip().lower()
+                    answer = (
+                        input(
+                            c(
+                                f"  Fusionner ces {len(swap_plan)} interversion(s) ? [O]ui / [n]on / [q]uitter : ",
+                                "yellow",
+                            )
+                        )
+                        .strip()
+                        .lower()
+                    )
                 except (EOFError, KeyboardInterrupt):
                     print("\nInterrompu.")
                     break
@@ -360,23 +430,27 @@ def run(dry_run=False):
                         for source in sources:
                             if not dry_run:
                                 do_merge(cur, target["id"], source["id"])
-                                logger.info(f"  Fusionné (interversion) #{source['id']} → #{target['id']} "
-                                            f"({source['last_name']} {source['first_name']})")
+                                logger.info(
+                                    f"  Fusionné (interversion) #{source['id']} → #{target['id']} "
+                                    f"({source['last_name']} {source['first_name']})"
+                                )
                             else:
-                                logger.info(f"  [dry-run] Fusionnerait (interversion) #{source['id']} → #{target['id']} "
-                                            f"({source['last_name']} {source['first_name']})")
+                                logger.info(
+                                    f"  [dry-run] Fusionnerait (interversion) #{source['id']} → #{target['id']} "
+                                    f"({source['last_name']} {source['first_name']})"
+                                )
                             total_merged += 1
                     if not dry_run:
                         conn.commit()
 
     # Résumé
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(c("  RÉSUMÉ", "bold"))
     print(f"  Fusions effectuées : {total_merged}")
     print(f"  Groupes ignorés   : {total_skipped}")
     if dry_run and total_merged > 0:
         print(c("  (dry-run — aucune modification effectuée)", "yellow"))
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     cur.close()
     conn.close()

@@ -50,6 +50,7 @@ logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__),
 # UTILITAIRES
 # =============================================================
 
+
 def extract_doi(doc: dict) -> str | None:
     """Extrait le DOI depuis les externalIds."""
     for ext in doc.get("externalIds") or []:
@@ -76,6 +77,7 @@ def get_title(doc: dict) -> str | None:
 # PUBLISHERS & JOURNALS (via services/journals.py)
 # =============================================================
 
+
 def upsert_publisher(cur, doc: dict) -> int | None:
     """Extrait et trouve/crée l'éditeur depuis les champs ScanR."""
     source = doc.get("source") or {}
@@ -96,15 +98,13 @@ def upsert_journal(cur, doc: dict, publisher_id: int | None) -> int | None:
     issn = issns[0] if len(issns) >= 1 else None
     eissn = issns[1] if len(issns) >= 2 else None
 
-    return find_or_create_journal(
-        cur, title,
-        issn=issn, eissn=eissn,
-        publisher_id=publisher_id)
+    return find_or_create_journal(cur, title, issn=issn, eissn=eissn, publisher_id=publisher_id)
 
 
 # =============================================================
 # PUBLICATIONS (via services/publications.py)
 # =============================================================
+
 
 def _extract_nnt_from_scanr_id(scanr_id: str) -> str | None:
     """Extrait le NNT depuis un source_id ScanR (format nnt{NNT})."""
@@ -113,8 +113,7 @@ def _extract_nnt_from_scanr_id(scanr_id: str) -> str | None:
     return None
 
 
-def extract_pub_metadata(doc: dict, journal_id: int | None,
-                         scanr_id: str | None = None) -> dict:
+def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None = None) -> dict:
     """Extrait les métadonnées de publication d'un document ScanR.
 
     Retourne un dict utilisable par find_or_create_publication.
@@ -134,16 +133,25 @@ def extract_pub_metadata(doc: dict, journal_id: int | None,
 
     nnt = _extract_nnt_from_scanr_id(scanr_id) if scanr_id else None
 
-    return dict(title=title, title_normalized=normalize_text(title) if title else None,
-                pub_year=pub_year, doc_type=doc_type, doi=doi, nnt=nnt,
-                oa_status=oa_status, journal_id=journal_id,
-                container_title=container_title)
+    return dict(
+        title=title,
+        title_normalized=normalize_text(title) if title else None,
+        pub_year=pub_year,
+        doc_type=doc_type,
+        doi=doi,
+        nnt=nnt,
+        oa_status=oa_status,
+        journal_id=journal_id,
+        container_title=container_title,
+    )
 
 
-def find_publication(cur, doc: dict, journal_id: int | None,
-                     scanr_id: str | None = None) -> int | None:
+def find_publication(
+    cur, doc: dict, journal_id: int | None, scanr_id: str | None = None
+) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None."""
     from utils.doc_types import map_doc_type
+
     meta = extract_pub_metadata(doc, journal_id, scanr_id)
     if not meta["pub_year"] or not meta["title"]:
         return None
@@ -156,9 +164,15 @@ def find_publication(cur, doc: dict, journal_id: int | None,
 # SOURCE DOCUMENTS (SCANR)
 # =============================================================
 
-def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
-                          publication_id: int | None,
-                          pub_meta: dict | None = None) -> int:
+
+def insert_scanr_document(
+    cur,
+    doc: dict,
+    staging_id: int,
+    scanr_id: str,
+    publication_id: int | None,
+    pub_meta: dict | None = None,
+) -> int:
     """Crée/retrouve l'entrée source_publications pour ScanR. Retourne source_publications.id."""
     doi = extract_doi(doc)
     hal_id = extract_hal_id(doc)
@@ -230,7 +244,8 @@ def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
     language = pub_meta.get("language") if pub_meta else None
     container_title = pub_meta.get("container_title") if pub_meta else None
 
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id, external_ids,
@@ -256,15 +271,34 @@ def insert_scanr_document(cur, doc: dict, staging_id: int, scanr_id: str,
             cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_publications.cited_by_count, 0)),
             urls = COALESCE(EXCLUDED.urls, source_publications.urls)
         RETURNING id
-    """, (scanr_id, doi, title, pub_year, doc_type, publication_id, staging_id, external_ids,
-          journal_id, oa_status, language, container_title,
-          abstract, keywords, topics, cited_by_count, urls or None))
+    """,
+        (
+            scanr_id,
+            doi,
+            title,
+            pub_year,
+            doc_type,
+            publication_id,
+            staging_id,
+            external_ids,
+            journal_id,
+            oa_status,
+            language,
+            container_title,
+            abstract,
+            keywords,
+            topics,
+            cited_by_count,
+            urls or None,
+        ),
+    )
     return cur.fetchone()["id"]
 
 
 # =============================================================
 # SCANR AUTHORS (source_persons, source='scanr')
 # =============================================================
+
 
 def upsert_scanr_author(cur, author: dict) -> int | None:
     """Insère/retrouve un auteur ScanR dans source_persons (source='scanr').
@@ -291,7 +325,8 @@ def upsert_scanr_author(cur, author: dict) -> int | None:
     #    idref va aussi dans la colonne idref de source_persons
     if idref:
         source_id = idref
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO source_persons
                 (source, source_id, full_name, last_name, first_name, orcid, idref)
             VALUES ('scanr', %s, %s, %s, %s, %s, %s)
@@ -300,18 +335,23 @@ def upsert_scanr_author(cur, author: dict) -> int | None:
                 full_name = EXCLUDED.full_name,
                 idref = COALESCE(source_persons.idref, EXCLUDED.idref)
             RETURNING id
-        """, (source_id, full_name, last_name, first_name, orcid, idref))
+        """,
+            (source_id, full_name, last_name, first_name, orcid, idref),
+        )
         return cur.fetchone()["id"]
 
     # 2. Par nom exact (auteurs sans idref)
-    cur.execute("""
+    cur.execute(
+        """
         SELECT id FROM source_persons
         WHERE source = 'scanr'
           AND source_id LIKE 'scanr-%%'
           AND full_name = %s
           AND first_name IS NOT DISTINCT FROM %s
         LIMIT 1
-    """, (full_name, first_name))
+    """,
+        (full_name, first_name),
+    )
     row = cur.fetchone()
     if row:
         return row["id"]
@@ -320,18 +360,22 @@ def upsert_scanr_author(cur, author: dict) -> int | None:
     cur.execute("SELECT nextval('source_persons_id_seq')")
     next_id = cur.fetchone()["nextval"]
     source_id = f"scanr-{next_id}"
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO source_persons
             (id, source, source_id, full_name, last_name, first_name, orcid)
         VALUES (%s, 'scanr', %s, %s, %s, %s, %s)
         RETURNING id
-    """, (next_id, source_id, full_name, last_name, first_name, orcid))
+    """,
+        (next_id, source_id, full_name, last_name, first_name, orcid),
+    )
     return cur.fetchone()["id"]
 
 
 # =============================================================
 # SCANR AUTHORSHIPS
 # =============================================================
+
 
 def process_authors(cur, doc: dict, source_publication_id: int):
     """Traite les auteurs d'un document ScanR."""
@@ -360,7 +404,8 @@ def process_authors(cur, doc: dict, source_publication_id: int):
 
         author_full_name = author_data.get("fullName")
 
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO source_authorships
                 (source, source_publication_id, source_person_id, author_position, roles,
                  author_name_normalized, raw_author_name)
@@ -370,8 +415,16 @@ def process_authors(cur, doc: dict, source_publication_id: int):
                 roles = EXCLUDED.roles,
                 raw_author_name = EXCLUDED.raw_author_name
             RETURNING id
-        """, (source_publication_id, source_person_id, position, roles or None,
-              author_full_name, author_full_name))
+        """,
+            (
+                source_publication_id,
+                source_person_id,
+                position,
+                roles or None,
+                author_full_name,
+                author_full_name,
+            ),
+        )
         row = cur.fetchone()
         sa_id = row[0] if isinstance(row, tuple) else row["id"]
 
@@ -382,6 +435,7 @@ def process_authors(cur, doc: dict, source_publication_id: int):
 # =============================================================
 # BOUCLE PRINCIPALE
 # =============================================================
+
 
 def process_work(cur, staging_row) -> bool:
     """Traite un work du staging ScanR."""
@@ -417,7 +471,8 @@ def process_work(cur, staging_row) -> bool:
         # Idempotence : réutiliser le publication_id existant
         cur.execute(
             "SELECT publication_id FROM source_publications WHERE source = 'scanr' AND source_id = %s",
-            (scanr_id,))
+            (scanr_id,),
+        )
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc["publication_id"]:
             publication_id = existing_doc["publication_id"]
@@ -472,6 +527,7 @@ def process_work(cur, staging_row) -> bool:
 
     except Exception as e:
         import traceback
+
         logger.error(f"Erreur sur {scanr_id}: {e}\n{traceback.format_exc()}")
         raise
 
@@ -479,10 +535,12 @@ def process_work(cur, staging_row) -> bool:
 def main():
     parser = argparse.ArgumentParser(description="Normalisation ScanR → tables structurées")
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
-    parser.add_argument("--reset", action="store_true",
-                        help="Remettre tous les works à processed=FALSE")
-    parser.add_argument("--batch-size", type=int, default=100,
-                        help="Taille du commit batch (défaut: 100)")
+    parser.add_argument(
+        "--reset", action="store_true", help="Remettre tous les works à processed=FALSE"
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=100, help="Taille du commit batch (défaut: 100)"
+    )
     args = parser.parse_args()
 
     conn = get_connection()
@@ -498,7 +556,9 @@ def main():
             logger.info(f"Reset : {count} works remis à processed=FALSE")
             return
 
-        cur.execute("SELECT COUNT(*) AS cnt FROM staging WHERE source = 'scanr' AND processed = FALSE")
+        cur.execute(
+            "SELECT COUNT(*) AS cnt FROM staging WHERE source = 'scanr' AND processed = FALSE"
+        )
         total = cur.fetchone()["cnt"]
         logger.info(f"=== Normalisation ScanR : {total} works à traiter ===")
 
@@ -510,13 +570,16 @@ def main():
         limit = min(limit, total)
         logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
 
-        cur.execute("""
+        cur.execute(
+            """
             SELECT id, source_id AS scanr_id, doi, raw_data
             FROM staging
             WHERE source = 'scanr' AND processed = FALSE
             ORDER BY id
             LIMIT %s
-        """, (limit,))
+        """,
+            (limit,),
+        )
 
         rows = cur.fetchall()
         processed = 0
@@ -534,16 +597,13 @@ def main():
 
             if processed % args.batch_size == 0:
                 conn.commit()
-                logger.info(
-                    f"  {processed}/{limit} traités ({errors} erreurs)"
-                )
+                logger.info(f"  {processed}/{limit} traités ({errors} erreurs)")
 
         conn.commit()
 
         logger.info("\n=== Terminé ===")
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Erreurs : {errors}")
-
 
     except KeyboardInterrupt:
         conn.commit()

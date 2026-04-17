@@ -20,7 +20,9 @@ from db.connection import get_connection
 from services.publications import merge_publications
 from utils.log import setup_logger
 
-logger = setup_logger("merge_scanr_hal_dups", os.path.join(os.path.dirname(__file__), "../processing/logs"))
+logger = setup_logger(
+    "merge_scanr_hal_dups", os.path.join(os.path.dirname(__file__), "../processing/logs")
+)
 
 
 def find_duplicates(cur) -> list[dict]:
@@ -54,10 +56,12 @@ def main():
     parser = argparse.ArgumentParser(
         description="Fusionne les doublons ScanR↔HAL par identifiant HAL"
     )
-    parser.add_argument("--apply", action="store_true",
-                        help="Appliquer les fusions (sans ce flag : dry-run)")
-    parser.add_argument("--batch-size", type=int, default=500,
-                        help="Taille du commit batch (défaut: 500)")
+    parser.add_argument(
+        "--apply", action="store_true", help="Appliquer les fusions (sans ce flag : dry-run)"
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=500, help="Taille du commit batch (défaut: 500)"
+    )
     args = parser.parse_args()
 
     conn = get_connection()

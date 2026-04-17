@@ -12,15 +12,16 @@ from psycopg2.extras import RealDictCursor, execute_values
 
 from config.settings import settings
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "imports_manuels", "APC")
+DATA_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "imports_manuels", "APC"
+)
 
 
 def parse_amount(s: str) -> float | None:
     """Parse un montant EUR HT au format français (espace insécable, virgule décimale)."""
-    if not s or s.strip().lower() in ('', 'na', 'non identifié'):
+    if not s or s.strip().lower() in ("", "na", "non identifié"):
         return None
-    s = s.replace('\xa0', '').replace(' ', '').replace(',', '.')
+    s = s.replace("\xa0", "").replace(" ", "").replace(",", ".")
     try:
         return float(s)
     except ValueError:
@@ -36,7 +37,7 @@ def parse_year(s: str) -> int | None:
 
 def clean(s: str) -> str | None:
     """Strip et retourne None si vide."""
-    s = (s or '').strip()
+    s = (s or "").strip()
     return s if s else None
 
 
@@ -44,7 +45,7 @@ def import_main_file(cur):
     """Importe le fichier principal APC."""
     fname = None
     for f in os.listdir(DATA_DIR):
-        if f.startswith('APC') and f.endswith('.csv'):
+        if f.startswith("APC") and f.endswith(".csv"):
             fname = f
             break
     if not fname:
@@ -52,44 +53,50 @@ def import_main_file(cur):
         return 0
 
     path = os.path.join(DATA_DIR, fname)
-    with open(path, encoding='utf-8-sig') as f:
+    with open(path, encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         rows = []
         for r in reader:
-            doi = clean(r.get('DOI', ''))
-            if doi and doi.lower() in ('non identifié', 'na'):
+            doi = clean(r.get("DOI", ""))
+            if doi and doi.lower() in ("non identifié", "na"):
                 doi = None
-            rows.append((
-                clean(r.get('Laboratoire')),
-                clean(r.get('Editeur')),
-                clean(r.get('TypeEditeur')),
-                clean(r.get('Revue')),
-                clean(r.get('Issn_l')),
-                clean(r.get('TypeRevue')),
-                doi,
-                clean(r.get('TitreArticle')),
-                parse_amount(r.get('MontantEURHT', '')),
-                parse_year(r.get('AnneeFacturation', '')),
-                parse_year(r.get('AnneePublication', '')),
-                clean(r.get('Budget')),
-                clean(r.get('Etablissement')),
-                clean(r.get('TypeEtablissement')),
-                int(r['CoManId']) if r.get('CoManId', '').strip().isdigit() else None,
-                clean(r.get('EtablissementsRepondantsAToutesLesEnquetes')),
-                clean(r.get('PaiementPartage')),
-                'enquete_apc',
-                None,  # expense_type
-                clean(r.get('Remarques')),
-            ))
+            rows.append(
+                (
+                    clean(r.get("Laboratoire")),
+                    clean(r.get("Editeur")),
+                    clean(r.get("TypeEditeur")),
+                    clean(r.get("Revue")),
+                    clean(r.get("Issn_l")),
+                    clean(r.get("TypeRevue")),
+                    doi,
+                    clean(r.get("TitreArticle")),
+                    parse_amount(r.get("MontantEURHT", "")),
+                    parse_year(r.get("AnneeFacturation", "")),
+                    parse_year(r.get("AnneePublication", "")),
+                    clean(r.get("Budget")),
+                    clean(r.get("Etablissement")),
+                    clean(r.get("TypeEtablissement")),
+                    int(r["CoManId"]) if r.get("CoManId", "").strip().isdigit() else None,
+                    clean(r.get("EtablissementsRepondantsAToutesLesEnquetes")),
+                    clean(r.get("PaiementPartage")),
+                    "enquete_apc",
+                    None,  # expense_type
+                    clean(r.get("Remarques")),
+                )
+            )
 
-    execute_values(cur, """
+    execute_values(
+        cur,
+        """
         INSERT INTO apc_payments (
             lab_name, publisher_name, publisher_type, journal_name, issn,
             journal_type, doi, article_title, amount_eur_ht, billing_year,
             pub_year, budget, institution, institution_type, coman_id,
             all_surveys_answered, shared_payment, source_file, expense_type, remarks
         ) VALUES %s
-    """, rows)
+    """,
+        rows,
+    )
     return len(rows)
 
 
@@ -99,44 +106,50 @@ def import_fp_hors_oa(cur):
     if not os.path.exists(path):
         return 0
 
-    with open(path, encoding='utf-8-sig') as f:
+    with open(path, encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         rows = []
         for r in reader:
-            doi = clean(r.get('DOI', ''))
-            if doi and doi.lower() in ('non identifié', 'na'):
+            doi = clean(r.get("DOI", ""))
+            if doi and doi.lower() in ("non identifié", "na"):
                 doi = None
-            rows.append((
-                clean(r.get('Laboratoire')),
-                clean(r.get('Editeur')),
-                clean(r.get("Type d'éditeur*")),
-                clean(r.get('Revue')),
-                clean(r.get('ISSN')),
-                clean(r.get("Type de revue*")),
-                doi,
-                None,  # article_title
-                parse_amount(r.get('Montant payé en EURHT', '')),
-                parse_year(r.get('Année de facturation', '')),
-                parse_year(r.get('Année de publication', '')),
-                clean(r.get('Budget')),
-                None,  # institution (pas de colonne dédiée, budget = institution)
-                clean(r.get("Type d'établissement")),
-                int(r['CoMan Id.']) if r.get('CoMan Id.', '').strip().isdigit() else None,
-                clean(r.get("Etablissement ayant répondu à toutes les enquêtes\ndepuis 2017")),
-                None,  # shared_payment
-                'fp_hors_oa',
-                clean(r.get("Nature de la dépense*")),
-                clean(r.get('Remarques')),
-            ))
+            rows.append(
+                (
+                    clean(r.get("Laboratoire")),
+                    clean(r.get("Editeur")),
+                    clean(r.get("Type d'éditeur*")),
+                    clean(r.get("Revue")),
+                    clean(r.get("ISSN")),
+                    clean(r.get("Type de revue*")),
+                    doi,
+                    None,  # article_title
+                    parse_amount(r.get("Montant payé en EURHT", "")),
+                    parse_year(r.get("Année de facturation", "")),
+                    parse_year(r.get("Année de publication", "")),
+                    clean(r.get("Budget")),
+                    None,  # institution (pas de colonne dédiée, budget = institution)
+                    clean(r.get("Type d'établissement")),
+                    int(r["CoMan Id."]) if r.get("CoMan Id.", "").strip().isdigit() else None,
+                    clean(r.get("Etablissement ayant répondu à toutes les enquêtes\ndepuis 2017")),
+                    None,  # shared_payment
+                    "fp_hors_oa",
+                    clean(r.get("Nature de la dépense*")),
+                    clean(r.get("Remarques")),
+                )
+            )
 
-    execute_values(cur, """
+    execute_values(
+        cur,
+        """
         INSERT INTO apc_payments (
             lab_name, publisher_name, publisher_type, journal_name, issn,
             journal_type, doi, article_title, amount_eur_ht, billing_year,
             pub_year, budget, institution, institution_type, coman_id,
             all_surveys_answered, shared_payment, source_file, expense_type, remarks
         ) VALUES %s
-    """, rows)
+    """,
+        rows,
+    )
     return len(rows)
 
 
@@ -203,7 +216,9 @@ def main():
     print(f"Éditeurs mappés → publisher_id: {m_p}")
 
     # Stats
-    cur.execute("SELECT COUNT(*) AS total, COUNT(publication_id) AS with_pub, COUNT(journal_id) AS with_journal, COUNT(publisher_id) AS with_publisher FROM apc_payments")
+    cur.execute(
+        "SELECT COUNT(*) AS total, COUNT(publication_id) AS with_pub, COUNT(journal_id) AS with_journal, COUNT(publisher_id) AS with_publisher FROM apc_payments"
+    )
     s = cur.fetchone()
     print(f"\nTotal: {s['total']} lignes")
     print(f"  avec publication_id: {s['with_pub']}")

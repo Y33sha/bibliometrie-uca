@@ -66,7 +66,8 @@ def build(cur, sources=None):
     logger.info("Étape 2 : peuplement des FK (source_authorships → authorships)...")
 
     for source_name, source_value in active_sources:
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE source_authorships sa
             SET authorship_id = a.id
             FROM source_publications sd
@@ -77,7 +78,9 @@ def build(cur, sources=None):
               AND a.person_id = sa.person_id
               AND NOT sa.excluded
               AND sa.authorship_id IS NULL
-        """, (source_value,))
+        """,
+            (source_value,),
+        )
         logger.info(f"  {source_name} FK : {cur.rowcount} liens")
 
     # ── Étape 3 : author_position et is_corresponding ──
@@ -155,7 +158,8 @@ def build(cur, sources=None):
 
     # Union des structure_ids et OR des in_perimeter par source
     for source_name, source_value in active_sources:
-        cur.execute("""
+        cur.execute(
+            """
             WITH src_data AS (
                 SELECT sd.publication_id, sa.person_id,
                        sa.structure_ids AS struct_ids, sa.in_perimeter AS src_in_perimeter
@@ -180,7 +184,9 @@ def build(cur, sources=None):
             FROM src_data sd
             WHERE a.publication_id = sd.publication_id
               AND a.person_id = sd.person_id
-        """, (source_value,))
+        """,
+            (source_value,),
+        )
         logger.info(f"  {source_name} : {cur.rowcount} authorships mises à jour")
 
     cur.execute("SELECT COUNT(*) FROM authorships WHERE in_perimeter = TRUE")
@@ -193,10 +199,8 @@ def build(cur, sources=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Simuler sans modifier la base")
-    parser.add_argument("--sources", default=None,
-                        help="Sources à traiter (défaut: toutes)")
+    parser.add_argument("--dry-run", action="store_true", help="Simuler sans modifier la base")
+    parser.add_argument("--sources", default=None, help="Sources à traiter (défaut: toutes)")
     args = parser.parse_args()
 
     sources = set(s.strip() for s in args.sources.split(",") if s.strip()) if args.sources else None

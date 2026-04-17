@@ -29,8 +29,8 @@ from utils.normalize import normalize_text
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 
-CHAPTER_TYPES = ('book_chapter', 'book-chapter', 'chapter', 'COUV')
-BOOK_TYPES = ('book', 'OUV')
+CHAPTER_TYPES = ("book_chapter", "book-chapter", "chapter", "COUV")
+BOOK_TYPES = ("book", "OUV")
 
 
 def find_bad_merges(cur):
@@ -61,13 +61,16 @@ def find_bad_merges(cur):
 
 def get_pub_documents(cur, pub_id):
     """Récupère tous les documents sources d'une publication."""
-    cur.execute("""
+    cur.execute(
+        """
         SELECT id, source AS src, title, doc_type, pub_year, doi
         FROM source_publications WHERE publication_id = %s
-    """, (pub_id,))
+    """,
+        (pub_id,),
+    )
     docs = []
     for r in cur.fetchall():
-        docs.append({**r, 'table': 'source_publications'})
+        docs.append({**r, "table": "source_publications"})
     return docs
 
 
@@ -77,16 +80,27 @@ def rebuild_doc(cur, doc):
     title_norm = normalize_text(title)
     pub_year = doc["pub_year"]
     doc_type_map = {
-        'COUV': 'book_chapter', 'book-chapter': 'book_chapter',
-        'chapter': 'book_chapter',
-        'OUV': 'book',
-        'ART': 'article', 'COMM': 'conference_paper', 'POSTER': 'conference_paper',
-        'THESE': 'thesis', 'HDR': 'thesis', 'MEM': 'thesis',
-        'REPORT': 'report', 'DOUV': 'book',
-        'UNDEFINED': 'other', 'OTHER': 'other', 'LECTURE': 'other',
-        'IMG': 'other', 'VIDEO': 'other', 'SON': 'other', 'MAP': 'other',
-        'PATENT': 'other',
-        'preprint': 'preprint',
+        "COUV": "book_chapter",
+        "book-chapter": "book_chapter",
+        "chapter": "book_chapter",
+        "OUV": "book",
+        "ART": "article",
+        "COMM": "conference_paper",
+        "POSTER": "conference_paper",
+        "THESE": "thesis",
+        "HDR": "thesis",
+        "MEM": "thesis",
+        "REPORT": "report",
+        "DOUV": "book",
+        "UNDEFINED": "other",
+        "OTHER": "other",
+        "LECTURE": "other",
+        "IMG": "other",
+        "VIDEO": "other",
+        "SON": "other",
+        "MAP": "other",
+        "PATENT": "other",
+        "preprint": "preprint",
     }
     doc_type = doc_type_map.get(doc["doc_type"], doc["doc_type"] or "other")
     doi = doc["doi"]
@@ -95,8 +109,12 @@ def rebuild_doc(cur, doc):
         return None
 
     pub_id, is_new = find_or_create(
-        cur, title=title, title_normalized=title_norm,
-        pub_year=pub_year, doc_type=doc_type, doi=doi,
+        cur,
+        title=title,
+        title_normalized=title_norm,
+        pub_year=pub_year,
+        doc_type=doc_type,
+        doi=doi,
     )
     return pub_id
 
@@ -123,9 +141,11 @@ def fix(conn, dry_run=False):
 
         for d in docs:
             is_chapter = d["doc_type"] in CHAPTER_TYPES
-            log.info(f"  [{d['src']}] {d['table']} #{d['id']} "
-                     f"type={d['doc_type']} doi={d['doi']} "
-                     f"titre={d['title'][:60] if d['title'] else '?'}...")
+            log.info(
+                f"  [{d['src']}] {d['table']} #{d['id']} "
+                f"type={d['doc_type']} doi={d['doi']} "
+                f"titre={d['title'][:60] if d['title'] else '?'}..."
+            )
 
             if dry_run:
                 if is_chapter and (has_book or has_diff_titles):
@@ -134,14 +154,12 @@ def fix(conn, dry_run=False):
                 continue
 
             # Détacher le document
-            cur.execute(f"UPDATE {d['table']} SET publication_id = NULL WHERE id = %s",
-                        (d["id"],))
+            cur.execute(f"UPDATE {d['table']} SET publication_id = NULL WHERE id = %s", (d["id"],))
 
             # Retirer le DOI des chapitres si c'est un DOI d'ouvrage
             # ou si chapitres de titres différents
             if is_chapter and (has_book or has_diff_titles):
-                cur.execute(f"UPDATE {d['table']} SET doi = NULL WHERE id = %s",
-                            (d["id"],))
+                cur.execute(f"UPDATE {d['table']} SET doi = NULL WHERE id = %s", (d["id"],))
                 d["doi"] = None
 
         if dry_run:
@@ -150,8 +168,10 @@ def fix(conn, dry_run=False):
 
         # Supprimer les authorships vérité et la publication
         cur.execute("DELETE FROM authorships WHERE publication_id = %s", (pub_id,))
-        cur.execute("DELETE FROM distinct_publications WHERE pub_id_a = %s OR pub_id_b = %s",
-                    (pub_id, pub_id))
+        cur.execute(
+            "DELETE FROM distinct_publications WHERE pub_id_a = %s OR pub_id_b = %s",
+            (pub_id, pub_id),
+        )
         cur.execute("DELETE FROM publications WHERE id = %s", (pub_id,))
         log.info(f"  Publication {pub_id} supprimée")
 
@@ -159,8 +179,10 @@ def fix(conn, dry_run=False):
         for d in docs:
             new_pub_id = rebuild_doc(cur, d)
             if new_pub_id:
-                cur.execute(f"UPDATE {d['table']} SET publication_id = %s WHERE id = %s",
-                            (new_pub_id, d["id"]))
+                cur.execute(
+                    f"UPDATE {d['table']} SET publication_id = %s WHERE id = %s",
+                    (new_pub_id, d["id"]),
+                )
                 update_sources(cur, new_pub_id)
                 log.info(f"  [{d['src']}] #{d['id']} → publication {new_pub_id}")
             else:
@@ -178,7 +200,8 @@ def fix(conn, dry_run=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Corrige les fusions erronées chapitre/ouvrage par DOI")
+        description="Corrige les fusions erronées chapitre/ouvrage par DOI"
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 

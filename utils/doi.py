@@ -20,7 +20,7 @@ def clean_doi(doi: str | None) -> str | None:
     doi = doi.strip()
     for prefix in ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/"):
         if doi.lower().startswith(prefix):
-            doi = doi[len(prefix):]
+            doi = doi[len(prefix) :]
             break
     doi = doi.strip()
     if not doi:

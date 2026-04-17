@@ -54,7 +54,7 @@ def fetch_oa_status(doi: str) -> str | None:
                 return None  # DOI inconnu d'Unpaywall
             if resp.status_code == 429:
                 wait = 5 * (attempt + 1)
-                log.warning(f"Rate limited, pause {wait}s (tentative {attempt+1}/3)...")
+                log.warning(f"Rate limited, pause {wait}s (tentative {attempt + 1}/3)...")
                 time.sleep(wait)
                 continue
             if resp.status_code != 200:
@@ -75,7 +75,9 @@ def fetch_oa_status(doi: str) -> str | None:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit", type=int, default=0, help="Nombre max de publis à traiter (0=toutes)")
+    parser.add_argument(
+        "--limit", type=int, default=0, help="Nombre max de publis à traiter (0=toutes)"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Afficher sans modifier la base")
     args = parser.parse_args()
 
@@ -109,7 +111,9 @@ def main():
         if i > 0 and i % BATCH_SIZE == 0:
             if not args.dry_run:
                 conn.commit()
-            log.info(f"  {i}/{total} — {updated} mis à jour, {skipped} inchangés, {not_found} non trouvés")
+            log.info(
+                f"  {i}/{total} — {updated} mis à jour, {skipped} inchangés, {not_found} non trouvés"
+            )
 
         status = fetch_oa_status(doi)
 
@@ -141,7 +145,9 @@ def main():
     if not args.dry_run:
         conn.commit()
 
-    log.info(f"Terminé : {updated} mis à jour, {skipped} inchangés, {not_found} non trouvés sur Unpaywall, {errors} erreurs")
+    log.info(
+        f"Terminé : {updated} mis à jour, {skipped} inchangés, {not_found} non trouvés sur Unpaywall, {errors} erreurs"
+    )
     conn.close()
 
 
