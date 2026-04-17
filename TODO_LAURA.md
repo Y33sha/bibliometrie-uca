@@ -64,6 +64,8 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 ### Personnes (admin)
 * [ ] quoi faire des entités fausses? a minima, rejeter leurs authorships et s'assurer qu'elles n'apparaissent pas dans orphan-authorships
 * [ ] si source erronée: rejeter authorship source + recalculer affiliations de l'authorship à partir des sources non rejetées / caveat: Clarifier la sémantique de `excluded` sur les authorships sources: est-ce l'authorship qui est fausse, ou son affiliation? (allons plus loin: pourrait-on déclarer fausses certaines colonnes et pas d'autres? via un champ jsonb par exemple)
+* [ ] date de dernière publication UCA? (permet de filtrer les auteurs "legacy" ou actifs)
+* [ ] aucun intérêt d'avoir le label de chaque identifier
 ### Publishers / Journals
 * [ ] Tri facettes
 * [ ] publishers: distinguer types d'entités (établissements d'enseignement, sociétés savantes, éditeurs commerciaux)
@@ -98,6 +100,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] décomptes sur les onglets: ne pas tenir compte des facettes en place
 * [ ] décomptes facettes: toujours aligné à droite
 * [ ] ordre des sources pour les thèses: harmoniser page laboratoire avec page thèses
+* [ ] admin/personnes, formes de nom: modal authorships: source affichée: default wos (ajouter les autres sources, et mettre default None)
 # Trucs pour plus tard
 * compte fractionnaire des publications?
 * collaborations nationales et internationales: identification structures? compliqué, je pense que pour ça il vaut mieux réutiliser les sources directement
