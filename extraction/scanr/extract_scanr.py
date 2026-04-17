@@ -20,13 +20,13 @@ from psycopg2.extras import Json
 from db.connection import get_connection
 from extraction.common import clean_doi, compute_hash, get_existing_ids, setup_logger
 from utils.api_limits import SCANR_DELAY, SCANR_PER_PAGE
+from utils.api_retry import http_request_with_retry
 from utils.app_config import (
     get_api_base_urls,
     get_scanr_affiliation_ids,
     get_scanr_credentials,
     get_years,
 )
-
 
 logger = setup_logger("extract_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -64,10 +64,10 @@ def extract_doi(doc: dict) -> str | None:
 
 
 def fetch_page(url: str, auth: tuple, query: dict) -> dict:
-    """Exécute une requête Elasticsearch."""
-    resp = requests.post(url, json=query, auth=auth, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
+    """Exécute une requête Elasticsearch (avec retry/backoff)."""
+    return http_request_with_retry(
+        "POST", url, json_body=query, auth=auth, timeout=30, label="ScanR search",
+    )
 
 
 def extract_year(
