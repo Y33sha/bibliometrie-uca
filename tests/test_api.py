@@ -65,7 +65,7 @@ for router_module in [
 ]:
     if router_module and hasattr(router_module, "get_cursor"):
         router_module.get_cursor = _test_get_cursor
-import config.settings as _settings
+from config.settings import settings as _settings
 
 
 @pytest.fixture(scope="module")
@@ -81,7 +81,7 @@ def auth_client():
     from backend.deps import _sign_token
     import time
     with TestClient(app, raise_server_exceptions=False) as c:
-        token = _sign_token(f"{_settings.ADMIN_USER}|{int(time.time())}")
+        token = _sign_token(f"{_settings.admin_user}|{int(time.time())}")
         c.cookies.set("session", token)
         yield c
 
