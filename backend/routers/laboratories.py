@@ -3,7 +3,7 @@
 import datetime
 import logging
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from backend.deps import get_cursor
 from backend.filters import persons_sort_clause
