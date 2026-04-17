@@ -7,10 +7,32 @@ restent autorisées dans les routers (convention du projet).
 """
 
 from psycopg2.extras import Json
+from pydantic import ValidationError as PydanticValidationError
 
 from domain.errors import NotFoundError, ValidationError
+from domain.structure import StructureApiIds
 from services.audit import emit_event
 from utils.normalize import normalize_text
+
+
+def _validate_api_ids(raw: dict | None) -> dict | None:
+    """Valide et normalise `api_ids` via le modèle domaine StructureApiIds.
+
+    - Entrée : dict brut (côté API admin) ou None.
+    - Sortie : dict canonique prêt pour JSONB, ou None si l'entrée
+      est vide/None.
+    - Lève ValidationError métier si le schéma est violé (type erroné,
+      valeur non-string dans une liste, etc.).
+
+    Le wrap PydanticValidationError → ValidationError garde le code
+    HTTP 400 via les handlers globaux (sinon on aurait un 500).
+    """
+    if not raw:
+        return None
+    try:
+        return StructureApiIds(**raw).to_dict() or None
+    except PydanticValidationError as e:
+        raise ValidationError(f"api_ids invalide : {e}") from e
 
 # ── Mapping des champs UI → colonnes SQL pour la table structures ──
 _STRUCTURE_FIELD_MAP = {
@@ -39,6 +61,7 @@ def create_structure(
     api_ids: dict | None = None,
 ) -> dict:
     """Crée une structure. Retourne la ligne insérée (RealDictRow)."""
+    validated_api_ids = _validate_api_ids(api_ids)
     cur.execute(
         """
         INSERT INTO structures (code, name, acronym, structure_type, ror_id,
@@ -49,7 +72,7 @@ def create_structure(
         """,
         (
             code, name, acronym, type, ror_id, rnsr_id, hal_collection,
-            Json(api_ids) if api_ids else None,
+            Json(validated_api_ids) if validated_api_ids else None,
         ),
     )
     return cur.fetchone()
@@ -74,8 +97,9 @@ def update_structure(cur, structure_id: int, *, fields: dict) -> dict:
             params.append(val)
 
     if "api_ids" in fields and fields["api_ids"] is not None:
+        validated = _validate_api_ids(fields["api_ids"])
         updates_sql.append("api_ids = %s")
-        params.append(Json(fields["api_ids"]) if fields["api_ids"] else None)
+        params.append(Json(validated) if validated else None)
 
     if not updates_sql:
         raise ValidationError("Aucun champ à mettre à jour")
