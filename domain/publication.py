@@ -1,14 +1,16 @@
-"""Value objects des identifiants bibliométriques.
+"""Concept métier Publication — value objects et (à terme) entités.
 
-Chaque identifiant est un objet-valeur immuable et auto-validé :
-- construction stricte : `DOI("...")` lève ValidationError si la valeur
-  est invalide ou vide
-- construction tolérante : `DOI.try_parse("...")` renvoie None si l'entrée
-  est inutilisable (pratique pour le code pipeline qui accepte l'absence
-  de donnée)
-- la valeur stockée est toujours normalisée (canonique) : on peut
-  comparer deux identifiants par égalité de valeur sans se soucier des
-  variantes d'écriture (préfixes URL, casse, suffixes de version, etc.)
+Regroupe ici tout ce qui est propre à une publication : identifiants
+(DOI, HAL ID document, NNT), puis plus tard les entités `Publication`,
+les règles de déduplication, les invariants métier.
+
+Les value objects sont immuables et auto-validés :
+- construction stricte : `DOI("...")` lève ValidationError si invalide
+- construction tolérante : `DOI.try_parse("...")` renvoie None quand
+  l'absence est un cas normal (code pipeline qui tolère les données
+  manquantes)
+- la valeur stockée est toujours normalisée (canonique) : deux VO
+  égaux par valeur, quel que soit le format d'entrée
 """
 
 import re
@@ -77,105 +79,47 @@ class DOI:
         return self.value
 
 
-# ── ORCID ──────────────────────────────────────────────────────────
+# ── HAL ID (document) ──────────────────────────────────────────────
 
-_ORCID_URL_PREFIXES = ("https://orcid.org/", "http://orcid.org/", "orcid.org/")
-# Format canonique : 4 groupes de 4 caractères, dernier peut être X (checksum)
-_ORCID_CANONICAL = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
+# Préfixes de portails HAL (liste historique, cf. utils/hal.py)
+_HAL_DOC_PREFIXES = ("hal", "tel", "halshs", "inserm", "pasteur", "cea", "ineris")
+_HAL_DOC_BASE = re.compile(
+    rf"((?:{'|'.join(_HAL_DOC_PREFIXES)})-\d+)", re.IGNORECASE
+)
 
 
-def _normalize_orcid(raw: str | None) -> str | None:
-    """Normalise un ORCID : supprime le préfixe URL, met les hyphens en forme.
+def _normalize_hal_id(raw: str | None) -> str | None:
+    """Extrait le HAL ID canonique d'une chaîne ou URL.
 
-    Accepte les variantes avec ou sans URL, avec ou sans hyphens.
-    Renvoie None si la normalisation échoue ou si le format est invalide.
+    Accepte une URL (hal.science, tel.archives-ouvertes.fr, …) ou un HAL
+    ID brut avec éventuel suffixe de version (v1, v2). Retourne l'ID
+    sans version (concept HAL).
     """
     if not raw:
         return None
-    s = raw.strip()
-    # Strip URL prefix (casse-insensible)
-    lower = s.lower()
-    for prefix in _ORCID_URL_PREFIXES:
-        if lower.startswith(prefix):
-            s = s[len(prefix):]
-            break
-    s = s.strip().upper()  # X en majuscule
-    # Forme sans hyphens → ajouter les hyphens
-    if "-" not in s and len(s) == 16:
-        s = f"{s[0:4]}-{s[4:8]}-{s[8:12]}-{s[12:16]}"
-    if not _ORCID_CANONICAL.match(s):
-        return None
-    return s
+    s = raw.strip().lower()
+    m = _HAL_DOC_BASE.search(s)
+    return m.group(1) if m else None
 
 
 @dataclass(frozen=True)
-class ORCID:
-    """Open Researcher and Contributor ID, format XXXX-XXXX-XXXX-XXXX.
+class HALId:
+    """Identifiant HAL d'un document (hal-XXXXX, tel-XXXXX, halshs-XXXXX, …).
 
-    Lève ValidationError si la valeur ne respecte pas le format. Ne
-    valide pas la checksum MOD 11-2 (à ajouter si besoin ultérieurement).
+    Normalisé en minuscules sans suffixe de version (`hal-04123456v2` →
+    `hal-04123456`). Accepte une URL en entrée.
     """
 
     value: str
 
     def __post_init__(self) -> None:
-        cleaned = _normalize_orcid(self.value)
+        cleaned = _normalize_hal_id(self.value)
         if not cleaned:
-            raise ValidationError(f"ORCID invalide : {self.value!r}")
+            raise ValidationError(f"HAL ID invalide : {self.value!r}")
         object.__setattr__(self, "value", cleaned)
 
     @classmethod
-    def try_parse(cls, raw: str | None) -> "ORCID | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
-
-
-# ── IdRef (PPN SUDOC) ──────────────────────────────────────────────
-
-_IDREF_URL_RE = re.compile(r"idref\.fr/(\d{8}[\dX])(?:/id)?", re.IGNORECASE)
-# PPN : 8 chiffres + 1 caractère de contrôle (chiffre ou X)
-_IDREF_CANONICAL = re.compile(r"^\d{8}[\dX]$")
-
-
-def _normalize_idref(raw: str | None) -> str | None:
-    """Normalise un IdRef (PPN) : 9 caractères, dernier peut être X.
-
-    Accepte une URL idref.fr en entrée.
-    """
-    if not raw:
-        return None
-    s = raw.strip()
-    # URL éventuelle
-    m = _IDREF_URL_RE.search(s)
-    if m:
-        s = m.group(1)
-    s = s.upper()
-    if not _IDREF_CANONICAL.match(s):
-        return None
-    return s
-
-
-@dataclass(frozen=True)
-class IdRef:
-    """Identifiant IdRef (PPN SUDOC), format 8 chiffres + clé de contrôle."""
-
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_idref(self.value)
-        if not cleaned:
-            raise ValidationError(f"IdRef invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "IdRef | None":
+    def try_parse(cls, raw: str | None) -> "HALId | None":
         if not raw:
             return None
         try:

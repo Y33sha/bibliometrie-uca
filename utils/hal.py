@@ -1,6 +1,10 @@
-"""Utilitaires HAL partagés entre extraction, normalisation et processing."""
+"""Utilitaires HAL partagés entre extraction, normalisation et processing.
 
-import re
+La logique d'extraction/validation de HAL ID vit dans `domain.publication`.
+`extract_hal_id_from_url` est conservé pour les sites d'appel existants.
+"""
+
+from domain.publication import _normalize_hal_id
 
 # Champs Solr à récupérer lors des requêtes HAL (staging)
 HAL_FIELDS = [
@@ -60,7 +64,4 @@ def extract_hal_id_from_url(url: str | None) -> str | None:
     >>> extract_hal_id_from_url("https://hal.science/hal-04123456v2")
     'hal-04123456'
     """
-    if not url:
-        return None
-    match = re.search(r"((?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+)", url)
-    return match.group(1) if match else None
+    return _normalize_hal_id(url)
