@@ -10,9 +10,6 @@ __pycache__/
 .venv/
 venv/
 
-# Config sensible (credentials, clés API)
-config/settings.py
-
 # Frontend (SvelteKit)
 frontend/node_modules/
 frontend/build/

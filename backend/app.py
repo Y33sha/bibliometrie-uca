@@ -47,10 +47,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 # ----- CORS -----
-
-_DEFAULT_ORIGINS = "http://localhost:5176,http://localhost:5173,http://127.0.0.1:5176"
+# CORS_ORIGINS est obligatoire (défini dans .env en dev, injecté en prod).
 _cors_origins = [o.strip() for o in
-                 os.environ.get("CORS_ORIGINS", _DEFAULT_ORIGINS).split(",")
+                 os.environ.get("CORS_ORIGINS", "").split(",")
                  if o.strip()]
 
 app.add_middleware(

@@ -22,8 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Code applicatif
 COPY backend/        ./backend/
-COPY config/__init__.py ./config/
-COPY config/settings.docker.py ./config/settings.py
+COPY config/ ./config/
 COPY db/              ./db/
 COPY extraction/      ./extraction/
 COPY processing/      ./processing/
