@@ -81,10 +81,17 @@ def process_document(cur, doc, dry_run):
         return True
 
     pub_id, is_new = find_or_create_publication(
-        cur, title=title, title_normalized=normalize_text(title),
-        pub_year=pub_year, doc_type=doc_type, doi=doi, nnt=nnt,
-        oa_status=oa_status, journal_id=journal_id,
-        container_title=container_title, language=language,
+        cur,
+        title=title,
+        title_normalized=normalize_text(title),
+        pub_year=pub_year,
+        doc_type=doc_type,
+        doi=doi,
+        nnt=nnt,
+        oa_status=oa_status,
+        journal_id=journal_id,
+        container_title=container_title,
+        language=language,
         allow_create=True,
     )
 
@@ -134,8 +141,9 @@ def run(dry_run=False):
             conn.rollback()
         else:
             conn.commit()
-            logger.info("Terminé : %d publications créées/rattachées, %d ignorées",
-                        created, skipped)
+            logger.info(
+                "Terminé : %d publications créées/rattachées, %d ignorées", created, skipped
+            )
 
         cur.close()
         conn.close()

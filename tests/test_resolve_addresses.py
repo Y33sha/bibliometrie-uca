@@ -1,6 +1,5 @@
 """Tests pour la résolution d'adresses (processing/resolve_addresses.py)."""
 
-
 from processing.resolve_addresses import (
     build_forms_by_structure,
     match_form_in_text,
@@ -9,8 +8,15 @@ from processing.resolve_addresses import (
 
 # ── Helpers pour construire des formes de test ───────────────────
 
-def _form(structure_id, form_text, form_normalized=None,
-          requires_context_of=None, form_id=None, is_word_boundary=False):
+
+def _form(
+    structure_id,
+    form_text,
+    form_normalized=None,
+    requires_context_of=None,
+    form_id=None,
+    is_word_boundary=False,
+):
     """Construit un dict de forme pour les tests."""
     return {
         "id": form_id or structure_id * 100,
@@ -24,6 +30,7 @@ def _form(structure_id, form_text, form_normalized=None,
 
 
 # ── match_form_in_text ───────────────────────────────────────────
+
 
 class TestMatchFormInText:
     def test_long_substring(self):
@@ -68,6 +75,7 @@ class TestMatchFormInText:
 
 # ── resolve_address ──────────────────────────────────────────────
 
+
 class TestResolveAddress:
     def test_simple_match(self):
         forms = [_form(1, "limos", "limos", form_id=10)]
@@ -106,8 +114,7 @@ class TestResolveAddress:
     def test_context_satisfied(self):
         """Forme avec requires_context_of : le contexte est présent."""
         forms = [
-            _form(1, "limos", "limos", form_id=10,
-                  requires_context_of=[2]),
+            _form(1, "limos", "limos", form_id=10, requires_context_of=[2]),
             _form(2, "clermont", "clermont", form_id=20),
         ]
         fbs = build_forms_by_structure(forms)
@@ -118,8 +125,7 @@ class TestResolveAddress:
     def test_context_not_satisfied(self):
         """Forme avec requires_context_of : le contexte est absent."""
         forms = [
-            _form(1, "limos", "limos", form_id=10,
-                  requires_context_of=[2]),
+            _form(1, "limos", "limos", form_id=10, requires_context_of=[2]),
             _form(2, "grenoble", "grenoble", form_id=20),
         ]
         fbs = build_forms_by_structure(forms)
@@ -134,15 +140,18 @@ class TestResolveAddress:
         L'adresse parisienne ne contient pas UCA → pas de match.
         """
         forms = [
-            _form(217, "u999", "u999", form_id=1566, is_word_boundary=True,
-                  requires_context_of=[169]),  # LRL, nécessite UCA
+            _form(
+                217, "u999", "u999", form_id=1566, is_word_boundary=True, requires_context_of=[169]
+            ),  # LRL, nécessite UCA
             _form(169, "universite clermont auvergne", form_id=100),  # UCA
         ]
         fbs = build_forms_by_structure(forms)
-        text = ("pole des cardiopathies congenitales du nouveau ne a l adulte "
-                "centre constitutif cardiopathies congenitales complexes m3c "
-                "groupe hospitalier paris saint joseph hopital marie lannelongue "
-                "inserm u999 universite paris saclay")
+        text = (
+            "pole des cardiopathies congenitales du nouveau ne a l adulte "
+            "centre constitutif cardiopathies congenitales complexes m3c "
+            "groupe hospitalier paris saint joseph hopital marie lannelongue "
+            "inserm u999 universite paris saclay"
+        )
         result = resolve_address(text, forms, fbs)
         matched_ids = {sid for sid, _ in result}
         assert 217 not in matched_ids  # LRL ne doit PAS matcher
@@ -150,8 +159,9 @@ class TestResolveAddress:
     def test_u999_clermont_matches_lrl(self):
         """u999 dans une adresse clermontoise avec UCA → matche LRL."""
         forms = [
-            _form(217, "u999", "u999", form_id=1566, is_word_boundary=True,
-                  requires_context_of=[169]),
+            _form(
+                217, "u999", "u999", form_id=1566, is_word_boundary=True, requires_context_of=[169]
+            ),
             _form(169, "universite clermont auvergne", form_id=100),
         ]
         fbs = build_forms_by_structure(forms)
@@ -164,8 +174,7 @@ class TestResolveAddress:
     def test_context_tutelles(self):
         """requires_context_of = [99] (IDs directs)."""
         forms = [
-            _form(1, "limos", "limos", form_id=10,
-                  requires_context_of=[99]),
+            _form(1, "limos", "limos", form_id=10, requires_context_of=[99]),
             _form(99, "uca", "uca", form_id=99),
         ]
         fbs = build_forms_by_structure(forms)

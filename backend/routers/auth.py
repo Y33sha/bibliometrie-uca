@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @router.post("/api/auth/login")
 async def auth_login(data: LoginRequest, response: Response):
     from fastapi import HTTPException
+
     if data.username != settings.admin_user or not _check_password(data.password):
         raise HTTPException(status_code=401, detail="Identifiants incorrects")
     payload = f"{settings.admin_user}|{int(time.time())}"

@@ -16,15 +16,18 @@ from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
 
 # ── Création ──
 
+
 def create_person(cur, last_name: str, first_name: str = "") -> int:
     """Crée une personne et retourne son id."""
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO persons (last_name, first_name,
                              last_name_normalized, first_name_normalized)
         VALUES (%s, %s, %s, %s)
         RETURNING id
-    """, (last_name, first_name,
-          normalize_name(last_name), normalize_name(first_name)))
+    """,
+        (last_name, first_name, normalize_name(last_name), normalize_name(first_name)),
+    )
     person_id = cur.fetchone()["id"]
     refresh_person_name_forms(cur, person_id, last_name, first_name)
     return person_id
@@ -32,9 +35,16 @@ def create_person(cur, last_name: str, first_name: str = "") -> int:
 
 # ── Rattachement / détachement authorships ──
 
-def link_authorship(cur, person_id: int, source: str, authorship_id: int,
-                    *, source_person_id: int | None = None,
-                    has_hal_person_id: bool = False):
+
+def link_authorship(
+    cur,
+    person_id: int,
+    source: str,
+    authorship_id: int,
+    *,
+    source_person_id: int | None = None,
+    has_hal_person_id: bool = False,
+):
     """Rattache une authorship source à une personne (pipeline).
 
     Pour HAL, fait aussi le dual-write sur source_persons si c'est un
@@ -44,14 +54,19 @@ def link_authorship(cur, person_id: int, source: str, authorship_id: int,
     if source not in ALL_SOURCES_SET:
         return
 
-    cur.execute("UPDATE source_authorships SET person_id = %s WHERE id = %s AND source = %s",
-                (person_id, authorship_id, source))
+    cur.execute(
+        "UPDATE source_authorships SET person_id = %s WHERE id = %s AND source = %s",
+        (person_id, authorship_id, source),
+    )
 
     if source == "hal" and source_person_id and has_hal_person_id:
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE source_persons SET person_id = %s
             WHERE id = %s AND (source_ids->>'hal_person_id') IS NOT NULL
-        """, (person_id, source_person_id))
+        """,
+            (person_id, source_person_id),
+        )
 
 
 def link_authorships(cur, person_id: int, authorships: list[dict]):
@@ -61,9 +76,14 @@ def link_authorships(cur, person_id: int, authorships: list[dict]):
     et optionnellement 'source_person_id' et 'has_hal_person_id'.
     """
     for a in authorships:
-        link_authorship(cur, person_id, a["source"], a["authorship_id"],
-                        source_person_id=a.get("source_person_id"),
-                        has_hal_person_id=a.get("has_hal_person_id", False))
+        link_authorship(
+            cur,
+            person_id,
+            a["source"],
+            a["authorship_id"],
+            source_person_id=a.get("source_person_id"),
+            has_hal_person_id=a.get("has_hal_person_id", False),
+        )
 
 
 def unlink_authorship(cur, person_id: int, source: str, authorship_id: int):
@@ -71,20 +91,24 @@ def unlink_authorship(cur, person_id: int, source: str, authorship_id: int):
     if source in ALL_SOURCES_SET:
         cur.execute(
             "UPDATE source_authorships SET person_id = NULL WHERE id = %s AND person_id = %s AND source = %s",
-            (authorship_id, person_id, source))
+            (authorship_id, person_id, source),
+        )
 
 
 # ── Identifiants ──
 
-def add_identifier(cur, person_id: int, id_type: str, id_value: str,
-                   source: str = "auto", status: str = "pending"):
+
+def add_identifier(
+    cur, person_id: int, id_type: str, id_value: str, source: str = "auto", status: str = "pending"
+):
     """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
 
     Si l'identifiant existe avec statut 'rejected', le réattribue
     (nouveau person_id, statut pending).
     Si 'pending' ou 'confirmed', ne fait rien.
     """
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
         VALUES (%s, %s, %s, %s, %s::identifier_status)
         ON CONFLICT (id_type, id_value) DO UPDATE SET
@@ -92,16 +116,21 @@ def add_identifier(cur, person_id: int, id_type: str, id_value: str,
             source = EXCLUDED.source,
             status = 'pending'
         WHERE person_identifiers.status = 'rejected'
-    """, (person_id, id_type, id_value, source, status))
+    """,
+        (person_id, id_type, id_value, source, status),
+    )
 
     # Attribution d'un idhal → rattacher le compte HAL correspondant
     if id_type == "idhal":
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE source_persons SET person_id = %s
             WHERE source = 'hal'
               AND source_ids->>'idhal' = %s
               AND (person_id IS NULL OR person_id != %s)
-        """, (person_id, id_value, person_id))
+        """,
+            (person_id, id_value, person_id),
+        )
 
 
 def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict]):
@@ -121,6 +150,7 @@ def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict
 
 
 # ── Formes de noms ──
+
 
 def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
     """Calcule les variantes normalisées de formes de nom pour une personne.
@@ -165,21 +195,27 @@ def refresh_person_name_forms(cur, person_id: int, last_name: str, first_name: s
     sources sont préservées (seul le person_id et la source sont retirés/ajoutés).
     """
     # 1a. Formes dont 'persons' est la seule source : retirer le person_id
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE person_name_forms
         SET person_ids = array_remove(person_ids, %s)
         WHERE %s = ANY(person_ids)
           AND sources = ARRAY['persons']
-    """, (person_id, person_id))
+    """,
+        (person_id, person_id),
+    )
     # 1b. Formes multi-sources : retirer 'persons' de sources, garder person_id
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE person_name_forms
         SET sources = array_remove(sources, 'persons'),
             updated_at = now()
         WHERE %s = ANY(person_ids)
           AND 'persons' = ANY(sources)
           AND array_length(sources, 1) > 1
-    """, (person_id,))
+    """,
+        (person_id,),
+    )
     # 1c. Nettoyer les formes devenues vides
     cur.execute("""
         DELETE FROM person_name_forms
@@ -203,7 +239,8 @@ def add_name_form(cur, person_id: int, full_name: str, source: str | None = None
     if not norm:
         return
     if source:
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO person_name_forms (name_form, person_ids, sources)
             VALUES (%s, ARRAY[%s], ARRAY[%s])
             ON CONFLICT (name_form) DO UPDATE
@@ -216,9 +253,12 @@ def add_name_form(cur, person_id: int, full_name: str, source: str | None = None
                     FROM unnest(COALESCE(person_name_forms.sources, '{}') || ARRAY[%s]) AS x
                 ),
                 updated_at = now()
-        """, (norm, person_id, source, person_id, source))
+        """,
+            (norm, person_id, source, person_id, source),
+        )
     else:
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO person_name_forms (name_form, person_ids)
             VALUES (%s, ARRAY[%s])
             ON CONFLICT (name_form) DO UPDATE
@@ -226,7 +266,9 @@ def add_name_form(cur, person_id: int, full_name: str, source: str | None = None
                 SELECT array_agg(DISTINCT x)
                 FROM unnest(person_name_forms.person_ids || ARRAY[%s]) AS x
             )
-        """, (norm, person_id, person_id))
+        """,
+            (norm, person_id, person_id),
+        )
 
 
 def detach_name_form(cur, person_id: int, name_form: str):
@@ -235,15 +277,21 @@ def detach_name_form(cur, person_id: int, name_form: str):
     Retire person_id de person_ids. Supprime la forme si person_ids devient vide.
     Retourne True si le détachement a eu lieu.
     """
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE person_name_forms
         SET person_ids = array_remove(person_ids, %s)
         WHERE name_form = %s
-    """, (person_id, name_form))
-    cur.execute("""
+    """,
+        (person_id, name_form),
+    )
+    cur.execute(
+        """
         DELETE FROM person_name_forms
         WHERE name_form = %s AND person_ids = '{}'
-    """, (name_form,))
+    """,
+        (name_form,),
+    )
     return True
 
 
@@ -284,6 +332,7 @@ _SOURCE_CONFIG = {
 
 # ── Attribution d'authorships orphelines ──
 
+
 def assign_orphan_authorship(cur, person_id: int, source: str, authorship_id: int):
     """Attribue une authorship orpheline (person_id IS NULL) à une personne.
 
@@ -299,10 +348,13 @@ def assign_orphan_authorship(cur, person_id: int, source: str, authorship_id: in
         raise ValueError(f"Source inconnue : {source}")
 
     # 1. Rattacher et récupérer le nom normalisé + statut excluded
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE source_authorships SET person_id = %s WHERE id = %s AND source = %s AND person_id IS NULL
         RETURNING excluded, author_name_normalized
-    """, (person_id, authorship_id, source))
+    """,
+        (person_id, authorship_id, source),
+    )
 
     row = cur.fetchone()
     if not row:
@@ -328,25 +380,32 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
     cfg = _SOURCE_CONFIG[source]
 
     # Trouver la publication_id via source_publications
-    cur.execute("""
+    cur.execute(
+        """
         SELECT d.publication_id FROM source_authorships sa
         JOIN source_publications d ON d.id = sa.source_publication_id
         WHERE sa.id = %s AND sa.source = %s
-    """, (authorship_id, source))
+    """,
+        (authorship_id, source),
+    )
     row = cur.fetchone()
     if not row or not row["publication_id"]:
         return
     pub_id = row["publication_id"]
 
     # 1. INSERT si pas déjà existant
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO authorships (publication_id, person_id)
         VALUES (%s, %s)
         ON CONFLICT (publication_id, person_id) DO NOTHING
-    """, (pub_id, person_id))
+    """,
+        (pub_id, person_id),
+    )
 
     # 2. FK sources (source_authorships.authorship_id → authorships.id)
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE source_authorships sa
         SET authorship_id = a.id
         FROM source_publications sd, authorships a
@@ -357,10 +416,13 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
           AND sa.person_id = %s
           AND NOT sa.excluded
           AND sa.authorship_id IS NULL
-    """, (pub_id, person_id))
+    """,
+        (pub_id, person_id),
+    )
 
     # 3. author_position et is_corresponding
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE authorships a
         SET author_position = sub.pos,
             is_corresponding = COALESCE(a.is_corresponding, sub.corr)
@@ -378,11 +440,14 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
         ) sub
         WHERE a.id = sub.authorship_id
           AND a.publication_id = %s AND a.person_id = %s
-    """, (pub_id, person_id))
+    """,
+        (pub_id, person_id),
+    )
 
     # 4. in_perimeter et structure_ids (union des sources)
     perimeter_ids = get_persons_structure_ids_list(cur)
-    cur.execute(f"""
+    cur.execute(
+        f"""
         WITH src AS (
             SELECT sa.in_perimeter AS uca, sa.structure_ids AS sids
             FROM source_authorships sa
@@ -401,10 +466,13 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
             updated_at = now()
         FROM agg
         WHERE a.publication_id = %s AND a.person_id = %s
-    """, (pub_id, person_id, pub_id, person_id))
+    """,
+        (pub_id, person_id, pub_id, person_id),
+    )
 
 
 # ── Fusion ──
+
 
 def merge_person(cur, target_id: int, source_id: int):
     """Fusionne la personne source_id dans target_id.
@@ -415,10 +483,13 @@ def merge_person(cur, target_id: int, source_id: int):
     Lève RuntimeError si les deux personnes ont chacune une fiche RH distincte.
     """
     # Garde-fou : ne JAMAIS fusionner si les deux ont une fiche RH
-    cur.execute("""
+    cur.execute(
+        """
         SELECT COUNT(*) AS n FROM persons_rh
         WHERE person_id IN (%s, %s)
-    """, (target_id, source_id))
+    """,
+        (target_id, source_id),
+    )
     if cur.fetchone()["n"] >= 2:
         raise RuntimeError(
             f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
@@ -426,45 +497,59 @@ def merge_person(cur, target_id: int, source_id: int):
         )
 
     # 1. Transférer les auteurs sources (comptes HAL/ScanR avec person_id)
-    cur.execute("UPDATE source_persons SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
+    cur.execute(
+        "UPDATE source_persons SET person_id = %s WHERE person_id = %s", (target_id, source_id)
+    )
 
     # 1b. Transférer les source_authorships
-    cur.execute("UPDATE source_authorships SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
+    cur.execute(
+        "UPDATE source_authorships SET person_id = %s WHERE person_id = %s", (target_id, source_id)
+    )
 
     # 4. Transférer les authorships consolidées (supprimer les doublons publication)
-    cur.execute("""
+    cur.execute(
+        """
         DELETE FROM authorships
         WHERE person_id = %s
           AND publication_id IN (
               SELECT publication_id FROM authorships WHERE person_id = %s
           )
-    """, (source_id, target_id))
-    cur.execute("UPDATE authorships SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
+    """,
+        (source_id, target_id),
+    )
+    cur.execute(
+        "UPDATE authorships SET person_id = %s WHERE person_id = %s", (target_id, source_id)
+    )
 
     # 5. Transférer les identifiants (supprimer doublons)
-    cur.execute("""
+    cur.execute(
+        """
         DELETE FROM person_identifiers
         WHERE person_id = %s
           AND (id_type, id_value) IN (
               SELECT id_type, id_value FROM person_identifiers WHERE person_id = %s
           )
-    """, (source_id, target_id))
-    cur.execute("UPDATE person_identifiers SET person_id = %s WHERE person_id = %s",
-                (target_id, source_id))
+    """,
+        (source_id, target_id),
+    )
+    cur.execute(
+        "UPDATE person_identifiers SET person_id = %s WHERE person_id = %s", (target_id, source_id)
+    )
 
     # 6. Transférer persons_rh de la source vers la cible (si la cible n'en a pas)
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE persons_rh SET person_id = %s
         WHERE person_id = %s
           AND NOT EXISTS (SELECT 1 FROM persons_rh WHERE person_id = %s)
-    """, (target_id, source_id, target_id))
+    """,
+        (target_id, source_id, target_id),
+    )
 
     # 7. Mettre à jour person_name_forms : remplacer source_id par target_id
     #    (pour les formes non-persons : hal, openalex, wos, manual)
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE person_name_forms
         SET person_ids = (
                 SELECT array_agg(DISTINCT v ORDER BY v)
@@ -472,13 +557,14 @@ def merge_person(cur, target_id: int, source_id: int):
             ),
             updated_at = now()
         WHERE %s = ANY(person_ids)
-    """, (source_id, target_id, source_id))
+    """,
+        (source_id, target_id, source_id),
+    )
 
     # 7b. Recalculer les formes source 'persons' du target
     cur.execute("SELECT last_name, first_name FROM persons WHERE id = %s", (target_id,))
     target = cur.fetchone()
-    refresh_person_name_forms(cur, target_id, target["last_name"],
-                              target["first_name"] or "")
+    refresh_person_name_forms(cur, target_id, target["last_name"], target["first_name"] or "")
 
     # 8. Supprimer la personne source
     cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))

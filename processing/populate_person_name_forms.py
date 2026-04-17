@@ -13,6 +13,7 @@ Sources :
 1. persons.last_name + persons.first_name (source: 'persons')
 2. source_authorships.author_name_normalized (toutes sources)
 """
+
 import os
 
 from psycopg2.extras import RealDictCursor
@@ -117,15 +118,21 @@ def populate(conn):
     for nf, data in new_forms.items():
         if nf in existing:
             old = existing[nf]
-            if set(data["person_ids"]) != set(old["person_ids"]) or set(data["sources"]) != set(old["sources"] or []):
-                cur.execute("""
+            if set(data["person_ids"]) != set(old["person_ids"]) or set(data["sources"]) != set(
+                old["sources"] or []
+            ):
+                cur.execute(
+                    """
                     UPDATE person_name_forms
                     SET person_ids = %s, sources = %s, updated_at = now()
                     WHERE id = %s
-                """, (data["person_ids"], data["sources"], old["id"]))
+                """,
+                    (data["person_ids"], data["sources"], old["id"]),
+                )
                 updated += 1
         else:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO person_name_forms (name_form, person_ids, sources)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (name_form) DO UPDATE SET
@@ -138,7 +145,9 @@ def populate(conn):
                         FROM unnest(COALESCE(person_name_forms.sources, '{}') || EXCLUDED.sources) AS x
                     ),
                     updated_at = now()
-            """, (nf, data["person_ids"], data["sources"]))
+            """,
+                (nf, data["person_ids"], data["sources"]),
+            )
             inserted += 1
 
     # 2. Supprimer les formes obsolètes (uniquement si sources purement bibliographiques)
@@ -155,8 +164,10 @@ def populate(conn):
 
     conn.commit()
 
-    log.info(f"Terminé : {inserted} ajoutées, {updated} mises à jour, "
-             f"{deleted} supprimées, {preserved} préservées")
+    log.info(
+        f"Terminé : {inserted} ajoutées, {updated} mises à jour, "
+        f"{deleted} supprimées, {preserved} préservées"
+    )
 
 
 if __name__ == "__main__":

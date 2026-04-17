@@ -5,6 +5,7 @@ normalisée pointe vers une personne unique dans person_name_forms.
 Affiche un résumé puis demande confirmation avant d'appliquer.
 À supprimer après exécution.
 """
+
 from psycopg2.extras import RealDictCursor
 
 from db.connection import get_connection
@@ -51,6 +52,7 @@ def main():
 
     # Grouper par (person_id, norm) pour l'affichage
     from collections import defaultdict
+
     groups = defaultdict(lambda: {"sources": set(), "items": []})
     for m in matchable:
         key = (m["person_id"], m["norm"])
@@ -68,9 +70,11 @@ def main():
     shown = 0
     for (pid, norm), g in sorted(groups.items()):
         p = persons.get(pid, {})
-        src_str = ', '.join(sorted(g["sources"]))
-        print(f"  Personne {pid} ({p.get('first_name', '')} {p.get('last_name', '')})"
-              f"  ← \"{norm}\" ({len(g['items'])} {src_str})")
+        src_str = ", ".join(sorted(g["sources"]))
+        print(
+            f"  Personne {pid} ({p.get('first_name', '')} {p.get('last_name', '')})"
+            f'  ← "{norm}" ({len(g["items"])} {src_str})'
+        )
         shown += 1
         if shown >= 30:
             print(f"  … et {len(groups) - shown} groupes de plus.")
@@ -78,7 +82,7 @@ def main():
 
     print()
     resp = input(f"  Rattacher les {len(matchable)} authorships ? [o/N] ").strip().lower()
-    if resp != 'o':
+    if resp != "o":
         print("  Abandon.")
         conn.close()
         return
@@ -88,7 +92,8 @@ def main():
     for m in matchable:
         cur.execute(
             "UPDATE source_authorships SET person_id = %s WHERE id = %s AND person_id IS NULL",
-            (m["person_id"], m["authorship_id"]))
+            (m["person_id"], m["authorship_id"]),
+        )
         if cur.rowcount:
             assigned += 1
 

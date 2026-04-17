@@ -10,6 +10,7 @@ from utils.sources import AUTHOR_SOURCES_SQL
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
 @router.get("/api/authorships/stats")
 async def authorships_stats(lab_id: int = Query(0)):
     """Statistiques auteurs UCA."""
@@ -20,7 +21,8 @@ async def authorships_stats(lab_id: int = Query(0)):
         params = [[lab_id]]
 
     with get_cursor() as (cur, conn):
-        cur.execute(f"""
+        cur.execute(
+            f"""
             WITH uca_authors AS (
                 SELECT sauth.id, sa.source,
                        (SELECT sa3.person_id FROM source_authorships sa3
@@ -39,7 +41,9 @@ async def authorships_stats(lab_id: int = Query(0)):
                 COUNT(*) FILTER (WHERE orcid IS NOT NULL) AS with_orcid,
                 COUNT(*) FILTER (WHERE idhal IS NOT NULL) AS with_idhal
             FROM uca_authors
-        """, params)
+        """,
+            params,
+        )
         return cur.fetchone()
 
 
@@ -110,32 +114,41 @@ async def authorships_facets(
     with get_cursor() as (cur, conn):
         # Linked
         where, p = build_where(skip="linked")
-        cur.execute(f"""{cte}
+        cur.execute(
+            f"""{cte}
             SELECT
                 COUNT(*) FILTER (WHERE ua.person_id IS NOT NULL) AS yes,
                 COUNT(*) FILTER (WHERE ua.person_id IS NULL) AS no
             FROM uca_authors ua {where}
-        """, cte_params + p)
+        """,
+            cte_params + p,
+        )
         linked_counts = cur.fetchone()
 
         # ORCID
         where, p = build_where(skip="has_orcid")
-        cur.execute(f"""{cte}
+        cur.execute(
+            f"""{cte}
             SELECT
                 COUNT(*) FILTER (WHERE ua.orcid IS NOT NULL) AS yes,
                 COUNT(*) FILTER (WHERE ua.orcid IS NULL) AS no
             FROM uca_authors ua {where}
-        """, cte_params + p)
+        """,
+            cte_params + p,
+        )
         orcid_counts = cur.fetchone()
 
         # idHAL
         where, p = build_where(skip="has_idhal")
-        cur.execute(f"""{cte}
+        cur.execute(
+            f"""{cte}
             SELECT
                 COUNT(*) FILTER (WHERE ua.idhal IS NOT NULL) AS yes,
                 COUNT(*) FILTER (WHERE ua.idhal IS NULL) AS no
             FROM uca_authors ua {where}
-        """, cte_params + p)
+        """,
+            cte_params + p,
+        )
         idhal_counts = cur.fetchone()
 
         # Labs (cross-filtered, excluding lab filter itself)
@@ -150,7 +163,8 @@ async def authorships_facets(
                   AND sauth.source IN {AUTHOR_SOURCES_SQL}
             )
         """
-        cur.execute(f"""{lab_cte}
+        cur.execute(
+            f"""{lab_cte}
             SELECT s.id AS value, COALESCE(s.acronym, s.name) AS label,
                    COUNT(DISTINCT (ast.author_id, ast.source)) AS count
             FROM author_structs ast
@@ -159,7 +173,9 @@ async def authorships_facets(
             {where} {"AND" if where else "WHERE"} s.structure_type = 'labo'
             GROUP BY s.id, s.acronym, s.name
             ORDER BY count DESC
-        """, lab_params + p)
+        """,
+            lab_params + p,
+        )
         lab_facets = cur.fetchall()
 
         return {
@@ -190,7 +206,9 @@ async def list_authorships(
     params: list = []
 
     if search:
-        cte_conditions.append("(unaccent(ua.full_name) ILIKE unaccent(%s) OR ua.orcid ILIKE %s OR ua.idhal ILIKE %s)")
+        cte_conditions.append(
+            "(unaccent(ua.full_name) ILIKE unaccent(%s) OR ua.orcid ILIKE %s OR ua.idhal ILIKE %s)"
+        )
         s = f"%{search}%"
         params.extend([s, s, s])
     if linked == "yes":
@@ -209,13 +227,17 @@ async def list_authorships(
     where = ("WHERE " + " AND ".join(cte_conditions)) if cte_conditions else ""
 
     with get_cursor() as (cur, conn):
-        cur.execute(f"""
+        cur.execute(
+            f"""
             {cte}
             SELECT COUNT(*) FROM uca_authors ua {where}
-        """, cte_params + params)
+        """,
+            cte_params + params,
+        )
         total = cur.fetchone()["count"]
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             {cte}
             SELECT ua.id, ua.source, ua.full_name, ua.last_name, ua.first_name,
                    ua.orcid, ua.idhal, ua.openalex_id, ua.person_id,
@@ -232,7 +254,9 @@ async def list_authorships(
             {where}
             ORDER BY ua.uca_pub_count DESC, ua.full_name
             OFFSET %s LIMIT %s
-        """, cte_params + params + [offset, per_page])
+        """,
+            cte_params + params + [offset, per_page],
+        )
 
         return {
             "total": total,

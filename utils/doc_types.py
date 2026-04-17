@@ -144,11 +144,30 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
 
 # Valeurs valides de l'enum doc_type (pour le fallback identity)
 _VALID_DOC_TYPES = {
-    "article", "conference_paper", "book", "book_chapter", "thesis",
-    "ongoing_thesis", "preprint", "review", "editorial", "report",
-    "peer_review", "other", "dataset", "software", "patent", "hdr",
-    "memoir", "poster", "letter", "erratum", "retraction", "book_review",
-    "data_paper", "proceedings",
+    "article",
+    "conference_paper",
+    "book",
+    "book_chapter",
+    "thesis",
+    "ongoing_thesis",
+    "preprint",
+    "review",
+    "editorial",
+    "report",
+    "peer_review",
+    "other",
+    "dataset",
+    "software",
+    "patent",
+    "hdr",
+    "memoir",
+    "poster",
+    "letter",
+    "erratum",
+    "retraction",
+    "book_review",
+    "data_paper",
+    "proceedings",
 }
 
 

@@ -52,17 +52,26 @@ def get_hal_collections(cur) -> dict[str, str]:
     # 1. Depuis les structures du périmètre d'extraction
     try:
         from utils.perimeter import get_perimeter_structure_ids
+
         perim_code = _get_from_db(cur, "perimeter_extraction") or "uca_wide"
         perimeter_ids = get_perimeter_structure_ids(cur, perim_code)
         if perimeter_ids:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT hal_collection, COALESCE(acronym, name) AS label
                 FROM structures
                 WHERE id = ANY(%s) AND hal_collection IS NOT NULL AND hal_collection != ''
-            """, (list(perimeter_ids),))
+            """,
+                (list(perimeter_ids),),
+            )
             rows = cur.fetchall()
             if rows:
-                return {(r["hal_collection"] if isinstance(r, dict) else r[0]): (r["label"] if isinstance(r, dict) else r[1]) for r in rows}
+                return {
+                    (r["hal_collection"] if isinstance(r, dict) else r[0]): (
+                        r["label"] if isinstance(r, dict) else r[1]
+                    )
+                    for r in rows
+                }
     except Exception as e:
         logger.warning(f"Impossible de dériver les collections HAL depuis le périmètre : {e}")
 
@@ -72,7 +81,6 @@ def get_hal_collections(cur) -> dict[str, str]:
         return val
 
     return {}
-
 
 
 # get_hal_portals supprimé — l'extraction par portail a été retirée,
@@ -120,13 +128,17 @@ def get_extraction_api_ids(cur, source: str) -> list[str]:
     if perim_code and isinstance(perim_code, str):
         try:
             from utils.perimeter import get_perimeter_structure_ids
+
             struct_ids = get_perimeter_structure_ids(cur, perim_code)
             if struct_ids:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT api_ids->%s AS ids
                     FROM structures
                     WHERE id = ANY(%s) AND api_ids ? %s
-                """, (source, list(struct_ids), source))
+                """,
+                    (source, list(struct_ids), source),
+                )
                 result = []
                 for row in cur.fetchall():
                     ids = row["ids"] if isinstance(row, dict) else row[0]

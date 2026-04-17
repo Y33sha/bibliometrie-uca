@@ -47,34 +47,36 @@ def find_duplicates(cur):
 
     src_by_halid = {}
     for r in cur.fetchall():
-        hid = r['hal_id']
+        hid = r["hal_id"]
         if hid not in src_by_halid:
             src_by_halid[hid] = {
-                'source': r['source'],
-                'src_doc_id': r['src_doc_id'],
-                'src_id': r['src_id'],
-                'src_pub_id': r['src_pub_id'],
+                "source": r["source"],
+                "src_doc_id": r["src_doc_id"],
+                "src_id": r["src_id"],
+                "src_pub_id": r["src_pub_id"],
             }
 
     # --- HAL documents ---
-    cur.execute("SELECT id AS hal_doc_id, source_id AS halid, publication_id AS hal_pub_id FROM source_publications WHERE source = 'hal'")
-    hal_by_id = {r['halid']: r for r in cur.fetchall()}
+    cur.execute(
+        "SELECT id AS hal_doc_id, source_id AS halid, publication_id AS hal_pub_id FROM source_publications WHERE source = 'hal'"
+    )
+    hal_by_id = {r["halid"]: r for r in cur.fetchall()}
 
     # --- Croiser ---
-    link_only = []    # HAL pub_id = NULL
-    merge_needed = [] # Both have different pub_id
+    link_only = []  # HAL pub_id = NULL
+    merge_needed = []  # Both have different pub_id
 
     for hid, src_info in src_by_halid.items():
         if hid not in hal_by_id:
             continue
         hal_info = hal_by_id[hid]
-        hal_pub = hal_info['hal_pub_id']
-        src_pub = src_info['src_pub_id']
+        hal_pub = hal_info["hal_pub_id"]
+        src_pub = src_info["src_pub_id"]
 
         if hal_pub is None and src_pub is not None:
-            link_only.append({**src_info, **hal_info, 'halid': hid})
+            link_only.append({**src_info, **hal_info, "halid": hid})
         elif hal_pub is not None and src_pub is not None and hal_pub != src_pub:
-            merge_needed.append({**src_info, **hal_info, 'halid': hid})
+            merge_needed.append({**src_info, **hal_info, "halid": hid})
 
     return link_only, merge_needed
 
@@ -82,9 +84,9 @@ def find_duplicates(cur):
 def link_hal_to_publication(cur, items, dry_run=False):
     """Case 1: HAL doc has no publication_id → link to source's publication."""
     for item in items:
-        hal_doc_id = item['hal_doc_id']
-        src_pub_id = item['src_pub_id']
-        halid = item['halid']
+        hal_doc_id = item["hal_doc_id"]
+        src_pub_id = item["src_pub_id"]
+        halid = item["halid"]
 
         if dry_run:
             log.info(f"  [LINK] [{item['source']}] hal_doc {halid} → pub {src_pub_id}")
@@ -92,7 +94,7 @@ def link_hal_to_publication(cur, items, dry_run=False):
 
         cur.execute(
             "UPDATE source_publications SET publication_id = %s WHERE id = %s",
-            (src_pub_id, hal_doc_id)
+            (src_pub_id, hal_doc_id),
         )
         update_sources(cur, src_pub_id)
     return len(items)
@@ -117,8 +119,8 @@ def merge_publications(cur, items, dry_run=False):
         return pub_id
 
     for item in items:
-        src_pub_id = resolve(item['src_pub_id'])
-        hal_pub_id = resolve(item['hal_pub_id'])
+        src_pub_id = resolve(item["src_pub_id"])
+        hal_pub_id = resolve(item["hal_pub_id"])
 
         if src_pub_id == hal_pub_id:
             continue  # Déjà résolu par une fusion précédente
@@ -149,8 +151,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Fusionne les publications par identifiant HAL (OpenAlex + ScanR)"
     )
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Lister sans fusionner")
+    parser.add_argument("--dry-run", action="store_true", help="Lister sans fusionner")
     args = parser.parse_args()
 
     conn = get_connection()

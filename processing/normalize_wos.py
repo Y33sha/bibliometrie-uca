@@ -57,6 +57,7 @@ def map_doc_type(raw_type: str | None) -> str:
     composites (séparés par ';') et le mapping WoS.
     """
     from utils.doc_types import map_doc_type as _map
+
     return _map(raw_type, "wos")
 
 
@@ -119,11 +120,13 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
             orgs = []
             for o in org_list:
                 if isinstance(o, dict) and o.get("content"):
-                    orgs.append({
-                        "name": o["content"],
-                        "ror_id": o.get("ror_id"),
-                        "pref": o.get("pref"),
-                    })
+                    orgs.append(
+                        {
+                            "name": o["content"],
+                            "ror_id": o.get("ror_id"),
+                            "pref": o.get("pref"),
+                        }
+                    )
             if orgs:
                 addr_orgs_map[str(addr_no)] = orgs
 
@@ -179,20 +182,22 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
         roles, is_corresponding_from_role = map_role("wos", wos_role)
         is_corresponding = is_corresponding or is_corresponding_from_role
 
-        authors.append({
-            "position": position,
-            "full_name": full_name.strip(),
-            "last_name": last_name,
-            "first_name": first_name,
-            "orcid": orcid,
-            "researcher_id": researcher_id,
-            "daisng_id": daisng_id,
-            "is_corresponding": is_corresponding,
-            "raw_affiliation": raw_affiliation,
-            "addresses": individual_addresses,
-            "organizations": author_orgs,
-            "roles": roles,
-        })
+        authors.append(
+            {
+                "position": position,
+                "full_name": full_name.strip(),
+                "last_name": last_name,
+                "first_name": first_name,
+                "orcid": orcid,
+                "researcher_id": researcher_id,
+                "daisng_id": daisng_id,
+                "is_corresponding": is_corresponding,
+                "raw_affiliation": raw_affiliation,
+                "addresses": individual_addresses,
+                "organizations": author_orgs,
+                "roles": roles,
+            }
+        )
 
     return authors
 
@@ -201,9 +206,7 @@ def _get_api_doi(dynamic: dict) -> str | None:
     """Extrait le DOI depuis la structure API."""
     try:
         identifiers = (
-            dynamic.get("cluster_related", {})
-            .get("identifiers", {})
-            .get("identifier", [])
+            dynamic.get("cluster_related", {}).get("identifiers", {}).get("identifier", [])
         )
         for ident in _safe_list(identifiers):
             if isinstance(ident, dict) and ident.get("type") == "doi":
@@ -217,9 +220,7 @@ def _get_api_issn(dynamic: dict, issn_type: str = "issn") -> str | None:
     """Extrait l'ISSN ou eISSN depuis la structure API."""
     try:
         identifiers = (
-            dynamic.get("cluster_related", {})
-            .get("identifiers", {})
-            .get("identifier", [])
+            dynamic.get("cluster_related", {}).get("identifiers", {}).get("identifier", [])
         )
         for ident in _safe_list(identifiers):
             if isinstance(ident, dict) and ident.get("type") == issn_type:
@@ -326,7 +327,9 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
     subjects = cat.get("subjects", {}).get("subject", [])
     if isinstance(subjects, dict):
         subjects = [subjects]
-    subj_names = [s.get("content") or s for s in subjects if isinstance(s, dict) and s.get("content")]
+    subj_names = [
+        s.get("content") or s for s in subjects if isinstance(s, dict) and s.get("content")
+    ]
     if subj_names:
         topics["subjects"] = subj_names
     headings = cat.get("headings", {}).get("heading", [])
@@ -374,6 +377,7 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
 # PUBLISHERS & JOURNALS (via services/journals.py)
 # =============================================================
 
+
 def upsert_publisher(cur, publisher_name: str | None) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
     return find_or_create_publisher(cur, publisher_name)
@@ -385,14 +389,14 @@ def upsert_journal(cur, rec: dict, publisher_id: int | None) -> int | None:
     if not title:
         return None
     return find_or_create_journal(
-        cur, title,
-        issn=rec.get("issn"), eissn=rec.get("eissn"),
-        publisher_id=publisher_id)
+        cur, title, issn=rec.get("issn"), eissn=rec.get("eissn"), publisher_id=publisher_id
+    )
 
 
 # =============================================================
 # PUBLICATIONS (via services/publications.py)
 # =============================================================
+
 
 def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
     """Extrait les métadonnées de publication d'un record WoS.
@@ -402,11 +406,17 @@ def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
     title = rec["title"]
     container_title = rec.get("journal_title") if not journal_id else None
 
-    return dict(title=title, title_normalized=normalize_text(title),
-                pub_year=rec["pub_year"], doc_type=rec["doc_type"],
-                doi=rec["doi"], oa_status=rec["oa_status"],
-                journal_id=journal_id, container_title=container_title,
-                language=rec.get("language"))
+    return dict(
+        title=title,
+        title_normalized=normalize_text(title),
+        pub_year=rec["pub_year"],
+        doc_type=rec["doc_type"],
+        doi=rec["doi"],
+        oa_status=rec["oa_status"],
+        journal_id=journal_id,
+        container_title=container_title,
+        language=rec.get("language"),
+    )
 
 
 def find_publication(cur, rec: dict, journal_id: int | None) -> int | None:
@@ -424,9 +434,10 @@ def find_publication(cur, rec: dict, journal_id: int | None) -> int | None:
 # SOURCE DOCUMENTS (WOS)
 # =============================================================
 
-def insert_wos_document(cur, rec: dict, staging_id: int,
-                        publication_id: int | None,
-                        pub_meta: dict | None = None) -> int:
+
+def insert_wos_document(
+    cur, rec: dict, staging_id: int, publication_id: int | None, pub_meta: dict | None = None
+) -> int:
     """Crée/retrouve l'entrée source_publications pour WoS. Retourne source_publications.id."""
     journal_id = pub_meta.get("journal_id") if pub_meta else None
     oa_status = pub_meta.get("oa_status") if pub_meta else None
@@ -441,7 +452,8 @@ def insert_wos_document(cur, rec: dict, staging_id: int,
     urls = rec.get("urls")
     external_ids = Json(rec["external_ids"]) if rec.get("external_ids") else None
 
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id,
@@ -469,11 +481,28 @@ def insert_wos_document(cur, rec: dict, staging_id: int,
             urls = COALESCE(EXCLUDED.urls, source_publications.urls),
             external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
         RETURNING id
-    """, (rec["ut"], rec["doi"], rec["title"], rec["pub_year"],
-          rec["doc_type"], publication_id, staging_id,
-          journal_id, oa_status, language, container_title,
-          abstract, cited_by_count, biblio, keywords, topics,
-          urls, external_ids))
+    """,
+        (
+            rec["ut"],
+            rec["doi"],
+            rec["title"],
+            rec["pub_year"],
+            rec["doc_type"],
+            publication_id,
+            staging_id,
+            journal_id,
+            oa_status,
+            language,
+            container_title,
+            abstract,
+            cited_by_count,
+            biblio,
+            keywords,
+            topics,
+            urls,
+            external_ids,
+        ),
+    )
     return cur.fetchone()[0]
 
 
@@ -514,7 +543,8 @@ def upsert_wos_author(cur, author: dict) -> int | None:
         source_ids["researcher_id"] = researcher_id
     source_ids_json = Json(source_ids) if source_ids else None
 
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO source_persons
             (source, source_id, full_name, last_name, first_name, orcid, source_ids)
         VALUES ('wos', %s, %s, %s, %s, %s, %s)
@@ -524,7 +554,9 @@ def upsert_wos_author(cur, author: dict) -> int | None:
             source_ids = COALESCE(source_persons.source_ids, '{}') ||
                          COALESCE(EXCLUDED.source_ids, '{}')
         RETURNING id
-    """, (daisng_id, full_name, last_name, first_name, orcid, source_ids_json))
+    """,
+        (daisng_id, full_name, last_name, first_name, orcid, source_ids_json),
+    )
     result = cur.fetchone()[0]
     _wos_author_cache[daisng_id] = result
     return result
@@ -533,6 +565,7 @@ def upsert_wos_author(cur, author: dict) -> int | None:
 # =============================================================
 # WOS AUTHORSHIPS
 # =============================================================
+
 
 def _resolve_addresses_batch(cur, raw_texts: set) -> dict[str, int]:
     """Résout un ensemble d'adresses en batch. Retourne {raw_text: id}.
@@ -545,15 +578,18 @@ def _resolve_addresses_batch(cur, raw_texts: set) -> dict[str, int]:
 
     # Batch INSERT (ON CONFLICT sur md5(raw_text) pour les existantes)
     values = [(t, normalize_text(t)) for t in raw_texts]
-    _ev(cur, """
+    _ev(
+        cur,
+        """
         INSERT INTO addresses (raw_text, normalized_text)
         VALUES %s
         ON CONFLICT (md5(raw_text)) DO NOTHING
-    """, values)
+    """,
+        values,
+    )
 
     # Récupérer tous les IDs en un seul SELECT
-    cur.execute("SELECT raw_text, id FROM addresses WHERE raw_text = ANY(%s)",
-                (list(raw_texts),))
+    cur.execute("SELECT raw_text, id FROM addresses WHERE raw_text = ANY(%s)", (list(raw_texts),))
     return {r[0]: r[1] for r in cur.fetchall()}
 
 
@@ -570,13 +606,16 @@ def upsert_wos_institution(cur, org: dict) -> int | None:
         return _wos_institution_cache[name]
 
     ror_id = org.get("ror_id")
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO source_structures (source, source_id, name, ror_id)
         VALUES ('wos', %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             ror_id = COALESCE(source_structures.ror_id, EXCLUDED.ror_id)
         RETURNING id
-    """, (name, name, ror_id))
+    """,
+        (name, name, ror_id),
+    )
     result = cur.fetchone()[0]
     _wos_institution_cache[name] = result
     return result
@@ -621,14 +660,21 @@ def process_authorships(cur, rec: dict, source_publication_id: int):
                 source_ids = {}
                 if a.get("researcher_id"):
                     source_ids["researcher_id"] = a["researcher_id"]
-                deduped.append((
-                    'wos', a["daisng_id"], a["full_name"],
-                    a.get("last_name"), a.get("first_name"),
-                    a.get("orcid"),
-                    Json(source_ids) if source_ids else None,
-                ))
+                deduped.append(
+                    (
+                        "wos",
+                        a["daisng_id"],
+                        a["full_name"],
+                        a.get("last_name"),
+                        a.get("first_name"),
+                        a.get("orcid"),
+                        Json(source_ids) if source_ids else None,
+                    )
+                )
 
-        _ev(cur, """
+        _ev(
+            cur,
+            """
             INSERT INTO source_persons
                 (source, source_id, full_name, last_name, first_name, orcid, source_ids)
             VALUES %s
@@ -638,7 +684,9 @@ def process_authorships(cur, rec: dict, source_publication_id: int):
                 source_ids = COALESCE(source_persons.source_ids, '{}'::jsonb) ||
                              COALESCE(EXCLUDED.source_ids, '{}'::jsonb)
             RETURNING id, source_id
-        """, deduped)
+        """,
+            deduped,
+        )
         for row in cur.fetchall():
             _wos_author_cache[row[1]] = row[0]
 
@@ -670,12 +718,20 @@ def process_authorships(cur, rec: dict, source_publication_id: int):
         name_norm = normalize_name_form(author["full_name"])
 
         values[key] = (
-            'wos', source_publication_id, source_person_id, author["position"],
-            author["is_corresponding"], name_norm,
-            institution_ids or None, author.get("roles"), author["full_name"],
+            "wos",
+            source_publication_id,
+            source_person_id,
+            author["position"],
+            author["is_corresponding"],
+            name_norm,
+            institution_ids or None,
+            author.get("roles"),
+            author["full_name"],
         )
 
-    _ev(cur, """
+    _ev(
+        cur,
+        """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              is_corresponding, author_name_normalized,
@@ -693,7 +749,9 @@ def process_authorships(cur, rec: dict, source_publication_id: int):
             ),
             roles = EXCLUDED.roles,
             raw_author_name = EXCLUDED.raw_author_name
-    """, list(values.values()))
+    """,
+        list(values.values()),
+    )
 
     # Phase 3 : batch adresses (source_authorship_addresses)
     authors_with_addrs = [(a, said) for a, said in author_ids if a.get("addresses")]
@@ -708,10 +766,13 @@ def process_authorships(cur, rec: dict, source_publication_id: int):
 
         # Récupérer les sa_id
         sa_ids_needed = [said for _, said in authors_with_addrs]
-        cur.execute("""
+        cur.execute(
+            """
             SELECT source_person_id, id FROM source_authorships
             WHERE source_publication_id = %s AND source_person_id = ANY(%s)
-        """, (source_publication_id, sa_ids_needed))
+        """,
+            (source_publication_id, sa_ids_needed),
+        )
         sa_id_map = {r[0]: r[1] for r in cur.fetchall()}
 
         # Construire les liens
@@ -726,20 +787,26 @@ def process_authorships(cur, rec: dict, source_publication_id: int):
                     addr_values.append((sa_id, addr_id))
 
         if addr_values:
-            _ev(cur, """
+            _ev(
+                cur,
+                """
                 INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
                 VALUES %s
                 ON CONFLICT (source_authorship_id, address_id) DO NOTHING
-            """, addr_values)
+            """,
+                addr_values,
+            )
 
 
 # =============================================================
 # BOUCLE PRINCIPALE
 # =============================================================
 
+
 def process_record(cur, staging_row: tuple) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
     from utils.timings import StepTimer
+
     staging_id, ut, staging_doi, raw_data = staging_row
 
     try:
@@ -764,7 +831,8 @@ def process_record(cur, staging_row: tuple) -> bool:
         # Idempotence : réutiliser le publication_id existant
         cur.execute(
             "SELECT publication_id FROM source_publications WHERE source = 'wos' AND source_id = %s",
-            (rec["ut"],))
+            (rec["ut"],),
+        )
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc[0]:
             publication_id = existing_doc[0]
@@ -779,9 +847,7 @@ def process_record(cur, staging_row: tuple) -> bool:
             publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
 
         # Document WoS (source_publications)
-        source_publication_id = insert_wos_document(
-            cur, rec, staging_id, publication_id, pub_meta
-        )
+        source_publication_id = insert_wos_document(cur, rec, staging_id, publication_id, pub_meta)
         t.mark("wos_doc")
 
         # Auteurs et authorships
@@ -805,10 +871,12 @@ def process_record(cur, staging_row: tuple) -> bool:
 def main():
     parser = argparse.ArgumentParser(description="Normalisation WoS → tables normalisées")
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
-    parser.add_argument("--reset", action="store_true",
-                        help="Remettre tous les works à processed=FALSE")
-    parser.add_argument("--batch-size", type=int, default=500,
-                        help="Taille du commit batch (défaut: 500)")
+    parser.add_argument(
+        "--reset", action="store_true", help="Remettre tous les works à processed=FALSE"
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=500, help="Taille du commit batch (défaut: 500)"
+    )
     args = parser.parse_args()
 
     conn = get_connection()
@@ -837,34 +905,44 @@ def main():
         logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
 
         # Charger les IDs puis fetch par lots pour limiter la memoire
-        cur.execute("""
+        cur.execute(
+            """
             SELECT id FROM staging
             WHERE source = 'wos' AND processed = FALSE
             ORDER BY id
             LIMIT %s
-        """, (limit,))
+        """,
+            (limit,),
+        )
         work_ids = [r[0] for r in cur.fetchall()]
 
         # Pré-charger les caches WoS
         cur.execute("SELECT source_id, id FROM source_structures WHERE source = 'wos'")
         for r in cur.fetchall():
             _wos_institution_cache[r[0]] = r[1]
-        cur.execute("SELECT source_id, id FROM source_persons WHERE source = 'wos' AND source_id NOT LIKE 'wos-%%'")
+        cur.execute(
+            "SELECT source_id, id FROM source_persons WHERE source = 'wos' AND source_id NOT LIKE 'wos-%%'"
+        )
         for r in cur.fetchall():
             _wos_author_cache[r[0]] = r[1]
-        logger.info(f"Cache WoS : {len(_wos_institution_cache)} institutions, {len(_wos_author_cache)} auteurs")
+        logger.info(
+            f"Cache WoS : {len(_wos_institution_cache)} institutions, {len(_wos_author_cache)} auteurs"
+        )
 
         processed = 0
         errors = 0
         FETCH_BATCH = 50
 
         for batch_start in range(0, len(work_ids), FETCH_BATCH):
-            batch_ids = work_ids[batch_start:batch_start + FETCH_BATCH]
-            cur.execute("""
+            batch_ids = work_ids[batch_start : batch_start + FETCH_BATCH]
+            cur.execute(
+                """
                 SELECT id, source_id AS ut, doi, raw_data
                 FROM staging WHERE id = ANY(%s)
                 ORDER BY id
-            """, (batch_ids,))
+            """,
+                (batch_ids,),
+            )
             batch_rows = cur.fetchall()
 
             for row in batch_rows:

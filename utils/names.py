@@ -6,7 +6,6 @@ Utilisées par :
 """
 
 
-
 def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
     """Parse un raw_author_name en (last_name, first_name).
 

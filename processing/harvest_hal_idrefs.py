@@ -6,6 +6,7 @@ et insère l'IdRef dans person_identifiers.
 Usage:
     python processing/harvest_hal_idrefs.py [--dry-run]
 """
+
 import argparse
 import time
 
@@ -28,11 +29,15 @@ def fetch_idref(hal_person_id: int = None, idhal: str = None) -> str | None:
             q = f"person_i:{hal_person_id}"
         else:
             return None
-        r = requests.get(HAL_AUTHOR_API, params={
-            "q": q,
-            "fl": "person_i,idrefId_s",
-            "rows": 1,
-        }, timeout=10)
+        r = requests.get(
+            HAL_AUTHOR_API,
+            params={
+                "q": q,
+                "fl": "person_i,idrefId_s",
+                "rows": 1,
+            },
+            timeout=10,
+        )
         r.raise_for_status()
         docs = r.json().get("response", {}).get("docs", [])
         if docs and docs[0].get("idrefId_s"):
@@ -74,8 +79,9 @@ def main():
             found += 1
             if not args.dry_run:
                 # Stocker dans source_persons
-                cur.execute("UPDATE source_persons SET idref = %s WHERE id = %s",
-                            (idref, a["ha_id"]))
+                cur.execute(
+                    "UPDATE source_persons SET idref = %s WHERE id = %s", (idref, a["ha_id"])
+                )
                 # Stocker dans person_identifiers
                 add_identifier(cur, a["person_id"], "idref", idref, source="hal")
             print(f"  {a['full_name']}: {idref}")
@@ -83,7 +89,7 @@ def main():
         if (i + 1) % 100 == 0:
             if not args.dry_run:
                 conn.commit()
-            print(f"  {i+1}/{len(authors)} traités, {found} IdRef trouvés")
+            print(f"  {i + 1}/{len(authors)} traités, {found} IdRef trouvés")
             time.sleep(HAL_DELAY)
 
     if not args.dry_run:

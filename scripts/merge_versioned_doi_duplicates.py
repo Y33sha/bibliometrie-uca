@@ -18,7 +18,9 @@ from db.connection import get_connection
 from services.publications import merge_publications
 from utils.log import setup_logger
 
-log = setup_logger("merge_versioned_doi", os.path.join(os.path.dirname(__file__), "..", "processing", "logs"))
+log = setup_logger(
+    "merge_versioned_doi", os.path.join(os.path.dirname(__file__), "..", "processing", "logs")
+)
 
 
 def find_versioned_duplicates(cur):
@@ -49,13 +51,15 @@ def main():
 
         merged = 0
         for p in pairs:
-            log.info(f"  {'[DRY] ' if args.dry_run else ''}"
-                     f"pub {p['source_id']} ({p['source_doi']}) → "
-                     f"pub {p['target_id']} ({p['target_doi']})")
+            log.info(
+                f"  {'[DRY] ' if args.dry_run else ''}"
+                f"pub {p['source_id']} ({p['source_doi']}) → "
+                f"pub {p['target_id']} ({p['target_doi']})"
+            )
             if not args.dry_run:
                 try:
                     cur.execute("SAVEPOINT merge_vdoi")
-                    merge_publications(cur, p['target_id'], p['source_id'])
+                    merge_publications(cur, p["target_id"], p["source_id"])
                     cur.execute("RELEASE SAVEPOINT merge_vdoi")
                     merged += 1
                 except Exception as e:

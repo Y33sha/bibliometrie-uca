@@ -45,7 +45,9 @@ def fetch_work(openalex_id: str) -> dict | None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Re-fetch publications OA tronquées (>= 100 auteurs)")
+    parser = argparse.ArgumentParser(
+        description="Re-fetch publications OA tronquées (>= 100 auteurs)"
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
     args = parser.parse_args()
@@ -65,7 +67,7 @@ def main():
     truncated = cur.fetchall()
 
     if args.limit:
-        truncated = truncated[:args.limit]
+        truncated = truncated[: args.limit]
 
     logger.info(f"{len(truncated)} works avec 100 auteurs détectés (potentiellement tronqués)")
 
@@ -95,23 +97,30 @@ def main():
         # Mettre à jour le staging avec la version complète
         raw_hash = compute_hash(work)
         meta_hash = compute_meta_hash(work)
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE staging
             SET raw_data = %s::jsonb, raw_hash = %s, meta_hash = %s,
                 processed = FALSE, last_seen_at = now()
             WHERE id = %s
-        """, (Json(work), raw_hash, meta_hash, row["id"]))
+        """,
+            (Json(work), raw_hash, meta_hash, row["id"]),
+        )
         updated += 1
 
         if (i + 1) % 50 == 0:
             conn.commit()
-            logger.info(f"  {i+1}/{len(truncated)}... ({updated} mis à jour, {already_complete} déjà complets)")
+            logger.info(
+                f"  {i + 1}/{len(truncated)}... ({updated} mis à jour, {already_complete} déjà complets)"
+            )
 
     conn.commit()
     conn.close()
 
-    logger.info(f"Terminé : {updated} works mis à jour avec authorships complètes, "
-                f"{already_complete} déjà complets, {errors} erreurs")
+    logger.info(
+        f"Terminé : {updated} works mis à jour avec authorships complètes, "
+        f"{already_complete} déjà complets, {errors} erreurs"
+    )
 
 
 if __name__ == "__main__":

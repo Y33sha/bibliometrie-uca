@@ -50,7 +50,8 @@ async def list_journals(
         order = sort_map.get(sort, sort_map["title"])
 
         offset = (page - 1) * per_page
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT j.id, j.title, j.issn, j.eissn, j.issnl,
                    j.publisher_id, p.name AS pub_name,
                    j.openalex_id, j.is_in_doaj, j.is_predatory,
@@ -63,7 +64,9 @@ async def list_journals(
             WHERE {where}
             ORDER BY {order}
             LIMIT %s OFFSET %s
-        """, params + [per_page, offset])
+        """,
+            params + [per_page, offset],
+        )
 
         return {
             "total": total,
@@ -95,6 +98,7 @@ async def update_journal(journal_id: int, body: JournalUpdate):
         fields = {k: v for k, v in body.model_dump(exclude_unset=True).items()}
         if "title" in fields:
             from utils.normalize import normalize_text
+
             fields["title_normalized"] = normalize_text(fields["title"])
 
         if not fields:
@@ -103,7 +107,8 @@ async def update_journal(journal_id: int, body: JournalUpdate):
         sets = ", ".join(f"{k} = %s" for k in fields)
         cur.execute(
             f"UPDATE journals SET {sets}, updated_at = now() WHERE id = %s",
-            list(fields.values()) + [journal_id])
+            list(fields.values()) + [journal_id],
+        )
         return {"ok": True}
 
 
@@ -113,8 +118,7 @@ async def merge(journal_id: int, body: MergeRequest):
         raise HTTPException(status_code=400, detail="source_id invalide")
 
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT id FROM journals WHERE id IN (%s, %s)",
-                    (journal_id, body.source_id))
+        cur.execute("SELECT id FROM journals WHERE id IN (%s, %s)", (journal_id, body.source_id))
         found = {row["id"] for row in cur.fetchall()}
         if journal_id not in found:
             raise HTTPException(status_code=404, detail="Revue cible introuvable")

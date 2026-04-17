@@ -46,18 +46,20 @@ def _fetch_with_retry(url: str, params: dict, label: str = "") -> dict:
             resp.raise_for_status()
             if not resp.text.strip():
                 wait = 2 ** (attempt + 1)
-                logger.warning(f"Réponse vide {label} (tentative {attempt+1}/5), attente {wait}s...")
+                logger.warning(
+                    f"Réponse vide {label} (tentative {attempt + 1}/5), attente {wait}s..."
+                )
                 time.sleep(wait)
                 continue
             return resp.json()
         except requests.exceptions.JSONDecodeError:
             wait = 2 ** (attempt + 1)
-            logger.warning(f"JSON invalide {label} (tentative {attempt+1}/5), attente {wait}s...")
+            logger.warning(f"JSON invalide {label} (tentative {attempt + 1}/5), attente {wait}s...")
             time.sleep(wait)
         except requests.RequestException as e:
             if attempt < 4:
                 wait = 2 ** (attempt + 1)
-                logger.warning(f"Erreur requête {label} (tentative {attempt+1}/5): {e}")
+                logger.warning(f"Erreur requête {label} (tentative {attempt + 1}/5): {e}")
                 time.sleep(wait)
             else:
                 raise
@@ -95,15 +97,16 @@ def extract_doi(rec: dict) -> str | None:
 def clean_doi_for_wos_search(doi: str) -> str | None:
     """Nettoie un DOI pour la recherche WoS. Retourne None si inutilisable."""
     import re
+
     doi = doi.strip()
     # Retirer les suffixes parasites (&ref=pdf, etc.)
-    doi = re.split(r'[&?]', doi)[0]
+    doi = re.split(r"[&?]", doi)[0]
     # Ignorer les DOIs de preprints/dépôts (pas dans WoS)
-    skip_prefixes = ('10.48550/', '10.2139/', '10.21203/', '10.5281/zenodo')
+    skip_prefixes = ("10.48550/", "10.2139/", "10.21203/", "10.5281/zenodo")
     if any(doi.lower().startswith(p) for p in skip_prefixes):
         return None
     # Ignorer les DOIs avec caractères problématiques
-    if '"' in doi or '\n' in doi:
+    if '"' in doi or "\n" in doi:
         return None
     return doi
 
@@ -163,8 +166,11 @@ def main():
     parser = argparse.ArgumentParser(description="Cross-import WoS par DOI")
     parser.add_argument("--dry-run", action="store_true", help="Compte sans insérer")
     parser.add_argument("--limit", type=int, default=0, help="Limite de DOIs à traiter")
-    parser.add_argument("--all", action="store_true",
-                        help="Considérer tout le staging (pas seulement les non-normalisés)")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Considérer tout le staging (pas seulement les non-normalisés)",
+    )
     args = parser.parse_args()
 
     global BASE_URL, HEADERS
@@ -177,7 +183,7 @@ def main():
     logger.info(f"{len(all_dois)} DOIs sans source WoS")
 
     if args.limit:
-        all_dois = all_dois[:args.limit]
+        all_dois = all_dois[: args.limit]
         logger.info(f"Limité à {len(all_dois)} DOIs")
 
     # Traiter par lots
@@ -186,7 +192,7 @@ def main():
     skipped_total = 0
 
     for i in range(0, len(all_dois), BATCH_SIZE):
-        batch = all_dois[i:i + BATCH_SIZE]
+        batch = all_dois[i : i + BATCH_SIZE]
         batch_num = i // BATCH_SIZE + 1
         total_batches = (len(all_dois) + BATCH_SIZE - 1) // BATCH_SIZE
         logger.info(f"Lot {batch_num}/{total_batches} ({len(batch)} DOIs)...")
@@ -211,7 +217,8 @@ def main():
                 continue
 
             h = compute_hash(rec)
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
                 VALUES ('wos', %s, %s, %s, %s)
                 ON CONFLICT (source, source_id) DO UPDATE SET
@@ -223,7 +230,9 @@ def main():
                         WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                         THEN FALSE ELSE staging.processed END,
                     last_seen_at = now()
-            """, (ut, doi, Json(rec), h))
+            """,
+                (ut, doi, Json(rec), h),
+            )
             if cur.rowcount:
                 inserted_total += 1
             else:
@@ -232,7 +241,9 @@ def main():
         conn.commit()
         time.sleep(WOS_DELAY)
 
-    logger.info(f"Terminé: {found_total} trouvés, {inserted_total} insérés, {skipped_total} déjà présents")
+    logger.info(
+        f"Terminé: {found_total} trouvés, {inserted_total} insérés, {skipped_total} déjà présents"
+    )
     conn.close()
 
 

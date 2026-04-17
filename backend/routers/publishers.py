@@ -45,7 +45,8 @@ async def list_publishers(
         order = sort_map.get(sort, sort_map["name"])
 
         offset = (page - 1) * per_page
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT p.id, p.name, p.openalex_id, p.country,
                    p.doi_prefix, p.is_predatory,
                    (SELECT COUNT(*) FROM journals j WHERE j.publisher_id = p.id) AS journal_count,
@@ -56,7 +57,9 @@ async def list_publishers(
             WHERE {where}
             ORDER BY {order}
             LIMIT %s OFFSET %s
-        """, params + [per_page, offset])
+        """,
+            params + [per_page, offset],
+        )
 
         return {
             "total": total,
@@ -87,6 +90,7 @@ async def update_publisher(publisher_id: int, body: PublisherUpdate):
         fields = {k: v for k, v in body.model_dump(exclude_unset=True).items()}
         if "name" in fields:
             from utils.normalize import normalize_text
+
             fields["name_normalized"] = normalize_text(fields["name"])
 
         if not fields:
@@ -95,7 +99,8 @@ async def update_publisher(publisher_id: int, body: PublisherUpdate):
         sets = ", ".join(f"{k} = %s" for k in fields)
         cur.execute(
             f"UPDATE publishers SET {sets}, updated_at = now() WHERE id = %s",
-            list(fields.values()) + [publisher_id])
+            list(fields.values()) + [publisher_id],
+        )
         return {"ok": True}
 
 
@@ -105,8 +110,9 @@ async def merge(publisher_id: int, body: MergeRequest):
         raise HTTPException(status_code=400, detail="source_id invalide")
 
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT id FROM publishers WHERE id IN (%s, %s)",
-                    (publisher_id, body.source_id))
+        cur.execute(
+            "SELECT id FROM publishers WHERE id IN (%s, %s)", (publisher_id, body.source_id)
+        )
         found = {row["id"] for row in cur.fetchall()}
         if publisher_id not in found:
             raise HTTPException(status_code=404, detail="Éditeur cible introuvable")

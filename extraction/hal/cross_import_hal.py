@@ -34,11 +34,10 @@ logger = setup_logger("cross_import_hal", os.path.join(os.path.dirname(__file__)
 HAL_API = "https://api.archives-ouvertes.fr/search"
 
 
-
 def fetch_by_doi(doi: str) -> dict | None:
     """Interroge l'API HAL pour un DOI donné. Retourne le document ou None."""
     params = {
-        "q": f"doiId_s:\"{doi}\"",
+        "q": f'doiId_s:"{doi}"',
         "fl": HAL_FIELDS_STR,
         "wt": "json",
         "rows": 1,
@@ -76,7 +75,8 @@ def insert_staging(conn, doc: dict):
     raw_hash = compute_hash(doc)
 
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed, raw_hash)
             VALUES ('hal', %s, %s, %s::jsonb, %s, FALSE, %s)
             ON CONFLICT (source, source_id) DO UPDATE SET
@@ -96,7 +96,9 @@ def insert_staging(conn, doc: dict):
                         THEN FALSE
                     ELSE staging.processed
                 END
-        """, (hal_id, doi, Json(doc), hal_collections, raw_hash))
+        """,
+            (hal_id, doi, Json(doc), hal_collections, raw_hash),
+        )
     conn.commit()
 
 
@@ -104,10 +106,14 @@ def main():
     parser = argparse.ArgumentParser(description="Import croisé DOI → HAL")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans importer")
     parser.add_argument("--limit", type=int, help="Nombre max de DOI à traiter")
-    parser.add_argument("--normalize", action="store_true",
-                        help="Lancer la normalisation après import")
-    parser.add_argument("--all", action="store_true",
-                        help="Considérer tout le staging (pas seulement les non-normalisés)")
+    parser.add_argument(
+        "--normalize", action="store_true", help="Lancer la normalisation après import"
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Considérer tout le staging (pas seulement les non-normalisés)",
+    )
     args = parser.parse_args()
 
     conn = get_connection()
@@ -120,7 +126,7 @@ def main():
             return
 
         if args.limit:
-            dois = dois[:args.limit]
+            dois = dois[: args.limit]
             logger.info(f"Limité à {len(dois)} DOI")
 
         found = 0
@@ -135,17 +141,11 @@ def main():
                 not_found += 1
 
             if (i + 1) % 100 == 0:
-                logger.info(
-                    f"  {i+1}/{len(dois)} traités — "
-                    f"{found} trouvés, {not_found} absents"
-                )
+                logger.info(f"  {i + 1}/{len(dois)} traités — {found} trouvés, {not_found} absents")
 
             time.sleep(HAL_DELAY)
 
-        logger.info(
-            f"=== Terminé : {found} documents importés, "
-            f"{not_found} absents de HAL ==="
-        )
+        logger.info(f"=== Terminé : {found} documents importés, {not_found} absents de HAL ===")
         logger.info("Relancer normalize_hal.py pour les integrer")
 
         if args.normalize and found > 0:
@@ -153,9 +153,15 @@ def main():
             conn.close()
             os.execvp(
                 sys.executable,
-                [sys.executable,
-                 os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                              "..", "processing", "normalize_hal.py")]
+                [
+                    sys.executable,
+                    os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "..",
+                        "processing",
+                        "normalize_hal.py",
+                    ),
+                ],
             )
 
     except KeyboardInterrupt:

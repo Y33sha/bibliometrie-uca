@@ -32,8 +32,8 @@ from utils.app_config import get_api_base_urls, get_wos_affiliations, get_wos_ap
 logger = setup_logger("extract_wos", os.path.join(os.path.dirname(__file__), "logs"))
 
 # ----- Constantes techniques -----
-BREATHER_EVERY = 10     # pause longue toutes les N pages
-BREATHER_SECS = 15      # durée de la pause longue (secondes)
+BREATHER_EVERY = 10  # pause longue toutes les N pages
+BREATHER_SECS = 15  # durée de la pause longue (secondes)
 
 # Initialisées dans main() depuis la config DB
 BASE_URL = ""
@@ -88,18 +88,20 @@ def _fetch_with_retry(url: str, params: dict, label: str = "") -> dict:
             # WoS renvoie parfois un body vide (rate limit silencieux)
             if not resp.text.strip():
                 wait = 2 ** (attempt + 1)
-                logger.warning(f"Réponse vide {label} (tentative {attempt+1}/5), attente {wait}s...")
+                logger.warning(
+                    f"Réponse vide {label} (tentative {attempt + 1}/5), attente {wait}s..."
+                )
                 time.sleep(wait)
                 continue
             return resp.json()
         except requests.exceptions.JSONDecodeError:
             wait = 2 ** (attempt + 1)
-            logger.warning(f"JSON invalide {label} (tentative {attempt+1}/5), attente {wait}s...")
+            logger.warning(f"JSON invalide {label} (tentative {attempt + 1}/5), attente {wait}s...")
             time.sleep(wait)
         except requests.RequestException as e:
             if attempt < 4:
                 wait = 2 ** (attempt + 1)
-                logger.warning(f"Erreur requête {label} (tentative {attempt+1}/5): {e}")
+                logger.warning(f"Erreur requête {label} (tentative {attempt + 1}/5): {e}")
                 time.sleep(wait)
             else:
                 raise
@@ -161,10 +163,7 @@ def insert_batch(conn, batch: list[tuple]):
             last_seen_at = now()
     """
     with conn.cursor() as cur:
-        execute_values(
-            cur, query, batch,
-            template="(%s, %s, %s, %s::jsonb, %s)"
-        )
+        execute_values(cur, query, batch, template="(%s, %s, %s, %s::jsonb, %s)")
     conn.commit()
 
 
@@ -205,8 +204,7 @@ def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> i
                 )
                 break
             logger.warning(
-                f"Page vide à firstRecord={first_record}, "
-                f"nouvelle tentative après pause..."
+                f"Page vide à firstRecord={first_record}, nouvelle tentative après pause..."
             )
             time.sleep(5)
             continue
@@ -250,8 +248,7 @@ def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> i
             break
 
     logger.info(
-        f"Année {year} terminée : {total_inserted} records insérés "
-        f"sur {total_count} trouvés"
+        f"Année {year} terminée : {total_inserted} records insérés sur {total_count} trouvés"
     )
     return total_inserted
 
@@ -266,7 +263,9 @@ def log_remaining_quota(resp_headers: dict):
 def main():
     parser = argparse.ArgumentParser(description="Extraction WoS → staging")
     parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
-    parser.add_argument("--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)")
+    parser.add_argument(
+        "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
     args = parser.parse_args()
 
@@ -300,7 +299,9 @@ def main():
             if remaining:
                 logger.info(f"Quota annuel restant : {remaining} records")
         elif test_resp.status_code in (401, 403):
-            logger.error(f"Erreur d'authentification ({test_resp.status_code}). Vérifier la clé API.")
+            logger.error(
+                f"Erreur d'authentification ({test_resp.status_code}). Vérifier la clé API."
+            )
             logger.error(f"Réponse : {test_resp.text[:300]}")
             sys.exit(1)
     except requests.RequestException as e:

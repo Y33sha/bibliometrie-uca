@@ -47,7 +47,6 @@ logger = setup_logger("normalize_hal", os.path.join(os.path.dirname(__file__), "
 # =============================================================
 
 
-
 # =============================================================
 # UTILITAIRES
 # =============================================================
@@ -77,6 +76,7 @@ def get_title(doc: dict) -> str:
 # PUBLISHERS & JOURNALS (via services/journals.py)
 # =============================================================
 
+
 def upsert_publisher(cur, publisher_name: str) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
     return find_or_create_publisher(cur, publisher_name)
@@ -88,15 +88,18 @@ def upsert_journal(cur, doc: dict, publisher_id: int | None) -> int | None:
     if not title:
         return None
     return find_or_create_journal(
-        cur, title,
+        cur,
+        title,
         issn=as_str(doc.get("journalIssn_s")),
         eissn=as_str(doc.get("journalEissn_s")),
-        publisher_id=publisher_id)
+        publisher_id=publisher_id,
+    )
 
 
 # =============================================================
 # PUBLICATIONS (via services/publications.py)
 # =============================================================
+
 
 def _map_hal_doc_type(doc: dict) -> str:
     """Mappe le type HAL vers le type canonique.
@@ -134,10 +137,18 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
 
     nnt = normalize_nnt(as_str(doc.get("nntId_s")))
 
-    return dict(title=title, title_normalized=normalize_text(title),
-                pub_year=pub_year, doc_type=doc_type, doi=doi, nnt=nnt,
-                oa_status=oa_status, journal_id=journal_id,
-                container_title=container_title, language=language)
+    return dict(
+        title=title,
+        title_normalized=normalize_text(title),
+        pub_year=pub_year,
+        doc_type=doc_type,
+        doi=doi,
+        nnt=nnt,
+        oa_status=oa_status,
+        journal_id=journal_id,
+        container_title=container_title,
+        language=language,
+    )
 
 
 def find_publication(cur, doc: dict, journal_id: int | None) -> int | None:
@@ -153,10 +164,16 @@ def find_publication(cur, doc: dict, journal_id: int | None) -> int | None:
 # SOURCE DOCUMENTS (HAL)
 # =============================================================
 
-def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
-                        hal_collections_staging: list | None,
-                        publication_id: int | None,
-                        pub_meta: dict | None = None) -> int:
+
+def insert_hal_document(
+    cur,
+    doc: dict,
+    staging_id: int,
+    hal_id: str,
+    hal_collections_staging: list | None,
+    publication_id: int | None,
+    pub_meta: dict | None = None,
+) -> int:
     """
     Crée/retrouve l'entrée source_publications pour HAL.
     Le champ hal_collections agrège toutes les collections vues.
@@ -200,7 +217,9 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
 
     # Topics (domaines HAL)
     domain_raw = doc.get("domain_s")
-    topics = Json({"hal_domains": domain_raw}) if isinstance(domain_raw, list) and domain_raw else None
+    topics = (
+        Json({"hal_domains": domain_raw}) if isinstance(domain_raw, list) and domain_raw else None
+    )
 
     # Biblio
     biblio = {}
@@ -219,7 +238,8 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
     uri = as_str(doc.get("uri_s"))
     urls = [uri] if uri else None
 
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
              hal_collections, publication_id, staging_id, external_ids,
@@ -252,10 +272,28 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
             biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
             urls = COALESCE(EXCLUDED.urls, source_publications.urls)
         RETURNING id
-    """, (hal_id, doi, title, pub_year, doc_type,
-          collections_array, publication_id, staging_id, external_ids,
-          journal_id, oa_status, language, container_title,
-          abstract, keywords, topics, biblio_json, urls))
+    """,
+        (
+            hal_id,
+            doi,
+            title,
+            pub_year,
+            doc_type,
+            collections_array,
+            publication_id,
+            staging_id,
+            external_ids,
+            journal_id,
+            oa_status,
+            language,
+            container_title,
+            abstract,
+            keywords,
+            topics,
+            biblio_json,
+            urls,
+        ),
+    )
     return cur.fetchone()[0]
 
 
@@ -263,8 +301,10 @@ def insert_hal_document(cur, doc: dict, staging_id: int, hal_id: str,
 # HAL AUTHORS (source_persons, source='hal')
 # =============================================================
 
-def _hal_source_id(hal_person_id: int | None, hal_form_id: int | None,
-                   old_id: int | None = None) -> str:
+
+def _hal_source_id(
+    hal_person_id: int | None, hal_form_id: int | None, old_id: int | None = None
+) -> str:
     """
     Calcule le source_id HAL :
     - hal_person_id seul si non null (un seul source_author par personne HAL)
@@ -281,9 +321,14 @@ def _hal_source_id(hal_person_id: int | None, hal_form_id: int | None,
 _hal_author_cache: dict[str, int] = {}
 
 
-def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
-                      idhal: str | None, hal_form_id: int | None = None,
-                      orcid: str | None = None) -> int | None:
+def upsert_hal_author(
+    cur,
+    full_name: str,
+    hal_person_id: int | None,
+    idhal: str | None,
+    hal_form_id: int | None = None,
+    orcid: str | None = None,
+) -> int | None:
     """
     Insère/retrouve un auteur HAL dans source_persons (source='hal').
     Déduplique par :
@@ -320,7 +365,8 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
         src_id = _hal_source_id(hal_person_id, hal_form_id)
         if src_id in _hal_author_cache:
             return _hal_author_cache[src_id]
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO source_persons
                 (source, source_id, full_name, last_name, first_name, orcid,
                  source_ids)
@@ -331,8 +377,9 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
                 source_ids = COALESCE(source_persons.source_ids, '{}') ||
                              COALESCE(EXCLUDED.source_ids, '{}')
             RETURNING id
-        """, (src_id, full_name, last_name, first_name, orcid,
-              source_ids_json))
+        """,
+            (src_id, full_name, last_name, first_name, orcid, source_ids_json),
+        )
         result = cur.fetchone()[0]
         _hal_author_cache[src_id] = result
         return result
@@ -342,7 +389,8 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
         src_id = _hal_source_id(None, hal_form_id)
         if src_id in _hal_author_cache:
             return _hal_author_cache[src_id]
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO source_persons
                 (source, source_id, full_name, last_name, first_name, orcid,
                  source_ids)
@@ -353,8 +401,9 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
                 source_ids = COALESCE(source_persons.source_ids, '{}') ||
                              COALESCE(EXCLUDED.source_ids, '{}')
             RETURNING id
-        """, (src_id, full_name, last_name, first_name, orcid,
-              source_ids_json))
+        """,
+            (src_id, full_name, last_name, first_name, orcid, source_ids_json),
+        )
         result = cur.fetchone()[0]
         _hal_author_cache[src_id] = result
         return result
@@ -364,24 +413,30 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
     if cache_key in _hal_author_cache:
         return _hal_author_cache[cache_key]
 
-    cur.execute("""
+    cur.execute(
+        """
         SELECT id FROM source_persons
         WHERE source = 'hal'
           AND source_id LIKE 'nokey-%%'
           AND full_name = %s
           AND first_name IS NOT DISTINCT FROM %s
         LIMIT 1
-    """, (full_name, first_name))
+    """,
+        (full_name, first_name),
+    )
     row = cur.fetchone()
     if row:
         if orcid or source_ids_json:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE source_persons SET
                     orcid = COALESCE(source_persons.orcid, %s),
                     source_ids = COALESCE(source_persons.source_ids, '{}') ||
                                  COALESCE(%s::jsonb, '{}')
                 WHERE id = %s
-            """, (orcid, source_ids_json, row[0]))
+            """,
+                (orcid, source_ids_json, row[0]),
+            )
         _hal_author_cache[cache_key] = row[0]
         return row[0]
 
@@ -389,14 +444,16 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
     cur.execute("SELECT nextval('source_persons_id_seq')")
     next_id = cur.fetchone()[0]
     src_id = f"nokey-{next_id}"
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO source_persons
             (id, source, source_id, full_name, last_name, first_name, orcid,
              source_ids)
         VALUES (%s, 'hal', %s, %s, %s, %s, %s, %s)
         RETURNING id
-    """, (next_id, src_id, full_name, last_name, first_name, orcid,
-          source_ids_json))
+    """,
+        (next_id, src_id, full_name, last_name, first_name, orcid, source_ids_json),
+    )
     result = cur.fetchone()[0]
     _hal_author_cache[cache_key] = result
     return result
@@ -406,9 +463,10 @@ def upsert_hal_author(cur, full_name: str, hal_person_id: int | None,
 # HAL AUTHORSHIPS
 # =============================================================
 
-def parse_author_structures(doc: dict, cur=None,
-                            struct_cache: dict | None = None,
-                            struct_name_cache: dict | None = None) -> dict[int, set[int]]:
+
+def parse_author_structures(
+    doc: dict, cur=None, struct_cache: dict | None = None, struct_name_cache: dict | None = None
+) -> dict[int, set[int]]:
     """
     Parse authIdHasStructure_fs pour extraire le mapping
     form_id → {hal_struct_id bruts (entiers HAL, résolus en source_struct_ids ensuite)}.
@@ -452,13 +510,16 @@ def parse_author_structures(doc: dict, cur=None,
 
         # Créer la source_structure si pas encore en cache
         if cur and struct_cache is not None and str(struct_id) not in struct_cache:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO source_structures (source, source_id, name)
                 VALUES ('hal', %s, %s)
                 ON CONFLICT (source, source_id) DO UPDATE SET
                     name = COALESCE(NULLIF(source_structures.name, ''), EXCLUDED.name)
                 RETURNING id
-            """, (str(struct_id), struct_name[:500] if struct_name else str(struct_id)))
+            """,
+                (str(struct_id), struct_name[:500] if struct_name else str(struct_id)),
+            )
             row = cur.fetchone()
             ss_id = row[0] if isinstance(row, tuple) else row["id"]
             struct_cache[str(struct_id)] = ss_id
@@ -468,9 +529,13 @@ def parse_author_structures(doc: dict, cur=None,
     return form_structs
 
 
-def process_authors(cur, doc: dict, source_publication_id: int,
-                    struct_cache: dict | None = None,
-                    struct_name_cache: dict | None = None):
+def process_authors(
+    cur,
+    doc: dict,
+    source_publication_id: int,
+    struct_cache: dict | None = None,
+    struct_name_cache: dict | None = None,
+):
     """
     Traite les auteurs d'un document HAL :
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
@@ -531,9 +596,9 @@ def process_authors(cur, doc: dict, source_publication_id: int,
                     pass
 
     # authIdHasStructure_fs → {form_id: set of hal_struct_id bruts}
-    form_struct_map = parse_author_structures(doc, cur=cur,
-                                              struct_cache=struct_cache,
-                                              struct_name_cache=struct_name_cache)
+    form_struct_map = parse_author_structures(
+        doc, cur=cur, struct_cache=struct_cache, struct_name_cache=struct_name_cache
+    )
 
     for position, name in enumerate(names):
         idhal = idhal_by_pos.get(position)
@@ -549,9 +614,7 @@ def process_authors(cur, doc: dict, source_publication_id: int,
         roles, is_corresponding_from_role = map_role("hal", quality)
         is_corresponding = is_corresponding_from_role
 
-        source_person_id = upsert_hal_author(
-            cur, name, hal_person_id, idhal, form_id, orcid=orcid
-        )
+        source_person_id = upsert_hal_author(cur, name, hal_person_id, idhal, form_id, orcid=orcid)
         if not source_person_id:
             continue
 
@@ -561,12 +624,17 @@ def process_authors(cur, doc: dict, source_publication_id: int,
         if form_id and form_id in form_struct_map:
             raw_hal_ids = sorted(form_struct_map[form_id])
             if struct_cache is not None:
-                resolved = [struct_cache[str(hid)] for hid in raw_hal_ids if str(hid) in struct_cache]
+                resolved = [
+                    struct_cache[str(hid)] for hid in raw_hal_ids if str(hid) in struct_cache
+                ]
             else:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT id FROM source_structures
                     WHERE source = 'hal' AND source_id = ANY(%s)
-                """, ([str(hid) for hid in raw_hal_ids],))
+                """,
+                    ([str(hid) for hid in raw_hal_ids],),
+                )
                 resolved = [r[0] for r in cur.fetchall()]
             if resolved:
                 source_struct_ids = sorted(resolved)
@@ -574,10 +642,14 @@ def process_authors(cur, doc: dict, source_publication_id: int,
         # Noms des structures pour les adresses
         addr_parts = []
         if source_struct_ids and struct_name_cache:
-            addr_parts = [struct_name_cache[sid] for sid in source_struct_ids
-                          if sid in struct_name_cache and struct_name_cache[sid].strip()]
+            addr_parts = [
+                struct_name_cache[sid]
+                for sid in source_struct_ids
+                if sid in struct_name_cache and struct_name_cache[sid].strip()
+            ]
 
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO source_authorships
                 (source, source_publication_id, source_person_id, author_position, source_struct_ids,
                  author_name_normalized, is_corresponding, roles, raw_author_name)
@@ -592,8 +664,18 @@ def process_authors(cur, doc: dict, source_publication_id: int,
                 roles = EXCLUDED.roles,
                 raw_author_name = EXCLUDED.raw_author_name
             RETURNING id
-        """, (source_publication_id, source_person_id, position,
-              source_struct_ids, name, is_corresponding, roles or None, name))
+        """,
+            (
+                source_publication_id,
+                source_person_id,
+                position,
+                source_struct_ids,
+                name,
+                is_corresponding,
+                roles or None,
+                name,
+            ),
+        )
         row = cur.fetchone()
         sa_id = row[0] if isinstance(row, tuple) else row["id"]
 
@@ -605,10 +687,13 @@ def process_authors(cur, doc: dict, source_publication_id: int,
 # BOUCLE PRINCIPALE
 # =============================================================
 
-def process_work(cur, staging_row: tuple, struct_cache: dict | None = None,
-                 struct_name_cache: dict | None = None) -> bool:
+
+def process_work(
+    cur, staging_row: tuple, struct_cache: dict | None = None, struct_name_cache: dict | None = None
+) -> bool:
     """Traite un work du staging HAL."""
     from utils.timings import StepTimer
+
     staging_id, hal_id, doi, raw_data, hal_collections_staging = staging_row
     doc = raw_data
 
@@ -632,10 +717,13 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None,
             if version_doi:
                 cur.execute(
                     "SELECT id FROM staging WHERE source = 'hal' AND lower(doi) = lower(%s)",
-                    (version_doi,))
+                    (version_doi,),
+                )
                 if cur.fetchone():
-                    logger.info(f"  {hal_id} concept DOI Zenodo {raw_doi} -> "
-                                f"version {version_doi} deja en staging, skip")
+                    logger.info(
+                        f"  {hal_id} concept DOI Zenodo {raw_doi} -> "
+                        f"version {version_doi} deja en staging, skip"
+                    )
                     mark_staging_done(cur, staging_id)
                     return False
 
@@ -654,7 +742,8 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None,
         # le réutiliser au lieu de risquer un doublon
         cur.execute(
             "SELECT publication_id FROM source_publications WHERE source = 'hal' AND source_id = %s",
-            (hal_id,))
+            (hal_id,),
+        )
         existing_doc = cur.fetchone()
         if existing_doc and existing_doc[0]:
             old_pub_id = existing_doc[0]
@@ -663,6 +752,7 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None,
             if publication_id and publication_id != old_pub_id:
                 # DOI/NNT pointe vers une autre publication → fusionner
                 from services.publications import merge_publications
+
                 logger.info(f"  {hal_id} : fusion pub {old_pub_id} → {publication_id} (DOI/NNT)")
                 merge_publications(cur, publication_id, old_pub_id)
             elif not publication_id:
@@ -675,7 +765,9 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None,
         # Enrichir la publication existante si trouvée
         # (try_merge_by_doi gère les fusions DOI, refresh_from_sources recalcule après)
         if publication_id:
-            publication_id = try_merge_by_doi(cur, publication_id, clean_doi(as_str(doc.get("doiId_s"))))
+            publication_id = try_merge_by_doi(
+                cur, publication_id, clean_doi(as_str(doc.get("doiId_s")))
+            )
 
         # Document HAL (source_publications) — publication_id peut être NULL
         source_publication_id = insert_hal_document(
@@ -684,8 +776,13 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None,
         t.mark("hal_doc")
 
         # Auteurs et authorships (avec source_struct_ids)
-        process_authors(cur, doc, source_publication_id,
-                        struct_cache=struct_cache, struct_name_cache=struct_name_cache)
+        process_authors(
+            cur,
+            doc,
+            source_publication_id,
+            struct_cache=struct_cache,
+            struct_name_cache=struct_name_cache,
+        )
         t.mark("authors")
 
         # Recalcul complet des métadonnées depuis toutes les sources
@@ -706,10 +803,12 @@ def process_work(cur, staging_row: tuple, struct_cache: dict | None = None,
 def main():
     parser = argparse.ArgumentParser(description="Normalisation HAL → tables structurées")
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
-    parser.add_argument("--reset", action="store_true",
-                        help="Remettre tous les works à processed=FALSE")
-    parser.add_argument("--batch-size", type=int, default=500,
-                        help="Taille du commit batch (défaut: 500)")
+    parser.add_argument(
+        "--reset", action="store_true", help="Remettre tous les works à processed=FALSE"
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=500, help="Taille du commit batch (défaut: 500)"
+    )
     args = parser.parse_args()
 
     conn = get_connection()
@@ -737,13 +836,16 @@ def main():
         limit = min(limit, total)
         logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
 
-        cur.execute("""
+        cur.execute(
+            """
             SELECT id, source_id, doi, raw_data, hal_collections
             FROM staging
             WHERE source = 'hal' AND processed = FALSE
             ORDER BY id
             LIMIT %s
-        """, (limit,))
+        """,
+            (limit,),
+        )
 
         rows = cur.fetchall()
         processed = 0
@@ -764,8 +866,9 @@ def main():
         for row in rows:
             try:
                 cur.execute("SAVEPOINT normalize_work")
-                success = process_work(cur, row, struct_cache=struct_cache,
-                                       struct_name_cache=struct_name_cache)
+                success = process_work(
+                    cur, row, struct_cache=struct_cache, struct_name_cache=struct_name_cache
+                )
                 cur.execute("RELEASE SAVEPOINT normalize_work")
                 if success:
                     processed += 1
@@ -831,7 +934,6 @@ def main():
         logger.info(f"Traités avec succès : {processed}")
         logger.info(f"Hors périmètre (enrichissement seul) : {skipped_hors_perimetre}")
         logger.info(f"Erreurs : {errors}")
-
 
     except KeyboardInterrupt:
         conn.commit()

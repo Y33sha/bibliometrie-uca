@@ -34,8 +34,6 @@ from utils.hal import HAL_FIELDS
 logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-
-
 def build_query(years: list, since: str = None) -> str:
     """Construit la requête HAL (paramètre q).
 
@@ -95,7 +93,8 @@ def upsert_work(conn, hal_id: str, doi: str | None, raw_data: dict, collection: 
     """
     raw_hash = compute_hash(raw_data)
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, raw_hash)
             VALUES ('hal', %s, %s, %s::jsonb, ARRAY[%s], %s)
             ON CONFLICT (source, source_id) DO UPDATE SET
@@ -117,7 +116,9 @@ def upsert_work(conn, hal_id: str, doi: str | None, raw_data: dict, collection: 
                     ELSE staging.processed
                 END,
                 last_seen_at = now()
-        """, (hal_id, doi, Json(raw_data), collection, raw_hash))
+        """,
+            (hal_id, doi, Json(raw_data), collection, raw_hash),
+        )
 
 
 def extract_collection(
@@ -187,11 +188,15 @@ def get_existing_hal_ids(conn) -> set:
 
 def main():
     parser = argparse.ArgumentParser(description="Extraction HAL → staging")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Compter sans insérer")
+    parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
     parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
-    parser.add_argument("--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)")
-    parser.add_argument("--since", help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents soumis depuis cette date")
+    parser.add_argument(
+        "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
+    )
+    parser.add_argument(
+        "--since",
+        help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents soumis depuis cette date",
+    )
     args = parser.parse_args()
 
     conn = get_connection()
@@ -215,7 +220,9 @@ def main():
     for code in extra_collections:
         if code not in all_collections:
             all_collections[code] = code
-    logger.info(f"Collections : {len(all_collections)} ({len(collections)} labos + {len(extra_collections)} extra)")
+    logger.info(
+        f"Collections : {len(all_collections)} ({len(collections)} labos + {len(extra_collections)} extra)"
+    )
 
     try:
         existing_ids = get_existing_hal_ids(conn)
@@ -225,7 +232,14 @@ def main():
 
         for code, label in all_collections.items():
             total, new = extract_collection(
-                code, label, conn, existing_ids, base_url, years=years, since=since, dry_run=args.dry_run
+                code,
+                label,
+                conn,
+                existing_ids,
+                base_url,
+                years=years,
+                since=since,
+                dry_run=args.dry_run,
             )
             grand_total_new += new
             if not args.dry_run and new > 0:

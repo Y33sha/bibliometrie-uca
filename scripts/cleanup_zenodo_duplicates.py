@@ -19,7 +19,9 @@ from services.publications import merge_publications
 from utils.log import setup_logger
 from utils.zenodo import resolve_zenodo_doi
 
-logger = setup_logger("cleanup_zenodo", os.path.join(os.path.dirname(__file__), "../processing/logs"))
+logger = setup_logger(
+    "cleanup_zenodo", os.path.join(os.path.dirname(__file__), "../processing/logs")
+)
 
 # Pause entre chaque appel API (secondes)
 API_POLITE_DELAY = 1.5
@@ -74,10 +76,13 @@ def do_merge(cur, conn, target_id, target_doi, source_id, source_doi, apply):
     try:
         merge_publications(cur, target_id, source_id)
         # Supprimer le source_document du concept DOI (maintenant rattaché à target)
-        cur.execute("""
+        cur.execute(
+            """
             DELETE FROM source_publications
             WHERE source = 'openalex' AND publication_id = %s AND lower(doi) = lower(%s)
-        """, (target_id, source_doi))
+        """,
+            (target_id, source_doi),
+        )
         return True
     except Exception as e:
         logger.error(f"Erreur merge {label}: {e}")
@@ -102,8 +107,7 @@ def main():
     if pairs:
         print(f"=== Passe 1 : {len(pairs)} paires consécutives ===\n")
         for concept_id, concept_doi, version_id, version_doi, _ in pairs:
-            if do_merge(cur, conn, version_id, version_doi,
-                        concept_id, concept_doi, args.apply):
+            if do_merge(cur, conn, version_id, version_doi, concept_id, concept_doi, args.apply):
                 merged += 1
             else:
                 errors += 1
@@ -128,16 +132,14 @@ def main():
                     concept_ids.append((pub_id, doi))
 
             if not version_ids or not concept_ids:
-                print(f"  SKIP {title_norm[:60]} — impossible de distinguer "
-                      f"concept/version")
+                print(f"  SKIP {title_norm[:60]} — impossible de distinguer concept/version")
                 continue
 
             target_id, target_doi = version_ids[0]
             sources = concept_ids + [(pid, d) for pid, d in version_ids[1:]]
 
             for source_id, source_doi in sources:
-                if do_merge(cur, conn, target_id, target_doi,
-                            source_id, source_doi, args.apply):
+                if do_merge(cur, conn, target_id, target_doi, source_id, source_doi, args.apply):
                     merged += 1
                 else:
                     errors += 1

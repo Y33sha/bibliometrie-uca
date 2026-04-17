@@ -28,6 +28,7 @@ from services.authorships import detach_source as _detach_source
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
 @router.get("/api/publications/facets")
 async def publications_facets(
     year: str = Query(""),
@@ -77,16 +78,24 @@ async def publications_facets(
             return
         hal_parts = []
         for v in values:
-            if v == 'hors_hal':
-                hal_parts.append("NOT EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal')")
-            elif v == 'hors_collection':
-                hal_parts.append("EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal' AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s]))")
+            if v == "hors_hal":
+                hal_parts.append(
+                    "NOT EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal')"
+                )
+            elif v == "hors_collection":
+                hal_parts.append(
+                    "EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal' AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s]))"
+                )
                 params.append(lab_hal_col)
-            elif v == 'notice':
-                hal_parts.append("(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal' AND sd.hal_collections @> ARRAY[%s]) AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))")
+            elif v == "notice":
+                hal_parts.append(
+                    "(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal' AND sd.hal_collections @> ARRAY[%s]) AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))"
+                )
                 params.append(lab_hal_col)
-            elif v == 'ok':
-                hal_parts.append("(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal' AND sd.hal_collections @> ARRAY[%s]) AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN ('closed', 'unknown'))")
+            elif v == "ok":
+                hal_parts.append(
+                    "(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal' AND sd.hal_collections @> ARRAY[%s]) AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN ('closed', 'unknown'))"
+                )
                 params.append(lab_hal_col)
         if len(hal_parts) == 1:
             conds.append(hal_parts[0])
@@ -126,22 +135,38 @@ async def publications_facets(
             apply_source_filter(conds, source_values)
         if skip != "apc" and has_apc:
             APC_FACET_MAP = {
-                "uca": ("EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s)", 1),
-                "other": ("(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))", 1),
-                "non_uca": ("(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))", 1),
-                "none": ("NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)", 0),
+                "uca": (
+                    "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s)",
+                    1,
+                ),
+                "other": (
+                    "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))",
+                    1,
+                ),
+                "non_uca": (
+                    "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))",
+                    1,
+                ),
+                "none": (
+                    "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
+                    0,
+                ),
             }
             apc_parts = []
-            for v in [x.strip() for x in has_apc.split(',') if x.strip()]:
+            for v in [x.strip() for x in has_apc.split(",") if x.strip()]:
                 if v in APC_FACET_MAP:
                     sql, rid_count = APC_FACET_MAP[v]
                     apc_parts.append(sql)
                     params.extend([_rid] * rid_count)
                 elif v == "this_lab" and lab_ids_clean:
-                    apc_parts.append("EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[]))")
+                    apc_parts.append(
+                        "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[]))"
+                    )
                     params.append(lab_ids_clean)
                 elif v == "other_uca" and lab_ids_clean:
-                    apc_parts.append("(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[])))")
+                    apc_parts.append(
+                        "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[])))"
+                    )
                     params.extend([_rid, lab_ids_clean])
             if len(apc_parts) == 1:
                 conds.append(apc_parts[0])
@@ -178,18 +203,22 @@ async def publications_facets(
         # --- Facette ANNÉES ---
         c, p = base_conds_params()
         add_all_except(c, p, skip="year")
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT p.pub_year AS value, COUNT(*) AS count
             FROM publications p
             WHERE {where_sql(c)} AND p.pub_year IS NOT NULL
             GROUP BY p.pub_year ORDER BY p.pub_year DESC
-        """, p)
+        """,
+            p,
+        )
         year_facets = cur.fetchall()
 
         # --- Facette LABOS ---
         c, p = base_conds_params()
         add_all_except(c, p, skip="lab")
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT s.id AS value, COALESCE(s.acronym, s.name) AS label,
                    COUNT(DISTINCT a.publication_id) AS count
             FROM authorships a
@@ -200,11 +229,14 @@ async def publications_facets(
               AND s.structure_type = 'labo'
             GROUP BY s.id, s.acronym, s.name
             ORDER BY count DESC
-        """, p)
+        """,
+            p,
+        )
         lab_facets = cur.fetchall()
 
         # Compter les pubs sans labo (via la table de vérité)
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT COUNT(*) AS count FROM publications p
             WHERE {where_sql(c)}
               AND NOT EXISTS (
@@ -214,45 +246,56 @@ async def publications_facets(
                     AND NOT a.excluded
                     AND s.structure_type = 'labo'
               )
-        """, p)
+        """,
+            p,
+        )
         no_lab_count = cur.fetchone()["count"]
 
         # --- Facette DOC_TYPE ---
         c, p = base_conds_params()
         add_all_except(c, p, skip="doc_type")
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT p.doc_type::text AS value, COUNT(*) AS count
             FROM publications p
             WHERE {where_sql(c)} AND p.doc_type IS NOT NULL
             GROUP BY p.doc_type ORDER BY count DESC
-        """, p)
+        """,
+            p,
+        )
         doc_type_facets = cur.fetchall()
 
         # --- Facette ACCÈS (ouvert / fermé) ---
         c, p = base_conds_params()
         add_all_except(c, p, skip="access")
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 COUNT(*) FILTER (WHERE p.oa_status::text IN ('gold','hybrid','bronze','green','diamond')) AS open_count,
                 COUNT(*) FILTER (WHERE p.oa_status::text IN ('closed','unknown') OR p.oa_status IS NULL) AS closed_count
             FROM publications p
             WHERE {where_sql(c)}
-        """, p)
+        """,
+            p,
+        )
         access_row = cur.fetchone()
         access_facets = [
-            {"value": "open",   "text": "Ouvert", "count": access_row["open_count"]},
-            {"value": "closed", "text": "Fermé",  "count": access_row["closed_count"]},
+            {"value": "open", "text": "Ouvert", "count": access_row["open_count"]},
+            {"value": "closed", "text": "Fermé", "count": access_row["closed_count"]},
         ]
 
         # --- Facette OA_STATUS ---
         c, p = base_conds_params()
         add_all_except(c, p, skip="oa_status")
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT p.oa_status::text AS value, COUNT(*) AS count
             FROM publications p
             WHERE {where_sql(c)} AND p.oa_status IS NOT NULL
             GROUP BY p.oa_status ORDER BY count DESC
-        """, p)
+        """,
+            p,
+        )
         oa_facets = cur.fetchall()
 
         # --- Facette CORRESPONDING (seulement si person_id) ---
@@ -261,7 +304,8 @@ async def publications_facets(
             c, p = base_conds_params()
             add_all_except(c, p, skip="corresponding")
             where = where_sql(c)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM authorships a
@@ -275,7 +319,9 @@ async def publications_facets(
                     )) AS no_count
                 FROM publications p
                 WHERE {where}
-            """, [person_id, person_id] + p)
+            """,
+                [person_id, person_id] + p,
+            )
             row = cur.fetchone()
             corr_facets = [
                 {"value": "yes", "count": row["yes_count"]},
@@ -286,7 +332,8 @@ async def publications_facets(
         c, p = base_conds_params()
         add_all_except(c, p, skip="source")
         where = where_sql(c)
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 COUNT(*) FILTER (WHERE p.sources @> ARRAY['hal'::source_type]) AS hal_count,
                 COUNT(*) FILTER (WHERE p.sources @> ARRAY['openalex'::source_type]) AS oa_count,
@@ -295,7 +342,9 @@ async def publications_facets(
                 COUNT(*) FILTER (WHERE p.sources @> ARRAY['theses'::source_type]) AS theses_count
             FROM publications p
             WHERE {where}
-        """, p)
+        """,
+            p,
+        )
         source_counts = cur.fetchone()
 
         # --- Facette APC ---
@@ -352,8 +401,10 @@ async def publications_facets(
             cur.execute(apc_sql, [lab_ids_clean, _rid, lab_ids_clean, _rid] + p)
             r = cur.fetchone()
             # Build lab acronym for label
-            cur.execute("SELECT COALESCE(acronym, name) AS label FROM structures WHERE id = %s",
-                        (lab_ids_clean[0],))
+            cur.execute(
+                "SELECT COALESCE(acronym, name) AS label FROM structures WHERE id = %s",
+                (lab_ids_clean[0],),
+            )
             lab_label = cur.fetchone()["label"] if cur.rowcount else "ce labo"
             apc_facets = [
                 {"value": "this_lab", "text": f"APC — {lab_label}", "count": r["apc_this_lab"]},
@@ -374,7 +425,8 @@ async def publications_facets(
         c, p = base_conds_params()
         add_all_except(c, p, skip="country")
         w = where_sql(c)
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT co.code, co.name, COUNT(*) AS count
             FROM (
                 SELECT unnest(p.countries) AS cc
@@ -384,9 +436,14 @@ async def publications_facets(
             JOIN countries co ON co.code = sub.cc
             GROUP BY co.code, co.name
             ORDER BY count DESC
-        """, p)
-        country_facets = [{"value": r["code"].strip(), "text": r["name"], "count": r["count"]}
-                         for r in cur.fetchall() if r["code"].strip() != "xx"]
+        """,
+            p,
+        )
+        country_facets = [
+            {"value": r["code"].strip(), "text": r["name"], "count": r["count"]}
+            for r in cur.fetchall()
+            if r["code"].strip() != "xx"
+        ]
 
         # --- Facette HAL STATUS (only meaningful with a single lab) ---
         hal_status_facets = []
@@ -400,7 +457,8 @@ async def publications_facets(
             w = where_sql(c)
 
             if lab_hal_col:
-                cur.execute(f"""
+                cur.execute(
+                    f"""
                     SELECT
                         COUNT(*) FILTER (WHERE NOT EXISTS (
                             SELECT 1 FROM source_publications sd
@@ -426,10 +484,13 @@ async def publications_facets(
                         ) AS ok
                     FROM publications p
                     WHERE {w}
-                """, [lab_hal_col, lab_hal_col, lab_hal_col] + p)
+                """,
+                    [lab_hal_col, lab_hal_col, lab_hal_col] + p,
+                )
             else:
                 # No collection configured: only hors_hal vs hors_collection
-                cur.execute(f"""
+                cur.execute(
+                    f"""
                     SELECT
                         COUNT(*) FILTER (WHERE NOT EXISTS (
                             SELECT 1 FROM source_publications sd
@@ -443,13 +504,19 @@ async def publications_facets(
                         0 AS ok
                     FROM publications p
                     WHERE {w}
-                """, p)
+                """,
+                    p,
+                )
             r = cur.fetchone()
             hal_status_facets = [
-                {"value": "ok",              "text": "OK",              "count": r["ok"]},
-                {"value": "notice",          "text": "Notice",          "count": r["notice"]},
-                {"value": "hors_collection", "text": "Hors collection", "count": r["hors_collection"]},
-                {"value": "hors_hal",        "text": "Hors HAL",        "count": r["hors_hal"]},
+                {"value": "ok", "text": "OK", "count": r["ok"]},
+                {"value": "notice", "text": "Notice", "count": r["notice"]},
+                {
+                    "value": "hors_collection",
+                    "text": "Hors collection",
+                    "count": r["hors_collection"],
+                },
+                {"value": "hors_hal", "text": "Hors HAL", "count": r["hors_hal"]},
             ]
 
         # --- Facette IN_PERIMETER (seulement si person_id) ---
@@ -458,7 +525,8 @@ async def publications_facets(
             c, p = base_conds_params()
             add_all_except(c, p, skip="in_perimeter")
             w = where_sql(c)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM authorships a
@@ -472,7 +540,9 @@ async def publications_facets(
                     )) AS no
                 FROM publications p
                 WHERE {w}
-            """, [person_id, person_id] + p)
+            """,
+                [person_id, person_id] + p,
+            )
             r = cur.fetchone()
             perimeter_facets = [
                 {"value": "yes", "text": "UCA", "count": r["yes"]},
@@ -529,26 +599,32 @@ async def export_publications_csv(
 ):
     """Export CSV des publications (mêmes filtres que list_publications)."""
 
-    years = [int(v) for v in year.split(',') if v.strip()] if year else []
-    doc_types = [v.strip() for v in doc_type.split(',') if v.strip()] if doc_type else []
-    excluded_types = [v.strip() for v in excluded_doc_type.split(',') if v.strip()] if excluded_doc_type else []
-    lab_id_parts_csv = [v.strip() for v in lab_id.split(',') if v.strip()] if lab_id else []
+    years = [int(v) for v in year.split(",") if v.strip()] if year else []
+    doc_types = [v.strip() for v in doc_type.split(",") if v.strip()] if doc_type else []
+    excluded_types = (
+        [v.strip() for v in excluded_doc_type.split(",") if v.strip()] if excluded_doc_type else []
+    )
+    lab_id_parts_csv = [v.strip() for v in lab_id.split(",") if v.strip()] if lab_id else []
     lab_none = "none" in lab_id_parts_csv
     lab_ids = [int(v) for v in lab_id_parts_csv if v != "none"] if lab_id_parts_csv else []
-    oa_values = [v.strip() for v in oa_status.split(',') if v.strip()] if oa_status else []
-    source_values = [v.strip() for v in source_filter.split(',') if v.strip()] if source_filter else []
+    oa_values = [v.strip() for v in oa_status.split(",") if v.strip()] if oa_status else []
+    source_values = (
+        [v.strip() for v in source_filter.split(",") if v.strip()] if source_filter else []
+    )
 
     with get_cursor() as (cur, conn):
         cur.execute("SET LOCAL jit = off")
 
         if person_id:
-            conditions = ["""
+            conditions = [
+                """
                 EXISTS (SELECT 1 FROM source_publications sd
                         JOIN source_authorships sa ON sa.source_publication_id = sd.id
                         WHERE sd.publication_id = p.id AND sa.person_id = %s
                           AND sa.excluded = FALSE
                           AND sa.roles && ARRAY['author']::text[])
-            """]
+            """
+            ]
             params: list = [person_id]
         elif lab_none and not lab_ids:
             conditions = [PUB_IS_UCA]
@@ -610,7 +686,7 @@ async def export_publications_csv(
         if oa_values:
             expanded = []
             for v in oa_values:
-                if v == 'oa':
+                if v == "oa":
                     expanded.extend(OA_OPEN_STATUSES)
                 else:
                     expanded.append(v)
@@ -634,7 +710,8 @@ async def export_publications_csv(
         }
         order = order_map.get(sort, "p.pub_year DESC, p.title")
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 p.id, p.title, p.pub_year, p.doi, p.doc_type::text,
                 p.oa_status::text,
@@ -664,31 +741,50 @@ async def export_publications_csv(
             ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}
-        """, params)
+        """,
+            params,
+        )
 
         buf = io.StringIO()
         writer = csv.writer(buf)
-        writer.writerow([
-            "Année", "Titre", "DOI", "Revue", "Éditeur",
-            "Laboratoires", "Type", "Voie OA", "HAL", "OpenAlex", "WoS",
-        ])
+        writer.writerow(
+            [
+                "Année",
+                "Titre",
+                "DOI",
+                "Revue",
+                "Éditeur",
+                "Laboratoires",
+                "Type",
+                "Voie OA",
+                "HAL",
+                "OpenAlex",
+                "WoS",
+            ]
+        )
         for row in cur.fetchall():
             hal_url = f"https://hal.science/{row['hal_id']}" if row["hal_id"] else ""
             oa_url = f"https://openalex.org/{row['openalex_id']}" if row["openalex_id"] else ""
-            wos_url = f"https://www.webofscience.com/wos/woscc/full-record/{row['wos_id']}" if row["wos_id"] else ""
-            writer.writerow([
-                row["pub_year"] or "",
-                row["title"] or "",
-                row["doi"] or "",
-                row["journal_title"] or "",
-                row["publisher_name"] or "",
-                row["labs"] or "",
-                row["doc_type"] or "",
-                row["oa_status"] or "",
-                hal_url,
-                oa_url,
-                wos_url,
-            ])
+            wos_url = (
+                f"https://www.webofscience.com/wos/woscc/full-record/{row['wos_id']}"
+                if row["wos_id"]
+                else ""
+            )
+            writer.writerow(
+                [
+                    row["pub_year"] or "",
+                    row["title"] or "",
+                    row["doi"] or "",
+                    row["journal_title"] or "",
+                    row["publisher_name"] or "",
+                    row["labs"] or "",
+                    row["doc_type"] or "",
+                    row["oa_status"] or "",
+                    hal_url,
+                    oa_url,
+                    wos_url,
+                ]
+            )
 
     output = buf.getvalue()
     return Response(
@@ -697,14 +793,17 @@ async def export_publications_csv(
         headers={"Content-Disposition": "attachment; filename=publications.csv"},
     )
 
+
 # ----- API: Publication detail -----
+
 
 @router.get("/api/publications/{pub_id}")
 async def get_publication(pub_id: int):
     """Détail complet d'une publication : métadonnées, sources, authorships."""
     with get_cursor() as (cur, conn):
         # a) Publication + journal + publisher
-        cur.execute("""
+        cur.execute(
+            """
             SELECT p.id, p.title, p.pub_year, p.doi, p.doc_type::text, p.oa_status::text,
                    p.language, p.container_title, p.abstract,
                    j.id AS journal_id, j.title AS journal_title, j.issn, j.eissn,
@@ -716,20 +815,26 @@ async def get_publication(pub_id: int):
             LEFT JOIN journals j ON j.id = p.journal_id
             LEFT JOIN publishers pub ON pub.id = j.publisher_id
             WHERE p.id = %s
-        """, (pub_id,))
+        """,
+            (pub_id,),
+        )
         pub = cur.fetchone()
         if not pub:
             raise HTTPException(status_code=404, detail="Publication not found")
 
         # b) Sources — countries depuis le document
-        cur.execute("""
+        cur.execute(
+            """
             SELECT sd.source, sd.source_id, sd.doi, sd.hal_collections, sd.countries
             FROM source_publications sd WHERE sd.publication_id = %s
-        """, (pub_id,))
+        """,
+            (pub_id,),
+        )
         sources = cur.fetchall()
 
         # c) Authorships — truth table
-        cur.execute("""
+        cur.execute(
+            """
             SELECT a.author_position, a.in_perimeter, a.is_corresponding,
                    a.structure_ids,
                    EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'hal') AS source_hal,
@@ -740,22 +845,28 @@ async def get_publication(pub_id: int):
             JOIN persons pe ON pe.id = a.person_id
             WHERE a.publication_id = %s AND NOT a.excluded
             ORDER BY a.author_position
-        """, (pub_id,))
+        """,
+            (pub_id,),
+        )
         authorships = cur.fetchall()
 
         # d) HAL authorships
-        cur.execute("""
+        cur.execute(
+            """
             SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                    sa.in_perimeter, sa.structure_ids, sa.excluded, sa.countries
             FROM source_authorships sa
             JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.source = 'hal' AND sd.publication_id = %s
             ORDER BY sa.author_position
-        """, (pub_id,))
+        """,
+            (pub_id,),
+        )
         hal_authorships = cur.fetchall()
 
         # e) OpenAlex authorships — pays depuis sa.countries ou adresses
-        cur.execute("""
+        cur.execute(
+            """
             SELECT sa.id, sa.author_position,
                    sa.raw_author_name AS full_name,
                    sa.person_id,
@@ -774,11 +885,14 @@ async def get_publication(pub_id: int):
             JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.source = 'openalex' AND sd.publication_id = %s
             ORDER BY sa.author_position
-        """, (pub_id,))
+        """,
+            (pub_id,),
+        )
         oa_authorships = cur.fetchall()
 
         # e2) WoS authorships — pays depuis sa.countries ou adresses
-        cur.execute("""
+        cur.execute(
+            """
             SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                    sa.in_perimeter, sa.structure_ids,
                    (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id) FROM source_authorship_addresses saa2 JOIN addresses addr ON addr.id = saa2.address_id WHERE saa2.source_authorship_id = sa.id) AS raw_affiliation,
@@ -795,30 +909,38 @@ async def get_publication(pub_id: int):
             JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.source = 'wos' AND sd.publication_id = %s
             ORDER BY sa.author_position
-        """, (pub_id,))
+        """,
+            (pub_id,),
+        )
         wos_authorships = cur.fetchall()
 
         # f) Theses.fr authorships (avec rôles)
-        cur.execute("""
+        cur.execute(
+            """
             SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                    sa.roles, sa.in_perimeter
             FROM source_authorships sa
             JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.source = 'theses' AND sd.publication_id = %s
             ORDER BY sa.author_position NULLS LAST, sa.raw_author_name
-        """, (pub_id,))
+        """,
+            (pub_id,),
+        )
         theses_authorships = cur.fetchall()
 
         # f2) Métadonnées thèse (discipline, école doctorale, partenaires)
         thesis_meta = None
         if pub["doc_type"] in ("thesis", "ongoing_thesis"):
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT sd.meta AS sd_meta, p.meta AS pub_meta
                 FROM publications p
                 LEFT JOIN source_publications sd ON sd.publication_id = p.id AND sd.source = 'theses'
                 WHERE p.id = %s
                 LIMIT 1
-            """, (pub_id,))
+            """,
+                (pub_id,),
+            )
             row = cur.fetchone()
             if row:
                 sd_meta = row["sd_meta"] or {}
@@ -827,8 +949,10 @@ async def get_publication(pub_id: int):
                     "discipline": sd_meta.get("discipline"),
                     "ecoles_doctorales": sd_meta.get("ecoles_doctorales"),
                     "partenaires": sd_meta.get("partenaires"),
-                    "date_soutenance": sd_meta.get("date_soutenance") or pub_meta.get("date_soutenance"),
-                    "date_inscription": sd_meta.get("date_inscription") or pub_meta.get("date_inscription"),
+                    "date_soutenance": sd_meta.get("date_soutenance")
+                    or pub_meta.get("date_soutenance"),
+                    "date_inscription": sd_meta.get("date_inscription")
+                    or pub_meta.get("date_inscription"),
                 }
 
         # g) Resolve all structure_ids → names
@@ -848,13 +972,18 @@ async def get_publication(pub_id: int):
 
         structures = {}
         if all_struct_ids:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id, acronym, name, structure_type AS type FROM structures
                 WHERE id = ANY(%s)
-            """, (list(all_struct_ids),))
+            """,
+                (list(all_struct_ids),),
+            )
             for s in cur.fetchall():
                 structures[str(s["id"])] = {
-                    "acronym": s["acronym"], "name": s["name"], "type": s["type"]
+                    "acronym": s["acronym"],
+                    "name": s["name"],
+                    "type": s["type"],
                 }
 
         return {
@@ -880,7 +1009,9 @@ VALID_SOURCE_TABLES = {
 
 
 @router.post("/api/source-authorships/{source}/{authorship_id}/exclude")
-async def exclude_source_authorship(source: str, authorship_id: int, body: ExcludeSourceAuthorship = ExcludeSourceAuthorship()):
+async def exclude_source_authorship(
+    source: str, authorship_id: int, body: ExcludeSourceAuthorship = ExcludeSourceAuthorship()
+):
     """Marque/démarque une authorship source comme fausse.
 
     Si aucune source non exclue n'atteste plus l'authorship consolidée,
@@ -910,21 +1041,22 @@ async def exclude_source_authorship(source: str, authorship_id: int, body: Exclu
 
 # ----- API: Publications list -----
 
+
 @router.get("/api/publications")
 async def list_publications(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
-    lab_id: str = Query(""),           # comma-separated ints
-    year: str = Query(""),             # comma-separated ints
+    lab_id: str = Query(""),  # comma-separated ints
+    year: str = Query(""),  # comma-separated ints
     publisher_id: int | None = Query(None),
     journal_id: int | None = Query(None),
-    access: str = Query(""),            # open, closed
-    oa_status: str = Query(""),        # comma-separated values
-    source_filter: str = Query(""),    # comma-separated: hal_only, oa_only, both
-    doc_type: str = Query(""),         # comma-separated values
+    access: str = Query(""),  # open, closed
+    oa_status: str = Query(""),  # comma-separated values
+    source_filter: str = Query(""),  # comma-separated: hal_only, oa_only, both
+    doc_type: str = Query(""),  # comma-separated values
     excluded_doc_type: str = Query(""),  # comma-separated values to exclude
-    sort: str = Query("year_desc"),    # year_desc, year_asc, title
+    sort: str = Query("year_desc"),  # year_desc, year_asc, title
     person_id: int | None = Query(None),
     is_corresponding: str = Query(""),  # yes, no
     has_apc: str = Query(""),  # yes, no
@@ -936,15 +1068,19 @@ async def list_publications(
     offset = (page - 1) * per_page
 
     # Parse comma-separated multi-value params
-    years = [int(v) for v in year.split(',') if v.strip()] if year else []
-    doc_types = [v.strip() for v in doc_type.split(',') if v.strip()] if doc_type else []
-    excluded_types = [v.strip() for v in excluded_doc_type.split(',') if v.strip()] if excluded_doc_type else []
-    lab_id_parts = [v.strip() for v in lab_id.split(',') if v.strip()] if lab_id else []
+    years = [int(v) for v in year.split(",") if v.strip()] if year else []
+    doc_types = [v.strip() for v in doc_type.split(",") if v.strip()] if doc_type else []
+    excluded_types = (
+        [v.strip() for v in excluded_doc_type.split(",") if v.strip()] if excluded_doc_type else []
+    )
+    lab_id_parts = [v.strip() for v in lab_id.split(",") if v.strip()] if lab_id else []
     lab_none = "none" in lab_id_parts
     lab_ids = [int(v) for v in lab_id_parts if v != "none"] if lab_id_parts else []
-    oa_values = [v.strip() for v in oa_status.split(',') if v.strip()] if oa_status else []
-    source_values = [v.strip() for v in source_filter.split(',') if v.strip()] if source_filter else []
-    country_values = [v.strip() for v in country.split(',') if v.strip()] if country else []
+    oa_values = [v.strip() for v in oa_status.split(",") if v.strip()] if oa_status else []
+    source_values = (
+        [v.strip() for v in source_filter.split(",") if v.strip()] if source_filter else []
+    )
+    country_values = [v.strip() for v in country.split(",") if v.strip()] if country else []
 
     with get_cursor() as (cur, conn):
         # Disable JIT — these queries are too small to benefit, and
@@ -954,12 +1090,14 @@ async def list_publications(
         if person_id:
             # Quand on filtre par personne, on montre TOUTES ses publications
             # (pas seulement UCA)
-            conditions = ["""
+            conditions = [
+                """
                 EXISTS (SELECT 1 FROM authorships a
                         JOIN source_authorships sa ON sa.authorship_id = a.id
                         WHERE a.publication_id = p.id AND a.person_id = %s
                           AND sa.roles && ARRAY['author']::text[])
-            """]
+            """
+            ]
             params = [person_id]
         elif lab_none and not lab_ids:
             # "Aucun labo" uniquement
@@ -1028,7 +1166,7 @@ async def list_publications(
         if oa_values:
             expanded = []
             for v in oa_values:
-                if v == 'oa':
+                if v == "oa":
                     expanded.extend(OA_OPEN_STATUSES)
                 else:
                     expanded.append(v)
@@ -1042,14 +1180,29 @@ async def list_publications(
         # APC filter (supports multi-select via comma)
         if has_apc:
             _rid2 = get_root_structure_id()
-            apc_values = [v.strip() for v in has_apc.split(',') if v.strip()]
+            apc_values = [v.strip() for v in has_apc.split(",") if v.strip()]
             APC_MAP = {
-                "uca": ("EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s)", 1),
-                "other": ("(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))", 1),
-                "non_uca": ("(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))", 1),
-                "none": ("NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)", 0),
+                "uca": (
+                    "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s)",
+                    1,
+                ),
+                "other": (
+                    "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))",
+                    1,
+                ),
+                "non_uca": (
+                    "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))",
+                    1,
+                ),
+                "none": (
+                    "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
+                    0,
+                ),
                 "yes": ("EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)", 0),
-                "no": ("NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)", 0),
+                "no": (
+                    "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
+                    0,
+                ),
             }
             parts = []
             for v in apc_values:
@@ -1058,10 +1211,14 @@ async def list_publications(
                     parts.append(sql)
                     params.extend([_rid2] * rid_count)
                 elif v == "this_lab" and lab_ids:
-                    parts.append("EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[]))")
+                    parts.append(
+                        "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[]))"
+                    )
                     params.append(lab_ids)
                 elif v == "other_uca" and lab_ids:
-                    parts.append("(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[])))")
+                    parts.append(
+                        "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[])))"
+                    )
                     params.extend([_rid2, lab_ids])
             if len(parts) == 1:
                 conditions.append(parts[0])
@@ -1074,7 +1231,9 @@ async def list_publications(
             params.append(country_values)
 
         # HAL status filter (requires lab_id for collection check)
-        hal_status_values = [v.strip() for v in hal_status.split(',') if v.strip()] if hal_status else []
+        hal_status_values = (
+            [v.strip() for v in hal_status.split(",") if v.strip()] if hal_status else []
+        )
         if hal_status_values and len(lab_ids) == 1:
             # Fetch the hal_collection for this lab
             cur.execute("SELECT hal_collection FROM structures WHERE id = %s", (lab_ids[0],))
@@ -1083,11 +1242,11 @@ async def list_publications(
 
             hal_parts = []
             for v in hal_status_values:
-                if v == 'hors_hal':
+                if v == "hors_hal":
                     hal_parts.append(
                         "NOT EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal')"
                     )
-                elif v == 'hors_collection':
+                elif v == "hors_collection":
                     if lab_hal_col:
                         hal_parts.append(
                             "EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
@@ -1099,7 +1258,7 @@ async def list_publications(
                         hal_parts.append(
                             "EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal')"
                         )
-                elif v == 'notice':
+                elif v == "notice":
                     if lab_hal_col:
                         hal_parts.append(
                             "(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
@@ -1107,7 +1266,7 @@ async def list_publications(
                             " AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))"
                         )
                         params.append(lab_hal_col)
-                elif v == 'ok':
+                elif v == "ok":
                     if lab_hal_col:
                         hal_parts.append(
                             "(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
@@ -1159,7 +1318,8 @@ async def list_publications(
         total = cur.fetchone()["count"]
 
         # Main query
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 p.id, p.title, p.pub_year, p.doi, p.doc_type::text,
                 p.oa_status::text,
@@ -1230,33 +1390,37 @@ async def list_publications(
             WHERE {where_clause}
             ORDER BY {order}
             LIMIT %s OFFSET %s
-        """, [person_id, person_id] + params + [per_page, offset])
+        """,
+            [person_id, person_id] + params + [per_page, offset],
+        )
 
         publications = []
         for row in cur.fetchall():
-            publications.append({
-                "id": row["id"],
-                "title": row["title"],
-                "pub_year": row["pub_year"],
-                "doi": row["doi"],
-                "doc_type": row["doc_type"],
-                "oa_status": row["oa_status"],
-                "journal": row["journal_title"],
-                "publisher": row["publisher_name"],
-                "hal_id": row["hal_id"],
-                "openalex_id": row["openalex_id"],
-                "scanr_id": row["scanr_id"],
-                "wos_id": row["wos_id"],
-                "theses_id": row["theses_id"],
-                "date_soutenance": row["date_soutenance"],
-                "date_inscription": row["date_inscription"],
-                "labs": row["labs"],
-                "lab_items": row["lab_items"],
-                "apc": row["apc_details"],
-                "is_corresponding": row["is_corresponding"],
-                "authorship_id": row["authorship_id"],
-                "hal_collections": row["hal_collections"],
-            })
+            publications.append(
+                {
+                    "id": row["id"],
+                    "title": row["title"],
+                    "pub_year": row["pub_year"],
+                    "doi": row["doi"],
+                    "doc_type": row["doc_type"],
+                    "oa_status": row["oa_status"],
+                    "journal": row["journal_title"],
+                    "publisher": row["publisher_name"],
+                    "hal_id": row["hal_id"],
+                    "openalex_id": row["openalex_id"],
+                    "scanr_id": row["scanr_id"],
+                    "wos_id": row["wos_id"],
+                    "theses_id": row["theses_id"],
+                    "date_soutenance": row["date_soutenance"],
+                    "date_inscription": row["date_inscription"],
+                    "labs": row["labs"],
+                    "lab_items": row["lab_items"],
+                    "apc": row["apc_details"],
+                    "is_corresponding": row["is_corresponding"],
+                    "authorship_id": row["authorship_id"],
+                    "hal_collections": row["hal_collections"],
+                }
+            )
 
         return {
             "total": total,
@@ -1267,6 +1431,4 @@ async def list_publications(
         }
 
 
-
 # ----- API: Doublons publications -----
-

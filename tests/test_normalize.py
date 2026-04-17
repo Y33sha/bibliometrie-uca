@@ -1,7 +1,6 @@
 """Tests des fonctions de parsing des normaliseurs (pas besoin de DB)."""
 
 
-
 # ── OpenAlex ─────────────────────────────────────────────────────
 
 from processing.normalize_openalex import (
@@ -30,42 +29,52 @@ class TestOAExtractShortId:
 
 class TestOAIsHalPrimaryLocation:
     def test_hal_url(self):
-        work = {"primary_location": {
-            "landing_page_url": "https://hal.science/hal-04123456",
-            "source": {}
-        }}
+        work = {
+            "primary_location": {
+                "landing_page_url": "https://hal.science/hal-04123456",
+                "source": {},
+            }
+        }
         assert is_hal_primary_location(work) is True
 
     def test_tel_url(self):
-        work = {"primary_location": {
-            "landing_page_url": "https://theses.hal.science/tel-04123456",
-            "source": {}
-        }}
+        work = {
+            "primary_location": {
+                "landing_page_url": "https://theses.hal.science/tel-04123456",
+                "source": {},
+            }
+        }
         assert is_hal_primary_location(work) is True
 
     def test_halshs_url(self):
-        work = {"primary_location": {
-            "landing_page_url": "https://shs.hal.science/halshs-01234567",
-            "source": {}
-        }}
+        work = {
+            "primary_location": {
+                "landing_page_url": "https://shs.hal.science/halshs-01234567",
+                "source": {},
+            }
+        }
         assert is_hal_primary_location(work) is True
 
     def test_not_hal(self):
-        work = {"primary_location": {
-            "landing_page_url": "https://doi.org/10.1234/test",
-            "source": {"type": "journal"}
-        }}
+        work = {
+            "primary_location": {
+                "landing_page_url": "https://doi.org/10.1234/test",
+                "source": {"type": "journal"},
+            }
+        }
         assert is_hal_primary_location(work) is False
 
     def test_hal_repository_source(self):
-        work = {"primary_location": {
-            "landing_page_url": "https://example.com/something",
-            "source": {
-                "type": "repository",
-                "display_name": "HAL",
-                "homepage_url": "https://hal.archives-ouvertes.fr"
+        work = {
+            "primary_location": {
+                "landing_page_url": "https://example.com/something",
+                "source": {
+                    "type": "repository",
+                    "display_name": "HAL",
+                    "homepage_url": "https://hal.archives-ouvertes.fr",
+                },
             }
-        }}
+        }
         assert is_hal_primary_location(work) is True
 
     def test_no_location(self):
@@ -108,8 +117,15 @@ class TestOAIsRepositorySource:
 
 class TestOADocTypeMap:
     def test_covers_common_types(self):
-        for t in ["article", "review", "book", "book-chapter",
-                   "proceedings-article", "preprint", "dissertation"]:
+        for t in [
+            "article",
+            "review",
+            "book",
+            "book-chapter",
+            "proceedings-article",
+            "preprint",
+            "dissertation",
+        ]:
             assert map_doc_type(t, "openalex") != "other", f"{t} non mappé"
 
     def test_all_values_valid(self):
@@ -199,9 +215,7 @@ class TestHALParseAuthorStructures:
         assert parse_author_structures(doc) == {}
 
     def test_non_numeric_ids(self):
-        doc = {"authIdHasStructure_fs": [
-            "abc-def_FacetSep_Nom_JoinSep_xyz_FacetSep_Lab"
-        ]}
+        doc = {"authIdHasStructure_fs": ["abc-def_FacetSep_Nom_JoinSep_xyz_FacetSep_Lab"]}
         assert parse_author_structures(doc) == {}
 
 
@@ -277,17 +291,21 @@ class TestWoSSafeList:
 
 class TestWoSGetApiTitle:
     def test_item_title(self):
-        static = {"summary": {"titles": {"title": [
-            {"type": "item", "content": "Mon article"},
-            {"type": "source", "content": "Ma revue"},
-        ]}}}
+        static = {
+            "summary": {
+                "titles": {
+                    "title": [
+                        {"type": "item", "content": "Mon article"},
+                        {"type": "source", "content": "Ma revue"},
+                    ]
+                }
+            }
+        }
         assert _get_api_title(static, "item") == "Mon article"
         assert _get_api_title(static, "source") == "Ma revue"
 
     def test_single_title_dict(self):
-        static = {"summary": {"titles": {"title":
-            {"type": "item", "content": "Unique"}
-        }}}
+        static = {"summary": {"titles": {"title": {"type": "item", "content": "Unique"}}}}
         assert _get_api_title(static, "item") == "Unique"
 
     def test_not_found(self):
@@ -297,8 +315,14 @@ class TestWoSGetApiTitle:
 
 class TestWoSDocTypeMap:
     def test_covers_common_types(self):
-        for t in ["article", "review", "book", "book chapter",
-                   "proceedings paper", "editorial material"]:
+        for t in [
+            "article",
+            "review",
+            "book",
+            "book chapter",
+            "proceedings paper",
+            "editorial material",
+        ]:
             assert map_doc_type(t, "wos") != "other", f"{t} non mappé"
 
 
@@ -326,24 +350,30 @@ class TestNormalizeNnt:
 
 class TestIsThesesFrSource:
     def test_display_name(self):
-        work = {"primary_location": {
-            "source": {"display_name": "theses.fr (ABES)"},
-            "landing_page_url": ""
-        }}
+        work = {
+            "primary_location": {
+                "source": {"display_name": "theses.fr (ABES)"},
+                "landing_page_url": "",
+            }
+        }
         assert is_theses_fr_source(work) is True
 
     def test_url(self):
-        work = {"primary_location": {
-            "source": {},
-            "landing_page_url": "http://www.theses.fr/2023UCFA0069/document"
-        }}
+        work = {
+            "primary_location": {
+                "source": {},
+                "landing_page_url": "http://www.theses.fr/2023UCFA0069/document",
+            }
+        }
         assert is_theses_fr_source(work) is True
 
     def test_not_theses(self):
-        work = {"primary_location": {
-            "source": {"display_name": "Elsevier"},
-            "landing_page_url": "https://doi.org/10.1234"
-        }}
+        work = {
+            "primary_location": {
+                "source": {"display_name": "Elsevier"},
+                "landing_page_url": "https://doi.org/10.1234",
+            }
+        }
         assert is_theses_fr_source(work) is False
 
     def test_no_location(self):
@@ -352,24 +382,20 @@ class TestIsThesesFrSource:
 
 class TestExtractNntFromOpenalex:
     def test_pmh_format(self):
-        work = {"primary_location": {
-            "id": "pmh:2023UCFA0069",
-            "landing_page_url": ""
-        }}
+        work = {"primary_location": {"id": "pmh:2023UCFA0069", "landing_page_url": ""}}
         assert extract_nnt_from_openalex(work) == "2023UCFA0069"
 
     def test_url_format(self):
-        work = {"primary_location": {
-            "id": "",
-            "landing_page_url": "http://www.theses.fr/2023UCFA0069/document"
-        }}
+        work = {
+            "primary_location": {
+                "id": "",
+                "landing_page_url": "http://www.theses.fr/2023UCFA0069/document",
+            }
+        }
         assert extract_nnt_from_openalex(work) == "2023UCFA0069"
 
     def test_no_nnt(self):
-        work = {"primary_location": {
-            "id": "",
-            "landing_page_url": "https://doi.org/10.1234"
-        }}
+        work = {"primary_location": {"id": "", "landing_page_url": "https://doi.org/10.1234"}}
         assert extract_nnt_from_openalex(work) is None
 
     def test_no_location(self):

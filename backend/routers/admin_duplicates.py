@@ -11,6 +11,7 @@ from services.publications import merge_publications
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
 @router.get("/api/admin/duplicates/next")
 async def next_duplicate_candidate(
     min_title_len: int = Query(30, ge=10),
@@ -40,20 +41,24 @@ async def next_duplicate_candidate(
         """
 
         # Compteur total
-        cur.execute(f"SELECT COUNT(*) AS total FROM (SELECT p1.id {candidate_where}) sub",
-                    (min_title_len,))
+        cur.execute(
+            f"SELECT COUNT(*) AS total FROM (SELECT p1.id {candidate_where}) sub", (min_title_len,)
+        )
         total = cur.fetchone()["total"]
 
         # Paire à la position offset
-        cur.execute(f"SELECT p1.id AS id_a, p2.id AS id_b {candidate_where} LIMIT 1 OFFSET %s",
-                    (min_title_len, offset))
+        cur.execute(
+            f"SELECT p1.id AS id_a, p2.id AS id_b {candidate_where} LIMIT 1 OFFSET %s",
+            (min_title_len, offset),
+        )
         row = cur.fetchone()
 
         if not row:
             return {"total": total, "offset": offset, "pair": None}
 
         def get_pub_detail(pub_id):
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT p.id, p.title, p.title_normalized, p.doi, p.pub_year,
                        p.doc_type::text, p.container_title, p.oa_status::text,
                        p.language, p.journal_id,
@@ -61,17 +66,23 @@ async def next_duplicate_candidate(
                 FROM publications p
                 LEFT JOIN journals j ON j.id = p.journal_id
                 WHERE p.id = %s
-            """, (pub_id,))
+            """,
+                (pub_id,),
+            )
             pub = cur.fetchone()
             if not pub:
                 return None
 
             sources = []
-            cur.execute("SELECT source, source_id FROM source_publications WHERE publication_id = %s", (pub_id,))
+            cur.execute(
+                "SELECT source, source_id FROM source_publications WHERE publication_id = %s",
+                (pub_id,),
+            )
             for r in cur.fetchall():
                 sources.append({"source": r["source"], "source_id": r["source_id"]})
 
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT a.author_position, a.in_perimeter, a.person_id,
                        COALESCE(p2.last_name) AS last_name,
                        COALESCE(p2.first_name) AS first_name,
@@ -84,19 +95,29 @@ async def next_duplicate_candidate(
                 LEFT JOIN source_authorships sa_wos ON sa_wos.authorship_id = a.id AND sa_wos.source = 'wos'
                 WHERE a.publication_id = %s AND NOT a.excluded
                 ORDER BY a.author_position NULLS LAST
-            """, (pub_id,))
+            """,
+                (pub_id,),
+            )
             authors = [dict(r) for r in cur.fetchall()]
 
             return {
-                "id": pub["id"], "title": pub["title"],
+                "id": pub["id"],
+                "title": pub["title"],
                 "title_normalized": pub["title_normalized"],
-                "doi": pub["doi"], "pub_year": pub["pub_year"],
+                "doi": pub["doi"],
+                "pub_year": pub["pub_year"],
                 "doc_type": pub["doc_type"],
                 "container_title": pub["container_title"],
-                "oa_status": pub["oa_status"], "language": pub["language"],
-                "journal": {"id": pub["journal_id"], "title": pub["journal_title"],
-                            "issn": pub["issn"], "eissn": pub["eissn"]}
-                           if pub["journal_id"] else None,
+                "oa_status": pub["oa_status"],
+                "language": pub["language"],
+                "journal": {
+                    "id": pub["journal_id"],
+                    "title": pub["journal_title"],
+                    "issn": pub["issn"],
+                    "eissn": pub["eissn"],
+                }
+                if pub["journal_id"]
+                else None,
                 "sources": sources,
                 "authors": authors,
             }
@@ -115,10 +136,15 @@ async def next_duplicate_candidate(
 async def merge_duplicate_publications(body: MergePublications):
     """Fusionne source_id dans target_id."""
     if body.target_id == body.source_id:
-        raise HTTPException(status_code=400, detail="target_id et source_id doivent être différents")
+        raise HTTPException(
+            status_code=400, detail="target_id et source_id doivent être différents"
+        )
 
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT id, doi, journal_id, oa_status::text, language, container_title FROM publications WHERE id IN (%s, %s)", (body.target_id, body.source_id))
+        cur.execute(
+            "SELECT id, doi, journal_id, oa_status::text, language, container_title FROM publications WHERE id IN (%s, %s)",
+            (body.target_id, body.source_id),
+        )
         pubs = {r["id"]: r for r in cur.fetchall()}
         if body.target_id not in pubs or body.source_id not in pubs:
             raise HTTPException(status_code=404, detail="Publication introuvable")
@@ -141,13 +167,15 @@ async def mark_publications_distinct(body: MarkDistinctPublications):
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
 
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO distinct_publications (pub_id_a, pub_id_b)
             VALUES (LEAST(%s, %s), GREATEST(%s, %s))
             ON CONFLICT DO NOTHING
-        """, (body.pub_id_a, body.pub_id_b, body.pub_id_a, body.pub_id_b))
+        """,
+            (body.pub_id_a, body.pub_id_b, body.pub_id_a, body.pub_id_b),
+        )
         return {"ok": True}
 
 
 # ----- API: Adresses -----
-

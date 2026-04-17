@@ -59,8 +59,9 @@ def show_stats(cur):
 def main():
     parser = argparse.ArgumentParser(description="Détection pays des adresses")
     parser.add_argument("--apply", action="store_true", help="Appliquer (sinon dry-run)")
-    parser.add_argument("--direct", action="store_true",
-                        help="Écrire dans countries au lieu de suggested_countries")
+    parser.add_argument(
+        "--direct", action="store_true", help="Écrire dans countries au lieu de suggested_countries"
+    )
     parser.add_argument("--stats", action="store_true", help="Stats uniquement")
     args = parser.parse_args()
 
@@ -105,6 +106,7 @@ def main():
     if not args.apply:
         # Afficher les formes non reconnues les plus fréquentes
         from collections import Counter
+
         unknown = Counter()
         for addr_id, raw_text in rows:
             last_seg = extract_last_segment(raw_text)
@@ -137,6 +139,7 @@ def main():
 
 def _apply_batch(cur, batch, column):
     from psycopg2.extras import execute_values
+
     execute_values(
         cur,
         f"UPDATE addresses SET {column} = data.countries FROM (VALUES %s) AS data(id, countries) WHERE addresses.id = data.id",

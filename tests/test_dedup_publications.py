@@ -11,6 +11,7 @@ from services.publications import find_by_nnt, find_or_create, refresh_from_sour
 
 # ── Helpers ──────────────────────────────────────────────────────
 
+
 def _create(db, **kwargs):
     """Crée une publication via find_or_create et retourne (id, is_new)."""
     defaults = {
@@ -29,22 +30,24 @@ def _create(db, **kwargs):
 def _create_journal(db, title="Test Journal"):
     """Crée un journal minimal et retourne son id."""
     from utils.normalize import normalize_text
+
     db.execute(
         "INSERT INTO journals (title, title_normalized) VALUES (%s, %s) RETURNING id",
-        (title, normalize_text(title))
+        (title, normalize_text(title)),
     )
     return db.fetchone()["id"]
 
 
 # ── Même DOI → fusion ───────────────────────────────────────────
 
+
 class TestDedupByDoi:
     def test_same_doi_same_type_merges(self, db):
         """Même DOI, même type → retrouve la même publication."""
-        id1, new1 = _create(db, doi="10.1234/test", title="Article A",
-                            title_normalized="article a")
-        id2, new2 = _create(db, doi="10.1234/test", title="Article A (bis)",
-                            title_normalized="article a bis")
+        id1, new1 = _create(db, doi="10.1234/test", title="Article A", title_normalized="article a")
+        id2, new2 = _create(
+            db, doi="10.1234/test", title="Article A (bis)", title_normalized="article a bis"
+        )
 
         assert new1 is True
         assert new2 is False
@@ -68,13 +71,20 @@ class TestDedupByDoi:
 
 # ── DOI + types incompatibles ────────────────────────────────────
 
+
 class TestDedupDoiTypeConflict:
     def test_chapter_vs_book_no_merge(self, db):
         """Même DOI, chapitre vs ouvrage → pas de fusion (DOI = celui de l'ouvrage)."""
-        id_book, _ = _create(db, doi="10.1234/book", doc_type="book",
-                             title="The Book", title_normalized="the book")
-        id_chap, new = _create(db, doi="10.1234/book", doc_type="book_chapter",
-                               title="Chapter 1", title_normalized="chapter 1")
+        id_book, _ = _create(
+            db, doi="10.1234/book", doc_type="book", title="The Book", title_normalized="the book"
+        )
+        id_chap, new = _create(
+            db,
+            doi="10.1234/book",
+            doc_type="book_chapter",
+            title="Chapter 1",
+            title_normalized="chapter 1",
+        )
 
         assert id_book != id_chap
         assert new is True
@@ -85,10 +95,16 @@ class TestDedupDoiTypeConflict:
 
     def test_book_vs_chapter_no_merge(self, db):
         """Même DOI, ouvrage après chapitre → pas de fusion, DOI retiré du chapitre."""
-        id_chap, _ = _create(db, doi="10.1234/book", doc_type="book_chapter",
-                             title="Chapter 1", title_normalized="chapter 1")
-        id_book, _ = _create(db, doi="10.1234/book", doc_type="book",
-                             title="The Book", title_normalized="the book")
+        id_chap, _ = _create(
+            db,
+            doi="10.1234/book",
+            doc_type="book_chapter",
+            title="Chapter 1",
+            title_normalized="chapter 1",
+        )
+        id_book, _ = _create(
+            db, doi="10.1234/book", doc_type="book", title="The Book", title_normalized="the book"
+        )
 
         assert id_chap != id_book
 
@@ -98,10 +114,20 @@ class TestDedupDoiTypeConflict:
 
     def test_two_chapters_same_doi_different_title(self, db):
         """Deux chapitres avec même DOI mais titres différents → pas de fusion, DOI retiré."""
-        id1, _ = _create(db, doi="10.1234/book", doc_type="book_chapter",
-                         title="Chapter 1", title_normalized="chapter 1")
-        id2, _ = _create(db, doi="10.1234/book", doc_type="book_chapter",
-                         title="Chapter 2", title_normalized="chapter 2")
+        id1, _ = _create(
+            db,
+            doi="10.1234/book",
+            doc_type="book_chapter",
+            title="Chapter 1",
+            title_normalized="chapter 1",
+        )
+        id2, _ = _create(
+            db,
+            doi="10.1234/book",
+            doc_type="book_chapter",
+            title="Chapter 2",
+            title_normalized="chapter 2",
+        )
 
         assert id1 != id2
 
@@ -113,10 +139,20 @@ class TestDedupDoiTypeConflict:
 
     def test_two_chapters_same_doi_same_title(self, db):
         """Deux chapitres avec même DOI et même titre → fusion."""
-        id1, _ = _create(db, doi="10.1234/chap", doc_type="book_chapter",
-                         title="Chapter 1", title_normalized="chapter 1")
-        id2, new = _create(db, doi="10.1234/chap", doc_type="book_chapter",
-                           title="Chapter 1", title_normalized="chapter 1")
+        id1, _ = _create(
+            db,
+            doi="10.1234/chap",
+            doc_type="book_chapter",
+            title="Chapter 1",
+            title_normalized="chapter 1",
+        )
+        id2, new = _create(
+            db,
+            doi="10.1234/chap",
+            doc_type="book_chapter",
+            title="Chapter 1",
+            title_normalized="chapter 1",
+        )
 
         assert id1 == id2
         assert new is False
@@ -124,14 +160,27 @@ class TestDedupDoiTypeConflict:
 
 # ── Déduplication par titre + année + journal ────────────────────
 
+
 class TestDedupByTitle:
     def test_same_title_year_journal_no_merge(self, db):
         """Meme titre + annee + journal sans DOI commun -> pas de fusion."""
         jid = _create_journal(db)
-        id1, _ = _create(db, title="Mon Article", title_normalized="mon article",
-                         pub_year=2024, journal_id=jid, doc_type="article")
-        id2, new = _create(db, title="Mon Article (v2)", title_normalized="mon article",
-                           pub_year=2024, journal_id=jid, doc_type="article")
+        id1, _ = _create(
+            db,
+            title="Mon Article",
+            title_normalized="mon article",
+            pub_year=2024,
+            journal_id=jid,
+            doc_type="article",
+        )
+        id2, new = _create(
+            db,
+            title="Mon Article (v2)",
+            title_normalized="mon article",
+            pub_year=2024,
+            journal_id=jid,
+            doc_type="article",
+        )
 
         assert id1 != id2
         assert new is True
@@ -139,10 +188,12 @@ class TestDedupByTitle:
     def test_same_title_different_year_no_merge(self, db):
         """Même titre + journal mais année différente → pas de fusion."""
         jid = _create_journal(db)
-        id1, _ = _create(db, title_normalized="mon article",
-                         pub_year=2023, journal_id=jid, doc_type="article")
-        id2, _ = _create(db, title_normalized="mon article",
-                         pub_year=2024, journal_id=jid, doc_type="article")
+        id1, _ = _create(
+            db, title_normalized="mon article", pub_year=2023, journal_id=jid, doc_type="article"
+        )
+        id2, _ = _create(
+            db, title_normalized="mon article", pub_year=2024, journal_id=jid, doc_type="article"
+        )
 
         assert id1 != id2
 
@@ -150,44 +201,67 @@ class TestDedupByTitle:
         """Même titre + année mais journal différent → pas de fusion."""
         j1 = _create_journal(db, "Journal A")
         j2 = _create_journal(db, "Journal B")
-        id1, _ = _create(db, title_normalized="mon article",
-                         pub_year=2024, journal_id=j1, doc_type="article")
-        id2, _ = _create(db, title_normalized="mon article",
-                         pub_year=2024, journal_id=j2, doc_type="article")
+        id1, _ = _create(
+            db, title_normalized="mon article", pub_year=2024, journal_id=j1, doc_type="article"
+        )
+        id2, _ = _create(
+            db, title_normalized="mon article", pub_year=2024, journal_id=j2, doc_type="article"
+        )
 
         assert id1 != id2
 
     def test_title_match_with_contradicting_doi_no_merge(self, db):
         """Même titre+année+journal mais DOI contradictoires → pas de fusion."""
         jid = _create_journal(db)
-        id1, _ = _create(db, doi="10.1234/aaa", title_normalized="mon article",
-                         pub_year=2024, journal_id=jid, doc_type="article")
-        id2, _ = _create(db, doi="10.1234/bbb", title_normalized="mon article",
-                         pub_year=2024, journal_id=jid, doc_type="article")
+        id1, _ = _create(
+            db,
+            doi="10.1234/aaa",
+            title_normalized="mon article",
+            pub_year=2024,
+            journal_id=jid,
+            doc_type="article",
+        )
+        id2, _ = _create(
+            db,
+            doi="10.1234/bbb",
+            title_normalized="mon article",
+            pub_year=2024,
+            journal_id=jid,
+            doc_type="article",
+        )
 
         assert id1 != id2
 
     def test_title_match_only_for_articles(self, db):
         """Le match par titre ne s'applique qu'aux articles (pas book_chapter, etc.)."""
         jid = _create_journal(db)
-        id1, _ = _create(db, title_normalized="mon chapitre",
-                         pub_year=2024, journal_id=jid, doc_type="book_chapter")
-        id2, _ = _create(db, title_normalized="mon chapitre",
-                         pub_year=2024, journal_id=jid, doc_type="book_chapter")
+        id1, _ = _create(
+            db,
+            title_normalized="mon chapitre",
+            pub_year=2024,
+            journal_id=jid,
+            doc_type="book_chapter",
+        )
+        id2, _ = _create(
+            db,
+            title_normalized="mon chapitre",
+            pub_year=2024,
+            journal_id=jid,
+            doc_type="book_chapter",
+        )
 
         assert id1 != id2
 
     def test_no_journal_no_title_match(self, db):
         """Sans journal_id, pas de match par titre (trop risqué)."""
-        id1, _ = _create(db, title_normalized="mon article",
-                         pub_year=2024, doc_type="article")
-        id2, _ = _create(db, title_normalized="mon article",
-                         pub_year=2024, doc_type="article")
+        id1, _ = _create(db, title_normalized="mon article", pub_year=2024, doc_type="article")
+        id2, _ = _create(db, title_normalized="mon article", pub_year=2024, doc_type="article")
 
         assert id1 != id2
 
 
 # ── Pas de DOI → pas de faux positif ────────────────────────────
+
 
 class TestNoDoi:
     def test_no_doi_no_journal_creates_separate(self, db):
@@ -207,24 +281,34 @@ class TestNoDoi:
 
 # ── Enrichissement ───────────────────────────────────────────────
 
+
 class TestRefreshFromSources:
     """Teste refresh_from_sources : recalcul des métadonnées depuis source_publications."""
 
     def _insert_sd(self, db, pub_id, source, **kwargs):
         """Insère un source_document rattaché à pub_id."""
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO source_publications (source, source_id, title, pub_year, publication_id,
                                           doc_type, oa_status, language, journal_id)
             VALUES (%s, %s, 'Test', 2024, %s, %s, %s, %s, %s)
-        """, (source, f"{source}-{pub_id}-{kwargs.get('oa_status', '')}",
-              pub_id,
-              kwargs.get("doc_type"), kwargs.get("oa_status"),
-              kwargs.get("language"), kwargs.get("journal_id")))
+        """,
+            (
+                source,
+                f"{source}-{pub_id}-{kwargs.get('oa_status', '')}",
+                pub_id,
+                kwargs.get("doc_type"),
+                kwargs.get("oa_status"),
+                kwargs.get("language"),
+                kwargs.get("journal_id"),
+            ),
+        )
 
     def test_language_from_source(self, db):
         """refresh_from_sources propage les métadonnées des source_publications."""
-        id1, _ = _create(db, doi="10.1234/enrich", oa_status="closed",
-                         pub_year=2024, doc_type="article")
+        id1, _ = _create(
+            db, doi="10.1234/enrich", oa_status="closed", pub_year=2024, doc_type="article"
+        )
         self._insert_sd(db, id1, "hal", language="en", oa_status="closed")
         refresh_from_sources(db, id1)
 
@@ -292,11 +376,14 @@ class TestRefreshFromSources:
     def test_keywords_merged(self, db):
         """Les keywords sont fusionnés sans doublons."""
         id1, _ = _create(db, pub_year=2024, doc_type="article")
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO source_publications (source, source_id, title, pub_year, publication_id, keywords)
             VALUES ('hal', 'hal-kw1', 'Test', 2024, %s, ARRAY['python', 'data']),
                    ('openalex', 'oa-kw1', 'Test', 2024, %s, ARRAY['Data', 'machine learning'])
-        """, (id1, id1))
+        """,
+            (id1, id1),
+        )
         refresh_from_sources(db, id1)
 
         db.execute("SELECT keywords FROM publications WHERE id = %s", (id1,))
@@ -311,11 +398,14 @@ class TestRefreshFromSources:
     def test_jsonb_merged(self, db):
         """Les champs JSONB sont fusionnés, priorité au premier."""
         id1, _ = _create(db, pub_year=2024, doc_type="article")
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO source_publications (source, source_id, title, pub_year, publication_id, topics)
             VALUES ('hal', 'hal-tp1', 'Test', 2024, %s, '{"hal_domains": ["info"]}'),
                    ('openalex', 'oa-tp1', 'Test', 2024, %s, '{"concepts": ["AI"], "hal_domains": ["math"]}')
-        """, (id1, id1))
+        """,
+            (id1, id1),
+        )
         refresh_from_sources(db, id1)
 
         db.execute("SELECT topics FROM publications WHERE id = %s", (id1,))
@@ -328,11 +418,14 @@ class TestRefreshFromSources:
     def test_is_retracted_or(self, db):
         """is_retracted = True si au moins une source le dit."""
         id1, _ = _create(db, pub_year=2024, doc_type="article")
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO source_publications (source, source_id, title, pub_year, publication_id, is_retracted)
             VALUES ('hal', 'hal-ret1', 'Test', 2024, %s, FALSE),
                    ('openalex', 'oa-ret1', 'Test', 2024, %s, TRUE)
-        """, (id1, id1))
+        """,
+            (id1, id1),
+        )
         refresh_from_sources(db, id1)
 
         db.execute("SELECT is_retracted FROM publications WHERE id = %s", (id1,))
@@ -340,77 +433,131 @@ class TestRefreshFromSources:
 
     def test_allow_create_false(self, db):
         """allow_create=False → retourne None si non trouvée."""
-        result, _ = find_or_create(db, title="X", title_normalized="x",
-                                   pub_year=2024, allow_create=False)
+        result, _ = find_or_create(
+            db, title="X", title_normalized="x", pub_year=2024, allow_create=False
+        )
         assert result is None
 
 
 # ── Déduplication par NNT ──────────────────────────────────────
 
+
 def _create_source_doc_with_nnt(db, pub_id, source, source_id, nnt):
     """Helper : crée un source_document avec NNT dans external_ids."""
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO source_publications
             (source, source_id, title, pub_year, publication_id, external_ids)
         VALUES (%s, %s, 'Thesis', 2023, %s, %s)
-    """, (source, source_id, pub_id, Json({"nnt": nnt})))
+    """,
+        (source, source_id, pub_id, Json({"nnt": nnt})),
+    )
 
 
 class TestDedupByNnt:
     def test_nnt_dedup_theses_first(self, db):
         """Thèse créée par theses.fr, retrouvée par NNT quand OpenAlex arrive."""
-        id1, new1 = _create(db, title="Ma thèse", title_normalized="ma these",
-                            pub_year=2023, doc_type="thesis", nnt="2023UCFA0069")
+        id1, new1 = _create(
+            db,
+            title="Ma thèse",
+            title_normalized="ma these",
+            pub_year=2023,
+            doc_type="thesis",
+            nnt="2023UCFA0069",
+        )
         assert new1 is True
-        _create_source_doc_with_nnt(db, id1, 'theses', '2023UCFA0069', '2023UCFA0069')
+        _create_source_doc_with_nnt(db, id1, "theses", "2023UCFA0069", "2023UCFA0069")
 
-        id2, new2 = _create(db, title="My thesis", title_normalized="my thesis",
-                            pub_year=2023, doc_type="thesis", nnt="2023UCFA0069")
+        id2, new2 = _create(
+            db,
+            title="My thesis",
+            title_normalized="my thesis",
+            pub_year=2023,
+            doc_type="thesis",
+            nnt="2023UCFA0069",
+        )
         assert new2 is False
         assert id1 == id2
 
     def test_nnt_dedup_openalex_first(self, db):
         """Thèse créée par OpenAlex, retrouvée par NNT quand theses.fr arrive."""
-        id1, new1 = _create(db, title="My thesis", title_normalized="my thesis",
-                            pub_year=2023, doc_type="thesis", nnt="2023UCFA0069")
+        id1, new1 = _create(
+            db,
+            title="My thesis",
+            title_normalized="my thesis",
+            pub_year=2023,
+            doc_type="thesis",
+            nnt="2023UCFA0069",
+        )
         assert new1 is True
-        _create_source_doc_with_nnt(db, id1, 'openalex', 'W123', '2023UCFA0069')
+        _create_source_doc_with_nnt(db, id1, "openalex", "W123", "2023UCFA0069")
 
-        id2, new2 = _create(db, title="Ma thèse", title_normalized="ma these",
-                            pub_year=2023, doc_type="thesis", nnt="2023UCFA0069")
+        id2, new2 = _create(
+            db,
+            title="Ma thèse",
+            title_normalized="ma these",
+            pub_year=2023,
+            doc_type="thesis",
+            nnt="2023UCFA0069",
+        )
         assert new2 is False
         assert id1 == id2
 
     def test_nnt_not_stored_as_doi(self, db):
         """Le NNT ne doit jamais se retrouver dans publications.doi."""
-        id1, _ = _create(db, title="Ma thèse", title_normalized="ma these",
-                         pub_year=2023, doc_type="thesis", nnt="2023UCFA0069")
+        id1, _ = _create(
+            db,
+            title="Ma thèse",
+            title_normalized="ma these",
+            pub_year=2023,
+            doc_type="thesis",
+            nnt="2023UCFA0069",
+        )
         db.execute("SELECT doi FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["doi"] is None
 
     def test_thesis_with_both_doi_and_nnt(self, db):
         """Thèse avec DOI réel + NNT : le DOI est stocké dans doi, NNT sert au dedup."""
-        id1, _ = _create(db, title="Ma thèse", title_normalized="ma these",
-                         pub_year=2023, doc_type="thesis",
-                         doi="10.1234/thesis", nnt="2023UCFA0069")
+        id1, _ = _create(
+            db,
+            title="Ma thèse",
+            title_normalized="ma these",
+            pub_year=2023,
+            doc_type="thesis",
+            doi="10.1234/thesis",
+            nnt="2023UCFA0069",
+        )
         db.execute("SELECT doi FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["doi"] == "10.1234/thesis"
 
     def test_doi_dedup_takes_priority(self, db):
         """Le DOI a priorité sur le NNT pour la déduplication."""
-        id1, _ = _create(db, title="Ma thèse", title_normalized="ma these",
-                         pub_year=2023, doc_type="thesis", doi="10.1234/thesis")
-        id2, new2 = _create(db, title="Ma thèse", title_normalized="ma these",
-                            pub_year=2023, doc_type="thesis",
-                            doi="10.1234/thesis", nnt="2023UCFA0069")
+        id1, _ = _create(
+            db,
+            title="Ma thèse",
+            title_normalized="ma these",
+            pub_year=2023,
+            doc_type="thesis",
+            doi="10.1234/thesis",
+        )
+        id2, new2 = _create(
+            db,
+            title="Ma thèse",
+            title_normalized="ma these",
+            pub_year=2023,
+            doc_type="thesis",
+            doi="10.1234/thesis",
+            nnt="2023UCFA0069",
+        )
         assert id1 == id2
         assert new2 is False
 
     def test_find_by_nnt(self, db):
         """find_by_nnt retrouve une publication via external_ids."""
-        id1, _ = _create(db, title="Ma thèse", title_normalized="ma these",
-                         pub_year=2023, doc_type="thesis")
-        _create_source_doc_with_nnt(db, id1, 'theses', '2023UCFA0069', '2023UCFA0069')
+        id1, _ = _create(
+            db, title="Ma thèse", title_normalized="ma these", pub_year=2023, doc_type="thesis"
+        )
+        _create_source_doc_with_nnt(db, id1, "theses", "2023UCFA0069", "2023UCFA0069")
 
         result = find_by_nnt(db, "2023UCFA0069")
         assert result is not None
@@ -418,9 +565,10 @@ class TestDedupByNnt:
 
     def test_find_by_nnt_case_insensitive(self, db):
         """find_by_nnt normalise en uppercase."""
-        id1, _ = _create(db, title="Ma thèse", title_normalized="ma these",
-                         pub_year=2023, doc_type="thesis")
-        _create_source_doc_with_nnt(db, id1, 'theses', '2023UCFA0069', '2023UCFA0069')
+        id1, _ = _create(
+            db, title="Ma thèse", title_normalized="ma these", pub_year=2023, doc_type="thesis"
+        )
+        _create_source_doc_with_nnt(db, id1, "theses", "2023UCFA0069", "2023UCFA0069")
 
         result = find_by_nnt(db, "2023ucfa0069")
         assert result is not None

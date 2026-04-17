@@ -1,6 +1,5 @@
 """Tests unitaires — fonctions pures, sans base de données."""
 
-
 from services.persons import compute_person_name_forms
 from utils.doi import clean_doi
 from utils.names import (
@@ -12,6 +11,7 @@ from utils.names import (
 from utils.normalize import normalize_name
 
 # ── normalize_name ──
+
 
 class TestNormalizeName:
     def test_accents(self):
@@ -53,6 +53,7 @@ class TestNormalizeName:
 
 # ── clean_doi ──
 
+
 class TestCleanDoi:
     def test_strip_https(self):
         assert clean_doi("https://doi.org/10.1234/test") == "10.1234/test"
@@ -85,6 +86,7 @@ class TestCleanDoi:
 
 # ── parse_raw_author_name ──
 
+
 class TestParseRawAuthorName:
     def test_comma_format(self):
         assert parse_raw_author_name("Dupont, Jean") == ("Dupont", "Jean")
@@ -107,6 +109,7 @@ class TestParseRawAuthorName:
 
 
 # ── names_compatible ──
+
 
 class TestNamesCompatible:
     def test_identical(self):
@@ -137,6 +140,7 @@ class TestNamesCompatible:
 
 
 # ── compute_person_name_forms ──
+
 
 class TestComputePersonNameForms:
     def test_standard(self):

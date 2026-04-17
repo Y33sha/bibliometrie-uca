@@ -11,17 +11,22 @@ from utils.normalize import normalize_text
 
 # ── Publishers ──
 
+
 def _add_publisher_name_form(cur, publisher_id: int, form_normalized: str):
     """Ajoute une forme de nom si elle n'existe pas encore."""
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO publisher_name_forms (publisher_id, form_normalized)
         VALUES (%s, %s)
         ON CONFLICT (form_normalized) DO NOTHING
-    """, (publisher_id, form_normalized))
+    """,
+        (publisher_id, form_normalized),
+    )
 
 
-def find_or_create_publisher(cur, name: str | None, *,
-                             openalex_id: str | None = None) -> int | None:
+def find_or_create_publisher(
+    cur, name: str | None, *, openalex_id: str | None = None
+) -> int | None:
     """Trouve ou crée un éditeur.
 
     Cascade de recherche :
@@ -47,27 +52,36 @@ def find_or_create_publisher(cur, name: str | None, *,
             return _val(row, 0)
 
     # 2. Par forme de nom
-    cur.execute("""
+    cur.execute(
+        """
         SELECT publisher_id FROM publisher_name_forms
         WHERE form_normalized = %s LIMIT 1
-    """, (name_normalized,))
+    """,
+        (name_normalized,),
+    )
     row = cur.fetchone()
     if row:
         pub_id = _val(row, 0)
         # Rattacher l'openalex_id si on ne l'avait pas
         if openalex_id:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE publishers SET openalex_id = %s
                 WHERE id = %s AND openalex_id IS NULL
-            """, (openalex_id, pub_id))
+            """,
+                (openalex_id, pub_id),
+            )
         return pub_id
 
     # 3. Créer
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO publishers (name, name_normalized, openalex_id)
         VALUES (%s, %s, %s)
         RETURNING id
-    """, (name.strip(), name_normalized, openalex_id))
+    """,
+        (name.strip(), name_normalized, openalex_id),
+    )
     pub_id = _val(cur.fetchone(), 0)
     _add_publisher_name_form(cur, pub_id, name_normalized)
     return pub_id
@@ -75,22 +89,36 @@ def find_or_create_publisher(cur, name: str | None, *,
 
 # ── Journals ──
 
-def _add_journal_name_form(cur, journal_id: int, form_normalized: str,
-                           publisher_id: int | None = None):
+
+def _add_journal_name_form(
+    cur, journal_id: int, form_normalized: str, publisher_id: int | None = None
+):
     """Ajoute une forme de nom si elle n'existe pas encore."""
     if not form_normalized:
         return
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO journal_name_forms (journal_id, form_normalized, publisher_id)
         VALUES (%s, %s, %s)
         ON CONFLICT (form_normalized, publisher_id) DO NOTHING
-    """, (journal_id, form_normalized, publisher_id))
+    """,
+        (journal_id, form_normalized, publisher_id),
+    )
 
 
-def _enrich_journal(cur, journal_id: int, *, issn=None, eissn=None,
-                    publisher_id=None, openalex_id=None, oa_model=None):
+def _enrich_journal(
+    cur,
+    journal_id: int,
+    *,
+    issn=None,
+    eissn=None,
+    publisher_id=None,
+    openalex_id=None,
+    oa_model=None,
+):
     """Enrichit un journal existant avec les métadonnées manquantes."""
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE journals SET
             issn = COALESCE(journals.issn, %s),
             eissn = COALESCE(journals.eissn, %s),
@@ -98,16 +126,22 @@ def _enrich_journal(cur, journal_id: int, *, issn=None, eissn=None,
             openalex_id = COALESCE(journals.openalex_id, %s),
             oa_model = COALESCE(journals.oa_model, %s)
         WHERE id = %s
-    """, (issn, eissn, publisher_id, openalex_id, oa_model, journal_id))
+    """,
+        (issn, eissn, publisher_id, openalex_id, oa_model, journal_id),
+    )
 
 
-def find_or_create_journal(cur, title: str | None, *,
-                           issn: str | None = None,
-                           eissn: str | None = None,
-                           issnl: str | None = None,
-                           publisher_id: int | None = None,
-                           openalex_id: str | None = None,
-                           oa_model: str | None = None) -> int | None:
+def find_or_create_journal(
+    cur,
+    title: str | None,
+    *,
+    issn: str | None = None,
+    eissn: str | None = None,
+    issnl: str | None = None,
+    publisher_id: int | None = None,
+    openalex_id: str | None = None,
+    oa_model: str | None = None,
+) -> int | None:
     """Trouve ou crée un journal.
 
     Cascade de recherche :
@@ -130,8 +164,7 @@ def find_or_create_journal(cur, title: str | None, *,
         cur.execute("SELECT id FROM journals WHERE openalex_id = %s", (openalex_id,))
         row = cur.fetchone()
         if row:
-            _enrich_journal(cur, _val(row, 0), issn=issn, eissn=eissn,
-                            publisher_id=publisher_id)
+            _enrich_journal(cur, _val(row, 0), issn=issn, eissn=eissn, publisher_id=publisher_id)
             _add_journal_name_form(cur, _val(row, 0), title_normalized, publisher_id)
             return _val(row, 0)
         # openalex_id inconnu : on cherche quand même par ISSN/name_form
@@ -141,12 +174,19 @@ def find_or_create_journal(cur, title: str | None, *,
     if issn:
         cur.execute(
             "SELECT id FROM journals WHERE issn = %s OR eissn = %s OR issnl = %s LIMIT 1",
-            (issn, issn, issn))
+            (issn, issn, issn),
+        )
         row = cur.fetchone()
         if row:
-            _enrich_journal(cur, _val(row, 0), issn=issn, eissn=eissn,
-                            publisher_id=publisher_id, openalex_id=openalex_id,
-                            oa_model=oa_model)
+            _enrich_journal(
+                cur,
+                _val(row, 0),
+                issn=issn,
+                eissn=eissn,
+                publisher_id=publisher_id,
+                openalex_id=openalex_id,
+                oa_model=oa_model,
+            )
             _add_journal_name_form(cur, _val(row, 0), title_normalized, publisher_id)
             return _val(row, 0)
 
@@ -154,12 +194,19 @@ def find_or_create_journal(cur, title: str | None, *,
     if eissn:
         cur.execute(
             "SELECT id FROM journals WHERE issn = %s OR eissn = %s OR issnl = %s LIMIT 1",
-            (eissn, eissn, eissn))
+            (eissn, eissn, eissn),
+        )
         row = cur.fetchone()
         if row:
-            _enrich_journal(cur, _val(row, 0), issn=issn, eissn=eissn,
-                            publisher_id=publisher_id, openalex_id=openalex_id,
-                            oa_model=oa_model)
+            _enrich_journal(
+                cur,
+                _val(row, 0),
+                issn=issn,
+                eissn=eissn,
+                publisher_id=publisher_id,
+                openalex_id=openalex_id,
+                oa_model=oa_model,
+            )
             _add_journal_name_form(cur, _val(row, 0), title_normalized, publisher_id)
             return _val(row, 0)
 
@@ -167,61 +214,89 @@ def find_or_create_journal(cur, title: str | None, *,
     if issnl:
         cur.execute(
             "SELECT id FROM journals WHERE issn = %s OR eissn = %s OR issnl = %s LIMIT 1",
-            (issnl, issnl, issnl))
+            (issnl, issnl, issnl),
+        )
         row = cur.fetchone()
         if row:
-            _enrich_journal(cur, _val(row, 0), issn=issn, eissn=eissn,
-                            publisher_id=publisher_id, openalex_id=openalex_id,
-                            oa_model=oa_model)
+            _enrich_journal(
+                cur,
+                _val(row, 0),
+                issn=issn,
+                eissn=eissn,
+                publisher_id=publisher_id,
+                openalex_id=openalex_id,
+                oa_model=oa_model,
+            )
             _add_journal_name_form(cur, _val(row, 0), title_normalized, publisher_id)
             return _val(row, 0)
 
     # 5. Par forme de nom (journal_name_forms)
     # Priorité aux journals avec eISSN (plus fiable que les ISSN print)
-    cur.execute("""
+    cur.execute(
+        """
         SELECT nf.journal_id FROM journal_name_forms nf
         JOIN journals j ON j.id = nf.journal_id
         WHERE nf.form_normalized = %s
           AND (nf.publisher_id IS NOT DISTINCT FROM %s OR nf.publisher_id IS NULL OR %s IS NULL)
         ORDER BY (j.eissn IS NOT NULL) DESC, j.id ASC
         LIMIT 1
-    """, (title_normalized, publisher_id, publisher_id))
+    """,
+        (title_normalized, publisher_id, publisher_id),
+    )
     row = cur.fetchone()
     if row:
-        _enrich_journal(cur, _val(row, 0), issn=issn, eissn=eissn,
-                        publisher_id=publisher_id, openalex_id=openalex_id,
-                        oa_model=oa_model)
+        _enrich_journal(
+            cur,
+            _val(row, 0),
+            issn=issn,
+            eissn=eissn,
+            publisher_id=publisher_id,
+            openalex_id=openalex_id,
+            oa_model=oa_model,
+        )
         return _val(row, 0)
 
     # 6. Créer + enregistrer la forme de nom
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO journals (title, title_normalized, issn, eissn, issnl,
                               publisher_id, openalex_id, oa_model)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
-    """, (title.strip(), title_normalized, issn, eissn, issnl,
-          publisher_id, openalex_id, oa_model))
+    """,
+        (title.strip(), title_normalized, issn, eissn, issnl, publisher_id, openalex_id, oa_model),
+    )
     journal_id = _val(cur.fetchone(), 0)
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO journal_name_forms (journal_id, form_normalized, publisher_id)
         VALUES (%s, %s, %s)
         ON CONFLICT (form_normalized, publisher_id) DO NOTHING
-    """, (journal_id, title_normalized, publisher_id))
+    """,
+        (journal_id, title_normalized, publisher_id),
+    )
     return journal_id
 
 
-def update_journal_apc(cur, journal_id: int, *,
-                       apc_amount: float | None = None,
-                       apc_currency: str | None = None,
-                       is_in_doaj: bool | None = None):
+def update_journal_apc(
+    cur,
+    journal_id: int,
+    *,
+    apc_amount: float | None = None,
+    apc_currency: str | None = None,
+    is_in_doaj: bool | None = None,
+):
     """Met à jour les informations APC/DOAJ d'un journal."""
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE journals SET
             apc_amount = COALESCE(%s, journals.apc_amount),
             apc_currency = COALESCE(%s, journals.apc_currency),
             is_in_doaj = COALESCE(%s, journals.is_in_doaj)
         WHERE id = %s
-    """, (apc_amount, apc_currency, is_in_doaj, journal_id))
+    """,
+        (apc_amount, apc_currency, is_in_doaj, journal_id),
+    )
 
 
 def reset_journal_apc(cur):
@@ -235,6 +310,7 @@ def reset_journal_apc(cur):
 
 
 # ── Fusions ──
+
 
 def merge_publishers(cur, target_id: int, source_id: int):
     """Fusionne l'éditeur source dans l'éditeur cible.
@@ -250,12 +326,15 @@ def merge_publishers(cur, target_id: int, source_id: int):
         raise RuntimeError("Impossible de fusionner un éditeur avec lui-même")
 
     # 1. Journals avec même titre normalisé → fusionner
-    cur.execute("""
+    cur.execute(
+        """
         SELECT jt.id AS target_journal_id, js.id AS source_journal_id
         FROM journals jt
         JOIN journals js ON js.title_normalized = jt.title_normalized
         WHERE jt.publisher_id = %s AND js.publisher_id = %s
-    """, (target_id, source_id))
+    """,
+        (target_id, source_id),
+    )
     journal_pairs = cur.fetchall()
 
     for pair in journal_pairs:
@@ -281,39 +360,47 @@ def merge_publishers(cur, target_id: int, source_id: int):
 
     # 2. Transférer les journals restants
     cur.execute(
-        "UPDATE journals SET publisher_id = %s WHERE publisher_id = %s",
-        (target_id, source_id))
+        "UPDATE journals SET publisher_id = %s WHERE publisher_id = %s", (target_id, source_id)
+    )
 
     # 3. Transférer les formes de nom
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE publisher_name_forms SET publisher_id = %s
         WHERE publisher_id = %s
           AND form_normalized NOT IN (
               SELECT form_normalized FROM publisher_name_forms WHERE publisher_id = %s
           )
-    """, (target_id, source_id, target_id))
+    """,
+        (target_id, source_id, target_id),
+    )
     cur.execute("DELETE FROM publisher_name_forms WHERE publisher_id = %s", (source_id,))
 
     # 3b. Transférer les journal_name_forms référençant le publisher source
     #     Supprimer celles qui existent déjà pour le publisher cible (UNIQUE form_normalized + publisher_id)
-    cur.execute("""
+    cur.execute(
+        """
         DELETE FROM journal_name_forms
         WHERE publisher_id = %s
           AND form_normalized IN (
               SELECT form_normalized FROM journal_name_forms WHERE publisher_id = %s
           )
-    """, (source_id, target_id))
+    """,
+        (source_id, target_id),
+    )
     cur.execute(
         "UPDATE journal_name_forms SET publisher_id = %s WHERE publisher_id = %s",
-        (target_id, source_id))
+        (target_id, source_id),
+    )
 
     # 4. Transférer les apc_payments
     cur.execute(
-        "UPDATE apc_payments SET publisher_id = %s WHERE publisher_id = %s",
-        (target_id, source_id))
+        "UPDATE apc_payments SET publisher_id = %s WHERE publisher_id = %s", (target_id, source_id)
+    )
 
     # 5. Enrichir la cible
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE publishers dest SET
             openalex_id = COALESCE(dest.openalex_id, src.openalex_id),
             country = COALESCE(dest.country, src.country),
@@ -321,7 +408,9 @@ def merge_publishers(cur, target_id: int, source_id: int):
             updated_at = now()
         FROM publishers src
         WHERE dest.id = %s AND src.id = %s
-    """, (target_id, source_id))
+    """,
+        (target_id, source_id),
+    )
 
     # 6. Supprimer la source
     cur.execute("DELETE FROM publishers WHERE id = %s", (source_id,))
@@ -341,30 +430,35 @@ def merge_journals(cur, target_id: int, source_id: int):
 
     # 1. Transférer les publications et source_publications
     cur.execute(
-        "UPDATE publications SET journal_id = %s WHERE journal_id = %s",
-        (target_id, source_id))
+        "UPDATE publications SET journal_id = %s WHERE journal_id = %s", (target_id, source_id)
+    )
     cur.execute(
         "UPDATE source_publications SET journal_id = %s WHERE journal_id = %s",
-        (target_id, source_id))
+        (target_id, source_id),
+    )
 
     # 2. Transférer les formes de nom
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE journal_name_forms SET journal_id = %s
         WHERE journal_id = %s
           AND (form_normalized, COALESCE(publisher_id, 0)) NOT IN (
               SELECT form_normalized, COALESCE(publisher_id, 0)
               FROM journal_name_forms WHERE journal_id = %s
           )
-    """, (target_id, source_id, target_id))
+    """,
+        (target_id, source_id, target_id),
+    )
     cur.execute("DELETE FROM journal_name_forms WHERE journal_id = %s", (source_id,))
 
     # 3. Transférer les apc_payments
     cur.execute(
-        "UPDATE apc_payments SET journal_id = %s WHERE journal_id = %s",
-        (target_id, source_id))
+        "UPDATE apc_payments SET journal_id = %s WHERE journal_id = %s", (target_id, source_id)
+    )
 
     # 4. Enrichir la cible
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE journals dest SET
             issn = COALESCE(dest.issn, src.issn),
             eissn = COALESCE(dest.eissn, src.eissn),
@@ -379,7 +473,9 @@ def merge_journals(cur, target_id: int, source_id: int):
             updated_at = now()
         FROM journals src
         WHERE dest.id = %s AND src.id = %s
-    """, (target_id, source_id))
+    """,
+        (target_id, source_id),
+    )
 
     # 5. Supprimer la source
     cur.execute("DELETE FROM journals WHERE id = %s", (source_id,))

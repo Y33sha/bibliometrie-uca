@@ -119,8 +119,10 @@ def main():
 
         if choice is None:
             # Prompt
-            print(f"\n  ? {pair['ln_a']} {pair['fn_a']} (id={pair['id_a']}) vs "
-                  f"{pair['ln_b']} {pair['fn_b']} (id={pair['id_b']})")
+            print(
+                f"\n  ? {pair['ln_a']} {pair['fn_a']} (id={pair['id_a']}) vs "
+                f"{pair['ln_b']} {pair['fn_b']} (id={pair['id_b']})"
+            )
             resp = input("    Garder [a/b/s(kip)] ? ").strip().lower()
             if resp == "a":
                 choice = (pair["id_a"], pair["id_b"])

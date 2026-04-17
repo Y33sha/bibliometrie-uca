@@ -40,12 +40,14 @@ async def list_all_todos():
             continue
         for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             for match in todo_re.finditer(line):
-                todos.append({
-                    "page": page["slug"],
-                    "page_title": page["title"],
-                    "line": i,
-                    "text": match.group(1).strip(),
-                })
+                todos.append(
+                    {
+                        "page": page["slug"],
+                        "page_title": page["title"],
+                        "line": i,
+                        "text": match.group(1).strip(),
+                    }
+                )
 
     return todos
 
@@ -72,6 +74,7 @@ async def get_doc(slug: str):
 
     # Extraire les titres h2/h3 pour la table des matières
     import re
+
     headings = []
     for line in content.splitlines():
         m = re.match(r"^(#{2})\s+(.+)$", line)

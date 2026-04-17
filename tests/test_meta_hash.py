@@ -22,8 +22,7 @@ def compute_meta_hash(raw_data: dict) -> str:
     return compute_hash(filtered)
 
 
-def _make_work(openalex_id, n_authors, title="Test Publication",
-               cited_by_count=10):
+def _make_work(openalex_id, n_authors, title="Test Publication", cited_by_count=10):
     """Crée un work OpenAlex synthétique avec n auteurs."""
     authorships = [
         {
@@ -64,7 +63,8 @@ def _insert_staging(db, work):
     meta_hash = compute_meta_hash(work)
     doi = work.get("doi", "").replace("https://doi.org/", "")
     openalex_id = work["id"].replace("https://openalex.org/", "")
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, meta_hash)
         VALUES ('openalex', %s, %s, %s::jsonb, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
@@ -98,18 +98,20 @@ def _insert_staging(db, work):
                 ELSE FALSE
             END,
             last_seen_at = now()
-    """, (openalex_id, doi, Json(work), raw_hash, meta_hash))
+    """,
+        (openalex_id, doi, Json(work), raw_hash, meta_hash),
+    )
 
 
 def _get_staging(db, openalex_id):
     db.execute(
         "SELECT raw_data, raw_hash, meta_hash, processed FROM staging WHERE source = 'openalex' AND source_id = %s",
-        (openalex_id,))
+        (openalex_id,),
+    )
     return db.fetchone()
 
 
 class TestMetaHashProtection:
-
     def test_same_meta_hash_preserves_authorships(self, db):
         """Import bulk avec meta_hash identique → authorships complètes préservées."""
         # 1. Simuler un refetch : 150 auteurs
@@ -120,7 +122,9 @@ class TestMetaHashProtection:
         assert len(row["raw_data"]["authorships"]) == 150
 
         # Marquer comme processed (simule normalisation)
-        db.execute("UPDATE staging SET processed = TRUE WHERE source = 'openalex' AND source_id = 'W100'")
+        db.execute(
+            "UPDATE staging SET processed = TRUE WHERE source = 'openalex' AND source_id = 'W100'"
+        )
 
         # 2. Import bulk : même work, mais tronqué à 100 auteurs
         truncated_work = _make_work("W100", 100)  # même metadata
@@ -139,8 +143,7 @@ class TestMetaHashProtection:
         _insert_staging(db, full_work)
 
         # 2. Import bulk avec titre modifié mais tronqué à 100
-        updated_work = _make_work("W200", 100, title="Updated Title",
-                                  cited_by_count=42)
+        updated_work = _make_work("W200", 100, title="Updated Title", cited_by_count=42)
         _insert_staging(db, updated_work)
 
         row = _get_staging(db, "W200")
@@ -176,17 +179,22 @@ class TestMetaHashProtection:
 
         # 2. Refetch individuel : 200 auteurs (complet)
         full = _make_work("W400", 200)
-        db.execute("""
+        db.execute(
+            """
             UPDATE staging
             SET raw_data = %s::jsonb, raw_hash = %s, meta_hash = %s,
                 processed = FALSE
             WHERE source = 'openalex' AND source_id = 'W400'
-        """, (Json(full), compute_hash(full), compute_meta_hash(full)))
+        """,
+            (Json(full), compute_hash(full), compute_meta_hash(full)),
+        )
 
         row = _get_staging(db, "W400")
         assert len(row["raw_data"]["authorships"]) == 200
 
-        db.execute("UPDATE staging SET processed = TRUE WHERE source = 'openalex' AND source_id = 'W400'")
+        db.execute(
+            "UPDATE staging SET processed = TRUE WHERE source = 'openalex' AND source_id = 'W400'"
+        )
 
         # 3. Reimport bulk : 100 auteurs, mêmes métadonnées
         reimport = _make_work("W400", 100)

@@ -14,7 +14,9 @@ from db.connection import get_connection
 from services.persons import add_identifier
 from utils.log import setup_logger
 
-log = setup_logger("backfill_identifiers", os.path.join(os.path.dirname(__file__), "../processing/logs"))
+log = setup_logger(
+    "backfill_identifiers", os.path.join(os.path.dirname(__file__), "../processing/logs")
+)
 
 # (id_type, colonne source_persons, filtre source optionnel)
 IDENTIFIERS = [
@@ -28,7 +30,8 @@ def backfill_identifier(cur, conn, id_type, column, source_filter):
     """Backfill un type d'identifiant."""
     where_source = f"AND {source_filter}" if source_filter else ""
 
-    cur.execute(f"""
+    cur.execute(
+        f"""
         SELECT DISTINCT sa.person_id, {column} AS id_value
         FROM source_persons sa
         WHERE sa.person_id IS NOT NULL
@@ -40,7 +43,9 @@ def backfill_identifier(cur, conn, id_type, column, source_filter):
                 AND pi.id_type = %s
                 AND pi.id_value = {column}
           )
-    """, (id_type,))
+    """,
+        (id_type,),
+    )
     rows = cur.fetchall()
 
     if not rows:
@@ -57,7 +62,8 @@ def backfill_identifier(cur, conn, id_type, column, source_filter):
     log.info("%s : %d insérés", id_type, inserted)
 
     # Vérification des restants (conflits)
-    cur.execute(f"""
+    cur.execute(
+        f"""
         SELECT COUNT(*) FROM source_persons sa
         WHERE sa.person_id IS NOT NULL
           AND {column} IS NOT NULL
@@ -68,7 +74,9 @@ def backfill_identifier(cur, conn, id_type, column, source_filter):
                 AND pi.id_type = %s
                 AND pi.id_value = {column}
           )
-    """, (id_type,))
+    """,
+        (id_type,),
+    )
     remaining = cur.fetchone()[0]
     if remaining:
         log.warning("%s : encore %d non propagés (conflits)", id_type, remaining)

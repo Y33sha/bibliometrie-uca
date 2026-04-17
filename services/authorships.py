@@ -19,9 +19,12 @@ def exclude_authorship(cur, authorship_id: int) -> dict | None:
     2. Met person_id = NULL sur les authorships sources liées
        (pour que build_authorships ne recrée pas le lien)
     """
-    cur.execute("""
+    cur.execute(
+        """
         SELECT id, person_id FROM authorships WHERE id = %s
-    """, (authorship_id,))
+    """,
+        (authorship_id,),
+    )
     row = cur.fetchone()
     if not row:
         return None
@@ -29,19 +32,25 @@ def exclude_authorship(cur, authorship_id: int) -> dict | None:
     person_id = row["person_id"]
 
     # 1. Marquer exclue
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE authorships SET excluded = TRUE, updated_at = now()
         WHERE id = %s RETURNING id, excluded
-    """, (authorship_id,))
+    """,
+        (authorship_id,),
+    )
     result = cur.fetchone()
 
     # 2. Détacher les authorships sources (person_id = NULL) et casser le lien FK
     if person_id:
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE source_authorships
             SET person_id = NULL, authorship_id = NULL
             WHERE authorship_id = %s AND person_id = %s
-        """, (authorship_id, person_id))
+        """,
+            (authorship_id, person_id),
+        )
 
     return result
 
@@ -56,10 +65,13 @@ def detach_source(cur, source_authorship_id: int, source: str):
         raise ValueError(f"Source inconnue : {source}")
 
     # Trouver l'authorship vérité liée
-    cur.execute("""
+    cur.execute(
+        """
         SELECT authorship_id FROM source_authorships
         WHERE id = %s AND source = %s
-    """, (source_authorship_id, source))
+    """,
+        (source_authorship_id, source),
+    )
     row = cur.fetchone()
     if not row or not row["authorship_id"]:
         return False
@@ -67,17 +79,23 @@ def detach_source(cur, source_authorship_id: int, source: str):
     truth_id = row["authorship_id"]
 
     # Détacher la FK source
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE source_authorships SET authorship_id = NULL
         WHERE id = %s AND source = %s
-    """, (source_authorship_id, source))
+    """,
+        (source_authorship_id, source),
+    )
 
     # Vérifier s'il reste d'autres sources
-    cur.execute("""
+    cur.execute(
+        """
         SELECT 1 FROM source_authorships
         WHERE authorship_id = %s AND NOT excluded
         LIMIT 1
-    """, (truth_id,))
+    """,
+        (truth_id,),
+    )
 
     if not cur.fetchone():
         # Plus aucune source → supprimer
@@ -92,19 +110,23 @@ def delete_orphan_authorships(cur, person_id: int) -> int:
     par aucune authorship source.
     Retourne le nombre d'authorships supprimées.
     """
-    cur.execute("""
+    cur.execute(
+        """
         DELETE FROM authorships a
         WHERE a.person_id = %s
           AND NOT EXISTS (SELECT 1 FROM source_authorships sa
                           JOIN source_publications sd ON sd.id = sa.source_publication_id
                           WHERE sa.person_id = %s AND sd.publication_id = a.publication_id
                             AND NOT sa.excluded)
-    """, (person_id, person_id))
+    """,
+        (person_id, person_id),
+    )
     return cur.rowcount
 
 
-def move_authorships_for_source(cur, source: str, source_authorship_ids: list[int],
-                                from_pub_id: int, to_pub_id: int):
+def move_authorships_for_source(
+    cur, source: str, source_authorship_ids: list[int], from_pub_id: int, to_pub_id: int
+):
     """Déplace des authorships vérité d'une publication à une autre,
     pour les authorships liées aux source_authorship_ids donnés.
     Utilisé par split_bad_merges.
@@ -113,13 +135,16 @@ def move_authorships_for_source(cur, source: str, source_authorship_ids: list[in
         raise ValueError(f"Source inconnue : {source}")
 
     for sa_id in source_authorship_ids:
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE authorships a
             SET publication_id = %s, updated_at = now()
             FROM source_authorships sa
             WHERE sa.authorship_id = a.id
               AND sa.id = %s AND a.publication_id = %s
-        """, (to_pub_id, sa_id, from_pub_id))
+        """,
+            (to_pub_id, sa_id, from_pub_id),
+        )
 
 
 def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int]):
@@ -130,7 +155,8 @@ def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}")
 
-    cur.execute("""
+    cur.execute(
+        """
         UPDATE authorships a
         SET person_id = src.person_id, updated_at = now()
         FROM source_authorships src
@@ -144,7 +170,9 @@ def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int
                 AND a2.person_id = src.person_id
                 AND a2.id <> a.id
           )
-    """, (source_authorship_ids,))
+    """,
+        (source_authorship_ids,),
+    )
     return cur.rowcount
 
 
@@ -160,23 +188,28 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
 
     # 1. Périmètre UCA
     from utils.perimeter import get_persons_structure_ids_list
+
     perimeter_ids = get_persons_structure_ids_list(cur)
     if not perimeter_ids:
         return
 
     # 2. Trouver les source_authorships (openalex/wos/scanr) affectés
-    cur.execute("""
+    cur.execute(
+        """
         SELECT DISTINCT saa.source_authorship_id
         FROM source_authorship_addresses saa
         WHERE saa.address_id = ANY(%s)
-    """, (address_ids,))
+    """,
+        (address_ids,),
+    )
     affected_sa_ids = [r["source_authorship_id"] for r in cur.fetchall()]
 
     if not affected_sa_ids:
         return
 
     # 3. Recalculer in_perimeter sur source_authorships affectés
-    cur.execute("""
+    cur.execute(
+        """
         WITH affected AS (
             SELECT unnest(%s::int[]) AS sa_id
         ),
@@ -196,10 +229,13 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
         FROM affected af
         LEFT JOIN uca_per_authorship upa ON upa.sa_id = af.sa_id
         WHERE sa.id = af.sa_id
-    """, (affected_sa_ids, perimeter_ids))
+    """,
+        (affected_sa_ids, perimeter_ids),
+    )
 
     # 4. Propager vers authorships (vérité) pour les person_id résolus
-    cur.execute("""
+    cur.execute(
+        """
         WITH affected_pubs AS (
             SELECT DISTINCT sd.publication_id, sa.person_id
             FROM source_authorships sa
@@ -241,4 +277,6 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]):
         WHERE a.publication_id = m.publication_id
           AND a.person_id = m.person_id
           AND a.person_id IS NOT NULL
-    """, (affected_sa_ids,))
+    """,
+        (affected_sa_ids,),
+    )

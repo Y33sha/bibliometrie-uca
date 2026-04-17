@@ -1,6 +1,7 @@
 """
 Debug : inspecte la réponse brute de l'API ref auteur HAL.
 """
+
 import json
 
 import requests

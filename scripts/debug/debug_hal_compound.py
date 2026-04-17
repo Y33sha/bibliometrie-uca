@@ -6,9 +6,9 @@ import requests
 
 # Quelques halId avec peu d'auteurs pour lire facilement
 TEST_IDS = [
-    "hal-05114304",   # 3 auteurs: Sabrina Alioui, Vanessa Serret, Kamal Si Mohammed
-    "hal-05157466",   # 3 auteurs: Nicolas Baelen, Sylvain Marsat, Guillaume Pijourlet
-    "hal-04967062",   # 3 auteurs: Emilie Bourlier-Bargues, Bertrand Valiorgue, Gazi Islam
+    "hal-05114304",  # 3 auteurs: Sabrina Alioui, Vanessa Serret, Kamal Si Mohammed
+    "hal-05157466",  # 3 auteurs: Nicolas Baelen, Sylvain Marsat, Guillaume Pijourlet
+    "hal-04967062",  # 3 auteurs: Emilie Bourlier-Bargues, Bertrand Valiorgue, Gazi Islam
 ]
 
 # Champs composés potentiellement intéressants
@@ -30,11 +30,15 @@ COMPOUND_FIELDS = [
 BASE_URL = "https://api.archives-ouvertes.fr/search/"
 
 for halid in TEST_IDS:
-    resp = requests.get(BASE_URL, params={
-        "q": f"halId_s:{halid}",
-        "fl": ",".join(COMPOUND_FIELDS),
-        "wt": "json",
-    }, timeout=15)
+    resp = requests.get(
+        BASE_URL,
+        params={
+            "q": f"halId_s:{halid}",
+            "fl": ",".join(COMPOUND_FIELDS),
+            "wt": "json",
+        },
+        timeout=15,
+    )
     data = resp.json()
     docs = data.get("response", {}).get("docs", [])
     if not docs:
@@ -58,11 +62,15 @@ for halid in TEST_IDS:
 
 # Deuxième passe : demander TOUS les champs pour un doc et grep auth/struct
 print("\n=== TOUS LES CHAMPS d'un document (filtre auth/struct) ===\n")
-resp = requests.get(BASE_URL, params={
-    "q": f"halId_s:{TEST_IDS[0]}",
-    "fl": "*",
-    "wt": "json",
-}, timeout=15)
+resp = requests.get(
+    BASE_URL,
+    params={
+        "q": f"halId_s:{TEST_IDS[0]}",
+        "fl": "*",
+        "wt": "json",
+    },
+    timeout=15,
+)
 doc = resp.json()["response"]["docs"][0]
 for key in sorted(doc.keys()):
     if "auth" in key.lower() or "struct" in key.lower():

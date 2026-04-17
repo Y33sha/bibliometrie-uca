@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 async def feedback_stats(structure_id: int = Query(...)):
     """Statistiques de qualité de la détection pour une structure donnée."""
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        cur.execute(
+            """
             SELECT
                 COUNT(*) FILTER (WHERE is_confirmed IS NOT NULL) AS total_reviewed,
                 COUNT(*) FILTER (WHERE is_confirmed = TRUE AND matched_form_id IS NOT NULL) AS concordant_valid,
@@ -29,11 +30,17 @@ async def feedback_stats(structure_id: int = Query(...)):
                 COUNT(*) FILTER (WHERE is_confirmed IS NULL AND matched_form_id IS NOT NULL) AS pending
             FROM address_structures
             WHERE structure_id = %s
-        """, (structure_id,))
+        """,
+            (structure_id,),
+        )
         row = cur.fetchone()
 
-        reviewed = (row["concordant_valid"] or 0) + (row["concordant_rejected"] or 0) + \
-                   (row["false_negatives"] or 0) + (row["false_positives"] or 0)
+        reviewed = (
+            (row["concordant_valid"] or 0)
+            + (row["concordant_rejected"] or 0)
+            + (row["false_negatives"] or 0)
+            + (row["false_positives"] or 0)
+        )
         concordant = (row["concordant_valid"] or 0) + (row["concordant_rejected"] or 0)
 
         return {
@@ -70,15 +77,19 @@ async def feedback_false_negatives(
 
         where = " AND ".join(conditions)
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT COUNT(*)
             FROM address_structures ast
             JOIN addresses a ON a.id = ast.address_id
             WHERE {where}
-        """, params)
+        """,
+            params,
+        )
         total = cur.fetchone()["count"]
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 a.id, a.raw_text, a.pub_count,
                 (SELECT json_agg(json_build_object(
@@ -95,7 +106,9 @@ async def feedback_false_negatives(
             WHERE {where}
             ORDER BY a.pub_count DESC, a.id
             LIMIT %s OFFSET %s
-        """, params + [per_page, offset])
+        """,
+            params + [per_page, offset],
+        )
 
         return {
             "total": total,
@@ -130,15 +143,19 @@ async def feedback_false_positives(
 
         where = " AND ".join(conditions)
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT COUNT(*)
             FROM address_structures ast
             JOIN addresses a ON a.id = ast.address_id
             WHERE {where}
-        """, params)
+        """,
+            params,
+        )
         total = cur.fetchone()["count"]
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 a.id, a.raw_text, a.pub_count,
                 (SELECT json_agg(json_build_object(
@@ -168,7 +185,9 @@ async def feedback_false_positives(
             WHERE {where}
             ORDER BY a.pub_count DESC, a.id
             LIMIT %s OFFSET %s
-        """, params + [structure_id, per_page, offset])
+        """,
+            params + [structure_id, per_page, offset],
+        )
 
         return {
             "total": total,
@@ -192,12 +211,15 @@ async def assign_structure(addr_id: int, action: AssignStructureAction):
             raise HTTPException(status_code=404, detail="Structure not found")
 
         # Upsert: insert or update
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO address_structures (address_id, structure_id, is_confirmed)
             VALUES (%s, %s, TRUE)
             ON CONFLICT (address_id, structure_id) DO UPDATE
             SET is_confirmed = TRUE
-        """, (addr_id, action.structure_id))
+        """,
+            (addr_id, action.structure_id),
+        )
 
         propagate_uca_for_addresses(cur, [addr_id])
         return {"id": addr_id, "structure_id": action.structure_id, "status": "assigned"}
@@ -208,14 +230,19 @@ async def feedback_rerun():
     """Lance resolve_addresses en SSE (détection complète sur toutes les adresses)."""
     import asyncio
 
-    script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                          "processing", "resolve_addresses.py")
+    script = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "processing",
+        "resolve_addresses.py",
+    )
     if not os.path.exists(script):
         raise HTTPException(status_code=500, detail="Script resolve_addresses.py introuvable")
 
     async def event_stream():
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-u", script,
+            sys.executable,
+            "-u",
+            script,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
@@ -243,13 +270,15 @@ async def feedback_rerun():
 async def unassign_structure(addr_id: int, structure_id: int = Query(...)):
     """Supprime l'assignation manuelle d'une structure."""
     with get_cursor() as (cur, conn):
-        cur.execute("""
+        cur.execute(
+            """
             DELETE FROM address_structures
             WHERE address_id = %s AND structure_id = %s AND matched_form_id IS NULL
-        """, (addr_id, structure_id))
+        """,
+            (addr_id, structure_id),
+        )
         propagate_uca_for_addresses(cur, [addr_id])
         return {"deleted": cur.rowcount > 0}
 
 
 # ----- API: Labos -----
-

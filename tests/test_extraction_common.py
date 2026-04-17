@@ -7,6 +7,7 @@ from utils.doi import clean_doi
 
 # ── compute_hash ─────────────────────────────────────────────────
 
+
 class TestComputeHash:
     def test_deterministic(self):
         data = {"title": "Test", "year": 2024}
@@ -40,6 +41,7 @@ class TestComputeHash:
 
 # ── clean_doi ────────────────────────────────────────────────────
 
+
 class TestCleanDoi:
     def test_none(self):
         assert clean_doi(None) is None
@@ -70,6 +72,7 @@ class TestCleanDoi:
 
 
 # ── get_existing_ids ─────────────────────────────────────────────
+
 
 class TestGetExistingIds:
     def test_rejects_unknown_source(self):

@@ -26,7 +26,10 @@ _APC_SUM = """COALESCE((SELECT SUM(ap.amount_eur_ht)
 
 _APC_FILTER_MAP = {
     "uca": (_APC_EXISTS, 1),
-    "non_uca": (f"(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND {_APC_NOT_EXISTS})", 1),
+    "non_uca": (
+        f"(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND {_APC_NOT_EXISTS})",
+        1,
+    ),
     "none": ("NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)", 0),
 }
 
@@ -36,7 +39,7 @@ def apply_apc_filter(conditions: list, params: list, has_apc: str):
     if not has_apc:
         return
     rid = get_root_structure_id()
-    values = [v.strip() for v in has_apc.split(',') if v.strip()]
+    values = [v.strip() for v in has_apc.split(",") if v.strip()]
     entries = [_APC_FILTER_MAP[v] for v in values if v in _APC_FILTER_MAP]
     parts = [e[0] for e in entries]
     for e in entries:
@@ -83,17 +86,21 @@ async def publisher_stats(
 
         where = " AND ".join(conditions)
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT COUNT(DISTINCT pub.id) AS total
             FROM publications p
             JOIN journals j ON j.id = p.journal_id
             JOIN publishers pub ON pub.id = j.publisher_id
             WHERE {where}
-        """, params)
+        """,
+            params,
+        )
         total = cur.fetchone()["total"]
 
         rid = get_root_structure_id()
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 pub.id AS publisher_id,
                 pub.name AS publisher_name,
@@ -123,7 +130,9 @@ async def publisher_stats(
                 }.get(sort, "COUNT(DISTINCT p.id) DESC")
             }
             LIMIT %s OFFSET %s
-        """, [rid] + params + [per_page, offset])
+        """,
+            [rid] + params + [per_page, offset],
+        )
 
         return {
             "total": total,
@@ -177,16 +186,20 @@ async def journal_stats(
 
         where = " AND ".join(conditions)
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT COUNT(DISTINCT j.id) AS total
             FROM publications p
             JOIN journals j ON j.id = p.journal_id
             WHERE {where}
-        """, params)
+        """,
+            params,
+        )
         total = cur.fetchone()["total"]
 
         rid = get_root_structure_id()
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 j.id AS journal_id,
                 j.title AS journal_title,
@@ -220,7 +233,9 @@ async def journal_stats(
                 }.get(sort, "COUNT(DISTINCT p.id) DESC")
             }
             LIMIT %s OFFSET %s
-        """, [rid] + params + [per_page, offset])
+        """,
+            [rid] + params + [per_page, offset],
+        )
 
         return {
             "total": total,
@@ -269,7 +284,8 @@ async def stats_by_year(
 
         where = " AND ".join(conditions)
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 p.pub_year,
                 COUNT(DISTINCT p.id) AS pub_count,
@@ -285,7 +301,9 @@ async def stats_by_year(
             WHERE {where}
             GROUP BY p.pub_year
             ORDER BY p.pub_year
-        """, params)
+        """,
+            params,
+        )
 
         return cur.fetchall()
 
@@ -328,7 +346,8 @@ async def stats_summary(
 
         where = " AND ".join(conditions)
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 COUNT(DISTINCT p.id) AS total_pubs,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
@@ -342,7 +361,9 @@ async def stats_summary(
             FROM publications p
             LEFT JOIN journals j ON j.id = p.journal_id
             WHERE {where}
-        """, params)
+        """,
+            params,
+        )
 
         return cur.fetchone()
 
@@ -402,7 +423,8 @@ async def stats_labs(
             )
         """
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             WITH {structs_cte}
             SELECT COUNT(DISTINCT s.id) AS total
             FROM publications p
@@ -410,10 +432,13 @@ async def stats_labs(
             JOIN pub_structs ps_structs ON ps_structs.publication_id = p.id
             JOIN structures s ON s.id = ANY(ps_structs.struct_ids) AND s.structure_type = 'labo'
             WHERE {where}
-        """, params)
+        """,
+            params,
+        )
         total = cur.fetchone()["total"]
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             WITH {structs_cte}
             SELECT
                 s.id AS lab_id,
@@ -446,7 +471,9 @@ async def stats_labs(
                 }.get(sort, "COUNT(DISTINCT p.id) DESC")
             }
             LIMIT %s OFFSET %s
-        """, params + [per_page, offset])
+        """,
+            params + [per_page, offset],
+        )
 
         return {
             "total": total,
@@ -516,7 +543,8 @@ async def stats_facets(
         year_params: list = []
         add_common(year_conds, year_params, skip="year")
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT p.pub_year, COUNT(DISTINCT p.id) AS count
             FROM publications p
             LEFT JOIN journals j ON j.id = p.journal_id
@@ -524,16 +552,18 @@ async def stats_facets(
               AND p.pub_year IS NOT NULL
             GROUP BY p.pub_year
             ORDER BY p.pub_year DESC
-        """, year_params)
-        year_facets = [{"value": r["pub_year"], "count": r["count"]}
-                       for r in cur.fetchall()]
+        """,
+            year_params,
+        )
+        year_facets = [{"value": r["pub_year"], "count": r["count"]} for r in cur.fetchall()]
 
         # --- Facette LABOS (exclut le filtre labo, garde les autres) ---
         lab_conds = list(base_conditions)
         lab_params: list = []
         add_common(lab_conds, lab_params, skip="lab")
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT s.id, COALESCE(s.acronym, s.name) AS label,
                    COUNT(DISTINCT a.publication_id) AS count
             FROM authorships a
@@ -545,16 +575,20 @@ async def stats_facets(
               AND s.structure_type = 'labo'
             GROUP BY s.id, s.acronym, s.name
             ORDER BY count DESC
-        """, lab_params)
-        lab_facets = [{"value": r["id"], "label": r["label"], "count": r["count"]}
-                      for r in cur.fetchall()]
+        """,
+            lab_params,
+        )
+        lab_facets = [
+            {"value": r["id"], "label": r["label"], "count": r["count"]} for r in cur.fetchall()
+        ]
 
         # --- Facette OA (exclut le filtre OA, garde les autres) ---
         oa_conds = list(base_conditions)
         oa_params: list = []
         add_common(oa_conds, oa_params, skip="oa")
 
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT p.oa_status::text AS value, COUNT(DISTINCT p.id) AS count
             FROM publications p
             LEFT JOIN journals j ON j.id = p.journal_id
@@ -562,9 +596,10 @@ async def stats_facets(
               AND p.oa_status IS NOT NULL
             GROUP BY p.oa_status
             ORDER BY count DESC
-        """, oa_params)
-        oa_facets = [{"value": r["value"], "count": r["count"]}
-                     for r in cur.fetchall()]
+        """,
+            oa_params,
+        )
+        oa_facets = [{"value": r["value"], "count": r["count"]} for r in cur.fetchall()]
 
         # --- Facette APC ---
         apc_conds = list(base_conditions)
@@ -572,7 +607,8 @@ async def stats_facets(
         add_common(apc_conds, apc_params, skip="apc")
         apc_where = " AND ".join(apc_conds) if apc_conds else "TRUE"
         rid = get_root_structure_id()
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT
                 COUNT(DISTINCT p.id) FILTER (WHERE EXISTS (
                     SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s
@@ -588,7 +624,9 @@ async def stats_facets(
             FROM publications p
             LEFT JOIN journals j ON j.id = p.journal_id
             WHERE {apc_where}
-        """, [rid, rid] + apc_params)
+        """,
+            [rid, rid] + apc_params,
+        )
         ar = cur.fetchone()
         apc_facets = [
             {"value": "uca", "text": "APC UCA", "count": ar["apc_uca"]},
@@ -596,5 +634,9 @@ async def stats_facets(
             {"value": "none", "text": "Sans APC", "count": ar["apc_none"]},
         ]
 
-        return {"years": year_facets, "labs": lab_facets, "oa_statuses": oa_facets, "apc": apc_facets}
-
+        return {
+            "years": year_facets,
+            "labs": lab_facets,
+            "oa_statuses": oa_facets,
+            "apc": apc_facets,
+        }

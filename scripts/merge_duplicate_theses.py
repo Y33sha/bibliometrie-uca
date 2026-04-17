@@ -22,7 +22,9 @@ from utils.log import setup_logger
 from utils.names import names_compatible
 from utils.normalize import normalize_name
 
-logger = setup_logger("merge_dup_theses", os.path.join(os.path.dirname(__file__), "../processing/logs"))
+logger = setup_logger(
+    "merge_dup_theses", os.path.join(os.path.dirname(__file__), "../processing/logs")
+)
 
 
 def _name_tokens_match(ln1, fn1, ln2, fn2):
@@ -54,7 +56,8 @@ def get_thesis_author(cur, pub_id):
     Cherche dans source_authorships le rôle 'author'.
     Retourne None si pas d'auteur unique trouvé.
     """
-    cur.execute("""
+    cur.execute(
+        """
         SELECT sa.last_name, sa.first_name
         FROM source_authorships sas
         JOIN source_publications sd ON sd.id = sas.source_publication_id
@@ -63,7 +66,9 @@ def get_thesis_author(cur, pub_id):
           AND 'author' = ANY(sas.roles)
         ORDER BY sd.id, sas.author_position
         LIMIT 1
-    """, (pub_id,))
+    """,
+        (pub_id,),
+    )
     row = cur.fetchone()
     if not row:
         return None
@@ -77,7 +82,8 @@ def choose_target(cur, pub_ids):
 
     Priorité : celle avec DOI > celle avec le plus de source_publications > id le plus bas.
     """
-    cur.execute("""
+    cur.execute(
+        """
         SELECT p.id, p.doi,
                (SELECT COUNT(*) FROM source_publications sd WHERE sd.publication_id = p.id) AS sd_count
         FROM publications p
@@ -86,7 +92,9 @@ def choose_target(cur, pub_ids):
             (p.doi IS NOT NULL) DESC,
             (SELECT COUNT(*) FROM source_publications sd WHERE sd.publication_id = p.id) DESC,
             p.id ASC
-    """, (pub_ids,))
+    """,
+        (pub_ids,),
+    )
     return cur.fetchall()
 
 
@@ -130,8 +138,10 @@ def main():
                 for j in range(i + 1, len(author_list)):
                     pid_a, (ln_a, fn_a) = author_list[i]
                     pid_b, (ln_b, fn_b) = author_list[j]
-                    if not (names_compatible(ln_a, fn_a, ln_b, fn_b)
-                           or _name_tokens_match(ln_a, fn_a, ln_b, fn_b)):
+                    if not (
+                        names_compatible(ln_a, fn_a, ln_b, fn_b)
+                        or _name_tokens_match(ln_a, fn_a, ln_b, fn_b)
+                    ):
                         all_compatible = False
                         break
                 if not all_compatible:
@@ -139,7 +149,7 @@ def main():
 
             if not all_compatible:
                 logger.info(
-                    f"  SKIP ({pub_year}) \"{title_norm[:70]}\" "
+                    f'  SKIP ({pub_year}) "{title_norm[:70]}" '
                     f"— auteurs incompatibles : "
                     + ", ".join(f"{pid}={ln} {fn}" for pid, (ln, fn) in author_list)
                 )

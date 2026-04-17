@@ -39,9 +39,13 @@ def _create_all_publications(cur):
         if nnt:
             nnt = normalize_nnt(nnt)
         pub_id, _ = find_or_create_publication(
-            cur, title=title, title_normalized=normalize_text(title),
-            pub_year=pub_year, doc_type=doc_type,
-            doi=doc["doi"], nnt=nnt,
+            cur,
+            title=title,
+            title_normalized=normalize_text(title),
+            pub_year=pub_year,
+            doc_type=doc_type,
+            doi=doc["doi"],
+            nnt=nnt,
             oa_status=doc["oa_status"] or "unknown",
             journal_id=doc["journal_id"],
             container_title=doc["container_title"],
@@ -49,8 +53,10 @@ def _create_all_publications(cur):
             allow_create=True,
         )
         if pub_id:
-            cur.execute("UPDATE source_publications SET publication_id = %s WHERE id = %s",
-                        (pub_id, doc["id"]))
+            cur.execute(
+                "UPDATE source_publications SET publication_id = %s WHERE id = %s",
+                (pub_id, doc["id"]),
+            )
             update_sources(cur, pub_id)
 
 
@@ -80,9 +86,17 @@ SCANR_STAGING_DOCS = [
                     "fullName": "Alice Dupont",
                     "role": "author",
                     "person": "idref000000001",
-                    "denormalized": {"id": "idref000000001", "idref": "000000001", "orcid": "0000-0001-0001-0001"},
+                    "denormalized": {
+                        "id": "idref000000001",
+                        "idref": "000000001",
+                        "orcid": "0000-0001-0001-0001",
+                    },
                     "affiliations": [
-                        {"name": "Université Clermont Auvergne", "ids": [{"id": "130028061", "type": "siren"}], "detected_countries": ["fr"]},
+                        {
+                            "name": "Université Clermont Auvergne",
+                            "ids": [{"id": "130028061", "type": "siren"}],
+                            "detected_countries": ["fr"],
+                        },
                     ],
                 },
                 {
@@ -91,7 +105,11 @@ SCANR_STAGING_DOCS = [
                     "person": "idref000000002",
                     "denormalized": {"id": "idref000000002", "idref": "000000002"},
                     "affiliations": [
-                        {"name": "CNRS", "ids": [{"id": "180089013", "type": "siren"}], "detected_countries": ["fr"]},
+                        {
+                            "name": "CNRS",
+                            "ids": [{"id": "180089013", "type": "siren"}],
+                            "detected_countries": ["fr"],
+                        },
                     ],
                 },
                 {
@@ -125,9 +143,17 @@ SCANR_STAGING_DOCS = [
                     "fullName": "Alice Dupont",
                     "role": "author",
                     "person": "idref000000001",
-                    "denormalized": {"id": "idref000000001", "idref": "000000001", "orcid": "0000-0001-0001-0001"},
+                    "denormalized": {
+                        "id": "idref000000001",
+                        "idref": "000000001",
+                        "orcid": "0000-0001-0001-0001",
+                    },
                     "affiliations": [
-                        {"name": "LMV, UCA", "ids": [{"id": "130028061", "type": "siren"}], "detected_countries": ["fr"]},
+                        {
+                            "name": "LMV, UCA",
+                            "ids": [{"id": "130028061", "type": "siren"}],
+                            "detected_countries": ["fr"],
+                        },
                     ],
                 },
             ],
@@ -161,17 +187,22 @@ SCANR_STAGING_DOCS = [
 def _insert_staging(cur, docs):
     """Insère des documents dans staging (source='scanr')."""
     for doc in docs:
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO staging (source, source_id, doi, raw_data, processed)
             VALUES ('scanr', %s, %s, %s, FALSE)
             ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
-        """, (doc["scanr_id"], doc["doi"], Json(doc["raw_data"])))
+        """,
+            (doc["scanr_id"], doc["doi"], Json(doc["raw_data"])),
+        )
 
 
 def _count_tables(cur) -> dict:
     """Retourne les compteurs des tables normalisées."""
     tables = [
-        "publications", "journals", "publishers",
+        "publications",
+        "journals",
+        "publishers",
         "source_persons",
     ]
     counts = {}
@@ -232,9 +263,7 @@ class TestNormalizeScanrIdempotence:
         counts_2 = _count_tables(db)
 
         assert counts_2 == counts_1, (
-            f"Compteurs différents après 2e passe !\n"
-            f"  1ère : {counts_1}\n"
-            f"  2ème : {counts_2}"
+            f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )
 
     def test_author_dedup_by_idref(self, db):
@@ -245,7 +274,9 @@ class TestNormalizeScanrIdempotence:
         db.execute("SELECT count(*) AS cnt FROM source_persons WHERE idref = '000000001'")
         assert db.fetchone()["cnt"] == 1, "Alice Dupont devrait être dédupliquée par idref"
 
-        db.execute("SELECT count(*) AS cnt FROM source_authorships WHERE source = 'scanr' AND source_person_id = (SELECT id FROM source_persons WHERE idref = '000000001')")
+        db.execute(
+            "SELECT count(*) AS cnt FROM source_authorships WHERE source = 'scanr' AND source_person_id = (SELECT id FROM source_persons WHERE idref = '000000001')"
+        )
         assert db.fetchone()["cnt"] == 2, "Alice devrait avoir 2 authorships (article + chapitre)"
 
     def test_author_without_idref(self, db):
@@ -277,7 +308,9 @@ class TestNormalizeScanrIdempotence:
         _run_normalize_scanr(db)
         _create_all_publications(db)
 
-        db.execute("SELECT count(*) AS cnt FROM publications WHERE lower(doi) = '10.1234/test-article-001'")
+        db.execute(
+            "SELECT count(*) AS cnt FROM publications WHERE lower(doi) = '10.1234/test-article-001'"
+        )
         assert db.fetchone()["cnt"] == 1, "Le DOI devrait être dédupliqué"
 
         db.execute("SELECT count(*) AS cnt FROM source_publications WHERE source = 'scanr'")
@@ -288,7 +321,9 @@ class TestNormalizeScanrIdempotence:
         _insert_staging(db, SCANR_STAGING_DOCS)
         _run_normalize_scanr(db)
 
-        db.execute("SELECT count(*) AS cnt FROM journals WHERE title_normalized LIKE '%volcanology%'")
+        db.execute(
+            "SELECT count(*) AS cnt FROM journals WHERE title_normalized LIKE '%volcanology%'"
+        )
         assert db.fetchone()["cnt"] == 1
 
     def test_publisher_dedup(self, db):
@@ -354,17 +389,21 @@ HAL_STAGING_DOCS = [
 
 def _insert_hal_staging(cur, docs):
     for doc in docs:
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed)
             VALUES ('hal', %s, %s, %s, %s, FALSE)
             ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
-        """, (doc["halid"], doc["doi"], Json(doc["raw_data"]), doc["hal_collections"]))
+        """,
+            (doc["halid"], doc["doi"], Json(doc["raw_data"]), doc["hal_collections"]),
+        )
 
 
 def _run_normalize_hal(cur):
     """Exécute la normalisation HAL via un curseur tuple (comme le vrai script)."""
     plain_cur = cur.connection.cursor()
     from processing.normalize_hal import process_work
+
     plain_cur.execute("""
         Select id, source_id AS halid, doi, raw_data, hal_collections
         FROM staging WHERE source = 'hal' AND processed = FALSE ORDER BY id
@@ -402,8 +441,7 @@ class TestNormalizeHalIdempotence:
         counts_2 = _count_hal_tables(db)
 
         assert counts_2 == counts_1, (
-            f"Compteurs différents après 2e passe !\n"
-            f"  1ère : {counts_1}\n  2ème : {counts_2}"
+            f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )
 
 
@@ -432,8 +470,15 @@ OA_STAGING_DOCS = [
                 },
             },
             "authorships": [
-                {"author": {"id": "https://openalex.org/A999001", "display_name": "Hector Vidal"},
-                 "author_position": "first", "institutions": [], "raw_affiliation_strings": ["UCA"]},
+                {
+                    "author": {
+                        "id": "https://openalex.org/A999001",
+                        "display_name": "Hector Vidal",
+                    },
+                    "author_position": "first",
+                    "institutions": [],
+                    "raw_affiliation_strings": ["UCA"],
+                },
             ],
             "open_access": {"oa_status": "gold", "is_oa": True},
             "cited_by_count": 5,
@@ -451,8 +496,15 @@ OA_STAGING_DOCS = [
             "type": "book-chapter",
             "primary_location": {"source": {"display_name": "Mineral Handbook", "type": "book"}},
             "authorships": [
-                {"author": {"id": "https://openalex.org/A999001", "display_name": "Hector Vidal"},
-                 "author_position": "first", "institutions": [], "raw_affiliation_strings": []},
+                {
+                    "author": {
+                        "id": "https://openalex.org/A999001",
+                        "display_name": "Hector Vidal",
+                    },
+                    "author_position": "first",
+                    "institutions": [],
+                    "raw_affiliation_strings": [],
+                },
             ],
             "open_access": {"oa_status": "closed", "is_oa": False},
         },
@@ -468,8 +520,12 @@ OA_STAGING_DOCS = [
             "type": "dissertation",
             "primary_location": {"source": None},
             "authorships": [
-                {"author": {"id": "https://openalex.org/A999002", "display_name": "Irene Blanc"},
-                 "author_position": "first", "institutions": [], "raw_affiliation_strings": []},
+                {
+                    "author": {"id": "https://openalex.org/A999002", "display_name": "Irene Blanc"},
+                    "author_position": "first",
+                    "institutions": [],
+                    "raw_affiliation_strings": [],
+                },
             ],
             "open_access": {"oa_status": "closed", "is_oa": False},
         },
@@ -479,16 +535,20 @@ OA_STAGING_DOCS = [
 
 def _insert_oa_staging(cur, docs):
     for doc in docs:
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO staging (source, source_id, doi, raw_data, processed)
             VALUES ('openalex', %s, %s, %s, FALSE)
             ON CONFLICT (source, source_id) DO UPDATE SET
                 processed = FALSE, raw_data = EXCLUDED.raw_data
-        """, (doc["openalex_id"], doc["doi"], Json(doc["raw_data"])))
+        """,
+            (doc["openalex_id"], doc["doi"], Json(doc["raw_data"])),
+        )
 
 
 def _run_normalize_oa(cur):
     from processing.normalize_openalex import process_work
+
     cur.execute("""
         SELECT id, source_id AS openalex_id, doi, raw_data
         FROM staging WHERE source = 'openalex' AND processed = FALSE ORDER BY id
@@ -529,8 +589,7 @@ class TestNormalizeOpenalexIdempotence:
         counts_2 = _count_oa_tables(db)
 
         assert counts_2 == counts_1, (
-            f"Compteurs différents après 2e passe !\n"
-            f"  1ère : {counts_1}\n  2ème : {counts_2}"
+            f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )
 
 
@@ -587,16 +646,20 @@ WOS_STAGING_DOCS = [
 
 def _insert_wos_staging(cur, docs):
     for doc in docs:
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO staging (source, source_id, doi, raw_data, processed)
             VALUES ('wos', %s, %s, %s, FALSE)
             ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
-        """, (doc["ut"], doc["doi"], Json(doc["raw_data"])))
+        """,
+            (doc["ut"], doc["doi"], Json(doc["raw_data"])),
+        )
 
 
 def _run_normalize_wos(cur):
     plain_cur = cur.connection.cursor()
     from processing.normalize_wos import process_record
+
     plain_cur.execute("""
         SELECT id, source_id AS ut, doi, raw_data
         FROM staging WHERE source = 'wos' AND processed = FALSE ORDER BY id
@@ -634,8 +697,7 @@ class TestNormalizeWosIdempotence:
         counts_2 = _count_wos_tables(db)
 
         assert counts_2 == counts_1, (
-            f"Compteurs différents après 2e passe !\n"
-            f"  1ère : {counts_1}\n  2ème : {counts_2}"
+            f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )
 
 
@@ -696,10 +758,21 @@ INTER_OA_DOCS = [
                 },
             },
             "authorships": [
-                {"author": {"id": "https://openalex.org/A991001", "display_name": "Alice Dupont"},
-                 "author_position": "first", "institutions": [], "raw_affiliation_strings": []},
-                {"author": {"id": "https://openalex.org/A991002", "display_name": "Bob Martin"},
-                 "author_position": "last", "institutions": [], "raw_affiliation_strings": []},
+                {
+                    "author": {
+                        "id": "https://openalex.org/A991001",
+                        "display_name": "Alice Dupont",
+                    },
+                    "author_position": "first",
+                    "institutions": [],
+                    "raw_affiliation_strings": [],
+                },
+                {
+                    "author": {"id": "https://openalex.org/A991002", "display_name": "Bob Martin"},
+                    "author_position": "last",
+                    "institutions": [],
+                    "raw_affiliation_strings": [],
+                },
             ],
             "open_access": {"oa_status": "gold", "is_oa": True},
             "cited_by_count": 3,
@@ -716,8 +789,15 @@ INTER_OA_DOCS = [
             "type": "article",
             "primary_location": {"source": None},
             "authorships": [
-                {"author": {"id": "https://openalex.org/A991003", "display_name": "Charlie Noid"},
-                 "author_position": "first", "institutions": [], "raw_affiliation_strings": []},
+                {
+                    "author": {
+                        "id": "https://openalex.org/A991003",
+                        "display_name": "Charlie Noid",
+                    },
+                    "author_position": "first",
+                    "institutions": [],
+                    "raw_affiliation_strings": [],
+                },
             ],
             "open_access": {"oa_status": "closed", "is_oa": False},
         },
@@ -746,8 +826,8 @@ class TestNormalizeInterSourceIdempotence:
 
         # L'article partagé ne doit pas être dupliqué (même DOI)
         db.execute(
-            "SELECT COUNT(*) AS cnt FROM publications WHERE lower(doi) = lower(%s)",
-            (SHARED_DOI,))
+            "SELECT COUNT(*) AS cnt FROM publications WHERE lower(doi) = lower(%s)", (SHARED_DOI,)
+        )
         assert db.fetchone()["cnt"] == 1, "L'article partagé ne doit exister qu'une fois"
 
         # Le rapport HAL sans DOI + l'article OA-only = 2 pubs de plus
@@ -763,8 +843,7 @@ class TestNormalizeInterSourceIdempotence:
         pubs_after_hal2 = db.fetchone()["cnt"]
 
         assert pubs_after_hal2 == pubs_after_oa, (
-            f"Relancer HAL ne devrait rien créer. "
-            f"Avant={pubs_after_oa}, après={pubs_after_hal2}"
+            f"Relancer HAL ne devrait rien créer. Avant={pubs_after_oa}, après={pubs_after_hal2}"
         )
 
     def test_shared_doi_same_journal(self, db):
@@ -785,6 +864,7 @@ class TestNormalizeInterSourceIdempotence:
 # ══════════════════════════════════════════════════════════════════
 # create_persons_from_source_authorships
 # ══════════════════════════════════════════════════════════════════
+
 
 def _setup_persons_test_data(db):
     """Crée une chaîne complète de données pour tester create_persons :
@@ -856,7 +936,9 @@ def _count_persons_tables(db) -> dict:
         db.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
         counts[t] = db.fetchone()["cnt"]
     # Aussi les authorships rattachées
-    db.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'hal' AND person_id IS NOT NULL")
+    db.execute(
+        "SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'hal' AND person_id IS NOT NULL"
+    )
     counts["hal_as_linked"] = db.fetchone()["cnt"]
     return counts
 
@@ -884,8 +966,7 @@ class TestCreatePersonsIdempotence:
         counts_2 = _count_persons_tables(db)
 
         assert counts_2 == counts_1, (
-            f"Compteurs différents après 2e passe !\n"
-            f"  1ère : {counts_1}\n  2ème : {counts_2}"
+            f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )
 
     def test_same_hal_person_id_one_person(self, db):
@@ -917,10 +998,12 @@ class TestCreatePersonsIdempotence:
 # build_authorships
 # ══════════════════════════════════════════════════════════════════
 
+
 def _run_build_authorships(db):
     """Exécute build_authorships sur le curseur de test (plain cursor)."""
     plain_cur = db.connection.cursor()
     from processing.build_authorships import build
+
     build(plain_cur)
 
 
@@ -930,7 +1013,9 @@ def _count_authorships_tables(db) -> dict:
     counts["total"] = db.fetchone()["cnt"]
     db.execute("SELECT COUNT(*) AS cnt FROM authorships WHERE in_perimeter = TRUE")
     counts["in_perimeter"] = db.fetchone()["cnt"]
-    db.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE authorship_id IS NOT NULL AND source = 'hal'")
+    db.execute(
+        "SELECT COUNT(*) AS cnt FROM source_authorships WHERE authorship_id IS NOT NULL AND source = 'hal'"
+    )
     counts["hal_fk"] = db.fetchone()["cnt"]
     db.execute("SELECT COUNT(*) AS cnt FROM authorships WHERE structure_ids IS NOT NULL")
     counts["with_structs"] = db.fetchone()["cnt"]
@@ -954,14 +1039,14 @@ class TestBuildAuthorshipsIdempotence:
         counts_2 = _count_authorships_tables(db)
 
         assert counts_2 == counts_1, (
-            f"Compteurs différents après 2e passe !\n"
-            f"  1ère : {counts_1}\n  2ème : {counts_2}"
+            f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )
 
 
 # ══════════════════════════════════════════════════════════════════
 # populate_affiliations
 # ══════════════════════════════════════════════════════════════════
+
 
 def _setup_affiliations_test_data(db):
     """Crée des données pour tester populate_affiliations :
@@ -1076,11 +1161,13 @@ def _count_affiliations(db) -> dict:
     for src in ["hal", "openalex"]:
         db.execute(
             "SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = %s AND in_perimeter = TRUE",
-            (src,))
+            (src,),
+        )
         counts[f"{src}_in_perimeter"] = db.fetchone()["cnt"]
         db.execute(
             "SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = %s AND structure_ids IS NOT NULL",
-            (src,))
+            (src,),
+        )
         counts[f"{src}_with_structs"] = db.fetchone()["cnt"]
     return counts
 
@@ -1098,12 +1185,13 @@ class TestPopulateAffiliationsIdempotence:
         # Sans populate_addresses + resolve_addresses dans ce test, HAL n'est pas in_perimeter.
         # L'idempotence est vérifiée par la comparaison counts_1 == counts_2 ci-dessous.
         assert counts_1["openalex_in_perimeter"] == 1, "L'authorship OA doit être in_perimeter"
-        assert counts_1["openalex_with_structs"] == 1, "L'authorship OA doit avoir des structure_ids"
+        assert counts_1["openalex_with_structs"] == 1, (
+            "L'authorship OA doit avoir des structure_ids"
+        )
 
         _run_populate_affiliations(db)
         counts_2 = _count_affiliations(db)
 
         assert counts_2 == counts_1, (
-            f"Compteurs différents après 2e passe !\n"
-            f"  1ère : {counts_1}\n  2ème : {counts_2}"
+            f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )

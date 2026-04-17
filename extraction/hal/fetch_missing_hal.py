@@ -55,7 +55,7 @@ def find_hal_primary_locations(cur) -> list[dict]:
     """)
     for row in cur.fetchall():
         raw = row["raw_data"]
-        loc = (raw.get("primary_location") or {})
+        loc = raw.get("primary_location") or {}
         url = loc.get("landing_page_url") or ""
         if "hal.science" not in url and "hal.archives-ouvertes.fr" not in url:
             continue
@@ -129,7 +129,7 @@ def find_hal_ids_from_scanr(cur) -> list[dict]:
     if candidates:
         cur.execute(
             "SELECT source_id FROM staging WHERE source = 'hal' AND source_id = ANY(%s)",
-            (list(candidates.keys()),)
+            (list(candidates.keys()),),
         )
         already_staged = {r["source_id"] for r in cur.fetchall()}
         for hal_id, scanr_id in candidates.items():
@@ -167,12 +167,16 @@ def find_nnt_without_hal(cur) -> list[dict]:
 def fetch_hal_by_nnt(nnt: str) -> dict | None:
     """Télécharge un document depuis l'API HAL par NNT."""
     try:
-        resp = requests.get(HAL_API, params={
-            "q": f"nntId_s:{nnt}",
-            "fl": HAL_FIELDS_STR,
-            "wt": "json",
-            "rows": 1,
-        }, timeout=15)
+        resp = requests.get(
+            HAL_API,
+            params={
+                "q": f"nntId_s:{nnt}",
+                "fl": HAL_FIELDS_STR,
+                "wt": "json",
+                "rows": 1,
+            },
+            timeout=15,
+        )
 
         if resp.status_code != 200:
             log.warning(f"  HTTP {resp.status_code} pour NNT {nnt}")
@@ -197,8 +201,7 @@ def find_missing_hal_ids(cur, hal_refs: list[dict]) -> list[dict]:
 
     hal_ids = [r["hal_id"] for r in hal_refs]
     cur.execute(
-        "SELECT source_id FROM staging WHERE source = 'hal' AND source_id = ANY(%s)",
-        (hal_ids,)
+        "SELECT source_id FROM staging WHERE source = 'hal' AND source_id = ANY(%s)", (hal_ids,)
     )
     existing = {row["source_id"] for row in cur.fetchall()}
 
@@ -209,12 +212,16 @@ def find_missing_hal_ids(cur, hal_refs: list[dict]) -> list[dict]:
 def fetch_hal_document(hal_id: str) -> dict | None:
     """Télécharge un document depuis l'API HAL."""
     try:
-        resp = requests.get(HAL_API, params={
-            "q": f"halId_s:{hal_id}",
-            "fl": HAL_FIELDS_STR,
-            "wt": "json",
-            "rows": 1,
-        }, timeout=15)
+        resp = requests.get(
+            HAL_API,
+            params={
+                "q": f"halId_s:{hal_id}",
+                "fl": HAL_FIELDS_STR,
+                "wt": "json",
+                "rows": 1,
+            },
+            timeout=15,
+        )
 
         if resp.status_code != 200:
             log.warning(f"  HTTP {resp.status_code} pour {hal_id}")
@@ -242,7 +249,8 @@ def insert_staging_hal(cur, hal_id: str, doi: str | None, doc: dict):
     hal_collections = coll_codes if isinstance(coll_codes, list) and coll_codes else None
 
     raw_hash = compute_hash(doc)
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed, raw_hash)
         VALUES ('hal', %s, %s, %s::jsonb, %s, FALSE, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
@@ -262,21 +270,28 @@ def insert_staging_hal(cur, hal_id: str, doi: str | None, doc: dict):
                     THEN FALSE
                 ELSE staging.processed
             END
-    """, (hal_id, doi, Json(doc), hal_collections, raw_hash))
+    """,
+        (hal_id, doi, Json(doc), hal_collections, raw_hash),
+    )
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="Récupère les entrées HAL manquantes découvertes via OpenAlex"
     )
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Lister sans télécharger")
-    parser.add_argument("--stats", action="store_true",
-                        help="Statistiques uniquement")
-    parser.add_argument("--all", action="store_true",
-                        help="Considérer tout le staging (pas seulement les non-normalisés)")
-    parser.add_argument("--mode", choices=["full", "weekly", "monthly", "daily"], default="full",
-                        help="Mode pipeline (NNT ignoré en daily/weekly)")
+    parser.add_argument("--dry-run", action="store_true", help="Lister sans télécharger")
+    parser.add_argument("--stats", action="store_true", help="Statistiques uniquement")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Considérer tout le staging (pas seulement les non-normalisés)",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["full", "weekly", "monthly", "daily"],
+        default="full",
+        help="Mode pipeline (NNT ignoré en daily/weekly)",
+    )
     args = parser.parse_args()
 
     conn = get_connection()
@@ -365,11 +380,14 @@ def main():
                 fetched += 1
             else:
                 # Marquer comme not_found dans staging pour ne plus le re-chercher
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO staging (source, source_id, raw_data, not_found, processed)
                     VALUES ('hal', %s, '{}', TRUE, TRUE)
                     ON CONFLICT (source, source_id) DO UPDATE SET not_found = TRUE
-                """, (hal_id,))
+                """,
+                    (hal_id,),
+                )
                 not_found += 1
 
             if (i + 1) % 50 == 0:
@@ -392,7 +410,9 @@ def main():
                 hal_id = doc.get("halId_s")
                 if hal_id:
                     # Vérifier que ce hal_id n'est pas déjà en staging
-                    cur.execute("SELECT 1 FROM staging WHERE source = 'hal' AND source_id = %s", (hal_id,))
+                    cur.execute(
+                        "SELECT 1 FROM staging WHERE source = 'hal' AND source_id = %s", (hal_id,)
+                    )
                     if not cur.fetchone():
                         doi_str = doc.get("doiId_s")
                         if isinstance(doi_str, list):
@@ -408,7 +428,9 @@ def main():
 
             if (i + 1) % 50 == 0:
                 conn.commit()
-                log.info(f"  {i + 1}/{len(nnt_refs)} — {nnt_fetched} récupérés, {nnt_not_found} absents de HAL")
+                log.info(
+                    f"  {i + 1}/{len(nnt_refs)} — {nnt_fetched} récupérés, {nnt_not_found} absents de HAL"
+                )
 
             time.sleep(HAL_DELAY)
 
