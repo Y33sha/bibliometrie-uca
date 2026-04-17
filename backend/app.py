@@ -102,8 +102,13 @@ async def auth_middleware(request: Request, call_next):
     response = await call_next(request)
     if response.status_code < 400:
         logger.info(
-            "admin_action user=%s method=%s path=%s status=%d",
-            admin_user, request.method, path, response.status_code,
+            "admin_action",
+            extra={
+                "user": admin_user,
+                "method": request.method,
+                "path": path,
+                "status": response.status_code,
+            },
         )
     return response
 
