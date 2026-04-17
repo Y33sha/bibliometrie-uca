@@ -6,6 +6,7 @@ reset_journal_apc, merge_publishers, merge_journals.
 
 import pytest
 
+from domain.errors import ConflictError, NotFoundError, ValidationError
 from services.journals import (
     find_or_create_journal,
     find_or_create_publisher,
@@ -174,17 +175,18 @@ class TestUpdateJournalApc:
 
 
 class TestUpdateJournal:
-    def test_returns_false_if_not_found(self, db):
-        assert update_journal(db, 999999, fields={"title": "X"}) is False
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            update_journal(db, 999999, fields={"title": "X"})
 
     def test_raises_on_empty_fields(self, db):
         j = _insert_journal(db, "Nature")
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             update_journal(db, j, fields={})
 
     def test_updates_title_and_normalizes(self, db):
         j = _insert_journal(db, "Old Title")
-        assert update_journal(db, j, fields={"title": "Nature Medicine"}) is True
+        update_journal(db, j, fields={"title": "Nature Medicine"})
         db.execute("SELECT title, title_normalized FROM journals WHERE id = %s", (j,))
         row = db.fetchone()
         assert row["title"] == "Nature Medicine"
@@ -200,17 +202,18 @@ class TestUpdateJournal:
 
 
 class TestUpdatePublisher:
-    def test_returns_false_if_not_found(self, db):
-        assert update_publisher(db, 999999, fields={"name": "X"}) is False
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            update_publisher(db, 999999, fields={"name": "X"})
 
     def test_raises_on_empty_fields(self, db):
         p = _insert_publisher(db, "Elsevier")
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             update_publisher(db, p, fields={})
 
     def test_updates_name_and_normalizes(self, db):
         p = _insert_publisher(db, "Old Name")
-        assert update_publisher(db, p, fields={"name": "Springer Nature"}) is True
+        update_publisher(db, p, fields={"name": "Springer Nature"})
         db.execute("SELECT name, name_normalized FROM publishers WHERE id = %s", (p,))
         row = db.fetchone()
         assert row["name"] == "Springer Nature"
@@ -243,7 +246,7 @@ class TestResetJournalApc:
 class TestMergePublishers:
     def test_raises_on_self_merge(self, db):
         p_id = _insert_publisher(db, "Elsevier")
-        with pytest.raises(RuntimeError, match="lui-même"):
+        with pytest.raises(ConflictError, match="lui-même"):
             merge_publishers(db, p_id, p_id)
 
     def test_transfers_journals_and_deletes_source(self, db):
@@ -283,7 +286,7 @@ class TestMergePublishers:
         _insert_journal(db, "Nature", publisher_id=target, issn="0028-0836")
         _insert_journal(db, "Nature", publisher_id=source, issn="9999-9999")
 
-        with pytest.raises(RuntimeError, match="Conflit issn"):
+        with pytest.raises(ConflictError, match="Conflit issn"):
             merge_publishers(db, target, source)
 
     def test_enriches_target_flags(self, db):
@@ -319,7 +322,7 @@ class TestMergePublishers:
 class TestMergeJournals:
     def test_raises_on_self_merge(self, db):
         j_id = _insert_journal(db, "Nature")
-        with pytest.raises(RuntimeError, match="lui-même"):
+        with pytest.raises(ConflictError, match="lui-même"):
             merge_journals(db, j_id, j_id)
 
     def test_transfers_publications(self, db):
