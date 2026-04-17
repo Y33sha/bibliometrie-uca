@@ -12,7 +12,7 @@ from utils.normalize import normalize_text
 # ── Publishers ──
 
 
-def _add_publisher_name_form(cur, publisher_id: int, form_normalized: str):
+def _add_publisher_name_form(cur, publisher_id: int, form_normalized: str) -> None:
     """Ajoute une forme de nom si elle n'existe pas encore."""
     cur.execute(
         """
@@ -92,7 +92,7 @@ def find_or_create_publisher(
 
 def _add_journal_name_form(
     cur, journal_id: int, form_normalized: str, publisher_id: int | None = None
-):
+) -> None:
     """Ajoute une forme de nom si elle n'existe pas encore."""
     if not form_normalized:
         return
@@ -115,7 +115,7 @@ def _enrich_journal(
     publisher_id=None,
     openalex_id=None,
     oa_model=None,
-):
+) -> None:
     """Enrichit un journal existant avec les métadonnées manquantes."""
     cur.execute(
         """
@@ -337,7 +337,7 @@ def update_journal_apc(
     apc_amount: float | None = None,
     apc_currency: str | None = None,
     is_in_doaj: bool | None = None,
-):
+) -> None:
     """Met à jour les informations APC/DOAJ d'un journal."""
     cur.execute(
         """
@@ -351,7 +351,7 @@ def update_journal_apc(
     )
 
 
-def reset_journal_apc(cur):
+def reset_journal_apc(cur) -> int:
     """Réinitialise les APC/DOAJ de toutes les revues avec openalex_id."""
     cur.execute("""
         UPDATE journals
@@ -364,7 +364,7 @@ def reset_journal_apc(cur):
 # ── Fusions ──
 
 
-def merge_publishers(cur, target_id: int, source_id: int):
+def merge_publishers(cur, target_id: int, source_id: int) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible.
 
     1. Fusionne les journals qui auraient le même titre normalisé
@@ -475,7 +475,7 @@ def merge_publishers(cur, target_id: int, source_id: int):
     cur.execute("DELETE FROM publishers WHERE id = %s", (source_id,))
 
 
-def merge_journals(cur, target_id: int, source_id: int):
+def merge_journals(cur, target_id: int, source_id: int) -> None:
     """Fusionne le journal source dans le journal cible.
 
     1. Transfère les publications

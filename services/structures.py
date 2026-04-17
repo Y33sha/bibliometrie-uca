@@ -35,7 +35,7 @@ def create_structure(
     rnsr_id: str | None = None,
     hal_collection: str | None = None,
     api_ids: dict | None = None,
-):
+) -> dict:
     """Crée une structure. Retourne la ligne insérée (RealDictRow)."""
     cur.execute(
         """
@@ -53,7 +53,7 @@ def create_structure(
     return cur.fetchone()
 
 
-def update_structure(cur, structure_id: int, *, fields: dict):
+def update_structure(cur, structure_id: int, *, fields: dict) -> dict | None:
     """Met à jour une structure.
 
     Retourne la ligne modifiée, ou None si la structure n'existe pas.
@@ -99,7 +99,7 @@ def delete_structure(cur, structure_id: int) -> bool:
 # ── structure_relations ───────────────────────────────────────────
 
 
-def create_relation(cur, *, parent_id: int, child_id: int, relation_type: str):
+def create_relation(cur, *, parent_id: int, child_id: int, relation_type: str) -> dict | None:
     """Crée une relation. Retourne la ligne insérée, ou None si elle existait déjà."""
     cur.execute(
         """
@@ -130,7 +130,7 @@ def create_name_form(
     is_word_boundary: bool = False,
     is_excluding: bool = False,
     requires_context_of: list | None = None,
-):
+) -> dict:
     """Crée une forme de nom. Retourne la ligne insérée."""
     cur.execute(
         """
@@ -150,7 +150,7 @@ def create_name_form(
     return cur.fetchone()
 
 
-def update_name_form(cur, form_id: int, *, fields: dict):
+def update_name_form(cur, form_id: int, *, fields: dict) -> dict | None:
     """Met à jour une forme de nom.
 
     Retourne la ligne modifiée, ou None si la forme n'existe pas.

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def review_structure_link(cur, address_id: int, structure_id: int,
-                           is_confirmed: bool | None):
+                           is_confirmed: bool | None) -> None:
     """Upsert le lien address ↔ structure (validation manuelle).
 
     - is_confirmed = True  → confirme (crée le lien si besoin)
@@ -268,7 +268,7 @@ def propagate_countries_to_similar(cur) -> list[int]:
 # ── Propagation pays vers source_publications et publications ────
 
 
-def propagate_countries_to_publications(cur, address_ids: list[int]):
+def propagate_countries_to_publications(cur, address_ids: list[int]) -> None:
     """Propage addresses.countries → source_publications.countries → publications.countries.
 
     Appelée après une modification de pays sur les adresses (typiquement en
