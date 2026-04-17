@@ -10,7 +10,7 @@ import re
 
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
-from config.settings import DB
+from config.settings import settings
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         "imports_manuels", "APC")
@@ -180,7 +180,7 @@ def map_publishers(cur):
 
 
 def main():
-    conn = psycopg2.connect(**DB)
+    conn = psycopg2.connect(**settings.db_args)
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     # Vider la table avant import (ré-importable)

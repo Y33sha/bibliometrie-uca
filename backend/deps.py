@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-from config.settings import DB, DB_POOL_MIN, DB_POOL_MAX, ADMIN_USER, ADMIN_HASH, SESSION_SECRET
+from config.settings import settings
 
 
 # ----- SPA Static Files -----
@@ -38,7 +38,7 @@ SESSION_MAX_AGE = 86400 * 7  # 7 jours
 
 
 def _sign_token(payload: str) -> str:
-    sig = hmac.new(SESSION_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    sig = hmac.new(settings.session_secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
     return f"{payload}.{sig}"
 
 
@@ -46,7 +46,7 @@ def _verify_token(token: str) -> str | None:
     if not token or "." not in token:
         return None
     payload, sig = token.rsplit(".", 1)
-    expected = hmac.new(SESSION_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    expected = hmac.new(settings.session_secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(sig, expected):
         return None
     try:
@@ -60,9 +60,9 @@ def _verify_token(token: str) -> str | None:
 
 
 def _check_password(password: str) -> bool:
-    if not ADMIN_HASH:
+    if not settings.admin_hash:
         return False
-    return bcrypt.checkpw(password.encode(), ADMIN_HASH.encode())
+    return bcrypt.checkpw(password.encode(), settings.admin_hash.encode())
 
 
 def require_admin(session: str | None = Cookie(None, alias="session")):
@@ -81,10 +81,12 @@ _pool = None
 def _get_pool():
     global _pool
     if _pool is None:
-        db_args = dict(DB)
+        db_args = settings.db_args
         if os.environ.get("BIBLIOMETRIE_SANDBOX") == "1":
             db_args["dbname"] = "bibliometrie_sandbox"
-        _pool = ThreadedConnectionPool(minconn=DB_POOL_MIN, maxconn=DB_POOL_MAX, **db_args)
+        _pool = ThreadedConnectionPool(minconn=settings.db_pool_min,
+                                       maxconn=settings.db_pool_max,
+                                       **db_args)
     return _pool
 
 

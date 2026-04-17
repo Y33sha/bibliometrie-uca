@@ -10,7 +10,7 @@ import os, time, argparse, csv
 import requests
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from config.settings import DB
+from config.settings import settings
 
 EMAIL = "laurent.le-coz@uca.fr"
 UNPAYWALL_URL = "https://api.unpaywall.org/v2/{doi}?email={email}"
@@ -49,7 +49,7 @@ def main():
                         help="Rapport CSV uniquement, sans modifier la base")
     args = parser.parse_args()
 
-    conn = psycopg2.connect(**DB)
+    conn = psycopg2.connect(**settings.db_args)
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     # Récupérer les pubs avec DOI, statut connu, et source OpenAlex

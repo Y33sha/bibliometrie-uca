@@ -5,10 +5,11 @@ import time
 from fastapi import APIRouter, Response, Cookie
 
 from backend.deps import (
-    ADMIN_USER, _sign_token, _verify_token, _check_password,
+    _sign_token, _verify_token, _check_password,
     SESSION_MAX_AGE,
 )
 from backend.models import LoginRequest
+from config.settings import settings
 
 router = APIRouter()
 
@@ -16,9 +17,9 @@ router = APIRouter()
 @router.post("/api/auth/login")
 async def auth_login(data: LoginRequest, response: Response):
     from fastapi import HTTPException
-    if data.username != ADMIN_USER or not _check_password(data.password):
+    if data.username != settings.admin_user or not _check_password(data.password):
         raise HTTPException(status_code=401, detail="Identifiants incorrects")
-    payload = f"{ADMIN_USER}|{int(time.time())}"
+    payload = f"{settings.admin_user}|{int(time.time())}"
     token = _sign_token(payload)
     response.set_cookie(
         key="session",

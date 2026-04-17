@@ -1,39 +1,62 @@
 """
 Configuration du projet bibliometrie-uca.
 
-Toutes les valeurs sont lues depuis les variables d'environnement.
-python-dotenv charge automatiquement un fichier `.env` à la racine du projet
-(gitignored) au démarrage. En prod, les variables sont injectées par
-l'orchestrateur (pm2, systemd, docker).
+Settings typés chargés depuis les variables d'environnement ou un fichier
+`.env` à la racine du projet (gitignored). En prod, les variables sont
+injectées par l'orchestrateur (pm2, systemd, docker).
+
+Usage :
+    from config.settings import settings
+    print(settings.db_host)
 
 Les paramètres externalisés dynamiques (périmètres, clés API, credentials
 ScanR, collections HAL, années pipeline) sont lus depuis la table `config`
 en base via utils.app_config.
 """
 
-import os as _os
-from pathlib import Path as _Path
+from pathlib import Path
 
-from dotenv import load_dotenv as _load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Charge .env à la racine du projet (sans écraser les env vars déjà définies)
-_load_dotenv(_Path(__file__).resolve().parent.parent / ".env")
 
-# ----- Authentification admin -----
-# Hash généré avec : python3 -c 'import bcrypt; print(bcrypt.hashpw(b"MOT_DE_PASSE", bcrypt.gensalt()).decode())'
-# Session secret : python3 -c "import secrets; print(secrets.token_hex(32))"
-ADMIN_USER = _os.environ.get("ADMIN_USER", "admin")
-ADMIN_HASH = _os.environ.get("ADMIN_HASH", "")
-SESSION_SECRET = _os.environ.get("SESSION_SECRET", "")
+class Settings(BaseSettings):
+    """Configuration de l'app — lit .env et les variables d'environnement."""
 
-# ----- Base de données -----
-DB = {
-    "dbname":   _os.environ.get("DB_NAME", "bibliometrie"),
-    "user":     _os.environ.get("DB_USER", "lalecoz"),
-    "password": _os.environ.get("DB_PASSWORD", ""),
-    "host":     _os.environ.get("DB_HOST", "localhost"),
-    "port":     int(_os.environ.get("DB_PORT", "5432")),
-}
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parent.parent / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",   # ignore les env vars non déclarées (POSTGRES_*, CORS_ORIGINS, etc.)
+        case_sensitive=False,
+    )
 
-DB_POOL_MIN = int(_os.environ.get("DB_POOL_MIN", "2"))
-DB_POOL_MAX = int(_os.environ.get("DB_POOL_MAX", "10"))
+    # ----- Authentification admin -----
+    # Hash bcrypt : python3 -c 'import bcrypt; print(bcrypt.hashpw(b"MOT_DE_PASSE", bcrypt.gensalt()).decode())'
+    # Session secret : python3 -c "import secrets; print(secrets.token_hex(32))"
+    admin_user: str = "admin"
+    admin_hash: str
+    session_secret: str
+
+    # ----- Base de données -----
+    db_host: str = "localhost"
+    db_port: int = 5432
+    db_name: str = "bibliometrie"
+    db_user: str = "lalecoz"
+    db_password: str
+
+    # ----- Pool de connexions -----
+    db_pool_min: int = 2
+    db_pool_max: int = 10
+
+    @property
+    def db_args(self) -> dict:
+        """Arguments pour psycopg2.connect() / ThreadedConnectionPool."""
+        return {
+            "dbname": self.db_name,
+            "user": self.db_user,
+            "password": self.db_password,
+            "host": self.db_host,
+            "port": self.db_port,
+        }
+
+
+settings = Settings()
