@@ -1,8 +1,8 @@
 """Lecture de la configuration applicative.
 
-Lit depuis la table `config` en base, avec fallback sur `config/settings.py`.
-Les scripts du pipeline appellent ce module au lieu de lire settings.py directement
-pour les paramètres externalisés (années, collections, affiliations).
+Lit depuis la table `config` en base. Les scripts du pipeline appellent ce
+module pour les paramètres externalisés (années, collections, affiliations,
+clés API, credentials ScanR).
 """
 
 import datetime
@@ -27,34 +27,28 @@ def _get_from_db(cur, key):
 def get_years(cur, mode: str = "full") -> list[int]:
     """Retourne la liste des années à extraire selon le mode.
 
-    Lit pipeline_years_full ou pipeline_years_weekly depuis la table config.
-    Fallback sur config/settings.py si la table config n'existe pas.
+    Lit pipeline_years_full ou pipeline_years_weekly depuis la table config
+    (offset en nombre d'années depuis l'année courante).
     """
     key = "pipeline_years_weekly" if mode == "weekly" else "pipeline_years_full"
     offset = _get_from_db(cur, key)
+    current_year = datetime.date.today().year
 
     if offset is not None:
         try:
             n = int(offset) if not isinstance(offset, int) else offset
-            current_year = datetime.date.today().year
             return list(range(current_year - n, current_year + 1))
         except (ValueError, TypeError):
             logger.warning(f"Valeur invalide pour {key}: {offset}")
 
-    # Fallback settings.py
-    try:
-        from config.settings import OPENALEX
-        return OPENALEX.get("years", [datetime.date.today().year])
-    except ImportError:
-        current_year = datetime.date.today().year
-        return [current_year]
+    return [current_year]
 
 
 def get_hal_collections(cur) -> dict[str, str]:
     """Retourne les collections HAL {code_hal: label}.
 
-    Dérivé des structures du périmètre UCA qui ont un hal_collection renseigné.
-    Fallback sur la table config, puis sur settings.py.
+    Dérivé des structures du périmètre UCA qui ont un hal_collection renseigné,
+    avec fallback sur la clé `hal_collections` de la table config.
     """
     # 1. Depuis les structures du périmètre d'extraction
     try:
@@ -78,12 +72,7 @@ def get_hal_collections(cur) -> dict[str, str]:
     if val and isinstance(val, dict):
         return val
 
-    # 3. Fallback settings.py
-    try:
-        from config.settings import HAL
-        return HAL.get("collections", {})
-    except ImportError:
-        return {}
+    return {}
 
 
 
@@ -164,20 +153,6 @@ def get_extraction_api_ids(cur, source: str) -> list[str]:
         if val and isinstance(val, list):
             return val
 
-    # 3. Fallback settings.py
-    settings_map = {
-        "openalex": lambda: __import__("config.settings", fromlist=["OPENALEX"]).OPENALEX.get("institution_ids", []),
-        "wos": lambda: __import__("config.settings", fromlist=["WOS"]).WOS.get("affiliations", []),
-        "scanr": lambda: __import__("config.settings", fromlist=["SCANR"]).SCANR.get("affiliation_ids", []),
-        "theses": lambda: __import__("config.settings", fromlist=["THESES"]).THESES.get("etab_ppns", []),
-    }
-    try:
-        getter = settings_map.get(source)
-        if getter:
-            return getter()
-    except ImportError:
-        pass
-
     return []
 
 
@@ -186,13 +161,7 @@ def get_openalex_institution_ids(cur) -> list[str]:
     val = _get_from_db(cur, "openalex_institution_ids")
     if val and isinstance(val, list):
         return val
-
-    try:
-        from config.settings import OPENALEX
-        ids = OPENALEX.get("institution_ids") or [OPENALEX.get("institution_id")]
-        return [i for i in ids if i]
-    except ImportError:
-        return ["i198244214"]
+    return []
 
 
 def get_wos_affiliations(cur) -> list[str]:
@@ -200,12 +169,7 @@ def get_wos_affiliations(cur) -> list[str]:
     val = _get_from_db(cur, "wos_affiliations")
     if val and isinstance(val, list):
         return val
-
-    try:
-        from config.settings import WOS
-        return WOS.get("affiliations", [])
-    except ImportError:
-        return []
+    return []
 
 
 def get_openalex_email(cur) -> str:
@@ -213,12 +177,7 @@ def get_openalex_email(cur) -> str:
     val = _get_from_db(cur, "openalex_email")
     if val and isinstance(val, str):
         return val
-
-    try:
-        from config.settings import OPENALEX
-        return OPENALEX.get("email", "bibliometrie@uca.fr")
-    except ImportError:
-        return "bibliometrie@uca.fr"
+    return "bibliometrie@uca.fr"
 
 
 def get_wos_api_key(cur) -> str:
@@ -226,12 +185,7 @@ def get_wos_api_key(cur) -> str:
     val = _get_from_db(cur, "wos_api_key")
     if val and isinstance(val, str):
         return val
-
-    try:
-        from config.settings import WOS
-        return WOS.get("api_key", "")
-    except ImportError:
-        return ""
+    return ""
 
 
 def get_scanr_affiliation_ids(cur) -> list[str]:
@@ -239,12 +193,7 @@ def get_scanr_affiliation_ids(cur) -> list[str]:
     val = _get_from_db(cur, "scanr_affiliation_ids")
     if val and isinstance(val, list):
         return val
-
-    try:
-        from config.settings import SCANR
-        return SCANR.get("affiliation_ids", [])
-    except ImportError:
-        return []
+    return []
 
 
 def get_theses_etab_ppns(cur) -> list[str]:
@@ -252,12 +201,7 @@ def get_theses_etab_ppns(cur) -> list[str]:
     val = _get_from_db(cur, "theses_etab_ppns")
     if val and isinstance(val, list):
         return val
-
-    try:
-        from config.settings import THESES
-        return THESES.get("etab_ppns", [])
-    except ImportError:
-        return []
+    return []
 
 
 def get_scanr_credentials(cur) -> tuple[str, str]:
@@ -266,9 +210,4 @@ def get_scanr_credentials(cur) -> tuple[str, str]:
     pwd = _get_from_db(cur, "scanr_password")
     if user and pwd:
         return user, pwd
-
-    try:
-        from config.settings import SCANR
-        return SCANR.get("username", ""), SCANR.get("password", "")
-    except ImportError:
-        return "", ""
+    return "", ""
