@@ -886,8 +886,7 @@ async def add_person_identifier(person_id: int, data: AddIdentifier):
 async def remove_person_identifier(person_id: int, id_type: str, id_value: str):
     """Supprime un identifiant d'une personne."""
     with get_cursor() as (cur, conn):
-        if not _remove_identifier(cur, person_id, id_type, id_value):
-            raise HTTPException(status_code=404, detail="Identifiant introuvable")
+        _remove_identifier(cur, person_id, id_type, id_value)
         return {"removed": True}
 
 
@@ -896,8 +895,6 @@ async def update_identifier_status(ident_id: int, body: UpdateIdentifierStatus):
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
     with get_cursor() as (cur, conn):
         row = _update_identifier_status(cur, ident_id, body.status)
-        if row is None:
-            raise HTTPException(status_code=404, detail="Identifiant introuvable")
         return {"id": row["id"], "status": row["status"]}
 
 
@@ -909,8 +906,7 @@ async def reassign_identifier(ident_id: int, body: ReassignIdentifier):
         cur.execute("SELECT id FROM persons WHERE id = %s", (target_person_id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Personne cible introuvable")
-        if not _reassign_identifier(cur, ident_id, target_person_id):
-            raise HTTPException(status_code=404, detail="Identifiant introuvable")
+        _reassign_identifier(cur, ident_id, target_person_id)
         return {"id": ident_id, "person_id": target_person_id, "status": "pending"}
 
 
@@ -926,8 +922,7 @@ async def toggle_authorship_excluded(authorship_id: int):
 async def reject_person(person_id: int, body: RejectPerson):
     """Marque/démarque une personne comme rejetée (fausse entité)."""
     with get_cursor() as (cur, conn):
-        if not _set_rejected(cur, person_id, body.rejected):
-            raise HTTPException(status_code=404, detail="Personne introuvable")
+        _set_rejected(cur, person_id, body.rejected)
         return {"ok": True}
 
 
@@ -939,8 +934,7 @@ async def update_person_name(person_id: int, body: UpdatePersonName):
     if not last_name:
         raise HTTPException(status_code=400, detail="Le nom est requis")
     with get_cursor() as (cur, conn):
-        if not _update_name(cur, person_id, last_name, first_name):
-            raise HTTPException(status_code=404, detail="Personne introuvable")
+        _update_name(cur, person_id, last_name, first_name)
         return {"ok": True}
 
 
@@ -960,11 +954,7 @@ async def merge_persons(person_id: int, body: MergePersons):
         if source_id not in found:
             raise HTTPException(status_code=404, detail="Personne source introuvable")
 
-        try:
-            _merge_person(cur, person_id, source_id)
-        except RuntimeError as e:
-            raise HTTPException(status_code=409, detail=str(e))
-
+        _merge_person(cur, person_id, source_id)
         return {"merged": True, "source_id": source_id, "target_id": person_id}
 
 

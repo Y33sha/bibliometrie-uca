@@ -5,6 +5,9 @@ detach_name_form, assign_orphan_authorship (qui couvre _ensure_truth_authorship)
 merge_person est déjà testé dans test_integration.py.
 """
 
+import pytest
+
+from domain.errors import NotFoundError, ValidationError
 from services.persons import (
     add_identifier,
     add_identifiers_from_authorships,
@@ -210,15 +213,16 @@ class TestRemoveIdentifier:
     def test_removes_existing(self, db):
         p = _insert_person(db)
         add_identifier(db, p, "orcid", "0000-0001")
-        assert remove_identifier(db, p, "orcid", "0000-0001") is True
+        remove_identifier(db, p, "orcid", "0000-0001")
         db.execute(
             "SELECT id FROM person_identifiers WHERE id_value = '0000-0001'"
         )
         assert db.fetchone() is None
 
-    def test_returns_false_if_not_found(self, db):
+    def test_raises_not_found(self, db):
         p = _insert_person(db)
-        assert remove_identifier(db, p, "orcid", "unknown") is False
+        with pytest.raises(NotFoundError):
+            remove_identifier(db, p, "orcid", "unknown")
 
 
 class TestUpdateIdentifierStatus:
@@ -232,8 +236,9 @@ class TestUpdateIdentifierStatus:
 
         assert row["status"] == "confirmed"
 
-    def test_returns_none_if_not_found(self, db):
-        assert update_identifier_status(db, 999999, "confirmed") is None
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            update_identifier_status(db, 999999, "confirmed")
 
 
 class TestReassignIdentifier:
@@ -244,7 +249,7 @@ class TestReassignIdentifier:
         db.execute("SELECT id FROM person_identifiers WHERE id_value='0000-0001'")
         ident_id = db.fetchone()["id"]
 
-        assert reassign_identifier(db, ident_id, p2) is True
+        reassign_identifier(db, ident_id, p2)
 
         db.execute(
             "SELECT person_id, status::text AS status FROM person_identifiers WHERE id = %s",
@@ -254,15 +259,16 @@ class TestReassignIdentifier:
         assert row["person_id"] == p2
         assert row["status"] == "pending"
 
-    def test_returns_false_if_not_found(self, db):
+    def test_raises_not_found(self, db):
         p = _insert_person(db)
-        assert reassign_identifier(db, 999999, p) is False
+        with pytest.raises(NotFoundError):
+            reassign_identifier(db, 999999, p)
 
 
 class TestSetRejected:
     def test_marks_rejected(self, db):
         p = _insert_person(db)
-        assert set_rejected(db, p, True) is True
+        set_rejected(db, p, True)
         db.execute("SELECT rejected FROM persons WHERE id = %s", (p,))
         assert db.fetchone()["rejected"] is True
 
@@ -273,8 +279,9 @@ class TestSetRejected:
         db.execute("SELECT rejected FROM persons WHERE id = %s", (p,))
         assert db.fetchone()["rejected"] is False
 
-    def test_returns_false_if_not_found(self, db):
-        assert set_rejected(db, 999999, True) is False
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            set_rejected(db, 999999, True)
 
 
 class TestUpdateName:
@@ -284,7 +291,7 @@ class TestUpdateName:
         db.execute("SELECT id FROM person_name_forms WHERE name_form = 'dupont jean'")
         assert db.fetchone() is not None
 
-        assert update_name(db, p, "Martin", "Sophie") is True
+        update_name(db, p, "Martin", "Sophie")
 
         db.execute("SELECT last_name, first_name FROM persons WHERE id = %s", (p,))
         row = db.fetchone()
@@ -295,8 +302,9 @@ class TestUpdateName:
         db.execute("SELECT id FROM person_name_forms WHERE name_form = 'martin sophie'")
         assert db.fetchone() is not None
 
-    def test_returns_false_if_not_found(self, db):
-        assert update_name(db, 999999, "X", "X") is False
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            update_name(db, 999999, "X", "X")
 
 
 # ── batch_assign_orphan_authorships ─────────────────────────────────
@@ -532,8 +540,7 @@ class TestAssignOrphanAuthorship:
         return uca_id
 
     def test_raises_on_invalid_source(self, db):
-        import pytest
-        with pytest.raises(ValueError, match="Source inconnue"):
+        with pytest.raises(ValidationError, match="Source inconnue"):
             assign_orphan_authorship(db, 1, "invalid", 1)
 
     def test_returns_false_if_already_assigned(self, db):
