@@ -11,6 +11,8 @@ Puis ouvrir http://localhost:8003
 import logging
 import os
 import traceback
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -110,19 +112,54 @@ async def strip_prefix(request: Request, call_next):
 
 # ----- Health check -----
 
+# Seuil à partir duquel une source est considérée "stale" (pas extraite
+# récemment). theses.fr est mensuel, les autres devraient être hebdomadaires.
+_STALE_THRESHOLD_DAYS = 7
+_PIPELINE_STATUS_FILE = Path(__file__).resolve().parent.parent / "pipeline" / "status.json"
+
 
 @app.get("/api/health")
 async def health():
-    """Vérifie que l'API est opérationnelle et la DB accessible."""
-    import os
-
+    """Vérifie que l'API est opérationnelle, la DB accessible, et la fraîcheur
+    des données (date de la dernière extraction par source).
+    """
     sandbox = os.environ.get("BIBLIOMETRIE_SANDBOX") == "1"
     try:
         with get_cursor() as (cur, conn):
             cur.execute("SELECT 1")
-        return {"status": "ok", "db": "ok", "sandbox": sandbox}
+            cur.execute(
+                "SELECT source, MAX(created_at) AS last_at "
+                "FROM source_publications GROUP BY source"
+            )
+            rows = cur.fetchall()
     except Exception as e:
         return JSONResponse(status_code=503, content={"status": "error", "db": str(e)})
+
+    now = datetime.now(timezone.utc)
+    threshold = now - timedelta(days=_STALE_THRESHOLD_DAYS)
+    last_extraction: dict = {}
+    stale: list[str] = []
+    for r in rows:
+        source = r["source"]
+        last_at = r["last_at"]
+        is_stale = bool(last_at and last_at < threshold)
+        last_extraction[source] = {
+            "at": last_at.isoformat() if last_at else None,
+            "age_days": (now - last_at).days if last_at else None,
+            "stale": is_stale,
+        }
+        if is_stale:
+            stale.append(source)
+
+    return {
+        "status": "ok",
+        "db": "ok",
+        "sandbox": sandbox,
+        "pipeline_running": _PIPELINE_STATUS_FILE.exists(),
+        "last_extraction": last_extraction,
+        "stale_sources": stale,
+        "stale_threshold_days": _STALE_THRESHOLD_DAYS,
+    }
 
 
 # ----- Root redirect -----
