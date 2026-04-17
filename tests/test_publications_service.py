@@ -316,19 +316,25 @@ class TestMergePublications:
         db.execute("SELECT journal_id FROM publications WHERE id = %s", (target,))
         assert db.fetchone()["journal_id"] == j_id
 
-    def test_doi_not_transferred_if_source_still_exists(self, db):
-        """Comportement actuel : le DOI de la source n'est PAS transféré à la cible,
-        car le CASE WHEN NOT EXISTS voit la source qui porte encore le DOI.
-        La source est supprimée juste après, donc le DOI est perdu.
-        (Potentiel bug : la target aurait dû hériter du DOI.)
-        """
+    def test_doi_transferred_when_target_has_none(self, db):
+        """Target sans DOI, source avec : la cible reçoit le DOI de la source."""
         target = _insert_publication(db, title="Target", doi=None)
         source = _insert_publication(db, title="Source", doi="10.1234/src")
 
         merge_publications(db, target, source)
 
         db.execute("SELECT doi FROM publications WHERE id = %s", (target,))
-        assert db.fetchone()["doi"] is None  # le DOI est perdu
+        assert db.fetchone()["doi"] == "10.1234/src"
+
+    def test_keeps_target_doi_when_both_set(self, db):
+        """Si les deux ont un DOI, celui de la cible est conservé."""
+        target = _insert_publication(db, title="Target", doi="10.1234/target")
+        source = _insert_publication(db, title="Source", doi="10.1234/source")
+
+        merge_publications(db, target, source)
+
+        db.execute("SELECT doi FROM publications WHERE id = %s", (target,))
+        assert db.fetchone()["doi"] == "10.1234/target"
 
     def test_oa_status_upgrade_diamond_wins(self, db):
         """Si source est diamond, la cible devient diamond même si elle avait gold."""

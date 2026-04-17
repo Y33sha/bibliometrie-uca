@@ -481,35 +481,46 @@ def merge_publications(cur, target_id: int, source_id: int):
     )
 
     # 3. Enrichir la cible avec les métadonnées de la source
+    # Ordre : capturer les valeurs src → NULL-er doi src (pour libérer la
+    # contrainte UNIQUE lower(doi)) → enrichir target avec les valeurs capturées.
     cur.execute(
         """
-        UPDATE publications dest SET
-            doi = CASE
-                WHEN dest.doi IS NOT NULL THEN dest.doi
-                WHEN src.doi IS NOT NULL AND NOT EXISTS (
-                    SELECT 1 FROM publications p2
-                    WHERE LOWER(p2.doi) = LOWER(src.doi) AND p2.id <> dest.id
-                ) THEN LOWER(src.doi)
-                ELSE dest.doi END,
-            journal_id = COALESCE(dest.journal_id, src.journal_id),
+        SELECT doi, journal_id, oa_status::text AS oa_status,
+               language, container_title, countries
+        FROM publications WHERE id = %s
+    """,
+        (source_id,),
+    )
+    src = cur.fetchone()
+    cur.execute("UPDATE publications SET doi = NULL WHERE id = %s", (source_id,))
+    cur.execute(
+        """
+        UPDATE publications SET
+            doi = COALESCE(doi, LOWER(%s)),
+            journal_id = COALESCE(journal_id, %s),
             oa_status = CASE
-                WHEN src.oa_status = 'diamond' THEN 'diamond'
-                WHEN dest.oa_status IN ('unknown', 'closed')
-                    AND src.oa_status NOT IN ('unknown', 'closed')
-                THEN src.oa_status ELSE dest.oa_status END,
-            language = COALESCE(dest.language, src.language),
-            container_title = COALESCE(dest.container_title, src.container_title),
+                WHEN %s = 'diamond' THEN 'diamond'::oa_type
+                WHEN oa_status IN ('unknown', 'closed')
+                    AND %s NOT IN ('unknown', 'closed')
+                THEN %s::oa_type ELSE oa_status END,
+            language = COALESCE(language, %s),
+            container_title = COALESCE(container_title, %s),
             countries = CASE
-                WHEN dest.countries IS NULL THEN src.countries
-                WHEN src.countries IS NULL THEN dest.countries
+                WHEN countries IS NULL THEN %s
+                WHEN %s IS NULL THEN countries
                 ELSE (SELECT array_agg(DISTINCT c ORDER BY c)
-                      FROM unnest(dest.countries || src.countries) AS c)
+                      FROM unnest(countries || %s) AS c)
                 END,
             updated_at = now()
-        FROM publications src
-        WHERE dest.id = %s AND src.id = %s
+        WHERE id = %s
     """,
-        (target_id, source_id),
+        (
+            src["doi"], src["journal_id"],
+            src["oa_status"], src["oa_status"], src["oa_status"],
+            src["language"], src["container_title"],
+            src["countries"], src["countries"], src["countries"],
+            target_id,
+        ),
     )
 
     # 4. Nettoyer distinct_publications et supprimer la source
