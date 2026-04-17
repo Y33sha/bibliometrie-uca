@@ -252,19 +252,21 @@ class TestMergePublishers:
         db.execute("SELECT is_predatory FROM publishers WHERE id = %s", (target,))
         assert db.fetchone()["is_predatory"] is True
 
-    @pytest.mark.xfail(
-        reason="BUG: merge_publishers viole l'unique constraint sur openalex_id "
-               "quand src a un openalex_id et dest n'en a pas. Il faudrait NULL-er "
-               "src.openalex_id avant l'UPDATE ou supprimer src d'abord.",
-        raises=Exception,
-        strict=True,
-    )
-    def test_transfers_openalex_id_currently_fails(self, db):
+    def test_transfers_openalex_id_when_target_has_none(self, db):
+        """Target sans openalex_id, source avec : la cible reçoit celui de la source."""
         target = _insert_publisher(db, "Target", openalex_id=None)
         source = _insert_publisher(db, "Source", openalex_id="P999")
         merge_publishers(db, target, source)
         db.execute("SELECT openalex_id FROM publishers WHERE id = %s", (target,))
         assert db.fetchone()["openalex_id"] == "P999"
+
+    def test_keeps_target_openalex_id_when_both_set(self, db):
+        """Si les deux ont un openalex_id, celui de la cible est conservé."""
+        target = _insert_publisher(db, "Target", openalex_id="P_TARGET")
+        source = _insert_publisher(db, "Source", openalex_id="P_SOURCE")
+        merge_publishers(db, target, source)
+        db.execute("SELECT openalex_id FROM publishers WHERE id = %s", (target,))
+        assert db.fetchone()["openalex_id"] == "P_TARGET"
 
 
 # ── merge_journals ─────────────────────────────────────────────────

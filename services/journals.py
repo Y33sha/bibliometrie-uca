@@ -399,17 +399,24 @@ def merge_publishers(cur, target_id: int, source_id: int):
     )
 
     # 5. Enrichir la cible
+    # Ordre : capturer les valeurs src → NULL-er openalex_id src (pour libérer
+    # la contrainte UNIQUE) → enrichir target avec les valeurs capturées → DELETE.
+    cur.execute(
+        "SELECT openalex_id, country, is_predatory FROM publishers WHERE id = %s",
+        (source_id,),
+    )
+    src = cur.fetchone()
+    cur.execute("UPDATE publishers SET openalex_id = NULL WHERE id = %s", (source_id,))
     cur.execute(
         """
-        UPDATE publishers dest SET
-            openalex_id = COALESCE(dest.openalex_id, src.openalex_id),
-            country = COALESCE(dest.country, src.country),
-            is_predatory = dest.is_predatory OR src.is_predatory,
+        UPDATE publishers SET
+            openalex_id = COALESCE(openalex_id, %s),
+            country = COALESCE(country, %s),
+            is_predatory = is_predatory OR %s,
             updated_at = now()
-        FROM publishers src
-        WHERE dest.id = %s AND src.id = %s
+        WHERE id = %s
     """,
-        (target_id, source_id),
+        (src["openalex_id"], src["country"], src["is_predatory"], target_id),
     )
 
     # 6. Supprimer la source
