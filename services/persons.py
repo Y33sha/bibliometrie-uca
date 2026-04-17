@@ -11,11 +11,26 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 """
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
+from domain.person import compute_person_name_forms
 from infrastructure.repositories.person_repository import PgPersonRepository
 from services.audit import emit_event
 from services.authorships import delete_orphan_authorships
-from utils.normalize import normalize_name
 from utils.sources import ALL_SOURCES_SET
+
+__all__ = [
+    # Domain re-export pour les callers existants (scripts, tests)
+    "compute_person_name_forms",
+    # Reste de l'API publique du service
+    "add_identifier", "add_identifiers_from_authorships",
+    "add_name_form", "assign_orphan_authorship",
+    "batch_assign_orphan_authorships", "create_person",
+    "detach_authorships", "detach_name_form",
+    "link_authorship", "link_authorships",
+    "mark_distinct", "merge_person", "reassign_identifier",
+    "refresh_person_name_forms", "remove_identifier",
+    "set_rejected", "unlink_authorship",
+    "update_identifier_status", "update_name",
+]
 
 # ── Création ──
 
@@ -168,39 +183,8 @@ def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict
 # ── Formes de noms ──
 
 
-def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
-    """Calcule les variantes normalisées de formes de nom pour une personne.
-
-    Retourne un ensemble de formes normalisées :
-      - "prenom nom", "nom prenom"
-      - "initiale(s) nom", "nom initiale(s)"
-        Si le prénom a plusieurs mots (ex: "jean michel"), produit :
-        - initiales séparées : "j m nom", "nom j m"
-        - initiales collées  : "jm nom", "nom jm"
-    """
-    ln = normalize_name(last_name)
-    fn = normalize_name(first_name)
-    if not ln:
-        return set()
-
-    forms = set()
-    if fn:
-        forms.add(f"{fn} {ln}")
-        forms.add(f"{ln} {fn}")
-
-        parts = fn.split()
-        if parts:
-            initials_spaced = " ".join(p[0] for p in parts)
-            initials_joined = "".join(p[0] for p in parts)
-            forms.add(f"{initials_spaced} {ln}")
-            forms.add(f"{ln} {initials_spaced}")
-            if initials_joined != initials_spaced:
-                forms.add(f"{initials_joined} {ln}")
-                forms.add(f"{ln} {initials_joined}")
-    else:
-        forms.add(ln)
-
-    return forms
+# Re-export depuis le domaine pour les callers historiques (scripts/, tests/).
+# La règle vit dans domain/person.py (logique pure, pas d'accès DB).
 
 
 def refresh_person_name_forms(cur, person_id: int, last_name: str, first_name: str) -> None:
@@ -345,98 +329,19 @@ def mark_distinct(cur, person_id_a: int, person_id_b: int) -> None:
 
 
 def merge_person(cur, target_id: int, source_id: int) -> None:
-    """Fusionne la personne source_id dans target_id.
+    """Fusionne la personne `source_id` dans `target_id`.
 
-    Transfère tous les auteurs liés, identifiants, authorships et person_name_forms
-    de source vers target, puis supprime la personne source.
+    Invariant métier : refus si les deux personnes ont chacune une
+    fiche RH distincte (risque de perdre de l'information humaine).
 
-    Lève RuntimeError si les deux personnes ont chacune une fiche RH distincte.
+    Lève ConflictError si l'invariant est violé. Émet un événement
+    d'audit `person.merged` si l'utilisateur est dans le contexte.
     """
-    # Garde-fou : ne JAMAIS fusionner si les deux ont une fiche RH
-    cur.execute(
-        """
-        SELECT COUNT(*) AS n FROM persons_rh
-        WHERE person_id IN (%s, %s)
-    """,
-        (target_id, source_id),
-    )
-    if cur.fetchone()["n"] >= 2:
+    repo = PgPersonRepository(cur)
+    if repo.has_distinct_rh(target_id, source_id):
         raise ConflictError(
             f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
             f"ont chacune une fiche RH distincte."
         )
-
-    # 1. Transférer les auteurs sources (comptes HAL/ScanR avec person_id)
-    cur.execute(
-        "UPDATE source_persons SET person_id = %s WHERE person_id = %s", (target_id, source_id)
-    )
-
-    # 1b. Transférer les source_authorships
-    cur.execute(
-        "UPDATE source_authorships SET person_id = %s WHERE person_id = %s", (target_id, source_id)
-    )
-
-    # 4. Transférer les authorships consolidées (supprimer les doublons publication)
-    cur.execute(
-        """
-        DELETE FROM authorships
-        WHERE person_id = %s
-          AND publication_id IN (
-              SELECT publication_id FROM authorships WHERE person_id = %s
-          )
-    """,
-        (source_id, target_id),
-    )
-    cur.execute(
-        "UPDATE authorships SET person_id = %s WHERE person_id = %s", (target_id, source_id)
-    )
-
-    # 5. Transférer les identifiants (supprimer doublons)
-    cur.execute(
-        """
-        DELETE FROM person_identifiers
-        WHERE person_id = %s
-          AND (id_type, id_value) IN (
-              SELECT id_type, id_value FROM person_identifiers WHERE person_id = %s
-          )
-    """,
-        (source_id, target_id),
-    )
-    cur.execute(
-        "UPDATE person_identifiers SET person_id = %s WHERE person_id = %s", (target_id, source_id)
-    )
-
-    # 6. Transférer persons_rh de la source vers la cible (si la cible n'en a pas)
-    cur.execute(
-        """
-        UPDATE persons_rh SET person_id = %s
-        WHERE person_id = %s
-          AND NOT EXISTS (SELECT 1 FROM persons_rh WHERE person_id = %s)
-    """,
-        (target_id, source_id, target_id),
-    )
-
-    # 7. Mettre à jour person_name_forms : remplacer source_id par target_id
-    #    (pour les formes non-persons : hal, openalex, wos, manual)
-    cur.execute(
-        """
-        UPDATE person_name_forms
-        SET person_ids = (
-                SELECT array_agg(DISTINCT v ORDER BY v)
-                FROM unnest(array_replace(person_ids, %s, %s)) AS v
-            ),
-            updated_at = now()
-        WHERE %s = ANY(person_ids)
-    """,
-        (source_id, target_id, source_id),
-    )
-
-    # 7b. Recalculer les formes source 'persons' du target
-    cur.execute("SELECT last_name, first_name FROM persons WHERE id = %s", (target_id,))
-    target = cur.fetchone()
-    refresh_person_name_forms(cur, target_id, target["last_name"], target["first_name"] or "")
-
-    # 8. Supprimer la personne source
-    cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))
-
+    repo.merge_into(target_id, source_id)
     emit_event(cur, "person.merged", "person", target_id, {"source_id": source_id})
