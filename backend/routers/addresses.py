@@ -11,7 +11,7 @@ from backend.models import (
     ReviewAction,
     SetCountry,
 )
-from services.authorships import propagate_uca_for_addresses
+from services import addresses as addresses_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -273,34 +273,9 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)):
 async def review_address(addr_id: int, action: ReviewAction):
     """Confirme, rejette ou reset le lien adresse↔structure (upsert)."""
     with get_cursor() as (cur, conn):
-        if action.is_confirmed is None:
-            # Reset : supprimer le lien manuel (sans matched_form_id) ou remettre is_confirmed à NULL
-            cur.execute(
-                """
-                DELETE FROM address_structures
-                WHERE address_id = %s AND structure_id = %s AND matched_form_id IS NULL
-            """,
-                (addr_id, action.structure_id),
-            )
-            cur.execute(
-                """
-                UPDATE address_structures SET is_confirmed = NULL
-                WHERE address_id = %s AND structure_id = %s
-            """,
-                (addr_id, action.structure_id),
-            )
-        else:
-            # Upsert : crée le lien s'il n'existe pas (lien manuel)
-            cur.execute(
-                """
-                INSERT INTO address_structures (address_id, structure_id, is_confirmed)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (address_id, structure_id) DO UPDATE SET is_confirmed = EXCLUDED.is_confirmed
-            """,
-                (addr_id, action.structure_id, action.is_confirmed),
-            )
-
-        propagate_uca_for_addresses(cur, [addr_id])
+        addresses_service.review_structure_link(
+            cur, addr_id, action.structure_id, action.is_confirmed
+        )
 
         # Retourner les structures à jour pour mise à jour locale côté client
         cur.execute(
@@ -344,39 +319,9 @@ async def review_address(addr_id: int, action: ReviewAction):
 async def batch_review(data: BatchReviewAction):
     """Confirme, rejette ou reset le lien adresse↔structure pour un lot d'adresses."""
     with get_cursor() as (cur, conn):
-        if data.is_confirmed is None:
-            # Reset : supprimer les liens manuels, remettre les auto-détectés à NULL
-            cur.execute(
-                """
-                DELETE FROM address_structures
-                WHERE address_id = ANY(%s) AND structure_id = %s AND matched_form_id IS NULL
-            """,
-                (data.address_ids, data.structure_id),
-            )
-            cur.execute(
-                """
-                UPDATE address_structures SET is_confirmed = NULL
-                WHERE address_id = ANY(%s) AND structure_id = %s
-            """,
-                (data.address_ids, data.structure_id),
-            )
-            updated = cur.rowcount
-        else:
-            # Upsert pour chaque adresse
-            from psycopg2.extras import execute_values
-
-            execute_values(
-                cur,
-                """
-                INSERT INTO address_structures (address_id, structure_id, is_confirmed)
-                VALUES %s
-                ON CONFLICT (address_id, structure_id) DO UPDATE SET is_confirmed = EXCLUDED.is_confirmed
-            """,
-                [(aid, data.structure_id, data.is_confirmed) for aid in data.address_ids],
-            )
-            updated = len(data.address_ids)
-
-        propagate_uca_for_addresses(cur, data.address_ids)
+        updated = addresses_service.batch_review_structure_link(
+            cur, data.address_ids, data.structure_id, data.is_confirmed
+        )
         return {"updated": updated}
 
 
