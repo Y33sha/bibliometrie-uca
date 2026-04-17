@@ -1,11 +1,14 @@
 """Auto-extracted router."""
 
+import logging
+
 from fastapi import APIRouter, Query, HTTPException
 from backend.deps import get_cursor
 from backend.models import MergePublications, MarkDistinctPublications
 from services.publications import merge_publications
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/api/admin/duplicates/next")
 async def next_duplicate_candidate(

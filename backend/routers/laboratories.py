@@ -1,11 +1,14 @@
 """Auto-extracted router."""
 
 import datetime
+import logging
+
 from fastapi import APIRouter, Query
 from backend.deps import get_cursor
 from backend.filters import persons_sort_clause
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/api/laboratories")
 async def list_laboratories():

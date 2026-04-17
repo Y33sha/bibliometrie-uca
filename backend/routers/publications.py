@@ -1,7 +1,9 @@
 """Auto-extracted router."""
 
-import io
 import csv
+import io
+import logging
+
 from fastapi import APIRouter, Query, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from backend.deps import get_cursor, get_root_structure_id
@@ -13,6 +15,7 @@ from backend.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, parse_int_csv, parse_
     apply_publisher_journal_filter)
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/api/publications/facets")
 async def publications_facets(

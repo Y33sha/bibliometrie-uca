@@ -1,11 +1,14 @@
 """Auto-extracted router."""
 
+import logging
+
 from fastapi import APIRouter, Query, HTTPException
 from backend.deps import get_cursor
 from backend.filters import PUB_IS_UCA
 from utils.sources import AUTHOR_SOURCES_SQL
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/api/authorships/stats")
 async def authorships_stats(lab_id: int = Query(0)):

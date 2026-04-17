@@ -1,11 +1,14 @@
 """Configuration router — paramètres applicatifs et périmètres."""
 
 import json
+import logging
+
 from fastapi import APIRouter, HTTPException
 from backend.deps import get_cursor
 from utils.perimeter import get_perimeter_structure_ids
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ── Config clé/valeur ──

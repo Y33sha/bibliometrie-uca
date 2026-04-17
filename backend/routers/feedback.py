@@ -1,12 +1,15 @@
 """Auto-extracted router."""
 
+import logging
 import subprocess
+
 from fastapi import APIRouter, Query, HTTPException, Depends
 from backend.deps import get_cursor, require_admin
 from services.authorships import propagate_uca_for_addresses
 from backend.models import AssignStructureAction
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/api/admin/feedback/stats")

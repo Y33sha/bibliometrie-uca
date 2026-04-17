@@ -1,6 +1,8 @@
 """Persons router: directory, search, list, profile, merge, identifiers, authors."""
 
+import logging
 import re
+
 from fastapi import APIRouter, Query, HTTPException, Depends
 from backend.deps import get_cursor, require_admin
 from backend.models import (AddIdentifier, UpdateIdentifierStatus, ReassignIdentifier,
@@ -28,6 +30,7 @@ from services.persons import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/api/persons/directory")
 async def persons_directory(
