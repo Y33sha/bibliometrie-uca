@@ -1,5 +1,6 @@
 """Auth endpoints: login, check, logout."""
 
+import logging
 import time
 
 from fastapi import APIRouter, Response, Cookie
@@ -12,6 +13,7 @@ from backend.models import LoginRequest
 from config.settings import settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/api/auth/login")

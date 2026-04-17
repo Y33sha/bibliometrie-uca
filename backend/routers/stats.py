@@ -1,9 +1,12 @@
 """Auto-extracted router."""
 
+import logging
+
 from fastapi import APIRouter, Query
 from backend.deps import get_cursor
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/api/admin/address-stats")
 async def get_stats(structure_id: int | None = Query(None)):

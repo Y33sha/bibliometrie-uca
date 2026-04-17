@@ -1,11 +1,14 @@
 """Router Éditeurs — liste, recherche, fusion."""
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Query
 from backend.deps import get_cursor
 from backend.models import PublisherUpdate, MergeRequest
 from services.journals import merge_publishers
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/api/publishers")

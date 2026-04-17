@@ -1,10 +1,13 @@
 """Endpoints pour consulter les rapports et le statut du pipeline."""
 
 import json
+import logging
 from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 BASE = Path(__file__).resolve().parent.parent.parent
 REPORTS_DIR = BASE / "pipeline" / "reports"

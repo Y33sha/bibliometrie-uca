@@ -1,10 +1,13 @@
 """Documentation router — sert les fichiers .md depuis docs/."""
 
+import logging
 import re
 from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 DOCS_DIR = Path(__file__).parent.parent.parent / "docs"
 

@@ -1,5 +1,7 @@
 """Auto-extracted router."""
 
+import logging
+
 from fastapi import APIRouter, Query, HTTPException, Depends
 from psycopg2.extras import Json
 from backend.deps import get_cursor, require_admin
@@ -8,6 +10,7 @@ from backend.models import (StructureCreate, StructureUpdate, RelationCreate,
 from utils.normalize import normalize_text
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 

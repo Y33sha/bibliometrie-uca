@@ -1,5 +1,7 @@
 """Admin person duplicates router."""
 
+import logging
+
 import psycopg2.extras
 from fastapi import APIRouter, Query, HTTPException
 from backend.deps import get_cursor
@@ -9,6 +11,7 @@ from backend.models import MarkPersonsDistinct
 from services.persons import merge_person as _merge_person
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ----- API: Doublons personnes -----

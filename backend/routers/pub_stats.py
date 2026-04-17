@@ -1,11 +1,14 @@
 """Auto-extracted router."""
 
+import logging
+
 from fastapi import APIRouter, Query
 from backend.deps import get_cursor, get_root_structure_id
 from backend.filters import (PUB_IS_UCA, parse_int_csv,
     apply_lab_filter, apply_year_filter, apply_oa_filter)
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 _APC_EXISTS = "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s)"
