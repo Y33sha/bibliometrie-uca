@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 
 from backend.deps import get_cursor
 from backend.models import AssignStructureAction
-from services.authorships import propagate_uca_for_addresses
+from services import addresses as addresses_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -210,18 +210,7 @@ async def assign_structure(addr_id: int, action: AssignStructureAction):
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Structure not found")
 
-        # Upsert: insert or update
-        cur.execute(
-            """
-            INSERT INTO address_structures (address_id, structure_id, is_confirmed)
-            VALUES (%s, %s, TRUE)
-            ON CONFLICT (address_id, structure_id) DO UPDATE
-            SET is_confirmed = TRUE
-        """,
-            (addr_id, action.structure_id),
-        )
-
-        propagate_uca_for_addresses(cur, [addr_id])
+        addresses_service.review_structure_link(cur, addr_id, action.structure_id, True)
         return {"id": addr_id, "structure_id": action.structure_id, "status": "assigned"}
 
 
@@ -270,15 +259,8 @@ async def feedback_rerun():
 async def unassign_structure(addr_id: int, structure_id: int = Query(...)):
     """Supprime l'assignation manuelle d'une structure."""
     with get_cursor() as (cur, conn):
-        cur.execute(
-            """
-            DELETE FROM address_structures
-            WHERE address_id = %s AND structure_id = %s AND matched_form_id IS NULL
-        """,
-            (addr_id, structure_id),
-        )
-        propagate_uca_for_addresses(cur, [addr_id])
-        return {"deleted": cur.rowcount > 0}
+        deleted = addresses_service.unassign_manual_structure(cur, addr_id, structure_id)
+        return {"deleted": deleted}
 
 
 # ----- API: Labos -----

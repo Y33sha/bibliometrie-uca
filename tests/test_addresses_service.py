@@ -15,6 +15,7 @@ from services.addresses import (
     propagate_countries_to_similar,
     review_structure_link,
     set_country,
+    unassign_manual_structure,
 )
 
 
@@ -193,6 +194,40 @@ class TestBatchReviewStructureLink:
         # Les 2 liens manuels ont été supprimés
         assert _get_link(db, a1, uca) is None
         assert _get_link(db, a2, uca) is None
+
+
+# ── unassign_manual_structure ───────────────────────────────────────
+
+class TestUnassignManualStructure:
+    def test_deletes_manual_link(self, db):
+        uca = _setup_uca_perimeter(db)
+        addr = _create_address(db)
+        _insert_address_structure(db, addr, uca, is_confirmed=True)  # manuel
+
+        assert unassign_manual_structure(db, addr, uca) is True
+        assert _get_link(db, addr, uca) is None
+
+    def test_preserves_auto_link(self, db):
+        """Un lien auto-détecté (matched_form_id non NULL) n'est pas supprimé."""
+        uca = _setup_uca_perimeter(db)
+        addr = _create_address(db)
+        db.execute(
+            "INSERT INTO structure_name_forms (structure_id, form_text) VALUES (%s, 'uca') RETURNING id",
+            (uca,),
+        )
+        form_id = db.fetchone()["id"]
+        _insert_address_structure(db, addr, uca,
+                                  is_confirmed=True, matched_form_id=form_id)
+
+        assert unassign_manual_structure(db, addr, uca) is False  # rien supprimé
+        link = _get_link(db, addr, uca)
+        assert link is not None  # lien auto préservé
+        assert link["is_confirmed"] is True  # is_confirmed NON touché
+
+    def test_returns_false_if_no_link(self, db):
+        uca = _setup_uca_perimeter(db)
+        addr = _create_address(db)
+        assert unassign_manual_structure(db, addr, uca) is False
 
 
 # ── set_country ─────────────────────────────────────────────────────

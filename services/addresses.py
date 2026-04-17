@@ -103,6 +103,26 @@ def batch_review_structure_link(cur, address_ids: list[int], structure_id: int,
     return updated
 
 
+def unassign_manual_structure(cur, address_id: int, structure_id: int) -> bool:
+    """Supprime uniquement le lien manuel (matched_form_id IS NULL) entre
+    une adresse et une structure. Les liens auto-détectés et leurs is_confirmed
+    ne sont pas touchés (contrairement à review_structure_link(None)).
+
+    Propage automatiquement l'UCA.
+    Retourne True si un lien manuel a été supprimé, False sinon.
+    """
+    cur.execute(
+        """
+        DELETE FROM address_structures
+        WHERE address_id = %s AND structure_id = %s AND matched_form_id IS NULL
+        """,
+        (address_id, structure_id),
+    )
+    deleted = cur.rowcount > 0
+    propagate_uca_for_addresses(cur, [address_id])
+    return deleted
+
+
 # ── Attribution des pays ──────────────────────────────────────────
 
 
