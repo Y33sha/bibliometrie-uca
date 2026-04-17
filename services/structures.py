@@ -8,6 +8,7 @@ restent autorisées dans les routers (convention du projet).
 
 from psycopg2.extras import Json
 
+from domain.errors import NotFoundError, ValidationError
 from utils.normalize import normalize_text
 
 # ── Mapping des champs UI → colonnes SQL pour la table structures ──
@@ -53,15 +54,15 @@ def create_structure(
     return cur.fetchone()
 
 
-def update_structure(cur, structure_id: int, *, fields: dict) -> dict | None:
-    """Met à jour une structure.
+def update_structure(cur, structure_id: int, *, fields: dict) -> dict:
+    """Met à jour une structure. Retourne la ligne modifiée.
 
-    Retourne la ligne modifiée, ou None si la structure n'existe pas.
-    Lève ValueError si `fields` ne contient aucun champ valide.
+    Lève NotFoundError si la structure n'existe pas.
+    Lève ValidationError si `fields` ne contient aucun champ valide.
     """
     cur.execute("SELECT id FROM structures WHERE id = %s", (structure_id,))
     if not cur.fetchone():
-        return None
+        raise NotFoundError(f"Structure {structure_id} introuvable")
 
     updates_sql = []
     params: list = []
@@ -76,7 +77,7 @@ def update_structure(cur, structure_id: int, *, fields: dict) -> dict | None:
         params.append(Json(fields["api_ids"]) if fields["api_ids"] else None)
 
     if not updates_sql:
-        raise ValueError("Aucun champ à mettre à jour")
+        raise ValidationError("Aucun champ à mettre à jour")
 
     params.append(structure_id)
     cur.execute(
@@ -90,10 +91,11 @@ def update_structure(cur, structure_id: int, *, fields: dict) -> dict | None:
     return cur.fetchone()
 
 
-def delete_structure(cur, structure_id: int) -> bool:
-    """Supprime une structure. Retourne True si supprimée, False si introuvable."""
+def delete_structure(cur, structure_id: int) -> None:
+    """Supprime une structure. Lève NotFoundError si elle n'existe pas."""
     cur.execute("DELETE FROM structures WHERE id = %s", (structure_id,))
-    return cur.rowcount > 0
+    if cur.rowcount == 0:
+        raise NotFoundError(f"Structure {structure_id} introuvable")
 
 
 # ── structure_relations ───────────────────────────────────────────
@@ -113,10 +115,11 @@ def create_relation(cur, *, parent_id: int, child_id: int, relation_type: str) -
     return cur.fetchone()
 
 
-def delete_relation(cur, relation_id: int) -> bool:
-    """Supprime une relation. Retourne True si supprimée, False si introuvable."""
+def delete_relation(cur, relation_id: int) -> None:
+    """Supprime une relation. Lève NotFoundError si elle n'existe pas."""
     cur.execute("DELETE FROM structure_relations WHERE id = %s", (relation_id,))
-    return cur.rowcount > 0
+    if cur.rowcount == 0:
+        raise NotFoundError(f"Relation {relation_id} introuvable")
 
 
 # ── structure_name_forms ──────────────────────────────────────────
@@ -150,15 +153,15 @@ def create_name_form(
     return cur.fetchone()
 
 
-def update_name_form(cur, form_id: int, *, fields: dict) -> dict | None:
-    """Met à jour une forme de nom.
+def update_name_form(cur, form_id: int, *, fields: dict) -> dict:
+    """Met à jour une forme de nom. Retourne la ligne modifiée.
 
-    Retourne la ligne modifiée, ou None si la forme n'existe pas.
-    Lève ValueError si `fields` ne contient aucun champ valide.
+    Lève NotFoundError si la forme n'existe pas.
+    Lève ValidationError si `fields` ne contient aucun champ valide.
     """
     cur.execute("SELECT id FROM structure_name_forms WHERE id = %s", (form_id,))
     if not cur.fetchone():
-        return None
+        raise NotFoundError(f"Forme {form_id} introuvable")
 
     updates_sql = []
     params: list = []
@@ -177,7 +180,7 @@ def update_name_form(cur, form_id: int, *, fields: dict) -> dict | None:
         params.append(fields["requires_context_of"] or None)
 
     if not updates_sql:
-        raise ValueError("Aucun champ à mettre à jour")
+        raise ValidationError("Aucun champ à mettre à jour")
 
     params.append(form_id)
     cur.execute(
@@ -190,7 +193,8 @@ def update_name_form(cur, form_id: int, *, fields: dict) -> dict | None:
     return cur.fetchone()
 
 
-def delete_name_form(cur, form_id: int) -> bool:
-    """Supprime une forme de nom. Retourne True si supprimée, False si introuvable."""
+def delete_name_form(cur, form_id: int) -> None:
+    """Supprime une forme de nom. Lève NotFoundError si elle n'existe pas."""
     cur.execute("DELETE FROM structure_name_forms WHERE id = %s", (form_id,))
-    return cur.rowcount > 0
+    if cur.rowcount == 0:
+        raise NotFoundError(f"Forme {form_id} introuvable")
