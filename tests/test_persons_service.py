@@ -1,0 +1,333 @@
+"""Tests de caractérisation pour services/persons.py.
+
+Couvre link/unlink_authorship (branches source invalide), add_identifier,
+detach_name_form, assign_orphan_authorship (qui couvre _ensure_truth_authorship).
+merge_person est déjà testé dans test_integration.py.
+"""
+
+from services.persons import (
+    add_identifier,
+    add_identifiers_from_authorships,
+    assign_orphan_authorship,
+    create_person,
+    detach_name_form,
+    link_authorship,
+    unlink_authorship,
+)
+
+
+# ── Helpers ────────────────────────────────────────────────────────
+
+def _insert_person(db, last="Dupont", first="Jean"):
+    db.execute(
+        """
+        INSERT INTO persons (last_name, first_name,
+                             last_name_normalized, first_name_normalized)
+        VALUES (%s, %s, lower(%s), lower(%s))
+        RETURNING id
+        """,
+        (last, first, last, first),
+    )
+    return db.fetchone()["id"]
+
+
+def _insert_publication(db, title="Test"):
+    db.execute(
+        "INSERT INTO publications (title, pub_year) VALUES (%s, 2024) RETURNING id",
+        (title,),
+    )
+    return db.fetchone()["id"]
+
+
+def _insert_source_publication(db, publication_id, source="hal", source_id="hal-1"):
+    db.execute(
+        """
+        INSERT INTO source_publications (source, source_id, title, publication_id)
+        VALUES (%s, %s, 'Test', %s)
+        RETURNING id
+        """,
+        (source, source_id, publication_id),
+    )
+    return db.fetchone()["id"]
+
+
+def _insert_source_person(db, source="hal", source_id="hal-p-1", full_name="Jean Dupont",
+                          source_ids=None):
+    import json
+    db.execute(
+        """
+        INSERT INTO source_persons (source, source_id, full_name, source_ids)
+        VALUES (%s, %s, %s, %s::jsonb)
+        RETURNING id
+        """,
+        (source, source_id, full_name, json.dumps(source_ids) if source_ids else None),
+    )
+    return db.fetchone()["id"]
+
+
+def _insert_source_authorship(db, source_publication_id, source_person_id,
+                              source="hal", person_id=None,
+                              author_name_normalized="jean dupont",
+                              excluded=False):
+    db.execute(
+        """
+        INSERT INTO source_authorships (source, source_publication_id,
+                                        source_person_id, person_id,
+                                        author_name_normalized, excluded)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING id
+        """,
+        (source, source_publication_id, source_person_id, person_id,
+         author_name_normalized, excluded),
+    )
+    return db.fetchone()["id"]
+
+
+# ── link_authorship / unlink_authorship ────────────────────────────
+
+class TestLinkAuthorship:
+    def test_ignores_invalid_source(self, db):
+        """Source inconnue → no-op silencieux (pas d'exception)."""
+        link_authorship(db, 1, "invalid", 1)
+
+    def test_sets_person_id_on_source_authorship(self, db):
+        person_id = _insert_person(db)
+        pub_id = _insert_publication(db)
+        sp_id = _insert_source_publication(db, pub_id)
+        sp_person = _insert_source_person(db)
+        sa_id = _insert_source_authorship(db, sp_id, sp_person)
+
+        link_authorship(db, person_id, "hal", sa_id)
+
+        db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa_id,))
+        assert db.fetchone()["person_id"] == person_id
+
+    def test_dual_write_hal_person(self, db):
+        """Pour HAL avec hal_person_id, propage aussi à source_persons."""
+        person_id = _insert_person(db)
+        pub_id = _insert_publication(db)
+        sp_id = _insert_source_publication(db, pub_id)
+        sp_person = _insert_source_person(db, source_ids={"hal_person_id": 42})
+        sa_id = _insert_source_authorship(db, sp_id, sp_person)
+
+        link_authorship(db, person_id, "hal", sa_id,
+                        source_person_id=sp_person, has_hal_person_id=True)
+
+        db.execute("SELECT person_id FROM source_persons WHERE id = %s", (sp_person,))
+        assert db.fetchone()["person_id"] == person_id
+
+
+class TestUnlinkAuthorship:
+    def test_ignores_invalid_source(self, db):
+        unlink_authorship(db, 1, "invalid", 1)  # no-op silencieux
+
+    def test_unsets_person_id(self, db):
+        person_id = _insert_person(db)
+        pub_id = _insert_publication(db)
+        sp_id = _insert_source_publication(db, pub_id)
+        sp_person = _insert_source_person(db)
+        sa_id = _insert_source_authorship(db, sp_id, sp_person, person_id=person_id)
+
+        unlink_authorship(db, person_id, "hal", sa_id)
+
+        db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa_id,))
+        assert db.fetchone()["person_id"] is None
+
+    def test_noop_if_person_id_mismatch(self, db):
+        """Ne détache pas si l'authorship est liée à une autre personne."""
+        p1 = _insert_person(db, "Dupont", "Jean")
+        p2 = _insert_person(db, "Martin", "Sophie")
+        pub_id = _insert_publication(db)
+        sp_id = _insert_source_publication(db, pub_id)
+        sp_person = _insert_source_person(db)
+        sa_id = _insert_source_authorship(db, sp_id, sp_person, person_id=p1)
+
+        unlink_authorship(db, p2, "hal", sa_id)
+
+        db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa_id,))
+        assert db.fetchone()["person_id"] == p1  # intact
+
+
+# ── add_identifier ─────────────────────────────────────────────────
+
+class TestAddIdentifier:
+    def test_inserts_new(self, db):
+        person_id = _insert_person(db)
+        add_identifier(db, person_id, "orcid", "0000-0001-2345-6789")
+        db.execute(
+            "SELECT status FROM person_identifiers WHERE id_type='orcid' AND id_value=%s",
+            ("0000-0001-2345-6789",),
+        )
+        assert db.fetchone()["status"] == "pending"
+
+    def test_reassigns_if_rejected(self, db):
+        p1 = _insert_person(db, "A", "A")
+        p2 = _insert_person(db, "B", "B")
+        add_identifier(db, p1, "orcid", "0000-0001")
+        db.execute(
+            "UPDATE person_identifiers SET status='rejected' WHERE id_value='0000-0001'"
+        )
+        add_identifier(db, p2, "orcid", "0000-0001")
+
+        db.execute(
+            "SELECT person_id, status FROM person_identifiers WHERE id_value='0000-0001'"
+        )
+        row = db.fetchone()
+        assert row["person_id"] == p2
+        assert row["status"] == "pending"
+
+    def test_does_not_override_pending(self, db):
+        """Si le même identifiant existe en 'pending', on ne touche pas."""
+        p1 = _insert_person(db, "A", "A")
+        p2 = _insert_person(db, "B", "B")
+        add_identifier(db, p1, "orcid", "0000-0001")
+        add_identifier(db, p2, "orcid", "0000-0001")  # devrait rien faire
+
+        db.execute(
+            "SELECT person_id FROM person_identifiers WHERE id_value='0000-0001'"
+        )
+        assert db.fetchone()["person_id"] == p1
+
+    def test_idhal_attaches_hal_source_person(self, db):
+        """Ajouter un idhal à une personne rattache le compte HAL correspondant."""
+        person_id = _insert_person(db)
+        sp = _insert_source_person(db, source_ids={"idhal": "jean-dupont"})
+
+        add_identifier(db, person_id, "idhal", "jean-dupont")
+
+        db.execute("SELECT person_id FROM source_persons WHERE id = %s", (sp,))
+        assert db.fetchone()["person_id"] == person_id
+
+
+class TestAddIdentifiersFromAuthorships:
+    def test_adds_orcid_idhal_idref_once(self, db):
+        person_id = _insert_person(db)
+        authorships = [
+            {"source": "hal", "orcid": "0000-0001", "idhal": "jdupont"},
+            {"source": "scanr", "orcid": "0000-0001", "idref": "123456"},  # orcid dédupliqué
+        ]
+        add_identifiers_from_authorships(db, person_id, authorships)
+
+        db.execute(
+            """SELECT id_type, id_value, source FROM person_identifiers
+               WHERE person_id = %s ORDER BY id_type""",
+            (person_id,),
+        )
+        rows = db.fetchall()
+        id_types = [r["id_type"] for r in rows]
+        assert id_types == ["idhal", "idref", "orcid"]
+
+
+# ── detach_name_form ───────────────────────────────────────────────
+
+class TestDetachNameForm:
+    def test_removes_person_from_form(self, db):
+        p1 = create_person(db, "Dupont", "Jean")
+        p2 = create_person(db, "Dupont", "Jean")  # même forme 'dupont jean'
+
+        detach_name_form(db, p1, "dupont jean")
+
+        db.execute(
+            "SELECT person_ids FROM person_name_forms WHERE name_form = 'dupont jean'"
+        )
+        row = db.fetchone()
+        assert row is not None
+        assert p1 not in row["person_ids"]
+        assert p2 in row["person_ids"]
+
+    def test_deletes_form_when_last_person_detached(self, db):
+        person_id = create_person(db, "Unique", "Name")
+
+        detach_name_form(db, person_id, "name unique")
+
+        db.execute(
+            "SELECT id FROM person_name_forms WHERE name_form = 'name unique'"
+        )
+        assert db.fetchone() is None
+
+
+# ── assign_orphan_authorship (+ _ensure_truth_authorship) ──────────
+
+class TestAssignOrphanAuthorship:
+    def _setup(self, db):
+        """Monte un périmètre UCA minimal (nécessaire pour _ensure_truth_authorship)."""
+        import json
+        db.execute(
+            """
+            INSERT INTO structures (code, name, structure_type)
+            VALUES ('UCA', 'UCA', 'universite'::structure_type)
+            RETURNING id
+            """
+        )
+        uca_id = db.fetchone()["id"]
+        db.execute(
+            "INSERT INTO perimeters (code, name, structure_ids) VALUES ('uca', 'UCA', %s)",
+            ([uca_id],),
+        )
+        db.execute(
+            "INSERT INTO config (key, value) VALUES ('perimeter_persons', %s::jsonb)",
+            (json.dumps("uca"),),
+        )
+        return uca_id
+
+    def test_raises_on_invalid_source(self, db):
+        import pytest
+        with pytest.raises(ValueError, match="Source inconnue"):
+            assign_orphan_authorship(db, 1, "invalid", 1)
+
+    def test_returns_false_if_already_assigned(self, db):
+        """Si l'authorship a déjà un person_id, l'UPDATE ne matche pas."""
+        self._setup(db)
+        person_id = _insert_person(db)
+        other_id = _insert_person(db, "Other", "Author")
+        pub_id = _insert_publication(db)
+        sp_id = _insert_source_publication(db, pub_id)
+        sp_person = _insert_source_person(db)
+        sa_id = _insert_source_authorship(db, sp_id, sp_person, person_id=other_id)
+
+        assert assign_orphan_authorship(db, person_id, "hal", sa_id) is False
+
+    def test_assigns_and_creates_truth_authorship(self, db):
+        self._setup(db)
+        person_id = _insert_person(db)
+        pub_id = _insert_publication(db)
+        sp_id = _insert_source_publication(db, pub_id)
+        sp_person = _insert_source_person(db)
+        sa_id = _insert_source_authorship(db, sp_id, sp_person)  # orpheline
+
+        result = assign_orphan_authorship(db, person_id, "hal", sa_id)
+
+        assert result is True
+        # person_id assigné sur source_authorship
+        db.execute("SELECT person_id, authorship_id FROM source_authorships WHERE id = %s", (sa_id,))
+        row = db.fetchone()
+        assert row["person_id"] == person_id
+        assert row["authorship_id"] is not None
+
+        # authorship vérité créée
+        db.execute(
+            "SELECT id FROM authorships WHERE publication_id = %s AND person_id = %s",
+            (pub_id, person_id),
+        )
+        assert db.fetchone() is not None
+
+    def test_skips_name_form_if_excluded(self, db):
+        """Si la source authorship est excluded, pas d'ajout de name_form."""
+        self._setup(db)
+        person_id = _insert_person(db, "Zzz", "Zzz")  # forme 'zzz' / 'zzz zzz'
+        pub_id = _insert_publication(db)
+        sp_id = _insert_source_publication(db, pub_id)
+        sp_person = _insert_source_person(db)
+        sa_id = _insert_source_authorship(
+            db, sp_id, sp_person,
+            author_name_normalized="other name",
+            excluded=True,
+        )
+
+        assign_orphan_authorship(db, person_id, "hal", sa_id)
+
+        # Aucune nouvelle name_form 'other name' n'a été créée
+        db.execute(
+            "SELECT id FROM person_name_forms WHERE name_form = 'other name'"
+        )
+        assert db.fetchone() is None
