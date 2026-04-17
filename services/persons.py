@@ -10,6 +10,7 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 (UNIQUE(source, source_id)), les authorships utilisent `source_person_id`.
 """
 
+from services.authorships import delete_orphan_authorships
 from utils.normalize import normalize_name
 from utils.perimeter import get_persons_structure_ids_list
 from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
@@ -454,6 +455,121 @@ def assign_orphan_authorship(cur, person_id: int, source: str, authorship_id: in
     _ensure_truth_authorship(cur, person_id, source, authorship_id)
 
     return True
+
+
+def batch_assign_orphan_authorships(cur, person_id: int, sa_ids: list[int]) -> int:
+    """Attribue en batch plusieurs authorships sources orphelines à une personne.
+
+    Plus efficace que boucler sur `assign_orphan_authorship` quand on a
+    plusieurs dizaines d'authorships à rattacher à la même personne :
+    1. SET person_id sur les source_authorships (seulement si NULL)
+    2. Crée les authorships vérité manquantes (une par publication)
+    3. Pose les FK source_authorships.authorship_id
+    4. Ajoute les formes de nom observées (auteur normalisé)
+
+    Retourne le nombre de source_authorships effectivement rattachées
+    (celles qui étaient orphelines).
+    """
+    if not sa_ids:
+        return 0
+
+    # 1. Rattacher les source_authorships orphelines
+    cur.execute(
+        """
+        UPDATE source_authorships SET person_id = %s
+        WHERE id = ANY(%s) AND person_id IS NULL
+        RETURNING id
+        """,
+        (person_id, sa_ids),
+    )
+    assigned = cur.rowcount
+
+    # 2. Créer les authorships vérité manquantes
+    cur.execute(
+        """
+        INSERT INTO authorships (publication_id, person_id,
+            author_position, in_perimeter, is_corresponding, structure_ids)
+        SELECT DISTINCT ON (sd.publication_id)
+            sd.publication_id, %s,
+            sa.author_position, sa.in_perimeter, sa.is_corresponding, sa.structure_ids
+        FROM source_authorships sa
+        JOIN source_publications sd ON sd.id = sa.source_publication_id
+        WHERE sa.id = ANY(%s) AND sd.publication_id IS NOT NULL
+        ORDER BY sd.publication_id,
+            CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 WHEN 'wos' THEN 3 END
+        ON CONFLICT (publication_id, person_id) DO NOTHING
+        """,
+        (person_id, sa_ids),
+    )
+
+    # 3. Poser les FK authorship_id sur les source_authorships
+    cur.execute(
+        """
+        UPDATE source_authorships sa SET authorship_id = a.id
+        FROM source_publications sd, authorships a
+        WHERE sa.id = ANY(%s)
+          AND sd.id = sa.source_publication_id
+          AND a.publication_id = sd.publication_id
+          AND a.person_id = %s
+          AND sa.authorship_id IS NULL
+        """,
+        (sa_ids, person_id),
+    )
+
+    # 4. Ajouter les formes de noms observées
+    cur.execute(
+        """
+        SELECT DISTINCT author_name_normalized
+        FROM source_authorships
+        WHERE id = ANY(%s)
+          AND author_name_normalized IS NOT NULL
+          AND NOT excluded
+        """,
+        (sa_ids,),
+    )
+    for row in cur.fetchall():
+        add_name_form(cur, person_id, row["author_name_normalized"])
+
+    return assigned
+
+
+def detach_authorships(cur, person_id: int, authorships: list[dict],
+                        name_form: str | None = None) -> dict:
+    """Détache un lot d'authorships sources d'une personne et nettoie les
+    authorships vérité devenues orphelines.
+
+    Si `name_form` est fourni, supprime aussi la forme de nom de la personne
+    lorsque plus aucune authorship ne la porte.
+
+    `authorships` : liste de dicts {source, authorship_id}.
+
+    Retourne {"detached": N, "deleted_authorships": M, "cleaned_form": bool}.
+    """
+    for a in authorships:
+        unlink_authorship(cur, person_id, a["source"], a["authorship_id"])
+
+    deleted = delete_orphan_authorships(cur, person_id)
+
+    cleaned_form = False
+    if name_form:
+        # Ne nettoyer la forme que si plus aucune source_authorship ne la porte
+        cur.execute(
+            f"""
+            SELECT COUNT(*) FROM source_authorships sa
+            WHERE sa.person_id = %s AND sa.author_name_normalized = %s
+              AND sa.source IN {AUTHOR_SOURCES_SQL}
+            """,
+            (person_id, name_form),
+        )
+        if cur.fetchone()["count"] == 0:
+            detach_name_form(cur, person_id, name_form)
+            cleaned_form = True
+
+    return {
+        "detached": len(authorships),
+        "deleted_authorships": deleted,
+        "cleaned_form": cleaned_form,
+    }
 
 
 def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: int):
