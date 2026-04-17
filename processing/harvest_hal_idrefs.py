@@ -8,6 +8,7 @@ Usage:
 """
 
 import argparse
+import os
 import time
 
 import requests
@@ -16,6 +17,9 @@ from psycopg2.extras import RealDictCursor
 from db.connection import get_connection
 from services.persons import add_identifier
 from utils.api_limits import HAL_DELAY
+from utils.log import setup_logger
+
+logger = setup_logger("harvest_hal_idrefs", os.path.join(os.path.dirname(__file__), "logs"))
 
 HAL_AUTHOR_API = "https://api.archives-ouvertes.fr/ref/author/"
 
@@ -44,7 +48,7 @@ def fetch_idref(hal_person_id: int = None, idhal: str = None) -> str | None:
             url = docs[0]["idrefId_s"][0]
             return url.rsplit("/", 1)[-1] if "/" in url else url
     except Exception as e:
-        print(f"  Erreur: {e}")
+        logger.warning(f"Erreur: {e}")
     return None
 
 
@@ -70,7 +74,7 @@ def main():
         ORDER BY sa.person_id
     """)
     authors = cur.fetchall()
-    print(f"{len(authors)} auteurs HAL à interroger")
+    logger.info(f"{len(authors)} auteurs HAL à interroger")
 
     found = 0
     for i, a in enumerate(authors):
@@ -84,18 +88,18 @@ def main():
                 )
                 # Stocker dans person_identifiers
                 add_identifier(cur, a["person_id"], "idref", idref, source="hal")
-            print(f"  {a['full_name']}: {idref}")
+            logger.info(f"  {a['full_name']}: {idref}")
 
         if (i + 1) % 100 == 0:
             if not args.dry_run:
                 conn.commit()
-            print(f"  {i + 1}/{len(authors)} traités, {found} IdRef trouvés")
+            logger.info(f"  {i + 1}/{len(authors)} traités, {found} IdRef trouvés")
             time.sleep(HAL_DELAY)
 
     if not args.dry_run:
         conn.commit()
 
-    print(f"\nTerminé: {found} IdRef trouvés sur {len(authors)} auteurs")
+    logger.info(f"Terminé: {found} IdRef trouvés sur {len(authors)} auteurs")
     conn.close()
 
 
