@@ -11,6 +11,7 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 """
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
+from infrastructure.repositories.person_repository import PgPersonRepository
 from services.audit import emit_event
 from services.authorships import delete_orphan_authorships
 from utils.normalize import normalize_name
@@ -41,12 +42,7 @@ def set_rejected(cur, person_id: int, rejected: bool) -> None:
 
     Lève NotFoundError si la personne n'existe pas.
     """
-    cur.execute(
-        "UPDATE persons SET rejected = %s, updated_at = now() WHERE id = %s",
-        (rejected, person_id),
-    )
-    if cur.rowcount == 0:
-        raise NotFoundError(f"Personne {person_id} introuvable")
+    PgPersonRepository(cur).set_rejected(person_id, rejected)
     emit_event(cur, "person.rejected", "person", person_id, {"rejected": rejected})
 
 
@@ -699,25 +695,16 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
 
 def mark_distinct(cur, person_id_a: int, person_id_b: int) -> None:
     """Marque deux personnes comme distinctes (non-doublon) dans
-    `distinct_persons`. Idempotent (ON CONFLICT DO NOTHING).
+    `distinct_persons`. Idempotent.
 
-    Les IDs sont triés (LEAST/GREATEST) pour garantir l'unicité de la paire.
+    Les IDs sont triés pour garantir l'unicité de la paire.
     """
-    cur.execute(
-        """
-        INSERT INTO distinct_persons (person_id_a, person_id_b)
-        VALUES (LEAST(%s, %s), GREATEST(%s, %s))
-        ON CONFLICT DO NOTHING
-        RETURNING person_id_a, person_id_b
-        """,
-        (person_id_a, person_id_b, person_id_a, person_id_b),
-    )
+    inserted = PgPersonRepository(cur).mark_distinct(person_id_a, person_id_b)
     # Audit seulement si une ligne a été insérée (la paire n'existait pas déjà)
-    row = cur.fetchone()
-    if row:
+    if inserted:
         emit_event(
-            cur, "person.marked_distinct", "person", row["person_id_a"],
-            {"other_id": row["person_id_b"]},
+            cur, "person.marked_distinct", "person", inserted[0],
+            {"other_id": inserted[1]},
         )
 
 
