@@ -934,12 +934,7 @@ async def exclude_source_authorship(
     celle-ci est supprimée.
     """
     with get_cursor() as (cur, conn):
-        try:
-            found = _set_source_authorship_excluded(cur, authorship_id, source, body.excluded)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        if not found:
-            raise HTTPException(status_code=404, detail="Authorship source introuvable")
+        _set_source_authorship_excluded(cur, authorship_id, source, body.excluded)
         return {"ok": True, "excluded": body.excluded}
 
 

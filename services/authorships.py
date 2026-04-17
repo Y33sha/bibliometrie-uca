@@ -9,15 +9,18 @@ Ce service encapsule les opérations ponctuelles utilisées par les routeurs
 et les scripts de correction.
 """
 
+from domain.errors import NotFoundError, ValidationError
 from utils.sources import BIBLIO_SOURCES as VALID_SOURCES
 
 
-def exclude_authorship(cur, authorship_id: int) -> dict | None:
+def exclude_authorship(cur, authorship_id: int) -> dict:
     """Marque une authorship vérité comme exclue et détache les authorships sources.
 
     1. Marque l'authorship vérité excluded = TRUE
     2. Met person_id = NULL sur les authorships sources liées
        (pour que build_authorships ne recrée pas le lien)
+
+    Lève NotFoundError si l'authorship n'existe pas.
     """
     cur.execute(
         """
@@ -27,7 +30,7 @@ def exclude_authorship(cur, authorship_id: int) -> dict | None:
     )
     row = cur.fetchone()
     if not row:
-        return None
+        raise NotFoundError(f"Authorship {authorship_id} introuvable")
 
     person_id = row["person_id"]
 
@@ -57,16 +60,17 @@ def exclude_authorship(cur, authorship_id: int) -> dict | None:
 
 def set_source_authorship_excluded(
     cur, source_authorship_id: int, source: str, excluded: bool
-) -> bool:
+) -> None:
     """Marque ou démarque une authorship source comme exclue.
 
     Si `excluded=True`, détache aussi la FK vers l'authorship vérité et
     supprime cette dernière si plus aucune source non-exclue ne l'atteste.
 
-    Retourne True si la source existe, False sinon.
+    Lève ValidationError si la source n'est pas reconnue.
+    Lève NotFoundError si l'authorship source n'existe pas.
     """
     if source not in VALID_SOURCES:
-        raise ValueError(f"Source inconnue : {source}")
+        raise ValidationError(f"Source inconnue : {source}")
 
     cur.execute(
         """
@@ -76,12 +80,10 @@ def set_source_authorship_excluded(
         (excluded, source_authorship_id, source),
     )
     if not cur.fetchone():
-        return False
+        raise NotFoundError(f"Authorship source {source}:{source_authorship_id} introuvable")
 
     if excluded:
         detach_source(cur, source_authorship_id, source)
-
-    return True
 
 
 def detach_source(cur, source_authorship_id: int, source: str) -> bool:
@@ -89,9 +91,10 @@ def detach_source(cur, source_authorship_id: int, source: str) -> bool:
     Si plus aucune source ne l'atteste, supprime l'authorship vérité.
 
     Retourne True si l'authorship vérité a été supprimée, False sinon.
+    Lève ValidationError si la source n'est pas reconnue.
     """
     if source not in VALID_SOURCES:
-        raise ValueError(f"Source inconnue : {source}")
+        raise ValidationError(f"Source inconnue : {source}")
 
     # Trouver l'authorship vérité liée
     cur.execute(
@@ -159,9 +162,10 @@ def move_authorships_for_source(
     """Déplace des authorships vérité d'une publication à une autre,
     pour les authorships liées aux source_authorship_ids donnés.
     Utilisé par split_bad_merges.
+    Lève ValidationError si la source n'est pas reconnue.
     """
     if source not in VALID_SOURCES:
-        raise ValueError(f"Source inconnue : {source}")
+        raise ValidationError(f"Source inconnue : {source}")
 
     for sa_id in source_authorship_ids:
         cur.execute(
@@ -180,9 +184,10 @@ def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int
     """Propage le person_id des authorships sources vers les authorships vérité.
     Évite les doublons (publication_id, person_id).
     Utilisé par fix_oa_person_conflicts.
+    Lève ValidationError si la source n'est pas reconnue.
     """
     if source not in VALID_SOURCES:
-        raise ValueError(f"Source inconnue : {source}")
+        raise ValidationError(f"Source inconnue : {source}")
 
     cur.execute(
         """

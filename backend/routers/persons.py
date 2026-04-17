@@ -919,8 +919,6 @@ async def toggle_authorship_excluded(authorship_id: int):
     """Marque un authorship comme exclu (lien personne-publication rejeté)."""
     with get_cursor() as (cur, conn):
         row = _exclude_authorship(cur, authorship_id)
-        if not row:
-            raise HTTPException(status_code=404, detail="Authorship introuvable")
         return {"id": row["id"], "excluded": row["excluded"]}
 
 

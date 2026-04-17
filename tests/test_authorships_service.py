@@ -8,6 +8,7 @@ import json
 
 import pytest
 
+from domain.errors import NotFoundError, ValidationError
 from services.authorships import (
     delete_orphan_authorships,
     detach_source,
@@ -192,8 +193,9 @@ class TestExcludeAuthorship:
         assert row["person_id"] is None
         assert row["authorship_id"] is None
 
-    def test_returns_none_if_not_found(self, db):
-        assert exclude_authorship(db, 999999) is None
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            exclude_authorship(db, 999999)
 
     def test_does_not_detach_unrelated_sources(self, db):
         """Les sources d'autres personnes sur la même pub ne sont pas touchées."""
@@ -226,7 +228,7 @@ class TestDetachSource:
     vérité. Supprime l'authorship vérité si plus aucune source ne l'atteste."""
 
     def test_raises_on_invalid_source(self, db):
-        with pytest.raises(ValueError, match="Source inconnue"):
+        with pytest.raises(ValidationError, match="Source inconnue"):
             detach_source(db, 1, "invalid_source")
 
     def test_returns_false_if_no_authorship_linked(self, db):
@@ -381,7 +383,7 @@ class TestMoveAuthorshipsForSource:
     source_authorship à une autre publication."""
 
     def test_raises_on_invalid_source(self, db):
-        with pytest.raises(ValueError, match="Source inconnue"):
+        with pytest.raises(ValidationError, match="Source inconnue"):
             move_authorships_for_source(db, "invalid", [1], 1, 2)
 
     def test_moves_authorship_to_target_pub(self, db):
@@ -427,7 +429,7 @@ class TestSyncPersonIdFromSource:
     l'authorship vérité, sans créer de doublon (publication, person)."""
 
     def test_raises_on_invalid_source(self, db):
-        with pytest.raises(ValueError, match="Source inconnue"):
+        with pytest.raises(ValidationError, match="Source inconnue"):
             sync_person_id_from_source(db, "invalid", [1])
 
     def test_sets_person_id_on_authorship(self, db):
@@ -586,11 +588,12 @@ class TestPropagateUcaForAddresses:
 
 class TestSetSourceAuthorshipExcluded:
     def test_raises_on_invalid_source(self, db):
-        with pytest.raises(ValueError, match="Source inconnue"):
+        with pytest.raises(ValidationError, match="Source inconnue"):
             set_source_authorship_excluded(db, 1, "invalid", True)
 
-    def test_returns_false_if_not_found(self, db):
-        assert set_source_authorship_excluded(db, 999999, "hal", True) is False
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            set_source_authorship_excluded(db, 999999, "hal", True)
 
     def test_marks_excluded(self, db):
         person_id = _create_person(db)
@@ -599,7 +602,7 @@ class TestSetSourceAuthorshipExcluded:
         src_person_id = _create_source_person(db)
         sa_id = _create_source_authorship(db, sp_id, src_person_id, person_id=person_id)
 
-        assert set_source_authorship_excluded(db, sa_id, "hal", True) is True
+        set_source_authorship_excluded(db, sa_id, "hal", True)
 
         db.execute("SELECT excluded FROM source_authorships WHERE id = %s", (sa_id,))
         assert db.fetchone()["excluded"] is True
