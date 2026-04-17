@@ -17,6 +17,8 @@
 - Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_PASSWORD=...`)
 - Tests frontend : `cd frontend && npm run check` (svelte-check, échoue sur les erreurs de types)
 - Lancement dev : `bash start.sh` (uvicorn port 8003 + vite port 5176)
+- Endpoints POST/PUT/PATCH : toujours un modèle Pydantic dans `backend/models.py`, jamais `body: dict`
+- Requêtes SQL : toujours des requêtes paramétrées (`%s`), jamais d'interpolation f-string pour les valeurs
 - Logging : utiliser `setup_logger` de `utils/log.py`
 - DOI : utiliser `clean_doi` de `utils/doi.py`
 - Noms : utiliser `names_compatible` et `parse_raw_author_name` de `utils/names.py`

@@ -33,3 +33,4 @@ db/backup/
 pipeline/reports/*.md
 pipeline/reports/sandbox/
 pipeline/status.json
+extraction/wos/downloads/

@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, Query
 from backend.deps import get_cursor
+from backend.models import PublisherUpdate, MergeRequest
 from services.journals import merge_publishers
 
 router = APIRouter()
@@ -72,17 +73,14 @@ async def get_publisher(publisher_id: int):
 
 
 @router.put("/api/publishers/{publisher_id}")
-async def update_publisher(publisher_id: int, body: dict):
+async def update_publisher(publisher_id: int, body: PublisherUpdate):
     """Met à jour un éditeur."""
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id FROM publishers WHERE id = %s", (publisher_id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Éditeur introuvable")
 
-        fields = {}
-        for key in ("name", "country", "doi_prefix", "is_predatory", "notes"):
-            if key in body:
-                fields[key] = body[key]
+        fields = {k: v for k, v in body.model_dump(exclude_unset=True).items()}
         if "name" in fields:
             from utils.normalize import normalize_text
             fields["name_normalized"] = normalize_text(fields["name"])
@@ -98,23 +96,22 @@ async def update_publisher(publisher_id: int, body: dict):
 
 
 @router.post("/api/publishers/{publisher_id}/merge")
-async def merge(publisher_id: int, body: dict):
-    source_id = body.get("source_id")
-    if not source_id or source_id == publisher_id:
+async def merge(publisher_id: int, body: MergeRequest):
+    if body.source_id == publisher_id:
         raise HTTPException(status_code=400, detail="source_id invalide")
 
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id FROM publishers WHERE id IN (%s, %s)",
-                    (publisher_id, source_id))
+                    (publisher_id, body.source_id))
         found = {row["id"] for row in cur.fetchall()}
         if publisher_id not in found:
             raise HTTPException(status_code=404, detail="Éditeur cible introuvable")
-        if source_id not in found:
+        if body.source_id not in found:
             raise HTTPException(status_code=404, detail="Éditeur source introuvable")
 
         try:
-            merge_publishers(cur, publisher_id, source_id)
+            merge_publishers(cur, publisher_id, body.source_id)
         except RuntimeError as e:
             raise HTTPException(status_code=409, detail=str(e))
 
-        return {"merged": True, "source_id": source_id, "target_id": publisher_id}
+        return {"merged": True, "source_id": body.source_id, "target_id": publisher_id}

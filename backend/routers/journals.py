@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, Query
 from backend.deps import get_cursor
+from backend.models import JournalUpdate, MergeRequest
 from services.journals import merge_journals
 
 router = APIRouter()
@@ -80,19 +81,14 @@ async def get_journal(journal_id: int):
 
 
 @router.put("/api/journals/{journal_id}")
-async def update_journal(journal_id: int, body: dict):
+async def update_journal(journal_id: int, body: JournalUpdate):
     """Met à jour une revue."""
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id FROM journals WHERE id = %s", (journal_id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Revue introuvable")
 
-        fields = {}
-        for key in ("title", "issn", "eissn", "issnl", "doi_prefix",
-                     "oa_model", "journal_type", "is_academic",
-                     "is_predatory", "is_in_doaj", "apc_amount", "notes"):
-            if key in body:
-                fields[key] = body[key]
+        fields = {k: v for k, v in body.model_dump(exclude_unset=True).items()}
         if "title" in fields:
             from utils.normalize import normalize_text
             fields["title_normalized"] = normalize_text(fields["title"])
@@ -108,23 +104,22 @@ async def update_journal(journal_id: int, body: dict):
 
 
 @router.post("/api/journals/{journal_id}/merge")
-async def merge(journal_id: int, body: dict):
-    source_id = body.get("source_id")
-    if not source_id or source_id == journal_id:
+async def merge(journal_id: int, body: MergeRequest):
+    if body.source_id == journal_id:
         raise HTTPException(status_code=400, detail="source_id invalide")
 
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id FROM journals WHERE id IN (%s, %s)",
-                    (journal_id, source_id))
+                    (journal_id, body.source_id))
         found = {row["id"] for row in cur.fetchall()}
         if journal_id not in found:
             raise HTTPException(status_code=404, detail="Revue cible introuvable")
-        if source_id not in found:
+        if body.source_id not in found:
             raise HTTPException(status_code=404, detail="Revue source introuvable")
 
         try:
-            merge_journals(cur, journal_id, source_id)
+            merge_journals(cur, journal_id, body.source_id)
         except RuntimeError as e:
             raise HTTPException(status_code=409, detail=str(e))
 
-        return {"merged": True, "source_id": source_id, "target_id": journal_id}
+        return {"merged": True, "source_id": body.source_id, "target_id": journal_id}

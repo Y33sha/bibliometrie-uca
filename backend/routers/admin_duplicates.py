@@ -3,6 +3,7 @@
 import sys, os
 from fastapi import APIRouter, Query, HTTPException
 from backend.deps import get_cursor
+from backend.models import MergePublications, MarkDistinctPublications
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from services.publications import merge_publications
 
@@ -109,36 +110,32 @@ async def next_duplicate_candidate(
 
 
 @router.post("/api/admin/duplicates/merge")
-async def merge_duplicate_publications(body: dict):
+async def merge_duplicate_publications(body: MergePublications):
     """Fusionne source_id dans target_id."""
-    target_id = body.get("target_id")
-    source_id = body.get("source_id")
-    if not target_id or not source_id or target_id == source_id:
+    if body.target_id == body.source_id:
         raise HTTPException(status_code=400, detail="target_id et source_id requis et différents")
 
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT id, doi, journal_id, oa_status::text, language, container_title FROM publications WHERE id IN (%s, %s)", (target_id, source_id))
+        cur.execute("SELECT id, doi, journal_id, oa_status::text, language, container_title FROM publications WHERE id IN (%s, %s)", (body.target_id, body.source_id))
         pubs = {r["id"]: r for r in cur.fetchall()}
-        if target_id not in pubs or source_id not in pubs:
+        if body.target_id not in pubs or body.source_id not in pubs:
             raise HTTPException(status_code=404, detail="Publication introuvable")
 
         cur.execute("SAVEPOINT merge_dup")
         try:
-            merge_publications(cur, target_id, source_id)
+            merge_publications(cur, body.target_id, body.source_id)
             cur.execute("RELEASE SAVEPOINT merge_dup")
         except Exception as e:
             cur.execute("ROLLBACK TO SAVEPOINT merge_dup")
             raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}")
 
-        return {"ok": True, "target_id": target_id, "source_id": source_id}
+        return {"ok": True, "target_id": body.target_id, "source_id": body.source_id}
 
 
 @router.post("/api/admin/duplicates/mark-distinct")
-async def mark_publications_distinct(body: dict):
+async def mark_publications_distinct(body: MarkDistinctPublications):
     """Marque deux publications comme distinctes (non-doublon)."""
-    a = body.get("pub_id_a")
-    b = body.get("pub_id_b")
-    if not a or not b or a == b:
+    if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b requis et différents")
 
     with get_cursor() as (cur, conn):
@@ -146,7 +143,7 @@ async def mark_publications_distinct(body: dict):
             INSERT INTO distinct_publications (pub_id_a, pub_id_b)
             VALUES (LEAST(%s, %s), GREATEST(%s, %s))
             ON CONFLICT DO NOTHING
-        """, (a, b, a, b))
+        """, (body.pub_id_a, body.pub_id_b, body.pub_id_a, body.pub_id_b))
         return {"ok": True}
 
 

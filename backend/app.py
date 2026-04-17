@@ -8,6 +8,10 @@ Usage:
 Puis ouvrir http://localhost:8003
 """
 
+import logging
+import os
+import traceback
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -25,13 +29,31 @@ from backend.routers import (
     pipeline,
 )
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Bibliométrie UCA")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Renvoie du JSON 500 au lieu de HTML pour les erreurs non gérées."""
+    logger.error("Erreur non gérée sur %s %s\n%s",
+                 request.method, request.url.path,
+                 traceback.format_exc())
+    return JSONResponse(status_code=500,
+                        content={"detail": "Erreur interne du serveur"})
+
 
 # ----- CORS (frontend SvelteKit sur port séparé) -----
 
+_DEFAULT_ORIGINS = "http://localhost:5176,http://localhost:5173,http://127.0.0.1:5176"
+_cors_origins = [o.strip() for o in
+                 os.environ.get("CORS_ORIGINS", _DEFAULT_ORIGINS).split(",")
+                 if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5176", "http://localhost:5173", "http://127.0.0.1:5176"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
