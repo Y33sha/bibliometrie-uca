@@ -27,6 +27,7 @@ from psycopg2.extras import Json
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
 from utils.api_limits import THESES_DELAY, THESES_PER_PAGE
+from utils.api_retry import http_request_with_retry
 from utils.app_config import get_api_base_urls, get_theses_etab_ppns
 
 logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
@@ -41,15 +42,15 @@ def build_query(ppn: str, status: str | None = None) -> str:
 
 
 def fetch_page(base_url: str, query: str, debut: int = 0, nombre: int = 500) -> dict:
-    """Récupère une page de résultats depuis l'API theses.fr."""
+    """Récupère une page de résultats depuis l'API theses.fr (avec retry/backoff)."""
     params = {
         "q": query,
         "debut": debut,
         "nombre": nombre or THESES_PER_PAGE,
     }
-    resp = requests.get(base_url, params=params, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
+    return http_request_with_retry(
+        "GET", base_url, params=params, timeout=30, label=f"theses debut={debut}",
+    )
 
 
 def extract_theses_id(these: dict) -> str:

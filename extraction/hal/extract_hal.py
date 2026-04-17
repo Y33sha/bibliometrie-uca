@@ -22,6 +22,7 @@ from psycopg2.extras import Json
 from db.connection import get_connection
 from extraction.common import clean_doi, compute_hash, get_existing_ids, setup_logger
 from utils.api_limits import HAL_DELAY, HAL_PER_PAGE
+from utils.api_retry import http_request_with_retry
 from utils.app_config import (
     get_api_base_urls,
     get_hal_collections,
@@ -58,7 +59,7 @@ def fetch_page(
     collection_code: str = None,
     start: int = 0,
 ) -> dict:
-    """Récupère une page de résultats depuis l'API HAL."""
+    """Récupère une page de résultats depuis l'API HAL (avec retry/backoff)."""
     params = {
         "q": query,
         "fl": ",".join(HAL_FIELDS),
@@ -70,9 +71,8 @@ def fetch_page(
     if collection_code:
         params["fq"] = f"collCode_s:{collection_code}"
 
-    response = requests.get(url, params=params, timeout=30)
-    response.raise_for_status()
-    return response.json()
+    label = f"HAL coll={collection_code or '-'} start={start}"
+    return http_request_with_retry("GET", url, params=params, timeout=30, label=label)
 
 
 def extract_hal_id(doc: dict) -> str:
