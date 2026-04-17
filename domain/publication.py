@@ -1,8 +1,10 @@
-"""Concept métier Publication — value objects et (à terme) entités.
+"""Concept métier Publication — value objects, modèles de données JSONB
+et (à terme) entités.
 
 Regroupe ici tout ce qui est propre à une publication : identifiants
-(DOI, HAL ID document, NNT), puis plus tard les entités `Publication`,
-les règles de déduplication, les invariants métier.
+(DOI, HAL ID document, NNT), modèles des colonnes JSONB
+(`external_ids`, `meta`, `biblio`, `topics`), puis plus tard les
+entités `Publication`, les règles de déduplication, les invariants.
 
 Les value objects sont immuables et auto-validés :
 - construction stricte : `DOI("...")` lève ValidationError si invalide
@@ -11,10 +13,16 @@ Les value objects sont immuables et auto-validés :
   manquantes)
 - la valeur stockée est toujours normalisée (canonique) : deux VO
   égaux par valeur, quel que soit le format d'entrée
+
+Les modèles JSONB sont des Pydantic BaseModel : ils documentent les
+clés attendues, valident à la construction (en réutilisant les VO
+pour les identifiants), sérialisent en dict pour l'écriture en base.
 """
 
 import re
 from dataclasses import dataclass
+
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from domain.errors import ValidationError
 
@@ -172,3 +180,57 @@ class NNT:
 
     def __str__(self) -> str:
         return self.value
+
+
+# ── ExternalIds : colonne source_publications.external_ids ─────────
+
+
+class ExternalIds(BaseModel):
+    """Modèle de la colonne JSONB `external_ids` des source_publications.
+
+    Identifiants externes cross-source, utilisés notamment pour la
+    déduplication (fusion par HAL-ID, par NNT, …). Les valeurs sont
+    normalisées via les value objects du domaine — un HAL URL en entrée
+    est stocké comme HAL ID canonique, un NNT est mis en majuscules, etc.
+
+    `extra="allow"` autorise les clés non déclarées (arxiv, issn, …)
+    pour ne pas bloquer l'évolution du schéma sur une clé nouvelle.
+    Les clés déclarées ici sont les seules qui sont validées/normalisées.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    hal: str | None = None      # HAL ID document (ex. "hal-04123456")
+    nnt: str | None = None      # Numéro National de Thèse
+    pmid: str | None = None     # PubMed ID
+    pmc: str | None = None      # PubMed Central ID
+
+    @field_validator("hal", mode="before")
+    @classmethod
+    def _normalize_hal(cls, v):
+        """Normalise via HALId : URL → ID canonique, strip version."""
+        if v is None or v == "":
+            return None
+        normalized = HALId.try_parse(v)
+        if normalized is None:
+            raise ValueError(f"HAL ID invalide : {v!r}")
+        return normalized.value
+
+    @field_validator("nnt", mode="before")
+    @classmethod
+    def _normalize_nnt(cls, v):
+        """Normalise via NNT : trim + uppercase."""
+        if v is None or v == "":
+            return None
+        normalized = NNT.try_parse(v)
+        if normalized is None:
+            raise ValueError(f"NNT invalide : {v!r}")
+        return normalized.value
+
+    def to_dict(self) -> dict:
+        """Sérialise pour écriture en base (JSONB).
+
+        Omet les clés None pour garder des objets compacts côté BD.
+        Préserve les clés supplémentaires (extra="allow").
+        """
+        return self.model_dump(exclude_none=True)
