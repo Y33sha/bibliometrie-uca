@@ -27,6 +27,7 @@ jobs:
     env:
       DB_HOST: 127.0.0.1
       DB_PORT: 5432
+      DB_NAME: postgres
       DB_USER: postgres
       DB_PASSWORD: postgres
 
@@ -40,9 +41,6 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
-
-      - name: Create config
-        run: cp config/settings.docker.py config/settings.py
 
       - name: Run tests
         run: python -m pytest tests/ -v

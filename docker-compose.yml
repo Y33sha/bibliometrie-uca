@@ -32,15 +32,12 @@ services:
     restart: unless-stopped
     volumes:
       - .:/app
-      # Remplace le settings.py local par la version Docker (env vars)
-      - ./config/settings.docker.py:/app/config/settings.py:ro
     ports:
       - "8003:8000"
     env_file: .env
     environment:
+      # Override pour le réseau docker : le conteneur db est accessible via l'hôte "db"
       DB_HOST: db
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-changeme}
     depends_on:
       db:
         condition: service_healthy
