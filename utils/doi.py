@@ -1,11 +1,15 @@
-"""Utilitaires de nettoyage et validation de DOI."""
+"""Utilitaires de nettoyage et validation de DOI.
 
-import re
+Shim de compatibilité : la logique de normalisation vit désormais dans
+`domain.identifiers`. `clean_doi` reste disponible pour le code existant
+qui travaille sur des chaînes brutes (~50 sites d'appel dans pipeline
+et extraction).
 
-# Suffixe de version sur les DOI de dépôts de données (figshare, zenodo,
-# techrxiv, opticaopen…).  On normalise vers le DOI "concept" (sans version)
-# qui pointe toujours vers la dernière version.
-_VERSION_SUFFIX = re.compile(r"\.v\d+$", re.IGNORECASE)
+Nouveau code : préférer `DOI.try_parse(...)` (renvoie un value object)
+ou `DOI(...)` (strict, lève ValidationError).
+"""
+
+from domain.identifiers import _normalize_doi
 
 
 def clean_doi(doi: str | None) -> str | None:
@@ -15,15 +19,4 @@ def clean_doi(doi: str | None) -> str | None:
     Gère les préfixes courants : https://doi.org/, http://doi.org/,
     https://dx.doi.org/.
     """
-    if not doi:
-        return None
-    doi = doi.strip()
-    for prefix in ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/"):
-        if doi.lower().startswith(prefix):
-            doi = doi[len(prefix) :]
-            break
-    doi = doi.strip()
-    if not doi:
-        return None
-    doi = _VERSION_SUFFIX.sub("", doi)
-    return doi if doi else None
+    return _normalize_doi(doi)
