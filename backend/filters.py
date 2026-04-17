@@ -133,6 +133,49 @@ def apply_corresponding_filter(conditions: list, params: list, person_id: int, c
         params.append(person_id)
 
 
+# Fragments SQL réutilisés par apply_hal_status_filter
+_SQL_HAS_HAL = (
+    "EXISTS (SELECT 1 FROM source_publications sd "
+    "WHERE sd.publication_id = p.id AND sd.source = 'hal')"
+)
+_SQL_IN_COLLECTION = (
+    "EXISTS (SELECT 1 FROM source_publications sd "
+    "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
+    "AND sd.hal_collections @> ARRAY[%s])"
+)
+
+
+def _build_hal_status_part(value: str, lab_hal_col: str | None,
+                           params: list) -> str | None:
+    """Construit la clause SQL pour une valeur hal_status donnée.
+    Retourne None si la valeur n'est pas applicable (ex: "notice" sans collection)."""
+    if value == "hors_hal":
+        return f"NOT {_SQL_HAS_HAL}"
+    if value == "hors_collection":
+        if lab_hal_col is None:
+            # Sans collection configurée, tous les docs HAL sont "hors collection"
+            return _SQL_HAS_HAL
+        params.append(lab_hal_col)
+        return (
+            "EXISTS (SELECT 1 FROM source_publications sd "
+            "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
+            "AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s]))"
+        )
+    if value == "notice" and lab_hal_col is not None:
+        params.append(lab_hal_col)
+        return (
+            f"({_SQL_IN_COLLECTION} "
+            "AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))"
+        )
+    if value == "ok" and lab_hal_col is not None:
+        params.append(lab_hal_col)
+        return (
+            f"({_SQL_IN_COLLECTION} "
+            "AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN ('closed', 'unknown'))"
+        )
+    return None
+
+
 def apply_hal_status_filter(
     conditions: list, params: list, values: list[str], lab_hal_col: str | None
 ) -> None:
@@ -140,46 +183,18 @@ def apply_hal_status_filter(
     d'un labo donné.
 
     Valeurs possibles dans `values` :
-      - "hors_hal"         : la publication n'a pas de source HAL
-      - "hors_collection"  : présente dans HAL mais hors de la collection du labo
-      - "notice"           : dans la collection mais OA fermé/inconnu (simple notice)
-      - "ok"               : dans la collection ET OA ouvert
+      - "hors_hal"         : pas de source HAL (ne nécessite pas lab_hal_col)
+      - "hors_collection"  : dans HAL mais hors de la collection (ou dans HAL si
+                             lab_hal_col est None, car aucune collection de référence)
+      - "notice"           : dans la collection mais OA fermé/inconnu (nécessite lab_hal_col)
+      - "ok"               : dans la collection ET OA ouvert (nécessite lab_hal_col)
 
-    No-op si `values` est vide ou `lab_hal_col` est None.
+    No-op si `values` est vide. Les valeurs qui requièrent lab_hal_col sont
+    silencieusement ignorées quand il est None.
     """
-    if not values or not lab_hal_col:
+    if not values:
         return
-    parts = []
-    for v in values:
-        if v == "hors_hal":
-            parts.append(
-                "NOT EXISTS (SELECT 1 FROM source_publications sd "
-                "WHERE sd.publication_id = p.id AND sd.source = 'hal')"
-            )
-        elif v == "hors_collection":
-            parts.append(
-                "EXISTS (SELECT 1 FROM source_publications sd "
-                "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
-                "AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s]))"
-            )
-            params.append(lab_hal_col)
-        elif v == "notice":
-            parts.append(
-                "(EXISTS (SELECT 1 FROM source_publications sd "
-                "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
-                "AND sd.hal_collections @> ARRAY[%s]) "
-                "AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))"
-            )
-            params.append(lab_hal_col)
-        elif v == "ok":
-            parts.append(
-                "(EXISTS (SELECT 1 FROM source_publications sd "
-                "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
-                "AND sd.hal_collections @> ARRAY[%s]) "
-                "AND p.oa_status IS NOT NULL "
-                "AND p.oa_status::text NOT IN ('closed', 'unknown'))"
-            )
-            params.append(lab_hal_col)
+    parts = [p for v in values if (p := _build_hal_status_part(v, lab_hal_col, params))]
     if len(parts) == 1:
         conditions.append(parts[0])
     elif len(parts) > 1:
