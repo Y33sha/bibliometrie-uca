@@ -140,20 +140,13 @@ async def create_structure(data: StructureCreate):
 async def update_structure(structure_id: int, data: StructureUpdate):
     fields = data.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
-        try:
-            row = structures_service.update_structure(cur, structure_id, fields=fields)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        if row is None:
-            raise HTTPException(status_code=404, detail="Structure not found")
-        return row
+        return structures_service.update_structure(cur, structure_id, fields=fields)
 
 
 @router.delete("/api/structures/{structure_id}")
 async def delete_structure(structure_id: int):
     with get_cursor() as (cur, conn):
-        if not structures_service.delete_structure(cur, structure_id):
-            raise HTTPException(status_code=404, detail="Structure not found")
+        structures_service.delete_structure(cur, structure_id)
         return {"deleted": True}
 
 
@@ -174,8 +167,7 @@ async def create_relation(data: RelationCreate):
 @router.delete("/api/structure-relations/{relation_id}")
 async def delete_relation(relation_id: int):
     with get_cursor() as (cur, conn):
-        if not structures_service.delete_relation(cur, relation_id):
-            raise HTTPException(status_code=404, detail="Relation not found")
+        structures_service.delete_relation(cur, relation_id)
         return {"deleted": True}
 
 
@@ -206,20 +198,13 @@ async def create_name_form(data: NameFormCreate):
 async def update_name_form(form_id: int, data: NameFormUpdate):
     fields = data.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
-        try:
-            row = structures_service.update_name_form(cur, form_id, fields=fields)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        if row is None:
-            raise HTTPException(status_code=404, detail="Name form not found")
-        return row
+        return structures_service.update_name_form(cur, form_id, fields=fields)
 
 
 @router.delete("/api/name-forms/{form_id}")
 async def delete_name_form(form_id: int):
     with get_cursor() as (cur, conn):
-        if not structures_service.delete_name_form(cur, form_id):
-            raise HTTPException(status_code=404, detail="Name form not found")
+        structures_service.delete_name_form(cur, form_id)
         return {"deleted": True}
 
 

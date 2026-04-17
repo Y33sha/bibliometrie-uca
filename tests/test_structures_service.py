@@ -6,6 +6,7 @@ structure_name_forms.
 
 import pytest
 
+from domain.errors import NotFoundError, ValidationError
 from services.structures import (
     create_name_form,
     create_relation,
@@ -36,12 +37,13 @@ class TestCreateStructure:
 
 
 class TestUpdateStructure:
-    def test_returns_none_if_not_found(self, db):
-        assert update_structure(db, 999999, fields={"name": "X"}) is None
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            update_structure(db, 999999, fields={"name": "X"})
 
     def test_raises_on_empty_fields(self, db):
         row = create_structure(db, code="X", name="X", type="labo")
-        with pytest.raises(ValueError, match="Aucun champ"):
+        with pytest.raises(ValidationError, match="Aucun champ"):
             update_structure(db, row["id"], fields={})
 
     def test_updates_fields(self, db):
@@ -69,12 +71,13 @@ class TestUpdateStructure:
 
 
 class TestDeleteStructure:
-    def test_returns_false_if_not_found(self, db):
-        assert delete_structure(db, 999999) is False
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            delete_structure(db, 999999)
 
     def test_deletes_existing(self, db):
         row = create_structure(db, code="X", name="X", type="labo")
-        assert delete_structure(db, row["id"]) is True
+        delete_structure(db, row["id"])
         db.execute("SELECT id FROM structures WHERE id = %s", (row["id"],))
         assert db.fetchone() is None
 
@@ -105,15 +108,18 @@ class TestCreateRelation:
 
 
 class TestDeleteRelation:
-    def test_returns_false_if_not_found(self, db):
-        assert delete_relation(db, 999999) is False
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            delete_relation(db, 999999)
 
     def test_deletes_existing(self, db):
         parent = create_structure(db, code="P", name="P", type="universite")
         child = create_structure(db, code="C", name="C", type="labo")
         rel = create_relation(db, parent_id=parent["id"], child_id=child["id"],
                               relation_type="est_tutelle_de")
-        assert delete_relation(db, rel["id"]) is True
+        delete_relation(db, rel["id"])
+        db.execute("SELECT id FROM structure_relations WHERE id = %s", (rel["id"],))
+        assert db.fetchone() is None
 
 
 # ── structure_name_forms ──────────────────────────────────────────
@@ -138,13 +144,14 @@ class TestCreateNameForm:
 
 
 class TestUpdateNameForm:
-    def test_returns_none_if_not_found(self, db):
-        assert update_name_form(db, 999999, fields={"form_text": "x"}) is None
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            update_name_form(db, 999999, fields={"form_text": "x"})
 
     def test_raises_on_empty_fields(self, db):
         s = create_structure(db, code="X", name="X", type="labo")
         form = create_name_form(db, structure_id=s["id"], form_text="x")
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             update_name_form(db, form["id"], fields={})
 
     def test_updates_form_text_with_normalization(self, db):
@@ -164,10 +171,13 @@ class TestUpdateNameForm:
 
 
 class TestDeleteNameForm:
-    def test_returns_false_if_not_found(self, db):
-        assert delete_name_form(db, 999999) is False
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            delete_name_form(db, 999999)
 
     def test_deletes_existing(self, db):
         s = create_structure(db, code="X", name="X", type="labo")
         form = create_name_form(db, structure_id=s["id"], form_text="x")
-        assert delete_name_form(db, form["id"]) is True
+        delete_name_form(db, form["id"])
+        db.execute("SELECT id FROM structure_name_forms WHERE id = %s", (form["id"],))
+        assert db.fetchone() is None
