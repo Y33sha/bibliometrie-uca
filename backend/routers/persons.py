@@ -25,16 +25,10 @@ from backend.models import (
     UpdatePersonName,
 )
 from services.authorships import (
-    delete_orphan_authorships as _delete_orphan_authorships,
-)
-from services.authorships import (
     exclude_authorship as _exclude_authorship,
 )
 from services.persons import (
     add_identifier as _add_identifier,
-)
-from services.persons import (
-    add_name_form as _add_name_form,
 )
 from services.persons import (
     assign_orphan_authorship as _assign_orphan,
@@ -58,16 +52,10 @@ from services.persons import (
     reassign_identifier as _reassign_identifier,
 )
 from services.persons import (
-    refresh_person_name_forms as _refresh_person_name_forms,
-)
-from services.persons import (
     remove_identifier as _remove_identifier,
 )
 from services.persons import (
     set_rejected as _set_rejected,
-)
-from services.persons import (
-    unlink_authorship as _unlink_authorship,
 )
 from services.persons import (
     update_identifier_status as _update_identifier_status,

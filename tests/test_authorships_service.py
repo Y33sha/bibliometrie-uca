@@ -18,7 +18,6 @@ from services.authorships import (
     sync_person_id_from_source,
 )
 
-
 # ── Helpers ────────────────────────────────────────────────────────
 
 def _create_person(db, last="Dupont", first="Jean"):

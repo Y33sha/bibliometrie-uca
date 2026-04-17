@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/api/publications/facets")
-async def publications_facets(
+async def publications_facets(  # noqa: C901
     year: str = Query(""),
     lab_id: str = Query(""),
     doc_type: str = Query(""),
@@ -506,7 +506,7 @@ async def all_years():
 
 
 @router.get("/api/publications/export.csv")
-async def export_publications_csv(
+async def export_publications_csv(  # noqa: C901
     search: str = Query(""),
     lab_id: str = Query(""),
     year: str = Query(""),
@@ -947,7 +947,7 @@ async def exclude_source_authorship(
 
 
 @router.get("/api/publications")
-async def list_publications(
+async def list_publications(  # noqa: C901
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),

@@ -17,7 +17,6 @@ from services.structures import (
     update_structure,
 )
 
-
 # ── structures ────────────────────────────────────────────────────
 
 class TestCreateStructure:

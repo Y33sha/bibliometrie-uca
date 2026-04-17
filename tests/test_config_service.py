@@ -13,7 +13,6 @@ from services.config import (
     update_perimeter,
 )
 
-
 # ── Helpers ────────────────────────────────────────────────────────
 
 def _insert_config(db, key, value, description="desc"):

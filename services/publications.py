@@ -289,7 +289,7 @@ _OA_RANK = {
 }
 
 
-def refresh_from_sources(cur, pub_id: int) -> None:
+def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
     """Recalcule les métadonnées d'une publication depuis ses source_publications.
 
     Contrairement à l'ancien _enrich() qui faisait du COALESCE incrémental (premier arrivé

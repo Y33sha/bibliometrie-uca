@@ -7,7 +7,6 @@ restent autorisées dans les routers (convention du projet).
 
 import json
 
-
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
 
