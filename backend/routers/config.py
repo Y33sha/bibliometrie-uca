@@ -5,6 +5,12 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 from backend.deps import get_cursor
+from backend.models import (
+    AddPerimeterStructure,
+    ConfigValueUpdate,
+    PerimeterCreate,
+    PerimeterUpdate,
+)
 from services import config as config_service
 from utils.perimeter import get_perimeter_structure_ids
 
@@ -33,13 +39,10 @@ async def get_hal_collections():
 
 
 @router.put("/api/config/{key}")
-async def update_config(key: str, data: dict):
-    if "value" not in data:
-        raise HTTPException(status_code=400, detail="'value' requis")
-
+async def update_config(key: str, body: ConfigValueUpdate):
     with get_cursor() as (cur, conn):
         try:
-            row = config_service.update_config_value(cur, key, data["value"])
+            row = config_service.update_config_value(cur, key, body.value)
         except (TypeError, ValueError) as e:
             raise HTTPException(status_code=400, detail=f"Valeur JSON invalide : {e}")
         if row is None:
@@ -75,12 +78,9 @@ async def list_perimeters():
 
 
 @router.post("/api/perimeters/{perimeter_id}/structures")
-async def add_perimeter_structure(perimeter_id: int, data: dict):
-    structure_id = data.get("structure_id")
-    if not structure_id:
-        raise HTTPException(status_code=400, detail="structure_id requis")
+async def add_perimeter_structure(perimeter_id: int, body: AddPerimeterStructure):
     with get_cursor() as (cur, conn):
-        status = config_service.add_perimeter_structure(cur, perimeter_id, structure_id)
+        status = config_service.add_perimeter_structure(cur, perimeter_id, body.structure_id)
         if status == "not_found":
             raise HTTPException(status_code=404, detail="Périmètre introuvable")
         return {"status": status}
@@ -95,13 +95,13 @@ async def remove_perimeter_structure(perimeter_id: int, structure_id: int):
 
 
 @router.post("/api/perimeters")
-async def create_perimeter(data: dict):
+async def create_perimeter(body: PerimeterCreate):
     """Crée un nouveau périmètre."""
-    code = (data.get("code") or "").strip()
-    name = (data.get("name") or "").strip()
+    code = body.code.strip()
+    name = body.name.strip()
     if not code or not name:
         raise HTTPException(status_code=400, detail="Code et nom requis")
-    description = (data.get("description") or "").strip() or None
+    description = (body.description or "").strip() or None
     with get_cursor() as (cur, conn):
         pid = config_service.create_perimeter(cur, code=code, name=name,
                                                description=description)
@@ -111,15 +111,14 @@ async def create_perimeter(data: dict):
 
 
 @router.put("/api/perimeters/{perimeter_id}")
-async def update_perimeter(perimeter_id: int, data: dict):
+async def update_perimeter(perimeter_id: int, body: PerimeterUpdate):
     """Met à jour un périmètre (nom, description, structures)."""
-    fields = {}
-    if "name" in data:
-        fields["name"] = data["name"].strip()
-    if "description" in data:
-        fields["description"] = data["description"].strip() or None
-    if "structure_ids" in data:
-        fields["structure_ids"] = data["structure_ids"]
+    fields = body.model_dump(exclude_unset=True)
+    # Nettoyer : strip des strings et description vide → None
+    if "name" in fields and isinstance(fields["name"], str):
+        fields["name"] = fields["name"].strip()
+    if "description" in fields and isinstance(fields["description"], str):
+        fields["description"] = fields["description"].strip() or None
     with get_cursor() as (cur, conn):
         try:
             found = config_service.update_perimeter(cur, perimeter_id, fields=fields)
