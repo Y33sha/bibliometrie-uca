@@ -947,7 +947,7 @@ async def exclude_source_authorship(
 
 
 @router.get("/api/publications")
-async def list_publications(  # noqa: C901 (refacto en cours, passé de 40 à 28)
+async def list_publications(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
@@ -1079,49 +1079,10 @@ async def list_publications(  # noqa: C901 (refacto en cours, passé de 40 à 28
             [v.strip() for v in hal_status.split(",") if v.strip()] if hal_status else []
         )
         if hal_status_values and len(lab_ids) == 1:
-            # Fetch the hal_collection for this lab
             cur.execute("SELECT hal_collection FROM structures WHERE id = %s", (lab_ids[0],))
             lab_row = cur.fetchone()
             lab_hal_col = lab_row["hal_collection"] if lab_row else None
-
-            hal_parts = []
-            for v in hal_status_values:
-                if v == "hors_hal":
-                    hal_parts.append(
-                        "NOT EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal')"
-                    )
-                elif v == "hors_collection":
-                    if lab_hal_col:
-                        hal_parts.append(
-                            "EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
-                            " AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s]))"
-                        )
-                        params.append(lab_hal_col)
-                    else:
-                        # No collection configured → all HAL docs are "hors collection"
-                        hal_parts.append(
-                            "EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal')"
-                        )
-                elif v == "notice":
-                    if lab_hal_col:
-                        hal_parts.append(
-                            "(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
-                            " AND sd.hal_collections @> ARRAY[%s])"
-                            " AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))"
-                        )
-                        params.append(lab_hal_col)
-                elif v == "ok":
-                    if lab_hal_col:
-                        hal_parts.append(
-                            "(EXISTS (SELECT 1 FROM source_publications sd WHERE sd.publication_id = p.id AND sd.source = 'hal'"
-                            " AND sd.hal_collections @> ARRAY[%s])"
-                            " AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN ('closed', 'unknown'))"
-                        )
-                        params.append(lab_hal_col)
-            if len(hal_parts) == 1:
-                conditions.append(hal_parts[0])
-            elif len(hal_parts) > 1:
-                conditions.append("(" + " OR ".join(hal_parts) + ")")
+            apply_hal_status_filter(conditions, params, hal_status_values, lab_hal_col)
 
         # Filtre périmètre (in_perimeter de l'authorship de cette personne)
         apply_in_perimeter_person_filter(conditions, params, in_perimeter, person_id)
