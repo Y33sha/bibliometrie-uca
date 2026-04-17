@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from backend.deps import get_cursor
 from backend.models import MergeRequest, PublisherUpdate
-from services.journals import merge_publishers, update_publisher as _update_publisher
+from services.journals import merge_publishers
+from services.journals import update_publisher as _update_publisher
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

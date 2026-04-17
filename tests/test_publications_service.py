@@ -18,7 +18,6 @@ from services.publications import (
     update_oa_status,
 )
 
-
 # ── Helpers ────────────────────────────────────────────────────────
 
 def _insert_journal(db, title="Nature"):

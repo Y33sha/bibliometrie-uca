@@ -18,7 +18,6 @@ from services.addresses import (
     unassign_manual_structure,
 )
 
-
 # ── Helpers ────────────────────────────────────────────────────────
 
 def _create_structure(db, code="UCA", name="UCA", structure_type="universite"):

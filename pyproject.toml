@@ -36,6 +36,7 @@ select = [
     "I",    # isort (ordre des imports)
     "UP",   # pyupgrade (syntaxe obsolète)
     "B",    # flake8-bugbear (pièges courants)
+    "C901", # complexité cyclomatique
 ]
 # Ignorés le temps d'assainir progressivement
 ignore = [
@@ -44,10 +45,17 @@ ignore = [
     "B008",   # function call in default argument — FastAPI Depends() idiomatique
 ]
 
+[tool.ruff.lint.mccabe]
+# Seuil pragmatique : on bloque les fonctions > 20 (grade D/F).
+# À faire redescendre à 15 puis 10 au fil des refactos.
+max-complexity = 20
+
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E402"]       # imports après setup de conftest
-"scripts/*" = ["E402"]
-"backend/routers/*" = ["E402"]  # imports tardifs fréquents
+"scripts/*" = ["E402", "C901"]     # scripts one-shot, complexité tolérée
+"processing/*" = ["C901"]          # normalisation par source, nombreuses branches métier
+"extraction/*" = ["C901"]          # idem pour les extracteurs
+"backend/routers/*" = ["E402"]     # imports tardifs fréquents
 
 # ----------------------------------------------------------------------
 # Pytest + coverage

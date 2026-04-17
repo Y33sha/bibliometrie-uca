@@ -17,7 +17,6 @@ from services.journals import (
     update_publisher,
 )
 
-
 # ── Helpers ────────────────────────────────────────────────────────
 
 def _insert_publisher(db, name="Elsevier", openalex_id=None):

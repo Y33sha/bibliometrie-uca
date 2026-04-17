@@ -23,7 +23,6 @@ from services.persons import (
     update_name,
 )
 
-
 # ── Helpers ────────────────────────────────────────────────────────
 
 def _insert_person(db, last="Dupont", first="Jean"):
