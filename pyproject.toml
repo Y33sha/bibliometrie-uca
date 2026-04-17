@@ -72,3 +72,27 @@ exclude_lines = [
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
 ]
+
+# ----------------------------------------------------------------------
+# Mypy : type checker (mode permissif au démarrage)
+# Durcir module par module via overrides quand le code est stabilisé.
+# ----------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+# Imports : ignorer les libs tierces non typées plutôt que de polluer
+ignore_missing_imports = true
+# Mode permissif : ne pas râler sur les fonctions sans annotations
+check_untyped_defs = false
+disallow_untyped_defs = false
+warn_return_any = false
+# Afficher les codes d'erreur pour pouvoir ignorer précisément au besoin
+show_error_codes = true
+# Ne pas imposer l'absence d'Optional implicite
+implicit_optional = true
+# Ignorer les erreurs dans les tests (focus sur le code de prod)
+exclude = [
+    "^tests/",
+    "^frontend/",
+    "^bibliometrie_uca\\.egg-info/",
+    "^\\.venv/",
+]
