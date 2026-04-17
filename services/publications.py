@@ -9,8 +9,6 @@ Les fonctions find_by_* retournent des namedtuples pour un accès par nom
 indépendant du type de curseur (tuple ou RealDictCursor).
 """
 
-from psycopg2.extras import Json
-
 from infrastructure.repositories.publication_repository import (
     PgPublicationRepository,
     PubByDoi,
@@ -241,23 +239,8 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
     Ne touche PAS à : title, title_normalized, notes, sources (utiliser
     update_sources() séparément).
     """
-    # Utiliser un RealDictCursor pour accès par nom de colonne,
-    # quel que soit le type de curseur passé par l'appelant.
-    from psycopg2.extras import RealDictCursor
-
-    dict_cur = cur.connection.cursor(cursor_factory=RealDictCursor)
-    dict_cur.execute(
-        """
-        SELECT source, doi, doc_type, pub_year, journal_id, oa_status,
-               container_title, language, abstract, keywords, countries,
-               topics, biblio, meta, is_retracted, external_ids
-        FROM source_publications
-        WHERE publication_id = %s
-    """,
-        (pub_id,),
-    )
-    rows = dict_cur.fetchall()
-    dict_cur.close()
+    repo = PgPublicationRepository(cur)
+    rows = repo.get_source_rows(pub_id)
     if not rows:
         return
 
@@ -358,37 +341,24 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
     new_biblio = merge_jsonb("biblio")
     new_meta = merge_jsonb("meta")
 
-    cur.execute(
-        """
-        UPDATE publications SET
-            doi = %s, doc_type = %s::doc_type, pub_year = %s,
-            journal_id = %s, oa_status = %s::oa_type,
-            container_title = %s, language = %s, abstract = %s,
-            keywords = %s, countries = %s,
-            topics = %s, biblio = %s, meta = %s,
-            is_retracted = %s, updated_at = now()
-        WHERE id = %s
-    """,
-        (
-            new_doi,
-            new_doc_type,
-            new_pub_year,
-            new_journal_id,
-            new_oa_status,
-            new_container_title,
-            new_language,
-            new_abstract,
-            new_keywords,
-            new_countries,
-            Json(new_topics) if new_topics else None,
-            Json(new_biblio) if new_biblio else None,
-            Json(new_meta) if new_meta else None,
-            new_is_retracted,
-            pub_id,
-        ),
+    repo.update_aggregated(
+        pub_id,
+        doi=new_doi,
+        doc_type=new_doc_type,
+        pub_year=new_pub_year,
+        journal_id=new_journal_id,
+        oa_status=new_oa_status,
+        container_title=new_container_title,
+        language=new_language,
+        abstract=new_abstract,
+        keywords=new_keywords,
+        countries=new_countries,
+        topics=new_topics,
+        biblio=new_biblio,
+        meta=new_meta,
+        is_retracted=new_is_retracted,
     )
-
-    update_sources(cur, pub_id)
+    repo.update_sources(pub_id)
 
 
 def mark_distinct(cur, pub_id_a: int, pub_id_b: int) -> None:
