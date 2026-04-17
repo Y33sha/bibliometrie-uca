@@ -12,7 +12,9 @@ from services.journals import (
     merge_journals,
     merge_publishers,
     reset_journal_apc,
+    update_journal,
     update_journal_apc,
+    update_publisher,
 )
 
 
@@ -170,6 +172,50 @@ class TestUpdateJournalApc:
         assert float(row["apc_amount"]) == 2000.0
         assert row["apc_currency"] == "EUR"
         assert row["is_in_doaj"] is True
+
+
+class TestUpdateJournal:
+    def test_returns_false_if_not_found(self, db):
+        assert update_journal(db, 999999, fields={"title": "X"}) is False
+
+    def test_raises_on_empty_fields(self, db):
+        j = _insert_journal(db, "Nature")
+        with pytest.raises(ValueError):
+            update_journal(db, j, fields={})
+
+    def test_updates_title_and_normalizes(self, db):
+        j = _insert_journal(db, "Old Title")
+        assert update_journal(db, j, fields={"title": "Nature Medicine"}) is True
+        db.execute("SELECT title, title_normalized FROM journals WHERE id = %s", (j,))
+        row = db.fetchone()
+        assert row["title"] == "Nature Medicine"
+        assert row["title_normalized"] == "nature medicine"
+
+    def test_partial_update(self, db):
+        j = _insert_journal(db, "Nature", issn="0028-0836")
+        update_journal(db, j, fields={"eissn": "1476-4687"})
+        db.execute("SELECT issn, eissn FROM journals WHERE id = %s", (j,))
+        row = db.fetchone()
+        assert row["issn"] == "0028-0836"  # inchangé
+        assert row["eissn"] == "1476-4687"
+
+
+class TestUpdatePublisher:
+    def test_returns_false_if_not_found(self, db):
+        assert update_publisher(db, 999999, fields={"name": "X"}) is False
+
+    def test_raises_on_empty_fields(self, db):
+        p = _insert_publisher(db, "Elsevier")
+        with pytest.raises(ValueError):
+            update_publisher(db, p, fields={})
+
+    def test_updates_name_and_normalizes(self, db):
+        p = _insert_publisher(db, "Old Name")
+        assert update_publisher(db, p, fields={"name": "Springer Nature"}) is True
+        db.execute("SELECT name, name_normalized FROM publishers WHERE id = %s", (p,))
+        row = db.fetchone()
+        assert row["name"] == "Springer Nature"
+        assert row["name_normalized"] == "springer nature"
 
 
 class TestResetJournalApc:

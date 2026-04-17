@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from backend.deps import get_cursor
 from backend.models import JournalUpdate, MergeRequest
-from services.journals import merge_journals
+from services.journals import merge_journals, update_journal as _update_journal
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -90,25 +90,14 @@ async def get_journal(journal_id: int):
 @router.put("/api/journals/{journal_id}")
 async def update_journal(journal_id: int, body: JournalUpdate):
     """Met à jour une revue."""
+    fields = body.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
-        cur.execute("SELECT id FROM journals WHERE id = %s", (journal_id,))
-        if not cur.fetchone():
+        try:
+            found = _update_journal(cur, journal_id, fields=fields)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        if not found:
             raise HTTPException(status_code=404, detail="Revue introuvable")
-
-        fields = {k: v for k, v in body.model_dump(exclude_unset=True).items()}
-        if "title" in fields:
-            from utils.normalize import normalize_text
-
-            fields["title_normalized"] = normalize_text(fields["title"])
-
-        if not fields:
-            raise HTTPException(status_code=400, detail="Rien à modifier")
-
-        sets = ", ".join(f"{k} = %s" for k in fields)
-        cur.execute(
-            f"UPDATE journals SET {sets}, updated_at = now() WHERE id = %s",
-            list(fields.values()) + [journal_id],
-        )
         return {"ok": True}
 
 
