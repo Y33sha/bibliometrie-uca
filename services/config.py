@@ -7,18 +7,20 @@ restent autorisées dans les routers (convention du projet).
 
 import json
 
+from domain.errors import ConflictError, NotFoundError, ValidationError
+
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
 
-def update_config_value(cur, key: str, value) -> dict | None:
+def update_config_value(cur, key: str, value) -> dict:
     """Met à jour la valeur d'un paramètre de config existant.
 
-    `value` est sérialisé en JSON. Retourne la ligne mise à jour
-    {key, value, description, updated_at} ou None si la clé n'existe pas.
+    `value` est sérialisé en JSON. Retourne la ligne mise à jour.
+    Lève NotFoundError si la clé n'existe pas.
     """
     cur.execute("SELECT key FROM config WHERE key = %s", (key,))
     if not cur.fetchone():
-        return None
+        raise NotFoundError(f"Paramètre '{key}' introuvable")
 
     cur.execute(
         """
@@ -40,7 +42,8 @@ def add_perimeter_structure(cur, perimeter_id: int, structure_id: int) -> str:
     Retourne :
       - "added" : la structure a été ajoutée au périmètre
       - "already_present" : la structure y était déjà
-      - "not_found" : le périmètre n'existe pas
+
+    Lève NotFoundError si le périmètre n'existe pas.
     """
     cur.execute(
         """
@@ -56,14 +59,15 @@ def add_perimeter_structure(cur, perimeter_id: int, structure_id: int) -> str:
 
     # Pas d'UPDATE → soit déjà présent, soit périmètre inexistant
     cur.execute("SELECT id FROM perimeters WHERE id = %s", (perimeter_id,))
-    return "already_present" if cur.fetchone() else "not_found"
+    if cur.fetchone():
+        return "already_present"
+    raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
 
-def remove_perimeter_structure(cur, perimeter_id: int, structure_id: int) -> bool:
-    """Retire une structure d'un périmètre.
+def remove_perimeter_structure(cur, perimeter_id: int, structure_id: int) -> None:
+    """Retire une structure d'un périmètre (idempotent).
 
-    Retourne True si le périmètre existe (array_remove est idempotent),
-    False si le périmètre n'existe pas.
+    Lève NotFoundError si le périmètre n'existe pas.
     """
     cur.execute(
         """
@@ -74,20 +78,25 @@ def remove_perimeter_structure(cur, perimeter_id: int, structure_id: int) -> boo
         """,
         (structure_id, perimeter_id),
     )
-    return cur.fetchone() is not None
+    if not cur.fetchone():
+        raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
 
 # ── Perimeters — CRUD ────────────────────────────────────────────
 
 
-def create_perimeter(cur, *, code: str, name: str, description: str | None = None) -> int | None:
-    """Crée un nouveau périmètre.
+def create_perimeter(cur, *, code: str, name: str, description: str | None = None) -> int:
+    """Crée un nouveau périmètre. Retourne l'id créé.
 
-    Retourne l'id créé, ou None si le code existe déjà (conflit).
+    Lève ValidationError si code ou name est vide.
+    Lève ConflictError si le code existe déjà.
     """
+    if not code or not name:
+        raise ValidationError("Code et nom requis")
+
     cur.execute("SELECT id FROM perimeters WHERE code = %s", (code,))
     if cur.fetchone():
-        return None
+        raise ConflictError(f"Le code '{code}' existe déjà")
 
     cur.execute(
         """
@@ -100,27 +109,26 @@ def create_perimeter(cur, *, code: str, name: str, description: str | None = Non
     return cur.fetchone()["id"]
 
 
-def update_perimeter(cur, perimeter_id: int, *, fields: dict) -> bool:
+def update_perimeter(cur, perimeter_id: int, *, fields: dict) -> None:
     """Met à jour un périmètre (name, description, structure_ids).
 
-    Retourne True si le périmètre existe et a été mis à jour, False sinon.
-    Lève ValueError si `fields` est vide ou ne contient aucun champ valide.
+    Lève NotFoundError si le périmètre n'existe pas.
+    Lève ValidationError si `fields` est vide ou ne contient aucun champ valide.
     """
     cur.execute("SELECT id FROM perimeters WHERE id = %s", (perimeter_id,))
     if not cur.fetchone():
-        return False
+        raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
     allowed = {"name", "description", "structure_ids"}
     clean = {k: v for k, v in fields.items() if k in allowed}
     if not clean:
-        raise ValueError("Aucun champ à mettre à jour")
+        raise ValidationError("Aucun champ à mettre à jour")
 
     sets = ", ".join(f"{k} = %s" for k in clean)
     cur.execute(
         f"UPDATE perimeters SET {sets} WHERE id = %s",
         list(clean.values()) + [perimeter_id],
     )
-    return True
 
 
 def perimeter_usage(cur, perimeter_code: str) -> list[str]:
@@ -137,21 +145,20 @@ def perimeter_usage(cur, perimeter_code: str) -> list[str]:
     return [r["key"] for r in cur.fetchall()]
 
 
-def delete_perimeter(cur, perimeter_id: int) -> bool:
+def delete_perimeter(cur, perimeter_id: int) -> None:
     """Supprime un périmètre.
 
-    Retourne True si supprimé, False si introuvable.
-    Lève ValueError si le périmètre est utilisé par la config pipeline ;
+    Lève NotFoundError si le périmètre n'existe pas.
+    Lève ConflictError si le périmètre est utilisé par la config pipeline ;
     le message contient la liste des clés qui le référencent.
     """
     cur.execute("SELECT code FROM perimeters WHERE id = %s", (perimeter_id,))
     row = cur.fetchone()
     if not row:
-        return False
+        raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
     used_by = perimeter_usage(cur, row["code"])
     if used_by:
-        raise ValueError(f"Ce périmètre est utilisé par : {', '.join(used_by)}")
+        raise ConflictError(f"Ce périmètre est utilisé par : {', '.join(used_by)}")
 
     cur.execute("DELETE FROM perimeters WHERE id = %s", (perimeter_id,))
-    return True
