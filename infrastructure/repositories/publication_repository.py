@@ -164,6 +164,81 @@ class PgPublicationRepository:
             (pub_id,),
         )
 
+    # ── Agrégation depuis source_publications ──────────────────────
+
+    def get_source_rows(self, pub_id: int) -> list[dict]:
+        """Retourne toutes les lignes source_publications attachées à
+        une publication, avec les champs nécessaires au recalcul
+        d'agrégation (refresh_from_sources).
+
+        Utilise un RealDictCursor interne pour garantir l'accès par
+        nom de colonne, quel que soit le type de curseur du caller.
+        """
+        from psycopg2.extras import RealDictCursor
+        dict_cur = self._cur.connection.cursor(cursor_factory=RealDictCursor)
+        try:
+            dict_cur.execute(
+                """
+                SELECT source, doi, doc_type, pub_year, journal_id, oa_status,
+                       container_title, language, abstract, keywords, countries,
+                       topics, biblio, meta, is_retracted, external_ids
+                FROM source_publications
+                WHERE publication_id = %s
+                """,
+                (pub_id,),
+            )
+            return dict_cur.fetchall()
+        finally:
+            dict_cur.close()
+
+    def update_aggregated(
+        self,
+        pub_id: int,
+        *,
+        doi: str | None,
+        doc_type: str,
+        pub_year: int | None,
+        journal_id: int | None,
+        oa_status: str | None,
+        container_title: str | None,
+        language: str | None,
+        abstract: str | None,
+        keywords: list[str] | None,
+        countries: list[str] | None,
+        topics: dict | None,
+        biblio: dict | None,
+        meta: dict | None,
+        is_retracted: bool,
+    ) -> None:
+        """Écrit les valeurs agrégées sur une publication.
+
+        Appelé par refresh_from_sources après calcul des valeurs
+        fusionnées. Le caller garde la responsabilité d'appeler
+        ensuite `update_sources` pour le tableau `sources`.
+        """
+        from psycopg2.extras import Json
+        self._cur.execute(
+            """
+            UPDATE publications SET
+                doi = %s, doc_type = %s::doc_type, pub_year = %s,
+                journal_id = %s, oa_status = %s::oa_type,
+                container_title = %s, language = %s, abstract = %s,
+                keywords = %s, countries = %s,
+                topics = %s, biblio = %s, meta = %s,
+                is_retracted = %s, updated_at = now()
+            WHERE id = %s
+            """,
+            (
+                doi, doc_type, pub_year, journal_id, oa_status,
+                container_title, language, abstract, keywords, countries,
+                Json(topics) if topics else None,
+                Json(biblio) if biblio else None,
+                Json(meta) if meta else None,
+                is_retracted,
+                pub_id,
+            ),
+        )
+
     # ── Création ───────────────────────────────────────────────────
 
     def create(
