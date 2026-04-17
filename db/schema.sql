@@ -2578,6 +2578,32 @@ ALTER TABLE ONLY public.structure_relations
 
 
 --
+-- Name: audit_log; Type: TABLE; Schema: public; Owner: -
+-- Migration 006_audit_log.sql. Ajouté manuellement pour que la base de
+-- test soit alignée avec la migration (sans ré-exporter schema.sql).
+--
+
+CREATE TABLE IF NOT EXISTS public.audit_log (
+    id             bigserial PRIMARY KEY,
+    event_type     text        NOT NULL,
+    aggregate_type text        NOT NULL,
+    aggregate_id   integer,
+    payload        jsonb       NOT NULL DEFAULT '{}'::jsonb,
+    user_id        text,
+    created_at     timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS audit_log_aggregate_idx
+    ON public.audit_log (aggregate_type, aggregate_id);
+
+CREATE INDEX IF NOT EXISTS audit_log_event_type_idx
+    ON public.audit_log (event_type, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS audit_log_created_at_idx
+    ON public.audit_log (created_at DESC);
+
+
+--
 -- PostgreSQL database dump complete
 --
 

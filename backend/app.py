@@ -27,6 +27,7 @@ from domain.errors import (
     UnauthorizedError,
     ValidationError,
 )
+from services import audit
 from utils.log import configure_root_logging
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
@@ -137,7 +138,16 @@ async def auth_middleware(request: Request, call_next):
 
     # Payload format : "admin_user|timestamp"
     admin_user = payload.split("|", 1)[0] if "|" in payload else payload
-    response = await call_next(request)
+
+    # Propager l'utilisateur dans le contexte async pour que emit_event()
+    # l'inclue dans les enregistrements audit_log, sans polluer les
+    # signatures des services métier.
+    token_ctx = audit.set_current_user(admin_user)
+    try:
+        response = await call_next(request)
+    finally:
+        audit.reset_current_user(token_ctx)
+
     if response.status_code < 400:
         logger.info(
             "admin_action",
