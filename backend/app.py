@@ -10,6 +10,7 @@ Puis ouvrir http://localhost:8003
 
 import logging
 import os
+import time
 import traceback
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -18,7 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from backend.deps import _verify_token, get_cursor
+from backend.deps import _get_pool, _verify_token, get_cursor
 from utils.log import configure_root_logging
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
@@ -121,6 +122,34 @@ async def strip_prefix(request: Request, call_next):
     return await call_next(request)
 
 
+# Endpoints exclus du logging de timing (trop bavards, peu utiles)
+_METRICS_SKIP_PATHS = ("/api/health", "/api/metrics")
+
+
+@app.middleware("http")
+async def timing_middleware(request: Request, call_next):
+    """Mesure la durée de chaque requête, ajoute un header X-Response-Time
+    et log un record `request_completed` structuré (sauf /api/health et /api/metrics).
+    """
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = round((time.perf_counter() - start) * 1000, 2)
+    response.headers["X-Response-Time"] = f"{duration_ms}ms"
+
+    path = request.scope.get("path", "")
+    if not any(path.startswith(p) for p in _METRICS_SKIP_PATHS):
+        logger.info(
+            "request_completed",
+            extra={
+                "method": request.method,
+                "path": path,
+                "status": response.status_code,
+                "duration_ms": duration_ms,
+            },
+        )
+    return response
+
+
 # ----- Health check -----
 
 # Seuil à partir duquel une source est considérée "stale" (pas extraite
@@ -170,6 +199,31 @@ async def health():
         "last_extraction": last_extraction,
         "stale_sources": stale,
         "stale_threshold_days": _STALE_THRESHOLD_DAYS,
+    }
+
+
+# ----- Metrics -----
+
+
+@app.get("/api/metrics")
+async def metrics():
+    """Métriques internes : état du pool de connexions DB.
+
+    Le timing des requêtes est émis via le middleware `timing_middleware`
+    (champs `method`, `path`, `status`, `duration_ms` en JSON structuré).
+    """
+    pool = _get_pool()
+    # Les attributs _pool et _used sont des internals de psycopg2.ThreadedConnectionPool,
+    # mais stables depuis des années et sans API publique équivalente.
+    available = len(getattr(pool, "_pool", []))
+    in_use = len(getattr(pool, "_used", {}))
+    return {
+        "db_pool": {
+            "minconn": pool.minconn,
+            "maxconn": pool.maxconn,
+            "in_use": in_use,
+            "available": available,
+        },
     }
 
 
