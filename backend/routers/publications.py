@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/api/publications/facets")
-async def publications_facets(  # noqa: C901
+async def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus tard)
     year: str = Query(""),
     lab_id: str = Query(""),
     doc_type: str = Query(""),
@@ -506,7 +506,7 @@ async def all_years():
 
 
 @router.get("/api/publications/export.csv")
-async def export_publications_csv(  # noqa: C901
+async def export_publications_csv(  # noqa: C901 (export CSV : logique de sérialisation dédiée)
     search: str = Query(""),
     lab_id: str = Query(""),
     year: str = Query(""),
@@ -947,7 +947,7 @@ async def exclude_source_authorship(
 
 
 @router.get("/api/publications")
-async def list_publications(  # noqa: C901
+async def list_publications(  # noqa: C901 (refacto en cours, passé de 40 à 28)
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
@@ -1033,16 +1033,7 @@ async def list_publications(  # noqa: C901
             params.append(doc_types)
 
         if lab_none and not lab_ids:
-            # Aucun labo : publications UCA sans structure de type labo
-            conditions.append("""
-                NOT EXISTS (
-                    SELECT 1 FROM authorships a
-                    JOIN structures s ON s.id = ANY(a.structure_ids)
-                    WHERE a.publication_id = p.id
-                      AND NOT a.excluded
-                      AND s.structure_type = 'labo'
-                )
-            """)
+            apply_no_lab_filter(conditions, params)
         elif lab_ids:
             apply_lab_filter(conditions, params, lab_ids)
 
@@ -1066,16 +1057,8 @@ async def list_publications(  # noqa: C901
         # Access filter (open / closed)
         apply_access_filter(conditions, params, access)
 
-        # OA filter: expand 'oa' shortcut, then use ANY
-        if oa_values:
-            expanded = []
-            for v in oa_values:
-                if v == "oa":
-                    expanded.extend(OA_OPEN_STATUSES)
-                else:
-                    expanded.append(v)
-            conditions.append("p.oa_status::text = ANY(%s)")
-            params.append(list(set(expanded)))
+        # OA filter (supporte 'oa' comme shortcut pour les statuts ouverts)
+        apply_oa_filter(conditions, params, oa_status)
 
         # Corresponding author filter
         if person_id:
@@ -1083,51 +1066,8 @@ async def list_publications(  # noqa: C901
 
         # APC filter (supports multi-select via comma)
         if has_apc:
-            _rid2 = get_root_structure_id()
-            apc_values = [v.strip() for v in has_apc.split(",") if v.strip()]
-            APC_MAP = {
-                "uca": (
-                    "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s)",
-                    1,
-                ),
-                "other": (
-                    "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))",
-                    1,
-                ),
-                "non_uca": (
-                    "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s))",
-                    1,
-                ),
-                "none": (
-                    "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
-                    0,
-                ),
-                "yes": ("EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)", 0),
-                "no": (
-                    "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
-                    0,
-                ),
-            }
-            parts = []
-            for v in apc_values:
-                if v in APC_MAP:
-                    sql, rid_count = APC_MAP[v]
-                    parts.append(sql)
-                    params.extend([_rid2] * rid_count)
-                elif v == "this_lab" and lab_ids:
-                    parts.append(
-                        "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[]))"
-                    )
-                    params.append(lab_ids)
-                elif v == "other_uca" and lab_ids:
-                    parts.append(
-                        "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s) AND NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.lab_structure_id = ANY(%s::int[])))"
-                    )
-                    params.extend([_rid2, lab_ids])
-            if len(parts) == 1:
-                conditions.append(parts[0])
-            elif len(parts) > 1:
-                conditions.append("(" + " OR ".join(parts) + ")")
+            apply_apc_filter(conditions, params, has_apc,
+                             get_root_structure_id(), lab_ids=lab_ids)
 
         # Country filter
         if country_values:
@@ -1184,21 +1124,7 @@ async def list_publications(  # noqa: C901
                 conditions.append("(" + " OR ".join(hal_parts) + ")")
 
         # Filtre périmètre (in_perimeter de l'authorship de cette personne)
-        if in_perimeter and person_id:
-            if in_perimeter == "yes":
-                conditions.append("""
-                    EXISTS (SELECT 1 FROM authorships a
-                            WHERE a.publication_id = p.id AND a.person_id = %s
-                              AND a.in_perimeter = TRUE AND NOT a.excluded)
-                """)
-                params.append(person_id)
-            elif in_perimeter == "no":
-                conditions.append("""
-                    NOT EXISTS (SELECT 1 FROM authorships a
-                                WHERE a.publication_id = p.id AND a.person_id = %s
-                                  AND a.in_perimeter = TRUE AND NOT a.excluded)
-                """)
-                params.append(person_id)
+        apply_in_perimeter_person_filter(conditions, params, in_perimeter, person_id)
 
         where_clause = " AND ".join(conditions) if conditions else "TRUE"
 
