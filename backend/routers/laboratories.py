@@ -115,21 +115,6 @@ async def get_laboratory(lab_id: int):
         }
 
 
-def persons_sort_clause(sort: str) -> str:
-    """Return an ORDER BY clause for the lab persons query."""
-    SORT_MAP = {
-        "name": "p.last_name ASC, p.first_name ASC",
-        "-name": "p.last_name DESC, p.first_name DESC",
-        "pubs": "pub_count ASC, p.last_name ASC",
-        "-pubs": "pub_count DESC, p.last_name ASC",
-        "dept": "prh.department_name ASC NULLS LAST, p.last_name ASC",
-        "-dept": "prh.department_name DESC NULLS LAST, p.last_name ASC",
-        "role": "prh.role_title ASC NULLS LAST, p.last_name ASC",
-        "-role": "prh.role_title DESC NULLS LAST, p.last_name ASC",
-    }
-    return SORT_MAP.get(sort, SORT_MAP["name"])
-
-
 @router.get("/api/laboratories/{lab_id}/persons")
 async def get_laboratory_persons(
     lab_id: int,
