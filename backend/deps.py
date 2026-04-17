@@ -7,6 +7,8 @@ import hmac
 import time
 from contextlib import contextmanager
 
+import bcrypt
+
 from fastapi import Cookie, HTTPException
 from fastapi.staticfiles import StaticFiles
 
@@ -14,7 +16,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.settings import DB, DB_POOL_MIN, DB_POOL_MAX, ADMIN_USER, ADMIN_SALT, ADMIN_HASH, SESSION_SECRET
+from config.settings import DB, DB_POOL_MIN, DB_POOL_MAX, ADMIN_USER, ADMIN_HASH, SESSION_SECRET
 
 
 # ----- SPA Static Files -----
@@ -60,7 +62,9 @@ def _verify_token(token: str) -> str | None:
 
 
 def _check_password(password: str) -> bool:
-    return hashlib.sha256((ADMIN_SALT + password).encode()).hexdigest() == ADMIN_HASH
+    if not ADMIN_HASH:
+        return False
+    return bcrypt.checkpw(password.encode(), ADMIN_HASH.encode())
 
 
 def require_admin(session: str | None = Cookie(None, alias="session")):

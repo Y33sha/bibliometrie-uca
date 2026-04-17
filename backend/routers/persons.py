@@ -5,7 +5,9 @@ import re
 import sys
 from fastapi import APIRouter, Query, HTTPException, Depends
 from backend.deps import get_cursor, require_admin
-from backend.models import AddIdentifier
+from backend.models import (AddIdentifier, UpdateIdentifierStatus, ReassignIdentifier,
+    RejectPerson, UpdatePersonName, MergePersons, AssignOrphanAuthorship,
+    BatchAssignOrphanAuthorships, DetachAuthorships, DetachNameForm)
 from backend.filters import (PUB_IS_UCA, OA_OPEN_STATUSES, persons_sort_clause,
     parse_int_csv, parse_str_csv, apply_source_filter)
 from utils.sources import AUTHOR_SOURCES_SQL, ALL_SOURCES_SET
@@ -799,16 +801,13 @@ async def remove_person_identifier(person_id: int, id_type: str, id_value: str):
 
 
 @router.patch("/api/person-identifiers/{ident_id}/status")
-async def update_identifier_status(ident_id: int, body: dict):
+async def update_identifier_status(ident_id: int, body: UpdateIdentifierStatus):
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
-    new_status = body.get("status")
-    if new_status not in ("pending", "confirmed", "rejected"):
-        raise HTTPException(status_code=400, detail="Statut invalide")
     with get_cursor() as (cur, conn):
         cur.execute("""
             UPDATE person_identifiers SET status = %s::identifier_status
             WHERE id = %s RETURNING id, status
-        """, (new_status, ident_id))
+        """, (body.status, ident_id))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Identifiant introuvable")
@@ -816,11 +815,9 @@ async def update_identifier_status(ident_id: int, body: dict):
 
 
 @router.patch("/api/person-identifiers/{ident_id}/reassign")
-async def reassign_identifier(ident_id: int, body: dict):
+async def reassign_identifier(ident_id: int, body: ReassignIdentifier):
     """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
-    target_person_id = body.get("person_id")
-    if not target_person_id:
-        raise HTTPException(status_code=400, detail="person_id requis")
+    target_person_id = body.person_id
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id, status FROM person_identifiers WHERE id = %s", (ident_id,))
         ident = cur.fetchone()
@@ -848,9 +845,9 @@ async def toggle_authorship_excluded(authorship_id: int):
 
 
 @router.patch("/api/persons/{person_id}/reject")
-async def reject_person(person_id: int, body: dict):
+async def reject_person(person_id: int, body: RejectPerson):
     """Marque/démarque une personne comme rejetée (fausse entité)."""
-    rejected = body.get("rejected", True)
+    rejected = body.rejected
     with get_cursor() as (cur, conn):
         cur.execute("UPDATE persons SET rejected = %s, updated_at = now() WHERE id = %s",
                     (rejected, person_id))
@@ -860,10 +857,10 @@ async def reject_person(person_id: int, body: dict):
 
 
 @router.patch("/api/persons/{person_id}/name")
-async def update_person_name(person_id: int, body: dict):
+async def update_person_name(person_id: int, body: UpdatePersonName):
     """Modifie le nom/prénom d'une personne."""
-    last_name = body.get("last_name", "").strip()
-    first_name = body.get("first_name", "").strip()
+    last_name = body.last_name.strip()
+    first_name = body.first_name.strip()
     if not last_name:
         raise HTTPException(status_code=400, detail="Le nom est requis")
     with get_cursor() as (cur, conn):
@@ -882,10 +879,10 @@ async def update_person_name(person_id: int, body: dict):
 
 
 @router.post("/api/persons/{person_id}/merge")
-async def merge_persons(person_id: int, body: dict):
+async def merge_persons(person_id: int, body: MergePersons):
     """Fusionne une autre personne (source) dans celle-ci (target)."""
-    source_id = body.get("source_id")
-    if not source_id or source_id == person_id:
+    source_id = body.source_id
+    if source_id == person_id:
         raise HTTPException(status_code=400, detail="source_id invalide")
 
     with get_cursor() as (cur, conn):
@@ -992,22 +989,19 @@ async def list_orphan_authorships(
 
 
 @router.post("/api/admin/orphan-authorships/assign")
-async def assign_orphan_authorship_endpoint(body: dict):
+async def assign_orphan_authorship_endpoint(body: AssignOrphanAuthorship):
     """Attribue une authorship orpheline à une personne existante ou nouvelle."""
-    source = body.get("source")
-    authorship_id = body.get("authorship_id")
-    person_id = body.get("person_id")
-    create_person_name = body.get("create_person")  # { last_name, first_name }
+    source = body.source
+    authorship_id = body.authorship_id
+    person_id = body.person_id
 
-    if not source or not authorship_id:
-        raise HTTPException(status_code=400, detail="source et authorship_id requis")
     if source not in ALL_SOURCES_SET:
         raise HTTPException(status_code=400, detail=f"Source inconnue: {source}")
 
     with get_cursor() as (cur, conn):
-        if create_person_name:
-            ln = create_person_name.get("last_name", "").strip()
-            fn = create_person_name.get("first_name", "").strip()
+        if body.create_person:
+            ln = body.create_person.last_name.strip()
+            fn = body.create_person.first_name.strip()
             if not ln:
                 raise HTTPException(status_code=400, detail="Nom requis")
             person_id = _create_person(cur, ln, fn)
@@ -1025,7 +1019,7 @@ async def assign_orphan_authorship_endpoint(body: dict):
 
 
 @router.post("/api/admin/orphan-authorships/batch-assign")
-async def batch_assign_orphan_authorships(body: dict):
+async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships):
     """Attribue plusieurs authorships orphelines a une meme personne.
 
     Fait tout en SQL batch au lieu d'iterer authorship par authorship :
@@ -1034,13 +1028,10 @@ async def batch_assign_orphan_authorships(body: dict):
     3. Met les FK source_authorships.authorship_id
     4. Ajoute les formes de noms
     """
-    authorships = body.get("authorships", [])  # [{ source, authorship_id }, ...]
-    person_id = body.get("person_id")
-    if not authorships or not person_id:
-        raise HTTPException(status_code=400, detail="authorships et person_id requis")
+    person_id = body.person_id
 
-    sa_ids = [a["authorship_id"] for a in authorships
-              if a.get("source") in ALL_SOURCES_SET]
+    sa_ids = [a.authorship_id for a in body.authorships
+              if a.source in ALL_SOURCES_SET]
     if not sa_ids:
         return {"ok": True, "assigned": 0}
 
@@ -1135,18 +1126,17 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
 
 
 @router.post("/api/persons/{person_id}/detach-authorships")
-async def detach_authorships(person_id: int, body: dict):
+async def detach_authorships(person_id: int, body: DetachAuthorships):
     """Détache des authorships sources d'une personne et nettoie les formes de noms.
 
     body.authorships: [{ source: 'hal'|'openalex'|'wos', authorship_id: int }, ...]
     body.name_form: str — forme de nom à supprimer si toutes ses authorships sont détachées
     """
-    authorships = body.get("authorships", [])
-    name_form = body.get("name_form", "")
+    name_form = body.name_form
 
     with get_cursor() as (cur, conn):
-        for a in authorships:
-            _unlink_authorship(cur, person_id, a["source"], a["authorship_id"])
+        for a in body.authorships:
+            _unlink_authorship(cur, person_id, a.source, a.authorship_id)
 
         # Supprimer les authorships vérité orphelines
         deleted_authorships = _delete_orphan_authorships(cur, person_id)
@@ -1176,18 +1166,16 @@ async def detach_authorships(person_id: int, body: dict):
                     cleaned_form = True
 
         return {
-            "detached": len(authorships),
+            "detached": len(body.authorships),
             "deleted_authorships": deleted_authorships,
             "cleaned_form": cleaned_form,
         }
 
 
 @router.post("/api/persons/{person_id}/detach-name-form")
-async def detach_name_form(person_id: int, body: dict):
+async def detach_name_form(person_id: int, body: DetachNameForm):
     """Détache une forme de nom d'une personne (quand aucune authorship n'y est liée)."""
-    name_form = body.get("name_form", "")
-    if not name_form:
-        raise HTTPException(status_code=400, detail="name_form requis")
+    name_form = body.name_form
 
     with get_cursor() as (cur, conn):
         # Vérifier qu'il n'y a aucune authorship liée

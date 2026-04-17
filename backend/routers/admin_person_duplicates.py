@@ -6,6 +6,7 @@ import psycopg2.extras
 from fastapi import APIRouter, Query, HTTPException
 from backend.deps import get_cursor
 from backend.filters import parse_str_csv
+from backend.models import MarkPersonsDistinct
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from services.persons import merge_person as _merge_person
@@ -293,11 +294,9 @@ async def next_person_duplicate(
 
 
 @router.post("/api/admin/person-duplicates/mark-distinct")
-async def mark_persons_distinct(body: dict):
+async def mark_persons_distinct(body: MarkPersonsDistinct):
     """Marque deux personnes comme distinctes (non-doublon)."""
-    a = body.get("person_id_a")
-    b = body.get("person_id_b")
-    if not a or not b or a == b:
+    if body.person_id_a == body.person_id_b:
         raise HTTPException(status_code=400, detail="person_id_a et person_id_b requis et différents")
 
     with get_cursor() as (cur, conn):
@@ -305,7 +304,7 @@ async def mark_persons_distinct(body: dict):
             INSERT INTO distinct_persons (person_id_a, person_id_b)
             VALUES (LEAST(%s, %s), GREATEST(%s, %s))
             ON CONFLICT DO NOTHING
-        """, (a, b, a, b))
+        """, (body.person_id_a, body.person_id_b, body.person_id_a, body.person_id_b))
         return {"ok": True}
 
 

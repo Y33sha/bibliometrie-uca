@@ -8,39 +8,30 @@ from backend.filters import (PUB_IS_UCA, parse_int_csv,
 router = APIRouter()
 
 
-def _apc_root_exists():
-    rid = get_root_structure_id()
-    return f"EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {rid})"
-
-
-def _apc_root_not_exists():
-    rid = get_root_structure_id()
-    return f"NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {rid})"
-
-
-def _apc_root_sum():
-    rid = get_root_structure_id()
-    return f"""COALESCE((SELECT SUM(ap.amount_eur_ht)
+_APC_EXISTS = "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s)"
+_APC_NOT_EXISTS = "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s)"
+_APC_SUM = """COALESCE((SELECT SUM(ap.amount_eur_ht)
      FROM apc_payments ap
-     WHERE ap.publication_id = p.id AND ap.budget_structure_id = {rid}
+     WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s
     ), 0)"""
 
-
-def _apc_sql():
-    return {
-        "uca": _apc_root_exists(),
-        "non_uca": f"(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND {_apc_root_not_exists()})",
-        "none": "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)",
-    }
+_APC_FILTER_MAP = {
+    "uca": (_APC_EXISTS, 1),
+    "non_uca": (f"(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) AND {_APC_NOT_EXISTS})", 1),
+    "none": ("NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)", 0),
+}
 
 
-def apply_apc_filter(conditions: list, has_apc: str):
+def apply_apc_filter(conditions: list, params: list, has_apc: str):
     """Ajoute le filtre APC aux conditions SQL. Supporte multi-sélection (virgule)."""
     if not has_apc:
         return
-    apc_sql = _apc_sql()
+    rid = get_root_structure_id()
     values = [v.strip() for v in has_apc.split(',') if v.strip()]
-    parts = [apc_sql[v] for v in values if v in apc_sql]
+    entries = [_APC_FILTER_MAP[v] for v in values if v in _APC_FILTER_MAP]
+    parts = [e[0] for e in entries]
+    for e in entries:
+        params.extend([rid] * e[1])
     if len(parts) == 1:
         conditions.append(parts[0])
     elif len(parts) > 1:
@@ -75,7 +66,7 @@ async def publisher_stats(
         apply_lab_filter(conditions, params, lab_ids)
         apply_year_filter(conditions, params, years)
         apply_oa_filter(conditions, params, oa_status)
-        apply_apc_filter(conditions, has_apc)
+        apply_apc_filter(conditions, params, has_apc)
 
         if search:
             conditions.append("unaccent(pub.name) ILIKE unaccent(%s)")
@@ -92,13 +83,14 @@ async def publisher_stats(
         """, params)
         total = cur.fetchone()["total"]
 
+        rid = get_root_structure_id()
         cur.execute(f"""
             SELECT
                 pub.id AS publisher_id,
                 pub.name AS publisher_name,
                 COUNT(DISTINCT j.id) AS journal_count,
                 COUNT(DISTINCT p.id) AS pub_count,
-                SUM({_apc_root_sum()})::numeric(12,2) AS apc_uca,
+                SUM({_APC_SUM})::numeric(12,2) AS apc_uca,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
@@ -122,7 +114,7 @@ async def publisher_stats(
                 }.get(sort, "COUNT(DISTINCT p.id) DESC")
             }
             LIMIT %s OFFSET %s
-        """, params + [per_page, offset])
+        """, [rid] + params + [per_page, offset])
 
         return {
             "total": total,
@@ -172,7 +164,7 @@ async def journal_stats(
             params.append(f"%{search}%")
 
         apply_oa_filter(conditions, params, oa_status)
-        apply_apc_filter(conditions, has_apc)
+        apply_apc_filter(conditions, params, has_apc)
 
         where = " AND ".join(conditions)
 
@@ -184,6 +176,7 @@ async def journal_stats(
         """, params)
         total = cur.fetchone()["total"]
 
+        rid = get_root_structure_id()
         cur.execute(f"""
             SELECT
                 j.id AS journal_id,
@@ -194,7 +187,7 @@ async def journal_stats(
                 j.is_predatory,
                 j.apc_amount,
                 COUNT(DISTINCT p.id) AS pub_count,
-                SUM({_apc_root_sum()})::numeric(12,2) AS apc_uca,
+                SUM({_APC_SUM})::numeric(12,2) AS apc_uca,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
                 COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
@@ -218,7 +211,7 @@ async def journal_stats(
                 }.get(sort, "COUNT(DISTINCT p.id) DESC")
             }
             LIMIT %s OFFSET %s
-        """, params + [per_page, offset])
+        """, [rid] + params + [per_page, offset])
 
         return {
             "total": total,
@@ -263,7 +256,7 @@ async def stats_by_year(
             params.append(journal_id)
 
         apply_oa_filter(conditions, params, oa_status)
-        apply_apc_filter(conditions, has_apc)
+        apply_apc_filter(conditions, params, has_apc)
 
         where = " AND ".join(conditions)
 
@@ -322,7 +315,7 @@ async def stats_summary(
             params.append(journal_id)
 
         apply_oa_filter(conditions, params, oa_status)
-        apply_apc_filter(conditions, has_apc)
+        apply_apc_filter(conditions, params, has_apc)
 
         where = " AND ".join(conditions)
 
@@ -385,7 +378,7 @@ async def stats_labs(
             params.append(journal_id)
 
         apply_oa_filter(conditions, params, oa_status)
-        apply_apc_filter(conditions, has_apc)
+        apply_apc_filter(conditions, params, has_apc)
 
         where = " AND ".join(conditions)
 
@@ -507,7 +500,7 @@ async def stats_facets(
             if skip != "oa":
                 apply_oa_filter(conds, params, oa_status)
             if skip != "apc":
-                apply_apc_filter(conds, has_apc)
+                apply_apc_filter(conds, params, has_apc)
 
         # --- Facette ANNÉES (exclut le filtre année, garde les autres) ---
         year_conds = list(base_conditions)
@@ -573,12 +566,12 @@ async def stats_facets(
         cur.execute(f"""
             SELECT
                 COUNT(DISTINCT p.id) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {rid}
+                    SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s
                 )) AS apc_uca,
                 COUNT(DISTINCT p.id) FILTER (WHERE EXISTS (
                     SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
                 ) AND NOT EXISTS (
-                    SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = {rid}
+                    SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id AND ap.budget_structure_id = %s
                 )) AS apc_non_uca,
                 COUNT(DISTINCT p.id) FILTER (WHERE NOT EXISTS (
                     SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
@@ -586,7 +579,7 @@ async def stats_facets(
             FROM publications p
             LEFT JOIN journals j ON j.id = p.journal_id
             WHERE {apc_where}
-        """, apc_params)
+        """, [rid, rid] + apc_params)
         ar = cur.fetchone()
         apc_facets = [
             {"value": "uca", "text": "APC UCA", "count": ar["apc_uca"]},

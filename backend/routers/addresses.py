@@ -4,7 +4,7 @@ import logging
 from fastapi import APIRouter, Query, HTTPException, Depends, BackgroundTasks
 from backend.deps import get_cursor, require_admin
 from services.authorships import propagate_uca_for_addresses
-from backend.models import ReviewAction, BatchReviewAction, AssignStructureAction
+from backend.models import ReviewAction, BatchReviewAction, AssignStructureAction, SetCountry, BatchSetCountry
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -484,9 +484,9 @@ async def suggest_countries(
 
 
 @router.post("/api/addresses/{addr_id}/country")
-async def set_address_country(addr_id: int, body: dict, bg: BackgroundTasks, _=Depends(require_admin)):
+async def set_address_country(addr_id: int, body: SetCountry, bg: BackgroundTasks, _=Depends(require_admin)):
     """Attribue des pays à une adresse."""
-    countries = body.get("countries")  # list of codes, or None to clear
+    countries = body.countries
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id FROM addresses WHERE id = %s", (addr_id,))
         if not cur.fetchone():
@@ -518,7 +518,7 @@ async def set_address_country(addr_id: int, body: dict, bg: BackgroundTasks, _=D
 
 
 @router.post("/api/addresses/batch-country")
-async def batch_set_country(body: dict, bg: BackgroundTasks, _=Depends(require_admin)):
+async def batch_set_country(body: BatchSetCountry, bg: BackgroundTasks, _=Depends(require_admin)):
     """Ajoute un pays à des adresses — par IDs ou par filtre.
 
     body.country_code: code pays à ajouter
@@ -526,12 +526,12 @@ async def batch_set_country(body: dict, bg: BackgroundTasks, _=Depends(require_a
     body.search: filtre texte (appliqué à toutes les adresses matching)
     body.has_country: "yes" ou "no" (filtre additionnel)
     """
-    country_code = body.get("country_code")
-    address_ids = body.get("address_ids")
-    filter_search = body.get("search", "")
-    filter_has_country = body.get("has_country", "")
-    filter_country = body.get("country_code_filter", "")  # filtre pays existant
-    filter_suggested = body.get("suggested_country", "")
+    country_code = body.country_code
+    address_ids = body.address_ids
+    filter_search = body.search
+    filter_has_country = body.has_country
+    filter_country = body.country_code_filter
+    filter_suggested = body.suggested_country
 
     if not country_code:
         raise HTTPException(status_code=400, detail="country_code requis")
