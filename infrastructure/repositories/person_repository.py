@@ -108,6 +108,95 @@ class PgPersonRepository:
             return None
         return row["person_id_a"], row["person_id_b"]
 
+    # ── person_identifiers ─────────────────────────────────────────
+
+    def add_identifier(
+        self,
+        person_id: int,
+        id_type: str,
+        id_value: str,
+        source: str = "auto",
+        status: str = "pending",
+    ) -> None:
+        """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
+
+        Si l'identifiant existe avec statut 'rejected', le réattribue
+        (nouveau person_id, statut pending). Si 'pending' ou 'confirmed',
+        ne fait rien.
+
+        Pour les idHAL, rattache aussi le compte HAL correspondant dans
+        `source_persons` (side-effect cross-table attendu par le pipeline).
+        """
+        self._cur.execute(
+            """
+            INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
+            VALUES (%s, %s, %s, %s, %s::identifier_status)
+            ON CONFLICT (id_type, id_value) DO UPDATE SET
+                person_id = EXCLUDED.person_id,
+                source = EXCLUDED.source,
+                status = 'pending'
+            WHERE person_identifiers.status = 'rejected'
+            """,
+            (person_id, id_type, id_value, source, status),
+        )
+
+        if id_type == "idhal":
+            self._cur.execute(
+                """
+                UPDATE source_persons SET person_id = %s
+                WHERE source = 'hal'
+                  AND source_ids->>'idhal' = %s
+                  AND (person_id IS NULL OR person_id != %s)
+                """,
+                (person_id, id_value, person_id),
+            )
+
+    def remove_identifier(self, person_id: int, id_type: str, id_value: str) -> None:
+        """Supprime un identifiant. Lève NotFoundError s'il n'existe pas."""
+        self._cur.execute(
+            """
+            DELETE FROM person_identifiers
+            WHERE person_id = %s AND id_type = %s AND id_value = %s
+            """,
+            (person_id, id_type, id_value),
+        )
+        if self._cur.rowcount == 0:
+            raise NotFoundError("Identifiant introuvable")
+
+    def update_identifier_status(self, ident_id: int, status: str) -> dict:
+        """Change le statut d'un identifiant.
+
+        Retourne {id, status, person_id}. Lève NotFoundError si l'identifiant
+        n'existe pas. Le service utilisera person_id pour l'audit.
+        """
+        self._cur.execute(
+            """
+            UPDATE person_identifiers SET status = %s::identifier_status
+            WHERE id = %s RETURNING id, status::text AS status, person_id
+            """,
+            (status, ident_id),
+        )
+        row = self._cur.fetchone()
+        if not row:
+            raise NotFoundError(f"Identifiant {ident_id} introuvable")
+        return row
+
+    def reassign_identifier(self, ident_id: int, target_person_id: int) -> None:
+        """Réattribue un identifiant à une autre personne (statut → pending).
+
+        Lève NotFoundError si l'identifiant n'existe pas.
+        """
+        self._cur.execute(
+            """
+            UPDATE person_identifiers
+            SET person_id = %s, status = 'pending'::identifier_status
+            WHERE id = %s
+            """,
+            (target_person_id, ident_id),
+        )
+        if self._cur.rowcount == 0:
+            raise NotFoundError(f"Identifiant {ident_id} introuvable")
+
     # ── person_name_forms ──────────────────────────────────────────
 
     def refresh_name_forms(self, person_id: int, forms: set[str]) -> None:
