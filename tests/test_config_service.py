@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from domain.errors import ConflictError, NotFoundError, ValidationError
 from services.config import (
     add_perimeter_structure,
     create_perimeter,
@@ -33,8 +34,9 @@ def _insert_perimeter(db, code="test", name="Test", structure_ids=None):
 # ── update_config_value ────────────────────────────────────────────
 
 class TestUpdateConfigValue:
-    def test_returns_none_if_not_found(self, db):
-        assert update_config_value(db, "nonexistent", "x") is None
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            update_config_value(db, "nonexistent", "x")
 
     def test_updates_existing(self, db):
         _insert_config(db, "test_key", "old")
@@ -71,7 +73,8 @@ class TestAddPerimeterStructure:
         assert add_perimeter_structure(db, p, s) == "already_present"
 
     def test_perimeter_not_found(self, db):
-        assert add_perimeter_structure(db, 999999, 1) == "not_found"
+        with pytest.raises(NotFoundError):
+            add_perimeter_structure(db, 999999, 1)
 
 
 # ── remove_perimeter_structure ─────────────────────────────────────
@@ -79,16 +82,17 @@ class TestAddPerimeterStructure:
 class TestRemovePerimeterStructure:
     def test_removes_if_present(self, db):
         p = _insert_perimeter(db, structure_ids=[1, 2, 3])
-        assert remove_perimeter_structure(db, p, 2) is True
+        remove_perimeter_structure(db, p, 2)
         db.execute("SELECT structure_ids FROM perimeters WHERE id = %s", (p,))
         assert db.fetchone()["structure_ids"] == [1, 3]
 
     def test_idempotent_if_absent(self, db):
         p = _insert_perimeter(db, structure_ids=[1])
-        assert remove_perimeter_structure(db, p, 999) is True  # no-op mais périmètre existe
+        remove_perimeter_structure(db, p, 999)  # no-op : pas d'erreur
 
-    def test_returns_false_if_perimeter_not_found(self, db):
-        assert remove_perimeter_structure(db, 999999, 1) is False
+    def test_raises_if_perimeter_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            remove_perimeter_structure(db, 999999, 1)
 
 
 # ── create_perimeter ───────────────────────────────────────────────
@@ -103,26 +107,34 @@ class TestCreatePerimeter:
         assert row["code"] == "new_perim"
         assert row["name"] == "New Perimeter"
 
-    def test_returns_none_on_code_conflict(self, db):
+    def test_raises_on_code_conflict(self, db):
         _insert_perimeter(db, code="existing")
-        assert create_perimeter(db, code="existing", name="X") is None
+        with pytest.raises(ConflictError):
+            create_perimeter(db, code="existing", name="X")
+
+    def test_raises_on_empty_code_or_name(self, db):
+        with pytest.raises(ValidationError):
+            create_perimeter(db, code="", name="X")
+        with pytest.raises(ValidationError):
+            create_perimeter(db, code="X", name="")
 
 
 # ── update_perimeter ───────────────────────────────────────────────
 
 class TestUpdatePerimeter:
-    def test_returns_false_if_not_found(self, db):
-        assert update_perimeter(db, 999999, fields={"name": "X"}) is False
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            update_perimeter(db, 999999, fields={"name": "X"})
 
     def test_raises_on_empty_fields(self, db):
         p = _insert_perimeter(db)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             update_perimeter(db, p, fields={})
 
     def test_raises_if_no_valid_field(self, db):
         """Seules name, description, structure_ids sont permises."""
         p = _insert_perimeter(db)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             update_perimeter(db, p, fields={"code": "other"})  # code non modifiable
 
     def test_updates_name_and_description(self, db):
@@ -143,12 +155,13 @@ class TestUpdatePerimeter:
 # ── delete_perimeter ───────────────────────────────────────────────
 
 class TestDeletePerimeter:
-    def test_returns_false_if_not_found(self, db):
-        assert delete_perimeter(db, 999999) is False
+    def test_raises_not_found(self, db):
+        with pytest.raises(NotFoundError):
+            delete_perimeter(db, 999999)
 
     def test_deletes(self, db):
         p = _insert_perimeter(db, code="disposable")
-        assert delete_perimeter(db, p) is True
+        delete_perimeter(db, p)
         db.execute("SELECT id FROM perimeters WHERE id = %s", (p,))
         assert db.fetchone() is None
 
@@ -157,7 +170,7 @@ class TestDeletePerimeter:
         p = _insert_perimeter(db, code="used_perim")
         _insert_config(db, "perimeter_extraction", "used_perim")
 
-        with pytest.raises(ValueError, match="utilisé par"):
+        with pytest.raises(ConflictError, match="utilisé par"):
             delete_perimeter(db, p)
 
         # Le périmètre existe toujours
