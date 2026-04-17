@@ -9,87 +9,45 @@ Les fonctions find_by_* retournent des namedtuples pour un accès par nom
 indépendant du type de curseur (tuple ou RealDictCursor).
 """
 
-from collections import namedtuple
-
 from psycopg2.extras import Json
 
+from infrastructure.repositories.publication_repository import (
+    PgPublicationRepository,
+    PubByDoi,
+    PubByNnt,
+    PubByTitle,
+    PubThesisCandidate,
+)
 from services.audit import emit_event
 from utils.db_helpers import row_val as _val
 from utils.doc_types import map_doc_type
 
-PubByDoi = namedtuple("PubByDoi", ["id", "doc_type", "title_normalized"])
-PubByNnt = namedtuple("PubByNnt", ["id", "doc_type", "title_normalized"])
-PubByTitle = namedtuple("PubByTitle", ["id", "doi"])
-PubThesisCandidate = namedtuple("PubThesisCandidate", ["id", "doi"])
+# Re-export des namedtuples pour les call sites historiques (scripts,
+# processing) qui font `from services.publications import PubByDoi`.
+__all__ = [
+    "PubByDoi", "PubByNnt", "PubByTitle", "PubThesisCandidate",
+    # Fonctions publiques du service (ajoutées au fur et à mesure).
+]
 
 
 def find_by_doi(cur, doi: str) -> PubByDoi | None:
     """Cherche une publication par DOI (case-insensitive)."""
-    if not doi:
-        return None
-    cur.execute(
-        "SELECT id, doc_type, title_normalized FROM publications WHERE lower(doi) = lower(%s)",
-        (doi,),
-    )
-    row = cur.fetchone()
-    return PubByDoi(_val(row, 0), _val(row, 1), _val(row, 2)) if row else None
+    return PgPublicationRepository(cur).find_by_doi(doi)
 
 
 def find_by_nnt(cur, nnt: str) -> PubByNnt | None:
-    """Cherche une publication via NNT stocké dans source_publications.external_ids."""
-    if not nnt:
-        return None
-    cur.execute(
-        """
-        SELECT p.id, p.doc_type, p.title_normalized
-        FROM publications p
-        JOIN source_publications sd ON sd.publication_id = p.id
-        WHERE sd.external_ids->>'nnt' = %s
-        LIMIT 1
-    """,
-        (nnt.upper(),),
-    )
-    row = cur.fetchone()
-    return PubByNnt(_val(row, 0), _val(row, 1), _val(row, 2)) if row else None
+    """Cherche une publication via NNT (source_publications.external_ids)."""
+    return PgPublicationRepository(cur).find_by_nnt(nnt)
 
 
 def find_by_title(cur, title_normalized: str, pub_year: int, journal_id: int) -> PubByTitle | None:
-    """Cherche une publication par titre normalisé + année + journal.
-    Ne matche que les articles avec journal connu (aucun NULL dans les critères).
-    """
-    if not title_normalized or not journal_id:
-        return None
-    cur.execute(
-        """
-        SELECT id, doi FROM publications
-        WHERE title_normalized = %s AND pub_year = %s AND journal_id = %s
-        LIMIT 1
-    """,
-        (title_normalized, pub_year, journal_id),
-    )
-    row = cur.fetchone()
-    return PubByTitle(_val(row, 0), _val(row, 1)) if row else None
+    """Cherche une publication par titre normalisé + année + journal."""
+    return PgPublicationRepository(cur).find_by_title(title_normalized, pub_year, journal_id)
 
 
 def find_thesis_by_title(cur, title_normalized: str, pub_year: int) -> list[PubThesisCandidate]:
-    """Cherche des thèses par titre normalisé + année.
-
-    Retourne les candidats pour déduplication thesis-specific
-    (pas de journal_id, donc le tier 2 standard ne fonctionne pas).
-    """
-    if not title_normalized or not pub_year:
-        return []
-    cur.execute(
-        """
-        SELECT id, doi FROM publications
-        WHERE title_normalized = %s AND pub_year = %s
-          AND doc_type IN ('thesis', 'ongoing_thesis')
-        ORDER BY id
-    """,
-        (title_normalized, pub_year),
-    )
-    rows = cur.fetchall()
-    return [PubThesisCandidate(_val(row, 0), _val(row, 1)) for row in rows]
+    """Cherche des thèses par titre normalisé + année (sans journal_id)."""
+    return PgPublicationRepository(cur).find_thesis_by_title(title_normalized, pub_year)
 
 
 def try_merge_by_doi(cur, pub_id: int, doi: str | None) -> int:
