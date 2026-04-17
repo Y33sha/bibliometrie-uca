@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from backend.deps import get_cursor
 from backend.models import MarkPersonsDistinct
+from services.persons import mark_distinct as _mark_persons_distinct
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -310,16 +311,8 @@ async def mark_persons_distinct(body: MarkPersonsDistinct):
         raise HTTPException(
             status_code=400, detail="person_id_a et person_id_b doivent être différents"
         )
-
     with get_cursor() as (cur, conn):
-        cur.execute(
-            """
-            INSERT INTO distinct_persons (person_id_a, person_id_b)
-            VALUES (LEAST(%s, %s), GREATEST(%s, %s))
-            ON CONFLICT DO NOTHING
-        """,
-            (body.person_id_a, body.person_id_b, body.person_id_a, body.person_id_b),
-        )
+        _mark_persons_distinct(cur, body.person_id_a, body.person_id_b)
         return {"ok": True}
 
 
