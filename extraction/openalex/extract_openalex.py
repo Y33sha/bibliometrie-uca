@@ -30,6 +30,7 @@ from extraction.openalex import (
     init_auth,
 )
 from utils.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
+from utils.api_retry import http_request_with_retry
 from utils.app_config import (
     get_api_base_urls,
     get_openalex_api_key,
@@ -37,7 +38,6 @@ from utils.app_config import (
     get_openalex_institution_ids,
     get_years,
 )
-
 
 # ----- Logging -----
 logger = setup_logger("extract_openalex", os.path.join(os.path.dirname(__file__), "logs"))
@@ -72,19 +72,10 @@ def fetch_page(
     institution_ids: list[str] = None,
     since: str = None,
 ) -> dict:
-    """Récupère une page de résultats depuis l'API (avec retry sur 429)."""
+    """Récupère une page de résultats depuis l'API OpenAlex (avec retry/backoff)."""
     params = build_params(year, cursor, institution_ids=institution_ids, since=since)
-    for attempt in range(5):
-        response = requests.get(base_url, params=params, timeout=30)
-        if response.status_code == 429:
-            wait = 2**attempt  # 1, 2, 4, 8, 16 secondes
-            logger.warning(f"429 Too Many Requests — pause {wait}s (tentative {attempt + 1}/5)")
-            time.sleep(wait)
-            continue
-        response.raise_for_status()
-        return response.json()
-    response.raise_for_status()  # lève l'erreur après 5 tentatives
-    return {}
+    label = f"OpenAlex {since or year}"
+    return http_request_with_retry("GET", base_url, params=params, timeout=30, label=label)
 
 
 def insert_batch(conn, batch: list[tuple]) -> int:

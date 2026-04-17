@@ -14,7 +14,6 @@ import argparse
 import os
 import time
 
-import requests
 from psycopg2.extras import Json
 
 from db.connection import get_connection
