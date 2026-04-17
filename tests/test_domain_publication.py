@@ -1,9 +1,11 @@
-"""Tests des value objects de domain/publication.py (DOI, HALId, NNT)."""
+"""Tests des value objects de domain/publication.py (DOI, HALId, NNT)
+et des modèles JSONB (ExternalIds, …)."""
 
 import pytest
+from pydantic import ValidationError as PydanticValidationError
 
 from domain.errors import ValidationError
-from domain.publication import DOI, NNT, HALId
+from domain.publication import DOI, NNT, ExternalIds, HALId
 
 
 # ── DOI ────────────────────────────────────────────────────────────
@@ -168,3 +170,59 @@ class TestNNT:
 
     def test_try_parse_invalid(self):
         assert NNT.try_parse("") is None
+
+
+# ── ExternalIds ────────────────────────────────────────────────────
+
+
+class TestExternalIdsParsing:
+    def test_empty(self):
+        ids = ExternalIds()
+        assert ids.hal is None
+        assert ids.nnt is None
+        assert ids.pmid is None
+        assert ids.pmc is None
+
+    def test_from_dict_basic(self):
+        ids = ExternalIds(hal="hal-04123456", nnt="2021clfa0030", pmid="12345")
+        assert ids.hal == "hal-04123456"
+        assert ids.nnt == "2021CLFA0030"  # normalisé en majuscules
+        assert ids.pmid == "12345"
+
+    def test_normalize_hal_url(self):
+        """Une URL HAL en entrée est normalisée en ID canonique."""
+        ids = ExternalIds(hal="https://hal.science/hal-04123456v2")
+        assert ids.hal == "hal-04123456"
+
+    def test_empty_string_treated_as_none(self):
+        ids = ExternalIds(hal="", nnt="")
+        assert ids.hal is None
+        assert ids.nnt is None
+
+    def test_invalid_hal_raises(self):
+        with pytest.raises(PydanticValidationError):
+            ExternalIds(hal="garbage-not-hal")
+
+    def test_invalid_nnt_raises(self):
+        with pytest.raises(PydanticValidationError):
+            ExternalIds(nnt="   ")  # blanc après strip, vide = invalide
+
+    def test_accepts_extra_keys(self):
+        """Les clés non déclarées (futures évolutions) sont conservées telles quelles."""
+        ids = ExternalIds(hal="hal-1234", arxiv="2401.00123", issn="0028-0836")
+        # Les extras sont accessibles via model_extra
+        dumped = ids.to_dict()
+        assert dumped["arxiv"] == "2401.00123"
+        assert dumped["issn"] == "0028-0836"
+
+    def test_to_dict_omits_none(self):
+        ids = ExternalIds(hal="hal-1234")
+        dumped = ids.to_dict()
+        assert dumped == {"hal": "hal-1234"}  # nnt/pmid/pmc omis car None
+
+    def test_roundtrip_from_db(self):
+        """Simule un aller-retour : lecture depuis BD (dict) → model → retour dict."""
+        from_db = {"hal": "hal-04123456", "nnt": "2021CLFA0030", "pmid": "12345678"}
+        ids = ExternalIds(**from_db)
+        back = ids.to_dict()
+        assert back == from_db
