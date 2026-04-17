@@ -2,9 +2,6 @@
 
 ## 1. Sécurité — Bloquant
 
-- [ ] Passer tous les secrets en variables d'environnement (`.env` en `.gitignore`, `.env.example` versionné)
-Secrets restants en variables d'environnement (section 1) — On a fait l'auth, mais settings.py contient encore en dur : la clé API WoS, les credentials ScanR, le mot de passe DB. Il faut les externaliser comme on a fait pour ADMIN_HASH. ~15 min.
-
 - [ ] Purger les credentials du repo (rewrite git history ou nouveau repo propre)
 Purger les credentials de l'historique git (section 1) — filter-repo sur config/settings.py pour virer les anciens hashes SHA256, la clé WoS, le mot de passe ScanR des commits passés. Mais cette fois on commit avant.
 

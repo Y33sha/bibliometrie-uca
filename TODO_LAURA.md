@@ -4,7 +4,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 ## Pipeline
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
-* [ ] y aura-t-il un cross-import sur le cross-import au run suivant?
+* [ ] y a-t-il un cross-import sur le cross-import au run suivant?
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes
 ## Robustesse du pipeline sur le long terme
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
