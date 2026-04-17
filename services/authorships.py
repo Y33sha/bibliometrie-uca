@@ -84,7 +84,7 @@ def set_source_authorship_excluded(
     return True
 
 
-def detach_source(cur, source_authorship_id: int, source: str):
+def detach_source(cur, source_authorship_id: int, source: str) -> bool:
     """Détache une authorship source de son authorship vérité.
     Si plus aucune source ne l'atteste, supprime l'authorship vérité.
 
@@ -155,7 +155,7 @@ def delete_orphan_authorships(cur, person_id: int) -> int:
 
 def move_authorships_for_source(
     cur, source: str, source_authorship_ids: list[int], from_pub_id: int, to_pub_id: int
-):
+) -> None:
     """Déplace des authorships vérité d'une publication à une autre,
     pour les authorships liées aux source_authorship_ids donnés.
     Utilisé par split_bad_merges.
@@ -176,7 +176,7 @@ def move_authorships_for_source(
         )
 
 
-def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int]):
+def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int]) -> int:
     """Propage le person_id des authorships sources vers les authorships vérité.
     Évite les doublons (publication_id, person_id).
     Utilisé par fix_oa_person_conflicts.
@@ -205,7 +205,7 @@ def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int
     return cur.rowcount
 
 
-def propagate_uca_for_addresses(cur, address_ids: list[int]):
+def propagate_uca_for_addresses(cur, address_ids: list[int]) -> None:
     """Recalcule in_perimeter sur source_authorships (openalex/wos) et authorships vérité
     pour tous les authorships liés aux adresses données.
 

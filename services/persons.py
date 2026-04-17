@@ -84,7 +84,7 @@ def link_authorship(
     *,
     source_person_id: int | None = None,
     has_hal_person_id: bool = False,
-):
+) -> None:
     """Rattache une authorship source à une personne (pipeline).
 
     Pour HAL, fait aussi le dual-write sur source_persons si c'est un
@@ -109,7 +109,7 @@ def link_authorship(
         )
 
 
-def link_authorships(cur, person_id: int, authorships: list[dict]):
+def link_authorships(cur, person_id: int, authorships: list[dict]) -> None:
     """Rattache un groupe d'authorships à une personne (pipeline).
 
     Chaque dict doit avoir 'source' et 'authorship_id',
@@ -126,7 +126,7 @@ def link_authorships(cur, person_id: int, authorships: list[dict]):
         )
 
 
-def unlink_authorship(cur, person_id: int, source: str, authorship_id: int):
+def unlink_authorship(cur, person_id: int, source: str, authorship_id: int) -> None:
     """Détache une authorship source d'une personne (met person_id à NULL)."""
     if source in ALL_SOURCES_SET:
         cur.execute(
@@ -140,7 +140,7 @@ def unlink_authorship(cur, person_id: int, source: str, authorship_id: int):
 
 def add_identifier(
     cur, person_id: int, id_type: str, id_value: str, source: str = "auto", status: str = "pending"
-):
+) -> None:
     """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
 
     Si l'identifiant existe avec statut 'rejected', le réattribue
@@ -220,7 +220,7 @@ def reassign_identifier(cur, ident_id: int, target_person_id: int) -> bool:
     return cur.rowcount > 0
 
 
-def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict]):
+def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict]) -> None:
     """Ajoute les ORCID, idHAL et IdRef trouvés dans un groupe d'authorships."""
     seen = set()
     for a in authorships:
@@ -274,7 +274,7 @@ def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
     return forms
 
 
-def refresh_person_name_forms(cur, person_id: int, last_name: str, first_name: str):
+def refresh_person_name_forms(cur, person_id: int, last_name: str, first_name: str) -> None:
     """Recalcule les formes de nom source 'persons' d'une personne.
 
     Supprime les anciennes formes 'persons' de cette personne, puis insère
@@ -314,7 +314,7 @@ def refresh_person_name_forms(cur, person_id: int, last_name: str, first_name: s
         add_name_form(cur, person_id, form, source="persons")
 
 
-def add_name_form(cur, person_id: int, full_name: str, source: str | None = None):
+def add_name_form(cur, person_id: int, full_name: str, source: str | None = None) -> None:
     """Ajoute une forme de nom à person_name_forms si elle n'existe pas déjà.
 
     Si source est fourni (ex: 'hal', 'openalex', 'persons'), il est ajouté
@@ -358,7 +358,7 @@ def add_name_form(cur, person_id: int, full_name: str, source: str | None = None
         )
 
 
-def detach_name_form(cur, person_id: int, name_form: str):
+def detach_name_form(cur, person_id: int, name_form: str) -> bool:
     """Détache une personne d'une forme de nom.
 
     Retire person_id de person_ids. Supprime la forme si person_ids devient vide.
@@ -420,7 +420,7 @@ _SOURCE_CONFIG = {
 # ── Attribution d'authorships orphelines ──
 
 
-def assign_orphan_authorship(cur, person_id: int, source: str, authorship_id: int):
+def assign_orphan_authorship(cur, person_id: int, source: str, authorship_id: int) -> bool:
     """Attribue une authorship orpheline (person_id IS NULL) à une personne.
 
     1. Met person_id sur l'authorship source (seulement si NULL)
@@ -572,7 +572,7 @@ def detach_authorships(cur, person_id: int, authorships: list[dict],
     }
 
 
-def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: int):
+def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: int) -> None:
     """Crée/synchronise l'authorship vérité à partir des authorships sources.
 
     Même logique que build_authorships.py mais pour une seule paire
@@ -676,7 +676,7 @@ def _ensure_truth_authorship(cur, person_id: int, source: str, authorship_id: in
 # ── Fusion ──
 
 
-def mark_distinct(cur, person_id_a: int, person_id_b: int):
+def mark_distinct(cur, person_id_a: int, person_id_b: int) -> None:
     """Marque deux personnes comme distinctes (non-doublon) dans
     `distinct_persons`. Idempotent (ON CONFLICT DO NOTHING).
 
@@ -692,7 +692,7 @@ def mark_distinct(cur, person_id_a: int, person_id_b: int):
     )
 
 
-def merge_person(cur, target_id: int, source_id: int):
+def merge_person(cur, target_id: int, source_id: int) -> None:
     """Fusionne la personne source_id dans target_id.
 
     Transfère tous les auteurs liés, identifiants, authorships et person_name_forms

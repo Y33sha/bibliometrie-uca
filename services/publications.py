@@ -229,7 +229,7 @@ def find_or_create(
     return _val(cur.fetchone(), 0), True
 
 
-def update_oa_status(cur, pub_id: int, oa_status: str):
+def update_oa_status(cur, pub_id: int, oa_status: str) -> None:
     """Met à jour le statut OA d'une publication."""
     cur.execute(
         """
@@ -240,7 +240,7 @@ def update_oa_status(cur, pub_id: int, oa_status: str):
     )
 
 
-def update_countries(cur, pub_id: int, countries: list[str]):
+def update_countries(cur, pub_id: int, countries: list[str]) -> None:
     """Met à jour les pays d'une publication."""
     cur.execute(
         """
@@ -251,7 +251,7 @@ def update_countries(cur, pub_id: int, countries: list[str]):
     )
 
 
-def update_sources(cur, pub_id: int):
+def update_sources(cur, pub_id: int) -> None:
     """Recalcule publications.sources depuis source_publications."""
     cur.execute(
         """
@@ -289,7 +289,7 @@ _OA_RANK = {
 }
 
 
-def refresh_from_sources(cur, pub_id: int):
+def refresh_from_sources(cur, pub_id: int) -> None:
     """Recalcule les métadonnées d'une publication depuis ses source_publications.
 
     Contrairement à l'ancien _enrich() qui faisait du COALESCE incrémental (premier arrivé
@@ -450,7 +450,7 @@ def refresh_from_sources(cur, pub_id: int):
     update_sources(cur, pub_id)
 
 
-def mark_distinct(cur, pub_id_a: int, pub_id_b: int):
+def mark_distinct(cur, pub_id_a: int, pub_id_b: int) -> None:
     """Marque deux publications comme distinctes (non-doublon) dans
     `distinct_publications`. Idempotent (ON CONFLICT DO NOTHING).
 
@@ -466,7 +466,7 @@ def mark_distinct(cur, pub_id_a: int, pub_id_b: int):
     )
 
 
-def merge_publications(cur, target_id: int, source_id: int):
+def merge_publications(cur, target_id: int, source_id: int) -> None:
     """Fusionne la publication source_id dans target_id.
 
     1. Transfère les documents sources (HAL, OA, WoS)
