@@ -97,3 +97,65 @@ class PgPublicationRepository:
         )
         rows = self._cur.fetchall()
         return [PubThesisCandidate(_val(row, 0), _val(row, 1)) for row in rows]
+
+    # ── Écritures simples ──────────────────────────────────────────
+
+    def update_oa_status(self, pub_id: int, oa_status: str) -> None:
+        """Met à jour le statut OA d'une publication."""
+        self._cur.execute(
+            """
+            UPDATE publications SET oa_status = %s::oa_type, updated_at = now()
+            WHERE id = %s
+            """,
+            (oa_status, pub_id),
+        )
+
+    def update_countries(self, pub_id: int, countries: list[str]) -> None:
+        """Met à jour les pays d'une publication."""
+        self._cur.execute(
+            """
+            UPDATE publications SET countries = %s, updated_at = now()
+            WHERE id = %s
+            """,
+            (countries, pub_id),
+        )
+
+    def update_sources(self, pub_id: int) -> None:
+        """Recalcule publications.sources depuis source_publications.
+
+        Pas de lecture préalable : agrégation SQL directe en une requête.
+        """
+        self._cur.execute(
+            """
+            UPDATE publications SET sources = COALESCE(sub.srcs, '{}'), updated_at = now()
+            FROM (
+                SELECT array_agg(DISTINCT source::source_type ORDER BY source::source_type) AS srcs
+                FROM source_publications
+                WHERE publication_id = %s
+            ) sub
+            WHERE id = %s
+            """,
+            (pub_id, pub_id),
+        )
+
+    # ── distinct_publications ──────────────────────────────────────
+
+    def mark_distinct(self, pub_id_a: int, pub_id_b: int) -> tuple[int, int] | None:
+        """Marque deux publications comme distinctes. Idempotent.
+
+        Retourne (a, b) si la paire vient d'être insérée, None sinon —
+        le caller décide s'il émet un audit ou pas.
+        """
+        self._cur.execute(
+            """
+            INSERT INTO distinct_publications (pub_id_a, pub_id_b)
+            VALUES (LEAST(%s, %s), GREATEST(%s, %s))
+            ON CONFLICT DO NOTHING
+            RETURNING pub_id_a, pub_id_b
+            """,
+            (pub_id_a, pub_id_b, pub_id_a, pub_id_b),
+        )
+        row = self._cur.fetchone()
+        if not row:
+            return None
+        return row["pub_id_a"], row["pub_id_b"]

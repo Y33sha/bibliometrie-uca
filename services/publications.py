@@ -190,40 +190,17 @@ def find_or_create(
 
 def update_oa_status(cur, pub_id: int, oa_status: str) -> None:
     """Met à jour le statut OA d'une publication."""
-    cur.execute(
-        """
-        UPDATE publications SET oa_status = %s::oa_type, updated_at = now()
-        WHERE id = %s
-    """,
-        (oa_status, pub_id),
-    )
+    PgPublicationRepository(cur).update_oa_status(pub_id, oa_status)
 
 
 def update_countries(cur, pub_id: int, countries: list[str]) -> None:
     """Met à jour les pays d'une publication."""
-    cur.execute(
-        """
-        UPDATE publications SET countries = %s, updated_at = now()
-        WHERE id = %s
-    """,
-        (countries, pub_id),
-    )
+    PgPublicationRepository(cur).update_countries(pub_id, countries)
 
 
 def update_sources(cur, pub_id: int) -> None:
     """Recalcule publications.sources depuis source_publications."""
-    cur.execute(
-        """
-        UPDATE publications SET sources = COALESCE(sub.srcs, '{}'), updated_at = now()
-        FROM (
-            SELECT array_agg(DISTINCT source::source_type ORDER BY source::source_type) AS srcs
-            FROM source_publications
-            WHERE publication_id = %s
-        ) sub
-        WHERE id = %s
-    """,
-        (pub_id, pub_id),
-    )
+    PgPublicationRepository(cur).update_sources(pub_id)
 
 
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
@@ -435,24 +412,15 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
 
 def mark_distinct(cur, pub_id_a: int, pub_id_b: int) -> None:
     """Marque deux publications comme distinctes (non-doublon) dans
-    `distinct_publications`. Idempotent (ON CONFLICT DO NOTHING).
+    `distinct_publications`. Idempotent.
 
-    Les IDs sont triés (LEAST/GREATEST) pour garantir l'unicité de la paire.
+    Les IDs sont triés pour garantir l'unicité de la paire.
     """
-    cur.execute(
-        """
-        INSERT INTO distinct_publications (pub_id_a, pub_id_b)
-        VALUES (LEAST(%s, %s), GREATEST(%s, %s))
-        ON CONFLICT DO NOTHING
-        RETURNING pub_id_a, pub_id_b
-        """,
-        (pub_id_a, pub_id_b, pub_id_a, pub_id_b),
-    )
-    row = cur.fetchone()
-    if row:
+    inserted = PgPublicationRepository(cur).mark_distinct(pub_id_a, pub_id_b)
+    if inserted:
         emit_event(
-            cur, "publication.marked_distinct", "publication", row["pub_id_a"],
-            {"other_id": row["pub_id_b"]},
+            cur, "publication.marked_distinct", "publication", inserted[0],
+            {"other_id": inserted[1]},
         )
 
 
