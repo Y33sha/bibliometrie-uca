@@ -395,8 +395,11 @@ class TestRefreshFromSources:
         assert "data" in lower_kw
         assert "machine learning" in lower_kw
 
-    def test_jsonb_merged(self, db):
-        """Les champs JSONB sont fusionnés, priorité au premier."""
+    def test_topics_composite_by_source(self, db):
+        """publications.topics est un composite {source: data}, chaque source
+        garde sa forme native. Rien n'est perdu (même en cas de clés en
+        conflit entre sources, avant le fix les données OpenAlex étaient
+        silencieusement perdues si HAL était prioritaire)."""
         id1, _ = _create(db, pub_year=2024, doc_type="article")
         db.execute(
             """
@@ -410,10 +413,33 @@ class TestRefreshFromSources:
 
         db.execute("SELECT topics FROM publications WHERE id = %s", (id1,))
         topics = db.fetchone()["topics"]
-        # HAL est prioritaire : hal_domains vient de HAL
-        assert topics["hal_domains"] == ["info"]
-        # concepts vient d'OpenAlex (pas de conflit)
-        assert topics["concepts"] == ["AI"]
+        # Chaque source garde sa forme sous sa propre clé
+        assert topics["hal"] == {"hal_domains": ["info"]}
+        assert topics["openalex"] == {"concepts": ["AI"], "hal_domains": ["math"]}
+
+    def test_topics_composite_supports_openalex_list(self, db):
+        """OpenAlex stocke les topics en liste (hiérarchie domain/field/subfield/topic).
+        Avant le fix, cette liste était silencieusement ignorée (isinstance dict check).
+        Maintenant elle est conservée sous la clé 'openalex'."""
+        id1, _ = _create(db, pub_year=2024, doc_type="article")
+        db.execute(
+            """
+            INSERT INTO source_publications (source, source_id, title, pub_year, publication_id, topics)
+            VALUES ('openalex', 'oa-tp2', 'Test', 2024, %s,
+                    '[{"domain": "SS", "field": "Eco", "subfield": "Micro", "topic": "Behav", "score": 0.95}]'::jsonb),
+                   ('theses', 'th-tp2', 'Test', 2024, %s, '{"discipline": "Info", "rameau": ["Algo"]}')
+        """,
+            (id1, id1),
+        )
+        refresh_from_sources(db, id1)
+
+        db.execute("SELECT topics FROM publications WHERE id = %s", (id1,))
+        topics = db.fetchone()["topics"]
+        # La liste OpenAlex est préservée telle quelle
+        assert isinstance(topics["openalex"], list)
+        assert topics["openalex"][0]["domain"] == "SS"
+        # Et le dict theses.fr aussi
+        assert topics["theses"]["discipline"] == "Info"
 
     def test_is_retracted_or(self, db):
         """is_retracted = True si au moins une source le dit."""

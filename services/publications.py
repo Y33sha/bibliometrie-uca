@@ -315,8 +315,12 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
       (diamond > gold > hybrid > bronze > green > closed > unknown).
     • Booléen (is_retracted) : True si au moins une source le dit.
     • Listes (keywords, countries) : union de toutes les sources, dédupliquée.
-    • JSONB (topics, biblio, meta) : fusion des clés de toutes les sources ;
-      en cas de conflit sur une clé, la source prioritaire l'emporte.
+    • JSONB biblio, meta : fusion shallow par clé (clés généralement
+      orthogonales entre sources) ; en cas de conflit sur une clé, la
+      source prioritaire l'emporte.
+    • JSONB topics : composite par source — {"openalex": [...], "theses":
+      {...}, "scanr": ...}. Chaque source garde sa forme native (liste
+      hiérarchique ou dict selon la source) pour ne rien perdre.
 
     Ne touche PAS à : title, title_normalized, notes, sources (utiliser
     update_sources() séparément).
@@ -380,6 +384,9 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
         return result or None
 
     def merge_jsonb(field):
+        """Fusion shallow par clé pour meta/biblio : les deux sont toujours
+        des dicts avec des clés orthogonales entre sources (pas de conflit
+        en pratique). La source prioritaire gagne par clé."""
         merged = {}
         for r in rows:
             d = r[field]
@@ -388,6 +395,23 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
                     if k not in merged:
                         merged[k] = v
         return merged or None
+
+    def topics_by_source():
+        """Indexe les topics par source pour ne RIEN perdre de l'info.
+
+        Les topics ont des schémas radicalement différents selon la source
+        (liste hiérarchique OpenAlex vs dict discipline/rameau theses.fr) ;
+        une fusion par clé ne peut pas les unifier sans perte. On rend
+        donc `publications.topics` composite :
+            {"openalex": [...], "theses": {...}, "scanr": ...}
+        Chaque source garde sa forme native.
+        """
+        out: dict = {}
+        for r in rows:
+            topics = r["topics"]
+            if topics:
+                out[r["source"]] = topics
+        return out or None
 
     def best_oa_status():
         best, best_rank = None, 0
@@ -414,7 +438,7 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
     new_is_retracted = any(r["is_retracted"] for r in rows if r["is_retracted"])
     new_keywords = merge_lists("keywords")
     new_countries = merge_lists("countries")
-    new_topics = merge_jsonb("topics")
+    new_topics = topics_by_source()
     new_biblio = merge_jsonb("biblio")
     new_meta = merge_jsonb("meta")
 
