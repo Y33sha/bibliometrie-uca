@@ -10,6 +10,7 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 (UNIQUE(source, source_id)), les authorships utilisent `source_person_id`.
 """
 
+from domain.errors import ConflictError, NotFoundError, ValidationError
 from services.authorships import delete_orphan_authorships
 from utils.normalize import normalize_name
 from utils.perimeter import get_persons_structure_ids_list
@@ -34,26 +35,27 @@ def create_person(cur, last_name: str, first_name: str = "") -> int:
     return person_id
 
 
-def set_rejected(cur, person_id: int, rejected: bool) -> bool:
+def set_rejected(cur, person_id: int, rejected: bool) -> None:
     """Marque ou démarque une personne comme rejetée (fausse entité).
 
-    Retourne True si l'UPDATE a touché une ligne, False si introuvable.
+    Lève NotFoundError si la personne n'existe pas.
     """
     cur.execute(
         "UPDATE persons SET rejected = %s, updated_at = now() WHERE id = %s",
         (rejected, person_id),
     )
-    return cur.rowcount > 0
+    if cur.rowcount == 0:
+        raise NotFoundError(f"Personne {person_id} introuvable")
 
 
-def update_name(cur, person_id: int, last_name: str, first_name: str) -> bool:
+def update_name(cur, person_id: int, last_name: str, first_name: str) -> None:
     """Met à jour le nom/prénom d'une personne et rafraîchit ses formes de nom.
 
-    Retourne True si la personne existe, False sinon.
+    Lève NotFoundError si la personne n'existe pas.
     """
     cur.execute("SELECT id FROM persons WHERE id = %s", (person_id,))
     if not cur.fetchone():
-        return False
+        raise NotFoundError(f"Personne {person_id} introuvable")
 
     cur.execute(
         """
@@ -70,7 +72,6 @@ def update_name(cur, person_id: int, last_name: str, first_name: str) -> bool:
         ),
     )
     refresh_person_name_forms(cur, person_id, last_name, first_name)
-    return True
 
 
 # ── Rattachement / détachement authorships ──
@@ -173,10 +174,10 @@ def add_identifier(
         )
 
 
-def remove_identifier(cur, person_id: int, id_type: str, id_value: str) -> bool:
+def remove_identifier(cur, person_id: int, id_type: str, id_value: str) -> None:
     """Supprime un identifiant d'une personne.
 
-    Retourne True si un enregistrement a été supprimé, False sinon.
+    Lève NotFoundError si l'identifiant n'existe pas.
     """
     cur.execute(
         """
@@ -185,13 +186,15 @@ def remove_identifier(cur, person_id: int, id_type: str, id_value: str) -> bool:
         """,
         (person_id, id_type, id_value),
     )
-    return cur.rowcount > 0
+    if cur.rowcount == 0:
+        raise NotFoundError("Identifiant introuvable")
 
 
-def update_identifier_status(cur, ident_id: int, status: str) -> dict | None:
+def update_identifier_status(cur, ident_id: int, status: str) -> dict:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
-    Retourne la ligne {id, status} mise à jour, ou None si introuvable.
+    Retourne la ligne {id, status} mise à jour.
+    Lève NotFoundError si l'identifiant n'existe pas.
     """
     cur.execute(
         """
@@ -200,14 +203,16 @@ def update_identifier_status(cur, ident_id: int, status: str) -> dict | None:
         """,
         (status, ident_id),
     )
-    return cur.fetchone()
+    row = cur.fetchone()
+    if not row:
+        raise NotFoundError(f"Identifiant {ident_id} introuvable")
+    return row
 
 
-def reassign_identifier(cur, ident_id: int, target_person_id: int) -> bool:
+def reassign_identifier(cur, ident_id: int, target_person_id: int) -> None:
     """Réattribue un identifiant à une autre personne (status → pending).
 
-    Retourne True si la réattribution a eu lieu, False si l'identifiant
-    n'existe pas.
+    Lève NotFoundError si l'identifiant n'existe pas.
     """
     cur.execute(
         """
@@ -217,7 +222,8 @@ def reassign_identifier(cur, ident_id: int, target_person_id: int) -> bool:
         """,
         (target_person_id, ident_id),
     )
-    return cur.rowcount > 0
+    if cur.rowcount == 0:
+        raise NotFoundError(f"Identifiant {ident_id} introuvable")
 
 
 def add_identifiers_from_authorships(cur, person_id: int, authorships: list[dict]) -> None:
@@ -432,7 +438,7 @@ def assign_orphan_authorship(cur, person_id: int, source: str, authorship_id: in
     """
     cfg = _SOURCE_CONFIG.get(source)
     if not cfg:
-        raise ValueError(f"Source inconnue : {source}")
+        raise ValidationError(f"Source inconnue : {source}")
 
     # 1. Rattacher et récupérer le nom normalisé + statut excluded
     cur.execute(
@@ -709,7 +715,7 @@ def merge_person(cur, target_id: int, source_id: int) -> None:
         (target_id, source_id),
     )
     if cur.fetchone()["n"] >= 2:
-        raise RuntimeError(
+        raise ConflictError(
             f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
             f"ont chacune une fiche RH distincte."
         )

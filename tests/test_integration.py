@@ -2,6 +2,7 @@
 
 import pytest
 
+from domain.errors import ConflictError
 from services.persons import merge_person
 from services.publications import find_or_create, refresh_from_sources
 
@@ -236,7 +237,7 @@ class TestMergePersons:
         create_persons_rh(db, target, matricule="MAT-001")
         create_persons_rh(db, source, matricule="MAT-002")
 
-        with pytest.raises(RuntimeError, match="REFUS de fusion"):
+        with pytest.raises(ConflictError, match="REFUS de fusion"):
             merge_person(db, target, source)
 
         # Les deux personnes existent toujours
