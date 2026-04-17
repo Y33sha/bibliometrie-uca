@@ -26,6 +26,7 @@ from psycopg2.extras import Json, execute_values
 from db.connection import get_connection
 from extraction.common import compute_hash, get_existing_ids, setup_logger
 from utils.api_limits import WOS_DELAY, WOS_PER_PAGE
+from utils.api_retry import http_request_with_retry
 from utils.app_config import get_api_base_urls, get_wos_affiliations, get_wos_api_key, get_years
 
 # ----- Logging -----
@@ -75,38 +76,12 @@ def extract_ut(rec: dict) -> str:
 
 
 def _fetch_with_retry(url: str, params: dict, label: str = "") -> dict:
-    """Requête GET avec retry (gère 429, réponses vides, erreurs réseau)."""
-    for attempt in range(5):
-        try:
-            resp = requests.get(url, headers=HEADERS, params=params, timeout=60)
-            if resp.status_code == 429:
-                wait = 2 ** (attempt + 1)
-                logger.warning(f"Rate limited 429 {label}, attente {wait}s...")
-                time.sleep(wait)
-                continue
-            resp.raise_for_status()
-            # WoS renvoie parfois un body vide (rate limit silencieux)
-            if not resp.text.strip():
-                wait = 2 ** (attempt + 1)
-                logger.warning(
-                    f"Réponse vide {label} (tentative {attempt + 1}/5), attente {wait}s..."
-                )
-                time.sleep(wait)
-                continue
-            return resp.json()
-        except requests.exceptions.JSONDecodeError:
-            wait = 2 ** (attempt + 1)
-            logger.warning(f"JSON invalide {label} (tentative {attempt + 1}/5), attente {wait}s...")
-            time.sleep(wait)
-        except requests.RequestException as e:
-            if attempt < 4:
-                wait = 2 ** (attempt + 1)
-                logger.warning(f"Erreur requête {label} (tentative {attempt + 1}/5): {e}")
-                time.sleep(wait)
-            else:
-                raise
-    logger.error(f"Échec après 5 tentatives {label}")
-    return {}
+    """Requête GET avec retry (gère 429, body vide, erreurs réseau)."""
+    return http_request_with_retry(
+        "GET", url, params=params, headers=HEADERS, timeout=60,
+        retry_on_empty_body=True, initial_backoff=2.0,  # WoS plus conservateur
+        label=label,
+    )
 
 
 def fetch_page(year: int, first_record: int) -> dict:
