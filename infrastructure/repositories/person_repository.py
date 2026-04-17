@@ -21,6 +21,7 @@ Usage :
 """
 
 from domain.errors import NotFoundError
+from domain.person import compute_person_name_forms
 from utils.normalize import normalize_name
 
 
@@ -83,6 +84,111 @@ class PgPersonRepository:
         )
         if self._cur.rowcount == 0:
             raise NotFoundError(f"Personne {person_id} introuvable")
+
+    # ── Fusion ─────────────────────────────────────────────────────
+
+    def has_distinct_rh(self, id_a: int, id_b: int) -> bool:
+        """Vrai si chacune des deux personnes possède une fiche RH distincte
+        (donc fusion interdite : invariant métier)."""
+        self._cur.execute(
+            "SELECT COUNT(*) AS n FROM persons_rh WHERE person_id IN (%s, %s)",
+            (id_a, id_b),
+        )
+        return self._cur.fetchone()["n"] >= 2
+
+    def merge_into(self, target_id: int, source_id: int) -> None:
+        """Fusionne la personne `source_id` dans `target_id`.
+
+        Toute la séquence de transferts est ici (une seule transaction) :
+        1. Transfert des auteurs sources et source_authorships
+        2. Dédoublonnage puis transfert des authorships vérité
+        3. Dédoublonnage puis transfert des identifiants
+        4. Transfert conditionnel de la fiche RH
+        5. Mise à jour des person_name_forms (remplacement source_id → target_id)
+        6. Recalcul des formes source 'persons' pour la cible
+        7. Suppression de la personne source
+
+        L'invariant métier (pas de fusion si les deux ont une fiche RH)
+        doit être vérifié AVANT par le service via `has_distinct_rh`.
+        """
+        # 1. Transférer les auteurs sources (comptes HAL/ScanR avec person_id)
+        self._cur.execute(
+            "UPDATE source_persons SET person_id = %s WHERE person_id = %s",
+            (target_id, source_id),
+        )
+        # 1b. Transférer les source_authorships
+        self._cur.execute(
+            "UPDATE source_authorships SET person_id = %s WHERE person_id = %s",
+            (target_id, source_id),
+        )
+
+        # 2. Transférer les authorships consolidées (supprimer doublons publication)
+        self._cur.execute(
+            """
+            DELETE FROM authorships
+            WHERE person_id = %s
+              AND publication_id IN (
+                  SELECT publication_id FROM authorships WHERE person_id = %s
+              )
+            """,
+            (source_id, target_id),
+        )
+        self._cur.execute(
+            "UPDATE authorships SET person_id = %s WHERE person_id = %s",
+            (target_id, source_id),
+        )
+
+        # 3. Transférer les identifiants (supprimer doublons)
+        self._cur.execute(
+            """
+            DELETE FROM person_identifiers
+            WHERE person_id = %s
+              AND (id_type, id_value) IN (
+                  SELECT id_type, id_value FROM person_identifiers WHERE person_id = %s
+              )
+            """,
+            (source_id, target_id),
+        )
+        self._cur.execute(
+            "UPDATE person_identifiers SET person_id = %s WHERE person_id = %s",
+            (target_id, source_id),
+        )
+
+        # 4. Transférer la fiche RH source vers la cible (si la cible n'en a pas)
+        self._cur.execute(
+            """
+            UPDATE persons_rh SET person_id = %s
+            WHERE person_id = %s
+              AND NOT EXISTS (SELECT 1 FROM persons_rh WHERE person_id = %s)
+            """,
+            (target_id, source_id, target_id),
+        )
+
+        # 5. person_name_forms : remplacer source_id par target_id partout
+        self._cur.execute(
+            """
+            UPDATE person_name_forms
+            SET person_ids = (
+                    SELECT array_agg(DISTINCT v ORDER BY v)
+                    FROM unnest(array_replace(person_ids, %s, %s)) AS v
+                ),
+                updated_at = now()
+            WHERE %s = ANY(person_ids)
+            """,
+            (source_id, target_id, source_id),
+        )
+
+        # 6. Recalculer les formes source 'persons' du target à partir de son nom
+        self._cur.execute(
+            "SELECT last_name, first_name FROM persons WHERE id = %s",
+            (target_id,),
+        )
+        target = self._cur.fetchone()
+        forms = compute_person_name_forms(target["last_name"], target["first_name"] or "")
+        self.refresh_name_forms(target_id, forms)
+
+        # 7. Supprimer la personne source
+        self._cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))
 
     # ── distinct_persons ───────────────────────────────────────────
 

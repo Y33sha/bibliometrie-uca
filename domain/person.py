@@ -1,8 +1,10 @@
-"""Concept métier Personne — value objects et (à terme) entités.
+"""Concept métier Personne — value objects, règles de composition, et
+(à terme) entités.
 
 Regroupe ici tout ce qui est propre à une personne : identifiants
-(ORCID, IdHAL login, IdRef/PPN SUDOC), puis plus tard les entités
-`Person`, les règles de dédoublonnage, les formes de nom, etc.
+(ORCID, IdHAL login, IdRef/PPN SUDOC), règles de composition des
+formes de nom, puis plus tard les entités `Person`, les règles de
+dédoublonnage, etc.
 
 Les value objects sont immuables et auto-validés (même contrat que
 domain/publication.py : `X("...")` strict, `X.try_parse(...)` tolérant).
@@ -12,6 +14,47 @@ import re
 from dataclasses import dataclass
 
 from domain.errors import ValidationError
+from utils.normalize import normalize_name
+
+
+# ── Formes de noms (règle métier) ──────────────────────────────────
+
+
+def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
+    """Calcule les variantes normalisées de formes de nom pour une personne.
+
+    Règle de composition du domaine (ne dépend d'aucune BD).
+
+    Retourne un ensemble de formes normalisées :
+      - "prenom nom", "nom prenom"
+      - "initiale(s) nom", "nom initiale(s)"
+        Si le prénom a plusieurs mots (ex: "jean michel"), produit :
+        - initiales séparées : "j m nom", "nom j m"
+        - initiales collées  : "jm nom", "nom jm"
+    """
+    ln = normalize_name(last_name)
+    fn = normalize_name(first_name)
+    if not ln:
+        return set()
+
+    forms: set[str] = set()
+    if fn:
+        forms.add(f"{fn} {ln}")
+        forms.add(f"{ln} {fn}")
+
+        parts = fn.split()
+        if parts:
+            initials_spaced = " ".join(p[0] for p in parts)
+            initials_joined = "".join(p[0] for p in parts)
+            forms.add(f"{initials_spaced} {ln}")
+            forms.add(f"{ln} {initials_spaced}")
+            if initials_joined != initials_spaced:
+                forms.add(f"{initials_joined} {ln}")
+                forms.add(f"{ln} {initials_joined}")
+    else:
+        forms.add(ln)
+
+    return forms
 
 # ── ORCID ──────────────────────────────────────────────────────────
 
