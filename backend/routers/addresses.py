@@ -17,75 +17,6 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def propagate_countries_for_addresses(cur, address_ids: list[int]):
-    """Propage les pays des adresses modifiées vers les documents sources et publications.
-
-    Chaîne : addresses.countries → source_publications.countries → publications.countries
-    """
-    if not address_ids:
-        return
-
-    # 1. Recalculer countries des source_publications (OA + WoS + ScanR) concernés
-    cur.execute(
-        """
-        UPDATE source_publications sd
-        SET countries = sub.new_countries
-        FROM (
-            SELECT sa.source_publication_id AS doc_id,
-                   (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM source_authorship_addresses saa2
-                    JOIN addresses a2 ON a2.id = saa2.address_id
-                    JOIN source_authorships sa2 ON sa2.id = saa2.source_authorship_id,
-                    LATERAL unnest(a2.countries) AS c
-                    WHERE sa2.source_publication_id = sa.source_publication_id
-                      AND a2.countries IS NOT NULL
-                   ) AS new_countries
-            FROM source_authorship_addresses saa
-            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-            WHERE saa.address_id = ANY(%s)
-            GROUP BY sa.source_publication_id
-        ) sub
-        WHERE sd.id = sub.doc_id
-          AND sd.countries IS DISTINCT FROM sub.new_countries
-    """,
-        (address_ids,),
-    )
-    addr_docs = cur.rowcount
-
-    # 2. Recalculer publications.countries pour les publications touchées
-    #    Maintenant que source_publications.countries est à jour, on lit tout depuis là
-    cur.execute(
-        """
-        WITH affected_pubs AS (
-            SELECT DISTINCT sd.publication_id
-            FROM source_authorship_addresses saa
-            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            WHERE saa.address_id = ANY(%s) AND sd.publication_id IS NOT NULL
-        )
-        UPDATE publications p
-        SET countries = sub.all_countries
-        FROM (
-            SELECT ap.publication_id,
-                   (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM source_publications sd,
-                    LATERAL unnest(sd.countries) AS c
-                    WHERE sd.publication_id = ap.publication_id
-                      AND sd.countries IS NOT NULL
-                   ) AS all_countries
-            FROM affected_pubs ap
-        ) sub
-        WHERE p.id = sub.publication_id
-          AND p.countries IS DISTINCT FROM sub.all_countries
-    """,
-        (address_ids,),
-    )
-    pubs = cur.rowcount
-
-    if addr_docs or pubs:
-        logger.info(f"Propagation pays : {addr_docs} docs source, {pubs} publications")
-
-
 def _bg_propagate_countries(address_ids: list[int]):
     """Propagation pays en tâche de fond (connexion séparée)."""
     from db.connection import get_connection
@@ -93,7 +24,7 @@ def _bg_propagate_countries(address_ids: list[int]):
     try:
         conn = get_connection()
         cur = conn.cursor()
-        propagate_countries_for_addresses(cur, address_ids)
+        addresses_service.propagate_countries_to_publications(cur, address_ids)
         conn.commit()
         cur.close()
         conn.close()
@@ -508,29 +439,9 @@ async def set_address_country(
                 cur.execute("SELECT code FROM countries WHERE code = %s", (c,))
                 if not cur.fetchone():
                     raise HTTPException(status_code=400, detail=f"Code pays inconnu: {c}")
-        cur.execute(
-            "UPDATE addresses SET countries = %s WHERE id = %s",
-            (countries if countries else None, addr_id),
-        )
-        # Propager aux adresses partageant le même normalized_text
-        propagated_ids = [addr_id]
-        if countries:
-            cur.execute(
-                """
-                UPDATE addresses a2
-                SET countries = %s
-                FROM addresses a1
-                WHERE a1.id = %s
-                  AND a2.normalized_text = a1.normalized_text
-                  AND a2.id <> a1.id
-                  AND LENGTH(a2.normalized_text) >= 5
-                RETURNING a2.id
-            """,
-                (countries, addr_id),
-            )
-            propagated_ids.extend(r["id"] for r in cur.fetchall())
-    # Propager les pays vers documents et publications en background
-    bg.add_task(_bg_propagate_countries, propagated_ids)
+        affected = addresses_service.set_country(cur, addr_id, countries)
+    # Propager vers documents et publications en background
+    bg.add_task(_bg_propagate_countries, affected)
     return {"ok": True}
 
 
@@ -538,12 +449,6 @@ async def set_address_country(
 async def batch_set_country(body: BatchSetCountry, bg: BackgroundTasks, _=Depends(require_admin)):
     """Ajoute un pays à des adresses — par IDs ou par filtre."""
     country_code = body.country_code
-    address_ids = body.address_ids
-    filter_search = body.search
-    filter_has_country = body.has_country
-    filter_country = body.country_code_filter
-    filter_suggested = body.suggested_country
-
     if not country_code:
         raise HTTPException(status_code=400, detail="country_code requis")
 
@@ -552,75 +457,26 @@ async def batch_set_country(body: BatchSetCountry, bg: BackgroundTasks, _=Depend
         if not cur.fetchone():
             raise HTTPException(status_code=400, detail=f"Code pays inconnu: {country_code}")
 
-        if address_ids:
-            # Mode sélection manuelle
-            cur.execute(
-                """
-                UPDATE addresses
-                SET countries = CASE
-                    WHEN countries IS NULL THEN ARRAY[%s]::char(2)[]
-                    WHEN %s = ANY(countries) THEN countries
-                    ELSE array_append(countries, %s::char(2))
-                END
-                WHERE id = ANY(%s)
-                RETURNING id
-            """,
-                (country_code, country_code, country_code, address_ids),
+        if body.address_ids:
+            modified_ids = addresses_service.batch_set_country_by_ids(
+                cur, country_code, body.address_ids
             )
-            modified_ids = [r["id"] for r in cur.fetchall()]
         else:
-            # Mode filtre — applique à toutes les adresses du filtre
-            conditions = []
-            params: list = []
-            if filter_search:
-                conditions.append("unaccent(raw_text) ILIKE unaccent(%s)")
-                params.append(f"%{filter_search}%")
-            if filter_has_country == "yes":
-                conditions.append("countries IS NOT NULL")
-            elif filter_has_country == "no":
-                conditions.append("countries IS NULL")
-            if filter_country:
-                conditions.append("%s = ANY(countries)")
-                params.append(filter_country)
-            if filter_suggested:
-                conditions.append("%s = ANY(suggested_countries)")
-                params.append(filter_suggested)
-            where = " AND ".join(conditions) if conditions else "TRUE"
-            cur.execute(
-                f"""
-                UPDATE addresses
-                SET countries = CASE
-                    WHEN countries IS NULL THEN ARRAY[%s]::char(2)[]
-                    WHEN %s = ANY(countries) THEN countries
-                    ELSE array_append(countries, %s::char(2))
-                END
-                WHERE {where}
-                RETURNING id
-            """,
-                [country_code, country_code, country_code] + params,
+            modified_ids = addresses_service.batch_set_country_by_filter(
+                cur, country_code,
+                search=body.search,
+                has_country=body.has_country,
+                country_code_filter=body.country_code_filter,
+                suggested_country=body.suggested_country,
             )
-            modified_ids = [r["id"] for r in cur.fetchall()]
         updated = len(modified_ids)
 
-        # Propager aux adresses partageant le même normalized_text
-        cur.execute("""
-            UPDATE addresses a2
-            SET countries = a1.countries
-            FROM addresses a1
-            WHERE a1.countries IS NOT NULL
-              AND a2.normalized_text = a1.normalized_text
-              AND a2.countries IS DISTINCT FROM a1.countries
-              AND LENGTH(a2.normalized_text) >= 5
-              AND a2.id <> a1.id
-            RETURNING a2.id
-        """)
-        propagated_rows = cur.fetchall()
-        propagated = len(propagated_rows)
-        all_ids = modified_ids + [r["id"] for r in propagated_rows]
+        propagated_ids = addresses_service.propagate_countries_to_similar(cur)
+        propagated = len(propagated_ids)
+        all_ids = modified_ids + propagated_ids
 
-    # Propager les pays vers documents et publications en background
+    # Propager vers documents et publications en background
     bg.add_task(_bg_propagate_countries, all_ids)
-
     return {"updated": updated, "propagated": propagated}
 
 
