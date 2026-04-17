@@ -1,10 +1,10 @@
-"""Concept métier Personne — value objects, règles de composition, et
-(à terme) entités.
+"""Concept métier Personne — value objects, règles de composition,
+modèles de données JSONB, et (à terme) entités.
 
 Regroupe ici tout ce qui est propre à une personne : identifiants
 (ORCID, IdHAL login, IdRef/PPN SUDOC), règles de composition des
-formes de nom, puis plus tard les entités `Person`, les règles de
-dédoublonnage, etc.
+formes de nom, modèles de colonnes JSONB (`source_ids`), puis plus
+tard les entités `Person`, les règles de dédoublonnage, etc.
 
 Les value objects sont immuables et auto-validés (même contrat que
 domain/publication.py : `X("...")` strict, `X.try_parse(...)` tolérant).
@@ -12,6 +12,8 @@ domain/publication.py : `X("...")` strict, `X.try_parse(...)` tolérant).
 
 import re
 from dataclasses import dataclass
+
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from domain.errors import ValidationError
 from utils.normalize import normalize_name
@@ -116,6 +118,7 @@ class ORCID:
         return self.value
 
 
+
 # ── IdHAL (personne) ───────────────────────────────────────────────
 
 # Slug HAL : minuscules, chiffres, tirets. Les anciens comptes peuvent
@@ -160,6 +163,7 @@ class IdHAL:
 
     def __str__(self) -> str:
         return self.value
+
 
 
 # ── IdRef (PPN SUDOC) ──────────────────────────────────────────────
@@ -210,3 +214,46 @@ class IdRef:
 
     def __str__(self) -> str:
         return self.value
+
+
+# ── PersonSourceIds : colonne source_persons.source_ids ────────────
+
+
+class PersonSourceIds(BaseModel):
+    """Modèle de la colonne JSONB `source_ids` de `source_persons`.
+
+    Identifiants **bruts** lus depuis les API sources (principalement
+    HAL). Distinct de la table `person_identifiers` qui stocke le
+    référentiel canonique (ORCID/idHAL/IdRef confirmés ou en attente,
+    attachés à une personne consolidée).
+
+    Ici on a par exemple :
+    - `hal_person_id` : entier interne HAL (>0 = compte confirmé)
+    - `idhal` : login slug HAL (validé via VO IdHAL)
+    - `hal_form_id` : ID du formulaire HAL (structure interne)
+
+    extra="allow" pour accepter d'autres clés que d'autres sources
+    (ScanR, WoS, …) pourraient introduire à l'avenir.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    hal_person_id: int | None = None
+    idhal: str | None = None
+    hal_form_id: int | None = None
+
+    @field_validator("idhal", mode="before")
+    @classmethod
+    def _normalize_idhal(cls, v):
+        """Normalise via le VO IdHAL : trim, lowercase, validation du slug."""
+        if v is None or v == "":
+            return None
+        normalized = IdHAL.try_parse(v)
+        if normalized is None:
+            raise ValueError(f"IdHAL invalide : {v!r}")
+        return normalized.value
+
+    def to_dict(self) -> dict:
+        """Sérialise pour écriture en base (JSONB). Omet les clés None."""
+        return self.model_dump(exclude_none=True)
+
