@@ -35,6 +35,23 @@ class TestCreateStructure:
         )
         assert row["api_ids"] == {"openalex": ["I1"], "wos": ["WOS_TEST"]}
 
+    def test_api_ids_validated_and_coerced(self, db):
+        """Un scalaire string passé pour une source est wrappé en liste via
+        StructureApiIds. Les listes vides sont éliminées à la normalisation."""
+        row = create_structure(
+            db, code="T2", name="T2", type="labo",
+            api_ids={"openalex": "I1", "wos": []},
+        )
+        assert row["api_ids"] == {"openalex": ["I1"]}
+
+    def test_api_ids_invalid_raises(self, db):
+        """Un type aberrant (int dans une liste de strings) est rejeté."""
+        with pytest.raises(ValidationError, match="api_ids invalide"):
+            create_structure(
+                db, code="T3", name="T3", type="labo",
+                api_ids={"openalex": [123, 456]},
+            )
+
 
 class TestUpdateStructure:
     def test_raises_not_found(self, db):
