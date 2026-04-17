@@ -6,6 +6,7 @@ Toute création ou recherche de journal/éditeur passe par ce module.
 Compatible avec les curseurs tuples (standard) et RealDictCursor.
 """
 
+from domain.errors import ConflictError, NotFoundError, ValidationError
 from utils.db_helpers import row_val as _val
 from utils.normalize import normalize_text
 
@@ -278,19 +279,19 @@ def find_or_create_journal(
     return journal_id
 
 
-def update_journal(cur, journal_id: int, *, fields: dict) -> bool:
+def update_journal(cur, journal_id: int, *, fields: dict) -> None:
     """Met à jour une revue. Le `title` est automatiquement normalisé en
     `title_normalized`.
 
-    Retourne True si la revue existe et a été mise à jour, False si introuvable.
-    Lève ValueError si `fields` est vide.
+    Lève NotFoundError si la revue n'existe pas.
+    Lève ValidationError si `fields` est vide.
     """
     if not fields:
-        raise ValueError("Aucun champ à mettre à jour")
+        raise ValidationError("Aucun champ à mettre à jour")
 
     cur.execute("SELECT id FROM journals WHERE id = %s", (journal_id,))
     if not cur.fetchone():
-        return False
+        raise NotFoundError(f"Revue {journal_id} introuvable")
 
     fields = dict(fields)
     if "title" in fields:
@@ -301,22 +302,21 @@ def update_journal(cur, journal_id: int, *, fields: dict) -> bool:
         f"UPDATE journals SET {sets}, updated_at = now() WHERE id = %s",
         list(fields.values()) + [journal_id],
     )
-    return True
 
 
-def update_publisher(cur, publisher_id: int, *, fields: dict) -> bool:
+def update_publisher(cur, publisher_id: int, *, fields: dict) -> None:
     """Met à jour un éditeur. Le `name` est automatiquement normalisé en
     `name_normalized`.
 
-    Retourne True si l'éditeur existe et a été mis à jour, False si introuvable.
-    Lève ValueError si `fields` est vide.
+    Lève NotFoundError si l'éditeur n'existe pas.
+    Lève ValidationError si `fields` est vide.
     """
     if not fields:
-        raise ValueError("Aucun champ à mettre à jour")
+        raise ValidationError("Aucun champ à mettre à jour")
 
     cur.execute("SELECT id FROM publishers WHERE id = %s", (publisher_id,))
     if not cur.fetchone():
-        return False
+        raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
     fields = dict(fields)
     if "name" in fields:
@@ -327,7 +327,6 @@ def update_publisher(cur, publisher_id: int, *, fields: dict) -> bool:
         f"UPDATE publishers SET {sets}, updated_at = now() WHERE id = %s",
         list(fields.values()) + [publisher_id],
     )
-    return True
 
 
 def update_journal_apc(
@@ -375,7 +374,7 @@ def merge_publishers(cur, target_id: int, source_id: int) -> None:
     6. Supprime la source
     """
     if target_id == source_id:
-        raise RuntimeError("Impossible de fusionner un éditeur avec lui-même")
+        raise ConflictError("Impossible de fusionner un éditeur avec lui-même")
 
     # 1. Journals avec même titre normalisé → fusionner
     cur.execute(
@@ -402,7 +401,7 @@ def merge_publishers(cur, target_id: int, source_id: int) -> None:
             tv = target_j[field]
             sv = source_j[field]
             if tv and sv and tv != sv:
-                raise RuntimeError(
+                raise ConflictError(
                     f"Conflit {field} lors de la fusion des revues "
                     f"(cible #{tj_id}: {tv}, source #{sj_id}: {sv}). "
                     f"Fusionner les revues manuellement d'abord."
@@ -485,7 +484,7 @@ def merge_journals(cur, target_id: int, source_id: int) -> None:
     5. Supprime la source
     """
     if target_id == source_id:
-        raise RuntimeError("Impossible de fusionner un journal avec lui-même")
+        raise ConflictError("Impossible de fusionner un journal avec lui-même")
 
     # 1. Transférer les publications et source_publications
     cur.execute(

@@ -93,20 +93,12 @@ async def update_journal(journal_id: int, body: JournalUpdate):
     """Met à jour une revue."""
     fields = body.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
-        try:
-            found = _update_journal(cur, journal_id, fields=fields)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        if not found:
-            raise HTTPException(status_code=404, detail="Revue introuvable")
+        _update_journal(cur, journal_id, fields=fields)
         return {"ok": True}
 
 
 @router.post("/api/journals/{journal_id}/merge")
 async def merge(journal_id: int, body: MergeRequest):
-    if body.source_id == journal_id:
-        raise HTTPException(status_code=400, detail="source_id invalide")
-
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id FROM journals WHERE id IN (%s, %s)", (journal_id, body.source_id))
         found = {row["id"] for row in cur.fetchall()}
@@ -115,9 +107,5 @@ async def merge(journal_id: int, body: MergeRequest):
         if body.source_id not in found:
             raise HTTPException(status_code=404, detail="Revue source introuvable")
 
-        try:
-            merge_journals(cur, journal_id, body.source_id)
-        except RuntimeError as e:
-            raise HTTPException(status_code=409, detail=str(e))
-
+        merge_journals(cur, journal_id, body.source_id)
         return {"merged": True, "source_id": body.source_id, "target_id": journal_id}

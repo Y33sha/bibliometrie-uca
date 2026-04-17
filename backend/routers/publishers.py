@@ -85,20 +85,12 @@ async def update_publisher(publisher_id: int, body: PublisherUpdate):
     """Met à jour un éditeur."""
     fields = body.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
-        try:
-            found = _update_publisher(cur, publisher_id, fields=fields)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        if not found:
-            raise HTTPException(status_code=404, detail="Éditeur introuvable")
+        _update_publisher(cur, publisher_id, fields=fields)
         return {"ok": True}
 
 
 @router.post("/api/publishers/{publisher_id}/merge")
 async def merge(publisher_id: int, body: MergeRequest):
-    if body.source_id == publisher_id:
-        raise HTTPException(status_code=400, detail="source_id invalide")
-
     with get_cursor() as (cur, conn):
         cur.execute(
             "SELECT id FROM publishers WHERE id IN (%s, %s)", (publisher_id, body.source_id)
@@ -109,9 +101,5 @@ async def merge(publisher_id: int, body: MergeRequest):
         if body.source_id not in found:
             raise HTTPException(status_code=404, detail="Éditeur source introuvable")
 
-        try:
-            merge_publishers(cur, publisher_id, body.source_id)
-        except RuntimeError as e:
-            raise HTTPException(status_code=409, detail=str(e))
-
+        merge_publishers(cur, publisher_id, body.source_id)
         return {"merged": True, "source_id": body.source_id, "target_id": publisher_id}
