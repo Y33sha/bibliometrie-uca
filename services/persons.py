@@ -119,33 +119,10 @@ def add_identifier(
     """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
 
     Si l'identifiant existe avec statut 'rejected', le réattribue
-    (nouveau person_id, statut pending).
-    Si 'pending' ou 'confirmed', ne fait rien.
+    (nouveau person_id, statut pending). Si 'pending' ou 'confirmed',
+    ne fait rien.
     """
-    cur.execute(
-        """
-        INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
-        VALUES (%s, %s, %s, %s, %s::identifier_status)
-        ON CONFLICT (id_type, id_value) DO UPDATE SET
-            person_id = EXCLUDED.person_id,
-            source = EXCLUDED.source,
-            status = 'pending'
-        WHERE person_identifiers.status = 'rejected'
-    """,
-        (person_id, id_type, id_value, source, status),
-    )
-
-    # Attribution d'un idhal → rattacher le compte HAL correspondant
-    if id_type == "idhal":
-        cur.execute(
-            """
-            UPDATE source_persons SET person_id = %s
-            WHERE source = 'hal'
-              AND source_ids->>'idhal' = %s
-              AND (person_id IS NULL OR person_id != %s)
-        """,
-            (person_id, id_value, person_id),
-        )
+    PgPersonRepository(cur).add_identifier(person_id, id_type, id_value, source, status)
 
 
 def remove_identifier(cur, person_id: int, id_type: str, id_value: str) -> None:
@@ -153,15 +130,7 @@ def remove_identifier(cur, person_id: int, id_type: str, id_value: str) -> None:
 
     Lève NotFoundError si l'identifiant n'existe pas.
     """
-    cur.execute(
-        """
-        DELETE FROM person_identifiers
-        WHERE person_id = %s AND id_type = %s AND id_value = %s
-        """,
-        (person_id, id_type, id_value),
-    )
-    if cur.rowcount == 0:
-        raise NotFoundError("Identifiant introuvable")
+    PgPersonRepository(cur).remove_identifier(person_id, id_type, id_value)
     emit_event(
         cur, "person_identifier.removed", "person", person_id,
         {"id_type": id_type, "id_value": id_value},
@@ -174,21 +143,11 @@ def update_identifier_status(cur, ident_id: int, status: str) -> dict:
     Retourne la ligne {id, status} mise à jour.
     Lève NotFoundError si l'identifiant n'existe pas.
     """
-    cur.execute(
-        """
-        UPDATE person_identifiers SET status = %s::identifier_status
-        WHERE id = %s RETURNING id, status::text AS status, person_id
-        """,
-        (status, ident_id),
-    )
-    row = cur.fetchone()
-    if not row:
-        raise NotFoundError(f"Identifiant {ident_id} introuvable")
+    row = PgPersonRepository(cur).update_identifier_status(ident_id, status)
     emit_event(
         cur, "person_identifier.status_changed", "person", row["person_id"],
         {"ident_id": ident_id, "status": status},
     )
-    # Retire person_id du retour pour préserver le contrat existant
     return {"id": row["id"], "status": row["status"]}
 
 
@@ -197,16 +156,7 @@ def reassign_identifier(cur, ident_id: int, target_person_id: int) -> None:
 
     Lève NotFoundError si l'identifiant n'existe pas.
     """
-    cur.execute(
-        """
-        UPDATE person_identifiers
-        SET person_id = %s, status = 'pending'::identifier_status
-        WHERE id = %s
-        """,
-        (target_person_id, ident_id),
-    )
-    if cur.rowcount == 0:
-        raise NotFoundError(f"Identifiant {ident_id} introuvable")
+    PgPersonRepository(cur).reassign_identifier(ident_id, target_person_id)
     emit_event(
         cur, "person_identifier.reassigned", "person", target_person_id,
         {"ident_id": ident_id},
