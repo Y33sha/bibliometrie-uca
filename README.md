@@ -127,7 +127,7 @@ npm install
 
 ```bash
 # Backend (port 8003 par défaut)
-uvicorn backend.app:app --reload
+uvicorn interfaces.api.app:app --reload
 
 # Frontend (port 5173 par défaut)
 cd frontend && npm run dev

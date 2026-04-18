@@ -4,8 +4,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.deps import get_cursor
-from backend.models import MarkDistinctPublications, MergePublications
+from interfaces.api.deps import get_cursor
+from interfaces.api.models import MarkDistinctPublications, MergePublications
 from application.publications import mark_distinct as _mark_pubs_distinct
 from application.publications import merge_publications
 

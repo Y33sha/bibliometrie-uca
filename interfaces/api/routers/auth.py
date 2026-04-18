@@ -5,13 +5,13 @@ import time
 
 from fastapi import APIRouter, Cookie, Response
 
-from backend.deps import (
+from interfaces.api.deps import (
     SESSION_MAX_AGE,
     _check_password,
     _sign_token,
     _verify_token,
 )
-from backend.models import LoginRequest
+from interfaces.api.models import LoginRequest
 from infrastructure.settings import settings
 
 router = APIRouter()

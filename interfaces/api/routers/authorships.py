@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Query
 
-from backend.deps import get_cursor
+from interfaces.api.deps import get_cursor
 from domain.sources import AUTHOR_SOURCES_SQL
 
 router = APIRouter()

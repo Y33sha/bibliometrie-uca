@@ -4,8 +4,8 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
-from backend.deps import get_cursor, require_admin
-from backend.models import (
+from interfaces.api.deps import get_cursor, require_admin
+from interfaces.api.models import (
     BatchReviewAction,
     BatchSetCountry,
     ReviewAction,

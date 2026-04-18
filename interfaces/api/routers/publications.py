@@ -6,8 +6,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
-from backend.deps import get_cursor, get_root_structure_id
-from backend.filters import (
+from interfaces.api.deps import get_cursor, get_root_structure_id
+from interfaces.api.filters import (
     OA_OPEN_STATUSES,
     PUB_IS_UCA,
     apply_access_filter,
@@ -26,7 +26,7 @@ from backend.filters import (
     parse_int_csv,
     parse_str_csv,
 )
-from backend.models import ExcludeSourceAuthorship
+from interfaces.api.models import ExcludeSourceAuthorship
 from application.authorships import set_source_authorship_excluded as _set_source_authorship_excluded
 
 router = APIRouter()

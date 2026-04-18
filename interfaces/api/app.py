@@ -19,7 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from backend.deps import _get_pool, _verify_token, get_cursor
+from interfaces.api.deps import _get_pool, _verify_token, get_cursor
 from domain.errors import (
     ConflictError,
     DomainError,
@@ -34,7 +34,7 @@ from infrastructure.log import configure_root_logging
 # À faire AVANT l'import des routers qui peuvent créer leur propre logger.
 configure_root_logging()
 
-from backend.routers import (  # noqa: E402
+from interfaces.api.routers import (  # noqa: E402
     addresses,
     admin_duplicates,
     admin_person_duplicates,

@@ -4,8 +4,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.deps import get_cursor
-from backend.models import JournalUpdate, MergeRequest
+from interfaces.api.deps import get_cursor
+from interfaces.api.models import JournalUpdate, MergeRequest
 from application.journals import merge_journals
 from application.journals import update_journal as _update_journal
 

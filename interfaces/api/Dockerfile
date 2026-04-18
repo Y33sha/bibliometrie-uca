@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # En dev, le code source est monté en volume (pas copié)
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "interfaces.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

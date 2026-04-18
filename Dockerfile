@@ -21,18 +21,16 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Code applicatif
-COPY backend/        ./backend/
-COPY config/ ./config/
-COPY db/              ./db/
-COPY extraction/      ./extraction/
-COPY processing/      ./processing/
-COPY services/        ./services/
-COPY utils/           ./utils/
+COPY application/     ./application/
+COPY domain/          ./domain/
+COPY infrastructure/  ./infrastructure/
+COPY interfaces/      ./interfaces/
+COPY scripts/         ./scripts/
 COPY run_pipeline.py  .
 
-# Frontend buildé (servi par le backend via SPAStaticFiles)
+# Frontend buildé (servi par l'API via SPAStaticFiles)
 COPY --from=frontend-build /build/build ./frontend/build
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "interfaces.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
