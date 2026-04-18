@@ -18,7 +18,7 @@ from psycopg2.extras import RealDictCursor
 
 from db.connection import get_connection
 from application.publications import merge_publications
-from utils.log import setup_logger
+from infrastructure.log import setup_logger
 from domain.names import names_compatible
 from domain.normalize import normalize_name
 

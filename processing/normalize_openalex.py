@@ -32,15 +32,15 @@ from application.publications import (
     try_merge_by_doi,
 )
 from application.publications import find_or_create as find_or_create_publication
-from utils.addresses import link_addresses
-from utils.db_helpers import mark_staging_done
+from infrastructure.addresses import link_addresses
+from infrastructure.db_helpers import mark_staging_done
 from domain.doc_types import map_doc_type
 from utils.doi import clean_doi
 from utils.hal import extract_hal_id_from_url
-from utils.log import setup_logger
+from infrastructure.log import setup_logger
 from utils.nnt import extract_nnt_from_openalex, is_theses_fr_source
 from domain.normalize import normalize_text
-from utils.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
+from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
 
 # ----- Logging -----
 logger = setup_logger("normalize_openalex", os.path.join(os.path.dirname(__file__), "logs"))

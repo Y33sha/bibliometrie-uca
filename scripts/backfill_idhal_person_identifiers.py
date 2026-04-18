@@ -12,7 +12,7 @@ import os
 
 from db.connection import get_connection
 from application.persons import add_identifier
-from utils.log import setup_logger
+from infrastructure.log import setup_logger
 
 log = setup_logger(
     "backfill_identifiers", os.path.join(os.path.dirname(__file__), "../processing/logs")

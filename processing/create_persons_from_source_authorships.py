@@ -50,7 +50,7 @@ from application.persons import (
 from application.persons import (
     link_authorships as link_to_person,
 )
-from utils.log import setup_logger
+from infrastructure.log import setup_logger
 from domain.names import names_compatible, parse_raw_author_name
 from domain.normalize import normalize_name
 

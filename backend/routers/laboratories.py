@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 async def list_laboratories():
     """Liste des labos du périmètre."""
     with get_cursor() as (cur, conn):
-        from utils.app_config import _get_from_db
-        from utils.perimeter import get_persons_structure_ids
+        from infrastructure.app_config import _get_from_db
+        from infrastructure.perimeter import get_persons_structure_ids
 
         perimeter_ids = list(get_persons_structure_ids(cur))
 

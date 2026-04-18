@@ -16,7 +16,7 @@ from psycopg2.extras import RealDictCursor
 
 from db.connection import get_connection
 from application.publications import merge_publications
-from utils.log import setup_logger
+from infrastructure.log import setup_logger
 
 log = setup_logger(
     "merge_versioned_doi", os.path.join(os.path.dirname(__file__), "..", "processing", "logs")

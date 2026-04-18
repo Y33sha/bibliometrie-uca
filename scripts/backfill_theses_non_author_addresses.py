@@ -10,7 +10,7 @@ Usage:
 import os
 
 from db.connection import get_connection
-from utils.log import setup_logger
+from infrastructure.log import setup_logger
 
 log = setup_logger(
     "backfill_theses_addresses", os.path.join(os.path.dirname(__file__), "../processing/logs")

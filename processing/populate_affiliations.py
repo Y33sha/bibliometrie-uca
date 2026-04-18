@@ -24,8 +24,8 @@ import os
 import time
 
 from db.connection import get_connection
-from utils.log import setup_logger
-from utils.perimeter import get_affiliations_structure_ids, get_persons_structure_ids
+from infrastructure.log import setup_logger
+from infrastructure.perimeter import get_affiliations_structure_ids, get_persons_structure_ids
 
 logger = setup_logger("populate_affiliations", os.path.join(os.path.dirname(__file__), "logs"))
 

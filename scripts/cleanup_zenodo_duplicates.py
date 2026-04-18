@@ -16,8 +16,8 @@ import time
 
 from db.connection import get_connection
 from application.publications import merge_publications
-from utils.log import setup_logger
-from utils.zenodo import resolve_zenodo_doi
+from infrastructure.log import setup_logger
+from infrastructure.zenodo import resolve_zenodo_doi
 
 logger = setup_logger(
     "cleanup_zenodo", os.path.join(os.path.dirname(__file__), "../processing/logs")

@@ -12,7 +12,7 @@ call sites historiques.
 
 from collections import namedtuple
 
-from utils.db_helpers import row_val as _val
+from infrastructure.db_helpers import row_val as _val
 
 # ── Types de résultat de recherche ─────────────────────────────────
 
