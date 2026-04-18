@@ -63,47 +63,6 @@ def find_or_create_publisher(
 # ── Journals ──
 
 
-def _add_journal_name_form(
-    cur, journal_id: int, form_normalized: str, publisher_id: int | None = None
-) -> None:
-    """Ajoute une forme de nom si elle n'existe pas encore."""
-    if not form_normalized:
-        return
-    cur.execute(
-        """
-        INSERT INTO journal_name_forms (journal_id, form_normalized, publisher_id)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (form_normalized, publisher_id) DO NOTHING
-    """,
-        (journal_id, form_normalized, publisher_id),
-    )
-
-
-def _enrich_journal(
-    cur,
-    journal_id: int,
-    *,
-    issn=None,
-    eissn=None,
-    publisher_id=None,
-    openalex_id=None,
-    oa_model=None,
-) -> None:
-    """Enrichit un journal existant avec les métadonnées manquantes."""
-    cur.execute(
-        """
-        UPDATE journals SET
-            issn = COALESCE(journals.issn, %s),
-            eissn = COALESCE(journals.eissn, %s),
-            publisher_id = COALESCE(journals.publisher_id, %s),
-            openalex_id = COALESCE(journals.openalex_id, %s),
-            oa_model = COALESCE(journals.oa_model, %s)
-        WHERE id = %s
-    """,
-        (issn, eissn, publisher_id, openalex_id, oa_model, journal_id),
-    )
-
-
 def find_or_create_journal(
     cur,
     title: str | None,
@@ -119,10 +78,11 @@ def find_or_create_journal(
 
     Cascade de recherche :
     1. openalex_id (upsert si fourni)
-    2. ISSN (+ check issnl)
-    3. eISSN (+ check issnl)
-    4. ISSN-L
-    5. Titre normalisé
+    2. ISSN (cherche dans issn, eissn, issnl)
+    3. eISSN (idem)
+    4. ISSN-L (idem)
+    5. Titre normalisé (forme de nom journal)
+    6. Création + enregistrement de la forme de nom
 
     Enrichit les métadonnées manquantes quand un journal existant est trouvé.
     Retourne journal.id ou None si title est vide.
@@ -131,123 +91,53 @@ def find_or_create_journal(
         return None
 
     title_normalized = normalize_text(title)
+    repo = PgJournalRepository(cur)
+
+    def _match_and_enrich(journal_id: int, *, with_openalex: bool = True) -> int:
+        """Enrichit le journal trouvé et rattache la forme de nom. Retourne son id."""
+        repo.enrich_journal(
+            journal_id,
+            issn=issn, eissn=eissn, publisher_id=publisher_id,
+            openalex_id=openalex_id if with_openalex else None,
+            oa_model=oa_model if with_openalex else None,
+        )
+        repo.add_journal_name_form(journal_id, title_normalized, publisher_id)
+        return journal_id
 
     # 1. Par openalex_id
     if openalex_id:
-        cur.execute("SELECT id FROM journals WHERE openalex_id = %s", (openalex_id,))
-        row = cur.fetchone()
-        if row:
-            _enrich_journal(cur, _val(row, 0), issn=issn, eissn=eissn, publisher_id=publisher_id)
-            _add_journal_name_form(cur, _val(row, 0), title_normalized, publisher_id)
-            return _val(row, 0)
+        jid = repo.find_journal_by_openalex_id(openalex_id)
+        if jid:
+            # Cas openalex_id : enrichit sans passer openalex_id/oa_model
+            # (déjà présents par définition)
+            return _match_and_enrich(jid, with_openalex=False)
         # openalex_id inconnu : on cherche quand même par ISSN/name_form
         # avant de créer, pour rattacher l'openalex_id à un journal existant
 
-    # 2. Par ISSN (cherche dans issn, eissn, issnl)
-    if issn:
-        cur.execute(
-            "SELECT id FROM journals WHERE issn = %s OR eissn = %s OR issnl = %s LIMIT 1",
-            (issn, issn, issn),
-        )
-        row = cur.fetchone()
-        if row:
-            _enrich_journal(
-                cur,
-                _val(row, 0),
-                issn=issn,
-                eissn=eissn,
-                publisher_id=publisher_id,
-                openalex_id=openalex_id,
-                oa_model=oa_model,
-            )
-            _add_journal_name_form(cur, _val(row, 0), title_normalized, publisher_id)
-            return _val(row, 0)
+    # 2-4. Par ISSN / eISSN / ISSN-L (dans n'importe lequel des 3 champs)
+    for value in (issn, eissn, issnl):
+        if not value:
+            continue
+        jid = repo.find_journal_by_issn_any(value)
+        if jid:
+            return _match_and_enrich(jid)
 
-    # 3. Par eISSN (cherche dans issn, eissn, issnl)
-    if eissn:
-        cur.execute(
-            "SELECT id FROM journals WHERE issn = %s OR eissn = %s OR issnl = %s LIMIT 1",
-            (eissn, eissn, eissn),
+    # 5. Par forme de nom (priorité aux journals avec eISSN)
+    jid = repo.find_journal_by_name_form(title_normalized, publisher_id)
+    if jid:
+        repo.enrich_journal(
+            jid, issn=issn, eissn=eissn, publisher_id=publisher_id,
+            openalex_id=openalex_id, oa_model=oa_model,
         )
-        row = cur.fetchone()
-        if row:
-            _enrich_journal(
-                cur,
-                _val(row, 0),
-                issn=issn,
-                eissn=eissn,
-                publisher_id=publisher_id,
-                openalex_id=openalex_id,
-                oa_model=oa_model,
-            )
-            _add_journal_name_form(cur, _val(row, 0), title_normalized, publisher_id)
-            return _val(row, 0)
-
-    # 4. Par ISSN-L (cherche dans issn, eissn, issnl)
-    if issnl:
-        cur.execute(
-            "SELECT id FROM journals WHERE issn = %s OR eissn = %s OR issnl = %s LIMIT 1",
-            (issnl, issnl, issnl),
-        )
-        row = cur.fetchone()
-        if row:
-            _enrich_journal(
-                cur,
-                _val(row, 0),
-                issn=issn,
-                eissn=eissn,
-                publisher_id=publisher_id,
-                openalex_id=openalex_id,
-                oa_model=oa_model,
-            )
-            _add_journal_name_form(cur, _val(row, 0), title_normalized, publisher_id)
-            return _val(row, 0)
-
-    # 5. Par forme de nom (journal_name_forms)
-    # Priorité aux journals avec eISSN (plus fiable que les ISSN print)
-    cur.execute(
-        """
-        SELECT nf.journal_id FROM journal_name_forms nf
-        JOIN journals j ON j.id = nf.journal_id
-        WHERE nf.form_normalized = %s
-          AND (nf.publisher_id IS NOT DISTINCT FROM %s OR nf.publisher_id IS NULL OR %s IS NULL)
-        ORDER BY (j.eissn IS NOT NULL) DESC, j.id ASC
-        LIMIT 1
-    """,
-        (title_normalized, publisher_id, publisher_id),
-    )
-    row = cur.fetchone()
-    if row:
-        _enrich_journal(
-            cur,
-            _val(row, 0),
-            issn=issn,
-            eissn=eissn,
-            publisher_id=publisher_id,
-            openalex_id=openalex_id,
-            oa_model=oa_model,
-        )
-        return _val(row, 0)
+        return jid
 
     # 6. Créer + enregistrer la forme de nom
-    cur.execute(
-        """
-        INSERT INTO journals (title, title_normalized, issn, eissn, issnl,
-                              publisher_id, openalex_id, oa_model)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-    """,
-        (title.strip(), title_normalized, issn, eissn, issnl, publisher_id, openalex_id, oa_model),
+    journal_id = repo.create_journal(
+        title=title.strip(), title_normalized=title_normalized,
+        issn=issn, eissn=eissn, issnl=issnl,
+        publisher_id=publisher_id, openalex_id=openalex_id, oa_model=oa_model,
     )
-    journal_id = _val(cur.fetchone(), 0)
-    cur.execute(
-        """
-        INSERT INTO journal_name_forms (journal_id, form_normalized, publisher_id)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (form_normalized, publisher_id) DO NOTHING
-    """,
-        (journal_id, title_normalized, publisher_id),
-    )
+    repo.add_journal_name_form(journal_id, title_normalized, publisher_id)
     return journal_id
 
 
