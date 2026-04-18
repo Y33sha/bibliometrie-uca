@@ -382,3 +382,36 @@ class PublicationTopics(BaseModel):
 
     def to_dict(self) -> dict:
         return self.model_dump(exclude_none=True)
+
+
+# ── Helpers publics (API string-in/string-out) ─────────────────────
+#
+# Ces fonctions couvrent le besoin du code existant qui travaille sur
+# des chaînes brutes (pipelines d'extraction, normalisation). Elles
+# sont l'équivalent fonctionnel des VO mais en retour string|None.
+# Pour un accès structuré et typé, préférer DOI/NNT/HALId directement.
+
+
+def clean_doi(doi: str | None) -> str | None:
+    """Nettoie un DOI brut : préfixe URL, espaces, suffixe de version.
+    Retourne le DOI canonique, ou None si l'entrée est vide/inutilisable.
+    """
+    return _normalize_doi(doi)
+
+
+def normalize_nnt(nnt: str | None) -> str | None:
+    """Normalise un NNT : uppercase, strip whitespace. Retourne None
+    si l'entrée est vide ou ne contient pas de caractères alphanumériques."""
+    return _normalize_nnt(nnt)
+
+
+def extract_hal_id_from_url(url: str | None) -> str | None:
+    """Extrait le HAL ID canonique d'une URL HAL ou d'un ID brut.
+
+    Gère les préfixes hal/tel/halshs/inserm/pasteur/cea/ineris.
+    Ignore le suffixe de version (v1, v2, etc.).
+
+    >>> extract_hal_id_from_url("https://hal.science/hal-04123456v2")
+    'hal-04123456'
+    """
+    return _normalize_hal_id(url)

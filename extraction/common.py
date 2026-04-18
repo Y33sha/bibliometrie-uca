@@ -5,7 +5,7 @@ Fonctions partagées par les scripts d'extraction (OpenAlex, HAL, WoS, ScanR).
 import hashlib
 import json
 
-from utils.doi import clean_doi  # noqa: F401 — réexporté pour les scripts d'extraction
+from domain.publication import clean_doi  # noqa: F401 — réexporté pour les scripts d'extraction
 from infrastructure.log import setup_logger  # noqa: F401 — réexporté pour les scripts d'extraction
 
 

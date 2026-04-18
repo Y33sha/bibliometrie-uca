@@ -31,7 +31,7 @@ from application.publications import (
 )
 from domain.doc_types import map_doc_type
 from infrastructure.log import setup_logger
-from utils.nnt import normalize_nnt
+from domain.publication import normalize_nnt
 from domain.normalize import normalize_text
 
 logger = setup_logger("create_publications", os.path.join(os.path.dirname(__file__), "logs"))
