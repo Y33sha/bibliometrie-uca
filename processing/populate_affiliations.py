@@ -23,7 +23,7 @@ import argparse
 import os
 import time
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 from infrastructure.perimeter import get_affiliations_structure_ids, get_persons_structure_ids
 

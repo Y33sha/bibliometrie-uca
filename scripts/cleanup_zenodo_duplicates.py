@@ -14,7 +14,7 @@ import argparse
 import os
 import time
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from application.publications import merge_publications
 from infrastructure.log import setup_logger
 from infrastructure.zenodo import resolve_zenodo_doi

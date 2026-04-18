@@ -196,7 +196,7 @@ def phase_normalize(**kw):
 
 def _vacuum_staging(full: bool = False):
     """VACUUM sur staging. FULL en mode full/monthly, simple sinon."""
-    from db.connection import get_connection
+    from infrastructure.db.connection import get_connection
 
     conn = get_connection()
     conn.autocommit = True

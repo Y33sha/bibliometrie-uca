@@ -24,7 +24,7 @@ import os
 
 from psycopg2.extras import Json
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from application.journals import find_or_create_journal, find_or_create_publisher
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi

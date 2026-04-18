@@ -22,7 +22,7 @@ import re
 
 from psycopg2.extras import Json, RealDictCursor
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from application.journals import find_or_create_journal, find_or_create_publisher
 from application.publications import (
     find_by_doi,

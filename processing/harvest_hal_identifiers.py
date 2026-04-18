@@ -20,7 +20,7 @@ import time
 
 import requests
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from infrastructure.api_limits import HAL_DELAY
 from infrastructure.log import setup_logger
 

@@ -27,7 +27,7 @@ import os
 
 from psycopg2.extras import Json, RealDictCursor
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from application.publications import (
     find_or_create,
     find_thesis_by_title,

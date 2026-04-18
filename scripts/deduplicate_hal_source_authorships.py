@@ -30,7 +30,7 @@ import os
 
 from psycopg2.extras import RealDictCursor
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 
 logger = setup_logger("dedup_hal_sa", os.path.join(os.path.dirname(__file__), "../processing/logs"))

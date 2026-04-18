@@ -18,7 +18,7 @@ import os
 import sys
 from datetime import datetime
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from application.persons import refresh_person_name_forms
 from domain.normalize import normalize_name
 

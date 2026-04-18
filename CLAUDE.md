@@ -13,7 +13,7 @@
 - Backend : FastAPI (Python), base PostgreSQL. Architecture en couches DDD : routers dans `backend/routers/`, services applicatifs (orchestration métier) dans `application/`, repositories SQL dans `infrastructure/repositories/`, value objects et règles métier dans `domain/`, utilitaires dans `utils/`
 - Frontend : SvelteKit (Svelte 5), routes dans `frontend/src/routes/`
 - Pipeline : scripts dans `processing/` et `extraction/`, orchestrateur `run_pipeline.py`
-- Migrations SQL dans `db/migrations/`, appliquées via `python db/migrate.py`
+- Migrations SQL dans `infrastructure/db/migrations/`, appliquées via `python -m infrastructure.db.migrate`
 - Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_PASSWORD=...`)
 - Tests frontend : `cd frontend && npm run check` (svelte-check, échoue sur les erreurs de types)
 - Lancement dev : `bash start.sh` (uvicorn port 8003 + vite port 5176)

@@ -15,7 +15,7 @@ import argparse
 import os
 import time
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 
 logger = setup_logger("build_authorships", os.path.join(os.path.dirname(__file__), "logs"))

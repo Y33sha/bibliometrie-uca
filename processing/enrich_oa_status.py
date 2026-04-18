@@ -20,7 +20,7 @@ import time
 
 import requests
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from application.publications import update_oa_status
 from infrastructure.api_limits import UNPAYWALL_DELAY
 from infrastructure.log import setup_logger

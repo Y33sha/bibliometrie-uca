@@ -10,7 +10,7 @@ Usage:
 
 import argparse
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from domain.doc_types import map_doc_type
 
 # Priorité des types : plus le score est élevé, plus le type est "précis"

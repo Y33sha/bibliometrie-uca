@@ -9,7 +9,7 @@ Usage:
 
 import os
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 
 log = setup_logger(

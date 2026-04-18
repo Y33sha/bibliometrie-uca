@@ -18,7 +18,7 @@ import time
 import requests
 from psycopg2.extras import Json, RealDictCursor
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from infrastructure.sources.common import compute_hash, setup_logger
 from infrastructure.sources.openalex import BASE_URL, SELECT_FIELDS, auth_params, compute_meta_hash, init_auth
 from infrastructure.api_limits import OPENALEX_DELAY

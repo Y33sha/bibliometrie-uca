@@ -18,7 +18,7 @@ Usage:
 
 import argparse
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 from domain.normalize import normalize_text
 
