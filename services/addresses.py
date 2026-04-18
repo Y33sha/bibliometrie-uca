@@ -1,15 +1,16 @@
 """
-Service Addresses — accès exclusif en écriture aux tables `addresses`,
+Service Addresses — orchestrateur des opérations sur `addresses`,
 `address_structures`, et propagation des pays vers les publications.
 
-Les routers passent par ces fonctions pour toute écriture sur les adresses.
-Les lectures restent autorisées dans les routers (convention du projet).
+Le SQL vit dans `infrastructure/repositories/address_repository.py`.
+Les routers passent par ces fonctions pour toute écriture sur les
+adresses. Les lectures restent autorisées dans les routers (convention
+du projet).
 """
 
 import logging
 
-from psycopg2.extras import execute_values
-
+from infrastructure.repositories.address_repository import PgAddressRepository
 from services.authorships import propagate_uca_for_addresses
 
 logger = logging.getLogger(__name__)
@@ -26,37 +27,13 @@ def review_structure_link(cur, address_id: int, structure_id: int,
     - is_confirmed = False → rejette (crée le lien si besoin)
     - is_confirmed = None  → reset (supprime le lien manuel, remet l'auto à NULL)
 
-    Propage automatiquement l'UCA aux source_authorships et authorships vérité
-    (via services.authorships.propagate_uca_for_addresses).
+    Propage automatiquement l'UCA aux source_authorships et authorships vérité.
     """
+    repo = PgAddressRepository(cur)
     if is_confirmed is None:
-        # Reset : retirer le lien manuel (sans matched_form_id), puis remettre
-        # is_confirmed à NULL pour les liens auto-détectés restants.
-        cur.execute(
-            """
-            DELETE FROM address_structures
-            WHERE address_id = %s AND structure_id = %s AND matched_form_id IS NULL
-            """,
-            (address_id, structure_id),
-        )
-        cur.execute(
-            """
-            UPDATE address_structures SET is_confirmed = NULL
-            WHERE address_id = %s AND structure_id = %s
-            """,
-            (address_id, structure_id),
-        )
+        repo.reset_manual_link(address_id, structure_id)
     else:
-        cur.execute(
-            """
-            INSERT INTO address_structures (address_id, structure_id, is_confirmed)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (address_id, structure_id) DO UPDATE
-                SET is_confirmed = EXCLUDED.is_confirmed
-            """,
-            (address_id, structure_id, is_confirmed),
-        )
-
+        repo.upsert_structure_link(address_id, structure_id, is_confirmed)
     propagate_uca_for_addresses(cur, [address_id])
 
 
@@ -70,33 +47,11 @@ def batch_review_structure_link(cur, address_ids: list[int], structure_id: int,
     if not address_ids:
         return 0
 
+    repo = PgAddressRepository(cur)
     if is_confirmed is None:
-        cur.execute(
-            """
-            DELETE FROM address_structures
-            WHERE address_id = ANY(%s) AND structure_id = %s AND matched_form_id IS NULL
-            """,
-            (address_ids, structure_id),
-        )
-        cur.execute(
-            """
-            UPDATE address_structures SET is_confirmed = NULL
-            WHERE address_id = ANY(%s) AND structure_id = %s
-            """,
-            (address_ids, structure_id),
-        )
-        updated = cur.rowcount
+        updated = repo.batch_reset_manual_links(address_ids, structure_id)
     else:
-        execute_values(
-            cur,
-            """
-            INSERT INTO address_structures (address_id, structure_id, is_confirmed)
-            VALUES %s
-            ON CONFLICT (address_id, structure_id) DO UPDATE
-                SET is_confirmed = EXCLUDED.is_confirmed
-            """,
-            [(aid, structure_id, is_confirmed) for aid in address_ids],
-        )
+        repo.batch_upsert_structure_links(address_ids, structure_id, is_confirmed)
         updated = len(address_ids)
 
     propagate_uca_for_addresses(cur, address_ids)
@@ -111,41 +66,12 @@ def unassign_manual_structure(cur, address_id: int, structure_id: int) -> bool:
     Propage automatiquement l'UCA.
     Retourne True si un lien manuel a été supprimé, False sinon.
     """
-    cur.execute(
-        """
-        DELETE FROM address_structures
-        WHERE address_id = %s AND structure_id = %s AND matched_form_id IS NULL
-        """,
-        (address_id, structure_id),
-    )
-    deleted = cur.rowcount > 0
+    deleted = PgAddressRepository(cur).delete_manual_structure_link(address_id, structure_id)
     propagate_uca_for_addresses(cur, [address_id])
     return deleted
 
 
 # ── Attribution des pays ──────────────────────────────────────────
-
-
-def _propagate_to_similar_addresses(cur, address_id: int) -> list[int]:
-    """Réplique addresses.countries d'une adresse vers toutes les adresses
-    partageant le même normalized_text (len >= 5).
-
-    Retourne la liste des IDs propagés (sans l'adresse source).
-    """
-    cur.execute(
-        """
-        UPDATE addresses a2
-        SET countries = a1.countries
-        FROM addresses a1
-        WHERE a1.id = %s
-          AND a2.normalized_text = a1.normalized_text
-          AND a2.id <> a1.id
-          AND LENGTH(a2.normalized_text) >= 5
-        RETURNING a2.id
-        """,
-        (address_id,),
-    )
-    return [r["id"] for r in cur.fetchall()]
 
 
 def set_country(cur, address_id: int, countries: list[str] | None) -> list[int]:
@@ -157,13 +83,11 @@ def set_country(cur, address_id: int, countries: list[str] | None) -> list[int]:
     Retourne la liste des IDs affectés (y compris address_id).
     Ne valide pas les codes pays : c'est au caller de le faire.
     """
-    cur.execute(
-        "UPDATE addresses SET countries = %s WHERE id = %s",
-        (countries if countries else None, address_id),
-    )
+    repo = PgAddressRepository(cur)
+    repo.set_countries(address_id, countries)
     affected = [address_id]
     if countries:
-        affected.extend(_propagate_to_similar_addresses(cur, address_id))
+        affected.extend(repo.propagate_countries_to_similar_address(address_id))
     return affected
 
 
@@ -176,20 +100,7 @@ def batch_set_country_by_ids(cur, country_code: str, address_ids: list[int]) -> 
 
     Retourne les IDs effectivement modifiés (= tous ceux passés en entrée).
     """
-    cur.execute(
-        """
-        UPDATE addresses
-        SET countries = CASE
-            WHEN countries IS NULL THEN ARRAY[%s]::char(2)[]
-            WHEN %s = ANY(countries) THEN countries
-            ELSE array_append(countries, %s::char(2))
-        END
-        WHERE id = ANY(%s)
-        RETURNING id
-        """,
-        (country_code, country_code, country_code, address_ids),
-    )
-    return [r["id"] for r in cur.fetchall()]
+    return PgAddressRepository(cur).batch_add_country_by_ids(country_code, address_ids)
 
 
 def batch_set_country_by_filter(
@@ -224,22 +135,10 @@ def batch_set_country_by_filter(
         conditions.append("%s = ANY(suggested_countries)")
         params.append(suggested_country)
 
-    where = " AND ".join(conditions) if conditions else "TRUE"
-
-    cur.execute(
-        f"""
-        UPDATE addresses
-        SET countries = CASE
-            WHEN countries IS NULL THEN ARRAY[%s]::char(2)[]
-            WHEN %s = ANY(countries) THEN countries
-            ELSE array_append(countries, %s::char(2))
-        END
-        WHERE {where}
-        RETURNING id
-        """,
-        [country_code, country_code, country_code] + params,
+    where_clause = " AND ".join(conditions) if conditions else "TRUE"
+    return PgAddressRepository(cur).batch_add_country_by_where(
+        country_code, where_clause, params,
     )
-    return [r["id"] for r in cur.fetchall()]
 
 
 def propagate_countries_to_similar(cur) -> list[int]:
@@ -249,20 +148,7 @@ def propagate_countries_to_similar(cur) -> list[int]:
     Appelée après un batch_set_country_by_* pour propager à travers tout le
     référentiel d'adresses. Retourne les IDs propagés.
     """
-    cur.execute(
-        """
-        UPDATE addresses a2
-        SET countries = a1.countries
-        FROM addresses a1
-        WHERE a1.countries IS NOT NULL
-          AND a2.normalized_text = a1.normalized_text
-          AND a2.countries IS DISTINCT FROM a1.countries
-          AND LENGTH(a2.normalized_text) >= 5
-          AND a2.id <> a1.id
-        RETURNING a2.id
-        """,
-    )
-    return [r["id"] for r in cur.fetchall()]
+    return PgAddressRepository(cur).propagate_countries_across_similar_addresses()
 
 
 # ── Propagation pays vers source_publications et publications ────
@@ -277,64 +163,9 @@ def propagate_countries_to_publications(cur, address_ids: list[int]) -> None:
     if not address_ids:
         return
 
-    # 1. Recalculer countries des source_publications concernés.
-    # Cast c::text nécessaire car addresses.countries est char(2)[] alors que
-    # source_publications.countries est text[] — l'IS DISTINCT FROM planterait
-    # sinon sur "operator does not exist: text[] = character[]".
-    cur.execute(
-        """
-        UPDATE source_publications sd
-        SET countries = sub.new_countries
-        FROM (
-            SELECT sa.source_publication_id AS doc_id,
-                   (SELECT array_agg(DISTINCT c::text ORDER BY c::text)
-                    FROM source_authorship_addresses saa2
-                    JOIN addresses a2 ON a2.id = saa2.address_id
-                    JOIN source_authorships sa2 ON sa2.id = saa2.source_authorship_id,
-                    LATERAL unnest(a2.countries) AS c
-                    WHERE sa2.source_publication_id = sa.source_publication_id
-                      AND a2.countries IS NOT NULL
-                   ) AS new_countries
-            FROM source_authorship_addresses saa
-            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-            WHERE saa.address_id = ANY(%s)
-            GROUP BY sa.source_publication_id
-        ) sub
-        WHERE sd.id = sub.doc_id
-          AND sd.countries IS DISTINCT FROM sub.new_countries
-        """,
-        (address_ids,),
-    )
-    addr_docs = cur.rowcount
-
-    # 2. Recalculer publications.countries (maintenant que source_publications est à jour)
-    cur.execute(
-        """
-        WITH affected_pubs AS (
-            SELECT DISTINCT sd.publication_id
-            FROM source_authorship_addresses saa
-            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            WHERE saa.address_id = ANY(%s) AND sd.publication_id IS NOT NULL
-        )
-        UPDATE publications p
-        SET countries = sub.all_countries
-        FROM (
-            SELECT ap.publication_id,
-                   (SELECT array_agg(DISTINCT c::text ORDER BY c::text)
-                    FROM source_publications sd,
-                    LATERAL unnest(sd.countries) AS c
-                    WHERE sd.publication_id = ap.publication_id
-                      AND sd.countries IS NOT NULL
-                   ) AS all_countries
-            FROM affected_pubs ap
-        ) sub
-        WHERE p.id = sub.publication_id
-          AND p.countries IS DISTINCT FROM sub.all_countries
-        """,
-        (address_ids,),
-    )
-    pubs = cur.rowcount
+    repo = PgAddressRepository(cur)
+    addr_docs = repo.refresh_source_publications_countries(address_ids)
+    pubs = repo.refresh_publications_countries_for_addresses(address_ids)
 
     if addr_docs or pubs:
         logger.info(f"Propagation pays : {addr_docs} docs source, {pubs} publications")
