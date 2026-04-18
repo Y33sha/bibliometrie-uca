@@ -10,12 +10,12 @@
 
 ## Conventions du projet
 
-- Architecture en couches DDD : `domain/` (règles et value objects, zéro I/O), `application/` (orchestrateurs métier, incluant `application/pipeline/`), `infrastructure/` (adapters SQL, APIs sources, settings), `interfaces/` (adapters entrants : `interfaces/api/` pour FastAPI). Entry points CLI : `run_pipeline.py` à la racine, scripts one-shot dans `interfaces/cli/`.
-- Frontend : SvelteKit (Svelte 5), routes dans `frontend/src/routes/`
+- Architecture en couches DDD : `domain/` (règles et value objects, zéro I/O), `application/` (orchestrateurs métier, incluant `application/pipeline/`), `infrastructure/` (adapters SQL, APIs sources, settings), `interfaces/` (adapters entrants : `interfaces/api/` pour FastAPI, `interfaces/frontend/` pour SvelteKit, `interfaces/cli/` pour les scripts one-shot). Entry points CLI : `run_pipeline.py` à la racine.
+- Frontend : SvelteKit (Svelte 5), routes dans `interfaces/frontend/src/routes/`
 - Pipeline : phases dans `application/pipeline/`, extracteurs dans `infrastructure/sources/`, orchestrateur `run_pipeline.py` à la racine
 - Migrations SQL dans `infrastructure/db/migrations/`, appliquées via `python -m infrastructure.db.migrate`
 - Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_PASSWORD=...`)
-- Tests frontend : `cd frontend && npm run check` (svelte-check, échoue sur les erreurs de types)
+- Tests frontend : `cd interfaces/frontend && npm run check` (svelte-check, échoue sur les erreurs de types)
 - Lancement dev : `bash start.sh` (uvicorn port 8003 + vite port 5176)
 - Endpoints POST/PUT/PATCH : toujours un modèle Pydantic dans `interfaces/api/models.py`, jamais `body: dict`
 - Requêtes SQL : toujours des requêtes paramétrées (`%s`), jamais d'interpolation f-string pour les valeurs

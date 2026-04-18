@@ -6,7 +6,7 @@ référentiel dédupliqué de publications, personnes et laboratoires.
 
 ## Stack technique
 
-- **Frontend** : SvelteKit (Svelte 5) — `frontend/`
+- **Frontend** : SvelteKit (Svelte 5) — `interfaces/frontend/`
 - **Backend** : FastAPI + PostgreSQL (psycopg2) — `backend/`
 - **Pipeline** : scripts Python — `processing/`, `extraction/`
 - **Base de données** : PostgreSQL 18
@@ -186,7 +186,7 @@ bibliometrie-uca/
 │   ├── deps.py           Dépendances (connexion DB, auth)
 │   ├── filters.py        Filtres SQL partagés
 │   └── models.py         Modèles Pydantic
-├── frontend/             Application SvelteKit
+├── interfaces/frontend/             Application SvelteKit
 │   └── src/
 │       ├── routes/       Pages (publiques + admin)
 │       └── lib/          Composants et styles partagés
