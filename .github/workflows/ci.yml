@@ -45,6 +45,15 @@ jobs:
       - name: Install dependencies
         run: pip install ".[dev]"
 
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Format check (ruff)
+        run: ruff format --check .
+
+      - name: Architecture contracts (import-linter)
+        run: lint-imports
+
       - name: Run tests
         run: python -m pytest tests/ -v
 
