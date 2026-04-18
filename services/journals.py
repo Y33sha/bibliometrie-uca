@@ -151,19 +151,14 @@ def update_journal(cur, journal_id: int, *, fields: dict) -> None:
     if not fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    cur.execute("SELECT id FROM journals WHERE id = %s", (journal_id,))
-    if not cur.fetchone():
+    repo = PgJournalRepository(cur)
+    if not repo.journal_exists(journal_id):
         raise NotFoundError(f"Revue {journal_id} introuvable")
 
     fields = dict(fields)
     if "title" in fields:
         fields["title_normalized"] = normalize_text(fields["title"])
-
-    sets = ", ".join(f"{k} = %s" for k in fields)
-    cur.execute(
-        f"UPDATE journals SET {sets}, updated_at = now() WHERE id = %s",
-        list(fields.values()) + [journal_id],
-    )
+    repo.update_journal_fields(journal_id, fields)
 
 
 def update_publisher(cur, publisher_id: int, *, fields: dict) -> None:
@@ -176,19 +171,14 @@ def update_publisher(cur, publisher_id: int, *, fields: dict) -> None:
     if not fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    cur.execute("SELECT id FROM publishers WHERE id = %s", (publisher_id,))
-    if not cur.fetchone():
+    repo = PgJournalRepository(cur)
+    if not repo.publisher_exists(publisher_id):
         raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
     fields = dict(fields)
     if "name" in fields:
         fields["name_normalized"] = normalize_text(fields["name"])
-
-    sets = ", ".join(f"{k} = %s" for k in fields)
-    cur.execute(
-        f"UPDATE publishers SET {sets}, updated_at = now() WHERE id = %s",
-        list(fields.values()) + [publisher_id],
-    )
+    repo.update_publisher_fields(publisher_id, fields)
 
 
 def update_journal_apc(
@@ -200,26 +190,15 @@ def update_journal_apc(
     is_in_doaj: bool | None = None,
 ) -> None:
     """Met à jour les informations APC/DOAJ d'un journal."""
-    cur.execute(
-        """
-        UPDATE journals SET
-            apc_amount = COALESCE(%s, journals.apc_amount),
-            apc_currency = COALESCE(%s, journals.apc_currency),
-            is_in_doaj = COALESCE(%s, journals.is_in_doaj)
-        WHERE id = %s
-    """,
-        (apc_amount, apc_currency, is_in_doaj, journal_id),
+    PgJournalRepository(cur).update_journal_apc(
+        journal_id,
+        apc_amount=apc_amount, apc_currency=apc_currency, is_in_doaj=is_in_doaj,
     )
 
 
 def reset_journal_apc(cur) -> int:
     """Réinitialise les APC/DOAJ de toutes les revues avec openalex_id."""
-    cur.execute("""
-        UPDATE journals
-        SET apc_amount = NULL, apc_currency = 'EUR', is_in_doaj = FALSE
-        WHERE openalex_id IS NOT NULL
-    """)
-    return cur.rowcount
+    return PgJournalRepository(cur).reset_journal_apc()
 
 
 # ── Fusions ──

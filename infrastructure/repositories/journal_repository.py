@@ -193,3 +193,64 @@ class PgJournalRepository:
              publisher_id, openalex_id, oa_model),
         )
         return _val(self._cur.fetchone(), 0)
+
+    # ── Updates génériques ─────────────────────────────────────────
+
+    def journal_exists(self, journal_id: int) -> bool:
+        """Vérifie l'existence d'un journal."""
+        self._cur.execute("SELECT id FROM journals WHERE id = %s", (journal_id,))
+        return self._cur.fetchone() is not None
+
+    def publisher_exists(self, publisher_id: int) -> bool:
+        """Vérifie l'existence d'un publisher."""
+        self._cur.execute("SELECT id FROM publishers WHERE id = %s", (publisher_id,))
+        return self._cur.fetchone() is not None
+
+    def update_journal_fields(self, journal_id: int, fields: dict) -> None:
+        """UPDATE dynamique sur journals. Pas de validation ici (l'existence
+        et la non-vacuité des fields sont vérifiées par le service)."""
+        sets = ", ".join(f"{k} = %s" for k in fields)
+        self._cur.execute(
+            f"UPDATE journals SET {sets}, updated_at = now() WHERE id = %s",
+            list(fields.values()) + [journal_id],
+        )
+
+    def update_publisher_fields(self, publisher_id: int, fields: dict) -> None:
+        """UPDATE dynamique sur publishers."""
+        sets = ", ".join(f"{k} = %s" for k in fields)
+        self._cur.execute(
+            f"UPDATE publishers SET {sets}, updated_at = now() WHERE id = %s",
+            list(fields.values()) + [publisher_id],
+        )
+
+    # ── APC / DOAJ ─────────────────────────────────────────────────
+
+    def update_journal_apc(
+        self,
+        journal_id: int,
+        *,
+        apc_amount: float | None = None,
+        apc_currency: str | None = None,
+        is_in_doaj: bool | None = None,
+    ) -> None:
+        """Met à jour les infos APC/DOAJ (COALESCE : champs None ignorés)."""
+        self._cur.execute(
+            """
+            UPDATE journals SET
+                apc_amount = COALESCE(%s, journals.apc_amount),
+                apc_currency = COALESCE(%s, journals.apc_currency),
+                is_in_doaj = COALESCE(%s, journals.is_in_doaj)
+            WHERE id = %s
+            """,
+            (apc_amount, apc_currency, is_in_doaj, journal_id),
+        )
+
+    def reset_journal_apc(self) -> int:
+        """Réinitialise les APC/DOAJ de toutes les revues avec openalex_id.
+        Retourne le nombre de lignes touchées."""
+        self._cur.execute("""
+            UPDATE journals
+            SET apc_amount = NULL, apc_currency = 'EUR', is_in_doaj = FALSE
+            WHERE openalex_id IS NOT NULL
+        """)
+        return self._cur.rowcount
