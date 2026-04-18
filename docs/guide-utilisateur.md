@@ -148,7 +148,3 @@ Paires de personnes potentiellement identiques. Même logique que les doublons d
 Deux modes de détection des candidats au dédoublonnage:
 - Par similitude de noms (tolérance aux initiales et aux noms composés vs simples);
 - Par conflit entre sources (deux personnes en même position auteur sur la même publication).
-
-
-
-

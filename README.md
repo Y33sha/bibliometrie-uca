@@ -114,6 +114,9 @@ Pour régénérer le seed depuis une base existante : `python scripts/generate_s
 pip install ".[dev]"   # runtime + outils de dev (pytest, ruff, mypy, …)
 # ou, pour un déploiement sans dev tools :
 pip install .
+
+# Installer le hook pre-commit (lance ruff + checks YAML/TOML avant chaque commit)
+pre-commit install
 ```
 
 ### Frontend
