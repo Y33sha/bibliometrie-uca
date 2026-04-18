@@ -27,7 +27,8 @@ from psycopg2.extras import Json, RealDictCursor
 from db.connection import get_connection
 from extraction.common import compute_hash
 from infrastructure.api_limits import HAL_DELAY
-from utils.hal import HAL_FIELDS_STR, extract_hal_id_from_url
+from domain.publication import extract_hal_id_from_url
+from utils.hal import HAL_FIELDS_STR
 from infrastructure.log import setup_logger
 
 log = setup_logger("fetch_missing_hal", os.path.join(os.path.dirname(__file__), "logs"))

@@ -32,9 +32,9 @@ from infrastructure.addresses import link_addresses
 from domain.authorship_roles import map_role
 from infrastructure.db_helpers import mark_staging_done
 from domain.doc_types import map_doc_type
-from utils.doi import clean_doi
+from domain.publication import clean_doi
 from infrastructure.log import setup_logger
-from utils.nnt import normalize_nnt
+from domain.publication import normalize_nnt
 from domain.normalize import normalize_text
 from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
 

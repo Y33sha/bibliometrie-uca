@@ -10,7 +10,7 @@ from processing.normalize_openalex import (
 )
 from domain.doc_types import _SOURCE_MAPS, map_doc_type
 from domain.doc_types import _VALID_DOC_TYPES as VALID_DOC_TYPES_SET
-from utils.hal import extract_hal_id_from_url
+from domain.publication import extract_hal_id_from_url
 
 
 class TestOAExtractShortId:
@@ -328,7 +328,8 @@ class TestWoSDocTypeMap:
 
 # ── NNT ─────────────────────────────────────────────────────────
 
-from utils.nnt import extract_nnt_from_openalex, is_theses_fr_source, normalize_nnt
+from domain.publication import normalize_nnt
+from utils.nnt import extract_nnt_from_openalex, is_theses_fr_source
 
 
 class TestNormalizeNnt:

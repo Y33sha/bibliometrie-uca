@@ -31,9 +31,9 @@ from application.publications import refresh_from_sources, try_merge_by_doi
 from infrastructure.addresses import link_addresses
 from domain.authorship_roles import map_role
 from infrastructure.db_helpers import mark_staging_done
-from utils.doi import clean_doi
+from domain.publication import clean_doi
 from infrastructure.log import setup_logger
-from utils.nnt import normalize_nnt
+from domain.publication import normalize_nnt
 from domain.normalize import normalize_text
 
 logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__), "logs"))

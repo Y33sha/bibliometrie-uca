@@ -39,7 +39,7 @@ from domain.authorship_roles import THESES_FIELD_ROLES, merge_roles
 from infrastructure.db_helpers import mark_staging_done
 from infrastructure.log import setup_logger
 from domain.names import names_compatible
-from utils.nnt import normalize_nnt
+from domain.publication import normalize_nnt
 from domain.normalize import normalize_name, normalize_text
 
 logger = setup_logger("normalize_theses", os.path.join(os.path.dirname(__file__), "logs"))
