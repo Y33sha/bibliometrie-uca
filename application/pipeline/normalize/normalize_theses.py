@@ -448,7 +448,7 @@ def process_persons(cur, these: dict, source_publication_id: int):
 
     # Insérer les authorships avec rôles fusionnés
     position = 0
-    for key, info in person_roles.items():
+    for _key, info in person_roles.items():
         source_person_id = upsert_source_author(cur, info["person"])
         if not source_person_id:
             continue

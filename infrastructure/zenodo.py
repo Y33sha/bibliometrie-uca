@@ -77,7 +77,7 @@ def resolve_zenodo_doi(doi: str) -> str | None:
 
         except requests.exceptions.RequestException as e:
             logger.warning(f"Erreur API Zenodo pour {doi}: {e}")
-            raise ZenodoResolutionError(str(e))
+            raise ZenodoResolutionError(str(e)) from e
 
     logger.warning(f"Zenodo API : abandon après {_MAX_RETRIES} tentatives pour {doi}")
     raise ZenodoResolutionError(f"rate-limited après {_MAX_RETRIES} tentatives")

@@ -108,7 +108,7 @@ def main():
         from collections import Counter
 
         unknown = Counter()
-        for addr_id, raw_text in rows:
+        for _addr_id, raw_text in rows:
             last_seg = extract_last_segment(raw_text)
             if last_seg and last_seg not in country_forms:
                 unknown[last_seg] += 1

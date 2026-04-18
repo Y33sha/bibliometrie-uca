@@ -169,7 +169,7 @@ def main():
 
                 conn.commit()
             elif identifiers:
-                for pid, ids in identifiers.items():
+                for _pid, ids in identifiers.items():
                     if "orcid" in ids:
                         stats["orcid_found"] += 1
                     if "idref" in ids:
