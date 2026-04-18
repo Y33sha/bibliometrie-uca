@@ -16,7 +16,7 @@ from infrastructure.settings import settings
 # ----- SPA Static Files -----
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BUILD_DIR = os.path.join(PROJECT_ROOT, "frontend", "build")
+BUILD_DIR = os.path.join(PROJECT_ROOT, "interfaces", "frontend", "build")
 
 
 class SPAStaticFiles(StaticFiles):

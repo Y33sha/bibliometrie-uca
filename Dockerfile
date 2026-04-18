@@ -7,9 +7,9 @@
 FROM node:22-slim AS frontend-build
 
 WORKDIR /build
-COPY frontend/package*.json ./
+COPY interfaces/frontend/package*.json ./
 RUN npm ci
-COPY frontend/ .
+COPY interfaces/frontend/ .
 RUN npm run build
 
 # ---- Étape 2 : image Python finale ----
@@ -25,11 +25,10 @@ COPY application/     ./application/
 COPY domain/          ./domain/
 COPY infrastructure/  ./infrastructure/
 COPY interfaces/      ./interfaces/
-COPY scripts/         ./scripts/
 COPY run_pipeline.py  .
 
 # Frontend buildé (servi par l'API via SPAStaticFiles)
-COPY --from=frontend-build /build/build ./frontend/build
+COPY --from=frontend-build /build/build ./interfaces/frontend/build
 
 EXPOSE 8000
 

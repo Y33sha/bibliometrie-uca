@@ -1,10 +1,14 @@
 # Roadmap transmission DSI
 
 ## Chantier transition DDD
+* repérer incohérences restantes (sql pas à sa place, dépendances dans le mauvais sens) et les corriger
+* verrouiller les acquis: import-linter
 
 ## Chantier qualité du code: maintenabilité, auditabilité, scalabilité...
 * mieux organiser le dossier tests
-* audit 12 factors, audit SOLID
+* audit 12 factors
+* audit SOLID
+* hook pre-commit (ruff, mypy, import-linter, tests)
 
 ## Chantier fonctionnalités (TODO_LAURA)
 
@@ -37,7 +41,7 @@ Construction de COUNT FILTER WHERE pour chaque bucket de facette (APC, HAL statu
 Tri dynamique par colonne (ORDER BY CASE) — très local aux endpoints
 Sérialisation spécifique de la réponse
 
-### Niveau 4 — logique. 
+### Niveau 4 — code. 
 complexité cyclomatique
 code dupliqué
 magic values (constantes métier: enum; valeurs config)
