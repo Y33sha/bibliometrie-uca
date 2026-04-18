@@ -19,7 +19,7 @@ import time
 import requests
 from psycopg2.extras import Json, execute_values
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from infrastructure.sources.common import compute_hash, get_existing_ids, setup_logger
 from infrastructure.sources.openalex import (
     SELECT_FIELDS,

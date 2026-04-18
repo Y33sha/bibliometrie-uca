@@ -16,7 +16,7 @@ import os
 
 from psycopg2.extras import RealDictCursor
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from application.publications import merge_publications
 from infrastructure.log import setup_logger
 from domain.names import names_compatible

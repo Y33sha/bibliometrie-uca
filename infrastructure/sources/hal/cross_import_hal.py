@@ -23,7 +23,7 @@ import time
 import requests
 from psycopg2.extras import Json
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from infrastructure.sources.common import compute_hash, get_cross_import_dois, setup_logger
 from infrastructure.api_limits import HAL_DELAY
 from infrastructure.hal import HAL_FIELDS_STR

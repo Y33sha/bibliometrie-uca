@@ -22,7 +22,7 @@ via db/schema.sql + migrations.
 import argparse
 import os
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 
 # Tables à exporter, dans l'ordre d'insertion (respect des FK)
 TABLES = [

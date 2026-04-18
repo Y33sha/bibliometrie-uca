@@ -22,7 +22,7 @@ import os
 import re
 import time
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 from domain.normalize import normalize_text as normalize
 from infrastructure.perimeter import get_persons_structure_ids

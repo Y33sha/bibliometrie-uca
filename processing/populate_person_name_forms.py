@@ -18,7 +18,7 @@ import os
 
 from psycopg2.extras import RealDictCursor
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from application.persons import compute_person_name_forms
 from infrastructure.log import setup_logger
 

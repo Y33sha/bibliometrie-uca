@@ -18,7 +18,7 @@ import argparse
 
 from psycopg2.extras import RealDictCursor
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from application.persons import merge_person
 
 PAIRS_SQL = """

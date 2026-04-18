@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def _bg_propagate_countries(address_ids: list[int]):
     """Propagation pays en tâche de fond (connexion séparée)."""
-    from db.connection import get_connection
+    from infrastructure.db.connection import get_connection
 
     try:
         conn = get_connection()

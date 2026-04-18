@@ -10,7 +10,7 @@ Les identifiants avec statut rejected sont réattribués (via add_identifier).
 
 import os
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from application.persons import add_identifier
 from infrastructure.log import setup_logger
 

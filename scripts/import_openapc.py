@@ -11,7 +11,7 @@ import argparse
 import csv
 import os
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from domain.publication import clean_doi
 from infrastructure.log import setup_logger
 

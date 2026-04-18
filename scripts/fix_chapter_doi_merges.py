@@ -22,7 +22,7 @@ import logging
 
 from psycopg2.extras import RealDictCursor
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from application.publications import find_or_create, update_sources
 from domain.normalize import normalize_text
 

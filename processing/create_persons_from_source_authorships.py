@@ -39,7 +39,7 @@ from collections import defaultdict
 
 from psycopg2.extras import RealDictCursor
 
-from db.connection import get_connection
+from infrastructure.db.connection import get_connection
 from application.persons import (
     add_identifiers_from_authorships as add_identifiers,
 )
