@@ -7,7 +7,7 @@ restent autorisées dans les routers (convention du projet).
 """
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from infrastructure.repositories.config_repository import PgConfigRepository
+from infrastructure.repositories import config_repository
 from application.audit import emit_event
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
@@ -19,7 +19,7 @@ def update_config_value(cur, key: str, value) -> dict:
     `value` est sérialisé en JSON. Retourne la ligne mise à jour.
     Lève NotFoundError si la clé n'existe pas.
     """
-    repo = PgConfigRepository(cur)
+    repo = config_repository(cur)
     if not repo.config_key_exists(key):
         raise NotFoundError(f"Paramètre '{key}' introuvable")
     return repo.update_config_value(key, value)
@@ -37,7 +37,7 @@ def add_perimeter_structure(cur, perimeter_id: int, structure_id: int) -> str:
 
     Lève NotFoundError si le périmètre n'existe pas.
     """
-    repo = PgConfigRepository(cur)
+    repo = config_repository(cur)
     if repo.add_structure_to_perimeter(perimeter_id, structure_id):
         return "added"
 
@@ -52,7 +52,7 @@ def remove_perimeter_structure(cur, perimeter_id: int, structure_id: int) -> Non
 
     Lève NotFoundError si le périmètre n'existe pas.
     """
-    if not PgConfigRepository(cur).remove_structure_from_perimeter(perimeter_id, structure_id):
+    if not config_repository(cur).remove_structure_from_perimeter(perimeter_id, structure_id):
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
 
@@ -68,7 +68,7 @@ def create_perimeter(cur, *, code: str, name: str, description: str | None = Non
     if not code or not name:
         raise ValidationError("Code et nom requis")
 
-    repo = PgConfigRepository(cur)
+    repo = config_repository(cur)
     if repo.perimeter_code_exists(code):
         raise ConflictError(f"Le code '{code}' existe déjà")
     return repo.create_perimeter(code=code, name=name, description=description)
@@ -80,7 +80,7 @@ def update_perimeter(cur, perimeter_id: int, *, fields: dict) -> None:
     Lève NotFoundError si le périmètre n'existe pas.
     Lève ValidationError si `fields` est vide ou ne contient aucun champ valide.
     """
-    repo = PgConfigRepository(cur)
+    repo = config_repository(cur)
     if not repo.perimeter_exists(perimeter_id):
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
@@ -96,7 +96,7 @@ def perimeter_usage(cur, perimeter_code: str) -> list[str]:
     """Retourne la liste des clés config qui référencent ce périmètre
     (ex: ["perimeter_extraction", "perimeter_persons"]).
     """
-    return PgConfigRepository(cur).config_keys_referencing_perimeter(perimeter_code)
+    return config_repository(cur).config_keys_referencing_perimeter(perimeter_code)
 
 
 def delete_perimeter(cur, perimeter_id: int) -> None:
@@ -106,7 +106,7 @@ def delete_perimeter(cur, perimeter_id: int) -> None:
     Lève ConflictError si le périmètre est utilisé par la config pipeline ;
     le message contient la liste des clés qui le référencent.
     """
-    repo = PgConfigRepository(cur)
+    repo = config_repository(cur)
     code = repo.get_perimeter_code(perimeter_id)
     if code is None:
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")

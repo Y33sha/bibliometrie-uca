@@ -12,7 +12,7 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.person import compute_person_name_forms
-from infrastructure.repositories.person_repository import PgPersonRepository
+from infrastructure.repositories import person_repository
 from application.audit import emit_event
 from application.authorships import delete_orphan_authorships
 from domain.sources import ALL_SOURCES_SET
@@ -37,7 +37,7 @@ __all__ = [
 
 def create_person(cur, last_name: str, first_name: str = "") -> int:
     """Crée une personne et retourne son id."""
-    repo = PgPersonRepository(cur)
+    repo = person_repository(cur)
     person_id = repo.create(last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
     return person_id
@@ -48,7 +48,7 @@ def set_rejected(cur, person_id: int, rejected: bool) -> None:
 
     Lève NotFoundError si la personne n'existe pas.
     """
-    PgPersonRepository(cur).set_rejected(person_id, rejected)
+    person_repository(cur).set_rejected(person_id, rejected)
     emit_event(cur, "person.rejected", "person", person_id, {"rejected": rejected})
 
 
@@ -57,7 +57,7 @@ def update_name(cur, person_id: int, last_name: str, first_name: str) -> None:
 
     Lève NotFoundError si la personne n'existe pas.
     """
-    repo = PgPersonRepository(cur)
+    repo = person_repository(cur)
     repo.update_name(person_id, last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
 
@@ -81,7 +81,7 @@ def link_authorship(
     """
     if source not in ALL_SOURCES_SET:
         return
-    PgPersonRepository(cur).link_authorship(
+    person_repository(cur).link_authorship(
         person_id, source, authorship_id,
         source_person_id=source_person_id,
         has_hal_person_id=has_hal_person_id,
@@ -108,7 +108,7 @@ def link_authorships(cur, person_id: int, authorships: list[dict]) -> None:
 def unlink_authorship(cur, person_id: int, source: str, authorship_id: int) -> None:
     """Détache une authorship source d'une personne (met person_id à NULL)."""
     if source in ALL_SOURCES_SET:
-        PgPersonRepository(cur).unlink_authorship(person_id, source, authorship_id)
+        person_repository(cur).unlink_authorship(person_id, source, authorship_id)
 
 
 # ── Identifiants ──
@@ -123,7 +123,7 @@ def add_identifier(
     (nouveau person_id, statut pending). Si 'pending' ou 'confirmed',
     ne fait rien.
     """
-    PgPersonRepository(cur).add_identifier(person_id, id_type, id_value, source, status)
+    person_repository(cur).add_identifier(person_id, id_type, id_value, source, status)
 
 
 def remove_identifier(cur, person_id: int, id_type: str, id_value: str) -> None:
@@ -131,7 +131,7 @@ def remove_identifier(cur, person_id: int, id_type: str, id_value: str) -> None:
 
     Lève NotFoundError si l'identifiant n'existe pas.
     """
-    PgPersonRepository(cur).remove_identifier(person_id, id_type, id_value)
+    person_repository(cur).remove_identifier(person_id, id_type, id_value)
     emit_event(
         cur, "person_identifier.removed", "person", person_id,
         {"id_type": id_type, "id_value": id_value},
@@ -144,7 +144,7 @@ def update_identifier_status(cur, ident_id: int, status: str) -> dict:
     Retourne la ligne {id, status} mise à jour.
     Lève NotFoundError si l'identifiant n'existe pas.
     """
-    row = PgPersonRepository(cur).update_identifier_status(ident_id, status)
+    row = person_repository(cur).update_identifier_status(ident_id, status)
     emit_event(
         cur, "person_identifier.status_changed", "person", row["person_id"],
         {"ident_id": ident_id, "status": status},
@@ -157,7 +157,7 @@ def reassign_identifier(cur, ident_id: int, target_person_id: int) -> None:
 
     Lève NotFoundError si l'identifiant n'existe pas.
     """
-    PgPersonRepository(cur).reassign_identifier(ident_id, target_person_id)
+    person_repository(cur).reassign_identifier(ident_id, target_person_id)
     emit_event(
         cur, "person_identifier.reassigned", "person", target_person_id,
         {"ident_id": ident_id},
@@ -193,18 +193,18 @@ def refresh_person_name_forms(cur, person_id: int, last_name: str, first_name: s
     Shim : calcule les formes via le domaine et délègue au repository.
     """
     forms = compute_person_name_forms(last_name, first_name)
-    PgPersonRepository(cur).refresh_name_forms(person_id, forms)
+    person_repository(cur).refresh_name_forms(person_id, forms)
 
 
 def add_name_form(cur, person_id: int, full_name: str, source: str | None = None) -> None:
     """Ajoute une forme de nom à person_name_forms si elle n'existe pas déjà."""
-    PgPersonRepository(cur).add_name_form(person_id, full_name, source=source)
+    person_repository(cur).add_name_form(person_id, full_name, source=source)
 
 
 def detach_name_form(cur, person_id: int, name_form: str) -> None:
     """Détache une personne d'une forme de nom. Supprime la forme si
     person_ids devient vide."""
-    PgPersonRepository(cur).detach_name_form(person_id, name_form)
+    person_repository(cur).detach_name_form(person_id, name_form)
 
 
 # ── Rattachement / détachement par auteur source ──
@@ -258,7 +258,7 @@ def assign_orphan_authorship(cur, person_id: int, source: str, authorship_id: in
     if source not in _SOURCE_CONFIG:
         raise ValidationError(f"Source inconnue : {source}")
 
-    repo = PgPersonRepository(cur)
+    repo = person_repository(cur)
     row = repo.assign_orphan_sa(person_id, source, authorship_id)
     if not row:
         return False
@@ -278,7 +278,7 @@ def batch_assign_orphan_authorships(cur, person_id: int, sa_ids: list[int]) -> i
     Retourne le nombre de source_authorships effectivement rattachées
     (celles qui étaient orphelines).
     """
-    return PgPersonRepository(cur).batch_assign_orphans(person_id, sa_ids)
+    return person_repository(cur).batch_assign_orphans(person_id, sa_ids)
 
 
 def detach_authorships(cur, person_id: int, authorships: list[dict],
@@ -291,7 +291,7 @@ def detach_authorships(cur, person_id: int, authorships: list[dict],
 
     Retourne {"detached": N, "deleted_authorships": M, "cleaned_form": bool}.
     """
-    repo = PgPersonRepository(cur)
+    repo = person_repository(cur)
     for a in authorships:
         if a["source"] in ALL_SOURCES_SET:
             repo.unlink_authorship(person_id, a["source"], a["authorship_id"])
@@ -319,7 +319,7 @@ def mark_distinct(cur, person_id_a: int, person_id_b: int) -> None:
 
     Les IDs sont triés pour garantir l'unicité de la paire.
     """
-    inserted = PgPersonRepository(cur).mark_distinct(person_id_a, person_id_b)
+    inserted = person_repository(cur).mark_distinct(person_id_a, person_id_b)
     # Audit seulement si une ligne a été insérée (la paire n'existait pas déjà)
     if inserted:
         emit_event(
@@ -337,7 +337,7 @@ def merge_person(cur, target_id: int, source_id: int) -> None:
     Lève ConflictError si l'invariant est violé. Émet un événement
     d'audit `person.merged` si l'utilisateur est dans le contexte.
     """
-    repo = PgPersonRepository(cur)
+    repo = person_repository(cur)
     if repo.has_distinct_rh(target_id, source_id):
         raise ConflictError(
             f"REFUS de fusion : les personnes #{target_id} et #{source_id} "

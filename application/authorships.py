@@ -12,7 +12,7 @@ et les scripts de correction. Le SQL vit dans
 """
 
 from domain.errors import NotFoundError, ValidationError
-from infrastructure.repositories.authorship_repository import PgAuthorshipRepository
+from infrastructure.repositories import authorship_repository
 from application.audit import emit_event
 from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
 
@@ -26,7 +26,7 @@ def exclude_authorship(cur, authorship_id: int) -> dict:
 
     Lève NotFoundError si l'authorship n'existe pas.
     """
-    repo = PgAuthorshipRepository(cur)
+    repo = authorship_repository(cur)
     row = repo.get_authorship_person(authorship_id)
     if not row:
         raise NotFoundError(f"Authorship {authorship_id} introuvable")
@@ -57,7 +57,7 @@ def set_source_authorship_excluded(
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
-    repo = PgAuthorshipRepository(cur)
+    repo = authorship_repository(cur)
     if not repo.set_source_authorship_excluded(source_authorship_id, source, excluded):
         raise NotFoundError(f"Authorship source {source}:{source_authorship_id} introuvable")
 
@@ -80,7 +80,7 @@ def detach_source(cur, source_authorship_id: int, source: str) -> bool:
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
-    repo = PgAuthorshipRepository(cur)
+    repo = authorship_repository(cur)
     truth_id = repo.get_source_authorship_truth_id(source_authorship_id, source)
     if not truth_id:
         return False
@@ -98,7 +98,7 @@ def delete_orphan_authorships(cur, person_id: int) -> int:
     par aucune authorship source.
     Retourne le nombre d'authorships supprimées.
     """
-    return PgAuthorshipRepository(cur).delete_orphan_authorships_for_person(person_id)
+    return authorship_repository(cur).delete_orphan_authorships_for_person(person_id)
 
 
 def move_authorships_for_source(
@@ -112,7 +112,7 @@ def move_authorships_for_source(
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
-    repo = PgAuthorshipRepository(cur)
+    repo = authorship_repository(cur)
     for sa_id in source_authorship_ids:
         repo.move_authorships_for_source_authorship(sa_id, from_pub_id, to_pub_id)
 
@@ -126,7 +126,7 @@ def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
-    return PgAuthorshipRepository(cur).sync_person_id_from_sources(source_authorship_ids)
+    return authorship_repository(cur).sync_person_id_from_sources(source_authorship_ids)
 
 
 def propagate_uca_for_addresses(cur, address_ids: list[int]) -> None:
@@ -145,7 +145,7 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]) -> None:
     if not perimeter_ids:
         return
 
-    repo = PgAuthorshipRepository(cur)
+    repo = authorship_repository(cur)
     affected_sa_ids = repo.find_source_authorships_by_addresses(address_ids)
     if not affected_sa_ids:
         return

@@ -68,14 +68,6 @@ je peux te donner des pointeurs quand on arrivera à la fin du 12-Factor, pour n
 
 2. Split utils/ (~1-2h, clarifie les couches)
 
-
-utils/              avant : tout en vrac
-        ↓
-domain/             règles métier et constantes : perimeter.py, sources.py,
-                    doc_types.py, authorship_roles.py, names.py
-infrastructure/     infra partagée : log.py, db_helpers.py,
-                    api_retry.py, api_limits.py
-utils/              utilitaires purs : normalize.py, timings.py
 Les shims doi.py, hal.py, nnt.py restent dans utils/ pour compat, ou sont carrément supprimés si on veut faire propre (nécessite update des ~60 call sites).
 
 4. domain/ports/ et inversion de dépendance (moyen effort, finalise l'hexagonal)
@@ -85,10 +77,6 @@ Définir des Protocol dans domain/ports/person_repository.py. Les services impor
 Pour l'instant on a des VOs. Ajouter une entité Person (id + last_name + first_name + identifiants), avec compute_person_name_forms comme méthode, et des règles de validation. Gain : encapsulation de la logique métier. À considérer quand tu rencontres des invariants complexes (ex. "un idHAL ne peut être associé qu'à une personne rejetée avec statut pending"). Pas urgent.
 
 Ma reco concrète pour les prochaines sessions :
-
-Session 4 : split utils/ + rename services/ → application/.
-
-Ensuite : domain/ports si tu veux fermer la boucle hexagonale.
 
 L'arbo cible propre, quand tout sera fait :
 
@@ -119,7 +107,8 @@ backend/            # adapter HTTP (FastAPI)
 
 utils/              # utilitaires vraiment transverses (normalize, timings)
 
-arbo cible Opus 4.7
+arbo cible Opus 4.7:
+
 bibliometrie-uca/
 ├── domain/
 │   ├── entities/

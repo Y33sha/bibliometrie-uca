@@ -9,16 +9,16 @@ Les fonctions find_by_* retournent des namedtuples pour un accès par nom
 indépendant du type de curseur (tuple ou RealDictCursor).
 """
 
-from infrastructure.repositories.publication_repository import (
-    PgPublicationRepository,
+from application.audit import emit_event
+from domain.doc_types import map_doc_type
+from domain.publication import (
     PubByDoi,
     PubByNnt,
     PubByTitle,
     PubThesisCandidate,
 )
-from application.audit import emit_event
 from infrastructure.db_helpers import row_val as _val
-from domain.doc_types import map_doc_type
+from infrastructure.repositories import publication_repository
 
 # Re-export des namedtuples pour les call sites historiques (scripts,
 # processing) qui font `from application.publications import PubByDoi`.
@@ -30,22 +30,22 @@ __all__ = [
 
 def find_by_doi(cur, doi: str) -> PubByDoi | None:
     """Cherche une publication par DOI (case-insensitive)."""
-    return PgPublicationRepository(cur).find_by_doi(doi)
+    return publication_repository(cur).find_by_doi(doi)
 
 
 def find_by_nnt(cur, nnt: str) -> PubByNnt | None:
     """Cherche une publication via NNT (source_publications.external_ids)."""
-    return PgPublicationRepository(cur).find_by_nnt(nnt)
+    return publication_repository(cur).find_by_nnt(nnt)
 
 
 def find_by_title(cur, title_normalized: str, pub_year: int, journal_id: int) -> PubByTitle | None:
     """Cherche une publication par titre normalisé + année + journal."""
-    return PgPublicationRepository(cur).find_by_title(title_normalized, pub_year, journal_id)
+    return publication_repository(cur).find_by_title(title_normalized, pub_year, journal_id)
 
 
 def find_thesis_by_title(cur, title_normalized: str, pub_year: int) -> list[PubThesisCandidate]:
     """Cherche des thèses par titre normalisé + année (sans journal_id)."""
-    return PgPublicationRepository(cur).find_thesis_by_title(title_normalized, pub_year)
+    return publication_repository(cur).find_thesis_by_title(title_normalized, pub_year)
 
 
 def try_merge_by_doi(cur, pub_id: int, doi: str | None) -> int:
@@ -59,7 +59,7 @@ def try_merge_by_doi(cur, pub_id: int, doi: str | None) -> int:
     """
     if not doi:
         return pub_id
-    repo = PgPublicationRepository(cur)
+    repo = publication_repository(cur)
     if repo.get_doi(pub_id):
         return pub_id
     # La pub n'a pas de DOI : vérifier si une autre l'a
@@ -84,7 +84,7 @@ def resolve_doi_conflict(
     - doi_corrige : le DOI a utiliser pour le nouveau document (None si retire)
     - publication_id_si_fusion : l'id de la publication existante si fusion, None sinon
     """
-    repo = PgPublicationRepository(cur)
+    repo = publication_repository(cur)
     ex_type = existing.doc_type or ""
     chapter_types = ("book_chapter", "book-chapter", "chapter")
     book_types = ("book",)
@@ -137,7 +137,7 @@ def find_or_create(
     if not pub_year or not title:
         return None, False
 
-    repo = PgPublicationRepository(cur)
+    repo = publication_repository(cur)
 
     # 1. Chercher par DOI
     if doi:
@@ -169,17 +169,17 @@ def find_or_create(
 
 def update_oa_status(cur, pub_id: int, oa_status: str) -> None:
     """Met à jour le statut OA d'une publication."""
-    PgPublicationRepository(cur).update_oa_status(pub_id, oa_status)
+    publication_repository(cur).update_oa_status(pub_id, oa_status)
 
 
 def update_countries(cur, pub_id: int, countries: list[str]) -> None:
     """Met à jour les pays d'une publication."""
-    PgPublicationRepository(cur).update_countries(pub_id, countries)
+    publication_repository(cur).update_countries(pub_id, countries)
 
 
 def update_sources(cur, pub_id: int) -> None:
     """Recalcule publications.sources depuis source_publications."""
-    PgPublicationRepository(cur).update_sources(pub_id)
+    publication_repository(cur).update_sources(pub_id)
 
 
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
@@ -239,7 +239,7 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
     Ne touche PAS à : title, title_normalized, notes, sources (utiliser
     update_sources() séparément).
     """
-    repo = PgPublicationRepository(cur)
+    repo = publication_repository(cur)
     rows = repo.get_source_rows(pub_id)
     if not rows:
         return
@@ -367,7 +367,7 @@ def mark_distinct(cur, pub_id_a: int, pub_id_b: int) -> None:
 
     Les IDs sont triés pour garantir l'unicité de la paire.
     """
-    inserted = PgPublicationRepository(cur).mark_distinct(pub_id_a, pub_id_b)
+    inserted = publication_repository(cur).mark_distinct(pub_id_a, pub_id_b)
     if inserted:
         emit_event(
             cur, "publication.marked_distinct", "publication", inserted[0],
@@ -383,7 +383,7 @@ def merge_publications(cur, target_id: int, source_id: int) -> None:
     2. Recalcule le tableau `sources` de la cible
     3. Émet l'événement d'audit (silencieusement no-op hors contexte HTTP)
     """
-    repo = PgPublicationRepository(cur)
+    repo = publication_repository(cur)
     repo.merge_into(target_id, source_id)
     repo.update_sources(target_id)
     emit_event(

@@ -7,7 +7,7 @@ Compatible avec les curseurs tuples (standard) et RealDictCursor.
 """
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from infrastructure.repositories.journal_repository import PgJournalRepository
+from infrastructure.repositories import journal_repository
 from application.audit import emit_event
 from domain.normalize import normalize_text
 
@@ -33,7 +33,7 @@ def find_or_create_publisher(
     if not name_normalized:
         return None
 
-    repo = PgJournalRepository(cur)
+    repo = journal_repository(cur)
 
     # 1. Par openalex_id
     if openalex_id:
@@ -90,7 +90,7 @@ def find_or_create_journal(
         return None
 
     title_normalized = normalize_text(title)
-    repo = PgJournalRepository(cur)
+    repo = journal_repository(cur)
 
     def _match_and_enrich(journal_id: int, *, with_openalex: bool = True) -> int:
         """Enrichit le journal trouvé et rattache la forme de nom. Retourne son id."""
@@ -150,7 +150,7 @@ def update_journal(cur, journal_id: int, *, fields: dict) -> None:
     if not fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    repo = PgJournalRepository(cur)
+    repo = journal_repository(cur)
     if not repo.journal_exists(journal_id):
         raise NotFoundError(f"Revue {journal_id} introuvable")
 
@@ -170,7 +170,7 @@ def update_publisher(cur, publisher_id: int, *, fields: dict) -> None:
     if not fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    repo = PgJournalRepository(cur)
+    repo = journal_repository(cur)
     if not repo.publisher_exists(publisher_id):
         raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
@@ -189,7 +189,7 @@ def update_journal_apc(
     is_in_doaj: bool | None = None,
 ) -> None:
     """Met à jour les informations APC/DOAJ d'un journal."""
-    PgJournalRepository(cur).update_journal_apc(
+    journal_repository(cur).update_journal_apc(
         journal_id,
         apc_amount=apc_amount, apc_currency=apc_currency, is_in_doaj=is_in_doaj,
     )
@@ -197,7 +197,7 @@ def update_journal_apc(
 
 def reset_journal_apc(cur) -> int:
     """Réinitialise les APC/DOAJ de toutes les revues avec openalex_id."""
-    return PgJournalRepository(cur).reset_journal_apc()
+    return journal_repository(cur).reset_journal_apc()
 
 
 # ── Fusions ──
@@ -214,7 +214,7 @@ def merge_publishers(cur, target_id: int, source_id: int) -> None:
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un éditeur avec lui-même")
 
-    repo = PgJournalRepository(cur)
+    repo = journal_repository(cur)
 
     # 1. Détecter les journaux partageant un titre entre les deux éditeurs,
     #    vérifier les conflits ISSN, puis les fusionner.
@@ -242,5 +242,5 @@ def merge_journals(cur, target_id: int, source_id: int) -> None:
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un journal avec lui-même")
 
-    PgJournalRepository(cur).merge_journal_into(target_id, source_id)
+    journal_repository(cur).merge_journal_into(target_id, source_id)
     emit_event(cur, "journal.merged", "journal", target_id, {"source_id": source_id})
