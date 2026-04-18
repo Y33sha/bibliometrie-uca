@@ -28,6 +28,7 @@ dev = [
     "deptry==0.25.1",
     "pip-audit==2.10.0",
     "pre-commit==4.4.0",
+    "import-linter==2.11",
 ]
 
 [tool.setuptools]
@@ -46,6 +47,43 @@ extend_exclude = ["frontend", ".venv", "venv"]
 # Le groupe `dev` de [project.optional-dependencies] est pour les outils
 # de dev/test — deptry ne doit pas exiger qu'ils soient importés.
 optional_dependencies_dev_groups = ["dev"]
+
+# ----------------------------------------------------------------------
+# import-linter : vérifie les règles de dépendance entre couches DDD.
+# Lancement : `lint-imports`
+#
+# Les contrats actuels verrouillent les invariants DDD qui sont DÉJÀ en
+# place. Quand §1.1 (sortir le SQL des routers) et §1.6 (DI complète via
+# FastAPI Depends) de la ROADMAP seront faits, on pourra durcir :
+# - ajouter un contrat layered strict interfaces > infrastructure > application > domain
+# - interdire les imports `infrastructure.*` depuis `interfaces.api.routers.*`
+# ----------------------------------------------------------------------
+[tool.importlinter]
+root_packages = ["domain", "application", "infrastructure", "interfaces"]
+
+[[tool.importlinter.contracts]]
+name = "Le domaine est un noyau pur"
+type = "forbidden"
+source_modules = ["domain"]
+forbidden_modules = ["application", "infrastructure", "interfaces"]
+
+[[tool.importlinter.contracts]]
+name = "Application ne dépend pas de interfaces"
+type = "forbidden"
+source_modules = ["application"]
+forbidden_modules = ["interfaces"]
+
+[[tool.importlinter.contracts]]
+name = "Infrastructure ne dépend pas de interfaces"
+type = "forbidden"
+source_modules = ["infrastructure"]
+forbidden_modules = ["interfaces"]
+
+[[tool.importlinter.contracts]]
+name = "Infrastructure ne dépend pas de application"
+type = "forbidden"
+source_modules = ["infrastructure"]
+forbidden_modules = ["application"]
 
 [tool.deptry.per_rule_ignores]
 # python-dotenv n'est pas importé directement, mais pydantic-settings

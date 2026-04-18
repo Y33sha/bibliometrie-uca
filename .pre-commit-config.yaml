@@ -23,3 +23,14 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=500]
+
+  # import-linter : vérifie les contrats d'architecture (pyproject.toml).
+  # Utilise le `lint-imports` installé localement (accès au code source).
+  - repo: local
+    hooks:
+      - id: lint-imports
+        name: lint-imports (architecture DDD)
+        entry: lint-imports
+        language: system
+        pass_filenames: false
+        types: [python]
