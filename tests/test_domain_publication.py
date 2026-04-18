@@ -1,6 +1,8 @@
 """Tests des value objects de domain/publication.py (DOI, HALId, NNT)
 et des modèles JSONB (ExternalIds, …)."""
 
+from dataclasses import FrozenInstanceError
+
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
@@ -86,7 +88,7 @@ class TestDOITryParse:
 class TestDOIImmutable:
     def test_is_frozen(self):
         d = DOI("10.1234/test")
-        with pytest.raises(Exception):  # FrozenInstanceError ou AttributeError
+        with pytest.raises(FrozenInstanceError):
             d.value = "other"
 
     def test_is_hashable(self):

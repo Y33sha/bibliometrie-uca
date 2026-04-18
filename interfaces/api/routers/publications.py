@@ -977,7 +977,6 @@ async def list_publications(
     lab_id_parts = [v.strip() for v in lab_id.split(",") if v.strip()] if lab_id else []
     lab_none = "none" in lab_id_parts
     lab_ids = [int(v) for v in lab_id_parts if v != "none"] if lab_id_parts else []
-    oa_values = [v.strip() for v in oa_status.split(",") if v.strip()] if oa_status else []
     source_values = (
         [v.strip() for v in source_filter.split(",") if v.strip()] if source_filter else []
     )

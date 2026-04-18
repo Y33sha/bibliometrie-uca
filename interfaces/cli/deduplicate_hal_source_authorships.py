@@ -289,7 +289,7 @@ def run(dry_run=True):
 
             # Rapport conflits
             conflict_fields = {}
-            for key, cfl in all_conflicts.items():
+            for _key, cfl in all_conflicts.items():
                 for field in cfl:
                     conflict_fields[field] = conflict_fields.get(field, 0) + 1
 

@@ -156,7 +156,7 @@ async def merge_duplicate_publications(body: MergePublications):
             cur.execute("RELEASE SAVEPOINT merge_dup")
         except Exception as e:
             cur.execute("ROLLBACK TO SAVEPOINT merge_dup")
-            raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}")
+            raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}") from e
 
         return {"ok": True, "target_id": body.target_id, "source_id": body.source_id}
 
