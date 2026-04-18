@@ -25,7 +25,7 @@ import requests
 from psycopg2.extras import Json
 
 from db.connection import get_connection
-from extraction.common import compute_hash, get_existing_ids, setup_logger
+from infrastructure.sources.common import compute_hash, get_existing_ids, setup_logger
 from infrastructure.api_limits import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import get_api_base_urls, get_theses_etab_ppns

@@ -24,8 +24,8 @@ import requests
 from psycopg2.extras import Json
 
 from db.connection import get_connection
-from extraction.common import compute_hash, get_cross_import_dois, setup_logger
-from extraction.openalex import (
+from infrastructure.sources.common import compute_hash, get_cross_import_dois, setup_logger
+from infrastructure.sources.openalex import (
     BASE_URL,
     SELECT_FIELDS,
     auth_params,

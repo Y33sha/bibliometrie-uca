@@ -14,7 +14,7 @@ Scénarios testés :
 
 from psycopg2.extras import Json
 
-from extraction.common import compute_hash
+from infrastructure.sources.common import compute_hash
 
 
 def compute_meta_hash(raw_data: dict) -> str:
