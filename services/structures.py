@@ -1,7 +1,8 @@
 """
-Service Structures — accès exclusif en écriture aux tables
-`structures`, `structure_relations`, `structure_name_forms`.
+Service Structures — orchestrateur des opérations sur `structures`,
+`structure_relations`, `structure_name_forms`.
 
+Le SQL vit dans `infrastructure/repositories/structure_repository.py`.
 Les routers passent par ces fonctions pour toute écriture. Les lectures
 restent autorisées dans les routers (convention du projet).
 """
@@ -11,6 +12,7 @@ from pydantic import ValidationError as PydanticValidationError
 
 from domain.errors import NotFoundError, ValidationError
 from domain.structure import StructureApiIds
+from infrastructure.repositories.structure_repository import PgStructureRepository
 from services.audit import emit_event
 from utils.normalize import normalize_text
 
@@ -19,13 +21,8 @@ def _validate_api_ids(raw: dict | None) -> dict | None:
     """Valide et normalise `api_ids` via le modèle domaine StructureApiIds.
 
     - Entrée : dict brut (côté API admin) ou None.
-    - Sortie : dict canonique prêt pour JSONB, ou None si l'entrée
-      est vide/None.
-    - Lève ValidationError métier si le schéma est violé (type erroné,
-      valeur non-string dans une liste, etc.).
-
-    Le wrap PydanticValidationError → ValidationError garde le code
-    HTTP 400 via les handlers globaux (sinon on aurait un 500).
+    - Sortie : dict canonique prêt pour JSONB, ou None si l'entrée est vide/None.
+    - Lève ValidationError métier si le schéma est violé.
     """
     if not raw:
         return None
@@ -33,6 +30,7 @@ def _validate_api_ids(raw: dict | None) -> dict | None:
         return StructureApiIds(**raw).to_dict() or None
     except PydanticValidationError as e:
         raise ValidationError(f"api_ids invalide : {e}") from e
+
 
 # ── Mapping des champs UI → colonnes SQL pour la table structures ──
 _STRUCTURE_FIELD_MAP = {
@@ -61,21 +59,11 @@ def create_structure(
     api_ids: dict | None = None,
 ) -> dict:
     """Crée une structure. Retourne la ligne insérée (RealDictRow)."""
-    validated_api_ids = _validate_api_ids(api_ids)
-    cur.execute(
-        """
-        INSERT INTO structures (code, name, acronym, structure_type, ror_id,
-                                rnsr_id, hal_collection, api_ids)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id, code, name, acronym, structure_type::text AS type,
-                  ror_id, rnsr_id, hal_collection, api_ids
-        """,
-        (
-            code, name, acronym, type, ror_id, rnsr_id, hal_collection,
-            Json(validated_api_ids) if validated_api_ids else None,
-        ),
+    return PgStructureRepository(cur).create_structure(
+        code=code, name=name, acronym=acronym, type=type,
+        ror_id=ror_id, rnsr_id=rnsr_id, hal_collection=hal_collection,
+        api_ids=_validate_api_ids(api_ids),
     )
-    return cur.fetchone()
 
 
 def update_structure(cur, structure_id: int, *, fields: dict) -> dict:
@@ -84,45 +72,32 @@ def update_structure(cur, structure_id: int, *, fields: dict) -> dict:
     Lève NotFoundError si la structure n'existe pas.
     Lève ValidationError si `fields` ne contient aucun champ valide.
     """
-    cur.execute("SELECT id FROM structures WHERE id = %s", (structure_id,))
-    if not cur.fetchone():
+    repo = PgStructureRepository(cur)
+    if not repo.structure_exists(structure_id):
         raise NotFoundError(f"Structure {structure_id} introuvable")
 
-    updates_sql = []
+    sql_fragments: list[str] = []
     params: list = []
     for field_name, col_name in _STRUCTURE_FIELD_MAP.items():
         val = fields.get(field_name)
         if val is not None:
-            updates_sql.append(f"{col_name} = %s")
+            sql_fragments.append(f"{col_name} = %s")
             params.append(val)
 
     if "api_ids" in fields and fields["api_ids"] is not None:
         validated = _validate_api_ids(fields["api_ids"])
-        updates_sql.append("api_ids = %s")
+        sql_fragments.append("api_ids = %s")
         params.append(Json(validated) if validated else None)
 
-    if not updates_sql:
+    if not sql_fragments:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    params.append(structure_id)
-    cur.execute(
-        f"""
-        UPDATE structures SET {", ".join(updates_sql)} WHERE id = %s
-        RETURNING id, code, name, acronym, structure_type::text AS type,
-                  ror_id, rnsr_id, hal_collection, api_ids
-        """,
-        params,
-    )
-    return cur.fetchone()
+    return repo.update_structure_fields(structure_id, sql_fragments, params)
 
 
 def delete_structure(cur, structure_id: int) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas."""
-    cur.execute(
-        "DELETE FROM structures WHERE id = %s RETURNING code, name",
-        (structure_id,),
-    )
-    row = cur.fetchone()
+    row = PgStructureRepository(cur).delete_structure(structure_id)
     if not row:
         raise NotFoundError(f"Structure {structure_id} introuvable")
     emit_event(
@@ -136,26 +111,14 @@ def delete_structure(cur, structure_id: int) -> None:
 
 def create_relation(cur, *, parent_id: int, child_id: int, relation_type: str) -> dict | None:
     """Crée une relation. Retourne la ligne insérée, ou None si elle existait déjà."""
-    cur.execute(
-        """
-        INSERT INTO structure_relations (parent_id, child_id, relation_type)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (parent_id, child_id, relation_type) DO NOTHING
-        RETURNING *
-        """,
-        (parent_id, child_id, relation_type),
+    return PgStructureRepository(cur).create_relation(
+        parent_id=parent_id, child_id=child_id, relation_type=relation_type,
     )
-    return cur.fetchone()
 
 
 def delete_relation(cur, relation_id: int) -> None:
     """Supprime une relation. Lève NotFoundError si elle n'existe pas."""
-    cur.execute(
-        """DELETE FROM structure_relations WHERE id = %s
-           RETURNING parent_id, child_id, relation_type::text AS relation_type""",
-        (relation_id,),
-    )
-    row = cur.fetchone()
+    row = PgStructureRepository(cur).delete_relation(relation_id)
     if not row:
         raise NotFoundError(f"Relation {relation_id} introuvable")
     emit_event(
@@ -182,22 +145,13 @@ def create_name_form(
     requires_context_of: list | None = None,
 ) -> dict:
     """Crée une forme de nom. Retourne la ligne insérée."""
-    cur.execute(
-        """
-        INSERT INTO structure_name_forms (structure_id, form_text,
-                                is_word_boundary, is_excluding, requires_context_of)
-        VALUES (%s, %s, %s, %s, %s)
-        RETURNING *
-        """,
-        (
-            structure_id,
-            normalize_text(form_text),
-            is_word_boundary,
-            is_excluding,
-            requires_context_of or None,
-        ),
+    return PgStructureRepository(cur).create_name_form(
+        structure_id=structure_id,
+        form_text_normalized=normalize_text(form_text),
+        is_word_boundary=is_word_boundary,
+        is_excluding=is_excluding,
+        requires_context_of=requires_context_of,
     )
-    return cur.fetchone()
 
 
 def update_name_form(cur, form_id: int, *, fields: dict) -> dict:
@@ -206,48 +160,35 @@ def update_name_form(cur, form_id: int, *, fields: dict) -> dict:
     Lève NotFoundError si la forme n'existe pas.
     Lève ValidationError si `fields` ne contient aucun champ valide.
     """
-    cur.execute("SELECT id FROM structure_name_forms WHERE id = %s", (form_id,))
-    if not cur.fetchone():
+    repo = PgStructureRepository(cur)
+    if not repo.name_form_exists(form_id):
         raise NotFoundError(f"Forme {form_id} introuvable")
 
-    updates_sql = []
+    sql_fragments: list[str] = []
     params: list = []
 
     if fields.get("form_text") is not None:
-        updates_sql.append("form_text = %s")
+        sql_fragments.append("form_text = %s")
         params.append(normalize_text(fields["form_text"]))
     if fields.get("is_word_boundary") is not None:
-        updates_sql.append("is_word_boundary = %s")
+        sql_fragments.append("is_word_boundary = %s")
         params.append(fields["is_word_boundary"])
     if fields.get("is_excluding") is not None:
-        updates_sql.append("is_excluding = %s")
+        sql_fragments.append("is_excluding = %s")
         params.append(fields["is_excluding"])
     if fields.get("requires_context_of") is not None:
-        updates_sql.append("requires_context_of = %s")
+        sql_fragments.append("requires_context_of = %s")
         params.append(fields["requires_context_of"] or None)
 
-    if not updates_sql:
+    if not sql_fragments:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    params.append(form_id)
-    cur.execute(
-        f"""
-        UPDATE structure_name_forms SET {", ".join(updates_sql)}
-        WHERE id = %s RETURNING *
-        """,
-        params,
-    )
-    return cur.fetchone()
+    return repo.update_name_form_fields(form_id, sql_fragments, params)
 
 
 def delete_name_form(cur, form_id: int) -> None:
     """Supprime une forme de nom. Lève NotFoundError si elle n'existe pas."""
-    cur.execute(
-        """DELETE FROM structure_name_forms WHERE id = %s
-           RETURNING structure_id, form_text""",
-        (form_id,),
-    )
-    row = cur.fetchone()
+    row = PgStructureRepository(cur).delete_name_form(form_id)
     if not row:
         raise NotFoundError(f"Forme {form_id} introuvable")
     emit_event(
