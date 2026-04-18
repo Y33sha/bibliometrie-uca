@@ -2,7 +2,7 @@
 
 import pytest
 
-from extraction.common import compute_hash, get_existing_ids
+from infrastructure.sources.common import compute_hash, get_existing_ids
 from domain.publication import clean_doi
 
 # ── compute_hash ─────────────────────────────────────────────────

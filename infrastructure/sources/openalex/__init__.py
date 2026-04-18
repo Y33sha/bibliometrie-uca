@@ -1,6 +1,6 @@
 """Constantes et utilitaires partagés pour l'extraction OpenAlex."""
 
-from extraction.common import clean_doi, compute_hash
+from infrastructure.sources.common import clean_doi, compute_hash
 
 BASE_URL = "https://api.openalex.org/works"
 

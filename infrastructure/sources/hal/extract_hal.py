@@ -20,7 +20,7 @@ import requests
 from psycopg2.extras import Json
 
 from db.connection import get_connection
-from extraction.common import clean_doi, compute_hash, get_existing_ids, setup_logger
+from infrastructure.sources.common import clean_doi, compute_hash, get_existing_ids, setup_logger
 from infrastructure.api_limits import HAL_DELAY, HAL_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import (

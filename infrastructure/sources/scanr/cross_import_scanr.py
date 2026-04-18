@@ -21,7 +21,7 @@ import requests
 from psycopg2.extras import Json
 
 from db.connection import get_connection
-from extraction.common import clean_doi, compute_hash, get_cross_import_dois, setup_logger
+from infrastructure.sources.common import clean_doi, compute_hash, get_cross_import_dois, setup_logger
 from infrastructure.api_limits import SCANR_DELAY
 from infrastructure.app_config import get_scanr_credentials
 

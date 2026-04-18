@@ -25,7 +25,7 @@ import requests
 from psycopg2.extras import Json, RealDictCursor
 
 from db.connection import get_connection
-from extraction.common import compute_hash
+from infrastructure.sources.common import compute_hash
 from infrastructure.api_limits import HAL_DELAY
 from domain.publication import extract_hal_id_from_url
 from infrastructure.hal import HAL_FIELDS_STR
