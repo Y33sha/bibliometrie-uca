@@ -1,25 +1,16 @@
 """Adapter PostgreSQL pour la persistance des publications.
 
-Isole le SQL de la couche métier (services/publications.py). Même
-contrat que PgPersonRepository : prend un curseur dans la transaction
-courante, lève des exceptions du domaine quand pertinent.
-
-Les namedtuples de résultat de recherche (PubByDoi, PubByNnt, …) sont
-définies ici car c'est le repository qui les peuple ; elles sont
-ré-exportées depuis services.publications pour ne pas casser les
-call sites historiques.
+Isole le SQL de la couche application. Implémente le port
+`PublicationRepository` défini dans domain/ports/.
 """
 
-from collections import namedtuple
-
+from domain.publication import (  # noqa: F401 — re-export pour compat
+    PubByDoi,
+    PubByNnt,
+    PubByTitle,
+    PubThesisCandidate,
+)
 from infrastructure.db_helpers import row_val as _val
-
-# ── Types de résultat de recherche ─────────────────────────────────
-
-PubByDoi = namedtuple("PubByDoi", ["id", "doc_type", "title_normalized"])
-PubByNnt = namedtuple("PubByNnt", ["id", "doc_type", "title_normalized"])
-PubByTitle = namedtuple("PubByTitle", ["id", "doi"])
-PubThesisCandidate = namedtuple("PubThesisCandidate", ["id", "doi"])
 
 
 class PgPublicationRepository:

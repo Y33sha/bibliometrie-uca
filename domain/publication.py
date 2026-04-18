@@ -1,10 +1,11 @@
-"""Concept métier Publication — value objects, modèles de données JSONB
-et (à terme) entités.
+"""Concept métier Publication — value objects, modèles de données JSONB,
+types de résultats de recherche et (à terme) entités.
 
 Regroupe ici tout ce qui est propre à une publication : identifiants
 (DOI, HAL ID document, NNT), modèles des colonnes JSONB
-(`external_ids`, `meta`, `biblio`, `topics`), puis plus tard les
-entités `Publication`, les règles de déduplication, les invariants.
+(`external_ids`, `meta`, `biblio`, `topics`), types de résultats
+renvoyés par les repositories, puis plus tard les entités
+`Publication`, les règles de déduplication, les invariants.
 
 Les value objects sont immuables et auto-validés :
 - construction stricte : `DOI("...")` lève ValidationError si invalide
@@ -20,11 +21,23 @@ pour les identifiants), sérialisent en dict pour l'écriture en base.
 """
 
 import re
+from collections import namedtuple
 from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from domain.errors import ValidationError
+
+
+# ── Types de résultats de recherche ────────────────────────────────
+# Utilisés par le port PublicationRepository et ses implémentations.
+# Vivent dans le domaine car ils décrivent la forme d'un résultat
+# métier, pas un détail d'infrastructure.
+
+PubByDoi = namedtuple("PubByDoi", ["id", "doc_type", "title_normalized"])
+PubByNnt = namedtuple("PubByNnt", ["id", "doc_type", "title_normalized"])
+PubByTitle = namedtuple("PubByTitle", ["id", "doi"])
+PubThesisCandidate = namedtuple("PubThesisCandidate", ["id", "doi"])
 
 # ── DOI ────────────────────────────────────────────────────────────
 
