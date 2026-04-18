@@ -10,26 +10,36 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 (UNIQUE(source, source_id)), les authorships utilisent `source_person_id`.
 """
 
-from domain.errors import ConflictError, NotFoundError, ValidationError
-from domain.person import compute_person_name_forms
-from infrastructure.repositories import person_repository
 from application.audit import emit_event
 from application.authorships import delete_orphan_authorships
+from domain.errors import ConflictError, ValidationError
+from domain.person import compute_person_name_forms
 from domain.sources import ALL_SOURCES_SET
+from infrastructure.repositories import person_repository
 
 __all__ = [
     # Domain re-export pour les callers existants (scripts, tests)
     "compute_person_name_forms",
     # Reste de l'API publique du service
-    "add_identifier", "add_identifiers_from_authorships",
-    "add_name_form", "assign_orphan_authorship",
-    "batch_assign_orphan_authorships", "create_person",
-    "detach_authorships", "detach_name_form",
-    "link_authorship", "link_authorships",
-    "mark_distinct", "merge_person", "reassign_identifier",
-    "refresh_person_name_forms", "remove_identifier",
-    "set_rejected", "unlink_authorship",
-    "update_identifier_status", "update_name",
+    "add_identifier",
+    "add_identifiers_from_authorships",
+    "add_name_form",
+    "assign_orphan_authorship",
+    "batch_assign_orphan_authorships",
+    "create_person",
+    "detach_authorships",
+    "detach_name_form",
+    "link_authorship",
+    "link_authorships",
+    "mark_distinct",
+    "merge_person",
+    "reassign_identifier",
+    "refresh_person_name_forms",
+    "remove_identifier",
+    "set_rejected",
+    "unlink_authorship",
+    "update_identifier_status",
+    "update_name",
 ]
 
 # ── Création ──
@@ -82,7 +92,9 @@ def link_authorship(
     if source not in ALL_SOURCES_SET:
         return
     person_repository(cur).link_authorship(
-        person_id, source, authorship_id,
+        person_id,
+        source,
+        authorship_id,
         source_person_id=source_person_id,
         has_hal_person_id=has_hal_person_id,
     )
@@ -133,7 +145,10 @@ def remove_identifier(cur, person_id: int, id_type: str, id_value: str) -> None:
     """
     person_repository(cur).remove_identifier(person_id, id_type, id_value)
     emit_event(
-        cur, "person_identifier.removed", "person", person_id,
+        cur,
+        "person_identifier.removed",
+        "person",
+        person_id,
         {"id_type": id_type, "id_value": id_value},
     )
 
@@ -146,7 +161,10 @@ def update_identifier_status(cur, ident_id: int, status: str) -> dict:
     """
     row = person_repository(cur).update_identifier_status(ident_id, status)
     emit_event(
-        cur, "person_identifier.status_changed", "person", row["person_id"],
+        cur,
+        "person_identifier.status_changed",
+        "person",
+        row["person_id"],
         {"ident_id": ident_id, "status": status},
     )
     return {"id": row["id"], "status": row["status"]}
@@ -159,7 +177,10 @@ def reassign_identifier(cur, ident_id: int, target_person_id: int) -> None:
     """
     person_repository(cur).reassign_identifier(ident_id, target_person_id)
     emit_event(
-        cur, "person_identifier.reassigned", "person", target_person_id,
+        cur,
+        "person_identifier.reassigned",
+        "person",
+        target_person_id,
         {"ident_id": ident_id},
     )
 
@@ -281,8 +302,9 @@ def batch_assign_orphan_authorships(cur, person_id: int, sa_ids: list[int]) -> i
     return person_repository(cur).batch_assign_orphans(person_id, sa_ids)
 
 
-def detach_authorships(cur, person_id: int, authorships: list[dict],
-                        name_form: str | None = None) -> dict:
+def detach_authorships(
+    cur, person_id: int, authorships: list[dict], name_form: str | None = None
+) -> dict:
     """Détache un lot d'authorships sources d'une personne et nettoie les
     authorships vérité devenues orphelines.
 
@@ -323,7 +345,10 @@ def mark_distinct(cur, person_id_a: int, person_id_b: int) -> None:
     # Audit seulement si une ligne a été insérée (la paire n'existait pas déjà)
     if inserted:
         emit_event(
-            cur, "person.marked_distinct", "person", inserted[0],
+            cur,
+            "person.marked_distinct",
+            "person",
+            inserted[0],
             {"other_id": inserted[1]},
         )
 

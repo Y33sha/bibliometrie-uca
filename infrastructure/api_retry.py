@@ -49,32 +49,44 @@ def http_request_with_retry(
     """
     last_error: Exception | None = None
     for attempt in range(max_retries):
-        wait = initial_backoff * (2 ** attempt)
+        wait = initial_backoff * (2**attempt)
         try:
             resp = requests.request(
-                method, url,
-                params=params, json=json_body, headers=headers,
-                auth=auth, timeout=timeout,
+                method,
+                url,
+                params=params,
+                json=json_body,
+                headers=headers,
+                auth=auth,
+                timeout=timeout,
             )
             if resp.status_code == 429:
-                logger.warning(f"429 Too Many Requests {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})")
+                logger.warning(
+                    f"429 Too Many Requests {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+                )
                 time.sleep(wait)
                 continue
             resp.raise_for_status()
             if retry_on_empty_body and not resp.text.strip():
-                logger.warning(f"Body vide {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})")
+                logger.warning(
+                    f"Body vide {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+                )
                 time.sleep(wait)
                 continue
             return resp.json()
         except requests.exceptions.JSONDecodeError as e:
             last_error = e
-            logger.warning(f"JSON invalide {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})")
+            logger.warning(
+                f"JSON invalide {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+            )
             time.sleep(wait)
         except requests.RequestException as e:
             last_error = e
             if attempt == max_retries - 1:
                 raise
-            logger.warning(f"Erreur réseau {label}: {e} — attente {wait}s (tentative {attempt + 1}/{max_retries})")
+            logger.warning(
+                f"Erreur réseau {label}: {e} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+            )
             time.sleep(wait)
 
     logger.error(f"Échec après {max_retries} tentatives {label}")

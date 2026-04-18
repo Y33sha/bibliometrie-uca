@@ -170,5 +170,3 @@ Fichier CSV importé via `interfaces/cli/import_apc.py` → table `apc_payments`
 
 A compléter par une extraction des [raw data](https://github.com/OpenAPC/openapc-de/blob/master/data/apc_de.csv) de [OpenAPC](https://treemaps.openapc.net/apcdata/clermont-u/). A ma connaissance OpenAPC ne propose pas d'API.
 <!-- TODO: Exploiter les raw data d'OpenAPC pour compléter les données sur les APC -->
-
-

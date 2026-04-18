@@ -20,11 +20,15 @@ class ConfigRepository(Protocol):
     # ── Liens structure ↔ perimeter ────────────────────────────────
 
     def add_structure_to_perimeter(
-        self, perimeter_id: int, structure_id: int,
+        self,
+        perimeter_id: int,
+        structure_id: int,
     ) -> bool: ...
 
     def remove_structure_from_perimeter(
-        self, perimeter_id: int, structure_id: int,
+        self,
+        perimeter_id: int,
+        structure_id: int,
     ) -> bool: ...
 
     # ── Perimeter CRUD ─────────────────────────────────────────────
@@ -34,7 +38,11 @@ class ConfigRepository(Protocol):
     def perimeter_code_exists(self, code: str) -> bool: ...
 
     def create_perimeter(
-        self, *, code: str, name: str, description: str | None,
+        self,
+        *,
+        code: str,
+        name: str,
+        description: str | None,
     ) -> int: ...
 
     def update_perimeter_fields(self, perimeter_id: int, fields: dict) -> None: ...

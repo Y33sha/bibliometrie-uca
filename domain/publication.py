@@ -28,7 +28,6 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from domain.errors import ValidationError
 
-
 # ── Types de résultats de recherche ────────────────────────────────
 # Utilisés par le port PublicationRepository et ses implémentations.
 # Vivent dans le domaine car ils décrivent la forme d'un résultat
@@ -60,7 +59,7 @@ def _normalize_doi(raw: str | None) -> str | None:
     lower = s.lower()
     for prefix in _DOI_URL_PREFIXES:
         if lower.startswith(prefix):
-            s = s[len(prefix):]
+            s = s[len(prefix) :]
             break
     s = s.strip()
     if not s:
@@ -104,9 +103,7 @@ class DOI:
 
 # Préfixes de portails HAL (liste historique, cf. utils/hal.py)
 _HAL_DOC_PREFIXES = ("hal", "tel", "halshs", "inserm", "pasteur", "cea", "ineris")
-_HAL_DOC_BASE = re.compile(
-    rf"((?:{'|'.join(_HAL_DOC_PREFIXES)})-\d+)", re.IGNORECASE
-)
+_HAL_DOC_BASE = re.compile(rf"((?:{'|'.join(_HAL_DOC_PREFIXES)})-\d+)", re.IGNORECASE)
 
 
 def _normalize_hal_id(raw: str | None) -> str | None:
@@ -213,10 +210,10 @@ class ExternalIds(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    hal: str | None = None      # HAL ID document (ex. "hal-04123456")
-    nnt: str | None = None      # Numéro National de Thèse
-    pmid: str | None = None     # PubMed ID
-    pmc: str | None = None      # PubMed Central ID
+    hal: str | None = None  # HAL ID document (ex. "hal-04123456")
+    nnt: str | None = None  # Numéro National de Thèse
+    pmid: str | None = None  # PubMed ID
+    pmc: str | None = None  # PubMed Central ID
 
     @field_validator("hal", mode="before")
     @classmethod
@@ -272,9 +269,9 @@ class PublicationBiblio(BaseModel):
 
     volume: str | None = None
     issue: str | None = None
-    pages: str | None = None       # HAL : range "123-456"
+    pages: str | None = None  # HAL : range "123-456"
     first_page: str | None = None  # OpenAlex, WoS
-    last_page: str | None = None   # OpenAlex, WoS
+    last_page: str | None = None  # OpenAlex, WoS
 
     def to_dict(self) -> dict:
         return self.model_dump(exclude_none=True)
@@ -285,6 +282,7 @@ class PublicationBiblio(BaseModel):
 
 class EcoleDoctorale(BaseModel):
     """École doctorale d'une thèse (metadata theses.fr)."""
+
     model_config = ConfigDict(extra="allow")
     nom: str
     ppn: str | None = None  # IdRef de l'ED quand disponible
@@ -292,6 +290,7 @@ class EcoleDoctorale(BaseModel):
 
 class Partenaire(BaseModel):
     """Partenaire de recherche d'une thèse (metadata theses.fr)."""
+
     model_config = ConfigDict(extra="allow")
     nom: str
     type: str | None = None  # ex: "etablissement", "laboratoire", …
@@ -337,6 +336,7 @@ class OpenAlexTopic(BaseModel):
     Tous les champs sont optionnels par défensivité (données réelles
     parfois incomplètes).
     """
+
     model_config = ConfigDict(extra="allow")
 
     domain: str | None = None
@@ -352,6 +352,7 @@ class ThesesTopics(BaseModel):
     `discipline` est une copie de `meta.discipline` — il est redondant
     mais présent dans les données historiques. Voir PublicationMeta.
     """
+
     model_config = ConfigDict(extra="allow")
 
     discipline: str | None = None

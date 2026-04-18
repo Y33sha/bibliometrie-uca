@@ -50,7 +50,9 @@ class PgConfigRepository:
     # ── Perimeters — structures membres ────────────────────────────
 
     def add_structure_to_perimeter(
-        self, perimeter_id: int, structure_id: int,
+        self,
+        perimeter_id: int,
+        structure_id: int,
     ) -> bool:
         """Ajoute la structure au périmètre si absente. Retourne True si
         l'ajout a eu lieu, False sinon (déjà présente ou périmètre
@@ -67,7 +69,9 @@ class PgConfigRepository:
         return self._cur.fetchone() is not None
 
     def remove_structure_from_perimeter(
-        self, perimeter_id: int, structure_id: int,
+        self,
+        perimeter_id: int,
+        structure_id: int,
     ) -> bool:
         """Retire la structure du périmètre (idempotent). Retourne True si
         le périmètre existe, False sinon."""
@@ -101,7 +105,11 @@ class PgConfigRepository:
         return self._cur.fetchone() is not None
 
     def create_perimeter(
-        self, *, code: str, name: str, description: str | None,
+        self,
+        *,
+        code: str,
+        name: str,
+        description: str | None,
     ) -> int:
         """Insère un périmètre avec structure_ids=[]. Retourne son id."""
         self._cur.execute(

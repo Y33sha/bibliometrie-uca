@@ -8,8 +8,8 @@ Affiche un résumé puis demande confirmation avant d'appliquer.
 
 from psycopg2.extras import RealDictCursor
 
-from infrastructure.db.connection import get_connection
 from application.persons import add_name_form
+from infrastructure.db.connection import get_connection
 
 
 def main():

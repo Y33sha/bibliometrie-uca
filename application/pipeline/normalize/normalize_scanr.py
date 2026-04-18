@@ -24,17 +24,16 @@ import time
 
 from psycopg2.extras import Json, RealDictCursor
 
-from infrastructure.db.connection import get_connection
 from application.journals import find_or_create_journal, find_or_create_publisher
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
-from infrastructure.addresses import link_addresses
 from domain.authorship_roles import map_role
-from infrastructure.db_helpers import mark_staging_done
-from domain.publication import clean_doi
-from infrastructure.log import setup_logger
-from domain.publication import normalize_nnt
 from domain.normalize import normalize_text
+from domain.publication import clean_doi, normalize_nnt
+from infrastructure.addresses import link_addresses
+from infrastructure.db.connection import get_connection
+from infrastructure.db_helpers import mark_staging_done
+from infrastructure.log import setup_logger
 
 logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 

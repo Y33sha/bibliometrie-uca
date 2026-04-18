@@ -6,6 +6,9 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
+from application.authorships import (
+    set_source_authorship_excluded as _set_source_authorship_excluded,
+)
 from interfaces.api.deps import get_cursor, get_root_structure_id
 from interfaces.api.filters import (
     OA_OPEN_STATUSES,
@@ -27,7 +30,6 @@ from interfaces.api.filters import (
     parse_str_csv,
 )
 from interfaces.api.models import ExcludeSourceAuthorship
-from application.authorships import set_source_authorship_excluded as _set_source_authorship_excluded
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -975,7 +977,6 @@ async def list_publications(
     lab_id_parts = [v.strip() for v in lab_id.split(",") if v.strip()] if lab_id else []
     lab_none = "none" in lab_id_parts
     lab_ids = [int(v) for v in lab_id_parts if v != "none"] if lab_id_parts else []
-    oa_values = [v.strip() for v in oa_status.split(",") if v.strip()] if oa_status else []
     source_values = (
         [v.strip() for v in source_filter.split(",") if v.strip()] if source_filter else []
     )
@@ -1061,8 +1062,7 @@ async def list_publications(
 
         # APC filter (supports multi-select via comma)
         if has_apc:
-            apply_apc_filter(conditions, params, has_apc,
-                             get_root_structure_id(), lab_ids=lab_ids)
+            apply_apc_filter(conditions, params, has_apc, get_root_structure_id(), lab_ids=lab_ids)
 
         # Country filter
         if country_values:

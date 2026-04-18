@@ -33,10 +33,10 @@ class StructureApiIds(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     openalex: list[str] | None = None
-    wos:      list[str] | None = None
-    scanr:    list[str] | None = None
-    theses:   list[str] | None = None  # PPN IdRef des établissements
-    hal:      list[str] | None = None  # collections HAL
+    wos: list[str] | None = None
+    scanr: list[str] | None = None
+    theses: list[str] | None = None  # PPN IdRef des établissements
+    hal: list[str] | None = None  # collections HAL
 
     @field_validator("openalex", "wos", "scanr", "theses", "hal", mode="before")
     @classmethod

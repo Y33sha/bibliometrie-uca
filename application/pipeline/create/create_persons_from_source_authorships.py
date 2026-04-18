@@ -39,7 +39,6 @@ from collections import defaultdict
 
 from psycopg2.extras import RealDictCursor
 
-from infrastructure.db.connection import get_connection
 from application.persons import (
     add_identifiers_from_authorships as add_identifiers,
 )
@@ -50,9 +49,10 @@ from application.persons import (
 from application.persons import (
     link_authorships as link_to_person,
 )
-from infrastructure.log import setup_logger
 from domain.names import names_compatible, parse_raw_author_name
 from domain.normalize import normalize_name
+from infrastructure.db.connection import get_connection
+from infrastructure.log import setup_logger
 
 logger = setup_logger("create_persons", os.path.join(os.path.dirname(__file__), "logs"))
 

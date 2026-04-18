@@ -14,8 +14,8 @@ import os
 
 from psycopg2.extras import RealDictCursor
 
-from infrastructure.db.connection import get_connection
 from application.publications import merge_publications
+from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 
 log = setup_logger(

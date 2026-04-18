@@ -55,7 +55,9 @@ class PgJournalRepository:
         return _val(row, 0) if row else None
 
     def set_publisher_openalex_id_if_missing(
-        self, publisher_id: int, openalex_id: str,
+        self,
+        publisher_id: int,
+        openalex_id: str,
     ) -> None:
         """Attribue un openalex_id au publisher s'il n'en a pas déjà un."""
         self._cur.execute(
@@ -67,7 +69,11 @@ class PgJournalRepository:
         )
 
     def create_publisher(
-        self, *, name: str, name_normalized: str, openalex_id: str | None,
+        self,
+        *,
+        name: str,
+        name_normalized: str,
+        openalex_id: str | None,
     ) -> int:
         """Insère un publisher et retourne son id."""
         self._cur.execute(
@@ -83,7 +89,10 @@ class PgJournalRepository:
     # ── journal_name_forms ─────────────────────────────────────────
 
     def add_journal_name_form(
-        self, journal_id: int, form_normalized: str, publisher_id: int | None,
+        self,
+        journal_id: int,
+        form_normalized: str,
+        publisher_id: int | None,
     ) -> None:
         """Ajoute une forme de nom de journal si elle n'existe pas (idempotent).
         No-op si form_normalized est vide."""
@@ -99,7 +108,9 @@ class PgJournalRepository:
         )
 
     def find_journal_by_name_form(
-        self, form_normalized: str, publisher_id: int | None,
+        self,
+        form_normalized: str,
+        publisher_id: int | None,
     ) -> int | None:
         """Cherche un journal_id via une forme de nom normalisée,
         en privilégiant les journaux avec eISSN (plus fiable)."""
@@ -189,8 +200,7 @@ class PgJournalRepository:
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
-            (title, title_normalized, issn, eissn, issnl,
-             publisher_id, openalex_id, oa_model),
+            (title, title_normalized, issn, eissn, issnl, publisher_id, openalex_id, oa_model),
         )
         return _val(self._cur.fetchone(), 0)
 
@@ -258,7 +268,9 @@ class PgJournalRepository:
     # ── Fusion ─────────────────────────────────────────────────────
 
     def find_shared_title_journal_pairs(
-        self, target_publisher_id: int, source_publisher_id: int,
+        self,
+        target_publisher_id: int,
+        source_publisher_id: int,
     ) -> list[dict]:
         """Retourne les paires de journaux (un du target, un du source)
         qui partagent le même `title_normalized`.

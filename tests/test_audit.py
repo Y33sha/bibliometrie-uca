@@ -69,9 +69,7 @@ class TestEmitEvent:
         token = set_current_user("admin")
         try:
             emit_event(db, "structure.deleted", "structure", None, {"name": "X"})
-            db.execute(
-                "SELECT aggregate_id FROM audit_log ORDER BY id DESC LIMIT 1"
-            )
+            db.execute("SELECT aggregate_id FROM audit_log ORDER BY id DESC LIMIT 1")
             assert db.fetchone()["aggregate_id"] is None
         finally:
             reset_current_user(token)
@@ -80,9 +78,7 @@ class TestEmitEvent:
         token = set_current_user("admin")
         try:
             emit_event(db, "person.rejected", "person", 42)
-            db.execute(
-                "SELECT payload FROM audit_log ORDER BY id DESC LIMIT 1"
-            )
+            db.execute("SELECT payload FROM audit_log ORDER BY id DESC LIMIT 1")
             assert db.fetchone()["payload"] == {}
         finally:
             reset_current_user(token)
@@ -92,9 +88,7 @@ class TestEmitEvent:
         try:
             emit_event(db, "a.b", "person", 1)
             emit_event(db, "c.d", "person", 2)
-            db.execute(
-                "SELECT event_type FROM audit_log ORDER BY id"
-            )
+            db.execute("SELECT event_type FROM audit_log ORDER BY id")
             rows = db.fetchall()
         finally:
             reset_current_user(token)

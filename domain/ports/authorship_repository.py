@@ -18,7 +18,9 @@ class AuthorshipRepository(Protocol):
     def mark_authorship_excluded(self, authorship_id: int) -> dict: ...
 
     def detach_source_authorships_for_person(
-        self, authorship_id: int, person_id: int,
+        self,
+        authorship_id: int,
+        person_id: int,
     ) -> None: ...
 
     def delete_authorship(self, authorship_id: int) -> None: ...
@@ -26,7 +28,10 @@ class AuthorshipRepository(Protocol):
     def delete_orphan_authorships_for_person(self, person_id: int) -> int: ...
 
     def move_authorships_for_source_authorship(
-        self, source_authorship_id: int, from_pub_id: int, to_pub_id: int,
+        self,
+        source_authorship_id: int,
+        from_pub_id: int,
+        to_pub_id: int,
     ) -> None: ...
 
     def sync_person_id_from_sources(self, source_authorship_ids: list[int]) -> int: ...
@@ -34,15 +39,22 @@ class AuthorshipRepository(Protocol):
     # ── source_authorships ─────────────────────────────────────────
 
     def set_source_authorship_excluded(
-        self, source_authorship_id: int, source: str, excluded: bool,
+        self,
+        source_authorship_id: int,
+        source: str,
+        excluded: bool,
     ) -> bool: ...
 
     def get_source_authorship_truth_id(
-        self, source_authorship_id: int, source: str,
+        self,
+        source_authorship_id: int,
+        source: str,
     ) -> int | None: ...
 
     def clear_source_authorship_fk(
-        self, source_authorship_id: int, source: str,
+        self,
+        source_authorship_id: int,
+        source: str,
     ) -> None: ...
 
     def has_active_source_attestation(self, truth_id: int) -> bool: ...
@@ -50,13 +62,17 @@ class AuthorshipRepository(Protocol):
     # ── Propagation UCA depuis les adresses ────────────────────────
 
     def find_source_authorships_by_addresses(
-        self, address_ids: list[int],
+        self,
+        address_ids: list[int],
     ) -> list[int]: ...
 
     def recompute_in_perimeter_on_source_authorships(
-        self, source_authorship_ids: list[int], perimeter_structure_ids: list[int],
+        self,
+        source_authorship_ids: list[int],
+        perimeter_structure_ids: list[int],
     ) -> None: ...
 
     def propagate_in_perimeter_to_truth_authorships(
-        self, source_authorship_ids: list[int],
+        self,
+        source_authorship_ids: list[int],
     ) -> None: ...

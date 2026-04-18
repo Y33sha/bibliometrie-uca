@@ -24,11 +24,11 @@ import time
 import requests
 from psycopg2.extras import Json
 
-from infrastructure.db.connection import get_connection
-from infrastructure.sources.common import compute_hash, get_existing_ids, setup_logger
 from infrastructure.api_limits import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import get_api_base_urls, get_theses_etab_ppns
+from infrastructure.db.connection import get_connection
+from infrastructure.sources.common import compute_hash, get_existing_ids, setup_logger
 
 logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -49,7 +49,11 @@ def fetch_page(base_url: str, query: str, debut: int = 0, nombre: int = 500) -> 
         "nombre": nombre or THESES_PER_PAGE,
     }
     return http_request_with_retry(
-        "GET", base_url, params=params, timeout=30, label=f"theses debut={debut}",
+        "GET",
+        base_url,
+        params=params,
+        timeout=30,
+        label=f"theses debut={debut}",
     )
 
 

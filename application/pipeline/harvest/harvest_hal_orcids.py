@@ -27,9 +27,9 @@ import time
 
 import requests
 
-from infrastructure.db.connection import get_connection
 from application.persons import add_identifier
 from infrastructure.api_limits import HAL_DELAY
+from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 
 logger = setup_logger("harvest_hal_orcids", os.path.join(os.path.dirname(__file__), "logs"))

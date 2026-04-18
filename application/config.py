@@ -6,9 +6,9 @@ Les routers passent par ces fonctions pour toute écriture. Les lectures
 restent autorisées dans les routers (convention du projet).
 """
 
+from application.audit import emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from infrastructure.repositories import config_repository
-from application.audit import emit_event
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
@@ -117,6 +117,9 @@ def delete_perimeter(cur, perimeter_id: int) -> None:
 
     repo.delete_perimeter(perimeter_id)
     emit_event(
-        cur, "perimeter.deleted", "perimeter", perimeter_id,
+        cur,
+        "perimeter.deleted",
+        "perimeter",
+        perimeter_id,
         {"code": code},
     )

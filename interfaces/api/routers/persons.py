@@ -5,25 +5,6 @@ import re
 
 from fastapi import APIRouter, HTTPException, Query
 
-from interfaces.api.deps import get_cursor
-from interfaces.api.filters import (
-    apply_person_has_identifier_filter,
-    apply_person_has_rh_filter,
-    apply_person_linked_filter,
-    parse_str_csv,
-)
-from interfaces.api.models import (
-    AddIdentifier,
-    AssignOrphanAuthorship,
-    BatchAssignOrphanAuthorships,
-    DetachAuthorships,
-    DetachNameForm,
-    MergePersons,
-    ReassignIdentifier,
-    RejectPerson,
-    UpdateIdentifierStatus,
-    UpdatePersonName,
-)
 from application.authorships import (
     exclude_authorship as _exclude_authorship,
 )
@@ -64,6 +45,25 @@ from application.persons import (
     update_name as _update_name,
 )
 from domain.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
+from interfaces.api.deps import get_cursor
+from interfaces.api.filters import (
+    apply_person_has_identifier_filter,
+    apply_person_has_rh_filter,
+    apply_person_linked_filter,
+    parse_str_csv,
+)
+from interfaces.api.models import (
+    AddIdentifier,
+    AssignOrphanAuthorship,
+    BatchAssignOrphanAuthorships,
+    DetachAuthorships,
+    DetachNameForm,
+    MergePersons,
+    ReassignIdentifier,
+    RejectPerson,
+    UpdateIdentifierStatus,
+    UpdatePersonName,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1153,8 +1153,9 @@ async def detach_authorships(person_id: int, body: DetachAuthorships):
         return _detach_authorships_service(
             cur,
             person_id,
-            authorships=[{"source": a.source, "authorship_id": a.authorship_id}
-                         for a in body.authorships],
+            authorships=[
+                {"source": a.source, "authorship_id": a.authorship_id} for a in body.authorships
+            ],
             name_form=body.name_form,
         )
 

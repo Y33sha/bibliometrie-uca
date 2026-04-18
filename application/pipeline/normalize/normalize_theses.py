@@ -27,20 +27,20 @@ import os
 
 from psycopg2.extras import Json, RealDictCursor
 
-from infrastructure.db.connection import get_connection
 from application.publications import (
     find_or_create,
     find_thesis_by_title,
     refresh_from_sources,
     try_merge_by_doi,
 )
-from infrastructure.addresses import link_addresses
 from domain.authorship_roles import THESES_FIELD_ROLES, merge_roles
+from domain.names import names_compatible
+from domain.normalize import normalize_name, normalize_text
+from domain.publication import normalize_nnt
+from infrastructure.addresses import link_addresses
+from infrastructure.db.connection import get_connection
 from infrastructure.db_helpers import mark_staging_done
 from infrastructure.log import setup_logger
-from domain.names import names_compatible
-from domain.publication import normalize_nnt
-from domain.normalize import normalize_name, normalize_text
 
 logger = setup_logger("normalize_theses", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -448,7 +448,7 @@ def process_persons(cur, these: dict, source_publication_id: int):
 
     # Insérer les authorships avec rôles fusionnés
     position = 0
-    for key, info in person_roles.items():
+    for _key, info in person_roles.items():
         source_person_id = upsert_source_author(cur, info["person"])
         if not source_person_id:
             continue
