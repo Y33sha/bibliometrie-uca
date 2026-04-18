@@ -10,7 +10,7 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
 
-from config.settings import settings
+from infrastructure.settings import settings
 
 DATA_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "imports_manuels", "APC"

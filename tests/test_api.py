@@ -80,7 +80,7 @@ for router_module in [
 ]:
     if router_module and hasattr(router_module, "get_cursor"):
         router_module.get_cursor = _test_get_cursor
-from config.settings import settings as _settings
+from infrastructure.settings import settings as _settings
 
 
 @pytest.fixture(scope="module")

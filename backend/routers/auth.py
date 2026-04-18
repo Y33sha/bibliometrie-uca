@@ -12,7 +12,7 @@ from backend.deps import (
     _verify_token,
 )
 from backend.models import LoginRequest
-from config.settings import settings
+from infrastructure.settings import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

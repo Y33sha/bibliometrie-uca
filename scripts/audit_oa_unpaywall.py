@@ -15,7 +15,7 @@ import psycopg2
 import requests
 from psycopg2.extras import RealDictCursor
 
-from config.settings import settings
+from infrastructure.settings import settings
 from infrastructure.api_limits import UNPAYWALL_DELAY
 
 EMAIL = "laurent.le-coz@uca.fr"

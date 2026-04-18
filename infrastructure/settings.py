@@ -6,7 +6,7 @@ Settings typés chargés depuis les variables d'environnement ou un fichier
 injectées par l'orchestrateur (pm2, systemd, docker).
 
 Usage :
-    from config.settings import settings
+    from infrastructure.settings import settings
     print(settings.db_host)
 
 Les paramètres externalisés dynamiques (périmètres, clés API, credentials

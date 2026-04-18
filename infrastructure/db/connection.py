@@ -6,7 +6,7 @@ import os
 
 import psycopg2
 
-from config.settings import settings
+from infrastructure.settings import settings
 
 SANDBOX_DB_NAME = "bibliometrie_sandbox"
 
