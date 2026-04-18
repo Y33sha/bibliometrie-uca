@@ -25,9 +25,9 @@ import os
 from psycopg2.extras import Json
 
 from db.connection import get_connection
-from services.journals import find_or_create_journal, find_or_create_publisher
-from services.publications import find_or_create as find_or_create_publication
-from services.publications import refresh_from_sources, try_merge_by_doi
+from application.journals import find_or_create_journal, find_or_create_publisher
+from application.publications import find_or_create as find_or_create_publication
+from application.publications import refresh_from_sources, try_merge_by_doi
 from utils.addresses import link_addresses
 from utils.authorship_roles import map_role
 from utils.db_helpers import mark_staging_done
@@ -751,7 +751,7 @@ def process_work(
             publication_id = find_publication(cur, doc, journal_id)
             if publication_id and publication_id != old_pub_id:
                 # DOI/NNT pointe vers une autre publication → fusionner
-                from services.publications import merge_publications
+                from application.publications import merge_publications
 
                 logger.info(f"  {hal_id} : fusion pub {old_pub_id} → {publication_id} (DOI/NNT)")
                 merge_publications(cur, publication_id, old_pub_id)

@@ -21,7 +21,7 @@ import time
 import requests
 
 from db.connection import get_connection
-from services.publications import update_oa_status
+from application.publications import update_oa_status
 from utils.api_limits import UNPAYWALL_DELAY
 from utils.log import setup_logger
 

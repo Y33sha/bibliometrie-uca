@@ -13,7 +13,7 @@ et les scripts de correction. Le SQL vit dans
 
 from domain.errors import NotFoundError, ValidationError
 from infrastructure.repositories.authorship_repository import PgAuthorshipRepository
-from services.audit import emit_event
+from application.audit import emit_event
 from utils.sources import BIBLIO_SOURCES as VALID_SOURCES
 
 

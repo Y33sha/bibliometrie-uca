@@ -25,9 +25,9 @@ import time
 from psycopg2.extras import Json, RealDictCursor
 
 from db.connection import get_connection
-from services.journals import find_or_create_journal, find_or_create_publisher
-from services.publications import find_or_create as find_or_create_publication
-from services.publications import refresh_from_sources, try_merge_by_doi
+from application.journals import find_or_create_journal, find_or_create_publisher
+from application.publications import find_or_create as find_or_create_publication
+from application.publications import refresh_from_sources, try_merge_by_doi
 from utils.addresses import link_addresses
 from utils.authorship_roles import map_role
 from utils.db_helpers import mark_staging_done

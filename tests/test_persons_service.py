@@ -8,7 +8,7 @@ merge_person est déjà testé dans test_integration.py.
 import pytest
 
 from domain.errors import NotFoundError, ValidationError
-from services.persons import (
+from application.persons import (
     add_identifier,
     add_identifiers_from_authorships,
     assign_orphan_authorship,

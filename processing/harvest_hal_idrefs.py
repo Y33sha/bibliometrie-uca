@@ -15,7 +15,7 @@ import requests
 from psycopg2.extras import RealDictCursor
 
 from db.connection import get_connection
-from services.persons import add_identifier
+from application.persons import add_identifier
 from utils.api_limits import HAL_DELAY
 from utils.log import setup_logger
 

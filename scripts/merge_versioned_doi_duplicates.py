@@ -15,7 +15,7 @@ import os
 from psycopg2.extras import RealDictCursor
 
 from db.connection import get_connection
-from services.publications import merge_publications
+from application.publications import merge_publications
 from utils.log import setup_logger
 
 log = setup_logger(

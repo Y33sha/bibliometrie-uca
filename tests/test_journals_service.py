@@ -7,7 +7,7 @@ reset_journal_apc, merge_publishers, merge_journals.
 import pytest
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from services.journals import (
+from application.journals import (
     find_or_create_journal,
     find_or_create_publisher,
     merge_journals,

@@ -5,7 +5,7 @@ avec une vraie base PostgreSQL (bibliometrie_test).
 Chaque test tourne dans une transaction rollbackée (isolation complète).
 """
 
-from services.persons import add_identifier, add_name_form, create_person
+from application.persons import add_identifier, add_name_form, create_person
 
 # ── Helpers ──────────────────────────────────────────────────────
 

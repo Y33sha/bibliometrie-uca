@@ -10,7 +10,7 @@ Ligne 590-598 — WoS authors détail : idem, sauth.orcid. Le JOIN reste pour l'
 
 Lignes 1588-1627 — Détection des personnes liées à 2+ comptes HAL : GROUP BY person_id HAVING COUNT(DISTINCT hal_person_id) >= 2. Requête spécifique aux comptes HAL, nécessite source_authors.
 
-# services/persons.py :
+# application/persons.py :
 
 link_authorship : dual-write person_id sur source_authors pour les comptes HAL. Légitime — tant que source_authors.person_id est utilisé ailleurs (étape 0 de create_persons, page comptes HAL).
 

@@ -27,7 +27,7 @@ from domain.errors import (
     UnauthorizedError,
     ValidationError,
 )
-from services import audit
+from application import audit
 from utils.log import configure_root_logging
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).

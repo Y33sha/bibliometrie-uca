@@ -7,7 +7,7 @@ structure_name_forms.
 import pytest
 
 from domain.errors import NotFoundError, ValidationError
-from services.structures import (
+from application.structures import (
     create_name_form,
     create_relation,
     create_structure,

@@ -5,7 +5,7 @@ import json
 import pytest
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from services.config import (
+from application.config import (
     add_perimeter_structure,
     create_perimeter,
     delete_perimeter,

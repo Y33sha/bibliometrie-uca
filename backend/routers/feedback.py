@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 
 from backend.deps import get_cursor
 from backend.models import AssignStructureAction
-from services import addresses as addresses_service
+from application import addresses as addresses_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

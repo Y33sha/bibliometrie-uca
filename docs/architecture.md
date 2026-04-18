@@ -69,32 +69,32 @@ Table unique pour toutes les sources. Colonnes notables : `source` (enum), `sour
 | `source_authorships` | `processing/normalize_*.py` |
 | `source_structures` | `processing/normalize_hal.py`, `enrich_hal_structures.py` |
 
-Note : `person_id` sur `source_authorships` est écrit par `services/persons.py` (rattachement), pas par les normaliseurs. `in_perimeter` et `structure_ids` sont écrits par `populate_affiliations.py`.
+Note : `person_id` sur `source_authorships` est écrit par `application/persons.py` (rattachement), pas par les normaliseurs. `in_perimeter` et `structure_ids` sont écrits par `populate_affiliations.py`.
 
-### Référentiel Publications — `services/publications.py`
+### Référentiel Publications — `application/publications.py`
 
 | Table | Propriétaire | Notes |
 |-------|-------------|-------|
-| `publications` | `services/publications.py` | `refresh_from_sources()` recalcule les métadonnées depuis les source_publications |
+| `publications` | `application/publications.py` | `refresh_from_sources()` recalcule les métadonnées depuis les source_publications |
 | `distinct_publications` | API admin | paires marquées distinctes malgré titre identique |
 | `apc_payments` | import APC (CSV) | — |
-| `journals` | `services/journals.py` | — |
-| `publishers` | `services/journals.py` | — |
+| `journals` | `application/journals.py` | — |
+| `publishers` | `application/journals.py` | — |
 
-### Référentiel Personnes — `services/persons.py`
+### Référentiel Personnes — `application/persons.py`
 
 | Table | Propriétaire | Notes |
 |-------|-------------|-------|
-| `persons` | `services/persons.py` | import RH écrit aussi (toléré) |
+| `persons` | `application/persons.py` | import RH écrit aussi (toléré) |
 | `persons_rh` | import RH (CSV) | table satellite |
-| `person_identifiers` | `services/persons.py` | ORCID, idHAL, IdRef |
-| `person_name_forms` | `services/persons.py` | recalcul bulk par `populate_person_name_forms.py` |
+| `person_identifiers` | `application/persons.py` | ORCID, idHAL, IdRef |
+| `person_name_forms` | `application/persons.py` | recalcul bulk par `populate_person_name_forms.py` |
 
 ### Authorships canoniques — `build_authorships.py`
 
 | Table | Propriétaire | Notes |
 |-------|-------------|-------|
-| `authorships` | `build_authorships.py` + `services/authorships.py` | dédupliqué (person_id, publication_id), consolide in_perimeter et structure_ids depuis les sources |
+| `authorships` | `build_authorships.py` + `application/authorships.py` | dédupliqué (person_id, publication_id), consolide in_perimeter et structure_ids depuis les sources |
 
 ### Structures — admin (pas de service)
 

@@ -15,7 +15,7 @@ import time
 import requests
 
 from db.connection import get_connection
-from services.journals import reset_journal_apc, update_journal_apc
+from application.journals import reset_journal_apc, update_journal_apc
 from utils.api_limits import DOAJ_DELAY
 from utils.log import setup_logger
 

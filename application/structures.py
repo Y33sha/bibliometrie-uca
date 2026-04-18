@@ -13,7 +13,7 @@ from pydantic import ValidationError as PydanticValidationError
 from domain.errors import NotFoundError, ValidationError
 from domain.structure import StructureApiIds
 from infrastructure.repositories.structure_repository import PgStructureRepository
-from services.audit import emit_event
+from application.audit import emit_event
 from utils.normalize import normalize_text
 
 

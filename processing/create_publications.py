@@ -23,10 +23,10 @@ import os
 from psycopg2.extras import RealDictCursor
 
 from db.connection import get_connection
-from services.publications import (
+from application.publications import (
     find_or_create as find_or_create_publication,
 )
-from services.publications import (
+from application.publications import (
     refresh_from_sources,
 )
 from utils.doc_types import map_doc_type

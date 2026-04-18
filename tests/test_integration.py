@@ -3,8 +3,8 @@
 import pytest
 
 from domain.errors import ConflictError
-from services.persons import merge_person
-from services.publications import find_or_create, refresh_from_sources
+from application.persons import merge_person
+from application.publications import find_or_create, refresh_from_sources
 
 # ── Helpers ──
 
@@ -189,7 +189,7 @@ class TestSourcesEnum:
 
     def test_source_config_covers_all_sources(self, db):
         """_SOURCE_CONFIG dans services/persons.py doit couvrir toutes les sources."""
-        from services.persons import _SOURCE_CONFIG
+        from application.persons import _SOURCE_CONFIG
         from utils.sources import ALL_SOURCES_SET
 
         missing = ALL_SOURCES_SET - set(_SOURCE_CONFIG.keys())

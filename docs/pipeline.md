@@ -311,6 +311,6 @@ flowchart LR
 | `utils/uca_perimeter.py` | `get_uca_structure_ids`, `get_uca_structure_ids_wide` — périmètre UCA |
 | `utils/log.py` | `setup_logger` — configuration logging avec fichier |
 | `extraction/common.py` | `compute_hash`, `get_existing_ids` — fonctions d'extraction |
-| `services/persons.py` | Création, rattachement, identifiants, formes de noms |
-| `services/publications.py` | `find_or_create`, déduplication par DOI + titre |
-| `services/journals.py` | Publishers, journals, APC |
+| `application/persons.py` | Création, rattachement, identifiants, formes de noms |
+| `application/publications.py` | `find_or_create`, déduplication par DOI + titre |
+| `application/journals.py` | Publishers, journals, APC |
