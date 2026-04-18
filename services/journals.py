@@ -7,23 +7,12 @@ Compatible avec les curseurs tuples (standard) et RealDictCursor.
 """
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
+from infrastructure.repositories.journal_repository import PgJournalRepository
 from services.audit import emit_event
 from utils.db_helpers import row_val as _val
 from utils.normalize import normalize_text
 
 # ── Publishers ──
-
-
-def _add_publisher_name_form(cur, publisher_id: int, form_normalized: str) -> None:
-    """Ajoute une forme de nom si elle n'existe pas encore."""
-    cur.execute(
-        """
-        INSERT INTO publisher_name_forms (publisher_id, form_normalized)
-        VALUES (%s, %s)
-        ON CONFLICT (form_normalized) DO NOTHING
-    """,
-        (publisher_id, form_normalized),
-    )
 
 
 def find_or_create_publisher(
@@ -45,47 +34,29 @@ def find_or_create_publisher(
     if not name_normalized:
         return None
 
+    repo = PgJournalRepository(cur)
+
     # 1. Par openalex_id
     if openalex_id:
-        cur.execute("SELECT id FROM publishers WHERE openalex_id = %s", (openalex_id,))
-        row = cur.fetchone()
-        if row:
-            _add_publisher_name_form(cur, _val(row, 0), name_normalized)
-            return _val(row, 0)
+        pub_id = repo.find_publisher_by_openalex_id(openalex_id)
+        if pub_id:
+            repo.add_publisher_name_form(pub_id, name_normalized)
+            return pub_id
 
-    # 2. Par forme de nom
-    cur.execute(
-        """
-        SELECT publisher_id FROM publisher_name_forms
-        WHERE form_normalized = %s LIMIT 1
-    """,
-        (name_normalized,),
-    )
-    row = cur.fetchone()
-    if row:
-        pub_id = _val(row, 0)
-        # Rattacher l'openalex_id si on ne l'avait pas
+    # 2. Par forme de nom (rattache l'openalex_id si on en a un)
+    pub_id = repo.find_publisher_by_name_form(name_normalized)
+    if pub_id:
         if openalex_id:
-            cur.execute(
-                """
-                UPDATE publishers SET openalex_id = %s
-                WHERE id = %s AND openalex_id IS NULL
-            """,
-                (openalex_id, pub_id),
-            )
+            repo.set_publisher_openalex_id_if_missing(pub_id, openalex_id)
         return pub_id
 
     # 3. Créer
-    cur.execute(
-        """
-        INSERT INTO publishers (name, name_normalized, openalex_id)
-        VALUES (%s, %s, %s)
-        RETURNING id
-    """,
-        (name.strip(), name_normalized, openalex_id),
+    pub_id = repo.create_publisher(
+        name=name.strip(),
+        name_normalized=name_normalized,
+        openalex_id=openalex_id,
     )
-    pub_id = _val(cur.fetchone(), 0)
-    _add_publisher_name_form(cur, pub_id, name_normalized)
+    repo.add_publisher_name_form(pub_id, name_normalized)
     return pub_id
 
 
