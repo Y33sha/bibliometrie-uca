@@ -7,7 +7,7 @@ commit séparé (Phase B).
 
 import json
 
-from services.addresses import (
+from application.addresses import (
     batch_review_structure_link,
     batch_set_country_by_filter,
     batch_set_country_by_ids,

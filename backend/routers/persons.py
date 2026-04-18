@@ -24,43 +24,43 @@ from backend.models import (
     UpdateIdentifierStatus,
     UpdatePersonName,
 )
-from services.authorships import (
+from application.authorships import (
     exclude_authorship as _exclude_authorship,
 )
-from services.persons import (
+from application.persons import (
     add_identifier as _add_identifier,
 )
-from services.persons import (
+from application.persons import (
     assign_orphan_authorship as _assign_orphan,
 )
-from services.persons import (
+from application.persons import (
     batch_assign_orphan_authorships as _batch_assign_orphan,
 )
-from services.persons import (
+from application.persons import (
     create_person as _create_person,
 )
-from services.persons import (
+from application.persons import (
     detach_authorships as _detach_authorships_service,
 )
-from services.persons import (
+from application.persons import (
     detach_name_form as _detach_name_form,
 )
-from services.persons import (
+from application.persons import (
     merge_person as _merge_person,
 )
-from services.persons import (
+from application.persons import (
     reassign_identifier as _reassign_identifier,
 )
-from services.persons import (
+from application.persons import (
     remove_identifier as _remove_identifier,
 )
-from services.persons import (
+from application.persons import (
     set_rejected as _set_rejected,
 )
-from services.persons import (
+from application.persons import (
     update_identifier_status as _update_identifier_status,
 )
-from services.persons import (
+from application.persons import (
     update_name as _update_name,
 )
 from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL

@@ -15,7 +15,7 @@ import os
 import time
 
 from db.connection import get_connection
-from services.publications import merge_publications
+from application.publications import merge_publications
 from utils.log import setup_logger
 from utils.zenodo import resolve_zenodo_doi
 

@@ -11,7 +11,7 @@ from backend.models import (
     PerimeterCreate,
     PerimeterUpdate,
 )
-from services import config as config_service
+from application import config as config_service
 from utils.perimeter import get_perimeter_structure_ids
 
 router = APIRouter()

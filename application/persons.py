@@ -13,8 +13,8 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.person import compute_person_name_forms
 from infrastructure.repositories.person_repository import PgPersonRepository
-from services.audit import emit_event
-from services.authorships import delete_orphan_authorships
+from application.audit import emit_event
+from application.authorships import delete_orphan_authorships
 from utils.sources import ALL_SOURCES_SET
 
 __all__ = [

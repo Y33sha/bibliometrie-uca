@@ -7,7 +7,7 @@ Chaque test tourne dans une transaction rollbackée (isolation complète).
 
 from psycopg2.extras import Json
 
-from services.publications import find_by_nnt, find_or_create, refresh_from_sources
+from application.publications import find_by_nnt, find_or_create, refresh_from_sources
 
 # ── Helpers ──────────────────────────────────────────────────────
 

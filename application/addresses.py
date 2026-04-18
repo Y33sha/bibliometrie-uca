@@ -11,7 +11,7 @@ du projet).
 import logging
 
 from infrastructure.repositories.address_repository import PgAddressRepository
-from services.authorships import propagate_uca_for_addresses
+from application.authorships import propagate_uca_for_addresses
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ restent autorisées dans les routers (convention du projet).
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from infrastructure.repositories.config_repository import PgConfigRepository
-from services.audit import emit_event
+from application.audit import emit_event
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 

@@ -16,12 +16,12 @@ from infrastructure.repositories.publication_repository import (
     PubByTitle,
     PubThesisCandidate,
 )
-from services.audit import emit_event
+from application.audit import emit_event
 from utils.db_helpers import row_val as _val
 from utils.doc_types import map_doc_type
 
 # Re-export des namedtuples pour les call sites historiques (scripts,
-# processing) qui font `from services.publications import PubByDoi`.
+# processing) qui font `from application.publications import PubByDoi`.
 __all__ = [
     "PubByDoi", "PubByNnt", "PubByTitle", "PubThesisCandidate",
     # Fonctions publiques du service (ajoutées au fur et à mesure).

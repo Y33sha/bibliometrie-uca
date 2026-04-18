@@ -18,7 +18,7 @@ import logging
 from psycopg2.extras import RealDictCursor
 
 from db.connection import get_connection
-from services.persons import merge_person
+from application.persons import merge_person
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)

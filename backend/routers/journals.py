@@ -6,8 +6,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from backend.deps import get_cursor
 from backend.models import JournalUpdate, MergeRequest
-from services.journals import merge_journals
-from services.journals import update_journal as _update_journal
+from application.journals import merge_journals
+from application.journals import update_journal as _update_journal
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

@@ -5,7 +5,7 @@ Vérifie deux comportements essentiels :
 2. Dans un contexte utilisateur (requête HTTP) → l'événement est persisté.
 """
 
-from services.audit import (
+from application.audit import (
     emit_event,
     get_current_user,
     reset_current_user,
@@ -117,7 +117,7 @@ class TestEndToEndServiceIntegration:
         return cur.fetchone()["id"]
 
     def test_set_rejected_emits_event(self, db):
-        from services.persons import set_rejected
+        from application.persons import set_rejected
 
         person_id = self._create_person(db)
         token = set_current_user("admin")
@@ -139,7 +139,7 @@ class TestEndToEndServiceIntegration:
     def test_set_rejected_without_context_no_event(self, db):
         """Confirme que hors contexte (pipeline, script), rien n'est audité
         même quand un service destructif est appelé."""
-        from services.persons import set_rejected
+        from application.persons import set_rejected
 
         person_id = self._create_person(db)
         set_rejected(db, person_id, True)
@@ -150,7 +150,7 @@ class TestEndToEndServiceIntegration:
     def test_mark_distinct_emits_only_on_actual_insert(self, db):
         """mark_distinct est idempotent : un appel sur une paire déjà
         marquée ne doit pas générer d'événement supplémentaire."""
-        from services.persons import mark_distinct
+        from application.persons import mark_distinct
 
         p1 = self._create_person(db, "A", "A")
         p2 = self._create_person(db, "B", "B")

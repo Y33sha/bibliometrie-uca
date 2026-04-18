@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 py-modules = []
 
 [tool.setuptools.packages.find]
-include = ["backend*", "config*", "db*", "domain*", "extraction*", "infrastructure*", "processing*", "services*", "utils*", "scripts*"]
+include = ["application*", "backend*", "config*", "db*", "domain*", "extraction*", "infrastructure*", "processing*", "utils*", "scripts*"]
 
 # ----------------------------------------------------------------------
 # Ruff : linter + formateur (remplace flake8, isort, pyupgrade, black)
@@ -66,7 +66,7 @@ addopts = "-q"
 
 [tool.coverage.run]
 branch = true
-source = ["backend", "services", "utils", "config", "db", "processing", "extraction"]
+source = ["application", "backend", "utils", "config", "db", "processing", "extraction", "domain", "infrastructure"]
 omit = [
     "tests/*",
     "*/__init__.py",

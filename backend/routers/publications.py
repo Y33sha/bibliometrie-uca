@@ -27,7 +27,7 @@ from backend.filters import (
     parse_str_csv,
 )
 from backend.models import ExcludeSourceAuthorship
-from services.authorships import set_source_authorship_excluded as _set_source_authorship_excluded
+from application.authorships import set_source_authorship_excluded as _set_source_authorship_excluded
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

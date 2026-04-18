@@ -9,7 +9,7 @@ import json
 import pytest
 
 from domain.errors import NotFoundError, ValidationError
-from services.authorships import (
+from application.authorships import (
     delete_orphan_authorships,
     detach_source,
     exclude_authorship,

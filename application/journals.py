@@ -8,7 +8,7 @@ Compatible avec les curseurs tuples (standard) et RealDictCursor.
 
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from infrastructure.repositories.journal_repository import PgJournalRepository
-from services.audit import emit_event
+from application.audit import emit_event
 from utils.normalize import normalize_text
 
 # ── Publishers ──

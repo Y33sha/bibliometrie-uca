@@ -11,7 +11,7 @@ from backend.models import (
     ReviewAction,
     SetCountry,
 )
-from services import addresses as addresses_service
+from application import addresses as addresses_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

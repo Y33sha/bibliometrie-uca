@@ -6,8 +6,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from backend.deps import get_cursor
 from backend.models import MarkDistinctPublications, MergePublications
-from services.publications import mark_distinct as _mark_pubs_distinct
-from services.publications import merge_publications
+from application.publications import mark_distinct as _mark_pubs_distinct
+from application.publications import merge_publications
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

@@ -9,8 +9,8 @@ Ces tests tournent sur la base bibliometrie_test (cf. conftest.py).
 
 from psycopg2.extras import Json
 
-from services.publications import find_or_create as find_or_create_publication
-from services.publications import update_sources
+from application.publications import find_or_create as find_or_create_publication
+from application.publications import update_sources
 from utils.doc_types import map_doc_type
 from utils.nnt import normalize_nnt
 from utils.normalize import normalize_text

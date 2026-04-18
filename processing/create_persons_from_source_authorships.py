@@ -40,14 +40,14 @@ from collections import defaultdict
 from psycopg2.extras import RealDictCursor
 
 from db.connection import get_connection
-from services.persons import (
+from application.persons import (
     add_identifiers_from_authorships as add_identifiers,
 )
-from services.persons import (
+from application.persons import (
     add_name_form,
     create_person,
 )
-from services.persons import (
+from application.persons import (
     link_authorships as link_to_person,
 )
 from utils.log import setup_logger

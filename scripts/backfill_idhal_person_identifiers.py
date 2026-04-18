@@ -11,7 +11,7 @@ Les identifiants avec statut rejected sont réattribués (via add_identifier).
 import os
 
 from db.connection import get_connection
-from services.persons import add_identifier
+from application.persons import add_identifier
 from utils.log import setup_logger
 
 log = setup_logger(

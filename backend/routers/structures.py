@@ -12,7 +12,7 @@ from backend.models import (
     StructureCreate,
     StructureUpdate,
 )
-from services import structures as structures_service
+from application import structures as structures_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

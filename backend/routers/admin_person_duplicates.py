@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from backend.deps import get_cursor
 from backend.models import MarkPersonsDistinct
-from services.persons import mark_distinct as _mark_persons_distinct
+from application.persons import mark_distinct as _mark_persons_distinct
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

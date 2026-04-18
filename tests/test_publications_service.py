@@ -5,7 +5,7 @@ resolve_doi_conflict (chapter/book), update_oa_status/countries,
 merge_publications. find_or_create est déjà couvert par test_integration.py.
 """
 
-from services.publications import (
+from application.publications import (
     find_by_doi,
     find_by_nnt,
     find_by_title,
@@ -192,7 +192,7 @@ class TestTryMergeByDoi:
 class TestResolveDoiConflict:
     def test_chapter_vs_existing_book_drops_doi(self, db):
         """Chapitre avec DOI qui pointe vers livre : DOI retiré du chapitre."""
-        from services.publications import PubByDoi
+        from application.publications import PubByDoi
         existing = PubByDoi(id=1, doc_type="book", title_normalized="livre")
 
         doi, merge_id = resolve_doi_conflict(db, "10.x/book", "book_chapter",
@@ -202,7 +202,7 @@ class TestResolveDoiConflict:
 
     def test_book_vs_existing_chapter_strips_doi_from_chapter(self, db):
         """Livre avec DOI existant sur un chapitre : DOI retiré du chapitre, livre garde."""
-        from services.publications import PubByDoi
+        from application.publications import PubByDoi
         existing_id = _insert_publication(
             db, title="Chapitre", doc_type="book_chapter", doi="10.x/book"
         )
@@ -217,7 +217,7 @@ class TestResolveDoiConflict:
 
     def test_two_chapters_different_titles_strip_both(self, db):
         """2 chapitres avec titres différents partageant un DOI : les 2 perdent le DOI."""
-        from services.publications import PubByDoi
+        from application.publications import PubByDoi
         existing_id = _insert_publication(
             db, title="C1", doc_type="book_chapter", doi="10.x/shared"
         )
@@ -232,7 +232,7 @@ class TestResolveDoiConflict:
 
     def test_two_chapters_same_title_merges(self, db):
         """2 chapitres avec même titre + DOI → fusion."""
-        from services.publications import PubByDoi
+        from application.publications import PubByDoi
         existing = PubByDoi(id=42, doc_type="book_chapter", title_normalized="same")
 
         doi, merge_id = resolve_doi_conflict(db, "10.x/shared", "book_chapter",
@@ -242,7 +242,7 @@ class TestResolveDoiConflict:
 
     def test_compatible_types_merge(self, db):
         """Types compatibles (ex: 2 articles) → fusion normale."""
-        from services.publications import PubByDoi
+        from application.publications import PubByDoi
         existing = PubByDoi(id=42, doc_type="article", title_normalized="a")
         doi, merge_id = resolve_doi_conflict(db, "10.x/a", "article", "a", existing)
         assert doi == "10.x/a"
