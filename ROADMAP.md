@@ -47,9 +47,14 @@ Gain concret : tests unitaires de services sans base. À faire si la
 couverture de tests devient un objectif.
 
 ### 1.7 Verrouiller les acquis : import-linter
-Définir formellement les règles de dépendance entre couches (domain
-ne dépend de rien, application ne dépend que de domain, …) et les
-vérifier en CI. Évite que la dérive silencieuse érode l'acquis.
+- [x] Contrats initiaux dans `pyproject.toml` (`[tool.importlinter]`),
+  vérifiés en pre-commit + CI. 4 contrats `forbidden` qui verrouillent :
+  (1) domain = noyau pur, (2) application ↛ interfaces,
+  (3) infrastructure ↛ interfaces, (4) infrastructure ↛ application.
+- [ ] Quand §1.1 sera faite (SQL hors routers), durcir en un contrat
+  `layered` strict (interfaces > infrastructure > application > domain).
+- [ ] Quand §1.6 sera faite (DI complète), retirer l'exception permettant
+  à `application/` d'importer les factories de `infrastructure.repositories`.
 
 ### 1.8 Audit périodique
 Parcours régulier pour repérer : SQL mal placé, dépendances dans le
