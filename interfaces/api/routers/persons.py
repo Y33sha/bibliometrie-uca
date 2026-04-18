@@ -5,14 +5,14 @@ import re
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.deps import get_cursor
-from backend.filters import (
+from interfaces.api.deps import get_cursor
+from interfaces.api.filters import (
     apply_person_has_identifier_filter,
     apply_person_has_rh_filter,
     apply_person_linked_filter,
     parse_str_csv,
 )
-from backend.models import (
+from interfaces.api.models import (
     AddIdentifier,
     AssignOrphanAuthorship,
     BatchAssignOrphanAuthorships,

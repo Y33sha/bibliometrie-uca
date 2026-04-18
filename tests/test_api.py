@@ -45,20 +45,20 @@ def _test_get_cursor():
 
 
 # Patcher get_cursor AVANT l'import de l'app
-import backend.deps
+import interfaces.api.deps
 
-backend.deps.get_cursor = _test_get_cursor
+interfaces.api.deps.get_cursor = _test_get_cursor
 
 from fastapi.testclient import TestClient
 
-import backend.app as _app_module
-from backend.app import app
+import interfaces.api.app as _app_module
+from interfaces.api.app import app
 
 # Patcher aussi les copies locales dans les modules qui font
-# "from backend.deps import get_cursor" (copie dans leur namespace)
+# "from interfaces.api.deps import get_cursor" (copie dans leur namespace)
 _app_module.get_cursor = _test_get_cursor
 for router_module in [
-    getattr(__import__(f"backend.routers.{name}", fromlist=[name]), name, None)
+    getattr(__import__(f"interfaces.api.routers.{name}", fromlist=[name]), name, None)
     for name in [
         "publications",
         "persons",
@@ -95,7 +95,7 @@ def auth_client():
     """Client authentifié séparé (cookie session valide)."""
     import time
 
-    from backend.deps import _sign_token
+    from interfaces.api.deps import _sign_token
 
     with TestClient(app, raise_server_exceptions=False) as c:
         token = _sign_token(f"{_settings.admin_user}|{int(time.time())}")

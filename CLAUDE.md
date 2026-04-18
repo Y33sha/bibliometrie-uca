@@ -10,14 +10,14 @@
 
 ## Conventions du projet
 
-- Backend : FastAPI (Python), base PostgreSQL. Architecture en couches DDD : routers dans `backend/routers/`, services applicatifs (orchestration métier) dans `application/`, repositories SQL dans `infrastructure/repositories/`, value objects et règles métier dans `domain/`, utilitaires dans `utils/`
+- Architecture en couches DDD : `domain/` (règles et value objects, zéro I/O), `application/` (orchestrateurs métier, incluant `application/pipeline/`), `infrastructure/` (adapters SQL, APIs sources, settings), `interfaces/` (adapters entrants : `interfaces/api/` pour FastAPI). Entry points CLI : `run_pipeline.py` à la racine, scripts one-shot dans `scripts/`.
 - Frontend : SvelteKit (Svelte 5), routes dans `frontend/src/routes/`
 - Pipeline : scripts dans `processing/` et `extraction/`, orchestrateur `run_pipeline.py`
 - Migrations SQL dans `infrastructure/db/migrations/`, appliquées via `python -m infrastructure.db.migrate`
 - Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_PASSWORD=...`)
 - Tests frontend : `cd frontend && npm run check` (svelte-check, échoue sur les erreurs de types)
 - Lancement dev : `bash start.sh` (uvicorn port 8003 + vite port 5176)
-- Endpoints POST/PUT/PATCH : toujours un modèle Pydantic dans `backend/models.py`, jamais `body: dict`
+- Endpoints POST/PUT/PATCH : toujours un modèle Pydantic dans `interfaces/api/models.py`, jamais `body: dict`
 - Requêtes SQL : toujours des requêtes paramétrées (`%s`), jamais d'interpolation f-string pour les valeurs
 - Logging : utiliser `setup_logger` de `infrastructure/log.py`
 - DOI : utiliser `DOI` / `DOI.try_parse` de `domain/publication.py` ; `clean_doi` de `utils/doi.py` reste un shim pour le code existant

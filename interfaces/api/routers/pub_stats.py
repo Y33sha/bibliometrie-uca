@@ -4,8 +4,8 @@ import logging
 
 from fastapi import APIRouter, Query
 
-from backend.deps import get_cursor, get_root_structure_id
-from backend.filters import (
+from interfaces.api.deps import get_cursor, get_root_structure_id
+from interfaces.api.filters import (
     PUB_IS_UCA,
     apply_lab_filter,
     apply_oa_filter,

@@ -4,8 +4,8 @@ import logging
 
 from fastapi import APIRouter
 
-from backend.deps import get_cursor
-from backend.models import (
+from interfaces.api.deps import get_cursor
+from interfaces.api.models import (
     AddPerimeterStructure,
     ConfigValueUpdate,
     PerimeterCreate,

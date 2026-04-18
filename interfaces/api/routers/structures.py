@@ -4,8 +4,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.deps import get_cursor
-from backend.models import (
+from interfaces.api.deps import get_cursor
+from interfaces.api.models import (
     NameFormCreate,
     NameFormUpdate,
     RelationCreate,

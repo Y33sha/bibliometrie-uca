@@ -5,8 +5,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.deps import get_cursor
-from backend.filters import (
+from interfaces.api.deps import get_cursor
+from interfaces.api.filters import (
     apply_person_has_identifier_filter,
     apply_person_has_rh_filter,
     persons_sort_clause,
