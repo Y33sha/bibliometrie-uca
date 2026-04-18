@@ -61,10 +61,13 @@ dupliqué entre agrégats.
 ## Chantier qualité du code : maintenabilité, auditabilité, scalabilité
 
 ### 2.1 Tooling & CI
-- **Pre-commit hook** : ruff + ruff format + mypy + import-linter
-  + pytest sur les tests unitaires (rapides)
-- Durcir mypy progressivement (strict par module à mesure qu'il est
-  stabilisé — aujourd'hui 73 erreurs, mode permissif)
+- [x] **Pre-commit hook** : ruff check (+ auto-fix) + ruff format
+  + checks basiques (trailing whitespace, EOF, YAML/TOML, merge conflicts).
+  Config dans `.pre-commit-config.yaml`. À compléter avec mypy et pytest
+  unitaires quand la §2.2 sera faite (séparation unit/integration).
+- [ ] Ajouter mypy au hook + le durcir progressivement (strict par module
+  à mesure qu'il est stabilisé — aujourd'hui 73 erreurs, mode permissif)
+- [ ] Ajouter pytest sur tests unitaires au hook (nécessite §2.2)
 - Couverture `pytest --cov` en CI avec seuil progressif (partir de
   la couverture actuelle, ne pas régresser)
 

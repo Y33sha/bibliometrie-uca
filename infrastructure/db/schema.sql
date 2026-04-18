@@ -2608,4 +2608,3 @@ CREATE INDEX IF NOT EXISTS audit_log_created_at_idx
 --
 
 \unrestrict tUrrFoAl7aDjIjtNcrrbJ2gRwrFzOg2LYM1fr0RoGnxesKTHJO9TbfCpohUruYB
-

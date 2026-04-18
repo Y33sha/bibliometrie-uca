@@ -3,7 +3,7 @@
 ## Principes de conception
 
 Le schéma repose sur une distinction entre des tables "sources" et des tables "canoniques" (= vérité).
-    - Les tables sources contiennent les *records* non dédupliqués importés depuis les API. 
+    - Les tables sources contiennent les *records* non dédupliqués importés depuis les API.
     - Les tables canoniques contiennent les référentiels **publications** et **personnes** dédupliqués et mappés depuis les sources (de manière automatisée avec possibilité de curation manuelle), ainsi que le référentiel **structures** (endogène, renseigné manuellement).
 
 ```mermaid
@@ -22,7 +22,7 @@ flowchart LR
     end
     source_publications--->publications
     source_authorships--->persons
-    
+
 ```
 
 ### Entités principales et relations
@@ -31,7 +31,7 @@ flowchart LR
 Les tables sources s'organisent selon un schéma en quatre tables: `source_publications`, `source_persons`, `source_authorships`, `source_structures`. Une `authorship` représente la contribution d'**un** auteur à **une** publication. C'est elle qui porte l'information d'affiliation (`structure_ids`).
 
 ```mermaid
-erDiagram 
+erDiagram
     direction LR
     Publications ||--|{ Authorships : a_pour_auteurs
     Persons ||--|{ Authorships : est_auteur_de
@@ -143,7 +143,7 @@ flowchart LR
     apc_payments ---|DOI| publications
     structures --- address_structures
     address_structures --- addresses
-    
+
     classDef manuel  fill:#8e5,stroke:#5a3
     class structures,structure_name_forms,perimeters,structure_relations manuel;
     classDef csv fill:#fa5
@@ -193,7 +193,7 @@ flowchart LR
     source_publications-->|normalize|publications
     publications---journals
     journals---publishers
-        
+
     classDef manuel  fill:#8e5,stroke:#5a3
     class structures,structure_name_forms,perimeters,structure_relations manuel;
     classDef csv fill:#fa5
@@ -218,7 +218,7 @@ Référentiel des individus. Une ligne = une personne physique. Alimenté par le
 ```mermaid
 flowchart LR
     structures --- authorships
-    
+
     authorships --- publications
     authorships ---- persons
     source_authorships-->persons
@@ -240,14 +240,14 @@ flowchart LR
 
 Tables associées :
 - `persons_rh`: Table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](sources#donnees-rh).
-- `person_identifiers`: Identifiants persistants : ORCID, idHAL, IdRef, etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` trace la provenance (`hal`, `openalex`, `scanr`, `theses`, `manual`, `auto`). La relation *many-to-one* permet de gérer les quelques cas d'ORCID multiples confirmés, et les nombreux cas d'identifiants (corrects ou erronés) en attente de vérification moissonnés dans les sources. 
+- `person_identifiers`: Identifiants persistants : ORCID, idHAL, IdRef, etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` trace la provenance (`hal`, `openalex`, `scanr`, `theses`, `manual`, `auto`). La relation *many-to-one* permet de gérer les quelques cas d'ORCID multiples confirmés, et les nombreux cas d'identifiants (corrects ou erronés) en attente de vérification moissonnés dans les sources.
 - `person_name_forms`: Formes de noms normalisées, utilisées pour le matching lors de la création de personnes. Chaque forme pointe vers un tableau de `person_ids`. Lorsqu'une authorship source est reliée à une personne, la forme de nom est ajoutée (si absente) aux name_forms de cette personne.
 
 #### `authorships`
 
 Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures. Construite par `build_authorships.py` à partir des *authorships* sources.
 
-- `person_id` 
+- `person_id`
 - `structure_ids`
 - `in_perimeter` : TRUE si l'auteur est affilié UCA sur cette publication
 - `author_position` : position dans la liste d'auteurs
@@ -261,4 +261,3 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 - **`source_persons`** : un enregistrement par auteur par source. Déduplication par `(source, source_id)`. Le `source_id` est l'identifiant interne de l'entité auteur dans la source. Porte aussi `orcid`, `idref` et `source_ids` (JSONB, identifiants propres à la source : idhal, hal_person_id, etc.).
 - **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `structure_ids` (affiliation résolue), `raw_author_name`, `raw_affiliations` (affiliations textuelles brutes issues de la source), `roles` (auteur, directeur, rapporteur — theses.fr), `excluded` (authorship rejetée manuellement).
 - **`source_structures`** : structures importées depuis HAL, OpenAlex et WoS. Mapping vers `structures` canoniques via `structure_id`. Utilisée par `populate_affiliations` pour résoudre les affiliations.
-

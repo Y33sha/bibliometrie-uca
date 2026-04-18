@@ -1,0 +1,25 @@
+# ============================================================
+# pre-commit : vérifications lancées avant chaque git commit.
+# Installation : `pre-commit install` (après `pip install ".[dev]"`)
+# Lancement manuel sur tout le repo : `pre-commit run --all-files`
+# ============================================================
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.11
+    hooks:
+      # Lint : applique les auto-fix (tri des imports, unused imports, …)
+      - id: ruff
+        args: [--fix]
+      # Format : reformate les fichiers modifiés
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
