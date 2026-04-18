@@ -37,7 +37,7 @@ MODULES = [
     "domain.doc_types",
     "domain.sources",
     "infrastructure.app_config",
-    "pipeline.metrics",
+    "infrastructure.pipeline_metrics",
 ]
 
 
