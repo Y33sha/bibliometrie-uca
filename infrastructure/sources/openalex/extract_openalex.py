@@ -19,6 +19,15 @@ import time
 import requests
 from psycopg2.extras import Json, execute_values
 
+from infrastructure.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
+from infrastructure.api_retry import http_request_with_retry
+from infrastructure.app_config import (
+    get_api_base_urls,
+    get_openalex_api_key,
+    get_openalex_email,
+    get_openalex_institution_ids,
+    get_years,
+)
 from infrastructure.db.connection import get_connection
 from infrastructure.sources.common import compute_hash, get_existing_ids, setup_logger
 from infrastructure.sources.openalex import (
@@ -28,15 +37,6 @@ from infrastructure.sources.openalex import (
     extract_doi,
     extract_openalex_id,
     init_auth,
-)
-from infrastructure.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
-from infrastructure.api_retry import http_request_with_retry
-from infrastructure.app_config import (
-    get_api_base_urls,
-    get_openalex_api_key,
-    get_openalex_email,
-    get_openalex_institution_ids,
-    get_years,
 )
 
 # ----- Logging -----

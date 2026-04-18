@@ -22,7 +22,6 @@ import re
 
 from psycopg2.extras import Json, RealDictCursor
 
-from infrastructure.db.connection import get_connection
 from application.journals import find_or_create_journal, find_or_create_publisher
 from application.publications import (
     find_by_doi,
@@ -32,14 +31,14 @@ from application.publications import (
     try_merge_by_doi,
 )
 from application.publications import find_or_create as find_or_create_publication
-from infrastructure.addresses import link_addresses
-from infrastructure.db_helpers import mark_staging_done
 from domain.doc_types import map_doc_type
-from domain.publication import clean_doi
-from domain.publication import extract_hal_id_from_url
+from domain.normalize import normalize_text
+from domain.publication import clean_doi, extract_hal_id_from_url
+from infrastructure.addresses import link_addresses
+from infrastructure.db.connection import get_connection
+from infrastructure.db_helpers import mark_staging_done
 from infrastructure.log import setup_logger
 from infrastructure.openalex import extract_nnt_from_openalex, is_theses_fr_source
-from domain.normalize import normalize_text
 from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
 
 # ----- Logging -----

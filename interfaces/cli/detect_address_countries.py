@@ -18,9 +18,9 @@ Usage:
 
 import argparse
 
+from domain.normalize import normalize_text
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
-from domain.normalize import normalize_text
 
 logger = setup_logger("suggest_countries", "processing/logs")
 
@@ -108,7 +108,7 @@ def main():
         from collections import Counter
 
         unknown = Counter()
-        for addr_id, raw_text in rows:
+        for _addr_id, raw_text in rows:
             last_seg = extract_last_segment(raw_text)
             if last_seg and last_seg not in country_forms:
                 unknown[last_seg] += 1

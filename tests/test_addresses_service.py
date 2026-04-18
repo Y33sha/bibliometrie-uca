@@ -20,6 +20,7 @@ from application.addresses import (
 
 # ── Helpers ────────────────────────────────────────────────────────
 
+
 def _create_structure(db, code="UCA", name="UCA", structure_type="universite"):
     db.execute(
         """
@@ -58,8 +59,9 @@ def _create_address(db, raw_text="Université Clermont Auvergne"):
     return db.fetchone()["id"]
 
 
-def _insert_address_structure(db, address_id, structure_id, *,
-                              is_confirmed=None, matched_form_id=None):
+def _insert_address_structure(
+    db, address_id, structure_id, *, is_confirmed=None, matched_form_id=None
+):
     db.execute(
         """
         INSERT INTO address_structures (address_id, structure_id, is_confirmed, matched_form_id)
@@ -91,6 +93,7 @@ def _get_link(db, address_id, structure_id):
 
 
 # ── review_structure_link ──────────────────────────────────────────
+
 
 class TestReviewStructureLink:
     def test_confirm_creates_link_if_absent(self, db):
@@ -144,8 +147,7 @@ class TestReviewStructureLink:
             (uca,),
         )
         form_id = db.fetchone()["id"]
-        _insert_address_structure(db, addr, uca,
-                                  is_confirmed=False, matched_form_id=form_id)
+        _insert_address_structure(db, addr, uca, is_confirmed=False, matched_form_id=form_id)
 
         review_structure_link(db, addr, uca, None)
 
@@ -156,6 +158,7 @@ class TestReviewStructureLink:
 
 
 # ── batch_review_structure_link ────────────────────────────────────
+
 
 class TestBatchReviewStructureLink:
     def test_empty_returns_zero(self, db):
@@ -197,6 +200,7 @@ class TestBatchReviewStructureLink:
 
 # ── unassign_manual_structure ───────────────────────────────────────
 
+
 class TestUnassignManualStructure:
     def test_deletes_manual_link(self, db):
         uca = _setup_uca_perimeter(db)
@@ -215,8 +219,7 @@ class TestUnassignManualStructure:
             (uca,),
         )
         form_id = db.fetchone()["id"]
-        _insert_address_structure(db, addr, uca,
-                                  is_confirmed=True, matched_form_id=form_id)
+        _insert_address_structure(db, addr, uca, is_confirmed=True, matched_form_id=form_id)
 
         assert unassign_manual_structure(db, addr, uca) is False  # rien supprimé
         link = _get_link(db, addr, uca)
@@ -230,6 +233,7 @@ class TestUnassignManualStructure:
 
 
 # ── set_country ─────────────────────────────────────────────────────
+
 
 def _ensure_country(db, code, name="Test"):
     db.execute(
@@ -287,6 +291,7 @@ class TestSetCountry:
 
 # ── batch_set_country_by_ids ────────────────────────────────────────
 
+
 class TestBatchSetCountryByIds:
     def test_adds_to_empty_countries(self, db):
         _ensure_country(db, "FR")
@@ -315,6 +320,7 @@ class TestBatchSetCountryByIds:
 
 # ── batch_set_country_by_filter ─────────────────────────────────────
 
+
 class TestBatchSetCountryByFilter:
     def test_filter_by_search(self, db):
         _ensure_country(db, "FR")
@@ -336,6 +342,7 @@ class TestBatchSetCountryByFilter:
 
 
 # ── propagate_countries_to_similar ──────────────────────────────────
+
 
 class TestPropagateCountriesToSimilar:
     def test_propagates_divergent_values(self, db):
@@ -359,6 +366,7 @@ class TestPropagateCountriesToSimilar:
 
 # ── propagate_countries_to_publications ─────────────────────────────
 
+
 class TestPropagateCountriesToPublications:
     def test_empty_is_noop(self, db):
         propagate_countries_to_publications(db, [])  # pas d'exception
@@ -368,9 +376,7 @@ class TestPropagateCountriesToPublications:
         une source_authorship, le pays doit remonter jusqu'à publications.countries."""
         _ensure_country(db, "FR")
         # Setup minimal : publication + source_publication + source_authorship + adresse liée
-        db.execute(
-            "INSERT INTO publications (title, pub_year) VALUES ('Test', 2024) RETURNING id"
-        )
+        db.execute("INSERT INTO publications (title, pub_year) VALUES ('Test', 2024) RETURNING id")
         pub_id = db.fetchone()["id"]
         db.execute(
             """

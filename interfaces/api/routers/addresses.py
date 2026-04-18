@@ -4,6 +4,7 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
+from application import addresses as addresses_service
 from interfaces.api.deps import get_cursor, require_admin
 from interfaces.api.models import (
     BatchReviewAction,
@@ -11,7 +12,6 @@ from interfaces.api.models import (
     ReviewAction,
     SetCountry,
 )
-from application import addresses as addresses_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -463,7 +463,8 @@ async def batch_set_country(body: BatchSetCountry, bg: BackgroundTasks, _=Depend
             )
         else:
             modified_ids = addresses_service.batch_set_country_by_filter(
-                cur, country_code,
+                cur,
+                country_code,
                 search=body.search,
                 has_country=body.has_country,
                 country_code_filter=body.country_code_filter,

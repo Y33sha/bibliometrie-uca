@@ -7,7 +7,6 @@ from pydantic import ValidationError as PydanticValidationError
 from domain.errors import ValidationError
 from domain.person import ORCID, IdHAL, IdRef, PersonSourceIds
 
-
 # ── ORCID ──────────────────────────────────────────────────────────
 
 

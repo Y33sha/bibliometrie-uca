@@ -36,7 +36,9 @@ class PgAuthorshipRepository:
         return self._cur.fetchone()
 
     def detach_source_authorships_for_person(
-        self, authorship_id: int, person_id: int,
+        self,
+        authorship_id: int,
+        person_id: int,
     ) -> None:
         """Met person_id=NULL et authorship_id=NULL sur les source_authorships
         liées à cette (authorship_id, person_id)."""
@@ -76,7 +78,10 @@ class PgAuthorshipRepository:
         return self._cur.rowcount
 
     def move_authorships_for_source_authorship(
-        self, source_authorship_id: int, from_pub_id: int, to_pub_id: int,
+        self,
+        source_authorship_id: int,
+        from_pub_id: int,
+        to_pub_id: int,
     ) -> None:
         """Déplace les authorships vérité liées à une source_authorship
         d'une publication à une autre."""
@@ -117,7 +122,10 @@ class PgAuthorshipRepository:
     # ── source_authorships ─────────────────────────────────────────
 
     def set_source_authorship_excluded(
-        self, source_authorship_id: int, source: str, excluded: bool,
+        self,
+        source_authorship_id: int,
+        source: str,
+        excluded: bool,
     ) -> bool:
         """UPDATE excluded sur une source_authorship. Retourne True si une
         ligne a été touchée, False sinon (source introuvable)."""
@@ -131,7 +139,9 @@ class PgAuthorshipRepository:
         return self._cur.fetchone() is not None
 
     def get_source_authorship_truth_id(
-        self, source_authorship_id: int, source: str,
+        self,
+        source_authorship_id: int,
+        source: str,
     ) -> int | None:
         """Retourne l'authorship_id vérité auquel une source_authorship est
         attachée, ou None."""
@@ -148,7 +158,9 @@ class PgAuthorshipRepository:
         return row["authorship_id"]
 
     def clear_source_authorship_fk(
-        self, source_authorship_id: int, source: str,
+        self,
+        source_authorship_id: int,
+        source: str,
     ) -> None:
         """Met authorship_id=NULL sur une source_authorship (détachement)."""
         self._cur.execute(
@@ -175,7 +187,8 @@ class PgAuthorshipRepository:
     # ── Propagation périmètre UCA depuis les adresses ──────────────
 
     def find_source_authorships_by_addresses(
-        self, address_ids: list[int],
+        self,
+        address_ids: list[int],
     ) -> list[int]:
         """Retourne les IDs de source_authorships touchant les adresses
         données (via la table de liaison source_authorship_addresses)."""
@@ -190,7 +203,9 @@ class PgAuthorshipRepository:
         return [r["source_authorship_id"] for r in self._cur.fetchall()]
 
     def recompute_in_perimeter_on_source_authorships(
-        self, source_authorship_ids: list[int], perimeter_structure_ids: list[int],
+        self,
+        source_authorship_ids: list[int],
+        perimeter_structure_ids: list[int],
     ) -> None:
         """Recalcule in_perimeter et structure_ids sur les source_authorships
         touchées, à partir des address_structures confirmées appartenant
@@ -221,7 +236,8 @@ class PgAuthorshipRepository:
         )
 
     def propagate_in_perimeter_to_truth_authorships(
-        self, source_authorship_ids: list[int],
+        self,
+        source_authorship_ids: list[int],
     ) -> None:
         """Propage vers les authorships vérité l'état in_perimeter/structure_ids
         recalculé sur les sources (union par paire (publication, person))."""

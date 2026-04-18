@@ -24,11 +24,16 @@ class PublicationRepository(Protocol):
     def find_by_nnt(self, nnt: str) -> PubByNnt | None: ...
 
     def find_by_title(
-        self, title_normalized: str, pub_year: int, journal_id: int,
+        self,
+        title_normalized: str,
+        pub_year: int,
+        journal_id: int,
     ) -> PubByTitle | None: ...
 
     def find_thesis_by_title(
-        self, title_normalized: str, pub_year: int,
+        self,
+        title_normalized: str,
+        pub_year: int,
     ) -> list[PubThesisCandidate]: ...
 
     # ── Écritures simples ──────────────────────────────────────────
@@ -94,5 +99,7 @@ class PublicationRepository(Protocol):
     # ── distinct_publications ──────────────────────────────────────
 
     def mark_distinct(
-        self, pub_id_a: int, pub_id_b: int,
+        self,
+        pub_id_a: int,
+        pub_id_b: int,
     ) -> tuple[int, int] | None: ...

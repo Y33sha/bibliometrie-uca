@@ -4,10 +4,10 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from interfaces.api.deps import get_cursor
-from interfaces.api.models import MarkDistinctPublications, MergePublications
 from application.publications import mark_distinct as _mark_pubs_distinct
 from application.publications import merge_publications
+from interfaces.api.deps import get_cursor
+from interfaces.api.models import MarkDistinctPublications, MergePublications
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -156,7 +156,7 @@ async def merge_duplicate_publications(body: MergePublications):
             cur.execute("RELEASE SAVEPOINT merge_dup")
         except Exception as e:
             cur.execute("ROLLBACK TO SAVEPOINT merge_dup")
-            raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}")
+            raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}") from e
 
         return {"ok": True, "target_id": body.target_id, "source_id": body.source_id}
 

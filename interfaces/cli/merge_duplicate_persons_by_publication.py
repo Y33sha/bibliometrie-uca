@@ -18,8 +18,8 @@ import argparse
 
 from psycopg2.extras import RealDictCursor
 
-from infrastructure.db.connection import get_connection
 from application.persons import merge_person
+from infrastructure.db.connection import get_connection
 
 PAIRS_SQL = """
 WITH name_candidates AS (

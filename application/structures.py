@@ -10,11 +10,11 @@ restent autorisées dans les routers (convention du projet).
 from psycopg2.extras import Json
 from pydantic import ValidationError as PydanticValidationError
 
+from application.audit import emit_event
 from domain.errors import NotFoundError, ValidationError
+from domain.normalize import normalize_text
 from domain.structure import StructureApiIds
 from infrastructure.repositories import structure_repository
-from application.audit import emit_event
-from domain.normalize import normalize_text
 
 
 def _validate_api_ids(raw: dict | None) -> dict | None:
@@ -60,8 +60,13 @@ def create_structure(
 ) -> dict:
     """Crée une structure. Retourne la ligne insérée (RealDictRow)."""
     return structure_repository(cur).create_structure(
-        code=code, name=name, acronym=acronym, type=type,
-        ror_id=ror_id, rnsr_id=rnsr_id, hal_collection=hal_collection,
+        code=code,
+        name=name,
+        acronym=acronym,
+        type=type,
+        ror_id=ror_id,
+        rnsr_id=rnsr_id,
+        hal_collection=hal_collection,
         api_ids=_validate_api_ids(api_ids),
     )
 
@@ -101,7 +106,10 @@ def delete_structure(cur, structure_id: int) -> None:
     if not row:
         raise NotFoundError(f"Structure {structure_id} introuvable")
     emit_event(
-        cur, "structure.deleted", "structure", structure_id,
+        cur,
+        "structure.deleted",
+        "structure",
+        structure_id,
         {"code": row["code"], "name": row["name"]},
     )
 
@@ -112,7 +120,9 @@ def delete_structure(cur, structure_id: int) -> None:
 def create_relation(cur, *, parent_id: int, child_id: int, relation_type: str) -> dict | None:
     """Crée une relation. Retourne la ligne insérée, ou None si elle existait déjà."""
     return structure_repository(cur).create_relation(
-        parent_id=parent_id, child_id=child_id, relation_type=relation_type,
+        parent_id=parent_id,
+        child_id=child_id,
+        relation_type=relation_type,
     )
 
 
@@ -122,7 +132,10 @@ def delete_relation(cur, relation_id: int) -> None:
     if not row:
         raise NotFoundError(f"Relation {relation_id} introuvable")
     emit_event(
-        cur, "structure_relation.deleted", "structure", row["parent_id"],
+        cur,
+        "structure_relation.deleted",
+        "structure",
+        row["parent_id"],
         {
             "relation_id": relation_id,
             "parent_id": row["parent_id"],
@@ -192,6 +205,9 @@ def delete_name_form(cur, form_id: int) -> None:
     if not row:
         raise NotFoundError(f"Forme {form_id} introuvable")
     emit_event(
-        cur, "structure_name_form.deleted", "structure", row["structure_id"],
+        cur,
+        "structure_name_form.deleted",
+        "structure",
+        row["structure_id"],
         {"form_id": form_id, "form_text": row["form_text"]},
     )

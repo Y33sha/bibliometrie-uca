@@ -4,6 +4,8 @@ import logging
 
 from fastapi import APIRouter
 
+from application import config as config_service
+from infrastructure.perimeter import get_perimeter_structure_ids
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import (
     AddPerimeterStructure,
@@ -11,8 +13,6 @@ from interfaces.api.models import (
     PerimeterCreate,
     PerimeterUpdate,
 )
-from application import config as config_service
-from infrastructure.perimeter import get_perimeter_structure_ids
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -92,8 +92,7 @@ async def create_perimeter(body: PerimeterCreate):
     name = body.name.strip()
     description = (body.description or "").strip() or None
     with get_cursor() as (cur, conn):
-        pid = config_service.create_perimeter(cur, code=code, name=name,
-                                               description=description)
+        pid = config_service.create_perimeter(cur, code=code, name=name, description=description)
         return {"id": pid}
 
 

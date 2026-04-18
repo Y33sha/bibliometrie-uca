@@ -22,9 +22,9 @@ import os
 import re
 import time
 
+from domain.normalize import normalize_text as normalize
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
-from domain.normalize import normalize_text as normalize
 from infrastructure.perimeter import get_persons_structure_ids
 
 logger = setup_logger("resolve_addresses", os.path.join(os.path.dirname(__file__), "logs"))

@@ -18,9 +18,9 @@ import os
 import sys
 from datetime import datetime
 
-from infrastructure.db.connection import get_connection
 from application.persons import refresh_person_name_forms
 from domain.normalize import normalize_name
+from infrastructure.db.connection import get_connection
 
 logging.basicConfig(
     level=logging.INFO,
@@ -146,7 +146,7 @@ def read_csv_tsv(filepath: str) -> list[dict]:
             raise ValueError(f"Colonne 'prenom' introuvable. En-têtes: {headers}")
 
         rows = []
-        for line_num, row in enumerate(reader, start=2):
+        for _line_num, row in enumerate(reader, start=2):
             if not any(cell.strip() for cell in row):
                 continue  # ligne vide
             record = {}

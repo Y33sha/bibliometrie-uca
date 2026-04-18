@@ -22,9 +22,9 @@ import logging
 
 from psycopg2.extras import RealDictCursor
 
-from infrastructure.db.connection import get_connection
 from application.publications import find_or_create, update_sources
 from domain.normalize import normalize_text
+from infrastructure.db.connection import get_connection
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)

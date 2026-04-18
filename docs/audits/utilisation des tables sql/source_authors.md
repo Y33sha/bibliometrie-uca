@@ -15,4 +15,3 @@ Lignes 1588-1627 — Détection des personnes liées à 2+ comptes HAL : GROUP B
 link_authorship : dual-write person_id sur source_authors pour les comptes HAL. Légitime — tant que source_authors.person_id est utilisé ailleurs (étape 0 de create_persons, page comptes HAL).
 
 Ligne 512 — merge_persons : transfert person_id sur source_authors.
-

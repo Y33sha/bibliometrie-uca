@@ -15,8 +15,8 @@ import os
 
 from psycopg2.extras import RealDictCursor
 
-from infrastructure.db.connection import get_connection
 from application.publications import merge_publications as _merge_pub
+from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 
 log = setup_logger("merge_pubs_by_nnt", os.path.join(os.path.dirname(__file__), "logs"))

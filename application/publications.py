@@ -17,13 +17,15 @@ from domain.publication import (
     PubByTitle,
     PubThesisCandidate,
 )
-from infrastructure.db_helpers import row_val as _val
 from infrastructure.repositories import publication_repository
 
 # Re-export des namedtuples pour les call sites historiques (scripts,
 # processing) qui font `from application.publications import PubByDoi`.
 __all__ = [
-    "PubByDoi", "PubByNnt", "PubByTitle", "PubThesisCandidate",
+    "PubByDoi",
+    "PubByNnt",
+    "PubByTitle",
+    "PubThesisCandidate",
     # Fonctions publiques du service (ajoutées au fur et à mesure).
 ]
 
@@ -159,10 +161,15 @@ def find_or_create(
         return None, False
 
     pub_id = repo.create(
-        title=title, title_normalized=title_normalized,
-        doc_type=doc_type, pub_year=pub_year, doi=doi,
-        oa_status=oa_status, journal_id=journal_id,
-        container_title=container_title, language=language,
+        title=title,
+        title_normalized=title_normalized,
+        doc_type=doc_type,
+        pub_year=pub_year,
+        doi=doi,
+        oa_status=oa_status,
+        journal_id=journal_id,
+        container_title=container_title,
+        language=language,
     )
     return pub_id, True
 
@@ -370,7 +377,10 @@ def mark_distinct(cur, pub_id_a: int, pub_id_b: int) -> None:
     inserted = publication_repository(cur).mark_distinct(pub_id_a, pub_id_b)
     if inserted:
         emit_event(
-            cur, "publication.marked_distinct", "publication", inserted[0],
+            cur,
+            "publication.marked_distinct",
+            "publication",
+            inserted[0],
             {"other_id": inserted[1]},
         )
 
@@ -387,6 +397,9 @@ def merge_publications(cur, target_id: int, source_id: int) -> None:
     repo.merge_into(target_id, source_id)
     repo.update_sources(target_id)
     emit_event(
-        cur, "publication.merged", "publication", target_id,
+        cur,
+        "publication.merged",
+        "publication",
+        target_id,
         {"source_id": source_id},
     )

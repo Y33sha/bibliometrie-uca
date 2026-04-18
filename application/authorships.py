@@ -11,10 +11,10 @@ et les scripts de correction. Le SQL vit dans
 `infrastructure/repositories/authorship_repository.py`.
 """
 
-from domain.errors import NotFoundError, ValidationError
-from infrastructure.repositories import authorship_repository
 from application.audit import emit_event
+from domain.errors import NotFoundError, ValidationError
 from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
+from infrastructure.repositories import authorship_repository
 
 
 def exclude_authorship(cur, authorship_id: int) -> dict:
@@ -37,7 +37,10 @@ def exclude_authorship(cur, authorship_id: int) -> dict:
         repo.detach_source_authorships_for_person(authorship_id, person_id)
 
     emit_event(
-        cur, "authorship.excluded", "authorship", authorship_id,
+        cur,
+        "authorship.excluded",
+        "authorship",
+        authorship_id,
         {"person_id": person_id},
     )
     return result
@@ -65,7 +68,10 @@ def set_source_authorship_excluded(
         detach_source(cur, source_authorship_id, source)
 
     emit_event(
-        cur, "source_authorship.excluded", "source_authorship", source_authorship_id,
+        cur,
+        "source_authorship.excluded",
+        "source_authorship",
+        source_authorship_id,
         {"source": source, "excluded": excluded},
     )
 
