@@ -218,7 +218,7 @@ def _count_tables(cur) -> dict:
 
 def _run_normalize_scanr(cur):
     """Exécute la normalisation ScanR sur le curseur de test."""
-    from processing.normalize_scanr import process_work
+    from application.pipeline.normalize.normalize_scanr import process_work
 
     cur.execute("""
         SELECT id, source_id AS scanr_id, doi, raw_data
@@ -402,7 +402,7 @@ def _insert_hal_staging(cur, docs):
 def _run_normalize_hal(cur):
     """Exécute la normalisation HAL via un curseur tuple (comme le vrai script)."""
     plain_cur = cur.connection.cursor()
-    from processing.normalize_hal import process_work
+    from application.pipeline.normalize.normalize_hal import process_work
 
     plain_cur.execute("""
         Select id, source_id AS halid, doi, raw_data, hal_collections
@@ -547,7 +547,7 @@ def _insert_oa_staging(cur, docs):
 
 
 def _run_normalize_oa(cur):
-    from processing.normalize_openalex import process_work
+    from application.pipeline.normalize.normalize_openalex import process_work
 
     cur.execute("""
         SELECT id, source_id AS openalex_id, doi, raw_data
@@ -658,7 +658,7 @@ def _insert_wos_staging(cur, docs):
 
 def _run_normalize_wos(cur):
     plain_cur = cur.connection.cursor()
-    from processing.normalize_wos import process_record
+    from application.pipeline.normalize.normalize_wos import process_record
 
     plain_cur.execute("""
         SELECT id, source_id AS ut, doi, raw_data
@@ -907,7 +907,7 @@ def _setup_persons_test_data(db):
 
 def _run_create_persons(db):
     """Exécute create_persons sur le curseur de test."""
-    from processing.create_persons_from_source_authorships import (
+    from application.pipeline.create.create_persons_from_source_authorships import (
         get_all_unlinked_authorships,
         load_linked_authorships_by_pub,
         load_name_form_map,
@@ -1002,7 +1002,7 @@ class TestCreatePersonsIdempotence:
 def _run_build_authorships(db):
     """Exécute build_authorships sur le curseur de test (plain cursor)."""
     plain_cur = db.connection.cursor()
-    from processing.build_authorships import build
+    from application.pipeline.build.build_authorships import build
 
     build(plain_cur)
 
@@ -1145,7 +1145,7 @@ def _setup_affiliations_test_data(db):
 
 def _run_populate_affiliations(db):
     """Exécute populate_affiliations sur le curseur de test."""
-    from processing.populate_affiliations import _step_address_source, step3d_theses
+    from application.pipeline.build.populate_affiliations import _step_address_source, step3d_theses
     from infrastructure.perimeter import get_affiliations_structure_ids, get_persons_structure_ids
 
     perimeter_ids = get_persons_structure_ids(db)

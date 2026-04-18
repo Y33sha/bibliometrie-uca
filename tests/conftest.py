@@ -113,7 +113,7 @@ def _clear_caches():
     clear_addr_cache()
     # HAL author cache
     try:
-        from processing.normalize_hal import _hal_author_cache
+        from application.pipeline.normalize.normalize_hal import _hal_author_cache
 
         _hal_author_cache.clear()
     except ImportError:

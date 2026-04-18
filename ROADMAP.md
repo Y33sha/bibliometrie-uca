@@ -2,7 +2,7 @@
 
 ## Chantier transition DDD
 
-## Chantier qualité du code
+## Chantier qualité du code: maintenabilité, auditabilité, scalabilité...
 * mieux organiser le dossier tests
 * audit 12 factors, audit SOLID
 

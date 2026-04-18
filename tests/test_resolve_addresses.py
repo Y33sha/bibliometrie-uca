@@ -1,6 +1,6 @@
 """Tests pour la résolution d'adresses (processing/resolve_addresses.py)."""
 
-from processing.resolve_addresses import (
+from application.pipeline.addresses.resolve_addresses import (
     build_forms_by_structure,
     match_form_in_text,
     resolve_address,

@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 py-modules = []
 
 [tool.setuptools.packages.find]
-include = ["application*", "backend*", "domain*", "infrastructure*", "processing*", "scripts*"]
+include = ["application*", "backend*", "domain*", "infrastructure*", "scripts*"]
 
 # ----------------------------------------------------------------------
 # Ruff : linter + formateur (remplace flake8, isort, pyupgrade, black)
@@ -53,7 +53,7 @@ max-complexity = 20
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E402"]       # imports après setup de conftest
 "scripts/*" = ["E402", "C901"]     # scripts one-shot, complexité tolérée
-"processing/*" = ["C901"]          # normalisation par source, nombreuses branches métier
+"application/pipeline/*" = ["C901"]          # normalisation par source, nombreuses branches métier
 "infrastructure/sources/*" = ["C901"]          # idem pour les extracteurs
 "backend/routers/*" = ["E402"]     # imports tardifs fréquents
 
@@ -66,7 +66,7 @@ addopts = "-q"
 
 [tool.coverage.run]
 branch = true
-source = ["application", "backend", "domain", "infrastructure", "processing"]
+source = ["application", "backend", "domain", "infrastructure"]
 omit = [
     "tests/*",
     "*/__init__.py",
