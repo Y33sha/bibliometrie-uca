@@ -24,13 +24,22 @@ repos:
       - id: check-added-large-files
         args: [--maxkb=500]
 
-  # import-linter : vérifie les contrats d'architecture (pyproject.toml).
-  # Utilise le `lint-imports` installé localement (accès au code source).
+  # Hooks locaux : outils installés dans l'env Python du projet.
   - repo: local
     hooks:
+      # Vérifie les contrats d'architecture DDD (pyproject.toml).
       - id: lint-imports
         name: lint-imports (architecture DDD)
         entry: lint-imports
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      # Lance uniquement les tests unitaires (sans BDD, ~1-2s).
+      # Les tests d'intégration (avec BDD) sont lancés en CI, pas ici.
+      - id: pytest-unit
+        name: pytest (tests unitaires)
+        entry: python -m pytest tests/unit/ -q
         language: system
         pass_filenames: false
         types: [python]
