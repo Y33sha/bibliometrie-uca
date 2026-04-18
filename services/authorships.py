@@ -1,15 +1,18 @@
 """
-Service Authorships vérité — accès en écriture à la table `authorships`.
+Service Authorships vérité — orchestrateur des opérations sur
+`authorships` et `source_authorships`.
 
 Opérations unitaires sur les authorships consolidées. Le script batch
 `build_authorships.py` reste le constructeur principal (reconstruction
 complète), et `webapp/uca.py` gère le recalcul UCA incrémental.
 
 Ce service encapsule les opérations ponctuelles utilisées par les routeurs
-et les scripts de correction.
+et les scripts de correction. Le SQL vit dans
+`infrastructure/repositories/authorship_repository.py`.
 """
 
 from domain.errors import NotFoundError, ValidationError
+from infrastructure.repositories.authorship_repository import PgAuthorshipRepository
 from services.audit import emit_event
 from utils.sources import BIBLIO_SOURCES as VALID_SOURCES
 
@@ -23,38 +26,15 @@ def exclude_authorship(cur, authorship_id: int) -> dict:
 
     Lève NotFoundError si l'authorship n'existe pas.
     """
-    cur.execute(
-        """
-        SELECT id, person_id FROM authorships WHERE id = %s
-    """,
-        (authorship_id,),
-    )
-    row = cur.fetchone()
+    repo = PgAuthorshipRepository(cur)
+    row = repo.get_authorship_person(authorship_id)
     if not row:
         raise NotFoundError(f"Authorship {authorship_id} introuvable")
 
     person_id = row["person_id"]
-
-    # 1. Marquer exclue
-    cur.execute(
-        """
-        UPDATE authorships SET excluded = TRUE, updated_at = now()
-        WHERE id = %s RETURNING id, excluded
-    """,
-        (authorship_id,),
-    )
-    result = cur.fetchone()
-
-    # 2. Détacher les authorships sources (person_id = NULL) et casser le lien FK
+    result = repo.mark_authorship_excluded(authorship_id)
     if person_id:
-        cur.execute(
-            """
-            UPDATE source_authorships
-            SET person_id = NULL, authorship_id = NULL
-            WHERE authorship_id = %s AND person_id = %s
-        """,
-            (authorship_id, person_id),
-        )
+        repo.detach_source_authorships_for_person(authorship_id, person_id)
 
     emit_event(
         cur, "authorship.excluded", "authorship", authorship_id,
@@ -77,14 +57,8 @@ def set_source_authorship_excluded(
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
-    cur.execute(
-        """
-        UPDATE source_authorships SET excluded = %s
-        WHERE id = %s AND source = %s RETURNING id
-        """,
-        (excluded, source_authorship_id, source),
-    )
-    if not cur.fetchone():
+    repo = PgAuthorshipRepository(cur)
+    if not repo.set_source_authorship_excluded(source_authorship_id, source, excluded):
         raise NotFoundError(f"Authorship source {source}:{source_authorship_id} introuvable")
 
     if excluded:
@@ -106,44 +80,16 @@ def detach_source(cur, source_authorship_id: int, source: str) -> bool:
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
-    # Trouver l'authorship vérité liée
-    cur.execute(
-        """
-        SELECT authorship_id FROM source_authorships
-        WHERE id = %s AND source = %s
-    """,
-        (source_authorship_id, source),
-    )
-    row = cur.fetchone()
-    if not row or not row["authorship_id"]:
+    repo = PgAuthorshipRepository(cur)
+    truth_id = repo.get_source_authorship_truth_id(source_authorship_id, source)
+    if not truth_id:
         return False
 
-    truth_id = row["authorship_id"]
+    repo.clear_source_authorship_fk(source_authorship_id, source)
 
-    # Détacher la FK source
-    cur.execute(
-        """
-        UPDATE source_authorships SET authorship_id = NULL
-        WHERE id = %s AND source = %s
-    """,
-        (source_authorship_id, source),
-    )
-
-    # Vérifier s'il reste d'autres sources
-    cur.execute(
-        """
-        SELECT 1 FROM source_authorships
-        WHERE authorship_id = %s AND NOT excluded
-        LIMIT 1
-    """,
-        (truth_id,),
-    )
-
-    if not cur.fetchone():
-        # Plus aucune source → supprimer
-        cur.execute("DELETE FROM authorships WHERE id = %s", (truth_id,))
+    if not repo.has_active_source_attestation(truth_id):
+        repo.delete_authorship(truth_id)
         return True
-
     return False
 
 
@@ -152,18 +98,7 @@ def delete_orphan_authorships(cur, person_id: int) -> int:
     par aucune authorship source.
     Retourne le nombre d'authorships supprimées.
     """
-    cur.execute(
-        """
-        DELETE FROM authorships a
-        WHERE a.person_id = %s
-          AND NOT EXISTS (SELECT 1 FROM source_authorships sa
-                          JOIN source_publications sd ON sd.id = sa.source_publication_id
-                          WHERE sa.person_id = %s AND sd.publication_id = a.publication_id
-                            AND NOT sa.excluded)
-    """,
-        (person_id, person_id),
-    )
-    return cur.rowcount
+    return PgAuthorshipRepository(cur).delete_orphan_authorships_for_person(person_id)
 
 
 def move_authorships_for_source(
@@ -177,17 +112,9 @@ def move_authorships_for_source(
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
+    repo = PgAuthorshipRepository(cur)
     for sa_id in source_authorship_ids:
-        cur.execute(
-            """
-            UPDATE authorships a
-            SET publication_id = %s, updated_at = now()
-            FROM source_authorships sa
-            WHERE sa.authorship_id = a.id
-              AND sa.id = %s AND a.publication_id = %s
-        """,
-            (to_pub_id, sa_id, from_pub_id),
-        )
+        repo.move_authorships_for_source_authorship(sa_id, from_pub_id, to_pub_id)
 
 
 def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int]) -> int:
@@ -199,29 +126,11 @@ def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
-    cur.execute(
-        """
-        UPDATE authorships a
-        SET person_id = src.person_id, updated_at = now()
-        FROM source_authorships src
-        WHERE src.authorship_id = a.id
-          AND a.person_id IS DISTINCT FROM src.person_id
-          AND src.person_id IS NOT NULL
-          AND src.id = ANY(%s)
-          AND NOT EXISTS (
-              SELECT 1 FROM authorships a2
-              WHERE a2.publication_id = a.publication_id
-                AND a2.person_id = src.person_id
-                AND a2.id <> a.id
-          )
-    """,
-        (source_authorship_ids,),
-    )
-    return cur.rowcount
+    return PgAuthorshipRepository(cur).sync_person_id_from_sources(source_authorship_ids)
 
 
 def propagate_uca_for_addresses(cur, address_ids: list[int]) -> None:
-    """Recalcule in_perimeter sur source_authorships (openalex/wos) et authorships vérité
+    """Recalcule in_perimeter sur source_authorships et authorships vérité
     pour tous les authorships liés aux adresses données.
 
     Appelé après chaque review/assign/unassign d'adresse pour
@@ -230,97 +139,16 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]) -> None:
     if not address_ids:
         return
 
-    # 1. Périmètre UCA
     from utils.perimeter import get_persons_structure_ids_list
 
     perimeter_ids = get_persons_structure_ids_list(cur)
     if not perimeter_ids:
         return
 
-    # 2. Trouver les source_authorships (openalex/wos/scanr) affectés
-    cur.execute(
-        """
-        SELECT DISTINCT saa.source_authorship_id
-        FROM source_authorship_addresses saa
-        WHERE saa.address_id = ANY(%s)
-    """,
-        (address_ids,),
-    )
-    affected_sa_ids = [r["source_authorship_id"] for r in cur.fetchall()]
-
+    repo = PgAuthorshipRepository(cur)
+    affected_sa_ids = repo.find_source_authorships_by_addresses(address_ids)
     if not affected_sa_ids:
         return
 
-    # 3. Recalculer in_perimeter sur source_authorships affectés
-    cur.execute(
-        """
-        WITH affected AS (
-            SELECT unnest(%s::int[]) AS sa_id
-        ),
-        uca_per_authorship AS (
-            SELECT saa.source_authorship_id AS sa_id,
-                   array_agg(DISTINCT ast.structure_id) AS struct_ids
-            FROM affected af
-            JOIN source_authorship_addresses saa ON saa.source_authorship_id = af.sa_id
-            JOIN address_structures ast ON ast.address_id = saa.address_id
-            WHERE ast.structure_id = ANY(%s)
-              AND ast.is_confirmed IS DISTINCT FROM FALSE
-            GROUP BY saa.source_authorship_id
-        )
-        UPDATE source_authorships sa
-        SET in_perimeter = (upa.struct_ids IS NOT NULL),
-            structure_ids = upa.struct_ids
-        FROM affected af
-        LEFT JOIN uca_per_authorship upa ON upa.sa_id = af.sa_id
-        WHERE sa.id = af.sa_id
-    """,
-        (affected_sa_ids, perimeter_ids),
-    )
-
-    # 4. Propager vers authorships (vérité) pour les person_id résolus
-    cur.execute(
-        """
-        WITH affected_pubs AS (
-            SELECT DISTINCT sd.publication_id, sa.person_id
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            WHERE sa.id = ANY(%s)
-              -- toutes les sources utilisent les adresses
-              AND sd.publication_id IS NOT NULL
-              AND sa.person_id IS NOT NULL
-        ),
-        src_uca AS (
-            SELECT sd.publication_id, sa.person_id, sa.source,
-                   sa.structure_ids AS struct_ids
-            FROM affected_pubs ap
-            JOIN source_publications sd ON sd.publication_id = ap.publication_id
-            JOIN source_authorships sa ON sa.source_publication_id = sd.id
-                AND sa.person_id = ap.person_id
-                AND sa.source = sd.source
-            WHERE sa.in_perimeter = TRUE AND sa.structure_ids IS NOT NULL
-        ),
-        merged AS (
-            SELECT ap.publication_id, ap.person_id,
-                   (SELECT array_agg(DISTINCT x)
-                    FROM src_uca su, unnest(su.struct_ids) AS x
-                    WHERE su.publication_id = ap.publication_id
-                      AND su.person_id = ap.person_id
-                   ) AS all_structs,
-                   EXISTS (
-                       SELECT 1 FROM src_uca su
-                       WHERE su.publication_id = ap.publication_id
-                         AND su.person_id = ap.person_id
-                   ) AS any_uca
-            FROM affected_pubs ap
-        )
-        UPDATE authorships a
-        SET in_perimeter = m.any_uca,
-            structure_ids = NULLIF(m.all_structs, ARRAY[]::int[]),
-            updated_at = now()
-        FROM merged m
-        WHERE a.publication_id = m.publication_id
-          AND a.person_id = m.person_id
-          AND a.person_id IS NOT NULL
-    """,
-        (affected_sa_ids,),
-    )
+    repo.recompute_in_perimeter_on_source_authorships(affected_sa_ids, perimeter_ids)
+    repo.propagate_in_perimeter_to_truth_authorships(affected_sa_ids)
