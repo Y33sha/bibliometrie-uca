@@ -19,7 +19,6 @@ from domain.publication import (
     ThesesTopics,
 )
 
-
 # ── DOI ────────────────────────────────────────────────────────────
 
 
@@ -303,11 +302,13 @@ class TestPublicationMeta:
 
     def test_ecole_doctorale_requires_nom(self):
         from pydantic import ValidationError as PVE
+
         with pytest.raises(PVE):
             EcoleDoctorale()  # nom obligatoire
 
     def test_partenaire_requires_nom(self):
         from pydantic import ValidationError as PVE
+
         with pytest.raises(PVE):
             Partenaire()  # nom obligatoire
 
@@ -320,10 +321,14 @@ class TestPublicationTopics:
         """La liste OpenAlex est conservée telle quelle sous la clé openalex."""
         t = PublicationTopics(
             openalex=[
-                {"domain": "SS", "field": "Eco", "subfield": "Micro",
-                 "topic": "Behav", "score": 0.95},
-                {"domain": "CS", "field": "AI", "subfield": "ML",
-                 "topic": "DL", "score": 0.87},
+                {
+                    "domain": "SS",
+                    "field": "Eco",
+                    "subfield": "Micro",
+                    "topic": "Behav",
+                    "score": 0.95,
+                },
+                {"domain": "CS", "field": "AI", "subfield": "ML", "topic": "DL", "score": 0.87},
             ]
         )
         d = t.to_dict()
@@ -333,9 +338,7 @@ class TestPublicationTopics:
         assert d["openalex"][0]["score"] == 0.95
 
     def test_theses_dict_preserved(self):
-        t = PublicationTopics(
-            theses={"discipline": "Informatique", "rameau": ["Algorithmes"]}
-        )
+        t = PublicationTopics(theses={"discipline": "Informatique", "rameau": ["Algorithmes"]})
         d = t.to_dict()
         assert d["theses"]["discipline"] == "Informatique"
         assert d["theses"]["rameau"] == ["Algorithmes"]

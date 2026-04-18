@@ -80,7 +80,7 @@ dupliqué entre agrégats.
 - [x] **Source unique des dépendances** : `[project.dependencies]` +
   `[project.optional-dependencies.dev]` dans `pyproject.toml`
   (ex-`requirements.txt` supprimé, installation via `pip install ".[dev]"`)
-- **Lockfile** des dépendances : `uv.lock` ou `poetry.lock` (prochaine étape
+- [ ] **Lockfile** des dépendances : `uv.lock` ou `poetry.lock` (prochaine étape
   pour figer les versions transitives)
 - [x] `deptry` pour repérer les paquets installés mais inutilisés
 - [x] `pip-audit` pour les vulnérabilités connues (à ajouter en CI ensuite)

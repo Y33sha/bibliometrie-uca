@@ -7,9 +7,9 @@ import sys
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
+from application import addresses as addresses_service
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import AssignStructureAction
-from application import addresses as addresses_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

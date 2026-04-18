@@ -4,7 +4,6 @@ import json
 
 import pytest
 
-from domain.errors import ConflictError, NotFoundError, ValidationError
 from application.config import (
     add_perimeter_structure,
     create_perimeter,
@@ -13,8 +12,10 @@ from application.config import (
     update_config_value,
     update_perimeter,
 )
+from domain.errors import ConflictError, NotFoundError, ValidationError
 
 # ── Helpers ────────────────────────────────────────────────────────
+
 
 def _insert_config(db, key, value, description="desc"):
     db.execute(
@@ -32,6 +33,7 @@ def _insert_perimeter(db, code="test", name="Test", structure_ids=None):
 
 
 # ── update_config_value ────────────────────────────────────────────
+
 
 class TestUpdateConfigValue:
     def test_raises_not_found(self, db):
@@ -51,6 +53,7 @@ class TestUpdateConfigValue:
 
 
 # ── add_perimeter_structure ────────────────────────────────────────
+
 
 class TestAddPerimeterStructure:
     def _create_struct(self, db, code="UCA"):
@@ -79,6 +82,7 @@ class TestAddPerimeterStructure:
 
 # ── remove_perimeter_structure ─────────────────────────────────────
 
+
 class TestRemovePerimeterStructure:
     def test_removes_if_present(self, db):
         p = _insert_perimeter(db, structure_ids=[1, 2, 3])
@@ -97,10 +101,10 @@ class TestRemovePerimeterStructure:
 
 # ── create_perimeter ───────────────────────────────────────────────
 
+
 class TestCreatePerimeter:
     def test_creates(self, db):
-        pid = create_perimeter(db, code="new_perim", name="New Perimeter",
-                               description="desc")
+        pid = create_perimeter(db, code="new_perim", name="New Perimeter", description="desc")
         assert pid is not None
         db.execute("SELECT code, name FROM perimeters WHERE id = %s", (pid,))
         row = db.fetchone()
@@ -120,6 +124,7 @@ class TestCreatePerimeter:
 
 
 # ── update_perimeter ───────────────────────────────────────────────
+
 
 class TestUpdatePerimeter:
     def test_raises_not_found(self, db):
@@ -153,6 +158,7 @@ class TestUpdatePerimeter:
 
 
 # ── delete_perimeter ───────────────────────────────────────────────
+
 
 class TestDeletePerimeter:
     def test_raises_not_found(self, db):

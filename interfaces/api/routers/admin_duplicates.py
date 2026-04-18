@@ -4,10 +4,10 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from interfaces.api.deps import get_cursor
-from interfaces.api.models import MarkDistinctPublications, MergePublications
 from application.publications import mark_distinct as _mark_pubs_distinct
 from application.publications import merge_publications
+from interfaces.api.deps import get_cursor
+from interfaces.api.models import MarkDistinctPublications, MergePublications
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

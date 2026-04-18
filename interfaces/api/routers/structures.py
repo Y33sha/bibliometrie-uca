@@ -4,6 +4,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
+from application import structures as structures_service
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import (
     NameFormCreate,
@@ -12,7 +13,6 @@ from interfaces.api.models import (
     StructureCreate,
     StructureUpdate,
 )
-from application import structures as structures_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

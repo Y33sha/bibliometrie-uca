@@ -18,9 +18,9 @@ Usage:
 
 import argparse
 
+from domain.normalize import normalize_text
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
-from domain.normalize import normalize_text
 
 logger = setup_logger("suggest_countries", "processing/logs")
 

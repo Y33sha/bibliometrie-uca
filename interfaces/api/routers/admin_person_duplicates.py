@@ -5,9 +5,9 @@ import logging
 import psycopg2.extras
 from fastapi import APIRouter, HTTPException, Query
 
+from application.persons import mark_distinct as _mark_persons_distinct
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import MarkPersonsDistinct
-from application.persons import mark_distinct as _mark_persons_distinct
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

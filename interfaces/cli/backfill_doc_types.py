@@ -10,8 +10,8 @@ Usage:
 
 import argparse
 
-from infrastructure.db.connection import get_connection
 from domain.doc_types import map_doc_type
+from infrastructure.db.connection import get_connection
 
 # Priorité des types : plus le score est élevé, plus le type est "précis"
 # 'other' est le moins précis, les types spécifiques sont tous équivalents

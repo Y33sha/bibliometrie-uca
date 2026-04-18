@@ -145,8 +145,7 @@ _SQL_IN_COLLECTION = (
 )
 
 
-def _build_hal_status_part(value: str, lab_hal_col: str | None,
-                           params: list) -> str | None:
+def _build_hal_status_part(value: str, lab_hal_col: str | None, params: list) -> str | None:
     """Construit la clause SQL pour une valeur hal_status donnée.
     Retourne None si la valeur n'est pas applicable (ex: "notice" sans collection)."""
     if value == "hors_hal":
@@ -313,9 +312,7 @@ def apply_no_lab_filter(conditions: list, params: list) -> None:
 # ── Filtres "persons" (listes de personnes) ──────────────────────
 
 
-def apply_person_has_identifier_filter(
-    conditions: list, id_type: str, value: str
-) -> None:
+def apply_person_has_identifier_filter(conditions: list, id_type: str, value: str) -> None:
     """Filtre : la personne a-t-elle un identifiant donné (orcid, idhal, idref)
     avec un statut différent de 'rejected' ?
 

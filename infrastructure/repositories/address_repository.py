@@ -32,7 +32,10 @@ class PgAddressRepository:
         )
 
     def upsert_structure_link(
-        self, address_id: int, structure_id: int, is_confirmed: bool,
+        self,
+        address_id: int,
+        structure_id: int,
+        is_confirmed: bool,
     ) -> None:
         """Upsert le lien address ↔ structure avec is_confirmed (True/False)."""
         self._cur.execute(
@@ -46,7 +49,9 @@ class PgAddressRepository:
         )
 
     def batch_reset_manual_links(
-        self, address_ids: list[int], structure_id: int,
+        self,
+        address_ids: list[int],
+        structure_id: int,
     ) -> int:
         """Version batch de reset_manual_link. Retourne le nombre de lignes
         remises à is_confirmed=NULL (après suppression des liens manuels)."""
@@ -67,7 +72,10 @@ class PgAddressRepository:
         return self._cur.rowcount
 
     def batch_upsert_structure_links(
-        self, address_ids: list[int], structure_id: int, is_confirmed: bool,
+        self,
+        address_ids: list[int],
+        structure_id: int,
+        is_confirmed: bool,
     ) -> None:
         """Upsert en batch via execute_values."""
         execute_values(
@@ -82,7 +90,9 @@ class PgAddressRepository:
         )
 
     def delete_manual_structure_link(
-        self, address_id: int, structure_id: int,
+        self,
+        address_id: int,
+        structure_id: int,
     ) -> bool:
         """Supprime uniquement le lien manuel (matched_form_id IS NULL).
         Retourne True si une ligne a été supprimée."""
@@ -98,7 +108,9 @@ class PgAddressRepository:
     # ── Pays ───────────────────────────────────────────────────────
 
     def set_countries(
-        self, address_id: int, countries: list[str] | None,
+        self,
+        address_id: int,
+        countries: list[str] | None,
     ) -> None:
         """Fixe la colonne countries (NULL si vide)."""
         self._cur.execute(
@@ -107,7 +119,8 @@ class PgAddressRepository:
         )
 
     def propagate_countries_to_similar_address(
-        self, address_id: int,
+        self,
+        address_id: int,
     ) -> list[int]:
         """Réplique addresses.countries vers les adresses ayant le même
         normalized_text (len >= 5). Retourne les IDs propagés."""
@@ -127,7 +140,9 @@ class PgAddressRepository:
         return [r["id"] for r in self._cur.fetchall()]
 
     def batch_add_country_by_ids(
-        self, country_code: str, address_ids: list[int],
+        self,
+        country_code: str,
+        address_ids: list[int],
     ) -> list[int]:
         """Ajoute country_code à addresses.countries pour chaque id du lot.
         Idempotent (no-op si déjà présent)."""
@@ -147,7 +162,10 @@ class PgAddressRepository:
         return [r["id"] for r in self._cur.fetchall()]
 
     def batch_add_country_by_where(
-        self, country_code: str, where_clause: str, where_params: list,
+        self,
+        country_code: str,
+        where_clause: str,
+        where_params: list,
     ) -> list[int]:
         """Ajoute country_code sur un WHERE dynamique construit par le
         service. Le service est responsable d'échapper ses filtres (tous
@@ -189,7 +207,8 @@ class PgAddressRepository:
     # ── Propagation vers source_publications et publications ───────
 
     def refresh_source_publications_countries(
-        self, address_ids: list[int],
+        self,
+        address_ids: list[int],
     ) -> int:
         """Recalcule source_publications.countries à partir des adresses
         touchées. Retourne le nombre de lignes réellement modifiées."""
@@ -220,7 +239,8 @@ class PgAddressRepository:
         return self._cur.rowcount
 
     def refresh_publications_countries_for_addresses(
-        self, address_ids: list[int],
+        self,
+        address_ids: list[int],
     ) -> int:
         """Recalcule publications.countries (union des source_publications).
         À appeler APRÈS refresh_source_publications_countries."""

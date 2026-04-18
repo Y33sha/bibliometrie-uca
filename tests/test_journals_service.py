@@ -6,7 +6,6 @@ reset_journal_apc, merge_publishers, merge_journals.
 
 import pytest
 
-from domain.errors import ConflictError, NotFoundError, ValidationError
 from application.journals import (
     find_or_create_journal,
     find_or_create_publisher,
@@ -17,8 +16,10 @@ from application.journals import (
     update_journal_apc,
     update_publisher,
 )
+from domain.errors import ConflictError, NotFoundError, ValidationError
 
 # ── Helpers ────────────────────────────────────────────────────────
+
 
 def _insert_publisher(db, name="Elsevier", openalex_id=None):
     db.execute(
@@ -42,11 +43,17 @@ def _insert_journal(db, title="Nature", publisher_id=None, **kwargs):
         RETURNING id
         """,
         (
-            title, title,
-            kwargs.get("issn"), kwargs.get("eissn"), kwargs.get("issnl"),
-            publisher_id, kwargs.get("openalex_id"),
-            kwargs.get("apc_amount"), kwargs.get("apc_currency"),
-            kwargs.get("is_in_doaj", False), kwargs.get("oa_model"),
+            title,
+            title,
+            kwargs.get("issn"),
+            kwargs.get("eissn"),
+            kwargs.get("issnl"),
+            publisher_id,
+            kwargs.get("openalex_id"),
+            kwargs.get("apc_amount"),
+            kwargs.get("apc_currency"),
+            kwargs.get("is_in_doaj", False),
+            kwargs.get("oa_model"),
         ),
     )
     return db.fetchone()["id"]
@@ -61,6 +68,7 @@ def _insert_publication(db, title="Pub", pub_year=2024, journal_id=None):
 
 
 # ── find_or_create_publisher ───────────────────────────────────────
+
 
 class TestFindOrCreatePublisher:
     def test_returns_none_on_empty_name(self, db):
@@ -91,6 +99,7 @@ class TestFindOrCreatePublisher:
 
 
 # ── find_or_create_journal ─────────────────────────────────────────
+
 
 class TestFindOrCreateJournal:
     def test_returns_none_on_empty_title(self, db):
@@ -135,8 +144,9 @@ class TestFindOrCreateJournal:
         """Si on trouve par ISSN, les champs vides (eissn, publisher_id) sont remplis."""
         existing = _insert_journal(db, "Nature", issn="0028-0836")
         pub_id = find_or_create_publisher(db, "Springer")
-        find_or_create_journal(db, "Nature", issn="0028-0836",
-                               eissn="1476-4687", publisher_id=pub_id)
+        find_or_create_journal(
+            db, "Nature", issn="0028-0836", eissn="1476-4687", publisher_id=pub_id
+        )
         db.execute("SELECT eissn, publisher_id FROM journals WHERE id = %s", (existing,))
         row = db.fetchone()
         assert row["eissn"] == "1476-4687"
@@ -145,11 +155,11 @@ class TestFindOrCreateJournal:
 
 # ── update_journal_apc / reset_journal_apc ─────────────────────────
 
+
 class TestUpdateJournalApc:
     def test_updates_fields(self, db):
         j_id = _insert_journal(db, "Nature")
-        update_journal_apc(db, j_id, apc_amount=3000.0, apc_currency="EUR",
-                           is_in_doaj=True)
+        update_journal_apc(db, j_id, apc_amount=3000.0, apc_currency="EUR", is_in_doaj=True)
         db.execute(
             "SELECT apc_amount, apc_currency, is_in_doaj FROM journals WHERE id = %s",
             (j_id,),
@@ -161,8 +171,7 @@ class TestUpdateJournalApc:
 
     def test_coalesce_preserves_existing(self, db):
         """Sans nouvelle valeur, les champs existants sont conservés."""
-        j_id = _insert_journal(db, "Nature", apc_amount=2000.0,
-                               apc_currency="USD", is_in_doaj=True)
+        j_id = _insert_journal(db, "Nature", apc_amount=2000.0, apc_currency="USD", is_in_doaj=True)
         update_journal_apc(db, j_id, apc_currency="EUR")  # juste la devise
         db.execute(
             "SELECT apc_amount, apc_currency, is_in_doaj FROM journals WHERE id = %s",
@@ -222,10 +231,8 @@ class TestUpdatePublisher:
 
 class TestResetJournalApc:
     def test_resets_only_openalex_journals(self, db):
-        j1 = _insert_journal(db, "Nature", openalex_id="S1", apc_amount=3000.0,
-                             is_in_doaj=True)
-        j2 = _insert_journal(db, "Manual", openalex_id=None, apc_amount=500.0,
-                             is_in_doaj=True)
+        j1 = _insert_journal(db, "Nature", openalex_id="S1", apc_amount=3000.0, is_in_doaj=True)
+        j2 = _insert_journal(db, "Manual", openalex_id=None, apc_amount=500.0, is_in_doaj=True)
 
         n = reset_journal_apc(db)
 
@@ -242,6 +249,7 @@ class TestResetJournalApc:
 
 
 # ── merge_publishers ───────────────────────────────────────────────
+
 
 class TestMergePublishers:
     def test_raises_on_self_merge(self, db):
@@ -319,6 +327,7 @@ class TestMergePublishers:
 
 # ── merge_journals ─────────────────────────────────────────────────
 
+
 class TestMergeJournals:
     def test_raises_on_self_merge(self, db):
         j_id = _insert_journal(db, "Nature")
@@ -339,8 +348,7 @@ class TestMergeJournals:
 
     def test_enriches_target_metadata(self, db):
         target = _insert_journal(db, "Target")  # pas d'ISSN
-        source = _insert_journal(db, "Source", issn="1234-5678",
-                                 eissn="9999-0000", is_in_doaj=True)
+        source = _insert_journal(db, "Source", issn="1234-5678", eissn="9999-0000", is_in_doaj=True)
 
         merge_journals(db, target, source)
 

@@ -8,7 +8,6 @@ import json
 
 import pytest
 
-from domain.errors import NotFoundError, ValidationError
 from application.authorships import (
     delete_orphan_authorships,
     detach_source,
@@ -18,8 +17,10 @@ from application.authorships import (
     set_source_authorship_excluded,
     sync_person_id_from_source,
 )
+from domain.errors import NotFoundError, ValidationError
 
 # ── Helpers ────────────────────────────────────────────────────────
+
 
 def _create_person(db, last="Dupont", first="Jean"):
     db.execute(
@@ -94,8 +95,16 @@ def _create_source_authorship(
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
-        (source, source_publication_id, source_person_id, person_id,
-         authorship_id, excluded, in_perimeter, structure_ids),
+        (
+            source,
+            source_publication_id,
+            source_person_id,
+            person_id,
+            authorship_id,
+            excluded,
+            in_perimeter,
+            structure_ids,
+        ),
     )
     return db.fetchone()["id"]
 
@@ -165,6 +174,7 @@ def _link_sa_address(db, source_authorship_id, address_id):
 
 # ── exclude_authorship ─────────────────────────────────────────────
 
+
 class TestExcludeAuthorship:
     """exclude_authorship marque l'authorship vérité comme excluded et
     détache les source_authorships qui y référaient."""
@@ -222,6 +232,7 @@ class TestExcludeAuthorship:
 
 
 # ── detach_source ──────────────────────────────────────────────────
+
 
 class TestDetachSource:
     """detach_source retire le lien FK d'une source_authorship vers l'authorship
@@ -294,8 +305,13 @@ class TestDetachSource:
             db, sp_hal, p_hal, source="hal", person_id=person_id, authorship_id=authorship_id
         )
         _create_source_authorship(
-            db, sp_oa, p_oa, source="openalex", person_id=person_id,
-            authorship_id=authorship_id, excluded=True,
+            db,
+            sp_oa,
+            p_oa,
+            source="openalex",
+            person_id=person_id,
+            authorship_id=authorship_id,
+            excluded=True,
         )
 
         assert detach_source(db, sa_hal, "hal") is True
@@ -305,6 +321,7 @@ class TestDetachSource:
 
 
 # ── delete_orphan_authorships ──────────────────────────────────────
+
 
 class TestDeleteOrphanAuthorships:
     """delete_orphan_authorships supprime les authorships vérité d'une
@@ -318,9 +335,7 @@ class TestDeleteOrphanAuthorships:
         n = delete_orphan_authorships(db, person_id)
 
         assert n == 1
-        db.execute(
-            "SELECT id FROM authorships WHERE person_id = %s", (person_id,)
-        )
+        db.execute("SELECT id FROM authorships WHERE person_id = %s", (person_id,))
         assert db.fetchall() == []
 
     def test_keeps_authorship_with_attesting_source(self, db):
@@ -347,8 +362,12 @@ class TestDeleteOrphanAuthorships:
         src_person_id = _create_source_person(db)
         authorship_id = _create_authorship(db, pub_id, person_id)
         _create_source_authorship(
-            db, sp_id, src_person_id, person_id=person_id,
-            authorship_id=authorship_id, excluded=True,
+            db,
+            sp_id,
+            src_person_id,
+            person_id=person_id,
+            authorship_id=authorship_id,
+            excluded=True,
         )
 
         n = delete_orphan_authorships(db, person_id)
@@ -376,6 +395,7 @@ class TestDeleteOrphanAuthorships:
 
 
 # ── move_authorships_for_source ────────────────────────────────────
+
 
 class TestMoveAuthorshipsForSource:
     """move_authorships_for_source repositionne une authorship vérité d'une
@@ -423,6 +443,7 @@ class TestMoveAuthorshipsForSource:
 
 
 # ── sync_person_id_from_source ─────────────────────────────────────
+
 
 class TestSyncPersonIdFromSource:
     """sync_person_id_from_source propage le person_id d'une source vers
@@ -487,9 +508,7 @@ class TestSyncPersonIdFromSource:
         # Une autre authorship sur même pub (sans person), avec source liée à p1
         orphan = _create_authorship(db, pub_id, None)
         # Ajouter author_position pour bypass la contrainte unique
-        db.execute(
-            "UPDATE authorships SET author_position = 2 WHERE id = %s", (orphan,)
-        )
+        db.execute("UPDATE authorships SET author_position = 2 WHERE id = %s", (orphan,))
         sa_id = _create_source_authorship(
             db, sp_id, src_person_id, person_id=p1, authorship_id=orphan
         )
@@ -500,6 +519,7 @@ class TestSyncPersonIdFromSource:
 
 
 # ── propagate_uca_for_addresses ────────────────────────────────────
+
 
 class TestPropagateUcaForAddresses:
     """propagate_uca_for_addresses recalcule in_perimeter et structure_ids
@@ -566,8 +586,13 @@ class TestPropagateUcaForAddresses:
         authorship_id = _create_authorship(db, pub_id, person_id)
         # source_authorship avec un flag in_perimeter déjà TRUE (état avant review)
         sa_id = _create_source_authorship(
-            db, sp_id, src_person_id, person_id=person_id,
-            authorship_id=authorship_id, in_perimeter=True, structure_ids=[uca_id],
+            db,
+            sp_id,
+            src_person_id,
+            person_id=person_id,
+            authorship_id=authorship_id,
+            in_perimeter=True,
+            structure_ids=[uca_id],
         )
         addr_id = _create_address(db)
         _link_address_structure(db, addr_id, uca_id, is_confirmed=False)
@@ -585,6 +610,7 @@ class TestPropagateUcaForAddresses:
 
 
 # ── set_source_authorship_excluded ────────────────────────────────
+
 
 class TestSetSourceAuthorshipExcluded:
     def test_raises_on_invalid_source(self, db):
@@ -615,8 +641,12 @@ class TestSetSourceAuthorshipExcluded:
         src_person_id = _create_source_person(db)
         authorship_id = _create_authorship(db, pub_id, person_id)
         sa_id = _create_source_authorship(
-            db, sp_id, src_person_id, person_id=person_id,
-            authorship_id=authorship_id, excluded=True,
+            db,
+            sp_id,
+            src_person_id,
+            person_id=person_id,
+            authorship_id=authorship_id,
+            excluded=True,
         )
 
         set_source_authorship_excluded(db, sa_id, "hal", False)

@@ -2,9 +2,9 @@
 
 import pytest
 
-from domain.errors import ConflictError
 from application.persons import merge_person
 from application.publications import find_or_create, refresh_from_sources
+from domain.errors import ConflictError
 
 # ── Helpers ──
 

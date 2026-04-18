@@ -16,11 +16,11 @@ import os
 
 from psycopg2.extras import RealDictCursor
 
-from infrastructure.db.connection import get_connection
 from application.publications import merge_publications
-from infrastructure.log import setup_logger
 from domain.names import names_compatible
 from domain.normalize import normalize_name
+from infrastructure.db.connection import get_connection
+from infrastructure.log import setup_logger
 
 logger = setup_logger(
     "merge_dup_theses", os.path.join(os.path.dirname(__file__), "../processing/logs")

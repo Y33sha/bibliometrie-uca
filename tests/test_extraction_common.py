@@ -2,8 +2,8 @@
 
 import pytest
 
-from infrastructure.sources.common import compute_hash, get_existing_ids
 from domain.publication import clean_doi
+from infrastructure.sources.common import compute_hash, get_existing_ids
 
 # ── compute_hash ─────────────────────────────────────────────────
 

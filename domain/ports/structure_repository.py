@@ -28,7 +28,10 @@ class StructureRepository(Protocol):
     ) -> dict: ...
 
     def update_structure_fields(
-        self, structure_id: int, sql_fragments: list[str], params: list,
+        self,
+        structure_id: int,
+        sql_fragments: list[str],
+        params: list,
     ) -> dict: ...
 
     def delete_structure(self, structure_id: int) -> dict | None: ...
@@ -36,7 +39,11 @@ class StructureRepository(Protocol):
     # ── structure_relations ────────────────────────────────────────
 
     def create_relation(
-        self, *, parent_id: int, child_id: int, relation_type: str,
+        self,
+        *,
+        parent_id: int,
+        child_id: int,
+        relation_type: str,
     ) -> dict | None: ...
 
     def delete_relation(self, relation_id: int) -> dict | None: ...
@@ -56,7 +63,10 @@ class StructureRepository(Protocol):
     ) -> dict: ...
 
     def update_name_form_fields(
-        self, form_id: int, sql_fragments: list[str], params: list,
+        self,
+        form_id: int,
+        sql_fragments: list[str],
+        params: list,
     ) -> dict: ...
 
     def delete_name_form(self, form_id: int) -> dict | None: ...

@@ -10,8 +10,8 @@ du projet).
 
 import logging
 
-from infrastructure.repositories import address_repository
 from application.authorships import propagate_uca_for_addresses
+from infrastructure.repositories import address_repository
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 # ── Validation des liens adresse ↔ structure ──────────────────────
 
 
-def review_structure_link(cur, address_id: int, structure_id: int,
-                           is_confirmed: bool | None) -> None:
+def review_structure_link(
+    cur, address_id: int, structure_id: int, is_confirmed: bool | None
+) -> None:
     """Upsert le lien address ↔ structure (validation manuelle).
 
     - is_confirmed = True  → confirme (crée le lien si besoin)
@@ -37,8 +38,9 @@ def review_structure_link(cur, address_id: int, structure_id: int,
     propagate_uca_for_addresses(cur, [address_id])
 
 
-def batch_review_structure_link(cur, address_ids: list[int], structure_id: int,
-                                 is_confirmed: bool | None) -> int:
+def batch_review_structure_link(
+    cur, address_ids: list[int], structure_id: int, is_confirmed: bool | None
+) -> int:
     """Comme review_structure_link mais sur un lot d'adresses.
 
     Retourne le nombre d'adresses touchées (pour les reset, nombre de lignes
@@ -137,7 +139,9 @@ def batch_set_country_by_filter(
 
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
     return address_repository(cur).batch_add_country_by_where(
-        country_code, where_clause, params,
+        country_code,
+        where_clause,
+        params,
     )
 
 

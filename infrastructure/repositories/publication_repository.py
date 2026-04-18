@@ -50,7 +50,10 @@ class PgPublicationRepository:
         return PubByNnt(_val(row, 0), _val(row, 1), _val(row, 2)) if row else None
 
     def find_by_title(
-        self, title_normalized: str, pub_year: int, journal_id: int,
+        self,
+        title_normalized: str,
+        pub_year: int,
+        journal_id: int,
     ) -> PubByTitle | None:
         """Cherche une publication par titre normalisé + année + journal.
         Ne matche que les articles avec journal connu."""
@@ -68,7 +71,9 @@ class PgPublicationRepository:
         return PubByTitle(_val(row, 0), _val(row, 1)) if row else None
 
     def find_thesis_by_title(
-        self, title_normalized: str, pub_year: int,
+        self,
+        title_normalized: str,
+        pub_year: int,
     ) -> list[PubThesisCandidate]:
         """Cherche des thèses par titre normalisé + année.
 
@@ -166,6 +171,7 @@ class PgPublicationRepository:
         nom de colonne, quel que soit le type de curseur du caller.
         """
         from psycopg2.extras import RealDictCursor
+
         dict_cur = self._cur.connection.cursor(cursor_factory=RealDictCursor)
         try:
             dict_cur.execute(
@@ -208,6 +214,7 @@ class PgPublicationRepository:
         ensuite `update_sources` pour le tableau `sources`.
         """
         from psycopg2.extras import Json
+
         self._cur.execute(
             """
             UPDATE publications SET
@@ -220,8 +227,16 @@ class PgPublicationRepository:
             WHERE id = %s
             """,
             (
-                doi, doc_type, pub_year, journal_id, oa_status,
-                container_title, language, abstract, keywords, countries,
+                doi,
+                doc_type,
+                pub_year,
+                journal_id,
+                oa_status,
+                container_title,
+                language,
+                abstract,
+                keywords,
+                countries,
                 Json(topics) if topics else None,
                 Json(biblio) if biblio else None,
                 Json(meta) if meta else None,
@@ -259,8 +274,15 @@ class PgPublicationRepository:
             RETURNING id
             """,
             (
-                title, title_normalized, doc_type, pub_year, doi,
-                oa_status, journal_id, container_title, language,
+                title,
+                title_normalized,
+                doc_type,
+                pub_year,
+                doi,
+                oa_status,
+                journal_id,
+                container_title,
+                language,
             ),
         )
         return _val(self._cur.fetchone(), 0)
@@ -340,10 +362,16 @@ class PgPublicationRepository:
             WHERE id = %s
             """,
             (
-                src["doi"], src["journal_id"],
-                src["oa_status"], src["oa_status"], src["oa_status"],
-                src["language"], src["container_title"],
-                src["countries"], src["countries"], src["countries"],
+                src["doi"],
+                src["journal_id"],
+                src["oa_status"],
+                src["oa_status"],
+                src["oa_status"],
+                src["language"],
+                src["container_title"],
+                src["countries"],
+                src["countries"],
+                src["countries"],
                 target_id,
             ),
         )

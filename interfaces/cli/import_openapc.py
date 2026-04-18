@@ -11,8 +11,8 @@ import argparse
 import csv
 import os
 
-from infrastructure.db.connection import get_connection
 from domain.publication import clean_doi
+from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 
 log = setup_logger("import_openapc", os.path.join(os.path.dirname(__file__), "../processing/logs"))

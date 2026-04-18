@@ -23,10 +23,10 @@ import time
 import requests
 from psycopg2.extras import Json
 
-from infrastructure.db.connection import get_connection
-from infrastructure.sources.common import compute_hash, get_cross_import_dois, setup_logger
 from infrastructure.api_limits import HAL_DELAY
+from infrastructure.db.connection import get_connection
 from infrastructure.hal import HAL_FIELDS_STR
+from infrastructure.sources.common import compute_hash, get_cross_import_dois, setup_logger
 
 # ----- Logging -----
 logger = setup_logger("cross_import_hal", os.path.join(os.path.dirname(__file__), "logs"))
