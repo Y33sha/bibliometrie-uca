@@ -54,8 +54,11 @@ jobs:
       - name: Architecture contracts (import-linter)
         run: lint-imports
 
-      - name: Run tests
-        run: python -m pytest tests/ -v
+      - name: Unit tests (sans BDD)
+        run: python -m pytest tests/unit/ -v
+
+      - name: Integration tests (avec BDD)
+        run: python -m pytest tests/integration/ -v
 
   build-frontend:
     runs-on: ubuntu-latest

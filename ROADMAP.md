@@ -67,22 +67,24 @@ dupliqué entre agrégats.
 
 ### 2.1 Tooling & CI
 - [x] **Pre-commit hook** : ruff check (+ auto-fix) + ruff format
-  + checks basiques (trailing whitespace, EOF, YAML/TOML, merge conflicts).
-  Config dans `.pre-commit-config.yaml`. À compléter avec mypy et pytest
-  unitaires quand la §2.2 sera faite (séparation unit/integration).
+  + checks basiques (trailing whitespace, EOF, YAML/TOML, merge conflicts)
+  + lint-imports (contrats DDD) + pytest unitaires (tests/unit/).
+  Config dans `.pre-commit-config.yaml`.
 - [ ] Ajouter mypy au hook + le durcir progressivement (strict par module
   à mesure qu'il est stabilisé — aujourd'hui 73 erreurs, mode permissif)
-- [ ] Ajouter pytest sur tests unitaires au hook (nécessite §2.2)
 - Couverture `pytest --cov` en CI avec seuil progressif (partir de
   la couverture actuelle, ne pas régresser)
 
 ### 2.2 Organisation des tests
-- Réorganiser `tests/` en sous-dossiers cohérents avec la structure
-  du code (`tests/domain/`, `tests/application/`, `tests/infrastructure/`,
-  `tests/interfaces/`)
-- Séparer tests unitaires (pas de BDD, rapides) et tests d'intégration
-  (avec BDD) pour permettre l'exécution rapide des premiers en pre-commit
-- Tests de caractérisation complémentaires sur les routers critiques
+- [x] Réorganisation `tests/unit/` + `tests/integration/`, sous-dossiers
+  par couche (`domain/`, `application/`, `pipeline/`, `interfaces/`).
+  274 unit en ~1.3s, 326 integration en ~26s.
+- [x] Conftest splitté : `tests/conftest.py` pour le cross-cutting
+  (mock logger, caches), `tests/integration/conftest.py` pour le
+  setup BDD + fixture `db`.
+- [x] Hook pre-commit `pytest-unit` qui lance uniquement `tests/unit/`.
+  CI fait les deux en étapes séparées.
+- [ ] Tests de caractérisation complémentaires sur les routers critiques
 
 ### 2.3 Dette externe / dépendances
 - [x] **Source unique des dépendances** : `[project.dependencies]` +
