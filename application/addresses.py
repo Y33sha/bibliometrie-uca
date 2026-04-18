@@ -10,7 +10,7 @@ du projet).
 
 import logging
 
-from infrastructure.repositories.address_repository import PgAddressRepository
+from infrastructure.repositories import address_repository
 from application.authorships import propagate_uca_for_addresses
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ def review_structure_link(cur, address_id: int, structure_id: int,
 
     Propage automatiquement l'UCA aux source_authorships et authorships vérité.
     """
-    repo = PgAddressRepository(cur)
+    repo = address_repository(cur)
     if is_confirmed is None:
         repo.reset_manual_link(address_id, structure_id)
     else:
@@ -47,7 +47,7 @@ def batch_review_structure_link(cur, address_ids: list[int], structure_id: int,
     if not address_ids:
         return 0
 
-    repo = PgAddressRepository(cur)
+    repo = address_repository(cur)
     if is_confirmed is None:
         updated = repo.batch_reset_manual_links(address_ids, structure_id)
     else:
@@ -66,7 +66,7 @@ def unassign_manual_structure(cur, address_id: int, structure_id: int) -> bool:
     Propage automatiquement l'UCA.
     Retourne True si un lien manuel a été supprimé, False sinon.
     """
-    deleted = PgAddressRepository(cur).delete_manual_structure_link(address_id, structure_id)
+    deleted = address_repository(cur).delete_manual_structure_link(address_id, structure_id)
     propagate_uca_for_addresses(cur, [address_id])
     return deleted
 
@@ -83,7 +83,7 @@ def set_country(cur, address_id: int, countries: list[str] | None) -> list[int]:
     Retourne la liste des IDs affectés (y compris address_id).
     Ne valide pas les codes pays : c'est au caller de le faire.
     """
-    repo = PgAddressRepository(cur)
+    repo = address_repository(cur)
     repo.set_countries(address_id, countries)
     affected = [address_id]
     if countries:
@@ -100,7 +100,7 @@ def batch_set_country_by_ids(cur, country_code: str, address_ids: list[int]) -> 
 
     Retourne les IDs effectivement modifiés (= tous ceux passés en entrée).
     """
-    return PgAddressRepository(cur).batch_add_country_by_ids(country_code, address_ids)
+    return address_repository(cur).batch_add_country_by_ids(country_code, address_ids)
 
 
 def batch_set_country_by_filter(
@@ -136,7 +136,7 @@ def batch_set_country_by_filter(
         params.append(suggested_country)
 
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
-    return PgAddressRepository(cur).batch_add_country_by_where(
+    return address_repository(cur).batch_add_country_by_where(
         country_code, where_clause, params,
     )
 
@@ -148,7 +148,7 @@ def propagate_countries_to_similar(cur) -> list[int]:
     Appelée après un batch_set_country_by_* pour propager à travers tout le
     référentiel d'adresses. Retourne les IDs propagés.
     """
-    return PgAddressRepository(cur).propagate_countries_across_similar_addresses()
+    return address_repository(cur).propagate_countries_across_similar_addresses()
 
 
 # ── Propagation pays vers source_publications et publications ────
@@ -163,7 +163,7 @@ def propagate_countries_to_publications(cur, address_ids: list[int]) -> None:
     if not address_ids:
         return
 
-    repo = PgAddressRepository(cur)
+    repo = address_repository(cur)
     addr_docs = repo.refresh_source_publications_countries(address_ids)
     pubs = repo.refresh_publications_countries_for_addresses(address_ids)
 

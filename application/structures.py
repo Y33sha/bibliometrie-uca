@@ -12,7 +12,7 @@ from pydantic import ValidationError as PydanticValidationError
 
 from domain.errors import NotFoundError, ValidationError
 from domain.structure import StructureApiIds
-from infrastructure.repositories.structure_repository import PgStructureRepository
+from infrastructure.repositories import structure_repository
 from application.audit import emit_event
 from domain.normalize import normalize_text
 
@@ -59,7 +59,7 @@ def create_structure(
     api_ids: dict | None = None,
 ) -> dict:
     """Crée une structure. Retourne la ligne insérée (RealDictRow)."""
-    return PgStructureRepository(cur).create_structure(
+    return structure_repository(cur).create_structure(
         code=code, name=name, acronym=acronym, type=type,
         ror_id=ror_id, rnsr_id=rnsr_id, hal_collection=hal_collection,
         api_ids=_validate_api_ids(api_ids),
@@ -72,7 +72,7 @@ def update_structure(cur, structure_id: int, *, fields: dict) -> dict:
     Lève NotFoundError si la structure n'existe pas.
     Lève ValidationError si `fields` ne contient aucun champ valide.
     """
-    repo = PgStructureRepository(cur)
+    repo = structure_repository(cur)
     if not repo.structure_exists(structure_id):
         raise NotFoundError(f"Structure {structure_id} introuvable")
 
@@ -97,7 +97,7 @@ def update_structure(cur, structure_id: int, *, fields: dict) -> dict:
 
 def delete_structure(cur, structure_id: int) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas."""
-    row = PgStructureRepository(cur).delete_structure(structure_id)
+    row = structure_repository(cur).delete_structure(structure_id)
     if not row:
         raise NotFoundError(f"Structure {structure_id} introuvable")
     emit_event(
@@ -111,14 +111,14 @@ def delete_structure(cur, structure_id: int) -> None:
 
 def create_relation(cur, *, parent_id: int, child_id: int, relation_type: str) -> dict | None:
     """Crée une relation. Retourne la ligne insérée, ou None si elle existait déjà."""
-    return PgStructureRepository(cur).create_relation(
+    return structure_repository(cur).create_relation(
         parent_id=parent_id, child_id=child_id, relation_type=relation_type,
     )
 
 
 def delete_relation(cur, relation_id: int) -> None:
     """Supprime une relation. Lève NotFoundError si elle n'existe pas."""
-    row = PgStructureRepository(cur).delete_relation(relation_id)
+    row = structure_repository(cur).delete_relation(relation_id)
     if not row:
         raise NotFoundError(f"Relation {relation_id} introuvable")
     emit_event(
@@ -145,7 +145,7 @@ def create_name_form(
     requires_context_of: list | None = None,
 ) -> dict:
     """Crée une forme de nom. Retourne la ligne insérée."""
-    return PgStructureRepository(cur).create_name_form(
+    return structure_repository(cur).create_name_form(
         structure_id=structure_id,
         form_text_normalized=normalize_text(form_text),
         is_word_boundary=is_word_boundary,
@@ -160,7 +160,7 @@ def update_name_form(cur, form_id: int, *, fields: dict) -> dict:
     Lève NotFoundError si la forme n'existe pas.
     Lève ValidationError si `fields` ne contient aucun champ valide.
     """
-    repo = PgStructureRepository(cur)
+    repo = structure_repository(cur)
     if not repo.name_form_exists(form_id):
         raise NotFoundError(f"Forme {form_id} introuvable")
 
@@ -188,7 +188,7 @@ def update_name_form(cur, form_id: int, *, fields: dict) -> dict:
 
 def delete_name_form(cur, form_id: int) -> None:
     """Supprime une forme de nom. Lève NotFoundError si elle n'existe pas."""
-    row = PgStructureRepository(cur).delete_name_form(form_id)
+    row = structure_repository(cur).delete_name_form(form_id)
     if not row:
         raise NotFoundError(f"Forme {form_id} introuvable")
     emit_event(
