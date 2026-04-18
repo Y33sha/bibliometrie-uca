@@ -11,7 +11,7 @@ from fastapi import Cookie, HTTPException
 from fastapi.staticfiles import StaticFiles
 from psycopg2.extras import RealDictCursor
 
-from config.settings import settings
+from infrastructure.settings import settings
 
 # ----- SPA Static Files -----
 
