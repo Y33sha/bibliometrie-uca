@@ -111,13 +111,15 @@ Pour régénérer le seed depuis une base existante : `python scripts/generate_s
 ### Backend
 
 ```bash
-pip install -r requirements.txt
+pip install ".[dev]"   # runtime + outils de dev (pytest, ruff, mypy, …)
+# ou, pour un déploiement sans dev tools :
+pip install .
 ```
 
 ### Frontend
 
 ```bash
-cd frontend
+cd interfaces/frontend
 npm install
 ```
 

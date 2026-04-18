@@ -6,12 +6,56 @@ build-backend = "setuptools.build_meta"
 name = "bibliometrie-uca"
 version = "0.1.0"
 requires-python = ">=3.10"
+dependencies = [
+    "requests==2.33.0",          # CVE-2024-35195, CVE-2024-47081, CVE-2026-25645 fixed
+    "psycopg2-binary==2.9.11",
+    "fastapi==0.128.2",
+    "uvicorn==0.40.0",
+    "bcrypt==5.0.0",
+    "python-dotenv==1.2.1",      # requis par pydantic-settings pour env_file
+    "pydantic==2.12.5",          # requis par pydantic-settings et utilisé directement
+    "pydantic-settings==2.13.1",
+    "openpyxl==3.1.5",           # utilisé par interfaces/cli/import_persons.py
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.0.3",             # CVE-2025-71176 fixed
+    "pytest-cov==7.1.0",
+    "httpx==0.27.2",
+    "ruff==0.15.11",
+    "mypy==1.20.1",
+    "deptry==0.25.1",
+    "pip-audit==2.10.0",
+]
 
 [tool.setuptools]
 py-modules = []
 
 [tool.setuptools.packages.find]
 include = ["application*", "domain*", "infrastructure*", "interfaces*"]
+
+# ----------------------------------------------------------------------
+# deptry : détection de dépendances manquantes / inutiles / transitives
+# Lit [project.dependencies] (PEP 621) et [project.optional-dependencies.dev].
+# ----------------------------------------------------------------------
+[tool.deptry]
+known_first_party = ["application", "domain", "infrastructure", "interfaces"]
+extend_exclude = ["frontend", ".venv", "venv"]
+# Le groupe `dev` de [project.optional-dependencies] est pour les outils
+# de dev/test — deptry ne doit pas exiger qu'ils soient importés.
+optional_dependencies_dev_groups = ["dev"]
+
+[tool.deptry.per_rule_ignores]
+# python-dotenv n'est pas importé directement, mais pydantic-settings
+# l'appelle en interne dès qu'on utilise `env_file=...`.
+DEP002 = ["python-dotenv"]
+
+# Alias paquet distribué → nom de module importé (les noms peuvent
+# différer : `psycopg2-binary` installe le module `psycopg2`, etc.).
+[tool.deptry.package_module_name_map]
+psycopg2-binary = "psycopg2"
+pydantic-settings = "pydantic_settings"
 
 # ----------------------------------------------------------------------
 # Ruff : linter + formateur (remplace flake8, isort, pyupgrade, black)

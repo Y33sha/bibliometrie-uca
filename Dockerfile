@@ -17,15 +17,14 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Code applicatif
+COPY pyproject.toml .
 COPY application/     ./application/
 COPY domain/          ./domain/
 COPY infrastructure/  ./infrastructure/
 COPY interfaces/      ./interfaces/
 COPY run_pipeline.py  .
+
+RUN pip install --no-cache-dir .
 
 # Frontend buildé (servi par l'API via SPAStaticFiles)
 COPY --from=frontend-build /build/build ./interfaces/frontend/build

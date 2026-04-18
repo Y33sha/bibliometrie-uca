@@ -43,7 +43,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install ".[dev]"
 
       - name: Run tests
         run: python -m pytest tests/ -v
@@ -60,13 +60,13 @@ jobs:
           node-version: "22"
 
       - name: Install dependencies
-        working-directory: frontend
+        working-directory: interfaces/frontend
         run: npm ci
 
       - name: Type check
-        working-directory: frontend
+        working-directory: interfaces/frontend
         run: npm run check
 
       - name: Build
-        working-directory: frontend
+        working-directory: interfaces/frontend
         run: npm run build
