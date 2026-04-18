@@ -254,3 +254,181 @@ class PgJournalRepository:
             WHERE openalex_id IS NOT NULL
         """)
         return self._cur.rowcount
+
+    # ── Fusion ─────────────────────────────────────────────────────
+
+    def find_shared_title_journal_pairs(
+        self, target_publisher_id: int, source_publisher_id: int,
+    ) -> list[dict]:
+        """Retourne les paires de journaux (un du target, un du source)
+        qui partagent le même `title_normalized`.
+
+        Chaque ligne contient `target_journal_id`, `source_journal_id`,
+        et les 6 valeurs ISSN/eISSN/ISSN-L des deux côtés — tout est
+        récupéré en une seule requête pour permettre au service de
+        détecter les conflits ISSN sans SELECT additionnel.
+        """
+        self._cur.execute(
+            """
+            SELECT
+                jt.id  AS target_journal_id,
+                js.id  AS source_journal_id,
+                jt.issn  AS t_issn,  jt.eissn AS t_eissn, jt.issnl AS t_issnl,
+                js.issn  AS s_issn,  js.eissn AS s_eissn, js.issnl AS s_issnl
+            FROM journals jt
+            JOIN journals js ON js.title_normalized = jt.title_normalized
+            WHERE jt.publisher_id = %s AND js.publisher_id = %s
+            """,
+            (target_publisher_id, source_publisher_id),
+        )
+        return self._cur.fetchall()
+
+    def merge_publisher_into(self, target_id: int, source_id: int) -> None:
+        """Fusion d'éditeur — étapes 2-6 (le service a déjà traité les paires
+        de journaux partageant un titre via `find_shared_title_journal_pairs`
+        + merge_journals).
+
+        1. (fait côté service) fusion des journaux à titres partagés
+        2. Transfert des journaux restants vers la cible
+        3. Transfert/dédup des publisher_name_forms
+        3b. Transfert/dédup des journal_name_forms référençant le publisher
+        4. Transfert des apc_payments
+        5. Enrichissement des champs (openalex_id, country, is_predatory)
+        6. Suppression de l'éditeur source
+        """
+        # 2. Transférer les journals restants
+        self._cur.execute(
+            "UPDATE journals SET publisher_id = %s WHERE publisher_id = %s",
+            (target_id, source_id),
+        )
+
+        # 3. Transférer les publisher_name_forms (dédup sur form_normalized)
+        self._cur.execute(
+            """
+            UPDATE publisher_name_forms SET publisher_id = %s
+            WHERE publisher_id = %s
+              AND form_normalized NOT IN (
+                  SELECT form_normalized FROM publisher_name_forms WHERE publisher_id = %s
+              )
+            """,
+            (target_id, source_id, target_id),
+        )
+        self._cur.execute(
+            "DELETE FROM publisher_name_forms WHERE publisher_id = %s",
+            (source_id,),
+        )
+
+        # 3b. journal_name_forms (supprime d'abord les doublons avec target,
+        # puis transfère le reste)
+        self._cur.execute(
+            """
+            DELETE FROM journal_name_forms
+            WHERE publisher_id = %s
+              AND form_normalized IN (
+                  SELECT form_normalized FROM journal_name_forms WHERE publisher_id = %s
+              )
+            """,
+            (source_id, target_id),
+        )
+        self._cur.execute(
+            "UPDATE journal_name_forms SET publisher_id = %s WHERE publisher_id = %s",
+            (target_id, source_id),
+        )
+
+        # 4. Transférer les apc_payments
+        self._cur.execute(
+            "UPDATE apc_payments SET publisher_id = %s WHERE publisher_id = %s",
+            (target_id, source_id),
+        )
+
+        # 5. Enrichir la cible. Ordre : capture src → NULL-er openalex_id src
+        # (libère la contrainte UNIQUE) → enrich target → delete source.
+        self._cur.execute(
+            "SELECT openalex_id, country, is_predatory FROM publishers WHERE id = %s",
+            (source_id,),
+        )
+        src = self._cur.fetchone()
+        self._cur.execute(
+            "UPDATE publishers SET openalex_id = NULL WHERE id = %s",
+            (source_id,),
+        )
+        self._cur.execute(
+            """
+            UPDATE publishers SET
+                openalex_id = COALESCE(openalex_id, %s),
+                country = COALESCE(country, %s),
+                is_predatory = is_predatory OR %s,
+                updated_at = now()
+            WHERE id = %s
+            """,
+            (src["openalex_id"], src["country"], src["is_predatory"], target_id),
+        )
+
+        # 6. Supprimer la source
+        self._cur.execute("DELETE FROM publishers WHERE id = %s", (source_id,))
+
+    def merge_journal_into(self, target_id: int, source_id: int) -> None:
+        """Fusion de journal (5 étapes SQL) :
+        1. Transfert des publications et source_publications
+        2. Transfert/dédup des journal_name_forms
+        3. Transfert des apc_payments
+        4. Enrichissement COALESCE des métadonnées journal
+        5. Suppression de la source
+        """
+        # 1. Transférer les publications et source_publications
+        self._cur.execute(
+            "UPDATE publications SET journal_id = %s WHERE journal_id = %s",
+            (target_id, source_id),
+        )
+        self._cur.execute(
+            "UPDATE source_publications SET journal_id = %s WHERE journal_id = %s",
+            (target_id, source_id),
+        )
+
+        # 2. Transférer les journal_name_forms (dédup par (form_normalized,
+        # publisher_id) en traitant NULL comme 0 pour l'uniqueness)
+        self._cur.execute(
+            """
+            UPDATE journal_name_forms SET journal_id = %s
+            WHERE journal_id = %s
+              AND (form_normalized, COALESCE(publisher_id, 0)) NOT IN (
+                  SELECT form_normalized, COALESCE(publisher_id, 0)
+                  FROM journal_name_forms WHERE journal_id = %s
+              )
+            """,
+            (target_id, source_id, target_id),
+        )
+        self._cur.execute(
+            "DELETE FROM journal_name_forms WHERE journal_id = %s",
+            (source_id,),
+        )
+
+        # 3. Transférer les apc_payments
+        self._cur.execute(
+            "UPDATE apc_payments SET journal_id = %s WHERE journal_id = %s",
+            (target_id, source_id),
+        )
+
+        # 4. Enrichir la cible (COALESCE sur toutes les métadonnées)
+        self._cur.execute(
+            """
+            UPDATE journals dest SET
+                issn = COALESCE(dest.issn, src.issn),
+                eissn = COALESCE(dest.eissn, src.eissn),
+                issnl = COALESCE(dest.issnl, src.issnl),
+                publisher_id = COALESCE(dest.publisher_id, src.publisher_id),
+                openalex_id = COALESCE(dest.openalex_id, src.openalex_id),
+                is_in_doaj = dest.is_in_doaj OR src.is_in_doaj,
+                is_predatory = dest.is_predatory OR src.is_predatory,
+                apc_amount = COALESCE(dest.apc_amount, src.apc_amount),
+                apc_currency = COALESCE(dest.apc_currency, src.apc_currency),
+                oa_model = COALESCE(dest.oa_model, src.oa_model),
+                updated_at = now()
+            FROM journals src
+            WHERE dest.id = %s AND src.id = %s
+            """,
+            (target_id, source_id),
+        )
+
+        # 5. Supprimer la source
+        self._cur.execute("DELETE FROM journals WHERE id = %s", (source_id,))
