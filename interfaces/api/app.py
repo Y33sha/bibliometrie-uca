@@ -19,7 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from interfaces.api.deps import _get_pool, _verify_token, get_cursor
+from application import audit
 from domain.errors import (
     ConflictError,
     DomainError,
@@ -27,8 +27,8 @@ from domain.errors import (
     UnauthorizedError,
     ValidationError,
 )
-from application import audit
 from infrastructure.log import configure_root_logging
+from interfaces.api.deps import _get_pool, _verify_token, get_cursor
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
 # À faire AVANT l'import des routers qui peuvent créer leur propre logger.
@@ -215,8 +215,7 @@ async def health():
         with get_cursor() as (cur, conn):
             cur.execute("SELECT 1")
             cur.execute(
-                "SELECT source, MAX(created_at) AS last_at "
-                "FROM source_publications GROUP BY source"
+                "SELECT source, MAX(created_at) AS last_at FROM source_publications GROUP BY source"
             )
             rows = cur.fetchall()
     except Exception as e:

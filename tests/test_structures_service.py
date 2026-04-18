@@ -6,7 +6,6 @@ structure_name_forms.
 
 import pytest
 
-from domain.errors import NotFoundError, ValidationError
 from application.structures import (
     create_name_form,
     create_relation,
@@ -17,8 +16,10 @@ from application.structures import (
     update_name_form,
     update_structure,
 )
+from domain.errors import NotFoundError, ValidationError
 
 # ── structures ────────────────────────────────────────────────────
+
 
 class TestCreateStructure:
     def test_minimal(self, db):
@@ -30,7 +31,10 @@ class TestCreateStructure:
 
     def test_with_api_ids(self, db):
         row = create_structure(
-            db, code="TEST", name="Test", type="labo",
+            db,
+            code="TEST",
+            name="Test",
+            type="labo",
             api_ids={"openalex": ["I1"], "wos": ["WOS_TEST"]},
         )
         assert row["api_ids"] == {"openalex": ["I1"], "wos": ["WOS_TEST"]}
@@ -39,7 +43,10 @@ class TestCreateStructure:
         """Un scalaire string passé pour une source est wrappé en liste via
         StructureApiIds. Les listes vides sont éliminées à la normalisation."""
         row = create_structure(
-            db, code="T2", name="T2", type="labo",
+            db,
+            code="T2",
+            name="T2",
+            type="labo",
             api_ids={"openalex": "I1", "wos": []},
         )
         assert row["api_ids"] == {"openalex": ["I1"]}
@@ -48,7 +55,10 @@ class TestCreateStructure:
         """Un type aberrant (int dans une liste de strings) est rejeté."""
         with pytest.raises(ValidationError, match="api_ids invalide"):
             create_structure(
-                db, code="T3", name="T3", type="labo",
+                db,
+                code="T3",
+                name="T3",
+                type="labo",
                 api_ids={"openalex": [123, 456]},
             )
 
@@ -66,14 +76,15 @@ class TestUpdateStructure:
     def test_updates_fields(self, db):
         row = create_structure(db, code="X", name="Ancien", type="labo")
         updated = update_structure(
-            db, row["id"], fields={"name": "Nouveau", "acronym": "N"},
+            db,
+            row["id"],
+            fields={"name": "Nouveau", "acronym": "N"},
         )
         assert updated["name"] == "Nouveau"
         assert updated["acronym"] == "N"
 
     def test_updates_api_ids_replaces_dict(self, db):
-        row = create_structure(db, code="X", name="X", type="labo",
-                               api_ids={"openalex": ["OLD"]})
+        row = create_structure(db, code="X", name="X", type="labo", api_ids={"openalex": ["OLD"]})
         updated = update_structure(db, row["id"], fields={"api_ids": {"openalex": ["NEW"]}})
         assert updated["api_ids"] == {"openalex": ["NEW"]}
 
@@ -81,7 +92,9 @@ class TestUpdateStructure:
         """Les champs à None dans le dict ne sont pas appliqués."""
         row = create_structure(db, code="X", name="Original", type="labo")
         updated = update_structure(
-            db, row["id"], fields={"name": None, "acronym": "AC"},
+            db,
+            row["id"],
+            fields={"name": None, "acronym": "AC"},
         )
         assert updated["name"] == "Original"  # inchangé
         assert updated["acronym"] == "AC"
@@ -101,12 +114,15 @@ class TestDeleteStructure:
 
 # ── structure_relations ───────────────────────────────────────────
 
+
 class TestCreateRelation:
     def test_creates(self, db):
         parent = create_structure(db, code="P", name="Parent", type="universite")
         child = create_structure(db, code="C", name="Child", type="labo")
         rel = create_relation(
-            db, parent_id=parent["id"], child_id=child["id"],
+            db,
+            parent_id=parent["id"],
+            child_id=child["id"],
             relation_type="est_tutelle_de",
         )
         assert rel is not None
@@ -117,10 +133,12 @@ class TestCreateRelation:
         """Si la relation existe déjà, retourne None (ON CONFLICT DO NOTHING)."""
         parent = create_structure(db, code="P", name="P", type="universite")
         child = create_structure(db, code="C", name="C", type="labo")
-        create_relation(db, parent_id=parent["id"], child_id=child["id"],
-                        relation_type="est_tutelle_de")
-        again = create_relation(db, parent_id=parent["id"], child_id=child["id"],
-                                relation_type="est_tutelle_de")
+        create_relation(
+            db, parent_id=parent["id"], child_id=child["id"], relation_type="est_tutelle_de"
+        )
+        again = create_relation(
+            db, parent_id=parent["id"], child_id=child["id"], relation_type="est_tutelle_de"
+        )
         assert again is None
 
 
@@ -132,14 +150,16 @@ class TestDeleteRelation:
     def test_deletes_existing(self, db):
         parent = create_structure(db, code="P", name="P", type="universite")
         child = create_structure(db, code="C", name="C", type="labo")
-        rel = create_relation(db, parent_id=parent["id"], child_id=child["id"],
-                              relation_type="est_tutelle_de")
+        rel = create_relation(
+            db, parent_id=parent["id"], child_id=child["id"], relation_type="est_tutelle_de"
+        )
         delete_relation(db, rel["id"])
         db.execute("SELECT id FROM structure_relations WHERE id = %s", (rel["id"],))
         assert db.fetchone() is None
 
 
 # ── structure_name_forms ──────────────────────────────────────────
+
 
 class TestCreateNameForm:
     def test_creates_with_normalization(self, db):
@@ -153,8 +173,11 @@ class TestCreateNameForm:
     def test_creates_with_context(self, db):
         s = create_structure(db, code="X", name="X", type="labo")
         form = create_name_form(
-            db, structure_id=s["id"], form_text="U999",
-            is_word_boundary=True, requires_context_of=[s["id"]],
+            db,
+            structure_id=s["id"],
+            form_text="U999",
+            is_word_boundary=True,
+            requires_context_of=[s["id"]],
         )
         assert form["is_word_boundary"] is True
         assert form["requires_context_of"] == [s["id"]]
@@ -181,7 +204,9 @@ class TestUpdateNameForm:
         s = create_structure(db, code="X", name="X", type="labo")
         form = create_name_form(db, structure_id=s["id"], form_text="x")
         updated = update_name_form(
-            db, form["id"], fields={"is_word_boundary": True, "is_excluding": True},
+            db,
+            form["id"],
+            fields={"is_word_boundary": True, "is_excluding": True},
         )
         assert updated["is_word_boundary"] is True
         assert updated["is_excluding"] is True

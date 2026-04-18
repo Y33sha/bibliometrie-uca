@@ -18,9 +18,9 @@ import os
 import sys
 from datetime import datetime
 
-from infrastructure.db.connection import get_connection
 from application.persons import refresh_person_name_forms
 from domain.normalize import normalize_name
+from infrastructure.db.connection import get_connection
 
 logging.basicConfig(
     level=logging.INFO,

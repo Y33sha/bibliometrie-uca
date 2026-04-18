@@ -1,7 +1,6 @@
 """Tests unitaires — fonctions pures, sans base de données."""
 
 from application.persons import compute_person_name_forms
-from domain.publication import clean_doi
 from domain.names import (
     first_names_compatible,
     last_names_compatible,
@@ -9,6 +8,7 @@ from domain.names import (
     parse_raw_author_name,
 )
 from domain.normalize import normalize_name
+from domain.publication import clean_doi
 
 # ── normalize_name ──
 

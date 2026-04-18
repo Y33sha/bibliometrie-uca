@@ -22,7 +22,6 @@ import os
 
 from psycopg2.extras import RealDictCursor
 
-from infrastructure.db.connection import get_connection
 from application.publications import (
     find_or_create as find_or_create_publication,
 )
@@ -30,9 +29,10 @@ from application.publications import (
     refresh_from_sources,
 )
 from domain.doc_types import map_doc_type
-from infrastructure.log import setup_logger
-from domain.publication import normalize_nnt
 from domain.normalize import normalize_text
+from domain.publication import normalize_nnt
+from infrastructure.db.connection import get_connection
+from infrastructure.log import setup_logger
 
 logger = setup_logger("create_publications", os.path.join(os.path.dirname(__file__), "logs"))
 

@@ -21,8 +21,8 @@ Usage :
 """
 
 from domain.errors import NotFoundError
-from domain.person import compute_person_name_forms
 from domain.normalize import normalize_name
+from domain.person import compute_person_name_forms
 
 
 class PgPersonRepository:
@@ -67,8 +67,10 @@ class PgPersonRepository:
             WHERE id = %s
             """,
             (
-                last_name, first_name,
-                normalize_name(last_name), normalize_name(first_name),
+                last_name,
+                first_name,
+                normalize_name(last_name),
+                normalize_name(first_name),
                 person_id,
             ),
         )
@@ -343,7 +345,10 @@ class PgPersonRepository:
         )
 
     def assign_orphan_sa(
-        self, person_id: int, source: str, authorship_id: int,
+        self,
+        person_id: int,
+        source: str,
+        authorship_id: int,
     ) -> dict | None:
         """Tente de poser person_id sur une source_authorship orpheline.
 
@@ -505,6 +510,7 @@ class PgPersonRepository:
 
         # 4. in_perimeter et structure_ids (union des sources)
         from domain.sources import AUTHOR_SOURCES_SQL
+
         self._cur.execute(
             f"""
             WITH src AS (
@@ -534,6 +540,7 @@ class PgPersonRepository:
         forme de nom donnée. Utilisé par detach_authorships pour décider
         de nettoyer la name_form ou pas."""
         from domain.sources import AUTHOR_SOURCES_SQL
+
         self._cur.execute(
             f"""
             SELECT COUNT(*) AS n FROM source_authorships sa

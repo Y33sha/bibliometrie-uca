@@ -18,11 +18,17 @@ import time
 import requests
 from psycopg2.extras import Json, RealDictCursor
 
-from infrastructure.db.connection import get_connection
-from infrastructure.sources.common import compute_hash, setup_logger
-from infrastructure.sources.openalex import BASE_URL, SELECT_FIELDS, auth_params, compute_meta_hash, init_auth
 from infrastructure.api_limits import OPENALEX_DELAY
 from infrastructure.app_config import get_openalex_api_key, get_openalex_email
+from infrastructure.db.connection import get_connection
+from infrastructure.sources.common import compute_hash, setup_logger
+from infrastructure.sources.openalex import (
+    BASE_URL,
+    SELECT_FIELDS,
+    auth_params,
+    compute_meta_hash,
+    init_auth,
+)
 
 logger = setup_logger("refetch_truncated", os.path.join(os.path.dirname(__file__), "logs"))
 

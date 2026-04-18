@@ -4,10 +4,10 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from interfaces.api.deps import get_cursor
-from interfaces.api.models import JournalUpdate, MergeRequest
 from application.journals import merge_journals
 from application.journals import update_journal as _update_journal
+from interfaces.api.deps import get_cursor
+from interfaces.api.models import JournalUpdate, MergeRequest
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

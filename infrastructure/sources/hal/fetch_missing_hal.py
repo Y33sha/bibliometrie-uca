@@ -24,12 +24,12 @@ import time
 import requests
 from psycopg2.extras import Json, RealDictCursor
 
-from infrastructure.db.connection import get_connection
-from infrastructure.sources.common import compute_hash
-from infrastructure.api_limits import HAL_DELAY
 from domain.publication import extract_hal_id_from_url
+from infrastructure.api_limits import HAL_DELAY
+from infrastructure.db.connection import get_connection
 from infrastructure.hal import HAL_FIELDS_STR
 from infrastructure.log import setup_logger
+from infrastructure.sources.common import compute_hash
 
 log = setup_logger("fetch_missing_hal", os.path.join(os.path.dirname(__file__), "logs"))
 

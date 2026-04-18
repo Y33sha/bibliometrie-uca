@@ -7,7 +7,6 @@ merge_person est déjà testé dans test_integration.py.
 
 import pytest
 
-from domain.errors import NotFoundError, ValidationError
 from application.persons import (
     add_identifier,
     add_identifiers_from_authorships,
@@ -25,8 +24,10 @@ from application.persons import (
     update_identifier_status,
     update_name,
 )
+from domain.errors import NotFoundError, ValidationError
 
 # ── Helpers ────────────────────────────────────────────────────────
+
 
 def _insert_person(db, last="Dupont", first="Jean"):
     db.execute(
@@ -61,9 +62,11 @@ def _insert_source_publication(db, publication_id, source="hal", source_id="hal-
     return db.fetchone()["id"]
 
 
-def _insert_source_person(db, source="hal", source_id="hal-p-1", full_name="Jean Dupont",
-                          source_ids=None):
+def _insert_source_person(
+    db, source="hal", source_id="hal-p-1", full_name="Jean Dupont", source_ids=None
+):
     import json
+
     db.execute(
         """
         INSERT INTO source_persons (source, source_id, full_name, source_ids)
@@ -75,10 +78,15 @@ def _insert_source_person(db, source="hal", source_id="hal-p-1", full_name="Jean
     return db.fetchone()["id"]
 
 
-def _insert_source_authorship(db, source_publication_id, source_person_id,
-                              source="hal", person_id=None,
-                              author_name_normalized="jean dupont",
-                              excluded=False):
+def _insert_source_authorship(
+    db,
+    source_publication_id,
+    source_person_id,
+    source="hal",
+    person_id=None,
+    author_name_normalized="jean dupont",
+    excluded=False,
+):
     db.execute(
         """
         INSERT INTO source_authorships (source, source_publication_id,
@@ -87,13 +95,20 @@ def _insert_source_authorship(db, source_publication_id, source_person_id,
         VALUES (%s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
-        (source, source_publication_id, source_person_id, person_id,
-         author_name_normalized, excluded),
+        (
+            source,
+            source_publication_id,
+            source_person_id,
+            person_id,
+            author_name_normalized,
+            excluded,
+        ),
     )
     return db.fetchone()["id"]
 
 
 # ── link_authorship / unlink_authorship ────────────────────────────
+
 
 class TestLinkAuthorship:
     def test_ignores_invalid_source(self, db):
@@ -120,8 +135,9 @@ class TestLinkAuthorship:
         sp_person = _insert_source_person(db, source_ids={"hal_person_id": 42})
         sa_id = _insert_source_authorship(db, sp_id, sp_person)
 
-        link_authorship(db, person_id, "hal", sa_id,
-                        source_person_id=sp_person, has_hal_person_id=True)
+        link_authorship(
+            db, person_id, "hal", sa_id, source_person_id=sp_person, has_hal_person_id=True
+        )
 
         db.execute("SELECT person_id FROM source_persons WHERE id = %s", (sp_person,))
         assert db.fetchone()["person_id"] == person_id
@@ -160,6 +176,7 @@ class TestUnlinkAuthorship:
 
 # ── add_identifier ─────────────────────────────────────────────────
 
+
 class TestAddIdentifier:
     def test_inserts_new(self, db):
         person_id = _insert_person(db)
@@ -174,14 +191,10 @@ class TestAddIdentifier:
         p1 = _insert_person(db, "A", "A")
         p2 = _insert_person(db, "B", "B")
         add_identifier(db, p1, "orcid", "0000-0001")
-        db.execute(
-            "UPDATE person_identifiers SET status='rejected' WHERE id_value='0000-0001'"
-        )
+        db.execute("UPDATE person_identifiers SET status='rejected' WHERE id_value='0000-0001'")
         add_identifier(db, p2, "orcid", "0000-0001")
 
-        db.execute(
-            "SELECT person_id, status FROM person_identifiers WHERE id_value='0000-0001'"
-        )
+        db.execute("SELECT person_id, status FROM person_identifiers WHERE id_value='0000-0001'")
         row = db.fetchone()
         assert row["person_id"] == p2
         assert row["status"] == "pending"
@@ -193,9 +206,7 @@ class TestAddIdentifier:
         add_identifier(db, p1, "orcid", "0000-0001")
         add_identifier(db, p2, "orcid", "0000-0001")  # devrait rien faire
 
-        db.execute(
-            "SELECT person_id FROM person_identifiers WHERE id_value='0000-0001'"
-        )
+        db.execute("SELECT person_id FROM person_identifiers WHERE id_value='0000-0001'")
         assert db.fetchone()["person_id"] == p1
 
     def test_idhal_attaches_hal_source_person(self, db):
@@ -214,9 +225,7 @@ class TestRemoveIdentifier:
         p = _insert_person(db)
         add_identifier(db, p, "orcid", "0000-0001")
         remove_identifier(db, p, "orcid", "0000-0001")
-        db.execute(
-            "SELECT id FROM person_identifiers WHERE id_value = '0000-0001'"
-        )
+        db.execute("SELECT id FROM person_identifiers WHERE id_value = '0000-0001'")
         assert db.fetchone() is None
 
     def test_raises_not_found(self, db):
@@ -309,9 +318,11 @@ class TestUpdateName:
 
 # ── batch_assign_orphan_authorships ─────────────────────────────────
 
+
 class TestBatchAssignOrphanAuthorships:
     def _setup_uca(self, db):
         import json
+
         db.execute(
             """
             INSERT INTO structures (code, name, structure_type)
@@ -342,10 +353,12 @@ class TestBatchAssignOrphanAuthorships:
         sp_oa = _insert_source_publication(db, pub_id, source="openalex", source_id="W1")
         sp_person_hal = _insert_source_person(db, source="hal", source_id="hal-p-1")
         sp_person_oa = _insert_source_person(db, source="openalex", source_id="oa-p-1")
-        sa1 = _insert_source_authorship(db, sp_hal, sp_person_hal, source="hal",
-                                        author_name_normalized="jean dupont")
-        sa2 = _insert_source_authorship(db, sp_oa, sp_person_oa, source="openalex",
-                                        author_name_normalized="jean dupont")
+        sa1 = _insert_source_authorship(
+            db, sp_hal, sp_person_hal, source="hal", author_name_normalized="jean dupont"
+        )
+        sa2 = _insert_source_authorship(
+            db, sp_oa, sp_person_oa, source="openalex", author_name_normalized="jean dupont"
+        )
 
         assigned = batch_assign_orphan_authorships(db, person_id, [sa1, sa2])
 
@@ -383,6 +396,7 @@ class TestBatchAssignOrphanAuthorships:
 
 # ── detach_authorships ─────────────────────────────────────────────
 
+
 class TestDetachAuthorships:
     def test_detaches_and_removes_truth_if_orphan(self, db):
         person_id = _insert_person(db)
@@ -401,7 +415,8 @@ class TestDetachAuthorships:
         sa_id = _insert_source_authorship(db, sp_id, sp_person, person_id=person_id)
 
         result = detach_authorships(
-            db, person_id,
+            db,
+            person_id,
             authorships=[{"source": "hal", "authorship_id": sa_id}],
         )
 
@@ -419,8 +434,7 @@ class TestDetachAuthorships:
         # add_name_form simulé via create_person
 
         # Pas de source_authorship portant "dupont jean" → la forme est nettoyée
-        result = detach_authorships(db, person_id, authorships=[],
-                                     name_form="dupont jean")
+        result = detach_authorships(db, person_id, authorships=[], name_form="dupont jean")
         assert result["cleaned_form"] is True
 
         db.execute("SELECT id FROM person_name_forms WHERE name_form = 'dupont jean'")
@@ -436,11 +450,11 @@ class TestDetachAuthorships:
         sp_id = _insert_source_publication(db, pub_id)
         sp_person = _insert_source_person(db)
         # source_authorship portant la forme "dupont jean"
-        _insert_source_authorship(db, sp_id, sp_person, person_id=person_id,
-                                  author_name_normalized="dupont jean")
+        _insert_source_authorship(
+            db, sp_id, sp_person, person_id=person_id, author_name_normalized="dupont jean"
+        )
 
-        result = detach_authorships(db, person_id, authorships=[],
-                                     name_form="dupont jean")
+        result = detach_authorships(db, person_id, authorships=[], name_form="dupont jean")
 
         assert result["cleaned_form"] is False
 
@@ -489,6 +503,7 @@ class TestAddIdentifiersFromAuthorships:
 
 # ── detach_name_form ───────────────────────────────────────────────
 
+
 class TestDetachNameForm:
     def test_removes_person_from_form(self, db):
         p1 = create_person(db, "Dupont", "Jean")
@@ -496,9 +511,7 @@ class TestDetachNameForm:
 
         detach_name_form(db, p1, "dupont jean")
 
-        db.execute(
-            "SELECT person_ids FROM person_name_forms WHERE name_form = 'dupont jean'"
-        )
+        db.execute("SELECT person_ids FROM person_name_forms WHERE name_form = 'dupont jean'")
         row = db.fetchone()
         assert row is not None
         assert p1 not in row["person_ids"]
@@ -509,18 +522,18 @@ class TestDetachNameForm:
 
         detach_name_form(db, person_id, "name unique")
 
-        db.execute(
-            "SELECT id FROM person_name_forms WHERE name_form = 'name unique'"
-        )
+        db.execute("SELECT id FROM person_name_forms WHERE name_form = 'name unique'")
         assert db.fetchone() is None
 
 
 # ── assign_orphan_authorship (+ _ensure_truth_authorship) ──────────
 
+
 class TestAssignOrphanAuthorship:
     def _setup(self, db):
         """Monte un périmètre UCA minimal (nécessaire pour _ensure_truth_authorship)."""
         import json
+
         db.execute(
             """
             INSERT INTO structures (code, name, structure_type)
@@ -567,7 +580,9 @@ class TestAssignOrphanAuthorship:
 
         assert result is True
         # person_id assigné sur source_authorship
-        db.execute("SELECT person_id, authorship_id FROM source_authorships WHERE id = %s", (sa_id,))
+        db.execute(
+            "SELECT person_id, authorship_id FROM source_authorships WHERE id = %s", (sa_id,)
+        )
         row = db.fetchone()
         assert row["person_id"] == person_id
         assert row["authorship_id"] is not None
@@ -587,7 +602,9 @@ class TestAssignOrphanAuthorship:
         sp_id = _insert_source_publication(db, pub_id)
         sp_person = _insert_source_person(db)
         sa_id = _insert_source_authorship(
-            db, sp_id, sp_person,
+            db,
+            sp_id,
+            sp_person,
             author_name_normalized="other name",
             excluded=True,
         )
@@ -595,7 +612,5 @@ class TestAssignOrphanAuthorship:
         assign_orphan_authorship(db, person_id, "hal", sa_id)
 
         # Aucune nouvelle name_form 'other name' n'a été créée
-        db.execute(
-            "SELECT id FROM person_name_forms WHERE name_form = 'other name'"
-        )
+        db.execute("SELECT id FROM person_name_forms WHERE name_form = 'other name'")
         assert db.fetchone() is None

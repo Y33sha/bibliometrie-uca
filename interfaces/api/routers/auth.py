@@ -5,6 +5,7 @@ import time
 
 from fastapi import APIRouter, Cookie, Response
 
+from infrastructure.settings import settings
 from interfaces.api.deps import (
     SESSION_MAX_AGE,
     _check_password,
@@ -12,7 +13,6 @@ from interfaces.api.deps import (
     _verify_token,
 )
 from interfaces.api.models import LoginRequest
-from infrastructure.settings import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

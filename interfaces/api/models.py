@@ -210,6 +210,7 @@ class DetachNameForm(BaseModel):
 
 class ConfigValueUpdate(BaseModel):
     """Corps de PUT /api/config/{key} : value JSON-sérialisable arbitraire."""
+
     value: Any
 
 

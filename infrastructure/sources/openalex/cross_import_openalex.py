@@ -23,6 +23,8 @@ import time
 import requests
 from psycopg2.extras import Json
 
+from infrastructure.api_limits import OPENALEX_DELAY
+from infrastructure.app_config import get_openalex_api_key, get_openalex_email
 from infrastructure.db.connection import get_connection
 from infrastructure.sources.common import compute_hash, get_cross_import_dois, setup_logger
 from infrastructure.sources.openalex import (
@@ -33,8 +35,6 @@ from infrastructure.sources.openalex import (
     extract_openalex_id,
     init_auth,
 )
-from infrastructure.api_limits import OPENALEX_DELAY
-from infrastructure.app_config import get_openalex_api_key, get_openalex_email
 
 # ----- Logging -----
 logger = setup_logger("cross_import_openalex", os.path.join(os.path.dirname(__file__), "logs"))

@@ -20,6 +20,7 @@ from application.publications import (
 
 # ── Helpers ────────────────────────────────────────────────────────
 
+
 def _insert_journal(db, title="Nature"):
     db.execute(
         "INSERT INTO journals (title, title_normalized) VALUES (%s, lower(%s)) RETURNING id",
@@ -28,9 +29,15 @@ def _insert_journal(db, title="Nature"):
     return db.fetchone()["id"]
 
 
-def _insert_publication(db, title="Test", pub_year=2024, doi=None,
-                       doc_type="article", journal_id=None,
-                       oa_status="unknown"):
+def _insert_publication(
+    db,
+    title="Test",
+    pub_year=2024,
+    doi=None,
+    doc_type="article",
+    journal_id=None,
+    oa_status="unknown",
+):
     db.execute(
         """
         INSERT INTO publications (title, title_normalized, pub_year, doi,
@@ -43,9 +50,11 @@ def _insert_publication(db, title="Test", pub_year=2024, doi=None,
     return db.fetchone()["id"]
 
 
-def _insert_source_publication(db, publication_id, source="hal", source_id="h-1",
-                              title="Test", external_ids=None):
+def _insert_source_publication(
+    db, publication_id, source="hal", source_id="h-1", title="Test", external_ids=None
+):
     import json
+
     db.execute(
         """
         INSERT INTO source_publications (source, source_id, title,
@@ -53,8 +62,13 @@ def _insert_source_publication(db, publication_id, source="hal", source_id="h-1"
         VALUES (%s, %s, %s, %s, %s::jsonb)
         RETURNING id
         """,
-        (source, source_id, title, publication_id,
-         json.dumps(external_ids) if external_ids else None),
+        (
+            source,
+            source_id,
+            title,
+            publication_id,
+            json.dumps(external_ids) if external_ids else None,
+        ),
     )
     return db.fetchone()["id"]
 
@@ -81,6 +95,7 @@ def _insert_authorship(db, publication_id, person_id=None):
 
 # ── find_by_* ──────────────────────────────────────────────────────
 
+
 class TestFindByDoi:
     def test_returns_none_on_empty(self, db):
         assert find_by_doi(db, None) is None
@@ -104,7 +119,10 @@ class TestFindByNnt:
     def test_finds_by_nnt_in_external_ids(self, db):
         pub_id = _insert_publication(db, doc_type="thesis")
         _insert_source_publication(
-            db, pub_id, source="theses", source_id="t-1",
+            db,
+            pub_id,
+            source="theses",
+            source_id="t-1",
             external_ids={"nnt": "2024UCAC0001"},
         )
         result = find_by_nnt(db, "2024UCAC0001")
@@ -114,7 +132,10 @@ class TestFindByNnt:
     def test_nnt_uppercased_for_lookup(self, db):
         pub_id = _insert_publication(db, doc_type="thesis")
         _insert_source_publication(
-            db, pub_id, source="theses", source_id="t-1",
+            db,
+            pub_id,
+            source="theses",
+            source_id="t-1",
             external_ids={"nnt": "2024UCAC0001"},
         )
         # Même en minuscules en entrée, trouve
@@ -161,6 +182,7 @@ class TestFindThesisByTitle:
 
 # ── try_merge_by_doi ───────────────────────────────────────────────
 
+
 class TestTryMergeByDoi:
     def test_noop_if_no_doi_given(self, db):
         pub_id = _insert_publication(db)
@@ -189,25 +211,26 @@ class TestTryMergeByDoi:
 
 # ── resolve_doi_conflict ───────────────────────────────────────────
 
+
 class TestResolveDoiConflict:
     def test_chapter_vs_existing_book_drops_doi(self, db):
         """Chapitre avec DOI qui pointe vers livre : DOI retiré du chapitre."""
         from application.publications import PubByDoi
+
         existing = PubByDoi(id=1, doc_type="book", title_normalized="livre")
 
-        doi, merge_id = resolve_doi_conflict(db, "10.x/book", "book_chapter",
-                                             "chapitre", existing)
+        doi, merge_id = resolve_doi_conflict(db, "10.x/book", "book_chapter", "chapitre", existing)
         assert doi is None
         assert merge_id is None
 
     def test_book_vs_existing_chapter_strips_doi_from_chapter(self, db):
         """Livre avec DOI existant sur un chapitre : DOI retiré du chapitre, livre garde."""
         from application.publications import PubByDoi
+
         existing_id = _insert_publication(
             db, title="Chapitre", doc_type="book_chapter", doi="10.x/book"
         )
-        existing = PubByDoi(id=existing_id, doc_type="book_chapter",
-                            title_normalized="chapitre")
+        existing = PubByDoi(id=existing_id, doc_type="book_chapter", title_normalized="chapitre")
 
         doi, merge_id = resolve_doi_conflict(db, "10.x/book", "book", "livre", existing)
         assert doi == "10.x/book"
@@ -218,13 +241,15 @@ class TestResolveDoiConflict:
     def test_two_chapters_different_titles_strip_both(self, db):
         """2 chapitres avec titres différents partageant un DOI : les 2 perdent le DOI."""
         from application.publications import PubByDoi
+
         existing_id = _insert_publication(
             db, title="C1", doc_type="book_chapter", doi="10.x/shared"
         )
         existing = PubByDoi(id=existing_id, doc_type="book_chapter", title_normalized="c1")
 
-        doi, merge_id = resolve_doi_conflict(db, "10.x/shared", "book_chapter",
-                                             "c2_different", existing)
+        doi, merge_id = resolve_doi_conflict(
+            db, "10.x/shared", "book_chapter", "c2_different", existing
+        )
         assert doi is None
         assert merge_id is None
         db.execute("SELECT doi FROM publications WHERE id = %s", (existing_id,))
@@ -233,16 +258,17 @@ class TestResolveDoiConflict:
     def test_two_chapters_same_title_merges(self, db):
         """2 chapitres avec même titre + DOI → fusion."""
         from application.publications import PubByDoi
+
         existing = PubByDoi(id=42, doc_type="book_chapter", title_normalized="same")
 
-        doi, merge_id = resolve_doi_conflict(db, "10.x/shared", "book_chapter",
-                                             "same", existing)
+        doi, merge_id = resolve_doi_conflict(db, "10.x/shared", "book_chapter", "same", existing)
         assert doi == "10.x/shared"
         assert merge_id == 42
 
     def test_compatible_types_merge(self, db):
         """Types compatibles (ex: 2 articles) → fusion normale."""
         from application.publications import PubByDoi
+
         existing = PubByDoi(id=42, doc_type="article", title_normalized="a")
         doi, merge_id = resolve_doi_conflict(db, "10.x/a", "article", "a", existing)
         assert doi == "10.x/a"
@@ -250,6 +276,7 @@ class TestResolveDoiConflict:
 
 
 # ── update_oa_status / update_countries ────────────────────────────
+
 
 class TestUpdateOaStatus:
     def test_updates(self, db):
@@ -268,6 +295,7 @@ class TestUpdateCountries:
 
 
 # ── merge_publications ────────────────────────────────────────────
+
 
 class TestMergePublications:
     def test_transfers_source_publications_and_authorships(self, db):

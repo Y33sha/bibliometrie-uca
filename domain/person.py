@@ -18,7 +18,6 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from domain.errors import ValidationError
 from domain.normalize import normalize_name
 
-
 # ── Formes de noms (règle métier) ──────────────────────────────────
 
 
@@ -58,6 +57,7 @@ def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
 
     return forms
 
+
 # ── ORCID ──────────────────────────────────────────────────────────
 
 _ORCID_URL_PREFIXES = ("https://orcid.org/", "http://orcid.org/", "orcid.org/")
@@ -78,7 +78,7 @@ def _normalize_orcid(raw: str | None) -> str | None:
     lower = s.lower()
     for prefix in _ORCID_URL_PREFIXES:
         if lower.startswith(prefix):
-            s = s[len(prefix):]
+            s = s[len(prefix) :]
             break
     s = s.strip().upper()  # X en majuscule
     # Forme sans hyphens → ajouter les hyphens
@@ -116,7 +116,6 @@ class ORCID:
 
     def __str__(self) -> str:
         return self.value
-
 
 
 # ── IdHAL (personne) ───────────────────────────────────────────────
@@ -163,7 +162,6 @@ class IdHAL:
 
     def __str__(self) -> str:
         return self.value
-
 
 
 # ── IdRef (PPN SUDOC) ──────────────────────────────────────────────
@@ -256,4 +254,3 @@ class PersonSourceIds(BaseModel):
     def to_dict(self) -> dict:
         """Sérialise pour écriture en base (JSONB). Omet les clés None."""
         return self.model_dump(exclude_none=True)
-

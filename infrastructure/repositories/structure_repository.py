@@ -43,14 +43,23 @@ class PgStructureRepository:
                       ror_id, rnsr_id, hal_collection, api_ids
             """,
             (
-                code, name, acronym, type, ror_id, rnsr_id, hal_collection,
+                code,
+                name,
+                acronym,
+                type,
+                ror_id,
+                rnsr_id,
+                hal_collection,
                 Json(api_ids) if api_ids else None,
             ),
         )
         return self._cur.fetchone()
 
     def update_structure_fields(
-        self, structure_id: int, sql_fragments: list[str], params: list,
+        self,
+        structure_id: int,
+        sql_fragments: list[str],
+        params: list,
     ) -> dict:
         """UPDATE dynamique + RETURNING de la ligne complète.
 
@@ -83,7 +92,11 @@ class PgStructureRepository:
     # ── structure_relations ────────────────────────────────────────
 
     def create_relation(
-        self, *, parent_id: int, child_id: int, relation_type: str,
+        self,
+        *,
+        parent_id: int,
+        child_id: int,
+        relation_type: str,
     ) -> dict | None:
         """Insère une relation (idempotent). Retourne la ligne ou None si
         elle existait déjà."""
@@ -139,15 +152,20 @@ class PgStructureRepository:
             RETURNING *
             """,
             (
-                structure_id, form_text_normalized,
-                is_word_boundary, is_excluding,
+                structure_id,
+                form_text_normalized,
+                is_word_boundary,
+                is_excluding,
                 requires_context_of or None,
             ),
         )
         return self._cur.fetchone()
 
     def update_name_form_fields(
-        self, form_id: int, sql_fragments: list[str], params: list,
+        self,
+        form_id: int,
+        sql_fragments: list[str],
+        params: list,
     ) -> dict:
         """UPDATE dynamique + RETURNING de la ligne complète."""
         sets = ", ".join(sql_fragments)

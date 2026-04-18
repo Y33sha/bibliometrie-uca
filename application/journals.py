@@ -6,10 +6,10 @@ Toute création ou recherche de journal/éditeur passe par ce module.
 Compatible avec les curseurs tuples (standard) et RealDictCursor.
 """
 
-from domain.errors import ConflictError, NotFoundError, ValidationError
-from infrastructure.repositories import journal_repository
 from application.audit import emit_event
+from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
+from infrastructure.repositories import journal_repository
 
 # ── Publishers ──
 
@@ -96,7 +96,9 @@ def find_or_create_journal(
         """Enrichit le journal trouvé et rattache la forme de nom. Retourne son id."""
         repo.enrich_journal(
             journal_id,
-            issn=issn, eissn=eissn, publisher_id=publisher_id,
+            issn=issn,
+            eissn=eissn,
+            publisher_id=publisher_id,
             openalex_id=openalex_id if with_openalex else None,
             oa_model=oa_model if with_openalex else None,
         )
@@ -125,16 +127,25 @@ def find_or_create_journal(
     jid = repo.find_journal_by_name_form(title_normalized, publisher_id)
     if jid:
         repo.enrich_journal(
-            jid, issn=issn, eissn=eissn, publisher_id=publisher_id,
-            openalex_id=openalex_id, oa_model=oa_model,
+            jid,
+            issn=issn,
+            eissn=eissn,
+            publisher_id=publisher_id,
+            openalex_id=openalex_id,
+            oa_model=oa_model,
         )
         return jid
 
     # 6. Créer + enregistrer la forme de nom
     journal_id = repo.create_journal(
-        title=title.strip(), title_normalized=title_normalized,
-        issn=issn, eissn=eissn, issnl=issnl,
-        publisher_id=publisher_id, openalex_id=openalex_id, oa_model=oa_model,
+        title=title.strip(),
+        title_normalized=title_normalized,
+        issn=issn,
+        eissn=eissn,
+        issnl=issnl,
+        publisher_id=publisher_id,
+        openalex_id=openalex_id,
+        oa_model=oa_model,
     )
     repo.add_journal_name_form(journal_id, title_normalized, publisher_id)
     return journal_id
@@ -191,7 +202,9 @@ def update_journal_apc(
     """Met à jour les informations APC/DOAJ d'un journal."""
     journal_repository(cur).update_journal_apc(
         journal_id,
-        apc_amount=apc_amount, apc_currency=apc_currency, is_in_doaj=is_in_doaj,
+        apc_amount=apc_amount,
+        apc_currency=apc_currency,
+        is_in_doaj=is_in_doaj,
     )
 
 

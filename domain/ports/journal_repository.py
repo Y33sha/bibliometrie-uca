@@ -14,7 +14,9 @@ class JournalRepository(Protocol):
     # ── publisher_name_forms ───────────────────────────────────────
 
     def add_publisher_name_form(
-        self, publisher_id: int, form_normalized: str,
+        self,
+        publisher_id: int,
+        form_normalized: str,
     ) -> None: ...
 
     def find_publisher_by_name_form(self, form_normalized: str) -> int | None: ...
@@ -24,21 +26,32 @@ class JournalRepository(Protocol):
     def find_publisher_by_openalex_id(self, openalex_id: str) -> int | None: ...
 
     def set_publisher_openalex_id_if_missing(
-        self, publisher_id: int, openalex_id: str,
+        self,
+        publisher_id: int,
+        openalex_id: str,
     ) -> None: ...
 
     def create_publisher(
-        self, *, name: str, name_normalized: str, openalex_id: str | None,
+        self,
+        *,
+        name: str,
+        name_normalized: str,
+        openalex_id: str | None,
     ) -> int: ...
 
     # ── journal_name_forms ─────────────────────────────────────────
 
     def add_journal_name_form(
-        self, journal_id: int, form_normalized: str, publisher_id: int | None,
+        self,
+        journal_id: int,
+        form_normalized: str,
+        publisher_id: int | None,
     ) -> None: ...
 
     def find_journal_by_name_form(
-        self, form_normalized: str, publisher_id: int | None,
+        self,
+        form_normalized: str,
+        publisher_id: int | None,
     ) -> int | None: ...
 
     # ── journals ───────────────────────────────────────────────────
@@ -97,7 +110,9 @@ class JournalRepository(Protocol):
     # ── Fusion ─────────────────────────────────────────────────────
 
     def find_shared_title_journal_pairs(
-        self, target_publisher_id: int, source_publisher_id: int,
+        self,
+        target_publisher_id: int,
+        source_publisher_id: int,
     ) -> list[dict]: ...
 
     def merge_publisher_into(self, target_id: int, source_id: int) -> None: ...

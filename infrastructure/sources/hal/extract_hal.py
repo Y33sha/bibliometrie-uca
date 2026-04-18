@@ -19,8 +19,6 @@ import time
 import requests
 from psycopg2.extras import Json
 
-from infrastructure.db.connection import get_connection
-from infrastructure.sources.common import clean_doi, compute_hash, get_existing_ids, setup_logger
 from infrastructure.api_limits import HAL_DELAY, HAL_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import (
@@ -29,7 +27,9 @@ from infrastructure.app_config import (
     get_hal_extra_collections,
     get_years,
 )
+from infrastructure.db.connection import get_connection
 from infrastructure.hal import HAL_FIELDS
+from infrastructure.sources.common import clean_doi, compute_hash, get_existing_ids, setup_logger
 
 # ----- Logging -----
 logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))

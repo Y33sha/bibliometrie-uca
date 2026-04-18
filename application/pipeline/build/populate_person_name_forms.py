@@ -18,8 +18,8 @@ import os
 
 from psycopg2.extras import RealDictCursor
 
-from infrastructure.db.connection import get_connection
 from application.persons import compute_person_name_forms
+from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 
 log = setup_logger("populate_person_name_forms", os.path.join(os.path.dirname(__file__), "logs"))
