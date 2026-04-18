@@ -26,7 +26,7 @@ from psycopg2.extras import Json
 from db.connection import get_connection
 from extraction.common import compute_hash, get_cross_import_dois, setup_logger
 from infrastructure.api_limits import HAL_DELAY
-from utils.hal import HAL_FIELDS_STR
+from infrastructure.hal import HAL_FIELDS_STR
 
 # ----- Logging -----
 logger = setup_logger("cross_import_hal", os.path.join(os.path.dirname(__file__), "logs"))

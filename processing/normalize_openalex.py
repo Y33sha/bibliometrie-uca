@@ -38,7 +38,7 @@ from domain.doc_types import map_doc_type
 from domain.publication import clean_doi
 from domain.publication import extract_hal_id_from_url
 from infrastructure.log import setup_logger
-from utils.nnt import extract_nnt_from_openalex, is_theses_fr_source
+from infrastructure.openalex import extract_nnt_from_openalex, is_theses_fr_source
 from domain.normalize import normalize_text
 from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
 
