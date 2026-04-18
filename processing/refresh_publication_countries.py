@@ -16,7 +16,7 @@ import os
 import time
 
 from db.connection import get_connection
-from utils.log import setup_logger
+from infrastructure.log import setup_logger
 
 logger = setup_logger(
     "refresh_publication_countries", os.path.join(os.path.dirname(__file__), "logs")

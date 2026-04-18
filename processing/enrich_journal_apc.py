@@ -16,8 +16,8 @@ import requests
 
 from db.connection import get_connection
 from application.journals import reset_journal_apc, update_journal_apc
-from utils.api_limits import DOAJ_DELAY
-from utils.log import setup_logger
+from infrastructure.api_limits import DOAJ_DELAY
+from infrastructure.log import setup_logger
 
 logger = setup_logger("enrich_journal_apc", os.path.join(os.path.dirname(__file__), "logs"))
 

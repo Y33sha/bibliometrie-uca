@@ -30,7 +30,7 @@ from application.publications import (
     refresh_from_sources,
 )
 from domain.doc_types import map_doc_type
-from utils.log import setup_logger
+from infrastructure.log import setup_logger
 from utils.nnt import normalize_nnt
 from domain.normalize import normalize_text
 

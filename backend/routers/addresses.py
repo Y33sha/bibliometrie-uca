@@ -59,7 +59,7 @@ async def list_addresses(
     with get_cursor() as (cur, conn):
         # Résoudre la structure de travail (défaut = première racine du périmètre)
         if structure_id is None:
-            from utils.app_config import _get_from_db
+            from infrastructure.app_config import _get_from_db
 
             perim_code = _get_from_db(cur, "perimeter_persons") or "uca"
             cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,))

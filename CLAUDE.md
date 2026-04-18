@@ -19,6 +19,6 @@
 - Lancement dev : `bash start.sh` (uvicorn port 8003 + vite port 5176)
 - Endpoints POST/PUT/PATCH : toujours un modèle Pydantic dans `backend/models.py`, jamais `body: dict`
 - Requêtes SQL : toujours des requêtes paramétrées (`%s`), jamais d'interpolation f-string pour les valeurs
-- Logging : utiliser `setup_logger` de `utils/log.py`
-- DOI : utiliser `clean_doi` de `utils/doi.py`
-- Noms : utiliser `names_compatible` et `parse_raw_author_name` de `utils/names.py`
+- Logging : utiliser `setup_logger` de `infrastructure/log.py`
+- DOI : utiliser `DOI` / `DOI.try_parse` de `domain/publication.py` ; `clean_doi` de `utils/doi.py` reste un shim pour le code existant
+- Noms : utiliser `names_compatible` et `parse_raw_author_name` de `domain/names.py`

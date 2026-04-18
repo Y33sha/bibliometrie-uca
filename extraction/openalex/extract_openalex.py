@@ -29,9 +29,9 @@ from extraction.openalex import (
     extract_openalex_id,
     init_auth,
 )
-from utils.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
-from utils.api_retry import http_request_with_retry
-from utils.app_config import (
+from infrastructure.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
+from infrastructure.api_retry import http_request_with_retry
+from infrastructure.app_config import (
     get_api_base_urls,
     get_openalex_api_key,
     get_openalex_email,

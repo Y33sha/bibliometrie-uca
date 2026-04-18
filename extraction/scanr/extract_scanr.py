@@ -18,9 +18,9 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import clean_doi, compute_hash, get_existing_ids, setup_logger
-from utils.api_limits import SCANR_DELAY, SCANR_PER_PAGE
-from utils.api_retry import http_request_with_retry
-from utils.app_config import (
+from infrastructure.api_limits import SCANR_DELAY, SCANR_PER_PAGE
+from infrastructure.api_retry import http_request_with_retry
+from infrastructure.app_config import (
     get_api_base_urls,
     get_scanr_affiliation_ids,
     get_scanr_credentials,

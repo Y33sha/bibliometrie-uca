@@ -139,7 +139,7 @@ def propagate_uca_for_addresses(cur, address_ids: list[int]) -> None:
     if not address_ids:
         return
 
-    from utils.perimeter import get_persons_structure_ids_list
+    from infrastructure.perimeter import get_persons_structure_ids_list
 
     perimeter_ids = get_persons_structure_ids_list(cur)
     if not perimeter_ids:

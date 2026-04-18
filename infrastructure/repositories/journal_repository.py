@@ -9,7 +9,7 @@ transaction courante, exceptions du domaine, pas d'orchestration
 métier (qui reste dans services/journals.py).
 """
 
-from utils.db_helpers import row_val as _val
+from infrastructure.db_helpers import row_val as _val
 
 
 class PgJournalRepository:

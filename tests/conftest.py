@@ -88,7 +88,7 @@ def pytest_configure(config):
 
     # Empêcher les scripts importés par les tests d'écrire dans les
     # fichiers log de production (processing/logs/*.log)
-    import utils.log as _log_module
+    import infrastructure.log as _log_module
 
     _original_setup = _log_module.setup_logger
 
@@ -108,7 +108,7 @@ def pytest_configure(config):
 def _clear_caches():
     """Vide les caches module-level entre chaque test (rollback-safe)."""
     yield
-    from utils.addresses import clear_cache as clear_addr_cache
+    from infrastructure.addresses import clear_cache as clear_addr_cache
 
     clear_addr_cache()
     # HAL author cache

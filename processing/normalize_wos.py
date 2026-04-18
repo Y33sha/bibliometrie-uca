@@ -29,9 +29,9 @@ from application.journals import find_or_create_journal, find_or_create_publishe
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
-from utils.db_helpers import mark_staging_done
+from infrastructure.db_helpers import mark_staging_done
 from utils.doi import clean_doi
-from utils.log import setup_logger
+from infrastructure.log import setup_logger
 from domain.normalize import normalize_text
 
 # ----- Logging -----
@@ -805,7 +805,7 @@ def process_authorships(cur, rec: dict, source_publication_id: int):
 
 def process_record(cur, staging_row: tuple) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
-    from utils.timings import StepTimer
+    from infrastructure.timings import StepTimer
 
     staging_id, ut, staging_doi, raw_data = staging_row
 

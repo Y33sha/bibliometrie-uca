@@ -28,15 +28,15 @@ from db.connection import get_connection
 from application.journals import find_or_create_journal, find_or_create_publisher
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
-from utils.addresses import link_addresses
+from infrastructure.addresses import link_addresses
 from domain.authorship_roles import map_role
-from utils.db_helpers import mark_staging_done
+from infrastructure.db_helpers import mark_staging_done
 from domain.doc_types import map_doc_type
 from utils.doi import clean_doi
-from utils.log import setup_logger
+from infrastructure.log import setup_logger
 from utils.nnt import normalize_nnt
 from domain.normalize import normalize_text
-from utils.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
+from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
 
 # ----- Logging -----
 logger = setup_logger("normalize_hal", os.path.join(os.path.dirname(__file__), "logs"))
@@ -692,7 +692,7 @@ def process_work(
     cur, staging_row: tuple, struct_cache: dict | None = None, struct_name_cache: dict | None = None
 ) -> bool:
     """Traite un work du staging HAL."""
-    from utils.timings import StepTimer
+    from infrastructure.timings import StepTimer
 
     staging_id, hal_id, doi, raw_data, hal_collections_staging = staging_row
     doc = raw_data

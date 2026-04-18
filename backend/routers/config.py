@@ -12,7 +12,7 @@ from backend.models import (
     PerimeterUpdate,
 )
 from application import config as config_service
-from utils.perimeter import get_perimeter_structure_ids
+from infrastructure.perimeter import get_perimeter_structure_ids
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ async def list_config():
 async def get_hal_collections():
     """Retourne les collections HAL dérivées des structures du périmètre UCA."""
     with get_cursor() as (cur, conn):
-        from utils.app_config import get_hal_collections as _get
+        from infrastructure.app_config import get_hal_collections as _get
 
         collections = _get(cur)
         return {"collections": collections, "count": len(collections)}

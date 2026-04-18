@@ -51,7 +51,7 @@ def get_hal_collections(cur) -> dict[str, str]:
     """
     # 1. Depuis les structures du périmètre d'extraction
     try:
-        from utils.perimeter import get_perimeter_structure_ids
+        from infrastructure.perimeter import get_perimeter_structure_ids
 
         perim_code = _get_from_db(cur, "perimeter_extraction") or "uca_wide"
         perimeter_ids = get_perimeter_structure_ids(cur, perim_code)
@@ -127,7 +127,7 @@ def get_extraction_api_ids(cur, source: str) -> list[str]:
     perim_code = _get_from_db(cur, "perimeter_extraction")
     if perim_code and isinstance(perim_code, str):
         try:
-            from utils.perimeter import get_perimeter_structure_ids
+            from infrastructure.perimeter import get_perimeter_structure_ids
 
             struct_ids = get_perimeter_structure_ids(cur, perim_code)
             if struct_ids:

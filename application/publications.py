@@ -17,7 +17,7 @@ from infrastructure.repositories.publication_repository import (
     PubThesisCandidate,
 )
 from application.audit import emit_event
-from utils.db_helpers import row_val as _val
+from infrastructure.db_helpers import row_val as _val
 from domain.doc_types import map_doc_type
 
 # Re-export des namedtuples pour les call sites historiques (scripts,

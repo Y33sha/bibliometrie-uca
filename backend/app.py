@@ -28,7 +28,7 @@ from domain.errors import (
     ValidationError,
 )
 from application import audit
-from utils.log import configure_root_logging
+from infrastructure.log import configure_root_logging
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
 # À faire AVANT l'import des routers qui peuvent créer leur propre logger.

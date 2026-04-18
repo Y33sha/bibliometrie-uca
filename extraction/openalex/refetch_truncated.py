@@ -21,8 +21,8 @@ from psycopg2.extras import Json, RealDictCursor
 from db.connection import get_connection
 from extraction.common import compute_hash, setup_logger
 from extraction.openalex import BASE_URL, SELECT_FIELDS, auth_params, compute_meta_hash, init_auth
-from utils.api_limits import OPENALEX_DELAY
-from utils.app_config import get_openalex_api_key, get_openalex_email
+from infrastructure.api_limits import OPENALEX_DELAY
+from infrastructure.app_config import get_openalex_api_key, get_openalex_email
 
 logger = setup_logger("refetch_truncated", os.path.join(os.path.dirname(__file__), "logs"))
 

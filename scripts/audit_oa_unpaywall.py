@@ -16,7 +16,7 @@ import requests
 from psycopg2.extras import RealDictCursor
 
 from config.settings import settings
-from utils.api_limits import UNPAYWALL_DELAY
+from infrastructure.api_limits import UNPAYWALL_DELAY
 
 EMAIL = "laurent.le-coz@uca.fr"
 UNPAYWALL_URL = "https://api.unpaywall.org/v2/{doi}?email={email}"

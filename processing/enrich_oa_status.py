@@ -22,8 +22,8 @@ import requests
 
 from db.connection import get_connection
 from application.publications import update_oa_status
-from utils.api_limits import UNPAYWALL_DELAY
-from utils.log import setup_logger
+from infrastructure.api_limits import UNPAYWALL_DELAY
+from infrastructure.log import setup_logger
 
 log = setup_logger("enrich_oa_unpaywall", os.path.join(os.path.dirname(__file__), "logs"))
 

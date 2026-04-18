@@ -5,8 +5,8 @@ import time
 
 import requests
 
-from utils.api_limits import ZENODO_DELAY
-from utils.log import setup_logger
+from infrastructure.api_limits import ZENODO_DELAY
+from infrastructure.log import setup_logger
 
 logger = setup_logger("zenodo", "processing/logs")
 

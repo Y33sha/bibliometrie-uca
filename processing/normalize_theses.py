@@ -34,10 +34,10 @@ from application.publications import (
     refresh_from_sources,
     try_merge_by_doi,
 )
-from utils.addresses import link_addresses
+from infrastructure.addresses import link_addresses
 from domain.authorship_roles import THESES_FIELD_ROLES, merge_roles
-from utils.db_helpers import mark_staging_done
-from utils.log import setup_logger
+from infrastructure.db_helpers import mark_staging_done
+from infrastructure.log import setup_logger
 from domain.names import names_compatible
 from utils.nnt import normalize_nnt
 from domain.normalize import normalize_name, normalize_text

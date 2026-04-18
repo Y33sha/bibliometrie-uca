@@ -22,8 +22,8 @@ from psycopg2.extras import Json
 
 from db.connection import get_connection
 from extraction.common import clean_doi, compute_hash, get_cross_import_dois, setup_logger
-from utils.api_limits import SCANR_DELAY
-from utils.app_config import get_scanr_credentials
+from infrastructure.api_limits import SCANR_DELAY
+from infrastructure.app_config import get_scanr_credentials
 
 logger = setup_logger("cross_import_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -52,7 +52,7 @@ def main():
     conn = get_connection()
     cur = conn.cursor()
     username, password = get_scanr_credentials(cur)
-    from utils.app_config import get_api_base_urls
+    from infrastructure.app_config import get_api_base_urls
 
     url = get_api_base_urls(cur).get(
         "scanr", "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search"

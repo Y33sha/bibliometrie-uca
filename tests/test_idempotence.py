@@ -1146,7 +1146,7 @@ def _setup_affiliations_test_data(db):
 def _run_populate_affiliations(db):
     """Exécute populate_affiliations sur le curseur de test."""
     from processing.populate_affiliations import _step_address_source, step3d_theses
-    from utils.perimeter import get_affiliations_structure_ids, get_persons_structure_ids
+    from infrastructure.perimeter import get_affiliations_structure_ids, get_persons_structure_ids
 
     perimeter_ids = get_persons_structure_ids(db)
     wide_ids = get_affiliations_structure_ids(db)
