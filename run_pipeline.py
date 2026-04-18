@@ -394,7 +394,7 @@ def main():
     log.info("Sources : %s", ", ".join(sorted(sources)))
 
     # Métriques pipeline
-    from pipeline.metrics import capture_log_offsets, generate_report, read_new_logs
+    from infrastructure.pipeline_metrics import capture_log_offsets, generate_report, read_new_logs
 
     phase_results = []  # [(name, duration, logs)]
 
