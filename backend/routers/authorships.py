@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter, Query
 
 from backend.deps import get_cursor
-from utils.sources import AUTHOR_SOURCES_SQL
+from domain.sources import AUTHOR_SOURCES_SQL
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

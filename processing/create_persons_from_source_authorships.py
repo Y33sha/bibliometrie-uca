@@ -51,8 +51,8 @@ from application.persons import (
     link_authorships as link_to_person,
 )
 from utils.log import setup_logger
-from utils.names import names_compatible, parse_raw_author_name
-from utils.normalize import normalize_name
+from domain.names import names_compatible, parse_raw_author_name
+from domain.normalize import normalize_name
 
 logger = setup_logger("create_persons", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -219,7 +219,7 @@ def load_linked_authorships_by_pub(cur):
     index = defaultdict(list)
 
     # Sources avec noms structurés dans source_persons (tout sauf OpenAlex)
-    from utils.sources import SOURCES_WITH_STRUCTURED_NAMES_SQL
+    from domain.sources import SOURCES_WITH_STRUCTURED_NAMES_SQL
 
     cur.execute(f"""
         SELECT sa_auth.person_id, sa_auth.author_position,

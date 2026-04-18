@@ -20,7 +20,7 @@ from datetime import datetime
 
 from db.connection import get_connection
 from application.persons import refresh_person_name_forms
-from utils.normalize import normalize_name
+from domain.normalize import normalize_name
 
 logging.basicConfig(
     level=logging.INFO,

@@ -29,12 +29,12 @@ from application.journals import find_or_create_journal, find_or_create_publishe
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
 from utils.addresses import link_addresses
-from utils.authorship_roles import map_role
+from domain.authorship_roles import map_role
 from utils.db_helpers import mark_staging_done
 from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.nnt import normalize_nnt
-from utils.normalize import normalize_text
+from domain.normalize import normalize_text
 
 logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -150,7 +150,7 @@ def find_publication(
     cur, doc: dict, journal_id: int | None, scanr_id: str | None = None
 ) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None."""
-    from utils.doc_types import map_doc_type
+    from domain.doc_types import map_doc_type
 
     meta = extract_pub_metadata(doc, journal_id, scanr_id)
     if not meta["pub_year"] or not meta["title"]:

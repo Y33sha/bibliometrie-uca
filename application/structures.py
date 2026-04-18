@@ -14,7 +14,7 @@ from domain.errors import NotFoundError, ValidationError
 from domain.structure import StructureApiIds
 from infrastructure.repositories.structure_repository import PgStructureRepository
 from application.audit import emit_event
-from utils.normalize import normalize_text
+from domain.normalize import normalize_text
 
 
 def _validate_api_ids(raw: dict | None) -> dict | None:

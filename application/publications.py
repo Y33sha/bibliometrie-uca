@@ -18,7 +18,7 @@ from infrastructure.repositories.publication_repository import (
 )
 from application.audit import emit_event
 from utils.db_helpers import row_val as _val
-from utils.doc_types import map_doc_type
+from domain.doc_types import map_doc_type
 
 # Re-export des namedtuples pour les call sites historiques (scripts,
 # processing) qui font `from application.publications import PubByDoi`.

@@ -7,7 +7,6 @@
 ## 5. Base de données
 
 - [ ] Documenter le schéma des colonnes JSONB (`meta`, `source_data`, `external_ids`)
-- [ ] Ajouter un audit trail pour les opérations destructives (fusions, suppressions)
 
 ## 6. Validation pipeline
 
@@ -64,6 +63,105 @@ Ordre concret que je suggère, vu ton contexte :
 - Là tu attaques ta liste : déduplication SQL, constantes, code mort, docstrings, composants front.
 - Documentation d'architecture et hooks pre-commit pour verrouiller les acquis.
 
-Un principe transversal : **une PR, un type de changement**. Un commit qui renomme + factorise + change le comportement est inauditable même par soi-même trois mois plus tard. Formatage d'abord (un commit), renommages ensuite, déplacements de code ensuite, changements de comportement en dernier — chaque catégorie dans son propre commit/PR.
-
 je peux te donner des pointeurs quand on arrivera à la fin du 12-Factor, pour ne pas mélanger — les plus pertinents pour ton profil (app web, Python, solo ou petite équipe) sont probablement Beyond the Twelve-Factor App (Kevin Hoffman, 2016, qui ajoute 3 facteurs et en revisite certains à l'ère Kubernetes), et côté code lui-même plutôt que déploiement, le Zen of Python pour la philo, les Google Engineering Practices (surtout le guide de code review) et le livre A Philosophy of Software Design de John Ousterhout (2018) qui est court, dense, et vise exactement le genre de questions d'architecture qu'on évoquait au niveau 1.
+
+
+2. Split utils/ (~1-2h, clarifie les couches)
+
+
+utils/              avant : tout en vrac
+        ↓
+domain/             règles métier et constantes : perimeter.py, sources.py,
+                    doc_types.py, authorship_roles.py, names.py
+infrastructure/     infra partagée : log.py, db_helpers.py,
+                    api_retry.py, api_limits.py
+utils/              utilitaires purs : normalize.py, timings.py
+Les shims doi.py, hal.py, nnt.py restent dans utils/ pour compat, ou sont carrément supprimés si on veut faire propre (nécessite update des ~60 call sites).
+
+4. domain/ports/ et inversion de dépendance (moyen effort, finalise l'hexagonal)
+Définir des Protocol dans domain/ports/person_repository.py. Les services importent le Protocol. Câblage de l'impl concrète dans un "composition root" (probablement backend/deps.py qui est déjà le site de l'injection FastAPI). À faire après #1 et #3.
+
+5. Entités dans le domaine (long terme)
+Pour l'instant on a des VOs. Ajouter une entité Person (id + last_name + first_name + identifiants), avec compute_person_name_forms comme méthode, et des règles de validation. Gain : encapsulation de la logique métier. À considérer quand tu rencontres des invariants complexes (ex. "un idHAL ne peut être associé qu'à une personne rejetée avec statut pending"). Pas urgent.
+
+Ma reco concrète pour les prochaines sessions :
+
+Session 4 : split utils/ + rename services/ → application/.
+
+Ensuite : domain/ports si tu veux fermer la boucle hexagonale.
+
+L'arbo cible propre, quand tout sera fait :
+
+
+domain/             # pur, aucune dépendance externe
+    errors.py
+    person.py
+    publication.py
+    structure.py
+    ports/          # interfaces (Protocol) des repositories
+    
+infrastructure/     # adapters concrets
+    repositories/
+        person_repository.py
+        publication_repository.py
+        ...
+    
+application/        # ex services/ — orchestrateurs métier
+    persons.py
+    publications.py
+    ...
+    
+backend/            # adapter HTTP (FastAPI)
+    routers/
+    models.py
+    deps.py
+    app.py
+
+utils/              # utilitaires vraiment transverses (normalize, timings)
+
+arbo cible Opus 4.7
+bibliometrie-uca/
+├── domain/
+│   ├── entities/
+│   │   ├── publication.py
+│   │   ├── personne.py
+│   │   ├── structure.py
+│   │   ├── authorship.py
+│   │   └── journal.py
+│   ├── services.py          # règles métier transversales (dédup, matching)
+│   ├── rules/               # invariants si volumineux
+│   └── ports/
+│       ├── repositories.py  # Protocols : PublicationRepository, etc.
+│       └── sources.py       # Protocols : HalClient, OpenAlexClient, WosClient
+├── application/
+│   ├── use_cases/           # un fichier par cas d'usage
+│   │   ├── import_publications.py
+│   │   ├── deduplicate.py
+│   │   └── ...
+│   └── pipeline/            # orchestration batch, appelle les use cases
+│       ├── phase_01_...py
+│       └── ...
+├── infrastructure/
+│   ├── db/
+│   │   ├── schema.sql
+│   │   ├── connection.py
+│   │   ├── filters.py
+│   │   ├── mappers.py       # row → entité
+│   │   └── repositories/    # impls concrètes des ports
+│   └── sources/             # anciennement extraction/
+│       ├── hal/
+│       ├── openalex/
+│       └── wos/
+├── interfaces/
+│   ├── api/                 # anciennement backend/
+│   │   ├── app.py
+│   │   ├── routers/
+│   │   ├── deps.py
+│   │   └── schemas.py       # Pydantic I/O, ex-models.py côté API
+│   ├── cli/                 # anciennement scripts/
+│   └── frontend/
+├── shared/                  # anciennement utils/ si purement technique
+├── config/
+├── tests/
+├── docs/
+└── run_pipeline.py          # point d'entrée, appelle application/pipeline/

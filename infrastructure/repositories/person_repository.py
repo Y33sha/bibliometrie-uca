@@ -22,7 +22,7 @@ Usage :
 
 from domain.errors import NotFoundError
 from domain.person import compute_person_name_forms
-from utils.normalize import normalize_name
+from domain.normalize import normalize_name
 
 
 class PgPersonRepository:
@@ -504,7 +504,7 @@ class PgPersonRepository:
         )
 
         # 4. in_perimeter et structure_ids (union des sources)
-        from utils.sources import AUTHOR_SOURCES_SQL
+        from domain.sources import AUTHOR_SOURCES_SQL
         self._cur.execute(
             f"""
             WITH src AS (
@@ -533,7 +533,7 @@ class PgPersonRepository:
         """Compte les source_authorships actives d'une personne portant une
         forme de nom donnée. Utilisé par detach_authorships pour décider
         de nettoyer la name_form ou pas."""
-        from utils.sources import AUTHOR_SOURCES_SQL
+        from domain.sources import AUTHOR_SOURCES_SQL
         self._cur.execute(
             f"""
             SELECT COUNT(*) AS n FROM source_authorships sa

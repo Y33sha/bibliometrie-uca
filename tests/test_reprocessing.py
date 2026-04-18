@@ -13,9 +13,9 @@ from psycopg2.extras import Json
 
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import update_sources
-from utils.doc_types import map_doc_type
+from domain.doc_types import map_doc_type
 from utils.nnt import normalize_nnt
-from utils.normalize import normalize_text
+from domain.normalize import normalize_text
 
 
 def _create_all_publications(cur):

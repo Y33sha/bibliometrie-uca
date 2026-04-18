@@ -5,7 +5,7 @@ et les liens source_authorship_addresses au moment de l'INSERT
 des source_authorships.
 """
 
-from utils.normalize import normalize_text
+from domain.normalize import normalize_text
 
 # Cache module-level pour éviter les lookups répétés dans un même run
 _addr_cache: dict[str, int] = {}

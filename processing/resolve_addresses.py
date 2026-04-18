@@ -24,7 +24,7 @@ import time
 
 from db.connection import get_connection
 from utils.log import setup_logger
-from utils.normalize import normalize_text as normalize
+from domain.normalize import normalize_text as normalize
 from utils.perimeter import get_persons_structure_ids
 
 logger = setup_logger("resolve_addresses", os.path.join(os.path.dirname(__file__), "logs"))
