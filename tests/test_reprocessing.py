@@ -100,7 +100,7 @@ def _run_normalize_hal(dict_cur):
     Le normaliseur HAL utilise un curseur tuple (accès par index),
     on en crée un temporaire sur la même connexion.
     """
-    from processing.normalize_hal import process_work
+    from application.pipeline.normalize.normalize_hal import process_work
 
     conn = dict_cur.connection
     tuple_cur = conn.cursor()  # curseur standard (tuple)

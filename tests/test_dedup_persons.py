@@ -156,7 +156,7 @@ def _get_person_identifiers(db, person_id):
 class TestStep0HalAccounts:
     def test_existing_person_propagates(self, db):
         """hal_author avec hal_person_id déjà rattaché → propage aux nouvelles authorships."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             step0_hal_accounts,
         )
@@ -183,7 +183,7 @@ class TestStep0HalAccounts:
 
     def test_virgin_hal_account_skipped(self, db):
         """hal_author avec hal_person_id mais sans person_id → ignoré par passe 0."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             step0_hal_accounts,
         )
@@ -204,7 +204,7 @@ class TestStep0HalAccounts:
 
     def test_virgin_hal_account_matched_by_name(self, db):
         """hal_author vierge → ignoré en passe 0, rattaché par nom en passe 3."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             load_name_form_map,
             step0_hal_accounts,
@@ -242,7 +242,7 @@ class TestStep0HalAccounts:
 class TestStep1CrossSource:
     def test_same_pub_same_position_compatible_name(self, db):
         """Même publi, même position, nom compatible → rattache à la même personne."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             load_linked_authorships_by_pub,
             step1_cross_source,
@@ -270,7 +270,7 @@ class TestStep1CrossSource:
 
     def test_cross_source_imports_identifiers(self, db):
         """Cross-source rattachement → les identifiants de l'authorship sont importés."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             load_linked_authorships_by_pub,
             step1_cross_source,
@@ -298,7 +298,7 @@ class TestStep1CrossSource:
 
     def test_same_pub_different_position_no_match(self, db):
         """Même publi mais position différente → pas de rattachement."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             load_linked_authorships_by_pub,
             step1_cross_source,
@@ -329,7 +329,7 @@ class TestStep1CrossSource:
 class TestStep2Orcid:
     def test_known_orcid_links(self, db):
         """ORCID déjà en base (confirmed) → rattache à la bonne personne."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             step2_orcid,
         )
@@ -358,7 +358,7 @@ class TestStep2Orcid:
 
     def test_orcid_match_imports_other_identifiers(self, db):
         """Rattachement par ORCID → les autres identifiants (IdRef) sont aussi importés."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             step2_orcid,
         )
@@ -386,7 +386,7 @@ class TestStep2Orcid:
 
     def test_rejected_orcid_ignored(self, db):
         """ORCID rejeté en base → pas de rattachement."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             step2_orcid,
         )
@@ -415,7 +415,7 @@ class TestStep2Orcid:
 
     def test_unknown_orcid_not_linked(self, db):
         """ORCID absent de la base → pas de rattachement (sera traité par name_forms)."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             step2_orcid,
         )
@@ -444,7 +444,7 @@ class TestStep2Orcid:
 class TestStep3NameForms:
     def test_known_name_form_links(self, db):
         """Forme de nom connue, mappée à 1 personne → rattache."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             load_name_form_map,
             step3_name_forms,
@@ -469,7 +469,7 @@ class TestStep3NameForms:
 
     def test_ambiguous_name_form_orphan(self, db):
         """Forme de nom mappée à 2 personnes → orphelin."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             load_name_form_map,
             step3_name_forms,
@@ -496,7 +496,7 @@ class TestStep3NameForms:
 
     def test_unknown_name_creates_person(self, db):
         """Forme de nom inconnue → crée une nouvelle personne."""
-        from processing.create_persons_from_source_authorships import (
+        from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
             load_name_form_map,
             step3_name_forms,

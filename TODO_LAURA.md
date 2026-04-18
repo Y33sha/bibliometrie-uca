@@ -73,10 +73,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] publishers: distinguer types d'entités (établissements d'enseignement, sociétés savantes, éditeurs commerciaux)
 ## Publique
 ### Personnes (public)
-#### Urgent
-* [ ] filtre "publications avec authorship UCA": certains ont 500 publications mais une seule en tant qu'auteur UCA, ça aiderait à les retrouver pour les vérifier
 * [ ] ajouter dashboard personne
-#### Autres
 * [ ] publications: indiquer si premier/dernier auteur ; + rôles autres que auteur?
 * [ ] signaler publis HAL non correctement reliées au compte HAL (dans la page problèmes-hal?)
 ### Structures (public)
@@ -104,7 +101,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] ordre des sources pour les thèses: harmoniser page laboratoire avec page thèses
 * [ ] admin/personnes, formes de nom: modal authorships: source affichée: default wos (ajouter les autres sources, et mettre default None)
 # Trucs pour plus tard
-* compte fractionnaire des publications?
+* stats en compte fractionnaire vs compte entiers
 * collaborations nationales et internationales: identification structures? compliqué, je pense que pour ça il vaut mieux réutiliser les sources directement
 * creuser le format de données CERIF, voir si c'est pertinent pour mon besoin
 * [ ] OpenAlex et WOS: mapping structures UCA pour pouvoir comparer sources/vérité?

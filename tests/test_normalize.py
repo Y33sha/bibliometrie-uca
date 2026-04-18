@@ -3,7 +3,7 @@
 
 # ── OpenAlex ─────────────────────────────────────────────────────
 
-from processing.normalize_openalex import (
+from application.pipeline.normalize.normalize_openalex import (
     extract_short_id,
     is_hal_primary_location,
     is_repository_source,
@@ -135,7 +135,7 @@ class TestOADocTypeMap:
 
 # ── HAL ──────────────────────────────────────────────────────────
 
-from processing.normalize_hal import (
+from application.pipeline.normalize.normalize_hal import (
     as_str,
     get_title,
     parse_author_structures,
@@ -231,12 +231,12 @@ class TestHALDocTypeMap:
 
 # ── WoS ──────────────────────────────────────────────────────────
 
-from processing.normalize_wos import (
+from application.pipeline.normalize.normalize_wos import (
     _get_api_title,
     _safe_list,
     map_oa_status,
 )
-from processing.normalize_wos import (
+from application.pipeline.normalize.normalize_wos import (
     map_doc_type as wos_map_doc_type,
 )
 
