@@ -29,7 +29,7 @@ from infrastructure.app_config import (
     get_hal_extra_collections,
     get_years,
 )
-from utils.hal import HAL_FIELDS
+from infrastructure.hal import HAL_FIELDS
 
 # ----- Logging -----
 logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))

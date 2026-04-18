@@ -63,15 +63,9 @@ Ordre concret que je suggère, vu ton contexte :
 - Là tu attaques ta liste : déduplication SQL, constantes, code mort, docstrings, composants front.
 - Documentation d'architecture et hooks pre-commit pour verrouiller les acquis.
 
-je peux te donner des pointeurs quand on arrivera à la fin du 12-Factor, pour ne pas mélanger — les plus pertinents pour ton profil (app web, Python, solo ou petite équipe) sont probablement Beyond the Twelve-Factor App (Kevin Hoffman, 2016, qui ajoute 3 facteurs et en revisite certains à l'ère Kubernetes), et côté code lui-même plutôt que déploiement, le Zen of Python pour la philo, les Google Engineering Practices (surtout le guide de code review) et le livre A Philosophy of Software Design de John Ousterhout (2018) qui est court, dense, et vise exactement le genre de questions d'architecture qu'on évoquait au niveau 1.
-
-
 2. Split utils/ (~1-2h, clarifie les couches)
 
 Les shims doi.py, hal.py, nnt.py restent dans utils/ pour compat, ou sont carrément supprimés si on veut faire propre (nécessite update des ~60 call sites).
-
-4. domain/ports/ et inversion de dépendance (moyen effort, finalise l'hexagonal)
-Définir des Protocol dans domain/ports/person_repository.py. Les services importent le Protocol. Câblage de l'impl concrète dans un "composition root" (probablement backend/deps.py qui est déjà le site de l'injection FastAPI). À faire après #1 et #3.
 
 5. Entités dans le domaine (long terme)
 Pour l'instant on a des VOs. Ajouter une entité Person (id + last_name + first_name + identifiants), avec compute_person_name_forms comme méthode, et des règles de validation. Gain : encapsulation de la logique métier. À considérer quand tu rencontres des invariants complexes (ex. "un idHAL ne peut être associé qu'à une personne rejetée avec statut pending"). Pas urgent.

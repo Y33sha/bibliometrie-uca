@@ -1,12 +1,10 @@
-"""Utilitaires HAL partagés entre extraction, normalisation et processing.
+"""Configuration de l'adapter HAL Solr.
 
-La logique d'extraction/validation de HAL ID vit dans `domain.publication`.
-`extract_hal_id_from_url` est conservé pour les sites d'appel existants.
+Liste des champs Solr à récupérer lors des requêtes HAL (staging).
+Si un champ est ajouté, il doit être référencé ici pour être extrait
+de l'API.
 """
 
-from domain.publication import _normalize_hal_id
-
-# Champs Solr à récupérer lors des requêtes HAL (staging)
 HAL_FIELDS = [
     "halId_s",
     "docid",
@@ -53,15 +51,3 @@ HAL_FIELDS = [
 ]
 
 HAL_FIELDS_STR = ",".join(HAL_FIELDS)
-
-
-def extract_hal_id_from_url(url: str | None) -> str | None:
-    """Extrait le halId depuis une URL HAL.
-
-    Gère les préfixes hal, tel, halshs, inserm, pasteur, cea, ineris.
-    Ignore le suffixe de version (v1, v2, etc.).
-
-    >>> extract_hal_id_from_url("https://hal.science/hal-04123456v2")
-    'hal-04123456'
-    """
-    return _normalize_hal_id(url)

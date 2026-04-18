@@ -1,23 +1,17 @@
-"""Fonctions utilitaires pour le NNT (Numéro National de Thèse).
+"""Helpers d'extraction de données spécifiques à l'API OpenAlex.
 
-Le NNT est un identifiant national attribué aux thèses soutenues en France.
-Format typique : 2023UCFA0069 (année + code établissement + numéro séquentiel).
+Ces fonctions lisent la forme des réponses OpenAlex (primary_location,
+landing_page_url, …) et en tirent des informations métier (NNT quand
+c'est une thèse theses.fr).
 
-Il est distinct du DOI et ne doit jamais être stocké dans publications.doi.
-Il est stocké dans source_publications.external_ids sous la clé "nnt".
-
-La logique de normalisation vit dans `domain.publication` ; ce module
-conserve `normalize_nnt` pour les sites d'appel existants.
+Reliées à l'adapter OpenAlex (extraction/) plutôt qu'au domaine : le
+"comment extraire" dépend du format de réponse OpenAlex, qui est
+externe et peut évoluer.
 """
 
 import re
 
-from domain.publication import _normalize_nnt
-
-
-def normalize_nnt(nnt: str | None) -> str | None:
-    """Normalise un NNT : uppercase, strip whitespace."""
-    return _normalize_nnt(nnt)
+from domain.publication import normalize_nnt
 
 
 def is_theses_fr_source(work: dict) -> bool:
