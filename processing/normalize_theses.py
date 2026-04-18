@@ -35,12 +35,12 @@ from application.publications import (
     try_merge_by_doi,
 )
 from utils.addresses import link_addresses
-from utils.authorship_roles import THESES_FIELD_ROLES, merge_roles
+from domain.authorship_roles import THESES_FIELD_ROLES, merge_roles
 from utils.db_helpers import mark_staging_done
 from utils.log import setup_logger
-from utils.names import names_compatible
+from domain.names import names_compatible
 from utils.nnt import normalize_nnt
-from utils.normalize import normalize_name, normalize_text
+from domain.normalize import normalize_name, normalize_text
 
 logger = setup_logger("normalize_theses", os.path.join(os.path.dirname(__file__), "logs"))
 

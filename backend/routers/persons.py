@@ -63,7 +63,7 @@ from application.persons import (
 from application.persons import (
     update_name as _update_name,
 )
-from utils.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
+from domain.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

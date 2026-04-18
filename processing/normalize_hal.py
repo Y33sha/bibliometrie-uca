@@ -29,13 +29,13 @@ from application.journals import find_or_create_journal, find_or_create_publishe
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
 from utils.addresses import link_addresses
-from utils.authorship_roles import map_role
+from domain.authorship_roles import map_role
 from utils.db_helpers import mark_staging_done
-from utils.doc_types import map_doc_type
+from domain.doc_types import map_doc_type
 from utils.doi import clean_doi
 from utils.log import setup_logger
 from utils.nnt import normalize_nnt
-from utils.normalize import normalize_text
+from domain.normalize import normalize_text
 from utils.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
 
 # ----- Logging -----

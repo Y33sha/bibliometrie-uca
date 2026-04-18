@@ -28,11 +28,11 @@ from db.connection import get_connection
 from application.journals import find_or_create_journal, find_or_create_publisher
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
-from utils.authorship_roles import map_role
+from domain.authorship_roles import map_role
 from utils.db_helpers import mark_staging_done
 from utils.doi import clean_doi
 from utils.log import setup_logger
-from utils.normalize import normalize_text
+from domain.normalize import normalize_text
 
 # ----- Logging -----
 logger = setup_logger("normalize_wos", os.path.join(os.path.dirname(__file__), "logs"))
@@ -56,7 +56,7 @@ def map_doc_type(raw_type: str | None) -> str:
     Délègue à utils.doc_types.map_doc_type qui gère les types
     composites (séparés par ';') et le mapping WoS.
     """
-    from utils.doc_types import map_doc_type as _map
+    from domain.doc_types import map_doc_type as _map
 
     return _map(raw_type, "wos")
 
@@ -701,7 +701,7 @@ def process_authorships(cur, rec: dict, source_publication_id: int):
         return
 
     # Phase 2 : batch INSERT source_authorships
-    from utils.normalize import normalize_name_form
+    from domain.normalize import normalize_name_form
 
     values = {}  # clé = (source_publication_id, source_person_id), dédupliqué
     for author, source_person_id in author_ids:

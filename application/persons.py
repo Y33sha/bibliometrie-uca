@@ -15,7 +15,7 @@ from domain.person import compute_person_name_forms
 from infrastructure.repositories.person_repository import PgPersonRepository
 from application.audit import emit_event
 from application.authorships import delete_orphan_authorships
-from utils.sources import ALL_SOURCES_SET
+from domain.sources import ALL_SOURCES_SET
 
 __all__ = [
     # Domain re-export pour les callers existants (scripts, tests)

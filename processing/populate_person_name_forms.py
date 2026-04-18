@@ -24,7 +24,7 @@ from utils.log import setup_logger
 
 log = setup_logger("populate_person_name_forms", os.path.join(os.path.dirname(__file__), "logs"))
 
-from utils.sources import BIBLIO_SOURCES_SET as BIBLIO_SOURCES
+from domain.sources import BIBLIO_SOURCES_SET as BIBLIO_SOURCES
 
 
 def populate(conn):

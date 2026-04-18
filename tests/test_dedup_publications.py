@@ -29,7 +29,7 @@ def _create(db, **kwargs):
 
 def _create_journal(db, title="Test Journal"):
     """Crée un journal minimal et retourne son id."""
-    from utils.normalize import normalize_text
+    from domain.normalize import normalize_text
 
     db.execute(
         "INSERT INTO journals (title, title_normalized) VALUES (%s, %s) RETURNING id",

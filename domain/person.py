@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from domain.errors import ValidationError
-from utils.normalize import normalize_name
+from domain.normalize import normalize_name
 
 
 # ── Formes de noms (règle métier) ──────────────────────────────────

@@ -2,13 +2,13 @@
 
 from application.persons import compute_person_name_forms
 from utils.doi import clean_doi
-from utils.names import (
+from domain.names import (
     first_names_compatible,
     last_names_compatible,
     names_compatible,
     parse_raw_author_name,
 )
-from utils.normalize import normalize_name
+from domain.normalize import normalize_name
 
 # ── normalize_name ──
 

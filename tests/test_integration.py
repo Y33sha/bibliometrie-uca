@@ -177,7 +177,7 @@ class TestPublicationService:
 class TestSourcesEnum:
     def test_python_matches_db(self, db):
         """utils.sources.ALL_SOURCES doit correspondre à l'enum source_type en base."""
-        from utils.sources import ALL_SOURCES_SET
+        from domain.sources import ALL_SOURCES_SET
 
         db.execute("SELECT unnest(enum_range(NULL::source_type))::text")
         db_sources = {row["unnest"] for row in db.fetchall()}
@@ -190,7 +190,7 @@ class TestSourcesEnum:
     def test_source_config_covers_all_sources(self, db):
         """_SOURCE_CONFIG dans services/persons.py doit couvrir toutes les sources."""
         from application.persons import _SOURCE_CONFIG
-        from utils.sources import ALL_SOURCES_SET
+        from domain.sources import ALL_SOURCES_SET
 
         missing = ALL_SOURCES_SET - set(_SOURCE_CONFIG.keys())
         assert not missing, f"Sources manquantes dans _SOURCE_CONFIG : {sorted(missing)}"

@@ -34,8 +34,8 @@ MODULES = [
     "application.persons",
     "application.authorships",
     "application.journals",
-    "utils.doc_types",
-    "utils.sources",
+    "domain.doc_types",
+    "domain.sources",
     "utils.app_config",
     "pipeline.metrics",
 ]

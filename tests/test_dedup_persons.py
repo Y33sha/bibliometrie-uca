@@ -12,7 +12,7 @@ from application.persons import add_identifier, add_name_form, create_person
 
 def _insert_publication(db, title="Test Pub", pub_year=2024):
     """Crée une publication minimale."""
-    from utils.normalize import normalize_text
+    from domain.normalize import normalize_text
 
     db.execute(
         """

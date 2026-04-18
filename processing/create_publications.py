@@ -29,10 +29,10 @@ from application.publications import (
 from application.publications import (
     refresh_from_sources,
 )
-from utils.doc_types import map_doc_type
+from domain.doc_types import map_doc_type
 from utils.log import setup_logger
 from utils.nnt import normalize_nnt
-from utils.normalize import normalize_text
+from domain.normalize import normalize_text
 
 logger = setup_logger("create_publications", os.path.join(os.path.dirname(__file__), "logs"))
 

@@ -8,8 +8,8 @@ from processing.normalize_openalex import (
     is_hal_primary_location,
     is_repository_source,
 )
-from utils.doc_types import _SOURCE_MAPS, map_doc_type
-from utils.doc_types import _VALID_DOC_TYPES as VALID_DOC_TYPES_SET
+from domain.doc_types import _SOURCE_MAPS, map_doc_type
+from domain.doc_types import _VALID_DOC_TYPES as VALID_DOC_TYPES_SET
 from utils.hal import extract_hal_id_from_url
 
 

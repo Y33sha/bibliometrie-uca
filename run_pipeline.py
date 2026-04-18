@@ -45,7 +45,7 @@ import sys
 import time
 from pathlib import Path
 
-from utils.sources import ALL_SOURCES_SET, BIBLIO_SOURCES_SET
+from domain.sources import ALL_SOURCES_SET, BIBLIO_SOURCES_SET
 
 logging.basicConfig(
     level=logging.INFO,

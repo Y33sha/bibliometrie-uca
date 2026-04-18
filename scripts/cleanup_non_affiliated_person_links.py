@@ -26,7 +26,7 @@ logger = setup_logger(
     "cleanup_non_affiliated", os.path.join(os.path.dirname(__file__), "../processing/logs")
 )
 
-from utils.sources import BIBLIO_SOURCES as SOURCES
+from domain.sources import BIBLIO_SOURCES as SOURCES
 
 
 def count_affected(cur):

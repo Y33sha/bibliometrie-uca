@@ -14,7 +14,7 @@ et les scripts de correction. Le SQL vit dans
 from domain.errors import NotFoundError, ValidationError
 from infrastructure.repositories.authorship_repository import PgAuthorshipRepository
 from application.audit import emit_event
-from utils.sources import BIBLIO_SOURCES as VALID_SOURCES
+from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
 
 
 def exclude_authorship(cur, authorship_id: int) -> dict:
