@@ -10,9 +10,9 @@
 
 ## Conventions du projet
 
-- Architecture en couches DDD : `domain/` (règles et value objects, zéro I/O), `application/` (orchestrateurs métier, incluant `application/pipeline/`), `infrastructure/` (adapters SQL, APIs sources, settings), `interfaces/` (adapters entrants : `interfaces/api/` pour FastAPI). Entry points CLI : `run_pipeline.py` à la racine, scripts one-shot dans `scripts/`.
+- Architecture en couches DDD : `domain/` (règles et value objects, zéro I/O), `application/` (orchestrateurs métier, incluant `application/pipeline/`), `infrastructure/` (adapters SQL, APIs sources, settings), `interfaces/` (adapters entrants : `interfaces/api/` pour FastAPI). Entry points CLI : `run_pipeline.py` à la racine, scripts one-shot dans `interfaces/cli/`.
 - Frontend : SvelteKit (Svelte 5), routes dans `frontend/src/routes/`
-- Pipeline : scripts dans `processing/` et `extraction/`, orchestrateur `run_pipeline.py`
+- Pipeline : phases dans `application/pipeline/`, extracteurs dans `infrastructure/sources/`, orchestrateur `run_pipeline.py` à la racine
 - Migrations SQL dans `infrastructure/db/migrations/`, appliquées via `python -m infrastructure.db.migrate`
 - Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_PASSWORD=...`)
 - Tests frontend : `cd frontend && npm run check` (svelte-check, échoue sur les erreurs de types)

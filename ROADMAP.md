@@ -61,8 +61,3 @@ Ordre concret que je suggère, vu ton contexte :
 - Typer les frontières (Pydantic partout aux entrées/sorties, Settings pour la config).
 - Là tu attaques ta liste : déduplication SQL, constantes, code mort, docstrings, composants front.
 - Documentation d'architecture et hooks pre-commit pour verrouiller les acquis.
-
-2. Split utils/ (~1-2h, clarifie les couches)
-
-5. Entités dans le domaine (long terme)
-Pour l'instant on a des VOs. Ajouter une entité Person (id + last_name + first_name + identifiants), avec compute_person_name_forms comme méthode, et des règles de validation. Gain : encapsulation de la logique métier. À considérer quand tu rencontres des invariants complexes (ex. "un idHAL ne peut être associé qu'à une personne rejetée avec statut pending"). Pas urgent.

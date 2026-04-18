@@ -144,7 +144,7 @@ Note : ces données ne sont pas encore exploitées en aval dans l'application.
 
 ### <span id="donnees-rh"></span>Base RH (personnel UCA)
 
-Fichier CSV importé via `scripts/import_rh.py` → table `persons_rh`.
+Fichier CSV importé via `interfaces/cli/import_rh.py` → table `persons_rh`.
 - Contient : email, nom, prénom, département, rôle, dates de début/fin
 - Rattaché à une personne du référentiel via `persons_rh.person_id`
 - Sert de filtre dans l'annuaire personnes (filtre "Base RH")
@@ -162,7 +162,7 @@ La FK sur la table `person_rh` permet:
 
 Données fournies par la Bibliothèque numérique le 11/03/2026.
 
-Fichier CSV importé via `scripts/import_apc.py` → table `apc_payments`.
+Fichier CSV importé via `interfaces/cli/import_apc.py` → table `apc_payments`.
 - Contient : DOI, montant en €, éditeur, labo payeur, année
 - Rattaché aux publications par DOI et aux structures par nom
 
