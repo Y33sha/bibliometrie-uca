@@ -1,13 +1,13 @@
 """
-Service Config — accès exclusif en écriture aux tables `config` et `perimeters`.
+Service Config — orchestrateur des opérations sur `config` et `perimeters`.
 
+Le SQL vit dans `infrastructure/repositories/config_repository.py`.
 Les routers passent par ces fonctions pour toute écriture. Les lectures
 restent autorisées dans les routers (convention du projet).
 """
 
-import json
-
 from domain.errors import ConflictError, NotFoundError, ValidationError
+from infrastructure.repositories.config_repository import PgConfigRepository
 from services.audit import emit_event
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
@@ -19,19 +19,10 @@ def update_config_value(cur, key: str, value) -> dict:
     `value` est sérialisé en JSON. Retourne la ligne mise à jour.
     Lève NotFoundError si la clé n'existe pas.
     """
-    cur.execute("SELECT key FROM config WHERE key = %s", (key,))
-    if not cur.fetchone():
+    repo = PgConfigRepository(cur)
+    if not repo.config_key_exists(key):
         raise NotFoundError(f"Paramètre '{key}' introuvable")
-
-    cur.execute(
-        """
-        UPDATE config SET value = %s::jsonb, updated_at = now()
-        WHERE key = %s
-        RETURNING key, value, description, updated_at
-        """,
-        (json.dumps(value), key),
-    )
-    return cur.fetchone()
+    return repo.update_config_value(key, value)
 
 
 # ── Perimeters — structures membres ──────────────────────────────
@@ -46,21 +37,12 @@ def add_perimeter_structure(cur, perimeter_id: int, structure_id: int) -> str:
 
     Lève NotFoundError si le périmètre n'existe pas.
     """
-    cur.execute(
-        """
-        UPDATE perimeters
-        SET structure_ids = array_append(structure_ids, %s)
-        WHERE id = %s AND NOT structure_ids @> ARRAY[%s]
-        RETURNING id
-        """,
-        (structure_id, perimeter_id, structure_id),
-    )
-    if cur.fetchone():
+    repo = PgConfigRepository(cur)
+    if repo.add_structure_to_perimeter(perimeter_id, structure_id):
         return "added"
 
     # Pas d'UPDATE → soit déjà présent, soit périmètre inexistant
-    cur.execute("SELECT id FROM perimeters WHERE id = %s", (perimeter_id,))
-    if cur.fetchone():
+    if repo.perimeter_exists(perimeter_id):
         return "already_present"
     raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
@@ -70,16 +52,7 @@ def remove_perimeter_structure(cur, perimeter_id: int, structure_id: int) -> Non
 
     Lève NotFoundError si le périmètre n'existe pas.
     """
-    cur.execute(
-        """
-        UPDATE perimeters
-        SET structure_ids = array_remove(structure_ids, %s)
-        WHERE id = %s
-        RETURNING id
-        """,
-        (structure_id, perimeter_id),
-    )
-    if not cur.fetchone():
+    if not PgConfigRepository(cur).remove_structure_from_perimeter(perimeter_id, structure_id):
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
 
@@ -95,19 +68,10 @@ def create_perimeter(cur, *, code: str, name: str, description: str | None = Non
     if not code or not name:
         raise ValidationError("Code et nom requis")
 
-    cur.execute("SELECT id FROM perimeters WHERE code = %s", (code,))
-    if cur.fetchone():
+    repo = PgConfigRepository(cur)
+    if repo.perimeter_code_exists(code):
         raise ConflictError(f"Le code '{code}' existe déjà")
-
-    cur.execute(
-        """
-        INSERT INTO perimeters (code, name, description, structure_ids)
-        VALUES (%s, %s, %s, '{}')
-        RETURNING id
-        """,
-        (code, name, description),
-    )
-    return cur.fetchone()["id"]
+    return repo.create_perimeter(code=code, name=name, description=description)
 
 
 def update_perimeter(cur, perimeter_id: int, *, fields: dict) -> None:
@@ -116,8 +80,8 @@ def update_perimeter(cur, perimeter_id: int, *, fields: dict) -> None:
     Lève NotFoundError si le périmètre n'existe pas.
     Lève ValidationError si `fields` est vide ou ne contient aucun champ valide.
     """
-    cur.execute("SELECT id FROM perimeters WHERE id = %s", (perimeter_id,))
-    if not cur.fetchone():
+    repo = PgConfigRepository(cur)
+    if not repo.perimeter_exists(perimeter_id):
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
     allowed = {"name", "description", "structure_ids"}
@@ -125,25 +89,14 @@ def update_perimeter(cur, perimeter_id: int, *, fields: dict) -> None:
     if not clean:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    sets = ", ".join(f"{k} = %s" for k in clean)
-    cur.execute(
-        f"UPDATE perimeters SET {sets} WHERE id = %s",
-        list(clean.values()) + [perimeter_id],
-    )
+    repo.update_perimeter_fields(perimeter_id, clean)
 
 
 def perimeter_usage(cur, perimeter_code: str) -> list[str]:
     """Retourne la liste des clés config qui référencent ce périmètre
     (ex: ["perimeter_extraction", "perimeter_persons"]).
     """
-    cur.execute(
-        """
-        SELECT key FROM config
-        WHERE key LIKE 'perimeter_%%' AND value #>> '{}' = %s
-        """,
-        (perimeter_code,),
-    )
-    return [r["key"] for r in cur.fetchall()]
+    return PgConfigRepository(cur).config_keys_referencing_perimeter(perimeter_code)
 
 
 def delete_perimeter(cur, perimeter_id: int) -> None:
@@ -153,17 +106,17 @@ def delete_perimeter(cur, perimeter_id: int) -> None:
     Lève ConflictError si le périmètre est utilisé par la config pipeline ;
     le message contient la liste des clés qui le référencent.
     """
-    cur.execute("SELECT code FROM perimeters WHERE id = %s", (perimeter_id,))
-    row = cur.fetchone()
-    if not row:
+    repo = PgConfigRepository(cur)
+    code = repo.get_perimeter_code(perimeter_id)
+    if code is None:
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
-    used_by = perimeter_usage(cur, row["code"])
+    used_by = repo.config_keys_referencing_perimeter(code)
     if used_by:
         raise ConflictError(f"Ce périmètre est utilisé par : {', '.join(used_by)}")
 
-    cur.execute("DELETE FROM perimeters WHERE id = %s", (perimeter_id,))
+    repo.delete_perimeter(perimeter_id)
     emit_event(
         cur, "perimeter.deleted", "perimeter", perimeter_id,
-        {"code": row["code"]},
+        {"code": code},
     )
