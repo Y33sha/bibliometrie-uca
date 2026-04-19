@@ -63,6 +63,9 @@ jobs:
       - name: Integration tests (avec BDD)
         run: python -m pytest tests/integration/ -v
 
+      - name: Coverage (tous les tests, seuil via pyproject.toml)
+        run: python -m pytest tests/ --cov --cov-report=term-missing
+
   build-frontend:
     runs-on: ubuntu-latest
 
