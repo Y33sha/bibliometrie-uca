@@ -5,6 +5,8 @@ Quand plusieurs source_publications (theses.fr, OpenAlex, ScanR) pointent vers
 des publications différentes mais ont le même NNT, on fusionne ces publications
 en une seule.
 
+Le SQL est isolé dans `infrastructure/db/queries/merge.py`.
+
 Usage:
     python merge_pubs_by_nnt.py              # fusionner
     python merge_pubs_by_nnt.py --dry-run    # lister sans fusionner
@@ -14,50 +16,15 @@ import argparse
 import os
 from typing import Any
 
-from psycopg2.extras import RealDictCursor
-
 from application.publications import merge_publications as _merge_pub
 from infrastructure.db.connection import get_connection
+from infrastructure.db.queries.merge import (
+    find_nnt_duplicates,
+    rank_publications_by_merge_priority,
+)
 from infrastructure.log import setup_logger
 
 log = setup_logger("merge_pubs_by_nnt", os.path.join(os.path.dirname(__file__), "logs"))
-
-
-def find_duplicates(cur: Any) -> Any:
-    """Trouve les NNT qui pointent vers des publications différentes."""
-    cur.execute("""
-        SELECT sd.external_ids->>'nnt' AS nnt,
-               array_agg(DISTINCT sd.publication_id ORDER BY sd.publication_id) AS pub_ids,
-               array_agg(DISTINCT sd.source::text ORDER BY sd.source::text) AS sources
-        FROM source_publications sd
-        WHERE sd.external_ids->>'nnt' IS NOT NULL
-          AND sd.publication_id IS NOT NULL
-        GROUP BY sd.external_ids->>'nnt'
-        HAVING COUNT(DISTINCT sd.publication_id) > 1
-        ORDER BY sd.external_ids->>'nnt'
-    """)
-    return cur.fetchall()
-
-
-def choose_target(cur: Any, pub_ids: Any) -> Any:
-    """Choisit la publication à garder.
-
-    Priorité : celle avec DOI > celle avec le plus de source_publications > id le plus bas.
-    """
-    cur.execute(
-        """
-        SELECT p.id, p.doi,
-               (SELECT COUNT(*) FROM source_publications sd WHERE sd.publication_id = p.id) AS sd_count
-        FROM publications p
-        WHERE p.id = ANY(%s)
-        ORDER BY
-            (p.doi IS NOT NULL AND p.doi ~ '^10\\.') DESC,
-            (SELECT COUNT(*) FROM source_publications sd WHERE sd.publication_id = p.id) DESC,
-            p.id ASC
-    """,
-        (pub_ids,),
-    )
-    return cur.fetchall()
 
 
 def main() -> Any:
@@ -67,10 +34,10 @@ def main() -> Any:
 
     conn = get_connection()
     conn.autocommit = False
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     try:
-        duplicates = find_duplicates(cur)
+        duplicates = find_nnt_duplicates(cur)
         log.info(f"NNT avec publications multiples : {len(duplicates)}")
 
         if not duplicates:
@@ -85,7 +52,7 @@ def main() -> Any:
             pub_ids = dup["pub_ids"]
             sources = dup["sources"]
 
-            ranked = choose_target(cur, pub_ids)
+            ranked = rank_publications_by_merge_priority(cur, pub_ids)
             target = ranked[0]
             to_merge = ranked[1:]
 
