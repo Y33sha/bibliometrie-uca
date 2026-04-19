@@ -267,6 +267,48 @@ def phase_countries(**kw: Any) -> Any:
     _run_refresh_publication_countries()
 
 
+def _run_enrich_oa_status() -> None:
+    from application.pipeline.enrich.enrich_oa_status import run_enrich
+    from infrastructure.api_limits import UNPAYWALL_DELAY
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.enrich import PgEnrichQueries
+
+    log.info("▶ enrich_oa_status")
+    t0 = time.time()
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        run_enrich(cur, conn, PgEnrichQueries(), log, rate_delay=UNPAYWALL_DELAY)
+    finally:
+        conn.close()
+    log.info("✓ enrich_oa_status terminé en %.1fs", time.time() - t0)
+
+
+def _run_enrich_journal_apc() -> None:
+    from application.pipeline.enrich.enrich_journal_apc import run_enrich
+    from infrastructure.api_limits import DOAJ_DELAY
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.enrich import PgEnrichQueries
+
+    log.info("▶ enrich_journal_apc")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        run_enrich(
+            cur,
+            conn,
+            PgEnrichQueries(),
+            log,
+            mailto="bibliometrie@uca.fr",
+            rate_delay=DOAJ_DELAY,
+        )
+    finally:
+        conn.close()
+    log.info("✓ enrich_journal_apc terminé en %.1fs", time.time() - t0)
+
+
 def _run_resolve_addresses(mode: str) -> None:
     from application.pipeline.addresses.resolve_addresses import run_resolution
     from infrastructure.db.connection import get_connection
@@ -311,8 +353,8 @@ def phase_enrich(mode: Any = "full", **kw: Any) -> Any:
     - APC revues (import fichiers budget)
     """
     if mode in ("full", "monthly"):
-        run_python("processing/enrich_oa_status.py")
-        run_python("processing/enrich_journal_apc.py")
+        _run_enrich_oa_status()
+        _run_enrich_journal_apc()
     else:
         log.info("Enrichissements ignorés en mode hebdomadaire")
 
