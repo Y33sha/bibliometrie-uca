@@ -8,11 +8,22 @@ sont en place, les ports Protocol existent pour les 7 repositories,
 le SQL est extrait des services. Ce qui reste :
 
 ### 1.1 Sortir le SQL qui traîne encore dans les routers
-Plusieurs routers `interfaces/api/routers/` exécutent encore du SQL
-direct (existence checks, lectures ad-hoc, construction de facettes).
-À extraire vers des repositories read-only ou des query builders
-dédiés. Attention aux routers lourds (`publications.py`, `persons.py`)
-qui concentrent la construction dynamique des WHERE et des ORDER BY.
+- [x] Nouveau module `infrastructure/db/queries/` : accueille les
+  query services extraits (CQRS-lite, SQL = infrastructure).
+- [x] `filters.py` SQL (PUB_IS_UCA, apply_*_filter) déplacé de
+  `interfaces/api/filters.py` vers `infrastructure/db/queries/filters.py`
+  — les parsers HTTP restent côté interfaces.
+- [x] **pub_stats** extrait (643 → 175 lignes de router) :
+  `infrastructure/db/queries/stats.py`
+- [x] **publications** extrait (1222 → 199 lignes) :
+  `infrastructure/db/queries/publications.py`
+- [x] **persons** (GET principaux) extrait (1807 → 1197 lignes) :
+  `infrastructure/db/queries/persons.py`. Les mutations (POST/PATCH/
+  DELETE) et endpoints admin (HAL-problems, orphan-authorships) restent
+  dans le router — à finaliser en reliquat.
+- [ ] **Reliquat** : addresses (487l), laboratories (449l),
+  admin_duplicates (175l), admin_person_duplicates (420l) + le
+  reste de persons.py (admin HAL-problems, orphan-authorships).
 
 ### 1.2 Factoriser la logique commune aux sources
 Créer des classes abstraites `BaseExtractor` / `BaseNormalizer` dans
@@ -51,10 +62,9 @@ couverture de tests devient un objectif.
   vérifiés en pre-commit + CI. 4 contrats `forbidden` qui verrouillent :
   (1) domain = noyau pur, (2) application ↛ interfaces,
   (3) infrastructure ↛ interfaces, (4) infrastructure ↛ application.
-- [ ] Quand §1.1 sera faite (SQL hors routers), durcir en un contrat
-  `layered` strict (interfaces > infrastructure > application > domain).
-- [ ] Quand §1.6 sera faite (DI complète), retirer l'exception permettant
-  à `application/` d'importer les factories de `infrastructure.repositories`.
+- [ ] Durcir en contrat `layered` strict — bloqué par §1.6 (DI complète) :
+  63 imports `application → infrastructure.*` à retirer avant. Revisiter
+  quand §1.6 avance.
 
 ### 1.8 Audit périodique
 Parcours régulier pour repérer : SQL mal placé, dépendances dans le
