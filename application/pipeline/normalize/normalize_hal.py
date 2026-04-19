@@ -52,7 +52,7 @@ logger = setup_logger("normalize_hal", os.path.join(os.path.dirname(__file__), "
 # =============================================================
 
 
-def as_str(value) -> str | None:
+def as_str(value: Any) -> str | None:
     """Extrait une chaîne depuis un champ HAL qui peut être str, list ou None."""
     if value is None:
         return None
@@ -77,12 +77,12 @@ def get_title(doc: dict) -> str:
 # =============================================================
 
 
-def upsert_publisher(cur, publisher_name: str) -> int | None:
+def upsert_publisher(cur: Any, publisher_name: str) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
     return find_or_create_publisher(cur, publisher_name)
 
 
-def upsert_journal(cur, doc: dict, publisher_id: int | None) -> int | None:
+def upsert_journal(cur: Any, doc: dict, publisher_id: int | None) -> int | None:
     """Extrait et trouve/crée la revue depuis les champs HAL."""
     title = as_str(doc.get("journalTitle_s"))
     if not title:
@@ -151,7 +151,7 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
     )
 
 
-def find_publication(cur, doc: dict, journal_id: int | None) -> int | None:
+def find_publication(cur: Any, doc: dict, journal_id: int | None) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None."""
     meta = extract_pub_metadata(doc, journal_id)
     if not meta["pub_year"] or not meta["title"]:
@@ -166,7 +166,7 @@ def find_publication(cur, doc: dict, journal_id: int | None) -> int | None:
 
 
 def insert_hal_document(
-    cur,
+    cur: Any,
     doc: dict,
     staging_id: int,
     hal_id: str,
@@ -322,7 +322,7 @@ _hal_author_cache: dict[str, int] = {}
 
 
 def upsert_hal_author(
-    cur,
+    cur: Any,
     full_name: str,
     hal_person_id: int | None,
     idhal: str | None,
@@ -465,7 +465,10 @@ def upsert_hal_author(
 
 
 def parse_author_structures(
-    doc: dict, cur=None, struct_cache: dict | None = None, struct_name_cache: dict | None = None
+    doc: dict,
+    cur: Any = None,
+    struct_cache: dict | None = None,
+    struct_name_cache: dict | None = None,
 ) -> dict[int, set[int]]:
     """
     Parse authIdHasStructure_fs pour extraire le mapping
@@ -530,12 +533,12 @@ def parse_author_structures(
 
 
 def process_authors(
-    cur,
+    cur: Any,
     doc: dict,
     source_publication_id: int,
     struct_cache: dict | None = None,
     struct_name_cache: dict | None = None,
-):
+) -> Any:
     """
     Traite les auteurs d'un document HAL :
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
@@ -688,7 +691,10 @@ def process_authors(
 
 
 def process_work(
-    cur, staging_row: tuple, struct_cache: dict | None = None, struct_name_cache: dict | None = None
+    cur: Any,
+    staging_row: tuple,
+    struct_cache: dict | None = None,
+    struct_name_cache: dict | None = None,
 ) -> bool:
     """Traite un work du staging HAL."""
     from infrastructure.timings import StepTimer
@@ -799,7 +805,7 @@ def process_work(
         raise
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Normalisation HAL → tables structurées")
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
     parser.add_argument(

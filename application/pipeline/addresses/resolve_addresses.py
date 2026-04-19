@@ -21,6 +21,7 @@ import argparse
 import os
 import re
 import time
+from typing import Any
 
 from domain.normalize import normalize_text as normalize
 from infrastructure.db.connection import get_connection
@@ -35,7 +36,7 @@ BATCH_SIZE = 1000
 # ─── Chargement des données ──────────────────────────────────────
 
 
-def load_forms(cur):
+def load_forms(cur: Any) -> Any:
     """Charge toutes les formes depuis structure_name_forms."""
     cur.execute("""
         SELECT nf.id, nf.structure_id, nf.form_text,
@@ -52,7 +53,7 @@ def load_forms(cur):
     return forms
 
 
-def load_perimeter(cur):
+def load_perimeter(cur: Any) -> Any:
     """Construit l'ensemble des structure_ids dans le périmètre."""
     return get_persons_structure_ids(cur)
 
@@ -60,7 +61,7 @@ def load_perimeter(cur):
 # ─── Matching ────────────────────────────────────────────────────
 
 
-def match_form_in_text(form, text_normalized):
+def match_form_in_text(form: Any, text_normalized: Any) -> Any:
     """Vérifie si une forme matche dans le texte normalisé.
 
     Si is_word_boundary ou forme <= 6 chars : mot entier (word boundary).
@@ -77,7 +78,7 @@ def match_form_in_text(form, text_normalized):
         return form_text in text_normalized
 
 
-def build_forms_by_structure(forms):
+def build_forms_by_structure(forms: Any) -> Any:
     """Index : structure_id → [forms]."""
     idx: dict[int, list] = {}
     for f in forms:
@@ -85,7 +86,9 @@ def build_forms_by_structure(forms):
     return idx
 
 
-def has_form_match_for_structure(struct_id, text_normalized, forms_by_structure):
+def has_form_match_for_structure(
+    struct_id: Any, text_normalized: Any, forms_by_structure: Any
+) -> Any:
     """Vérifie si au moins une forme de la structure donnée matche."""
     for f in forms_by_structure.get(struct_id, []):
         if match_form_in_text(f, text_normalized):
@@ -93,7 +96,7 @@ def has_form_match_for_structure(struct_id, text_normalized, forms_by_structure)
     return False
 
 
-def resolve_address(text_normalized, forms, forms_by_structure):
+def resolve_address(text_normalized: Any, forms: Any, forms_by_structure: Any) -> Any:
     """Résout une adresse : trouve toutes les structures identifiées.
 
     Les formes excluantes (is_excluding=True) retirent la structure
@@ -140,7 +143,7 @@ def resolve_address(text_normalized, forms, forms_by_structure):
 # ─── Main ────────────────────────────────────────────────────────
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser()
     parser.add_argument("--reset", action="store_true", help="Supprime les affiliations auto")
     parser.add_argument(
@@ -201,7 +204,9 @@ def main():
     conn.close()
 
 
-def process_addresses(cur, conn, rows, forms, forms_by_structure, perimeter):
+def process_addresses(
+    cur: Any, conn: Any, rows: Any, forms: Any, forms_by_structure: Any, perimeter: Any
+) -> Any:
     """Traite une liste d'adresses : détection + affiliations."""
     t_start = time.perf_counter()
     total = len(rows)

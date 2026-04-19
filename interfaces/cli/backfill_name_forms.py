@@ -8,6 +8,7 @@ Usage:
 """
 
 import argparse
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -17,7 +18,7 @@ from infrastructure.log import setup_logger
 logger = setup_logger("backfill_name_forms", "processing/logs")
 
 
-def backfill_forms(cur, conn, apply: bool):
+def backfill_forms(cur: Any, conn: Any, apply: bool) -> Any:
     """Insère une forme de nom par entité existante (si pas déjà présente)."""
     # Publishers
     cur.execute("""
@@ -43,7 +44,7 @@ def backfill_forms(cur, conn, apply: bool):
     return pub_forms, jnl_forms
 
 
-def find_duplicate_publishers(cur):
+def find_duplicate_publishers(cur: Any) -> Any:
     """Trouve les publishers ayant le même name_normalized (doublons exacts)."""
     cur.execute("""
         SELECT name_normalized, array_agg(id ORDER BY id) AS ids
@@ -54,7 +55,7 @@ def find_duplicate_publishers(cur):
     return [(r["name_normalized"], r["ids"]) for r in cur.fetchall()]
 
 
-def find_duplicate_journals(cur):
+def find_duplicate_journals(cur: Any) -> Any:
     """Trouve les journals ayant le même title_normalized."""
     cur.execute("""
         SELECT title_normalized, array_agg(id ORDER BY id) AS ids
@@ -65,7 +66,7 @@ def find_duplicate_journals(cur):
     return [(r["title_normalized"], r["ids"]) for r in cur.fetchall()]
 
 
-def merge_publishers(cur, target_id: int, source_id: int):
+def merge_publishers(cur: Any, target_id: int, source_id: int) -> Any:
     """Fusionne un publisher source dans un publisher cible."""
     # Transférer les journaux
     cur.execute(
@@ -134,7 +135,7 @@ def merge_publishers(cur, target_id: int, source_id: int):
     cur.execute("DELETE FROM publishers WHERE id = %s", (source_id,))
 
 
-def merge_journals(cur, target_id: int, source_id: int):
+def merge_journals(cur: Any, target_id: int, source_id: int) -> Any:
     """Fusionne un journal source dans un journal cible."""
     # Transférer les publications
     cur.execute(
@@ -197,7 +198,7 @@ def merge_journals(cur, target_id: int, source_id: int):
     cur.execute("DELETE FROM journals WHERE id = %s", (source_id,))
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()

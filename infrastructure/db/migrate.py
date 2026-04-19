@@ -15,6 +15,7 @@ import argparse
 import io
 import sys
 from pathlib import Path
+from typing import Any
 
 # Forcer UTF-8 sur la sortie (Windows cp1252)
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -25,7 +26,7 @@ from infrastructure.db.connection import get_connection
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
 
-def ensure_migrations_table(cur):
+def ensure_migrations_table(cur: Any) -> Any:
     """Crée la table schema_migrations si elle n'existe pas."""
     cur.execute("""
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -35,7 +36,7 @@ def ensure_migrations_table(cur):
     """)
 
 
-def get_applied(cur) -> set[str]:
+def get_applied(cur: Any) -> set[str]:
     """Retourne les versions déjà appliquées."""
     cur.execute("SELECT version FROM schema_migrations ORDER BY version")
     return {row[0] for row in cur.fetchall()}
@@ -49,7 +50,7 @@ def get_pending(applied: set[str]) -> list[Path]:
     return [f for f in files if f.name not in applied]
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Applique les migrations SQL")
     parser.add_argument("--status", action="store_true", help="Afficher l'état")
     args = parser.parse_args()

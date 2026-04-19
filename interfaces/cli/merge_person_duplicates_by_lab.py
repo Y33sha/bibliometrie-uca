@@ -14,6 +14,7 @@ Usage:
 
 import argparse
 import logging
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -34,7 +35,7 @@ COLORS = {
 }
 
 
-def c(text, *styles):
+def c(text: Any, *styles: Any) -> Any:
     prefix = "".join(COLORS.get(s, "") for s in styles)
     return f"{prefix}{text}{COLORS['reset']}"
 
@@ -56,7 +57,7 @@ LAB_PERSONS_CTE = """
 """
 
 
-def get_labs_with_duplicates(cur):
+def get_labs_with_duplicates(cur: Any) -> Any:
     """Retourne les labos ayant des personnes homonymes."""
     cur.execute(
         LAB_PERSONS_CTE
@@ -75,7 +76,7 @@ def get_labs_with_duplicates(cur):
     return cur.fetchall()
 
 
-def get_swapped_name_duplicates(cur, lab_id):
+def get_swapped_name_duplicates(cur: Any, lab_id: Any) -> Any:
     """Retourne les paires (personne A, personne B) dans un labo
     où nom_A = prénom_B et prénom_A = nom_B (interversion nom/prénom)."""
     cur.execute(
@@ -99,7 +100,7 @@ def get_swapped_name_duplicates(cur, lab_id):
     return cur.fetchall()
 
 
-def get_labs_with_swaps(cur):
+def get_labs_with_swaps(cur: Any) -> Any:
     """Retourne les labos ayant des interversions nom/prénom."""
     cur.execute(
         LAB_PERSONS_CTE
@@ -120,7 +121,7 @@ def get_labs_with_swaps(cur):
     return {row["lab_id"]: row["lab_name"] for row in cur.fetchall()}
 
 
-def get_person_details(cur, person_ids):
+def get_person_details(cur: Any, person_ids: Any) -> Any:
     """Récupère les détails des personnes pour affichage."""
     cur.execute(
         """
@@ -154,7 +155,7 @@ def get_person_details(cur, person_ids):
     return cur.fetchall()
 
 
-def pick_target(persons):
+def pick_target(persons: Any) -> Any:
     """Choisit la personne cible : RH d'abord, puis max publications."""
     # Le tri SQL met déjà la meilleure en premier
     return persons[0]
@@ -163,7 +164,7 @@ def pick_target(persons):
 do_merge = merge_person
 
 
-def display_person(p, is_target=False):
+def display_person(p: Any, is_target: Any = False) -> Any:
     """Affiche une ligne pour une personne."""
     marker = c(" ← CIBLE", "green", "bold") if is_target else ""
     rh = c(" [RH]", "cyan") if p["has_rh"] else ""
@@ -181,7 +182,7 @@ def display_person(p, is_target=False):
     )
 
 
-def run(dry_run=False):
+def run(dry_run: Any = False) -> Any:
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 

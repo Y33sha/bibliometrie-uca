@@ -9,6 +9,8 @@ Les fonctions find_by_* retournent des namedtuples pour un accès par nom
 indépendant du type de curseur (tuple ou RealDictCursor).
 """
 
+from typing import Any
+
 from application.audit import emit_event
 from domain.doc_types import map_doc_type
 from domain.publication import (
@@ -30,27 +32,31 @@ __all__ = [
 ]
 
 
-def find_by_doi(cur, doi: str) -> PubByDoi | None:
+def find_by_doi(cur: Any, doi: str) -> PubByDoi | None:
     """Cherche une publication par DOI (case-insensitive)."""
     return publication_repository(cur).find_by_doi(doi)
 
 
-def find_by_nnt(cur, nnt: str) -> PubByNnt | None:
+def find_by_nnt(cur: Any, nnt: str) -> PubByNnt | None:
     """Cherche une publication via NNT (source_publications.external_ids)."""
     return publication_repository(cur).find_by_nnt(nnt)
 
 
-def find_by_title(cur, title_normalized: str, pub_year: int, journal_id: int) -> PubByTitle | None:
+def find_by_title(
+    cur: Any, title_normalized: str, pub_year: int, journal_id: int
+) -> PubByTitle | None:
     """Cherche une publication par titre normalisé + année + journal."""
     return publication_repository(cur).find_by_title(title_normalized, pub_year, journal_id)
 
 
-def find_thesis_by_title(cur, title_normalized: str, pub_year: int) -> list[PubThesisCandidate]:
+def find_thesis_by_title(
+    cur: Any, title_normalized: str, pub_year: int
+) -> list[PubThesisCandidate]:
     """Cherche des thèses par titre normalisé + année (sans journal_id)."""
     return publication_repository(cur).find_thesis_by_title(title_normalized, pub_year)
 
 
-def try_merge_by_doi(cur, pub_id: int, doi: str | None) -> int:
+def try_merge_by_doi(cur: Any, pub_id: int, doi: str | None) -> int:
     """Tente de fusionner via DOI si la publication n'en a pas encore.
 
     Si pub_id n'a pas de DOI et qu'une autre publication porte ce DOI,
@@ -75,7 +81,7 @@ def try_merge_by_doi(cur, pub_id: int, doi: str | None) -> int:
 
 
 def resolve_doi_conflict(
-    cur, doi: str, doc_type: str, title_normalized: str, existing
+    cur: Any, doi: str, doc_type: str, title_normalized: str, existing: Any
 ) -> tuple[str | None, int | None]:
     """Gere les conflits de DOI entre chapitres et ouvrages.
 
@@ -112,7 +118,7 @@ def resolve_doi_conflict(
 
 
 def find_or_create(
-    cur,
+    cur: Any,
     *,
     title: str,
     title_normalized: str,
@@ -174,17 +180,17 @@ def find_or_create(
     return pub_id, True
 
 
-def update_oa_status(cur, pub_id: int, oa_status: str) -> None:
+def update_oa_status(cur: Any, pub_id: int, oa_status: str) -> None:
     """Met à jour le statut OA d'une publication."""
     publication_repository(cur).update_oa_status(pub_id, oa_status)
 
 
-def update_countries(cur, pub_id: int, countries: list[str]) -> None:
+def update_countries(cur: Any, pub_id: int, countries: list[str]) -> None:
     """Met à jour les pays d'une publication."""
     publication_repository(cur).update_countries(pub_id, countries)
 
 
-def update_sources(cur, pub_id: int) -> None:
+def update_sources(cur: Any, pub_id: int) -> None:
     """Recalcule publications.sources depuis source_publications."""
     publication_repository(cur).update_sources(pub_id)
 
@@ -211,7 +217,7 @@ _OA_RANK = {
 }
 
 
-def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
+def refresh_from_sources(cur: Any, pub_id: int) -> None:  # noqa: C901
     """Recalcule les métadonnées d'une publication depuis ses source_publications.
 
     Contrairement à l'ancien _enrich() qui faisait du COALESCE incrémental (premier arrivé
@@ -271,14 +277,14 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
     rows.sort(key=lambda r: rank.get(r["source"], 99))
 
     # --- Helpers ---
-    def first_non_null(field):
+    def first_non_null(field: Any) -> Any:
         for r in rows:
             v = r[field]
             if v is not None:
                 return v
         return None
 
-    def merge_lists(field):
+    def merge_lists(field: Any) -> Any:
         seen = set()
         result = []
         for r in rows:
@@ -289,7 +295,7 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
                     result.append(item)
         return result or None
 
-    def merge_jsonb(field):
+    def merge_jsonb(field: Any) -> Any:
         """Fusion shallow par clé pour meta/biblio : les deux sont toujours
         des dicts avec des clés orthogonales entre sources (pas de conflit
         en pratique). La source prioritaire gagne par clé."""
@@ -302,7 +308,7 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
                         merged[k] = v
         return merged or None
 
-    def topics_by_source():
+    def topics_by_source() -> Any:
         """Indexe les topics par source pour ne RIEN perdre de l'info.
 
         Les topics ont des schémas radicalement différents selon la source
@@ -319,7 +325,7 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
                 out[r["source"]] = topics
         return out or None
 
-    def best_oa_status():
+    def best_oa_status() -> Any:
         best, best_rank = None, 0
         for r in rows:
             s = r["oa_status"]
@@ -368,7 +374,7 @@ def refresh_from_sources(cur, pub_id: int) -> None:  # noqa: C901
     repo.update_sources(pub_id)
 
 
-def mark_distinct(cur, pub_id_a: int, pub_id_b: int) -> None:
+def mark_distinct(cur: Any, pub_id_a: int, pub_id_b: int) -> None:
     """Marque deux publications comme distinctes (non-doublon) dans
     `distinct_publications`. Idempotent.
 
@@ -385,7 +391,7 @@ def mark_distinct(cur, pub_id_a: int, pub_id_b: int) -> None:
         )
 
 
-def merge_publications(cur, target_id: int, source_id: int) -> None:
+def merge_publications(cur: Any, target_id: int, source_id: int) -> None:
     """Fusionne la publication `source_id` dans `target_id`.
 
     Orchestration :

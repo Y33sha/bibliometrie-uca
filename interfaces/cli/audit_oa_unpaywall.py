@@ -47,7 +47,7 @@ def fetch_unpaywall(doi: str) -> str | None:
         return None
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=0, help="Limiter le nombre de DOI")
     parser.add_argument(

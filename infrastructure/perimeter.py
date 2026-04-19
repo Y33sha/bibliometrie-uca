@@ -1,3 +1,5 @@
+from typing import Any
+
 """Calcul des périmètres de structures.
 
 Lit les périmètres depuis la table `perimeters` (colonne structure_ids).
@@ -10,7 +12,7 @@ L'association phase→périmètre est lue depuis la table `config` :
 """
 
 
-def get_perimeter_structure_ids(cur, perimeter_code: str) -> set[int]:
+def get_perimeter_structure_ids(cur: Any, perimeter_code: str) -> set[int]:
     """Retourne l'ensemble des structure_ids pour un périmètre donné.
 
     Chaque structure listée dans perimeters.structure_ids est une racine.
@@ -47,7 +49,7 @@ def get_perimeter_structure_ids(cur, perimeter_code: str) -> set[int]:
 # ── Fonctions par rôle (lisent la config) ──
 
 
-def _config_perimeter_code(cur, config_key: str, default: str) -> str:
+def _config_perimeter_code(cur: Any, config_key: str, default: str) -> str:
     """Lit un code périmètre depuis la table config."""
     try:
         cur.execute("SELECT value FROM config WHERE key = %s", (config_key,))
@@ -61,18 +63,18 @@ def _config_perimeter_code(cur, config_key: str, default: str) -> str:
     return default
 
 
-def get_affiliations_structure_ids(cur) -> set[int]:
+def get_affiliations_structure_ids(cur: Any) -> set[int]:
     """Périmètre pour la résolution des affiliations (structure_ids)."""
     code = _config_perimeter_code(cur, "perimeter_affiliations", "uca_wide")
     return get_perimeter_structure_ids(cur, code)
 
 
-def get_persons_structure_ids(cur) -> set[int]:
+def get_persons_structure_ids(cur: Any) -> set[int]:
     """Périmètre pour la création des personnes (in_perimeter)."""
     code = _config_perimeter_code(cur, "perimeter_persons", "uca")
     return get_perimeter_structure_ids(cur, code)
 
 
-def get_persons_structure_ids_list(cur) -> list[int]:
+def get_persons_structure_ids_list(cur: Any) -> list[int]:
     """Variante liste (pour usage dans les requêtes SQL ANY(%s))."""
     return list(get_persons_structure_ids(cur))

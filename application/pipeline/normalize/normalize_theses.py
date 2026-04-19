@@ -62,7 +62,7 @@ def _extract_thesis_author(these: dict) -> tuple[str, str] | None:
     return (ln, fn) if ln else None
 
 
-def _thesis_author_compatible(cur, pub_id: int, author: tuple[str, str]) -> bool:
+def _thesis_author_compatible(cur: Any, pub_id: int, author: tuple[str, str]) -> bool:
     """Vérifie si l'auteur d'une thèse existante est compatible avec author."""
     cur.execute(
         """
@@ -133,7 +133,7 @@ def extract_pub_metadata(these: dict) -> dict:
     )
 
 
-def find_publication(cur, these: dict) -> int | None:
+def find_publication(cur: Any, these: dict) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None.
 
     Déduplication en 2 étapes :
@@ -190,7 +190,7 @@ def _parse_date_iso(date_str: str | None) -> str | None:
         return None
 
 
-def _update_thesis_meta(cur, pub_id: int, these: dict):
+def _update_thesis_meta(cur: Any, pub_id: int, these: dict) -> Any:
     """Met à jour publications.meta avec les dates de thèse."""
     meta = {}
     ds = _parse_date_iso(these.get("dateSoutenance"))
@@ -246,7 +246,7 @@ def _build_source_meta(these: dict) -> dict | None:
 
 
 def insert_source_document(
-    cur,
+    cur: Any,
     these: dict,
     staging_id: int,
     theses_id: str,
@@ -351,7 +351,7 @@ def insert_source_document(
 # =============================================================
 
 
-def upsert_source_author(cur, person: dict) -> int | None:
+def upsert_source_author(cur: Any, person: dict) -> int | None:
     """Insère/retrouve un auteur theses.fr. Déduplique par PPN IdRef."""
     nom = person.get("nom")
     prenom = person.get("prenom")
@@ -411,7 +411,7 @@ def upsert_source_author(cur, person: dict) -> int | None:
 # =============================================================
 
 
-def process_persons(cur, these: dict, source_publication_id: int):
+def process_persons(cur: Any, these: dict, source_publication_id: int) -> Any:
     """Traite tous les rôles d'une thèse : auteurs, directeurs, rapporteurs, etc.
 
     Une même personne peut apparaître dans plusieurs champs (ex: directeur + jury).
@@ -497,7 +497,7 @@ def process_persons(cur, these: dict, source_publication_id: int):
 # =============================================================
 
 
-def process_work(cur, row: dict) -> bool:
+def process_work(cur: Any, row: dict) -> bool:
     """Traite une thèse du staging."""
     staging_id = row["id"]
     theses_id = row["source_id"]
@@ -555,7 +555,7 @@ def process_work(cur, row: dict) -> bool:
         raise
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Normalisation theses.fr → tables structurées")
     parser.add_argument("--limit", type=int, help="Nombre max de thèses à traiter")
     parser.add_argument("--reset", action="store_true", help="Remettre processed=FALSE")

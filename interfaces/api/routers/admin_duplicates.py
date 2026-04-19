@@ -1,6 +1,7 @@
 """Auto-extracted router."""
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 async def next_duplicate_candidate(
     min_title_len: int = Query(30, ge=10),
     offset: int = Query(0, ge=0),
-):
+) -> Any:
     """Renvoie la paire candidate à la position offset."""
     with get_cursor() as (cur, conn):
         candidate_where = """
@@ -57,7 +58,7 @@ async def next_duplicate_candidate(
         if not row:
             return {"total": total, "offset": offset, "pair": None}
 
-        def get_pub_detail(pub_id):
+        def get_pub_detail(pub_id: Any) -> Any:
             cur.execute(
                 """
                 SELECT p.id, p.title, p.title_normalized, p.doi, p.pub_year,
@@ -134,7 +135,7 @@ async def next_duplicate_candidate(
 
 
 @router.post("/api/admin/duplicates/merge")
-async def merge_duplicate_publications(body: MergePublications):
+async def merge_duplicate_publications(body: MergePublications) -> Any:
     """Fusionne source_id dans target_id."""
     if body.target_id == body.source_id:
         raise HTTPException(
@@ -162,7 +163,7 @@ async def merge_duplicate_publications(body: MergePublications):
 
 
 @router.post("/api/admin/duplicates/mark-distinct")
-async def mark_publications_distinct(body: MarkDistinctPublications):
+async def mark_publications_distinct(body: MarkDistinctPublications) -> Any:
     """Marque deux publications comme distinctes (non-doublon)."""
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")

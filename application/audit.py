@@ -52,7 +52,7 @@ def get_current_user() -> str | None:
 
 
 def emit_event(
-    cur,
+    cur: Any,
     event_type: str,
     aggregate_type: str,
     aggregate_id: int | None = None,

@@ -1,6 +1,7 @@
 """Auto-extracted router."""
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Query
 
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/api/admin/address-stats")
-async def get_stats(structure_id: int | None = Query(None)):
+async def get_stats(structure_id: int | None = Query(None)) -> Any:
     """Compteurs d'adresses par détection/validation pour une structure."""
     with get_cursor() as (cur, conn):
         # Résoudre la structure (défaut = première racine du périmètre)

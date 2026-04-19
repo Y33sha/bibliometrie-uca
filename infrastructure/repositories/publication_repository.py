@@ -4,6 +4,8 @@ Isole le SQL de la couche application. Implémente le port
 `PublicationRepository` défini dans domain/ports/.
 """
 
+from typing import Any
+
 from domain.publication import (  # noqa: F401 — re-export pour compat
     PubByDoi,
     PubByNnt,
@@ -16,7 +18,7 @@ from infrastructure.db_helpers import row_val as _val
 class PgPublicationRepository:
     """Accès PostgreSQL à l'agrégat Publication."""
 
-    def __init__(self, cur):
+    def __init__(self, cur: Any) -> None:
         self._cur = cur
 
     # ── Recherches ─────────────────────────────────────────────────

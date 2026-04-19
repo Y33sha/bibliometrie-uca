@@ -44,6 +44,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 from domain.sources import ALL_SOURCES_SET, BIBLIO_SOURCES_SET
 
@@ -58,7 +59,9 @@ BASE = Path(__file__).resolve().parent
 STATUS_FILE = BASE / "pipeline" / "status.json"
 
 
-def _write_status(mode: str, phase: str, started_at: str, phases_done: int, phases_total: int):
+def _write_status(
+    mode: str, phase: str, started_at: str, phases_done: int, phases_total: int
+) -> Any:
     """Écrit le fichier de statut pour le suivi en temps réel."""
     STATUS_FILE.write_text(
         json.dumps(
@@ -76,7 +79,7 @@ def _write_status(mode: str, phase: str, started_at: str, phases_done: int, phas
     )
 
 
-def _clear_status():
+def _clear_status() -> Any:
     """Supprime le fichier de statut à la fin du pipeline."""
     STATUS_FILE.unlink(missing_ok=True)
 
@@ -90,7 +93,7 @@ atexit.register(_clear_status)
 # ---------------------------------------------------------------------------
 
 
-def phase_extract(mode="full", sources=None, year=None, **kw):
+def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **kw: Any) -> Any:
     """Phase 1 : Extraction des sources vers staging + refetch truncated.
 
     Les années sont déterminées par la config DB (pipeline_years_full/weekly).
@@ -135,7 +138,9 @@ def phase_extract(mode="full", sources=None, year=None, **kw):
         run_python("extraction/openalex/refetch_truncated.py")
 
 
-def phase_cross_imports(mode="full", sources=None, full_cross_import=False, **kw):
+def phase_cross_imports(
+    mode: Any = "full", sources: Any = None, full_cross_import: Any = False, **kw: Any
+) -> Any:
     """Phase 2 : Cross-imports entre sources (lit le staging uniquement).
 
     - daily/weekly : cross-import sur les documents non normalisés (processed=FALSE)
@@ -162,7 +167,7 @@ def phase_cross_imports(mode="full", sources=None, full_cross_import=False, **kw
         run_python("extraction/scanr/cross_import_scanr.py", *full_flag)
 
 
-def phase_normalize(**kw):
+def phase_normalize(**kw: Any) -> Any:
     """Normalisation staging -> tables sources.
 
     Rattache aux publications existantes (DOI/NNT/HAL-ID) sans en creer.
@@ -194,7 +199,7 @@ def phase_normalize(**kw):
         _vacuum_staging(full=False)
 
 
-def _vacuum_staging(full: bool = False):
+def _vacuum_staging(full: bool = False) -> Any:
     """VACUUM sur staging. FULL en mode full/monthly, simple sinon."""
     from infrastructure.db.connection import get_connection
 
@@ -205,7 +210,7 @@ def _vacuum_staging(full: bool = False):
     conn.close()
 
 
-def phase_affiliations(**kw):
+def phase_affiliations(**kw: Any) -> Any:
     """Résolution des affiliations UCA sur les source_authorships.
 
     1. resolve_addresses : matche les adresses vers les structures connues
@@ -218,7 +223,7 @@ def phase_affiliations(**kw):
     run_python("processing/populate_affiliations.py", "--sources", source_args, "--mode", mode)
 
 
-def phase_publications(**kw):
+def phase_publications(**kw: Any) -> Any:
     """Creation des publications canoniques.
 
     Ne cree des publications que pour les source_publications ayant au moins
@@ -230,7 +235,7 @@ def phase_publications(**kw):
     run_python("processing/merge_pubs_by_nnt.py")
 
 
-def phase_persons(**kw):
+def phase_persons(**kw: Any) -> Any:
     """Creation et rattachement des personnes.
 
     Cree des personnes a partir des source_authorships in_perimeter non rattachees.
@@ -241,7 +246,7 @@ def phase_persons(**kw):
     run_python("processing/populate_person_name_forms.py")
 
 
-def phase_authorships(**kw):
+def phase_authorships(**kw: Any) -> Any:
     """Construction de la table de verite authorships.
 
     Consolide les source_authorships en authorships canoniques
@@ -255,14 +260,14 @@ def phase_authorships(**kw):
         run_python("processing/build_authorships.py")
 
 
-def phase_countries(**kw):
+def phase_countries(**kw: Any) -> Any:
     """Detection des pays des adresses et recalcul sur les publications."""
     run_python("scripts/detect_address_countries.py", "--direct", "--apply")
     run_python("scripts/suggest_address_countries.py")
     run_python("processing/refresh_publication_countries.py")
 
 
-def phase_enrich(mode="full", **kw):
+def phase_enrich(mode: Any = "full", **kw: Any) -> Any:
     """Enrichissements optionnels (mode full/monthly uniquement).
 
     - Statut OA via Unpaywall
@@ -296,7 +301,7 @@ PHASE_NAMES = [name for name, _ in PHASES]
 # ---------------------------------------------------------------------------
 
 
-def run_python(script: str, *args):
+def run_python(script: str, *args: Any) -> Any:
     """Lance un script Python du projet."""
     path = BASE / script
     if not path.exists():
@@ -320,7 +325,7 @@ def run_python(script: str, *args):
 # ---------------------------------------------------------------------------
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Orchestrateur pipeline bibliométrique UCA")
     parser.add_argument(
         "--from", dest="from_phase", metavar="PHASE", help="Reprendre depuis cette phase"

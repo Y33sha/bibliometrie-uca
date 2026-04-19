@@ -22,7 +22,7 @@ class StepTimer:
         self._steps: list[tuple[str, float]] = []
         self._threshold = threshold
 
-    def mark(self, label: str):
+    def mark(self, label: str) -> None:
         now = time.perf_counter()
         self._steps.append((label, now - self._last))
         self._last = now
@@ -30,7 +30,7 @@ class StepTimer:
     def total(self) -> float:
         return time.perf_counter() - self._t0
 
-    def log_if_slow(self, doc_id: str, logger: logging.Logger):
+    def log_if_slow(self, doc_id: str, logger: logging.Logger) -> None:
         total = self.total()
         if total > self._threshold:
             breakdown = " | ".join(f"{k}:{v:.3f}s" for k, v in self._steps)

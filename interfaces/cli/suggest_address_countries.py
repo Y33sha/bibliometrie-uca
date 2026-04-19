@@ -24,7 +24,7 @@ from infrastructure.log import setup_logger
 logger = setup_logger("suggest_countries", "processing/logs")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch-size", type=int, default=5000)
     parser.add_argument(

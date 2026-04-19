@@ -81,7 +81,7 @@ async def persons_directory(
     has_idhal: str = Query(""),  # "yes" or "no"
     has_rh: str = Query(""),  # "yes" or "no"
     sort: str = Query("name"),  # name, -name
-):
+) -> Any:
     """Annuaire public des personnes UCA avec ORCID et idHAL."""
     offset = (page - 1) * per_page
 
@@ -174,7 +174,9 @@ async def persons_directory(
 
 
 @router.get("/api/persons/search")
-async def search_persons(q: str = Query("", min_length=2), limit: int = Query(10, ge=1, le=30)):
+async def search_persons(
+    q: str = Query("", min_length=2), limit: int = Query(10, ge=1, le=30)
+) -> Any:
     """Recherche rapide de personnes (autocomplete)."""
     words = q.strip().split()
     if not words:
@@ -217,7 +219,7 @@ async def list_persons(
     has_idhal: str = Query(""),  # "yes", "no", ""
     has_rh: str = Query(""),  # "yes", "no", ""
     sort: str = Query("name"),  # name, -name, pubs, -pubs
-):
+) -> Any:
     """Liste des personnes avec filtres."""
     offset = (page - 1) * per_page
     conditions = []
@@ -343,7 +345,7 @@ async def persons_facets(
     has_idhal: str = Query(""),
     has_rh: str = Query(""),
     linked: str = Query(""),
-):
+) -> Any:
     """Facettes dynamiques pour la page personnes.
     Chaque facette exclut son propre filtre."""
     departments = parse_str_csv(department)
@@ -502,7 +504,7 @@ async def persons_facets(
 
 
 @router.get("/api/persons/departments")
-async def list_departments():
+async def list_departments() -> Any:
     """Liste des départements distincts."""
     with get_cursor() as (cur, conn):
         cur.execute("""
@@ -516,7 +518,7 @@ async def list_departments():
 
 
 @router.get("/api/persons/roles")
-async def list_roles():
+async def list_roles() -> Any:
     """Liste des rôles distincts."""
     with get_cursor() as (cur, conn):
         cur.execute("""
@@ -530,7 +532,7 @@ async def list_roles():
 
 
 @router.get("/api/persons/stats")
-async def persons_stats():
+async def persons_stats() -> Any:
     """Statistiques sur les personnes et l'alignement."""
     with get_cursor() as (cur, conn):
         cur.execute("""
@@ -545,7 +547,7 @@ async def persons_stats():
 
 
 @router.get("/api/persons/{person_id}")
-async def get_person(person_id: int):
+async def get_person(person_id: int) -> Any:
     """Retourne une personne avec ses auteurs lies."""
     with get_cursor() as (cur, conn):
         cur.execute(
@@ -580,7 +582,7 @@ async def get_person(person_id: int):
 
 
 @router.get("/api/persons/{person_id}/profile")
-async def person_profile(person_id: int):
+async def person_profile(person_id: int) -> Any:
     """Profil public complet d'une personne : infos, identifiants, auteurs liés."""
     with get_cursor() as (cur, conn):
         # Infos personne
@@ -684,7 +686,7 @@ async def person_profile(person_id: int):
 
 
 @router.get("/api/persons/{person_id}/theses")
-async def person_theses(person_id: int):
+async def person_theses(person_id: int) -> Any:
     """Thèses liées à cette personne avec un rôle non-auteur (directeur, rapporteur, jury)."""
     with get_cursor() as (cur, conn):
         cur.execute(
@@ -787,7 +789,7 @@ async def person_addresses(
     person_id: int,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-):
+) -> Any:
     """Adresses distinctes utilisées dans les authorships sources de cette personne."""
     with get_cursor() as (cur, conn):
         base_where = """a.id IN (
@@ -833,7 +835,7 @@ ORCID_RE = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
 
 
 @router.post("/api/persons/{person_id}/identifier")
-async def add_person_identifier(person_id: int, data: AddIdentifier):
+async def add_person_identifier(person_id: int, data: AddIdentifier) -> Any:
     """Ajoute manuellement un identifiant (ORCID ou idHAL) à une personne."""
     if data.id_type not in ("orcid", "idhal", "idref"):
         raise HTTPException(status_code=400, detail="id_type doit être 'orcid', 'idhal' ou 'idref'")
@@ -884,7 +886,7 @@ async def add_person_identifier(person_id: int, data: AddIdentifier):
 
 
 @router.delete("/api/persons/{person_id}/identifier/{id_type}/{id_value:path}")
-async def remove_person_identifier(person_id: int, id_type: str, id_value: str):
+async def remove_person_identifier(person_id: int, id_type: str, id_value: str) -> Any:
     """Supprime un identifiant d'une personne."""
     with get_cursor() as (cur, conn):
         _remove_identifier(cur, person_id, id_type, id_value)
@@ -892,7 +894,7 @@ async def remove_person_identifier(person_id: int, id_type: str, id_value: str):
 
 
 @router.patch("/api/person-identifiers/{ident_id}/status")
-async def update_identifier_status(ident_id: int, body: UpdateIdentifierStatus):
+async def update_identifier_status(ident_id: int, body: UpdateIdentifierStatus) -> Any:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
     with get_cursor() as (cur, conn):
         row = _update_identifier_status(cur, ident_id, body.status)
@@ -900,7 +902,7 @@ async def update_identifier_status(ident_id: int, body: UpdateIdentifierStatus):
 
 
 @router.patch("/api/person-identifiers/{ident_id}/reassign")
-async def reassign_identifier(ident_id: int, body: ReassignIdentifier):
+async def reassign_identifier(ident_id: int, body: ReassignIdentifier) -> Any:
     """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
     target_person_id = body.person_id
     with get_cursor() as (cur, conn):
@@ -912,7 +914,7 @@ async def reassign_identifier(ident_id: int, body: ReassignIdentifier):
 
 
 @router.patch("/api/authorships/{authorship_id}/exclude")
-async def toggle_authorship_excluded(authorship_id: int):
+async def toggle_authorship_excluded(authorship_id: int) -> Any:
     """Marque un authorship comme exclu (lien personne-publication rejeté)."""
     with get_cursor() as (cur, conn):
         row = _exclude_authorship(cur, authorship_id)
@@ -920,7 +922,7 @@ async def toggle_authorship_excluded(authorship_id: int):
 
 
 @router.patch("/api/persons/{person_id}/reject")
-async def reject_person(person_id: int, body: RejectPerson):
+async def reject_person(person_id: int, body: RejectPerson) -> Any:
     """Marque/démarque une personne comme rejetée (fausse entité)."""
     with get_cursor() as (cur, conn):
         _set_rejected(cur, person_id, body.rejected)
@@ -928,7 +930,7 @@ async def reject_person(person_id: int, body: RejectPerson):
 
 
 @router.patch("/api/persons/{person_id}/name")
-async def update_person_name(person_id: int, body: UpdatePersonName):
+async def update_person_name(person_id: int, body: UpdatePersonName) -> Any:
     """Modifie le nom/prénom d'une personne."""
     last_name = body.last_name.strip()
     first_name = body.first_name.strip()
@@ -940,7 +942,7 @@ async def update_person_name(person_id: int, body: UpdatePersonName):
 
 
 @router.post("/api/persons/{person_id}/merge")
-async def merge_persons(person_id: int, body: MergePersons):
+async def merge_persons(person_id: int, body: MergePersons) -> Any:
     """Fusionne une autre personne (source) dans celle-ci (target)."""
     source_id = body.source_id
     if source_id == person_id:
@@ -979,7 +981,7 @@ _ORPHAN_BASE = f"""
 
 
 @router.get("/api/admin/orphan-authorships/count")
-async def orphan_authorships_count():
+async def orphan_authorships_count() -> Any:
     """Nombre d'authorships UCA sans person_id."""
     with get_cursor() as (cur, conn):
         cur.execute(f"""
@@ -997,7 +999,7 @@ async def list_orphan_authorships(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
-):
+) -> Any:
     """Liste les authorships UCA sans person_id, avec publication et nom d'auteur."""
     offset = (page - 1) * per_page
     search_cond = ""
@@ -1051,7 +1053,7 @@ async def list_orphan_authorships(
 
 
 @router.post("/api/admin/orphan-authorships/assign")
-async def assign_orphan_authorship_endpoint(body: AssignOrphanAuthorship):
+async def assign_orphan_authorship_endpoint(body: AssignOrphanAuthorship) -> Any:
     """Attribue une authorship orpheline à une personne existante ou nouvelle."""
     if body.source not in ALL_SOURCES_SET:
         raise HTTPException(status_code=400, detail=f"Source inconnue: {body.source}")
@@ -1078,7 +1080,7 @@ async def assign_orphan_authorship_endpoint(body: AssignOrphanAuthorship):
 
 
 @router.post("/api/admin/orphan-authorships/batch-assign")
-async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships):
+async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships) -> Any:
     """Attribue plusieurs authorships orphelines a une meme personne.
 
     Fait tout en SQL batch au lieu d'iterer authorship par authorship :
@@ -1106,7 +1108,7 @@ async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships):
 
 
 @router.get("/api/persons/{person_id}/name-form-authorships")
-async def name_form_authorships(person_id: int, name_form: str = Query(...)):
+async def name_form_authorships(person_id: int, name_form: str = Query(...)) -> Any:
     """Liste les authorships sources liées à une personne pour une forme de nom donnée.
     name_form est la forme normalisée (lowercase, unaccent) depuis person_name_forms.
     Retourne aussi les autres personnes partageant cette forme de nom."""
@@ -1148,7 +1150,7 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)):
 
 
 @router.post("/api/persons/{person_id}/detach-authorships")
-async def detach_authorships(person_id: int, body: DetachAuthorships):
+async def detach_authorships(person_id: int, body: DetachAuthorships) -> Any:
     """Détache des authorships sources d'une personne et nettoie les formes de noms."""
     with get_cursor() as (cur, conn):
         return _detach_authorships_service(
@@ -1162,7 +1164,7 @@ async def detach_authorships(person_id: int, body: DetachAuthorships):
 
 
 @router.post("/api/persons/{person_id}/detach-name-form")
-async def detach_name_form(person_id: int, body: DetachNameForm):
+async def detach_name_form(person_id: int, body: DetachNameForm) -> Any:
     """Détache une forme de nom d'une personne (quand aucune authorship n'y est liée)."""
     name_form = body.name_form
 
@@ -1304,7 +1306,7 @@ PERSON_DUP_QUERIES = [
 ]
 
 
-def _get_person_dedup_detail(cur, person_id):
+def _get_person_dedup_detail(cur: Any, person_id: Any) -> Any:
     """Détail d'une personne pour la page de déduplication."""
     cur.execute(
         """
@@ -1399,7 +1401,9 @@ def _parse_skip_pairs(skip: str) -> set[tuple[int, int]]:
     return result
 
 
-def _scan_dup_query(cur, sql, skip_pairs=None, stop_at_first=False, skip_n=0):
+def _scan_dup_query(
+    cur: Any, sql: Any, skip_pairs: Any = None, stop_at_first: Any = False, skip_n: Any = 0
+) -> Any:
     """Parcourt une requête de doublons avec curseur serveur.
     Retourne (found_row_or_None, count_of_valid_pairs).
     skip_n: nombre de paires valides à sauter avant de retourner la première.
@@ -1445,7 +1449,7 @@ def _scan_dup_query(cur, sql, skip_pairs=None, stop_at_first=False, skip_n=0):
 async def hal_duplicate_accounts(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
-):
+) -> Any:
     """Personnes liées à 2+ comptes HAL distincts."""
     offset = (page - 1) * per_page
     with get_cursor() as (cur, conn):
@@ -1506,7 +1510,7 @@ async def hal_duplicate_accounts(
 # ----- HAL problems: duplicate publications -----
 
 
-def _hal_pub_detail(cur, pub_id):
+def _hal_pub_detail(cur: Any, pub_id: Any) -> Any:
     """Détail d'une publication pour la page doublons HAL."""
     cur.execute(
         """
@@ -1534,7 +1538,7 @@ def _hal_pub_detail(cur, pub_id):
 async def hal_duplicate_pubs_by_doi(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
-):
+) -> Any:
     """Dépôts HAL avec DOI identique rattachés à la même publication."""
     offset = (page - 1) * per_page
     with get_cursor() as (cur, conn):
@@ -1584,7 +1588,7 @@ async def hal_duplicate_pubs_by_doi(
 async def hal_duplicate_pubs_by_metadata(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
-):
+) -> Any:
     """Doublons possibles: dépôts HAL avec métadonnées identiques."""
     offset = (page - 1) * per_page
     with get_cursor() as (cur, conn):
@@ -1643,7 +1647,7 @@ async def hal_missing_collections(
     lab_id: int = Query(...),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
-):
+) -> Any:
     """Publications affiliées à un labo sur OA/WoS, présentes dans HAL,
     mais absentes de la collection HAL du labo."""
     offset = (page - 1) * per_page
@@ -1694,7 +1698,7 @@ async def hal_missing_collections(
 
 
 @router.get("/api/hal-problems/missing-collections/labs")
-async def hal_missing_collections_labs():
+async def hal_missing_collections_labs() -> Any:
     """Liste des labos avec collection HAL."""
     with get_cursor() as (cur, conn):
         cur.execute("""
@@ -1727,7 +1731,7 @@ SHS_LAB_CODES = (
 )
 
 
-def _affiliation_pub_row(r):
+def _affiliation_pub_row(r: Any) -> Any:
     return {
         "id": r["id"],
         "title": r["title"],
@@ -1743,7 +1747,7 @@ def _affiliation_pub_row(r):
 async def hal_affiliation_conflicts(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
-):
+) -> Any:
     """Publications affiliées UCA dans HAL mais pas dans OA/WoS."""
     offset = (page - 1) * per_page
     with get_cursor() as (cur, conn):

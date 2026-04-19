@@ -1,3 +1,5 @@
+from typing import Any
+
 """Adapter PostgreSQL pour la persistance des authorships (canoniques et
 sources).
 
@@ -10,7 +12,7 @@ vérité détache les sources, et vice-versa).
 class PgAuthorshipRepository:
     """Accès PostgreSQL aux agrégats Authorship (vérité et sources)."""
 
-    def __init__(self, cur):
+    def __init__(self, cur: Any) -> None:
         self._cur = cur
 
     # ── authorships (vérité) ───────────────────────────────────────

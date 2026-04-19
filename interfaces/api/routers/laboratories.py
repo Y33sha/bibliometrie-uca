@@ -2,6 +2,7 @@
 
 import datetime
 import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/api/laboratories")
-async def list_laboratories():
+async def list_laboratories() -> Any:
     """Liste des labos du périmètre."""
     with get_cursor() as (cur, conn):
         from infrastructure.app_config import _get_from_db
@@ -55,7 +56,7 @@ async def list_laboratories():
 
 
 @router.get("/api/laboratories/{lab_id}")
-async def get_laboratory(lab_id: int):
+async def get_laboratory(lab_id: int) -> Any:
     """Profil public d'un laboratoire."""
     with get_cursor() as (cur, conn):
         cur.execute(
@@ -129,7 +130,7 @@ async def get_laboratory_persons(
     has_rh: str = Query(""),  # "yes", "no", ""
     has_orcid: str = Query(""),
     has_idhal: str = Query(""),
-):
+) -> Any:
     """Personnes et authorships orphelines liées à un labo."""
     offset = (page - 1) * per_page
     lab_arr = [lab_id]
@@ -304,7 +305,7 @@ async def get_laboratory_addresses(
     lab_id: int,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
-):
+) -> Any:
     """Adresses liées à un laboratoire."""
     offset = (page - 1) * per_page
 
@@ -345,7 +346,7 @@ async def get_laboratory_addresses(
 
 
 @router.get("/api/laboratories/{lab_id}/dashboard")
-async def get_laboratory_dashboard(lab_id: int):
+async def get_laboratory_dashboard(lab_id: int) -> Any:
     """Données du dashboard labo : publications par an + répartition OA."""
     with get_cursor() as (cur, conn):
         lab_arr = [lab_id]

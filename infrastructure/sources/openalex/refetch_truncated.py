@@ -50,7 +50,7 @@ def fetch_work(openalex_id: str) -> dict | None:
     return None
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Re-fetch publications OA tronquées (>= 100 auteurs)"
     )

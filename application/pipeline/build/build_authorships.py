@@ -14,6 +14,7 @@ Usage:
 import argparse
 import os
 import time
+from typing import Any
 
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
@@ -21,7 +22,7 @@ from infrastructure.log import setup_logger
 logger = setup_logger("build_authorships", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def build(cur, sources=None):
+def build(cur: Any, sources: Any = None) -> Any:
     all_sources = [
         ("HAL", "hal"),
         ("OpenAlex", "openalex"),
@@ -197,7 +198,7 @@ def build(cur, sources=None):
     logger.info(f"\nTerminé en {elapsed:.1f}s")
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="Simuler sans modifier la base")
     parser.add_argument("--sources", default=None, help="Sources à traiter (défaut: toutes)")
