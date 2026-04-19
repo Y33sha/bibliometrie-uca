@@ -46,11 +46,7 @@ from application.persons import (
     update_name as _update_name,
 )
 from domain.sources import ALL_SOURCES_SET, AUTHOR_SOURCES_SQL
-from infrastructure.db.queries.filters import (
-    apply_person_has_identifier_filter,
-    apply_person_has_rh_filter,
-    apply_person_linked_filter,
-)
+from infrastructure.db.queries import persons as persons_queries
 from interfaces.api.deps import get_cursor
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
@@ -75,102 +71,26 @@ async def persons_directory(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
-    department: str = Query(""),  # comma-separated
-    role: str = Query(""),  # comma-separated
-    has_orcid: str = Query(""),  # "yes" or "no"
-    has_idhal: str = Query(""),  # "yes" or "no"
-    has_rh: str = Query(""),  # "yes" or "no"
-    sort: str = Query("name"),  # name, -name
+    department: str = Query(""),
+    role: str = Query(""),
+    has_orcid: str = Query(""),
+    has_idhal: str = Query(""),
+    has_rh: str = Query(""),
+    sort: str = Query("name"),
 ) -> Any:
     """Annuaire public des personnes UCA avec ORCID et idHAL."""
-    offset = (page - 1) * per_page
-
-    departments = [v.strip() for v in department.split(",") if v.strip()] if department else []
-    roles = [v.strip() for v in role.split(",") if v.strip()] if role else []
-
-    conditions = ["p.rejected = FALSE"]
-    params: list[Any] = []
-
-    if search:
-        conditions.append(
-            "(unaccent(p.last_name) ILIKE unaccent(%s) OR unaccent(p.first_name) ILIKE unaccent(%s))"
+    filters = persons_queries.DirectoryFilters(
+        search=search,
+        departments=parse_str_csv(department),
+        roles=parse_str_csv(role),
+        has_orcid=has_orcid,
+        has_idhal=has_idhal,
+        has_rh=has_rh,
+    )
+    with get_cursor() as (cur, _conn):
+        return persons_queries.persons_directory(
+            cur, filters=filters, page=page, per_page=per_page, sort=sort
         )
-        s = f"%{search}%"
-        params.extend([s, s])
-    if departments:
-        conditions.append("prh.department_name = ANY(%s)")
-        params.append(departments)
-    if roles:
-        conditions.append("prh.role_title = ANY(%s)")
-        params.append(roles)
-    if has_orcid == "yes":
-        conditions.append(
-            "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')"
-        )
-    elif has_orcid == "no":
-        conditions.append(
-            "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')"
-        )
-    if has_idhal == "yes":
-        conditions.append(
-            "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')"
-        )
-    elif has_idhal == "no":
-        conditions.append(
-            "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')"
-        )
-    if has_rh == "yes":
-        conditions.append("prh.id IS NOT NULL")
-    elif has_rh == "no":
-        conditions.append("prh.id IS NULL")
-
-    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-
-    with get_cursor() as (cur, conn):
-        cur.execute(
-            f"SELECT COUNT(*) FROM persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id {where}",
-            params,
-        )
-        total = cur.fetchone()["count"]
-
-        cur.execute(
-            f"""
-            SELECT
-                p.id, p.last_name, p.first_name,
-                prh.role_title, prh.department_name,
-                (prh.id IS NOT NULL) AS has_rh,
-                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
-                 FROM person_identifiers pi
-                 WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
-                ) AS orcids,
-                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
-                 FROM person_identifiers pi
-                 WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
-                ) AS idhals
-            FROM persons p
-            LEFT JOIN persons_rh prh ON prh.person_id = p.id
-            {where}
-            ORDER BY {
-                {
-                    "name": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
-                    "-name": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
-                }.get(sort, "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC")
-            }
-            LIMIT %s OFFSET %s
-        """,
-            params + [per_page, offset],
-        )
-
-        return {
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page,
-            "persons": cur.fetchall(),
-        }
-
-
-# ----- API: Stats -----
 
 
 @router.get("/api/persons/search")
@@ -178,33 +98,8 @@ async def search_persons(
     q: str = Query("", min_length=2), limit: int = Query(10, ge=1, le=30)
 ) -> Any:
     """Recherche rapide de personnes (autocomplete)."""
-    words = q.strip().split()
-    if not words:
-        return []
-    # Each word must match in last_name OR first_name
-    conditions = ["p.rejected = FALSE"]
-    params: list = []
-    for w in words:
-        s = f"%{w}%"
-        conditions.append(
-            "(unaccent(p.last_name) ILIKE unaccent(%s) OR unaccent(p.first_name) ILIKE unaccent(%s))"
-        )
-        params.extend([s, s])
-    params.append(limit)
-    with get_cursor() as (cur, conn):
-        cur.execute(
-            f"""
-            SELECT p.id, p.last_name, p.first_name, prh.department_name,
-                   (prh.id IS NOT NULL) AS has_rh
-            FROM persons p
-            LEFT JOIN persons_rh prh ON prh.person_id = p.id
-            WHERE {" AND ".join(conditions)}
-            ORDER BY LOWER(p.last_name), LOWER(p.first_name)
-            LIMIT %s
-        """,
-            params,
-        )
-        return cur.fetchall()
+    with get_cursor() as (cur, _conn):
+        return persons_queries.search_persons(cur, q=q, limit=limit)
 
 
 @router.get("/api/persons")
@@ -214,127 +109,26 @@ async def list_persons(
     search: str = Query(""),
     department: str = Query(""),
     role: str = Query(""),
-    linked: str = Query(""),  # "yes", "no", ""
-    has_orcid: str = Query(""),  # "yes", "no", ""
-    has_idhal: str = Query(""),  # "yes", "no", ""
-    has_rh: str = Query(""),  # "yes", "no", ""
-    sort: str = Query("name"),  # name, -name, pubs, -pubs
+    linked: str = Query(""),
+    has_orcid: str = Query(""),
+    has_idhal: str = Query(""),
+    has_rh: str = Query(""),
+    sort: str = Query("name"),
 ) -> Any:
-    """Liste des personnes avec filtres."""
-    offset = (page - 1) * per_page
-    conditions = []
-    params: list[Any] = []
-
-    if search:
-        conditions.append("""(
-            unaccent(p.last_name) ILIKE unaccent(%s) OR unaccent(p.first_name) ILIKE unaccent(%s)
-            OR prh.email ILIKE %s OR unaccent(prh.department_name) ILIKE unaccent(%s)
-        )""")
-        s = f"%{search}%"
-        params.extend([s, s, s, s])
-    if department:
-        conditions.append("prh.department_name = %s")
-        params.append(department)
-    if role:
-        conditions.append("prh.role_title = %s")
-        params.append(role)
-    apply_person_linked_filter(conditions, linked)
-    apply_person_has_identifier_filter(conditions, "orcid", has_orcid)
-    apply_person_has_identifier_filter(conditions, "idhal", has_idhal)
-    apply_person_has_rh_filter(conditions, has_rh)
-
-    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-
-    with get_cursor() as (cur, conn):
-        cur.execute(
-            f"SELECT COUNT(*) FROM persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id {where}",
-            params,
+    """Liste des personnes avec filtres (admin)."""
+    filters = persons_queries.ListFilters(
+        search=search,
+        department=department,
+        role=role,
+        linked=linked,
+        has_orcid=has_orcid,
+        has_idhal=has_idhal,
+        has_rh=has_rh,
+    )
+    with get_cursor() as (cur, _conn):
+        return persons_queries.list_persons(
+            cur, filters=filters, page=page, per_page=per_page, sort=sort
         )
-        total = cur.fetchone()["count"]
-
-        # Requête principale : données personne + counts (rapide)
-        cur.execute(
-            f"""
-            SELECT p.id, p.last_name, p.first_name,
-                p.last_name_normalized, p.first_name_normalized,
-                prh.role_title, prh.department_name, prh.start_date, prh.end_date,
-                (prh.id IS NOT NULL) AS has_rh, p.rejected,
-                (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id) AS pub_count,
-                (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id AND a.in_perimeter = TRUE) AS uca_pub_count
-            FROM persons p
-            LEFT JOIN persons_rh prh ON prh.person_id = p.id
-            {where}
-            ORDER BY {
-                {
-                    "name": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
-                    "-name": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
-                    "pubs": "pub_count ASC, LOWER(p.last_name) ASC",
-                    "-pubs": "pub_count DESC, LOWER(p.last_name) ASC",
-                    "uca_pubs": "uca_pub_count ASC, LOWER(p.last_name) ASC",
-                    "-uca_pubs": "uca_pub_count DESC, LOWER(p.last_name) ASC",
-                }.get(sort, "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC")
-            }
-            LIMIT %s OFFSET %s
-        """,
-            params + [per_page, offset],
-        )
-        persons_rows = cur.fetchall()
-        person_ids = [p["id"] for p in persons_rows]
-
-        # Identifiants : une seule requête pour les 50 personnes
-        identifiers_map: dict = {}
-        if person_ids:
-            cur.execute(
-                """
-                SELECT pi.person_id,
-                       json_agg(json_build_object(
-                           'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
-                           'source', pi.source, 'status', pi.status
-                       ) ORDER BY pi.id_type, pi.id_value) AS identifiers
-                FROM person_identifiers pi
-                WHERE pi.person_id = ANY(%s)
-                GROUP BY pi.person_id
-            """,
-                (person_ids,),
-            )
-            for r in cur.fetchall():
-                identifiers_map[r["person_id"]] = r["identifiers"]
-
-        # Formes de noms avec sources : depuis person_name_forms
-        name_forms_map: dict = {}
-        if person_ids:
-            cur.execute(
-                """
-                SELECT pid AS person_id,
-                       json_agg(json_build_object(
-                           'name_form', pnf.name_form,
-                           'sources', pnf.sources,
-                           'ambiguous', (array_length(pnf.person_ids, 1) > 1)
-                       ) ORDER BY pnf.name_form) AS name_forms
-                FROM person_name_forms pnf,
-                     LATERAL unnest(pnf.person_ids) AS pid
-                WHERE pid = ANY(%s)
-                  AND pnf.sources IS NOT NULL
-                  AND NOT (pnf.sources = ARRAY['persons']::text[])
-                GROUP BY pid
-            """,
-                (person_ids,),
-            )
-            for r in cur.fetchall():
-                name_forms_map[r["person_id"]] = r["name_forms"]
-
-        # Assembler
-        for p in persons_rows:
-            p["identifiers"] = identifiers_map.get(p["id"])
-            p["name_forms"] = name_forms_map.get(p["id"])
-
-        return {
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page,
-            "persons": persons_rows,
-        }
 
 
 @router.get("/api/persons/facets")
@@ -346,236 +140,45 @@ async def persons_facets(
     has_rh: str = Query(""),
     linked: str = Query(""),
 ) -> Any:
-    """Facettes dynamiques pour la page personnes.
-    Chaque facette exclut son propre filtre."""
-    departments = parse_str_csv(department)
-    roles = parse_str_csv(role)
-
-    def base_filters(*, skip: str) -> tuple[list[str], list]:
-        conds: list[str] = []
-        params: list = []
-        if skip != "department" and departments:
-            conds.append("prh.department_name = ANY(%s)")
-            params.append(departments)
-        if skip != "role" and roles:
-            conds.append("prh.role_title = ANY(%s)")
-            params.append(roles)
-        if skip != "has_orcid":
-            if has_orcid == "yes":
-                conds.append(
-                    "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')"
-                )
-            elif has_orcid == "no":
-                conds.append(
-                    "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected')"
-                )
-        if skip != "has_idhal":
-            if has_idhal == "yes":
-                conds.append(
-                    "EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')"
-                )
-            elif has_idhal == "no":
-                conds.append(
-                    "NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')"
-                )
-        if skip != "has_rh":
-            if has_rh == "yes":
-                conds.append("prh.id IS NOT NULL")
-            elif has_rh == "no":
-                conds.append("prh.id IS NULL")
-        if skip != "linked":
-            if linked == "yes":
-                conds.append("EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)")
-            elif linked == "no":
-                conds.append("NOT EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)")
-        return conds, params
-
-    base_from = "persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id"
-
-    with get_cursor() as (cur, conn):
-        # --- Facette DÉPARTEMENTS ---
-        c, p = base_filters(skip="department")
-        where = ("WHERE " + " AND ".join(c)) if c else ""
-        cur.execute(
-            f"""
-            SELECT prh.department_name AS value, COUNT(*) AS count
-            FROM {base_from}
-            {where} {"AND" if c else "WHERE"} prh.department_name IS NOT NULL
-            GROUP BY prh.department_name ORDER BY count DESC
-        """,
-            p,
-        )
-        dept_facets = cur.fetchall()
-
-        # --- Facette RÔLES ---
-        c, p = base_filters(skip="role")
-        where = ("WHERE " + " AND ".join(c)) if c else ""
-        cur.execute(
-            f"""
-            SELECT prh.role_title AS value, COUNT(*) AS count
-            FROM {base_from}
-            {where} {"AND" if c else "WHERE"} prh.role_title IS NOT NULL
-            GROUP BY prh.role_title ORDER BY count DESC
-        """,
-            p,
-        )
-        role_facets = cur.fetchall()
-
-        # --- Facettes booléennes (orcid, idhal, rh) : comptages yes/no ---
-        c, p = base_filters(skip="has_orcid")
-        where = ("WHERE " + " AND ".join(c)) if c else ""
-        cur.execute(
-            f"""
-            SELECT
-                COUNT(*) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
-                )) AS yes,
-                COUNT(*) FILTER (WHERE NOT EXISTS (
-                    SELECT 1 FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
-                )) AS no
-            FROM {base_from} {where}
-        """,
-            p,
-        )
-        orcid_counts = cur.fetchone()
-
-        c, p = base_filters(skip="has_idhal")
-        where = ("WHERE " + " AND ".join(c)) if c else ""
-        cur.execute(
-            f"""
-            SELECT
-                COUNT(*) FILTER (WHERE
-                    EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
-                ) AS yes,
-                COUNT(*) FILTER (WHERE
-                    NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected')
-                ) AS no
-            FROM {base_from} {where}
-        """,
-            p,
-        )
-        idhal_counts = cur.fetchone()
-
-        c, p = base_filters(skip="has_rh")
-        where = ("WHERE " + " AND ".join(c)) if c else ""
-        cur.execute(
-            f"""
-            SELECT
-                COUNT(*) FILTER (WHERE prh.id IS NOT NULL) AS yes,
-                COUNT(*) FILTER (WHERE prh.id IS NULL) AS no
-            FROM {base_from} {where}
-        """,
-            p,
-        )
-        rh_counts = cur.fetchone()
-
-        # --- Facette LINKED (admin uniquement) ---
-        linked_counts = None
-        if linked or True:  # toujours calculer pour que l'admin puisse l'utiliser
-            c, p = base_filters(skip="linked")
-            where = ("WHERE " + " AND ".join(c)) if c else ""
-            cur.execute(
-                f"""
-                SELECT
-                    COUNT(*) FILTER (WHERE
-                        EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)
-                    ) AS yes,
-                    COUNT(*) FILTER (WHERE
-                        NOT EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)
-                    ) AS no
-                FROM {base_from} {where}
-            """,
-                p,
-            )
-            linked_counts = cur.fetchone()
-
-        return {
-            "departments": dept_facets,
-            "roles": role_facets,
-            "orcid": {"yes": orcid_counts["yes"], "no": orcid_counts["no"]},
-            "idhal": {"yes": idhal_counts["yes"], "no": idhal_counts["no"]},
-            "rh": {"yes": rh_counts["yes"], "no": rh_counts["no"]},
-            "linked": {"yes": linked_counts["yes"], "no": linked_counts["no"]}
-            if linked_counts
-            else None,
-        }
+    """Facettes dynamiques pour la page personnes."""
+    filters = persons_queries.FacetFilters(
+        departments=parse_str_csv(department),
+        roles=parse_str_csv(role),
+        has_orcid=has_orcid,
+        has_idhal=has_idhal,
+        has_rh=has_rh,
+        linked=linked,
+    )
+    with get_cursor() as (cur, _conn):
+        return persons_queries.persons_facets(cur, filters=filters)
 
 
 @router.get("/api/persons/departments")
 async def list_departments() -> Any:
     """Liste des départements distincts."""
-    with get_cursor() as (cur, conn):
-        cur.execute("""
-            SELECT department_name, COUNT(*) AS count
-            FROM persons_rh
-            WHERE department_name IS NOT NULL
-            GROUP BY department_name
-            ORDER BY count DESC
-        """)
-        return cur.fetchall()
+    with get_cursor() as (cur, _conn):
+        return persons_queries.list_departments(cur)
 
 
 @router.get("/api/persons/roles")
 async def list_roles() -> Any:
     """Liste des rôles distincts."""
-    with get_cursor() as (cur, conn):
-        cur.execute("""
-            SELECT role_title, COUNT(*) AS count
-            FROM persons_rh
-            WHERE role_title IS NOT NULL
-            GROUP BY role_title
-            ORDER BY count DESC
-        """)
-        return cur.fetchall()
+    with get_cursor() as (cur, _conn):
+        return persons_queries.list_roles(cur)
 
 
 @router.get("/api/persons/stats")
 async def persons_stats() -> Any:
     """Statistiques sur les personnes et l'alignement."""
-    with get_cursor() as (cur, conn):
-        cur.execute("""
-            SELECT
-                (SELECT COUNT(*) FROM persons) AS total_persons,
-                (SELECT COUNT(DISTINCT person_id) FROM authorships WHERE person_id IS NOT NULL) AS linked_persons,
-                (SELECT COUNT(*) FROM authorships WHERE person_id IS NOT NULL) AS linked_authors,
-                (SELECT COUNT(DISTINCT department_name)
-                 FROM persons_rh WHERE department_name IS NOT NULL) AS departments
-        """)
-        return cur.fetchone()
+    with get_cursor() as (cur, _conn):
+        return persons_queries.persons_stats(cur)
 
 
 @router.get("/api/persons/{person_id}")
 async def get_person(person_id: int) -> Any:
-    """Retourne une personne avec ses auteurs lies."""
-    with get_cursor() as (cur, conn):
-        cur.execute(
-            """
-            SELECT p.id, p.last_name, p.first_name,
-                p.last_name_normalized, p.first_name_normalized,
-                prh.role_title, prh.department_name, prh.start_date, prh.end_date,
-                (prh.id IS NOT NULL) AS has_rh,
-                (SELECT json_agg(x) FROM (
-                    SELECT DISTINCT ON (sa.source, sa.source_person_id)
-                           sa.source_person_id AS id, sa.source,
-                           sa.raw_author_name AS full_name
-                    FROM source_authorships sa
-                    WHERE sa.person_id = p.id AND NOT sa.excluded
-                    ORDER BY sa.source, sa.source_person_id
-                ) x) AS linked_authors,
-                (SELECT json_agg(json_build_object(
-                    'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
-                    'source', pi.source, 'status', pi.status
-                ) ORDER BY pi.id_type, pi.id_value) FROM person_identifiers pi WHERE pi.person_id = p.id
-                ) AS identifiers
-            FROM persons p
-            LEFT JOIN persons_rh prh ON prh.person_id = p.id
-            WHERE p.id = %s
-        """,
-            (person_id,),
-        )
-        person = cur.fetchone()
+    """Détail d'une personne avec auteurs liés."""
+    with get_cursor() as (cur, _conn):
+        person = persons_queries.get_person(cur, person_id)
         if not person:
             raise HTTPException(status_code=404, detail="Person not found")
         return person
@@ -583,205 +186,19 @@ async def get_person(person_id: int) -> Any:
 
 @router.get("/api/persons/{person_id}/profile")
 async def person_profile(person_id: int) -> Any:
-    """Profil public complet d'une personne : infos, identifiants, auteurs liés."""
-    with get_cursor() as (cur, conn):
-        # Infos personne
-        cur.execute(
-            """
-            SELECT p.id, p.last_name, p.first_name,
-                   prh.role_title, prh.department_name,
-                   prh.start_date, prh.end_date
-            FROM persons p
-            LEFT JOIN persons_rh prh ON prh.person_id = p.id
-            WHERE p.id = %s
-        """,
-            (person_id,),
-        )
-        person = cur.fetchone()
-        if not person:
+    """Profil public complet d'une personne."""
+    with get_cursor() as (cur, _conn):
+        profile = persons_queries.person_profile(cur, person_id)
+        if not profile:
             raise HTTPException(status_code=404, detail="Person not found")
-
-        # Identifiants
-        cur.execute(
-            """
-            SELECT id, id_type, id_value, source, status
-            FROM person_identifiers WHERE person_id = %s
-        """,
-            (person_id,),
-        )
-        identifiers = cur.fetchall()
-
-        # Auteurs liés HAL + compte publis UCA (exclut les authorships rejetées)
-        cur.execute(
-            """
-            SELECT DISTINCT sauth.id, 'hal' AS source, sauth.full_name, sauth.orcid,
-                   sauth.source_ids->>'idhal' AS idhal,
-                   (sauth.source_ids->>'hal_person_id')::int AS hal_person_id,
-                   NULL::text AS openalex_id,
-                   (SELECT COUNT(*) FROM source_authorships sa2
-                    WHERE sa2.source = 'hal' AND sa2.source_person_id = sauth.id
-                      AND sa2.in_perimeter = TRUE AND NOT sa2.excluded) AS uca_pub_count
-            FROM source_persons sauth
-            JOIN source_authorships sa ON sa.source = 'hal' AND sa.source_person_id = sauth.id
-            WHERE sa.person_id = %s AND NOT sa.excluded
-        """,
-            (person_id,),
-        )
-        hal_authors = cur.fetchall()
-
-        # Auteurs liés OpenAlex : formes de noms distinctes
-        cur.execute(
-            """
-            SELECT MIN(sa.id) AS id,
-                   sa.raw_author_name AS full_name,
-                   'openalex' AS source,
-                   NULL::text AS orcid, NULL::text AS idhal, NULL::text AS openalex_id,
-                   COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
-            FROM source_authorships sa
-            WHERE sa.source = 'openalex' AND sa.person_id = %s
-            GROUP BY sa.raw_author_name
-        """,
-            (person_id,),
-        )
-        oa_authors = cur.fetchall()
-
-        # Auteurs liés WoS + compte publis UCA
-        cur.execute(
-            """
-            SELECT sauth.id, 'wos' AS source, sa.raw_author_name AS full_name, sauth.orcid,
-                   NULL::text AS idhal, NULL::text AS openalex_id,
-                   (SELECT COUNT(*) FROM source_authorships sa2
-                    WHERE sa2.source = 'wos' AND sa2.source_person_id = sauth.id
-                      AND sa2.in_perimeter = TRUE) AS uca_pub_count
-            FROM source_persons sauth
-            JOIN source_authorships sa ON sa.source = 'wos' AND sa.source_person_id = sauth.id
-            WHERE sa.person_id = %s
-            GROUP BY sauth.id, sa.raw_author_name, sauth.orcid
-        """,
-            (person_id,),
-        )
-        wos_authors = cur.fetchall()
-
-        # Nombre de thèses avec rôle non-auteur
-        cur.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            WHERE sa.person_id = %s
-              AND sa.source = 'theses'
-              AND NOT (sa.roles && ARRAY['author']::text[])
-              AND sd.publication_id IS NOT NULL
-        """,
-            (person_id,),
-        )
-        theses_count = cur.fetchone()["count"]
-
-        return {
-            "person": person,
-            "identifiers": identifiers,
-            "authors": hal_authors + oa_authors + wos_authors,
-            "theses_count": theses_count,
-        }
+        return profile
 
 
 @router.get("/api/persons/{person_id}/theses")
 async def person_theses(person_id: int) -> Any:
-    """Thèses liées à cette personne avec un rôle non-auteur (directeur, rapporteur, jury)."""
-    with get_cursor() as (cur, conn):
-        cur.execute(
-            """
-            SELECT p.id, p.title, p.pub_year, p.doi,
-                   sa.roles,
-                   (SELECT sa2.raw_author_name
-                    FROM source_authorships sa2
-                    WHERE sa2.source_publication_id = sd.id
-                      AND sa2.source = 'theses'
-                      AND sa2.roles && ARRAY['author']::text[]
-                    LIMIT 1
-                   ) AS author_name,
-                   (SELECT sa2.person_id
-                    FROM source_authorships sa2
-                    WHERE sa2.source_publication_id = sd.id
-                      AND sa2.source = 'theses'
-                      AND sa2.roles && ARRAY['author']::text[]
-                    LIMIT 1
-                   ) AS author_person_id,
-                   (SELECT ARRAY_AGG(DISTINCT sid)
-                    FROM authorships a,
-                         UNNEST(a.structure_ids) AS sid
-                    JOIN structures st ON st.id = sid
-                    WHERE a.publication_id = p.id AND a.in_perimeter
-                      AND st.structure_type = 'labo'
-                   ) AS structure_ids
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            JOIN publications p ON p.id = sd.publication_id
-            WHERE sa.person_id = %s
-              AND sa.source = 'theses'
-              AND NOT (sa.roles && ARRAY['author']::text[])
-            ORDER BY p.pub_year DESC NULLS LAST, p.title
-        """,
-            (person_id,),
-        )
-        rows = cur.fetchall()
-
-        # Collecter tous les structure_ids pour résolution
-        all_struct_ids = set()
-        for row in rows:
-            for sid in row["structure_ids"] or []:
-                all_struct_ids.add(sid)
-
-        structures = {}
-        if all_struct_ids:
-            cur.execute(
-                "SELECT id, acronym, name FROM structures WHERE id = ANY(%s)",
-                (list(all_struct_ids),),
-            )
-            for s in cur.fetchall():
-                structures[s["id"]] = {"acronym": s["acronym"], "name": s["name"]}
-
-        # Grouper par role
-        role_labels = {
-            "thesis_director": "Directeur/directrice de thèse",
-            "rapporteur": "Rapporteur",
-            "jury_president": "Président du jury",
-            "jury_member": "Membre du jury",
-        }
-        by_role: dict[str, list] = {}
-        for row in rows:
-            roles = row["roles"] or []
-            # Prendre le role le plus specifique
-            role = "jury_member"
-            for r in ("thesis_director", "rapporteur", "jury_president", "jury_member"):
-                if r in roles:
-                    role = r
-                    break
-            by_role.setdefault(role, []).append(
-                {
-                    "id": row["id"],
-                    "title": row["title"],
-                    "pub_year": row["pub_year"],
-                    "doi": row["doi"],
-                    "author_name": row["author_name"],
-                    "author_person_id": row["author_person_id"],
-                    "structure_ids": row["structure_ids"] or [],
-                }
-            )
-
-        # Ordonner les sections
-        sections = []
-        for role_key in ("thesis_director", "rapporteur", "jury_president", "jury_member"):
-            if role_key in by_role:
-                sections.append(
-                    {
-                        "role": role_key,
-                        "label": role_labels.get(role_key, role_key),
-                        "theses": by_role[role_key],
-                    }
-                )
-
-        return {"sections": sections, "total": len(rows), "structures": structures}
+    """Thèses liées à cette personne avec un rôle non-auteur."""
+    with get_cursor() as (cur, _conn):
+        return persons_queries.person_theses(cur, person_id)
 
 
 @router.get("/api/persons/{person_id}/addresses")
@@ -791,42 +208,8 @@ async def person_addresses(
     per_page: int = Query(50, ge=1, le=200),
 ) -> Any:
     """Adresses distinctes utilisées dans les authorships sources de cette personne."""
-    with get_cursor() as (cur, conn):
-        base_where = """a.id IN (
-                SELECT DISTINCT saa.address_id
-                FROM source_authorship_addresses saa
-                JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-                WHERE sa.person_id = %s
-            )"""
-        cur.execute(f"SELECT COUNT(*) AS total FROM addresses a WHERE {base_where}", (person_id,))
-        total = cur.fetchone()["total"]
-        pages = max(1, (total + per_page - 1) // per_page)
-        page = min(page, pages)
-        offset = (page - 1) * per_page
-
-        cur.execute(
-            f"""
-            SELECT a.id, a.raw_text,
-                   (SELECT jsonb_agg(jsonb_build_object(
-                        'id', s.id, 'acronym', s.acronym, 'name', s.name))
-                    FROM address_structures ast
-                    JOIN structures s ON s.id = ast.structure_id
-                    WHERE ast.address_id = a.id AND s.structure_type != 'site'
-                      AND ast.is_confirmed IS DISTINCT FROM FALSE
-                   ) AS structures
-            FROM addresses a
-            WHERE {base_where}
-            ORDER BY a.raw_text
-            LIMIT %s OFFSET %s
-        """,
-            (person_id, per_page, offset),
-        )
-        return {
-            "total": total,
-            "page": page,
-            "pages": pages,
-            "addresses": cur.fetchall(),
-        }
+    with get_cursor() as (cur, _conn):
+        return persons_queries.person_addresses(cur, person_id, page=page, per_page=per_page)
 
 
 # ----- Identifier management -----
