@@ -231,8 +231,8 @@ def phase_publications(**kw: Any) -> Any:
     hors perimetre). Applique ensuite les merges inter-sources (HAL-ID, NNT).
     """
     run_python("processing/create_publications.py")
-    run_python("processing/merge_pubs_by_hal_id.py")
-    run_python("processing/merge_pubs_by_nnt.py")
+    _run_merge_pubs_by_hal_id()
+    _run_merge_pubs_by_nnt()
 
 
 def phase_persons(**kw: Any) -> Any:
@@ -265,6 +265,40 @@ def phase_countries(**kw: Any) -> Any:
     run_python("scripts/detect_address_countries.py", "--direct", "--apply")
     run_python("scripts/suggest_address_countries.py")
     _run_refresh_publication_countries()
+
+
+def _run_merge_pubs_by_nnt() -> None:
+    from application.pipeline.merge.merge_pubs_by_nnt import run_merge
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.merge import PgMergeQueries
+
+    log.info("▶ merge_pubs_by_nnt")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        run_merge(cur, conn, PgMergeQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ merge_pubs_by_nnt terminé en %.1fs", time.time() - t0)
+
+
+def _run_merge_pubs_by_hal_id() -> None:
+    from application.pipeline.merge.merge_pubs_by_hal_id import run_merge
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.merge import PgMergeQueries
+
+    log.info("▶ merge_pubs_by_hal_id")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        run_merge(cur, conn, PgMergeQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
 
 
 def _run_harvest_hal_identifiers() -> None:
