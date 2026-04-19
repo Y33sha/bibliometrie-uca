@@ -19,13 +19,13 @@ via populate_affiliations.py, pas ici. Ce script ne fait que stocker les source_
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
-import argparse
 import os
 from typing import Any
 
 from psycopg2.extras import Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
+from application.pipeline.normalize.base import SourceNormalizer, run_normalizer
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
@@ -33,7 +33,6 @@ from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.publication import clean_doi, normalize_nnt
 from infrastructure.addresses import link_addresses
-from infrastructure.db.connection import get_connection
 from infrastructure.db_helpers import mark_staging_done
 from infrastructure.log import setup_logger
 from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
@@ -805,93 +804,40 @@ def process_work(
         raise
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser(description="Normalisation HAL → tables structurées")
-    parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
-    parser.add_argument(
-        "--reset", action="store_true", help="Remettre tous les works à processed=FALSE"
-    )
-    parser.add_argument(
-        "--batch-size", type=int, default=500, help="Taille du commit batch (défaut: 500)"
-    )
-    args = parser.parse_args()
+class HalNormalizer(SourceNormalizer):
+    SOURCE = "hal"
+    DEFAULT_BATCH_SIZE = 500
+    USE_DICT_CURSOR = False
+    USE_SAVEPOINT = True
+    FETCH_COLUMNS = "id, source_id, doi, raw_data, hal_collections"
 
-    conn = get_connection()
-    conn.autocommit = False
+    def __init__(self, conn: Any, logger: Any) -> None:
+        super().__init__(conn, logger)
+        self._struct_cache: dict[str, int] = {}
+        self._struct_name_cache: dict[int, str] = {}
 
-    try:
-        cur = conn.cursor()
-
-        if args.reset:
-            cur.execute("UPDATE staging SET processed = FALSE WHERE source = 'hal'")
-            count = cur.rowcount
-            conn.commit()
-            logger.info(f"Reset : {count} works remis à processed=FALSE")
-            return
-
-        cur.execute("SELECT COUNT(*) FROM staging WHERE source = 'hal' AND processed = FALSE")
-        total = cur.fetchone()[0]
-        logger.info(f"=== Normalisation HAL : {total} works à traiter ===")
-
-        if total == 0:
-            logger.info("Rien à faire.")
-            return
-
-        limit = args.limit or total
-        limit = min(limit, total)
-        logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
-
-        cur.execute(
-            """
-            SELECT id, source_id, doi, raw_data, hal_collections
-            FROM staging
-            WHERE source = 'hal' AND processed = FALSE
-            ORDER BY id
-            LIMIT %s
-        """,
-            (limit,),
-        )
-
-        rows = cur.fetchall()
-        processed = 0
-        errors = 0
-        skipped_hors_perimetre = 0
-
-        # Cache source_structures HAL (source_id → id + nom) pour éviter une requête par auteur
+    def preload_caches(self, cur: Any) -> None:
+        # Cache source_structures HAL (source_id → id + nom) pour éviter une
+        # requête par auteur dans process_work.
         cur.execute("""
-            SELECT source_id, id,
-                   COALESCE(name, '')
+            SELECT source_id, id, COALESCE(name, '')
             FROM source_structures WHERE source = 'hal'
         """)
-        _struct_rows = cur.fetchall()
-        struct_cache = {r[0]: r[1] for r in _struct_rows}
-        struct_name_cache = {r[1]: r[2] for r in _struct_rows}
-        logger.info(f"Cache source_structures : {len(struct_cache)} entrées")
+        rows = cur.fetchall()
+        self._struct_cache = {r[0]: r[1] for r in rows}
+        self._struct_name_cache = {r[1]: r[2] for r in rows}
+        self.logger.info(f"Cache source_structures : {len(self._struct_cache)} entrées")
 
-        for row in rows:
-            try:
-                cur.execute("SAVEPOINT normalize_work")
-                success = process_work(
-                    cur, row, struct_cache=struct_cache, struct_name_cache=struct_name_cache
-                )
-                cur.execute("RELEASE SAVEPOINT normalize_work")
-                if success:
-                    processed += 1
-            except Exception:
-                cur.execute("ROLLBACK TO SAVEPOINT normalize_work")
-                errors += 1
-                continue
+    def process_work(self, cur: Any, row: Any) -> bool | None:
+        return process_work(
+            cur,
+            row,
+            struct_cache=self._struct_cache,
+            struct_name_cache=self._struct_name_cache,
+        )
 
-            if processed % args.batch_size == 0:
-                conn.commit()
-                logger.info(
-                    f"  {processed}/{limit} traités "
-                    f"({errors} erreurs, {skipped_hors_perimetre} hors périmètre)"
-                )
-
-        conn.commit()
-
-        # Nettoyage : supprimer les doublons de position (garder le plus recent)
+    def post_process(self, cur: Any) -> None:
+        # Doublons de position : garder le plus récent
         cur.execute("""
             DELETE FROM source_authorship_addresses
             WHERE source_authorship_id IN (
@@ -914,11 +860,10 @@ def main() -> Any:
                 WHERE sa1.source = 'hal' AND sa1.author_position IS NOT NULL
             )
         """)
-        dup_deleted = cur.rowcount
-        if dup_deleted:
-            logger.info(f"Doublons de position supprimés : {dup_deleted}")
+        if cur.rowcount:
+            self.logger.info(f"Doublons de position supprimés : {cur.rowcount}")
 
-        # Nettoyage : supprimer les source_persons HAL orphelins
+        # source_persons HAL orphelins
         cur.execute("""
             DELETE FROM source_persons
             WHERE source = 'hal'
@@ -927,28 +872,17 @@ def main() -> Any:
                   WHERE sa.source_person_id = source_persons.id
               )
         """)
-        orphans_deleted = cur.rowcount
-        if orphans_deleted:
-            logger.info(f"Source_authors orphelins supprimés : {orphans_deleted}")
+        if cur.rowcount:
+            self.logger.info(f"Source_authors orphelins supprimés : {cur.rowcount}")
 
-        conn.commit()
-        struct_cache.clear()
+    def cleanup(self) -> None:
+        self._struct_cache.clear()
+        self._struct_name_cache.clear()
         _hal_author_cache.clear()
 
-        logger.info("\n=== Terminé ===")
-        logger.info(f"Traités avec succès : {processed}")
-        logger.info(f"Hors périmètre (enrichissement seul) : {skipped_hors_perimetre}")
-        logger.info(f"Erreurs : {errors}")
 
-    except KeyboardInterrupt:
-        conn.commit()
-        logger.warning("Interruption — données déjà traitées conservées.")
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Erreur fatale : {e}")
-        raise
-    finally:
-        conn.close()
+def main() -> None:
+    run_normalizer(HalNormalizer, logger)
 
 
 if __name__ == "__main__":

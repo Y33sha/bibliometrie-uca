@@ -13,11 +13,9 @@ stocke la liste.
 
 import argparse
 import os
-import sys
 import time
 from typing import Any
 
-import requests
 from psycopg2.extras import Json
 
 from infrastructure.api_limits import HAL_DELAY, HAL_PER_PAGE
@@ -28,9 +26,9 @@ from infrastructure.app_config import (
     get_hal_extra_collections,
     get_years,
 )
-from infrastructure.db.connection import get_connection
 from infrastructure.hal import HAL_FIELDS
-from infrastructure.sources.common import clean_doi, compute_hash, get_existing_ids, setup_logger
+from infrastructure.sources.base import ExtractionStats, SourceExtractor, run_extractor
+from infrastructure.sources.common import clean_doi, compute_hash, setup_logger
 
 # ----- Logging -----
 logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))
@@ -184,82 +182,78 @@ def extract_collection(
     return total_count, total_new
 
 
-def get_existing_hal_ids(conn: Any) -> set:
-    """Récupère les halId déjà en base."""
-    return get_existing_ids(conn, "hal")
+class HalExtractor(SourceExtractor):
+    SOURCE = "hal"
+    DESCRIPTION = "Extraction HAL → staging"
 
+    def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
+        parser.add_argument(
+            "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
+        )
+        parser.add_argument(
+            "--since",
+            help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents soumis depuis cette date",
+        )
 
-def main() -> Any:
-    parser = argparse.ArgumentParser(description="Extraction HAL → staging")
-    parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
-    parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
-    parser.add_argument(
-        "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
-    )
-    parser.add_argument(
-        "--since",
-        help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents soumis depuis cette date",
-    )
-    args = parser.parse_args()
+    def load_config(self, cur: Any) -> dict[str, Any]:
+        collections = get_hal_collections(cur)
+        extra_collections = get_hal_extra_collections(cur)
+        all_collections = dict(collections)
+        for code in extra_collections:
+            if code not in all_collections:
+                all_collections[code] = code
+        return {
+            "base_url": get_api_base_urls(cur).get(
+                "hal", "https://api.archives-ouvertes.fr/search/"
+            ),
+            "all_collections": all_collections,
+            "n_collections": len(collections),
+            "n_extra": len(extra_collections),
+        }
 
-    conn = get_connection()
-    cur = conn.cursor()
-    collections = get_hal_collections(cur)
-    extra_collections = get_hal_extra_collections(cur)
-    base_url = get_api_base_urls(cur).get("hal", "https://api.archives-ouvertes.fr/search/")
-    config_years = get_years(cur, mode=args.mode)
-    cur.close()
+    def setup_logging(self, args: argparse.Namespace, config: dict[str, Any]) -> None:
+        if args.since:
+            self.logger.info(f"Mode incrémental : documents soumis depuis {args.since}")
+        else:
+            years = [args.year] if args.year else None  # sera recalculé dans extract_all
+            self.logger.info(f"Année(s) : {years or 'toutes (config)'}")
+        self.logger.info(
+            f"Collections : {len(config['all_collections'])} "
+            f"({config['n_collections']} labos + {config['n_extra']} extra)"
+        )
 
-    since = args.since
-    years = [args.year] if args.year else config_years
+    def extract_all(
+        self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
+    ) -> ExtractionStats:
+        # Années : from CLI ou from config
+        with self.conn.cursor() as cur:
+            config_years = get_years(cur, mode=args.mode)
+        years = [args.year] if args.year else config_years
 
-    logger.info("=== Extraction HAL démarrée ===")
-    if since:
-        logger.info(f"Mode incrémental : documents soumis depuis {since}")
-    else:
-        logger.info(f"Années : {years}")
-
-    all_collections = dict(collections)
-    for code in extra_collections:
-        if code not in all_collections:
-            all_collections[code] = code
-    logger.info(
-        f"Collections : {len(all_collections)} ({len(collections)} labos + {len(extra_collections)} extra)"
-    )
-
-    try:
-        existing_ids = get_existing_hal_ids(conn)
-        logger.info(f"{len(existing_ids)} works déjà en staging")
-
-        grand_total_new = 0
-
-        for code, label in all_collections.items():
+        stats = ExtractionStats()
+        for code, label in config["all_collections"].items():
             total, new = extract_collection(
                 code,
                 label,
-                conn,
+                self.conn,
                 existing_ids,
-                base_url,
+                config["base_url"],
                 years=years,
-                since=since,
+                since=args.since,
                 dry_run=args.dry_run,
             )
-            grand_total_new += new
+            stats.add(new=new, total=total)
             if not args.dry_run and new > 0:
-                logger.info(f"    ->{new} nouveaux insérés")
+                self.logger.info(f"    ->{new} nouveaux insérés")
+        return stats
 
-        logger.info(f"\n=== Terminé : {grand_total_new} works insérés au total ===")
-        logger.info(f"Total en staging : {len(existing_ids)} works HAL")
+    def log_summary(self, stats: ExtractionStats, args: argparse.Namespace) -> None:
+        self.logger.info(f"\n=== Terminé : {stats.new} works insérés au total ===")
 
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"Erreur API : {e}")
-        logger.error(f"Réponse : {e.response.text[:500] if e.response else 'N/A'}")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        logger.warning("Interruption utilisateur — données déjà insérées conservées.")
-        sys.exit(0)
-    finally:
-        conn.close()
+
+def main() -> None:
+    run_extractor(HalExtractor, logger)
 
 
 if __name__ == "__main__":

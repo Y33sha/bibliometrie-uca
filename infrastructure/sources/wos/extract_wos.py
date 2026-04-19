@@ -17,7 +17,6 @@ Query:  OG=(Universite Clermont Auvergne OR CHU Clermont Ferrand
 
 import argparse
 import os
-import sys
 import time
 from typing import Any
 
@@ -32,8 +31,8 @@ from infrastructure.app_config import (
     get_wos_api_key,
     get_years,
 )
-from infrastructure.db.connection import get_connection
-from infrastructure.sources.common import compute_hash, get_existing_ids, setup_logger
+from infrastructure.sources.base import ExtractionStats, SourceExtractor, run_extractor
+from infrastructure.sources.common import compute_hash, setup_logger
 
 # ----- Logging -----
 logger = setup_logger("extract_wos", os.path.join(os.path.dirname(__file__), "logs"))
@@ -128,6 +127,8 @@ def get_records_found(data: dict) -> int:
 
 def get_existing_uts(conn: Any) -> set:
     """Récupère les UT déjà en base pour éviter les doublons."""
+    from infrastructure.sources.common import get_existing_ids
+
     return get_existing_ids(conn, "wos")
 
 
@@ -246,80 +247,81 @@ def log_remaining_quota(resp_headers: dict) -> Any:
         logger.info(f"Quota annuel restant : {remaining} records")
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser(description="Extraction WoS → staging")
-    parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
-    parser.add_argument(
-        "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
-    )
-    parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
-    args = parser.parse_args()
+class WosExtractor(SourceExtractor):
+    SOURCE = "wos"
+    DESCRIPTION = "Extraction WoS → staging"
 
-    global BASE_URL, HEADERS
-
-    conn = get_connection()
-    cur = conn.cursor()
-    affiliations = get_wos_affiliations(cur)
-    api_key = get_wos_api_key(cur)
-    BASE_URL = get_api_base_urls(cur).get("wos", "https://api.clarivate.com/api/wos")
-    HEADERS = {"X-ApiKey": api_key, "Accept": "application/json"}
-    config_years = get_years(cur, mode=args.mode)
-    cur.close()
-
-    years = [args.year] if args.year else config_years
-
-    logger.info("=== Extraction Web of Science démarrée ===")
-    logger.info(f"Affiliations : {affiliations}")
-    logger.info(f"Années : {years}")
-
-    # Vérifier le quota avec une requête légère
-    try:
-        test_resp = requests.get(
-            BASE_URL,
-            headers=HEADERS,
-            params={"databaseId": "WOS", "usrQuery": "OG=(test)", "count": "0", "firstRecord": "1"},
-            timeout=30,
+    def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
+        parser.add_argument(
+            "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
         )
-        if test_resp.status_code == 200:
-            remaining = test_resp.headers.get("X-REC-AmtPerYear-Remaining")
-            if remaining:
-                logger.info(f"Quota annuel restant : {remaining} records")
-        elif test_resp.status_code in (401, 403):
-            logger.error(
-                f"Erreur d'authentification ({test_resp.status_code}). Vérifier la clé API."
+
+    def load_config(self, cur: Any) -> dict[str, Any]:
+        global BASE_URL, HEADERS
+        affiliations = get_wos_affiliations(cur)
+        api_key = get_wos_api_key(cur)
+        BASE_URL = get_api_base_urls(cur).get("wos", "https://api.clarivate.com/api/wos")
+        HEADERS = {"X-ApiKey": api_key, "Accept": "application/json"}
+        return {
+            "affiliations": affiliations,
+            "base_url": BASE_URL,
+        }
+
+    def setup_logging(self, args: argparse.Namespace, config: dict[str, Any]) -> None:
+        self.logger.info(f"Affiliations : {config['affiliations']}")
+        # Vérifier le quota
+        try:
+            test_resp = requests.get(
+                config["base_url"],
+                headers=HEADERS,
+                params={
+                    "databaseId": "WOS",
+                    "usrQuery": "OG=(test)",
+                    "count": "0",
+                    "firstRecord": "1",
+                },
+                timeout=30,
             )
-            logger.error(f"Réponse : {test_resp.text[:300]}")
-            sys.exit(1)
-    except requests.RequestException as e:
-        logger.warning(f"Impossible de vérifier le quota : {e}")
+            if test_resp.status_code == 200:
+                remaining = test_resp.headers.get("X-REC-AmtPerYear-Remaining")
+                if remaining:
+                    self.logger.info(f"Quota annuel restant : {remaining} records")
+            elif test_resp.status_code in (401, 403):
+                self.logger.error(
+                    f"Erreur d'authentification ({test_resp.status_code}). Vérifier la clé API."
+                )
+                self.logger.error(f"Réponse : {test_resp.text[:300]}")
+                raise SystemExit(1)
+        except requests.RequestException as e:
+            self.logger.warning(f"Impossible de vérifier le quota : {e}")
 
-    try:
-        existing_uts = get_existing_uts(conn)
-        logger.info(f"{len(existing_uts)} records déjà en staging")
+    def extract_all(
+        self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
+    ) -> ExtractionStats:
+        with self.conn.cursor() as cur:
+            config_years = get_years(cur, mode=args.mode)
+        years = [args.year] if args.year else config_years
+        self.logger.info(f"Années : {years}")
 
-        grand_total = 0
+        stats = ExtractionStats()
         for i, year in enumerate(years):
             try:
-                inserted = extract_year(year, conn, existing_uts, dry_run=args.dry_run)
-                grand_total += inserted
+                inserted = extract_year(year, self.conn, existing_ids, dry_run=args.dry_run)
+                stats.add(new=inserted)
             except Exception as e:
-                logger.error(f"Erreur sur l'année {year} : {e} — passage à la suivante")
-            # Pause longue entre les années pour laisser l'API souffler
+                self.logger.error(f"Erreur sur l'année {year} : {e} — passage à la suivante")
             if i < len(years) - 1:
-                logger.info("Pause de 30s avant l'année suivante...")
+                self.logger.info("Pause de 30s avant l'année suivante...")
                 time.sleep(30)
+        return stats
 
-        logger.info(f"=== Terminé : {grand_total} records insérés au total ===")
+    def log_summary(self, stats: ExtractionStats, args: argparse.Namespace) -> None:
+        self.logger.info(f"=== Terminé : {stats.new} records insérés au total ===")
 
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"Erreur API : {e}")
-        logger.error(f"Réponse : {e.response.text[:500] if e.response else 'N/A'}")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        logger.warning("Interruption utilisateur — les données déjà insérées sont conservées.")
-        sys.exit(0)
-    finally:
-        conn.close()
+
+def main() -> None:
+    run_extractor(WosExtractor, logger)
 
 
 if __name__ == "__main__":
