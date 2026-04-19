@@ -67,3 +67,17 @@ def fetch_journals_needing_apc(cur: Any, *, limit: int | None = None) -> list[tu
             """
         )
     return cur.fetchall()
+
+
+class PgEnrichQueries:
+    """Adapter PostgreSQL pour `application.ports.enrich.EnrichQueries`."""
+
+    def fetch_publications_with_doi(
+        self, cur: Any, *, limit: int | None = None
+    ) -> list[tuple[int, str, str | None]]:
+        return fetch_publications_with_doi(cur, limit=limit)
+
+    def fetch_journals_needing_apc(
+        self, cur: Any, *, limit: int | None = None
+    ) -> list[tuple[int, str]]:
+        return fetch_journals_needing_apc(cur, limit=limit)

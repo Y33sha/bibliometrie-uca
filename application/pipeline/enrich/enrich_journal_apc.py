@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Enrichit les revues avec les données APC (Article Processing Charges) depuis OpenAlex.
 
@@ -6,28 +5,23 @@ Source des données : prix catalogue DOAJ, exposés via l'API OpenAlex Sources.
 Champs mis à jour : apc_amount, apc_currency, is_in_doaj.
 
 Utilise le filtre openalex avec pipe (|) pour interroger jusqu'à 50 sources par requête.
+
+L'orchestrateur dépend du port `EnrichQueries`. Le point d'entrée CLI est dans
+`interfaces/cli/pipeline/enrich_journal_apc.py`.
 """
 
-import argparse
-import os
 import time
 from typing import Any
 
 import requests
 
 from application.journals import reset_journal_apc, update_journal_apc
-from infrastructure.api_limits import DOAJ_DELAY
-from infrastructure.db.connection import get_connection
-from infrastructure.db.queries.enrich import fetch_journals_needing_apc
-from infrastructure.log import setup_logger
-
-logger = setup_logger("enrich_journal_apc", os.path.join(os.path.dirname(__file__), "logs"))
+from application.ports.enrich import EnrichQueries
 
 OPENALEX_API = "https://api.openalex.org/sources"
 OPENALEX_PREFIX = "https://openalex.org/"
 BATCH_SIZE = 50  # max IDs par requête (API limit = 100, on reste prudent)
 COMMIT_EVERY = 500  # commit DB tous les N journals traités
-MAILTO = "bibliometrie@uca.fr"  # mis à jour dans main() depuis la config DB
 
 
 def to_full_id(short_id: str) -> str:
@@ -44,7 +38,7 @@ def to_short_id(full_id: str) -> str:
     return full_id
 
 
-def fetch_sources_batch(openalex_ids: list[str]) -> dict[str, dict]:
+def fetch_sources_batch(openalex_ids: list[str], mailto: str, logger: Any) -> dict[str, dict]:
     """Interroge l'API OpenAlex pour un lot d'IDs et retourne un dict short_id → données."""
     full_ids = [to_full_id(oid) for oid in openalex_ids]
     filter_value = "|".join(full_ids)
@@ -52,7 +46,7 @@ def fetch_sources_batch(openalex_ids: list[str]) -> dict[str, dict]:
         "filter": f"openalex:{filter_value}",
         "per_page": str(len(openalex_ids)),
         "select": "id,apc_usd,apc_prices,is_in_doaj",
-        "mailto": MAILTO,
+        "mailto": mailto,
     }
 
     for attempt in range(3):
@@ -87,17 +81,14 @@ def extract_apc(source: dict) -> tuple[float | None, str]:
     """
     apc_prices = source.get("apc_prices") or []
 
-    # Chercher EUR en priorité
     for entry in apc_prices:
         if entry.get("currency") == "EUR":
             return entry["price"], "EUR"
 
-    # Sinon prendre la première devise disponible
     if apc_prices:
         entry = apc_prices[0]
         return entry["price"], entry.get("currency", "USD")
 
-    # Fallback : apc_usd (montant converti par OpenAlex)
     apc_usd = source.get("apc_usd")
     if apc_usd is not None:
         return apc_usd, "USD"
@@ -105,30 +96,25 @@ def extract_apc(source: dict) -> tuple[float | None, str]:
     return None, "EUR"
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser(
-        description="Enrichir les revues avec les APC depuis OpenAlex (prix catalogue DOAJ)"
-    )
-    parser.add_argument(
-        "--limit", type=int, default=0, help="Limiter le nombre de revues traitées (0 = toutes)"
-    )
-    parser.add_argument("--dry-run", action="store_true", help="Aperçu sans modifier la base")
-    parser.add_argument(
-        "--reset", action="store_true", help="Réinitialiser apc_amount/is_in_doaj pour retraiter"
-    )
-    args = parser.parse_args()
-
-    conn = get_connection()
-    conn.autocommit = False
-    cur = conn.cursor()
-
+def run_enrich(
+    cur: Any,
+    conn: Any,
+    queries: EnrichQueries,
+    logger: Any,
+    *,
+    mailto: str,
+    limit: int = 0,
+    dry_run: bool = False,
+    reset: bool = False,
+    rate_delay: float = 0.1,
+) -> None:
     try:
-        if args.reset:
+        if reset:
             count = reset_journal_apc(cur)
             conn.commit()
             logger.info(f"Reset : {count} revues réinitialisées.")
 
-        journals = fetch_journals_needing_apc(cur, limit=args.limit)
+        journals = queries.fetch_journals_needing_apc(cur, limit=limit or None)
         total = len(journals)
         logger.info(f"{total} revues à traiter (avec openalex_id, sans APC).")
 
@@ -141,14 +127,13 @@ def main() -> Any:
         with_apc = 0
         processed = 0
 
-        # Traiter par lots
         for i in range(0, total, BATCH_SIZE):
             batch = journals[i : i + BATCH_SIZE]
             oa_ids = [row[1] for row in batch]
-            id_map = {row[1]: row[0] for row in batch}  # openalex_id → journal_id
+            id_map = {row[1]: row[0] for row in batch}
 
-            sources = fetch_sources_batch(oa_ids)
-            time.sleep(DOAJ_DELAY)
+            sources = fetch_sources_batch(oa_ids, mailto, logger)
+            time.sleep(rate_delay)
 
             for oa_id, journal_id in id_map.items():
                 source = sources.get(oa_id)
@@ -159,7 +144,7 @@ def main() -> Any:
                 is_in_doaj = source.get("is_in_doaj", False) or False
                 apc_amount, apc_currency = extract_apc(source)
 
-                if not args.dry_run:
+                if not dry_run:
                     update_journal_apc(
                         cur,
                         journal_id,
@@ -175,15 +160,14 @@ def main() -> Any:
                     with_apc += 1
                 processed += 1
 
-            # Commit par lots
-            if not args.dry_run and processed % COMMIT_EVERY < BATCH_SIZE:
+            if not dry_run and processed % COMMIT_EVERY < BATCH_SIZE:
                 conn.commit()
 
             logger.info(
                 f"  {min(i + BATCH_SIZE, total)}/{total} — {with_apc} avec APC, {doaj_count} DOAJ"
             )
 
-        if not args.dry_run:
+        if not dry_run:
             conn.commit()
 
         logger.info(
@@ -192,17 +176,10 @@ def main() -> Any:
         )
 
     except KeyboardInterrupt:
-        if not args.dry_run:
+        if not dry_run:
             conn.commit()
         logger.warning("Interruption — données déjà traitées conservées.")
     except Exception as e:
         conn.rollback()
         logger.error(f"Erreur fatale : {e}")
         raise
-    finally:
-        cur.close()
-        conn.close()
-
-
-if __name__ == "__main__":
-    main()
