@@ -204,3 +204,40 @@ def fetch_name_form_map(cur: Any) -> dict[str, list[int]]:
     """Charge `person_name_forms` sous forme `{name_form: [person_id, ...]}`."""
     cur.execute("SELECT name_form, person_ids FROM person_name_forms")
     return {r["name_form"]: r["person_ids"] for r in rows_as_dicts(cur)}
+
+
+class PgPersonsCreateQueries:
+    """Adapter PostgreSQL pour `application.ports.persons_create.PersonsCreateQueries`."""
+
+    def fetch_unlinked_hal_authorships(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_unlinked_hal_authorships(cur)
+
+    def fetch_unlinked_openalex_authorships(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_unlinked_openalex_authorships(cur)
+
+    def fetch_unlinked_wos_authorships(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_unlinked_wos_authorships(cur)
+
+    def fetch_unlinked_scanr_authorships(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_unlinked_scanr_authorships(cur)
+
+    def fetch_unlinked_theses_authorships(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_unlinked_theses_authorships(cur)
+
+    def fetch_linked_authorships_structured(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_linked_authorships_structured(cur)
+
+    def fetch_linked_authorships_openalex(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_linked_authorships_openalex(cur)
+
+    def fetch_hal_account_to_person_map(self, cur: Any) -> dict[int, int]:
+        return fetch_hal_account_to_person_map(cur)
+
+    def fetch_idref_to_person_map(self, cur: Any) -> dict[str, int]:
+        return fetch_idref_to_person_map(cur)
+
+    def fetch_orcid_to_person_map(self, cur: Any) -> dict[str, int]:
+        return fetch_orcid_to_person_map(cur)
+
+    def fetch_name_form_map(self, cur: Any) -> dict[str, list[int]]:
+        return fetch_name_form_map(cur)

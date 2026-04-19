@@ -28,15 +28,10 @@ Algorithme en 4 étapes + 1 étape complémentaire :
   Étape 4 : Presonnes liées aux thèses (directeurs, rapporteurs, jury)
     Les rôles non-auteur des thèses sont hors périmètre (in_perimeter=false: pas de signatures ni de structure_ids) et ne passent pas par les étapes 0-3. Si leur source_author a un IdRef correspondant à une personne connue, on rattache sans modifier in_perimeter ni créer de personne.
 
-Le SQL est isolé dans `infrastructure/db/queries/persons_create.py`.
-
-Usage:
-    python create_persons_from_source_authorships.py              # exécuter
-    python create_persons_from_source_authorships.py --dry-run    # dry-run
+L'orchestrateur dépend du port `PersonsCreateQueries`. Le point d'entrée CLI
+est dans `interfaces/cli/pipeline/create_persons_from_source_authorships.py`.
 """
 
-import argparse
-import os
 from collections import defaultdict
 from typing import Any
 
@@ -50,40 +45,23 @@ from application.persons import (
 from application.persons import (
     link_authorships as link_to_person,
 )
+from application.ports.persons_create import PersonsCreateQueries
 from domain.names import names_compatible, parse_raw_author_name
 from domain.normalize import normalize_name
-from infrastructure.db.connection import get_connection
-from infrastructure.db.queries.persons_create import (
-    fetch_hal_account_to_person_map,
-    fetch_idref_to_person_map,
-    fetch_linked_authorships_openalex,
-    fetch_linked_authorships_structured,
-    fetch_name_form_map,
-    fetch_orcid_to_person_map,
-    fetch_unlinked_hal_authorships,
-    fetch_unlinked_openalex_authorships,
-    fetch_unlinked_scanr_authorships,
-    fetch_unlinked_theses_authorships,
-    fetch_unlinked_wos_authorships,
-)
-from infrastructure.log import setup_logger
-
-logger = setup_logger("create_persons", os.path.join(os.path.dirname(__file__), "logs"))
-
 
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
 
 
-def get_all_unlinked_authorships(cur: Any) -> list[dict[str, Any]]:
+def get_all_unlinked_authorships(cur: Any, queries: PersonsCreateQueries) -> list[dict[str, Any]]:
     """Charge les authorships UCA sans person_id (toutes sources) et les enrichit
     (parsing noms, filtrage ORCID OpenAlex, flag allow_create)."""
-    hal_rows = fetch_unlinked_hal_authorships(cur)
-    oa_rows = fetch_unlinked_openalex_authorships(cur)
-    wos_rows = fetch_unlinked_wos_authorships(cur)
-    scanr_rows = fetch_unlinked_scanr_authorships(cur)
-    theses_rows = fetch_unlinked_theses_authorships(cur)
+    hal_rows = queries.fetch_unlinked_hal_authorships(cur)
+    oa_rows = queries.fetch_unlinked_openalex_authorships(cur)
+    wos_rows = queries.fetch_unlinked_wos_authorships(cur)
+    scanr_rows = queries.fetch_unlinked_scanr_authorships(cur)
+    theses_rows = queries.fetch_unlinked_theses_authorships(cur)
 
     all_rows = []
     for r in hal_rows + oa_rows + wos_rows + scanr_rows + theses_rows:
@@ -115,15 +93,12 @@ def get_all_unlinked_authorships(cur: Any) -> list[dict[str, Any]]:
 
 
 def load_linked_authorships_by_pub(
-    cur: Any,
+    cur: Any, queries: PersonsCreateQueries
 ) -> dict[tuple[int, int], list[tuple[int, str, str, str]]]:
-    """Index des authorships rattachées par (publication_id, author_position).
-
-    Retourne : {(pub_id, position): [(person_id, last_norm, first_norm, source), ...]}
-    """
+    """Index des authorships rattachées par (publication_id, author_position)."""
     index: dict[tuple[int, int], list[tuple[int, str, str, str]]] = defaultdict(list)
 
-    for r in fetch_linked_authorships_structured(cur):
+    for r in queries.fetch_linked_authorships_structured(cur):
         ln = normalize_name(r["last_name"] or "")
         fn = normalize_name(r["first_name"] or "")
         if not ln and r["full_name"]:
@@ -133,7 +108,7 @@ def load_linked_authorships_by_pub(
             (r["person_id"], ln, fn, r["source"])
         )
 
-    for r in fetch_linked_authorships_openalex(cur):
+    for r in queries.fetch_linked_authorships_openalex(cur):
         last, first = parse_raw_author_name(r["full_name"])
         ln, fn = normalize_name(last), normalize_name(first)
         index[(r["publication_id"], r["author_position"])].append(
@@ -148,19 +123,21 @@ def load_linked_authorships_by_pub(
 # ---------------------------------------------------------------------------
 
 
-def step0_hal_accounts(cur: Any, all_authorships: Any, linked_ids: Any, dry_run: Any) -> Any:
-    """Propagation des comptes HAL déjà rattachés à une personne.
-
-    Seuls les source_persons HAL avec hal_person_id ET person_id sont traités.
-    Les comptes HAL non encore rattachés sont laissés aux passes suivantes
-    (matching par nom, ORCID, position) pour éviter de créer des doublons.
-    """
+def step0_hal_accounts(
+    cur: Any,
+    queries: PersonsCreateQueries,
+    logger: Any,
+    all_authorships: Any,
+    linked_ids: set,
+    dry_run: bool,
+) -> int:
+    """Propagation des comptes HAL déjà rattachés à une personne."""
     by_hal_pid = defaultdict(list)
     for a in all_authorships:
         if a["source"] == "hal" and a["has_hal_person_id"]:
             by_hal_pid[a["hal_person_id"]].append(a)
 
-    hal_person_map = fetch_hal_account_to_person_map(cur)
+    hal_person_map = queries.fetch_hal_account_to_person_map(cur)
 
     linked = 0
     skipped = 0
@@ -183,16 +160,19 @@ def step0_hal_accounts(cur: Any, all_authorships: Any, linked_ids: Any, dry_run:
 
 
 # ---------------------------------------------------------------------------
-# Étape 1 : Cross-source (même publication + même position)
+# Étape 1 : Cross-source
 # ---------------------------------------------------------------------------
 
 
 def step1_cross_source(
-    cur: Any, all_authorships: Any, linked_ids: Any, linked_index: Any, dry_run: Any
-) -> Any:
-    """Pour chaque authorship sans person_id, chercher sur la même publication
-    (même position) une authorship d'une autre source rattachée à une personne.
-    """
+    cur: Any,
+    logger: Any,
+    all_authorships: Any,
+    linked_ids: set,
+    linked_index: dict,
+    dry_run: bool,
+) -> int:
+    """Match par (publication, position) avec nom compatible d'une autre source."""
     linked = 0
     for a in all_authorships:
         if (a["source"], a["authorship_id"]) in linked_ids:
@@ -236,11 +216,16 @@ def step1_cross_source(
 # ---------------------------------------------------------------------------
 
 
-def step1b_idref(cur: Any, all_authorships: Any, linked_ids: Any, dry_run: Any) -> Any:
-    """Si l'authorship a un IdRef déjà connu en base (non rejeté),
-    rattacher à la personne correspondante.
-    """
-    idref_map = fetch_idref_to_person_map(cur)
+def step1b_idref(
+    cur: Any,
+    queries: PersonsCreateQueries,
+    logger: Any,
+    all_authorships: Any,
+    linked_ids: set,
+    dry_run: bool,
+) -> int:
+    """Si l'authorship a un IdRef déjà connu en base (non rejeté), rattacher."""
+    idref_map = queries.fetch_idref_to_person_map(cur)
     linked = 0
 
     for a in all_authorships:
@@ -269,11 +254,16 @@ def step1b_idref(cur: Any, all_authorships: Any, linked_ids: Any, dry_run: Any) 
 # ---------------------------------------------------------------------------
 
 
-def step2_orcid(cur: Any, all_authorships: Any, linked_ids: Any, dry_run: Any) -> Any:
-    """Si l'authorship a un ORCID déjà connu en base (non rejeté),
-    rattacher à la personne correspondante.
-    """
-    orcid_map = fetch_orcid_to_person_map(cur)
+def step2_orcid(
+    cur: Any,
+    queries: PersonsCreateQueries,
+    logger: Any,
+    all_authorships: Any,
+    linked_ids: set,
+    dry_run: bool,
+) -> int:
+    """Si l'authorship a un ORCID déjà connu en base, rattacher."""
+    orcid_map = queries.fetch_orcid_to_person_map(cur)
     linked = 0
 
     for a in all_authorships:
@@ -303,14 +293,14 @@ def step2_orcid(cur: Any, all_authorships: Any, linked_ids: Any, dry_run: Any) -
 
 
 def step3_name_forms(
-    cur: Any, all_authorships: Any, linked_ids: Any, name_form_map: Any, dry_run: Any
-) -> Any:
-    """Lookup par author_name_normalized dans person_name_forms.
-
-    - Mappé à 1 personne → rattacher
-    - Mappé à >1 personnes → orphelin (traitement manuel)
-    - Forme inconnue → créer nouvelle personne
-    """
+    cur: Any,
+    logger: Any,
+    all_authorships: Any,
+    linked_ids: set,
+    name_form_map: dict,
+    dry_run: bool,
+) -> tuple[int, int, int]:
+    """Lookup par author_name_normalized dans person_name_forms."""
     linked = 0
     created = 0
     ambiguous = 0
@@ -369,41 +359,39 @@ def step3_name_forms(
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Orchestrateur
 # ---------------------------------------------------------------------------
 
 
-def run(dry_run: Any = False) -> Any:
-    conn = get_connection()
-    cur = conn.cursor()
-
-    all_authorships = get_all_unlinked_authorships(cur)
+def run(
+    cur: Any, conn: Any, queries: PersonsCreateQueries, logger: Any, *, dry_run: bool = False
+) -> None:
+    all_authorships = get_all_unlinked_authorships(cur, queries)
     logger.info(f"{len(all_authorships)} authorships UCA non rattachées (toutes sources)")
 
     if not all_authorships:
         logger.info("Rien à faire.")
-        conn.close()
         return
 
     linked_ids: set[tuple[str, int]] = set()
 
     logger.info("\n--- Étape 0 : comptes HAL ---")
-    s0 = step0_hal_accounts(cur, all_authorships, linked_ids, dry_run)
+    s0 = step0_hal_accounts(cur, queries, logger, all_authorships, linked_ids, dry_run)
 
     logger.info("\n--- Étape 1 : cross-source (même publi + position) ---")
-    linked_index = load_linked_authorships_by_pub(cur)
-    s1 = step1_cross_source(cur, all_authorships, linked_ids, linked_index, dry_run)
+    linked_index = load_linked_authorships_by_pub(cur, queries)
+    s1 = step1_cross_source(cur, logger, all_authorships, linked_ids, linked_index, dry_run)
 
     logger.info("\n--- Étape 1b : IdRef connu ---")
-    s1b = step1b_idref(cur, all_authorships, linked_ids, dry_run)
+    s1b = step1b_idref(cur, queries, logger, all_authorships, linked_ids, dry_run)
 
     logger.info("\n--- Étape 2 : ORCID connu ---")
-    s2 = step2_orcid(cur, all_authorships, linked_ids, dry_run)
+    s2 = step2_orcid(cur, queries, logger, all_authorships, linked_ids, dry_run)
 
     logger.info("\n--- Étape 3 : person_name_forms ---")
-    name_form_map = fetch_name_form_map(cur)
+    name_form_map = queries.fetch_name_form_map(cur)
     s3_created, s3_linked, s3_ambiguous = step3_name_forms(
-        cur, all_authorships, linked_ids, name_form_map, dry_run
+        cur, logger, all_authorships, linked_ids, name_form_map, dry_run
     )
 
     total_linked = len(linked_ids)
@@ -415,7 +403,8 @@ def run(dry_run: Any = False) -> Any:
     logger.info(f"  Étape 1b (IdRef connu)   : {s1b} rattachées")
     logger.info(f"  Étape 2 (ORCID connu)    : {s2} rattachées")
     logger.info(
-        f"  Étape 3 (name_forms)     : {s3_created} créées, {s3_linked} rattachées, {s3_ambiguous} ambiguës"
+        f"  Étape 3 (name_forms)     : {s3_created} créées, {s3_linked} rattachées, "
+        f"{s3_ambiguous} ambiguës"
     )
     logger.info(f"  Non résolues             : {unlinked}")
 
@@ -426,19 +415,3 @@ def run(dry_run: Any = False) -> Any:
         conn.commit()
         logger.info("\n  ✓ Appliqué.")
         logger.info("  → Lancer build_authorships.py pour propager in_perimeter/structure_ids")
-
-    cur.close()
-    conn.close()
-
-
-def main() -> Any:
-    parser = argparse.ArgumentParser(
-        description="Crée des personnes à partir des authorships sources UCA"
-    )
-    parser.add_argument("--dry-run", action="store_true", help="Simuler sans modifier la base")
-    args = parser.parse_args()
-    run(dry_run=args.dry_run)
-
-
-if __name__ == "__main__":
-    main()

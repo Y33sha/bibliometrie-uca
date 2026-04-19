@@ -230,7 +230,7 @@ def phase_publications(**kw: Any) -> Any:
     une source_authorship in_perimeter (evite de creer des publications
     hors perimetre). Applique ensuite les merges inter-sources (HAL-ID, NNT).
     """
-    run_python("processing/create_publications.py")
+    _run_create_publications()
     _run_merge_pubs_by_hal_id()
     _run_merge_pubs_by_nnt()
 
@@ -242,7 +242,7 @@ def phase_persons(**kw: Any) -> Any:
     Exclut les publications de type memoir (v_active_publications).
     Rattache aussi les authorships theses hors-perimetre par IdRef.
     """
-    run_python("processing/create_persons_from_source_authorships.py")
+    _run_create_persons()
     _run_populate_person_name_forms()
 
 
@@ -262,6 +262,38 @@ def phase_countries(**kw: Any) -> Any:
     run_python("scripts/detect_address_countries.py", "--direct", "--apply")
     run_python("scripts/suggest_address_countries.py")
     _run_refresh_publication_countries()
+
+
+def _run_create_publications() -> None:
+    from application.pipeline.create.create_publications import run
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.publications_create import PgPublicationsCreateQueries
+
+    log.info("▶ create_publications")
+    t0 = time.time()
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        run(cur, conn, PgPublicationsCreateQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ create_publications terminé en %.1fs", time.time() - t0)
+
+
+def _run_create_persons() -> None:
+    from application.pipeline.create.create_persons_from_source_authorships import run
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
+
+    log.info("▶ create_persons_from_source_authorships")
+    t0 = time.time()
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        run(cur, conn, PgPersonsCreateQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ create_persons_from_source_authorships terminé en %.1fs", time.time() - t0)
 
 
 def _run_build_authorships(sources: Any = None) -> None:

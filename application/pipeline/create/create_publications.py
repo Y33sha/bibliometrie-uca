@@ -10,20 +10,13 @@ source_authorship in_perimeter :
   2. Si trouvée : rattache et enrichit
   3. Si non trouvée : crée la publication
 
-Les source_publications hors périmètre restent sans publication_id.
-
-Le SQL est isolé dans `infrastructure/db/queries/publications_create.py`
-et `infrastructure/db/queries/merge.py`.
-
-Usage:
-    python create_publications.py              # exécuter
-    python create_publications.py --dry-run    # dry-run
+L'orchestrateur dépend du port `PublicationsCreateQueries`. Le point
+d'entrée CLI est dans `interfaces/cli/pipeline/create_publications.py`.
 """
 
-import argparse
-import os
 from typing import Any
 
+from application.ports.publications_create import PublicationsCreateQueries
 from application.publications import (
     find_or_create as find_or_create_publication,
 )
@@ -33,17 +26,9 @@ from application.publications import (
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.publication import normalize_nnt
-from infrastructure.db.connection import get_connection
-from infrastructure.db.queries.merge import link_source_publication_to_publication
-from infrastructure.db.queries.publications_create import (
-    fetch_orphan_in_perimeter_source_publications,
-)
-from infrastructure.log import setup_logger
-
-logger = setup_logger("create_publications", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def process_document(cur: Any, doc: Any, dry_run: Any) -> Any:
+def process_document(cur: Any, queries: PublicationsCreateQueries, doc: Any, dry_run: bool) -> bool:
     """Crée ou rattache une publication pour un source_document orphelin."""
     title = doc["title"] or ""
     pub_year = doc["pub_year"]
@@ -66,7 +51,7 @@ def process_document(cur: Any, doc: Any, dry_run: Any) -> Any:
     if dry_run:
         return True
 
-    pub_id, is_new = find_or_create_publication(
+    pub_id, _is_new = find_or_create_publication(
         cur,
         title=title,
         title_normalized=normalize_text(title),
@@ -84,29 +69,32 @@ def process_document(cur: Any, doc: Any, dry_run: Any) -> Any:
     if not pub_id:
         return False
 
-    link_source_publication_to_publication(cur, doc["id"], pub_id)
+    queries.link_source_publication_to_publication(cur, doc["id"], pub_id)
     refresh_from_sources(cur, pub_id)
 
     return True
 
 
-def run(dry_run: Any = False) -> Any:
-    conn = get_connection()
+def run(
+    cur: Any,
+    conn: Any,
+    queries: PublicationsCreateQueries,
+    logger: Any,
+    *,
+    dry_run: bool = False,
+) -> None:
     try:
-        cur = conn.cursor()
-
-        docs = fetch_orphan_in_perimeter_source_publications(cur)
+        docs = queries.fetch_orphan_in_perimeter_source_publications(cur)
         logger.info("%d source_publications in-perimeter sans publication", len(docs))
 
         if not docs:
             logger.info("Rien a faire.")
-            conn.close()
             return
 
         created = 0
         skipped = 0
         for i, doc in enumerate(docs):
-            if process_document(cur, doc, dry_run):
+            if process_document(cur, queries, doc, dry_run):
                 created += 1
             else:
                 skipped += 1
@@ -125,19 +113,7 @@ def run(dry_run: Any = False) -> Any:
                 "Terminé : %d publications créées/rattachées, %d ignorées", created, skipped
             )
 
-        cur.close()
-        conn.close()
-
     except Exception:
         conn.rollback()
         logger.exception("Erreur")
         raise
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Cree les publications pour les source_publications in-perimeter orphelins"
-    )
-    parser.add_argument("--dry-run", action="store_true")
-    args = parser.parse_args()
-    run(dry_run=args.dry_run)
