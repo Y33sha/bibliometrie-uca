@@ -165,9 +165,9 @@ omit = [
 [tool.coverage.report]
 skip_empty = true
 show_missing = true
-# Seuil progressif : part de la baseline actuelle (42% hors CLI), à faire
-# remonter au fur et à mesure qu'on ajoute des tests. Ne jamais régresser.
-fail_under = 41
+# Seuil progressif : ne jamais régresser. À faire remonter au fur et à
+# mesure qu'on ajoute des tests.
+fail_under = 44
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",

@@ -92,7 +92,10 @@ dupliqué entre agrégats.
   setup BDD + fixture `db`.
 - [x] Hook pre-commit `pytest-unit` qui lance uniquement `tests/unit/`.
   CI fait les deux en étapes séparées.
-- [ ] Tests de caractérisation complémentaires sur les routers critiques
+- [x] Tests de caractérisation sur les routers critiques (publications,
+  persons, pub_stats) avant l'extraction SQL §1.1. 63 tests qui exercent
+  les combinaisons de filtres et la construction dynamique des WHERE/ORDER BY.
+  Seuil couverture remonté à 44%.
 
 ### 2.3 Dette externe / dépendances
 - [x] **Source unique des dépendances** : `[project.dependencies]` +
