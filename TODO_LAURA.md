@@ -33,7 +33,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] depuis que la déduplication automatique par identité de métadonnées a été abandonnée: passer en revue les cas concernés, auditer, re-dupliquer?
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
 * [ ] investiguer les 388k doublons de position WoS (source_authorships, même publi, même position)
-* [ ] logique bizarre à corriger: if is_thesis and has_hal_link: priority = _PRIORITY_THESIS_HAL_LINKED
+
 ### Problèmes spécifiques HAL
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
 * [ ] https://hal.science/hal-03874894 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
@@ -56,6 +56,10 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] contrôler données journal/doc_type via DOI? => DOI peut permettre de dédoublonner journals
 * [ ] utiliser DOAJ pour enrichir données journals et s'en servir pour contrôler oa_status?
 * [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
+# Code
+* [ ] sortir hal-problems du routeur persons, ça n'a rien à y faire
+* [ ] logique bizarre à corriger: if is_thesis and has_hal_link: priority = _PRIORITY_THESIS_HAL_LINKED
+* [ ] renommage de routeurs (admin/, public/; pub_stats, stats)
 # Interface
 ## Admin
 * [ ] interface pour consulter l'audit trail
