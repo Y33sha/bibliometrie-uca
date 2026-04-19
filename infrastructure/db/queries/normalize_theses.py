@@ -219,6 +219,105 @@ def get_theses_publication_id(cur: Any, theses_id: str) -> int | None:
     return row["publication_id"] if isinstance(row, dict) else row[0]
 
 
+class PgThesesNormalizeQueries:
+    """Adapter PostgreSQL pour `application.ports.normalize_theses.ThesesNormalizeQueries`."""
+
+    def fetch_thesis_primary_author(self, cur: Any, publication_id: int) -> tuple[str, str] | None:
+        return fetch_thesis_primary_author(cur, publication_id)
+
+    def merge_publication_meta(self, cur: Any, publication_id: int, meta_json: Any) -> None:
+        merge_publication_meta(cur, publication_id, meta_json)
+
+    def upsert_theses_source_publication(
+        self,
+        cur: Any,
+        *,
+        theses_id: str,
+        doi: str | None,
+        title: str,
+        pub_year: int | None,
+        doc_type: str,
+        publication_id: int | None,
+        staging_id: int,
+        external_ids: Any,
+        journal_id: int | None,
+        oa_status: str | None,
+        language: str | None,
+        container_title: str | None,
+        keywords: list[str] | None,
+        topics_json: Any,
+        source_meta_json: Any,
+    ) -> int:
+        return upsert_theses_source_publication(
+            cur,
+            theses_id=theses_id,
+            doi=doi,
+            title=title,
+            pub_year=pub_year,
+            doc_type=doc_type,
+            publication_id=publication_id,
+            staging_id=staging_id,
+            external_ids=external_ids,
+            journal_id=journal_id,
+            oa_status=oa_status,
+            language=language,
+            container_title=container_title,
+            keywords=keywords,
+            topics_json=topics_json,
+            source_meta_json=source_meta_json,
+        )
+
+    def upsert_theses_source_person_by_ppn(
+        self,
+        cur: Any,
+        *,
+        ppn: str,
+        full_name: str,
+        last_name: str,
+        first_name: str | None,
+    ) -> int:
+        return upsert_theses_source_person_by_ppn(
+            cur, ppn=ppn, full_name=full_name, last_name=last_name, first_name=first_name
+        )
+
+    def find_theses_source_person_by_name(
+        self, cur: Any, *, full_name: str, first_name: str | None
+    ) -> int | None:
+        return find_theses_source_person_by_name(cur, full_name=full_name, first_name=first_name)
+
+    def insert_theses_source_person_new(
+        self, cur: Any, *, full_name: str, last_name: str, first_name: str | None
+    ) -> int:
+        return insert_theses_source_person_new(
+            cur, full_name=full_name, last_name=last_name, first_name=first_name
+        )
+
+    def upsert_theses_source_authorship(
+        self,
+        cur: Any,
+        *,
+        source_publication_id: int,
+        source_person_id: int,
+        author_position: int | None,
+        roles: list[str],
+        raw_author_name: str,
+    ) -> int:
+        return upsert_theses_source_authorship(
+            cur,
+            source_publication_id=source_publication_id,
+            source_person_id=source_person_id,
+            author_position=author_position,
+            roles=roles,
+            raw_author_name=raw_author_name,
+        )
+
+    def get_theses_publication_id(self, cur: Any, theses_id: str) -> int | None:
+        return get_theses_publication_id(cur, theses_id)
+
+    def count_theses_table(self, cur: Any, table: str) -> int:
+        return count_theses_table(cur, table)
+
+
 def count_theses_table(cur: Any, table: str) -> int:
     """Compte les lignes d'une table avec `source = 'theses'`.
 

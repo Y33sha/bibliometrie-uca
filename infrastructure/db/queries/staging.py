@@ -75,3 +75,24 @@ def fetch_staging_by_ids(cur: Any, staging_ids: list[int], *, columns: str) -> l
         (staging_ids,),
     )
     return cur.fetchall()
+
+
+class PgStagingQueries:
+    """Adapter PostgreSQL pour `application.ports.staging.StagingQueries`."""
+
+    def reset_processed_flag(self, cur: Any, source: str) -> int:
+        return reset_processed_flag(cur, source)
+
+    def count_pending_staging(self, cur: Any, source: str) -> int:
+        return count_pending_staging(cur, source)
+
+    def fetch_pending_staging(
+        self, cur: Any, source: str, *, columns: str, limit: int
+    ) -> list[Any]:
+        return fetch_pending_staging(cur, source, columns=columns, limit=limit)
+
+    def fetch_pending_staging_ids(self, cur: Any, source: str, *, limit: int) -> list[int]:
+        return fetch_pending_staging_ids(cur, source, limit=limit)
+
+    def fetch_staging_by_ids(self, cur: Any, staging_ids: list[int], *, columns: str) -> list[Any]:
+        return fetch_staging_by_ids(cur, staging_ids, columns=columns)
