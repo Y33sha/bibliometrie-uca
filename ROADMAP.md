@@ -8,11 +8,22 @@ sont en place, les ports Protocol existent pour les 7 repositories,
 le SQL est extrait des services. Ce qui reste :
 
 ### 1.1 Sortir le SQL qui traîne encore dans les routers
-Plusieurs routers `interfaces/api/routers/` exécutent encore du SQL
-direct (existence checks, lectures ad-hoc, construction de facettes).
-À extraire vers des repositories read-only ou des query builders
-dédiés. Attention aux routers lourds (`publications.py`, `persons.py`)
-qui concentrent la construction dynamique des WHERE et des ORDER BY.
+- [x] Nouveau module `infrastructure/db/queries/` : accueille les
+  query services extraits (CQRS-lite, SQL = infrastructure).
+- [x] `filters.py` SQL (PUB_IS_UCA, apply_*_filter) déplacé de
+  `interfaces/api/filters.py` vers `infrastructure/db/queries/filters.py`.
+- [x] **pub_stats** : 643 → 175 lignes (`stats.py`)
+- [x] **publications** : 1222 → 199 lignes (`publications.py`)
+- [x] **persons** : 1807 → 512 lignes (`persons.py` + `persons_admin.py`)
+- [x] **addresses** : 487 → 197 lignes (`addresses.py`)
+- [x] **laboratories** : 449 → 70 lignes (`laboratories.py`)
+- [x] **admin_duplicates + admin_person_duplicates** : 595 → 125 lignes
+  (`duplicates.py` consolidé)
+- [x] **authorships** : 273 → 51 lignes (`authorships.py`)
+- [ ] **Reliquat** (petits routers — existence checks + lookups simples,
+  acceptables selon CQRS-lite) : feedback, structures, journals,
+  publishers, config, stats. ~30 `cur.execute` au total, la plupart
+  étant des `SELECT id WHERE id = %s` (OK en router selon Opus 4.7).
 
 ### 1.2 Factoriser la logique commune aux sources
 Créer des classes abstraites `BaseExtractor` / `BaseNormalizer` dans
@@ -51,10 +62,9 @@ couverture de tests devient un objectif.
   vérifiés en pre-commit + CI. 4 contrats `forbidden` qui verrouillent :
   (1) domain = noyau pur, (2) application ↛ interfaces,
   (3) infrastructure ↛ interfaces, (4) infrastructure ↛ application.
-- [ ] Quand §1.1 sera faite (SQL hors routers), durcir en un contrat
-  `layered` strict (interfaces > infrastructure > application > domain).
-- [ ] Quand §1.6 sera faite (DI complète), retirer l'exception permettant
-  à `application/` d'importer les factories de `infrastructure.repositories`.
+- [ ] Durcir en contrat `layered` strict — bloqué par §1.6 (DI complète) :
+  63 imports `application → infrastructure.*` à retirer avant. Revisiter
+  quand §1.6 avance.
 
 ### 1.8 Audit périodique
 Parcours régulier pour repérer : SQL mal placé, dépendances dans le
@@ -76,8 +86,12 @@ dupliqué entre agrégats.
   run_pipeline) — beaucoup en `Any` pragmatique pour les params DB
   (`cur: Any`, `conn: Any`) et les helpers internes. Les nouveaux
   ajouts seront donc typés par défaut.
-- [ ] Couverture `pytest --cov` en CI avec seuil progressif (partir de
-  la couverture actuelle, ne pas régresser)
+- [x] Couverture `pytest --cov` en CI avec seuil à **41%**
+  (`fail_under` dans `[tool.coverage.report]`). Baseline actuelle : 42%
+  hors `interfaces/cli/*` (scripts one-shot exclus de la mesure, car
+  leur logique utile est factorisée dans application/infrastructure et
+  testée là). À faire remonter par paliers : +5% quand chantier §1.1
+  sera fait (nouveaux tests de caractérisation sur les routers).
 
 ### 2.2 Organisation des tests
 - [x] Réorganisation `tests/unit/` + `tests/integration/`, sous-dossiers
@@ -88,7 +102,10 @@ dupliqué entre agrégats.
   setup BDD + fixture `db`.
 - [x] Hook pre-commit `pytest-unit` qui lance uniquement `tests/unit/`.
   CI fait les deux en étapes séparées.
-- [ ] Tests de caractérisation complémentaires sur les routers critiques
+- [x] Tests de caractérisation sur les routers critiques (publications,
+  persons, pub_stats) avant l'extraction SQL §1.1. 63 tests qui exercent
+  les combinaisons de filtres et la construction dynamique des WHERE/ORDER BY.
+  Seuil couverture remonté à 44%.
 
 ### 2.3 Dette externe / dépendances
 - [x] **Source unique des dépendances** : `[project.dependencies]` +
