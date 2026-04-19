@@ -32,7 +32,7 @@ def apply_oa_filter(conditions: list, params: list, oa_status: str | None):
     values = [v.strip() for v in oa_status.split(",") if v.strip()]
     if not values:
         return
-    expanded = []
+    expanded: list[str] = []
     for v in values:
         if v == "oa":
             expanded.extend(OA_OPEN_STATUSES)

@@ -40,7 +40,7 @@ def fetch_by_doi(doi: str) -> dict | None:
         "q": f'doiId_s:"{doi}"',
         "fl": HAL_FIELDS_STR,
         "wt": "json",
-        "rows": 1,
+        "rows": "1",
     }
     try:
         resp = requests.get(HAL_API, params=params, timeout=15)

@@ -2,6 +2,7 @@
 
 import logging
 import re
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -88,7 +89,7 @@ async def persons_directory(
     roles = [v.strip() for v in role.split(",") if v.strip()] if role else []
 
     conditions = ["p.rejected = FALSE"]
-    params = []
+    params: list[Any] = []
 
     if search:
         conditions.append(
@@ -220,7 +221,7 @@ async def list_persons(
     """Liste des personnes avec filtres."""
     offset = (page - 1) * per_page
     conditions = []
-    params = []
+    params: list[Any] = []
 
     if search:
         conditions.append("""(

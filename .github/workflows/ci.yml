@@ -54,6 +54,9 @@ jobs:
       - name: Architecture contracts (import-linter)
         run: lint-imports
 
+      - name: Type check (mypy)
+        run: mypy .
+
       - name: Unit tests (sans BDD)
         run: python -m pytest tests/unit/ -v
 

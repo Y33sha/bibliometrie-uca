@@ -633,10 +633,10 @@ def process_authorships(cur, work: dict, source_publication_id: int):
 # =============================================================
 
 
-def process_work(cur, staging_row: tuple) -> bool:
+def process_work(cur, staging_row: tuple) -> bool | None:
     """
     Traite un work du staging OpenAlex.
-    Retourne True si traité avec succès.
+    Retourne True si traité, False en cas d'erreur, None si skippé.
     """
     if isinstance(staging_row, dict):
         staging_id = staging_row["id"]
@@ -650,7 +650,7 @@ def process_work(cur, staging_row: tuple) -> bool:
         # Zenodo : si le DOI est un concept DOI, vérifier si le version DOI
         # est déjà en staging → skip pour éviter les doublons
         raw_doi = clean_doi(doi)
-        if is_zenodo_doi(raw_doi):
+        if raw_doi and is_zenodo_doi(raw_doi):
             try:
                 version_doi = resolve_zenodo_doi(raw_doi)
             except ZenodoResolutionError as e:
@@ -719,15 +719,15 @@ def process_work(cur, staging_row: tuple) -> bool:
             enrich_doi = pub_meta["doi"]
             # Résoudre les conflits de DOI chapitre/ouvrage
             if enrich_doi:
-                existing = find_by_doi(cur, enrich_doi)
-                if existing and existing.id != publication_id:
+                existing_by_doi = find_by_doi(cur, enrich_doi)
+                if existing_by_doi and existing_by_doi.id != publication_id:
                     original_doi = enrich_doi
                     enrich_doi, _ = resolve_doi_conflict(
                         cur,
                         enrich_doi,
                         pub_meta["doc_type"],
                         pub_meta["title_normalized"],
-                        existing,
+                        existing_by_doi,
                     )
                     if enrich_doi != original_doi:
                         pub_meta["source_doi"] = original_doi

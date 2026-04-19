@@ -197,7 +197,7 @@ def extract_year(
             raw_hash = compute_hash(work)
             meta_hash = compute_meta_hash(work)
             batch.append(("openalex", oa_id, doi, Json(work), raw_hash, meta_hash))
-            if oa_id not in existing_ids:
+            if existing_ids is not None and oa_id not in existing_ids:
                 existing_ids.add(oa_id)
                 new_count += 1
 
