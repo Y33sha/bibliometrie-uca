@@ -194,3 +194,28 @@ def count_source_authorships_stats(cur: Any, source: str) -> tuple[int, int, int
     )
     with_structs = cur.fetchone()[0]
     return total, uca, with_structs
+
+
+class PgAffiliationsQueries:
+    """Adapter PostgreSQL pour `application.ports.affiliations.AffiliationsQueries`."""
+
+    def reset_source_authorships_for(self, cur: Any, source: str) -> int:
+        return reset_source_authorships_for(cur, source)
+
+    def set_in_perimeter_from_addresses(
+        self, cur: Any, *, source: str, perimeter_ids: list[int], daily: bool
+    ) -> int:
+        return set_in_perimeter_from_addresses(
+            cur, source=source, perimeter_ids=perimeter_ids, daily=daily
+        )
+
+    def set_structure_ids_from_addresses(
+        self, cur: Any, *, source: str, wide_ids: list[int], daily: bool
+    ) -> int:
+        return set_structure_ids_from_addresses(cur, source=source, wide_ids=wide_ids, daily=daily)
+
+    def set_theses_structure_ids(self, cur: Any, *, wide_ids: list[int], daily: bool) -> int:
+        return set_theses_structure_ids(cur, wide_ids=wide_ids, daily=daily)
+
+    def count_source_authorships_stats(self, cur: Any, source: str) -> tuple[int, int, int]:
+        return count_source_authorships_stats(cur, source)

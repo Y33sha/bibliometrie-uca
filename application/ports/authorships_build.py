@@ -1,0 +1,26 @@
+"""Port : SQL de construction de la table `authorships`.
+
+Implémenté par `infrastructure.db.queries.authorships_build.PgAuthorshipsBuildQueries`.
+"""
+
+from typing import Any, Protocol
+
+
+class AuthorshipsBuildQueries(Protocol):
+    """Opérations SQL pour promouvoir `source_authorships` → `authorships`."""
+
+    def insert_missing_authorships(self, cur: Any) -> int: ...
+
+    def link_source_authorships_to_authorship_for(self, cur: Any, source: str) -> int: ...
+
+    def propagate_author_position(self, cur: Any) -> int: ...
+
+    def propagate_is_corresponding(self, cur: Any) -> int: ...
+
+    def propagate_roles(self, cur: Any) -> int: ...
+
+    def reset_authorships_perimeter_and_structures(self, cur: Any) -> int: ...
+
+    def propagate_perimeter_and_structures_from(self, cur: Any, source: str) -> int: ...
+
+    def count_authorships_in_perimeter(self, cur: Any) -> int: ...

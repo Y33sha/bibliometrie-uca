@@ -13,64 +13,50 @@ Sources :
 1. persons.last_name + persons.first_name (source: 'persons')
 2. source_authorships.author_name_normalized (toutes sources)
 
-Le SQL est isolé dans `infrastructure/db/queries/name_forms.py`.
+L'orchestrateur dépend du port `NameFormsQueries`. Le point d'entrée CLI
+est dans `interfaces/cli/pipeline/populate_person_name_forms.py`.
 """
 
-import os
 from typing import Any
 
 from application.persons import compute_person_name_forms
+from application.ports.name_forms import NameFormsQueries
 from domain.sources import BIBLIO_SOURCES_SET as BIBLIO_SOURCES
-from infrastructure.db.connection import get_connection
-from infrastructure.db.queries.name_forms import (
-    create_temp_raw_forms_table,
-    delete_name_form,
-    drop_temp_raw_forms_table,
-    fetch_active_persons_names,
-    fetch_existing_name_forms,
-    fetch_normalized_forms_from_temp,
-    fetch_source_authorship_name_forms,
-    insert_name_form_with_merge,
-    insert_raw_forms_batch,
-    update_name_form,
-)
-from infrastructure.log import setup_logger
-
-log = setup_logger("populate_person_name_forms", os.path.join(os.path.dirname(__file__), "logs"))
-
 
 BATCH_SIZE = 5000
 
 
-def populate(conn: Any) -> Any:
-    cur = conn.cursor()
-
+def populate(cur: Any, conn: Any, queries: NameFormsQueries, logger: Any) -> None:
     triples = []
 
-    log.info("Source 1 : persons (prénom nom + nom prénom)")
-    for r in fetch_active_persons_names(cur):
+    logger.info("Source 1 : persons (prénom nom + nom prénom)")
+    for r in queries.fetch_active_persons_names(cur):
         fn = (r["first_name"] or "").strip()
         ln = r["last_name"].strip()
         for form in compute_person_name_forms(ln, fn):
             triples.append((form, r["id"], "persons"))
 
-    log.info("Source 2 : source_authorships.author_name_normalized (toutes sources)")
-    source_forms = fetch_source_authorship_name_forms(cur)
-    log.info(f"  {len(triples)} triplets persons + {len(source_forms)} formes source_authorships")
+    logger.info("Source 2 : source_authorships.author_name_normalized (toutes sources)")
+    source_forms = queries.fetch_source_authorship_name_forms(cur)
+    logger.info(
+        f"  {len(triples)} triplets persons + {len(source_forms)} formes source_authorships"
+    )
 
-    log.info("Normalisation des formes persons...")
-    create_temp_raw_forms_table(cur)
+    logger.info("Normalisation des formes persons...")
+    queries.create_temp_raw_forms_table(cur)
     batch: list[tuple[str, int, str]] = []
     for raw, pid, src in triples:
         batch.append((raw.strip(), pid, src))
         if len(batch) >= BATCH_SIZE:
-            insert_raw_forms_batch(cur, batch)
+            queries.insert_raw_forms_batch(cur, batch)
             batch = []
     if batch:
-        insert_raw_forms_batch(cur, batch)
+        queries.insert_raw_forms_batch(cur, batch)
 
-    new_forms = {r["name_form"]: r for r in fetch_normalized_forms_from_temp(cur) if r["name_form"]}
-    drop_temp_raw_forms_table(cur)
+    new_forms = {
+        r["name_form"]: r for r in queries.fetch_normalized_forms_from_temp(cur) if r["name_form"]
+    }
+    queries.drop_temp_raw_forms_table(cur)
 
     for r in source_forms:
         nf = r["name_form"]
@@ -88,10 +74,10 @@ def populate(conn: Any) -> Any:
                 "sources": [r["source"]],
             }
 
-    log.info(f"  {len(new_forms)} formes distinctes après fusion")
+    logger.info(f"  {len(new_forms)} formes distinctes après fusion")
 
-    existing = {r["name_form"]: r for r in fetch_existing_name_forms(cur)}
-    log.info(f"  {len(existing)} formes existantes en base")
+    existing = {r["name_form"]: r for r in queries.fetch_existing_name_forms(cur)}
+    logger.info(f"  {len(existing)} formes existantes en base")
 
     inserted = 0
     updated = 0
@@ -104,32 +90,24 @@ def populate(conn: Any) -> Any:
             if set(data["person_ids"]) != set(old["person_ids"]) or set(data["sources"]) != set(
                 old["sources"] or []
             ):
-                update_name_form(cur, old["id"], data["person_ids"], data["sources"])
+                queries.update_name_form(cur, old["id"], data["person_ids"], data["sources"])
                 updated += 1
         else:
-            insert_name_form_with_merge(cur, nf, data["person_ids"], data["sources"])
+            queries.insert_name_form_with_merge(cur, nf, data["person_ids"], data["sources"])
             inserted += 1
 
     for nf, old in existing.items():
         if nf not in new_forms:
             old_sources = set(old["sources"] or [])
             if not old_sources or old_sources <= BIBLIO_SOURCES:
-                delete_name_form(cur, old["id"])
+                queries.delete_name_form(cur, old["id"])
                 deleted += 1
             else:
                 preserved += 1
 
     conn.commit()
 
-    log.info(
+    logger.info(
         f"Terminé : {inserted} ajoutées, {updated} mises à jour, "
         f"{deleted} supprimées, {preserved} préservées"
     )
-
-
-if __name__ == "__main__":
-    conn = get_connection()
-    try:
-        populate(conn)
-    finally:
-        conn.close()

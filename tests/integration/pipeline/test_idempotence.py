@@ -1001,10 +1001,13 @@ class TestCreatePersonsIdempotence:
 
 def _run_build_authorships(db):
     """Exécute build_authorships sur le curseur de test (plain cursor)."""
+    import logging
+
     plain_cur = db.connection.cursor()
     from application.pipeline.build.build_authorships import build
+    from infrastructure.db.queries.authorships_build import PgAuthorshipsBuildQueries
 
-    build(plain_cur)
+    build(plain_cur, PgAuthorshipsBuildQueries(), logging.getLogger("test"))
 
 
 def _count_authorships_tables(db) -> dict:
@@ -1145,15 +1148,23 @@ def _setup_affiliations_test_data(db):
 
 def _run_populate_affiliations(db):
     """Exécute populate_affiliations sur le curseur de test."""
-    from application.pipeline.build.populate_affiliations import _step_address_source, step3d_theses
+    import logging
+
+    from application.pipeline.build.populate_affiliations import (
+        _step_address_source,
+        step3d_theses,
+    )
+    from infrastructure.db.queries.affiliations import PgAffiliationsQueries
     from infrastructure.perimeter import get_affiliations_structure_ids, get_persons_structure_ids
 
     perimeter_ids = get_persons_structure_ids(db)
     wide_ids = get_affiliations_structure_ids(db)
+    queries = PgAffiliationsQueries()
+    logger = logging.getLogger("test")
 
     for source in ["hal", "openalex", "wos", "scanr"]:
-        _step_address_source(db, source, perimeter_ids, wide_ids)
-    step3d_theses(db, wide_ids)
+        _step_address_source(db, queries, logger, source, perimeter_ids, wide_ids)
+    step3d_theses(db, queries, logger, wide_ids)
 
 
 def _count_affiliations(db) -> dict:
