@@ -11,6 +11,20 @@ Vit dans `infrastructure/` parce que ces fonctions génèrent du SQL
 """
 
 OA_OPEN_STATUSES = ("gold", "hybrid", "bronze", "green", "diamond")
+OA_CLOSED_STATUSES = ("closed", "unknown")
+
+
+def _sql_list(values: tuple[str, ...]) -> str:
+    """Formate un tuple de strings en liste SQL littérale `('a','b',...)`.
+
+    Utilisé pour injecter une liste de valeurs métier stables (constantes)
+    dans du SQL inline. Ne pas utiliser avec des valeurs utilisateur.
+    """
+    return "(" + ",".join(f"'{v}'" for v in values) + ")"
+
+
+OA_OPEN_SQL = _sql_list(OA_OPEN_STATUSES)
+OA_CLOSED_SQL = _sql_list(OA_CLOSED_STATUSES)
 
 # Filtre SQL : la publication a au moins un authorship dans le périmètre.
 # Exclut les peer_review et les personnes rejetées (fausses entités).
@@ -30,9 +44,7 @@ def apply_access_filter(conditions: list, params: list, access: str | None) -> N
         conditions.append("p.oa_status::text = ANY(%s)")
         params.append(list(OA_OPEN_STATUSES))
     elif access == "closed":
-        conditions.append(
-            "(p.oa_status::text = 'closed' OR p.oa_status IS NULL OR p.oa_status::text = 'unknown')"
-        )
+        conditions.append(f"(p.oa_status::text IN {OA_CLOSED_SQL} OR p.oa_status IS NULL)")
 
 
 def apply_oa_filter(conditions: list, params: list, oa_status: str | None) -> None:
@@ -175,13 +187,13 @@ def _build_hal_status_part(value: str, lab_hal_col: str | None, params: list) ->
         params.append(lab_hal_col)
         return (
             f"({_SQL_IN_COLLECTION} "
-            "AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown')))"
+            f"AND (p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL}))"
         )
     if value == "ok" and lab_hal_col is not None:
         params.append(lab_hal_col)
         return (
             f"({_SQL_IN_COLLECTION} "
-            "AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN ('closed', 'unknown'))"
+            f"AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN {OA_CLOSED_SQL})"
         )
     return None
 
