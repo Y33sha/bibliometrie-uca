@@ -26,11 +26,19 @@ le SQL est extrait des services. Ce qui reste :
   étant des `SELECT id WHERE id = %s` (OK en router selon Opus 4.7).
 
 ### 1.2 Factoriser la logique commune aux sources
-Créer des classes abstraites `BaseExtractor` / `BaseNormalizer` dans
-`infrastructure/sources/` pour isoler la boilerplate récurrente
-(pagination, insertion staging, hash, idempotence). Chaque source
-n'implémente plus que ses primitives (`build_query()`, `extract_id()`,
-`extract_doi()`, …).
+- [x] **SourceNormalizer** (`application/pipeline/normalize/base.py`) :
+  capture argparse + cycle connexion + --reset + comptage + boucle +
+  commit périodique + summary. Hooks pour variations (USE_DICT_CURSOR,
+  USE_SAVEPOINT, FETCH_SUB_BATCH, preload_caches, post_process).
+  5 normalizers migrés, chaque `main()` passe de 50-130 lignes à 10.
+- [x] **SourceExtractor** (`infrastructure/sources/base.py`) :
+  capture argparse + cycle connexion + existing_ids + try/except
+  (HTTPError, KeyboardInterrupt) + summary. Chaque source drive sa
+  propre itération (cursor / search_after / firstRecord / collections
+  × pages) via `extract_all()`. 5 extractors migrés.
+- [ ] Ajouter une nouvelle source (CrossRef, ArXiv, PubMed,
+  DataCite) : ne nécessite plus qu'un subclass + `load_config()` +
+  `extract_all()` côté extractor, `process_work()` côté normalizer.
 
 ### 1.3 Module `facets`
 La logique de facettes dynamiques est dupliquée entre plusieurs

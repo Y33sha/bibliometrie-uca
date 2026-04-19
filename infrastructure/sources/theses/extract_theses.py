@@ -22,14 +22,13 @@ import sys
 import time
 from typing import Any
 
-import requests
 from psycopg2.extras import Json
 
 from infrastructure.api_limits import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import get_api_base_urls, get_theses_etab_ppns
-from infrastructure.db.connection import get_connection
-from infrastructure.sources.common import compute_hash, get_existing_ids, setup_logger
+from infrastructure.sources.base import ExtractionStats, SourceExtractor, run_extractor
+from infrastructure.sources.common import compute_hash, setup_logger
 
 logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -164,70 +163,67 @@ def extract_ppn(
     return total, inserted, updated
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser(description="Extraction theses.fr → staging")
-    parser.add_argument("--soutenues", action="store_true", help="Thèses soutenues uniquement")
-    parser.add_argument("--en-cours", action="store_true", help="Thèses en cours uniquement")
-    parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
-    args = parser.parse_args()
-
-    # Déterminer les statuts à extraire
+def _resolve_statuses(args: argparse.Namespace) -> list[str]:
+    """Détermine les statuts à extraire depuis les args CLI."""
     if args.soutenues and args.en_cours:
-        statuses = ["soutenue", "enCours"]
-    elif args.soutenues:
-        statuses = ["soutenue"]
-    elif args.en_cours:
-        statuses = ["enCours"]
-    else:
-        statuses = ["soutenue", "enCours"]
+        return ["soutenue", "enCours"]
+    if args.soutenues:
+        return ["soutenue"]
+    if args.en_cours:
+        return ["enCours"]
+    return ["soutenue", "enCours"]
 
-    conn = get_connection()
-    cur = conn.cursor()
-    ppns = get_theses_etab_ppns(cur)
-    base_url = get_api_base_urls(cur).get("theses", "https://theses.fr/api/v1/theses/recherche/")
-    cur.close()
 
-    if not ppns:
-        logger.error("Aucun PPN configuré (clé 'theses_etab_ppns' dans config)")
-        conn.close()
-        sys.exit(1)
+class ThesesExtractor(SourceExtractor):
+    SOURCE = "theses"
+    DESCRIPTION = "Extraction theses.fr → staging"
 
-    logger.info("=== Extraction theses.fr démarrée ===")
-    logger.info(f"Établissements PPN : {ppns}")
-    logger.info(f"Statuts : {statuses}")
+    def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--soutenues", action="store_true", help="Thèses soutenues uniquement")
+        parser.add_argument("--en-cours", action="store_true", help="Thèses en cours uniquement")
 
-    try:
-        existing_ids = get_existing_ids(conn, "theses") if not args.dry_run else set()
-        logger.info(f"{len(existing_ids)} thèses déjà en staging")
+    def load_config(self, cur: Any) -> dict[str, Any]:
+        return {
+            "ppns": get_theses_etab_ppns(cur),
+            "base_url": get_api_base_urls(cur).get(
+                "theses", "https://theses.fr/api/v1/theses/recherche/"
+            ),
+        }
 
-        grand_total = 0
-        grand_inserted = 0
-        grand_updated = 0
+    def setup_logging(self, args: argparse.Namespace, config: dict[str, Any]) -> None:
+        if not config["ppns"]:
+            self.logger.error("Aucun PPN configuré (clé 'theses_etab_ppns' dans config)")
+            self.conn.close()
+            sys.exit(1)
+        self.logger.info(f"Établissements PPN : {config['ppns']}")
+        self.logger.info(f"Statuts : {_resolve_statuses(args)}")
 
-        for ppn in ppns:
-            for status in statuses:
+    def extract_all(
+        self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
+    ) -> ExtractionStats:
+        stats = ExtractionStats()
+        for ppn in config["ppns"]:
+            for status in _resolve_statuses(args):
                 total, inserted, updated = extract_ppn(
-                    ppn, conn, existing_ids, base_url, status=status, dry_run=args.dry_run
+                    ppn,
+                    self.conn,
+                    existing_ids,
+                    config["base_url"],
+                    status=status,
+                    dry_run=args.dry_run,
                 )
-                grand_total += total
-                grand_inserted += inserted
-                grand_updated += updated
+                stats.add(new=inserted, updated=updated, total=total)
+        return stats
 
-        logger.info("\n=== Terminé ===")
-        logger.info(f"Total API : {grand_total}")
-        logger.info(f"Nouveaux : {grand_inserted}")
-        logger.info(f"Mis à jour : {grand_updated}")
-        logger.info(f"En staging : {len(existing_ids)}")
+    def log_summary(self, stats: ExtractionStats, args: argparse.Namespace) -> None:
+        self.logger.info("\n=== Terminé ===")
+        self.logger.info(f"Total API : {stats.total}")
+        self.logger.info(f"Nouveaux : {stats.new}")
+        self.logger.info(f"Mis à jour : {stats.updated}")
 
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"Erreur API : {e}")
-        logger.error(f"Réponse : {e.response.text[:500] if e.response else 'N/A'}")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        logger.warning("Interruption — les données déjà insérées sont conservées.")
-        sys.exit(0)
-    finally:
-        conn.close()
+
+def main() -> None:
+    run_extractor(ThesesExtractor, logger)
 
 
 if __name__ == "__main__":

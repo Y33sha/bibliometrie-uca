@@ -13,11 +13,9 @@ Les works déjà présents (même openalex_id) sont ignorés.
 
 import argparse
 import os
-import sys
 import time
 from typing import Any
 
-import requests
 from psycopg2.extras import Json, execute_values
 
 from infrastructure.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
@@ -29,8 +27,8 @@ from infrastructure.app_config import (
     get_openalex_institution_ids,
     get_years,
 )
-from infrastructure.db.connection import get_connection
-from infrastructure.sources.common import compute_hash, get_existing_ids, setup_logger
+from infrastructure.sources.base import ExtractionStats, SourceExtractor, run_extractor
+from infrastructure.sources.common import compute_hash, setup_logger
 from infrastructure.sources.openalex import (
     SELECT_FIELDS,
     auth_params,
@@ -237,77 +235,71 @@ def extract_year(
     return total_new, total_updated
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser(description="Extraction OpenAlex → staging")
-    parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
-    parser.add_argument(
-        "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
-    )
-    parser.add_argument(
-        "--since",
-        help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents modifiés depuis cette date",
-    )
-    parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
-    args = parser.parse_args()
+class OpenalexExtractor(SourceExtractor):
+    SOURCE = "openalex"
+    DESCRIPTION = "Extraction OpenAlex → staging"
 
-    conn = get_connection()
-    cur = conn.cursor()
-    institution_ids = get_openalex_institution_ids(cur)
-    init_auth(api_key=get_openalex_api_key(cur), email=get_openalex_email(cur))
-    base_url = get_api_base_urls(cur).get("openalex", "https://api.openalex.org/works")
-    config_years = get_years(cur, mode=args.mode)
-    cur.close()
+    def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
+        parser.add_argument(
+            "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
+        )
+        parser.add_argument(
+            "--since",
+            help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents modifiés depuis cette date",
+        )
 
-    since = args.since
-    years = [args.year] if args.year else config_years
+    def load_config(self, cur: Any) -> dict[str, Any]:
+        institution_ids = get_openalex_institution_ids(cur)
+        init_auth(api_key=get_openalex_api_key(cur), email=get_openalex_email(cur))
+        return {
+            "institution_ids": institution_ids,
+            "base_url": get_api_base_urls(cur).get("openalex", "https://api.openalex.org/works"),
+        }
 
-    logger.info("=== Extraction OpenAlex démarrée ===")
-    logger.info(f"Institutions OpenAlex : {', '.join(institution_ids)} (lineage OR)")
-    if since:
-        logger.info(f"Mode incrémental : documents modifiés depuis {since}")
-    else:
-        logger.info(f"Années : {years}")
-    try:
-        existing_ids = get_existing_ids(conn, "openalex")
-        logger.info(f"{len(existing_ids)} works déjà en staging")
+    def setup_logging(self, args: argparse.Namespace, config: dict[str, Any]) -> None:
+        self.logger.info(
+            f"Institutions OpenAlex : {', '.join(config['institution_ids'])} (lineage OR)"
+        )
+        if args.since:
+            self.logger.info(f"Mode incrémental : documents modifiés depuis {args.since}")
 
-        grand_new = 0
-        grand_updated = 0
-        if since:
+    def extract_all(
+        self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
+    ) -> ExtractionStats:
+        with self.conn.cursor() as cur:
+            config_years = get_years(cur, mode=args.mode)
+        years = [args.year] if args.year else config_years
+        if not args.since:
+            self.logger.info(f"Années : {years}")
+
+        stats = ExtractionStats()
+        if args.since:
             year_new, year_updated = extract_year(
-                conn=conn,
+                conn=self.conn,
                 existing_ids=existing_ids,
-                base_url=base_url,
-                institution_ids=institution_ids,
-                since=since,
+                base_url=config["base_url"],
+                institution_ids=config["institution_ids"],
+                since=args.since,
                 dry_run=args.dry_run,
             )
-            grand_new += year_new
-            grand_updated += year_updated
+            stats.add(new=year_new, updated=year_updated)
         else:
             for year in years:
                 year_new, year_updated = extract_year(
                     year,
-                    conn,
+                    self.conn,
                     existing_ids,
-                    base_url=base_url,
-                    institution_ids=institution_ids,
+                    base_url=config["base_url"],
+                    institution_ids=config["institution_ids"],
                     dry_run=args.dry_run,
                 )
-            grand_new += year_new
-            grand_updated += year_updated
+                stats.add(new=year_new, updated=year_updated)
+        return stats
 
-        logger.info(f"=== Terminé : {grand_new} nouveaux, {grand_updated} mis à jour ===")
 
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"Erreur API : {e}")
-        logger.error(f"Réponse : {e.response.text[:500] if e.response else 'N/A'}")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        logger.warning("Interruption utilisateur — les données déjà insérées sont conservées.")
-        sys.exit(0)
-    finally:
-        conn.close()
+def main() -> None:
+    run_extractor(OpenalexExtractor, logger)
 
 
 if __name__ == "__main__":
