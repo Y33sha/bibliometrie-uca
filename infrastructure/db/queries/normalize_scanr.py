@@ -201,3 +201,113 @@ def get_scanr_publication_id(cur: Any, scanr_id: str) -> int | None:
     if row is None:
         return None
     return row["publication_id"] if isinstance(row, dict) else row[0]
+
+
+class PgScanrNormalizeQueries:
+    """Adapter PostgreSQL pour `application.ports.normalize_scanr.ScanrNormalizeQueries`."""
+
+    def upsert_scanr_source_publication(
+        self,
+        cur: Any,
+        *,
+        scanr_id: str,
+        doi: str | None,
+        title: str,
+        pub_year: int | None,
+        doc_type: str | None,
+        publication_id: int | None,
+        staging_id: int,
+        external_ids: Any,
+        journal_id: int | None,
+        oa_status: str | None,
+        language: str | None,
+        container_title: str | None,
+        abstract: str | None,
+        keywords: list[str] | None,
+        topics: Any,
+        cited_by_count: int | None,
+        urls: list[str] | None,
+    ) -> int:
+        return upsert_scanr_source_publication(
+            cur,
+            scanr_id=scanr_id,
+            doi=doi,
+            title=title,
+            pub_year=pub_year,
+            doc_type=doc_type,
+            publication_id=publication_id,
+            staging_id=staging_id,
+            external_ids=external_ids,
+            journal_id=journal_id,
+            oa_status=oa_status,
+            language=language,
+            container_title=container_title,
+            abstract=abstract,
+            keywords=keywords,
+            topics=topics,
+            cited_by_count=cited_by_count,
+            urls=urls,
+        )
+
+    def upsert_scanr_source_person_by_idref(
+        self,
+        cur: Any,
+        *,
+        idref: str,
+        full_name: str,
+        last_name: str | None,
+        first_name: str | None,
+        orcid: str | None,
+    ) -> int:
+        return upsert_scanr_source_person_by_idref(
+            cur,
+            idref=idref,
+            full_name=full_name,
+            last_name=last_name,
+            first_name=first_name,
+            orcid=orcid,
+        )
+
+    def find_scanr_source_person_by_name(
+        self, cur: Any, *, full_name: str, first_name: str | None
+    ) -> int | None:
+        return find_scanr_source_person_by_name(cur, full_name=full_name, first_name=first_name)
+
+    def insert_scanr_source_person_new(
+        self,
+        cur: Any,
+        *,
+        full_name: str,
+        last_name: str | None,
+        first_name: str | None,
+        orcid: str | None,
+    ) -> int:
+        return insert_scanr_source_person_new(
+            cur,
+            full_name=full_name,
+            last_name=last_name,
+            first_name=first_name,
+            orcid=orcid,
+        )
+
+    def upsert_scanr_source_authorship(
+        self,
+        cur: Any,
+        *,
+        source_publication_id: int,
+        source_person_id: int,
+        author_position: int,
+        roles: list[str] | None,
+        raw_author_name: str | None,
+    ) -> int:
+        return upsert_scanr_source_authorship(
+            cur,
+            source_publication_id=source_publication_id,
+            source_person_id=source_person_id,
+            author_position=author_position,
+            roles=roles,
+            raw_author_name=raw_author_name,
+        )
+
+    def get_scanr_publication_id(self, cur: Any, scanr_id: str) -> int | None:
+        return get_scanr_publication_id(cur, scanr_id)

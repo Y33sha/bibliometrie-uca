@@ -713,8 +713,8 @@ class HalNormalizer(SourceNormalizer):
     USE_SAVEPOINT = True
     FETCH_COLUMNS = "id, source_id, doi, raw_data, hal_collections"
 
-    def __init__(self, conn: Any, logger: Any) -> None:
-        super().__init__(conn, logger)
+    def __init__(self, conn: Any, logger: Any, staging_queries: Any) -> None:
+        super().__init__(conn, logger, staging_queries)
         self._struct_cache: dict[str, int] = {}
         self._struct_name_cache: dict[int, str] = {}
 

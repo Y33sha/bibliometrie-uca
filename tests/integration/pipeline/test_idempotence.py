@@ -218,7 +218,13 @@ def _count_tables(cur) -> dict:
 
 def _run_normalize_scanr(cur):
     """Exécute la normalisation ScanR sur le curseur de test."""
+    import logging
+
     from application.pipeline.normalize.normalize_scanr import process_work
+    from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
+
+    queries = PgScanrNormalizeQueries()
+    logger = logging.getLogger("test")
 
     cur.execute("""
         SELECT id, source_id AS scanr_id, doi, raw_data
@@ -229,7 +235,7 @@ def _run_normalize_scanr(cur):
     rows = cur.fetchall()
     processed = 0
     for row in rows:
-        if process_work(cur, row):
+        if process_work(cur, queries, logger, row):
             processed += 1
     return processed
 

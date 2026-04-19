@@ -8,9 +8,9 @@ Capture le boilerplate commun aux 5 normalizers existants :
 - boucle avec `try/rollback/continue` + commit périodique
 - logs de progression et summary
 
-Chaque source hérite et implémente `process_work()`. Points de variation
-exposés en hooks optionnels : type de curseur, savepoints, colonnes
-de fetch, pré-chargement de caches, post-processing, stats finales.
+L'accès au staging passe par le port `StagingQueries` (injecté par le
+point d'entrée CLI dans `interfaces/cli/pipeline/`). Chaque source hérite
+et implémente `process_work()`.
 """
 
 from __future__ import annotations
@@ -21,14 +21,7 @@ from typing import Any, ClassVar
 
 from psycopg2.extras import RealDictCursor
 
-from infrastructure.db.connection import get_connection
-from infrastructure.db.queries.staging import (
-    count_pending_staging,
-    fetch_pending_staging,
-    fetch_pending_staging_ids,
-    fetch_staging_by_ids,
-    reset_processed_flag,
-)
+from application.ports.staging import StagingQueries
 
 
 class SourceNormalizer(ABC):
@@ -55,9 +48,10 @@ class SourceNormalizer(ABC):
     FETCH_SUB_BATCH: ClassVar[int | None] = None
     FETCH_COLUMNS: ClassVar[str] = "id, source_id, doi, raw_data"
 
-    def __init__(self, conn: Any, logger: Any) -> None:
+    def __init__(self, conn: Any, logger: Any, staging_queries: StagingQueries) -> None:
         self.conn = conn
         self.logger = logger
+        self._staging = staging_queries
 
     # ── Hooks métier ────────────────────────────────────────────
 
@@ -102,23 +96,25 @@ class SourceNormalizer(ABC):
         return self.conn.cursor()
 
     def _reset(self, cur: Any) -> int:
-        return reset_processed_flag(cur, self.SOURCE)
+        return self._staging.reset_processed_flag(cur, self.SOURCE)
 
     def _count_pending(self, cur: Any) -> int:
-        return count_pending_staging(cur, self.SOURCE)
+        return self._staging.count_pending_staging(cur, self.SOURCE)
 
     def _iter_rows(self, cur: Any, limit: int) -> Any:
         """Itère les lignes à traiter. Peut faire un fetch en un coup ou par sous-lots."""
         if self.FETCH_SUB_BATCH is None:
-            yield from fetch_pending_staging(
+            yield from self._staging.fetch_pending_staging(
                 cur, self.SOURCE, columns=self.FETCH_COLUMNS, limit=limit
             )
             return
 
-        work_ids = fetch_pending_staging_ids(cur, self.SOURCE, limit=limit)
+        work_ids = self._staging.fetch_pending_staging_ids(cur, self.SOURCE, limit=limit)
         for start in range(0, len(work_ids), self.FETCH_SUB_BATCH):
             batch_ids = work_ids[start : start + self.FETCH_SUB_BATCH]
-            yield from fetch_staging_by_ids(cur, batch_ids, columns=self.FETCH_COLUMNS)
+            yield from self._staging.fetch_staging_by_ids(
+                cur, batch_ids, columns=self.FETCH_COLUMNS
+            )
 
     def _process_one(self, cur: Any, row: Any) -> bool | None:
         """Enveloppe process_work avec SAVEPOINT optionnel."""
@@ -217,6 +213,14 @@ class SourceNormalizer(ABC):
 
 
 def run_normalizer(cls: type[SourceNormalizer], logger: Any) -> None:
-    """Helper pour les entry points : instancie et lance."""
+    """Shim de transition pour les normalizers pas encore migrés (theses, OA, WoS, HAL).
+
+    Instancie la connexion et l'adapter staging. À supprimer quand tous les
+    normalizers auront leur propre entry point dans `interfaces/cli/pipeline/`
+    qui injecte à la fois `StagingQueries` et le port spécifique à la source.
+    """
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.staging import PgStagingQueries
+
     conn = get_connection()
-    cls(conn, logger).run()
+    cls(conn, logger, PgStagingQueries()).run()  # type: ignore[call-arg]
