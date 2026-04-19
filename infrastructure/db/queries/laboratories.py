@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from infrastructure.db.queries.filters import (
+    OA_CLOSED_SQL,
     apply_person_has_identifier_filter,
     apply_person_has_rh_filter,
     persons_sort_clause,
@@ -338,9 +339,9 @@ def get_laboratory_dashboard(cur: Any, lab_id: int) -> dict[str, Any]:
     pubs_by_year = [{"year": r["pub_year"], "count": r["count"]} for r in cur.fetchall()]
 
     cur.execute(
-        """
+        f"""
         SELECT
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status NOT IN ('closed', 'unknown') AND p.oa_status IS NOT NULL) AS open_access,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status NOT IN {OA_CLOSED_SQL} AND p.oa_status IS NOT NULL) AS open_access,
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown' OR p.oa_status IS NULL) AS unknown,
             COUNT(DISTINCT p.id) AS total

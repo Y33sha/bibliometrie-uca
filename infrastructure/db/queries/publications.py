@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from infrastructure.db.queries.filters import (
+    OA_CLOSED_SQL,
+    OA_OPEN_SQL,
     OA_OPEN_STATUSES,
     PUB_IS_UCA,
     apply_access_filter,
@@ -627,8 +629,8 @@ class _PublicationFacetsBuilder:
         self.cur.execute(
             f"""
             SELECT
-                COUNT(*) FILTER (WHERE p.oa_status::text IN ('gold','hybrid','bronze','green','diamond')) AS open_count,
-                COUNT(*) FILTER (WHERE p.oa_status::text IN ('closed','unknown') OR p.oa_status IS NULL) AS closed_count
+                COUNT(*) FILTER (WHERE p.oa_status::text IN {OA_OPEN_SQL}) AS open_count,
+                COUNT(*) FILTER (WHERE p.oa_status::text IN {OA_CLOSED_SQL} OR p.oa_status IS NULL) AS closed_count
             FROM publications p
             WHERE {self._where_sql(c)}
             """,
@@ -830,14 +832,14 @@ class _PublicationFacetsBuilder:
                         SELECT 1 FROM source_publications sd
                         WHERE sd.publication_id = p.id AND sd.source = 'hal'
                           AND sd.hal_collections @> ARRAY[%s]
-                    ) AND (p.oa_status IS NULL OR p.oa_status::text IN ('closed', 'unknown'))
+                    ) AND (p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL})
                     ) AS notice,
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM source_publications sd
                         WHERE sd.publication_id = p.id AND sd.source = 'hal'
                           AND sd.hal_collections @> ARRAY[%s]
                     ) AND p.oa_status IS NOT NULL
-                      AND p.oa_status::text NOT IN ('closed', 'unknown')
+                      AND p.oa_status::text NOT IN {OA_CLOSED_SQL}
                     ) AS ok
                 FROM publications p
                 WHERE {self._where_sql(c)}

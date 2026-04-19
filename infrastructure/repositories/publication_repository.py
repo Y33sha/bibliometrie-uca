@@ -12,6 +12,7 @@ from domain.publication import (  # noqa: F401 — re-export pour compat
     PubByTitle,
     PubThesisCandidate,
 )
+from infrastructure.db.queries.filters import OA_CLOSED_SQL
 from infrastructure.db_helpers import row_val as _val
 
 
@@ -343,14 +344,14 @@ class PgPublicationRepository:
         src = self._cur.fetchone()
         self._cur.execute("UPDATE publications SET doi = NULL WHERE id = %s", (source_id,))
         self._cur.execute(
-            """
+            f"""
             UPDATE publications SET
                 doi = COALESCE(doi, LOWER(%s)),
                 journal_id = COALESCE(journal_id, %s),
                 oa_status = CASE
                     WHEN %s = 'diamond' THEN 'diamond'::oa_type
-                    WHEN oa_status IN ('unknown', 'closed')
-                        AND %s NOT IN ('unknown', 'closed')
+                    WHEN oa_status IN {OA_CLOSED_SQL}
+                        AND %s NOT IN {OA_CLOSED_SQL}
                     THEN %s::oa_type ELSE oa_status END,
                 language = COALESCE(language, %s),
                 container_title = COALESCE(container_title, %s),
