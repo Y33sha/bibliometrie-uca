@@ -18,6 +18,7 @@ import requests
 from application.journals import reset_journal_apc, update_journal_apc
 from infrastructure.api_limits import DOAJ_DELAY
 from infrastructure.db.connection import get_connection
+from infrastructure.db.queries.enrich import fetch_journals_needing_apc
 from infrastructure.log import setup_logger
 
 logger = setup_logger("enrich_journal_apc", os.path.join(os.path.dirname(__file__), "logs"))
@@ -127,19 +128,7 @@ def main() -> Any:
             conn.commit()
             logger.info(f"Reset : {count} revues réinitialisées.")
 
-        # Sélectionner les revues avec openalex_id et sans APC renseigné
-        query = """
-            SELECT id, openalex_id
-            FROM journals
-            WHERE openalex_id IS NOT NULL
-              AND apc_amount IS NULL
-            ORDER BY id
-        """
-        if args.limit:
-            query += f" LIMIT {args.limit}"
-
-        cur.execute(query)
-        journals = cur.fetchall()
+        journals = fetch_journals_needing_apc(cur, limit=args.limit)
         total = len(journals)
         logger.info(f"{total} revues à traiter (avec openalex_id, sans APC).")
 

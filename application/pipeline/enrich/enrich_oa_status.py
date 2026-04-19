@@ -24,6 +24,7 @@ import requests
 from application.publications import update_oa_status
 from infrastructure.api_limits import UNPAYWALL_DELAY
 from infrastructure.db.connection import get_connection
+from infrastructure.db.queries.enrich import fetch_publications_with_doi
 from infrastructure.log import setup_logger
 
 log = setup_logger("enrich_oa_unpaywall", os.path.join(os.path.dirname(__file__), "logs"))
@@ -85,17 +86,7 @@ def main() -> Any:
     conn = get_connection()
     cur = conn.cursor()
 
-    # Trouver les publis avec DOI (toutes, pas seulement unknown)
-    query = """
-        SELECT id, doi, oa_status::text FROM publications
-        WHERE doi IS NOT NULL
-        ORDER BY pub_year DESC, id
-    """
-    if args.limit:
-        query += f" LIMIT {args.limit}"
-
-    cur.execute(query)
-    pubs = cur.fetchall()
+    pubs = fetch_publications_with_doi(cur, limit=args.limit)
     total = len(pubs)
     log.info(f"{total} publications avec DOI à vérifier sur Unpaywall")
 
