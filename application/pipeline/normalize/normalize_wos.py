@@ -31,6 +31,20 @@ from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
 from domain.publication import clean_doi
+from infrastructure.db.queries.normalize_wos import (
+    fetch_address_ids_by_raw_text,
+    fetch_source_authorship_ids,
+    fetch_wos_source_persons_with_daisng,
+    fetch_wos_source_structures,
+    get_wos_publication_id,
+    insert_source_authorship_addresses_batch,
+    upsert_addresses_batch,
+    upsert_wos_source_authorships_batch,
+    upsert_wos_source_person,
+    upsert_wos_source_persons_batch,
+    upsert_wos_source_publication,
+    upsert_wos_source_structure,
+)
 from infrastructure.db_helpers import mark_staging_done
 from infrastructure.log import setup_logger
 
@@ -452,58 +466,27 @@ def insert_wos_document(
     urls = rec.get("urls")
     external_ids = Json(rec["external_ids"]) if rec.get("external_ids") else None
 
-    cur.execute(
-        """
-        INSERT INTO source_publications
-            (source, source_id, doi, title, pub_year, doc_type,
-             publication_id, staging_id,
-             journal_id, oa_status, language, container_title,
-             abstract, cited_by_count, biblio, keywords, topics,
-             urls, external_ids)
-        VALUES ('wos', %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s, %s, %s,
-                %s, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            publication_id = COALESCE(
-                source_publications.publication_id, EXCLUDED.publication_id
-            ),
-            doc_type = COALESCE(EXCLUDED.doc_type, source_publications.doc_type),
-            journal_id = COALESCE(EXCLUDED.journal_id, source_publications.journal_id),
-            oa_status = COALESCE(EXCLUDED.oa_status, source_publications.oa_status),
-            language = COALESCE(EXCLUDED.language, source_publications.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_publications.container_title),
-            abstract = COALESCE(EXCLUDED.abstract, source_publications.abstract),
-            cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_publications.cited_by_count, 0)),
-            biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
-            keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
-            topics = COALESCE(EXCLUDED.topics, source_publications.topics),
-            urls = COALESCE(EXCLUDED.urls, source_publications.urls),
-            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
-        RETURNING id
-    """,
-        (
-            rec["ut"],
-            rec["doi"],
-            rec["title"],
-            rec["pub_year"],
-            rec["doc_type"],
-            publication_id,
-            staging_id,
-            journal_id,
-            oa_status,
-            language,
-            container_title,
-            abstract,
-            cited_by_count,
-            biblio,
-            keywords,
-            topics,
-            urls,
-            external_ids,
-        ),
+    return upsert_wos_source_publication(
+        cur,
+        ut=rec["ut"],
+        doi=rec["doi"],
+        title=rec["title"],
+        pub_year=rec["pub_year"],
+        doc_type=rec["doc_type"],
+        publication_id=publication_id,
+        staging_id=staging_id,
+        journal_id=journal_id,
+        oa_status=oa_status,
+        language=language,
+        container_title=container_title,
+        abstract=abstract,
+        cited_by_count=cited_by_count,
+        biblio=biblio,
+        keywords=keywords,
+        topics=topics,
+        urls=urls,
+        external_ids=external_ids,
     )
-    return cur.fetchone()[0]
 
 
 # =============================================================
@@ -543,21 +526,15 @@ def upsert_wos_author(cur: Any, author: dict) -> int | None:
         source_ids["researcher_id"] = researcher_id
     source_ids_json = Json(source_ids) if source_ids else None
 
-    cur.execute(
-        """
-        INSERT INTO source_persons
-            (source, source_id, full_name, last_name, first_name, orcid, source_ids)
-        VALUES ('wos', %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
-            full_name = EXCLUDED.full_name,
-            source_ids = COALESCE(source_persons.source_ids, '{}') ||
-                         COALESCE(EXCLUDED.source_ids, '{}')
-        RETURNING id
-    """,
-        (daisng_id, full_name, last_name, first_name, orcid, source_ids_json),
+    result = upsert_wos_source_person(
+        cur,
+        daisng_id=daisng_id,
+        full_name=full_name,
+        last_name=last_name,
+        first_name=first_name,
+        orcid=orcid,
+        source_ids_json=source_ids_json,
     )
-    result = cur.fetchone()[0]
     _wos_author_cache[daisng_id] = result
     return result
 
@@ -574,23 +551,9 @@ def _resolve_addresses_batch(cur: Any, raw_texts: set) -> dict[str, int]:
     """
     if not raw_texts:
         return {}
-    from psycopg2.extras import execute_values as _ev
-
-    # Batch INSERT (ON CONFLICT sur md5(raw_text) pour les existantes)
     values = [(t, normalize_text(t)) for t in raw_texts]
-    _ev(
-        cur,
-        """
-        INSERT INTO addresses (raw_text, normalized_text)
-        VALUES %s
-        ON CONFLICT (md5(raw_text)) DO NOTHING
-    """,
-        values,
-    )
-
-    # Récupérer tous les IDs en un seul SELECT
-    cur.execute("SELECT raw_text, id FROM addresses WHERE raw_text = ANY(%s)", (list(raw_texts),))
-    return {r[0]: r[1] for r in cur.fetchall()}
+    upsert_addresses_batch(cur, values)
+    return fetch_address_ids_by_raw_text(cur, list(raw_texts))
 
 
 _wos_institution_cache: dict[str, int] = {}
@@ -606,17 +569,7 @@ def upsert_wos_institution(cur: Any, org: dict) -> int | None:
         return _wos_institution_cache[name]
 
     ror_id = org.get("ror_id")
-    cur.execute(
-        """
-        INSERT INTO source_structures (source, source_id, name, ror_id)
-        VALUES ('wos', %s, %s, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            ror_id = COALESCE(source_structures.ror_id, EXCLUDED.ror_id)
-        RETURNING id
-    """,
-        (name, name, ror_id),
-    )
-    result = cur.fetchone()[0]
+    result = upsert_wos_source_structure(cur, name=name, ror_id=ror_id)
     _wos_institution_cache[name] = result
     return result
 
@@ -635,9 +588,6 @@ def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
             upsert_wos_institution(cur, {"name": org_name})
 
     # Phase 1 : résoudre tous les auteurs (batch upsert source_persons)
-    from psycopg2.extras import execute_values as _ev
-
-    # Séparer les auteurs déjà en cache de ceux à insérer
     authors_resolved = []  # [(author_dict, source_person_id)]
     authors_to_insert = []  # [(author_dict, daisng_id, ...)]
     for author in rec.get("authors", []):
@@ -672,23 +622,8 @@ def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
                     )
                 )
 
-        _ev(
-            cur,
-            """
-            INSERT INTO source_persons
-                (source, source_id, full_name, last_name, first_name, orcid, source_ids)
-            VALUES %s
-            ON CONFLICT (source, source_id) DO UPDATE SET
-                orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
-                full_name = EXCLUDED.full_name,
-                source_ids = COALESCE(source_persons.source_ids, '{}'::jsonb) ||
-                             COALESCE(EXCLUDED.source_ids, '{}'::jsonb)
-            RETURNING id, source_id
-        """,
-            deduped,
-        )
-        for row in cur.fetchall():
-            _wos_author_cache[row[1]] = row[0]
+        for pid, src_id in upsert_wos_source_persons_batch(cur, deduped):
+            _wos_author_cache[src_id] = pid
 
         # Résoudre les auteurs insérés
         for a in authors_to_insert:
@@ -729,29 +664,7 @@ def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
             author["full_name"],
         )
 
-    _ev(
-        cur,
-        """
-        INSERT INTO source_authorships
-            (source, source_publication_id, source_person_id, author_position,
-             is_corresponding, author_name_normalized,
-             source_struct_ids, roles, raw_author_name)
-        VALUES %s
-        ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
-            is_corresponding = EXCLUDED.is_corresponding OR source_authorships.is_corresponding,
-            author_name_normalized = COALESCE(
-                EXCLUDED.author_name_normalized,
-                source_authorships.author_name_normalized
-            ),
-            source_struct_ids = COALESCE(
-                EXCLUDED.source_struct_ids,
-                source_authorships.source_struct_ids
-            ),
-            roles = EXCLUDED.roles,
-            raw_author_name = EXCLUDED.raw_author_name
-    """,
-        list(values.values()),
-    )
+    upsert_wos_source_authorships_batch(cur, list(values.values()))
 
     # Phase 3 : batch adresses (source_authorship_addresses)
     authors_with_addrs = [(a, said) for a, said in author_ids if a.get("addresses")]
@@ -766,14 +679,9 @@ def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
 
         # Récupérer les sa_id
         sa_ids_needed = [said for _, said in authors_with_addrs]
-        cur.execute(
-            """
-            SELECT source_person_id, id FROM source_authorships
-            WHERE source_publication_id = %s AND source_person_id = ANY(%s)
-        """,
-            (source_publication_id, sa_ids_needed),
+        sa_id_map = fetch_source_authorship_ids(
+            cur, source_publication_id=source_publication_id, source_person_ids=sa_ids_needed
         )
-        sa_id_map = {r[0]: r[1] for r in cur.fetchall()}
 
         # Construire les liens
         addr_values = []
@@ -786,16 +694,7 @@ def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
                 if addr_id:
                     addr_values.append((sa_id, addr_id))
 
-        if addr_values:
-            _ev(
-                cur,
-                """
-                INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
-                VALUES %s
-                ON CONFLICT (source_authorship_id, address_id) DO NOTHING
-            """,
-                addr_values,
-            )
+        insert_source_authorship_addresses_batch(cur, addr_values)
 
 
 # =============================================================
@@ -829,13 +728,7 @@ def process_record(cur: Any, staging_row: tuple) -> bool:
         publication_id = None
 
         # Idempotence : réutiliser le publication_id existant
-        cur.execute(
-            "SELECT publication_id FROM source_publications WHERE source = 'wos' AND source_id = %s",
-            (rec["ut"],),
-        )
-        existing_doc = cur.fetchone()
-        if existing_doc and existing_doc[0]:
-            publication_id = existing_doc[0]
+        publication_id = get_wos_publication_id(cur, rec["ut"])
 
         # Recherche par DOI/titre (sans création)
         if not publication_id:
@@ -877,15 +770,10 @@ class WosNormalizer(SourceNormalizer):
     FETCH_COLUMNS = "id, source_id AS ut, doi, raw_data"
 
     def preload_caches(self, cur: Any) -> None:
-        cur.execute("SELECT source_id, id FROM source_structures WHERE source = 'wos'")
-        for r in cur.fetchall():
-            _wos_institution_cache[r[0]] = r[1]
-        cur.execute(
-            "SELECT source_id, id FROM source_persons WHERE source = 'wos' "
-            "AND source_id NOT LIKE 'wos-%%'"
-        )
-        for r in cur.fetchall():
-            _wos_author_cache[r[0]] = r[1]
+        for src_id, pid in fetch_wos_source_structures(cur):
+            _wos_institution_cache[src_id] = pid
+        for src_id, pid in fetch_wos_source_persons_with_daisng(cur):
+            _wos_author_cache[src_id] = pid
         self.logger.info(
             f"Cache WoS : {len(_wos_institution_cache)} institutions, "
             f"{len(_wos_author_cache)} auteurs"
