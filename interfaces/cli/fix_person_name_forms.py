@@ -64,10 +64,10 @@ def fix(conn, dry_run=False, person_id=None):
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     # Collecter les (name_form, person_id, sources) attendus
-    expected = {}  # (name_form, person_id) -> set(sources)
+    expected: dict[tuple[str, int], set[str]] = {}  # (name_form, person_id) -> set(sources)
     for source_name, query in SOURCES:
         q = query
-        params = ()
+        params: tuple = ()
         if person_id is not None:
             q += " AND person_id = %s"
             params = (person_id,)

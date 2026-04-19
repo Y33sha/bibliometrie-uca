@@ -71,7 +71,7 @@ def main():
     rows = cur.fetchall()
     changes = {}
     stats = {"total": len(rows), "changed": 0, "unchanged": 0}
-    change_details = {}  # (old, new) → count
+    change_details: dict[tuple[str, str], int] = {}  # (old, new) → count
 
     for pub_id, current_type, hal_types, oa_types, wos_types in rows:
         candidates = []

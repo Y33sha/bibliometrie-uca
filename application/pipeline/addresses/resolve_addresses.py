@@ -79,7 +79,7 @@ def match_form_in_text(form, text_normalized):
 
 def build_forms_by_structure(forms):
     """Index : structure_id → [forms]."""
-    idx = {}
+    idx: dict[int, list] = {}
     for f in forms:
         idx.setdefault(f["structure_id"], []).append(f)
     return idx
@@ -228,7 +228,7 @@ def process_addresses(cur, conn, rows, forms, forms_by_structure, perimeter):
                 AND matched_form_id IS NOT NULL
                 AND structure_id != ALL(%s)
             """
-            obsolete_params = (addr_id, list(detected_structure_ids))
+            obsolete_params: tuple = (addr_id, list(detected_structure_ids))
         else:
             obsolete_condition = """
                 address_id = %s
