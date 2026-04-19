@@ -59,20 +59,31 @@ Ajouter au fur et à mesure : `ROR`, `RNSR` (identifiants de structure),
 normalisation explicite émerge.
 
 ### 1.6 Inversion de dépendance complète
-Aujourd'hui `application/` importe des factories depuis
-`infrastructure.repositories`. Pour une inversion canonique, injecter
-les repositories via FastAPI `Depends` (et équivalent côté pipeline).
-Gain concret : tests unitaires de services sans base. À faire si la
-couverture de tests devient un objectif.
+- [x] **Extraction SQL des scripts pipeline vers `infrastructure/db/queries/`**
+  (branche `feature/pipeline-di`, 13 commits atomiques). 153 `cur.execute`
+  dispersés dans `application/pipeline/*` → 9 restants (tous des SAVEPOINT
+  de contrôle de transaction). Nouveaux modules par sous-dossier :
+  `countries`, `address_resolution`, `enrich`, `harvest`, `merge`,
+  `publications_create` + `persons_create`, `authorships_build` +
+  `affiliations` + `name_forms`, `staging` + `normalize_{scanr,theses,
+  openalex,wos,hal}`. Même pattern que §1.1 pour les routers : chaque
+  orchestrateur pipeline ne contient plus que de la logique Python pure
+  (parsing, boucles, conditions métier) et délègue la persistance.
+- [ ] Reste : injection canonique via ports (Protocol) + factories
+  FastAPI `Depends` côté API, équivalent unit-of-work côté pipeline.
+  À faire si la couverture de tests devient un objectif. Avec §1.6
+  comme socle, le pas restant est mécanique (aucun SQL à déplacer,
+  juste passer les query services en paramètre).
 
 ### 1.7 Verrouiller les acquis : import-linter
 - [x] Contrats initiaux dans `pyproject.toml` (`[tool.importlinter]`),
   vérifiés en pre-commit + CI. 4 contrats `forbidden` qui verrouillent :
   (1) domain = noyau pur, (2) application ↛ interfaces,
   (3) infrastructure ↛ interfaces, (4) infrastructure ↛ application.
-- [ ] Durcir en contrat `layered` strict — bloqué par §1.6 (DI complète) :
-  63 imports `application → infrastructure.*` à retirer avant. Revisiter
-  quand §1.6 avance.
+- [ ] Durcir en contrat `layered` strict — toujours bloqué par la DI
+  canonique (§1.6 partie 2) : le SQL est extrait, mais `application/`
+  importe encore les query services depuis `infrastructure.db.queries`.
+  À faire quand les ports seront posés.
 
 ### 1.8 Audit périodique
 Parcours régulier pour repérer : SQL mal placé, dépendances dans le

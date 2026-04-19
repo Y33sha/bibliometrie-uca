@@ -6,6 +6,7 @@ Chaque test tourne dans une transaction rollbackée (isolation complète).
 """
 
 from application.persons import add_identifier, add_name_form, create_person
+from infrastructure.db.queries.persons_create import fetch_name_form_map
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -206,7 +207,6 @@ class TestStep0HalAccounts:
         """hal_author vierge → ignoré en passe 0, rattaché par nom en passe 3."""
         from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
-            load_name_form_map,
             step0_hal_accounts,
             step3_name_forms,
         )
@@ -231,7 +231,7 @@ class TestStep0HalAccounts:
         assert _get_person_id_of_hal_authorship(db, has_id) is None
 
         # Passe 3 : rattaché par nom
-        name_form_map = load_name_form_map(db)
+        name_form_map = fetch_name_form_map(db)
         step3_name_forms(db, all_as, linked_ids, name_form_map, dry_run=False)
         assert _get_person_id_of_hal_authorship(db, has_id) == person_id
 
@@ -446,7 +446,6 @@ class TestStep3NameForms:
         """Forme de nom connue, mappée à 1 personne → rattache."""
         from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
-            load_name_form_map,
             step3_name_forms,
         )
 
@@ -462,7 +461,7 @@ class TestStep3NameForms:
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
-        name_form_map = load_name_form_map(db)
+        name_form_map = fetch_name_form_map(db)
         step3_name_forms(db, all_as, linked_ids, name_form_map, dry_run=False)
 
         assert _get_person_id_of_oa_authorship(db, oa_as) == person_id
@@ -471,7 +470,6 @@ class TestStep3NameForms:
         """Forme de nom mappée à 2 personnes → orphelin."""
         from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
-            load_name_form_map,
             step3_name_forms,
         )
 
@@ -488,7 +486,7 @@ class TestStep3NameForms:
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
-        name_form_map = load_name_form_map(db)
+        name_form_map = fetch_name_form_map(db)
         step3_name_forms(db, all_as, linked_ids, name_form_map, dry_run=False)
 
         # Doit rester orphelin
@@ -498,7 +496,6 @@ class TestStep3NameForms:
         """Forme de nom inconnue → crée une nouvelle personne."""
         from application.pipeline.create.create_persons_from_source_authorships import (
             get_all_unlinked_authorships,
-            load_name_form_map,
             step3_name_forms,
         )
 
@@ -511,7 +508,7 @@ class TestStep3NameForms:
 
         all_as = get_all_unlinked_authorships(db)
         linked_ids = set()
-        name_form_map = load_name_form_map(db)
+        name_form_map = fetch_name_form_map(db)
         step3_name_forms(db, all_as, linked_ids, name_form_map, dry_run=False)
 
         pid = _get_person_id_of_oa_authorship(db, oa_as)

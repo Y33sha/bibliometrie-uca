@@ -28,6 +28,8 @@ Algorithme en 4 étapes + 1 étape complémentaire :
   Étape 4 : Presonnes liées aux thèses (directeurs, rapporteurs, jury)
     Les rôles non-auteur des thèses sont hors périmètre (in_perimeter=false: pas de signatures ni de structure_ids) et ne passent pas par les étapes 0-3. Si leur source_author a un IdRef correspondant à une personne connue, on rattache sans modifier in_perimeter ni créer de personne.
 
+Le SQL est isolé dans `infrastructure/db/queries/persons_create.py`.
+
 Usage:
     python create_persons_from_source_authorships.py              # exécuter
     python create_persons_from_source_authorships.py --dry-run    # dry-run
@@ -37,8 +39,6 @@ import argparse
 import os
 from collections import defaultdict
 from typing import Any
-
-from psycopg2.extras import RealDictCursor
 
 from application.persons import (
     add_identifiers_from_authorships as add_identifiers,
@@ -53,6 +53,19 @@ from application.persons import (
 from domain.names import names_compatible, parse_raw_author_name
 from domain.normalize import normalize_name
 from infrastructure.db.connection import get_connection
+from infrastructure.db.queries.persons_create import (
+    fetch_hal_account_to_person_map,
+    fetch_idref_to_person_map,
+    fetch_linked_authorships_openalex,
+    fetch_linked_authorships_structured,
+    fetch_name_form_map,
+    fetch_orcid_to_person_map,
+    fetch_unlinked_hal_authorships,
+    fetch_unlinked_openalex_authorships,
+    fetch_unlinked_scanr_authorships,
+    fetch_unlinked_theses_authorships,
+    fetch_unlinked_wos_authorships,
+)
 from infrastructure.log import setup_logger
 
 logger = setup_logger("create_persons", os.path.join(os.path.dirname(__file__), "logs"))
@@ -63,127 +76,17 @@ logger = setup_logger("create_persons", os.path.join(os.path.dirname(__file__), 
 # ---------------------------------------------------------------------------
 
 
-def get_all_unlinked_authorships(cur: Any) -> Any:
-    """Récupère toutes les authorships UCA sans person_id, toutes sources."""
-    # HAL
-    cur.execute("""
-        SELECT sa_auth.id AS authorship_id, 'hal' AS source,
-               sa_auth.raw_author_name AS full_name, sa.last_name, sa.first_name,
-               sa.orcid,
-               sa.source_ids->>'idhal' AS idhal,
-               sa.idref,
-               sa.id AS source_person_id,
-               ((sa.source_ids->>'hal_person_id') IS NOT NULL) AS has_hal_person_id,
-               (sa.source_ids->>'hal_person_id')::int AS hal_person_id,
-               sd.publication_id,
-               sa_auth.author_position
-        FROM source_authorships sa_auth
-        JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-        JOIN v_active_publications vap ON vap.id = sd.publication_id
-        WHERE sa_auth.source = 'hal'
-          AND sa_auth.person_id IS NULL
-          AND sa_auth.in_perimeter = TRUE
-          AND sd.publication_id IS NOT NULL
-    """)
-    hal_rows = cur.fetchall()
+def get_all_unlinked_authorships(cur: Any) -> list[dict[str, Any]]:
+    """Charge les authorships UCA sans person_id (toutes sources) et les enrichit
+    (parsing noms, filtrage ORCID OpenAlex, flag allow_create)."""
+    hal_rows = fetch_unlinked_hal_authorships(cur)
+    oa_rows = fetch_unlinked_openalex_authorships(cur)
+    wos_rows = fetch_unlinked_wos_authorships(cur)
+    scanr_rows = fetch_unlinked_scanr_authorships(cur)
+    theses_rows = fetch_unlinked_theses_authorships(cur)
 
-    # OpenAlex
-    # L'ORCID n'est remonté que si raw_author_name est compatible avec
-    # le display_name de l'entité auteur OA (l'algo OA fusionne parfois
-    # des personnes différentes, attribuant un ORCID erroné).
-    cur.execute("""
-        SELECT sa_auth.id AS authorship_id, 'openalex' AS source,
-               sa_auth.raw_author_name AS full_name,
-               NULL::text AS last_name, NULL::text AS first_name,
-               sa.orcid AS oa_orcid, sa.full_name AS oa_full_name,
-               NULL::text AS idhal,
-               NULL::int AS source_person_id,
-               FALSE AS has_hal_person_id,
-               NULL::int AS hal_person_id,
-               sd.publication_id,
-               sa_auth.author_position
-        FROM source_authorships sa_auth
-        JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-        JOIN v_active_publications vap ON vap.id = sd.publication_id
-        WHERE sa_auth.source = 'openalex'
-          AND sa_auth.person_id IS NULL
-          AND sa_auth.in_perimeter = TRUE
-          AND sa_auth.raw_author_name IS NOT NULL
-          AND sd.publication_id IS NOT NULL
-    """)
-    oa_rows = cur.fetchall()
-
-    # WoS
-    cur.execute("""
-        SELECT sa_auth.id AS authorship_id, 'wos' AS source,
-               sa_auth.raw_author_name AS full_name, sa.last_name, sa.first_name,
-               sa.orcid, NULL::text AS idhal,
-               NULL::int AS source_person_id,
-               FALSE AS has_hal_person_id,
-               NULL::int AS hal_person_id,
-               sd.publication_id,
-               sa_auth.author_position
-        FROM source_authorships sa_auth
-        JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-        JOIN v_active_publications vap ON vap.id = sd.publication_id
-        WHERE sa_auth.source = 'wos'
-          AND sa_auth.person_id IS NULL
-          AND sa_auth.in_perimeter = TRUE
-          AND sd.publication_id IS NOT NULL
-    """)
-    wos_rows = cur.fetchall()
-
-    # ScanR
-    cur.execute("""
-        SELECT sa_auth.id AS authorship_id, 'scanr' AS source,
-               sa_auth.raw_author_name AS full_name, sa.last_name, sa.first_name,
-               sa.orcid, NULL::text AS idhal, sa.idref,
-               NULL::int AS source_person_id,
-               FALSE AS has_hal_person_id,
-               NULL::int AS hal_person_id,
-               sd.publication_id,
-               sa_auth.author_position
-        FROM source_authorships sa_auth
-        JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-        JOIN v_active_publications vap ON vap.id = sd.publication_id
-        WHERE sa_auth.source = 'scanr'
-          AND sa_auth.person_id IS NULL
-          AND sa_auth.in_perimeter = TRUE
-          AND sd.publication_id IS NOT NULL
-    """)
-    scanr_rows = cur.fetchall()
-
-    # theses.fr (même structure que ScanR : idref comme clé)
-    # Les rôles non-auteur (directeur, rapporteur, jury) ne créent pas de personne.
-    cur.execute("""
-        SELECT sa_auth.id AS authorship_id, 'theses' AS source,
-               sa_auth.raw_author_name AS full_name, sa.last_name, sa.first_name,
-               sa.orcid, NULL::text AS idhal, sa.idref,
-               NULL::int AS source_person_id,
-               FALSE AS has_hal_person_id,
-               NULL::int AS hal_person_id,
-               sd.publication_id,
-               sa_auth.author_position,
-               sa_auth.roles
-        FROM source_authorships sa_auth
-        JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-        JOIN v_active_publications vap ON vap.id = sd.publication_id
-        WHERE sa_auth.source = 'theses'
-          AND sa_auth.person_id IS NULL
-          AND sa_auth.in_perimeter = TRUE
-          AND sd.publication_id IS NOT NULL
-    """)
-    theses_rows = cur.fetchall()
-
-    # Enrichir avec last_name/first_name parsés + filtrage ORCID OA
     all_rows = []
     for r in hal_rows + oa_rows + wos_rows + scanr_rows + theses_rows:
-        r = dict(r)
         if not r.get("last_name"):
             r["last_name"], r["first_name"] = parse_raw_author_name(r["full_name"])
         r["last_norm"] = normalize_name(r["last_name"])
@@ -211,30 +114,16 @@ def get_all_unlinked_authorships(cur: Any) -> Any:
     return all_rows
 
 
-def load_linked_authorships_by_pub(cur: Any) -> Any:
-    """Charge les authorships déjà rattachées à une personne, indexées par
-    (publication_id, author_position) pour le cross-source matching.
+def load_linked_authorships_by_pub(
+    cur: Any,
+) -> dict[tuple[int, int], list[tuple[int, str, str, str]]]:
+    """Index des authorships rattachées par (publication_id, author_position).
 
     Retourne : {(pub_id, position): [(person_id, last_norm, first_norm, source), ...]}
     """
-    index = defaultdict(list)
+    index: dict[tuple[int, int], list[tuple[int, str, str, str]]] = defaultdict(list)
 
-    # Sources avec noms structurés dans source_persons (tout sauf OpenAlex)
-    from domain.sources import SOURCES_WITH_STRUCTURED_NAMES_SQL
-
-    cur.execute(f"""
-        SELECT sa_auth.person_id, sa_auth.author_position,
-               sd.publication_id,
-               sa.last_name, sa.first_name, sa_auth.raw_author_name AS full_name,
-               sa_auth.source
-        FROM source_authorships sa_auth
-        JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-        WHERE sa_auth.source IN {SOURCES_WITH_STRUCTURED_NAMES_SQL}
-          AND sa_auth.person_id IS NOT NULL
-          AND sd.publication_id IS NOT NULL
-    """)
-    for r in cur.fetchall():
+    for r in fetch_linked_authorships_structured(cur):
         ln = normalize_name(r["last_name"] or "")
         fn = normalize_name(r["first_name"] or "")
         if not ln and r["full_name"]:
@@ -244,19 +133,7 @@ def load_linked_authorships_by_pub(cur: Any) -> Any:
             (r["person_id"], ln, fn, r["source"])
         )
 
-    # OpenAlex : nom depuis raw_author_name
-    cur.execute("""
-        SELECT sa_auth.person_id, sa_auth.author_position,
-               sd.publication_id,
-               sa_auth.raw_author_name AS full_name,
-               'openalex' AS source
-        FROM source_authorships sa_auth
-        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-        WHERE sa_auth.source = 'openalex'
-          AND sa_auth.person_id IS NOT NULL
-          AND sd.publication_id IS NOT NULL
-    """)
-    for r in cur.fetchall():
+    for r in fetch_linked_authorships_openalex(cur):
         last, first = parse_raw_author_name(r["full_name"])
         ln, fn = normalize_name(last), normalize_name(first)
         index[(r["publication_id"], r["author_position"])].append(
@@ -264,15 +141,6 @@ def load_linked_authorships_by_pub(cur: Any) -> Any:
         )
 
     return index
-
-
-def load_name_form_map(cur: Any) -> Any:
-    """Charge person_name_forms.
-
-    Retourne : {name_form: [person_id, ...]}
-    """
-    cur.execute("SELECT name_form, person_ids FROM person_name_forms")
-    return {r["name_form"]: r["person_ids"] for r in cur.fetchall()}
 
 
 # ---------------------------------------------------------------------------
@@ -292,15 +160,7 @@ def step0_hal_accounts(cur: Any, all_authorships: Any, linked_ids: Any, dry_run:
         if a["source"] == "hal" and a["has_hal_person_id"]:
             by_hal_pid[a["hal_person_id"]].append(a)
 
-    # source_persons HAL déjà liés à une personne
-    cur.execute("""
-        SELECT (sa.source_ids->>'hal_person_id')::int AS hal_person_id, sa.person_id
-        FROM source_persons sa
-        WHERE sa.source = 'hal'
-          AND (sa.source_ids->>'hal_person_id') IS NOT NULL
-          AND sa.person_id IS NOT NULL
-    """)
-    hal_person_map = {r["hal_person_id"]: r["person_id"] for r in cur.fetchall()}
+    hal_person_map = fetch_hal_account_to_person_map(cur)
 
     linked = 0
     skipped = 0
@@ -314,7 +174,6 @@ def step0_hal_accounts(cur: Any, all_authorships: Any, linked_ids: Any, dry_run:
             for a in group:
                 linked_ids.add((a["source"], a["authorship_id"]))
         else:
-            # Compte HAL non rattaché → laisser aux passes suivantes
             skipped += len(group)
 
     logger.info(
@@ -348,14 +207,13 @@ def step1_cross_source(
         if not candidates:
             continue
 
-        # Chercher un candidat d'une autre source avec nom compatible
         matched_pid = None
         for pid, ln, fn, src in candidates:
             if src == a["source"]:
-                continue  # même source, pas utile
+                continue
             if names_compatible(a["last_norm"], a["first_norm"], ln, fn):
                 if matched_pid is not None and matched_pid != pid:
-                    matched_pid = None  # ambiguïté
+                    matched_pid = None
                     break
                 matched_pid = pid
 
@@ -365,7 +223,6 @@ def step1_cross_source(
                 add_name_form(cur, matched_pid, a["full_name"])
                 add_identifiers(cur, matched_pid, [a])
             linked_ids.add((a["source"], a["authorship_id"]))
-            # Mettre à jour l'index pour les passes suivantes
             ln, fn = a["last_norm"], a["first_norm"]
             linked_index[(pub_id, position)].append((matched_pid, ln, fn, a["source"]))
             linked += 1
@@ -379,25 +236,11 @@ def step1_cross_source(
 # ---------------------------------------------------------------------------
 
 
-def load_idref_person_map(cur: Any) -> Any:
-    """Charge les IdRef déjà mappés à une personne (status != rejected).
-
-    Retourne : {idref: person_id}
-    """
-    cur.execute("""
-        SELECT id_value, person_id
-        FROM person_identifiers
-        WHERE id_type = 'idref'
-          AND status != 'rejected'
-    """)
-    return {r["id_value"]: r["person_id"] for r in cur.fetchall()}
-
-
 def step1b_idref(cur: Any, all_authorships: Any, linked_ids: Any, dry_run: Any) -> Any:
     """Si l'authorship a un IdRef déjà connu en base (non rejeté),
     rattacher à la personne correspondante.
     """
-    idref_map = load_idref_person_map(cur)
+    idref_map = fetch_idref_to_person_map(cur)
     linked = 0
 
     for a in all_authorships:
@@ -426,25 +269,11 @@ def step1b_idref(cur: Any, all_authorships: Any, linked_ids: Any, dry_run: Any) 
 # ---------------------------------------------------------------------------
 
 
-def load_orcid_person_map(cur: Any) -> Any:
-    """Charge les ORCID déjà mappés à une personne (status != rejected).
-
-    Retourne : {orcid: person_id}
-    """
-    cur.execute("""
-        SELECT id_value, person_id
-        FROM person_identifiers
-        WHERE id_type = 'orcid'
-          AND status != 'rejected'
-    """)
-    return {r["id_value"]: r["person_id"] for r in cur.fetchall()}
-
-
 def step2_orcid(cur: Any, all_authorships: Any, linked_ids: Any, dry_run: Any) -> Any:
     """Si l'authorship a un ORCID déjà connu en base (non rejeté),
     rattacher à la personne correspondante.
     """
-    orcid_map = load_orcid_person_map(cur)
+    orcid_map = fetch_orcid_to_person_map(cur)
     linked = 0
 
     for a in all_authorships:
@@ -494,7 +323,6 @@ def step3_name_forms(
         if not ln:
             continue
 
-        # Chercher dans les name_forms (essayer les deux ordres)
         person_ids = None
         forms_to_try = [f for f in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip(), ln] if f]
         for form in forms_to_try:
@@ -504,7 +332,6 @@ def step3_name_forms(
 
         if person_ids is not None:
             if len(person_ids) == 1:
-                # Unique → rattacher
                 pid = person_ids[0]
                 if not dry_run:
                     link_to_person(cur, pid, [a])
@@ -512,12 +339,10 @@ def step3_name_forms(
                 linked_ids.add((a["source"], a["authorship_id"]))
                 linked += 1
             else:
-                # Ambigu → orphelin
                 ambiguous += 1
         else:
-            # Forme inconnue → créer personne (sauf si création interdite)
             if not a.get("allow_create", True):
-                ambiguous += 1  # comptabilisé comme orphelin
+                ambiguous += 1
                 continue
             last = a["last_name"] or a["full_name"] or "?"
             first = a["first_name"] or ""
@@ -526,14 +351,13 @@ def step3_name_forms(
                 link_to_person(cur, pid, [a])
                 add_identifiers(cur, pid, [a])
                 add_name_form(cur, pid, a["full_name"])
-                # Enregistrer la nouvelle forme pour les authorships suivantes
                 for form in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip()]:
                     if form:
                         name_form_map[form] = [pid]
             else:
                 for form in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip()]:
                     if form:
-                        name_form_map[form] = [-1]  # placeholder dry-run
+                        name_form_map[form] = [-1]
 
             linked_ids.add((a["source"], a["authorship_id"]))
             created += 1
@@ -551,7 +375,7 @@ def step3_name_forms(
 
 def run(dry_run: Any = False) -> Any:
     conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     all_authorships = get_all_unlinked_authorships(cur)
     logger.info(f"{len(all_authorships)} authorships UCA non rattachées (toutes sources)")
@@ -561,33 +385,27 @@ def run(dry_run: Any = False) -> Any:
         conn.close()
         return
 
-    linked_ids: set[tuple[str, int]] = set()  # (source, authorship_id)
+    linked_ids: set[tuple[str, int]] = set()
 
-    # ── Étape 0 : Comptes HAL ──
     logger.info("\n--- Étape 0 : comptes HAL ---")
     s0 = step0_hal_accounts(cur, all_authorships, linked_ids, dry_run)
 
-    # ── Étape 1 : Cross-source ──
     logger.info("\n--- Étape 1 : cross-source (même publi + position) ---")
     linked_index = load_linked_authorships_by_pub(cur)
     s1 = step1_cross_source(cur, all_authorships, linked_ids, linked_index, dry_run)
 
-    # ── Étape 1b : IdRef connu ──
     logger.info("\n--- Étape 1b : IdRef connu ---")
     s1b = step1b_idref(cur, all_authorships, linked_ids, dry_run)
 
-    # ── Étape 2 : ORCID connu ──
     logger.info("\n--- Étape 2 : ORCID connu ---")
     s2 = step2_orcid(cur, all_authorships, linked_ids, dry_run)
 
-    # ── Étape 3 : Name forms ──
     logger.info("\n--- Étape 3 : person_name_forms ---")
-    name_form_map = load_name_form_map(cur)
+    name_form_map = fetch_name_form_map(cur)
     s3_created, s3_linked, s3_ambiguous = step3_name_forms(
         cur, all_authorships, linked_ids, name_form_map, dry_run
     )
 
-    # ── Résumé ──
     total_linked = len(linked_ids)
     unlinked = len(all_authorships) - total_linked
 

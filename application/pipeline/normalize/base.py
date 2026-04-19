@@ -22,6 +22,13 @@ from typing import Any, ClassVar
 from psycopg2.extras import RealDictCursor
 
 from infrastructure.db.connection import get_connection
+from infrastructure.db.queries.staging import (
+    count_pending_staging,
+    fetch_pending_staging,
+    fetch_pending_staging_ids,
+    fetch_staging_by_ids,
+    reset_processed_flag,
+)
 
 
 class SourceNormalizer(ABC):
@@ -95,54 +102,23 @@ class SourceNormalizer(ABC):
         return self.conn.cursor()
 
     def _reset(self, cur: Any) -> int:
-        cur.execute(f"UPDATE staging SET processed = FALSE WHERE source = '{self.SOURCE}'")
-        return cur.rowcount
+        return reset_processed_flag(cur, self.SOURCE)
 
     def _count_pending(self, cur: Any) -> int:
-        cur.execute(
-            f"SELECT COUNT(*) AS cnt FROM staging "
-            f"WHERE source = '{self.SOURCE}' AND processed = FALSE"
-        )
-        row = cur.fetchone()
-        return row["cnt"] if self.USE_DICT_CURSOR else row[0]
+        return count_pending_staging(cur, self.SOURCE)
 
     def _iter_rows(self, cur: Any, limit: int) -> Any:
         """Itère les lignes à traiter. Peut faire un fetch en un coup ou par sous-lots."""
         if self.FETCH_SUB_BATCH is None:
-            cur.execute(
-                f"""
-                SELECT {self.FETCH_COLUMNS}
-                FROM staging
-                WHERE source = '{self.SOURCE}' AND processed = FALSE
-                ORDER BY id
-                LIMIT %s
-                """,
-                (limit,),
+            yield from fetch_pending_staging(
+                cur, self.SOURCE, columns=self.FETCH_COLUMNS, limit=limit
             )
-            yield from cur.fetchall()
             return
 
-        cur.execute(
-            f"""
-            SELECT id FROM staging
-            WHERE source = '{self.SOURCE}' AND processed = FALSE
-            ORDER BY id
-            LIMIT %s
-            """,
-            (limit,),
-        )
-        work_ids = [r["id"] if self.USE_DICT_CURSOR else r[0] for r in cur.fetchall()]
+        work_ids = fetch_pending_staging_ids(cur, self.SOURCE, limit=limit)
         for start in range(0, len(work_ids), self.FETCH_SUB_BATCH):
             batch_ids = work_ids[start : start + self.FETCH_SUB_BATCH]
-            cur.execute(
-                f"""
-                SELECT {self.FETCH_COLUMNS}
-                FROM staging WHERE id = ANY(%s)
-                ORDER BY id
-                """,
-                (batch_ids,),
-            )
-            yield from cur.fetchall()
+            yield from fetch_staging_by_ids(cur, batch_ids, columns=self.FETCH_COLUMNS)
 
     def _process_one(self, cur: Any, row: Any) -> bool | None:
         """Enveloppe process_work avec SAVEPOINT optionnel."""
