@@ -1,6 +1,7 @@
 """Router Revues — liste, recherche, fusion."""
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -23,7 +24,7 @@ async def list_journals(
 ):
     with get_cursor() as (cur, conn):
         conditions = []
-        params = []
+        params: list[Any] = []
 
         if search and len(search) >= 2:
             conditions.append("j.title_normalized LIKE '%%' || %s || '%%'")

@@ -21,11 +21,12 @@ via db/schema.sql + migrations.
 
 import argparse
 import os
+from typing import Any
 
 from infrastructure.db.connection import get_connection
 
 # Tables à exporter, dans l'ordre d'insertion (respect des FK)
-TABLES = [
+TABLES: list[dict[str, Any]] = [
     {
         "table": "config",
         "columns": ["key", "value", "description"],

@@ -93,7 +93,7 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     # Force UTF-8 sur la console pour éviter les UnicodeEncodeError Windows (cp1252)
     # On wrape stdout.buffer sans en prendre ownership (line_buffering pour flush immédiat)
     utf8_stream = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", line_buffering=True)
-    utf8_stream.close = lambda: None  # Empêcher la fermeture de stdout.buffer
+    utf8_stream.close = lambda: None  # type: ignore[method-assign]  # Empêcher la fermeture de stdout.buffer
     console = logging.StreamHandler(stream=utf8_stream)
     console.setFormatter(fmt)
 

@@ -43,7 +43,7 @@ BREATHER_SECS = 15  # durée de la pause longue (secondes)
 
 # Initialisées dans main() depuis la config DB
 BASE_URL = ""
-HEADERS = {}
+HEADERS: dict[str, str] = {}
 
 
 def build_query(year: int, affiliations: list[str] | None = None) -> str:

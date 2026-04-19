@@ -48,7 +48,7 @@ def fetch_sources_batch(openalex_ids: list[str]) -> dict[str, dict]:
     filter_value = "|".join(full_ids)
     params = {
         "filter": f"openalex:{filter_value}",
-        "per_page": len(openalex_ids),
+        "per_page": str(len(openalex_ids)),
         "select": "id,apc_usd,apc_prices,is_in_doaj",
         "mailto": MAILTO,
     }

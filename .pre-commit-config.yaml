@@ -35,6 +35,14 @@ repos:
         pass_filenames: false
         types: [python]
 
+      # Type check (config permissive dans pyproject.toml — à durcir progressivement).
+      - id: mypy
+        name: mypy (type check)
+        entry: mypy .
+        language: system
+        pass_filenames: false
+        types: [python]
+
       # Lance uniquement les tests unitaires (sans BDD, ~1-2s).
       # Les tests d'intégration (avec BDD) sont lancés en CI, pas ici.
       - id: pytest-unit

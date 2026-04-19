@@ -35,7 +35,7 @@ from infrastructure.sources.common import clean_doi, compute_hash, get_existing_
 logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def build_query(years: list, since: str = None) -> str:
+def build_query(years: list | None, since: str | None = None) -> str:
     """Construit la requête HAL (paramètre q).
 
     Si since est fourni (format YYYY-MM-DD), filtre sur dateLastIndexed_tdate
@@ -43,6 +43,8 @@ def build_query(years: list, since: str = None) -> str:
     """
     if since:
         return f"submittedDate_tdate:[{since}T00:00:00Z TO *]"
+    if not years:
+        raise ValueError("build_query requires either `since` or a non-empty `years` list")
     year_min = min(years)
     year_max = max(years)
     return f"producedDateY_i:[{year_min} TO {year_max}]"
