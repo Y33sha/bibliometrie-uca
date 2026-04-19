@@ -50,7 +50,7 @@ def fetch_orcids_batch(person_ids: list[int]) -> dict[int, str]:
     params = {
         "q": f"person_i:({or_clause})",
         "fl": "person_i,orcidId_s",
-        "rows": len(person_ids),
+        "rows": str(len(person_ids)),
         "wt": "json",
     }
 

@@ -24,6 +24,7 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 
 import argparse
 import os
+from typing import Any
 
 from psycopg2.extras import Json, RealDictCursor
 
@@ -217,7 +218,7 @@ def _update_thesis_meta(cur, pub_id: int, these: dict):
 
 def _build_source_meta(these: dict) -> dict | None:
     """Construit le meta jsonb pour source_publications à partir des données brutes."""
-    meta = {}
+    meta: dict[str, Any] = {}
     ds = _parse_date_iso(these.get("dateSoutenance"))
     di = _parse_date_iso(these.get("datePremiereInscriptionDoctorat"))
     if ds:

@@ -26,7 +26,7 @@ from infrastructure.sources.common import compute_hash, get_cross_import_dois, s
 logger = setup_logger("cross_import_wos", os.path.join(os.path.dirname(__file__), "logs"))
 
 BASE_URL = ""
-HEADERS = {}
+HEADERS: dict[str, str] = {}
 BATCH_SIZE = 20  # nombre de DOIs par requête WoS (réduit pour éviter URLs trop longues)
 
 

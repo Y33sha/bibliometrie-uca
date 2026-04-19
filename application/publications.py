@@ -151,10 +151,10 @@ def find_or_create(
 
     # 1b. Chercher par NNT (theses uniquement)
     if nnt:
-        existing = repo.find_by_nnt(nnt)
-        if existing:
-            try_merge_by_doi(cur, existing.id, doi)
-            return existing.id, False
+        existing_nnt = repo.find_by_nnt(nnt)
+        if existing_nnt:
+            try_merge_by_doi(cur, existing_nnt.id, doi)
+            return existing_nnt.id, False
 
     # 2. Creer
     if not allow_create:

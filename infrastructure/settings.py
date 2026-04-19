@@ -59,4 +59,6 @@ class Settings(BaseSettings):
         }
 
 
-settings = Settings()
+# pydantic-settings lit les champs required depuis l'environnement / .env ;
+# mypy ne le voit pas et les exige comme kwargs explicites.
+settings = Settings()  # type: ignore[call-arg]

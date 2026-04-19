@@ -41,7 +41,7 @@ def fetch_identifiers_batch(person_ids: list[int]) -> dict[int, dict]:
     params = {
         "q": f"person_i:({or_clause})",
         "fl": "person_i,orcidId_s,idrefId_s",
-        "rows": len(person_ids),
+        "rows": str(len(person_ids)),
         "wt": "json",
     }
 
