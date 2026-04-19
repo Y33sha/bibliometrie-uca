@@ -39,6 +39,17 @@ from domain.names import names_compatible
 from domain.normalize import normalize_name, normalize_text
 from domain.publication import normalize_nnt
 from infrastructure.addresses import link_addresses
+from infrastructure.db.queries.normalize_theses import (
+    count_theses_table,
+    fetch_thesis_primary_author,
+    find_theses_source_person_by_name,
+    get_theses_publication_id,
+    insert_theses_source_person_new,
+    merge_publication_meta,
+    upsert_theses_source_authorship,
+    upsert_theses_source_person_by_ppn,
+    upsert_theses_source_publication,
+)
 from infrastructure.db_helpers import mark_staging_done
 from infrastructure.log import setup_logger
 
@@ -63,25 +74,12 @@ def _extract_thesis_author(these: dict) -> tuple[str, str] | None:
 
 def _thesis_author_compatible(cur: Any, pub_id: int, author: tuple[str, str]) -> bool:
     """Vérifie si l'auteur d'une thèse existante est compatible avec author."""
-    cur.execute(
-        """
-        SELECT sa.last_name, sa.first_name
-        FROM source_authorships sas
-        JOIN source_publications sd ON sd.id = sas.source_publication_id
-        JOIN source_persons sa ON sa.id = sas.source_person_id
-        WHERE sd.publication_id = %s
-          AND 'author' = ANY(sas.roles)
-        ORDER BY sd.id, sas.author_position
-        LIMIT 1
-    """,
-        (pub_id,),
-    )
-    row = cur.fetchone()
-    if not row:
+    primary = fetch_thesis_primary_author(cur, pub_id)
+    if primary is None:
         # Pas d'auteur connu → on accepte le match (titre+année suffisent)
         return True
-    ln = normalize_name(row["last_name"] or "")
-    fn = normalize_name(row["first_name"] or "")
+    ln = normalize_name(primary[0])
+    fn = normalize_name(primary[1])
     if not ln:
         return True
     if names_compatible(author[0], author[1], ln, fn):
@@ -200,14 +198,7 @@ def _update_thesis_meta(cur: Any, pub_id: int, these: dict) -> Any:
         meta["date_inscription"] = di
     if not meta:
         return
-    cur.execute(
-        """
-        UPDATE publications
-        SET meta = COALESCE(meta, '{}') || %s, updated_at = now()
-        WHERE id = %s
-    """,
-        (Json(meta), pub_id),
-    )
+    merge_publication_meta(cur, pub_id, Json(meta))
 
 
 # =============================================================
@@ -299,50 +290,24 @@ def insert_source_document(
     language = pub_meta.get("language") if pub_meta else None
     container_title = pub_meta.get("container_title") if pub_meta else None
 
-    cur.execute(
-        """
-        INSERT INTO source_publications
-            (source, source_id, doi, title, pub_year, doc_type,
-             publication_id, staging_id, external_ids,
-             journal_id, oa_status, language, container_title,
-             keywords, topics, meta)
-        VALUES ('theses', %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            publication_id = COALESCE(
-                source_publications.publication_id, EXCLUDED.publication_id
-            ),
-            doc_type = COALESCE(EXCLUDED.doc_type, source_publications.doc_type),
-            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
-            journal_id = COALESCE(EXCLUDED.journal_id, source_publications.journal_id),
-            oa_status = COALESCE(EXCLUDED.oa_status, source_publications.oa_status),
-            language = COALESCE(EXCLUDED.language, source_publications.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_publications.container_title),
-            keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
-            topics = COALESCE(EXCLUDED.topics, source_publications.topics),
-            meta = COALESCE(EXCLUDED.meta, source_publications.meta)
-        RETURNING id
-    """,
-        (
-            theses_id,
-            doi,
-            title,
-            pub_year,
-            doc_type,
-            publication_id,
-            staging_id,
-            external_ids,
-            journal_id,
-            oa_status,
-            language,
-            container_title,
-            keywords,
-            topics_json,
-            source_meta_json,
-        ),
+    return upsert_theses_source_publication(
+        cur,
+        theses_id=theses_id,
+        doi=doi,
+        title=title,
+        pub_year=pub_year,
+        doc_type=doc_type,
+        publication_id=publication_id,
+        staging_id=staging_id,
+        external_ids=external_ids,
+        journal_id=journal_id,
+        oa_status=oa_status,
+        language=language,
+        container_title=container_title,
+        keywords=keywords,
+        topics_json=topics_json,
+        source_meta_json=source_meta_json,
     )
-    return cur.fetchone()["id"]
 
 
 # =============================================================
@@ -362,47 +327,17 @@ def upsert_source_author(cur: Any, person: dict) -> int | None:
 
     # Par PPN (clé fiable)
     if ppn:
-        cur.execute(
-            """
-            INSERT INTO source_persons
-                (source, source_id, full_name, last_name, first_name, idref)
-            VALUES ('theses', %s, %s, %s, %s, %s)
-            ON CONFLICT (source, source_id) DO UPDATE SET
-                full_name = EXCLUDED.full_name,
-                idref = COALESCE(source_persons.idref, EXCLUDED.idref)
-            RETURNING id
-        """,
-            (ppn, full_name, nom, prenom, ppn),
+        return upsert_theses_source_person_by_ppn(
+            cur, ppn=ppn, full_name=full_name, last_name=nom, first_name=prenom
         )
-        return cur.fetchone()["id"]
 
-    # Sans PPN : dédup par nom exact
-    cur.execute(
-        """
-        SELECT id FROM source_persons
-        WHERE source = 'theses'
-          AND source_id LIKE 'nokey-%%'
-          AND full_name = %s
-          AND first_name IS NOT DISTINCT FROM %s
-        LIMIT 1
-    """,
-        (full_name, prenom),
-    )
-    row = cur.fetchone()
-    if row:
-        return row["id"]
+    existing = find_theses_source_person_by_name(cur, full_name=full_name, first_name=prenom)
+    if existing is not None:
+        return existing
 
-    # Nouveau sans identifiant
-    cur.execute(
-        """
-        INSERT INTO source_persons
-            (source, source_id, full_name, last_name, first_name)
-        VALUES ('theses', 'nokey-' || nextval('source_persons_id_seq'), %s, %s, %s)
-        RETURNING id
-    """,
-        (full_name, nom, prenom),
+    return insert_theses_source_person_new(
+        cur, full_name=full_name, last_name=nom, first_name=prenom
     )
-    return cur.fetchone()["id"]
 
 
 # =============================================================
@@ -460,30 +395,14 @@ def process_persons(cur: Any, these: dict, source_publication_id: int) -> Any:
             info["person"].get("prenom", "") + " " + info["person"].get("nom", "")
         ).strip()
 
-        cur.execute(
-            """
-            INSERT INTO source_authorships
-                (source, source_publication_id, source_person_id, author_position,
-                 author_name_normalized, roles,
-                 raw_author_name)
-            VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s)
-            ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
-                roles = EXCLUDED.roles,
-                author_name_normalized = EXCLUDED.author_name_normalized,
-                raw_author_name = EXCLUDED.raw_author_name
-            RETURNING id
-        """,
-            (
-                source_publication_id,
-                source_person_id,
-                position if is_author else None,
-                author_full_name,
-                roles,
-                author_full_name,
-            ),
+        sa_id = upsert_theses_source_authorship(
+            cur,
+            source_publication_id=source_publication_id,
+            source_person_id=source_person_id,
+            author_position=position if is_author else None,
+            roles=roles,
+            raw_author_name=author_full_name,
         )
-        row = cur.fetchone()
-        sa_id = row[0] if isinstance(row, tuple) else row["id"]
 
         if addr_parts:
             link_addresses(cur, sa_id, addr_parts)
@@ -515,13 +434,7 @@ def process_work(cur: Any, row: dict) -> bool:
         publication_id = None
 
         # Idempotence : réutiliser le publication_id existant
-        cur.execute(
-            "SELECT publication_id FROM source_publications WHERE source = 'theses' AND source_id = %s",
-            (theses_id,),
-        )
-        existing_doc = cur.fetchone()
-        if existing_doc and existing_doc["publication_id"]:
-            publication_id = existing_doc["publication_id"]
+        publication_id = get_theses_publication_id(cur, theses_id)
 
         # Recherche par DOI/NNT/titre (sans création)
         if not publication_id:
@@ -562,11 +475,10 @@ class ThesesNormalizer(SourceNormalizer):
         return process_work(cur, row)
 
     def summary_stats(self, cur: Any) -> list[str]:
-        lines = []
-        for table in ("source_publications", "source_persons", "source_authorships"):
-            cur.execute(f"SELECT COUNT(*) AS cnt FROM {table} WHERE source = 'theses'")
-            lines.append(f"  {table} (theses) : {cur.fetchone()['cnt']}")
-        return lines
+        return [
+            f"  {table} (theses) : {count_theses_table(cur, table)}"
+            for table in ("source_publications", "source_persons", "source_authorships")
+        ]
 
 
 def main() -> None:
