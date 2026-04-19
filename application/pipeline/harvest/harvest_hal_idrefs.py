@@ -13,11 +13,14 @@ import time
 from typing import Any
 
 import requests
-from psycopg2.extras import RealDictCursor
 
 from application.persons import add_identifier
 from infrastructure.api_limits import HAL_DELAY
 from infrastructure.db.connection import get_connection
+from infrastructure.db.queries.harvest import (
+    fetch_hal_persons_missing_idref,
+    update_source_person_idref,
+)
 from infrastructure.log import setup_logger
 
 logger = setup_logger("harvest_hal_idrefs", os.path.join(os.path.dirname(__file__), "logs"))
@@ -59,22 +62,9 @@ def main() -> Any:
     args = parser.parse_args()
 
     conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
-    # source_persons HAL avec hal_person_id + person_id, sans IdRef déjà connu
-    cur.execute("""
-        SELECT sa.id AS ha_id,
-               (sa.source_ids->>'hal_person_id')::int AS hal_person_id,
-               sa.source_ids->>'idhal' AS idhal,
-               sa.person_id, sa.full_name
-        FROM source_persons sa
-        WHERE sa.source = 'hal'
-          AND (sa.source_ids->>'hal_person_id') IS NOT NULL
-          AND sa.person_id IS NOT NULL
-          AND sa.idref IS NULL
-        ORDER BY sa.person_id
-    """)
-    authors = cur.fetchall()
+    authors = fetch_hal_persons_missing_idref(cur)
     logger.info(f"{len(authors)} auteurs HAL à interroger")
 
     found = 0
@@ -83,11 +73,7 @@ def main() -> Any:
         if idref:
             found += 1
             if not args.dry_run:
-                # Stocker dans source_persons
-                cur.execute(
-                    "UPDATE source_persons SET idref = %s WHERE id = %s", (idref, a["ha_id"])
-                )
-                # Stocker dans person_identifiers
+                update_source_person_idref(cur, a["ha_id"], idref)
                 add_identifier(cur, a["person_id"], "idref", idref, source="hal")
             logger.info(f"  {a['full_name']}: {idref}")
 

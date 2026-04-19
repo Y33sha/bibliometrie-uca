@@ -6,6 +6,8 @@ Construit la table authorships (table de vérité) à partir des authorships sou
 Étape 3 : Propager author_position et is_corresponding
 Étape 4 : Propager in_perimeter et structure_ids (union des sources)
 
+Le SQL est isolé dans `infrastructure/db/queries/authorships_build.py`.
+
 Usage:
     python build_authorships.py              # exécuter
     python build_authorships.py --dry-run    # dry-run
@@ -17,6 +19,16 @@ import time
 from typing import Any
 
 from infrastructure.db.connection import get_connection
+from infrastructure.db.queries.authorships_build import (
+    count_authorships_in_perimeter,
+    insert_missing_authorships,
+    link_source_authorships_to_authorship_for,
+    propagate_author_position,
+    propagate_is_corresponding,
+    propagate_perimeter_and_structures_from,
+    propagate_roles,
+    reset_authorships_perimeter_and_structures,
+)
 from infrastructure.log import setup_logger
 
 logger = setup_logger("build_authorships", os.path.join(os.path.dirname(__file__), "logs"))
@@ -40,158 +52,32 @@ def build(cur: Any, sources: Any = None) -> Any:
     t0 = time.perf_counter()
     logger.info(f"Sources : {', '.join(n for n, _ in active_sources)}")
 
-    # ── Étape 1 : Insérer les authorships manquantes ──
     logger.info("Étape 1 : insertion des authorships manquantes...")
-
-    cur.execute("""
-        WITH all_pairs AS (
-            SELECT DISTINCT sd.publication_id, sa.person_id
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            JOIN v_active_publications vap ON vap.id = sd.publication_id
-            WHERE sa.person_id IS NOT NULL AND NOT sa.excluded
-        )
-        INSERT INTO authorships (publication_id, person_id)
-        SELECT ap.publication_id, ap.person_id
-        FROM all_pairs ap
-        WHERE NOT EXISTS (
-            SELECT 1 FROM authorships a
-            WHERE a.publication_id = ap.publication_id
-              AND a.person_id = ap.person_id
-        )
-    """)
-    inserted = cur.rowcount
+    inserted = insert_missing_authorships(cur)
     logger.info(f"  {inserted} authorships créées")
 
-    # ── Étape 2 : Peupler les FK (source_authorships.authorship_id) ──
     logger.info("Étape 2 : peuplement des FK (source_authorships → authorships)...")
-
     for source_name, source_value in active_sources:
-        cur.execute(
-            """
-            UPDATE source_authorships sa
-            SET authorship_id = a.id
-            FROM source_publications sd
-            JOIN authorships a ON a.publication_id = sd.publication_id
-            WHERE sd.id = sa.source_publication_id
-              AND sa.source = %s
-              AND sa.person_id IS NOT NULL
-              AND a.person_id = sa.person_id
-              AND NOT sa.excluded
-              AND sa.authorship_id IS NULL
-        """,
-            (source_value,),
-        )
-        logger.info(f"  {source_name} FK : {cur.rowcount} liens")
+        n = link_source_authorships_to_authorship_for(cur, source_value)
+        logger.info(f"  {source_name} FK : {n} liens")
 
-    # ── Étape 3 : author_position et is_corresponding ──
     logger.info("Étape 3 : author_position et is_corresponding...")
+    logger.info(f"  {propagate_author_position(cur)} positions mises à jour")
+    logger.info(f"  {propagate_is_corresponding(cur)} is_corresponding mises à jour")
+    logger.info(f"  {propagate_roles(cur)} roles mises à jour")
 
-    cur.execute("""
-        UPDATE authorships a
-        SET author_position = sub.pos
-        FROM (
-            SELECT sa.authorship_id,
-                   (array_agg(sa.author_position ORDER BY
-                       CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 WHEN 'scanr' THEN 3 WHEN 'wos' THEN 4 END
-                   ))[1] AS pos
-            FROM source_authorships sa
-            WHERE sa.authorship_id IS NOT NULL
-              AND sa.author_position IS NOT NULL
-              AND NOT sa.excluded
-            GROUP BY sa.authorship_id
-        ) sub
-        WHERE a.id = sub.authorship_id
-          AND a.author_position IS NULL
-    """)
-    pos_count = cur.rowcount
-    logger.info(f"  {pos_count} positions mises à jour")
-
-    cur.execute("""
-        UPDATE authorships a
-        SET is_corresponding = sub.corr
-        FROM (
-            SELECT sa.authorship_id,
-                   (array_agg(sa.is_corresponding ORDER BY
-                       CASE sa.source WHEN 'wos' THEN 1 WHEN 'openalex' THEN 2 WHEN 'hal' THEN 3 END
-                   ))[1] AS corr
-            FROM source_authorships sa
-            WHERE sa.authorship_id IS NOT NULL
-              AND sa.is_corresponding IS NOT NULL
-              AND NOT sa.excluded
-            GROUP BY sa.authorship_id
-        ) sub
-        WHERE a.id = sub.authorship_id
-          AND a.is_corresponding IS NULL
-    """)
-    corr_count = cur.rowcount
-    logger.info(f"  {corr_count} is_corresponding mises à jour")
-
-    # ── Étape 3b : Propagation roles ──
-    cur.execute("""
-        UPDATE authorships a
-        SET roles = sub.merged_roles
-        FROM (
-            SELECT sa.authorship_id,
-                   array_agg(DISTINCT r ORDER BY r) AS merged_roles
-            FROM source_authorships sa,
-                 LATERAL unnest(sa.roles) AS r
-            WHERE sa.authorship_id IS NOT NULL
-              AND sa.roles IS NOT NULL
-            GROUP BY sa.authorship_id
-        ) sub
-        WHERE a.id = sub.authorship_id
-          AND a.roles IS DISTINCT FROM sub.merged_roles
-    """)
-    logger.info(f"  {cur.rowcount} roles mises à jour")
-
-    # ── Étape 4 : Propagation in_perimeter et structure_ids ──
-    # Les sources ont déjà in_perimeter et structure_ids peuplés par
-    # populate_affiliations.py → on fait l'union des sources.
     logger.info("Étape 4 : propagation in_perimeter et structure_ids...")
-
     if full_run:
-        # Reset toutes les authorships (run complet)
-        cur.execute("UPDATE authorships SET in_perimeter = FALSE, structure_ids = NULL")
-        logger.info(f"  Reset {cur.rowcount} authorships")
+        reset = reset_authorships_perimeter_and_structures(cur)
+        logger.info(f"  Reset {reset} authorships")
     else:
         logger.info("  Pas de reset (run partiel)")
 
-    # Union des structure_ids et OR des in_perimeter par source
     for source_name, source_value in active_sources:
-        cur.execute(
-            """
-            WITH src_data AS (
-                SELECT sd.publication_id, sa.person_id,
-                       sa.structure_ids AS struct_ids, sa.in_perimeter AS src_in_perimeter
-                FROM source_authorships sa
-                JOIN source_publications sd ON sd.id = sa.source_publication_id
-                JOIN v_active_publications vap ON vap.id = sd.publication_id
-                WHERE sa.source = %s
-                  AND (sa.structure_ids IS NOT NULL OR sa.in_perimeter = TRUE)
-                  AND sa.person_id IS NOT NULL
-                  AND NOT sa.excluded
-            )
-            UPDATE authorships a
-            SET structure_ids = CASE
-                    WHEN sd.struct_ids IS NOT NULL THEN (
-                        SELECT array_agg(DISTINCT x)
-                        FROM unnest(COALESCE(a.structure_ids, '{}'::int[]) || sd.struct_ids) AS x
-                    )
-                    ELSE a.structure_ids
-                END,
-                in_perimeter = a.in_perimeter OR sd.src_in_perimeter,
-                updated_at = now()
-            FROM src_data sd
-            WHERE a.publication_id = sd.publication_id
-              AND a.person_id = sd.person_id
-        """,
-            (source_value,),
-        )
-        logger.info(f"  {source_name} : {cur.rowcount} authorships mises à jour")
+        n = propagate_perimeter_and_structures_from(cur, source_value)
+        logger.info(f"  {source_name} : {n} authorships mises à jour")
 
-    cur.execute("SELECT COUNT(*) FROM authorships WHERE in_perimeter = TRUE")
-    total_uca = cur.fetchone()[0]
+    total_uca = count_authorships_in_perimeter(cur)
     logger.info(f"  Total authorships in_perimeter=TRUE : {total_uca}")
 
     elapsed = time.perf_counter() - t0

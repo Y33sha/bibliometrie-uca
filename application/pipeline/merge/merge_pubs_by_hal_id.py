@@ -10,6 +10,8 @@ Deux cas :
 2. Les deux pointent vers des publications différentes → on garde celle du HAL,
    on fusionne l'autre dedans
 
+Le SQL est isolé dans `infrastructure/db/queries/merge.py`.
+
 Usage:
     python merge_pubs_by_hal_id.py              # fusionner
     python merge_pubs_by_hal_id.py --dry-run    # lister sans fusionner
@@ -19,35 +21,28 @@ import argparse
 import os
 from typing import Any
 
-from psycopg2.extras import RealDictCursor
-
 from application.publications import merge_publications as _merge_pub
 from application.publications import update_sources
 from infrastructure.db.connection import get_connection
+from infrastructure.db.queries.merge import (
+    fetch_hal_source_publications,
+    fetch_source_publications_with_hal_external_id,
+    link_source_publication_to_publication,
+)
 from infrastructure.log import setup_logger
 
 log = setup_logger("merge_pubs_by_hal_id", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def find_duplicates(cur: Any) -> Any:
-    """
-    Trouve les paires (document source, hal_document) qui pointent
-    vers des publications différentes (ou HAL → NULL).
+def find_duplicates(cur: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Croise `source_publications` OA/ScanR (avec hal_id) et HAL.
 
-    Sources : source_publications.external_ids->>'hal' (OpenAlex + ScanR)
+    Retourne deux listes :
+      - `link_only` : HAL sans publication_id → lier à la publication source
+      - `merge_needed` : publications distinctes à fusionner
     """
-    # --- OpenAlex + ScanR → HAL ---
-    cur.execute("""
-        SELECT sd.id AS src_doc_id, sd.source::text AS source,
-               sd.source_id AS src_id, sd.publication_id AS src_pub_id,
-               sd.external_ids->>'hal' AS hal_id
-        FROM source_publications sd
-        WHERE sd.source IN ('openalex', 'scanr')
-          AND sd.external_ids->>'hal' IS NOT NULL
-    """)
-
-    src_by_halid = {}
-    for r in cur.fetchall():
+    src_by_halid: dict[str, dict[str, Any]] = {}
+    for r in fetch_source_publications_with_hal_external_id(cur):
         hid = r["hal_id"]
         if hid not in src_by_halid:
             src_by_halid[hid] = {
@@ -57,15 +52,10 @@ def find_duplicates(cur: Any) -> Any:
                 "src_pub_id": r["src_pub_id"],
             }
 
-    # --- HAL documents ---
-    cur.execute(
-        "SELECT id AS hal_doc_id, source_id AS halid, publication_id AS hal_pub_id FROM source_publications WHERE source = 'hal'"
-    )
-    hal_by_id = {r["halid"]: r for r in cur.fetchall()}
+    hal_by_id = {r["halid"]: r for r in fetch_hal_source_publications(cur)}
 
-    # --- Croiser ---
-    link_only = []  # HAL pub_id = NULL
-    merge_needed = []  # Both have different pub_id
+    link_only: list[dict[str, Any]] = []
+    merge_needed: list[dict[str, Any]] = []
 
     for hid, src_info in src_by_halid.items():
         if hid not in hal_by_id:
@@ -82,7 +72,7 @@ def find_duplicates(cur: Any) -> Any:
     return link_only, merge_needed
 
 
-def link_hal_to_publication(cur: Any, items: Any, dry_run: Any = False) -> Any:
+def link_hal_to_publication(cur: Any, items: Any, dry_run: bool = False) -> int:
     """Case 1: HAL doc has no publication_id → link to source's publication."""
     for item in items:
         hal_doc_id = item["hal_doc_id"]
@@ -93,15 +83,12 @@ def link_hal_to_publication(cur: Any, items: Any, dry_run: Any = False) -> Any:
             log.info(f"  [LINK] [{item['source']}] hal_doc {halid} → pub {src_pub_id}")
             continue
 
-        cur.execute(
-            "UPDATE source_publications SET publication_id = %s WHERE id = %s",
-            (src_pub_id, hal_doc_id),
-        )
+        link_source_publication_to_publication(cur, hal_doc_id, src_pub_id)
         update_sources(cur, src_pub_id)
     return len(items)
 
 
-def merge_publications(cur: Any, items: Any, dry_run: Any = False) -> Any:
+def merge_publications(cur: Any, items: Any, dry_run: bool = False) -> tuple[int, int]:
     """
     Case 2: Both have different publication_id.
     Keep the HAL publication, merge the other into it.
@@ -124,7 +111,7 @@ def merge_publications(cur: Any, items: Any, dry_run: Any = False) -> Any:
         hal_pub_id = resolve(item["hal_pub_id"])
 
         if src_pub_id == hal_pub_id:
-            continue  # Déjà résolu par une fusion précédente
+            continue
 
         if dry_run:
             log.info(
@@ -157,7 +144,7 @@ def main() -> Any:
 
     conn = get_connection()
     conn.autocommit = False
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     try:
         log.info("Recherche des doublons par identifiant HAL (OpenAlex + ScanR)...")

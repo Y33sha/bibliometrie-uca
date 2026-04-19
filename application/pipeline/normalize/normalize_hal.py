@@ -33,6 +33,22 @@ from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.publication import clean_doi, normalize_nnt
 from infrastructure.addresses import link_addresses
+from infrastructure.db.queries.normalize_hal import (
+    delete_hal_duplicate_authorship_addresses,
+    delete_hal_duplicate_authorships,
+    delete_hal_orphan_source_persons,
+    enrich_hal_source_person,
+    fetch_hal_source_structure_ids,
+    fetch_hal_source_structures_for_cache,
+    find_hal_source_person_nokey,
+    get_hal_publication_id,
+    insert_hal_source_person_new,
+    staging_has_hal_doi,
+    upsert_hal_source_authorship,
+    upsert_hal_source_person,
+    upsert_hal_source_publication,
+    upsert_hal_source_structure,
+)
 from infrastructure.db_helpers import mark_staging_done
 from infrastructure.log import setup_logger
 from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
@@ -237,63 +253,27 @@ def insert_hal_document(
     uri = as_str(doc.get("uri_s"))
     urls = [uri] if uri else None
 
-    cur.execute(
-        """
-        INSERT INTO source_publications
-            (source, source_id, doi, title, pub_year, doc_type,
-             hal_collections, publication_id, staging_id, external_ids,
-             journal_id, oa_status, language, container_title,
-             abstract, keywords, topics, biblio, urls)
-        VALUES ('hal', %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s, %s, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            publication_id = COALESCE(
-                source_publications.publication_id, EXCLUDED.publication_id
-            ),
-            doi = COALESCE(source_publications.doi, EXCLUDED.doi),
-            doc_type = COALESCE(EXCLUDED.doc_type, source_publications.doc_type),
-            hal_collections = (
-                SELECT array_agg(DISTINCT c ORDER BY c)
-                FROM unnest(
-                    COALESCE(source_publications.hal_collections, '{}') ||
-                    COALESCE(EXCLUDED.hal_collections, '{}')
-                ) AS c
-            ),
-            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
-            journal_id = COALESCE(EXCLUDED.journal_id, source_publications.journal_id),
-            oa_status = COALESCE(EXCLUDED.oa_status, source_publications.oa_status),
-            language = COALESCE(EXCLUDED.language, source_publications.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_publications.container_title),
-            abstract = COALESCE(EXCLUDED.abstract, source_publications.abstract),
-            keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
-            topics = COALESCE(EXCLUDED.topics, source_publications.topics),
-            biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
-            urls = COALESCE(EXCLUDED.urls, source_publications.urls)
-        RETURNING id
-    """,
-        (
-            hal_id,
-            doi,
-            title,
-            pub_year,
-            doc_type,
-            collections_array,
-            publication_id,
-            staging_id,
-            external_ids,
-            journal_id,
-            oa_status,
-            language,
-            container_title,
-            abstract,
-            keywords,
-            topics,
-            biblio_json,
-            urls,
-        ),
+    return upsert_hal_source_publication(
+        cur,
+        hal_id=hal_id,
+        doi=doi,
+        title=title,
+        pub_year=pub_year,
+        doc_type=doc_type,
+        hal_collections=collections_array,
+        publication_id=publication_id,
+        staging_id=staging_id,
+        external_ids=external_ids,
+        journal_id=journal_id,
+        oa_status=oa_status,
+        language=language,
+        container_title=container_title,
+        abstract=abstract,
+        keywords=keywords,
+        topics=topics,
+        biblio=biblio_json,
+        urls=urls,
     )
-    return cur.fetchone()[0]
 
 
 # =============================================================
@@ -364,22 +344,15 @@ def upsert_hal_author(
         src_id = _hal_source_id(hal_person_id, hal_form_id)
         if src_id in _hal_author_cache:
             return _hal_author_cache[src_id]
-        cur.execute(
-            """
-            INSERT INTO source_persons
-                (source, source_id, full_name, last_name, first_name, orcid,
-                 source_ids)
-            VALUES ('hal', %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (source, source_id) DO UPDATE SET
-                orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
-                full_name = EXCLUDED.full_name,
-                source_ids = COALESCE(source_persons.source_ids, '{}') ||
-                             COALESCE(EXCLUDED.source_ids, '{}')
-            RETURNING id
-        """,
-            (src_id, full_name, last_name, first_name, orcid, source_ids_json),
+        result = upsert_hal_source_person(
+            cur,
+            source_id=src_id,
+            full_name=full_name,
+            last_name=last_name,
+            first_name=first_name,
+            orcid=orcid,
+            source_ids_json=source_ids_json,
         )
-        result = cur.fetchone()[0]
         _hal_author_cache[src_id] = result
         return result
 
@@ -388,22 +361,15 @@ def upsert_hal_author(
         src_id = _hal_source_id(None, hal_form_id)
         if src_id in _hal_author_cache:
             return _hal_author_cache[src_id]
-        cur.execute(
-            """
-            INSERT INTO source_persons
-                (source, source_id, full_name, last_name, first_name, orcid,
-                 source_ids)
-            VALUES ('hal', %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (source, source_id) DO UPDATE SET
-                orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
-                full_name = EXCLUDED.full_name,
-                source_ids = COALESCE(source_persons.source_ids, '{}') ||
-                             COALESCE(EXCLUDED.source_ids, '{}')
-            RETURNING id
-        """,
-            (src_id, full_name, last_name, first_name, orcid, source_ids_json),
+        result = upsert_hal_source_person(
+            cur,
+            source_id=src_id,
+            full_name=full_name,
+            last_name=last_name,
+            first_name=first_name,
+            orcid=orcid,
+            source_ids_json=source_ids_json,
         )
-        result = cur.fetchone()[0]
         _hal_author_cache[src_id] = result
         return result
 
@@ -412,48 +378,27 @@ def upsert_hal_author(
     if cache_key in _hal_author_cache:
         return _hal_author_cache[cache_key]
 
-    cur.execute(
-        """
-        SELECT id FROM source_persons
-        WHERE source = 'hal'
-          AND source_id LIKE 'nokey-%%'
-          AND full_name = %s
-          AND first_name IS NOT DISTINCT FROM %s
-        LIMIT 1
-    """,
-        (full_name, first_name),
-    )
-    row = cur.fetchone()
-    if row:
+    existing_id = find_hal_source_person_nokey(cur, full_name=full_name, first_name=first_name)
+    if existing_id is not None:
         if orcid or source_ids_json:
-            cur.execute(
-                """
-                UPDATE source_persons SET
-                    orcid = COALESCE(source_persons.orcid, %s),
-                    source_ids = COALESCE(source_persons.source_ids, '{}') ||
-                                 COALESCE(%s::jsonb, '{}')
-                WHERE id = %s
-            """,
-                (orcid, source_ids_json, row[0]),
+            enrich_hal_source_person(
+                cur,
+                source_person_id=existing_id,
+                orcid=orcid,
+                source_ids_json=source_ids_json,
             )
-        _hal_author_cache[cache_key] = row[0]
-        return row[0]
+        _hal_author_cache[cache_key] = existing_id
+        return existing_id
 
     # 4. Nouveau sans identifiant — on génère un source_id séquentiel
-    cur.execute("SELECT nextval('source_persons_id_seq')")
-    next_id = cur.fetchone()[0]
-    src_id = f"nokey-{next_id}"
-    cur.execute(
-        """
-        INSERT INTO source_persons
-            (id, source, source_id, full_name, last_name, first_name, orcid,
-             source_ids)
-        VALUES (%s, 'hal', %s, %s, %s, %s, %s, %s)
-        RETURNING id
-    """,
-        (next_id, src_id, full_name, last_name, first_name, orcid, source_ids_json),
+    result = insert_hal_source_person_new(
+        cur,
+        full_name=full_name,
+        last_name=last_name,
+        first_name=first_name,
+        orcid=orcid,
+        source_ids_json=source_ids_json,
     )
-    result = cur.fetchone()[0]
     _hal_author_cache[cache_key] = result
     return result
 
@@ -512,18 +457,11 @@ def parse_author_structures(
 
         # Créer la source_structure si pas encore en cache
         if cur and struct_cache is not None and str(struct_id) not in struct_cache:
-            cur.execute(
-                """
-                INSERT INTO source_structures (source, source_id, name)
-                VALUES ('hal', %s, %s)
-                ON CONFLICT (source, source_id) DO UPDATE SET
-                    name = COALESCE(NULLIF(source_structures.name, ''), EXCLUDED.name)
-                RETURNING id
-            """,
-                (str(struct_id), struct_name[:500] if struct_name else str(struct_id)),
+            ss_id = upsert_hal_source_structure(
+                cur,
+                source_id=str(struct_id),
+                name=(struct_name[:500] if struct_name else str(struct_id)),
             )
-            row = cur.fetchone()
-            ss_id = row[0] if isinstance(row, tuple) else row["id"]
             struct_cache[str(struct_id)] = ss_id
             if struct_name_cache is not None:
                 struct_name_cache[ss_id] = struct_name
@@ -629,14 +567,7 @@ def process_authors(
                     struct_cache[str(hid)] for hid in raw_hal_ids if str(hid) in struct_cache
                 ]
             else:
-                cur.execute(
-                    """
-                    SELECT id FROM source_structures
-                    WHERE source = 'hal' AND source_id = ANY(%s)
-                """,
-                    ([str(hid) for hid in raw_hal_ids],),
-                )
-                resolved = [r[0] for r in cur.fetchall()]
+                resolved = fetch_hal_source_structure_ids(cur, [str(hid) for hid in raw_hal_ids])
             if resolved:
                 source_struct_ids = sorted(resolved)
 
@@ -649,36 +580,16 @@ def process_authors(
                 if sid in struct_name_cache and struct_name_cache[sid].strip()
             ]
 
-        cur.execute(
-            """
-            INSERT INTO source_authorships
-                (source, source_publication_id, source_person_id, author_position, source_struct_ids,
-                 author_name_normalized, is_corresponding, roles, raw_author_name)
-            VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
-            ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
-                source_struct_ids = COALESCE(
-                    EXCLUDED.source_struct_ids,
-                    source_authorships.source_struct_ids
-                ),
-                author_name_normalized = EXCLUDED.author_name_normalized,
-                is_corresponding = EXCLUDED.is_corresponding,
-                roles = EXCLUDED.roles,
-                raw_author_name = EXCLUDED.raw_author_name
-            RETURNING id
-        """,
-            (
-                source_publication_id,
-                source_person_id,
-                position,
-                source_struct_ids,
-                name,
-                is_corresponding,
-                roles or None,
-                name,
-            ),
+        sa_id = upsert_hal_source_authorship(
+            cur,
+            source_publication_id=source_publication_id,
+            source_person_id=source_person_id,
+            author_position=position,
+            source_struct_ids=source_struct_ids,
+            raw_author_name=name,
+            is_corresponding=is_corresponding,
+            roles=roles or None,
         )
-        row = cur.fetchone()
-        sa_id = row[0] if isinstance(row, tuple) else row["id"]
 
         if addr_parts:
             link_addresses(cur, sa_id, addr_parts)
@@ -719,11 +630,7 @@ def process_work(
                 logger.warning(f"  {hal_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
                 return False  # ne pas marquer processed
             if version_doi:
-                cur.execute(
-                    "SELECT id FROM staging WHERE source = 'hal' AND lower(doi) = lower(%s)",
-                    (version_doi,),
-                )
-                if cur.fetchone():
+                if staging_has_hal_doi(cur, version_doi):
                     logger.info(
                         f"  {hal_id} concept DOI Zenodo {raw_doi} -> "
                         f"version {version_doi} deja en staging, skip"
@@ -744,13 +651,8 @@ def process_work(
 
         # Idempotence : si source_publications a déjà ce source_id avec un publication_id,
         # le réutiliser au lieu de risquer un doublon
-        cur.execute(
-            "SELECT publication_id FROM source_publications WHERE source = 'hal' AND source_id = %s",
-            (hal_id,),
-        )
-        existing_doc = cur.fetchone()
-        if existing_doc and existing_doc[0]:
-            old_pub_id = existing_doc[0]
+        old_pub_id = get_hal_publication_id(cur, hal_id)
+        if old_pub_id:
             # Re-traitement : relancer find pour détecter les fusions par DOI/NNT
             publication_id = find_publication(cur, doc, journal_id)
             if publication_id and publication_id != old_pub_id:
@@ -819,13 +721,9 @@ class HalNormalizer(SourceNormalizer):
     def preload_caches(self, cur: Any) -> None:
         # Cache source_structures HAL (source_id → id + nom) pour éviter une
         # requête par auteur dans process_work.
-        cur.execute("""
-            SELECT source_id, id, COALESCE(name, '')
-            FROM source_structures WHERE source = 'hal'
-        """)
-        rows = cur.fetchall()
-        self._struct_cache = {r[0]: r[1] for r in rows}
-        self._struct_name_cache = {r[1]: r[2] for r in rows}
+        rows = fetch_hal_source_structures_for_cache(cur)
+        self._struct_cache = {src: pid for src, pid, _ in rows}
+        self._struct_name_cache = {pid: name for _, pid, name in rows}
         self.logger.info(f"Cache source_structures : {len(self._struct_cache)} entrées")
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
@@ -838,42 +736,14 @@ class HalNormalizer(SourceNormalizer):
 
     def post_process(self, cur: Any) -> None:
         # Doublons de position : garder le plus récent
-        cur.execute("""
-            DELETE FROM source_authorship_addresses
-            WHERE source_authorship_id IN (
-                SELECT sa1.id FROM source_authorships sa1
-                JOIN source_authorships sa2
-                  ON sa2.source_publication_id = sa1.source_publication_id
-                 AND sa2.author_position = sa1.author_position
-                 AND sa2.id > sa1.id
-                WHERE sa1.source = 'hal' AND sa1.author_position IS NOT NULL
-            )
-        """)
-        cur.execute("""
-            DELETE FROM source_authorships
-            WHERE source = 'hal' AND id IN (
-                SELECT sa1.id FROM source_authorships sa1
-                JOIN source_authorships sa2
-                  ON sa2.source_publication_id = sa1.source_publication_id
-                 AND sa2.author_position = sa1.author_position
-                 AND sa2.id > sa1.id
-                WHERE sa1.source = 'hal' AND sa1.author_position IS NOT NULL
-            )
-        """)
-        if cur.rowcount:
-            self.logger.info(f"Doublons de position supprimés : {cur.rowcount}")
+        delete_hal_duplicate_authorship_addresses(cur)
+        deleted_dups = delete_hal_duplicate_authorships(cur)
+        if deleted_dups:
+            self.logger.info(f"Doublons de position supprimés : {deleted_dups}")
 
-        # source_persons HAL orphelins
-        cur.execute("""
-            DELETE FROM source_persons
-            WHERE source = 'hal'
-              AND NOT EXISTS (
-                  SELECT 1 FROM source_authorships sa
-                  WHERE sa.source_person_id = source_persons.id
-              )
-        """)
-        if cur.rowcount:
-            self.logger.info(f"Source_authors orphelins supprimés : {cur.rowcount}")
+        orphans = delete_hal_orphan_source_persons(cur)
+        if orphans:
+            self.logger.info(f"Source_authors orphelins supprimés : {orphans}")
 
     def cleanup(self) -> None:
         self._struct_cache.clear()
