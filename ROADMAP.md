@@ -132,18 +132,27 @@ de migration depuis un schéma Python. Alembic est le standard Python
 pour ça. Évaluer migration coût/bénéfice.
 
 ### 2.5 Code hygiene
-- [ ] **Complexité cyclomatique** : seuil actuel à 20 (ruff C901), faire
-  descendre progressivement à 15 puis 10 en cassant les fonctions trop
-  denses (typiquement les routers de facettes et `refresh_from_sources`)
+- [x] **Complexité cyclomatique** : seuil ruff C901 à **15** après
+  décomposition de 4 fonctions (`publications_facets` 25→<10 via
+  `_PublicationFacetsBuilder`, `_build_list_conditions` 17→<15 via
+  3 helpers, `refresh_from_sources` 24→<15 via extraction des helpers
+  au module-level, `export_publications_csv` 23→<15 via
+  `_build_export_conditions`). Prochaine cible 10 : demande encore
+  ~9 fonctions à décomposer, rendement décroissant.
 - [x] **Mypy** strict : `check_untyped_defs` + `disallow_untyped_defs`
   globalement activés, 0 erreur. Durcissement futur possible : remplacer
   les `Any` pragmatiques par des types plus précis (en particulier sur
   les signatures métier — les `cur: Any` pour psycopg2 peuvent rester).
-- [ ] **Dédoublonnage** : audit complet du code dupliqué (`radon` ou manuel)
-  — notamment le SQL qui pouvait être factorisé depuis la fusion des
-  tables sources, mais qui ne l'a pas été
-- [ ] **Magic values** : systématiser les enums pour les constantes métier,
-  les settings pour les valeurs de configuration
+- [x] **Dédoublonnage** : audit via pylint `duplicate-code`. Résultats :
+  `harvest_hal_orcids.py` supprimé (orphelin, superseded par
+  `harvest_hal_identifiers.py`). Les autres duplications détectées
+  (forme des dicts `extract_pub_metadata`) sont liées à la logique
+  source-spécifique, pas factorisables sans perte.
+- [x] **Magic values** : `OA_CLOSED_STATUSES` centralisée aux côtés
+  d'`OA_OPEN_STATUSES` dans `filters.py`, +helper `_sql_list()` pour
+  injection SQL littérale. 7 occurrences inline remplacées. Les autres
+  constantes métier (`doc_types`, `sources`, `authorship_roles`) sont
+  déjà factorisées dans `domain/`.
 
 ### 2.6 Documentation et DX
 - [ ] **README** : permettre à une nouvelle personne (ou toi-dans-2-ans)
