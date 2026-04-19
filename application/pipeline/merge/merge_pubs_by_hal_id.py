@@ -107,7 +107,7 @@ def merge_publications(cur, items, dry_run=False):
     """
     merged = 0
     errors = 0
-    merged_into = {}
+    merged_into: dict[int, int] = {}
 
     def resolve(pub_id):
         visited = set()

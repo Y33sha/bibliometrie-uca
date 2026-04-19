@@ -276,7 +276,7 @@ def main():
         test_resp = requests.get(
             BASE_URL,
             headers=HEADERS,
-            params={"databaseId": "WOS", "usrQuery": "OG=(test)", "count": 0, "firstRecord": 1},
+            params={"databaseId": "WOS", "usrQuery": "OG=(test)", "count": "0", "firstRecord": "1"},
             timeout=30,
         )
         if test_resp.status_code == 200:

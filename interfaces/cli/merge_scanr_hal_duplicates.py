@@ -93,7 +93,7 @@ def main():
     skipped = 0
     errors = 0
     # Suivre les publications supprimées → leur cible de fusion
-    merged_into = {}  # {source_id: target_id}
+    merged_into: dict[int, int] = {}  # {source_id: target_id}
 
     def resolve(pub_id):
         """Suit la chaîne de fusions pour trouver la publication vivante."""
