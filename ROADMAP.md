@@ -126,10 +126,15 @@ dupliqué entre agrégats.
 - Version Python supportée documentée et alignée avec prod DSI
 
 ### 2.4 Migrations BDD : évaluer Alembic
-Le système de migrations maison (`infrastructure/db/migrate.py`)
-fonctionne mais ne gère pas les downgrades, ni la génération automatique
-de migration depuis un schéma Python. Alembic est le standard Python
-pour ça. Évaluer migration coût/bénéfice.
+- [x] **Évaluation** : ne pas migrer. Raisons :
+  1. Le système maison (`migrate.py`, 120 lignes) a géré 70+ migrations
+     historiques (pré-squashing) + 6 depuis, 0 downgrade utilisé.
+  2. La génération auto — vrai gain d'Alembic — nécessite SQLAlchemy,
+     qui demanderait un chantier disproportionné (pas sur la roadmap).
+  3. Pour la DSI : le système maison est lisible en 2 min. Alembic
+     n'apporterait qu'un standard connu, sans gain fonctionnel prouvé.
+- [ ] Si downgrades deviennent utiles : convention `NNN_down.sql`
+  optionnelle, ~10 lignes à ajouter dans `migrate.py`.
 
 ### 2.5 Code hygiene
 - [x] **Complexité cyclomatique** : seuil ruff C901 à **15** après
