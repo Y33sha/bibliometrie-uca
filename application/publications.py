@@ -217,7 +217,86 @@ _OA_RANK = {
 }
 
 
-def refresh_from_sources(cur: Any, pub_id: int) -> None:  # noqa: C901
+def _choose_priority(rows: list[dict[str, Any]]) -> list[str]:
+    """Sélectionne l'ordre de priorité des sources selon le contexte.
+
+    - Thèses avec un OpenAlex liant vers HAL : ordre HAL-linked
+    - Thèses : theses.fr > HAL > OA > WoS > ScanR
+    - Autres : HAL > OA > WoS > ScanR > theses.fr
+    """
+    has_hal_link = any(
+        r["source"] == "openalex" and (r["external_ids"] or {}).get("hal") for r in rows
+    )
+    is_thesis = any(
+        map_doc_type(r["doc_type"], r["source"]) in ("thesis", "ongoing_thesis") for r in rows
+    )
+    if is_thesis and has_hal_link:
+        return _PRIORITY_THESIS_HAL_LINKED
+    if is_thesis:
+        return _PRIORITY_THESIS
+    return _PRIORITY_DEFAULT
+
+
+def _first_non_null(rows: list[dict[str, Any]], field: str) -> Any:
+    for r in rows:
+        v = r[field]
+        if v is not None:
+            return v
+    return None
+
+
+def _merge_lists(rows: list[dict[str, Any]], field: str) -> list[Any] | None:
+    seen: set[Any] = set()
+    result: list[Any] = []
+    for r in rows:
+        for item in r[field] or []:
+            key = item.lower() if isinstance(item, str) else item
+            if key not in seen:
+                seen.add(key)
+                result.append(item)
+    return result or None
+
+
+def _merge_jsonb(rows: list[dict[str, Any]], field: str) -> dict | None:
+    """Fusion shallow par clé pour meta/biblio (source prioritaire gagne par clé)."""
+    merged: dict[str, Any] = {}
+    for r in rows:
+        d = r[field]
+        if isinstance(d, dict):
+            for k, v in d.items():
+                if k not in merged:
+                    merged[k] = v
+    return merged or None
+
+
+def _topics_by_source(rows: list[dict[str, Any]]) -> dict | None:
+    """Indexe les topics par source (schémas radicalement différents par source)."""
+    out: dict[str, Any] = {}
+    for r in rows:
+        topics = r["topics"]
+        if topics:
+            out[r["source"]] = topics
+    return out or None
+
+
+def _best_oa_status(rows: list[dict[str, Any]]) -> str | None:
+    best: str | None = None
+    best_rank = 0
+    for r in rows:
+        s = r["oa_status"]
+        if s and _OA_RANK.get(s, 0) > best_rank:
+            best, best_rank = s, _OA_RANK[s]
+    return best
+
+
+def _first_doc_type(rows: list[dict[str, Any]]) -> str:
+    for r in rows:
+        if r["doc_type"]:
+            return map_doc_type(r["doc_type"], r["source"])
+    return "other"
+
+
+def refresh_from_sources(cur: Any, pub_id: int) -> None:
     """Recalcule les métadonnées d'une publication depuis ses source_publications.
 
     Contrairement à l'ancien _enrich() qui faisait du COALESCE incrémental (premier arrivé
@@ -257,119 +336,26 @@ def refresh_from_sources(cur: Any, pub_id: int) -> None:  # noqa: C901
     if not rows:
         return
 
-    # Déterminer si c'est une thèse et si un OA pointe vers HAL
-    has_hal_link = any(
-        r["source"] == "openalex" and (r["external_ids"] or {}).get("hal") for r in rows
-    )
-    is_thesis = any(
-        map_doc_type(r["doc_type"], r["source"]) in ("thesis", "ongoing_thesis") for r in rows
-    )
-
-    if is_thesis and has_hal_link:
-        priority = _PRIORITY_THESIS_HAL_LINKED
-    elif is_thesis:
-        priority = _PRIORITY_THESIS
-    else:
-        priority = _PRIORITY_DEFAULT
-
-    # Trier les lignes par priorité de source
+    priority = _choose_priority(rows)
     rank = {s: i for i, s in enumerate(priority)}
     rows.sort(key=lambda r: rank.get(r["source"], 99))
 
-    # --- Helpers ---
-    def first_non_null(field: Any) -> Any:
-        for r in rows:
-            v = r[field]
-            if v is not None:
-                return v
-        return None
-
-    def merge_lists(field: Any) -> Any:
-        seen = set()
-        result = []
-        for r in rows:
-            for item in r[field] or []:
-                key = item.lower() if isinstance(item, str) else item
-                if key not in seen:
-                    seen.add(key)
-                    result.append(item)
-        return result or None
-
-    def merge_jsonb(field: Any) -> Any:
-        """Fusion shallow par clé pour meta/biblio : les deux sont toujours
-        des dicts avec des clés orthogonales entre sources (pas de conflit
-        en pratique). La source prioritaire gagne par clé."""
-        merged = {}
-        for r in rows:
-            d = r[field]
-            if isinstance(d, dict):
-                for k, v in d.items():
-                    if k not in merged:
-                        merged[k] = v
-        return merged or None
-
-    def topics_by_source() -> Any:
-        """Indexe les topics par source pour ne RIEN perdre de l'info.
-
-        Les topics ont des schémas radicalement différents selon la source
-        (liste hiérarchique OpenAlex vs dict discipline/rameau theses.fr) ;
-        une fusion par clé ne peut pas les unifier sans perte. On rend
-        donc `publications.topics` composite :
-            {"openalex": [...], "theses": {...}, "scanr": ...}
-        Chaque source garde sa forme native.
-        """
-        out: dict = {}
-        for r in rows:
-            topics = r["topics"]
-            if topics:
-                out[r["source"]] = topics
-        return out or None
-
-    def best_oa_status() -> Any:
-        best, best_rank = None, 0
-        for r in rows:
-            s = r["oa_status"]
-            if s and _OA_RANK.get(s, 0) > best_rank:
-                best, best_rank = s, _OA_RANK[s]
-        return best
-
-    # --- Calcul des valeurs ---
-    new_doi = first_non_null("doi")
-    # doc_type : premier non-null mappé vers l'enum canonique
-    new_doc_type = "other"
-    for r in rows:
-        if r["doc_type"]:
-            new_doc_type = map_doc_type(r["doc_type"], r["source"])
-            break
-    new_pub_year = first_non_null("pub_year")
-    new_journal_id = first_non_null("journal_id")
-    new_container_title = first_non_null("container_title")
-    new_language = first_non_null("language")
-    new_abstract = first_non_null("abstract")
-    new_oa_status = best_oa_status()
-    new_is_retracted = any(r["is_retracted"] for r in rows if r["is_retracted"])
-    new_keywords = merge_lists("keywords")
-    new_countries = merge_lists("countries")
-    new_topics = topics_by_source()
-    new_biblio = merge_jsonb("biblio")
-    new_meta = merge_jsonb("meta")
-
     repo.update_aggregated(
         pub_id,
-        doi=new_doi,
-        doc_type=new_doc_type,
-        pub_year=new_pub_year,
-        journal_id=new_journal_id,
-        oa_status=new_oa_status,
-        container_title=new_container_title,
-        language=new_language,
-        abstract=new_abstract,
-        keywords=new_keywords,
-        countries=new_countries,
-        topics=new_topics,
-        biblio=new_biblio,
-        meta=new_meta,
-        is_retracted=new_is_retracted,
+        doi=_first_non_null(rows, "doi"),
+        doc_type=_first_doc_type(rows),
+        pub_year=_first_non_null(rows, "pub_year"),
+        journal_id=_first_non_null(rows, "journal_id"),
+        oa_status=_best_oa_status(rows),
+        container_title=_first_non_null(rows, "container_title"),
+        language=_first_non_null(rows, "language"),
+        abstract=_first_non_null(rows, "abstract"),
+        keywords=_merge_lists(rows, "keywords"),
+        countries=_merge_lists(rows, "countries"),
+        topics=_topics_by_source(rows),
+        biblio=_merge_jsonb(rows, "biblio"),
+        meta=_merge_jsonb(rows, "meta"),
+        is_retracted=any(r["is_retracted"] for r in rows if r["is_retracted"]),
     )
     repo.update_sources(pub_id)
 

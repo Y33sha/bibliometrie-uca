@@ -55,34 +55,27 @@ class ListFilters:
     in_perimeter: str = ""
 
 
-def _build_list_conditions(
-    cur: Any, filters: ListFilters, root_structure_id: int
-) -> tuple[list[str], list[Any]]:
-    """Construit les (conditions, params) communs à list et export.
-
-    `cur` est utilisé pour charger la hal_collection du labo quand un
-    filtre hal_status est actif (nécessite un seul lab_id).
-    """
+def _initial_conditions(filters: ListFilters) -> tuple[list[str], list[Any]]:
+    """Initialise les conditions de base selon le scope (person, labs, UCA)."""
     if filters.person_id:
-        conditions: list[str] = [
+        return (
+            [
+                """
+                EXISTS (SELECT 1 FROM authorships a
+                        JOIN source_authorships sa ON sa.authorship_id = a.id
+                        WHERE a.publication_id = p.id AND a.person_id = %s
+                          AND sa.roles && ARRAY['author']::text[])
             """
-            EXISTS (SELECT 1 FROM authorships a
-                    JOIN source_authorships sa ON sa.authorship_id = a.id
-                    WHERE a.publication_id = p.id AND a.person_id = %s
-                      AND sa.roles && ARRAY['author']::text[])
-        """
-        ]
-        params: list[Any] = [filters.person_id]
-    elif filters.lab_none and not filters.lab_ids:
-        conditions = [PUB_IS_UCA]
-        params = []
-    elif filters.lab_ids:
-        conditions = []
-        params = []
-    else:
-        conditions = [PUB_IS_UCA]
-        params = []
+            ],
+            [filters.person_id],
+        )
+    if filters.lab_ids:
+        return [], []
+    return [PUB_IS_UCA], []
 
+
+def _apply_inline_filters(conditions: list[str], params: list[Any], filters: ListFilters) -> None:
+    """Filtres simples (non délégués aux helpers filters.py)."""
     conditions.append("p.doc_type NOT IN ('peer_review', 'memoir')")
     if filters.excluded_types:
         conditions.append("p.doc_type::text != ALL(%s)")
@@ -96,12 +89,6 @@ def _build_list_conditions(
     if filters.doc_types:
         conditions.append("p.doc_type::text = ANY(%s)")
         params.append(filters.doc_types)
-
-    if filters.lab_none and not filters.lab_ids:
-        apply_no_lab_filter(conditions, params)
-    elif filters.lab_ids:
-        apply_lab_filter(conditions, params, filters.lab_ids)
-
     if filters.publisher_id:
         conditions.append("""
             EXISTS (
@@ -110,10 +97,36 @@ def _build_list_conditions(
             )
         """)
         params.append(filters.publisher_id)
-
     if filters.journal_id:
         conditions.append("p.journal_id = %s")
         params.append(filters.journal_id)
+    if filters.country_values:
+        conditions.append("p.countries && %s::text[]")
+        params.append(filters.country_values)
+
+
+def _apply_hal_status(
+    cur: Any, conditions: list[str], params: list[Any], filters: ListFilters
+) -> None:
+    """Filtre hal_status (nécessite un seul lab_id pour charger la collection)."""
+    if filters.hal_status_values and len(filters.lab_ids) == 1:
+        cur.execute("SELECT hal_collection FROM structures WHERE id = %s", (filters.lab_ids[0],))
+        lab_row = cur.fetchone()
+        lab_hal_col = lab_row["hal_collection"] if lab_row else None
+        apply_hal_status_filter(conditions, params, filters.hal_status_values, lab_hal_col)
+
+
+def _build_list_conditions(
+    cur: Any, filters: ListFilters, root_structure_id: int
+) -> tuple[list[str], list[Any]]:
+    """Construit les (conditions, params) communs à list et export."""
+    conditions, params = _initial_conditions(filters)
+    _apply_inline_filters(conditions, params, filters)
+
+    if filters.lab_none and not filters.lab_ids:
+        apply_no_lab_filter(conditions, params)
+    elif filters.lab_ids:
+        apply_lab_filter(conditions, params, filters.lab_ids)
 
     if filters.source_values:
         apply_source_filter(conditions, filters.source_values)
@@ -122,22 +135,11 @@ def _build_list_conditions(
 
     if filters.person_id:
         apply_corresponding_filter(conditions, params, filters.person_id, filters.is_corresponding)
-
     if filters.has_apc:
         apply_apc_filter(
             conditions, params, filters.has_apc, root_structure_id, lab_ids=filters.lab_ids
         )
-
-    if filters.country_values:
-        conditions.append("p.countries && %s::text[]")
-        params.append(filters.country_values)
-
-    if filters.hal_status_values and len(filters.lab_ids) == 1:
-        cur.execute("SELECT hal_collection FROM structures WHERE id = %s", (filters.lab_ids[0],))
-        lab_row = cur.fetchone()
-        lab_hal_col = lab_row["hal_collection"] if lab_row else None
-        apply_hal_status_filter(conditions, params, filters.hal_status_values, lab_hal_col)
-
+    _apply_hal_status(cur, conditions, params, filters)
     apply_in_perimeter_person_filter(conditions, params, filters.in_perimeter, filters.person_id)
     return conditions, params
 
@@ -291,7 +293,74 @@ def list_publications(
 # ── Export CSV ────────────────────────────────────────────────────
 
 
-def export_publications_csv(  # noqa: C901 (reproduction fidèle du comportement historique)
+def _initial_conditions_for_export(filters: ListFilters) -> tuple[list[str], list[Any]]:
+    """Variante export : le filtre person passe par `source_authorships` directement
+    (comportement historique différent de list_publications).
+    """
+    if filters.person_id:
+        return (
+            [
+                """
+                EXISTS (SELECT 1 FROM source_publications sd
+                        JOIN source_authorships sa ON sa.source_publication_id = sd.id
+                        WHERE sd.publication_id = p.id AND sa.person_id = %s
+                          AND sa.excluded = FALSE
+                          AND sa.roles && ARRAY['author']::text[])
+            """
+            ],
+            [filters.person_id],
+        )
+    if filters.lab_ids:
+        return [], []
+    return [PUB_IS_UCA], []
+
+
+def _apply_export_source_filters(conditions: list[str], source_values: list[str]) -> None:
+    """Version inline du filtre source pour l'export (pas via apply_source_filter
+    pour préserver le comportement historique à 4 valeurs hal_yes/no oa_yes/no)."""
+    for sv in source_values:
+        if sv == "hal_yes":
+            conditions.append("p.sources @> ARRAY['hal'::source_type]")
+        elif sv == "hal_no":
+            conditions.append("NOT p.sources @> ARRAY['hal'::source_type]")
+        elif sv == "oa_yes":
+            conditions.append("p.sources @> ARRAY['openalex'::source_type]")
+        elif sv == "oa_no":
+            conditions.append("NOT p.sources @> ARRAY['openalex'::source_type]")
+
+
+def _apply_export_oa_filter(conditions: list[str], params: list[Any], oa_status: str) -> None:
+    """Version inline du filtre oa_status pour l'export."""
+    if not oa_status:
+        return
+    oa_values = [v.strip() for v in oa_status.split(",") if v.strip()]
+    if not oa_values:
+        return
+    expanded: list[str] = []
+    for v in oa_values:
+        if v == "oa":
+            expanded.extend(OA_OPEN_STATUSES)
+        else:
+            expanded.append(v)
+    conditions.append("p.oa_status::text = ANY(%s)")
+    params.append(list(set(expanded)))
+
+
+def _build_export_conditions(filters: ListFilters) -> tuple[list[str], list[Any]]:
+    """Construit les conditions pour export CSV (sous-ensemble simplifié
+    des filtres de list_publications, comportement historique)."""
+    conditions, params = _initial_conditions_for_export(filters)
+    _apply_inline_filters(conditions, params, filters)
+    if filters.lab_none and not filters.lab_ids:
+        apply_no_lab_filter(conditions, params)
+    elif filters.lab_ids:
+        apply_lab_filter(conditions, params, filters.lab_ids)
+    _apply_export_source_filters(conditions, filters.source_values)
+    _apply_export_oa_filter(conditions, params, filters.oa_status)
+    return conditions, params
+
+
+def export_publications_csv(
     cur: Any, *, filters: ListFilters, root_structure_id: int, sort: str
 ) -> str:
     """Export CSV (sans pagination) avec les mêmes filtres que list_publications.
@@ -303,79 +372,7 @@ def export_publications_csv(  # noqa: C901 (reproduction fidèle du comportement
     appliqués dans l'export historique, on reproduit ce comportement.
     """
     cur.execute("SET LOCAL jit = off")
-    # L'export utilise un sous-ensemble simplifié des filtres — on reproduit
-    # la construction historique manuelle pour préserver le comportement.
-    if filters.person_id:
-        conditions: list[str] = [
-            """
-            EXISTS (SELECT 1 FROM source_publications sd
-                    JOIN source_authorships sa ON sa.source_publication_id = sd.id
-                    WHERE sd.publication_id = p.id AND sa.person_id = %s
-                      AND sa.excluded = FALSE
-                      AND sa.roles && ARRAY['author']::text[])
-        """
-        ]
-        params: list[Any] = [filters.person_id]
-    elif filters.lab_none and not filters.lab_ids:
-        conditions = [PUB_IS_UCA]
-        params = []
-    elif filters.lab_ids:
-        conditions = []
-        params = []
-    else:
-        conditions = [PUB_IS_UCA]
-        params = []
-
-    conditions.append("p.doc_type NOT IN ('peer_review', 'memoir')")
-    if filters.excluded_types:
-        conditions.append("p.doc_type::text != ALL(%s)")
-        params.append(filters.excluded_types)
-    if filters.search:
-        conditions.append("unaccent(p.title) ILIKE unaccent(%s)")
-        params.append(f"%{filters.search}%")
-    if filters.years:
-        conditions.append("p.pub_year = ANY(%s)")
-        params.append(filters.years)
-    if filters.doc_types:
-        conditions.append("p.doc_type::text = ANY(%s)")
-        params.append(filters.doc_types)
-    if filters.lab_none and not filters.lab_ids:
-        apply_no_lab_filter(conditions, params)
-    elif filters.lab_ids:
-        apply_lab_filter(conditions, params, filters.lab_ids)
-    if filters.publisher_id:
-        conditions.append("""
-            EXISTS (
-                SELECT 1 FROM journals j2
-                WHERE j2.id = p.journal_id AND j2.publisher_id = %s
-            )
-        """)
-        params.append(filters.publisher_id)
-    if filters.journal_id:
-        conditions.append("p.journal_id = %s")
-        params.append(filters.journal_id)
-    if filters.source_values:
-        for sv in filters.source_values:
-            if sv == "hal_yes":
-                conditions.append("p.sources @> ARRAY['hal'::source_type]")
-            elif sv == "hal_no":
-                conditions.append("NOT p.sources @> ARRAY['hal'::source_type]")
-            elif sv == "oa_yes":
-                conditions.append("p.sources @> ARRAY['openalex'::source_type]")
-            elif sv == "oa_no":
-                conditions.append("NOT p.sources @> ARRAY['openalex'::source_type]")
-    if filters.oa_status:
-        oa_values = [v.strip() for v in filters.oa_status.split(",") if v.strip()]
-        if oa_values:
-            expanded: list[str] = []
-            for v in oa_values:
-                if v == "oa":
-                    expanded.extend(OA_OPEN_STATUSES)
-                else:
-                    expanded.append(v)
-            conditions.append("p.oa_status::text = ANY(%s)")
-            params.append(list(set(expanded)))
-
+    conditions, params = _build_export_conditions(filters)
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
     order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
 
@@ -484,170 +481,183 @@ class FacetFilters:
     in_perimeter: str = ""
 
 
-def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus tard)
-    cur: Any, *, filters: FacetFilters, root_structure_id: int
-) -> dict[str, Any]:
-    """Facettes dynamiques : chaque facette exclut son propre filtre mais
-    applique tous les autres."""
-    cur.execute("SET LOCAL jit = off")
+class _PublicationFacetsBuilder:
+    """Construit les 15 facettes dynamiques pour /api/publications/facets.
 
-    def base_conds_params() -> tuple[list[str], list[Any]]:
-        if filters.person_id:
+    Chaque facette exclut son propre filtre mais applique tous les autres.
+    Décomposition : une méthode privée par facette + un orchestrateur `build()`.
+    """
+
+    def __init__(self, cur: Any, filters: FacetFilters, root_structure_id: int) -> None:
+        self.cur = cur
+        self.filters = filters
+        self.root_structure_id = root_structure_id
+        self.lab_hal_col: Any = None
+        self._preload_lab_hal_col()
+
+    # ── Utilitaires internes ────────────────────────────────────
+
+    def _preload_lab_hal_col(self) -> None:
+        """Charge la hal_collection du labo (si un seul labo est sélectionné)."""
+        if len(self.filters.lab_ids) == 1:
+            self.cur.execute(
+                "SELECT hal_collection FROM structures WHERE id = %s",
+                (self.filters.lab_ids[0],),
+            )
+            row = self.cur.fetchone()
+            self.lab_hal_col = row["hal_collection"] if row else None
+
+    def _base_conds(self) -> tuple[list[str], list[Any]]:
+        """Conditions de base : publications UCA ou par personne."""
+        f = self.filters
+        if f.person_id:
             c: list[str] = ["p.doc_type NOT IN ('peer_review', 'memoir')"]
             p: list[Any] = []
-            apply_person_filter(c, p, filters.person_id)
+            apply_person_filter(c, p, f.person_id)
         else:
             c, p = [PUB_IS_UCA], []
-        if filters.excluded_types:
+        if f.excluded_types:
             c.append("p.doc_type::text != ALL(%s)")
-            p.append(filters.excluded_types)
+            p.append(f.excluded_types)
         return c, p
 
-    lab_hal_col: list[Any] = [None]
-
-    def add_all_except(conds: list[str], params: list[Any], *, skip: str) -> None:
+    def _conds_skipping(self, skip: str) -> tuple[list[str], list[Any]]:  # noqa: C901
+        """Conditions de base + tous les filtres sauf `skip`."""
+        conds, params = self._base_conds()
+        f = self.filters
         if skip != "year":
-            apply_year_filter(conds, params, filters.years)
-        if skip != "corresponding" and filters.person_id:
-            apply_corresponding_filter(conds, params, filters.person_id, filters.is_corresponding)
+            apply_year_filter(conds, params, f.years)
+        if skip != "corresponding" and f.person_id:
+            apply_corresponding_filter(conds, params, f.person_id, f.is_corresponding)
         if skip != "lab":
-            if filters.lab_none and not filters.lab_ids:
+            if f.lab_none and not f.lab_ids:
                 apply_no_lab_filter(conds, params)
-            elif filters.lab_ids:
-                apply_lab_filter(conds, params, filters.lab_ids)
+            elif f.lab_ids:
+                apply_lab_filter(conds, params, f.lab_ids)
         if skip != "doc_type":
-            apply_doc_type_filter(conds, params, filters.doc_types)
+            apply_doc_type_filter(conds, params, f.doc_types)
         if skip != "access":
-            apply_access_filter(conds, params, filters.access)
+            apply_access_filter(conds, params, f.access)
         if skip != "oa_status":
-            apply_oa_filter(conds, params, filters.oa_status)
+            apply_oa_filter(conds, params, f.oa_status)
         if skip != "source":
-            apply_source_filter(conds, filters.source_values)
+            apply_source_filter(conds, f.source_values)
         if skip != "apc":
-            apply_apc_filter(
-                conds, params, filters.has_apc, root_structure_id, lab_ids=filters.lab_ids
-            )
-        apply_publisher_journal_filter(conds, params, filters.publisher_id, filters.journal_id)
-        if skip != "country" and filters.country_values:
+            apply_apc_filter(conds, params, f.has_apc, self.root_structure_id, lab_ids=f.lab_ids)
+        apply_publisher_journal_filter(conds, params, f.publisher_id, f.journal_id)
+        if skip != "country" and f.country_values:
             conds.append("p.countries && %s::text[]")
-            params.append(filters.country_values)
+            params.append(f.country_values)
         if skip != "hal_status":
-            apply_hal_status_filter(conds, params, filters.hal_status_values, lab_hal_col[0])
+            apply_hal_status_filter(conds, params, f.hal_status_values, self.lab_hal_col)
         if skip != "in_perimeter":
-            apply_in_perimeter_person_filter(conds, params, filters.in_perimeter, filters.person_id)
+            apply_in_perimeter_person_filter(conds, params, f.in_perimeter, f.person_id)
+        return conds, params
 
-    def where_sql(conds: list[str]) -> str:
+    @staticmethod
+    def _where_sql(conds: list[str]) -> str:
         return " AND ".join(conds) if conds else "TRUE"
 
-    # Pré-charger la hal_collection du labo (utilisée par hal_status filter)
-    if len(filters.lab_ids) == 1:
-        cur.execute("SELECT hal_collection FROM structures WHERE id = %s", (filters.lab_ids[0],))
-        row = cur.fetchone()
-        lab_hal_col[0] = row["hal_collection"] if row else None
+    # ── Facettes ────────────────────────────────────────────────
 
-    # --- ANNÉES ---
-    c, p = base_conds_params()
-    add_all_except(c, p, skip="year")
-    cur.execute(
-        f"""
-        SELECT p.pub_year AS value, COUNT(*) AS count
-        FROM publications p
-        WHERE {where_sql(c)} AND p.pub_year IS NOT NULL
-        GROUP BY p.pub_year ORDER BY p.pub_year DESC
-        """,
-        p,
-    )
-    year_facets = cur.fetchall()
+    def _facet_years(self) -> list[dict[str, Any]]:
+        c, p = self._conds_skipping("year")
+        self.cur.execute(
+            f"""
+            SELECT p.pub_year AS value, COUNT(*) AS count
+            FROM publications p
+            WHERE {self._where_sql(c)} AND p.pub_year IS NOT NULL
+            GROUP BY p.pub_year ORDER BY p.pub_year DESC
+            """,
+            p,
+        )
+        return self.cur.fetchall()
 
-    # --- LABOS ---
-    c, p = base_conds_params()
-    add_all_except(c, p, skip="lab")
-    cur.execute(
-        f"""
-        SELECT s.id AS value, COALESCE(s.acronym, s.name) AS label,
-               COUNT(DISTINCT a.publication_id) AS count
-        FROM authorships a
-        JOIN publications p ON p.id = a.publication_id
-        CROSS JOIN LATERAL unnest(a.structure_ids) AS struct_id
-        JOIN structures s ON s.id = struct_id
-        WHERE {where_sql(c)}
-          AND s.structure_type = 'labo'
-        GROUP BY s.id, s.acronym, s.name
-        ORDER BY count DESC
-        """,
-        p,
-    )
-    lab_facets = cur.fetchall()
+    def _facet_labs(self) -> tuple[list[dict[str, Any]], int]:
+        c, p = self._conds_skipping("lab")
+        self.cur.execute(
+            f"""
+            SELECT s.id AS value, COALESCE(s.acronym, s.name) AS label,
+                   COUNT(DISTINCT a.publication_id) AS count
+            FROM authorships a
+            JOIN publications p ON p.id = a.publication_id
+            CROSS JOIN LATERAL unnest(a.structure_ids) AS struct_id
+            JOIN structures s ON s.id = struct_id
+            WHERE {self._where_sql(c)}
+              AND s.structure_type = 'labo'
+            GROUP BY s.id, s.acronym, s.name
+            ORDER BY count DESC
+            """,
+            p,
+        )
+        labs = self.cur.fetchall()
 
-    cur.execute(
-        f"""
-        SELECT COUNT(*) AS count FROM publications p
-        WHERE {where_sql(c)}
-          AND NOT EXISTS (
-              SELECT 1 FROM authorships a
-              JOIN structures s ON s.id = ANY(a.structure_ids)
-              WHERE a.publication_id = p.id
-                AND NOT a.excluded
-                AND s.structure_type = 'labo'
-          )
-        """,
-        p,
-    )
-    no_lab_count = cur.fetchone()["count"]
+        self.cur.execute(
+            f"""
+            SELECT COUNT(*) AS count FROM publications p
+            WHERE {self._where_sql(c)}
+              AND NOT EXISTS (
+                  SELECT 1 FROM authorships a
+                  JOIN structures s ON s.id = ANY(a.structure_ids)
+                  WHERE a.publication_id = p.id
+                    AND NOT a.excluded
+                    AND s.structure_type = 'labo'
+              )
+            """,
+            p,
+        )
+        no_lab_count = self.cur.fetchone()["count"]
+        return labs, no_lab_count
 
-    # --- DOC_TYPE ---
-    c, p = base_conds_params()
-    add_all_except(c, p, skip="doc_type")
-    cur.execute(
-        f"""
-        SELECT p.doc_type::text AS value, COUNT(*) AS count
-        FROM publications p
-        WHERE {where_sql(c)} AND p.doc_type IS NOT NULL
-        GROUP BY p.doc_type ORDER BY count DESC
-        """,
-        p,
-    )
-    doc_type_facets = cur.fetchall()
+    def _facet_doc_types(self) -> list[dict[str, Any]]:
+        c, p = self._conds_skipping("doc_type")
+        self.cur.execute(
+            f"""
+            SELECT p.doc_type::text AS value, COUNT(*) AS count
+            FROM publications p
+            WHERE {self._where_sql(c)} AND p.doc_type IS NOT NULL
+            GROUP BY p.doc_type ORDER BY count DESC
+            """,
+            p,
+        )
+        return self.cur.fetchall()
 
-    # --- ACCÈS ---
-    c, p = base_conds_params()
-    add_all_except(c, p, skip="access")
-    cur.execute(
-        f"""
-        SELECT
-            COUNT(*) FILTER (WHERE p.oa_status::text IN ('gold','hybrid','bronze','green','diamond')) AS open_count,
-            COUNT(*) FILTER (WHERE p.oa_status::text IN ('closed','unknown') OR p.oa_status IS NULL) AS closed_count
-        FROM publications p
-        WHERE {where_sql(c)}
-        """,
-        p,
-    )
-    access_row = cur.fetchone()
-    access_facets = [
-        {"value": "open", "text": "Ouvert", "count": access_row["open_count"]},
-        {"value": "closed", "text": "Fermé", "count": access_row["closed_count"]},
-    ]
+    def _facet_access(self) -> list[dict[str, Any]]:
+        c, p = self._conds_skipping("access")
+        self.cur.execute(
+            f"""
+            SELECT
+                COUNT(*) FILTER (WHERE p.oa_status::text IN ('gold','hybrid','bronze','green','diamond')) AS open_count,
+                COUNT(*) FILTER (WHERE p.oa_status::text IN ('closed','unknown') OR p.oa_status IS NULL) AS closed_count
+            FROM publications p
+            WHERE {self._where_sql(c)}
+            """,
+            p,
+        )
+        r = self.cur.fetchone()
+        return [
+            {"value": "open", "text": "Ouvert", "count": r["open_count"]},
+            {"value": "closed", "text": "Fermé", "count": r["closed_count"]},
+        ]
 
-    # --- OA_STATUS ---
-    c, p = base_conds_params()
-    add_all_except(c, p, skip="oa_status")
-    cur.execute(
-        f"""
-        SELECT p.oa_status::text AS value, COUNT(*) AS count
-        FROM publications p
-        WHERE {where_sql(c)} AND p.oa_status IS NOT NULL
-        GROUP BY p.oa_status ORDER BY count DESC
-        """,
-        p,
-    )
-    oa_facets = cur.fetchall()
+    def _facet_oa_statuses(self) -> list[dict[str, Any]]:
+        c, p = self._conds_skipping("oa_status")
+        self.cur.execute(
+            f"""
+            SELECT p.oa_status::text AS value, COUNT(*) AS count
+            FROM publications p
+            WHERE {self._where_sql(c)} AND p.oa_status IS NOT NULL
+            GROUP BY p.oa_status ORDER BY count DESC
+            """,
+            p,
+        )
+        return self.cur.fetchall()
 
-    # --- CORRESPONDING ---
-    corr_facets: list[dict[str, Any]] = []
-    if filters.person_id:
-        c, p = base_conds_params()
-        add_all_except(c, p, skip="corresponding")
-        cur.execute(
+    def _facet_corresponding(self) -> list[dict[str, Any]]:
+        if not self.filters.person_id:
+            return []
+        c, p = self._conds_skipping("corresponding")
+        self.cur.execute(
             f"""
             SELECT
                 COUNT(*) FILTER (WHERE EXISTS (
@@ -661,40 +671,52 @@ def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus tard)
                       AND a.is_corresponding = TRUE AND NOT a.excluded
                 )) AS no_count
             FROM publications p
-            WHERE {where_sql(c)}
+            WHERE {self._where_sql(c)}
             """,
-            [filters.person_id, filters.person_id] + p,
+            [self.filters.person_id, self.filters.person_id] + p,
         )
-        row = cur.fetchone()
-        corr_facets = [
+        row = self.cur.fetchone()
+        return [
             {"value": "yes", "count": row["yes_count"]},
             {"value": "no", "count": row["no_count"]},
         ]
 
-    # --- SOURCES ---
-    c, p = base_conds_params()
-    add_all_except(c, p, skip="source")
-    cur.execute(
-        f"""
-        SELECT
-            COUNT(*) FILTER (WHERE p.sources @> ARRAY['hal'::source_type]) AS hal_count,
-            COUNT(*) FILTER (WHERE p.sources @> ARRAY['openalex'::source_type]) AS oa_count,
-            COUNT(*) FILTER (WHERE p.sources @> ARRAY['scanr'::source_type]) AS scanr_count,
-            COUNT(*) FILTER (WHERE p.sources @> ARRAY['wos'::source_type]) AS wos_count,
-            COUNT(*) FILTER (WHERE p.sources @> ARRAY['theses'::source_type]) AS theses_count
-        FROM publications p
-        WHERE {where_sql(c)}
-        """,
-        p,
-    )
-    source_counts = cur.fetchone()
+    def _facet_source_counts(self) -> dict[str, int]:
+        c, p = self._conds_skipping("source")
+        self.cur.execute(
+            f"""
+            SELECT
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['hal'::source_type]) AS hal_count,
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['openalex'::source_type]) AS oa_count,
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['scanr'::source_type]) AS scanr_count,
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['wos'::source_type]) AS wos_count,
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['theses'::source_type]) AS theses_count
+            FROM publications p
+            WHERE {self._where_sql(c)}
+            """,
+            p,
+        )
+        row = self.cur.fetchone()
+        return {
+            "hal": row["hal_count"],
+            "oa": row["oa_count"],
+            "scanr": row["scanr_count"],
+            "wos": row["wos_count"],
+            "theses": row["theses_count"],
+        }
 
-    # --- APC ---
-    c, p = base_conds_params()
-    add_all_except(c, p, skip="apc")
-    where = where_sql(c)
-    if filters.lab_ids:
-        apc_sql = f"""
+    def _facet_apc(self) -> list[dict[str, Any]]:
+        """APC : variante à 4 catégories si un labo est sélectionné, sinon 3."""
+        c, p = self._conds_skipping("apc")
+        where = self._where_sql(c)
+        if self.filters.lab_ids:
+            return self._facet_apc_with_lab(where, p)
+        return self._facet_apc_without_lab(where, p)
+
+    def _facet_apc_with_lab(self, where: str, p: list[Any]) -> list[dict[str, Any]]:
+        lab_ids = self.filters.lab_ids
+        self.cur.execute(
+            f"""
             SELECT
                 COUNT(*) FILTER (WHERE EXISTS (
                     SELECT 1 FROM apc_payments ap
@@ -718,24 +740,25 @@ def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus tard)
                 )) AS apc_none
             FROM publications p
             WHERE {where}
-        """
-        cur.execute(
-            apc_sql, [filters.lab_ids, root_structure_id, filters.lab_ids, root_structure_id] + p
+            """,
+            [lab_ids, self.root_structure_id, lab_ids, self.root_structure_id] + p,
         )
-        r = cur.fetchone()
-        cur.execute(
+        r = self.cur.fetchone()
+        self.cur.execute(
             "SELECT COALESCE(acronym, name) AS label FROM structures WHERE id = %s",
-            (filters.lab_ids[0],),
+            (lab_ids[0],),
         )
-        lab_label = cur.fetchone()["label"] if cur.rowcount else "ce labo"
-        apc_facets = [
+        lab_label = self.cur.fetchone()["label"] if self.cur.rowcount else "ce labo"
+        return [
             {"value": "this_lab", "text": f"APC — {lab_label}", "count": r["apc_this_lab"]},
             {"value": "other_uca", "text": "APC — autres UCA", "count": r["apc_other_uca"]},
             {"value": "non_uca", "text": "APC hors UCA", "count": r["apc_non_uca"]},
             {"value": "none", "text": "Sans APC", "count": r["apc_none"]},
         ]
-    else:
-        apc_sql = f"""
+
+    def _facet_apc_without_lab(self, where: str, p: list[Any]) -> list[dict[str, Any]]:
+        self.cur.execute(
+            f"""
             SELECT
                 COUNT(*) FILTER (WHERE EXISTS (
                     SELECT 1 FROM apc_payments ap
@@ -752,50 +775,46 @@ def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus tard)
                 )) AS apc_none
             FROM publications p
             WHERE {where}
-        """
-        cur.execute(apc_sql, [root_structure_id, root_structure_id] + p)
-        r = cur.fetchone()
-        apc_facets = [
+            """,
+            [self.root_structure_id, self.root_structure_id] + p,
+        )
+        r = self.cur.fetchone()
+        return [
             {"value": "uca", "text": "APC — UCA", "count": r["apc_uca"]},
             {"value": "other", "text": "APC — autres", "count": r["apc_other"]},
             {"value": "none", "text": "Sans APC", "count": r["apc_none"]},
         ]
 
-    # --- COUNTRIES ---
-    c, p = base_conds_params()
-    add_all_except(c, p, skip="country")
-    cur.execute(
-        f"""
-        SELECT co.code, co.name, COUNT(*) AS count
-        FROM (
-            SELECT unnest(p.countries) AS cc
-            FROM publications p
-            WHERE {where_sql(c)} AND p.countries IS NOT NULL
-        ) sub
-        JOIN countries co ON co.code = sub.cc
-        GROUP BY co.code, co.name
-        ORDER BY count DESC
-        """,
-        p,
-    )
-    country_facets = [
-        {"value": r["code"].strip(), "text": r["name"], "count": r["count"]}
-        for r in cur.fetchall()
-        if r["code"].strip() != "xx"
-    ]
+    def _facet_countries(self) -> list[dict[str, Any]]:
+        c, p = self._conds_skipping("country")
+        self.cur.execute(
+            f"""
+            SELECT co.code, co.name, COUNT(*) AS count
+            FROM (
+                SELECT unnest(p.countries) AS cc
+                FROM publications p
+                WHERE {self._where_sql(c)} AND p.countries IS NOT NULL
+            ) sub
+            JOIN countries co ON co.code = sub.cc
+            GROUP BY co.code, co.name
+            ORDER BY count DESC
+            """,
+            p,
+        )
+        return [
+            {"value": r["code"].strip(), "text": r["name"], "count": r["count"]}
+            for r in self.cur.fetchall()
+            if r["code"].strip() != "xx"
+        ]
 
-    # --- HAL STATUS (seulement avec un seul labo) ---
-    hal_status_facets: list[dict[str, Any]] = []
-    if len(filters.lab_ids) == 1:
-        cur.execute("SELECT hal_collection FROM structures WHERE id = %s", (filters.lab_ids[0],))
-        lab_row = cur.fetchone()
-        col = lab_row["hal_collection"] if lab_row else None
-
-        c, p = base_conds_params()
-        add_all_except(c, p, skip="hal_status")
-
+    def _facet_hal_status(self) -> list[dict[str, Any]]:
+        """HAL status : seulement si un seul labo est sélectionné."""
+        if len(self.filters.lab_ids) != 1:
+            return []
+        c, p = self._conds_skipping("hal_status")
+        col = self.lab_hal_col
         if col:
-            cur.execute(
+            self.cur.execute(
                 f"""
                 SELECT
                     COUNT(*) FILTER (WHERE NOT EXISTS (
@@ -821,12 +840,12 @@ def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus tard)
                       AND p.oa_status::text NOT IN ('closed', 'unknown')
                     ) AS ok
                 FROM publications p
-                WHERE {where_sql(c)}
+                WHERE {self._where_sql(c)}
                 """,
                 [col, col, col] + p,
             )
         else:
-            cur.execute(
+            self.cur.execute(
                 f"""
                 SELECT
                     COUNT(*) FILTER (WHERE NOT EXISTS (
@@ -840,24 +859,23 @@ def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus tard)
                     0 AS notice,
                     0 AS ok
                 FROM publications p
-                WHERE {where_sql(c)}
+                WHERE {self._where_sql(c)}
                 """,
                 p,
             )
-        r = cur.fetchone()
-        hal_status_facets = [
+        r = self.cur.fetchone()
+        return [
             {"value": "ok", "text": "OK", "count": r["ok"]},
             {"value": "notice", "text": "Notice", "count": r["notice"]},
             {"value": "hors_collection", "text": "Hors collection", "count": r["hors_collection"]},
             {"value": "hors_hal", "text": "Hors HAL", "count": r["hors_hal"]},
         ]
 
-    # --- IN_PERIMETER ---
-    perimeter_facets: list[dict[str, Any]] = []
-    if filters.person_id:
-        c, p = base_conds_params()
-        add_all_except(c, p, skip="in_perimeter")
-        cur.execute(
+    def _facet_in_perimeter(self) -> list[dict[str, Any]]:
+        if not self.filters.person_id:
+            return []
+        c, p = self._conds_skipping("in_perimeter")
+        self.cur.execute(
             f"""
             SELECT
                 COUNT(*) FILTER (WHERE EXISTS (
@@ -871,36 +889,43 @@ def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus tard)
                       AND a.in_perimeter = TRUE AND NOT a.excluded
                 )) AS no
             FROM publications p
-            WHERE {where_sql(c)}
+            WHERE {self._where_sql(c)}
             """,
-            [filters.person_id, filters.person_id] + p,
+            [self.filters.person_id, self.filters.person_id] + p,
         )
-        r = cur.fetchone()
-        perimeter_facets = [
+        r = self.cur.fetchone()
+        return [
             {"value": "yes", "text": "UCA", "count": r["yes"]},
             {"value": "no", "text": "Hors périmètre", "count": r["no"]},
         ]
 
-    return {
-        "years": year_facets,
-        "labs": lab_facets,
-        "no_lab_count": no_lab_count,
-        "doc_types": doc_type_facets,
-        "access": access_facets,
-        "oa_statuses": oa_facets,
-        "corresponding": corr_facets,
-        "source_counts": {
-            "hal": source_counts["hal_count"],
-            "oa": source_counts["oa_count"],
-            "scanr": source_counts["scanr_count"],
-            "wos": source_counts["wos_count"],
-            "theses": source_counts["theses_count"],
-        },
-        "apc": apc_facets,
-        "countries": country_facets,
-        "hal_status": hal_status_facets,
-        "in_perimeter": perimeter_facets,
-    }
+    # ── Orchestrateur ──────────────────────────────────────────
+
+    def build(self) -> dict[str, Any]:
+        labs, no_lab_count = self._facet_labs()
+        return {
+            "years": self._facet_years(),
+            "labs": labs,
+            "no_lab_count": no_lab_count,
+            "doc_types": self._facet_doc_types(),
+            "access": self._facet_access(),
+            "oa_statuses": self._facet_oa_statuses(),
+            "corresponding": self._facet_corresponding(),
+            "source_counts": self._facet_source_counts(),
+            "apc": self._facet_apc(),
+            "countries": self._facet_countries(),
+            "hal_status": self._facet_hal_status(),
+            "in_perimeter": self._facet_in_perimeter(),
+        }
+
+
+def publications_facets(
+    cur: Any, *, filters: FacetFilters, root_structure_id: int
+) -> dict[str, Any]:
+    """Facettes dynamiques : chaque facette exclut son propre filtre mais
+    applique tous les autres. Décomposé dans `_PublicationFacetsBuilder`."""
+    cur.execute("SET LOCAL jit = off")
+    return _PublicationFacetsBuilder(cur, filters, root_structure_id).build()
 
 
 # ── Années ────────────────────────────────────────────────────────
