@@ -10,6 +10,7 @@ Usage:
 import argparse
 import os
 import time
+from typing import Any
 
 import requests
 from psycopg2.extras import RealDictCursor
@@ -52,7 +53,7 @@ def fetch_idref(hal_person_id: int = None, idhal: str = None) -> str | None:
     return None
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

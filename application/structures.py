@@ -7,6 +7,8 @@ Les routers passent par ces fonctions pour toute écriture. Les lectures
 restent autorisées dans les routers (convention du projet).
 """
 
+from typing import Any
+
 from psycopg2.extras import Json
 from pydantic import ValidationError as PydanticValidationError
 
@@ -47,7 +49,7 @@ _STRUCTURE_FIELD_MAP = {
 
 
 def create_structure(
-    cur,
+    cur: Any,
     *,
     code: str,
     name: str,
@@ -71,7 +73,7 @@ def create_structure(
     )
 
 
-def update_structure(cur, structure_id: int, *, fields: dict) -> dict:
+def update_structure(cur: Any, structure_id: int, *, fields: dict) -> dict:
     """Met à jour une structure. Retourne la ligne modifiée.
 
     Lève NotFoundError si la structure n'existe pas.
@@ -100,7 +102,7 @@ def update_structure(cur, structure_id: int, *, fields: dict) -> dict:
     return repo.update_structure_fields(structure_id, sql_fragments, params)
 
 
-def delete_structure(cur, structure_id: int) -> None:
+def delete_structure(cur: Any, structure_id: int) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas."""
     row = structure_repository(cur).delete_structure(structure_id)
     if not row:
@@ -117,7 +119,7 @@ def delete_structure(cur, structure_id: int) -> None:
 # ── structure_relations ───────────────────────────────────────────
 
 
-def create_relation(cur, *, parent_id: int, child_id: int, relation_type: str) -> dict | None:
+def create_relation(cur: Any, *, parent_id: int, child_id: int, relation_type: str) -> dict | None:
     """Crée une relation. Retourne la ligne insérée, ou None si elle existait déjà."""
     return structure_repository(cur).create_relation(
         parent_id=parent_id,
@@ -126,7 +128,7 @@ def create_relation(cur, *, parent_id: int, child_id: int, relation_type: str) -
     )
 
 
-def delete_relation(cur, relation_id: int) -> None:
+def delete_relation(cur: Any, relation_id: int) -> None:
     """Supprime une relation. Lève NotFoundError si elle n'existe pas."""
     row = structure_repository(cur).delete_relation(relation_id)
     if not row:
@@ -149,7 +151,7 @@ def delete_relation(cur, relation_id: int) -> None:
 
 
 def create_name_form(
-    cur,
+    cur: Any,
     *,
     structure_id: int,
     form_text: str,
@@ -167,7 +169,7 @@ def create_name_form(
     )
 
 
-def update_name_form(cur, form_id: int, *, fields: dict) -> dict:
+def update_name_form(cur: Any, form_id: int, *, fields: dict) -> dict:
     """Met à jour une forme de nom. Retourne la ligne modifiée.
 
     Lève NotFoundError si la forme n'existe pas.
@@ -199,7 +201,7 @@ def update_name_form(cur, form_id: int, *, fields: dict) -> dict:
     return repo.update_name_form_fields(form_id, sql_fragments, params)
 
 
-def delete_name_form(cur, form_id: int) -> None:
+def delete_name_form(cur: Any, form_id: int) -> None:
     """Supprime une forme de nom. Lève NotFoundError si elle n'existe pas."""
     row = structure_repository(cur).delete_name_form(form_id)
     if not row:

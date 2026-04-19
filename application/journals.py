@@ -6,6 +6,8 @@ Toute création ou recherche de journal/éditeur passe par ce module.
 Compatible avec les curseurs tuples (standard) et RealDictCursor.
 """
 
+from typing import Any
+
 from application.audit import emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
@@ -15,7 +17,7 @@ from infrastructure.repositories import journal_repository
 
 
 def find_or_create_publisher(
-    cur, name: str | None, *, openalex_id: str | None = None
+    cur: Any, name: str | None, *, openalex_id: str | None = None
 ) -> int | None:
     """Trouve ou crée un éditeur.
 
@@ -63,7 +65,7 @@ def find_or_create_publisher(
 
 
 def find_or_create_journal(
-    cur,
+    cur: Any,
     title: str | None,
     *,
     issn: str | None = None,
@@ -151,7 +153,7 @@ def find_or_create_journal(
     return journal_id
 
 
-def update_journal(cur, journal_id: int, *, fields: dict) -> None:
+def update_journal(cur: Any, journal_id: int, *, fields: dict) -> None:
     """Met à jour une revue. Le `title` est automatiquement normalisé en
     `title_normalized`.
 
@@ -171,7 +173,7 @@ def update_journal(cur, journal_id: int, *, fields: dict) -> None:
     repo.update_journal_fields(journal_id, fields)
 
 
-def update_publisher(cur, publisher_id: int, *, fields: dict) -> None:
+def update_publisher(cur: Any, publisher_id: int, *, fields: dict) -> None:
     """Met à jour un éditeur. Le `name` est automatiquement normalisé en
     `name_normalized`.
 
@@ -192,7 +194,7 @@ def update_publisher(cur, publisher_id: int, *, fields: dict) -> None:
 
 
 def update_journal_apc(
-    cur,
+    cur: Any,
     journal_id: int,
     *,
     apc_amount: float | None = None,
@@ -208,7 +210,7 @@ def update_journal_apc(
     )
 
 
-def reset_journal_apc(cur) -> int:
+def reset_journal_apc(cur: Any) -> int:
     """Réinitialise les APC/DOAJ de toutes les revues avec openalex_id."""
     return journal_repository(cur).reset_journal_apc()
 
@@ -216,7 +218,7 @@ def reset_journal_apc(cur) -> int:
 # ── Fusions ──
 
 
-def merge_publishers(cur, target_id: int, source_id: int) -> None:
+def merge_publishers(cur: Any, target_id: int, source_id: int) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible.
 
     Invariant métier : s'il y a des journaux aux titres partagés entre
@@ -250,7 +252,7 @@ def merge_publishers(cur, target_id: int, source_id: int) -> None:
     emit_event(cur, "publisher.merged", "publisher", target_id, {"source_id": source_id})
 
 
-def merge_journals(cur, target_id: int, source_id: int) -> None:
+def merge_journals(cur: Any, target_id: int, source_id: int) -> None:
     """Fusionne le journal source dans le journal cible."""
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un journal avec lui-même")

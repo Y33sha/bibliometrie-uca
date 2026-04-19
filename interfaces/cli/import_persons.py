@@ -17,6 +17,7 @@ import logging
 import os
 import sys
 from datetime import datetime
+from typing import Any
 
 from application.persons import refresh_person_name_forms
 from domain.normalize import normalize_name
@@ -29,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def parse_date(val) -> str | None:
+def parse_date(val: Any) -> str | None:
     """Parse une date depuis différents formats possibles."""
     if not val or str(val).strip() == "":
         return None
@@ -208,7 +209,7 @@ def read_file(filepath: str) -> list[dict]:
 
 
 def import_persons(
-    conn, records: list[dict], dry_run: bool = False, export_date: str = None
+    conn: Any, records: list[dict], dry_run: bool = False, export_date: str = None
 ) -> int:
     """Insère les personnes en base. Retourne le nombre d'insertions."""
     cur = conn.cursor()
@@ -296,7 +297,7 @@ def import_persons(
 # =============================================================
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Import personnes RH → base")
     parser.add_argument("file", help="Fichier RH (CSV, TSV, ou Excel)")
     parser.add_argument(

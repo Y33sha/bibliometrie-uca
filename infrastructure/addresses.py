@@ -5,18 +5,20 @@ et les liens source_authorship_addresses au moment de l'INSERT
 des source_authorships.
 """
 
+from typing import Any
+
 from domain.normalize import normalize_text
 
 # Cache module-level pour éviter les lookups répétés dans un même run
 _addr_cache: dict[str, int] = {}
 
 
-def clear_cache():
+def clear_cache() -> Any:
     """Vide le cache d'adresses (à appeler en fin de run)."""
     _addr_cache.clear()
 
 
-def _get_or_create_address(cur, text: str) -> int | None:
+def _get_or_create_address(cur: Any, text: str) -> int | None:
     """Crée ou retrouve une adresse. Retourne l'id."""
     addr_id = _addr_cache.get(text)
     if addr_id is not None:
@@ -46,7 +48,7 @@ def _get_or_create_address(cur, text: str) -> int | None:
 
 
 def link_addresses(
-    cur, authorship_id: int, addr_texts: list[str], countries: list[str] | None = None
+    cur: Any, authorship_id: int, addr_texts: list[str], countries: list[str] | None = None
 ) -> int:
     """Crée les adresses et les liens pour une authorship.
 

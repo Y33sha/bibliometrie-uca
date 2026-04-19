@@ -20,6 +20,8 @@ Usage :
         repo.set_rejected(person_id, True)
 """
 
+from typing import Any
+
 from domain.errors import NotFoundError
 from domain.normalize import normalize_name
 from domain.person import compute_person_name_forms
@@ -28,7 +30,7 @@ from domain.person import compute_person_name_forms
 class PgPersonRepository:
     """Accès PostgreSQL à l'agrégat Person."""
 
-    def __init__(self, cur):
+    def __init__(self, cur: Any) -> None:
         """cur : curseur psycopg2 dans la transaction courante (fournie
         par le service appelant, qui gère le cycle de vie de la connexion)."""
         self._cur = cur

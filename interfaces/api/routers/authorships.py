@@ -1,6 +1,7 @@
 """Auto-extracted router."""
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Query
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/api/authorships/stats")
-async def authorships_stats(lab_id: int = Query(0)):
+async def authorships_stats(lab_id: int = Query(0)) -> Any:
     """Statistiques auteurs UCA."""
     lab_filter = ""
     params: list = []
@@ -86,7 +87,7 @@ async def authorships_facets(
     has_orcid: str = Query(""),
     has_idhal: str = Query(""),
     lab_id: int = Query(0),
-):
+) -> Any:
     """Facettes dynamiques pour la page authorships admin."""
     cte, cte_params = _uca_authors_cte(lab_id=lab_id)
 
@@ -195,7 +196,7 @@ async def list_authorships(
     has_orcid: str = Query(""),
     has_idhal: str = Query(""),
     lab_id: int = Query(0),
-):
+) -> Any:
     """Liste des auteurs UCA avec filtres."""
     offset = (page - 1) * per_page
 

@@ -4,6 +4,7 @@ Fonctions partagées par les scripts d'extraction (OpenAlex, HAL, WoS, ScanR).
 
 import hashlib
 import json
+from typing import Any
 
 from domain.publication import clean_doi  # noqa: F401 — réexporté pour les scripts d'extraction
 from infrastructure.log import setup_logger  # noqa: F401 — réexporté pour les scripts d'extraction
@@ -18,7 +19,7 @@ def compute_hash(raw_data: dict) -> str:
 from domain.sources import ALL_SOURCES_SET as VALID_SOURCES
 
 
-def get_cross_import_dois(conn, target: str, all_staged: bool = False) -> list[str]:
+def get_cross_import_dois(conn: Any, target: str, all_staged: bool = False) -> list[str]:
     """Retourne les DOI présents dans les autres sources staging mais absents de la cible.
 
     Args:
@@ -56,7 +57,7 @@ def get_cross_import_dois(conn, target: str, all_staged: bool = False) -> list[s
         return [row[0] for row in cur.fetchall()]
 
 
-def get_existing_ids(conn, source: str) -> set:
+def get_existing_ids(conn: Any, source: str) -> set:
     """Récupère les source_id déjà en staging pour une source donnée."""
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")

@@ -11,6 +11,7 @@ Usage:
 
 import argparse
 import os
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -23,7 +24,7 @@ log = setup_logger(
 )
 
 
-def find_versioned_duplicates(cur):
+def find_versioned_duplicates(cur: Any) -> Any:
     cur.execute("""
         SELECT p1.id AS target_id, p1.doi AS target_doi,
                p2.id AS source_id, p2.doi AS source_doi
@@ -36,7 +37,7 @@ def find_versioned_duplicates(cur):
     return cur.fetchall()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Fusionne les doublons DOI versionnés")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

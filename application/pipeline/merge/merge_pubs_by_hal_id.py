@@ -17,6 +17,7 @@ Usage:
 
 import argparse
 import os
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -28,7 +29,7 @@ from infrastructure.log import setup_logger
 log = setup_logger("merge_pubs_by_hal_id", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def find_duplicates(cur):
+def find_duplicates(cur: Any) -> Any:
     """
     Trouve les paires (document source, hal_document) qui pointent
     vers des publications différentes (ou HAL → NULL).
@@ -81,7 +82,7 @@ def find_duplicates(cur):
     return link_only, merge_needed
 
 
-def link_hal_to_publication(cur, items, dry_run=False):
+def link_hal_to_publication(cur: Any, items: Any, dry_run: Any = False) -> Any:
     """Case 1: HAL doc has no publication_id → link to source's publication."""
     for item in items:
         hal_doc_id = item["hal_doc_id"]
@@ -100,7 +101,7 @@ def link_hal_to_publication(cur, items, dry_run=False):
     return len(items)
 
 
-def merge_publications(cur, items, dry_run=False):
+def merge_publications(cur: Any, items: Any, dry_run: Any = False) -> Any:
     """
     Case 2: Both have different publication_id.
     Keep the HAL publication, merge the other into it.
@@ -109,7 +110,7 @@ def merge_publications(cur, items, dry_run=False):
     errors = 0
     merged_into: dict[int, int] = {}
 
-    def resolve(pub_id):
+    def resolve(pub_id: Any) -> Any:
         visited = set()
         while pub_id in merged_into:
             if pub_id in visited:
@@ -147,7 +148,7 @@ def merge_publications(cur, items, dry_run=False):
     return merged, errors
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(
         description="Fusionne les publications par identifiant HAL (OpenAlex + ScanR)"
     )

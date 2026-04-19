@@ -19,6 +19,7 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 import argparse
 import os
 import re
+from typing import Any
 
 from psycopg2.extras import Json, RealDictCursor
 
@@ -168,7 +169,7 @@ def is_hal_primary_location(work: dict) -> bool:
     return False
 
 
-def find_hal_publication_id(cur, work: dict) -> int | None:
+def find_hal_publication_id(cur: Any, work: dict) -> int | None:
     """
     Si le work OpenAlex pointe vers un document HAL existant,
     retourne le publication_id associé (pour éviter les doublons).
@@ -201,7 +202,7 @@ def is_repository_source(work: dict) -> bool:
 # =============================================================
 
 
-def upsert_publisher(cur, work: dict) -> int | None:
+def upsert_publisher(cur: Any, work: dict) -> int | None:
     """Extrait et trouve/crée l'éditeur depuis le work OpenAlex."""
     location = work.get("primary_location") or {}
     source = location.get("source") or {}
@@ -212,7 +213,7 @@ def upsert_publisher(cur, work: dict) -> int | None:
     return find_or_create_publisher(cur, publisher_name, openalex_id=openalex_id or None)
 
 
-def upsert_journal(cur, work: dict, publisher_id: int | None) -> int | None:
+def upsert_journal(cur: Any, work: dict, publisher_id: int | None) -> int | None:
     """Extrait et trouve/crée la revue depuis le work OpenAlex."""
     location = work.get("primary_location") or {}
     source = location.get("source") or {}
@@ -301,7 +302,7 @@ def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
     )
 
 
-def find_publication(cur, work: dict, journal_id: int | None) -> int | None:
+def find_publication(cur: Any, work: dict, journal_id: int | None) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None."""
     meta = extract_pub_metadata(work, journal_id)
     if not meta["pub_year"] or not meta["title"]:
@@ -318,7 +319,7 @@ def find_publication(cur, work: dict, journal_id: int | None) -> int | None:
 
 
 def insert_openalex_document(
-    cur, work: dict, staging_id: int, publication_id: int | None, pub_meta: dict | None = None
+    cur: Any, work: dict, staging_id: int, publication_id: int | None, pub_meta: dict | None = None
 ) -> int:
     """
     Crée/retrouve l'entrée source_publications pour OpenAlex.
@@ -432,7 +433,7 @@ def insert_openalex_document(
 # =============================================================
 
 
-def upsert_openalex_author(cur, authorship: dict) -> int | None:
+def upsert_openalex_author(cur: Any, authorship: dict) -> int | None:
     """
     Insère/retrouve un auteur OpenAlex dans source_persons (source='openalex').
     Déduplique par openalex_id (clé unique via source_id).
@@ -486,7 +487,7 @@ def upsert_openalex_author(cur, authorship: dict) -> int | None:
 # =============================================================
 
 
-def upsert_openalex_institution(cur, institution: dict) -> int | None:
+def upsert_openalex_institution(cur: Any, institution: dict) -> int | None:
     """
     Insère/retrouve une institution OpenAlex dans source_structures.
     Retourne source_structures.id ou None.
@@ -538,7 +539,7 @@ def upsert_openalex_institution(cur, institution: dict) -> int | None:
 # =============================================================
 
 
-def process_authorships(cur, work: dict, source_publication_id: int):
+def process_authorships(cur: Any, work: dict, source_publication_id: int) -> Any:
     """
     Traite les authorships d'un work OpenAlex :
     - Insère/retrouve chaque auteur dans source_persons (source='openalex')
@@ -633,7 +634,7 @@ def process_authorships(cur, work: dict, source_publication_id: int):
 # =============================================================
 
 
-def process_work(cur, staging_row: tuple) -> bool | None:
+def process_work(cur: Any, staging_row: tuple) -> bool | None:
     """
     Traite un work du staging OpenAlex.
     Retourne True si traité, False en cas d'erreur, None si skippé.
@@ -769,7 +770,7 @@ def process_work(cur, staging_row: tuple) -> bool | None:
         raise
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Normalisation OpenAlex → tables structurées")
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
     parser.add_argument(

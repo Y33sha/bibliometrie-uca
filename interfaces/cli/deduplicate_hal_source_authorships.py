@@ -27,6 +27,7 @@ Usage:
 
 import argparse
 import os
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -63,7 +64,7 @@ SA_CONFLICT_RULES = {
 AUTHOR_TRANSFER_FIELDS = ["orcid", "idref", "person_id"]
 
 
-def find_duplicate_groups(cur):
+def find_duplicate_groups(cur: Any) -> Any:
     """Trouve tous les groupes de source_authorships HAL en double."""
     cur.execute("""
         SELECT source_publication_id, author_position,
@@ -78,7 +79,7 @@ def find_duplicate_groups(cur):
     return cur.fetchall()
 
 
-def merge_source_authorships(cur, group, dry_run):
+def merge_source_authorships(cur: Any, group: Any, dry_run: Any) -> Any:
     """Fusionne un groupe de source_authorships.
 
     Garde le dernier (id max), transfère les champs null depuis les anciens.
@@ -146,7 +147,7 @@ def merge_source_authorships(cur, group, dry_run):
     return keep_id, delete_ids, conflicts
 
 
-def merge_source_persons(cur, keep_author_id, old_author_ids, dry_run):
+def merge_source_persons(cur: Any, keep_author_id: Any, old_author_ids: Any, dry_run: Any) -> Any:
     """Fusionne les source_persons : transfère les champs manquants, supprime les anciens."""
     cur.execute("SELECT * FROM source_persons WHERE id = %s", (keep_author_id,))
     keep = cur.fetchone()
@@ -180,7 +181,7 @@ def merge_source_persons(cur, keep_author_id, old_author_ids, dry_run):
                 cur.execute("DELETE FROM source_persons WHERE id = %s", (old_id,))
 
 
-def find_duplicate_authors(cur):
+def find_duplicate_authors(cur: Any) -> Any:
     """Trouve les groupes de source_persons HAL avec le même hal_person_id."""
     cur.execute("""
         SELECT (source_ids->>'hal_person_id')::int AS hal_person_id,
@@ -194,7 +195,7 @@ def find_duplicate_authors(cur):
     return cur.fetchall()
 
 
-def merge_duplicate_authors(cur, group, dry_run):
+def merge_duplicate_authors(cur: Any, group: Any, dry_run: Any) -> Any:
     """Fusionne un groupe de source_persons avec le même hal_person_id.
 
     Garde le plus récent (id max), migre les source_authorships, transfère
@@ -259,7 +260,7 @@ def merge_duplicate_authors(cur, group, dry_run):
     return deleted
 
 
-def run(dry_run=True):
+def run(dry_run: Any = True) -> Any:
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:

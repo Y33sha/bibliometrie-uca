@@ -2,6 +2,7 @@
 
 import logging
 import time
+from typing import Any
 
 from fastapi import APIRouter, Cookie, Response
 
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/api/auth/login")
-async def auth_login(data: LoginRequest, response: Response):
+async def auth_login(data: LoginRequest, response: Response) -> Any:
     from fastapi import HTTPException
 
     if data.username != settings.admin_user or not _check_password(data.password):
@@ -38,13 +39,13 @@ async def auth_login(data: LoginRequest, response: Response):
 
 
 @router.get("/api/auth/check")
-async def auth_check(session: str | None = Cookie(None, alias="session")):
+async def auth_check(session: str | None = Cookie(None, alias="session")) -> Any:
     if session and _verify_token(session):
         return {"authenticated": True}
     return {"authenticated": False}
 
 
 @router.post("/api/auth/logout")
-async def auth_logout(response: Response):
+async def auth_logout(response: Response) -> Any:
     response.delete_cookie(key="session", path="/")
     return {"ok": True}

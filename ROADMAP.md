@@ -70,10 +70,12 @@ dupliqué entre agrégats.
   + checks basiques (trailing whitespace, EOF, YAML/TOML, merge conflicts)
   + lint-imports (contrats DDD) + pytest unitaires (tests/unit/).
   Config dans `.pre-commit-config.yaml`.
-- [x] Mypy ajouté au hook + à la CI. `check_untyped_defs = true` activé
-  (le corps des fonctions non annotées est vérifié). Prochaine étape :
-  activer `disallow_untyped_defs` par module à mesure que les fonctions
-  sont annotées.
+- [x] Mypy strict en CI + pre-commit : `check_untyped_defs` +
+  `disallow_untyped_defs` globalement activés. Toutes les fonctions
+  sont annotées (domain, application, infrastructure, interfaces,
+  run_pipeline) — beaucoup en `Any` pragmatique pour les params DB
+  (`cur: Any`, `conn: Any`) et les helpers internes. Les nouveaux
+  ajouts seront donc typés par défaut.
 - [ ] Couverture `pytest --cov` en CI avec seuil progressif (partir de
   la couverture actuelle, ne pas régresser)
 
@@ -108,9 +110,10 @@ pour ça. Évaluer migration coût/bénéfice.
 - [ ] **Complexité cyclomatique** : seuil actuel à 20 (ruff C901), faire
   descendre progressivement à 15 puis 10 en cassant les fonctions trop
   denses (typiquement les routers de facettes et `refresh_from_sources`)
-- [ ] **Mypy** : `check_untyped_defs = true` activé. Prochaine étape :
-  activer `disallow_untyped_defs` par module via `[[tool.mypy.overrides]]`,
-  en commençant par les couches propres (domain, puis application).
+- [x] **Mypy** strict : `check_untyped_defs` + `disallow_untyped_defs`
+  globalement activés, 0 erreur. Durcissement futur possible : remplacer
+  les `Any` pragmatiques par des types plus précis (en particulier sur
+  les signatures métier — les `cur: Any` pour psycopg2 peuvent rester).
 - [ ] **Dédoublonnage** : audit complet du code dupliqué (`radon` ou manuel)
   — notamment le SQL qui pouvait être factorisé depuis la fusion des
   tables sources, mais qui ne l'a pas été

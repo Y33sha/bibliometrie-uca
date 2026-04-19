@@ -18,6 +18,7 @@ Usage :
 """
 
 import argparse
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -60,7 +61,7 @@ SOURCES = [
 ]
 
 
-def fix(conn, dry_run=False, person_id=None):
+def fix(conn: Any, dry_run: Any = False, person_id: Any = None) -> Any:
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     # Collecter les (name_form, person_id, sources) attendus

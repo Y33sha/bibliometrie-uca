@@ -16,6 +16,8 @@ Usage :
         person_repository(cur).set_rejected(person_id, rejected)
 """
 
+from typing import Any
+
 from domain.ports.address_repository import AddressRepository
 from domain.ports.authorship_repository import AuthorshipRepository
 from domain.ports.config_repository import ConfigRepository
@@ -33,36 +35,36 @@ from .publication_repository import PgPublicationRepository
 from .structure_repository import PgStructureRepository
 
 
-def address_repository(cur) -> AddressRepository:
+def address_repository(cur: Any) -> AddressRepository:
     """Retourne un AddressRepository lié au curseur donné."""
     return PgAddressRepository(cur)
 
 
-def authorship_repository(cur) -> AuthorshipRepository:
+def authorship_repository(cur: Any) -> AuthorshipRepository:
     """Retourne un AuthorshipRepository lié au curseur donné."""
     return PgAuthorshipRepository(cur)
 
 
-def config_repository(cur) -> ConfigRepository:
+def config_repository(cur: Any) -> ConfigRepository:
     """Retourne un ConfigRepository lié au curseur donné."""
     return PgConfigRepository(cur)
 
 
-def journal_repository(cur) -> JournalRepository:
+def journal_repository(cur: Any) -> JournalRepository:
     """Retourne un JournalRepository lié au curseur donné."""
     return PgJournalRepository(cur)
 
 
-def person_repository(cur) -> PersonRepository:
+def person_repository(cur: Any) -> PersonRepository:
     """Retourne un PersonRepository lié au curseur donné."""
     return PgPersonRepository(cur)
 
 
-def publication_repository(cur) -> PublicationRepository:
+def publication_repository(cur: Any) -> PublicationRepository:
     """Retourne un PublicationRepository lié au curseur donné."""
     return PgPublicationRepository(cur)
 
 
-def structure_repository(cur) -> StructureRepository:
+def structure_repository(cur: Any) -> StructureRepository:
     """Retourne un StructureRepository lié au curseur donné."""
     return PgStructureRepository(cur)

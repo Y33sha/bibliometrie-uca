@@ -6,6 +6,7 @@ Usage:
 
 import csv
 import os
+from typing import Any
 
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
@@ -41,7 +42,7 @@ def clean(s: str | None) -> str | None:
     return s if s else None
 
 
-def import_main_file(cur):
+def import_main_file(cur: Any) -> Any:
     """Importe le fichier principal APC."""
     fname = None
     for name in os.listdir(DATA_DIR):
@@ -100,7 +101,7 @@ def import_main_file(cur):
     return len(rows)
 
 
-def import_fp_hors_oa(cur):
+def import_fp_hors_oa(cur: Any) -> Any:
     """Importe FP hors OA."""
     path = os.path.join(DATA_DIR, "FP hors OA.csv")
     if not os.path.exists(path):
@@ -153,7 +154,7 @@ def import_fp_hors_oa(cur):
     return len(rows)
 
 
-def map_dois(cur):
+def map_dois(cur: Any) -> Any:
     """Mappe les DOI vers publication_id."""
     cur.execute("""
         UPDATE apc_payments ap
@@ -166,7 +167,7 @@ def map_dois(cur):
     return cur.rowcount
 
 
-def map_journals(cur):
+def map_journals(cur: Any) -> Any:
     """Mappe les ISSN vers journal_id."""
     cur.execute("""
         UPDATE apc_payments ap
@@ -179,7 +180,7 @@ def map_journals(cur):
     return cur.rowcount
 
 
-def map_publishers(cur):
+def map_publishers(cur: Any) -> Any:
     """Mappe les noms d'éditeurs vers publisher_id."""
     cur.execute("""
         UPDATE apc_payments ap
@@ -192,7 +193,7 @@ def map_publishers(cur):
     return cur.rowcount
 
 
-def main():
+def main() -> None:
     conn = psycopg2.connect(**settings.db_args)
     cur = conn.cursor(cursor_factory=RealDictCursor)
 

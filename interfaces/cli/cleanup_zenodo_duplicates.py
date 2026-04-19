@@ -13,6 +13,7 @@ Usage:
 import argparse
 import os
 import time
+from typing import Any
 
 from application.publications import merge_publications
 from infrastructure.db.connection import get_connection
@@ -27,7 +28,7 @@ logger = setup_logger(
 API_POLITE_DELAY = 1.5
 
 
-def find_consecutive_pairs(cur):
+def find_consecutive_pairs(cur: Any) -> Any:
     """Passe 1 : paires N/N+1 (sans API)."""
     cur.execute("""
         WITH zenodo_pubs AS (
@@ -48,7 +49,7 @@ def find_consecutive_pairs(cur):
     return cur.fetchall()
 
 
-def find_remaining_groups(cur):
+def find_remaining_groups(cur: Any) -> Any:
     """Passe 2 : groupes de doublons Zenodo restants (non consécutifs)."""
     cur.execute("""
         WITH zenodo_pubs AS (
@@ -65,7 +66,15 @@ def find_remaining_groups(cur):
     return cur.fetchall()
 
 
-def do_merge(cur, conn, target_id, target_doi, source_id, source_doi, apply):
+def do_merge(
+    cur: Any,
+    conn: Any,
+    target_id: Any,
+    target_doi: Any,
+    source_id: Any,
+    source_doi: Any,
+    apply: Any,
+) -> Any:
     """Fusionne source dans target + supprime l'openalex_document source."""
     label = f"pub {source_id} ({source_doi}) → {target_id} ({target_doi})"
     print(f"  {'MERGE' if apply else 'DRY'} {label}")
@@ -90,7 +99,7 @@ def do_merge(cur, conn, target_id, target_doi, source_id, source_doi, apply):
         return False
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Nettoyage doublons Zenodo")
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()

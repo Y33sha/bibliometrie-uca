@@ -14,7 +14,7 @@ from application.persons import add_name_form
 from infrastructure.db.connection import get_connection
 
 
-def main():
+def main() -> None:
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 

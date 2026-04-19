@@ -9,7 +9,7 @@ _api_key = None
 _email = ""
 
 
-def init_auth(api_key: str | None = None, email: str = ""):
+def init_auth(api_key: str | None = None, email: str = "") -> None:
     """Initialise les paramètres d'authentification OpenAlex."""
     global _api_key, _email
     _api_key = api_key

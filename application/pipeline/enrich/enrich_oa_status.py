@@ -17,6 +17,7 @@ Rate limit: 100 000 req/jour, ~10 req/s recommandé
 import argparse
 import os
 import time
+from typing import Any
 
 import requests
 
@@ -73,7 +74,7 @@ def fetch_oa_status(doi: str) -> str | None:
     return None
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--limit", type=int, default=0, help="Nombre max de publis à traiter (0=toutes)"

@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import os
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -27,14 +28,14 @@ logger = setup_logger(
 )
 
 
-def _name_tokens_match(ln1, fn1, ln2, fn2):
+def _name_tokens_match(ln1: Any, fn1: Any, ln2: Any, fn2: Any) -> Any:
     """Fallback : les tokens du nom complet sont les mêmes (gère les particules)."""
     tokens_a = set(f"{ln1} {fn1}".split())
     tokens_b = set(f"{ln2} {fn2}".split())
     return tokens_a == tokens_b and len(tokens_a) >= 2
 
 
-def find_duplicate_groups(cur):
+def find_duplicate_groups(cur: Any) -> Any:
     """Trouve les groupes de thèses avec même titre normalisé + année."""
     cur.execute("""
         SELECT title_normalized, pub_year,
@@ -50,7 +51,7 @@ def find_duplicate_groups(cur):
     return cur.fetchall()
 
 
-def get_thesis_author(cur, pub_id):
+def get_thesis_author(cur: Any, pub_id: Any) -> Any:
     """Retourne (last_name, first_name) normalisés de l'auteur d'une thèse.
 
     Cherche dans source_authorships le rôle 'author'.
@@ -77,7 +78,7 @@ def get_thesis_author(cur, pub_id):
     return (ln, fn) if ln else None
 
 
-def choose_target(cur, pub_ids):
+def choose_target(cur: Any, pub_ids: Any) -> Any:
     """Choisit la publication cible (celle à garder).
 
     Priorité : celle avec DOI > celle avec le plus de source_publications > id le plus bas.
@@ -98,7 +99,7 @@ def choose_target(cur, pub_ids):
     return cur.fetchall()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Fusion rétroactive des thèses en doublon")
     parser.add_argument("--apply", action="store_true", help="Appliquer les fusions")
     args = parser.parse_args()

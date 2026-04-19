@@ -12,6 +12,7 @@ Usage:
 
 import argparse
 import os
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -22,7 +23,7 @@ from infrastructure.log import setup_logger
 log = setup_logger("merge_pubs_by_nnt", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def find_duplicates(cur):
+def find_duplicates(cur: Any) -> Any:
     """Trouve les NNT qui pointent vers des publications différentes."""
     cur.execute("""
         SELECT sd.external_ids->>'nnt' AS nnt,
@@ -38,7 +39,7 @@ def find_duplicates(cur):
     return cur.fetchall()
 
 
-def choose_target(cur, pub_ids):
+def choose_target(cur: Any, pub_ids: Any) -> Any:
     """Choisit la publication à garder.
 
     Priorité : celle avec DOI > celle avec le plus de source_publications > id le plus bas.
@@ -59,7 +60,7 @@ def choose_target(cur, pub_ids):
     return cur.fetchall()
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Fusionne les publications par NNT (cross-source)")
     parser.add_argument("--dry-run", action="store_true", help="Lister sans fusionner")
     args = parser.parse_args()

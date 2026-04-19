@@ -9,13 +9,15 @@ transaction courante, exceptions du domaine, pas d'orchestration
 métier (qui reste dans services/journals.py).
 """
 
+from typing import Any
+
 from infrastructure.db_helpers import row_val as _val
 
 
 class PgJournalRepository:
     """Accès PostgreSQL aux agrégats Journal et Publisher."""
 
-    def __init__(self, cur):
+    def __init__(self, cur: Any) -> None:
         self._cur = cur
 
     # ── publisher_name_forms ───────────────────────────────────────

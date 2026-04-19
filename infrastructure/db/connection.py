@@ -3,6 +3,7 @@ Utilitaire de connexion PostgreSQL.
 """
 
 import os
+from typing import Any
 
 import psycopg2
 
@@ -11,7 +12,7 @@ from infrastructure.settings import settings
 SANDBOX_DB_NAME = "bibliometrie_sandbox"
 
 
-def get_connection():
+def get_connection() -> Any:
     """Retourne une connexion psycopg2.
 
     Si la variable d'environnement BIBLIOMETRIE_SANDBOX=1 est définie,

@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+from typing import Any
 
 from domain.normalize import normalize_text
 from infrastructure.db.connection import get_connection
@@ -25,7 +26,7 @@ from infrastructure.log import setup_logger
 logger = setup_logger("suggest_countries", "processing/logs")
 
 
-def load_country_forms(cur) -> dict[str, str]:
+def load_country_forms(cur: Any) -> dict[str, str]:
     """Charge country_name_forms. Retourne {form_normalized: iso_code}."""
     cur.execute("SELECT form_normalized, iso_code FROM country_name_forms")
     return {r[0]: r[1] for r in cur.fetchall()}
@@ -39,7 +40,7 @@ def extract_last_segment(raw_text: str) -> str:
     return normalize_text(parts[-1].strip())
 
 
-def show_stats(cur):
+def show_stats(cur: Any) -> Any:
     cur.execute("""
         SELECT count(*) AS total,
                count(*) FILTER (WHERE countries IS NOT NULL) AS avec_pays,
@@ -56,7 +57,7 @@ def show_stats(cur):
     logger.info(f"  Sans rien        : {r[3]}")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Détection pays des adresses")
     parser.add_argument("--apply", action="store_true", help="Appliquer (sinon dry-run)")
     parser.add_argument(
@@ -137,7 +138,7 @@ def main():
     conn.close()
 
 
-def _apply_batch(cur, batch, column):
+def _apply_batch(cur: Any, batch: Any, column: Any) -> Any:
     from psycopg2.extras import execute_values
 
     execute_values(

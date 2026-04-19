@@ -13,6 +13,7 @@ Les résultats bruts sont stockés dans staging (JSONB).
 import argparse
 import os
 import time
+from typing import Any
 
 from psycopg2.extras import Json
 
@@ -75,7 +76,7 @@ def fetch_page(url: str, auth: tuple, query: dict) -> dict:
 
 
 def extract_year(
-    conn,
+    conn: Any,
     url: str,
     auth: tuple,
     year: int,
@@ -156,7 +157,7 @@ def extract_year(
     return total, inserted, updated
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Extraction ScanR → staging")
     parser.add_argument("--year", type=int, help="Année unique")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")

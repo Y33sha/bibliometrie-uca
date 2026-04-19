@@ -2,13 +2,15 @@
 `structures`, `structure_relations`, `structure_name_forms`.
 """
 
+from typing import Any
+
 from psycopg2.extras import Json
 
 
 class PgStructureRepository:
     """Accès PostgreSQL à l'agrégat Structure."""
 
-    def __init__(self, cur):
+    def __init__(self, cur: Any) -> None:
         self._cur = cur
 
     # ── structures ─────────────────────────────────────────────────

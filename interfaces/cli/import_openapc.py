@@ -18,7 +18,7 @@ from infrastructure.log import setup_logger
 log = setup_logger("import_openapc", os.path.join(os.path.dirname(__file__), "../processing/logs"))
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Import Open APC (DOI matching)")
     parser.add_argument("csv_file", help="Fichier CSV Open APC")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")

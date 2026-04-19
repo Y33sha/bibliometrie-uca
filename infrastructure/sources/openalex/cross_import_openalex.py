@@ -19,6 +19,7 @@ import argparse
 import os
 import sys
 import time
+from typing import Any
 
 import requests
 from psycopg2.extras import Json
@@ -63,7 +64,7 @@ def fetch_by_doi(doi: str) -> dict | None:
     return None
 
 
-def insert_work(conn, work: dict):
+def insert_work(conn: Any, work: dict) -> Any:
     """Insère un work dans staging."""
     oa_id = extract_openalex_id(work)
     doi = extract_doi(work)
@@ -81,7 +82,7 @@ def insert_work(conn, work: dict):
     conn.commit()
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Import croisé DOI → OpenAlex")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans importer")
     parser.add_argument("--limit", type=int, help="Nombre max de DOI à traiter")

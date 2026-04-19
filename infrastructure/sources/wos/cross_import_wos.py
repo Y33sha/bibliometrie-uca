@@ -162,7 +162,7 @@ def search_by_dois(dois: list[str]) -> list[dict]:
     return all_records
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Cross-import WoS par DOI")
     parser.add_argument("--dry-run", action="store_true", help="Compte sans insérer")
     parser.add_argument("--limit", type=int, default=0, help="Limite de DOIs à traiter")
