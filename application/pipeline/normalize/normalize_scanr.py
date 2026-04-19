@@ -18,21 +18,20 @@ via populate_affiliations.py, pas ici.
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
-import argparse
 import os
 import time
 from typing import Any
 
-from psycopg2.extras import Json, RealDictCursor
+from psycopg2.extras import Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
+from application.pipeline.normalize.base import SourceNormalizer, run_normalizer
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
 from domain.publication import clean_doi, normalize_nnt
 from infrastructure.addresses import link_addresses
-from infrastructure.db.connection import get_connection
 from infrastructure.db_helpers import mark_staging_done
 from infrastructure.log import setup_logger
 
@@ -531,88 +530,17 @@ def process_work(cur: Any, staging_row: Any) -> bool:
         raise
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser(description="Normalisation ScanR → tables structurées")
-    parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
-    parser.add_argument(
-        "--reset", action="store_true", help="Remettre tous les works à processed=FALSE"
-    )
-    parser.add_argument(
-        "--batch-size", type=int, default=100, help="Taille du commit batch (défaut: 100)"
-    )
-    args = parser.parse_args()
+class ScanrNormalizer(SourceNormalizer):
+    SOURCE = "scanr"
+    DEFAULT_BATCH_SIZE = 100
+    FETCH_COLUMNS = "id, source_id AS scanr_id, doi, raw_data"
 
-    conn = get_connection()
-    conn.autocommit = False
+    def process_work(self, cur: Any, row: Any) -> bool | None:
+        return process_work(cur, row)
 
-    try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        if args.reset:
-            cur.execute("UPDATE staging SET processed = FALSE WHERE source = 'scanr'")
-            count = cur.rowcount
-            conn.commit()
-            logger.info(f"Reset : {count} works remis à processed=FALSE")
-            return
-
-        cur.execute(
-            "SELECT COUNT(*) AS cnt FROM staging WHERE source = 'scanr' AND processed = FALSE"
-        )
-        total = cur.fetchone()["cnt"]
-        logger.info(f"=== Normalisation ScanR : {total} works à traiter ===")
-
-        if total == 0:
-            logger.info("Rien à faire.")
-            return
-
-        limit = args.limit or total
-        limit = min(limit, total)
-        logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
-
-        cur.execute(
-            """
-            SELECT id, source_id AS scanr_id, doi, raw_data
-            FROM staging
-            WHERE source = 'scanr' AND processed = FALSE
-            ORDER BY id
-            LIMIT %s
-        """,
-            (limit,),
-        )
-
-        rows = cur.fetchall()
-        processed = 0
-        errors = 0
-
-        for row in rows:
-            try:
-                success = process_work(cur, row)
-                if success:
-                    processed += 1
-            except Exception:
-                conn.rollback()
-                errors += 1
-                continue
-
-            if processed % args.batch_size == 0:
-                conn.commit()
-                logger.info(f"  {processed}/{limit} traités ({errors} erreurs)")
-
-        conn.commit()
-
-        logger.info("\n=== Terminé ===")
-        logger.info(f"Traités avec succès : {processed}")
-        logger.info(f"Erreurs : {errors}")
-
-    except KeyboardInterrupt:
-        conn.commit()
-        logger.warning("Interruption — données déjà traitées conservées.")
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Erreur fatale : {e}")
-        raise
-    finally:
-        conn.close()
+def main() -> None:
+    run_normalizer(ScanrNormalizer, logger)
 
 
 if __name__ == "__main__":

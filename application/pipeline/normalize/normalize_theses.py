@@ -22,12 +22,12 @@ Particularités theses.fr :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
-import argparse
 import os
 from typing import Any
 
-from psycopg2.extras import Json, RealDictCursor
+from psycopg2.extras import Json
 
+from application.pipeline.normalize.base import SourceNormalizer, run_normalizer
 from application.publications import (
     find_or_create,
     find_thesis_by_title,
@@ -39,7 +39,6 @@ from domain.names import names_compatible
 from domain.normalize import normalize_name, normalize_text
 from domain.publication import normalize_nnt
 from infrastructure.addresses import link_addresses
-from infrastructure.db.connection import get_connection
 from infrastructure.db_helpers import mark_staging_done
 from infrastructure.log import setup_logger
 
@@ -555,89 +554,23 @@ def process_work(cur: Any, row: dict) -> bool:
         raise
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser(description="Normalisation theses.fr → tables structurées")
-    parser.add_argument("--limit", type=int, help="Nombre max de thèses à traiter")
-    parser.add_argument("--reset", action="store_true", help="Remettre processed=FALSE")
-    parser.add_argument("--batch-size", type=int, default=100)
-    args = parser.parse_args()
+class ThesesNormalizer(SourceNormalizer):
+    SOURCE = "theses"
+    DEFAULT_BATCH_SIZE = 100
 
-    conn = get_connection()
-    conn.autocommit = False
+    def process_work(self, cur: Any, row: Any) -> bool | None:
+        return process_work(cur, row)
 
-    try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+    def summary_stats(self, cur: Any) -> list[str]:
+        lines = []
+        for table in ("source_publications", "source_persons", "source_authorships"):
+            cur.execute(f"SELECT COUNT(*) AS cnt FROM {table} WHERE source = 'theses'")
+            lines.append(f"  {table} (theses) : {cur.fetchone()['cnt']}")
+        return lines
 
-        if args.reset:
-            cur.execute("UPDATE staging SET processed = FALSE WHERE source = 'theses'")
-            count = cur.rowcount
-            conn.commit()
-            logger.info(f"Reset : {count} thèses remises à processed=FALSE")
-            return
 
-        cur.execute(
-            "SELECT COUNT(*) AS cnt FROM staging WHERE source = 'theses' AND processed = FALSE"
-        )
-        total = cur.fetchone()["cnt"]
-        logger.info(f"=== Normalisation theses.fr : {total} thèses à traiter ===")
-
-        if total == 0:
-            logger.info("Rien à faire.")
-            return
-
-        limit = min(args.limit or total, total)
-        logger.info(f"Traitement de {limit} thèses")
-
-        cur.execute(
-            """
-            SELECT id, source_id, doi, raw_data
-            FROM staging
-            WHERE source = 'theses' AND processed = FALSE
-            ORDER BY id
-            LIMIT %s
-        """,
-            (limit,),
-        )
-
-        rows = cur.fetchall()
-        processed = 0
-        errors = 0
-
-        for row in rows:
-            try:
-                if process_work(cur, row):
-                    processed += 1
-            except Exception:
-                conn.rollback()
-                errors += 1
-                continue
-
-            if processed % args.batch_size == 0 and processed > 0:
-                conn.commit()
-                logger.info(f"  {processed}/{limit} traités...")
-
-        conn.commit()
-
-        logger.info("\n=== Terminé ===")
-        logger.info(f"Traités avec succès : {processed}")
-        logger.info(f"Erreurs : {errors}")
-
-        cur.execute("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'theses'")
-        logger.info(f"  source_publications (theses) : {cur.fetchone()['cnt']}")
-        cur.execute("SELECT COUNT(*) AS cnt FROM source_persons WHERE source = 'theses'")
-        logger.info(f"  source_persons (theses) : {cur.fetchone()['cnt']}")
-        cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'theses'")
-        logger.info(f"  source_authorships (theses) : {cur.fetchone()['cnt']}")
-
-    except KeyboardInterrupt:
-        conn.commit()
-        logger.warning("Interruption — données déjà traitées conservées.")
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Erreur fatale : {e}")
-        raise
-    finally:
-        conn.close()
+def main() -> None:
+    run_normalizer(ThesesNormalizer, logger)
 
 
 if __name__ == "__main__":
