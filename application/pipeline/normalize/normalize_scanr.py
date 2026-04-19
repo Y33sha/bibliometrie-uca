@@ -32,6 +32,14 @@ from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
 from domain.publication import clean_doi, normalize_nnt
 from infrastructure.addresses import link_addresses
+from infrastructure.db.queries.normalize_scanr import (
+    find_scanr_source_person_by_name,
+    get_scanr_publication_id,
+    insert_scanr_source_person_new,
+    upsert_scanr_source_authorship,
+    upsert_scanr_source_person_by_idref,
+    upsert_scanr_source_publication,
+)
 from infrastructure.db_helpers import mark_staging_done
 from infrastructure.log import setup_logger
 
@@ -243,55 +251,26 @@ def insert_scanr_document(
     language = pub_meta.get("language") if pub_meta else None
     container_title = pub_meta.get("container_title") if pub_meta else None
 
-    cur.execute(
-        """
-        INSERT INTO source_publications
-            (source, source_id, doi, title, pub_year, doc_type,
-             publication_id, staging_id, external_ids,
-             journal_id, oa_status, language, container_title,
-             abstract, keywords, topics, cited_by_count, urls)
-        VALUES ('scanr', %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s, %s, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            publication_id = COALESCE(
-                source_publications.publication_id, EXCLUDED.publication_id
-            ),
-            doi = COALESCE(source_publications.doi, EXCLUDED.doi),
-            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
-            doc_type = COALESCE(EXCLUDED.doc_type, source_publications.doc_type),
-            journal_id = COALESCE(EXCLUDED.journal_id, source_publications.journal_id),
-            oa_status = COALESCE(EXCLUDED.oa_status, source_publications.oa_status),
-            language = COALESCE(EXCLUDED.language, source_publications.language),
-            container_title = COALESCE(EXCLUDED.container_title, source_publications.container_title),
-            abstract = COALESCE(EXCLUDED.abstract, source_publications.abstract),
-            keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
-            topics = COALESCE(EXCLUDED.topics, source_publications.topics),
-            cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_publications.cited_by_count, 0)),
-            urls = COALESCE(EXCLUDED.urls, source_publications.urls)
-        RETURNING id
-    """,
-        (
-            scanr_id,
-            doi,
-            title,
-            pub_year,
-            doc_type,
-            publication_id,
-            staging_id,
-            external_ids,
-            journal_id,
-            oa_status,
-            language,
-            container_title,
-            abstract,
-            keywords,
-            topics,
-            cited_by_count,
-            urls or None,
-        ),
+    return upsert_scanr_source_publication(
+        cur,
+        scanr_id=scanr_id,
+        doi=doi,
+        title=title,
+        pub_year=pub_year,
+        doc_type=doc_type,
+        publication_id=publication_id,
+        staging_id=staging_id,
+        external_ids=external_ids,
+        journal_id=journal_id,
+        oa_status=oa_status,
+        language=language,
+        container_title=container_title,
+        abstract=abstract,
+        keywords=keywords,
+        topics=topics,
+        cited_by_count=cited_by_count,
+        urls=urls or None,
     )
-    return cur.fetchone()["id"]
 
 
 # =============================================================
@@ -320,55 +299,29 @@ def upsert_scanr_author(cur: Any, author: dict) -> int | None:
     orcid = denorm.get("orcid")
 
     # 1. Par idref (clé fiable)
-    #    source_id = COALESCE(idref, 'scanr-{old_id}')
-    #    idref va aussi dans la colonne idref de source_persons
     if idref:
-        source_id = idref
-        cur.execute(
-            """
-            INSERT INTO source_persons
-                (source, source_id, full_name, last_name, first_name, orcid, idref)
-            VALUES ('scanr', %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (source, source_id) DO UPDATE SET
-                orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
-                full_name = EXCLUDED.full_name,
-                idref = COALESCE(source_persons.idref, EXCLUDED.idref)
-            RETURNING id
-        """,
-            (source_id, full_name, last_name, first_name, orcid, idref),
+        return upsert_scanr_source_person_by_idref(
+            cur,
+            idref=idref,
+            full_name=full_name,
+            last_name=last_name,
+            first_name=first_name,
+            orcid=orcid,
         )
-        return cur.fetchone()["id"]
 
     # 2. Par nom exact (auteurs sans idref)
-    cur.execute(
-        """
-        SELECT id FROM source_persons
-        WHERE source = 'scanr'
-          AND source_id LIKE 'scanr-%%'
-          AND full_name = %s
-          AND first_name IS NOT DISTINCT FROM %s
-        LIMIT 1
-    """,
-        (full_name, first_name),
-    )
-    row = cur.fetchone()
-    if row:
-        return row["id"]
+    existing = find_scanr_source_person_by_name(cur, full_name=full_name, first_name=first_name)
+    if existing is not None:
+        return existing
 
-    # 3. Nouveau sans identifiant — on génère un source_id séquentiel
-    cur.execute("SELECT nextval('source_persons_id_seq')")
-    next_id = cur.fetchone()["nextval"]
-    source_id = f"scanr-{next_id}"
-    cur.execute(
-        """
-        INSERT INTO source_persons
-            (id, source, source_id, full_name, last_name, first_name, orcid)
-        VALUES (%s, 'scanr', %s, %s, %s, %s, %s)
-        RETURNING id
-    """,
-        (next_id, source_id, full_name, last_name, first_name, orcid),
+    # 3. Nouveau sans identifiant
+    return insert_scanr_source_person_new(
+        cur,
+        full_name=full_name,
+        last_name=last_name,
+        first_name=first_name,
+        orcid=orcid,
     )
-    return cur.fetchone()["id"]
 
 
 # =============================================================
@@ -403,29 +356,14 @@ def process_authors(cur: Any, doc: dict, source_publication_id: int) -> Any:
 
         author_full_name = author_data.get("fullName")
 
-        cur.execute(
-            """
-            INSERT INTO source_authorships
-                (source, source_publication_id, source_person_id, author_position, roles,
-                 author_name_normalized, raw_author_name)
-            VALUES ('scanr', %s, %s, %s, %s, normalize_name_form(%s), %s)
-            ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
-                author_name_normalized = EXCLUDED.author_name_normalized,
-                roles = EXCLUDED.roles,
-                raw_author_name = EXCLUDED.raw_author_name
-            RETURNING id
-        """,
-            (
-                source_publication_id,
-                source_person_id,
-                position,
-                roles or None,
-                author_full_name,
-                author_full_name,
-            ),
+        sa_id = upsert_scanr_source_authorship(
+            cur,
+            source_publication_id=source_publication_id,
+            source_person_id=source_person_id,
+            author_position=position,
+            roles=roles or None,
+            raw_author_name=author_full_name,
         )
-        row = cur.fetchone()
-        sa_id = row[0] if isinstance(row, tuple) else row["id"]
 
         if addr_parts:
             link_addresses(cur, sa_id, addr_parts, countries=detected_countries or None)
@@ -468,13 +406,7 @@ def process_work(cur: Any, staging_row: Any) -> bool:
         publication_id = None
 
         # Idempotence : réutiliser le publication_id existant
-        cur.execute(
-            "SELECT publication_id FROM source_publications WHERE source = 'scanr' AND source_id = %s",
-            (scanr_id,),
-        )
-        existing_doc = cur.fetchone()
-        if existing_doc and existing_doc["publication_id"]:
-            publication_id = existing_doc["publication_id"]
+        publication_id = get_scanr_publication_id(cur, scanr_id)
 
         # Recherche par DOI/NNT/titre (sans création)
         if not publication_id:
