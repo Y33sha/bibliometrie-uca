@@ -183,9 +183,9 @@ def phase_normalize(**kw: Any) -> Any:
     if "wos" in sources:
         run_python("processing/normalize_wos.py")
     if "scanr" in sources:
-        run_python("processing/normalize_scanr.py")
+        _run_normalize_scanr()
     if "theses" in sources:
-        run_python("processing/normalize_theses.py")
+        _run_normalize_theses()
     if "hal" in sources:
         if kw.get("mode", "full") in ("full", "monthly"):
             _run_harvest_hal_identifiers()
@@ -394,6 +394,32 @@ def _run_merge_pubs_by_hal_id() -> None:
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
+
+
+def _run_normalize_scanr() -> None:
+    from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
+
+    log.info("▶ normalize_scanr")
+    t0 = time.time()
+    conn = get_connection()
+    ScanrNormalizer(conn, log, PgStagingQueries(), PgScanrNormalizeQueries()).run([])
+    log.info("✓ normalize_scanr terminé en %.1fs", time.time() - t0)
+
+
+def _run_normalize_theses() -> None:
+    from application.pipeline.normalize.normalize_theses import ThesesNormalizer
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.normalize_theses import PgThesesNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
+
+    log.info("▶ normalize_theses")
+    t0 = time.time()
+    conn = get_connection()
+    ThesesNormalizer(conn, log, PgStagingQueries(), PgThesesNormalizeQueries()).run([])
+    log.info("✓ normalize_theses terminé en %.1fs", time.time() - t0)
 
 
 def _run_harvest_hal_identifiers() -> None:
