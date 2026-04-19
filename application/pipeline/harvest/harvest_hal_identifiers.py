@@ -6,36 +6,22 @@ et récupère ORCID et IdRef en une seule passe.
 
 Met à jour :
   - source_persons.orcid, source_persons.idref
-  - person_identifiers (source='hal')
 
-Usage:
-    python harvest_hal_identifiers.py              # moissonnage complet
-    python harvest_hal_identifiers.py --dry-run    # rapport sans écriture
-    python harvest_hal_identifiers.py --batch 50   # taille de batch API
+L'orchestrateur dépend du port `HarvestQueries`. Le point d'entrée CLI
+est dans `interfaces/cli/pipeline/harvest_hal_identifiers.py`.
 """
 
-import argparse
-import os
 import time
 from typing import Any
 
 import requests
 
-from infrastructure.api_limits import HAL_DELAY
-from infrastructure.db.connection import get_connection
-from infrastructure.db.queries.harvest import (
-    fetch_hal_persons_missing_identifiers,
-    fill_source_person_idref_if_null,
-    fill_source_person_orcid_if_null,
-)
-from infrastructure.log import setup_logger
-
-logger = setup_logger("harvest_hal_identifiers", os.path.join(os.path.dirname(__file__), "logs"))
+from application.ports.harvest import HarvestQueries
 
 API_URL = "https://api.archives-ouvertes.fr/ref/author/"
 
 
-def fetch_identifiers_batch(person_ids: list[int]) -> dict[int, dict]:
+def fetch_identifiers_batch(person_ids: list[int], logger: Any) -> dict[int, dict]:
     """Interroge l'API HAL pour un lot de person_ids.
 
     Retourne {hal_person_id: {"orcid": ..., "idref": ...}} pour ceux qui en ont.
@@ -74,7 +60,6 @@ def fetch_identifiers_batch(person_ids: list[int]) -> dict[int, dict]:
 
         identifiers = {}
 
-        # ORCID
         orcid_raw = doc.get("orcidId_s")
         if orcid_raw:
             if isinstance(orcid_raw, list):
@@ -83,12 +68,10 @@ def fetch_identifiers_batch(person_ids: list[int]) -> dict[int, dict]:
             if orcid:
                 identifiers["orcid"] = orcid
 
-        # IdRef
         idref_raw = doc.get("idrefId_s")
         if idref_raw:
             if isinstance(idref_raw, list):
                 idref_raw = idref_raw[0]
-            # idrefId_s peut être une URL complète ou juste l'identifiant
             idref = idref_raw.rsplit("/", 1)[-1] if "/" in idref_raw else idref_raw
             idref = idref.strip()
             if idref:
@@ -100,23 +83,18 @@ def fetch_identifiers_batch(person_ids: list[int]) -> dict[int, dict]:
     return results
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser(
-        description="Moissonnage ORCID + IdRef depuis l'API personnes HAL"
-    )
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument(
-        "--batch", type=int, default=100, help="Nombre de person_ids par requête API (défaut: 100)"
-    )
-    args = parser.parse_args()
-
-    conn = get_connection()
-    conn.autocommit = False
-
+def run_harvest(
+    cur: Any,
+    conn: Any,
+    queries: HarvestQueries,
+    logger: Any,
+    *,
+    batch_size: int = 100,
+    dry_run: bool = False,
+    rate_delay: float = 0.1,
+) -> None:
     try:
-        cur = conn.cursor()
-
-        rows = fetch_hal_persons_missing_identifiers(cur)
+        rows = queries.fetch_hal_persons_missing_identifiers(cur)
         logger.info(f"{len(rows)} source_persons HAL à interroger (ORCID ou IdRef manquant)")
 
         if not rows:
@@ -124,27 +102,25 @@ def main() -> Any:
             return
 
         stats = {"orcid_found": 0, "idref_found": 0, "ha_updated": 0}
-        batch_size = args.batch
 
         for i in range(0, len(rows), batch_size):
             batch = rows[i : i + batch_size]
-            # {hal_person_id: (source_persons.id, person_id)}
             id_map = {row[1]: (row[0], row[2]) for row in batch}
             person_ids = list(id_map.keys())
 
-            identifiers = fetch_identifiers_batch(person_ids)
+            identifiers = fetch_identifiers_batch(person_ids, logger)
 
-            if identifiers and not args.dry_run:
+            if identifiers and not dry_run:
                 for pid, ids in identifiers.items():
                     ha_id, _person_id = id_map[pid]
 
                     if "orcid" in ids:
-                        if fill_source_person_orcid_if_null(cur, ha_id, ids["orcid"]):
+                        if queries.fill_source_person_orcid_if_null(cur, ha_id, ids["orcid"]):
                             stats["ha_updated"] += 1
                         stats["orcid_found"] += 1
 
                     if "idref" in ids:
-                        if fill_source_person_idref_if_null(cur, ha_id, ids["idref"]):
+                        if queries.fill_source_person_idref_if_null(cur, ha_id, ids["idref"]):
                             stats["ha_updated"] += 1
                         stats["idref_found"] += 1
 
@@ -164,9 +140,9 @@ def main() -> Any:
                     f"{stats['orcid_found']} ORCID, {stats['idref_found']} IdRef"
                 )
 
-            time.sleep(HAL_DELAY)
+            time.sleep(rate_delay)
 
-        if args.dry_run:
+        if dry_run:
             conn.rollback()
             logger.info(
                 f"\n[DRY RUN] {stats['orcid_found']} ORCID, {stats['idref_found']} IdRef trouvés"
@@ -184,9 +160,3 @@ def main() -> Any:
         conn.rollback()
         logger.error(f"Erreur fatale : {e}")
         raise
-    finally:
-        conn.close()
-
-
-if __name__ == "__main__":
-    main()
