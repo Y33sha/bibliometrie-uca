@@ -11,19 +11,19 @@ le SQL est extrait des services. Ce qui reste :
 - [x] Nouveau module `infrastructure/db/queries/` : accueille les
   query services extraits (CQRS-lite, SQL = infrastructure).
 - [x] `filters.py` SQL (PUB_IS_UCA, apply_*_filter) déplacé de
-  `interfaces/api/filters.py` vers `infrastructure/db/queries/filters.py`
-  — les parsers HTTP restent côté interfaces.
-- [x] **pub_stats** extrait (643 → 175 lignes de router) :
-  `infrastructure/db/queries/stats.py`
-- [x] **publications** extrait (1222 → 199 lignes) :
-  `infrastructure/db/queries/publications.py`
-- [x] **persons** (GET principaux) extrait (1807 → 1197 lignes) :
-  `infrastructure/db/queries/persons.py`. Les mutations (POST/PATCH/
-  DELETE) et endpoints admin (HAL-problems, orphan-authorships) restent
-  dans le router — à finaliser en reliquat.
-- [ ] **Reliquat** : addresses (487l), laboratories (449l),
-  admin_duplicates (175l), admin_person_duplicates (420l) + le
-  reste de persons.py (admin HAL-problems, orphan-authorships).
+  `interfaces/api/filters.py` vers `infrastructure/db/queries/filters.py`.
+- [x] **pub_stats** : 643 → 175 lignes (`stats.py`)
+- [x] **publications** : 1222 → 199 lignes (`publications.py`)
+- [x] **persons** : 1807 → 512 lignes (`persons.py` + `persons_admin.py`)
+- [x] **addresses** : 487 → 197 lignes (`addresses.py`)
+- [x] **laboratories** : 449 → 70 lignes (`laboratories.py`)
+- [x] **admin_duplicates + admin_person_duplicates** : 595 → 125 lignes
+  (`duplicates.py` consolidé)
+- [x] **authorships** : 273 → 51 lignes (`authorships.py`)
+- [ ] **Reliquat** (petits routers — existence checks + lookups simples,
+  acceptables selon CQRS-lite) : feedback, structures, journals,
+  publishers, config, stats. ~30 `cur.execute` au total, la plupart
+  étant des `SELECT id WHERE id = %s` (OK en router selon Opus 4.7).
 
 ### 1.2 Factoriser la logique commune aux sources
 Créer des classes abstraites `BaseExtractor` / `BaseNormalizer` dans
