@@ -23,6 +23,11 @@ import requests
 
 from infrastructure.api_limits import HAL_DELAY
 from infrastructure.db.connection import get_connection
+from infrastructure.db.queries.harvest import (
+    fetch_hal_persons_missing_identifiers,
+    fill_source_person_idref_if_null,
+    fill_source_person_orcid_if_null,
+)
 from infrastructure.log import setup_logger
 
 logger = setup_logger("harvest_hal_identifiers", os.path.join(os.path.dirname(__file__), "logs"))
@@ -111,16 +116,7 @@ def main() -> Any:
     try:
         cur = conn.cursor()
 
-        # source_persons HAL avec hal_person_id mais sans ORCID ou sans idRef
-        cur.execute("""
-            SELECT id, (source_ids->>'hal_person_id')::int AS hal_person_id, person_id
-            FROM source_persons
-            WHERE source = 'hal'
-              AND (source_ids->>'hal_person_id') IS NOT NULL
-              AND (orcid IS NULL OR idref IS NULL)
-            ORDER BY id
-        """)
-        rows = cur.fetchall()
+        rows = fetch_hal_persons_missing_identifiers(cur)
         logger.info(f"{len(rows)} source_persons HAL à interroger (ORCID ou IdRef manquant)")
 
         if not rows:
@@ -140,31 +136,15 @@ def main() -> Any:
 
             if identifiers and not args.dry_run:
                 for pid, ids in identifiers.items():
-                    ha_id, person_id = id_map[pid]
+                    ha_id, _person_id = id_map[pid]
 
                     if "orcid" in ids:
-                        cur.execute(
-                            """
-                            UPDATE source_persons
-                            SET orcid = COALESCE(orcid, %s), updated_at = now()
-                            WHERE id = %s AND orcid IS NULL
-                        """,
-                            (ids["orcid"], ha_id),
-                        )
-                        if cur.rowcount:
+                        if fill_source_person_orcid_if_null(cur, ha_id, ids["orcid"]):
                             stats["ha_updated"] += 1
                         stats["orcid_found"] += 1
 
                     if "idref" in ids:
-                        cur.execute(
-                            """
-                            UPDATE source_persons
-                            SET idref = COALESCE(idref, %s), updated_at = now()
-                            WHERE id = %s AND idref IS NULL
-                        """,
-                            (ids["idref"], ha_id),
-                        )
-                        if cur.rowcount:
+                        if fill_source_person_idref_if_null(cur, ha_id, ids["idref"]):
                             stats["ha_updated"] += 1
                         stats["idref_found"] += 1
 
