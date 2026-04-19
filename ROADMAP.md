@@ -76,8 +76,12 @@ dupliqué entre agrégats.
   run_pipeline) — beaucoup en `Any` pragmatique pour les params DB
   (`cur: Any`, `conn: Any`) et les helpers internes. Les nouveaux
   ajouts seront donc typés par défaut.
-- [ ] Couverture `pytest --cov` en CI avec seuil progressif (partir de
-  la couverture actuelle, ne pas régresser)
+- [x] Couverture `pytest --cov` en CI avec seuil à **41%**
+  (`fail_under` dans `[tool.coverage.report]`). Baseline actuelle : 42%
+  hors `interfaces/cli/*` (scripts one-shot exclus de la mesure, car
+  leur logique utile est factorisée dans application/infrastructure et
+  testée là). À faire remonter par paliers : +5% quand chantier §1.1
+  sera fait (nouveaux tests de caractérisation sur les routers).
 
 ### 2.2 Organisation des tests
 - [x] Réorganisation `tests/unit/` + `tests/integration/`, sous-dossiers

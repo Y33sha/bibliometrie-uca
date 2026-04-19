@@ -154,11 +154,20 @@ source = ["application", "domain", "infrastructure", "interfaces"]
 omit = [
     "tests/*",
     "*/__init__.py",
+    # Scripts CLI one-shot : lancés à la main, pas testés unitairement.
+    # Leur logique métier utile est factorisée dans application/ ou
+    # infrastructure/ et testée là.
+    "interfaces/cli/*",
+    # Debug scripts dans interfaces/cli/debug/
+    "interfaces/cli/debug/*",
 ]
 
 [tool.coverage.report]
 skip_empty = true
 show_missing = true
+# Seuil progressif : part de la baseline actuelle (42% hors CLI), à faire
+# remonter au fur et à mesure qu'on ajoute des tests. Ne jamais régresser.
+fail_under = 41
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",
