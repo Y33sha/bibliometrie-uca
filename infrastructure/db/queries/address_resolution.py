@@ -10,6 +10,8 @@ Séparé de `infrastructure/db/queries/addresses.py`, qui sert la couche API
 
 from typing import Any
 
+from infrastructure.db_helpers import rows_as_dicts
+
 
 def load_name_forms(cur: Any) -> list[dict[str, Any]]:
     """Charge toutes les formes depuis `structure_name_forms` + infos structure."""
@@ -22,8 +24,7 @@ def load_name_forms(cur: Any) -> list[dict[str, Any]]:
         JOIN structures s ON s.id = nf.structure_id
         ORDER BY nf.id
     """)
-    columns = [desc[0] for desc in cur.description]
-    return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+    return rows_as_dicts(cur)
 
 
 def reset_auto_detected(cur: Any) -> int:

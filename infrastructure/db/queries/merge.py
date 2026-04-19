@@ -8,6 +8,8 @@ passent par `application.publications.merge_publications`.
 
 from typing import Any
 
+from infrastructure.db_helpers import rows_as_dicts
+
 
 def find_nnt_duplicates(cur: Any) -> list[dict[str, Any]]:
     """Liste les NNT dont les `source_publications` pointent vers plusieurs publications.
@@ -25,8 +27,7 @@ def find_nnt_duplicates(cur: Any) -> list[dict[str, Any]]:
         HAVING COUNT(DISTINCT sd.publication_id) > 1
         ORDER BY sd.external_ids->>'nnt'
     """)
-    columns = [desc[0] for desc in cur.description]
-    return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+    return rows_as_dicts(cur)
 
 
 def rank_publications_by_merge_priority(
@@ -53,8 +54,7 @@ def rank_publications_by_merge_priority(
         """,
         (publication_ids,),
     )
-    columns = [desc[0] for desc in cur.description]
-    return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+    return rows_as_dicts(cur)
 
 
 def fetch_source_publications_with_hal_external_id(
@@ -72,8 +72,7 @@ def fetch_source_publications_with_hal_external_id(
         WHERE sd.source IN ('openalex', 'scanr')
           AND sd.external_ids->>'hal' IS NOT NULL
     """)
-    columns = [desc[0] for desc in cur.description]
-    return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+    return rows_as_dicts(cur)
 
 
 def fetch_hal_source_publications(cur: Any) -> list[dict[str, Any]]:
@@ -85,8 +84,7 @@ def fetch_hal_source_publications(cur: Any) -> list[dict[str, Any]]:
         WHERE source = 'hal'
         """
     )
-    columns = [desc[0] for desc in cur.description]
-    return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+    return rows_as_dicts(cur)
 
 
 def link_source_publication_to_publication(

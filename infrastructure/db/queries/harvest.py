@@ -6,6 +6,8 @@ identifiants (ORCID, IdRef) sur la table `source_persons`.
 
 from typing import Any
 
+from infrastructure.db_helpers import rows_as_dicts
+
 
 def fetch_hal_persons_missing_idref(cur: Any) -> list[dict[str, Any]]:
     """`source_persons` HAL avec `person_id` et sans `idref`.
@@ -25,8 +27,7 @@ def fetch_hal_persons_missing_idref(cur: Any) -> list[dict[str, Any]]:
           AND sa.idref IS NULL
         ORDER BY sa.person_id
     """)
-    columns = [desc[0] for desc in cur.description]
-    return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+    return rows_as_dicts(cur)
 
 
 def fetch_hal_persons_missing_identifiers(cur: Any) -> list[tuple[int, int, int | None]]:
