@@ -6,6 +6,8 @@ Affiche un résumé puis demande confirmation avant d'appliquer.
 À supprimer après exécution.
 """
 
+from typing import Any
+
 from psycopg2.extras import RealDictCursor
 
 from application.persons import add_name_form
@@ -53,7 +55,9 @@ def main():
     # Grouper par (person_id, norm) pour l'affichage
     from collections import defaultdict
 
-    groups = defaultdict(lambda: {"sources": set(), "items": []})
+    groups: dict[tuple[int, str], dict[str, Any]] = defaultdict(
+        lambda: {"sources": set(), "items": []}
+    )
     for m in matchable:
         key = (m["person_id"], m["norm"])
         groups[key]["sources"].add(m["source"])

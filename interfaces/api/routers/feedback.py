@@ -235,6 +235,7 @@ async def feedback_rerun():
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
+        assert proc.stdout is not None  # subprocess créé avec stdout=PIPE
         try:
             while True:
                 line = await asyncio.wait_for(proc.stdout.readline(), timeout=600)

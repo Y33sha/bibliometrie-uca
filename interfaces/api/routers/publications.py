@@ -69,6 +69,7 @@ async def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus t
 
     def base_conds_params():
         """Conditions de base : publications UCA ou personne. Exclut peer_review + excluded_doc_type."""
+        p: list[Any]
         if person_id:
             c, p = ["p.doc_type NOT IN ('peer_review', 'memoir')"], []
             apply_person_filter(c, p, person_id)

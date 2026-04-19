@@ -270,7 +270,7 @@ def run(dry_run=True):
 
             all_conflicts = {}
             sa_deleted = 0
-            authors_to_merge = {}  # keep_author_id -> set(old_author_ids)
+            authors_to_merge: dict[int, set[int]] = {}  # keep_author_id -> set(old_author_ids)
 
             for group in groups:
                 keep_id, delete_ids, conflicts = merge_source_authorships(cur, group, dry_run)
@@ -288,7 +288,7 @@ def run(dry_run=True):
                     existing.update(old_authors)
 
             # Rapport conflits
-            conflict_fields = {}
+            conflict_fields: dict[str, int] = {}
             for _key, cfl in all_conflicts.items():
                 for field in cfl:
                     conflict_fields[field] = conflict_fields.get(field, 0) + 1
