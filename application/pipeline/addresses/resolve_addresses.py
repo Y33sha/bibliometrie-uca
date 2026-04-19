@@ -5,6 +5,9 @@ Lit les formes de noms depuis la table structure_name_forms,
 et enregistre dans address_structures avec matched_form_id pour
 la traçabilité (boucle de rétroaction).
 
+Le SQL de la pipeline est isolé dans
+`infrastructure/db/queries/address_resolution.py`.
+
 Schéma v2 :
   - address_structures (address_id, structure_id, matched_form_id, is_confirmed)
   - matched_form_id IS NOT NULL = détection auto
@@ -14,7 +17,6 @@ Usage:
     python resolve_addresses.py              # résoudre les adresses non traitées
     python resolve_addresses.py --reset      # remettre à zéro (auto uniquement)
     python resolve_addresses.py --rerun      # reset auto + relancer tout
-    python resolve_addresses.py --stats      # stats
 """
 
 import argparse
@@ -25,37 +27,22 @@ from typing import Any
 
 from domain.normalize import normalize_text as normalize
 from infrastructure.db.connection import get_connection
+from infrastructure.db.queries.address_resolution import (
+    delete_obsolete_detections,
+    fetch_addresses_to_resolve,
+    load_name_forms,
+    mark_address_resolved,
+    reset_all_resolved_at,
+    reset_auto_detected,
+    unflag_obsolete_detections,
+    upsert_detected_structure,
+)
 from infrastructure.log import setup_logger
 from infrastructure.perimeter import get_persons_structure_ids
 
 logger = setup_logger("resolve_addresses", os.path.join(os.path.dirname(__file__), "logs"))
 
 BATCH_SIZE = 1000
-
-
-# ─── Chargement des données ──────────────────────────────────────
-
-
-def load_forms(cur: Any) -> Any:
-    """Charge toutes les formes depuis structure_name_forms."""
-    cur.execute("""
-        SELECT nf.id, nf.structure_id, nf.form_text,
-               nf.is_word_boundary, nf.requires_context_of,
-               nf.is_excluding,
-               s.code AS struct_code, s.structure_type::text AS struct_type
-        FROM structure_name_forms nf
-        JOIN structures s ON s.id = nf.structure_id
-        ORDER BY nf.id
-    """)
-    columns = [desc[0] for desc in cur.description]
-    forms = [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
-    logger.info(f"  {len(forms)} formes chargées")
-    return forms
-
-
-def load_perimeter(cur: Any) -> Any:
-    """Construit l'ensemble des structure_ids dans le périmètre."""
-    return get_persons_structure_ids(cur)
 
 
 # ─── Matching ────────────────────────────────────────────────────
@@ -162,39 +149,25 @@ def main() -> Any:
     cur = conn.cursor()
 
     if args.reset or args.rerun:
-        # Supprimer les affiliations auto-détectées (matched_form_id IS NOT NULL)
-        cur.execute("DELETE FROM address_structures WHERE matched_form_id IS NOT NULL")
-        affils = cur.rowcount
-        # Remettre resolved_at à NULL pour forcer le recalcul
-        cur.execute("UPDATE addresses SET resolved_at = NULL")
+        affils = reset_auto_detected(cur)
+        reset_all_resolved_at(cur)
         conn.commit()
         logger.info(f"Reset : {affils} affiliations auto supprimées")
         if args.reset and not args.rerun:
             conn.close()
             return
 
-    # Charger les données
     logger.info("Chargement des structures et formes...")
-    forms = load_forms(cur)
+    forms = load_name_forms(cur)
+    logger.info(f"  {len(forms)} formes chargées")
     forms_by_structure = build_forms_by_structure(forms)
-    perimeter = load_perimeter(cur)
+    perimeter = get_persons_structure_ids(cur)
     logger.info(f"  {len(perimeter)} structures dans le périmètre")
 
-    # En mode daily : uniquement les adresses jamais résolues
-    if args.mode == "daily":
-        cur.execute("""
-            SELECT a.id, a.raw_text FROM addresses a
-            WHERE a.resolved_at IS NULL
-            ORDER BY a.id
-        """)
+    incremental = args.mode == "daily"
+    if incremental:
         logger.info("Mode incrémental : adresses non résolues uniquement")
-    else:
-        cur.execute("""
-            SELECT a.id, a.raw_text FROM addresses a
-            ORDER BY a.id
-        """)
-
-    rows = cur.fetchall()
+    rows = fetch_addresses_to_resolve(cur, incremental=incremental)
     total = len(rows)
     logger.info(f"  {total} adresses à résoudre")
 
@@ -213,7 +186,6 @@ def process_addresses(
     processed = 0
     uca_count = 0
     affil_count = 0
-
     removed_count = 0
 
     for addr_id, raw_text in rows:
@@ -224,58 +196,16 @@ def process_addresses(
         if in_perimeter:
             uca_count += 1
 
-        detected_structure_ids = {sid for sid, _ in matches}
+        detected_structure_ids = [sid for sid, _ in matches]
 
-        # Liens auto-détectés obsolètes (structure plus détectée par le script)
-        if detected_structure_ids:
-            obsolete_condition = """
-                address_id = %s
-                AND matched_form_id IS NOT NULL
-                AND structure_id != ALL(%s)
-            """
-            obsolete_params: tuple = (addr_id, list(detected_structure_ids))
-        else:
-            obsolete_condition = """
-                address_id = %s
-                AND matched_form_id IS NOT NULL
-            """
-            obsolete_params = (addr_id,)
+        removed_count += delete_obsolete_detections(cur, addr_id, detected_structure_ids)
+        unflag_obsolete_detections(cur, addr_id, detected_structure_ids)
 
-        # Non confirmés : supprimer
-        cur.execute(
-            f"""
-            DELETE FROM address_structures
-            WHERE {obsolete_condition} AND is_confirmed IS NULL
-        """,
-            obsolete_params,
-        )
-        removed_count += cur.rowcount
-
-        # Confirmés/rejetés : retirer le flag de détection auto
-        cur.execute(
-            f"""
-            UPDATE address_structures
-            SET matched_form_id = NULL
-            WHERE {obsolete_condition} AND is_confirmed IS NOT NULL
-        """,
-            obsolete_params,
-        )
-
-        # Insérer/mettre à jour les structures détectées
         for structure_id, form_id in matches:
             affil_count += 1
-            cur.execute(
-                """
-                INSERT INTO address_structures
-                    (address_id, structure_id, matched_form_id)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (address_id, structure_id)
-                    DO UPDATE SET matched_form_id = EXCLUDED.matched_form_id
-            """,
-                (addr_id, structure_id, form_id),
-            )
+            upsert_detected_structure(cur, addr_id, structure_id, form_id)
 
-        cur.execute("UPDATE addresses SET resolved_at = now() WHERE id = %s", (addr_id,))
+        mark_address_resolved(cur, addr_id)
         processed += 1
         if processed % BATCH_SIZE == 0:
             conn.commit()
