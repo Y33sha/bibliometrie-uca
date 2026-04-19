@@ -264,7 +264,25 @@ def phase_countries(**kw: Any) -> Any:
     """Detection des pays des adresses et recalcul sur les publications."""
     run_python("scripts/detect_address_countries.py", "--direct", "--apply")
     run_python("scripts/suggest_address_countries.py")
-    run_python("processing/refresh_publication_countries.py")
+    _run_refresh_publication_countries()
+
+
+def _run_refresh_publication_countries() -> None:
+    from application.pipeline.countries.refresh_publication_countries import refresh
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.countries import PgCountryQueries
+
+    log.info("▶ refresh_publication_countries")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        refresh(cur, PgCountryQueries(), log)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ refresh_publication_countries terminé en %.1fs", time.time() - t0)
 
 
 def phase_enrich(mode: Any = "full", **kw: Any) -> Any:
