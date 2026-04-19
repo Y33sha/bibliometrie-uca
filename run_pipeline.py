@@ -220,7 +220,7 @@ def phase_affiliations(**kw: Any) -> Any:
     source_args = ",".join(sorted(sources))
     mode = kw.get("mode", "full")
     _run_resolve_addresses(mode)
-    run_python("processing/populate_affiliations.py", "--sources", source_args, "--mode", mode)
+    _run_populate_affiliations(sources=set(source_args.split(",")), mode=mode)
 
 
 def phase_publications(**kw: Any) -> Any:
@@ -243,7 +243,7 @@ def phase_persons(**kw: Any) -> Any:
     Rattache aussi les authorships theses hors-perimetre par IdRef.
     """
     run_python("processing/create_persons_from_source_authorships.py")
-    run_python("processing/populate_person_name_forms.py")
+    _run_populate_person_name_forms()
 
 
 def phase_authorships(**kw: Any) -> Any:
@@ -254,10 +254,7 @@ def phase_authorships(**kw: Any) -> Any:
     et structure_ids propages.
     """
     sources = kw.get("sources")
-    if sources and sources != ALL_SOURCES_SET:
-        run_python("processing/build_authorships.py", "--sources", ",".join(sorted(sources)))
-    else:
-        run_python("processing/build_authorships.py")
+    _run_build_authorships(sources if sources and sources != ALL_SOURCES_SET else None)
 
 
 def phase_countries(**kw: Any) -> Any:
@@ -265,6 +262,72 @@ def phase_countries(**kw: Any) -> Any:
     run_python("scripts/detect_address_countries.py", "--direct", "--apply")
     run_python("scripts/suggest_address_countries.py")
     _run_refresh_publication_countries()
+
+
+def _run_build_authorships(sources: Any = None) -> None:
+    from application.pipeline.build.build_authorships import build
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.authorships_build import PgAuthorshipsBuildQueries
+
+    log.info("▶ build_authorships %s", f"sources={sorted(sources)}" if sources else "")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        build(cur, PgAuthorshipsBuildQueries(), log, sources=sources)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ build_authorships terminé en %.1fs", time.time() - t0)
+
+
+def _run_populate_affiliations(*, sources: set, mode: str) -> None:
+    from application.pipeline.build.populate_affiliations import run_populate
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.affiliations import PgAffiliationsQueries
+    from infrastructure.perimeter import (
+        get_affiliations_structure_ids,
+        get_persons_structure_ids,
+    )
+
+    log.info("▶ populate_affiliations --mode %s --sources %s", mode, ",".join(sorted(sources)))
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        perimeter_ids = get_persons_structure_ids(cur)
+        wide_ids = get_affiliations_structure_ids(cur)
+        run_populate(
+            cur,
+            conn,
+            PgAffiliationsQueries(),
+            log,
+            perimeter_ids,
+            wide_ids,
+            sources=sources,
+            mode=mode,
+        )
+    finally:
+        conn.close()
+    log.info("✓ populate_affiliations terminé en %.1fs", time.time() - t0)
+
+
+def _run_populate_person_name_forms() -> None:
+    from application.pipeline.build.populate_person_name_forms import populate
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.name_forms import PgNameFormsQueries
+
+    log.info("▶ populate_person_name_forms")
+    t0 = time.time()
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        populate(cur, conn, PgNameFormsQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ populate_person_name_forms terminé en %.1fs", time.time() - t0)
 
 
 def _run_merge_pubs_by_nnt() -> None:
