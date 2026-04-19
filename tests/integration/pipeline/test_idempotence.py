@@ -907,6 +907,8 @@ def _setup_persons_test_data(db):
 
 def _run_create_persons(db):
     """Exécute create_persons sur le curseur de test."""
+    import logging
+
     from application.pipeline.create.create_persons_from_source_authorships import (
         get_all_unlinked_authorships,
         load_linked_authorships_by_pub,
@@ -915,17 +917,19 @@ def _run_create_persons(db):
         step2_orcid,
         step3_name_forms,
     )
-    from infrastructure.db.queries.persons_create import fetch_name_form_map
+    from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
 
-    all_authorships = get_all_unlinked_authorships(db)
-    linked_ids = set()
+    queries = PgPersonsCreateQueries()
+    logger = logging.getLogger("test")
+    all_authorships = get_all_unlinked_authorships(db, queries)
+    linked_ids: set = set()
 
-    step0_hal_accounts(db, all_authorships, linked_ids, dry_run=False)
-    linked_index = load_linked_authorships_by_pub(db)
-    step1_cross_source(db, all_authorships, linked_ids, linked_index, dry_run=False)
-    step2_orcid(db, all_authorships, linked_ids, dry_run=False)
-    name_form_map = fetch_name_form_map(db)
-    step3_name_forms(db, all_authorships, linked_ids, name_form_map, dry_run=False)
+    step0_hal_accounts(db, queries, logger, all_authorships, linked_ids, dry_run=False)
+    linked_index = load_linked_authorships_by_pub(db, queries)
+    step1_cross_source(db, logger, all_authorships, linked_ids, linked_index, dry_run=False)
+    step2_orcid(db, queries, logger, all_authorships, linked_ids, dry_run=False)
+    name_form_map = queries.fetch_name_form_map(db)
+    step3_name_forms(db, logger, all_authorships, linked_ids, name_form_map, dry_run=False)
 
     return len(linked_ids)
 
