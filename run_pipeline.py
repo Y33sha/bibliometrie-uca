@@ -188,7 +188,7 @@ def phase_normalize(**kw: Any) -> Any:
         run_python("processing/normalize_theses.py")
     if "hal" in sources:
         if kw.get("mode", "full") in ("full", "monthly"):
-            run_python("processing/harvest_hal_identifiers.py")
+            _run_harvest_hal_identifiers()
     # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
     mode = kw.get("mode", "full")
     if mode in ("full", "monthly"):
@@ -265,6 +265,24 @@ def phase_countries(**kw: Any) -> Any:
     run_python("scripts/detect_address_countries.py", "--direct", "--apply")
     run_python("scripts/suggest_address_countries.py")
     _run_refresh_publication_countries()
+
+
+def _run_harvest_hal_identifiers() -> None:
+    from application.pipeline.harvest.harvest_hal_identifiers import run_harvest
+    from infrastructure.api_limits import HAL_DELAY
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.harvest import PgHarvestQueries
+
+    log.info("▶ harvest_hal_identifiers")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        run_harvest(cur, conn, PgHarvestQueries(), log, rate_delay=HAL_DELAY)
+    finally:
+        conn.close()
+    log.info("✓ harvest_hal_identifiers terminé en %.1fs", time.time() - t0)
 
 
 def _run_enrich_oa_status() -> None:
