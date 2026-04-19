@@ -17,6 +17,7 @@ Usage:
 import argparse
 import os
 import time
+from typing import Any
 
 import requests
 
@@ -94,7 +95,7 @@ def fetch_identifiers_batch(person_ids: list[int]) -> dict[int, dict]:
     return results
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(
         description="Moissonnage ORCID + IdRef depuis l'API personnes HAL"
     )

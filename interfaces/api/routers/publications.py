@@ -53,7 +53,7 @@ async def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus t
     country: str = Query(""),
     hal_status: str = Query(""),
     in_perimeter: str = Query(""),
-):
+) -> Any:
     """Facettes dynamiques pour la page publications.
     Chaque facette exclut son propre filtre mais applique tous les autres."""
     years = parse_int_csv(year)
@@ -67,7 +67,7 @@ async def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus t
     hal_status_values = parse_str_csv(hal_status)
     _rid = get_root_structure_id()
 
-    def base_conds_params():
+    def base_conds_params() -> Any:
         """Conditions de base : publications UCA ou personne. Exclut peer_review + excluded_doc_type."""
         p: list[Any]
         if person_id:
@@ -84,7 +84,7 @@ async def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus t
     # Chargée après ouverture du curseur (liste mutable pour référence dans la closure).
     _lab_hal_col = [None]
 
-    def add_all_except(conds, params, *, skip: str):
+    def add_all_except(conds: Any, params: Any, *, skip: str) -> Any:
         """Ajoute tous les filtres sauf celui indiqué par skip."""
         if skip != "year":
             apply_year_filter(conds, params, years)
@@ -498,7 +498,7 @@ async def publications_facets(  # noqa: C901 (15 facettes, à décomposer plus t
 
 
 @router.get("/api/publications/years")
-async def all_years():
+async def all_years() -> Any:
     """Toutes les années disponibles."""
     with get_cursor() as (cur, conn):
         cur.execute("""
@@ -522,7 +522,7 @@ async def export_publications_csv(  # noqa: C901 (export CSV : logique de séria
     sort: str = Query("year_desc"),
     person_id: int | None = Query(None),
     excluded_doc_type: str = Query(""),
-):
+) -> Any:
     """Export CSV des publications (mêmes filtres que list_publications)."""
 
     years = [int(v) for v in year.split(",") if v.strip()] if year else []
@@ -724,7 +724,7 @@ async def export_publications_csv(  # noqa: C901 (export CSV : logique de séria
 
 
 @router.get("/api/publications/{pub_id}")
-async def get_publication(pub_id: int):
+async def get_publication(pub_id: int) -> Any:
     """Détail complet d'une publication : métadonnées, sources, authorships."""
     with get_cursor() as (cur, conn):
         # a) Publication + journal + publisher
@@ -931,7 +931,7 @@ async def get_publication(pub_id: int):
 @router.post("/api/source-authorships/{source}/{authorship_id}/exclude")
 async def exclude_source_authorship(
     source: str, authorship_id: int, body: ExcludeSourceAuthorship = ExcludeSourceAuthorship()
-):
+) -> Any:
     """Marque/démarque une authorship source comme fausse.
 
     Si aucune source non exclue n'atteste plus l'authorship consolidée,
@@ -966,7 +966,7 @@ async def list_publications(
     country: str = Query(""),  # comma-separated country codes
     hal_status: str = Query(""),  # comma-separated: ok, notice, hors_collection, hors_hal
     in_perimeter: str = Query(""),  # yes, no — filtre sur in_perimeter de l'authorship person_id
-):
+) -> Any:
     """Liste les publications avec sources, labos, journal."""
     offset = (page - 1) * per_page
 

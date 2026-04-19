@@ -9,6 +9,7 @@ du projet).
 """
 
 import logging
+from typing import Any
 
 from application.authorships import propagate_uca_for_addresses
 from infrastructure.repositories import address_repository
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def review_structure_link(
-    cur, address_id: int, structure_id: int, is_confirmed: bool | None
+    cur: Any, address_id: int, structure_id: int, is_confirmed: bool | None
 ) -> None:
     """Upsert le lien address ↔ structure (validation manuelle).
 
@@ -39,7 +40,7 @@ def review_structure_link(
 
 
 def batch_review_structure_link(
-    cur, address_ids: list[int], structure_id: int, is_confirmed: bool | None
+    cur: Any, address_ids: list[int], structure_id: int, is_confirmed: bool | None
 ) -> int:
     """Comme review_structure_link mais sur un lot d'adresses.
 
@@ -60,7 +61,7 @@ def batch_review_structure_link(
     return updated
 
 
-def unassign_manual_structure(cur, address_id: int, structure_id: int) -> bool:
+def unassign_manual_structure(cur: Any, address_id: int, structure_id: int) -> bool:
     """Supprime uniquement le lien manuel (matched_form_id IS NULL) entre
     une adresse et une structure. Les liens auto-détectés et leurs is_confirmed
     ne sont pas touchés (contrairement à review_structure_link(None)).
@@ -76,7 +77,7 @@ def unassign_manual_structure(cur, address_id: int, structure_id: int) -> bool:
 # ── Attribution des pays ──────────────────────────────────────────
 
 
-def set_country(cur, address_id: int, countries: list[str] | None) -> list[int]:
+def set_country(cur: Any, address_id: int, countries: list[str] | None) -> list[int]:
     """Attribue une liste de pays à une adresse.
 
     - `countries=None` ou `[]` → remet la colonne à NULL.
@@ -93,7 +94,7 @@ def set_country(cur, address_id: int, countries: list[str] | None) -> list[int]:
     return affected
 
 
-def batch_set_country_by_ids(cur, country_code: str, address_ids: list[int]) -> list[int]:
+def batch_set_country_by_ids(cur: Any, country_code: str, address_ids: list[int]) -> list[int]:
     """Ajoute `country_code` à `addresses.countries` pour la liste d'IDs donnée.
 
     - Si `countries` est NULL → le crée à [country_code].
@@ -106,7 +107,7 @@ def batch_set_country_by_ids(cur, country_code: str, address_ids: list[int]) -> 
 
 
 def batch_set_country_by_filter(
-    cur,
+    cur: Any,
     country_code: str,
     *,
     search: str | None = None,
@@ -145,7 +146,7 @@ def batch_set_country_by_filter(
     )
 
 
-def propagate_countries_to_similar(cur) -> list[int]:
+def propagate_countries_to_similar(cur: Any) -> list[int]:
     """Propage addresses.countries vers toutes les adresses partageant le même
     normalized_text, quand l'autre adresse a des countries différents.
 
@@ -158,7 +159,7 @@ def propagate_countries_to_similar(cur) -> list[int]:
 # ── Propagation pays vers source_publications et publications ────
 
 
-def propagate_countries_to_publications(cur, address_ids: list[int]) -> None:
+def propagate_countries_to_publications(cur: Any, address_ids: list[int]) -> None:
     """Propage addresses.countries → source_publications.countries → publications.countries.
 
     Appelée après une modification de pays sur les adresses (typiquement en

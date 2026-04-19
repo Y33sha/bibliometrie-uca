@@ -11,6 +11,7 @@ Utilise le filtre openalex avec pipe (|) pour interroger jusqu'à 50 sources par
 import argparse
 import os
 import time
+from typing import Any
 
 import requests
 
@@ -103,7 +104,7 @@ def extract_apc(source: dict) -> tuple[float | None, str]:
     return None, "EUR"
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(
         description="Enrichir les revues avec les APC depuis OpenAlex (prix catalogue DOAJ)"
     )

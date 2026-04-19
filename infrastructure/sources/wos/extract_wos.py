@@ -19,6 +19,7 @@ import argparse
 import os
 import sys
 import time
+from typing import Any
 
 import requests
 from psycopg2.extras import Json, execute_values
@@ -125,12 +126,12 @@ def get_records_found(data: dict) -> int:
         return 0
 
 
-def get_existing_uts(conn) -> set:
+def get_existing_uts(conn: Any) -> set:
     """Récupère les UT déjà en base pour éviter les doublons."""
     return get_existing_ids(conn, "wos")
 
 
-def insert_batch(conn, batch: list[tuple]):
+def insert_batch(conn: Any, batch: list[tuple]) -> Any:
     """Insère un batch de records dans staging.
     Si le record existe et le hash a changé, met à jour raw_data et remet processed = FALSE.
     """
@@ -152,7 +153,7 @@ def insert_batch(conn, batch: list[tuple]):
     conn.commit()
 
 
-def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> int:
+def extract_year(year: int, conn: Any, existing_uts: set, dry_run: bool = False) -> int:
     """Extrait toutes les publications d'une année. Retourne le nb insérés."""
     logger.info(f"Requête WoS : {build_query(year)}")
 
@@ -238,14 +239,14 @@ def extract_year(year: int, conn, existing_uts: set, dry_run: bool = False) -> i
     return total_inserted
 
 
-def log_remaining_quota(resp_headers: dict):
+def log_remaining_quota(resp_headers: dict) -> Any:
     """Log les quotas restants si disponibles dans les headers."""
     remaining = resp_headers.get("X-REC-AmtPerYear-Remaining")
     if remaining:
         logger.info(f"Quota annuel restant : {remaining} records")
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Extraction WoS → staging")
     parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
     parser.add_argument(

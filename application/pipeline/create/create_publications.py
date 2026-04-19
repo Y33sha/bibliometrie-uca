@@ -19,6 +19,7 @@ Usage:
 
 import argparse
 import os
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -37,7 +38,7 @@ from infrastructure.log import setup_logger
 logger = setup_logger("create_publications", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def get_orphan_source_publications(cur):
+def get_orphan_source_publications(cur: Any) -> Any:
     """Récupère les source_publications sans publication_id ayant au moins
     un source_authorship in_perimeter."""
     cur.execute("""
@@ -56,7 +57,7 @@ def get_orphan_source_publications(cur):
     return cur.fetchall()
 
 
-def process_document(cur, doc, dry_run):
+def process_document(cur: Any, doc: Any, dry_run: Any) -> Any:
     """Crée ou rattache une publication pour un source_document orphelin."""
     title = doc["title"] or ""
     pub_year = doc["pub_year"]
@@ -110,7 +111,7 @@ def process_document(cur, doc, dry_run):
     return True
 
 
-def run(dry_run=False):
+def run(dry_run: Any = False) -> Any:
     conn = get_connection()
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)

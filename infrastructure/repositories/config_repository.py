@@ -6,12 +6,13 @@ codes, détection d'usage avant suppression) reste dans le service.
 """
 
 import json
+from typing import Any
 
 
 class PgConfigRepository:
     """Accès PostgreSQL aux agrégats Config et Perimeter."""
 
-    def __init__(self, cur):
+    def __init__(self, cur: Any) -> None:
         self._cur = cur
 
     # ── Table config (clé / valeur JSON) ───────────────────────────
@@ -21,7 +22,7 @@ class PgConfigRepository:
         self._cur.execute("SELECT key FROM config WHERE key = %s", (key,))
         return self._cur.fetchone() is not None
 
-    def update_config_value(self, key: str, value) -> dict:
+    def update_config_value(self, key: str, value: Any) -> dict:
         """UPDATE la valeur JSON d'une clé. Retourne la ligne mise à jour
         (ou None si la clé n'existe pas — le service vérifie l'existence
         au préalable)."""

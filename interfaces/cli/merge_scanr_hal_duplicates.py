@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import os
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -25,7 +26,7 @@ logger = setup_logger(
 )
 
 
-def find_duplicates(cur) -> list[dict]:
+def find_duplicates(cur: Any) -> list[dict]:
     """Trouve les paires (scanr_pub, hal_pub) à fusionner.
 
     Critères :
@@ -52,7 +53,7 @@ def find_duplicates(cur) -> list[dict]:
     return cur.fetchall()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Fusionne les doublons ScanR↔HAL par identifiant HAL"
     )
@@ -95,7 +96,7 @@ def main():
     # Suivre les publications supprimées → leur cible de fusion
     merged_into: dict[int, int] = {}  # {source_id: target_id}
 
-    def resolve(pub_id):
+    def resolve(pub_id: Any) -> Any:
         """Suit la chaîne de fusions pour trouver la publication vivante."""
         visited = set()
         while pub_id in merged_into:

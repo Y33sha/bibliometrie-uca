@@ -21,6 +21,7 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 import argparse
 import os
 import time
+from typing import Any
 
 from psycopg2.extras import Json, RealDictCursor
 
@@ -77,7 +78,7 @@ def get_title(doc: dict) -> str | None:
 # =============================================================
 
 
-def upsert_publisher(cur, doc: dict) -> int | None:
+def upsert_publisher(cur: Any, doc: dict) -> int | None:
     """Extrait et trouve/crée l'éditeur depuis les champs ScanR."""
     source = doc.get("source") or {}
     publisher_name = source.get("publisher")
@@ -86,7 +87,7 @@ def upsert_publisher(cur, doc: dict) -> int | None:
     return find_or_create_publisher(cur, publisher_name)
 
 
-def upsert_journal(cur, doc: dict, publisher_id: int | None) -> int | None:
+def upsert_journal(cur: Any, doc: dict, publisher_id: int | None) -> int | None:
     """Extrait et trouve/crée le journal depuis les champs ScanR."""
     source = doc.get("source") or {}
     title = source.get("title")
@@ -146,7 +147,7 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
 
 
 def find_publication(
-    cur, doc: dict, journal_id: int | None, scanr_id: str | None = None
+    cur: Any, doc: dict, journal_id: int | None, scanr_id: str | None = None
 ) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None."""
     from domain.doc_types import map_doc_type
@@ -165,7 +166,7 @@ def find_publication(
 
 
 def insert_scanr_document(
-    cur,
+    cur: Any,
     doc: dict,
     staging_id: int,
     scanr_id: str,
@@ -299,7 +300,7 @@ def insert_scanr_document(
 # =============================================================
 
 
-def upsert_scanr_author(cur, author: dict) -> int | None:
+def upsert_scanr_author(cur: Any, author: dict) -> int | None:
     """Insère/retrouve un auteur ScanR dans source_persons (source='scanr').
     Déduplique par idref (via source_id). L'idref va dans BOTH source_id et idref."""
     full_name = author.get("fullName")
@@ -376,7 +377,7 @@ def upsert_scanr_author(cur, author: dict) -> int | None:
 # =============================================================
 
 
-def process_authors(cur, doc: dict, source_publication_id: int):
+def process_authors(cur: Any, doc: dict, source_publication_id: int) -> Any:
     """Traite les auteurs d'un document ScanR."""
     authors = doc.get("authors") or []
 
@@ -436,7 +437,7 @@ def process_authors(cur, doc: dict, source_publication_id: int):
 # =============================================================
 
 
-def process_work(cur, staging_row) -> bool:
+def process_work(cur: Any, staging_row: Any) -> bool:
     """Traite un work du staging ScanR."""
     staging_id = staging_row["id"]
     scanr_id = staging_row["scanr_id"]
@@ -530,7 +531,7 @@ def process_work(cur, staging_row) -> bool:
         raise
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Normalisation ScanR → tables structurées")
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
     parser.add_argument(

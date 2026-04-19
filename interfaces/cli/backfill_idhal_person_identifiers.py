@@ -9,6 +9,7 @@ Les identifiants avec statut rejected sont réattribués (via add_identifier).
 """
 
 import os
+from typing import Any
 
 from application.persons import add_identifier
 from infrastructure.db.connection import get_connection
@@ -26,7 +27,7 @@ IDENTIFIERS = [
 ]
 
 
-def backfill_identifier(cur, conn, id_type, column, source_filter):
+def backfill_identifier(cur: Any, conn: Any, id_type: Any, column: Any, source_filter: Any) -> Any:
     """Backfill un type d'identifiant."""
     where_source = f"AND {source_filter}" if source_filter else ""
 
@@ -81,7 +82,7 @@ def backfill_identifier(cur, conn, id_type, column, source_filter):
         log.warning("%s : encore %d non propagés (conflits)", id_type, remaining)
 
 
-def main():
+def main() -> None:
     conn = get_connection()
     cur = conn.cursor()
 

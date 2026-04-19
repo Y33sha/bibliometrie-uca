@@ -1,5 +1,7 @@
 """Shared SQL filter helpers and constants."""
 
+from typing import Any
+
 OA_OPEN_STATUSES = ("gold", "hybrid", "bronze", "green", "diamond")
 
 # Filtre SQL : la publication a au moins un authorship dans le périmètre.
@@ -12,7 +14,7 @@ PUB_IS_UCA = """(
 )"""
 
 
-def apply_access_filter(conditions: list, params: list, access: str | None):
+def apply_access_filter(conditions: list, params: list, access: str | None) -> Any:
     """Ajoute le filtre accès ouvert/fermé."""
     if not access:
         return
@@ -25,7 +27,7 @@ def apply_access_filter(conditions: list, params: list, access: str | None):
         )
 
 
-def apply_oa_filter(conditions: list, params: list, oa_status: str | None):
+def apply_oa_filter(conditions: list, params: list, oa_status: str | None) -> Any:
     """Ajoute le filtre OA status aux conditions SQL."""
     if not oa_status:
         return
@@ -47,7 +49,7 @@ def apply_oa_filter(conditions: list, params: list, oa_status: str | None):
         params.append(expanded)
 
 
-def apply_lab_filter(conditions: list, params: list, lab_ids: list[int]):
+def apply_lab_filter(conditions: list, params: list, lab_ids: list[int]) -> Any:
     """Ajoute le filtre laboratoire via la table de vérité authorships."""
     if not lab_ids:
         return
@@ -62,7 +64,7 @@ def apply_lab_filter(conditions: list, params: list, lab_ids: list[int]):
     params.append(lab_ids)
 
 
-def apply_year_filter(conditions: list, params: list, years: list[int]):
+def apply_year_filter(conditions: list, params: list, years: list[int]) -> Any:
     """Ajoute le filtre année (une ou plusieurs)."""
     if not years:
         return
@@ -70,7 +72,7 @@ def apply_year_filter(conditions: list, params: list, years: list[int]):
     params.append(years)
 
 
-def apply_doc_type_filter(conditions: list, params: list, doc_types: list[str]):
+def apply_doc_type_filter(conditions: list, params: list, doc_types: list[str]) -> Any:
     """Ajoute le filtre type de document."""
     if not doc_types:
         return
@@ -78,7 +80,7 @@ def apply_doc_type_filter(conditions: list, params: list, doc_types: list[str]):
     params.append(doc_types)
 
 
-def apply_source_filter(conditions: list, source_values: list[str]):
+def apply_source_filter(conditions: list, source_values: list[str]) -> Any:
     """Ajoute les filtres de source via la colonne publications.sources (GIN)."""
     SOURCE_MAP = {
         "hal": "hal",
@@ -101,7 +103,7 @@ def apply_source_filter(conditions: list, source_values: list[str]):
             conditions.append(f"NOT p.sources @> ARRAY['{source}'::source_type]")
 
 
-def apply_person_filter(conditions: list, params: list, person_id: int):
+def apply_person_filter(conditions: list, params: list, person_id: int) -> Any:
     """Ajoute le filtre personne — uniquement les publications où la personne est auteur."""
     conditions.append("""
         EXISTS (SELECT 1 FROM authorships a
@@ -113,7 +115,9 @@ def apply_person_filter(conditions: list, params: list, person_id: int):
     params.append(person_id)
 
 
-def apply_corresponding_filter(conditions: list, params: list, person_id: int, corr_filter: str):
+def apply_corresponding_filter(
+    conditions: list, params: list, person_id: int, corr_filter: str
+) -> Any:
     """Filtre sur is_corresponding pour une personne donnée."""
     if not corr_filter or not person_id:
         return
@@ -364,7 +368,7 @@ def apply_person_has_rh_filter(conditions: list, value: str) -> None:
 
 def apply_publisher_journal_filter(
     conditions: list, params: list, publisher_id: int | None, journal_id: int | None
-):
+) -> Any:
     """Ajoute les filtres éditeur et revue."""
     if publisher_id:
         conditions.append("""

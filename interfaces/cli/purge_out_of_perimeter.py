@@ -24,6 +24,7 @@ Usage:
 
 import argparse
 import os
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -33,7 +34,7 @@ from infrastructure.log import setup_logger
 logger = setup_logger("purge_oop", os.path.join(os.path.dirname(__file__), "../processing/logs"))
 
 
-def run(dry_run=True):
+def run(dry_run: Any = True) -> Any:
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:

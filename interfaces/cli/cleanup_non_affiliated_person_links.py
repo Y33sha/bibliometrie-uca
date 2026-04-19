@@ -16,6 +16,7 @@ Usage:
 
 import argparse
 import os
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -29,7 +30,7 @@ logger = setup_logger(
 from domain.sources import BIBLIO_SOURCES as SOURCES
 
 
-def count_affected(cur):
+def count_affected(cur: Any) -> Any:
     """Compte les authorships sources avec person_id et sans structure_ids."""
     counts = {}
     for source in SOURCES:
@@ -45,7 +46,7 @@ def count_affected(cur):
     return counts
 
 
-def cleanup(cur, dry_run=False):
+def cleanup(cur: Any, dry_run: Any = False) -> Any:
     """Supprime les person_id des authorships sans affiliation."""
     total = 0
     for source in SOURCES:
@@ -72,7 +73,7 @@ def cleanup(cur, dry_run=False):
     return total
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Supprime les person_id des authorships sources sans affiliation"
     )

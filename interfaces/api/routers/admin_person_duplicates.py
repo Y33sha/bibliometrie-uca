@@ -1,6 +1,7 @@
 """Admin person duplicates router."""
 
 import logging
+from typing import Any
 
 import psycopg2.extras
 from fastapi import APIRouter, HTTPException, Query
@@ -131,7 +132,7 @@ PERSON_DUP_QUERIES = [
 ]
 
 
-def _get_person_dedup_detail(cur, person_id):
+def _get_person_dedup_detail(cur: Any, person_id: Any) -> Any:
     """Détail d'une personne pour la page de déduplication."""
     cur.execute(
         """
@@ -226,7 +227,9 @@ def _parse_skip_pairs(skip: str) -> set[tuple[int, int]]:
     return result
 
 
-def _scan_dup_query(cur, sql, skip_pairs=None, stop_at_first=False, skip_n=0):
+def _scan_dup_query(
+    cur: Any, sql: Any, skip_pairs: Any = None, stop_at_first: Any = False, skip_n: Any = 0
+) -> Any:
     """Parcourt une requête de doublons avec curseur serveur.
     Retourne (found_row_or_None, count_of_valid_pairs).
     skip_n: nombre de paires valides à sauter avant de retourner la première.
@@ -266,7 +269,7 @@ def _scan_dup_query(cur, sql, skip_pairs=None, stop_at_first=False, skip_n=0):
 
 
 @router.get("/api/admin/person-duplicates/count")
-async def count_person_duplicates():
+async def count_person_duplicates() -> Any:
     """Comptage des paires candidates (scan complet, appelé une seule fois)."""
     with get_cursor() as (cur, conn):
         total = 0
@@ -280,7 +283,7 @@ async def count_person_duplicates():
 async def next_person_duplicate(
     skip: str = Query("", alias="skip"),
     offset: int = Query(0, ge=0),
-):
+) -> Any:
     """Renvoie la paire candidate à la position offset."""
     # Support legacy skip pairs (pour compatibilité)
     skip_pairs = _parse_skip_pairs(skip) if skip else None
@@ -305,7 +308,7 @@ async def next_person_duplicate(
 
 
 @router.post("/api/admin/person-duplicates/mark-distinct")
-async def mark_persons_distinct(body: MarkPersonsDistinct):
+async def mark_persons_distinct(body: MarkPersonsDistinct) -> Any:
     """Marque deux personnes comme distinctes (non-doublon)."""
     if body.person_id_a == body.person_id_b:
         raise HTTPException(
@@ -356,7 +359,7 @@ ORDER BY COUNT(*) DESC, LEAST(a1.person_id, a2.person_id)
 
 
 @router.get("/api/admin/person-duplicates/conflicts/count")
-async def count_person_conflict_pairs():
+async def count_person_conflict_pairs() -> Any:
     """Nombre de paires de personnes en conflit sur des publications."""
     with get_cursor() as (cur, conn):
         cur.execute(f"SELECT COUNT(*) AS total FROM ({CONFLICT_PAIRS_SQL}) sub")
@@ -367,7 +370,7 @@ async def count_person_conflict_pairs():
 async def next_person_conflict(
     skip: str = Query("", alias="skip"),
     offset: int = Query(0, ge=0),
-):
+) -> Any:
     """Renvoie la paire en conflit à la position offset."""
     skip_pairs = _parse_skip_pairs(skip) if skip else set()
 

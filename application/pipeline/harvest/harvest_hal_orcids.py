@@ -24,6 +24,7 @@ Usage:
 import argparse
 import os
 import time
+from typing import Any
 
 import requests
 
@@ -84,7 +85,7 @@ def fetch_orcids_batch(person_ids: list[int]) -> dict[int, str]:
     return results
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Moissonnage des ORCID depuis l'API personnes HAL")
     parser.add_argument("--dry-run", action="store_true", help="Rapport sans écriture en base")
     parser.add_argument(

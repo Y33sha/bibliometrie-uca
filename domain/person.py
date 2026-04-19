@@ -12,6 +12,7 @@ domain/publication.py : `X("...")` strict, `X.try_parse(...)` tolérant).
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -242,7 +243,7 @@ class PersonSourceIds(BaseModel):
 
     @field_validator("idhal", mode="before")
     @classmethod
-    def _normalize_idhal(cls, v):
+    def _normalize_idhal(cls, v: Any) -> str | None:
         """Normalise via le VO IdHAL : trim, lowercase, validation du slug."""
         if v is None or v == "":
             return None

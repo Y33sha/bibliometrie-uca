@@ -19,6 +19,7 @@ Usage:
 
 import argparse
 import logging
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -33,7 +34,7 @@ CHAPTER_TYPES = ("book_chapter", "book-chapter", "chapter", "COUV")
 BOOK_TYPES = ("book", "OUV")
 
 
-def find_bad_merges(cur):
+def find_bad_merges(cur: Any) -> Any:
     """Trouve les publications avec fusion chapitre/ouvrage ou chapitre/chapitre erronée."""
     cur.execute("""
         WITH pub_docs AS (
@@ -59,7 +60,7 @@ def find_bad_merges(cur):
     return cur.fetchall()
 
 
-def get_pub_documents(cur, pub_id):
+def get_pub_documents(cur: Any, pub_id: Any) -> Any:
     """Récupère tous les documents sources d'une publication."""
     cur.execute(
         """
@@ -74,7 +75,7 @@ def get_pub_documents(cur, pub_id):
     return docs
 
 
-def rebuild_doc(cur, doc):
+def rebuild_doc(cur: Any, doc: Any) -> Any:
     """Recrée une publication pour un document source détaché."""
     title = doc["title"] or ""
     title_norm = normalize_text(title)
@@ -119,7 +120,7 @@ def rebuild_doc(cur, doc):
     return pub_id
 
 
-def fix(conn, dry_run=False):
+def fix(conn: Any, dry_run: Any = False) -> Any:
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     bad = find_bad_merges(cur)

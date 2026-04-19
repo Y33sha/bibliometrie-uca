@@ -23,6 +23,7 @@ pour les identifiants), sérialisent en dict pour l'écriture en base.
 import re
 from collections import namedtuple
 from dataclasses import dataclass
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -217,7 +218,7 @@ class ExternalIds(BaseModel):
 
     @field_validator("hal", mode="before")
     @classmethod
-    def _normalize_hal(cls, v):
+    def _normalize_hal(cls, v: Any) -> str | None:
         """Normalise via HALId : URL → ID canonique, strip version."""
         if v is None or v == "":
             return None
@@ -228,7 +229,7 @@ class ExternalIds(BaseModel):
 
     @field_validator("nnt", mode="before")
     @classmethod
-    def _normalize_nnt(cls, v):
+    def _normalize_nnt(cls, v: Any) -> str | None:
         """Normalise via NNT : trim + uppercase."""
         if v is None or v == "":
             return None

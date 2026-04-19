@@ -20,6 +20,7 @@ Usage:
 import argparse
 import os
 import time
+from typing import Any
 
 import requests
 from psycopg2.extras import Json, RealDictCursor
@@ -36,7 +37,7 @@ log = setup_logger("fetch_missing_hal", os.path.join(os.path.dirname(__file__), 
 HAL_API = "https://api.archives-ouvertes.fr/search"
 
 
-def find_hal_primary_locations(cur) -> list[dict]:
+def find_hal_primary_locations(cur: Any) -> list[dict]:
     """
     Trouve les works OpenAlex dont la primary_location pointe vers HAL.
 
@@ -87,7 +88,7 @@ def find_hal_primary_locations(cur) -> list[dict]:
     return list(results.values())
 
 
-def find_hal_ids_from_scanr(cur) -> list[dict]:
+def find_hal_ids_from_scanr(cur: Any) -> list[dict]:
     """
     Trouve les HAL IDs référencés par ScanR mais absents de staging HAL.
 
@@ -140,7 +141,7 @@ def find_hal_ids_from_scanr(cur) -> list[dict]:
     return list(results.values())
 
 
-def find_nnt_without_hal(cur) -> list[dict]:
+def find_nnt_without_hal(cur: Any) -> list[dict]:
     """
     Trouve les NNT (thèses soutenues) qui n'ont pas de document HAL associé.
     Recherche via source_publications.external_ids->>'nnt' pour les publications
@@ -195,7 +196,7 @@ def fetch_hal_by_nnt(nnt: str) -> dict | None:
         return None
 
 
-def find_missing_hal_ids(cur, hal_refs: list[dict]) -> list[dict]:
+def find_missing_hal_ids(cur: Any, hal_refs: list[dict]) -> list[dict]:
     """Filtre pour ne garder que les halId absents de staging_hal."""
     if not hal_refs:
         return []
@@ -241,7 +242,7 @@ def fetch_hal_document(hal_id: str) -> dict | None:
         return None
 
 
-def insert_staging_hal(cur, hal_id: str, doi: str | None, doc: dict):
+def insert_staging_hal(cur: Any, hal_id: str, doi: str | None, doc: dict) -> Any:
     """Insere un document dans staging HAL avec ses collections.
     Si le document existe et a change (hash different), met a jour et remet processed = FALSE.
     """
@@ -276,7 +277,7 @@ def insert_staging_hal(cur, hal_id: str, doi: str | None, doc: dict):
     )
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(
         description="Récupère les entrées HAL manquantes découvertes via OpenAlex"
     )

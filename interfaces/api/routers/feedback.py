@@ -3,6 +3,7 @@
 import logging
 import os
 import sys
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/api/admin/feedback/stats")
-async def feedback_stats(structure_id: int = Query(...)):
+async def feedback_stats(structure_id: int = Query(...)) -> Any:
     """Statistiques de qualité de la détection pour une structure donnée."""
     with get_cursor() as (cur, conn):
         cur.execute(
@@ -59,7 +60,7 @@ async def feedback_false_negatives(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
-):
+) -> Any:
     """Adresses confirmées manuellement pour cette structure mais non détectées par le script."""
     offset = (page - 1) * per_page
 
@@ -125,7 +126,7 @@ async def feedback_false_positives(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
-):
+) -> Any:
     """Adresses détectées pour cette structure mais rejetées manuellement."""
     offset = (page - 1) * per_page
 
@@ -199,7 +200,7 @@ async def feedback_false_positives(
 
 
 @router.post("/api/addresses/{addr_id}/assign-structure")
-async def assign_structure(addr_id: int, action: AssignStructureAction):
+async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
     """Assigne manuellement une structure à une adresse."""
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id FROM addresses WHERE id = %s", (addr_id,))
@@ -215,7 +216,7 @@ async def assign_structure(addr_id: int, action: AssignStructureAction):
 
 
 @router.get("/api/admin/feedback/rerun")
-async def feedback_rerun():
+async def feedback_rerun() -> Any:
     """Lance resolve_addresses en SSE (détection complète sur toutes les adresses)."""
     import asyncio
 
@@ -227,7 +228,7 @@ async def feedback_rerun():
     if not os.path.exists(script):
         raise HTTPException(status_code=500, detail="Script resolve_addresses.py introuvable")
 
-    async def event_stream():
+    async def event_stream() -> Any:
         proc = await asyncio.create_subprocess_exec(
             sys.executable,
             "-u",
@@ -257,7 +258,7 @@ async def feedback_rerun():
 
 
 @router.delete("/api/addresses/{addr_id}/assign-structure")
-async def unassign_structure(addr_id: int, structure_id: int = Query(...)):
+async def unassign_structure(addr_id: int, structure_id: int = Query(...)) -> Any:
     """Supprime l'assignation manuelle d'une structure."""
     with get_cursor() as (cur, conn):
         deleted = addresses_service.unassign_manual_structure(cur, addr_id, structure_id)

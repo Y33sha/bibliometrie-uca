@@ -1,6 +1,7 @@
 """Auto-extracted router."""
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
@@ -17,7 +18,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _bg_propagate_countries(address_ids: list[int]):
+def _bg_propagate_countries(address_ids: list[int]) -> Any:
     """Propagation pays en tâche de fond (connexion séparée)."""
     from infrastructure.db.connection import get_connection
 
@@ -41,7 +42,7 @@ async def list_addresses(
     validation: str = Query("pending"),  # all, pending, confirmed, rejected
     search: str = Query(""),
     search_mode: str = Query("contains"),  # contains, not_contains
-):
+) -> Any:
     """Liste les adresses avec filtres détection/validation pour une structure."""
     offset = (page - 1) * per_page
 
@@ -159,7 +160,7 @@ async def list_addresses(
 
 
 @router.get("/api/addresses/{addr_id}/publications")
-async def get_address_publications(addr_id: int, limit: int = Query(20)):
+async def get_address_publications(addr_id: int, limit: int = Query(20)) -> Any:
     """Récupère un échantillon de publications liées à une adresse."""
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id, raw_text FROM addresses WHERE id = %s", (addr_id,))
@@ -201,7 +202,7 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)):
 
 
 @router.post("/api/addresses/{addr_id}/review")
-async def review_address(addr_id: int, action: ReviewAction):
+async def review_address(addr_id: int, action: ReviewAction) -> Any:
     """Confirme, rejette ou reset le lien adresse↔structure (upsert)."""
     with get_cursor() as (cur, conn):
         addresses_service.review_structure_link(
@@ -247,7 +248,7 @@ async def review_address(addr_id: int, action: ReviewAction):
 
 
 @router.post("/api/addresses/batch-review")
-async def batch_review(data: BatchReviewAction):
+async def batch_review(data: BatchReviewAction) -> Any:
     """Confirme, rejette ou reset le lien adresse↔structure pour un lot d'adresses."""
     with get_cursor() as (cur, conn):
         updated = addresses_service.batch_review_structure_link(
@@ -260,7 +261,7 @@ async def batch_review(data: BatchReviewAction):
 
 
 @router.get("/api/countries")
-async def list_countries():
+async def list_countries() -> Any:
     """Liste des pays."""
     with get_cursor() as (cur, conn):
         cur.execute("SELECT code, name FROM countries ORDER BY (code = 'xx') DESC, name")
@@ -276,7 +277,7 @@ async def addresses_countries(
     suggest: bool = Query(False),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
-):
+) -> Any:
     """Liste des adresses pour l'attribution de pays."""
     offset = (page - 1) * per_page
     conditions = []
@@ -388,8 +389,8 @@ async def addresses_countries(
 @router.get("/api/addresses/suggest-countries")
 async def suggest_countries(
     search: str = Query(""),
-    _=Depends(require_admin),
-):
+    _: Any = Depends(require_admin),
+) -> Any:
     """Pour un filtre de recherche, renvoie la distribution des pays
     des adresses qui matchent ET qui ont déjà un pays assigné.
     Sert à suggérer un pays pour les adresses sans pays du même filtre."""
@@ -426,8 +427,8 @@ async def suggest_countries(
 
 @router.post("/api/addresses/{addr_id}/country")
 async def set_address_country(
-    addr_id: int, body: SetCountry, bg: BackgroundTasks, _=Depends(require_admin)
-):
+    addr_id: int, body: SetCountry, bg: BackgroundTasks, _: Any = Depends(require_admin)
+) -> Any:
     """Attribue des pays à une adresse."""
     countries = body.countries
     with get_cursor() as (cur, conn):
@@ -446,7 +447,9 @@ async def set_address_country(
 
 
 @router.post("/api/addresses/batch-country")
-async def batch_set_country(body: BatchSetCountry, bg: BackgroundTasks, _=Depends(require_admin)):
+async def batch_set_country(
+    body: BatchSetCountry, bg: BackgroundTasks, _: Any = Depends(require_admin)
+) -> Any:
     """Ajoute un pays à des adresses — par IDs ou par filtre."""
     country_code = body.country_code
     if not country_code:

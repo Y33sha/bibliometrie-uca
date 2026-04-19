@@ -20,6 +20,7 @@ import argparse
 import os
 import sys
 import time
+from typing import Any
 
 import requests
 from psycopg2.extras import Json
@@ -78,7 +79,7 @@ def extract_doi(these: dict) -> str | None:
 
 def extract_ppn(
     ppn: str,
-    conn,
+    conn: Any,
     existing_ids: set,
     base_url: str,
     status: str | None = None,
@@ -163,7 +164,7 @@ def extract_ppn(
     return total, inserted, updated
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Extraction theses.fr → staging")
     parser.add_argument("--soutenues", action="store_true", help="Thèses soutenues uniquement")
     parser.add_argument("--en-cours", action="store_true", help="Thèses en cours uniquement")

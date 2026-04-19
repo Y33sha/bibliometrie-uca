@@ -15,6 +15,7 @@ import argparse
 import os
 import sys
 import time
+from typing import Any
 
 import requests
 from psycopg2.extras import Json
@@ -87,7 +88,7 @@ def extract_doi(doc: dict) -> str | None:
     return clean_doi(doc.get("doiId_s"))
 
 
-def upsert_work(conn, hal_id: str, doi: str | None, raw_data: dict, collection: str):
+def upsert_work(conn: Any, hal_id: str, doi: str | None, raw_data: dict, collection: str) -> Any:
     """
     Insère ou met à jour un work dans staging.
     Si le halId existe déjà : ajoute la collection, et si le contenu a changé
@@ -126,7 +127,7 @@ def upsert_work(conn, hal_id: str, doi: str | None, raw_data: dict, collection: 
 def extract_collection(
     collection_code: str,
     collection_label: str,
-    conn,
+    conn: Any,
     existing_ids: set,
     base_url: str,
     years: list = None,
@@ -183,12 +184,12 @@ def extract_collection(
     return total_count, total_new
 
 
-def get_existing_hal_ids(conn) -> set:
+def get_existing_hal_ids(conn: Any) -> set:
     """Récupère les halId déjà en base."""
     return get_existing_ids(conn, "hal")
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Extraction HAL → staging")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans insérer")
     parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
