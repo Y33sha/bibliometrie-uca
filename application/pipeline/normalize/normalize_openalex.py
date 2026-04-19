@@ -16,14 +16,14 @@ Tables peuplées :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
-import argparse
 import os
 import re
 from typing import Any
 
-from psycopg2.extras import Json, RealDictCursor
+from psycopg2.extras import Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
+from application.pipeline.normalize.base import SourceNormalizer, run_normalizer
 from application.publications import (
     find_by_doi,
     find_by_nnt,
@@ -36,7 +36,6 @@ from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.publication import clean_doi, extract_hal_id_from_url
 from infrastructure.addresses import link_addresses
-from infrastructure.db.connection import get_connection
 from infrastructure.db_helpers import mark_staging_done
 from infrastructure.log import setup_logger
 from infrastructure.openalex import extract_nnt_from_openalex, is_theses_fr_source
@@ -770,121 +769,26 @@ def process_work(cur: Any, staging_row: tuple) -> bool | None:
         raise
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser(description="Normalisation OpenAlex → tables structurées")
-    parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
-    parser.add_argument(
-        "--reset", action="store_true", help="Remettre tous les works à processed=FALSE"
-    )
-    parser.add_argument(
-        "--batch-size", type=int, default=500, help="Taille du commit batch (défaut: 500)"
-    )
-    args = parser.parse_args()
+class OpenalexNormalizer(SourceNormalizer):
+    SOURCE = "openalex"
+    DEFAULT_BATCH_SIZE = 500
+    FETCH_SUB_BATCH = 50
+    FETCH_COLUMNS = "id, source_id AS openalex_id, doi, raw_data"
 
-    conn = get_connection()
-    conn.autocommit = False
+    def process_work(self, cur: Any, row: Any) -> bool | None:
+        return process_work(cur, row)
 
-    try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+    def summary_stats(self, cur: Any) -> list[str]:
+        lines = []
+        for table in ("source_structures", "source_persons", "source_publications"):
+            cur.execute(f"SELECT COUNT(*) FROM {table} WHERE source = 'openalex'")
+            count = cur.fetchone()["count"]
+            lines.append(f"  {table} (openalex) : {count} enregistrements")
+        return lines
 
-        if args.reset:
-            cur.execute("UPDATE staging SET processed = FALSE WHERE source = 'openalex'")
-            count = cur.rowcount
-            conn.commit()
-            logger.info(f"Reset : {count} works remis à processed=FALSE")
-            return
 
-        cur.execute("SELECT COUNT(*) FROM staging WHERE source = 'openalex' AND processed = FALSE")
-        total = cur.fetchone()["count"]
-        logger.info(f"=== Normalisation OpenAlex : {total} works à traiter ===")
-
-        if total == 0:
-            logger.info("Rien à faire.")
-            return
-
-        limit = args.limit or total
-        limit = min(limit, total)
-        logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
-
-        # Charger les IDs puis fetch par lots pour limiter la mémoire
-        cur.execute(
-            """
-            SELECT id FROM staging
-            WHERE source = 'openalex' AND processed = FALSE
-            ORDER BY id
-            LIMIT %s
-        """,
-            (limit,),
-        )
-        work_ids = [r["id"] for r in cur.fetchall()]
-
-        processed = 0
-        skipped = 0
-        errors = 0
-        FETCH_BATCH = 50
-
-        for batch_start in range(0, len(work_ids), FETCH_BATCH):
-            batch_ids = work_ids[batch_start : batch_start + FETCH_BATCH]
-            cur.execute(
-                """
-                SELECT id, source_id AS openalex_id, doi, raw_data
-                FROM staging WHERE id = ANY(%s)
-                ORDER BY id
-            """,
-                (batch_ids,),
-            )
-            batch_rows = cur.fetchall()
-
-            for row in batch_rows:
-                try:
-                    result = process_work(cur, row)
-                    if result is True:
-                        processed += 1
-                    elif result is None:
-                        skipped += 1
-                    else:
-                        errors += 1
-                except Exception:
-                    conn.rollback()
-                    errors += 1
-                    continue
-
-                done = processed + skipped
-                if done % args.batch_size == 0:
-                    conn.commit()
-                    parts = [f"{done}/{limit} traites"]
-                    if skipped:
-                        parts.append(f"{skipped} ignores")
-                    if errors:
-                        parts.append(f"{errors} erreurs")
-                    logger.info(f"  {', '.join(parts)}")
-
-        conn.commit()
-
-        logger.info("\n=== Terminé ===")
-        logger.info(f"Traités avec succès : {processed}")
-        if skipped:
-            logger.info(f"Ignorés (Zenodo, etc.) : {skipped}")
-        logger.info(f"Erreurs : {errors}")
-        cur.execute("SELECT COUNT(*) FROM source_structures WHERE source = 'openalex'")
-        count = cur.fetchone()["count"]
-        logger.info(f"  source_structures (openalex) : {count} enregistrements")
-        cur.execute("SELECT COUNT(*) FROM source_persons WHERE source = 'openalex'")
-        count = cur.fetchone()["count"]
-        logger.info(f"  source_persons (openalex) : {count} enregistrements")
-        cur.execute("SELECT COUNT(*) FROM source_publications WHERE source = 'openalex'")
-        count = cur.fetchone()["count"]
-        logger.info(f"  source_publications (openalex) : {count} enregistrements")
-
-    except KeyboardInterrupt:
-        conn.commit()
-        logger.warning("Interruption — données déjà traitées conservées.")
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Erreur fatale : {e}")
-        raise
-    finally:
-        conn.close()
+def main() -> None:
+    run_normalizer(OpenalexNormalizer, logger)
 
 
 if __name__ == "__main__":

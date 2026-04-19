@@ -19,19 +19,18 @@ Gère deux formats de raw_data :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
-import argparse
 import os
 from typing import Any
 
 from psycopg2.extras import Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
+from application.pipeline.normalize.base import SourceNormalizer, run_normalizer
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
 from domain.publication import clean_doi
-from infrastructure.db.connection import get_connection
 from infrastructure.db_helpers import mark_staging_done
 from infrastructure.log import setup_logger
 
@@ -869,121 +868,39 @@ def process_record(cur: Any, staging_row: tuple) -> bool:
         raise
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser(description="Normalisation WoS → tables normalisées")
-    parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
-    parser.add_argument(
-        "--reset", action="store_true", help="Remettre tous les works à processed=FALSE"
-    )
-    parser.add_argument(
-        "--batch-size", type=int, default=500, help="Taille du commit batch (défaut: 500)"
-    )
-    args = parser.parse_args()
+class WosNormalizer(SourceNormalizer):
+    SOURCE = "wos"
+    DEFAULT_BATCH_SIZE = 500
+    USE_DICT_CURSOR = False
+    USE_SAVEPOINT = True
+    FETCH_SUB_BATCH = 50
+    FETCH_COLUMNS = "id, source_id AS ut, doi, raw_data"
 
-    conn = get_connection()
-    conn.autocommit = False
-
-    try:
-        cur = conn.cursor()
-
-        if args.reset:
-            cur.execute("UPDATE staging SET processed = FALSE WHERE source = 'wos'")
-            count = cur.rowcount
-            conn.commit()
-            logger.info(f"Reset : {count} works remis à processed=FALSE")
-            return
-
-        cur.execute("SELECT COUNT(*) FROM staging WHERE source = 'wos' AND processed = FALSE")
-        total = cur.fetchone()[0]
-        logger.info(f"=== Normalisation WoS : {total} works à traiter ===")
-
-        if total == 0:
-            logger.info("Rien à faire.")
-            return
-
-        limit = args.limit or total
-        limit = min(limit, total)
-        logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
-
-        # Charger les IDs puis fetch par lots pour limiter la memoire
-        cur.execute(
-            """
-            SELECT id FROM staging
-            WHERE source = 'wos' AND processed = FALSE
-            ORDER BY id
-            LIMIT %s
-        """,
-            (limit,),
-        )
-        work_ids = [r[0] for r in cur.fetchall()]
-
-        # Pré-charger les caches WoS
+    def preload_caches(self, cur: Any) -> None:
         cur.execute("SELECT source_id, id FROM source_structures WHERE source = 'wos'")
         for r in cur.fetchall():
             _wos_institution_cache[r[0]] = r[1]
         cur.execute(
-            "SELECT source_id, id FROM source_persons WHERE source = 'wos' AND source_id NOT LIKE 'wos-%%'"
+            "SELECT source_id, id FROM source_persons WHERE source = 'wos' "
+            "AND source_id NOT LIKE 'wos-%%'"
         )
         for r in cur.fetchall():
             _wos_author_cache[r[0]] = r[1]
-        logger.info(
-            f"Cache WoS : {len(_wos_institution_cache)} institutions, {len(_wos_author_cache)} auteurs"
+        self.logger.info(
+            f"Cache WoS : {len(_wos_institution_cache)} institutions, "
+            f"{len(_wos_author_cache)} auteurs"
         )
 
-        processed = 0
-        errors = 0
-        FETCH_BATCH = 50
+    def process_work(self, cur: Any, row: Any) -> bool | None:
+        return process_record(cur, row)
 
-        for batch_start in range(0, len(work_ids), FETCH_BATCH):
-            batch_ids = work_ids[batch_start : batch_start + FETCH_BATCH]
-            cur.execute(
-                """
-                SELECT id, source_id AS ut, doi, raw_data
-                FROM staging WHERE id = ANY(%s)
-                ORDER BY id
-            """,
-                (batch_ids,),
-            )
-            batch_rows = cur.fetchall()
-
-            for row in batch_rows:
-                try:
-                    cur.execute("SAVEPOINT normalize_wos_work")
-                    success = process_record(cur, row)
-                    cur.execute("RELEASE SAVEPOINT normalize_wos_work")
-                    if success:
-                        processed += 1
-                    else:
-                        errors += 1
-                except Exception:
-                    try:
-                        cur.execute("ROLLBACK TO SAVEPOINT normalize_wos_work")
-                    except Exception:
-                        conn.rollback()
-                    errors += 1
-                    continue
-
-                if processed % args.batch_size == 0 and processed > 0:
-                    conn.commit()
-                    logger.info(f"  {processed}/{limit} traités ({errors} erreurs)")
-
-        conn.commit()
+    def cleanup(self) -> None:
         _wos_institution_cache.clear()
         _wos_author_cache.clear()
 
-        logger.info("\n=== Terminé ===")
-        logger.info(f"Traités avec succès : {processed}")
-        logger.info(f"Erreurs : {errors}")
 
-    except KeyboardInterrupt:
-        conn.commit()
-        logger.warning("Interruption — données déjà traitées conservées.")
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Erreur fatale : {e}")
-        raise
-    finally:
-        conn.close()
+def main() -> None:
+    run_normalizer(WosNormalizer, logger)
 
 
 if __name__ == "__main__":
