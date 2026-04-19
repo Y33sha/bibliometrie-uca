@@ -15,6 +15,7 @@ Sources :
 """
 
 import os
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -27,7 +28,7 @@ log = setup_logger("populate_person_name_forms", os.path.join(os.path.dirname(__
 from domain.sources import BIBLIO_SOURCES_SET as BIBLIO_SOURCES
 
 
-def populate(conn):
+def populate(conn: Any) -> Any:
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     # Collecter les triplets (forme brute, person_id, source)

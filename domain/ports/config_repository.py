@@ -3,7 +3,7 @@
 Implémenté par infrastructure/repositories/config_repository.py.
 """
 
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class ConfigRepository(Protocol):
@@ -13,7 +13,7 @@ class ConfigRepository(Protocol):
 
     def config_key_exists(self, key: str) -> bool: ...
 
-    def update_config_value(self, key: str, value) -> dict: ...
+    def update_config_value(self, key: str, value: Any) -> dict: ...
 
     def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]: ...
 

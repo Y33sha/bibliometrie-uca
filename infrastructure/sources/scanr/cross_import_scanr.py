@@ -43,7 +43,7 @@ def fetch_by_dois(url: str, auth: tuple, dois: list[str]) -> list[dict]:
     return [hit["_source"] for hit in resp.json()["hits"]["hits"]]
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Cross-import ScanR")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--limit", type=int, help="Nombre max de DOI")

@@ -15,6 +15,7 @@ import argparse
 import os
 import sys
 import time
+from typing import Any
 
 import requests
 from psycopg2.extras import Json, execute_values
@@ -78,7 +79,7 @@ def fetch_page(
     return http_request_with_retry("GET", base_url, params=params, timeout=30, label=label)
 
 
-def insert_batch(conn, batch: list[tuple]) -> int:
+def insert_batch(conn: Any, batch: list[tuple]) -> int:
     """Insère un batch de works dans staging.
 
     Logique de mise à jour :
@@ -150,7 +151,7 @@ def insert_batch(conn, batch: list[tuple]) -> int:
 
 def extract_year(
     year: int = None,
-    conn=None,
+    conn: Any = None,
     existing_ids: set = None,
     base_url: str = "",
     institution_ids: list[str] = None,
@@ -236,7 +237,7 @@ def extract_year(
     return total_new, total_updated
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Extraction OpenAlex → staging")
     parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
     parser.add_argument(

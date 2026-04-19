@@ -49,7 +49,7 @@ def best_type(types: list[str]) -> str:
     return non_other[0]
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Backfill doc_type des publications")
     parser.add_argument("--apply", action="store_true", help="Appliquer (sinon dry-run)")
     args = parser.parse_args()

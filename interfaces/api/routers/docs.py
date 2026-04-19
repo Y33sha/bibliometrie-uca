@@ -3,6 +3,7 @@
 import logging
 import re
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
@@ -23,13 +24,13 @@ DOC_PAGES = [
 
 
 @router.get("/api/docs")
-async def list_docs():
+async def list_docs() -> Any:
     """Liste les pages de documentation disponibles."""
     return DOC_PAGES
 
 
 @router.get("/api/docs/todos/all")
-async def list_all_todos():
+async def list_all_todos() -> Any:
     """Collecte tous les <!-- TODO: ... --> de tous les fichiers .md."""
     todos = []
     todo_re = re.compile(r"<!--\s*TODO\s*:\s*(.+?)\s*-->")
@@ -53,7 +54,7 @@ async def list_all_todos():
 
 
 @router.get("/api/docs/{slug}")
-async def get_doc(slug: str):
+async def get_doc(slug: str) -> Any:
     """Retourne le contenu markdown d'une page de documentation."""
     # Sécurité : pas de traversal
     if "/" in slug or "\\" in slug or ".." in slug:

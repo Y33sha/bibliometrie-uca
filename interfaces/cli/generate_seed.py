@@ -90,7 +90,7 @@ TABLES: list[dict[str, Any]] = [
 ]
 
 
-def escape_sql(value, is_jsonb=False) -> str:
+def escape_sql(value: Any, is_jsonb: Any = False) -> str:
     """Échappe une valeur pour insertion SQL.
 
     Si is_jsonb=True, la valeur est sérialisée en JSON valide
@@ -118,7 +118,7 @@ def escape_sql(value, is_jsonb=False) -> str:
     return f"'{s}'"
 
 
-def generate_seed(cur, output_path: str):
+def generate_seed(cur: Any, output_path: str) -> Any:
     lines = []
     lines.append("-- Seed généré automatiquement par scripts/generate_seed.py")
     lines.append("-- Ne pas modifier à la main — relancer le script pour régénérer.")
@@ -185,7 +185,7 @@ def generate_seed(cur, output_path: str):
         print(f"  {spec['table']}: {count} lignes")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Génère db/seed.sql depuis la base courante")
     parser.add_argument(
         "--output",

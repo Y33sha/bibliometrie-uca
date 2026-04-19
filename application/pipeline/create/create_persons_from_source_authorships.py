@@ -36,6 +36,7 @@ Usage:
 import argparse
 import os
 from collections import defaultdict
+from typing import Any
 
 from psycopg2.extras import RealDictCursor
 
@@ -62,7 +63,7 @@ logger = setup_logger("create_persons", os.path.join(os.path.dirname(__file__), 
 # ---------------------------------------------------------------------------
 
 
-def get_all_unlinked_authorships(cur):
+def get_all_unlinked_authorships(cur: Any) -> Any:
     """Récupère toutes les authorships UCA sans person_id, toutes sources."""
     # HAL
     cur.execute("""
@@ -210,7 +211,7 @@ def get_all_unlinked_authorships(cur):
     return all_rows
 
 
-def load_linked_authorships_by_pub(cur):
+def load_linked_authorships_by_pub(cur: Any) -> Any:
     """Charge les authorships déjà rattachées à une personne, indexées par
     (publication_id, author_position) pour le cross-source matching.
 
@@ -265,7 +266,7 @@ def load_linked_authorships_by_pub(cur):
     return index
 
 
-def load_name_form_map(cur):
+def load_name_form_map(cur: Any) -> Any:
     """Charge person_name_forms.
 
     Retourne : {name_form: [person_id, ...]}
@@ -279,7 +280,7 @@ def load_name_form_map(cur):
 # ---------------------------------------------------------------------------
 
 
-def step0_hal_accounts(cur, all_authorships, linked_ids, dry_run):
+def step0_hal_accounts(cur: Any, all_authorships: Any, linked_ids: Any, dry_run: Any) -> Any:
     """Propagation des comptes HAL déjà rattachés à une personne.
 
     Seuls les source_persons HAL avec hal_person_id ET person_id sont traités.
@@ -327,7 +328,9 @@ def step0_hal_accounts(cur, all_authorships, linked_ids, dry_run):
 # ---------------------------------------------------------------------------
 
 
-def step1_cross_source(cur, all_authorships, linked_ids, linked_index, dry_run):
+def step1_cross_source(
+    cur: Any, all_authorships: Any, linked_ids: Any, linked_index: Any, dry_run: Any
+) -> Any:
     """Pour chaque authorship sans person_id, chercher sur la même publication
     (même position) une authorship d'une autre source rattachée à une personne.
     """
@@ -376,7 +379,7 @@ def step1_cross_source(cur, all_authorships, linked_ids, linked_index, dry_run):
 # ---------------------------------------------------------------------------
 
 
-def load_idref_person_map(cur):
+def load_idref_person_map(cur: Any) -> Any:
     """Charge les IdRef déjà mappés à une personne (status != rejected).
 
     Retourne : {idref: person_id}
@@ -390,7 +393,7 @@ def load_idref_person_map(cur):
     return {r["id_value"]: r["person_id"] for r in cur.fetchall()}
 
 
-def step1b_idref(cur, all_authorships, linked_ids, dry_run):
+def step1b_idref(cur: Any, all_authorships: Any, linked_ids: Any, dry_run: Any) -> Any:
     """Si l'authorship a un IdRef déjà connu en base (non rejeté),
     rattacher à la personne correspondante.
     """
@@ -423,7 +426,7 @@ def step1b_idref(cur, all_authorships, linked_ids, dry_run):
 # ---------------------------------------------------------------------------
 
 
-def load_orcid_person_map(cur):
+def load_orcid_person_map(cur: Any) -> Any:
     """Charge les ORCID déjà mappés à une personne (status != rejected).
 
     Retourne : {orcid: person_id}
@@ -437,7 +440,7 @@ def load_orcid_person_map(cur):
     return {r["id_value"]: r["person_id"] for r in cur.fetchall()}
 
 
-def step2_orcid(cur, all_authorships, linked_ids, dry_run):
+def step2_orcid(cur: Any, all_authorships: Any, linked_ids: Any, dry_run: Any) -> Any:
     """Si l'authorship a un ORCID déjà connu en base (non rejeté),
     rattacher à la personne correspondante.
     """
@@ -470,7 +473,9 @@ def step2_orcid(cur, all_authorships, linked_ids, dry_run):
 # ---------------------------------------------------------------------------
 
 
-def step3_name_forms(cur, all_authorships, linked_ids, name_form_map, dry_run):
+def step3_name_forms(
+    cur: Any, all_authorships: Any, linked_ids: Any, name_form_map: Any, dry_run: Any
+) -> Any:
     """Lookup par author_name_normalized dans person_name_forms.
 
     - Mappé à 1 personne → rattacher
@@ -544,7 +549,7 @@ def step3_name_forms(cur, all_authorships, linked_ids, name_form_map, dry_run):
 # ---------------------------------------------------------------------------
 
 
-def run(dry_run=False):
+def run(dry_run: Any = False) -> Any:
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -608,7 +613,7 @@ def run(dry_run=False):
     conn.close()
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(
         description="Crée des personnes à partir des authorships sources UCA"
     )

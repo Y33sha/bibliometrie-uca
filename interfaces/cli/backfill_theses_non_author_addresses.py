@@ -17,7 +17,7 @@ log = setup_logger(
 )
 
 
-def main():
+def main() -> None:
     conn = get_connection()
     cur = conn.cursor()
 

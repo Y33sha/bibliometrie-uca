@@ -21,7 +21,7 @@ async def list_journals(
     search: str | None = None,
     publisher_id: int | None = None,
     sort: str = "title",
-):
+) -> Any:
     with get_cursor() as (cur, conn):
         conditions = []
         params: list[Any] = []
@@ -80,7 +80,7 @@ async def list_journals(
 
 @router.put("/api/journals/{journal_id}")
 @router.get("/api/journals/{journal_id}")
-async def get_journal(journal_id: int):
+async def get_journal(journal_id: int) -> Any:
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id, title FROM journals WHERE id = %s", (journal_id,))
         row = cur.fetchone()
@@ -90,7 +90,7 @@ async def get_journal(journal_id: int):
 
 
 @router.put("/api/journals/{journal_id}")
-async def update_journal(journal_id: int, body: JournalUpdate):
+async def update_journal(journal_id: int, body: JournalUpdate) -> Any:
     """Met à jour une revue."""
     fields = body.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
@@ -99,7 +99,7 @@ async def update_journal(journal_id: int, body: JournalUpdate):
 
 
 @router.post("/api/journals/{journal_id}/merge")
-async def merge(journal_id: int, body: MergeRequest):
+async def merge(journal_id: int, body: MergeRequest) -> Any:
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id FROM journals WHERE id IN (%s, %s)", (journal_id, body.source_id))
         found = {row["id"] for row in cur.fetchall()}

@@ -1,6 +1,7 @@
 """Router Éditeurs — liste, recherche, fusion."""
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -19,7 +20,7 @@ async def list_publishers(
     per_page: int = Query(50, ge=1, le=200),
     search: str | None = None,
     sort: str = "name",
-):
+) -> Any:
     with get_cursor() as (cur, conn):
         conditions = []
         params = []
@@ -71,7 +72,7 @@ async def list_publishers(
 
 
 @router.get("/api/publishers/{publisher_id}")
-async def get_publisher(publisher_id: int):
+async def get_publisher(publisher_id: int) -> Any:
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id, name FROM publishers WHERE id = %s", (publisher_id,))
         row = cur.fetchone()
@@ -81,7 +82,7 @@ async def get_publisher(publisher_id: int):
 
 
 @router.put("/api/publishers/{publisher_id}")
-async def update_publisher(publisher_id: int, body: PublisherUpdate):
+async def update_publisher(publisher_id: int, body: PublisherUpdate) -> Any:
     """Met à jour un éditeur."""
     fields = body.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
@@ -90,7 +91,7 @@ async def update_publisher(publisher_id: int, body: PublisherUpdate):
 
 
 @router.post("/api/publishers/{publisher_id}/merge")
-async def merge(publisher_id: int, body: MergeRequest):
+async def merge(publisher_id: int, body: MergeRequest) -> Any:
     with get_cursor() as (cur, conn):
         cur.execute(
             "SELECT id FROM publishers WHERE id IN (%s, %s)", (publisher_id, body.source_id)

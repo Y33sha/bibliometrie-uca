@@ -14,6 +14,7 @@ Usage:
 import argparse
 import os
 import time
+from typing import Any
 
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
@@ -40,7 +41,7 @@ REFRESH_QUERY = """
 """
 
 
-def refresh_hal_document_countries(cur):
+def refresh_hal_document_countries(cur: Any) -> Any:
     """Étape préalable : propager source_structures.country → source_publications.countries (HAL).
 
     Pour chaque document HAL, collecte les pays des structures de ses auteurs
@@ -68,7 +69,7 @@ def refresh_hal_document_countries(cur):
     return updated
 
 
-def refresh_address_document_countries(cur):
+def refresh_address_document_countries(cur: Any) -> Any:
     """Propager addresses.countries → source_publications.countries (OA, WoS, ScanR).
 
     Pour chaque document non-HAL, collecte les pays des adresses de ses auteurs
@@ -96,7 +97,7 @@ def refresh_address_document_countries(cur):
     return updated
 
 
-def refresh(cur):
+def refresh(cur: Any) -> Any:
     t0 = time.perf_counter()
 
     # 1. Propager les pays HAL (structures → documents)
@@ -113,7 +114,7 @@ def refresh(cur):
     return updated
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Recalcul des pays des publications")
     parser.parse_args()
 

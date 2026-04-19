@@ -2,13 +2,15 @@
 propagations vers source_publications/publications.countries.
 """
 
+from typing import Any
+
 from psycopg2.extras import execute_values
 
 
 class PgAddressRepository:
     """Accès PostgreSQL à l'agrégat Address."""
 
-    def __init__(self, cur):
+    def __init__(self, cur: Any) -> None:
         self._cur = cur
 
     # ── Validation des liens adresse ↔ structure ───────────────────

@@ -11,13 +11,15 @@ et les scripts de correction. Le SQL vit dans
 `infrastructure/repositories/authorship_repository.py`.
 """
 
+from typing import Any
+
 from application.audit import emit_event
 from domain.errors import NotFoundError, ValidationError
 from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
 from infrastructure.repositories import authorship_repository
 
 
-def exclude_authorship(cur, authorship_id: int) -> dict:
+def exclude_authorship(cur: Any, authorship_id: int) -> dict:
     """Marque une authorship vérité comme exclue et détache les authorships sources.
 
     1. Marque l'authorship vérité excluded = TRUE
@@ -47,7 +49,7 @@ def exclude_authorship(cur, authorship_id: int) -> dict:
 
 
 def set_source_authorship_excluded(
-    cur, source_authorship_id: int, source: str, excluded: bool
+    cur: Any, source_authorship_id: int, source: str, excluded: bool
 ) -> None:
     """Marque ou démarque une authorship source comme exclue.
 
@@ -76,7 +78,7 @@ def set_source_authorship_excluded(
     )
 
 
-def detach_source(cur, source_authorship_id: int, source: str) -> bool:
+def detach_source(cur: Any, source_authorship_id: int, source: str) -> bool:
     """Détache une authorship source de son authorship vérité.
     Si plus aucune source ne l'atteste, supprime l'authorship vérité.
 
@@ -99,7 +101,7 @@ def detach_source(cur, source_authorship_id: int, source: str) -> bool:
     return False
 
 
-def delete_orphan_authorships(cur, person_id: int) -> int:
+def delete_orphan_authorships(cur: Any, person_id: int) -> int:
     """Supprime les authorships vérité d'une personne qui ne sont plus attestées
     par aucune authorship source.
     Retourne le nombre d'authorships supprimées.
@@ -108,7 +110,7 @@ def delete_orphan_authorships(cur, person_id: int) -> int:
 
 
 def move_authorships_for_source(
-    cur, source: str, source_authorship_ids: list[int], from_pub_id: int, to_pub_id: int
+    cur: Any, source: str, source_authorship_ids: list[int], from_pub_id: int, to_pub_id: int
 ) -> None:
     """Déplace des authorships vérité d'une publication à une autre,
     pour les authorships liées aux source_authorship_ids donnés.
@@ -123,7 +125,7 @@ def move_authorships_for_source(
         repo.move_authorships_for_source_authorship(sa_id, from_pub_id, to_pub_id)
 
 
-def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int]) -> int:
+def sync_person_id_from_source(cur: Any, source: str, source_authorship_ids: list[int]) -> int:
     """Propage le person_id des authorships sources vers les authorships vérité.
     Évite les doublons (publication_id, person_id).
     Utilisé par fix_oa_person_conflicts.
@@ -135,7 +137,7 @@ def sync_person_id_from_source(cur, source: str, source_authorship_ids: list[int
     return authorship_repository(cur).sync_person_id_from_sources(source_authorship_ids)
 
 
-def propagate_uca_for_addresses(cur, address_ids: list[int]) -> None:
+def propagate_uca_for_addresses(cur: Any, address_ids: list[int]) -> None:
     """Recalcule in_perimeter sur source_authorships et authorships vérité
     pour tous les authorships liés aux adresses données.
 

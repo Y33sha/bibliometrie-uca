@@ -173,11 +173,12 @@ exclude_lines = [
 python_version = "3.10"
 # Imports : ignorer les libs tierces non typées plutôt que de polluer
 ignore_missing_imports = true
-# Vérifie le corps des fonctions même sans annotation (attrape les vrais
-# bugs de typage internes). `disallow_untyped_defs` reste off : on ne force
-# pas encore les annotations sur toutes les fonctions — à durcir par module.
+# Mode strict : toutes les fonctions doivent être annotées, et leur corps
+# est vérifié. `warn_return_any` reste off car `-> Any` est utilisé
+# pragmatiquement sur les fonctions CLI/helpers où le type de retour
+# n'apporte pas d'information.
 check_untyped_defs = true
-disallow_untyped_defs = false
+disallow_untyped_defs = true
 warn_return_any = false
 # Afficher les codes d'erreur pour pouvoir ignorer précisément au besoin
 show_error_codes = true

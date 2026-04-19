@@ -3,6 +3,7 @@
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
@@ -15,7 +16,7 @@ STATUS_FILE = BASE / "pipeline" / "status.json"
 
 
 @router.get("/api/admin/pipeline/status")
-async def pipeline_status():
+async def pipeline_status() -> Any:
     """Retourne le statut du pipeline en cours, ou null si aucun ne tourne."""
     if not STATUS_FILE.exists():
         return None
@@ -29,7 +30,7 @@ CRON_LOG = BASE / "processing" / "logs" / "cron.log"
 
 
 @router.get("/api/admin/pipeline/logs")
-async def pipeline_logs(lines: int = 200):
+async def pipeline_logs(lines: int = 200) -> Any:
     """Retourne les N dernières lignes du cron.log."""
     if not CRON_LOG.exists():
         return {"content": ""}
@@ -42,7 +43,7 @@ async def pipeline_logs(lines: int = 200):
 
 
 @router.get("/api/admin/pipeline/reports")
-async def list_reports():
+async def list_reports() -> Any:
     """Liste les rapports pipeline disponibles (plus récent en premier)."""
     if not REPORTS_DIR.exists():
         return []
@@ -60,7 +61,7 @@ async def list_reports():
 
 
 @router.get("/api/admin/pipeline/reports/{filename}")
-async def get_report(filename: str):
+async def get_report(filename: str) -> Any:
     """Retourne le contenu d'un rapport pipeline."""
     # Sécurité : empêcher le path traversal
     if "/" in filename or "\\" in filename or ".." in filename:

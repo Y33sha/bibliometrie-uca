@@ -5,6 +5,7 @@ import hmac
 import os
 import time
 from contextlib import contextmanager
+from typing import Any
 
 import bcrypt
 from fastapi import Cookie, HTTPException
@@ -22,7 +23,7 @@ BUILD_DIR = os.path.join(PROJECT_ROOT, "interfaces", "frontend", "build")
 class SPAStaticFiles(StaticFiles):
     """Sert les fichiers statiques avec fallback index.html pour le routage SPA."""
 
-    async def get_response(self, path, scope):
+    async def get_response(self, path: Any, scope: Any) -> Any:
         try:
             return await super().get_response(path, scope)
         except Exception:
@@ -64,7 +65,7 @@ def _check_password(password: str) -> bool:
     return bcrypt.checkpw(password.encode(), settings.admin_hash.encode())
 
 
-def require_admin(session: str | None = Cookie(None, alias="session")):
+def require_admin(session: str | None = Cookie(None, alias="session")) -> Any:
     """Dépendance FastAPI : vérifie que l'utilisateur est authentifié."""
     if not session or not _verify_token(session):
         raise HTTPException(status_code=401, detail="Non authentifié")
@@ -77,7 +78,7 @@ from psycopg2.pool import ThreadedConnectionPool
 _pool = None
 
 
-def _get_pool():
+def _get_pool() -> Any:
     global _pool
     if _pool is None:
         db_args = settings.db_args
@@ -90,7 +91,7 @@ def _get_pool():
 
 
 @contextmanager
-def get_cursor():
+def get_cursor() -> Any:
     pool = _get_pool()
     conn = pool.getconn()
     try:

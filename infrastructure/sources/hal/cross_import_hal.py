@@ -19,6 +19,7 @@ import argparse
 import os
 import sys
 import time
+from typing import Any
 
 import requests
 from psycopg2.extras import Json
@@ -56,7 +57,7 @@ def fetch_by_doi(doi: str) -> dict | None:
     return None
 
 
-def insert_staging(conn, doc: dict):
+def insert_staging(conn: Any, doc: dict) -> Any:
     """Insere un document dans staging avec ses collections HAL."""
     hal_id = doc.get("halId_s")
     if isinstance(hal_id, list):
@@ -102,7 +103,7 @@ def insert_staging(conn, doc: dict):
     conn.commit()
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Import croisé DOI → HAL")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans importer")
     parser.add_argument("--limit", type=int, help="Nombre max de DOI à traiter")

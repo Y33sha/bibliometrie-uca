@@ -35,7 +35,7 @@ _APC_FILTER_MAP = {
 }
 
 
-def apply_apc_filter(conditions: list, params: list, has_apc: str):
+def apply_apc_filter(conditions: list, params: list, has_apc: str) -> Any:
     """Ajoute le filtre APC aux conditions SQL. Supporte multi-sélection (virgule)."""
     if not has_apc:
         return
@@ -61,7 +61,7 @@ async def publisher_stats(
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
     sort: str = Query("-pubs"),
-):
+) -> Any:
     """Stats d'articles par éditeur."""
     offset = (page - 1) * per_page
     lab_ids = parse_int_csv(lab_id)
@@ -155,7 +155,7 @@ async def journal_stats(
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
     sort: str = Query("-pubs"),
-):
+) -> Any:
     """Stats d'articles par revue."""
     offset = (page - 1) * per_page
     lab_ids = parse_int_csv(lab_id)
@@ -255,7 +255,7 @@ async def stats_by_year(
     journal_id: int | None = Query(None),
     oa_status: str = Query(""),
     has_apc: str = Query(""),
-):
+) -> Any:
     """Ventilation par année (pour les graphiques)."""
     lab_ids = parse_int_csv(lab_id)
     years = parse_int_csv(year)
@@ -317,7 +317,7 @@ async def stats_summary(
     journal_id: int | None = Query(None),
     oa_status: str = Query(""),
     has_apc: str = Query(""),
-):
+) -> Any:
     """Résumé global."""
     lab_ids = parse_int_csv(lab_id)
     years = parse_int_csv(year)
@@ -380,7 +380,7 @@ async def stats_labs(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     sort: str = Query("-pubs"),
-):
+) -> Any:
     """Stats d'articles par laboratoire."""
     offset = (page - 1) * per_page
     lab_ids = parse_int_csv(lab_id)
@@ -486,7 +486,7 @@ async def stats_labs(
 
 
 @router.get("/api/stats/years")
-async def available_years():
+async def available_years() -> Any:
     """Années disponibles (validées uniquement)."""
     with get_cursor() as (cur, conn):
         cur.execute("SET LOCAL jit = off")
@@ -506,7 +506,7 @@ async def stats_facets(
     journal_id: int | None = Query(None),
     oa_status: str = Query(""),
     has_apc: str = Query(""),
-):
+) -> Any:
     """Facettes dynamiques : retourne les années et labos disponibles
     en tenant compte des filtres croisés (chaque facette exclut son propre filtre)."""
     lab_ids = parse_int_csv(lab_id)
@@ -522,7 +522,7 @@ async def stats_facets(
             "(j.oa_model IS DISTINCT FROM 'repository')",
         ]
 
-        def add_common(conds, params, *, skip: str):
+        def add_common(conds: Any, params: Any, *, skip: str) -> Any:
             """Ajoute tous les filtres sauf celui indiqué."""
             if skip != "year":
                 apply_year_filter(conds, params, years)

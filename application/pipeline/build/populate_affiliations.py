@@ -22,6 +22,7 @@ Usage:
 import argparse
 import os
 import time
+from typing import Any
 
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
@@ -34,7 +35,9 @@ logger = setup_logger("populate_affiliations", os.path.join(os.path.dirname(__fi
 DAILY_FILTER = "sd.created_at >= NOW() - INTERVAL '24 hours'"
 
 
-def _step_address_source(cur, source, perimeter_ids, wide_ids, daily=False):
+def _step_address_source(
+    cur: Any, source: Any, perimeter_ids: Any, wide_ids: Any, daily: Any = False
+) -> Any:
     """Étapes 3/3b/3c : source avec adresses — calculer in_perimeter + structure_ids."""
     label = source.capitalize() if source != "openalex" else "OA"
 
@@ -133,7 +136,7 @@ def _step_address_source(cur, source, perimeter_ids, wide_ids, daily=False):
     logger.info(f"  {label} structure_ids : {cur.rowcount} authorships")
 
 
-def step3d_theses(cur, wide_ids, daily=False):
+def step3d_theses(cur: Any, wide_ids: Any, daily: Any = False) -> Any:
     """Étape 3d : theses.fr — résoudre structure_ids via adresses.
 
     in_perimeter est déjà à TRUE (posé par normalize_theses), on ne le reset pas.
@@ -188,7 +191,7 @@ def step3d_theses(cur, wide_ids, daily=False):
     logger.info(f"Étape 3d — theses.fr structure_ids : {cur.rowcount} authorships")
 
 
-def show_stats(cur):
+def show_stats(cur: Any) -> Any:
     """Affiche les compteurs in_perimeter par source."""
     for source_name, source_value in [
         ("HAL", "hal"),
@@ -214,7 +217,7 @@ def show_stats(cur):
         )
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Peuplement in_perimeter et structure_ids")
     parser.add_argument("--stats", action="store_true", help="Stats uniquement")
     parser.add_argument(

@@ -1,6 +1,7 @@
 """Configuration router — paramètres applicatifs et périmètres."""
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter
 
@@ -22,14 +23,14 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/api/config")
-async def list_config():
+async def list_config() -> Any:
     with get_cursor() as (cur, conn):
         cur.execute("SELECT key, value, description, updated_at FROM config ORDER BY key")
         return cur.fetchall()
 
 
 @router.get("/api/config/hal-collections")
-async def get_hal_collections():
+async def get_hal_collections() -> Any:
     """Retourne les collections HAL dérivées des structures du périmètre UCA."""
     with get_cursor() as (cur, conn):
         from infrastructure.app_config import get_hal_collections as _get
@@ -39,7 +40,7 @@ async def get_hal_collections():
 
 
 @router.put("/api/config/{key}")
-async def update_config(key: str, body: ConfigValueUpdate):
+async def update_config(key: str, body: ConfigValueUpdate) -> Any:
     with get_cursor() as (cur, conn):
         return config_service.update_config_value(cur, key, body.value)
 
@@ -48,7 +49,7 @@ async def update_config(key: str, body: ConfigValueUpdate):
 
 
 @router.get("/api/perimeters")
-async def list_perimeters():
+async def list_perimeters() -> Any:
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id, code, name, description, structure_ids FROM perimeters ORDER BY id")
         perimeters = cur.fetchall()
@@ -72,21 +73,21 @@ async def list_perimeters():
 
 
 @router.post("/api/perimeters/{perimeter_id}/structures")
-async def add_perimeter_structure(perimeter_id: int, body: AddPerimeterStructure):
+async def add_perimeter_structure(perimeter_id: int, body: AddPerimeterStructure) -> Any:
     with get_cursor() as (cur, conn):
         status = config_service.add_perimeter_structure(cur, perimeter_id, body.structure_id)
         return {"status": status}
 
 
 @router.delete("/api/perimeters/{perimeter_id}/structures/{structure_id}")
-async def remove_perimeter_structure(perimeter_id: int, structure_id: int):
+async def remove_perimeter_structure(perimeter_id: int, structure_id: int) -> Any:
     with get_cursor() as (cur, conn):
         config_service.remove_perimeter_structure(cur, perimeter_id, structure_id)
         return {"status": "removed"}
 
 
 @router.post("/api/perimeters")
-async def create_perimeter(body: PerimeterCreate):
+async def create_perimeter(body: PerimeterCreate) -> Any:
     """Crée un nouveau périmètre."""
     code = body.code.strip()
     name = body.name.strip()
@@ -97,7 +98,7 @@ async def create_perimeter(body: PerimeterCreate):
 
 
 @router.put("/api/perimeters/{perimeter_id}")
-async def update_perimeter(perimeter_id: int, body: PerimeterUpdate):
+async def update_perimeter(perimeter_id: int, body: PerimeterUpdate) -> Any:
     """Met à jour un périmètre (nom, description, structures)."""
     fields = body.model_dump(exclude_unset=True)
     # Nettoyer : strip des strings et description vide → None
@@ -111,7 +112,7 @@ async def update_perimeter(perimeter_id: int, body: PerimeterUpdate):
 
 
 @router.delete("/api/perimeters/{perimeter_id}")
-async def delete_perimeter(perimeter_id: int):
+async def delete_perimeter(perimeter_id: int) -> Any:
     """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
     with get_cursor() as (cur, conn):
         config_service.delete_perimeter(cur, perimeter_id)

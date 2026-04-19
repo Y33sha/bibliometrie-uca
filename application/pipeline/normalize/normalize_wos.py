@@ -21,6 +21,7 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 
 import argparse
 import os
+from typing import Any
 
 from psycopg2.extras import Json
 
@@ -80,7 +81,7 @@ def map_oa_status(raw_oa: str | None) -> str:
     return "unknown"
 
 
-def _safe_list(obj) -> list:
+def _safe_list(obj: Any) -> list:
     """WoS API retourne parfois un dict au lieu d'une liste."""
     if obj is None:
         return []
@@ -378,12 +379,12 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
 # =============================================================
 
 
-def upsert_publisher(cur, publisher_name: str | None) -> int | None:
+def upsert_publisher(cur: Any, publisher_name: str | None) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
     return find_or_create_publisher(cur, publisher_name)
 
 
-def upsert_journal(cur, rec: dict, publisher_id: int | None) -> int | None:
+def upsert_journal(cur: Any, rec: dict, publisher_id: int | None) -> int | None:
     """Trouve ou crée une revue depuis les données WoS."""
     title = rec.get("journal_title")
     if not title:
@@ -419,7 +420,7 @@ def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
     )
 
 
-def find_publication(cur, rec: dict, journal_id: int | None) -> int | None:
+def find_publication(cur: Any, rec: dict, journal_id: int | None) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None."""
     meta = extract_pub_metadata(rec, journal_id)
     if not meta["pub_year"] or not meta["title"] or meta["title"] == "(sans titre)":
@@ -436,7 +437,7 @@ def find_publication(cur, rec: dict, journal_id: int | None) -> int | None:
 
 
 def insert_wos_document(
-    cur, rec: dict, staging_id: int, publication_id: int | None, pub_meta: dict | None = None
+    cur: Any, rec: dict, staging_id: int, publication_id: int | None, pub_meta: dict | None = None
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour WoS. Retourne source_publications.id."""
     journal_id = pub_meta.get("journal_id") if pub_meta else None
@@ -513,7 +514,7 @@ def insert_wos_document(
 _wos_author_cache: dict[str, int] = {}
 
 
-def upsert_wos_author(cur, author: dict) -> int | None:
+def upsert_wos_author(cur: Any, author: dict) -> int | None:
     """Insère/retrouve un auteur WoS dans source_persons (source='wos').
 
     Utilise le daisng_id comme clé unique (format API).
@@ -567,7 +568,7 @@ def upsert_wos_author(cur, author: dict) -> int | None:
 # =============================================================
 
 
-def _resolve_addresses_batch(cur, raw_texts: set) -> dict[str, int]:
+def _resolve_addresses_batch(cur: Any, raw_texts: set) -> dict[str, int]:
     """Résout un ensemble d'adresses en batch. Retourne {raw_text: id}.
 
     Insère les adresses inconnues en un seul batch, puis récupère tous les IDs.
@@ -596,7 +597,7 @@ def _resolve_addresses_batch(cur, raw_texts: set) -> dict[str, int]:
 _wos_institution_cache: dict[str, int] = {}
 
 
-def upsert_wos_institution(cur, org: dict) -> int | None:
+def upsert_wos_institution(cur: Any, org: dict) -> int | None:
     """Insère/retrouve une organisation WoS dans source_structures. Retourne source_structures.id."""
     name = org.get("name")
     if not name:
@@ -621,7 +622,7 @@ def upsert_wos_institution(cur, org: dict) -> int | None:
     return result
 
 
-def process_authorships(cur, rec: dict, source_publication_id: int):
+def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
     """Traite les authorships d'un record WoS + crée les liens adresses et institutions."""
     # Résoudre toutes les organisations du document en un seul pass
     all_orgs = set()
@@ -803,7 +804,7 @@ def process_authorships(cur, rec: dict, source_publication_id: int):
 # =============================================================
 
 
-def process_record(cur, staging_row: tuple) -> bool:
+def process_record(cur: Any, staging_row: tuple) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
     from infrastructure.timings import StepTimer
 
@@ -868,7 +869,7 @@ def process_record(cur, staging_row: tuple) -> bool:
         raise
 
 
-def main():
+def main() -> Any:
     parser = argparse.ArgumentParser(description="Normalisation WoS → tables normalisées")
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
     parser.add_argument(

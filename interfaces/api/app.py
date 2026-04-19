@@ -14,6 +14,7 @@ import time
 import traceback
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,34 +67,34 @@ app = FastAPI(title="Bibliométrie UCA")
 
 
 @app.exception_handler(NotFoundError)
-async def not_found_handler(request: Request, exc: NotFoundError):
+async def not_found_handler(request: Request, exc: NotFoundError) -> Any:
     return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
 @app.exception_handler(ValidationError)
-async def validation_handler(request: Request, exc: ValidationError):
+async def validation_handler(request: Request, exc: ValidationError) -> Any:
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.exception_handler(ConflictError)
-async def conflict_handler(request: Request, exc: ConflictError):
+async def conflict_handler(request: Request, exc: ConflictError) -> Any:
     return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
 @app.exception_handler(UnauthorizedError)
-async def unauthorized_handler(request: Request, exc: UnauthorizedError):
+async def unauthorized_handler(request: Request, exc: UnauthorizedError) -> Any:
     return JSONResponse(status_code=401, content={"detail": str(exc)})
 
 
 @app.exception_handler(DomainError)
-async def domain_error_handler(request: Request, exc: DomainError):
+async def domain_error_handler(request: Request, exc: DomainError) -> Any:
     # Filet de sécurité pour une DomainError non spécialisée ci-dessus.
     logger.warning("DomainError non mappée : %s", exc)
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
+async def unhandled_exception_handler(request: Request, exc: Exception) -> Any:
     """Renvoie du JSON 500 au lieu de HTML pour les erreurs non gérées."""
     logger.error(
         "Erreur non gérée sur %s %s\n%s", request.method, request.url.path, traceback.format_exc()
@@ -117,7 +118,7 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def auth_middleware(request: Request, call_next):
+async def auth_middleware(request: Request, call_next: Any) -> Any:
     """Protège les endpoints d'écriture (POST/PUT/DELETE/PATCH) sauf auth.
 
     Log aussi les actions admin réussies (status < 400) pour traçabilité —
@@ -162,7 +163,7 @@ async def auth_middleware(request: Request, call_next):
 
 
 @app.middleware("http")
-async def strip_prefix(request: Request, call_next):
+async def strip_prefix(request: Request, call_next: Any) -> Any:
     """Strip /bibliometrie prefix pour que les routes /api/* fonctionnent en accès direct."""
     if request.url.path.startswith("/bibliometrie/api/"):
         request.scope["path"] = request.url.path[len("/bibliometrie") :]
@@ -174,7 +175,7 @@ _METRICS_SKIP_PATHS = ("/api/health", "/api/metrics")
 
 
 @app.middleware("http")
-async def timing_middleware(request: Request, call_next):
+async def timing_middleware(request: Request, call_next: Any) -> Any:
     """Mesure la durée de chaque requête, ajoute un header X-Response-Time
     et log un record `request_completed` structuré (sauf /api/health et /api/metrics).
     """
@@ -206,7 +207,7 @@ _PIPELINE_STATUS_FILE = Path(__file__).resolve().parent.parent / "pipeline" / "s
 
 
 @app.get("/api/health")
-async def health():
+async def health() -> Any:
     """Vérifie que l'API est opérationnelle, la DB accessible, et la fraîcheur
     des données (date de la dernière extraction par source).
     """
@@ -252,7 +253,7 @@ async def health():
 
 
 @app.get("/api/metrics")
-async def metrics():
+async def metrics() -> Any:
     """Métriques internes : état du pool de connexions DB.
 
     Le timing des requêtes est émis via le middleware `timing_middleware`
@@ -277,7 +278,7 @@ async def metrics():
 
 
 @app.get("/")
-async def root():
+async def root() -> Any:
     return RedirectResponse("/bibliometrie/stats")
 
 
