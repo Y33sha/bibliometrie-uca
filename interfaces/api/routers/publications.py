@@ -10,8 +10,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from application.authorships import (
     set_source_authorship_excluded as _set_source_authorship_excluded,
 )
-from interfaces.api.deps import get_cursor, get_root_structure_id
-from interfaces.api.filters import (
+from infrastructure.db.queries.filters import (
     OA_OPEN_STATUSES,
     PUB_IS_UCA,
     apply_access_filter,
@@ -27,9 +26,9 @@ from interfaces.api.filters import (
     apply_publisher_journal_filter,
     apply_source_filter,
     apply_year_filter,
-    parse_int_csv,
-    parse_str_csv,
 )
+from interfaces.api.deps import get_cursor, get_root_structure_id
+from interfaces.api.filters import parse_int_csv, parse_str_csv
 from interfaces.api.models import ExcludeSourceAuthorship
 
 router = APIRouter()

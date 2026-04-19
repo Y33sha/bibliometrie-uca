@@ -6,12 +6,12 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from interfaces.api.deps import get_cursor
-from interfaces.api.filters import (
+from infrastructure.db.queries.filters import (
     apply_person_has_identifier_filter,
     apply_person_has_rh_filter,
     persons_sort_clause,
 )
+from interfaces.api.deps import get_cursor
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
