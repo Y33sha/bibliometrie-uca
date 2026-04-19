@@ -70,8 +70,10 @@ dupliqué entre agrégats.
   + checks basiques (trailing whitespace, EOF, YAML/TOML, merge conflicts)
   + lint-imports (contrats DDD) + pytest unitaires (tests/unit/).
   Config dans `.pre-commit-config.yaml`.
-- [ ] Ajouter mypy au hook + le durcir progressivement (strict par module
-  à mesure qu'il est stabilisé — aujourd'hui 73 erreurs, mode permissif)
+- [x] Mypy ajouté au hook + à la CI. Baseline à **zéro erreur** (config
+  permissive — `check_untyped_defs = false`). Prochaine étape : activer
+  `check_untyped_defs` globalement, puis `disallow_untyped_defs` par
+  module à mesure que les fonctions sont annotées.
 - Couverture `pytest --cov` en CI avec seuil progressif (partir de
   la couverture actuelle, ne pas régresser)
 
@@ -106,6 +108,8 @@ pour ça. Évaluer migration coût/bénéfice.
 - **Complexité cyclomatique** : seuil actuel à 20 (ruff C901), faire
   descendre progressivement à 15 puis 10 en cassant les fonctions trop
   denses (typiquement les routers de facettes et `refresh_from_sources`)
+- **Mypy** : baseline zéro erreur en mode permissif. Durcir par étapes
+  (activer `check_untyped_defs`, puis `disallow_untyped_defs` par module).
 - **Dédoublonnage** : audit complet du code dupliqué (`radon` ou manuel)
   — notamment le SQL qui pouvait être factorisé depuis la fusion des
   tables sources, mais qui ne l'a pas été

@@ -1,6 +1,7 @@
 """Auto-extracted router."""
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Query
 
@@ -73,7 +74,7 @@ async def publisher_stats(
             "p.doc_type IN ('article', 'review')",
             "j.oa_model IS DISTINCT FROM 'repository'",
         ]
-        params = []
+        params: list[Any] = []
 
         apply_lab_filter(conditions, params, lab_ids)
         apply_year_filter(conditions, params, years)
@@ -168,7 +169,7 @@ async def journal_stats(
             "p.doc_type IN ('article', 'review')",
             "j.oa_model IS DISTINCT FROM 'repository'",
         ]
-        params = []
+        params: list[Any] = []
 
         apply_lab_filter(conditions, params, lab_ids)
         apply_year_filter(conditions, params, years)
@@ -266,7 +267,7 @@ async def stats_by_year(
             "p.doc_type IN ('article', 'review')",
             "(j.oa_model IS DISTINCT FROM 'repository')",
         ]
-        params = []
+        params: list[Any] = []
 
         apply_lab_filter(conditions, params, lab_ids)
         apply_year_filter(conditions, params, years)
@@ -328,7 +329,7 @@ async def stats_summary(
             "p.doc_type IN ('article', 'review')",
             "(j.oa_model IS DISTINCT FROM 'repository')",
         ]
-        params = []
+        params: list[Any] = []
 
         apply_lab_filter(conditions, params, lab_ids)
         apply_year_filter(conditions, params, years)
@@ -391,7 +392,7 @@ async def stats_labs(
             "p.doc_type IN ('article', 'review')",
             "(j.oa_model IS DISTINCT FROM 'repository')",
         ]
-        params = []
+        params: list[Any] = []
 
         if lab_ids:
             conditions.append("ps_structs.struct_ids && %s::int[]")

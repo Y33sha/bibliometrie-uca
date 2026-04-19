@@ -38,7 +38,7 @@ def fetch_idref(hal_person_id: int = None, idhal: str = None) -> str | None:
             params={
                 "q": q,
                 "fl": "person_i,idrefId_s",
-                "rows": 1,
+                "rows": "1",
             },
             timeout=10,
         )

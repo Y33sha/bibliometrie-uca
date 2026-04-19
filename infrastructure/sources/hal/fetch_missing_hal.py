@@ -174,7 +174,7 @@ def fetch_hal_by_nnt(nnt: str) -> dict | None:
                 "q": f"nntId_s:{nnt}",
                 "fl": HAL_FIELDS_STR,
                 "wt": "json",
-                "rows": 1,
+                "rows": "1",
             },
             timeout=15,
         )
@@ -219,7 +219,7 @@ def fetch_hal_document(hal_id: str) -> dict | None:
                 "q": f"halId_s:{hal_id}",
                 "fl": HAL_FIELDS_STR,
                 "wt": "json",
-                "rows": 1,
+                "rows": "1",
             },
             timeout=15,
         )

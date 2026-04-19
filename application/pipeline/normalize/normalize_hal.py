@@ -21,6 +21,7 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 
 import argparse
 import os
+from typing import Any
 
 from psycopg2.extras import Json
 
@@ -350,7 +351,7 @@ def upsert_hal_author(
         last_name = full_name
 
     # Construire le JSONB source_ids pour les IDs spécifiques HAL
-    source_ids = {}
+    source_ids: dict[str, Any] = {}
     if hal_person_id and hal_person_id > 0:
         source_ids["hal_person_id"] = hal_person_id
     if idhal:
@@ -550,8 +551,8 @@ def process_authors(
     #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position
     # C'est le champ le plus complet : on en extrait form_id, person_id et idhal
     composite = doc.get("authFullNameFormIDPersonIDIDHal_fs") or []
-    form_id_by_pos = {}
-    hal_person_id_by_pos = {}
+    form_id_by_pos: dict[int, int | None] = {}
+    hal_person_id_by_pos: dict[int, int | None] = {}
     idhal_by_pos = {}
 
     for pos, entry in enumerate(composite):
@@ -561,8 +562,7 @@ def process_authors(
             dash_parts = parts[1].rsplit("-", 1)
             if len(dash_parts) == 2:
                 try:
-                    form_id = int(dash_parts[0])
-                    form_id_by_pos[pos] = form_id
+                    form_id_by_pos[pos] = int(dash_parts[0])
                 except ValueError:
                     pass
                 try:
@@ -707,7 +707,7 @@ def process_work(
         # Zenodo : si le DOI est un concept DOI, vérifier si le version DOI
         # est déjà en staging → skip pour éviter les doublons
         raw_doi = clean_doi(as_str(doc.get("doiId_s")))
-        if is_zenodo_doi(raw_doi):
+        if raw_doi and is_zenodo_doi(raw_doi):
             try:
                 version_doi = resolve_zenodo_doi(raw_doi)
             except ZenodoResolutionError as e:
@@ -727,7 +727,7 @@ def process_work(
                     return False
 
         publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
-        publisher_id = upsert_publisher(cur, publisher_name)
+        publisher_id = upsert_publisher(cur, publisher_name) if publisher_name else None
         journal_id = upsert_journal(cur, doc, publisher_id)
         t.mark("publisher+journal")
 

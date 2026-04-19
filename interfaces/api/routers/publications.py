@@ -3,6 +3,7 @@
 import csv
 import io
 import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
@@ -549,7 +550,7 @@ async def export_publications_csv(  # noqa: C901 (export CSV : logique de séria
                           AND sa.roles && ARRAY['author']::text[])
             """
             ]
-            params: list = [person_id]
+            params: list[Any] = [person_id]
         elif lab_none and not lab_ids:
             conditions = [PUB_IS_UCA]
             params = []
@@ -608,7 +609,7 @@ async def export_publications_csv(  # noqa: C901 (export CSV : logique de séria
                 elif sv == "oa_no":
                     conditions.append("NOT p.sources @> ARRAY['openalex'::source_type]")
         if oa_values:
-            expanded = []
+            expanded: list[str] = []
             for v in oa_values:
                 if v == "oa":
                     expanded.extend(OA_OPEN_STATUSES)
@@ -998,7 +999,7 @@ async def list_publications(
                           AND sa.roles && ARRAY['author']::text[])
             """
             ]
-            params = [person_id]
+            params: list[Any] = [person_id]
         elif lab_none and not lab_ids:
             # "Aucun labo" uniquement
             conditions = [PUB_IS_UCA]
