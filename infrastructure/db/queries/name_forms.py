@@ -8,6 +8,8 @@ passe par une table temporaire pour normalisation SQL via
 
 from typing import Any
 
+from infrastructure.db_helpers import rows_as_dicts
+
 
 def fetch_active_persons_names(cur: Any) -> list[dict[str, Any]]:
     """`(id, first_name, last_name)` des personnes actives avec un nom."""
@@ -19,8 +21,7 @@ def fetch_active_persons_names(cur: Any) -> list[dict[str, Any]]:
         WHERE last_name IS NOT NULL AND last_name != ''
           AND rejected = FALSE
     """)
-    columns = [desc[0] for desc in cur.description]
-    return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+    return rows_as_dicts(cur)
 
 
 def fetch_source_authorship_name_forms(cur: Any) -> list[dict[str, Any]]:
@@ -31,8 +32,7 @@ def fetch_source_authorship_name_forms(cur: Any) -> list[dict[str, Any]]:
         WHERE sa.person_id IS NOT NULL AND NOT sa.excluded
           AND sa.author_name_normalized IS NOT NULL AND sa.author_name_normalized != ''
     """)
-    columns = [desc[0] for desc in cur.description]
-    return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+    return rows_as_dicts(cur)
 
 
 def create_temp_raw_forms_table(cur: Any) -> None:
@@ -55,8 +55,7 @@ def fetch_normalized_forms_from_temp(cur: Any) -> list[dict[str, Any]]:
         WHERE trim(raw_text) != ''
         GROUP BY normalize_name_form(raw_text)
     """)
-    columns = [desc[0] for desc in cur.description]
-    return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+    return rows_as_dicts(cur)
 
 
 def drop_temp_raw_forms_table(cur: Any) -> None:
@@ -66,8 +65,7 @@ def drop_temp_raw_forms_table(cur: Any) -> None:
 def fetch_existing_name_forms(cur: Any) -> list[dict[str, Any]]:
     """Charge toutes les lignes de `person_name_forms`."""
     cur.execute("SELECT id, name_form, person_ids, sources FROM person_name_forms")
-    columns = [desc[0] for desc in cur.description]
-    return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+    return rows_as_dicts(cur)
 
 
 def update_name_form(cur: Any, form_id: int, person_ids: list[int], sources: list[str]) -> None:

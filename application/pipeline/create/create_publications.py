@@ -12,6 +12,9 @@ source_authorship in_perimeter :
 
 Les source_publications hors périmètre restent sans publication_id.
 
+Le SQL est isolé dans `infrastructure/db/queries/publications_create.py`
+et `infrastructure/db/queries/merge.py`.
+
 Usage:
     python create_publications.py              # exécuter
     python create_publications.py --dry-run    # dry-run
@@ -20,8 +23,6 @@ Usage:
 import argparse
 import os
 from typing import Any
-
-from psycopg2.extras import RealDictCursor
 
 from application.publications import (
     find_or_create as find_or_create_publication,
@@ -33,28 +34,13 @@ from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.publication import normalize_nnt
 from infrastructure.db.connection import get_connection
+from infrastructure.db.queries.merge import link_source_publication_to_publication
+from infrastructure.db.queries.publications_create import (
+    fetch_orphan_in_perimeter_source_publications,
+)
 from infrastructure.log import setup_logger
 
 logger = setup_logger("create_publications", os.path.join(os.path.dirname(__file__), "logs"))
-
-
-def get_orphan_source_publications(cur: Any) -> Any:
-    """Récupère les source_publications sans publication_id ayant au moins
-    un source_authorship in_perimeter."""
-    cur.execute("""
-        SELECT sd.id, sd.source, sd.source_id, sd.doi, sd.title, sd.pub_year,
-               sd.doc_type, sd.journal_id, sd.oa_status, sd.language,
-               sd.container_title, sd.external_ids,
-               sd.is_retracted, sd.biblio, sd.abstract, sd.keywords, sd.topics
-        FROM source_publications sd
-        WHERE sd.publication_id IS NULL
-          AND EXISTS (
-              SELECT 1 FROM source_authorships sa
-              WHERE sa.source_publication_id = sd.id AND sa.in_perimeter = TRUE
-          )
-        ORDER BY sd.id
-    """)
-    return cur.fetchall()
 
 
 def process_document(cur: Any, doc: Any, dry_run: Any) -> Any:
@@ -72,7 +58,6 @@ def process_document(cur: Any, doc: Any, dry_run: Any) -> Any:
     language = doc["language"]
     container_title = doc["container_title"]
 
-    # Extraire le NNT depuis external_ids
     ext_ids = doc["external_ids"] or {}
     nnt = ext_ids.get("nnt")
     if nnt:
@@ -99,13 +84,7 @@ def process_document(cur: Any, doc: Any, dry_run: Any) -> Any:
     if not pub_id:
         return False
 
-    # Rattacher le source_document
-    cur.execute(
-        "UPDATE source_publications SET publication_id = %s WHERE id = %s",
-        (pub_id, doc["id"]),
-    )
-
-    # Recalcul complet des métadonnées depuis toutes les sources
+    link_source_publication_to_publication(cur, doc["id"], pub_id)
     refresh_from_sources(cur, pub_id)
 
     return True
@@ -114,9 +93,9 @@ def process_document(cur: Any, doc: Any, dry_run: Any) -> Any:
 def run(dry_run: Any = False) -> Any:
     conn = get_connection()
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = conn.cursor()
 
-        docs = get_orphan_source_publications(cur)
+        docs = fetch_orphan_in_perimeter_source_publications(cur)
         logger.info("%d source_publications in-perimeter sans publication", len(docs))
 
         if not docs:

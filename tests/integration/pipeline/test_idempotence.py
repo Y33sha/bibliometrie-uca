@@ -910,12 +910,12 @@ def _run_create_persons(db):
     from application.pipeline.create.create_persons_from_source_authorships import (
         get_all_unlinked_authorships,
         load_linked_authorships_by_pub,
-        load_name_form_map,
         step0_hal_accounts,
         step1_cross_source,
         step2_orcid,
         step3_name_forms,
     )
+    from infrastructure.db.queries.persons_create import fetch_name_form_map
 
     all_authorships = get_all_unlinked_authorships(db)
     linked_ids = set()
@@ -924,7 +924,7 @@ def _run_create_persons(db):
     linked_index = load_linked_authorships_by_pub(db)
     step1_cross_source(db, all_authorships, linked_ids, linked_index, dry_run=False)
     step2_orcid(db, all_authorships, linked_ids, dry_run=False)
-    name_form_map = load_name_form_map(db)
+    name_form_map = fetch_name_form_map(db)
     step3_name_forms(db, all_authorships, linked_ids, name_form_map, dry_run=False)
 
     return len(linked_ids)
