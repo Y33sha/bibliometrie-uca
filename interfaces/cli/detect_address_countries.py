@@ -107,7 +107,7 @@ def main():
         # Afficher les formes non reconnues les plus fréquentes
         from collections import Counter
 
-        unknown = Counter()
+        unknown: Counter[str] = Counter()
         for _addr_id, raw_text in rows:
             last_seg = extract_last_segment(raw_text)
             if last_seg and last_seg not in country_forms:

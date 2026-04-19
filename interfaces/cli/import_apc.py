@@ -35,7 +35,7 @@ def parse_year(s: str) -> int | None:
     return y if 1990 <= y <= 2100 else None
 
 
-def clean(s: str) -> str | None:
+def clean(s: str | None) -> str | None:
     """Strip et retourne None si vide."""
     s = (s or "").strip()
     return s if s else None
@@ -44,9 +44,9 @@ def clean(s: str) -> str | None:
 def import_main_file(cur):
     """Importe le fichier principal APC."""
     fname = None
-    for f in os.listdir(DATA_DIR):
-        if f.startswith("APC") and f.endswith(".csv"):
-            fname = f
+    for name in os.listdir(DATA_DIR):
+        if name.startswith("APC") and name.endswith(".csv"):
+            fname = name
             break
     if not fname:
         print("Fichier principal APC introuvable")

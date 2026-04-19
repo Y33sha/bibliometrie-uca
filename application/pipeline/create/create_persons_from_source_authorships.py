@@ -556,7 +556,7 @@ def run(dry_run=False):
         conn.close()
         return
 
-    linked_ids = set()  # (source, authorship_id)
+    linked_ids: set[tuple[str, int]] = set()  # (source, authorship_id)
 
     # ── Étape 0 : Comptes HAL ──
     logger.info("\n--- Étape 0 : comptes HAL ---")

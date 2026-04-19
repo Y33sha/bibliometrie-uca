@@ -70,11 +70,11 @@ dupliqué entre agrégats.
   + checks basiques (trailing whitespace, EOF, YAML/TOML, merge conflicts)
   + lint-imports (contrats DDD) + pytest unitaires (tests/unit/).
   Config dans `.pre-commit-config.yaml`.
-- [x] Mypy ajouté au hook + à la CI. Baseline à **zéro erreur** (config
-  permissive — `check_untyped_defs = false`). Prochaine étape : activer
-  `check_untyped_defs` globalement, puis `disallow_untyped_defs` par
-  module à mesure que les fonctions sont annotées.
-- Couverture `pytest --cov` en CI avec seuil progressif (partir de
+- [x] Mypy ajouté au hook + à la CI. `check_untyped_defs = true` activé
+  (le corps des fonctions non annotées est vérifié). Prochaine étape :
+  activer `disallow_untyped_defs` par module à mesure que les fonctions
+  sont annotées.
+- [ ] Couverture `pytest --cov` en CI avec seuil progressif (partir de
   la couverture actuelle, ne pas régresser)
 
 ### 2.2 Organisation des tests
@@ -105,42 +105,43 @@ de migration depuis un schéma Python. Alembic est le standard Python
 pour ça. Évaluer migration coût/bénéfice.
 
 ### 2.5 Code hygiene
-- **Complexité cyclomatique** : seuil actuel à 20 (ruff C901), faire
+- [ ] **Complexité cyclomatique** : seuil actuel à 20 (ruff C901), faire
   descendre progressivement à 15 puis 10 en cassant les fonctions trop
   denses (typiquement les routers de facettes et `refresh_from_sources`)
-- **Mypy** : baseline zéro erreur en mode permissif. Durcir par étapes
-  (activer `check_untyped_defs`, puis `disallow_untyped_defs` par module).
-- **Dédoublonnage** : audit complet du code dupliqué (`radon` ou manuel)
+- [ ] **Mypy** : `check_untyped_defs = true` activé. Prochaine étape :
+  activer `disallow_untyped_defs` par module via `[[tool.mypy.overrides]]`,
+  en commençant par les couches propres (domain, puis application).
+- [ ] **Dédoublonnage** : audit complet du code dupliqué (`radon` ou manuel)
   — notamment le SQL qui pouvait être factorisé depuis la fusion des
   tables sources, mais qui ne l'a pas été
-- **Magic values** : systématiser les enums pour les constantes métier,
+- [ ] **Magic values** : systématiser les enums pour les constantes métier,
   les settings pour les valeurs de configuration
 
 ### 2.6 Documentation et DX
-- **README** : permettre à une nouvelle personne (ou toi-dans-2-ans)
+- [ ] **README** : permettre à une nouvelle personne (ou toi-dans-2-ans)
   de monter un env de dev en 15 minutes, depuis zéro
-- **CONTRIBUTING.md** (ou équivalent) : "comment ajouter une nouvelle
+- [ ] **CONTRIBUTING.md** (ou équivalent) : "comment ajouter une nouvelle
   source de données", "comment ajouter une phase au pipeline",
   "comment ajouter un endpoint"
-- **Schéma d'architecture versionné** dans `docs/` : diagramme des
+- [ ] **Schéma d'architecture versionné** dans `docs/` : diagramme des
   couches, liste des agrégats et de leurs repositories, flux du pipeline
-- **Descriptions OpenAPI** : Pydantic permet de les générer gratuitement
+- [ ] **Descriptions OpenAPI** : Pydantic permet de les générer gratuitement
   depuis les modèles — à compléter endpoint par endpoint
 
 ### 2.7 Frontend
-- Audit de la séparation stores vs composants (est-ce que la logique
+- [ ] Audit de la séparation stores vs composants (est-ce que la logique
   métier se fait dans les composants ou dans des stores dédiés ?)
-- Centralisation des appels API dans un client dédié (`interfaces/frontend/src/lib/api/`)
-- **Types TypeScript générés depuis OpenAPI** plutôt que réécrits
+- [ ] Centralisation des appels API dans un client dédié (`interfaces/frontend/src/lib/api/`)
+- [ ] **Types TypeScript générés depuis OpenAPI** plutôt que réécrits
   manuellement (évite la dérive silencieuse backend/front)
 
 ### 2.8 Observabilité et robustesse production
-- **Alerting sur échec pipeline** (email ou webhook)
-- **Checks automatiques post-pipeline** : comptages, orphelins,
+- [ ] **Alerting sur échec pipeline** (email ou webhook)
+- [ ] **Checks automatiques post-pipeline** : comptages, orphelins,
   anomalies (type tests de caractérisation sur les données produites)
-- Dashboard métriques (temps de réponse, pool DB, taux d'erreur) —
+- [ ] Dashboard métriques (temps de réponse, pool DB, taux d'erreur) —
   partiellement en place, à consolider
-- Structured logs (JSON) prêts pour agrégateur externe (Loki / ELK
+- [ ] Structured logs (JSON) prêts pour agrégateur externe (Loki / ELK
   selon ce qu'installera la DSI)
 
 ### 2.9 Audits transversaux périodiques
