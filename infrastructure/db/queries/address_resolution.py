@@ -132,3 +132,37 @@ def upsert_detected_structure(cur: Any, addr_id: int, structure_id: int, form_id
 def mark_address_resolved(cur: Any, addr_id: int) -> None:
     """Marque une adresse comme résolue (`resolved_at = now()`)."""
     cur.execute("UPDATE addresses SET resolved_at = now() WHERE id = %s", (addr_id,))
+
+
+class PgAddressResolutionQueries:
+    """Adapter PostgreSQL pour `application.ports.address_resolution.AddressResolutionQueries`."""
+
+    def load_name_forms(self, cur: Any) -> list[dict[str, Any]]:
+        return load_name_forms(cur)
+
+    def reset_auto_detected(self, cur: Any) -> int:
+        return reset_auto_detected(cur)
+
+    def reset_all_resolved_at(self, cur: Any) -> None:
+        reset_all_resolved_at(cur)
+
+    def fetch_addresses_to_resolve(self, cur: Any, *, incremental: bool) -> list[tuple[int, str]]:
+        return fetch_addresses_to_resolve(cur, incremental=incremental)
+
+    def delete_obsolete_detections(
+        self, cur: Any, addr_id: int, kept_structure_ids: list[int]
+    ) -> int:
+        return delete_obsolete_detections(cur, addr_id, kept_structure_ids)
+
+    def unflag_obsolete_detections(
+        self, cur: Any, addr_id: int, kept_structure_ids: list[int]
+    ) -> None:
+        unflag_obsolete_detections(cur, addr_id, kept_structure_ids)
+
+    def upsert_detected_structure(
+        self, cur: Any, addr_id: int, structure_id: int, form_id: int
+    ) -> None:
+        upsert_detected_structure(cur, addr_id, structure_id, form_id)
+
+    def mark_address_resolved(self, cur: Any, addr_id: int) -> None:
+        mark_address_resolved(cur, addr_id)

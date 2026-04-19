@@ -219,7 +219,7 @@ def phase_affiliations(**kw: Any) -> Any:
     sources = kw.get("sources", set(ALL_SOURCES_SET))
     source_args = ",".join(sorted(sources))
     mode = kw.get("mode", "full")
-    run_python("processing/resolve_addresses.py", "--mode", mode)
+    _run_resolve_addresses(mode)
     run_python("processing/populate_affiliations.py", "--sources", source_args, "--mode", mode)
 
 
@@ -265,6 +265,25 @@ def phase_countries(**kw: Any) -> Any:
     run_python("scripts/detect_address_countries.py", "--direct", "--apply")
     run_python("scripts/suggest_address_countries.py")
     _run_refresh_publication_countries()
+
+
+def _run_resolve_addresses(mode: str) -> None:
+    from application.pipeline.addresses.resolve_addresses import run_resolution
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.address_resolution import PgAddressResolutionQueries
+    from infrastructure.perimeter import get_persons_structure_ids
+
+    log.info("▶ resolve_addresses --mode %s", mode)
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        perimeter_ids = get_persons_structure_ids(cur)
+        run_resolution(cur, conn, PgAddressResolutionQueries(), perimeter_ids, log, mode=mode)
+    finally:
+        conn.close()
+    log.info("✓ resolve_addresses terminé en %.1fs", time.time() - t0)
 
 
 def _run_refresh_publication_countries() -> None:
