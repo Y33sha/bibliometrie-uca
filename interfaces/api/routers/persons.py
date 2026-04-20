@@ -38,11 +38,25 @@ from interfaces.api.models import (
     AddIdentifier,
     AssignOrphanAuthorship,
     BatchAssignOrphanAuthorships,
+    DepartmentCount,
     DetachAuthorships,
     DetachNameForm,
     MergePersons,
+    NameFormAuthorshipsResponse,
+    OrphanAuthorshipsResponse,
+    OrphanCountResponse,
+    PersonAddressesResponse,
+    PersonDetail,
+    PersonDirectoryResponse,
+    PersonListResponse,
+    PersonProfileResponse,
+    PersonSearchResult,
+    PersonsFacetsResponse,
+    PersonsStatsResponse,
+    PersonThesesResponse,
     ReassignIdentifier,
     RejectPerson,
+    RoleCount,
     UpdateIdentifierStatus,
     UpdatePersonName,
 )
@@ -54,7 +68,7 @@ logger = logging.getLogger(__name__)
 # ── Endpoints GET principaux (queries dans persons_queries) ──────
 
 
-@router.get("/api/persons/directory")
+@router.get("/api/persons/directory", response_model=PersonDirectoryResponse)
 async def persons_directory(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
@@ -81,7 +95,7 @@ async def persons_directory(
         )
 
 
-@router.get("/api/persons/search")
+@router.get("/api/persons/search", response_model=list[PersonSearchResult])
 async def search_persons(
     q: str = Query("", min_length=2), limit: int = Query(10, ge=1, le=30)
 ) -> Any:
@@ -90,7 +104,7 @@ async def search_persons(
         return persons_queries.search_persons(cur, q=q, limit=limit)
 
 
-@router.get("/api/persons")
+@router.get("/api/persons", response_model=PersonListResponse)
 async def list_persons(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
@@ -119,7 +133,7 @@ async def list_persons(
         )
 
 
-@router.get("/api/persons/facets")
+@router.get("/api/persons/facets", response_model=PersonsFacetsResponse)
 async def persons_facets(
     department: str = Query(""),
     role: str = Query(""),
@@ -141,28 +155,28 @@ async def persons_facets(
         return persons_queries.persons_facets(cur, filters=filters)
 
 
-@router.get("/api/persons/departments")
+@router.get("/api/persons/departments", response_model=list[DepartmentCount])
 async def list_departments() -> Any:
     """Liste des départements distincts."""
     with get_cursor() as (cur, _conn):
         return persons_queries.list_departments(cur)
 
 
-@router.get("/api/persons/roles")
+@router.get("/api/persons/roles", response_model=list[RoleCount])
 async def list_roles() -> Any:
     """Liste des rôles distincts."""
     with get_cursor() as (cur, _conn):
         return persons_queries.list_roles(cur)
 
 
-@router.get("/api/persons/stats")
+@router.get("/api/persons/stats", response_model=PersonsStatsResponse)
 async def persons_stats() -> Any:
     """Statistiques sur les personnes et l'alignement."""
     with get_cursor() as (cur, _conn):
         return persons_queries.persons_stats(cur)
 
 
-@router.get("/api/persons/{person_id}")
+@router.get("/api/persons/{person_id}", response_model=PersonDetail)
 async def get_person(person_id: int) -> Any:
     """Détail d'une personne avec auteurs liés."""
     with get_cursor() as (cur, _conn):
@@ -172,7 +186,7 @@ async def get_person(person_id: int) -> Any:
         return person
 
 
-@router.get("/api/persons/{person_id}/profile")
+@router.get("/api/persons/{person_id}/profile", response_model=PersonProfileResponse)
 async def person_profile(person_id: int) -> Any:
     """Profil public complet d'une personne."""
     with get_cursor() as (cur, _conn):
@@ -182,14 +196,14 @@ async def person_profile(person_id: int) -> Any:
         return profile
 
 
-@router.get("/api/persons/{person_id}/theses")
+@router.get("/api/persons/{person_id}/theses", response_model=PersonThesesResponse)
 async def person_theses(person_id: int) -> Any:
     """Thèses liées à cette personne avec un rôle non-auteur."""
     with get_cursor() as (cur, _conn):
         return persons_queries.person_theses(cur, person_id)
 
 
-@router.get("/api/persons/{person_id}/addresses")
+@router.get("/api/persons/{person_id}/addresses", response_model=PersonAddressesResponse)
 async def person_addresses(
     person_id: int,
     page: int = Query(1, ge=1),
@@ -329,14 +343,14 @@ async def merge_persons(person_id: int, body: MergePersons) -> Any:
 # ── Authorships orphelines ───────────────────────────────────────
 
 
-@router.get("/api/admin/orphan-authorships/count")
+@router.get("/api/admin/orphan-authorships/count", response_model=OrphanCountResponse)
 async def orphan_authorships_count() -> Any:
     """Nombre d'authorships UCA sans person_id."""
     with get_cursor() as (cur, _conn):
         return admin_queries.orphan_authorships_count(cur)
 
 
-@router.get("/api/admin/orphan-authorships")
+@router.get("/api/admin/orphan-authorships", response_model=OrphanAuthorshipsResponse)
 async def list_orphan_authorships(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
@@ -393,7 +407,10 @@ async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships) ->
 # ── Formes de noms / détachement authorships ─────────────────────
 
 
-@router.get("/api/persons/{person_id}/name-form-authorships")
+@router.get(
+    "/api/persons/{person_id}/name-form-authorships",
+    response_model=NameFormAuthorshipsResponse,
+)
 async def name_form_authorships(person_id: int, name_form: str = Query(...)) -> Any:
     """Authorships sources + autres personnes partageant une forme de nom."""
     with get_cursor() as (cur, _conn):

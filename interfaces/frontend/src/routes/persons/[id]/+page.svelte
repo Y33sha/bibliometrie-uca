@@ -13,70 +13,21 @@
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
 	import TabNav from '$lib/components/TabNav.svelte';
+	import type { components } from '$lib/api/schema';
 
 	const personId = $derived($page.params.id);
 	let canGoBack = $state(false);
 
 	// --- Types ---
-	interface Person {
-		id: number;
-		last_name: string;
-		first_name: string;
-		role_title: string | null;
-		department_name: string | null;
-		start_date: string | null;
-		end_date: string | null;
-	}
-	interface Identifier {
-		id_type: string;
-		id_value: string;
-		source: string;
-		status: 'pending' | 'confirmed' | 'rejected';
-	}
-	interface Author {
-		id: number;
-		source: string;
-		full_name: string;
-		orcid: string | null;
-		idhal: string | null;
-		hal_person_id: number | null;
-		openalex_id: string | null;
-		uca_pub_count: number;
-	}
-	interface ProfileResponse {
-		person: Person;
-		identifiers: Identifier[];
-		authors: Author[];
-		theses_count: number;
-	}
-	interface Address {
-		id: number;
-		raw_text: string;
-		structures: { id: number; acronym: string | null; name: string }[] | null;
-	}
-	interface ThesisEntry {
-		id: number;
-		title: string;
-		pub_year: number | null;
-		doi: string | null;
-		author_name: string;
-		author_person_id: number | null;
-		structure_ids: number[];
-	}
-	interface ThesisSection {
-		role: string;
-		label: string;
-		theses: ThesisEntry[];
-	}
-	interface ThesisStructInfo {
-		acronym: string | null;
-		name: string;
-	}
-	interface ThesesResponse {
-		sections: ThesisSection[];
-		total: number;
-		structures: Record<string, ThesisStructInfo>;
-	}
+	type Person = components['schemas']['PersonProfileCore'];
+	type Identifier = components['schemas']['PersonIdentifierOut'];
+	type Author = components['schemas']['PersonProfileAuthor'];
+	type ProfileResponse = components['schemas']['PersonProfileResponse'];
+	type Address = components['schemas']['PersonAddressOut'];
+	type ThesisEntry = components['schemas']['PersonThesis'];
+	type ThesisSection = components['schemas']['PersonThesesSection'];
+	type ThesisStructInfo = components['schemas']['StructureRef'];
+	type ThesesResponse = components['schemas']['PersonThesesResponse'];
 	interface Publication {
 		id: number;
 		title: string;

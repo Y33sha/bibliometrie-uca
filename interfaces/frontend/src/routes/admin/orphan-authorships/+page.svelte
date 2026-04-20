@@ -6,14 +6,11 @@
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import { titleCase } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import type { components } from '$lib/api/schema';
 
-	interface PersonResult {
-		id: number;
-		last_name: string;
-		first_name: string;
-		has_rh: boolean;
-		department_name: string | null;
-	}
+	type PersonResult = components['schemas']['PersonSearchResult'];
+	type OrphanAuthorship = components['schemas']['OrphanAuthorshipOut'];
+	type OrphansResponse = components['schemas']['OrphanAuthorshipsResponse'];
 
 	async function searchPersons(q: string): Promise<PersonResult[]> {
 		return api<PersonResult[]>(`/api/persons/search?q=${encodeURIComponent(q)}`);
@@ -23,19 +20,19 @@
 	let currentPage = $state(1);
 	let totalPages = $state(1);
 	let total = $state(0);
-	let orphans: any[] = $state([]);
+	let orphans: OrphanAuthorship[] = $state([]);
 	// Une seule ligne peut avoir son panneau "attribuer" ouvert à la fois.
 	let activeAssignIdx: number | null = $state(null);
 	const assignSearch = useDebouncedSearch<PersonResult>({ search: searchPersons });
 	let selectedIds = $state(new Set<string>());  // "source-authorship_id"
 	const batchSearch = useDebouncedSearch<PersonResult>({ search: searchPersons });
 	const allSelected = $derived(orphans.length > 0 && orphans.every(o => selectedIds.has(`${o.source}-${o.authorship_id}`)));
-	let createModal: { lastName: string; firstName: string; items: any[] } | null = $state(null);
+	let createModal: { lastName: string; firstName: string; items: OrphanAuthorship[] } | null = $state(null);
 
 	async function loadOrphans() {
 		const params = new URLSearchParams({ page: String(currentPage), per_page: '50' });
 		if (search.trim()) params.set('search', search.trim());
-		const data = await api<{ total: number; page: number; pages: number; authorships: any[] }>(
+		const data = await api<OrphansResponse>(
 			'/api/admin/orphan-authorships?' + params, { key: 'orphans' }
 		);
 		orphans = data.authorships;
