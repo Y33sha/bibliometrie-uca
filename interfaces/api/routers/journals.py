@@ -9,13 +9,13 @@ from application.journals import merge_journals
 from application.journals import update_journal as _update_journal
 from infrastructure.repositories import journal_repository
 from interfaces.api.deps import get_cursor
-from interfaces.api.models import JournalUpdate, MergeRequest
+from interfaces.api.models import JournalListResponse, JournalUpdate, MergeRequest
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/api/journals")
+@router.get("/api/journals", response_model=JournalListResponse)
 async def list_journals(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),

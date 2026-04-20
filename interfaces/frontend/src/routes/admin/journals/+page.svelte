@@ -3,27 +3,10 @@
 	import { api, ApiError, journals as journalsApi } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import type { components } from '$lib/api/schema';
 
-	interface Journal {
-		id: number;
-		title: string;
-		issn: string | null;
-		eissn: string | null;
-		issnl: string | null;
-		publisher_id: number | null;
-		pub_name: string | null;
-		openalex_id: string | null;
-		is_in_doaj: boolean;
-		is_predatory: boolean;
-		apc_amount: number | null;
-		apc_currency: string | null;
-		oa_model: string | null;
-		journal_type: string | null;
-		is_academic: boolean | null;
-		doi_prefix: string | null;
-		notes: string | null;
-		pub_count: number;
-	}
+	type Journal = components['schemas']['JournalOut'];
+	type JournalListResponse = components['schemas']['JournalListResponse'];
 
 	let journals: Journal[] = $state([]);
 	let total = $state(0);
@@ -38,7 +21,7 @@
 	let mergeTargetId: number | null = $state(null);
 	const mergeSearch = useDebouncedSearch<Journal>({
 		search: async (q) => {
-			const data = await api<{ journals: Journal[] }>(
+			const data = await api<JournalListResponse>(
 				`/api/journals?search=${encodeURIComponent(q)}&per_page=10`,
 			);
 			return data.journals;
@@ -49,7 +32,7 @@
 	async function load() {
 		const params = new URLSearchParams({ page: String(page), per_page: String(perPage), sort });
 		if (search) params.set('search', search);
-		const data = await api<any>(`/api/journals?${params}`);
+		const data = await api<JournalListResponse>(`/api/journals?${params}`);
 		journals = data.journals;
 		total = data.total;
 		pages = data.pages;
