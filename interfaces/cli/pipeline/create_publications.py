@@ -3,7 +3,7 @@
 import argparse
 import os
 
-from application.pipeline.create.create_publications import run
+from application.pipeline.publications.create_publications import run
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.publications_create import PgPublicationsCreateQueries
 from infrastructure.log import setup_logger

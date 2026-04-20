@@ -3,7 +3,7 @@
 import argparse
 import os
 
-from application.pipeline.harvest.harvest_hal_identifiers import run_harvest
+from application.pipeline.normalize.harvest_hal_identifiers import run_harvest
 from infrastructure.api_limits import HAL_DELAY
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.harvest import PgHarvestQueries

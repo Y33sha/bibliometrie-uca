@@ -952,7 +952,7 @@ def _run_create_persons(db):
     """Exécute create_persons sur le curseur de test."""
     import logging
 
-    from application.pipeline.create.create_persons_from_source_authorships import (
+    from application.pipeline.persons.create_persons_from_source_authorships import (
         get_all_unlinked_authorships,
         load_linked_authorships_by_pub,
         step0_hal_accounts,
@@ -1073,7 +1073,7 @@ def _run_build_authorships(db):
     import logging
 
     plain_cur = db.connection.cursor()
-    from application.pipeline.build.build_authorships import build
+    from application.pipeline.authorships.build_authorships import build
     from infrastructure.db.queries.authorships_build import PgAuthorshipsBuildQueries
 
     build(plain_cur, PgAuthorshipsBuildQueries(), logging.getLogger("test"))
@@ -1219,7 +1219,7 @@ def _run_populate_affiliations(db):
     """Exécute populate_affiliations sur le curseur de test."""
     import logging
 
-    from application.pipeline.build.populate_affiliations import (
+    from application.pipeline.affiliations.populate_affiliations import (
         _step_address_source,
         step3d_theses,
     )

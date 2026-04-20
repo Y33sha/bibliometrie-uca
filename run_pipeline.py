@@ -261,7 +261,7 @@ def phase_countries(**kw: Any) -> Any:
 
 
 def _run_create_publications() -> None:
-    from application.pipeline.create.create_publications import run
+    from application.pipeline.publications.create_publications import run
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.publications_create import PgPublicationsCreateQueries
     from infrastructure.repositories import publication_repository
@@ -284,7 +284,7 @@ def _run_create_publications() -> None:
 
 
 def _run_create_persons() -> None:
-    from application.pipeline.create.create_persons_from_source_authorships import run
+    from application.pipeline.persons.create_persons_from_source_authorships import run
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
     from infrastructure.repositories import person_repository
@@ -307,7 +307,7 @@ def _run_create_persons() -> None:
 
 
 def _run_build_authorships(sources: Any = None) -> None:
-    from application.pipeline.build.build_authorships import build
+    from application.pipeline.authorships.build_authorships import build
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.authorships_build import PgAuthorshipsBuildQueries
 
@@ -325,7 +325,7 @@ def _run_build_authorships(sources: Any = None) -> None:
 
 
 def _run_populate_affiliations(*, sources: set, mode: str) -> None:
-    from application.pipeline.build.populate_affiliations import run_populate
+    from application.pipeline.affiliations.populate_affiliations import run_populate
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.affiliations import PgAffiliationsQueries
     from infrastructure.perimeter import (
@@ -357,7 +357,7 @@ def _run_populate_affiliations(*, sources: set, mode: str) -> None:
 
 
 def _run_populate_person_name_forms() -> None:
-    from application.pipeline.build.populate_person_name_forms import populate
+    from application.pipeline.persons.populate_person_name_forms import populate
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.name_forms import PgNameFormsQueries
 
@@ -373,7 +373,7 @@ def _run_populate_person_name_forms() -> None:
 
 
 def _run_merge_pubs_by_nnt() -> None:
-    from application.pipeline.merge.merge_pubs_by_nnt import run_merge
+    from application.pipeline.publications.merge_pubs_by_nnt import run_merge
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.merge import PgMergeQueries
     from infrastructure.repositories import publication_repository
@@ -393,7 +393,7 @@ def _run_merge_pubs_by_nnt() -> None:
 
 
 def _run_merge_pubs_by_hal_id() -> None:
-    from application.pipeline.merge.merge_pubs_by_hal_id import run_merge
+    from application.pipeline.publications.merge_pubs_by_hal_id import run_merge
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.merge import PgMergeQueries
     from infrastructure.repositories import publication_repository
@@ -505,7 +505,7 @@ def _run_normalize_theses() -> None:
 
 
 def _run_harvest_hal_identifiers() -> None:
-    from application.pipeline.harvest.harvest_hal_identifiers import run_harvest
+    from application.pipeline.normalize.harvest_hal_identifiers import run_harvest
     from infrastructure.api_limits import HAL_DELAY
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.harvest import PgHarvestQueries
@@ -575,7 +575,7 @@ def _run_enrich_journal_apc() -> None:
 
 
 def _run_resolve_addresses(mode: str) -> None:
-    from application.pipeline.addresses.resolve_addresses import run_resolution
+    from application.pipeline.affiliations.resolve_addresses import run_resolution
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.address_resolution import PgAddressResolutionQueries
     from infrastructure.perimeter import get_persons_structure_ids
