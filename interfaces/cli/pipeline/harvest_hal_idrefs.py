@@ -8,6 +8,7 @@ from infrastructure.api_limits import HAL_DELAY
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.harvest import PgHarvestQueries
 from infrastructure.log import setup_logger
+from infrastructure.repositories import person_repository
 
 logger = setup_logger("harvest_hal_idrefs", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -21,7 +22,13 @@ def main() -> None:
     try:
         cur = conn.cursor()
         run_harvest(
-            cur, conn, PgHarvestQueries(), logger, dry_run=args.dry_run, rate_delay=HAL_DELAY
+            cur,
+            conn,
+            PgHarvestQueries(),
+            logger,
+            person_repo=person_repository(cur),
+            dry_run=args.dry_run,
+            rate_delay=HAL_DELAY,
         )
     finally:
         conn.close()
