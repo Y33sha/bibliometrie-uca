@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
 	import { replaceState } from '$app/navigation';
-	import { api } from '$lib/api';
+	import { addresses as addressesApi, api } from '$lib/api';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
@@ -125,11 +125,7 @@
 		const addr = addresses.find(a => a.id === addrId);
 		if (!addr || !code) return;
 		const newList = [...new Set([...(addr.countries || []), code])].sort();
-		await fetch(base + '/api/addresses/' + addrId + '/country', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ countries: newList })
-		});
+		await addressesApi.setCountry(addrId, { countries: newList });
 		if (selectedHasCountry.includes('no') || suggestMode) {
 			loadAddresses();
 		} else {
@@ -142,11 +138,7 @@
 		const addr = addresses.find(a => a.id === addrId);
 		if (!addr) return;
 		const newList = (addr.countries || []).filter(c => c !== code);
-		await fetch(base + '/api/addresses/' + addrId + '/country', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ countries: newList.length ? newList : null })
-		});
+		await addressesApi.setCountry(addrId, { countries: newList.length ? newList : null });
 		addr.countries = newList.length ? newList : null;
 		addresses = [...addresses];
 	}
@@ -200,12 +192,7 @@
 		} else {
 			body.address_ids = [...selectedIds];
 		}
-		const resp = await fetch(base + '/api/addresses/batch-country', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(body)
-		});
-		const data = await resp.json();
+		const data = await addressesApi.batchSetCountry(body);
 		batchResult = `${data.updated} adresse${data.updated > 1 ? 's' : ''} mise${data.updated > 1 ? 's' : ''} à jour`;
 		selectedIds = new Set();
 		if (applyToAll) selectedSugCountry = [];

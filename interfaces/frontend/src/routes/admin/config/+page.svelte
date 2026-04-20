@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { base } from "$app/paths";
-  import { api } from "$lib/api";
+  import { api, ApiError, config as configApi, perimeters as perimetersApi } from "$lib/api";
 
   interface ConfigItem {
     key: string;
@@ -62,44 +62,44 @@
                    structures: [...p.structures] };
   }
 
+  function extractDetail(e: unknown): string {
+    if (e instanceof ApiError) {
+      const d = (e.detail as { detail?: string })?.detail;
+      return d || `Erreur ${e.status}`;
+    }
+    return (e as Error)?.message || 'Erreur';
+  }
+
   async function savePerimeter() {
     if (!perimModal) return;
     try {
       if (perimModal.mode === 'create') {
-        const res = await fetch(base + '/api/perimeters', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: perimModal.code, name: perimModal.name,
-                                 description: perimModal.description }),
+        const { id } = await perimetersApi.create({
+          code: perimModal.code,
+          name: perimModal.name,
+          description: perimModal.description,
         });
-        if (!res.ok) throw new Error((await res.json()).detail || 'Erreur');
-        const { id } = await res.json();
-        // Ajouter les structures
         for (const sid of perimModal.structure_ids) {
-          await fetch(base + `/api/perimeters/${id}/structures`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ structure_id: sid }),
-          });
+          await perimetersApi.addStructure(id, sid);
         }
       } else {
-        const res = await fetch(base + `/api/perimeters/${perimModal.id}`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: perimModal.name, description: perimModal.description,
-                                 structure_ids: perimModal.structure_ids }),
+        await perimetersApi.update(perimModal.id!, {
+          name: perimModal.name,
+          description: perimModal.description,
+          structure_ids: perimModal.structure_ids,
         });
-        if (!res.ok) throw new Error((await res.json()).detail || 'Erreur');
       }
       perimModal = null;
       await load();
-    } catch (e: any) { alert(e.message); }
+    } catch (e) { alert(extractDetail(e)); }
   }
 
   async function deletePerimeter(id: number) {
     if (!confirm('Supprimer ce périmètre ?')) return;
     try {
-      const res = await fetch(base + `/api/perimeters/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error((await res.json()).detail || 'Erreur');
+      await perimetersApi.remove(id);
       await load();
-    } catch (e: any) { alert(e.message); }
+    } catch (e) { alert(extractDetail(e)); }
   }
 
   async function perimSearchStructures() {
@@ -164,12 +164,11 @@
       } catch {
         parsed = editValue;
       }
-      const res = await fetch(base + "/api/config/" + key, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ value: parsed }) });
-      if (!res.ok) throw new Error(await res.text());
+      await configApi.setValue(key, parsed);
       editingKey = null;
       await load();
-    } catch (e: any) {
-      alert("Erreur : " + e.message);
+    } catch (e) {
+      alert("Erreur : " + extractDetail(e));
     }
     saving = false;
   }
@@ -313,12 +312,10 @@
           value={item.value}
           onchange={async (e) => {
             const target = e.target as HTMLSelectElement;
-            const res = await fetch(base + "/api/config/" + role.key, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ value: target.value }),
-            });
-            if (res.ok) await load();
+            try {
+              await configApi.setValue(role.key, target.value);
+              await load();
+            } catch {}
           }}
         >
           {#each perimeters as p (p.id)}

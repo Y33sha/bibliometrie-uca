@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { base } from "$app/paths";
-  import { api } from "$lib/api";
+  import {
+    api,
+    ApiError,
+    nameForms,
+    structures as structuresApi,
+  } from "$lib/api";
 
   /* ── Types ── */
 
@@ -211,14 +215,10 @@
   async function pickStructure(otherId: number) {
     const parentId = pickerDirection === "parent" ? otherId : pickerStructId!;
     const childId = pickerDirection === "parent" ? pickerStructId! : otherId;
-    await fetch(base + "/api/structure-relations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        parent_id: parentId,
-        child_id: childId,
-        relation_type: pickerRelType,
-      }),
+    await structuresApi.createRelation({
+      parent_id: parentId,
+      child_id: childId,
+      relation_type: pickerRelType,
     });
     relationPickerOpen = false;
     await selectStructure(pickerStructId!);
@@ -227,9 +227,7 @@
   }
 
   async function deleteRelation(relId: number) {
-    await fetch(base + "/api/structure-relations/" + relId, {
-      method: "DELETE",
-    });
+    await structuresApi.deleteRelation(relId);
     if (selectedId) await selectStructure(selectedId);
     loadList();
     refreshCache();
@@ -242,20 +240,21 @@
     if (!text) return;
     const ctx = newFormCtx.length ? newFormCtx : null;
 
-    const resp = await fetch(base + "/api/name-forms", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      await nameForms.create({
         structure_id: structId,
         form_text: text,
         is_word_boundary: addFormWordBoundary || text.length <= 6,
         is_excluding: addFormExcluding,
         requires_context_of: ctx,
-      }),
-    });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: `Erreur ${resp.status}` }));
-      alert(err.detail || `Erreur ${resp.status}`);
+      });
+    } catch (e) {
+      if (e instanceof ApiError) {
+        const detail = (e.detail as { detail?: string })?.detail;
+        alert(detail || `Erreur ${e.status}`);
+        return;
+      }
+      alert((e as Error).message);
       return;
     }
     addFormText = "";
@@ -267,21 +266,17 @@
   }
 
   async function toggleExcluding(formId: number, excluding: boolean) {
-    await fetch(base + "/api/name-forms/" + formId, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ is_excluding: excluding }),
-    });
+    await nameForms.update(formId, { is_excluding: excluding });
     if (selectedId) await selectStructure(selectedId);
   }
 
   async function deleteForm(formId: number) {
     if (!confirm("Supprimer cette forme ?")) return;
-    const res = await fetch(base + "/api/name-forms/" + formId, {
-      method: "DELETE",
-    });
-    if (!res.ok) {
-      alert("Erreur suppression: " + (await res.text()));
+    try {
+      await nameForms.remove(formId);
+    } catch (e) {
+      const msg = e instanceof ApiError ? JSON.stringify(e.detail) : (e as Error).message;
+      alert("Erreur suppression: " + msg);
       return;
     }
     if (selectedId) await selectStructure(selectedId);
@@ -295,14 +290,10 @@
   async function saveEditForm() {
     if (!editFormModal) return;
     const text = editFormModal.form_text.trim();
-    await fetch(base + "/api/name-forms/" + editFormModal.id, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        form_text: text,
-        is_word_boundary: editFormModal.is_word_boundary || text.length <= 6,
-        is_excluding: editFormModal.is_excluding,
-      }),
+    await nameForms.update(editFormModal.id, {
+      form_text: text,
+      is_word_boundary: editFormModal.is_word_boundary || text.length <= 6,
+      is_excluding: editFormModal.is_excluding,
     });
     editFormModal = null;
     if (selectedId) await selectStructure(selectedId);
@@ -332,12 +323,8 @@
     if (ctxPickerFormId === null) {
       newFormCtx = [...ctxPickerCurrentCtx];
     } else {
-      await fetch(base + "/api/name-forms/" + ctxPickerFormId, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          requires_context_of: ctxPickerCurrentCtx,
-        }),
+      await nameForms.update(ctxPickerFormId, {
+        requires_context_of: ctxPickerCurrentCtx,
       });
       if (selectedId) await selectStructure(selectedId);
     }
@@ -349,11 +336,7 @@
     if (ctxPickerFormId === null) {
       newFormCtx = [];
     } else {
-      await fetch(base + "/api/name-forms/" + ctxPickerFormId, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requires_context_of: [] }),
-      });
+      await nameForms.update(ctxPickerFormId, { requires_context_of: [] });
       if (selectedId) await selectStructure(selectedId);
     }
   }
@@ -361,11 +344,7 @@
   async function removeCtx(formId: number, itemToRemove: number | string) {
     const currentCtx = formsData[formId] || [];
     const newCtx = currentCtx.filter((x) => x !== itemToRemove);
-    await fetch(base + "/api/name-forms/" + formId, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requires_context_of: newCtx }),
-    });
+    await nameForms.update(formId, { requires_context_of: newCtx });
     if (selectedId) await selectStructure(selectedId);
   }
 
@@ -381,7 +360,7 @@
 
   async function deleteStructure(id: number) {
     if (!confirm("Supprimer cette structure et toutes ses formes/relations ?")) return;
-    await fetch(base + "/api/structures/" + id, { method: "DELETE" });
+    await structuresApi.remove(id);
     selectedId = null;
     detail = null;
     loadList();
@@ -451,19 +430,15 @@
     data.api_ids = buildApiIds();
 
     try {
-      const res = await fetch(base + "/api/structures/" + selectedId, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error(await res.text());
+      await structuresApi.update(selectedId, data);
       createModalOpen = false;
       editMode = false;
       await selectStructure(selectedId);
       loadList();
       refreshCache();
     } catch (e: any) {
-      alert("Erreur: " + e.message);
+      const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
+      alert("Erreur: " + msg);
     }
   }
 
@@ -499,19 +474,14 @@
     }
 
     try {
-      const res = await fetch(base + "/api/structures", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const created = await res.json();
+      const created = await structuresApi.create(data) as { id: number };
       createModalOpen = false;
       await loadList();
       refreshCache();
       selectStructure(created.id);
     } catch (e: any) {
-      alert("Erreur: " + e.message);
+      const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
+      alert("Erreur: " + msg);
     }
   }
 
