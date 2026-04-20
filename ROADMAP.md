@@ -23,10 +23,20 @@ source (CrossRef, ArXiv, PubMed, DataCite) = un subclass +
 côté normalizer.
 
 ### 1.3 Module `facets`
-- [ ] La logique de facettes dynamiques est dupliquée entre plusieurs
-  routers (publications, persons, laboratoires). À factoriser dans un
-  module dédié — typiquement un specification pattern ou un query
-  builder spécialisé.
+Audit fait : la duplication réelle inter-entités est marginale (~30-50
+lignes, essentiellement un helper `_where_sql`). Les 3 routers
+(publications, persons, laboratories) ont chacun une logique "skip
+filter" déjà factorisée **en interne** — publications via classe
+`_PublicationFacetsBuilder` (bien découpée en méthodes `_facet_*`),
+persons et laboratories via fonctions locales `base_filters(skip=...)`
+/ `facet_base(skip=...)`. Le SQL de chaque facette est intrinsèquement
+spécifique à son entité (année vs département vs RH) et ne se
+factorise pas sans perdre en lisibilité.
+
+Pas de mini-framework maison : si on introduit un query builder
+dynamique (SQLAlchemy Core, cf. "À explorer"), il remplacera
+naturellement cette surface — autant éviter d'inventer une
+abstraction intermédiaire à jeter ensuite.
 
 ### 1.4 Entités riches dans le domaine
 - [ ] Aujourd'hui le domaine contient des value objects (DOI, ORCID, …) et
