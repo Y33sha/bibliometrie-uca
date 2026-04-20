@@ -286,7 +286,7 @@ def _run_create_publications() -> None:
 def _run_create_persons() -> None:
     from application.pipeline.persons.create_persons_from_source_authorships import run
     from infrastructure.db.connection import get_connection
-    from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
+    from infrastructure.db.queries.persons.create import PgPersonsCreateQueries
     from infrastructure.repositories import person_repository
 
     log.info("▶ create_persons_from_source_authorships")

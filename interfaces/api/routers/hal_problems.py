@@ -3,10 +3,6 @@
 Regroupe les endpoints d'audit HAL : comptes dupliqués, dépôts en double
 par DOI ou métadonnées, publications manquant dans la collection d'un
 labo, conflits d'affiliations inter-sources.
-
-Les queries SQL sont dans `infrastructure/db/queries/persons_admin.py`
-(là où elles ont été initialement écrites — migration éventuelle vers
-un module dédié `hal_problems.py` quand la surface grossit).
 """
 
 import logging
@@ -14,7 +10,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from infrastructure.db.queries import persons_admin as admin_queries
+from infrastructure.db.queries import hal_problems as hal_queries
+from infrastructure.db.queries.persons import admin as persons_admin_queries
 from interfaces.api.deps import get_cursor
 
 router = APIRouter()
@@ -28,7 +25,7 @@ async def hal_duplicate_accounts(
 ) -> Any:
     """Personnes liées à 2+ comptes HAL distincts."""
     with get_cursor() as (cur, _conn):
-        return admin_queries.hal_duplicate_accounts(cur, page=page, per_page=per_page)
+        return persons_admin_queries.hal_duplicate_accounts(cur, page=page, per_page=per_page)
 
 
 @router.get("/api/hal-problems/duplicate-pubs-doi")
@@ -38,7 +35,7 @@ async def hal_duplicate_pubs_by_doi(
 ) -> Any:
     """Dépôts HAL avec DOI identique rattachés à la même publication."""
     with get_cursor() as (cur, _conn):
-        return admin_queries.hal_duplicate_pubs_by_doi(cur, page=page, per_page=per_page)
+        return hal_queries.hal_duplicate_pubs_by_doi(cur, page=page, per_page=per_page)
 
 
 @router.get("/api/hal-problems/duplicate-pubs-meta")
@@ -48,7 +45,7 @@ async def hal_duplicate_pubs_by_metadata(
 ) -> Any:
     """Doublons possibles : dépôts HAL avec métadonnées identiques."""
     with get_cursor() as (cur, _conn):
-        return admin_queries.hal_duplicate_pubs_by_metadata(cur, page=page, per_page=per_page)
+        return hal_queries.hal_duplicate_pubs_by_metadata(cur, page=page, per_page=per_page)
 
 
 @router.get("/api/hal-problems/missing-collections")
@@ -59,7 +56,7 @@ async def hal_missing_collections(
 ) -> Any:
     """Publications affiliées à un labo dans HAL mais absentes de sa collection."""
     with get_cursor() as (cur, _conn):
-        result = admin_queries.hal_missing_collections(
+        result = hal_queries.hal_missing_collections(
             cur, lab_id=lab_id, page=page, per_page=per_page
         )
         if result.get("error") == "no_collection":
@@ -71,7 +68,7 @@ async def hal_missing_collections(
 async def hal_missing_collections_labs() -> Any:
     """Liste des labos avec collection HAL."""
     with get_cursor() as (cur, _conn):
-        return admin_queries.hal_missing_collections_labs(cur)
+        return hal_queries.hal_missing_collections_labs(cur)
 
 
 @router.get("/api/hal-problems/affiliation-conflicts")
@@ -81,4 +78,4 @@ async def hal_affiliation_conflicts(
 ) -> Any:
     """Publications affiliées UCA dans HAL mais pas dans OA/WoS."""
     with get_cursor() as (cur, _conn):
-        return admin_queries.hal_affiliation_conflicts(cur, page=page, per_page=per_page)
+        return hal_queries.hal_affiliation_conflicts(cur, page=page, per_page=per_page)
