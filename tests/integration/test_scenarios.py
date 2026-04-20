@@ -6,6 +6,12 @@ import pytest
 from application.persons import merge_person
 from application.publications import find_or_create, refresh_from_sources
 from domain.errors import ConflictError
+from infrastructure.repositories import person_repository
+
+
+@pytest.fixture
+def person_repo(db):
+    return person_repository(db)
 
 # ── Helpers ──
 
@@ -201,7 +207,7 @@ class TestSourcesEnum:
 
 
 class TestMergePersons:
-    def test_merge_transfers_name_forms(self, db):
+    def test_merge_transfers_name_forms(self, db, person_repo):
         target = create_person(db, "Dupont", "Jean")
         source = create_person(db, "Dupont", "J.")
 
@@ -220,7 +226,7 @@ class TestMergePersons:
             ([source],),
         )
 
-        merge_person(db, target, source)
+        merge_person(db, target, source, repo=person_repo)
 
         # Source supprimée
         db.execute("SELECT 1 FROM persons WHERE id = %s", (source,))
@@ -232,25 +238,25 @@ class TestMergePersons:
         assert target in row["person_ids"]
         assert source not in row["person_ids"]
 
-    def test_merge_blocked_if_both_rh(self, db):
+    def test_merge_blocked_if_both_rh(self, db, person_repo):
         target = create_person(db, "Dupont", "Jean")
         source = create_person(db, "Dupont", "J.")
         create_persons_rh(db, target, matricule="MAT-001")
         create_persons_rh(db, source, matricule="MAT-002")
 
         with pytest.raises(ConflictError, match="REFUS de fusion"):
-            merge_person(db, target, source)
+            merge_person(db, target, source, repo=person_repo)
 
         # Les deux personnes existent toujours
         db.execute("SELECT 1 FROM persons WHERE id = %s", (source,))
         assert db.fetchone() is not None
 
-    def test_merge_allowed_if_only_target_has_rh(self, db):
+    def test_merge_allowed_if_only_target_has_rh(self, db, person_repo):
         target = create_person(db, "Dupont", "Jean")
         source = create_person(db, "Dupont", "J.")
         create_persons_rh(db, target, matricule="MAT-001")
 
-        merge_person(db, target, source)
+        merge_person(db, target, source, repo=person_repo)
 
         db.execute("SELECT 1 FROM persons WHERE id = %s", (source,))
         assert db.fetchone() is None

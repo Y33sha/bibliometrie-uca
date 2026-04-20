@@ -284,13 +284,20 @@ def _run_create_persons() -> None:
     from application.pipeline.create.create_persons_from_source_authorships import run
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
+    from infrastructure.repositories import person_repository
 
     log.info("▶ create_persons_from_source_authorships")
     t0 = time.time()
     conn = get_connection()
     try:
         cur = conn.cursor()
-        run(cur, conn, PgPersonsCreateQueries(), log)
+        run(
+            cur,
+            conn,
+            PgPersonsCreateQueries(),
+            log,
+            person_repo=person_repository(cur),
+        )
     finally:
         conn.close()
     log.info("✓ create_persons_from_source_authorships terminé en %.1fs", time.time() - t0)
