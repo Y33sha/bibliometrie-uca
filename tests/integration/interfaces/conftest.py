@@ -16,6 +16,7 @@ session par le conftest racine intégration (schema.sql frais).
 import os
 from contextlib import contextmanager
 
+import psycopg2
 import pytest
 from psycopg2.extras import RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool
@@ -35,12 +36,23 @@ _test_pool = ThreadedConnectionPool(minconn=1, maxconn=3, **_test_db_args)
 @contextmanager
 def _test_get_cursor():
     conn = _test_pool.getconn()
+    # Ping : si la connexion pool est stale (timeout server pendant la phase
+    # de collecte pytest), la jeter et en demander une neuve.
+    try:
+        with conn.cursor() as _ping:
+            _ping.execute("SELECT 1")
+    except psycopg2.Error:
+        _test_pool.putconn(conn, close=True)
+        conn = _test_pool.getconn()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             yield cur, conn
         conn.commit()
     except Exception:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except psycopg2.InterfaceError:
+            pass  # connexion déjà fermée côté serveur, rien à rollback
         raise
     finally:
         _test_pool.putconn(conn)
@@ -71,7 +83,7 @@ for router_module in [
         "admin_person_duplicates",
         "admin_feedback",
         "admin_pipeline",
-        "pub_stats",
+        "stats",
         "config",
         "publishers",
         "journals",

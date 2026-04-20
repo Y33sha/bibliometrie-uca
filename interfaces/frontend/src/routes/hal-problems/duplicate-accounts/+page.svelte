@@ -7,26 +7,9 @@
   import { titleCase } from "$lib/utils";
   import Pagination from "$lib/components/Pagination.svelte";
 
-  interface HalAccount {
-    hal_person_id: number;
-    full_name: string;
-    idhal: string | null;
-    orcid: string | null;
-    pub_count: number;
-  }
-  interface PersonRow {
-    person_id: number;
-    last_name: string;
-    first_name: string;
-    has_rh: boolean;
-    hal_accounts: HalAccount[];
-  }
-  interface Response {
-    total: number;
-    page: number;
-    pages: number;
-    persons: PersonRow[];
-  }
+  import type { components } from "$lib/api/schema";
+  type PersonRow = components["schemas"]["HalDuplicateAccountPerson"];
+  type Response = components["schemas"]["HalDuplicateAccountsResponse"];
 
   let persons: PersonRow[] = $state([]);
   let total = $state(0);

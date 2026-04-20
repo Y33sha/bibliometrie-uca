@@ -7,18 +7,9 @@
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
 
-	interface Suggestion { code: string; count: number; }
-	interface Address {
-		id: number;
-		raw_text: string;
-		countries: string[] | null;
-		pub_count: number;
-		suggested_countries?: Suggestion[];
-	}
-	interface Country {
-		code: string;
-		name: string;
-	}
+	import type { components } from '$lib/api/schema';
+	type Address = components['schemas']['AddressForCountryAttribution'];
+	type Country = components['schemas']['CountryOut'];
 
 	let addresses: Address[] = $state([]);
 	let countries: Country[] = $state([]);

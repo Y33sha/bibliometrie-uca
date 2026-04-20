@@ -8,7 +8,7 @@ Synthèse de l'audit DSI (avril 2026) — ROI décroissant (impact / effort) :
 2. [x] **§2.10** — Découper les 4 fichiers backend monolithiques (`queries/publications.py` 1140 LOC, `queries/persons.py` 711, `repositories/person_repository.py` 665, `queries/stats.py` 630). Effort moyen, impact maintenabilité + testabilité. *Clôturé le 2026-04-20.*
 3. [~] **§2.1 +§2.2** — Remonter `fail_under` de 49 → 60+ en ciblant `infrastructure/db/queries/*`. Effort moyen, réduit le risque de régression en prod. *Partiel au 2026-04-20 : phases A→C faites, couverture 50.27 % → 56.34 %, `fail_under = 55`. Pour franchir 60 il faudrait élargir aux routers API (phase D non faite).*
 4. [x] **§2.7.4** — Découper les 3 routes Svelte > 1000 LOC. *Fait 2026-04-20 : `publications/[id]` 1132 → 206, `admin/persons` 1263 → 642, `admin/structures` 1572 → 797. 14 composants extraits, 0 erreur svelte-check.*
-5. [ ] **§2.7.3** — Généraliser les types OpenAPI aux ~29 endpoints restants (~88 interfaces locales à éliminer). Effort moyen, impact cohérence front/back.
+5. [x] **§2.7.3** — Généraliser les types OpenAPI aux endpoints restants. *Clôturé le 2026-04-20 : 14 routers couverts (stats, publications, laboratories, addresses, hal_problems, admin_person_duplicates, admin_pipeline, admin_feedback, perimeters, publishers, auth, config, authorships, admin_duplicates) ; ~63 endpoints supplémentaires annotés `response_model` ; ~62 interfaces TS locales remplacées par les types générés.*
 6. [ ] **§2.6** — `CONTRIBUTING.md` + descriptions OpenAPI. Effort faible, impact onboarding DSI.
 7. [ ] **§2.7.5** — Amorcer des tests frontend (Vitest composables + Playwright parcours critiques). Nouveau.
 8. [ ] **§2.4** — Convention `NNN_down.sql` pour rollbacks d'urgence. Effort très faible, résilience prod.
@@ -143,8 +143,7 @@ en CI et pre-commit, 0 erreur. Toutes les fonctions annotées (souvent
   corrigés en chemin (`PgAddressLinker` fallback RealDictCursor,
   `authorships_stats` scope `sa.source`, `harvest.fill_source_person_*_if_null`
   colonne `updated_at` inexistante). Pour dépasser 60, finir phase D
-  sur `persons`, `publishers`, `structures`, `admin_feedback` (non
-  planifié à court terme).
+  sur `persons`, `publishers`, `structures`, `admin_feedback`.
 
 ### 2.2 Organisation des tests
 `tests/unit/` + `tests/integration/` (sous-dossiers `domain/`,
@@ -232,26 +231,54 @@ API + logique métier.
   `src/lib/api/schema.ts` committé comme source de vérité ;
   interface `Journal` locale du composant admin/journals remplacée
   par le type généré.
-- [~] **Généraliser aux autres endpoints**. Audit 2026-04-20 : 115
-  endpoints au total, 130 interfaces TS locales (plus que les ~88
-  estimées). Progression par router :
+- [x] **Généraliser aux autres endpoints**. Audit 2026-04-20 : 115
+  endpoints au total, 130 interfaces TS locales. Couverture finale
+  (clôturé le 2026-04-20) :
   - [x] `/api/journals` (4 endpoints — pilote d'origine).
-  - [x] `/api/persons` (26 endpoints, 2026-04-20) : 14 GET + 12
-    mutations annotés `response_model` ; ~30 modèles Pydantic Out ajoutés ;
-    interfaces locales remplacées dans admin/persons, persons/,
-    persons/[id], admin/orphan-authorships ; wrappers api/persons.ts,
-    api/authorships.ts, api/orphanAuthorships.ts typés via schema.ts.
-  - [x] `/api/structures` (11 endpoints, 2026-04-20) : GET list/detail,
-    CRUD structure, POST/DELETE relation, CRUD name-form annotés ;
-    modèles StructureListItem, StructureOut, RelatedStructureOut,
-    NameFormOut, StructureDetailResponse,
-    StructureRelationCreateResponse, DeletedResponse ; admin/structures
-    + admin/config migrés ; wrappers api/structures.ts +
-    api/nameForms.ts typés ; bugfix latent `struct_type → type` sur
-    les enfants de /api/structures/{id}.
-  - [ ] Routers restants : addresses, publishers, publications,
-    laboratories, perimeters, admin_*, pub_stats, authorships, config.
-    ~74 endpoints + ~90 interfaces locales.
+  - [x] `/api/persons` (26 endpoints) : 14 GET + 12 mutations annotés ;
+    ~30 modèles Pydantic Out ajoutés ; interfaces locales remplacées
+    dans admin/persons, persons/, persons/[id], admin/orphan-authorships.
+  - [x] `/api/structures` (11 endpoints) : CRUD structure / relations /
+    name-forms ; bugfix latent `struct_type → type` sur les enfants
+    de /api/structures/{id}.
+  - [x] `/api/stats` (7 endpoints) : router renommé `pub_stats → stats`
+    en chemin ; modèles OaCounts, *StatsRow, *StatsResponse, StatsSummary,
+    StatsFacetsResponse + 4 facets génériques (YearFacet, OaFacet,
+    LabFacet, ApcFacet).
+  - [x] `/api/publications` (6 endpoints) : PublicationListItem +
+    PublicationDetailResponse + facets génériques (IntValueFacet,
+    StrValueFacet, LabeledIntFacet, TextStrFacet) ; types.ts de
+    publications/[id] migré vers schema.ts (8 interfaces aliasées).
+  - [x] `/api/laboratories` (5 endpoints) : Lab*ListItem / Detail /
+    PersonsResponse / AddressesResponse / DashboardResponse.
+  - [x] `/api/addresses/*` + `/api/countries` + `/api/admin/address-stats`
+    (12 endpoints) : Address*, CountryOut, BatchCountryResponse, etc.
+  - [x] `/api/hal-problems/*` (6 endpoints) : HalPubDetail (commun aux
+    doublons), HalCollectionLab, HalAffiliationConflict*,
+    HalDuplicateAccount*.
+  - [x] `/api/admin/person-duplicates/*` (5 endpoints) : PersonDedupDetail
+    partagé /next + /conflicts/next ; TotalCountResponse générique.
+  - [x] `/api/admin/pipeline/*` (4 endpoints) : PipelineStatus,
+    PipelineLogsResponse, PipelineReportItem/Content.
+  - [x] `/api/admin/feedback/*` (3/4 endpoints — /rerun reste en SSE
+    StreamingResponse) : FeedbackStats, FeedbackLabDetected,
+    FeedbackMatchedForm, FeedbackAddressItem.
+  - [x] `/api/perimeters/*` (6 endpoints) : PerimeterOut, génériques
+    CreatedIdResponse, StatusResponse.
+  - [x] `/api/publishers/*` (4 endpoints) : PublisherListItem,
+    PublisherBasic, MergeResponse réutilisé.
+  - [x] `/api/auth/*` (3 endpoints) : AuthCheckResponse, OkResponse.
+  - [x] `/api/config/*` (3 endpoints) : ConfigItem, HalCollectionsResponse.
+  - [x] `/api/authorships/*` (3 endpoints) : AuthorshipsStats / Facets /
+    ListResponse.
+  - [x] `/api/admin/duplicates/*` (3 endpoints, doublons publications) :
+    PubDedupDetail, PubDuplicateNextResponse, PubMergeResponse.
+
+  En chemin : 4 fixes annexes commités séparément (rename pub_stats,
+  Windows path bugs dans test_log + test_pipeline_metrics, Unicode
+  dump_openapi.py, pool de connexions stale dans le conftest
+  intégration). Réutilisation systématique des modèles déjà présents
+  (OkResponse, MergeResponse, DeletedResponse) plutôt que duplications.
 
 #### 2.7.4 Découpe des routes monolithiques — fait 2026-04-20
 Audit initial : 3 routes dépassaient 1000 LOC et mêlaient UI + état +

@@ -10,13 +10,19 @@ from application.publications import merge_publications
 from infrastructure.db.queries import duplicates as dup_queries
 from infrastructure.repositories import publication_repository
 from interfaces.api.deps import get_cursor
-from interfaces.api.models import MarkDistinctPublications, MergePublications
+from interfaces.api.models import (
+    MarkDistinctPublications,
+    MergePublications,
+    OkResponse,
+    PubDuplicateNextResponse,
+    PubMergeResponse,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/api/admin/duplicates/next")
+@router.get("/api/admin/duplicates/next", response_model=PubDuplicateNextResponse)
 async def next_duplicate_candidate(
     min_title_len: int = Query(30, ge=10),
     offset: int = Query(0, ge=0),
@@ -26,7 +32,7 @@ async def next_duplicate_candidate(
         return dup_queries.next_pub_duplicate(cur, min_title_len=min_title_len, offset=offset)
 
 
-@router.post("/api/admin/duplicates/merge")
+@router.post("/api/admin/duplicates/merge", response_model=PubMergeResponse)
 async def merge_duplicate_publications(body: MergePublications) -> Any:
     """Fusionne source_id dans target_id."""
     if body.target_id == body.source_id:
@@ -52,7 +58,7 @@ async def merge_duplicate_publications(body: MergePublications) -> Any:
         return {"ok": True, "target_id": body.target_id, "source_id": body.source_id}
 
 
-@router.post("/api/admin/duplicates/mark-distinct")
+@router.post("/api/admin/duplicates/mark-distinct", response_model=OkResponse)
 async def mark_publications_distinct(body: MarkDistinctPublications) -> Any:
     """Marque deux publications comme distinctes (non-doublon)."""
     if body.pub_id_a == body.pub_id_b:

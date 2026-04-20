@@ -6,31 +6,10 @@
 
   type StructureListItem = components["schemas"]["StructureListItem"];
 
-  interface ConfigItem {
-    key: string;
-    value: any;
-    description: string | null;
-    updated_at: string;
-  }
-  interface PerimeterStructure {
-    id: number;
-    name: string;
-    acronym: string | null;
-    code: string;
-  }
-  interface Perimeter {
-    id: number;
-    code: string;
-    name: string;
-    description: string | null;
-    structure_ids: number[];
-    structures: PerimeterStructure[];
-    structure_count: number;
-  }
-  interface HalCollections {
-    collections: Record<string, string>;
-    count: number;
-  }
+  type ConfigItem = components["schemas"]["ConfigItem"];
+  type PerimeterStructure = components["schemas"]["PerimeterStructureItem"];
+  type Perimeter = components["schemas"]["PerimeterOut"];
+  type HalCollections = components["schemas"]["HalCollectionsResponse"];
 
   let configs: ConfigItem[] = $state([]);
   let perimeters: Perimeter[] = $state([]);

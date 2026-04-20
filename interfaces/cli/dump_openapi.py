@@ -22,7 +22,7 @@ def main() -> None:
 
     openapi = app.openapi()
     out_path.write_text(json.dumps(openapi, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"OpenAPI schema → {out_path}")
+    print(f"OpenAPI schema -> {out_path}")
 
 
 if __name__ == "__main__":

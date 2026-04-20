@@ -6,50 +6,14 @@
 	import { onMount } from 'svelte';
 	import { sanitizeTitle } from '$lib/utils';
 
-	interface Identifier {
-		id: number;
-		id_type: string;
-		id_value: string;
-		source: string;
-		status: string;
-	}
-	interface Publication {
-		id: number;
-		title: string;
-		pub_year: number | null;
-		doi: string | null;
-		doc_type: string | null;
-		sources: string[];
-	}
-	interface Lab {
-		id: number;
-		acronym: string | null;
-		name: string;
-	}
-	interface PersonDetail {
-		id: number;
-		last_name: string;
-		first_name: string;
-		last_name_normalized: string;
-		first_name_normalized: string;
-		has_rh: boolean;
-		role_title: string | null;
-		department_name: string | null;
-		identifiers: Identifier[];
-		publications: Publication[];
-		pub_count: number;
-		labs: Lab[];
-	}
-	interface ConflictPub {
-		id: number;
-		title: string;
-		pub_year: number | null;
-		doc_type: string | null;
-		position: number;
-	}
-	interface NextResponse {
+	import type { components } from '$lib/api/schema';
+	type PersonDetail = components['schemas']['PersonDedupDetail'];
+	type ConflictPub = components['schemas']['PersonConflictPub'];
+	// Réponse partagée pour /next et /conflicts/next : conflict_pubs présent
+	// uniquement sur l'endpoint conflict (PersonConflictPair vs PersonDuplicatePair).
+	type NextResponse = {
 		pair: { person_a: PersonDetail; person_b: PersonDetail; conflict_pubs?: ConflictPub[] } | null;
-	}
+	};
 
 	type Mode = 'name' | 'conflict';
 

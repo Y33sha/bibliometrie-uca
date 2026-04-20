@@ -19,12 +19,13 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from interfaces.api.deps import get_cursor
+from interfaces.api.models import FeedbackAddressesResponse, FeedbackStats
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/api/admin/feedback/stats")
+@router.get("/api/admin/feedback/stats", response_model=FeedbackStats)
 async def feedback_stats(structure_id: int = Query(...)) -> Any:
     """Statistiques de qualité de la détection pour une structure donnée."""
     with get_cursor() as (cur, conn):
@@ -62,7 +63,7 @@ async def feedback_stats(structure_id: int = Query(...)) -> Any:
         }
 
 
-@router.get("/api/admin/feedback/false-negatives")
+@router.get("/api/admin/feedback/false-negatives", response_model=FeedbackAddressesResponse)
 async def feedback_false_negatives(
     structure_id: int = Query(...),
     page: int = Query(1, ge=1),
@@ -128,7 +129,7 @@ async def feedback_false_negatives(
         }
 
 
-@router.get("/api/admin/feedback/false-positives")
+@router.get("/api/admin/feedback/false-positives", response_model=FeedbackAddressesResponse)
 async def feedback_false_positives(
     structure_id: int = Query(...),
     page: int = Query(1, ge=1),
