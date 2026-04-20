@@ -2226,6 +2226,13 @@ export interface components {
              */
             first_name: string;
         };
+        /** DepartmentCount */
+        DepartmentCount: {
+            /** Department Name */
+            department_name: string;
+            /** Count */
+            count: number;
+        };
         /** DetachAuthorships */
         DetachAuthorships: {
             /** Authorships */
@@ -2248,6 +2255,13 @@ export interface components {
              * @default true
              */
             excluded: boolean;
+        };
+        /** FacetValueCount */
+        FacetValueCount: {
+            /** Value */
+            value: string;
+            /** Count */
+            count: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2339,6 +2353,18 @@ export interface components {
             /** Notes */
             notes?: string | null;
         };
+        /**
+         * LinkedAuthorOut
+         * @description Auteur source (HAL/OpenAlex/WoS) lié à une personne.
+         */
+        LinkedAuthorOut: {
+            /** Id */
+            id: number;
+            /** Source */
+            source: string;
+            /** Full Name */
+            full_name: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Username */
@@ -2377,6 +2403,28 @@ export interface components {
             /** Source Id */
             source_id: number;
         };
+        /** NameFormAuthorshipRef */
+        NameFormAuthorshipRef: {
+            /** Source */
+            source: string;
+            /** Authorship Id */
+            authorship_id: number;
+            /** Pub Id */
+            pub_id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doi */
+            doi: string | null;
+        };
+        /** NameFormAuthorshipsResponse */
+        NameFormAuthorshipsResponse: {
+            /** Authorships */
+            authorships: components["schemas"]["NameFormAuthorshipRef"][];
+            /** Other Persons */
+            other_persons: components["schemas"]["OtherPersonOut"][];
+        };
         /** NameFormCreate */
         NameFormCreate: {
             /** Structure Id */
@@ -2396,6 +2444,18 @@ export interface components {
             /** Requires Context Of */
             requires_context_of?: number[] | null;
         };
+        /**
+         * NameFormSummaryOut
+         * @description Forme de nom observée pour une personne (liste admin).
+         */
+        NameFormSummaryOut: {
+            /** Name Form */
+            name_form: string;
+            /** Sources */
+            sources: string[];
+            /** Ambiguous */
+            ambiguous: boolean;
+        };
         /** NameFormUpdate */
         NameFormUpdate: {
             /** Form Text */
@@ -2406,6 +2466,50 @@ export interface components {
             is_excluding?: boolean | null;
             /** Requires Context Of */
             requires_context_of?: number[] | null;
+        };
+        /** OrphanAuthorshipOut */
+        OrphanAuthorshipOut: {
+            /** Source */
+            source: string;
+            /** Authorship Id */
+            authorship_id: number;
+            /** Full Name */
+            full_name: string;
+            /** Publication Id */
+            publication_id: number;
+            /** Pub Title */
+            pub_title: string;
+            /** Pub Year */
+            pub_year: number | null;
+        };
+        /** OrphanAuthorshipsResponse */
+        OrphanAuthorshipsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Pages */
+            pages: number;
+            /** Authorships */
+            authorships: components["schemas"]["OrphanAuthorshipOut"][];
+        };
+        /** OrphanCountResponse */
+        OrphanCountResponse: {
+            /** Total */
+            total: number;
+        };
+        /** OtherPersonOut */
+        OtherPersonOut: {
+            /** Id */
+            id: number;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Department Name */
+            department_name: string | null;
+            /** Has Rh */
+            has_rh: boolean;
         };
         /** PerimeterCreate */
         PerimeterCreate: {
@@ -2424,6 +2528,298 @@ export interface components {
             description?: string | null;
             /** Structure Ids */
             structure_ids?: number[] | null;
+        };
+        /** PersonAddressOut */
+        PersonAddressOut: {
+            /** Id */
+            id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Structures */
+            structures: components["schemas"]["PersonAddressStruct"][] | null;
+        };
+        /** PersonAddressStruct */
+        PersonAddressStruct: {
+            /** Id */
+            id: number;
+            /** Acronym */
+            acronym: string | null;
+            /** Name */
+            name: string;
+        };
+        /** PersonAddressesResponse */
+        PersonAddressesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Pages */
+            pages: number;
+            /** Addresses */
+            addresses: components["schemas"]["PersonAddressOut"][];
+        };
+        /**
+         * PersonDetail
+         * @description Réponse de `/api/persons/{id}` (détail + auteurs liés).
+         */
+        PersonDetail: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name Normalized */
+            last_name_normalized: string;
+            /** First Name Normalized */
+            first_name_normalized: string;
+            /** Role Title */
+            role_title: string | null;
+            /** Department Name */
+            department_name: string | null;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Linked Authors */
+            linked_authors: components["schemas"]["LinkedAuthorOut"][] | null;
+            /** Identifiers */
+            identifiers: components["schemas"]["PersonIdentifierOut"][] | null;
+        };
+        /**
+         * PersonDirectoryEntry
+         * @description Ligne de l'annuaire public `/api/persons/directory`.
+         */
+        PersonDirectoryEntry: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Role Title */
+            role_title: string | null;
+            /** Department Name */
+            department_name: string | null;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Orcids */
+            orcids: components["schemas"]["ValueConfirmedOut"][] | null;
+            /** Idhals */
+            idhals: components["schemas"]["ValueConfirmedOut"][] | null;
+        };
+        /** PersonDirectoryResponse */
+        PersonDirectoryResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Persons */
+            persons: components["schemas"]["PersonDirectoryEntry"][];
+        };
+        /**
+         * PersonIdentifierOut
+         * @description Identifiant (ORCID, idHAL, idRef) attaché à une personne.
+         */
+        PersonIdentifierOut: {
+            /** Id */
+            id: number;
+            /** Id Type */
+            id_type: string;
+            /** Id Value */
+            id_value: string;
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "confirmed" | "rejected";
+        };
+        /** PersonListResponse */
+        PersonListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Persons */
+            persons: components["schemas"]["PersonOut"][];
+        };
+        /**
+         * PersonOut
+         * @description Ligne de `/api/persons` (liste admin).
+         */
+        PersonOut: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name Normalized */
+            last_name_normalized: string;
+            /** First Name Normalized */
+            first_name_normalized: string;
+            /** Role Title */
+            role_title: string | null;
+            /** Department Name */
+            department_name: string | null;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Rejected */
+            rejected: boolean;
+            /** Pub Count */
+            pub_count: number;
+            /** Uca Pub Count */
+            uca_pub_count: number;
+            /** Identifiers */
+            identifiers: components["schemas"]["PersonIdentifierOut"][] | null;
+            /** Name Forms */
+            name_forms: components["schemas"]["NameFormSummaryOut"][] | null;
+        };
+        /**
+         * PersonProfileAuthor
+         * @description Auteur source dans `/api/persons/{id}/profile` (vue publique enrichie).
+         */
+        PersonProfileAuthor: {
+            /** Id */
+            id: number;
+            /** Source */
+            source: string;
+            /** Full Name */
+            full_name: string;
+            /** Orcid */
+            orcid: string | null;
+            /** Idhal */
+            idhal: string | null;
+            /** Hal Person Id */
+            hal_person_id?: number | null;
+            /** Openalex Id */
+            openalex_id: string | null;
+            /** Uca Pub Count */
+            uca_pub_count: number;
+        };
+        /**
+         * PersonProfileCore
+         * @description Bloc `person` de `/api/persons/{id}/profile`.
+         */
+        PersonProfileCore: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Role Title */
+            role_title: string | null;
+            /** Department Name */
+            department_name: string | null;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+        };
+        /** PersonProfileResponse */
+        PersonProfileResponse: {
+            person: components["schemas"]["PersonProfileCore"];
+            /** Identifiers */
+            identifiers: components["schemas"]["PersonIdentifierOut"][];
+            /** Authors */
+            authors: components["schemas"]["PersonProfileAuthor"][];
+            /** Theses Count */
+            theses_count: number;
+        };
+        /**
+         * PersonSearchResult
+         * @description Résultat d'autocomplete `/api/persons/search`.
+         */
+        PersonSearchResult: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Department Name */
+            department_name: string | null;
+            /** Has Rh */
+            has_rh: boolean;
+        };
+        /** PersonThesesResponse */
+        PersonThesesResponse: {
+            /** Sections */
+            sections: components["schemas"]["PersonThesesSection"][];
+            /** Total */
+            total: number;
+            /** Structures */
+            structures: {
+                [key: string]: components["schemas"]["StructureRef"];
+            };
+        };
+        /** PersonThesesSection */
+        PersonThesesSection: {
+            /** Role */
+            role: string;
+            /** Label */
+            label: string;
+            /** Theses */
+            theses: components["schemas"]["PersonThesis"][];
+        };
+        /** PersonThesis */
+        PersonThesis: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doi */
+            doi: string | null;
+            /** Author Name */
+            author_name: string | null;
+            /** Author Person Id */
+            author_person_id: number | null;
+            /** Structure Ids */
+            structure_ids: number[];
+        };
+        /**
+         * PersonsFacetsResponse
+         * @description Réponse de `/api/persons/facets`.
+         */
+        PersonsFacetsResponse: {
+            /** Departments */
+            departments: components["schemas"]["FacetValueCount"][];
+            /** Roles */
+            roles: components["schemas"]["FacetValueCount"][];
+            orcid: components["schemas"]["YesNoCount"];
+            idhal: components["schemas"]["YesNoCount"];
+            rh: components["schemas"]["YesNoCount"];
+            linked: components["schemas"]["YesNoCount"];
+        };
+        /** PersonsStatsResponse */
+        PersonsStatsResponse: {
+            /** Total Persons */
+            total_persons: number;
+            /** Linked Persons */
+            linked_persons: number;
+            /** Linked Authors */
+            linked_authors: number;
+            /** Departments */
+            departments: number;
         };
         /** PublisherUpdate */
         PublisherUpdate: {
@@ -2467,6 +2863,13 @@ export interface components {
             /** Is Confirmed */
             is_confirmed: boolean | null;
         };
+        /** RoleCount */
+        RoleCount: {
+            /** Role Title */
+            role_title: string;
+            /** Count */
+            count: number;
+        };
         /** SetCountry */
         SetCountry: {
             /** Countries */
@@ -2499,6 +2902,16 @@ export interface components {
             api_ids?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * StructureRef
+         * @description Référence courte à une structure (acronyme + nom).
+         */
+        StructureRef: {
+            /** Acronym */
+            acronym: string | null;
+            /** Name */
+            name: string;
         };
         /** StructureUpdate */
         StructureUpdate: {
@@ -2549,6 +2962,23 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * ValueConfirmedOut
+         * @description Identifiant sous forme condensée (annuaire public).
+         */
+        ValueConfirmedOut: {
+            /** Value */
+            value: string;
+            /** Confirmed */
+            confirmed: boolean;
+        };
+        /** YesNoCount */
+        YesNoCount: {
+            /** Yes */
+            yes: number;
+            /** No */
+            no: number;
         };
     };
     responses: never;
@@ -4423,7 +4853,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonDirectoryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4455,7 +4885,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonSearchResult"][];
                 };
             };
             /** @description Validation Error */
@@ -4495,7 +4925,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4531,7 +4961,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonsFacetsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4560,7 +4990,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DepartmentCount"][];
                 };
             };
         };
@@ -4580,7 +5010,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["RoleCount"][];
                 };
             };
         };
@@ -4600,7 +5030,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonsStatsResponse"];
                 };
             };
         };
@@ -4622,7 +5052,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonDetail"];
                 };
             };
             /** @description Validation Error */
@@ -4653,7 +5083,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4684,7 +5114,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonThesesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4718,7 +5148,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonAddressesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5021,7 +5451,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrphanCountResponse"];
                 };
             };
         };
@@ -5045,7 +5475,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrphanAuthorshipsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5144,7 +5574,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["NameFormAuthorshipsResponse"];
                 };
             };
             /** @description Validation Error */

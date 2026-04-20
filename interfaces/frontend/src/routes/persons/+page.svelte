@@ -8,21 +8,9 @@
 	import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
 	import { useFacets } from "$lib/composables/useFacets.svelte";
 	import { useUrlFilters } from "$lib/composables/useUrlFilters.svelte";
+	import type { components } from "$lib/api/schema";
 
-	interface IdEntry {
-		value: string;
-		confirmed: boolean;
-	}
-	interface Person {
-		id: number;
-		last_name: string;
-		first_name: string;
-		role_title: string | null;
-		department_name: string | null;
-		has_rh: boolean;
-		orcids: IdEntry[] | null;
-		idhals: IdEntry[] | null;
-	}
+	type Person = components["schemas"]["PersonDirectoryEntry"];
 
 	// --- Filter state ---
 	let search = $state("");
