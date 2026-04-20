@@ -408,7 +408,9 @@ def _insert_hal_staging(cur, docs):
 def _run_normalize_hal(cur):
     """Exécute la normalisation HAL via un curseur tuple (comme le vrai script)."""
     plain_cur = cur.connection.cursor()
-    from application.pipeline.normalize.normalize_hal import process_work
+    from application.pipeline.normalize.normalize_hal import (
+        process_work,  # still uses module-level fns
+    )
 
     plain_cur.execute("""
         Select id, source_id AS halid, doi, raw_data, hal_collections
@@ -553,7 +555,13 @@ def _insert_oa_staging(cur, docs):
 
 
 def _run_normalize_oa(cur):
+    import logging
+
     from application.pipeline.normalize.normalize_openalex import process_work
+    from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
+
+    queries = PgOpenalexNormalizeQueries()
+    logger = logging.getLogger("test")
 
     cur.execute("""
         SELECT id, source_id AS openalex_id, doi, raw_data
@@ -562,7 +570,7 @@ def _run_normalize_oa(cur):
     rows = cur.fetchall()
     processed = 0
     for row in rows:
-        if process_work(cur, row):
+        if process_work(cur, queries, logger, row):
             processed += 1
     return processed
 

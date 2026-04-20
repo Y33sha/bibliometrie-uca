@@ -177,7 +177,7 @@ def phase_normalize(**kw: Any) -> Any:
     """
     sources = kw.get("sources", set(ALL_SOURCES_SET))
     if "openalex" in sources:
-        run_python("processing/normalize_openalex.py")
+        _run_normalize_openalex()
     if "hal" in sources:
         run_python("processing/normalize_hal.py")
     if "wos" in sources:
@@ -394,6 +394,19 @@ def _run_merge_pubs_by_hal_id() -> None:
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
+
+
+def _run_normalize_openalex() -> None:
+    from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
+
+    log.info("▶ normalize_openalex")
+    t0 = time.time()
+    conn = get_connection()
+    OpenalexNormalizer(conn, log, PgStagingQueries(), PgOpenalexNormalizeQueries()).run([])
+    log.info("✓ normalize_openalex terminé en %.1fs", time.time() - t0)
 
 
 def _run_normalize_scanr() -> None:
