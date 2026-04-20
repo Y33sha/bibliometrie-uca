@@ -1,25 +1,20 @@
-"""Utilitaires pour la résolution des DOI Zenodo (concept vs version)."""
+"""Résolution HTTP des DOI Zenodo (concept → version). Le test de format est
+dans `domain.zenodo`."""
 
-import re
 import time
 
 import requests
 
+from domain.zenodo import ZENODO_DOI_RE
 from infrastructure.api_limits import ZENODO_DELAY
 from infrastructure.log import setup_logger
 
 logger = setup_logger("zenodo", "processing/logs")
 
-_ZENODO_DOI_RE = re.compile(r"10\.5281/zenodo\.(\d+)", re.IGNORECASE)
 _API_BASE = "https://zenodo.org/api/records"
 _MAX_RETRIES = 3
 _INITIAL_BACKOFF = 2  # secondes
 _last_request_time = 0.0
-
-
-def is_zenodo_doi(doi: str | None) -> bool:
-    """Vérifie si un DOI est un DOI Zenodo."""
-    return bool(doi and _ZENODO_DOI_RE.search(doi))
 
 
 class ZenodoResolutionError(Exception):
@@ -37,7 +32,7 @@ def resolve_zenodo_doi(doi: str) -> str | None:
       pour que l'appelant puisse décider de ne pas marquer processed.
     - Retry avec backoff exponentiel en cas de 429 (rate limit).
     """
-    match = _ZENODO_DOI_RE.search(doi)
+    match = ZENODO_DOI_RE.search(doi)
     if not match:
         return None
 
