@@ -18,7 +18,13 @@ from application.authorships import (
     sync_person_id_from_source,
 )
 from domain.errors import NotFoundError, ValidationError
+from infrastructure.db.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import authorship_repository
+
+
+@pytest.fixture
+def perimeter_queries():
+    return PgPerimeterQueries()
 
 
 @pytest.fixture
@@ -543,18 +549,20 @@ class TestPropagateUcaForAddresses:
         _set_config(db, "perimeter_persons", "uca")
         return uca_id
 
-    def test_noop_on_empty_address_ids(self, db, repo):
+    def test_noop_on_empty_address_ids(self, db, repo, perimeter_queries):
         self._setup_uca(db)
-        propagate_uca_for_addresses(db, [], repo=repo)
+        propagate_uca_for_addresses(db, [], repo=repo, perimeter_queries=perimeter_queries)
         # Pas d'assertion négative utile : on vérifie juste qu'aucune exception
 
-    def test_noop_if_no_perimeter_configured(self, db, repo):
+    def test_noop_if_no_perimeter_configured(self, db, repo, perimeter_queries):
         """Si aucun périmètre configuré, la fonction sort sans rien faire."""
         addr_id = _create_address(db)
         # Aucun set_config perimeter_persons
-        propagate_uca_for_addresses(db, [addr_id], repo=repo)
+        propagate_uca_for_addresses(
+            db, [addr_id], repo=repo, perimeter_queries=perimeter_queries
+        )
 
-    def test_sets_in_perimeter_when_address_confirmed(self, db, repo):
+    def test_sets_in_perimeter_when_address_confirmed(self, db, repo, perimeter_queries):
         uca_id = self._setup_uca(db)
         person_id = _create_person(db)
         pub_id = _create_publication(db)
@@ -568,7 +576,9 @@ class TestPropagateUcaForAddresses:
         _link_address_structure(db, addr_id, uca_id, is_confirmed=True)
         _link_sa_address(db, sa_id, addr_id)
 
-        propagate_uca_for_addresses(db, [addr_id], repo=repo)
+        propagate_uca_for_addresses(
+            db, [addr_id], repo=repo, perimeter_queries=perimeter_queries
+        )
 
         db.execute(
             "SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = %s",
@@ -586,7 +596,7 @@ class TestPropagateUcaForAddresses:
         assert a["in_perimeter"] is True
         assert a["structure_ids"] == [uca_id]
 
-    def test_unsets_in_perimeter_when_address_rejected(self, db, repo):
+    def test_unsets_in_perimeter_when_address_rejected(self, db, repo, perimeter_queries):
         """Si l'adresse est rejetée (is_confirmed=False), la structure ne compte pas."""
         uca_id = self._setup_uca(db)
         person_id = _create_person(db)
@@ -608,7 +618,9 @@ class TestPropagateUcaForAddresses:
         _link_address_structure(db, addr_id, uca_id, is_confirmed=False)
         _link_sa_address(db, sa_id, addr_id)
 
-        propagate_uca_for_addresses(db, [addr_id], repo=repo)
+        propagate_uca_for_addresses(
+            db, [addr_id], repo=repo, perimeter_queries=perimeter_queries
+        )
 
         db.execute(
             "SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = %s",

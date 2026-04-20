@@ -14,6 +14,7 @@ et les scripts de correction. Le SQL vit dans
 from typing import Any
 
 from application.audit import emit_event
+from application.ports.perimeter import PerimeterQueries
 from domain.errors import NotFoundError, ValidationError
 from domain.ports.authorship_repository import AuthorshipRepository
 from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
@@ -155,7 +156,11 @@ def sync_person_id_from_source(
 
 
 def propagate_uca_for_addresses(
-    cur: Any, address_ids: list[int], *, repo: AuthorshipRepository
+    cur: Any,
+    address_ids: list[int],
+    *,
+    repo: AuthorshipRepository,
+    perimeter_queries: PerimeterQueries,
 ) -> None:
     """Recalcule in_perimeter sur source_authorships et authorships vérité
     pour tous les authorships liés aux adresses données.
@@ -166,9 +171,7 @@ def propagate_uca_for_addresses(
     if not address_ids:
         return
 
-    from infrastructure.perimeter import get_persons_structure_ids_list
-
-    perimeter_ids = get_persons_structure_ids_list(cur)
+    perimeter_ids = perimeter_queries.get_persons_structure_ids_list(cur)
     if not perimeter_ids:
         return
 
