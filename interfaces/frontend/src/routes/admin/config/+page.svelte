@@ -2,6 +2,9 @@
   import { onMount } from "svelte";
   import { base } from "$app/paths";
   import { api, ApiError, config as configApi, perimeters as perimetersApi } from "$lib/api";
+  import type { components } from "$lib/api/schema";
+
+  type StructureListItem = components["schemas"]["StructureListItem"];
 
   interface ConfigItem {
     key: string;
@@ -107,7 +110,7 @@
       if (perimModal) perimModal.structResults = [];
       return;
     }
-    perimModal.structResults = await api<any[]>(`/api/structures?search=${encodeURIComponent(perimModal.structSearch)}`);
+    perimModal.structResults = await api<StructureListItem[]>(`/api/structures?search=${encodeURIComponent(perimModal.structSearch)}`);
   }
 
   function perimAddStruct(s: any) {

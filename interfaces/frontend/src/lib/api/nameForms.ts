@@ -1,13 +1,17 @@
 import { del, post, put } from './client';
+import type { components } from './schema';
 
-export function create(body: Record<string, unknown>): Promise<unknown> {
-	return post('/api/name-forms', body);
+type NameFormOut = components['schemas']['NameFormOut'];
+type DeletedResponse = components['schemas']['DeletedResponse'];
+
+export function create(body: Record<string, unknown>): Promise<NameFormOut> {
+	return post<NameFormOut>('/api/name-forms', body);
 }
 
-export function update(formId: number, body: Record<string, unknown>): Promise<unknown> {
-	return put(`/api/name-forms/${formId}`, body);
+export function update(formId: number, body: Record<string, unknown>): Promise<NameFormOut> {
+	return put<NameFormOut>(`/api/name-forms/${formId}`, body);
 }
 
-export function remove(formId: number): Promise<null> {
-	return del<null>(`/api/name-forms/${formId}`);
+export function remove(formId: number): Promise<DeletedResponse> {
+	return del<DeletedResponse>(`/api/name-forms/${formId}`);
 }

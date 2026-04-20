@@ -2254,6 +2254,14 @@ export interface components {
              */
             first_name: string;
         };
+        /** DeletedResponse */
+        DeletedResponse: {
+            /**
+             * Deleted
+             * @default true
+             */
+            deleted: boolean;
+        };
         /** DepartmentCount */
         DepartmentCount: {
             /** Department Name */
@@ -2513,6 +2521,26 @@ export interface components {
             is_excluding: boolean;
             /** Requires Context Of */
             requires_context_of?: number[] | null;
+        };
+        /**
+         * NameFormOut
+         * @description Forme de nom d'une structure.
+         */
+        NameFormOut: {
+            /** Id */
+            id: number;
+            /** Structure Id */
+            structure_id: number;
+            /** Form Text */
+            form_text: string;
+            /** Is Word Boundary */
+            is_word_boundary: boolean;
+            /** Is Excluding */
+            is_excluding: boolean;
+            /** Requires Context Of */
+            requires_context_of: number[] | null;
+            /** Created At */
+            created_at?: string | null;
         };
         /**
          * NameFormSummaryOut
@@ -2948,6 +2976,26 @@ export interface components {
              */
             rejected: boolean;
         };
+        /**
+         * RelatedStructureOut
+         * @description Structure voisine (parent/enfant) dans le détail d'une structure.
+         */
+        RelatedStructureOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+            /** Relation Id */
+            relation_id: number;
+            /** Relation Type */
+            relation_type: string;
+        };
         /** RelationCreate */
         RelationCreate: {
             /** Parent Id */
@@ -3013,6 +3061,61 @@ export interface components {
             } | null;
         };
         /**
+         * StructureDetailResponse
+         * @description Détail complet renvoyé par GET /api/structures/{id}.
+         */
+        StructureDetailResponse: {
+            structure: components["schemas"]["StructureOut"];
+            /** Parents */
+            parents: components["schemas"]["RelatedStructureOut"][];
+            /** Children */
+            children: components["schemas"]["RelatedStructureOut"][];
+            /** Forms */
+            forms: components["schemas"]["NameFormOut"][];
+        };
+        /**
+         * StructureListItem
+         * @description Ligne résumée de `/api/structures` (liste + recherche).
+         */
+        StructureListItem: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+        };
+        /**
+         * StructureOut
+         * @description Structure complète — renvoyée par GET/POST/PUT sur `/api/structures`.
+         */
+        StructureOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+            /** Ror Id */
+            ror_id: string | null;
+            /** Rnsr Id */
+            rnsr_id: string | null;
+            /** Hal Collection */
+            hal_collection: string | null;
+            /** Api Ids */
+            api_ids: {
+                [key: string]: string[];
+            } | null;
+        };
+        /**
          * StructureRef
          * @description Référence courte à une structure (acronyme + nom).
          */
@@ -3021,6 +3124,24 @@ export interface components {
             acronym: string | null;
             /** Name */
             name: string;
+        };
+        /**
+         * StructureRelationCreateResponse
+         * @description Réponse de POST /api/structure-relations.
+         *
+         *     Polymorphe : soit la relation créée, soit `{status: "already_exists"}`.
+         */
+        StructureRelationCreateResponse: {
+            /** Id */
+            id?: number | null;
+            /** Parent Id */
+            parent_id?: number | null;
+            /** Child Id */
+            child_id?: number | null;
+            /** Relation Type */
+            relation_type?: string | null;
+            /** Status */
+            status?: string | null;
         };
         /** StructureUpdate */
         StructureUpdate: {
@@ -4497,7 +4618,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StructureListItem"][];
                 };
             };
             /** @description Validation Error */
@@ -4530,7 +4651,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StructureOut"];
                 };
             };
             /** @description Validation Error */
@@ -4561,7 +4682,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StructureDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4596,7 +4717,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StructureOut"];
                 };
             };
             /** @description Validation Error */
@@ -4627,7 +4748,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DeletedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4660,7 +4781,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StructureRelationCreateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4691,7 +4812,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DeletedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4722,7 +4843,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["NameFormOut"];
                 };
             };
             /** @description Validation Error */
@@ -4757,7 +4878,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["NameFormOut"];
                 };
             };
             /** @description Validation Error */
@@ -4788,7 +4909,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DeletedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4821,7 +4942,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["NameFormOut"];
                 };
             };
             /** @description Validation Error */
