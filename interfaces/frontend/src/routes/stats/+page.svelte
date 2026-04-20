@@ -69,7 +69,7 @@
 		endpoint: '/api/stats/publishers',
 		itemsKey: 'publishers',
 		perPage: 50,
-		apiKey: 'pub-stats-publishers',
+		apiKey: 'stats-publishers',
 		buildParams: () => {
 			const p = chartParams();
 			if (search.trim()) p.set('search', search.trim());
@@ -82,7 +82,7 @@
 		endpoint: '/api/stats/journals',
 		itemsKey: 'journals',
 		perPage: 50,
-		apiKey: 'pub-stats-journals',
+		apiKey: 'stats-journals',
 		buildParams: () => {
 			const p = chartParams();
 			if (search.trim()) p.set('search', search.trim());
@@ -95,7 +95,7 @@
 		endpoint: '/api/stats/labs',
 		itemsKey: 'labs',
 		perPage: 50,
-		apiKey: 'pub-stats-labs',
+		apiKey: 'stats-labs',
 		buildParams: () => {
 			const p = chartParams();
 			p.set('sort', labSort);
@@ -106,7 +106,7 @@
 	// --- Composable: facets ---
 	const facets = useFacets<'years' | 'labs' | 'oa' | 'apc'>({
 		endpoint: '/api/stats/facets',
-		apiKey: 'pub-stats-facets',
+		apiKey: 'stats-facets',
 		buildParams: chartParams,
 		facets: {
 			years: { type: 'simple', apiKey: 'years' },

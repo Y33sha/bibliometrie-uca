@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour le router pub_stats (§1.1).
+"""Tests de caractérisation pour le router stats (§1.1).
 
 Ces endpoints concentrent du SQL complexe (agrégations, facettes
 dynamiques) qui sera extrait vers des query builders lors du refactor.
