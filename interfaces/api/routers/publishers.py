@@ -9,13 +9,20 @@ from application.journals import merge_publishers
 from application.journals import update_publisher as _update_publisher
 from infrastructure.repositories import journal_repository
 from interfaces.api.deps import get_cursor
-from interfaces.api.models import MergeRequest, PublisherUpdate
+from interfaces.api.models import (
+    MergeRequest,
+    MergeResponse,
+    OkResponse,
+    PublisherBasic,
+    PublisherListResponse,
+    PublisherUpdate,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/api/publishers")
+@router.get("/api/publishers", response_model=PublisherListResponse)
 async def list_publishers(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
@@ -72,7 +79,7 @@ async def list_publishers(
         }
 
 
-@router.get("/api/publishers/{publisher_id}")
+@router.get("/api/publishers/{publisher_id}", response_model=PublisherBasic)
 async def get_publisher(publisher_id: int) -> Any:
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id, name FROM publishers WHERE id = %s", (publisher_id,))
@@ -82,7 +89,7 @@ async def get_publisher(publisher_id: int) -> Any:
         return row
 
 
-@router.put("/api/publishers/{publisher_id}")
+@router.put("/api/publishers/{publisher_id}", response_model=OkResponse)
 async def update_publisher(publisher_id: int, body: PublisherUpdate) -> Any:
     """Met à jour un éditeur."""
     fields = body.model_dump(exclude_unset=True)
@@ -91,7 +98,7 @@ async def update_publisher(publisher_id: int, body: PublisherUpdate) -> Any:
         return {"ok": True}
 
 
-@router.post("/api/publishers/{publisher_id}/merge")
+@router.post("/api/publishers/{publisher_id}/merge", response_model=MergeResponse)
 async def merge(publisher_id: int, body: MergeRequest) -> Any:
     with get_cursor() as (cur, conn):
         cur.execute(

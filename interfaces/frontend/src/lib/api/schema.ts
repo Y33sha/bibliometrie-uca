@@ -4185,6 +4185,46 @@ export interface components {
             /** In Perimeter */
             in_perimeter: components["schemas"]["TextStrFacet"][];
         };
+        /**
+         * PublisherBasic
+         * @description GET /api/publishers/{id} : juste id + name (recherche par id).
+         */
+        PublisherBasic: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** PublisherListItem */
+        PublisherListItem: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Openalex Id */
+            openalex_id: string | null;
+            /** Country */
+            country: string | null;
+            /** Doi Prefix */
+            doi_prefix: string | null;
+            /** Is Predatory */
+            is_predatory: boolean;
+            /** Journal Count */
+            journal_count: number;
+            /** Pub Count */
+            pub_count: number;
+        };
+        /** PublisherListResponse */
+        PublisherListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Pages */
+            pages: number;
+            /** Publishers */
+            publishers: components["schemas"]["PublisherListItem"][];
+        };
         /** PublisherStatsResponse */
         PublisherStatsResponse: {
             /** Total */
@@ -8016,7 +8056,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PublisherListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8047,7 +8087,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PublisherBasic"];
                 };
             };
             /** @description Validation Error */
@@ -8082,7 +8122,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8117,7 +8157,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MergeResponse"];
                 };
             };
             /** @description Validation Error */
