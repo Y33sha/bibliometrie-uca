@@ -15,12 +15,10 @@ import argparse
 import os
 from typing import Any
 
-from psycopg2.extras import RealDictCursor
-
 from application.publications import merge_publications
-from infrastructure.repositories import publication_repository
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
+from infrastructure.repositories import publication_repository
 
 logger = setup_logger(
     "merge_scanr_hal_dups", os.path.join(os.path.dirname(__file__), "../processing/logs")
@@ -68,7 +66,7 @@ def main() -> None:
 
     conn = get_connection()
     conn.autocommit = False
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     duplicates = find_duplicates(cur)
     logger.info(f"Doublons ScanR↔HAL trouvés : {len(duplicates)}")

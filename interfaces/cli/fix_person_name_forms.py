@@ -20,8 +20,6 @@ Usage :
 import argparse
 from typing import Any
 
-from psycopg2.extras import RealDictCursor
-
 from infrastructure.db.connection import get_connection
 
 SOURCES = [
@@ -62,7 +60,7 @@ SOURCES = [
 
 
 def fix(conn: Any, dry_run: Any = False, person_id: Any = None) -> Any:
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     # Collecter les (name_form, person_id, sources) attendus
     expected: dict[tuple[str, int], set[str]] = {}  # (name_form, person_id) -> set(sources)

@@ -9,7 +9,6 @@ import os
 from typing import Any
 
 import psycopg2
-from psycopg2.extras import RealDictCursor, execute_values
 
 from infrastructure.settings import settings
 
@@ -86,15 +85,14 @@ def import_main_file(cur: Any) -> Any:
                 )
             )
 
-    execute_values(
-        cur,
+    cur.executemany(
         """
         INSERT INTO apc_payments (
             lab_name, publisher_name, publisher_type, journal_name, issn,
             journal_type, doi, article_title, amount_eur_ht, billing_year,
             pub_year, budget, institution, institution_type, coman_id,
             all_surveys_answered, shared_payment, source_file, expense_type, remarks
-        ) VALUES %s
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """,
         rows,
     )
@@ -139,15 +137,14 @@ def import_fp_hors_oa(cur: Any) -> Any:
                 )
             )
 
-    execute_values(
-        cur,
+    cur.executemany(
         """
         INSERT INTO apc_payments (
             lab_name, publisher_name, publisher_type, journal_name, issn,
             journal_type, doi, article_title, amount_eur_ht, billing_year,
             pub_year, budget, institution, institution_type, coman_id,
             all_surveys_answered, shared_payment, source_file, expense_type, remarks
-        ) VALUES %s
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """,
         rows,
     )
@@ -195,7 +192,7 @@ def map_publishers(cur: Any) -> Any:
 
 def main() -> None:
     conn = psycopg2.connect(**settings.db_args)
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     # Vider la table avant import (ré-importable)
     cur.execute("TRUNCATE apc_payments RESTART IDENTITY")

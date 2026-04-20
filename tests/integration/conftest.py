@@ -12,9 +12,9 @@ par psycopg2 pour être portable.
 import os
 import pathlib
 
-import psycopg2
+import psycopg
 import pytest
-from psycopg2.extras import RealDictCursor
+from psycopg.rows import dict_row
 
 DB_NAME = "bibliometrie_test"
 DB_USER = os.environ.get("DB_USER", "lalecoz")
@@ -42,7 +42,7 @@ def _db_connect_args() -> dict:
 
 def _create_test_db():
     """Recrée la base de test depuis schema.sql."""
-    conn = psycopg2.connect(**_admin_connect_args())
+    conn = psycopg.connect(**_admin_connect_args())
     conn.autocommit = True
     cur = conn.cursor()
 
@@ -58,7 +58,7 @@ def _create_test_db():
     conn.close()
 
     # Charger le schéma (en filtrant les commandes psql comme \restrict)
-    conn = psycopg2.connect(**_db_connect_args())
+    conn = psycopg.connect(**_db_connect_args())
     conn.autocommit = True
     cur = conn.cursor()
     schema_sql = "\n".join(
@@ -96,9 +96,9 @@ def db():
             row = db.fetchone()
             assert row["id"] == 1
     """
-    conn = psycopg2.connect(**_db_connect_args())
+    conn = psycopg.connect(**_db_connect_args(), row_factory=dict_row)
     conn.autocommit = False
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
     yield cur
     conn.rollback()
     conn.close()

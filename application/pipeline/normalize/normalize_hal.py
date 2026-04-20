@@ -22,7 +22,7 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 from collections.abc import Callable
 from typing import Any
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
 from application.pipeline.normalize.base import SourceNormalizer

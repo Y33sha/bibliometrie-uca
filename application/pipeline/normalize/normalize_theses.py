@@ -25,7 +25,7 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 from collections.abc import Callable
 from typing import Any
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.address_linker import AddressLinker
@@ -457,9 +457,7 @@ def process_work(
             cur, queries, these, staging_id, theses_id, publication_id, pub_meta
         )
 
-        process_persons(
-            cur, queries, these, source_publication_id, address_linker=address_linker
-        )
+        process_persons(cur, queries, these, source_publication_id, address_linker=address_linker)
 
         if publication_id:
             refresh_from_sources(cur, publication_id, repo=pub_repo)

@@ -16,8 +16,6 @@ import argparse
 import logging
 from typing import Any
 
-from psycopg2.extras import RealDictCursor
-
 from application.persons import merge_person
 from infrastructure.db.connection import get_connection
 from infrastructure.repositories import person_repository
@@ -185,7 +183,7 @@ def display_person(p: Any, is_target: Any = False) -> Any:
 
 def run(dry_run: Any = False) -> Any:
     conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     rows = get_labs_with_duplicates(cur)
 
@@ -431,7 +429,9 @@ def run(dry_run: Any = False) -> Any:
                     for target, sources in swap_plan:
                         for source in sources:
                             if not dry_run:
-                                do_merge(cur, target["id"], source["id"], repo=person_repository(cur))
+                                do_merge(
+                                    cur, target["id"], source["id"], repo=person_repository(cur)
+                                )
                                 logger.info(
                                     f"  Fusionné (interversion) #{source['id']} → #{target['id']} "
                                     f"({source['last_name']} {source['first_name']})"

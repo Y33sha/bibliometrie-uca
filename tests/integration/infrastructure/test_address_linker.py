@@ -1,7 +1,5 @@
 """Tests de caractérisation pour `infrastructure.addresses.PgAddressLinker`."""
 
-from psycopg2.extras import RealDictCursor
-
 from infrastructure.addresses import PgAddressLinker
 
 
@@ -41,17 +39,17 @@ def _create_authorship_stub(db):
     return db.fetchone()["id"]
 
 
-class TestLinkAddressesRealDictCursor:
-    """Garantit que link() fonctionne avec un RealDictCursor, y compris
+class TestLinkAddressesDictCursor:
+    """Garantit que link() fonctionne avec un curseur dict_row, y compris
     sur le chemin fallback (SELECT après ON CONFLICT DO NOTHING).
 
-    Régression d'un bug : `row[0]` sur un RealDictRow lève KeyError.
+    Régression d'un bug : `row[0]` sur une row dict lève KeyError.
     """
 
     def test_reuses_existing_address_via_fallback_path(self, db):
         """Si l'adresse existe déjà, la branche fallback est exercée :
         ON CONFLICT DO NOTHING ne retourne rien, donc SELECT par md5
-        doit pouvoir lire l'id même sur un curseur RealDictCursor."""
+        doit pouvoir lire l'id même sur un curseur dict_row."""
         sa_id = _create_authorship_stub(db)
 
         # Pré-insérer l'adresse pour forcer ON CONFLICT DO NOTHING
@@ -64,8 +62,8 @@ class TestLinkAddressesRealDictCursor:
         )
         existing_id = db.fetchone()["id"]
 
-        # Utiliser un RealDictCursor comme en pipeline openalex/scanr
-        dict_cur = db.connection.cursor(cursor_factory=RealDictCursor)
+        # Utiliser un curseur dict_row comme en pipeline openalex/scanr
+        dict_cur = db.connection.cursor()
         try:
             linker = PgAddressLinker()
             links = linker.link(dict_cur, sa_id, ["Université Clermont Auvergne"])

@@ -16,7 +16,7 @@ import os
 import time
 from typing import Any
 
-from psycopg2.extras import Json, execute_values
+from psycopg.types.json import Jsonb as Json
 
 from infrastructure.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
@@ -95,7 +95,7 @@ def insert_batch(conn: Any, batch: list[tuple]) -> int:
     """
     query = """
         INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, meta_hash)
-        VALUES %s
+        VALUES (%s, %s, %s, %s::jsonb, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             raw_data = CASE
                 WHEN staging.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
@@ -140,7 +140,7 @@ def insert_batch(conn: Any, batch: list[tuple]) -> int:
         )
         old_hashes = {r[0]: r[1] for r in cur.fetchall()}
 
-        execute_values(cur, query, batch, template="(%s, %s, %s, %s::jsonb, %s, %s)")
+        cur.executemany(query, batch)
     conn.commit()
 
     # Compter les mises à jour réelles (meta_hash différent, document existant)

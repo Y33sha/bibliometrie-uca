@@ -5,7 +5,7 @@ avec une vraie base PostgreSQL (bibliometrie_test).
 Chaque test tourne dans une transaction rollbackée (isolation complète).
 """
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from application.publications import find_by_nnt, find_or_create, refresh_from_sources
 from infrastructure.repositories import publication_repository

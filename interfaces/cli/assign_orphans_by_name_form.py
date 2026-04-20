@@ -8,8 +8,6 @@ Affiche un résumé puis demande confirmation avant d'appliquer.
 
 from typing import Any
 
-from psycopg2.extras import RealDictCursor
-
 from application.persons import add_name_form
 from infrastructure.db.connection import get_connection
 from infrastructure.repositories import person_repository
@@ -17,7 +15,7 @@ from infrastructure.repositories import person_repository
 
 def main() -> None:
     conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     print("\n=== Authorships orphelines (périmètre) rattachables par forme de nom ===\n")
 

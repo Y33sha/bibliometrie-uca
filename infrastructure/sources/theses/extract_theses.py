@@ -21,7 +21,7 @@ import os
 import time
 from typing import Any
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from infrastructure.api_limits import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry

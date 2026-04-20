@@ -12,7 +12,7 @@ Scénarios testés :
 3. meta_hash différent et moins d'auteurs en base → remplacement complet
 """
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from infrastructure.sources.common import compute_hash
 

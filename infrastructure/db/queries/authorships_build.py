@@ -170,8 +170,8 @@ def propagate_perimeter_and_structures_from(cur: Any, source: str) -> int:
 
 def count_authorships_in_perimeter(cur: Any) -> int:
     """Compte les `authorships` avec `in_perimeter = TRUE`."""
-    cur.execute("SELECT COUNT(*) FROM authorships WHERE in_perimeter = TRUE")
-    return cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) AS n FROM authorships WHERE in_perimeter = TRUE")
+    return cur.fetchone()["n"]
 
 
 class PgAuthorshipsBuildQueries:
