@@ -3,6 +3,7 @@
   import { base } from "$app/paths";
   import { replaceState } from "$app/navigation";
   import { api, ApiError, orphanAuthorships, persons as personsApi } from "$lib/api";
+  import { useDebouncedSearch } from "$lib/composables/useDebouncedSearch.svelte";
   import { sanitizeTitle, titleCase } from "$lib/utils";
   import FacetDropdown from "$lib/components/FacetDropdown.svelte";
   import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
@@ -71,8 +72,11 @@
   let orphanPages = $state(1);
   let orphanTotal = $state(0);
   let orphans: any[] = $state([]);
-  let orphanAssignSearch: Record<number, { query: string; results: any[]; loading: boolean }> = $state({});
-  let orphanTimers: Record<number, ReturnType<typeof setTimeout>> = {};
+  // Un seul panneau "attribuer à une personne" peut être ouvert à la fois.
+  let activeOrphanAssignIdx: number | null = $state(null);
+  const orphanAssignSearch = useDebouncedSearch<PersonSearchResult>({
+    search: (q) => api<PersonSearchResult[]>(`/api/persons/search?q=${encodeURIComponent(q)}`),
+  });
 
   let search = $state("");
   let selectedDepts: string[] = $state([]);
@@ -136,14 +140,20 @@
   }
   let detachModal: { personId: number; nameForm: string; authorships: DetachAuthorship[]; otherPersons: OtherPerson[]; loading: boolean } | null = $state(null);
 
-  /* Merge search state */
-  interface MergeSearch {
-    query: string;
-    results: { id: number; first_name: string; last_name: string; department_name: string | null; has_rh: boolean }[];
-    loading: boolean;
+  /* Merge search state : une seule recherche de fusion ouverte à la fois. */
+  interface PersonSearchResult {
+    id: number;
+    first_name: string;
+    last_name: string;
+    department_name: string | null;
+    has_rh: boolean;
   }
-  let mergeSearches: Record<number, MergeSearch> = $state({});
-  let mergeTimers: Record<number, ReturnType<typeof setTimeout>> = {};
+  let activeMergePersonId: number | null = $state(null);
+  const mergeSearch = useDebouncedSearch<PersonSearchResult>({
+    search: (q) => api<PersonSearchResult[]>(`/api/persons/search?q=${encodeURIComponent(q)}`),
+    transform: (results) =>
+      activeMergePersonId === null ? results : results.filter((r) => r.id !== activeMergePersonId),
+  });
 
   /* ── Derived ── */
 
@@ -378,21 +388,13 @@
   }
 
   function openOrphanAssign(idx: number) {
-    orphanAssignSearch = { [idx]: { query: "", results: [], loading: false } };
+    activeOrphanAssignIdx = idx;
+    orphanAssignSearch.clear();
   }
 
-  function handleOrphanSearchInput(idx: number, query: string) {
-    orphanAssignSearch = { ...orphanAssignSearch, [idx]: { ...orphanAssignSearch[idx], query } };
-    if (orphanTimers[idx]) clearTimeout(orphanTimers[idx]);
-    if (query.trim().length < 2) {
-      orphanAssignSearch = { ...orphanAssignSearch, [idx]: { ...orphanAssignSearch[idx], results: [], loading: false } };
-      return;
-    }
-    orphanTimers[idx] = setTimeout(async () => {
-      orphanAssignSearch = { ...orphanAssignSearch, [idx]: { ...orphanAssignSearch[idx], loading: true } };
-      const results = await api<any[]>(`/api/persons/search?q=${encodeURIComponent(query.trim())}`);
-      orphanAssignSearch = { ...orphanAssignSearch, [idx]: { ...orphanAssignSearch[idx], results, loading: false } };
-    }, 300);
+  function closeOrphanAssign() {
+    activeOrphanAssignIdx = null;
+    orphanAssignSearch.clear();
   }
 
   async function assignOrphan(orphan: any, personId: number) {
@@ -401,7 +403,7 @@
       authorship_id: orphan.authorship_id,
       person_id: personId,
     });
-    orphanAssignSearch = {};
+    closeOrphanAssign();
     loadOrphans();
     loadOrphanCount();
   }
@@ -417,7 +419,7 @@
       authorship_id: orphan.authorship_id,
       create_person: { last_name: lastName, first_name: firstName },
     });
-    orphanAssignSearch = {};
+    closeOrphanAssign();
     loadOrphans();
     loadOrphanCount();
   }
@@ -486,38 +488,18 @@
   /* ── Merge ── */
 
   function openMergeSearch(personId: number) {
-    // Close all other merge searches
-    for (const id of Object.keys(mergeTimers)) {
-      clearTimeout(mergeTimers[Number(id)]);
-    }
-    mergeSearches = { [personId]: { query: "", results: [], loading: false } };
+    activeMergePersonId = personId;
+    mergeSearch.clear();
   }
 
-  function closeMergeSearch(personId: number) {
-    const next = { ...mergeSearches };
-    delete next[personId];
-    mergeSearches = next;
-    if (mergeTimers[personId]) clearTimeout(mergeTimers[personId]);
-  }
-
-  function handleMergeSearchInput(personId: number, query: string) {
-    mergeSearches = { ...mergeSearches, [personId]: { ...mergeSearches[personId], query } };
-    if (mergeTimers[personId]) clearTimeout(mergeTimers[personId]);
-    if (query.trim().length < 2) {
-      mergeSearches = { ...mergeSearches, [personId]: { ...mergeSearches[personId], results: [], loading: false } };
-      return;
-    }
-    mergeTimers[personId] = setTimeout(async () => {
-      mergeSearches = { ...mergeSearches, [personId]: { ...mergeSearches[personId], loading: true } };
-      const results = await api<MergeSearch["results"]>(`/api/persons/search?q=${encodeURIComponent(query.trim())}`);
-      // Exclude self from results
-      mergeSearches = { ...mergeSearches, [personId]: { ...mergeSearches[personId], results: results.filter((r) => r.id !== personId), loading: false } };
-    }, 300);
+  function closeMergeSearch() {
+    activeMergePersonId = null;
+    mergeSearch.clear();
   }
 
   async function mergeInto(targetId: number, sourceId: number) {
     await personsApi.merge(targetId, sourceId);
-    closeMergeSearch(targetId);
+    closeMergeSearch();
     loadStats();
     loadTable();
   }
@@ -688,18 +670,17 @@
           </td>
           <!-- Actions -->
           <td>
-            {#if p.id in mergeSearches}
-              {@const ms = mergeSearches[p.id]}
+            {#if activeMergePersonId === p.id}
               <div class="merge-search">
                 <div class="merge-input-row">
-                  <input type="text" placeholder="Nom à absorber…" value={ms.query} oninput={(e) => handleMergeSearchInput(p.id, (e.target as HTMLInputElement).value)} />
-                  <button class="btn" onclick={() => closeMergeSearch(p.id)}>&times;</button>
+                  <input type="text" placeholder="Nom à absorber…" value={mergeSearch.query} oninput={(e) => mergeSearch.setQuery((e.target as HTMLInputElement).value)} />
+                  <button class="btn" onclick={closeMergeSearch}>&times;</button>
                 </div>
-                {#if ms.loading}
+                {#if mergeSearch.loading}
                   <div class="merge-results"><span class="loading-text">Recherche…</span></div>
-                {:else if ms.results.length}
+                {:else if mergeSearch.results.length}
                   <div class="merge-results">
-                    {#each ms.results as r}
+                    {#each mergeSearch.results as r (r.id)}
                       <button class="merge-result" onclick={() => mergeInto(p.id, r.id)}>
                         <strong>{r.last_name}</strong>
                         {r.first_name}
@@ -708,7 +689,7 @@
                       </button>
                     {/each}
                   </div>
-                {:else if ms.query.trim().length >= 2}
+                {:else if mergeSearch.query.trim().length >= 2}
                   <div class="merge-results"><span class="loading-text">Aucun résultat</span></div>
                 {/if}
               </div>
