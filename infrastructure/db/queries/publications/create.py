@@ -39,7 +39,8 @@ def fetch_orphan_in_perimeter_source_publications(cur: Any) -> list[dict[str, An
 class PgPublicationsCreateQueries:
     """Adapter PostgreSQL pour `application.ports.publications_create.PublicationsCreateQueries`.
 
-    Délègue `link_source_publication_to_publication` à `queries.merge` (même SQL).
+    Délègue `link_source_publication_to_publication` à
+    `infrastructure.db.queries.merge` (même SQL).
     """
 
     def fetch_orphan_in_perimeter_source_publications(self, cur: Any) -> list[dict[str, Any]]:
