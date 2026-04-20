@@ -106,12 +106,18 @@ def _run_normalize_hal(dict_cur):
     import logging
 
     from application.pipeline.normalize.normalize_hal import process_work
+    from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.zenodo import HttpZenodoResolver
 
     conn = dict_cur.connection
     tuple_cur = conn.cursor()  # curseur standard (tuple)
     queries = PgHalNormalizeQueries()
+    staging_queries = PgStagingQueries()
+    address_linker = PgAddressLinker()
+    zenodo_resolver = HttpZenodoResolver()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(tuple_cur)
     pub_repo = publication_repository(tuple_cur)
@@ -132,6 +138,9 @@ def _run_normalize_hal(dict_cur):
                 row,
                 journal_repo=journal_repo,
                 pub_repo=pub_repo,
+                zenodo_resolver=zenodo_resolver,
+                staging_queries=staging_queries,
+                address_linker=address_linker,
             ):
                 processed += 1
         return processed

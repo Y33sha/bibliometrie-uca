@@ -224,10 +224,14 @@ def _run_normalize_scanr(cur):
     import logging
 
     from application.pipeline.normalize.normalize_scanr import process_work
+    from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import journal_repository, publication_repository
 
     queries = PgScanrNormalizeQueries()
+    staging_queries = PgStagingQueries()
+    address_linker = PgAddressLinker()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(cur)
     pub_repo = publication_repository(cur)
@@ -241,7 +245,16 @@ def _run_normalize_scanr(cur):
     rows = cur.fetchall()
     processed = 0
     for row in rows:
-        if process_work(cur, queries, logger, row, journal_repo=journal_repo, pub_repo=pub_repo):
+        if process_work(
+            cur,
+            queries,
+            logger,
+            row,
+            journal_repo=journal_repo,
+            pub_repo=pub_repo,
+            staging_queries=staging_queries,
+            address_linker=address_linker,
+        ):
             processed += 1
     return processed
 
@@ -417,10 +430,16 @@ def _run_normalize_hal(cur):
 
     plain_cur = cur.connection.cursor()
     from application.pipeline.normalize.normalize_hal import process_work
+    from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.zenodo import HttpZenodoResolver
 
     queries = PgHalNormalizeQueries()
+    staging_queries = PgStagingQueries()
+    address_linker = PgAddressLinker()
+    zenodo_resolver = HttpZenodoResolver()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(plain_cur)
     pub_repo = publication_repository(plain_cur)
@@ -433,7 +452,15 @@ def _run_normalize_hal(cur):
     processed = 0
     for row in rows:
         if process_work(
-            plain_cur, queries, logger, row, journal_repo=journal_repo, pub_repo=pub_repo
+            plain_cur,
+            queries,
+            logger,
+            row,
+            journal_repo=journal_repo,
+            pub_repo=pub_repo,
+            zenodo_resolver=zenodo_resolver,
+            staging_queries=staging_queries,
+            address_linker=address_linker,
         ):
             processed += 1
     return processed
@@ -573,10 +600,16 @@ def _run_normalize_oa(cur):
     import logging
 
     from application.pipeline.normalize.normalize_openalex import process_work
+    from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.zenodo import HttpZenodoResolver
 
     queries = PgOpenalexNormalizeQueries()
+    staging_queries = PgStagingQueries()
+    address_linker = PgAddressLinker()
+    zenodo_resolver = HttpZenodoResolver()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(cur)
     pub_repo = publication_repository(cur)
@@ -588,7 +621,17 @@ def _run_normalize_oa(cur):
     rows = cur.fetchall()
     processed = 0
     for row in rows:
-        if process_work(cur, queries, logger, row, journal_repo=journal_repo, pub_repo=pub_repo):
+        if process_work(
+            cur,
+            queries,
+            logger,
+            row,
+            journal_repo=journal_repo,
+            pub_repo=pub_repo,
+            zenodo_resolver=zenodo_resolver,
+            staging_queries=staging_queries,
+            address_linker=address_linker,
+        ):
             processed += 1
     return processed
 
@@ -694,9 +737,11 @@ def _run_normalize_wos(cur):
     plain_cur = cur.connection.cursor()
     from application.pipeline.normalize.normalize_wos import process_record
     from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import journal_repository, publication_repository
 
     queries = PgWosNormalizeQueries()
+    staging_queries = PgStagingQueries()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(plain_cur)
     pub_repo = publication_repository(plain_cur)
@@ -709,7 +754,13 @@ def _run_normalize_wos(cur):
     processed = 0
     for row in rows:
         if process_record(
-            plain_cur, queries, logger, row, journal_repo=journal_repo, pub_repo=pub_repo
+            plain_cur,
+            queries,
+            logger,
+            row,
+            journal_repo=journal_repo,
+            pub_repo=pub_repo,
+            staging_queries=staging_queries,
         ):
             processed += 1
     return processed
