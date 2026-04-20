@@ -8,24 +8,10 @@
 	import { sanitizeTitle, halDocUrl } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
 
-	interface Lab { id: number; acronym: string; name: string; hal_collection: string }
-	interface Pub {
-		id: number;
-		title: string;
-		pub_year: number | null;
-		doc_type: string | null;
-		doi: string | null;
-		halids: string[] | null;
-		hors_uca: boolean;
-	}
-	interface Response {
-		total: number;
-		page: number;
-		pages: number;
-		lab_acronym: string;
-		hal_collection: string;
-		publications: Pub[];
-	}
+	import type { components } from '$lib/api/schema';
+	type Lab = components['schemas']['HalCollectionLab'];
+	type Pub = components['schemas']['HalMissingCollectionPub'];
+	type Response = components['schemas']['HalMissingCollectionsResponse'];
 
 	let labs: Lab[] = $state([]);
 	let selectedLabId: number | null = $state(null);
@@ -63,7 +49,7 @@
 		total = data.total;
 		pages = data.pages;
 		page = data.page;
-		labAcronym = data.lab_acronym;
+		labAcronym = data.lab_acronym ?? '';
 		halCollection = data.hal_collection;
 		loading = false;
 		syncUrl();
