@@ -719,7 +719,7 @@ def process_record(
     pub_repo: PublicationRepository,
 ) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
-    from infrastructure.timings import StepTimer
+    from application.pipeline.timings import StepTimer
 
     staging_id, ut, staging_doi, raw_data = staging_row
 

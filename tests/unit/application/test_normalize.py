@@ -329,7 +329,10 @@ class TestWoSDocTypeMap:
 # ── NNT ─────────────────────────────────────────────────────────
 
 from domain.publication import normalize_nnt
-from infrastructure.openalex import extract_nnt_from_openalex, is_theses_fr_source
+from application.pipeline.normalize.openalex_parsing import (
+    extract_nnt_from_openalex,
+    is_theses_fr_source,
+)
 
 
 class TestNormalizeNnt:

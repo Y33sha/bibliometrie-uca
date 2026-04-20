@@ -38,7 +38,8 @@ from domain.ports.publication_repository import PublicationRepository
 from domain.publication import clean_doi, normalize_nnt
 from infrastructure.addresses import link_addresses
 from infrastructure.db_helpers import mark_staging_done
-from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
+from domain.zenodo import is_zenodo_doi
+from infrastructure.zenodo import ZenodoResolutionError, resolve_zenodo_doi
 
 # =============================================================
 # MAPPINGS
@@ -625,7 +626,7 @@ def process_work(
     struct_name_cache: dict | None = None,
 ) -> bool:
     """Traite un work du staging HAL."""
-    from infrastructure.timings import StepTimer
+    from application.pipeline.timings import StepTimer
 
     staging_id, hal_id, doi, raw_data, hal_collections_staging = staging_row
     doc = raw_data

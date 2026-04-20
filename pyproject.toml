@@ -72,7 +72,7 @@ ignore_imports = [
     # Services applicatifs → infrastructure.repositories : 0 restant
     # (tous levés : config, authorships, addresses, structures, journals,
     # persons, publications)
-    # Pipeline normalize_* → helpers infrastructure (14)
+    # Pipeline normalize_* → helpers infrastructure (11)
     "application.pipeline.normalize.normalize_hal -> infrastructure.addresses",
     "application.pipeline.normalize.normalize_openalex -> infrastructure.addresses",
     "application.pipeline.normalize.normalize_theses -> infrastructure.addresses",
@@ -84,9 +84,6 @@ ignore_imports = [
     "application.pipeline.normalize.normalize_scanr -> infrastructure.db_helpers",
     "application.pipeline.normalize.normalize_hal -> infrastructure.zenodo",
     "application.pipeline.normalize.normalize_openalex -> infrastructure.zenodo",
-    "application.pipeline.normalize.normalize_openalex -> infrastructure.openalex",
-    "application.pipeline.normalize.normalize_hal -> infrastructure.timings",
-    "application.pipeline.normalize.normalize_wos -> infrastructure.timings",
     # application.authorships → infrastructure.perimeter (1)
     "application.authorships -> infrastructure.perimeter",
 ]

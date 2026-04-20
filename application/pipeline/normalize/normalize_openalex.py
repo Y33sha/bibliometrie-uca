@@ -41,8 +41,12 @@ from domain.ports.publication_repository import PublicationRepository
 from domain.publication import clean_doi, extract_hal_id_from_url
 from infrastructure.addresses import link_addresses
 from infrastructure.db_helpers import mark_staging_done
-from infrastructure.openalex import extract_nnt_from_openalex, is_theses_fr_source
-from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
+from application.pipeline.normalize.openalex_parsing import (
+    extract_nnt_from_openalex,
+    is_theses_fr_source,
+)
+from domain.zenodo import is_zenodo_doi
+from infrastructure.zenodo import ZenodoResolutionError, resolve_zenodo_doi
 
 # =============================================================
 # MAPPINGS
