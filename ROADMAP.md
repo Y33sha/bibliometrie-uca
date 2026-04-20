@@ -135,14 +135,16 @@ pytest-unit). Mypy strict (`check_untyped_defs` + `disallow_untyped_defs`)
 en CI et pre-commit, 0 erreur. Toutes les fonctions annotées (souvent
 `Any` pragmatique pour les params DB).
 - [x] **Couverture** : `pytest --cov` en CI. Seuil actuel
-  `fail_under = 55`, baseline réelle ~56.3 %. `interfaces/cli/*`
+  `fail_under = 56`, baseline réelle ~57.3 %. `interfaces/cli/*`
   exclu (scripts one-shot, logique utile testée via
-  application/infrastructure). Remontée de 49 → 55 dans le chantier
-  §2.1 (phases A→C : tests ajoutés sur 14 modules `queries/*`, 2 bugs
-  latents exposés et corrigés — `authorships_stats` et
-  `harvest.fill_source_person_*_if_null`). Pour dépasser 60, phase D
-  (tests sur les routers les moins couverts : `addresses`, `persons`)
-  non planifiée pour l'instant.
+  application/infrastructure). Remontée de 49 → 56 dans le chantier
+  §2.1 (phases A→C : tests ajoutés sur 14 modules `queries/*` ; phase D
+  partielle : router `addresses` 0 → 99 %). 3 bugs latents exposés et
+  corrigés en chemin (`PgAddressLinker` fallback RealDictCursor,
+  `authorships_stats` scope `sa.source`, `harvest.fill_source_person_*_if_null`
+  colonne `updated_at` inexistante). Pour dépasser 60, finir phase D
+  sur `persons`, `publishers`, `structures`, `admin_feedback` (non
+  planifié à court terme).
 
 ### 2.2 Organisation des tests
 `tests/unit/` + `tests/integration/` (sous-dossiers `domain/`,
