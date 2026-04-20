@@ -45,8 +45,8 @@ from application.pipeline.normalize.openalex_parsing import (
     extract_nnt_from_openalex,
     is_theses_fr_source,
 )
-from domain.zenodo import is_zenodo_doi
-from infrastructure.zenodo import ZenodoResolutionError, resolve_zenodo_doi
+from application.ports.zenodo_resolver import ZenodoResolver
+from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
 
 # =============================================================
 # MAPPINGS
@@ -583,6 +583,7 @@ def process_work(
     *,
     journal_repo: JournalRepository,
     pub_repo: PublicationRepository,
+    zenodo_resolver: ZenodoResolver,
 ) -> bool | None:
     """Traite un work du staging OpenAlex."""
     if isinstance(staging_row, dict):
@@ -597,7 +598,7 @@ def process_work(
         raw_doi = clean_doi(doi)
         if raw_doi and is_zenodo_doi(raw_doi):
             try:
-                version_doi = resolve_zenodo_doi(raw_doi)
+                version_doi = zenodo_resolver.resolve(raw_doi)
             except ZenodoResolutionError as e:
                 logger.warning(f"  {openalex_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
                 return None
@@ -690,6 +691,7 @@ class OpenalexNormalizer(SourceNormalizer):
         queries: OpenalexNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
         pub_repo_factory: Callable[[Any], PublicationRepository],
+        zenodo_resolver: ZenodoResolver,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -697,6 +699,7 @@ class OpenalexNormalizer(SourceNormalizer):
         self._journal_repo: JournalRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
+        self._zenodo_resolver = zenodo_resolver
 
     def preload_caches(self, cur: Any) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
@@ -711,6 +714,7 @@ class OpenalexNormalizer(SourceNormalizer):
             row,
             journal_repo=self._journal_repo,
             pub_repo=self._pub_repo,
+            zenodo_resolver=self._zenodo_resolver,
         )
 
     def summary_stats(self, cur: Any) -> list[str]:

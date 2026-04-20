@@ -418,6 +418,7 @@ def _run_normalize_hal() -> None:
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.zenodo import HttpZenodoResolver
 
     log.info("▶ normalize_hal")
     t0 = time.time()
@@ -426,6 +427,7 @@ def _run_normalize_hal() -> None:
         conn, log, PgStagingQueries(), PgHalNormalizeQueries(),
         journal_repo_factory=journal_repository,
         pub_repo_factory=publication_repository,
+        zenodo_resolver=HttpZenodoResolver(),
     ).run([])
     log.info("✓ normalize_hal terminé en %.1fs", time.time() - t0)
 
@@ -454,6 +456,7 @@ def _run_normalize_openalex() -> None:
     from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.zenodo import HttpZenodoResolver
 
     log.info("▶ normalize_openalex")
     t0 = time.time()
@@ -462,6 +465,7 @@ def _run_normalize_openalex() -> None:
         conn, log, PgStagingQueries(), PgOpenalexNormalizeQueries(),
         journal_repo_factory=journal_repository,
         pub_repo_factory=publication_repository,
+        zenodo_resolver=HttpZenodoResolver(),
     ).run([])
     log.info("✓ normalize_openalex terminé en %.1fs", time.time() - t0)
 

@@ -8,6 +8,7 @@ from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQuer
 from infrastructure.db.queries.staging import PgStagingQueries
 from infrastructure.log import setup_logger
 from infrastructure.repositories import journal_repository, publication_repository
+from infrastructure.zenodo import HttpZenodoResolver
 
 logger = setup_logger("normalize_openalex", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -21,6 +22,7 @@ def main() -> None:
         PgOpenalexNormalizeQueries(),
         journal_repo_factory=journal_repository,
         pub_repo_factory=publication_repository,
+        zenodo_resolver=HttpZenodoResolver(),
     ).run()
 
 
