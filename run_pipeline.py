@@ -8,8 +8,8 @@ Usage:
     python run_pipeline.py --only extract     # Exécuter une seule phase
     python run_pipeline.py --list             # Lister les phases
     python run_pipeline.py --dry-run          # Afficher sans exécuter
-    python run_pipeline.py --mode daily       # Import quotidien (HAL + OpenAlex, depuis dernier run)
-    python run_pipeline.py --mode weekly      # Import incrémental (6 derniers mois)
+    python run_pipeline.py --mode daily       # Import quotidien (HAL depuis dernier run)
+    python run_pipeline.py --mode weekly      # Import années n et n-1
     python run_pipeline.py --mode monthly     # Repasse complète + cross-imports
     python run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement
     python run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
@@ -181,7 +181,7 @@ def phase_normalize(**kw: Any) -> Any:
     if "hal" in sources:
         run_python("processing/normalize_hal.py")
     if "wos" in sources:
-        run_python("processing/normalize_wos.py")
+        _run_normalize_wos()
     if "scanr" in sources:
         _run_normalize_scanr()
     if "theses" in sources:
@@ -394,6 +394,19 @@ def _run_merge_pubs_by_hal_id() -> None:
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
+
+
+def _run_normalize_wos() -> None:
+    from application.pipeline.normalize.normalize_wos import WosNormalizer
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
+
+    log.info("▶ normalize_wos")
+    t0 = time.time()
+    conn = get_connection()
+    WosNormalizer(conn, log, PgStagingQueries(), PgWosNormalizeQueries()).run([])
+    log.info("✓ normalize_wos terminé en %.1fs", time.time() - t0)
 
 
 def _run_normalize_openalex() -> None:

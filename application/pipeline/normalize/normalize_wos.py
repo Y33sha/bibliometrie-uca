@@ -19,38 +19,20 @@ Gère deux formats de raw_data :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
-import os
 from typing import Any
 
 from psycopg2.extras import Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
-from application.pipeline.normalize.base import SourceNormalizer, run_normalizer
+from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.normalize_wos import WosNormalizeQueries
+from application.ports.staging import StagingQueries
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
 from domain.publication import clean_doi
-from infrastructure.db.queries.normalize_wos import (
-    fetch_address_ids_by_raw_text,
-    fetch_source_authorship_ids,
-    fetch_wos_source_persons_with_daisng,
-    fetch_wos_source_structures,
-    get_wos_publication_id,
-    insert_source_authorship_addresses_batch,
-    upsert_addresses_batch,
-    upsert_wos_source_authorships_batch,
-    upsert_wos_source_person,
-    upsert_wos_source_persons_batch,
-    upsert_wos_source_publication,
-    upsert_wos_source_structure,
-)
 from infrastructure.db_helpers import mark_staging_done
-from infrastructure.log import setup_logger
-
-# ----- Logging -----
-logger = setup_logger("normalize_wos", os.path.join(os.path.dirname(__file__), "logs"))
-
 
 # =============================================================
 # MAPPINGS
@@ -450,7 +432,12 @@ def find_publication(cur: Any, rec: dict, journal_id: int | None) -> int | None:
 
 
 def insert_wos_document(
-    cur: Any, rec: dict, staging_id: int, publication_id: int | None, pub_meta: dict | None = None
+    cur: Any,
+    queries: WosNormalizeQueries,
+    rec: dict,
+    staging_id: int,
+    publication_id: int | None,
+    pub_meta: dict | None = None,
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour WoS. Retourne source_publications.id."""
     journal_id = pub_meta.get("journal_id") if pub_meta else None
@@ -466,7 +453,7 @@ def insert_wos_document(
     urls = rec.get("urls")
     external_ids = Json(rec["external_ids"]) if rec.get("external_ids") else None
 
-    return upsert_wos_source_publication(
+    return queries.upsert_wos_source_publication(
         cur,
         ut=rec["ut"],
         doi=rec["doi"],
@@ -496,7 +483,9 @@ def insert_wos_document(
 _wos_author_cache: dict[str, int] = {}
 
 
-def upsert_wos_author(cur: Any, author: dict) -> int | None:
+def upsert_wos_author(
+    cur: Any, queries: WosNormalizeQueries, logger: Any, author: dict
+) -> int | None:
     """Insère/retrouve un auteur WoS dans source_persons (source='wos').
 
     Utilise le daisng_id comme clé unique (format API).
@@ -509,7 +498,6 @@ def upsert_wos_author(cur: Any, author: dict) -> int | None:
 
     daisng_id = author.get("daisng_id")
     if not daisng_id:
-        # Sans daisng_id, on ne peut pas dédupliquer proprement
         logger.warning(f"Auteur WoS sans daisng_id : {full_name}")
         return None
 
@@ -526,7 +514,7 @@ def upsert_wos_author(cur: Any, author: dict) -> int | None:
         source_ids["researcher_id"] = researcher_id
     source_ids_json = Json(source_ids) if source_ids else None
 
-    result = upsert_wos_source_person(
+    result = queries.upsert_wos_source_person(
         cur,
         daisng_id=daisng_id,
         full_name=full_name,
@@ -544,23 +532,22 @@ def upsert_wos_author(cur: Any, author: dict) -> int | None:
 # =============================================================
 
 
-def _resolve_addresses_batch(cur: Any, raw_texts: set) -> dict[str, int]:
-    """Résout un ensemble d'adresses en batch. Retourne {raw_text: id}.
-
-    Insère les adresses inconnues en un seul batch, puis récupère tous les IDs.
-    """
+def _resolve_addresses_batch(
+    cur: Any, queries: WosNormalizeQueries, raw_texts: set
+) -> dict[str, int]:
+    """Résout un ensemble d'adresses en batch. Retourne {raw_text: id}."""
     if not raw_texts:
         return {}
     values = [(t, normalize_text(t)) for t in raw_texts]
-    upsert_addresses_batch(cur, values)
-    return fetch_address_ids_by_raw_text(cur, list(raw_texts))
+    queries.upsert_addresses_batch(cur, values)
+    return queries.fetch_address_ids_by_raw_text(cur, list(raw_texts))
 
 
 _wos_institution_cache: dict[str, int] = {}
 
 
-def upsert_wos_institution(cur: Any, org: dict) -> int | None:
-    """Insère/retrouve une organisation WoS dans source_structures. Retourne source_structures.id."""
+def upsert_wos_institution(cur: Any, queries: WosNormalizeQueries, org: dict) -> int | None:
+    """Insère/retrouve une organisation WoS dans source_structures."""
     name = org.get("name")
     if not name:
         return None
@@ -569,12 +556,14 @@ def upsert_wos_institution(cur: Any, org: dict) -> int | None:
         return _wos_institution_cache[name]
 
     ror_id = org.get("ror_id")
-    result = upsert_wos_source_structure(cur, name=name, ror_id=ror_id)
+    result = queries.upsert_wos_source_structure(cur, name=name, ror_id=ror_id)
     _wos_institution_cache[name] = result
     return result
 
 
-def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
+def process_authorships(
+    cur: Any, queries: WosNormalizeQueries, rec: dict, source_publication_id: int
+) -> None:
     """Traite les authorships d'un record WoS + crée les liens adresses et institutions."""
     # Résoudre toutes les organisations du document en un seul pass
     all_orgs = set()
@@ -585,7 +574,7 @@ def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
                 all_orgs.add(name)
     for org_name in all_orgs:
         if org_name not in _wos_institution_cache:
-            upsert_wos_institution(cur, {"name": org_name})
+            upsert_wos_institution(cur, queries, {"name": org_name})
 
     # Phase 1 : résoudre tous les auteurs (batch upsert source_persons)
     authors_resolved = []  # [(author_dict, source_person_id)]
@@ -622,7 +611,7 @@ def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
                     )
                 )
 
-        for pid, src_id in upsert_wos_source_persons_batch(cur, deduped):
+        for pid, src_id in queries.upsert_wos_source_persons_batch(cur, deduped):
             _wos_author_cache[src_id] = pid
 
         # Résoudre les auteurs insérés
@@ -664,7 +653,7 @@ def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
             author["full_name"],
         )
 
-    upsert_wos_source_authorships_batch(cur, list(values.values()))
+    queries.upsert_wos_source_authorships_batch(cur, list(values.values()))
 
     # Phase 3 : batch adresses (source_authorship_addresses)
     authors_with_addrs = [(a, said) for a, said in author_ids if a.get("addresses")]
@@ -675,11 +664,11 @@ def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
             all_addr_texts.update(author["addresses"])
 
         # Résoudre en batch (INSERT + SELECT)
-        addr_id_map = _resolve_addresses_batch(cur, all_addr_texts)
+        addr_id_map = _resolve_addresses_batch(cur, queries, all_addr_texts)
 
         # Récupérer les sa_id
         sa_ids_needed = [said for _, said in authors_with_addrs]
-        sa_id_map = fetch_source_authorship_ids(
+        sa_id_map = queries.fetch_source_authorship_ids(
             cur, source_publication_id=source_publication_id, source_person_ids=sa_ids_needed
         )
 
@@ -694,7 +683,7 @@ def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
                 if addr_id:
                     addr_values.append((sa_id, addr_id))
 
-        insert_source_authorship_addresses_batch(cur, addr_values)
+        queries.insert_source_authorship_addresses_batch(cur, addr_values)
 
 
 # =============================================================
@@ -702,7 +691,7 @@ def process_authorships(cur: Any, rec: dict, source_publication_id: int) -> Any:
 # =============================================================
 
 
-def process_record(cur: Any, staging_row: tuple) -> bool:
+def process_record(cur: Any, queries: WosNormalizeQueries, logger: Any, staging_row: tuple) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
     from infrastructure.timings import StepTimer
 
@@ -712,42 +701,32 @@ def process_record(cur: Any, staging_row: tuple) -> bool:
         t = StepTimer()
         rec = extract_from_api(raw_data, staging_doi)
 
-        # Forcer le UT depuis le staging si absent du raw_data
         if not rec["ut"]:
             rec["ut"] = ut
 
-        # Publisher & Journal
         publisher_id = upsert_publisher(cur, rec.get("publisher_name"))
         journal_id = upsert_journal(cur, rec, publisher_id)
         t.mark("publisher+journal")
 
-        # Métadonnées de publication (stockées sur source_publications)
         pub_meta = extract_pub_metadata(rec, journal_id)
 
-        # Chercher une publication existante (sans créer)
-        publication_id = None
+        publication_id = queries.get_wos_publication_id(cur, rec["ut"])
 
-        # Idempotence : réutiliser le publication_id existant
-        publication_id = get_wos_publication_id(cur, rec["ut"])
-
-        # Recherche par DOI/titre (sans création)
         if not publication_id:
             publication_id = find_publication(cur, rec, journal_id)
         t.mark("publication")
 
-        # Enrichir la publication existante si trouvée
         if publication_id:
             publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
 
-        # Document WoS (source_publications)
-        source_publication_id = insert_wos_document(cur, rec, staging_id, publication_id, pub_meta)
+        source_publication_id = insert_wos_document(
+            cur, queries, rec, staging_id, publication_id, pub_meta
+        )
         t.mark("wos_doc")
 
-        # Auteurs et authorships
-        process_authorships(cur, rec, source_publication_id)
+        process_authorships(cur, queries, rec, source_publication_id)
         t.mark("authors")
 
-        # Recalcul complet des métadonnées depuis toutes les sources
         if publication_id:
             refresh_from_sources(cur, publication_id)
         t.mark("refresh")
@@ -769,10 +748,20 @@ class WosNormalizer(SourceNormalizer):
     FETCH_SUB_BATCH = 50
     FETCH_COLUMNS = "id, source_id AS ut, doi, raw_data"
 
+    def __init__(
+        self,
+        conn: Any,
+        logger: Any,
+        staging_queries: StagingQueries,
+        queries: WosNormalizeQueries,
+    ) -> None:
+        super().__init__(conn, logger, staging_queries)
+        self._queries = queries
+
     def preload_caches(self, cur: Any) -> None:
-        for src_id, pid in fetch_wos_source_structures(cur):
+        for src_id, pid in self._queries.fetch_wos_source_structures(cur):
             _wos_institution_cache[src_id] = pid
-        for src_id, pid in fetch_wos_source_persons_with_daisng(cur):
+        for src_id, pid in self._queries.fetch_wos_source_persons_with_daisng(cur):
             _wos_author_cache[src_id] = pid
         self.logger.info(
             f"Cache WoS : {len(_wos_institution_cache)} institutions, "
@@ -780,16 +769,8 @@ class WosNormalizer(SourceNormalizer):
         )
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        return process_record(cur, row)
+        return process_record(cur, self._queries, self.logger, row)
 
     def cleanup(self) -> None:
         _wos_institution_cache.clear()
         _wos_author_cache.clear()
-
-
-def main() -> None:
-    run_normalizer(WosNormalizer, logger)
-
-
-if __name__ == "__main__":
-    main()
