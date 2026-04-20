@@ -25,6 +25,16 @@ from infrastructure.db.connection import get_connection
 from infrastructure.sources.common import get_existing_ids
 
 
+class ExtractionConfigError(Exception):
+    """Configuration d'extraction incomplète (IDs/affiliations manquants).
+
+    Levée par ``load_config`` d'un extracteur quand un paramètre API
+    indispensable (IDs institution, affiliations, PPN…) n'est pas
+    disponible. Interrompt l'extraction proprement avec un message
+    explicite au lieu d'un 400 API opaque.
+    """
+
+
 class ExtractionStats:
     """Résultat d'une extraction. Les sources peuvent étendre/customiser."""
 
@@ -100,8 +110,13 @@ class SourceExtractor(ABC):
         """Entry point : parse, load config, extract, handle errors, close."""
         args = self.parse_args(argv)
 
-        with self.conn.cursor() as cur:
-            config = self.load_config(cur)
+        try:
+            with self.conn.cursor() as cur:
+                config = self.load_config(cur)
+        except ExtractionConfigError as e:
+            self.logger.error(f"Extraction {self.SOURCE} interrompue : {e}")
+            self.conn.close()
+            sys.exit(2)
 
         self.logger.info(f"=== Extraction {self.SOURCE} démarrée ===")
         self.setup_logging(args, config)

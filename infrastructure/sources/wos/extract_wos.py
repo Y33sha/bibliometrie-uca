@@ -27,11 +27,16 @@ from infrastructure.api_limits import WOS_DELAY, WOS_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import (
     get_api_base_urls,
-    get_wos_affiliations,
+    get_extraction_api_ids,
     get_wos_api_key,
     get_years,
 )
-from infrastructure.sources.base import ExtractionStats, SourceExtractor, run_extractor
+from infrastructure.sources.base import (
+    ExtractionConfigError,
+    ExtractionStats,
+    SourceExtractor,
+    run_extractor,
+)
 from infrastructure.sources.common import compute_hash, setup_logger
 
 # ----- Logging -----
@@ -259,7 +264,12 @@ class WosExtractor(SourceExtractor):
 
     def load_config(self, cur: Any) -> dict[str, Any]:
         global BASE_URL, HEADERS
-        affiliations = get_wos_affiliations(cur)
+        affiliations = get_extraction_api_ids(cur, "wos")
+        if not affiliations:
+            raise ExtractionConfigError(
+                "aucune affiliation WoS configurée "
+                "(structures.api_ids->'wos' vide pour le périmètre d'extraction)"
+            )
         api_key = get_wos_api_key(cur)
         BASE_URL = get_api_base_urls(cur).get("wos", "https://api.clarivate.com/api/wos")
         HEADERS = {"X-ApiKey": api_key, "Accept": "application/json"}

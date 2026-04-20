@@ -21,11 +21,16 @@ from infrastructure.api_limits import SCANR_DELAY, SCANR_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import (
     get_api_base_urls,
-    get_scanr_affiliation_ids,
+    get_extraction_api_ids,
     get_scanr_credentials,
     get_years,
 )
-from infrastructure.sources.base import ExtractionStats, SourceExtractor, run_extractor
+from infrastructure.sources.base import (
+    ExtractionConfigError,
+    ExtractionStats,
+    SourceExtractor,
+    run_extractor,
+)
 from infrastructure.sources.common import clean_doi, compute_hash, setup_logger
 
 logger = setup_logger("extract_scanr", os.path.join(os.path.dirname(__file__), "logs"))
@@ -160,10 +165,16 @@ class ScanrExtractor(SourceExtractor):
         parser.add_argument("--year", type=int, help="Année unique")
 
     def load_config(self, cur: Any) -> dict[str, Any]:
+        affiliation_ids = get_extraction_api_ids(cur, "scanr")
+        if not affiliation_ids:
+            raise ExtractionConfigError(
+                "aucun affiliation_id ScanR configuré "
+                "(structures.api_ids->'scanr' vide pour le périmètre d'extraction)"
+            )
         username, password = get_scanr_credentials(cur)
         return {
             "years": get_years(cur),
-            "affiliation_ids": get_scanr_affiliation_ids(cur),
+            "affiliation_ids": affiliation_ids,
             "auth": (username, password),
             "url": get_api_base_urls(cur).get(
                 "scanr",
