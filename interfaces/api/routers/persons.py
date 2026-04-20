@@ -36,14 +36,24 @@ from interfaces.api.deps import get_cursor
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
     AddIdentifier,
+    AddIdentifierResponse,
     AssignOrphanAuthorship,
+    AuthorshipExcludeResponse,
     BatchAssignOrphanAuthorships,
     DepartmentCount,
     DetachAuthorships,
+    DetachAuthorshipsResponse,
+    DetachedResponse,
     DetachNameForm,
+    IdentifierReassignResponse,
+    IdentifierStatusResponse,
     MergePersons,
+    MergeResponse,
     NameFormAuthorshipsResponse,
+    OkResponse,
+    OrphanAssignResponse,
     OrphanAuthorshipsResponse,
+    OrphanBatchAssignResponse,
     OrphanCountResponse,
     PersonAddressesResponse,
     PersonDetail,
@@ -56,6 +66,7 @@ from interfaces.api.models import (
     PersonThesesResponse,
     ReassignIdentifier,
     RejectPerson,
+    RemovedResponse,
     RoleCount,
     UpdateIdentifierStatus,
     UpdatePersonName,
@@ -219,7 +230,7 @@ async def person_addresses(
 ORCID_RE = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
 
 
-@router.post("/api/persons/{person_id}/identifiers")
+@router.post("/api/persons/{person_id}/identifiers", response_model=AddIdentifierResponse)
 async def add_person_identifier(person_id: int, data: AddIdentifier) -> Any:
     """Ajoute manuellement un identifiant (ORCID ou idHAL) à une personne."""
     if data.id_type not in ("orcid", "idhal", "idref"):
@@ -267,7 +278,10 @@ async def add_person_identifier(person_id: int, data: AddIdentifier) -> Any:
         return result
 
 
-@router.delete("/api/persons/{person_id}/identifiers/{id_type}/{id_value:path}")
+@router.delete(
+    "/api/persons/{person_id}/identifiers/{id_type}/{id_value:path}",
+    response_model=RemovedResponse,
+)
 async def remove_person_identifier(person_id: int, id_type: str, id_value: str) -> Any:
     """Supprime un identifiant d'une personne."""
     with get_cursor() as (cur, _conn):
@@ -275,7 +289,7 @@ async def remove_person_identifier(person_id: int, id_type: str, id_value: str) 
         return {"removed": True}
 
 
-@router.patch("/api/person-identifiers/{ident_id}/status")
+@router.patch("/api/person-identifiers/{ident_id}/status", response_model=IdentifierStatusResponse)
 async def update_identifier_status(ident_id: int, body: UpdateIdentifierStatus) -> Any:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
     with get_cursor() as (cur, _conn):
@@ -283,7 +297,9 @@ async def update_identifier_status(ident_id: int, body: UpdateIdentifierStatus) 
         return {"id": row["id"], "status": row["status"]}
 
 
-@router.patch("/api/person-identifiers/{ident_id}/reassign")
+@router.patch(
+    "/api/person-identifiers/{ident_id}/reassign", response_model=IdentifierReassignResponse
+)
 async def reassign_identifier(ident_id: int, body: ReassignIdentifier) -> Any:
     """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
     with get_cursor() as (cur, _conn):
@@ -293,7 +309,7 @@ async def reassign_identifier(ident_id: int, body: ReassignIdentifier) -> Any:
         return {"id": ident_id, "person_id": body.person_id, "status": "pending"}
 
 
-@router.patch("/api/authorships/{authorship_id}/exclude")
+@router.patch("/api/authorships/{authorship_id}/exclude", response_model=AuthorshipExcludeResponse)
 async def toggle_authorship_excluded(authorship_id: int) -> Any:
     """Marque un authorship comme exclu."""
     with get_cursor() as (cur, _conn):
@@ -301,7 +317,7 @@ async def toggle_authorship_excluded(authorship_id: int) -> Any:
         return {"id": row["id"], "excluded": row["excluded"]}
 
 
-@router.patch("/api/persons/{person_id}/reject")
+@router.patch("/api/persons/{person_id}/reject", response_model=OkResponse)
 async def reject_person(person_id: int, body: RejectPerson) -> Any:
     """Marque/démarque une personne comme rejetée."""
     with get_cursor() as (cur, _conn):
@@ -309,7 +325,7 @@ async def reject_person(person_id: int, body: RejectPerson) -> Any:
         return {"ok": True}
 
 
-@router.patch("/api/persons/{person_id}/name")
+@router.patch("/api/persons/{person_id}/name", response_model=OkResponse)
 async def update_person_name(person_id: int, body: UpdatePersonName) -> Any:
     """Modifie le nom/prénom d'une personne."""
     last_name = body.last_name.strip()
@@ -321,7 +337,7 @@ async def update_person_name(person_id: int, body: UpdatePersonName) -> Any:
         return {"ok": True}
 
 
-@router.post("/api/persons/{person_id}/merge")
+@router.post("/api/persons/{person_id}/merge", response_model=MergeResponse)
 async def merge_persons(person_id: int, body: MergePersons) -> Any:
     """Fusionne une autre personne (source) dans celle-ci (target)."""
     source_id = body.source_id
@@ -363,7 +379,7 @@ async def list_orphan_authorships(
         )
 
 
-@router.post("/api/admin/orphan-authorships/assign")
+@router.post("/api/admin/orphan-authorships/assign", response_model=OrphanAssignResponse)
 async def assign_orphan_authorship_endpoint(body: AssignOrphanAuthorship) -> Any:
     """Attribue une authorship orpheline à une personne."""
     if body.source not in ALL_SOURCES_SET:
@@ -389,7 +405,9 @@ async def assign_orphan_authorship_endpoint(body: AssignOrphanAuthorship) -> Any
         return {"ok": True, "person_id": person_id}
 
 
-@router.post("/api/admin/orphan-authorships/batch-assign")
+@router.post(
+    "/api/admin/orphan-authorships/batch-assign", response_model=OrphanBatchAssignResponse
+)
 async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships) -> Any:
     """Attribue plusieurs authorships orphelines à une même personne."""
     person_id = body.person_id
@@ -417,7 +435,9 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)) -> 
         return admin_queries.name_form_authorships(cur, person_id, name_form)
 
 
-@router.post("/api/persons/{person_id}/detach-authorships")
+@router.post(
+    "/api/persons/{person_id}/detach-authorships", response_model=DetachAuthorshipsResponse
+)
 async def detach_authorships(person_id: int, body: DetachAuthorships) -> Any:
     """Détache des authorships sources d'une personne et nettoie les formes de noms."""
     with get_cursor() as (cur, _conn):
@@ -433,7 +453,7 @@ async def detach_authorships(person_id: int, body: DetachAuthorships) -> Any:
         )
 
 
-@router.post("/api/persons/{person_id}/detach-name-form")
+@router.post("/api/persons/{person_id}/detach-name-form", response_model=DetachedResponse)
 async def detach_name_form(person_id: int, body: DetachNameForm) -> Any:
     """Détache une forme de nom d'une personne (quand aucune authorship n'y est liée)."""
     with get_cursor() as (cur, _conn):

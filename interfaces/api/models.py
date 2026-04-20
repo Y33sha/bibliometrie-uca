@@ -514,6 +514,77 @@ class OrphanAuthorshipsResponse(BaseModel):
     authorships: list[OrphanAuthorshipOut]
 
 
+# ----- Persons (mutation responses) -----
+
+
+class OkResponse(BaseModel):
+    """Réponse minimale d'acquittement (pas de données)."""
+
+    ok: bool = True
+
+
+class RemovedResponse(BaseModel):
+    removed: bool = True
+
+
+class DetachedResponse(BaseModel):
+    detached: bool = True
+
+
+class AddIdentifierResponse(BaseModel):
+    """Réponse de `POST /api/persons/{id}/identifiers`.
+
+    Polymorphe selon le chemin :
+    - doublon exact : `added=False` + `reason`
+    - ajout normal  : `added=True` + `id_type` + `id_value`
+    - réattribution : en plus, `reassigned=True`
+    """
+
+    added: bool
+    reason: str | None = None
+    id_type: str | None = None
+    id_value: str | None = None
+    reassigned: bool | None = None
+
+
+class IdentifierStatusResponse(BaseModel):
+    id: int
+    status: str
+
+
+class IdentifierReassignResponse(BaseModel):
+    id: int
+    person_id: int
+    status: str
+
+
+class AuthorshipExcludeResponse(BaseModel):
+    id: int
+    excluded: bool
+
+
+class MergeResponse(BaseModel):
+    merged: bool
+    source_id: int
+    target_id: int
+
+
+class OrphanAssignResponse(BaseModel):
+    ok: bool = True
+    person_id: int
+
+
+class OrphanBatchAssignResponse(BaseModel):
+    ok: bool = True
+    assigned: int
+
+
+class DetachAuthorshipsResponse(BaseModel):
+    detached: int
+    deleted_authorships: int
+    cleaned_form: bool
+
+
 # ----- Config / Perimeters -----
 
 
