@@ -671,8 +671,14 @@ def _insert_wos_staging(cur, docs):
 
 
 def _run_normalize_wos(cur):
+    import logging
+
     plain_cur = cur.connection.cursor()
     from application.pipeline.normalize.normalize_wos import process_record
+    from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
+
+    queries = PgWosNormalizeQueries()
+    logger = logging.getLogger("test")
 
     plain_cur.execute("""
         SELECT id, source_id AS ut, doi, raw_data
@@ -681,7 +687,7 @@ def _run_normalize_wos(cur):
     rows = plain_cur.fetchall()
     processed = 0
     for row in rows:
-        if process_record(plain_cur, row):
+        if process_record(plain_cur, queries, logger, row):
             processed += 1
     return processed
 
