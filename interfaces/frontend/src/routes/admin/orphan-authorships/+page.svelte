@@ -3,21 +3,32 @@
 	import { base } from '$app/paths';
 	import { replaceState } from '$app/navigation';
 	import { api, orphanAuthorships } from '$lib/api';
+	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import { titleCase } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
+
+	interface PersonResult {
+		id: number;
+		last_name: string;
+		first_name: string;
+		has_rh: boolean;
+		department_name: string | null;
+	}
+
+	async function searchPersons(q: string): Promise<PersonResult[]> {
+		return api<PersonResult[]>(`/api/persons/search?q=${encodeURIComponent(q)}`);
+	}
 
 	let search = $state('');
 	let currentPage = $state(1);
 	let totalPages = $state(1);
 	let total = $state(0);
 	let orphans: any[] = $state([]);
-	let assignSearch: Record<number, { query: string; results: any[]; loading: boolean }> = $state({});
-	let timers: Record<number, ReturnType<typeof setTimeout>> = {};
+	// Une seule ligne peut avoir son panneau "attribuer" ouvert à la fois.
+	let activeAssignIdx: number | null = $state(null);
+	const assignSearch = useDebouncedSearch<PersonResult>({ search: searchPersons });
 	let selectedIds = $state(new Set<string>());  // "source-authorship_id"
-	let batchSearch = $state('');
-	let batchResults: any[] = $state([]);
-	let batchLoading = $state(false);
-	let batchTimer: ReturnType<typeof setTimeout>;
+	const batchSearch = useDebouncedSearch<PersonResult>({ search: searchPersons });
 	const allSelected = $derived(orphans.length > 0 && orphans.every(o => selectedIds.has(`${o.source}-${o.authorship_id}`)));
 	let createModal: { lastName: string; firstName: string; items: any[] } | null = $state(null);
 
@@ -34,21 +45,13 @@
 	}
 
 	function openAssign(idx: number) {
-		assignSearch = { [idx]: { query: '', results: [], loading: false } };
+		activeAssignIdx = idx;
+		assignSearch.clear();
 	}
 
-	function handleSearchInput(idx: number, query: string) {
-		assignSearch = { ...assignSearch, [idx]: { ...assignSearch[idx], query } };
-		if (timers[idx]) clearTimeout(timers[idx]);
-		if (query.trim().length < 2) {
-			assignSearch = { ...assignSearch, [idx]: { ...assignSearch[idx], results: [], loading: false } };
-			return;
-		}
-		timers[idx] = setTimeout(async () => {
-			assignSearch = { ...assignSearch, [idx]: { ...assignSearch[idx], loading: true } };
-			const results = await api<any[]>(`/api/persons/search?q=${encodeURIComponent(query.trim())}`);
-			assignSearch = { ...assignSearch, [idx]: { ...assignSearch[idx], results, loading: false } };
-		}, 300);
+	function closeAssign() {
+		activeAssignIdx = null;
+		assignSearch.clear();
 	}
 
 	async function assign(orphan: any, personId: number) {
@@ -57,7 +60,7 @@
 			authorship_id: orphan.authorship_id,
 			person_id: personId,
 		});
-		assignSearch = {};
+		closeAssign();
 		loadOrphans();
 	}
 
@@ -70,7 +73,7 @@
 			firstName: parts[1] || '',
 			items: [orphan],
 		};
-		assignSearch = {};
+		closeAssign();
 	}
 
 	function toggleSelect(o: any) {
@@ -88,17 +91,6 @@
 		}
 	}
 
-	function handleBatchSearchInput(query: string) {
-		batchSearch = query;
-		if (batchTimer) clearTimeout(batchTimer);
-		if (query.trim().length < 2) { batchResults = []; batchLoading = false; return; }
-		batchLoading = true;
-		batchTimer = setTimeout(async () => {
-			batchResults = await api<any[]>(`/api/persons/search?q=${encodeURIComponent(query.trim())}`);
-			batchLoading = false;
-		}, 300);
-	}
-
 	async function batchAssign(personId: number) {
 		const items = orphans.filter(o => selectedIds.has(`${o.source}-${o.authorship_id}`));
 		await orphanAuthorships.batchAssign({
@@ -106,8 +98,7 @@
 			authorships: items.map(o => ({ source: o.source, authorship_id: o.authorship_id })),
 		});
 		selectedIds = new Set();
-		batchSearch = '';
-		batchResults = [];
+		batchSearch.clear();
 		loadOrphans();
 	}
 
@@ -145,8 +136,7 @@
 		}
 		createModal = null;
 		selectedIds = new Set();
-		batchSearch = '';
-		batchResults = [];
+		batchSearch.clear();
 		loadOrphans();
 	}
 
@@ -193,14 +183,14 @@
 {#if selectedIds.size > 0}
 	<div class="batch-bar">
 		<span>{selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}</span>
-		<input type="text" placeholder="Attribuer à une personne existante…" value={batchSearch}
-			oninput={(e) => handleBatchSearchInput((e.target as HTMLInputElement).value)} autocomplete="off" />
+		<input type="text" placeholder="Attribuer à une personne existante…" value={batchSearch.query}
+			oninput={(e) => batchSearch.setQuery((e.target as HTMLInputElement).value)} autocomplete="off" />
 		<button class="btn btn-sm btn-create" onclick={openCreateModal}>Créer une personne</button>
-		{#if batchLoading}
+		{#if batchSearch.loading}
 			<span class="loading-text">…</span>
-		{:else if batchResults.length}
+		{:else if batchSearch.results.length}
 			<div class="batch-results">
-				{#each batchResults as r}
+				{#each batchSearch.results as r (r.id)}
 					<button class="result-btn" onclick={() => batchAssign(r.id)}>
 						<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
 						{#if r.has_rh}<span class="rh-check">✓</span>{/if}
@@ -237,19 +227,18 @@
 						</a>
 					</td>
 					<td>
-						{#if i in assignSearch}
-							{@const as = assignSearch[i]}
+						{#if activeAssignIdx === i}
 							<div class="assign-panel">
 								<div class="assign-row">
-									<input type="text" placeholder="Nom de la personne…" value={as.query}
-										oninput={(e) => handleSearchInput(i, (e.target as HTMLInputElement).value)} />
-									<button class="btn btn-sm" onclick={() => { delete assignSearch[i]; assignSearch = assignSearch; }}>&times;</button>
+									<input type="text" placeholder="Nom de la personne…" value={assignSearch.query}
+										oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
+									<button class="btn btn-sm" onclick={closeAssign}>&times;</button>
 								</div>
-								{#if as.loading}
+								{#if assignSearch.loading}
 									<span class="loading-text">…</span>
-								{:else if as.results.length}
+								{:else if assignSearch.results.length}
 									<div class="assign-results">
-										{#each as.results as r}
+										{#each assignSearch.results as r (r.id)}
 											<button class="result-btn" onclick={() => assign(o, r.id)}>
 												<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
 												{#if r.has_rh}<span class="rh-check">✓</span>{/if}
@@ -257,7 +246,7 @@
 											</button>
 										{/each}
 									</div>
-								{:else if as.query.length >= 2}
+								{:else if assignSearch.query.length >= 2}
 									<div class="assign-results">
 										<span class="loading-text">Aucun résultat</span>
 										<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
