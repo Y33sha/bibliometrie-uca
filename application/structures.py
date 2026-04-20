@@ -15,8 +15,8 @@ from pydantic import ValidationError as PydanticValidationError
 from application.audit import emit_event
 from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
+from domain.ports.structure_repository import StructureRepository
 from domain.structure import StructureApiIds
-from infrastructure.repositories import structure_repository
 
 
 def _validate_api_ids(raw: dict | None) -> dict | None:
@@ -59,9 +59,10 @@ def create_structure(
     rnsr_id: str | None = None,
     hal_collection: str | None = None,
     api_ids: dict | None = None,
+    repo: StructureRepository,
 ) -> dict:
     """Crée une structure. Retourne la ligne insérée (RealDictRow)."""
-    return structure_repository(cur).create_structure(
+    return repo.create_structure(
         code=code,
         name=name,
         acronym=acronym,
@@ -73,13 +74,14 @@ def create_structure(
     )
 
 
-def update_structure(cur: Any, structure_id: int, *, fields: dict) -> dict:
+def update_structure(
+    cur: Any, structure_id: int, *, fields: dict, repo: StructureRepository
+) -> dict:
     """Met à jour une structure. Retourne la ligne modifiée.
 
     Lève NotFoundError si la structure n'existe pas.
     Lève ValidationError si `fields` ne contient aucun champ valide.
     """
-    repo = structure_repository(cur)
     if not repo.structure_exists(structure_id):
         raise NotFoundError(f"Structure {structure_id} introuvable")
 
@@ -102,9 +104,11 @@ def update_structure(cur: Any, structure_id: int, *, fields: dict) -> dict:
     return repo.update_structure_fields(structure_id, sql_fragments, params)
 
 
-def delete_structure(cur: Any, structure_id: int) -> None:
+def delete_structure(
+    cur: Any, structure_id: int, *, repo: StructureRepository
+) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas."""
-    row = structure_repository(cur).delete_structure(structure_id)
+    row = repo.delete_structure(structure_id)
     if not row:
         raise NotFoundError(f"Structure {structure_id} introuvable")
     emit_event(
@@ -119,18 +123,27 @@ def delete_structure(cur: Any, structure_id: int) -> None:
 # ── structure_relations ───────────────────────────────────────────
 
 
-def create_relation(cur: Any, *, parent_id: int, child_id: int, relation_type: str) -> dict | None:
+def create_relation(
+    cur: Any,
+    *,
+    parent_id: int,
+    child_id: int,
+    relation_type: str,
+    repo: StructureRepository,
+) -> dict | None:
     """Crée une relation. Retourne la ligne insérée, ou None si elle existait déjà."""
-    return structure_repository(cur).create_relation(
+    return repo.create_relation(
         parent_id=parent_id,
         child_id=child_id,
         relation_type=relation_type,
     )
 
 
-def delete_relation(cur: Any, relation_id: int) -> None:
+def delete_relation(
+    cur: Any, relation_id: int, *, repo: StructureRepository
+) -> None:
     """Supprime une relation. Lève NotFoundError si elle n'existe pas."""
-    row = structure_repository(cur).delete_relation(relation_id)
+    row = repo.delete_relation(relation_id)
     if not row:
         raise NotFoundError(f"Relation {relation_id} introuvable")
     emit_event(
@@ -158,9 +171,10 @@ def create_name_form(
     is_word_boundary: bool = False,
     is_excluding: bool = False,
     requires_context_of: list | None = None,
+    repo: StructureRepository,
 ) -> dict:
     """Crée une forme de nom. Retourne la ligne insérée."""
-    return structure_repository(cur).create_name_form(
+    return repo.create_name_form(
         structure_id=structure_id,
         form_text_normalized=normalize_text(form_text),
         is_word_boundary=is_word_boundary,
@@ -169,13 +183,14 @@ def create_name_form(
     )
 
 
-def update_name_form(cur: Any, form_id: int, *, fields: dict) -> dict:
+def update_name_form(
+    cur: Any, form_id: int, *, fields: dict, repo: StructureRepository
+) -> dict:
     """Met à jour une forme de nom. Retourne la ligne modifiée.
 
     Lève NotFoundError si la forme n'existe pas.
     Lève ValidationError si `fields` ne contient aucun champ valide.
     """
-    repo = structure_repository(cur)
     if not repo.name_form_exists(form_id):
         raise NotFoundError(f"Forme {form_id} introuvable")
 
@@ -201,9 +216,11 @@ def update_name_form(cur: Any, form_id: int, *, fields: dict) -> dict:
     return repo.update_name_form_fields(form_id, sql_fragments, params)
 
 
-def delete_name_form(cur: Any, form_id: int) -> None:
+def delete_name_form(
+    cur: Any, form_id: int, *, repo: StructureRepository
+) -> None:
     """Supprime une forme de nom. Lève NotFoundError si elle n'existe pas."""
-    row = structure_repository(cur).delete_name_form(form_id)
+    row = repo.delete_name_form(form_id)
     if not row:
         raise NotFoundError(f"Forme {form_id} introuvable")
     emit_event(
