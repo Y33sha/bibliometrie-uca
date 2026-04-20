@@ -3,13 +3,6 @@ from typing import Any
 """Helpers pour l'acces aux rows psycopg2, compatibles tuple et RealDictCursor."""
 
 
-def mark_staging_done(cur: Any, staging_id: int) -> Any:
-    """Marque un document staging comme traite et vide le raw_data."""
-    cur.execute(
-        "UPDATE staging SET processed = TRUE, raw_data = '{}'::jsonb WHERE id = %s", (staging_id,)
-    )
-
-
 def rows_as_dicts(cur: Any) -> list[dict[str, Any]]:
     """`cur.fetchall()` mais garantit des dicts.
 

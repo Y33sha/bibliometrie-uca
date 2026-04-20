@@ -26,8 +26,10 @@ from psycopg2.extras import Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
 from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.address_linker import AddressLinker
 from application.ports.normalize_hal import HalNormalizeQueries
 from application.ports.staging import StagingQueries
+from application.ports.zenodo_resolver import ZenodoResolver
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
@@ -36,9 +38,7 @@ from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import clean_doi, normalize_nnt
-from infrastructure.addresses import link_addresses
-from infrastructure.db_helpers import mark_staging_done
-from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
+from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
 
 # =============================================================
 # MAPPINGS
@@ -478,6 +478,8 @@ def process_authors(
     queries: HalNormalizeQueries,
     doc: dict,
     source_publication_id: int,
+    *,
+    address_linker: AddressLinker,
     struct_cache: dict | None = None,
     struct_name_cache: dict | None = None,
 ) -> None:
@@ -605,7 +607,7 @@ def process_authors(
         )
 
         if addr_parts:
-            link_addresses(cur, sa_id, addr_parts)
+            address_linker.link(cur, sa_id, addr_parts)
 
 
 # =============================================================
@@ -621,11 +623,14 @@ def process_work(
     *,
     journal_repo: JournalRepository,
     pub_repo: PublicationRepository,
+    zenodo_resolver: ZenodoResolver,
+    staging_queries: StagingQueries,
+    address_linker: AddressLinker,
     struct_cache: dict | None = None,
     struct_name_cache: dict | None = None,
 ) -> bool:
     """Traite un work du staging HAL."""
-    from infrastructure.timings import StepTimer
+    from application.pipeline.timings import StepTimer
 
     staging_id, hal_id, doi, raw_data, hal_collections_staging = staging_row
     doc = raw_data
@@ -641,7 +646,7 @@ def process_work(
         raw_doi = clean_doi(as_str(doc.get("doiId_s")))
         if raw_doi and is_zenodo_doi(raw_doi):
             try:
-                version_doi = resolve_zenodo_doi(raw_doi)
+                version_doi = zenodo_resolver.resolve(raw_doi)
             except ZenodoResolutionError as e:
                 logger.warning(f"  {hal_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
                 return False
@@ -651,7 +656,7 @@ def process_work(
                         f"  {hal_id} concept DOI Zenodo {raw_doi} -> "
                         f"version {version_doi} deja en staging, skip"
                     )
-                    mark_staging_done(cur, staging_id)
+                    staging_queries.mark_done(cur, staging_id)
                     return False
 
         publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
@@ -702,6 +707,7 @@ def process_work(
             queries,
             doc,
             source_publication_id,
+            address_linker=address_linker,
             struct_cache=struct_cache,
             struct_name_cache=struct_name_cache,
         )
@@ -711,7 +717,7 @@ def process_work(
             refresh_from_sources(cur, publication_id, repo=pub_repo)
         t.mark("refresh")
 
-        mark_staging_done(cur, staging_id)
+        staging_queries.mark_done(cur, staging_id)
         t.log_if_slow(hal_id, logger)
 
         return True
@@ -736,6 +742,8 @@ class HalNormalizer(SourceNormalizer):
         queries: HalNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
         pub_repo_factory: Callable[[Any], PublicationRepository],
+        zenodo_resolver: ZenodoResolver,
+        address_linker: AddressLinker,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -743,6 +751,8 @@ class HalNormalizer(SourceNormalizer):
         self._journal_repo: JournalRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
+        self._zenodo_resolver = zenodo_resolver
+        self._address_linker = address_linker
         self._struct_cache: dict[str, int] = {}
         self._struct_name_cache: dict[int, str] = {}
 
@@ -764,6 +774,9 @@ class HalNormalizer(SourceNormalizer):
             row,
             journal_repo=self._journal_repo,
             pub_repo=self._pub_repo,
+            zenodo_resolver=self._zenodo_resolver,
+            staging_queries=self._staging,
+            address_linker=self._address_linker,
             struct_cache=self._struct_cache,
             struct_name_cache=self._struct_name_cache,
         )
@@ -781,4 +794,5 @@ class HalNormalizer(SourceNormalizer):
     def cleanup(self) -> None:
         self._struct_cache.clear()
         self._struct_name_cache.clear()
+        self._address_linker.clear_cache()
         _hal_author_cache.clear()

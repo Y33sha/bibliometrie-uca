@@ -28,6 +28,7 @@ from typing import Any
 from psycopg2.extras import Json
 
 from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.address_linker import AddressLinker
 from application.ports.normalize_theses import ThesesNormalizeQueries
 from application.ports.staging import StagingQueries
 from application.publications import (
@@ -41,8 +42,6 @@ from domain.names import names_compatible
 from domain.normalize import normalize_name, normalize_text
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
-from infrastructure.addresses import link_addresses
-from infrastructure.db_helpers import mark_staging_done
 
 # =============================================================
 # PUBLICATIONS
@@ -348,7 +347,12 @@ def upsert_source_author(cur: Any, queries: ThesesNormalizeQueries, person: dict
 
 
 def process_persons(
-    cur: Any, queries: ThesesNormalizeQueries, these: dict, source_publication_id: int
+    cur: Any,
+    queries: ThesesNormalizeQueries,
+    these: dict,
+    source_publication_id: int,
+    *,
+    address_linker: AddressLinker,
 ) -> None:
     """Traite tous les rôles d'une thèse : auteurs, directeurs, rapporteurs, etc.
 
@@ -409,7 +413,7 @@ def process_persons(
         )
 
         if addr_parts:
-            link_addresses(cur, sa_id, addr_parts)
+            address_linker.link(cur, sa_id, addr_parts)
         if is_author:
             position += 1
 
@@ -426,6 +430,8 @@ def process_work(
     row: dict,
     *,
     pub_repo: PublicationRepository,
+    staging_queries: StagingQueries,
+    address_linker: AddressLinker,
 ) -> bool:
     """Traite une thèse du staging."""
     staging_id = row["id"]
@@ -451,13 +457,15 @@ def process_work(
             cur, queries, these, staging_id, theses_id, publication_id, pub_meta
         )
 
-        process_persons(cur, queries, these, source_publication_id)
+        process_persons(
+            cur, queries, these, source_publication_id, address_linker=address_linker
+        )
 
         if publication_id:
             refresh_from_sources(cur, publication_id, repo=pub_repo)
             _update_thesis_meta(cur, queries, publication_id, these)
 
-        mark_staging_done(cur, staging_id)
+        staging_queries.mark_done(cur, staging_id)
 
         return True
 
@@ -477,11 +485,13 @@ class ThesesNormalizer(SourceNormalizer):
         staging_queries: StagingQueries,
         queries: ThesesNormalizeQueries,
         pub_repo_factory: Callable[[Any], PublicationRepository],
+        address_linker: AddressLinker,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
+        self._address_linker = address_linker
 
     def preload_caches(self, cur: Any) -> None:
         self._pub_repo = self._pub_repo_factory(cur)
@@ -489,8 +499,17 @@ class ThesesNormalizer(SourceNormalizer):
     def process_work(self, cur: Any, row: Any) -> bool | None:
         assert self._pub_repo is not None
         return process_work(
-            cur, self._queries, self.logger, row, pub_repo=self._pub_repo
+            cur,
+            self._queries,
+            self.logger,
+            row,
+            pub_repo=self._pub_repo,
+            staging_queries=self._staging,
+            address_linker=self._address_linker,
         )
+
+    def cleanup(self) -> None:
+        self._address_linker.clear_cache()
 
     def summary_stats(self, cur: Any) -> list[str]:
         return [

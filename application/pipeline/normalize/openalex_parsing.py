@@ -1,12 +1,8 @@
-"""Helpers d'extraction de données spécifiques à l'API OpenAlex.
+"""Parsing pur de la forme des réponses OpenAlex.
 
 Ces fonctions lisent la forme des réponses OpenAlex (primary_location,
 landing_page_url, …) et en tirent des informations métier (NNT quand
-c'est une thèse theses.fr).
-
-Reliées à l'adapter OpenAlex (extraction/) plutôt qu'au domaine : le
-"comment extraire" dépend du format de réponse OpenAlex, qui est
-externe et peut évoluer.
+c'est une thèse theses.fr). Pas d'I/O, pas de dépendance infrastructure.
 """
 
 import re

@@ -3,6 +3,7 @@
 import os
 
 from application.pipeline.normalize.normalize_theses import ThesesNormalizer
+from infrastructure.addresses import PgAddressLinker
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.normalize_theses import PgThesesNormalizeQueries
 from infrastructure.db.queries.staging import PgStagingQueries
@@ -20,6 +21,7 @@ def main() -> None:
         PgStagingQueries(),
         PgThesesNormalizeQueries(),
         pub_repo_factory=publication_repository,
+        address_linker=PgAddressLinker(),
     ).run()
 
 

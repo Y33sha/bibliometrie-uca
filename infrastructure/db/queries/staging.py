@@ -77,6 +77,14 @@ def fetch_staging_by_ids(cur: Any, staging_ids: list[int], *, columns: str) -> l
     return cur.fetchall()
 
 
+def mark_done(cur: Any, staging_id: int) -> None:
+    """Marque un staging comme traité et vide le raw_data."""
+    cur.execute(
+        "UPDATE staging SET processed = TRUE, raw_data = '{}'::jsonb WHERE id = %s",
+        (staging_id,),
+    )
+
+
 class PgStagingQueries:
     """Adapter PostgreSQL pour `application.ports.staging.StagingQueries`."""
 
@@ -96,3 +104,6 @@ class PgStagingQueries:
 
     def fetch_staging_by_ids(self, cur: Any, staging_ids: list[int], *, columns: str) -> list[Any]:
         return fetch_staging_by_ids(cur, staging_ids, columns=columns)
+
+    def mark_done(self, cur: Any, staging_id: int) -> None:
+        mark_done(cur, staging_id)

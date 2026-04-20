@@ -21,6 +21,7 @@ from psycopg2.extras import RealDictCursor
 
 from application.persons import merge_person
 from infrastructure.db.connection import get_connection
+from infrastructure.repositories import person_repository
 
 PAIRS_SQL = """
 WITH name_candidates AS (
@@ -135,7 +136,7 @@ def main() -> None:
 
         target_id, source_id = choice
         if not args.dry_run:
-            do_merge(cur, target_id, source_id)
+            do_merge(cur, target_id, source_id, repo=person_repository(cur))
         skipped_already_merged.add(source_id)
         merged += 1
 
