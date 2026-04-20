@@ -49,7 +49,7 @@ class Settings(BaseSettings):
 
     @property
     def db_args(self) -> dict:
-        """Arguments pour psycopg2.connect() / ThreadedConnectionPool."""
+        """Arguments pour psycopg.connect() / psycopg_pool.ConnectionPool."""
         return {
             "dbname": self.db_name,
             "user": self.db_user,

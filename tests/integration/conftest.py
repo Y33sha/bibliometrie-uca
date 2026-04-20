@@ -6,7 +6,7 @@ rollbackée après chaque test (isolation complète).
 
 Fonctionne en local (PostgreSQL natif) et dans Docker (conteneur db).
 N'utilise pas de commandes shell (dropdb, createdb, psql) — tout passe
-par psycopg2 pour être portable.
+par psycopg3 pour être portable.
 """
 
 import os

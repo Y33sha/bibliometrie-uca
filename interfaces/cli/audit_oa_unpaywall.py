@@ -11,7 +11,7 @@ import csv
 import os
 import time
 
-import psycopg2
+import psycopg
 import requests
 
 from infrastructure.api_limits import UNPAYWALL_DELAY
@@ -54,7 +54,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    conn = psycopg2.connect(**settings.db_args)
+    conn = psycopg.connect(**settings.db_args)
     cur = conn.cursor()
 
     # Récupérer les pubs avec DOI, statut connu, et source OpenAlex

@@ -8,7 +8,7 @@ import csv
 import os
 from typing import Any
 
-import psycopg2
+import psycopg
 
 from infrastructure.settings import settings
 
@@ -191,7 +191,7 @@ def map_publishers(cur: Any) -> Any:
 
 
 def main() -> None:
-    conn = psycopg2.connect(**settings.db_args)
+    conn = psycopg.connect(**settings.db_args)
     cur = conn.cursor()
 
     # Vider la table avant import (ré-importable)
@@ -218,6 +218,7 @@ def main() -> None:
         "SELECT COUNT(*) AS total, COUNT(publication_id) AS with_pub, COUNT(journal_id) AS with_journal, COUNT(publisher_id) AS with_publisher FROM apc_payments"
     )
     s = cur.fetchone()
+    assert s is not None  # SELECT COUNT(*) renvoie toujours une row
     print(f"\nTotal: {s['total']} lignes")
     print(f"  avec publication_id: {s['with_pub']}")
     print(f"  avec journal_id: {s['with_journal']}")

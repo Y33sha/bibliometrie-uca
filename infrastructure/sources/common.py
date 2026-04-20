@@ -23,7 +23,7 @@ def get_cross_import_dois(conn: Any, target: str, all_staged: bool = False) -> l
     """Retourne les DOI présents dans les autres sources staging mais absents de la cible.
 
     Args:
-        conn: connexion psycopg2
+        conn: connexion psycopg3
         target: clé source cible (hal, openalex, wos, scanr)
         all_staged: si False, ne considère que les documents non normalisés (processed=FALSE)
     """
