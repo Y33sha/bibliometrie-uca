@@ -203,7 +203,7 @@ async def timing_middleware(request: Request, call_next: Any) -> Any:
 # Seuil à partir duquel une source est considérée "stale" (pas extraite
 # récemment). theses.fr est mensuel, les autres devraient être hebdomadaires.
 _STALE_THRESHOLD_DAYS = 7
-_PIPELINE_STATUS_FILE = Path(__file__).resolve().parent.parent / "pipeline" / "status.json"
+_PIPELINE_STATUS_FILE = Path(__file__).resolve().parent.parent.parent / "logs" / "status.json"
 
 
 @app.get("/api/health")

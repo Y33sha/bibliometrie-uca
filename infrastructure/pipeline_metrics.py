@@ -4,20 +4,26 @@ import datetime
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
-REPORTS_DIR = Path(__file__).parent / "reports"
-
-LOG_DIRS = [
-    BASE / "processing" / "logs",
-    BASE / "extraction" / "hal" / "logs",
-    BASE / "extraction" / "openalex" / "logs",
-    BASE / "extraction" / "wos" / "logs",
-    BASE / "extraction" / "scanr" / "logs",
-    BASE / "extraction" / "theses" / "logs",
-]
+LOGS_ROOT = BASE / "logs"
+REPORTS_DIR = LOGS_ROOT / "reports"
 
 
 # Fichiers log à exclure de la capture (sortie orchestrateur, loggers parasites)
 _EXCLUDED_LOGS = {"cron.log", "zenodo.log"}
+
+
+def _iter_log_files() -> list[Path]:
+    """Retourne tous les fichiers .log sous ``logs/`` (hors reports/ et exclus)."""
+    if not LOGS_ROOT.exists():
+        return []
+    files = []
+    for f in LOGS_ROOT.rglob("*.log"):
+        if f.name in _EXCLUDED_LOGS:
+            continue
+        if REPORTS_DIR in f.parents:
+            continue
+        files.append(f)
+    return files
 
 
 def capture_log_offsets() -> dict[str, int]:
@@ -26,15 +32,7 @@ def capture_log_offsets() -> dict[str, int]:
     Retourne un dict {chemin_absolu: byte_offset} pour pouvoir
     lire uniquement le contenu ajouté après cet instant.
     """
-    offsets = {}
-    for log_dir in LOG_DIRS:
-        if not log_dir.exists():
-            continue
-        for f in log_dir.glob("*.log"):
-            if f.name in _EXCLUDED_LOGS:
-                continue
-            offsets[str(f)] = f.stat().st_size
-    return offsets
+    return {str(f): f.stat().st_size for f in _iter_log_files()}
 
 
 def read_new_logs(offsets: dict[str, int]) -> str:
@@ -43,24 +41,18 @@ def read_new_logs(offsets: dict[str, int]) -> str:
     Retourne le texte concaténé (avec en-têtes par fichier).
     """
     parts = []
-    for log_dir in LOG_DIRS:
-        if not log_dir.exists():
+    for f in sorted(_iter_log_files()):
+        path = str(f)
+        prev_size = offsets.get(path, 0)
+        current_size = f.stat().st_size
+        if current_size <= prev_size:
             continue
-        for f in sorted(log_dir.glob("*.log")):
-            if f.name in _EXCLUDED_LOGS:
-                continue
-            path = str(f)
-            prev_size = offsets.get(path, 0)
-            current_size = f.stat().st_size
-            if current_size <= prev_size:
-                continue
-            with open(f, encoding="utf-8", errors="replace") as fh:
-                fh.seek(prev_size)
-                content = fh.read().rstrip()
-            if content:
-                # En-tête relatif au projet
-                rel = f.relative_to(BASE)
-                parts.append(f"### {rel}\n```\n{content}\n```")
+        with open(f, encoding="utf-8", errors="replace") as fh:
+            fh.seek(prev_size)
+            content = fh.read().rstrip()
+        if content:
+            rel = f.relative_to(BASE)
+            parts.append(f"### {rel}\n```\n{content}\n```")
     return "\n\n".join(parts)
 
 
@@ -70,7 +62,7 @@ def generate_report(
     phases: list[tuple[str, float, str]],  # [(name, duration_s, logs)]
     total_duration: float,
 ) -> str:
-    """Génère le rapport Markdown et l'écrit dans pipeline/reports/."""
+    """Génère le rapport Markdown et l'écrit dans logs/reports/."""
     import os
 
     now = datetime.datetime.now()

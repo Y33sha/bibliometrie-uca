@@ -3,6 +3,9 @@
 Par défaut, les logs sont émis au format JSON (une ligne = un record) pour
 permettre leur agrégation par un collecteur externe (Loki, ELK, stdout→fluentd).
 Pour revenir au format texte lisible en dev : `export LOG_FORMAT=text`.
+
+Tous les fichiers .log sont consolidés sous ``PROJECT_ROOT/logs/``, en
+reproduisant l'arborescence du caller (voir ``_rebase_log_dir``).
 """
 
 import io
@@ -11,6 +14,9 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Attributs internes de logging.LogRecord à ne PAS inclure dans la sortie JSON
 # (ils sont soit déjà couverts, soit trop verbeux).
@@ -71,15 +77,40 @@ def _make_formatter() -> logging.Formatter:
     return JsonFormatter()
 
 
+def _rebase_log_dir(log_dir: str) -> Path:
+    """Rebase ``log_dir`` vers ``PROJECT_ROOT/logs/<relpath>/``.
+
+    Le relpath est calculé à partir du chemin du caller relatif à la racine
+    du projet. Un suffixe ``logs`` final est éliminé pour éviter une
+    imbrication redondante ``logs/.../logs/``. Un chemin hors projet est
+    replié sous ``PROJECT_ROOT/logs/`` en préservant ses segments nommés.
+    """
+    p = Path(log_dir)
+    if not p.is_absolute():
+        p = _PROJECT_ROOT / p
+    try:
+        rel = p.resolve().relative_to(_PROJECT_ROOT)
+    except ValueError:
+        rel = Path(*(part for part in p.parts if part not in ("/", "\\", "")))
+    parts = list(rel.parts)
+    while parts and parts[-1] == "logs":
+        parts.pop()
+    return _PROJECT_ROOT / "logs" / Path(*parts) if parts else _PROJECT_ROOT / "logs"
+
+
 def setup_logger(name: str, log_dir: str) -> logging.Logger:
     """Configure un logger avec sortie console + fichier.
 
-    Crée le répertoire de logs si nécessaire.
+    Le ``log_dir`` passé par le caller est rebasé vers
+    ``PROJECT_ROOT/logs/<relpath>/`` (voir ``_rebase_log_dir``) afin que
+    tous les fichiers ``.log`` soient regroupés sous une arborescence
+    unique. Crée le répertoire si nécessaire.
     Configure uniquement le logger nommé (pas le root logger).
     Format : JSON par défaut, texte si LOG_FORMAT=text.
     """
-    os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, f"{name}.log")
+    target_dir = _rebase_log_dir(log_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    log_file = str(target_dir / f"{name}.log")
 
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
