@@ -13,7 +13,8 @@ personnes et laboratoires.
   `run_pipeline.py`), extracteurs dans `infrastructure/sources/`
 - **Architecture** : DDD en 4 couches (`domain/`, `application/`,
   `infrastructure/`, `interfaces/`) — voir
-  [docs/architecture.md](docs/architecture.md)
+  [docs/architecture.md](docs/architecture.md) (archi logicielle) et
+  [docs/donnees.md](docs/donnees.md) (modèle de données)
 
 ## Prérequis
 
@@ -212,7 +213,8 @@ d'import entre couches (vérifiées par import-linter en pre-commit + CI).
 
 ## Documentation
 
-- [Architecture des données](docs/architecture.md) — schéma, principes de conception
+- [Architecture logicielle](docs/architecture.md) — couches DDD, ports/adapters, règles d'import
+- [Modèle de données](docs/donnees.md) — schéma, domaines fonctionnels, relations
 - [Pipeline](docs/pipeline.md) — les 9 phases de traitement
 - [Sources de données](docs/sources.md) — API, imports manuels, particularités par source
 - [Guide d'exploitation](docs/exploitation.md) — lancement, reprise, supervision, déploiement

@@ -1,263 +1,249 @@
-# Architecture des données — Bibliométrie UCA
+# Architecture logicielle — Bibliométrie UCA
 
-## Principes de conception
+Pour le modèle de données (tables, relations, domaines fonctionnels),
+voir [donnees.md](donnees.md).
 
-Le schéma repose sur une distinction entre des tables "sources" et des tables "canoniques" (= vérité).
-    - Les tables sources contiennent les *records* non dédupliqués importés depuis les API.
-    - Les tables canoniques contiennent les référentiels **publications** et **personnes** dédupliqués et mappés depuis les sources (de manière automatisée avec possibilité de curation manuelle), ainsi que le référentiel **structures** (endogène, renseigné manuellement).
+## Vue d'ensemble
 
-```mermaid
-flowchart LR
-    subgraph sources
-    direction LR
-        source_publications---source_authorships
-        source_persons---source_authorships
-        source_authorships---source_structures
-    end
-    subgraph vérité
-        direction LR
-        publications---authorships
-        persons---authorships
-        authorships---structures
-    end
-    source_publications--->publications
-    source_authorships--->persons
+Le projet suit une architecture **hexagonale (DDD)** en 4 couches
+distinctes, vérifiées par `import-linter` en pre-commit et en CI.
 
 ```
-
-### Entités principales et relations
-
-#### Tables sources
-Les tables sources s'organisent selon un schéma en quatre tables: `source_publications`, `source_persons`, `source_authorships`, `source_structures`. Une `authorship` représente la contribution d'**un** auteur à **une** publication. C'est elle qui porte l'information d'affiliation (`structure_ids`).
-
-```mermaid
-erDiagram
-    direction LR
-    Publications ||--|{ Authorships : a_pour_auteurs
-    Persons ||--|{ Authorships : est_auteur_de
-    Authorships }o--|{ Structures : est_affilie_a
-
+┌─────────────────────────────────────────────────────────┐
+│  interfaces/       (adapters entrants — HTTP / CLI)     │
+│  ├─ api/           FastAPI : routers, middlewares       │
+│  ├─ frontend/      SvelteKit                            │
+│  └─ cli/           Scripts one-shot (imports, debug)    │
+└────────────────────┬────────────────────────────────────┘
+                     │ peut importer tout le reste
+       ┌─────────────┴─────────────┐
+       ▼                           ▼
+┌─────────────────┐         ┌──────────────────────────┐
+│  application/   │         │  infrastructure/          │
+│  services,      │  ───✗   │  adapters sortants (SQL,  │
+│  orchestrateurs │  (port) │  APIs, settings, logs)    │
+└────────┬────────┘         └──────────────┬────────────┘
+         │                                 │
+         └────────────────┬────────────────┘
+                          ▼
+                  ┌───────────────┐
+                  │  domain/      │
+                  │  entités,     │
+                  │  value objects│
+                  │  règles pures │
+                  └───────────────┘
 ```
 
-Les tables sources sont toutes peuplées lors de la [phase 3](pipeline#normalize) du pipeline (`normalize`).
+Règles dures :
 
-#### Tables “canoniques”
+- `domain/` est le noyau pur : **zéro I/O**, zéro import externe
+  (hormis stdlib). Peut être unit-testé sans DB, sans HTTP, sans
+  mock.
+- `application/` et `infrastructure/` sont **siblings** : ni l'un ni
+  l'autre ne peut importer l'autre directement. Leurs interactions
+  passent par des **ports** (Protocol) définis dans `application/ports/`
+  ou `domain/ports/`.
+- `interfaces/` peut tout importer ; c'est le niveau composition root.
 
-Les tables canoniques obéissent au même schéma et sont peuplées progressivement au cours du [pipeline](pipeline#tables-canoniques) de traitement.
+Le contrat `layers` est dans `pyproject.toml` (`[tool.importlinter]`).
+Toute violation fait échouer pre-commit et la CI.
 
+## Les 4 couches en détail
 
-## Zones fonctionnelles et propriétaires de données
+### `domain/` — noyau métier pur
 
-Chaque table a un **service propriétaire** qui est le seul autorisé à y écrire
-(INSERT/UPDATE/DELETE). Les autres composants lisent via SELECT mais passent par
-le service pour écrire.
+Contenu :
+- **Value objects** : `DOI`, `ORCID`, `IdRef`, normalisation de noms
+  (`names.py`, `normalize.py`), identité ORCID/idHAL
+- **Modèles métier** : représentations immutables (dataclasses) avec
+  invariants (`publication.py`, `person.py`, `structure.py`)
+- **Règles métier pures** : `doc_types`, `authorship_roles`, `sources`
+  (enum des 5 sources)
+- **Ports repositories** (`domain/ports/*`) : interfaces Protocol pour
+  `PersonRepository`, `PublicationRepository`, `JournalRepository`,
+  `StructureRepository`, `AuthorshipRepository`, `AddressRepository`,
+  `ConfigRepository`
 
-### Staging — scripts d'extraction
+Le domaine est testé en unit sans DB.
 
-| Table | Propriétaire |
-|-------|-------------|
-| `staging` | extracteurs (`extraction/*/extract_*.py`, cross-imports) |
+### `application/` — services et orchestrateurs
 
-Table unique pour toutes les sources. Colonnes notables : `source` (enum), `source_id`, `raw_data` (JSONB, vidé après normalisation), `hal_collections` (text[], HAL uniquement), `not_found` (documents disparus).
+Contenu :
+- **Services métier** : `persons.py`, `publications.py`, `journals.py`,
+  `authorships.py`, `structures.py`, `addresses.py`, `audit.py`,
+  `config.py`. Ces services reçoivent leurs dépendances par injection
+  (kwarg `repo=`, cf. §1.7b de la ROADMAP).
+- **Orchestrateurs pipeline** dans `application/pipeline/` :
+  - `normalize/` — staging → tables sources (un module par source)
+  - `build/` — construction authorships, affiliations, name_forms
+  - `create/` — création publications, personnes
+  - `merge/` — fusions inter-sources (DOI, HAL-ID, NNT)
+  - `enrich/` — Unpaywall, APC
+  - `harvest/` — identifiants HAL (ORCID, IdRef)
+  - `countries/` — détection pays, refresh
+  - `addresses/` — résolution adresses → structures
+- **Ports** (`application/ports/*`) : interfaces Protocol pour les
+  query services (adapters dans `infrastructure/db/queries/*`).
 
-### Sources bibliographiques — scripts de normalisation
+Interdiction : **`application/` ne peut pas importer
+`infrastructure/`**. 15 violations historiques grandfathered dans
+`ignore_imports` (pipeline normalize_* qui utilisent encore
+`infrastructure.addresses`, `db_helpers`, `zenodo`, `openalex`,
+`timings`, `perimeter`). Chaque nettoyage = une ligne retirée
+(cf. ROADMAP §1.7b).
 
-| Table | Propriétaire |
-|-------|-------------|
-| `source_publications` | `processing/normalize_*.py` |
-| `source_persons` | `processing/normalize_*.py` |
-| `source_authorships` | `processing/normalize_*.py` |
-| `source_structures` | `processing/normalize_hal.py`, `enrich_hal_structures.py` |
+### `infrastructure/` — adapters sortants
 
-Note : `person_id` sur `source_authorships` est écrit par `application/persons.py` (rattachement), pas par les normaliseurs. `in_perimeter` et `structure_ids` sont écrits par `populate_affiliations.py`.
+Contenu :
+- **`db/`** :
+  - `schema.sql`, `seed.sql`
+  - `migrations/` — migrations numérotées, appliquées via
+    `python -m infrastructure.db.migrate`
+  - `queries/` — query services SQL (un par agrégat ou phase
+    pipeline) ; implémentent les ports définis dans `application/
+    ports/*`
+  - `connection.py` — pool psycopg2
+- **`repositories/`** — adapters PostgreSQL implémentant les ports
+  `domain/ports/*` : `person_repository.py`, `publication_repository.py`,
+  `journal_repository.py`, `structure_repository.py`,
+  `authorship_repository.py`, `address_repository.py`,
+  `config_repository.py`. Factories exposées dans `__init__.py`
+  (`person_repository(cur)`, `publication_repository(cur)`, …).
+- **`sources/`** — extracteurs API (HAL, OpenAlex, WoS, ScanR,
+  theses.fr). Héritent de `SourceExtractor` (`base.py`).
+- **Divers** : `log.py` (JSON structuré), `settings.py`
+  (pydantic-settings), `perimeter.py`, `addresses.py`, `zenodo.py`,
+  `api_retry.py`, `api_limits.py`, `pipeline_metrics.py`.
 
-### Référentiel Publications — `application/publications.py`
+Interdiction : **`infrastructure/` ne peut pas importer
+`application/`** (sauf par un port explicitement passé).
 
-| Table | Propriétaire | Notes |
-|-------|-------------|-------|
-| `publications` | `application/publications.py` | `refresh_from_sources()` recalcule les métadonnées depuis les source_publications |
-| `distinct_publications` | API admin | paires marquées distinctes malgré titre identique |
-| `apc_payments` | import APC (CSV) | — |
-| `journals` | `application/journals.py` | — |
-| `publishers` | `application/journals.py` | — |
+### `interfaces/` — adapters entrants
 
-### Référentiel Personnes — `application/persons.py`
+Contenu :
+- **`api/`** — FastAPI :
+  - `app.py` — entry point (routers, middlewares, gestion d'erreurs)
+  - `routers/` — un module par agrégat (publications, persons,
+    laboratories, addresses, …)
+  - `models.py` — Pydantic pour les bodies POST/PUT/PATCH
+  - `deps.py` — dépendances (pool DB, auth)
+  - `middlewares/` — request-id, audit, timing
+- **`frontend/`** — SvelteKit (Svelte 5)
+- **`cli/`** — scripts one-shot (imports manuels, debug, corrections
+  ponctuelles). Exclus de la couverture pytest
+  (`[tool.coverage.run]` omit).
 
-| Table | Propriétaire | Notes |
-|-------|-------------|-------|
-| `persons` | `application/persons.py` | import RH écrit aussi (toléré) |
-| `persons_rh` | import RH (CSV) | table satellite |
-| `person_identifiers` | `application/persons.py` | ORCID, idHAL, IdRef |
-| `person_name_forms` | `application/persons.py` | recalcul bulk par `populate_person_name_forms.py` |
+## Patterns d'injection
 
-### Authorships canoniques — `build_authorships.py`
+### Services applicatifs ↔ repositories
 
-| Table | Propriétaire | Notes |
-|-------|-------------|-------|
-| `authorships` | `build_authorships.py` + `application/authorships.py` | dédupliqué (person_id, publication_id), consolide in_perimeter et structure_ids depuis les sources |
+Les services acceptent leur repo en kwarg :
 
-### Structures — admin (pas de service)
-
-| Table | Propriétaire |
-|-------|-------------|
-| `structures` | admin / API |
-| `structure_relations` | admin / API |
-| `structure_name_forms` | admin / API |
-| `perimeters` | admin / API |
-| `countries`, `country_name_forms` | référentiel statique |
-| `config` | admin / API |
-
-### Adresses — scripts du pipeline
-
-| Table | Propriétaire |
-|-------|-------------|
-| `addresses` | `populate_addresses.py` |
-| `address_structures` | `resolve_addresses.py`, admin (confirmation manuelle) |
-| `source_authorship_addresses` | `populate_addresses.py` |
-
-
-## Détail des tables
-
-### Tables canoniques
-
-#### <span id="structures"></span>Domaine fonctionnel `structures`
-
-Référentiel institutionnel maintenu manuellement. Contient l'UCA, ses laboratoires, les co-tutelles (CNRS, INRAE...), d'autres établissements partenaires (INP, VetAgro Sup, le CHU), etc.
-
-- `code` : identifiant court stable (`uca`, `cnrs`, `lpc`, `ip`)
-- `structure_type` : `universite`, `onr`, `chu`, `ecole`, `labo`, `equipe`, `site`, `autre`
-- `ror_id` : identifiant ROR
-- `rnsr_id` : identifiant RNSR
-- `hal_collection` : collection HAL associée
-- `api_ids` : identifiants dans les sources API (OpenAlex, etc.)
-
-```mermaid
-flowchart LR
-    structure_name_forms --- structures
-    structure_relations --- structures
-    perimeters---structures
-    structures --- authorships
-    authorships --- publications
-    authorships --- persons
-    structures ---|acronyme| apc_payments
-    apc_payments ---|DOI| publications
-    structures --- address_structures
-    address_structures --- addresses
-
-    classDef manuel  fill:#8e5,stroke:#5a3
-    class structures,structure_name_forms,perimeters,structure_relations manuel;
-    classDef csv fill:#fa5
-    class apc_payments csv
-    classDef auto fill:#adf,stroke:#58c
-    class address_structures,addresses,authorships,persons,publications auto
-    classDef main stroke-width:4px,font-weight:bold
-    class structures,publications,persons,authorships main
+```python
+def set_rejected(cur: Any, person_id: int, rejected: bool, *,
+                 repo: PersonRepository) -> None:
+    repo.set_rejected(person_id, rejected)
 ```
 
-Légende:
-- **vert**: tables peuplées manuellement;
-- **orange**: imports CSV;
-- **bleu**: tables peuplées automatiquement par le pipeline à partir des imports API.
+Les callers directs (routers, tests, scripts CLI) créent l'instance
+via la factory :
 
-Tables associées :
-- `perimeters` : un périmètre est un ensemble de structures, incluant récursivement les sous-structures. Actuellement deux périmètres sont définis: **UCA** et **UCA élargi** (UCA + CHU + INP). Impacte:
-    - les critères d'affiliation utilisés en paramètre des requêtes API;
-    - les authorships sources dont le champ `structure_ids` sera peuplé par le pipeline ([phase 5](pipeline#affiliations) du pipeline), et qui serviront à générer des `publications` et des `personnes` dans les tables canoniques.
-
-- `structure_relations` : définit les relations entre structures. Deux relations existent: **tutelle** (asymétrique), **partenariat** (symétrique, non transitif). La relation "partenariat" est purement informative (elle réplique l'information présente dans le [référentiel ROR](glossaire#ror)); la relation "tutelle" a une conséquence sur les **structures incluses dans un périmètre** donné.
-- `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: `LMV` reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `addresses` du [pipeline](pipeline#addresses) pour peupler la table de liaison `address_structures`.
-- `address_structures`: table de liaison. Les adresses proviennent des authorships sources (phase 4 `addresses` du pipeline). Les structures identifiées sont ensuite propagées aux authorships sources.
-- `apc_payments`: données provenant d'un import CSV, voir [doc sources](sources#donnees-apc).
-
-La page [**admin/structures**](guide-utilisateur#admin-structures) permet de gérer le CRUD des structures ainsi que leurs relations et formes de noms.
-
-La page [**admin/config**](guide-utilisateur#admin-config) permet de gérer le CRUD des périmètres et quel périmètre est pris en compte à différentes étapes du *pipeline*.
-
-#### <span id="publications"></span>Domaine fonctionnel  `publications`
-
-Référentiel dédupliqué. Hiérarchie de déduplication :
-1. **DOI identique** (case-insensitive) → même publication (sauf cas particuliers)
-2. **NNT identique** (pour les thèses)
-3. **hal-id identique** (OpenAlex ou ScanR citant HAL comme source)
-4. **Métadonnées** : rien en place pour l'instant, algorithme à mettre en place <!--TODO: algo de déduplication par identité de métadonnées-->
-5. Interface de dédoublonnage manuel `admin/duplicates` <!--TODO: améliorer l'interface de déduplication; à terme, autoriser un user à signaler un doublon-->
-
-
-```mermaid
-flowchart LR
-    structures --- authorships
-    authorships --- publications
-    authorships --- persons
-    structures --- apc_payments
-    apc_payments ---|DOI| publications
-    source_publications-->|normalize|publications
-    publications---journals
-    journals---publishers
-
-    classDef manuel  fill:#8e5,stroke:#5a3
-    class structures,structure_name_forms,perimeters,structure_relations manuel;
-    classDef csv fill:#fa5
-    class apc_payments csv
-    classDef auto fill:#adf,stroke:#58c
-    class source_publications,publications,journals,publishers,authorships,persons auto
-    classDef main stroke-width:4px,font-weight:bold
-    class structures,publications,persons,authorships main
-
+```python
+from infrastructure.repositories import person_repository
+set_rejected(db, person_id, True, repo=person_repository(db))
 ```
 
-Tables associées:
-- `journals`: référentiel des revues
-- `publishers` : référentiel des éditeurs
-- `apc_payments`
-- `distinct_publications` (non représenté ci-dessus): Paires de publications marquées comme **distinctes malgré un titre identique**, évite de les re-suggérer dans l'interface de dédoublonnage `admin/duplicates`.
+### Orchestrateurs pipeline ↔ query services + repositories
 
-#### <span id="persons"></span>Domaine fonctionnel `persons`
+Les orchestrateurs dans `application/pipeline/*` ne peuvent pas
+importer `infrastructure.*` directement. Deux mécanismes :
 
-Référentiel des individus. Une ligne = une personne physique. Alimenté par le script `create_persons_from_source_authorships.py` (création automatique depuis les authorships) et complété par les exports RH (données dans la table satellite `persons_rh`).
+1. **Query services** (SQL de la phase) : passés en paramètre
+   typés par un port `application/ports/*`. L'entry point
+   (`run_pipeline.py` ou `interfaces/cli/pipeline/*`) instancie les
+   adapters `Pg*Queries` concrets.
 
-```mermaid
-flowchart LR
-    structures --- authorships
+2. **Repositories** (ex. `PublicationRepository`) : quand un
+   orchestrateur a besoin d'un repo, on passe un **factory callable**
+   `repo_factory: Callable[[Any], XRepository]` au constructeur.
+   L'orchestrateur appelle `self._repo = self._repo_factory(cur)` dans
+   `preload_caches()` ou au début de `run()`.
 
-    authorships --- publications
-    authorships ---- persons
-    source_authorships-->persons
-    persons---persons_rh
-    persons---person_identifiers
-    persons---person_name_forms
+Exemple depuis `run_pipeline.py` :
 
-    classDef manuel  fill:#8e5,stroke:#5a3
-    class structures,structure_name_forms,perimeters,structure_relations manuel;
-    classDef csv fill:#fa5
-    class persons_rh csv
-    classDef auto fill:#adf,stroke:#58c
-    class source_authorships,publications,person_identifiers,person_name_forms,authorships,persons auto
-    classDef main stroke-width:4px,font-weight:bold
-    class structures,publications,persons,authorships main
+```python
+from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
+from infrastructure.repositories import person_repository
 
-
+PgPersonsCreateQueries()        # adapter query service
+person_repository(cur)          # factory repository
 ```
 
-Tables associées :
-- `persons_rh`: Table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](sources#donnees-rh).
-- `person_identifiers`: Identifiants persistants : ORCID, idHAL, IdRef, etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` trace la provenance (`hal`, `openalex`, `scanr`, `theses`, `manual`, `auto`). La relation *many-to-one* permet de gérer les quelques cas d'ORCID multiples confirmés, et les nombreux cas d'identifiants (corrects ou erronés) en attente de vérification moissonnés dans les sources.
-- `person_name_forms`: Formes de noms normalisées, utilisées pour le matching lors de la création de personnes. Chaque forme pointe vers un tableau de `person_ids`. Lorsqu'une authorship source est reliée à une personne, la forme de nom est ajoutée (si absente) aux name_forms de cette personne.
+## Pipeline
 
-#### `authorships`
+L'orchestrateur `run_pipeline.py` à la racine enchaîne 9 phases :
 
-Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures. Construite par `build_authorships.py` à partir des *authorships* sources.
+1. **extract** — sources → staging (JSONB brut)
+2. **cross_imports** — DOIs manquants entre sources, fetch HAL par
+   hal-id / NNT
+3. **normalize** — staging → tables sources (`source_publications`,
+   `source_persons`, `source_authorships`). Rattachement aux
+   publications existantes par DOI/NNT/HAL-ID, **sans création**
+4. **affiliations** — adresses → structures, propagation
+   `in_perimeter` et `structure_ids` sur `source_authorships`
+5. **publications** — création publications pour les
+   source_publications in-perimeter non rattachées + merges
+   inter-sources (HAL-ID, NNT)
+6. **persons** — création/mapping personnes + formes de noms
+7. **authorships** — reconstruction authorships canoniques (table de
+   vérité) + propagation UCA
+8. **countries** — détection pays des adresses + recalcul pays des
+   publications
+9. **enrich** — OA status via Unpaywall, APC revues
 
-- `person_id`
-- `structure_ids`
-- `in_perimeter` : TRUE si l'auteur est affilié UCA sur cette publication
-- `author_position` : position dans la liste d'auteurs
-- `is_corresponding` : auteur correspondant
+Chaque phase est idempotente (relançable sans risque). Reprise depuis
+une phase donnée : `python run_pipeline.py --from <phase>`.
 
-### Tables source
+Voir [pipeline.md](pipeline.md) pour le détail par phase.
 
-Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses).
+## Tests
 
-- **`source_publications`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées (doc_type non mappé, oa_status, abstract, keywords, topics, biblio, meta). Le champ `hal_collections` (text[]) est spécifique à HAL.
-- **`source_persons`** : un enregistrement par auteur par source. Déduplication par `(source, source_id)`. Le `source_id` est l'identifiant interne de l'entité auteur dans la source. Porte aussi `orcid`, `idref` et `source_ids` (JSONB, identifiants propres à la source : idhal, hal_person_id, etc.).
-- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `structure_ids` (affiliation résolue), `raw_author_name`, `raw_affiliations` (affiliations textuelles brutes issues de la source), `roles` (auteur, directeur, rapporteur — theses.fr), `excluded` (authorship rejetée manuellement).
-- **`source_structures`** : structures importées depuis HAL, OpenAlex et WoS. Mapping vers `structures` canoniques via `structure_id`. Utilisée par `populate_affiliations` pour résoudre les affiliations.
+- **Unit** (`tests/unit/`) — pas de DB. Couvre `domain/`,
+  `application/` (services avec mocks), parsing des normalizers,
+  infrastructure pure (log, pipeline_metrics).
+- **Intégration** (`tests/integration/`) — base `bibliometrie_test`
+  créée à la volée, fixture `db` avec rollback entre chaque test.
+  Couvre les routers, les orchestrateurs pipeline, et les adapters
+  repositories.
+
+Conftest splitté :
+- `tests/conftest.py` — cross-cutting (mock `setup_logger` pour
+  éviter la pollution disque, caches)
+- `tests/integration/conftest.py` — setup BDD, fixture `db`
+
+Couverture actuelle ~49%, seuil `fail_under = 49`
+(`[tool.coverage.report]` dans `pyproject.toml`).
+
+## Composition roots
+
+Les endroits qui câblent le tout (instanciation concrète des adapters,
+passage aux services/orchestrateurs) :
+
+- `interfaces/api/app.py` + les routers — API HTTP
+- `run_pipeline.py` — orchestrateur pipeline (appelle directement les
+  phases `application/pipeline/*` avec les `Pg*Queries` concrets)
+- `interfaces/cli/pipeline/*` — entry points CLI pour chaque phase
+  (lancés ponctuellement hors pipeline complet)
+- `interfaces/cli/*` — scripts one-shot
+
+Aucun autre endroit ne doit importer `infrastructure.repositories` ou
+`infrastructure.db.queries` : ce sont les seuls points où le domaine
+rencontre ses implémentations concrètes.
+
+## Pour aller plus loin
+
+- [ROADMAP.md](../ROADMAP.md) — état des chantiers architecture,
+  points d'audit périodique
+- [donnees.md](donnees.md) — modèle de données
+- [pipeline.md](pipeline.md) — détail des phases
+- [sources.md](sources.md) — API et imports par source
