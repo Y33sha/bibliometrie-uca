@@ -13,7 +13,7 @@ Usage :
 import argparse
 import os
 
-from application.pipeline.addresses.resolve_addresses import run_resolution
+from application.pipeline.affiliations.resolve_addresses import run_resolution
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.address_resolution import PgAddressResolutionQueries
 from infrastructure.log import setup_logger

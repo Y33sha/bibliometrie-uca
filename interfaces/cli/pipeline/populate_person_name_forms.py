@@ -2,7 +2,7 @@
 
 import os
 
-from application.pipeline.build.populate_person_name_forms import populate
+from application.pipeline.persons.populate_person_name_forms import populate
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.name_forms import PgNameFormsQueries
 from infrastructure.log import setup_logger

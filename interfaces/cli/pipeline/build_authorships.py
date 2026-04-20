@@ -3,7 +3,7 @@
 import argparse
 import os
 
-from application.pipeline.build.build_authorships import build
+from application.pipeline.authorships.build_authorships import build
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.authorships_build import PgAuthorshipsBuildQueries
 from infrastructure.log import setup_logger

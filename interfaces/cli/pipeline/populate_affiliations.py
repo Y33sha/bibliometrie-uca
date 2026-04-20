@@ -3,7 +3,7 @@
 import argparse
 import os
 
-from application.pipeline.build.populate_affiliations import run_populate, show_stats
+from application.pipeline.affiliations.populate_affiliations import run_populate, show_stats
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.affiliations import PgAffiliationsQueries
 from infrastructure.log import setup_logger

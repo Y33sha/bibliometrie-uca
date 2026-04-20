@@ -3,7 +3,7 @@
 import argparse
 import os
 
-from application.pipeline.merge.merge_pubs_by_hal_id import run_merge
+from application.pipeline.publications.merge_pubs_by_hal_id import run_merge
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.merge import PgMergeQueries
 from infrastructure.log import setup_logger
