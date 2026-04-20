@@ -41,13 +41,13 @@ le SQL est extrait des services. Ce qui reste :
   `extract_all()` côté extractor, `process_work()` côté normalizer.
 
 ### 1.3 Module `facets`
-La logique de facettes dynamiques est dupliquée entre plusieurs
+- [ ] La logique de facettes dynamiques est dupliquée entre plusieurs
 routers (publications, persons, laboratoires). À factoriser dans un
 module dédié — typiquement un specification pattern ou un query
 builder spécialisé.
 
 ### 1.4 Entités riches dans le domaine
-Aujourd'hui le domaine contient des value objects (DOI, ORCID, …) et
+- [ ] Aujourd'hui le domaine contient des value objects (DOI, ORCID, …) et
 des modèles JSONB, mais pas d'entités au sens DDD. Passer à de vraies
 entités `Person`, `Publication`, `Structure` avec identité + invariants
 devient intéressant quand émergent des règles complexes (ex. un idHAL
@@ -81,7 +81,7 @@ normalisation explicite émerge.
   imports Python directs. `logger` également threadé en param dans les
   5 `normalize_*` (pattern cohérent, plus aucun `setup_logger` module-
   level dans `application/`). Zéro import `infrastructure.db.queries`
-  depuis `application/` : §1.7 peut passer en `layered` strict.
+  depuis `application/` : §1.7 a pu basculer en `layered`.
 - [ ] Reste côté API : factories FastAPI `Depends` pour injecter les
   query services dans les routers (équivalent unit-of-work). Mécanique
   si la couverture de tests devient un objectif.
@@ -91,9 +91,26 @@ normalisation explicite émerge.
   vérifiés en pre-commit + CI. 4 contrats `forbidden` qui verrouillent :
   (1) domain = noyau pur, (2) application ↛ interfaces,
   (3) infrastructure ↛ interfaces, (4) infrastructure ↛ application.
-- [ ] Durcir en contrat `layered` strict — débloqué par §1.6 (ports
-  posés côté pipeline, plus aucun import `infrastructure.db.queries`
-  depuis `application/`). Prochain chantier.
+- [x] **Contrat `layers` unique remplace les 4 `forbidden`** :
+  `interfaces > infrastructure | application > domain` (siblings au
+  même niveau, ni l'un ni l'autre ne peut importer l'autre ; les deux
+  peuvent importer domain ; interfaces peut tout importer). Enforce en
+  plus `application ↛ infrastructure` — **nouvelle règle** vs les 4
+  forbidden précédents.
+- [ ] **§1.7b — Lever les 22 `ignore_imports`** (grandfather clause
+  verrouillant les violations existantes `application → infrastructure`).
+  Chaque nettoyage = une ligne retirée de `ignore_imports` dans
+  `pyproject.toml`.
+  - Services applicatifs → ports/adapters pour `infrastructure.
+    repositories.*` (7 modules : config, journals, authorships,
+    publications, addresses, persons, structures). Même pattern que
+    §1.6 côté pipeline.
+  - Pipeline normalize_* → déplacer ou porter les helpers infrastructure :
+    `link_addresses` (4), `mark_staging_done` (5), `StepTimer` (2),
+    `resolve_zenodo_doi`/`is_zenodo_doi` (2), `extract_nnt_from_openalex`/
+    `is_theses_fr_source` (1).
+  - `application.authorships → infrastructure.perimeter.
+    get_persons_structure_ids_list` (1) — cas isolé.
 
 ### 1.8 Audit périodique
 Parcours régulier pour repérer : SQL mal placé, dépendances dans le
@@ -241,8 +258,4 @@ Le détail est dans `TODO_LAURA.md`. Grands axes :
 **SQLAlchemy Core** (pas ORM), pour la construction dynamique de requêtes. SQLAlchemy a deux couches : Core (query builder, paramétrage sûr, abstraction du dialecte) et ORM (mapping objets-tables). Tu peux utiliser Core sans ORM : tu écris des requêtes via son API Python (select(...).where(...).order_by(...)) qui génèrent du SQL sûr et paramétré, mais tu n'introduis pas de couche ORM. C'est particulièrement utile pour les requêtes dynamiques avec filtres variables. Tes requêtes "statiques" peuvent rester en SQL brut pour la clarté.
 **Alembic** pour les migrations. Indépendant de l'usage d'ORM. Tu continues à écrire ton schéma en SQL brut si tu veux, mais tu versionnes et orchestres les migrations avec Alembic. Gain de maintenance réel, coût d'adoption modéré.
 **psycopg3** avec des curseurs typés, si tu n'y es pas déjà. Psycopg3 supporte bien les Row classes typées et les dict_row, ce qui rend ton SQL brut plus sûr à manipuler côté Python sans introduire un ORM.
-
-## Items évalués et retirés
-
-*(rien à retirer pour l'instant — cette section sert de cimetière pour
-les idées qu'on aura abandonnées en le justifiant)*
+**environnement virtuel**?
