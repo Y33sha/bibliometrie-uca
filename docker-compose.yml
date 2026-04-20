@@ -16,7 +16,6 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-changeme}
     volumes:
       - pgdata:/var/lib/postgresql
-      - ./db/docker-init:/docker-entrypoint-initdb.d:ro
     ports:
       - "5432:5432"
     healthcheck:

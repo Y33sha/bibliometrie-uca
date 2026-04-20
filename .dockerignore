@@ -7,11 +7,17 @@ __pycache__
 *.pyc
 .venv
 venv
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.import_linter_cache
+.coverage
+htmlcov
 
 # Frontend (rebuildé dans le conteneur)
-frontend/node_modules
-frontend/.svelte-kit
-frontend/build
+interfaces/frontend/node_modules
+interfaces/frontend/.svelte-kit
+interfaces/frontend/build
 
 # IDE
 .vscode
@@ -20,14 +26,11 @@ frontend/build
 # Claude
 .claude
 
-# Config sensible (env vars utilisées à la place)
-config/settings.py
+# Logs et rapports pipeline (runtime)
+logs
 
-# Divers
-*.log
+# Imports manuels volumineux
 imports_manuels
-db/backup
-analysis
-PLAN_AMELIORATION.md
-TODO_CLAUDE.md
+
+# Notes internes (non déployables)
 TODO_LAURA.md
