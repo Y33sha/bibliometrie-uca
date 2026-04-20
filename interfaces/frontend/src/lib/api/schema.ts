@@ -2145,6 +2145,27 @@ export interface components {
             /** Id Value */
             id_value: string;
         };
+        /**
+         * AddIdentifierResponse
+         * @description Réponse de `POST /api/persons/{id}/identifiers`.
+         *
+         *     Polymorphe selon le chemin :
+         *     - doublon exact : `added=False` + `reason`
+         *     - ajout normal  : `added=True` + `id_type` + `id_value`
+         *     - réattribution : en plus, `reassigned=True`
+         */
+        AddIdentifierResponse: {
+            /** Added */
+            added: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Id Type */
+            id_type?: string | null;
+            /** Id Value */
+            id_value?: string | null;
+            /** Reassigned */
+            reassigned?: boolean | null;
+        };
         /** AddPerimeterStructure */
         AddPerimeterStructure: {
             /** Structure Id */
@@ -2164,6 +2185,13 @@ export interface components {
         AssignStructureAction: {
             /** Structure Id */
             structure_id: number;
+        };
+        /** AuthorshipExcludeResponse */
+        AuthorshipExcludeResponse: {
+            /** Id */
+            id: number;
+            /** Excluded */
+            excluded: boolean;
         };
         /** BatchAssignOrphanAuthorships */
         BatchAssignOrphanAuthorships: {
@@ -2243,10 +2271,27 @@ export interface components {
              */
             name_form: string;
         };
+        /** DetachAuthorshipsResponse */
+        DetachAuthorshipsResponse: {
+            /** Detached */
+            detached: number;
+            /** Deleted Authorships */
+            deleted_authorships: number;
+            /** Cleaned Form */
+            cleaned_form: boolean;
+        };
         /** DetachNameForm */
         DetachNameForm: {
             /** Name Form */
             name_form: string;
+        };
+        /** DetachedResponse */
+        DetachedResponse: {
+            /**
+             * Detached
+             * @default true
+             */
+            detached: boolean;
         };
         /** ExcludeSourceAuthorship */
         ExcludeSourceAuthorship: {
@@ -2267,6 +2312,22 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** IdentifierReassignResponse */
+        IdentifierReassignResponse: {
+            /** Id */
+            id: number;
+            /** Person Id */
+            person_id: number;
+            /** Status */
+            status: string;
+        };
+        /** IdentifierStatusResponse */
+        IdentifierStatusResponse: {
+            /** Id */
+            id: number;
+            /** Status */
+            status: string;
         };
         /** JournalListResponse */
         JournalListResponse: {
@@ -2403,6 +2464,15 @@ export interface components {
             /** Source Id */
             source_id: number;
         };
+        /** MergeResponse */
+        MergeResponse: {
+            /** Merged */
+            merged: boolean;
+            /** Source Id */
+            source_id: number;
+            /** Target Id */
+            target_id: number;
+        };
         /** NameFormAuthorshipRef */
         NameFormAuthorshipRef: {
             /** Source */
@@ -2467,6 +2537,27 @@ export interface components {
             /** Requires Context Of */
             requires_context_of?: number[] | null;
         };
+        /**
+         * OkResponse
+         * @description Réponse minimale d'acquittement (pas de données).
+         */
+        OkResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+        };
+        /** OrphanAssignResponse */
+        OrphanAssignResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /** Person Id */
+            person_id: number;
+        };
         /** OrphanAuthorshipOut */
         OrphanAuthorshipOut: {
             /** Source */
@@ -2492,6 +2583,16 @@ export interface components {
             pages: number;
             /** Authorships */
             authorships: components["schemas"]["OrphanAuthorshipOut"][];
+        };
+        /** OrphanBatchAssignResponse */
+        OrphanBatchAssignResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /** Assigned */
+            assigned: number;
         };
         /** OrphanCountResponse */
         OrphanCountResponse: {
@@ -2855,6 +2956,14 @@ export interface components {
             child_id: number;
             /** Relation Type */
             relation_type: string;
+        };
+        /** RemovedResponse */
+        RemovedResponse: {
+            /**
+             * Removed
+             * @default true
+             */
+            removed: boolean;
         };
         /** ReviewAction */
         ReviewAction: {
@@ -5183,7 +5292,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddIdentifierResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5216,7 +5325,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["RemovedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5251,7 +5360,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["IdentifierStatusResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5286,7 +5395,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["IdentifierReassignResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5317,7 +5426,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthorshipExcludeResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5352,7 +5461,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5387,7 +5496,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5422,7 +5531,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MergeResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5508,7 +5617,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrphanAssignResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5541,7 +5650,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrphanBatchAssignResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5609,7 +5718,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DetachAuthorshipsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5644,7 +5753,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DetachedResponse"];
                 };
             };
             /** @description Validation Error */
