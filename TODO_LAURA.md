@@ -6,6 +6,11 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
 * [ ] y a-t-il un cross-import sur le cross-import au run suivant?
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
+* [ ] 2026-04-20 12:13:42 [ERROR] Erreur sur W4206741675: ERREUR:  une instruction insert ou update sur la table « source_authorship_addresses » viole la contrainte de clé
+étrangère « source_authorship_addresses_address_id_fkey »
+DETAIL:  La clé (address_id)=(4283651) n'est pas présente dans la table « addresses ».
+* [ ] système de logging cassé
+* [ ] évaluer l'intérêt de enrich_source_person
 ## Robustesse du pipeline sur le long terme
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
 * [ ] authorships excluded: info perdue si réimport (grave?)
@@ -30,7 +35,6 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?).
 * [ ] hal_authors importés sans id par un script de cross-import: ça ne devrait pas être possible. Auditer.
 * [ ] publis OpenAlex avec date correspondant au dépôt dans HAL: ex. 8651 => si dates différentes, utiliser l'autre. Si OA cite HAL comme source, prendre métadonnées HAL
-* [ ] depuis que la déduplication automatique par identité de métadonnées a été abandonnée: passer en revue les cas concernés, auditer, re-dupliquer?
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
 * [ ] investiguer les 388k doublons de position WoS (source_authorships, même publi, même position)
 
@@ -57,11 +61,11 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] utiliser DOAJ pour enrichir données journals et s'en servir pour contrôler oa_status?
 * [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
 # Code
-* [ ] sortir hal-problems du routeur persons, ça n'a rien à y faire
 * [ ] logique bizarre à corriger: if is_thesis and has_hal_link: priority = _PRIORITY_THESIS_HAL_LINKED
-* [ ] renommage de routeurs (admin/, public/; pub_stats, stats)
-* [ ] renommage/réorganisation des phases du pipeline
+* [ ] vérifier si certains ports ne seraient pas mieux placés dans application/ (critère: sont-ils importés par domain/ ou pas?)
+* [ ] faire le ménage dans db/queries: trop de choses mal rangées ou mal nommées
 # Interface
+* [ ] documentation: affichage cassé
 ## Admin
 * [ ] interface pour consulter l'audit trail
 ### Adresses
