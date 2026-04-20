@@ -163,6 +163,9 @@ class ScanrExtractor(SourceExtractor):
 
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--year", type=int, help="Année unique")
+        parser.add_argument(
+            "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
+        )
 
     def load_config(self, cur: Any) -> dict[str, Any]:
         affiliation_ids = get_extraction_api_ids(cur, "scanr")
@@ -173,7 +176,6 @@ class ScanrExtractor(SourceExtractor):
             )
         username, password = get_scanr_credentials(cur)
         return {
-            "years": get_years(cur),
             "affiliation_ids": affiliation_ids,
             "auth": (username, password),
             "url": get_api_base_urls(cur).get(
@@ -183,16 +185,17 @@ class ScanrExtractor(SourceExtractor):
         }
 
     def setup_logging(self, args: argparse.Namespace, config: dict[str, Any]) -> None:
-        years = [args.year] if args.year else config["years"]
         self.logger.info(
-            f"=== Extraction ScanR : années {years}, "
-            f"{len(config['affiliation_ids'])} structures ==="
+            f"=== Extraction ScanR : {len(config['affiliation_ids'])} structures ==="
         )
 
     def extract_all(
         self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
     ) -> ExtractionStats:
-        years = [args.year] if args.year else config["years"]
+        with self.conn.cursor() as cur:
+            config_years = get_years(cur, mode=args.mode)
+        years = [args.year] if args.year else config_years
+        self.logger.info(f"Années : {years}")
         stats = ExtractionStats()
         for year in years:
             total, inserted, updated = extract_year(
