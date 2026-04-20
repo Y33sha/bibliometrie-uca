@@ -1,8 +1,8 @@
-"""Persons router: directory, search, list, profile, merge, identifiers, admin, HAL problems.
+"""Persons router: directory, search, list, profile, merge, identifiers, admin.
 
 Toutes les queries SQL sont dans :
 - `infrastructure/db/queries/persons.py` (endpoints principaux)
-- `infrastructure/db/queries/persons_admin.py` (orphan-authorships, HAL-problems)
+- `infrastructure/db/queries/persons_admin.py` (orphan-authorships)
 - `infrastructure/db/queries/duplicates.py` (doublons personnes)
 
 Les mutations délèguent à `application.persons` et `application.authorships`.
@@ -17,44 +17,22 @@ from fastapi import APIRouter, HTTPException, Query
 from application.authorships import exclude_authorship as _exclude_authorship
 from application.persons import (
     add_identifier as _add_identifier,
-)
-from infrastructure.repositories import authorship_repository, person_repository
-from application.persons import (
     assign_orphan_authorship as _assign_orphan,
-)
-from application.persons import (
     batch_assign_orphan_authorships as _batch_assign_orphan,
-)
-from application.persons import (
     create_person as _create_person,
-)
-from application.persons import (
     detach_authorships as _detach_authorships_service,
-)
-from application.persons import (
     detach_name_form as _detach_name_form,
-)
-from application.persons import (
     merge_person as _merge_person,
-)
-from application.persons import (
     reassign_identifier as _reassign_identifier,
-)
-from application.persons import (
     remove_identifier as _remove_identifier,
-)
-from application.persons import (
     set_rejected as _set_rejected,
-)
-from application.persons import (
     update_identifier_status as _update_identifier_status,
-)
-from application.persons import (
     update_name as _update_name,
 )
 from domain.sources import ALL_SOURCES_SET
 from infrastructure.db.queries import persons as persons_queries
 from infrastructure.db.queries import persons_admin as admin_queries
+from infrastructure.repositories import authorship_repository, person_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
@@ -452,67 +430,5 @@ async def detach_name_form(person_id: int, body: DetachNameForm) -> Any:
         return {"detached": True}
 
 
-# ── HAL problems ─────────────────────────────────────────────────
-
-
-@router.get("/api/hal-problems/duplicate-accounts")
-async def hal_duplicate_accounts(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
-) -> Any:
-    """Personnes liées à 2+ comptes HAL distincts."""
-    with get_cursor() as (cur, _conn):
-        return admin_queries.hal_duplicate_accounts(cur, page=page, per_page=per_page)
-
-
-@router.get("/api/hal-problems/duplicate-pubs-doi")
-async def hal_duplicate_pubs_by_doi(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
-) -> Any:
-    """Dépôts HAL avec DOI identique rattachés à la même publication."""
-    with get_cursor() as (cur, _conn):
-        return admin_queries.hal_duplicate_pubs_by_doi(cur, page=page, per_page=per_page)
-
-
-@router.get("/api/hal-problems/duplicate-pubs-meta")
-async def hal_duplicate_pubs_by_metadata(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
-) -> Any:
-    """Doublons possibles : dépôts HAL avec métadonnées identiques."""
-    with get_cursor() as (cur, _conn):
-        return admin_queries.hal_duplicate_pubs_by_metadata(cur, page=page, per_page=per_page)
-
-
-@router.get("/api/hal-problems/missing-collections")
-async def hal_missing_collections(
-    lab_id: int = Query(...),
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
-) -> Any:
-    """Publications affiliées à un labo dans HAL mais absentes de sa collection."""
-    with get_cursor() as (cur, _conn):
-        result = admin_queries.hal_missing_collections(
-            cur, lab_id=lab_id, page=page, per_page=per_page
-        )
-        if result.get("error") == "no_collection":
-            raise HTTPException(status_code=400, detail="Labo sans collection HAL")
-        return result
-
-
-@router.get("/api/hal-problems/missing-collections/labs")
-async def hal_missing_collections_labs() -> Any:
-    """Liste des labos avec collection HAL."""
-    with get_cursor() as (cur, _conn):
-        return admin_queries.hal_missing_collections_labs(cur)
-
-
-@router.get("/api/hal-problems/affiliation-conflicts")
-async def hal_affiliation_conflicts(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
-) -> Any:
-    """Publications affiliées UCA dans HAL mais pas dans OA/WoS."""
-    with get_cursor() as (cur, _conn):
-        return admin_queries.hal_affiliation_conflicts(cur, page=page, per_page=per_page)
+# Les endpoints `/api/hal-problems/*` ont été déplacés dans
+# `interfaces/api/routers/hal_problems.py`.
