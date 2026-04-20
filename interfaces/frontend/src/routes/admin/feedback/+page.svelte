@@ -8,45 +8,15 @@
 
   // ---------- Types ----------
 
-  interface FeedbackStats {
-    detection_rate: number | null;
-    total_reviewed: number;
-    false_negatives: number;
-    false_positives: number;
-    concordant_valid: number;
-    pending: number;
-  }
+  import type { components } from "$lib/api/schema";
+  type FeedbackStats = components["schemas"]["FeedbackStats"];
+  type LabDetected = components["schemas"]["FeedbackLabDetected"];
+  type MatchedForm = components["schemas"]["FeedbackMatchedForm"];
+  type FeedbackAddress = components["schemas"]["FeedbackAddressItem"];
+  type FeedbackPage = components["schemas"]["FeedbackAddressesResponse"];
 
-  interface LabDetected {
-    structure_id: number;
-    name: string;
-    acronym: string | null;
-    is_detected: boolean;
-    is_confirmed: boolean | null;
-  }
-
-  interface MatchedForm {
-    form_id: number;
-    form_text: string;
-    structure_name: string;
-    requires_context_of: (string | number)[] | null;
-  }
-
-  interface FeedbackAddress {
-    id: number;
-    raw_text: string;
-    pub_count: number;
-    labs: LabDetected[];
-    matched_forms?: MatchedForm[];
-  }
-
-  interface FeedbackPage {
-    total: number;
-    page: number;
-    pages: number;
-    addresses: FeedbackAddress[];
-  }
-
+  // Types ci-dessous : sources hors router admin_feedback
+  // (picker structures, formes de noms côté nameForms API).
   interface Structure {
     id: number;
     code: string;
