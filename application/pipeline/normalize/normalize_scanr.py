@@ -21,6 +21,7 @@ from psycopg2.extras import Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
 from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.address_linker import AddressLinker
 from application.ports.normalize_scanr import ScanrNormalizeQueries
 from application.ports.staging import StagingQueries
 from application.publications import find_or_create as find_or_create_publication
@@ -31,8 +32,6 @@ from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import clean_doi
-from infrastructure.addresses import link_addresses
-from infrastructure.db_helpers import mark_staging_done
 
 # =============================================================
 # UTILITAIRES
@@ -287,7 +286,12 @@ def upsert_scanr_author(cur: Any, queries: ScanrNormalizeQueries, author: dict) 
 
 
 def process_authors(
-    cur: Any, queries: ScanrNormalizeQueries, doc: dict, source_publication_id: int
+    cur: Any,
+    queries: ScanrNormalizeQueries,
+    doc: dict,
+    source_publication_id: int,
+    *,
+    address_linker: AddressLinker,
 ) -> None:
     authors = doc.get("authors") or []
 
@@ -323,7 +327,9 @@ def process_authors(
         )
 
         if addr_parts:
-            link_addresses(cur, sa_id, addr_parts, countries=detected_countries or None)
+            address_linker.link(
+                cur, sa_id, addr_parts, countries=detected_countries or None
+            )
 
 
 # =============================================================
@@ -339,6 +345,8 @@ def process_work(
     *,
     journal_repo: JournalRepository,
     pub_repo: PublicationRepository,
+    staging_queries: StagingQueries,
+    address_linker: AddressLinker,
 ) -> bool:
     staging_id = staging_row["id"]
     scanr_id = staging_row["scanr_id"]
@@ -381,13 +389,15 @@ def process_work(
         timings["scanr_doc"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        process_authors(cur, queries, doc, source_publication_id)
+        process_authors(
+            cur, queries, doc, source_publication_id, address_linker=address_linker
+        )
         timings["authors"] = time.perf_counter() - t0
 
         if publication_id:
             refresh_from_sources(cur, publication_id, repo=pub_repo)
 
-        mark_staging_done(cur, staging_id)
+        staging_queries.mark_done(cur, staging_id)
 
         total = sum(timings.values())
         if total > 0.5:
@@ -416,6 +426,7 @@ class ScanrNormalizer(SourceNormalizer):
         queries: ScanrNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
         pub_repo_factory: Callable[[Any], PublicationRepository],
+        address_linker: AddressLinker,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -423,6 +434,7 @@ class ScanrNormalizer(SourceNormalizer):
         self._journal_repo: JournalRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
+        self._address_linker = address_linker
 
     def preload_caches(self, cur: Any) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
@@ -437,4 +449,9 @@ class ScanrNormalizer(SourceNormalizer):
             row,
             journal_repo=self._journal_repo,
             pub_repo=self._pub_repo,
+            staging_queries=self._staging,
+            address_linker=self._address_linker,
         )
+
+    def cleanup(self) -> None:
+        self._address_linker.clear_cache()

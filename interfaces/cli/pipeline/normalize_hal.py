@@ -3,6 +3,7 @@
 import os
 
 from application.pipeline.normalize.normalize_hal import HalNormalizer
+from infrastructure.addresses import PgAddressLinker
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
 from infrastructure.db.queries.staging import PgStagingQueries
@@ -23,6 +24,7 @@ def main() -> None:
         journal_repo_factory=journal_repository,
         pub_repo_factory=publication_repository,
         zenodo_resolver=HttpZenodoResolver(),
+        address_linker=PgAddressLinker(),
     ).run()
 
 

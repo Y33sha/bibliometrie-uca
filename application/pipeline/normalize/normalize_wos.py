@@ -35,7 +35,6 @@ from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import clean_doi
-from infrastructure.db_helpers import mark_staging_done
 
 # =============================================================
 # MAPPINGS
@@ -717,6 +716,7 @@ def process_record(
     *,
     journal_repo: JournalRepository,
     pub_repo: PublicationRepository,
+    staging_queries: StagingQueries,
 ) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
     from application.pipeline.timings import StepTimer
@@ -757,7 +757,7 @@ def process_record(
             refresh_from_sources(cur, publication_id, repo=pub_repo)
         t.mark("refresh")
 
-        mark_staging_done(cur, staging_id)
+        staging_queries.mark_done(cur, staging_id)
         t.log_if_slow(ut, logger)
         return True
 
@@ -811,6 +811,7 @@ class WosNormalizer(SourceNormalizer):
             row,
             journal_repo=self._journal_repo,
             pub_repo=self._pub_repo,
+            staging_queries=self._staging,
         )
 
     def cleanup(self) -> None:
