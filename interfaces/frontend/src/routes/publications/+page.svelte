@@ -13,23 +13,8 @@
 	import { useColumnVisibility } from '$lib/composables/useColumnVisibility.svelte';
 	import ColumnMenu from '$lib/components/ColumnMenu.svelte';
 
-	interface Publication {
-		id: number;
-		title: string;
-		pub_year: number | null;
-		doi: string | null;
-		doc_type: string | null;
-		oa_status: string | null;
-		journal: string | null;
-		publisher_name: string | null;
-		hal_id: string | null;
-		openalex_id: string | null;
-		scanr_id: string | null;
-		wos_id: string | null;
-		labs: string | null;
-		lab_items: { id: number; label: string }[] | null;
-		apc: { amount: number; institution: string | null; lab_id: number | null; lab_acronym: string | null; budget_structure_id: number | null }[] | null;
-	}
+	import type { components } from '$lib/api/schema';
+	type Publication = components['schemas']['PublicationListItem'];
 
 	// --- Column visibility ---
 	const cv = useColumnVisibility([

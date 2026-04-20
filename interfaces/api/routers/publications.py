@@ -17,7 +17,13 @@ from infrastructure.db.queries.publications import FacetFilters, ListFilters
 from infrastructure.repositories import authorship_repository
 from interfaces.api.deps import get_cursor, get_root_structure_id
 from interfaces.api.filters import parse_int_csv, parse_str_csv
-from interfaces.api.models import ExcludeSourceAuthorship
+from interfaces.api.models import (
+    ExcludeSourceAuthorship,
+    ExcludeSourceAuthorshipResponse,
+    PublicationDetailResponse,
+    PublicationListResponse,
+    PublicationsFacetsResponse,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -31,7 +37,7 @@ def _parse_lab_id(lab_id: str) -> tuple[list[int], bool]:
     return lab_ids, lab_none
 
 
-@router.get("/api/publications/facets")
+@router.get("/api/publications/facets", response_model=PublicationsFacetsResponse)
 async def publications_facets(
     year: str = Query(""),
     lab_id: str = Query(""),
@@ -75,7 +81,7 @@ async def publications_facets(
         )
 
 
-@router.get("/api/publications/years")
+@router.get("/api/publications/years", response_model=list[int])
 async def all_years() -> Any:
     """Toutes les années disponibles."""
     with get_cursor() as (cur, _conn):
@@ -122,7 +128,7 @@ async def export_publications_csv(
     )
 
 
-@router.get("/api/publications/{pub_id}")
+@router.get("/api/publications/{pub_id}", response_model=PublicationDetailResponse)
 async def get_publication(pub_id: int) -> Any:
     """Détail complet d'une publication."""
     with get_cursor() as (cur, _conn):
@@ -132,7 +138,10 @@ async def get_publication(pub_id: int) -> Any:
         return detail
 
 
-@router.post("/api/source-authorships/{source}/{authorship_id}/exclude")
+@router.post(
+    "/api/source-authorships/{source}/{authorship_id}/exclude",
+    response_model=ExcludeSourceAuthorshipResponse,
+)
 async def exclude_source_authorship(
     source: str, authorship_id: int, body: ExcludeSourceAuthorship = ExcludeSourceAuthorship()
 ) -> Any:
@@ -148,7 +157,7 @@ async def exclude_source_authorship(
         return {"ok": True, "excluded": body.excluded}
 
 
-@router.get("/api/publications")
+@router.get("/api/publications", response_model=PublicationListResponse)
 async def list_publications(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
