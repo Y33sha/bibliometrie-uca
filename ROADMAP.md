@@ -232,12 +232,18 @@ API + logique métier.
   `src/lib/api/schema.ts` committé comme source de vérité ;
   interface `Journal` locale du composant admin/journals remplacée
   par le type généré.
-- [ ] **Généraliser aux ~29 autres endpoints** (publishers, persons,
-  publications, laboratories, structures, addresses…) : pour chaque
-  endpoint, (A) ajouter un `XxxOut` Pydantic + `response_model`, (B)
-  régénérer le schema, (C) remplacer l'interface locale dans le ou
-  les composants qui la consomment. ~88 interfaces locales à
-  éliminer progressivement.
+- [~] **Généraliser aux autres endpoints**. Audit 2026-04-20 : 115
+  endpoints au total, 130 interfaces TS locales (plus que les ~88
+  estimées). Progression par router :
+  - [x] `/api/journals` (4 endpoints — pilote d'origine).
+  - [x] `/api/persons` (26 endpoints, 2026-04-20) : 14 GET + 12
+    mutations annotés `response_model` ; ~30 modèles Pydantic Out ajoutés ;
+    interfaces locales remplacées dans admin/persons, persons/,
+    persons/[id], admin/orphan-authorships ; wrappers api/persons.ts,
+    api/authorships.ts, api/orphanAuthorships.ts typés via schema.ts.
+  - [ ] Routers restants : structures, addresses, publishers,
+    publications, laboratories, perimeters, admin_*, pub_stats,
+    authorships, config. ~85 endpoints + ~100 interfaces locales.
 
 #### 2.7.4 Découpe des routes monolithiques — fait 2026-04-20
 Audit initial : 3 routes dépassaient 1000 LOC et mêlaient UI + état +
