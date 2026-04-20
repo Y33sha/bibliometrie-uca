@@ -1047,6 +1047,40 @@ class FeedbackAddressesResponse(BaseModel):
     addresses: list[FeedbackAddressItem]
 
 
+# ----- Perimeters (output) -----
+
+
+class PerimeterStructureItem(BaseModel):
+    id: int
+    name: str
+    acronym: str | None
+    code: str
+
+
+class PerimeterOut(BaseModel):
+    """Périmètre + ses structures racines (résolues + comptage effectif)."""
+
+    id: int
+    code: str
+    name: str
+    description: str | None
+    structure_ids: list[int]
+    structures: list[PerimeterStructureItem]
+    structure_count: int
+
+
+class CreatedIdResponse(BaseModel):
+    """Réponse générique : `{id: int}` après création."""
+
+    id: int
+
+
+class StatusResponse(BaseModel):
+    """Réponse générique : `{status: str}` (mutations sans corps utile)."""
+
+    status: str
+
+
 # ----- Persons -----
 
 

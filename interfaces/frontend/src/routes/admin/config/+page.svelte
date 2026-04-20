@@ -12,21 +12,8 @@
     description: string | null;
     updated_at: string;
   }
-  interface PerimeterStructure {
-    id: number;
-    name: string;
-    acronym: string | null;
-    code: string;
-  }
-  interface Perimeter {
-    id: number;
-    code: string;
-    name: string;
-    description: string | null;
-    structure_ids: number[];
-    structures: PerimeterStructure[];
-    structure_count: number;
-  }
+  type PerimeterStructure = components["schemas"]["PerimeterStructureItem"];
+  type Perimeter = components["schemas"]["PerimeterOut"];
   interface HalCollections {
     collections: Record<string, string>;
     count: number;
