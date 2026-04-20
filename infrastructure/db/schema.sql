@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tUrrFoAl7aDjIjtNcrrbJ2gRwrFzOg2LYM1fr0RoGnxesKTHJO9TbfCpohUruYB
+\restrict PhZBaJDHCip1UrSuxVBlVDLIaOgllL0H4dB5qS7JLOvSrcHeyJztJ596sH27Hdt
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -278,6 +278,82 @@ CREATE SEQUENCE public.apc_payments_id_seq
 --
 
 ALTER SEQUENCE public.apc_payments_id_seq OWNED BY public.apc_payments.id;
+
+
+--
+-- Name: audit_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.audit_log (
+    id bigint NOT NULL,
+    event_type text NOT NULL,
+    aggregate_type text NOT NULL,
+    aggregate_id integer,
+    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    user_id text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE audit_log; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.audit_log IS 'Trace des opérations destructives/décisionnelles déclenchées via l''admin HTTP. Les opérations du pipeline ne sont pas auditées.';
+
+
+--
+-- Name: COLUMN audit_log.event_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.audit_log.event_type IS 'Type d''événement, notation pointée : person.merged, publication.excluded, structure.deleted, etc.';
+
+
+--
+-- Name: COLUMN audit_log.aggregate_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.audit_log.aggregate_type IS 'Type de l''entité affectée : person, publication, structure, journal, publisher, authorship.';
+
+
+--
+-- Name: COLUMN audit_log.aggregate_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.audit_log.aggregate_id IS 'ID de l''entité affectée, NULL si l''entité a été supprimée et n''a pas d''équivalent survivant.';
+
+
+--
+-- Name: COLUMN audit_log.payload; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.audit_log.payload IS 'Données utiles pour l''audit : source_id d''une fusion, champs modifiés, raison, etc.';
+
+
+--
+-- Name: COLUMN audit_log.user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.audit_log.user_id IS 'Utilisateur admin authentifié ayant déclenché l''opération (middleware auth). NULL théoriquement impossible quand l''entrée est écrite.';
+
+
+--
+-- Name: audit_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.audit_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: audit_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.audit_log_id_seq OWNED BY public.audit_log.id;
 
 
 --
@@ -1210,6 +1286,13 @@ ALTER TABLE ONLY public.apc_payments ALTER COLUMN id SET DEFAULT nextval('public
 
 
 --
+-- Name: audit_log id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log ALTER COLUMN id SET DEFAULT nextval('public.audit_log_id_seq'::regclass);
+
+
+--
 -- Name: authorships id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1400,6 +1483,14 @@ ALTER TABLE ONLY public.addresses
 
 ALTER TABLE ONLY public.apc_payments
     ADD CONSTRAINT apc_payments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
 
 
 --
@@ -1783,6 +1874,27 @@ ALTER TABLE ONLY public.structure_name_forms
 --
 
 CREATE UNIQUE INDEX addresses_raw_text_key ON public.addresses USING btree (md5(raw_text));
+
+
+--
+-- Name: audit_log_aggregate_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_aggregate_idx ON public.audit_log USING btree (aggregate_type, aggregate_id);
+
+
+--
+-- Name: audit_log_created_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_created_at_idx ON public.audit_log USING btree (created_at DESC);
+
+
+--
+-- Name: audit_log_event_type_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_event_type_idx ON public.audit_log USING btree (event_type, created_at DESC);
 
 
 --
@@ -2578,33 +2690,8 @@ ALTER TABLE ONLY public.structure_relations
 
 
 --
--- Name: audit_log; Type: TABLE; Schema: public; Owner: -
--- Migration 006_audit_log.sql. Ajouté manuellement pour que la base de
--- test soit alignée avec la migration (sans ré-exporter schema.sql).
---
-
-CREATE TABLE IF NOT EXISTS public.audit_log (
-    id             bigserial PRIMARY KEY,
-    event_type     text        NOT NULL,
-    aggregate_type text        NOT NULL,
-    aggregate_id   integer,
-    payload        jsonb       NOT NULL DEFAULT '{}'::jsonb,
-    user_id        text,
-    created_at     timestamp with time zone NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS audit_log_aggregate_idx
-    ON public.audit_log (aggregate_type, aggregate_id);
-
-CREATE INDEX IF NOT EXISTS audit_log_event_type_idx
-    ON public.audit_log (event_type, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS audit_log_created_at_idx
-    ON public.audit_log (created_at DESC);
-
-
---
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tUrrFoAl7aDjIjtNcrrbJ2gRwrFzOg2LYM1fr0RoGnxesKTHJO9TbfCpohUruYB
+\unrestrict PhZBaJDHCip1UrSuxVBlVDLIaOgllL0H4dB5qS7JLOvSrcHeyJztJ596sH27Hdt
+
