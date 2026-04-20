@@ -112,25 +112,21 @@ def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **k
         # (429 "Plan upgrade required"). Les changefiles couvrent tout OA
         # (plusieurs Go/jour), pas filtrable par institution.
         # OpenAlex est rattrapé par le mode weekly.
-    elif mode == "weekly":
-        log.info("Mode hebdomadaire (WoS exclu)")
+    elif mode in ("full", "weekly", "monthly"):
+        # Les extracteurs ne connaissent que full/weekly (plage d'années).
+        # monthly = full pour la sélection d'années, les cross-imports complets
+        # sont gérés dans phase_cross_imports.
+        sub_mode = "weekly" if mode == "weekly" else "full"
+        if mode == "weekly":
+            log.info("Mode hebdomadaire (WoS exclu)")
         if "openalex" in sources:
-            run_python("infrastructure/sources/openalex/extract_openalex.py", "--mode", "weekly", *year_args)
+            run_python("infrastructure/sources/openalex/extract_openalex.py", "--mode", sub_mode, *year_args)
         if "hal" in sources:
-            run_python("infrastructure/sources/hal/extract_hal.py", "--mode", "weekly", *year_args)
+            run_python("infrastructure/sources/hal/extract_hal.py", "--mode", sub_mode, *year_args)
+        if "wos" in sources and mode != "weekly":
+            run_python("infrastructure/sources/wos/extract_wos.py", "--mode", sub_mode, *year_args)
         if "scanr" in sources:
-            run_python("infrastructure/sources/scanr/extract_scanr.py", *year_args)
-        if "theses" in sources:
-            run_python("infrastructure/sources/theses/extract_theses.py")
-    else:
-        if "openalex" in sources:
-            run_python("infrastructure/sources/openalex/extract_openalex.py", "--mode", mode, *year_args)
-        if "hal" in sources:
-            run_python("infrastructure/sources/hal/extract_hal.py", "--mode", mode, *year_args)
-        if "wos" in sources:
-            run_python("infrastructure/sources/wos/extract_wos.py", "--mode", mode, *year_args)
-        if "scanr" in sources:
-            run_python("infrastructure/sources/scanr/extract_scanr.py", *year_args)
+            run_python("infrastructure/sources/scanr/extract_scanr.py", "--mode", sub_mode, *year_args)
         if "theses" in sources:
             run_python("infrastructure/sources/theses/extract_theses.py")
     # Re-fetch des publications OA tronquées à 100 auteurs (sauf mode daily)
