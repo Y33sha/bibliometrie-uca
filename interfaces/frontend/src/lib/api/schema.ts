@@ -2171,6 +2171,158 @@ export interface components {
             /** Structure Id */
             structure_id: number;
         };
+        /**
+         * AddressForCountryAttribution
+         * @description Ligne de `/api/addresses/countries`.
+         */
+        AddressForCountryAttribution: {
+            /** Id */
+            id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Countries */
+            countries: string[] | null;
+            /** Suggested Countries */
+            suggested_countries: components["schemas"]["CountrySuggestion"][];
+            /** Pub Count */
+            pub_count: number;
+        };
+        /**
+         * AddressListResponse
+         * @description Réponse paginée de `/api/addresses`.
+         *
+         *     `requires_search=True` quand le caller utilise un filtre trop large
+         *     (no/all + pas de search) et que le serveur a renvoyé une liste vide
+         *     par garde-fou.
+         */
+        AddressListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Addresses */
+            addresses: components["schemas"]["AddressOut"][];
+            /** Requires Search */
+            requires_search?: boolean | null;
+        };
+        /** AddressOkResponse */
+        AddressOkResponse: {
+            /** Ok */
+            ok: boolean;
+        };
+        /**
+         * AddressOut
+         * @description Ligne de `/api/addresses` (liste paginée pour validation).
+         */
+        AddressOut: {
+            /** Id */
+            id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Is Confirmed */
+            is_confirmed: boolean | null;
+            /** Is Detected */
+            is_detected: boolean;
+            /** Structures */
+            structures: components["schemas"]["AddressStructureSummary"][];
+            /** Pub Count */
+            pub_count: number;
+        };
+        /** AddressPublicationItem */
+        AddressPublicationItem: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doi */
+            doi: string | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Journal Title */
+            journal_title: string | null;
+            /** Author Name */
+            author_name: string | null;
+            /** Source Id */
+            source_id: string | null;
+        };
+        /** AddressPublicationsResponse */
+        AddressPublicationsResponse: {
+            /** Address Id */
+            address_id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Publications */
+            publications: components["schemas"]["AddressPublicationItem"][];
+        };
+        /**
+         * AddressReviewResponse
+         * @description Réponse de POST /api/addresses/{addr_id}/review.
+         */
+        AddressReviewResponse: {
+            /** Id */
+            id: number;
+            /** Is Confirmed */
+            is_confirmed: boolean | null;
+            /** Is Detected */
+            is_detected: boolean;
+            /** Structures */
+            structures: components["schemas"]["AddressStructureSummary"][];
+        };
+        /**
+         * AddressStatsResponse
+         * @description GET /api/admin/address-stats.
+         */
+        AddressStatsResponse: {
+            /** Total */
+            total: number;
+            /** Detected */
+            detected: number;
+            /** Pending */
+            pending: number;
+            /** Rejected */
+            rejected: number;
+            /** Confirmed */
+            confirmed: number;
+        };
+        /**
+         * AddressStructureSummary
+         * @description Lien adresse ↔ structure (élément de `structures` dans la liste/review).
+         */
+        AddressStructureSummary: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Is Confirmed */
+            is_confirmed: boolean | null;
+            /** Is Detected */
+            is_detected: boolean;
+        };
+        /** AddressesCountriesResponse */
+        AddressesCountriesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Addresses */
+            addresses: components["schemas"]["AddressForCountryAttribution"][];
+            /** Suggestion Facets */
+            suggestion_facets?: components["schemas"]["CountrySuggestion"][] | null;
+            /** Country Facets */
+            country_facets: components["schemas"]["CountrySuggestion"][];
+        };
         /** ApcFacet */
         ApcFacet: {
             /**
@@ -2198,6 +2350,15 @@ export interface components {
             /** Structure Id */
             structure_id: number;
         };
+        /** AssignStructureResponse */
+        AssignStructureResponse: {
+            /** Id */
+            id: number;
+            /** Structure Id */
+            structure_id: number;
+            /** Status */
+            status: string;
+        };
         /** AuthorshipExcludeResponse */
         AuthorshipExcludeResponse: {
             /** Id */
@@ -2211,6 +2372,16 @@ export interface components {
             authorships: components["schemas"]["SourceAuthorshipRef"][];
             /** Person Id */
             person_id: number;
+        };
+        /**
+         * BatchCountryResponse
+         * @description POST /api/addresses/batch-country : modifs directes + propagation.
+         */
+        BatchCountryResponse: {
+            /** Updated */
+            updated: number;
+            /** Propagated */
+            propagated: number;
         };
         /** BatchReviewAction */
         BatchReviewAction: {
@@ -2248,6 +2419,11 @@ export interface components {
              */
             suggested_country: string;
         };
+        /** BatchUpdatedResponse */
+        BatchUpdatedResponse: {
+            /** Updated */
+            updated: number;
+        };
         /**
          * ConfigValueUpdate
          * @description Corps de PUT /api/config/{key} : value JSON-sérialisable arbitraire.
@@ -2281,6 +2457,30 @@ export interface components {
             last_name: string;
             /** First Name */
             first_name: string;
+        };
+        /** CountryOut */
+        CountryOut: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+        };
+        /** CountrySuggestion */
+        CountrySuggestion: {
+            /** Code */
+            code: string;
+            /** Count */
+            count: number;
+        };
+        /**
+         * CountrySuggestionsResponse
+         * @description GET /api/addresses/suggest-countries (admin).
+         */
+        CountrySuggestionsResponse: {
+            /** Suggestions */
+            suggestions: components["schemas"]["CountrySuggestion"][];
+            /** Without Country */
+            without_country: number;
         };
         /** CreatePersonName */
         CreatePersonName: {
@@ -3920,6 +4120,11 @@ export interface components {
             /** Date Inscription */
             date_inscription: string | null;
         };
+        /** UnassignStructureResponse */
+        UnassignStructureResponse: {
+            /** Deleted */
+            deleted: boolean;
+        };
         /** UpdateIdentifierStatus */
         UpdateIdentifierStatus: {
             /**
@@ -4739,7 +4944,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddressListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4772,7 +4977,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddressPublicationsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4807,7 +5012,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddressReviewResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4840,7 +5045,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["BatchUpdatedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4869,7 +5074,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CountryOut"][];
                 };
             };
         };
@@ -4897,7 +5102,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddressesCountriesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4930,7 +5135,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CountrySuggestionsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4967,7 +5172,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddressOkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5002,7 +5207,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["BatchCountryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5037,7 +5242,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AssignStructureResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5070,7 +5275,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["UnassignStructureResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5101,7 +5306,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddressStatsResponse"];
                 };
             };
             /** @description Validation Error */

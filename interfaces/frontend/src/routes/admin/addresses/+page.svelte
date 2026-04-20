@@ -9,58 +9,24 @@
 
 	// ---- Type definitions ----
 
+	import type { components } from '$lib/api/schema';
+	type Stats = components['schemas']['AddressStatsResponse'];
+	type AddressStructure = components['schemas']['AddressStructureSummary'];
+	type Address = components['schemas']['AddressOut'];
+	type AddressesResponse = components['schemas']['AddressListResponse'];
+	type Publication = components['schemas']['AddressPublicationItem'];
+	type PublicationsResponse = components['schemas']['AddressPublicationsResponse'];
+
+	// Structure : forme propre au front (utilisée par le picker de
+	// structure pour assigner manuellement). Côté API, l'endpoint qui
+	// liste les structures cibles est dans le router structures, pas
+	// addresses — type local conservé.
 	interface Structure {
 		id: number;
 		name: string;
 		acronym: string | null;
 		code: string | null;
 		type: string;
-	}
-
-	interface Stats {
-		total: number;
-		detected: number;
-		pending: number;
-		rejected: number;
-		confirmed: number;
-	}
-
-	interface AddressStructure {
-		acronym: string | null;
-		name: string;
-		is_confirmed: boolean | null;
-		is_detected: boolean;
-	}
-
-	interface Address {
-		id: number;
-		raw_text: string;
-		pub_count: number;
-		is_confirmed: boolean | null;
-		is_detected: boolean;
-		structures: AddressStructure[];
-	}
-
-	interface AddressesResponse {
-		total: number;
-		pages: number;
-		page: number;
-		addresses: Address[];
-		requires_search?: boolean;
-	}
-
-	interface Publication {
-		title: string | null;
-		pub_year: number | null;
-		doc_type: string | null;
-		author_name: string | null;
-		journal_title: string | null;
-		doi: string | null;
-		source_id: string | null;
-	}
-
-	interface PublicationsResponse {
-		publications: Publication[];
 	}
 
 	interface GroupedStructures {
