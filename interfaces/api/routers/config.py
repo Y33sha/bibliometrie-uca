@@ -7,6 +7,7 @@ from fastapi import APIRouter
 
 from application import config as config_service
 from infrastructure.perimeter import get_perimeter_structure_ids
+from infrastructure.repositories import config_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import (
     AddPerimeterStructure,
@@ -42,7 +43,9 @@ async def get_hal_collections() -> Any:
 @router.put("/api/config/{key}")
 async def update_config(key: str, body: ConfigValueUpdate) -> Any:
     with get_cursor() as (cur, conn):
-        return config_service.update_config_value(cur, key, body.value)
+        return config_service.update_config_value(
+            cur, key, body.value, repo=config_repository(cur)
+        )
 
 
 # ── Périmètres ──
@@ -75,14 +78,18 @@ async def list_perimeters() -> Any:
 @router.post("/api/perimeters/{perimeter_id}/structures")
 async def add_perimeter_structure(perimeter_id: int, body: AddPerimeterStructure) -> Any:
     with get_cursor() as (cur, conn):
-        status = config_service.add_perimeter_structure(cur, perimeter_id, body.structure_id)
+        status = config_service.add_perimeter_structure(
+            cur, perimeter_id, body.structure_id, repo=config_repository(cur)
+        )
         return {"status": status}
 
 
 @router.delete("/api/perimeters/{perimeter_id}/structures/{structure_id}")
 async def remove_perimeter_structure(perimeter_id: int, structure_id: int) -> Any:
     with get_cursor() as (cur, conn):
-        config_service.remove_perimeter_structure(cur, perimeter_id, structure_id)
+        config_service.remove_perimeter_structure(
+            cur, perimeter_id, structure_id, repo=config_repository(cur)
+        )
         return {"status": "removed"}
 
 
@@ -93,7 +100,9 @@ async def create_perimeter(body: PerimeterCreate) -> Any:
     name = body.name.strip()
     description = (body.description or "").strip() or None
     with get_cursor() as (cur, conn):
-        pid = config_service.create_perimeter(cur, code=code, name=name, description=description)
+        pid = config_service.create_perimeter(
+            cur, code=code, name=name, description=description, repo=config_repository(cur)
+        )
         return {"id": pid}
 
 
@@ -107,7 +116,9 @@ async def update_perimeter(perimeter_id: int, body: PerimeterUpdate) -> Any:
     if "description" in fields and isinstance(fields["description"], str):
         fields["description"] = fields["description"].strip() or None
     with get_cursor() as (cur, conn):
-        config_service.update_perimeter(cur, perimeter_id, fields=fields)
+        config_service.update_perimeter(
+            cur, perimeter_id, fields=fields, repo=config_repository(cur)
+        )
         return {"ok": True}
 
 
@@ -115,5 +126,5 @@ async def update_perimeter(perimeter_id: int, body: PerimeterUpdate) -> Any:
 async def delete_perimeter(perimeter_id: int) -> Any:
     """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
     with get_cursor() as (cur, conn):
-        config_service.delete_perimeter(cur, perimeter_id)
+        config_service.delete_perimeter(cur, perimeter_id, repo=config_repository(cur))
         return {"ok": True}

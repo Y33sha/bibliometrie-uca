@@ -102,9 +102,13 @@ normalisation explicite émerge.
   Chaque nettoyage = une ligne retirée de `ignore_imports` dans
   `pyproject.toml`.
   - Services applicatifs → ports/adapters pour `infrastructure.
-    repositories.*` (7 modules : config, journals, authorships,
-    publications, addresses, persons, structures). Même pattern que
-    §1.6 côté pipeline.
+    repositories.*` (1/7 fait : **config**. Reste 6 : journals,
+    authorships, publications, addresses, persons, structures).
+    Pattern : service accepte `repo: XRepository` en kwarg ; callers
+    (routers, tests) créent l'instance via `X_repository(cur)` et la
+    passent. Pas de Depends FastAPI (pattern `with get_cursor()`
+    conservé). Ports déjà définis dans `domain/ports/*_repository.py`,
+    implémentations dans `infrastructure/repositories/*`.
   - Pipeline normalize_* → déplacer ou porter les helpers infrastructure :
     `link_addresses` (4), `mark_staging_done` (5), `StepTimer` (2),
     `resolve_zenodo_doi`/`is_zenodo_doi` (2), `extract_nnt_from_openalex`/
