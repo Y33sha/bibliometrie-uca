@@ -22,6 +22,7 @@ from domain.names import names_compatible
 from domain.normalize import normalize_name
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
+from infrastructure.repositories import publication_repository
 
 logger = setup_logger(
     "merge_dup_theses", os.path.join(os.path.dirname(__file__), "../processing/logs")
@@ -177,7 +178,9 @@ def main() -> None:
 
                 try:
                     cur.execute("SAVEPOINT merge_thesis")
-                    merge_publications(cur, target["id"], source["id"])
+                    merge_publications(
+                        cur, target["id"], source["id"], repo=publication_repository(cur)
+                    )
                     cur.execute("RELEASE SAVEPOINT merge_thesis")
                     logger.info(f"  MERGE {label}")
                     merged_total += 1

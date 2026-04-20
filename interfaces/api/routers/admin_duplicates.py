@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from application.publications import mark_distinct as _mark_pubs_distinct
 from application.publications import merge_publications
 from infrastructure.db.queries import duplicates as dup_queries
+from infrastructure.repositories import publication_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import MarkDistinctPublications, MergePublications
 
@@ -40,7 +41,9 @@ async def merge_duplicate_publications(body: MergePublications) -> Any:
 
         cur.execute("SAVEPOINT merge_dup")
         try:
-            merge_publications(cur, body.target_id, body.source_id)
+            merge_publications(
+                cur, body.target_id, body.source_id, repo=publication_repository(cur)
+            )
             cur.execute("RELEASE SAVEPOINT merge_dup")
         except Exception as e:
             cur.execute("ROLLBACK TO SAVEPOINT merge_dup")
@@ -55,5 +58,5 @@ async def mark_publications_distinct(body: MarkDistinctPublications) -> Any:
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
     with get_cursor() as (cur, _conn):
-        _mark_pubs_distinct(cur, body.pub_id_a, body.pub_id_b)
+        _mark_pubs_distinct(cur, body.pub_id_a, body.pub_id_b, repo=publication_repository(cur))
         return {"ok": True}

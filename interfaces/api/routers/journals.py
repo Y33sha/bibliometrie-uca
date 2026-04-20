@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from application.journals import merge_journals
 from application.journals import update_journal as _update_journal
+from infrastructure.repositories import journal_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import JournalUpdate, MergeRequest
 
@@ -94,7 +95,7 @@ async def update_journal(journal_id: int, body: JournalUpdate) -> Any:
     """Met à jour une revue."""
     fields = body.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
-        _update_journal(cur, journal_id, fields=fields)
+        _update_journal(cur, journal_id, fields=fields, repo=journal_repository(cur))
         return {"ok": True}
 
 
@@ -108,5 +109,5 @@ async def merge(journal_id: int, body: MergeRequest) -> Any:
         if body.source_id not in found:
             raise HTTPException(status_code=404, detail="Revue source introuvable")
 
-        merge_journals(cur, journal_id, body.source_id)
+        merge_journals(cur, journal_id, body.source_id, repo=journal_repository(cur))
         return {"merged": True, "source_id": body.source_id, "target_id": journal_id}

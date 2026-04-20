@@ -19,6 +19,7 @@ Gère deux formats de raw_data :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
+from collections.abc import Callable
 from typing import Any
 
 from psycopg2.extras import Json
@@ -31,6 +32,8 @@ from application.publications import find_or_create as find_or_create_publicatio
 from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
+from domain.ports.journal_repository import JournalRepository
+from domain.ports.publication_repository import PublicationRepository
 from domain.publication import clean_doi
 from infrastructure.db_helpers import mark_staging_done
 
@@ -374,18 +377,27 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
 # =============================================================
 
 
-def upsert_publisher(cur: Any, publisher_name: str | None) -> int | None:
+def upsert_publisher(
+    cur: Any, publisher_name: str | None, *, journal_repo: JournalRepository
+) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
-    return find_or_create_publisher(cur, publisher_name)
+    return find_or_create_publisher(cur, publisher_name, repo=journal_repo)
 
 
-def upsert_journal(cur: Any, rec: dict, publisher_id: int | None) -> int | None:
+def upsert_journal(
+    cur: Any, rec: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+) -> int | None:
     """Trouve ou crée une revue depuis les données WoS."""
     title = rec.get("journal_title")
     if not title:
         return None
     return find_or_create_journal(
-        cur, title, issn=rec.get("issn"), eissn=rec.get("eissn"), publisher_id=publisher_id
+        cur,
+        title,
+        issn=rec.get("issn"),
+        eissn=rec.get("eissn"),
+        publisher_id=publisher_id,
+        repo=journal_repo,
     )
 
 
@@ -415,14 +427,20 @@ def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
     )
 
 
-def find_publication(cur: Any, rec: dict, journal_id: int | None) -> int | None:
+def find_publication(
+    cur: Any,
+    rec: dict,
+    journal_id: int | None,
+    *,
+    pub_repo: PublicationRepository,
+) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None."""
     meta = extract_pub_metadata(rec, journal_id)
     if not meta["pub_year"] or not meta["title"] or meta["title"] == "(sans titre)":
         return None
     # Mapper le doc_type pour find_or_create (resolve_doi_conflict a besoin du type canonique)
     meta["doc_type"] = map_doc_type(meta["doc_type"])
-    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
+    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False, repo=pub_repo)
     return pub_id
 
 
@@ -691,7 +709,15 @@ def process_authorships(
 # =============================================================
 
 
-def process_record(cur: Any, queries: WosNormalizeQueries, logger: Any, staging_row: tuple) -> bool:
+def process_record(
+    cur: Any,
+    queries: WosNormalizeQueries,
+    logger: Any,
+    staging_row: tuple,
+    *,
+    journal_repo: JournalRepository,
+    pub_repo: PublicationRepository,
+) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
     from infrastructure.timings import StepTimer
 
@@ -704,8 +730,8 @@ def process_record(cur: Any, queries: WosNormalizeQueries, logger: Any, staging_
         if not rec["ut"]:
             rec["ut"] = ut
 
-        publisher_id = upsert_publisher(cur, rec.get("publisher_name"))
-        journal_id = upsert_journal(cur, rec, publisher_id)
+        publisher_id = upsert_publisher(cur, rec.get("publisher_name"), journal_repo=journal_repo)
+        journal_id = upsert_journal(cur, rec, publisher_id, journal_repo=journal_repo)
         t.mark("publisher+journal")
 
         pub_meta = extract_pub_metadata(rec, journal_id)
@@ -713,11 +739,11 @@ def process_record(cur: Any, queries: WosNormalizeQueries, logger: Any, staging_
         publication_id = queries.get_wos_publication_id(cur, rec["ut"])
 
         if not publication_id:
-            publication_id = find_publication(cur, rec, journal_id)
+            publication_id = find_publication(cur, rec, journal_id, pub_repo=pub_repo)
         t.mark("publication")
 
         if publication_id:
-            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
+            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"], repo=pub_repo)
 
         source_publication_id = insert_wos_document(
             cur, queries, rec, staging_id, publication_id, pub_meta
@@ -728,7 +754,7 @@ def process_record(cur: Any, queries: WosNormalizeQueries, logger: Any, staging_
         t.mark("authors")
 
         if publication_id:
-            refresh_from_sources(cur, publication_id)
+            refresh_from_sources(cur, publication_id, repo=pub_repo)
         t.mark("refresh")
 
         mark_staging_done(cur, staging_id)
@@ -754,11 +780,19 @@ class WosNormalizer(SourceNormalizer):
         logger: Any,
         staging_queries: StagingQueries,
         queries: WosNormalizeQueries,
+        journal_repo_factory: Callable[[Any], JournalRepository],
+        pub_repo_factory: Callable[[Any], PublicationRepository],
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
+        self._journal_repo_factory = journal_repo_factory
+        self._journal_repo: JournalRepository | None = None
+        self._pub_repo_factory = pub_repo_factory
+        self._pub_repo: PublicationRepository | None = None
 
     def preload_caches(self, cur: Any) -> None:
+        self._journal_repo = self._journal_repo_factory(cur)
+        self._pub_repo = self._pub_repo_factory(cur)
         for src_id, pid in self._queries.fetch_wos_source_structures(cur):
             _wos_institution_cache[src_id] = pid
         for src_id, pid in self._queries.fetch_wos_source_persons_with_daisng(cur):
@@ -769,7 +803,15 @@ class WosNormalizer(SourceNormalizer):
         )
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        return process_record(cur, self._queries, self.logger, row)
+        assert self._journal_repo is not None and self._pub_repo is not None
+        return process_record(
+            cur,
+            self._queries,
+            self.logger,
+            row,
+            journal_repo=self._journal_repo,
+            pub_repo=self._pub_repo,
+        )
 
     def cleanup(self) -> None:
         _wos_institution_cache.clear()

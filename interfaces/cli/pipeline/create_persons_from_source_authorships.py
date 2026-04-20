@@ -7,6 +7,7 @@ from application.pipeline.create.create_persons_from_source_authorships import r
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
 from infrastructure.log import setup_logger
+from infrastructure.repositories import person_repository
 
 logger = setup_logger("create_persons", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -21,7 +22,14 @@ def main() -> None:
     conn = get_connection()
     try:
         cur = conn.cursor()
-        run(cur, conn, PgPersonsCreateQueries(), logger, dry_run=args.dry_run)
+        run(
+            cur,
+            conn,
+            PgPersonsCreateQueries(),
+            logger,
+            person_repo=person_repository(cur),
+            dry_run=args.dry_run,
+        )
     finally:
         conn.close()
 

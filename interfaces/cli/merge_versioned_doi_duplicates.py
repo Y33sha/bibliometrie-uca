@@ -18,6 +18,7 @@ from psycopg2.extras import RealDictCursor
 from application.publications import merge_publications
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
+from infrastructure.repositories import publication_repository
 
 log = setup_logger(
     "merge_versioned_doi", os.path.join(os.path.dirname(__file__), "..", "processing", "logs")
@@ -60,7 +61,9 @@ def main() -> None:
             if not args.dry_run:
                 try:
                     cur.execute("SAVEPOINT merge_vdoi")
-                    merge_publications(cur, p["target_id"], p["source_id"])
+                    merge_publications(
+                        cur, p["target_id"], p["source_id"], repo=publication_repository(cur)
+                    )
                     cur.execute("RELEASE SAVEPOINT merge_vdoi")
                     merged += 1
                 except Exception as e:
