@@ -19,12 +19,18 @@ from application.addresses import (
     set_country,
     unassign_manual_structure,
 )
+from infrastructure.db.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import address_repository, authorship_repository
 
 
 @pytest.fixture
 def repo(db):
     return address_repository(db)
+
+
+@pytest.fixture
+def perimeter_queries():
+    return PgPerimeterQueries()
 
 
 @pytest.fixture
@@ -109,46 +115,46 @@ def _get_link(db, address_id, structure_id):
 
 
 class TestReviewStructureLink:
-    def test_confirm_creates_link_if_absent(self, db, repo, authorship_repo):
+    def test_confirm_creates_link_if_absent(self, db, repo, authorship_repo, perimeter_queries):
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
 
-        review_structure_link(db, addr, uca, True, repo=repo, authorship_repo=authorship_repo)
+        review_structure_link(db, addr, uca, True, repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries)
 
         link = _get_link(db, addr, uca)
         assert link is not None
         assert link["is_confirmed"] is True
 
-    def test_reject_creates_link_if_absent(self, db, repo, authorship_repo):
+    def test_reject_creates_link_if_absent(self, db, repo, authorship_repo, perimeter_queries):
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
 
-        review_structure_link(db, addr, uca, False, repo=repo, authorship_repo=authorship_repo)
+        review_structure_link(db, addr, uca, False, repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries)
 
         link = _get_link(db, addr, uca)
         assert link["is_confirmed"] is False
 
-    def test_confirm_updates_existing_link(self, db, repo, authorship_repo):
+    def test_confirm_updates_existing_link(self, db, repo, authorship_repo, perimeter_queries):
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
         _insert_address_structure(db, addr, uca, is_confirmed=False)
 
-        review_structure_link(db, addr, uca, True, repo=repo, authorship_repo=authorship_repo)
+        review_structure_link(db, addr, uca, True, repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries)
 
         assert _get_link(db, addr, uca)["is_confirmed"] is True
 
-    def test_reset_deletes_manual_link(self, db, repo, authorship_repo):
+    def test_reset_deletes_manual_link(self, db, repo, authorship_repo, perimeter_queries):
         """Reset supprime le lien manuel (matched_form_id IS NULL)."""
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
         _insert_address_structure(db, addr, uca, is_confirmed=True)  # manuel
 
-        review_structure_link(db, addr, uca, None, repo=repo, authorship_repo=authorship_repo)
+        review_structure_link(db, addr, uca, None, repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries)
 
         assert _get_link(db, addr, uca) is None
 
     def test_reset_preserves_auto_link_but_clears_confirmation(
-        self, db, repo, authorship_repo
+        self, db, repo, authorship_repo, perimeter_queries
     ):
         """Reset sur un lien auto-détecté : le lien reste, is_confirmed → NULL."""
         uca = _setup_uca_perimeter(db)
@@ -164,7 +170,7 @@ class TestReviewStructureLink:
         form_id = db.fetchone()["id"]
         _insert_address_structure(db, addr, uca, is_confirmed=False, matched_form_id=form_id)
 
-        review_structure_link(db, addr, uca, None, repo=repo, authorship_repo=authorship_repo)
+        review_structure_link(db, addr, uca, None, repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries)
 
         link = _get_link(db, addr, uca)
         assert link is not None  # lien auto préservé
@@ -176,16 +182,17 @@ class TestReviewStructureLink:
 
 
 class TestBatchReviewStructureLink:
-    def test_empty_returns_zero(self, db, repo, authorship_repo):
+    def test_empty_returns_zero(self, db, repo, authorship_repo, perimeter_queries):
         uca = _setup_uca_perimeter(db)
         assert (
             batch_review_structure_link(
-                db, [], uca, True, repo=repo, authorship_repo=authorship_repo
+                db, [], uca, True, repo=repo, authorship_repo=authorship_repo,
+                perimeter_queries=perimeter_queries,
             )
             == 0
         )
 
-    def test_confirm_upserts_lot(self, db, repo, authorship_repo):
+    def test_confirm_upserts_lot(self, db, repo, authorship_repo, perimeter_queries):
         uca = _setup_uca_perimeter(db)
         addrs = [_create_address(db, raw_text=f"adr{i}") for i in range(3)]
 
@@ -197,7 +204,7 @@ class TestBatchReviewStructureLink:
         for aid in addrs:
             assert _get_link(db, aid, uca)["is_confirmed"] is True
 
-    def test_reject_lot(self, db, repo, authorship_repo):
+    def test_reject_lot(self, db, repo, authorship_repo, perimeter_queries):
         uca = _setup_uca_perimeter(db)
         addrs = [_create_address(db, raw_text=f"x{i}") for i in range(2)]
 
@@ -208,7 +215,7 @@ class TestBatchReviewStructureLink:
         for aid in addrs:
             assert _get_link(db, aid, uca)["is_confirmed"] is False
 
-    def test_reset_lot(self, db, repo, authorship_repo):
+    def test_reset_lot(self, db, repo, authorship_repo, perimeter_queries):
         uca = _setup_uca_perimeter(db)
         a1 = _create_address(db, raw_text="a1")
         a2 = _create_address(db, raw_text="a2")
@@ -228,20 +235,21 @@ class TestBatchReviewStructureLink:
 
 
 class TestUnassignManualStructure:
-    def test_deletes_manual_link(self, db, repo, authorship_repo):
+    def test_deletes_manual_link(self, db, repo, authorship_repo, perimeter_queries):
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
         _insert_address_structure(db, addr, uca, is_confirmed=True)  # manuel
 
         assert (
             unassign_manual_structure(
-                db, addr, uca, repo=repo, authorship_repo=authorship_repo
+                db, addr, uca, repo=repo, authorship_repo=authorship_repo,
+                perimeter_queries=perimeter_queries,
             )
             is True
         )
         assert _get_link(db, addr, uca) is None
 
-    def test_preserves_auto_link(self, db, repo, authorship_repo):
+    def test_preserves_auto_link(self, db, repo, authorship_repo, perimeter_queries):
         """Un lien auto-détecté (matched_form_id non NULL) n'est pas supprimé."""
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
@@ -254,7 +262,8 @@ class TestUnassignManualStructure:
 
         assert (
             unassign_manual_structure(
-                db, addr, uca, repo=repo, authorship_repo=authorship_repo
+                db, addr, uca, repo=repo, authorship_repo=authorship_repo,
+                perimeter_queries=perimeter_queries,
             )
             is False
         )  # rien supprimé
@@ -262,12 +271,13 @@ class TestUnassignManualStructure:
         assert link is not None  # lien auto préservé
         assert link["is_confirmed"] is True  # is_confirmed NON touché
 
-    def test_returns_false_if_no_link(self, db, repo, authorship_repo):
+    def test_returns_false_if_no_link(self, db, repo, authorship_repo, perimeter_queries):
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
         assert (
             unassign_manual_structure(
-                db, addr, uca, repo=repo, authorship_repo=authorship_repo
+                db, addr, uca, repo=repo, authorship_repo=authorship_repo,
+                perimeter_queries=perimeter_queries,
             )
             is False
         )

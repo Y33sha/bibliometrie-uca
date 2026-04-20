@@ -22,6 +22,7 @@ from typing import Any
 from application.persons import refresh_person_name_forms
 from domain.normalize import normalize_name
 from infrastructure.db.connection import get_connection
+from infrastructure.repositories import person_repository
 
 logging.basicConfig(
     level=logging.INFO,
@@ -264,7 +265,9 @@ def import_persons(
             (last_name, first_name, last_norm, first_norm),
         )
         person_id = cur.fetchone()["id"]
-        refresh_person_name_forms(cur, person_id, last_name, first_name)
+        refresh_person_name_forms(
+            cur, person_id, last_name, first_name, repo=person_repository(cur)
+        )
 
         cur.execute(
             """

@@ -414,10 +414,12 @@ def _run_merge_pubs_by_hal_id() -> None:
 
 def _run_normalize_hal() -> None:
     from application.pipeline.normalize.normalize_hal import HalNormalizer
+    from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.zenodo import HttpZenodoResolver
 
     log.info("▶ normalize_hal")
     t0 = time.time()
@@ -426,6 +428,8 @@ def _run_normalize_hal() -> None:
         conn, log, PgStagingQueries(), PgHalNormalizeQueries(),
         journal_repo_factory=journal_repository,
         pub_repo_factory=publication_repository,
+        zenodo_resolver=HttpZenodoResolver(),
+        address_linker=PgAddressLinker(),
     ).run([])
     log.info("✓ normalize_hal terminé en %.1fs", time.time() - t0)
 
@@ -450,10 +454,12 @@ def _run_normalize_wos() -> None:
 
 def _run_normalize_openalex() -> None:
     from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
+    from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.zenodo import HttpZenodoResolver
 
     log.info("▶ normalize_openalex")
     t0 = time.time()
@@ -462,12 +468,15 @@ def _run_normalize_openalex() -> None:
         conn, log, PgStagingQueries(), PgOpenalexNormalizeQueries(),
         journal_repo_factory=journal_repository,
         pub_repo_factory=publication_repository,
+        zenodo_resolver=HttpZenodoResolver(),
+        address_linker=PgAddressLinker(),
     ).run([])
     log.info("✓ normalize_openalex terminé en %.1fs", time.time() - t0)
 
 
 def _run_normalize_scanr() -> None:
     from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
+    from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
@@ -480,12 +489,14 @@ def _run_normalize_scanr() -> None:
         conn, log, PgStagingQueries(), PgScanrNormalizeQueries(),
         journal_repo_factory=journal_repository,
         pub_repo_factory=publication_repository,
+        address_linker=PgAddressLinker(),
     ).run([])
     log.info("✓ normalize_scanr terminé en %.1fs", time.time() - t0)
 
 
 def _run_normalize_theses() -> None:
     from application.pipeline.normalize.normalize_theses import ThesesNormalizer
+    from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_theses import PgThesesNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
@@ -500,6 +511,7 @@ def _run_normalize_theses() -> None:
         PgStagingQueries(),
         PgThesesNormalizeQueries(),
         pub_repo_factory=publication_repository,
+        address_linker=PgAddressLinker(),
     ).run([])
     log.info("✓ normalize_theses terminé en %.1fs", time.time() - t0)
 

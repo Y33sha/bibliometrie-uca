@@ -24,8 +24,14 @@ from psycopg2.extras import Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
 from application.pipeline.normalize.base import SourceNormalizer
+from application.pipeline.normalize.openalex_parsing import (
+    extract_nnt_from_openalex,
+    is_theses_fr_source,
+)
+from application.ports.address_linker import AddressLinker
 from application.ports.normalize_openalex import OpenalexNormalizeQueries
 from application.ports.staging import StagingQueries
+from application.ports.zenodo_resolver import ZenodoResolver
 from application.publications import (
     find_by_doi,
     find_by_nnt,
@@ -39,10 +45,7 @@ from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import clean_doi, extract_hal_id_from_url
-from infrastructure.addresses import link_addresses
-from infrastructure.db_helpers import mark_staging_done
-from infrastructure.openalex import extract_nnt_from_openalex, is_theses_fr_source
-from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
+from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
 
 # =============================================================
 # MAPPINGS
@@ -498,6 +501,8 @@ def process_authorships(
     queries: OpenalexNormalizeQueries,
     work: dict,
     source_publication_id: int,
+    *,
+    address_linker: AddressLinker,
 ) -> None:
     """
     Traite les authorships d'un work OpenAlex :
@@ -563,7 +568,7 @@ def process_authorships(
         )
 
         if addr_parts:
-            link_addresses(cur, sa_id, addr_parts)
+            address_linker.link(cur, sa_id, addr_parts)
 
 
 # =============================================================
@@ -579,6 +584,9 @@ def process_work(
     *,
     journal_repo: JournalRepository,
     pub_repo: PublicationRepository,
+    zenodo_resolver: ZenodoResolver,
+    staging_queries: StagingQueries,
+    address_linker: AddressLinker,
 ) -> bool | None:
     """Traite un work du staging OpenAlex."""
     if isinstance(staging_row, dict):
@@ -593,7 +601,7 @@ def process_work(
         raw_doi = clean_doi(doi)
         if raw_doi and is_zenodo_doi(raw_doi):
             try:
-                version_doi = resolve_zenodo_doi(raw_doi)
+                version_doi = zenodo_resolver.resolve(raw_doi)
             except ZenodoResolutionError as e:
                 logger.warning(f"  {openalex_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
                 return None
@@ -603,7 +611,7 @@ def process_work(
                         f"  {openalex_id} concept DOI Zenodo {raw_doi} -> "
                         f"version {version_doi} deja en staging, skip"
                     )
-                    mark_staging_done(cur, staging_id)
+                    staging_queries.mark_done(cur, staging_id)
                     return None
 
         hal_location = is_hal_primary_location(work)
@@ -659,12 +667,14 @@ def process_work(
             cur, queries, work, staging_id, publication_id, pub_meta
         )
 
-        process_authorships(cur, queries, work, source_publication_id)
+        process_authorships(
+            cur, queries, work, source_publication_id, address_linker=address_linker
+        )
 
         if publication_id:
             refresh_from_sources(cur, publication_id, repo=pub_repo)
 
-        mark_staging_done(cur, staging_id)
+        staging_queries.mark_done(cur, staging_id)
         return True
 
     except Exception as e:
@@ -686,6 +696,8 @@ class OpenalexNormalizer(SourceNormalizer):
         queries: OpenalexNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
         pub_repo_factory: Callable[[Any], PublicationRepository],
+        zenodo_resolver: ZenodoResolver,
+        address_linker: AddressLinker,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -693,6 +705,8 @@ class OpenalexNormalizer(SourceNormalizer):
         self._journal_repo: JournalRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
+        self._zenodo_resolver = zenodo_resolver
+        self._address_linker = address_linker
 
     def preload_caches(self, cur: Any) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
@@ -707,7 +721,13 @@ class OpenalexNormalizer(SourceNormalizer):
             row,
             journal_repo=self._journal_repo,
             pub_repo=self._pub_repo,
+            zenodo_resolver=self._zenodo_resolver,
+            staging_queries=self._staging,
+            address_linker=self._address_linker,
         )
+
+    def cleanup(self) -> None:
+        self._address_linker.clear_cache()
 
     def summary_stats(self, cur: Any) -> list[str]:
         return [

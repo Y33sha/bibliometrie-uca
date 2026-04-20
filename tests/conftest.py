@@ -35,11 +35,11 @@ def pytest_configure(config):
 
 @pytest.fixture(autouse=True)
 def _clear_caches():
-    """Vide les caches module-level entre chaque test (rollback-safe)."""
-    yield
-    from infrastructure.addresses import clear_cache as clear_addr_cache
+    """Vide les caches module-level restants entre chaque test (rollback-safe).
 
-    clear_addr_cache()
+    Le cache d'adresses est désormais instance-level (PgAddressLinker).
+    """
+    yield
     # HAL author cache
     try:
         from application.pipeline.normalize.normalize_hal import _hal_author_cache

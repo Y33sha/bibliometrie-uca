@@ -1,31 +1,29 @@
-"""Utilitaires pour la résolution des DOI Zenodo (concept vs version)."""
+"""Adapter HTTP pour `application.ports.zenodo_resolver.ZenodoResolver`.
 
-import re
+Le format des DOI Zenodo et l'erreur du contrat sont dans `domain.zenodo`.
+"""
+
 import time
 
 import requests
 
+from domain.zenodo import ZENODO_DOI_RE, ZenodoResolutionError
 from infrastructure.api_limits import ZENODO_DELAY
 from infrastructure.log import setup_logger
 
 logger = setup_logger("zenodo", "processing/logs")
 
-_ZENODO_DOI_RE = re.compile(r"10\.5281/zenodo\.(\d+)", re.IGNORECASE)
 _API_BASE = "https://zenodo.org/api/records"
 _MAX_RETRIES = 3
 _INITIAL_BACKOFF = 2  # secondes
 _last_request_time = 0.0
 
 
-def is_zenodo_doi(doi: str | None) -> bool:
-    """Vérifie si un DOI est un DOI Zenodo."""
-    return bool(doi and _ZENODO_DOI_RE.search(doi))
+class HttpZenodoResolver:
+    """Adapter HTTP pour `application.ports.zenodo_resolver.ZenodoResolver`."""
 
-
-class ZenodoResolutionError(Exception):
-    """Erreur temporaire de résolution Zenodo (rate-limit, timeout)."""
-
-    pass
+    def resolve(self, doi: str) -> str | None:
+        return resolve_zenodo_doi(doi)
 
 
 def resolve_zenodo_doi(doi: str) -> str | None:
@@ -37,7 +35,7 @@ def resolve_zenodo_doi(doi: str) -> str | None:
       pour que l'appelant puisse décider de ne pas marquer processed.
     - Retry avec backoff exponentiel en cas de 429 (rate limit).
     """
-    match = _ZENODO_DOI_RE.search(doi)
+    match = ZENODO_DOI_RE.search(doi)
     if not match:
         return None
 

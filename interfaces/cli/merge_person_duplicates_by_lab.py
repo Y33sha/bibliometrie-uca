@@ -20,6 +20,7 @@ from psycopg2.extras import RealDictCursor
 
 from application.persons import merge_person
 from infrastructure.db.connection import get_connection
+from infrastructure.repositories import person_repository
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -315,7 +316,7 @@ def run(dry_run: Any = False) -> Any:
                 for target, sources in merge_plan:
                     for source in sources:
                         if not dry_run:
-                            do_merge(cur, target["id"], source["id"])
+                            do_merge(cur, target["id"], source["id"], repo=person_repository(cur))
                             logger.info(
                                 f"  Fusionné #{source['id']} → #{target['id']} "
                                 f"({source['last_name']} {source['first_name']})"
@@ -430,7 +431,7 @@ def run(dry_run: Any = False) -> Any:
                     for target, sources in swap_plan:
                         for source in sources:
                             if not dry_run:
-                                do_merge(cur, target["id"], source["id"])
+                                do_merge(cur, target["id"], source["id"], repo=person_repository(cur))
                                 logger.info(
                                     f"  Fusionné (interversion) #{source['id']} → #{target['id']} "
                                     f"({source['last_name']} {source['first_name']})"

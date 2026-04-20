@@ -14,6 +14,7 @@ from typing import Any
 from application.persons import add_identifier
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
+from infrastructure.repositories import person_repository
 
 log = setup_logger(
     "backfill_identifiers", os.path.join(os.path.dirname(__file__), "../processing/logs")
@@ -55,7 +56,9 @@ def backfill_identifier(cur: Any, conn: Any, id_type: Any, column: Any, source_f
 
     inserted = 0
     for person_id, id_value in rows:
-        add_identifier(cur, person_id, id_type, id_value, source="hal")
+        add_identifier(
+            cur, person_id, id_type, id_value, source="hal", repo=person_repository(cur)
+        )
         inserted += 1
 
     conn.commit()

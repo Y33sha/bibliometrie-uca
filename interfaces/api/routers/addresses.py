@@ -12,6 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from application import addresses as addresses_service
 from infrastructure.app_config import _get_from_db
 from infrastructure.db.queries import addresses as addr_queries
+from infrastructure.db.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import address_repository, authorship_repository
 from interfaces.api.deps import get_cursor, require_admin
 from interfaces.api.models import (
@@ -108,6 +109,7 @@ async def review_address(addr_id: int, action: ReviewAction) -> Any:
             action.is_confirmed,
             repo=address_repository(cur),
             authorship_repo=authorship_repository(cur),
+            perimeter_queries=PgPerimeterQueries(),
         )
         structures = addr_queries.get_address_structures(cur, addr_id)
         link = addr_queries.get_structure_link(cur, addr_id, action.structure_id)
@@ -130,6 +132,7 @@ async def batch_review(data: BatchReviewAction) -> Any:
             data.is_confirmed,
             repo=address_repository(cur),
             authorship_repo=authorship_repository(cur),
+            perimeter_queries=PgPerimeterQueries(),
         )
         return {"updated": updated}
 
@@ -248,6 +251,7 @@ async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
             True,
             repo=address_repository(cur),
             authorship_repo=authorship_repository(cur),
+            perimeter_queries=PgPerimeterQueries(),
         )
         return {"id": addr_id, "structure_id": action.structure_id, "status": "assigned"}
 
@@ -262,6 +266,7 @@ async def unassign_structure(addr_id: int, structure_id: int = Query(...)) -> An
             structure_id,
             repo=address_repository(cur),
             authorship_repo=authorship_repository(cur),
+            perimeter_queries=PgPerimeterQueries(),
         )
         return {"deleted": deleted}
 

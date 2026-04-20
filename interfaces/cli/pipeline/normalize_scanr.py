@@ -3,6 +3,7 @@
 import os
 
 from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
+from infrastructure.addresses import PgAddressLinker
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
 from infrastructure.db.queries.staging import PgStagingQueries
@@ -21,6 +22,7 @@ def main() -> None:
         PgScanrNormalizeQueries(),
         journal_repo_factory=journal_repository,
         pub_repo_factory=publication_repository,
+        address_linker=PgAddressLinker(),
     ).run()
 
 
