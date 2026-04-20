@@ -10,18 +10,17 @@ from typing import Any
 
 from application.audit import emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from infrastructure.repositories import config_repository
+from domain.ports.config_repository import ConfigRepository
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
 
-def update_config_value(cur: Any, key: str, value: Any) -> dict:
+def update_config_value(cur: Any, key: str, value: Any, *, repo: ConfigRepository) -> dict:
     """Met à jour la valeur d'un paramètre de config existant.
 
     `value` est sérialisé en JSON. Retourne la ligne mise à jour.
     Lève NotFoundError si la clé n'existe pas.
     """
-    repo = config_repository(cur)
     if not repo.config_key_exists(key):
         raise NotFoundError(f"Paramètre '{key}' introuvable")
     return repo.update_config_value(key, value)
@@ -30,7 +29,9 @@ def update_config_value(cur: Any, key: str, value: Any) -> dict:
 # ── Perimeters — structures membres ──────────────────────────────
 
 
-def add_perimeter_structure(cur: Any, perimeter_id: int, structure_id: int) -> str:
+def add_perimeter_structure(
+    cur: Any, perimeter_id: int, structure_id: int, *, repo: ConfigRepository
+) -> str:
     """Ajoute une structure au périmètre (idempotent).
 
     Retourne :
@@ -39,7 +40,6 @@ def add_perimeter_structure(cur: Any, perimeter_id: int, structure_id: int) -> s
 
     Lève NotFoundError si le périmètre n'existe pas.
     """
-    repo = config_repository(cur)
     if repo.add_structure_to_perimeter(perimeter_id, structure_id):
         return "added"
 
@@ -49,19 +49,28 @@ def add_perimeter_structure(cur: Any, perimeter_id: int, structure_id: int) -> s
     raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
 
-def remove_perimeter_structure(cur: Any, perimeter_id: int, structure_id: int) -> None:
+def remove_perimeter_structure(
+    cur: Any, perimeter_id: int, structure_id: int, *, repo: ConfigRepository
+) -> None:
     """Retire une structure d'un périmètre (idempotent).
 
     Lève NotFoundError si le périmètre n'existe pas.
     """
-    if not config_repository(cur).remove_structure_from_perimeter(perimeter_id, structure_id):
+    if not repo.remove_structure_from_perimeter(perimeter_id, structure_id):
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
 
 # ── Perimeters — CRUD ────────────────────────────────────────────
 
 
-def create_perimeter(cur: Any, *, code: str, name: str, description: str | None = None) -> int:
+def create_perimeter(
+    cur: Any,
+    *,
+    code: str,
+    name: str,
+    description: str | None = None,
+    repo: ConfigRepository,
+) -> int:
     """Crée un nouveau périmètre. Retourne l'id créé.
 
     Lève ValidationError si code ou name est vide.
@@ -70,19 +79,19 @@ def create_perimeter(cur: Any, *, code: str, name: str, description: str | None 
     if not code or not name:
         raise ValidationError("Code et nom requis")
 
-    repo = config_repository(cur)
     if repo.perimeter_code_exists(code):
         raise ConflictError(f"Le code '{code}' existe déjà")
     return repo.create_perimeter(code=code, name=name, description=description)
 
 
-def update_perimeter(cur: Any, perimeter_id: int, *, fields: dict) -> None:
+def update_perimeter(
+    cur: Any, perimeter_id: int, *, fields: dict, repo: ConfigRepository
+) -> None:
     """Met à jour un périmètre (name, description, structure_ids).
 
     Lève NotFoundError si le périmètre n'existe pas.
     Lève ValidationError si `fields` est vide ou ne contient aucun champ valide.
     """
-    repo = config_repository(cur)
     if not repo.perimeter_exists(perimeter_id):
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
@@ -94,21 +103,22 @@ def update_perimeter(cur: Any, perimeter_id: int, *, fields: dict) -> None:
     repo.update_perimeter_fields(perimeter_id, clean)
 
 
-def perimeter_usage(cur: Any, perimeter_code: str) -> list[str]:
+def perimeter_usage(
+    cur: Any, perimeter_code: str, *, repo: ConfigRepository
+) -> list[str]:
     """Retourne la liste des clés config qui référencent ce périmètre
     (ex: ["perimeter_extraction", "perimeter_persons"]).
     """
-    return config_repository(cur).config_keys_referencing_perimeter(perimeter_code)
+    return repo.config_keys_referencing_perimeter(perimeter_code)
 
 
-def delete_perimeter(cur: Any, perimeter_id: int) -> None:
+def delete_perimeter(cur: Any, perimeter_id: int, *, repo: ConfigRepository) -> None:
     """Supprime un périmètre.
 
     Lève NotFoundError si le périmètre n'existe pas.
     Lève ConflictError si le périmètre est utilisé par la config pipeline ;
     le message contient la liste des clés qui le référencent.
     """
-    repo = config_repository(cur)
     code = repo.get_perimeter_code(perimeter_id)
     if code is None:
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")

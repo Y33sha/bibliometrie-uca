@@ -73,8 +73,7 @@ layers = [
 # Violations connues `application → infrastructure` verrouillées à date du
 # merge §1.6. Nettoyage suivi en §1.7b : chaque refacto = une ligne retirée.
 ignore_imports = [
-    # Services applicatifs → infrastructure.repositories (7)
-    "application.config -> infrastructure.repositories.config_repository",
+    # Services applicatifs → infrastructure.repositories (6 — config levé)
     "application.journals -> infrastructure.repositories.journal_repository",
     "application.authorships -> infrastructure.repositories.authorship_repository",
     "application.publications -> infrastructure.repositories.publication_repository",
