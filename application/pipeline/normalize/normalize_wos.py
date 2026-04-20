@@ -19,6 +19,7 @@ Gère deux formats de raw_data :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
+from collections.abc import Callable
 from typing import Any
 
 from psycopg2.extras import Json
@@ -31,6 +32,7 @@ from application.publications import find_or_create as find_or_create_publicatio
 from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
+from domain.ports.journal_repository import JournalRepository
 from domain.publication import clean_doi
 from infrastructure.db_helpers import mark_staging_done
 
@@ -374,18 +376,27 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
 # =============================================================
 
 
-def upsert_publisher(cur: Any, publisher_name: str | None) -> int | None:
+def upsert_publisher(
+    cur: Any, publisher_name: str | None, *, journal_repo: JournalRepository
+) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
-    return find_or_create_publisher(cur, publisher_name)
+    return find_or_create_publisher(cur, publisher_name, repo=journal_repo)
 
 
-def upsert_journal(cur: Any, rec: dict, publisher_id: int | None) -> int | None:
+def upsert_journal(
+    cur: Any, rec: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+) -> int | None:
     """Trouve ou crée une revue depuis les données WoS."""
     title = rec.get("journal_title")
     if not title:
         return None
     return find_or_create_journal(
-        cur, title, issn=rec.get("issn"), eissn=rec.get("eissn"), publisher_id=publisher_id
+        cur,
+        title,
+        issn=rec.get("issn"),
+        eissn=rec.get("eissn"),
+        publisher_id=publisher_id,
+        repo=journal_repo,
     )
 
 
@@ -691,7 +702,14 @@ def process_authorships(
 # =============================================================
 
 
-def process_record(cur: Any, queries: WosNormalizeQueries, logger: Any, staging_row: tuple) -> bool:
+def process_record(
+    cur: Any,
+    queries: WosNormalizeQueries,
+    logger: Any,
+    staging_row: tuple,
+    *,
+    journal_repo: JournalRepository,
+) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
     from infrastructure.timings import StepTimer
 
@@ -704,8 +722,8 @@ def process_record(cur: Any, queries: WosNormalizeQueries, logger: Any, staging_
         if not rec["ut"]:
             rec["ut"] = ut
 
-        publisher_id = upsert_publisher(cur, rec.get("publisher_name"))
-        journal_id = upsert_journal(cur, rec, publisher_id)
+        publisher_id = upsert_publisher(cur, rec.get("publisher_name"), journal_repo=journal_repo)
+        journal_id = upsert_journal(cur, rec, publisher_id, journal_repo=journal_repo)
         t.mark("publisher+journal")
 
         pub_meta = extract_pub_metadata(rec, journal_id)
@@ -754,11 +772,15 @@ class WosNormalizer(SourceNormalizer):
         logger: Any,
         staging_queries: StagingQueries,
         queries: WosNormalizeQueries,
+        journal_repo_factory: Callable[[Any], JournalRepository],
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
+        self._journal_repo_factory = journal_repo_factory
+        self._journal_repo: JournalRepository | None = None
 
     def preload_caches(self, cur: Any) -> None:
+        self._journal_repo = self._journal_repo_factory(cur)
         for src_id, pid in self._queries.fetch_wos_source_structures(cur):
             _wos_institution_cache[src_id] = pid
         for src_id, pid in self._queries.fetch_wos_source_persons_with_daisng(cur):
@@ -769,7 +791,10 @@ class WosNormalizer(SourceNormalizer):
         )
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        return process_record(cur, self._queries, self.logger, row)
+        assert self._journal_repo is not None, "preload_caches doit être appelé avant"
+        return process_record(
+            cur, self._queries, self.logger, row, journal_repo=self._journal_repo
+        )
 
     def cleanup(self) -> None:
         _wos_institution_cache.clear()

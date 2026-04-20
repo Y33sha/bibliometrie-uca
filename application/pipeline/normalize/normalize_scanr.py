@@ -25,8 +25,10 @@ from application.ports.normalize_scanr import ScanrNormalizeQueries
 from application.ports.staging import StagingQueries
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
+from collections.abc import Callable
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
+from domain.ports.journal_repository import JournalRepository
 from domain.publication import clean_doi
 from infrastructure.addresses import link_addresses
 from infrastructure.db_helpers import mark_staging_done
@@ -57,21 +59,32 @@ def get_title(doc: dict) -> str | None:
     return title
 
 
-def upsert_publisher(cur: Any, doc: dict) -> int | None:
+def upsert_publisher(
+    cur: Any, doc: dict, *, journal_repo: JournalRepository
+) -> int | None:
     publisher_name = (doc.get("source") or {}).get("publisher")
     if not publisher_name:
         return None
-    return find_or_create_publisher(cur, publisher_name)
+    return find_or_create_publisher(cur, publisher_name, repo=journal_repo)
 
 
-def upsert_journal(cur: Any, doc: dict, publisher_id: int | None) -> int | None:
+def upsert_journal(
+    cur: Any, doc: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+) -> int | None:
     source = doc.get("source") or {}
     title = source.get("title")
     if not title:
         return None
     issn = source.get("issn")
     eissn = source.get("eissn")
-    return find_or_create_journal(cur, title, issn=issn, eissn=eissn, publisher_id=publisher_id)
+    return find_or_create_journal(
+        cur,
+        title,
+        issn=issn,
+        eissn=eissn,
+        publisher_id=publisher_id,
+        repo=journal_repo,
+    )
 
 
 def _extract_nnt_from_scanr_id(scanr_id: str) -> str | None:
@@ -312,7 +325,14 @@ def process_authors(
 # =============================================================
 
 
-def process_work(cur: Any, queries: ScanrNormalizeQueries, logger: Any, staging_row: Any) -> bool:
+def process_work(
+    cur: Any,
+    queries: ScanrNormalizeQueries,
+    logger: Any,
+    staging_row: Any,
+    *,
+    journal_repo: JournalRepository,
+) -> bool:
     staging_id = staging_row["id"]
     scanr_id = staging_row["scanr_id"]
     raw_data = staging_row["raw_data"]
@@ -327,11 +347,11 @@ def process_work(cur: Any, queries: ScanrNormalizeQueries, logger: Any, staging_
             return False
 
         t0 = time.perf_counter()
-        publisher_id = upsert_publisher(cur, doc)
+        publisher_id = upsert_publisher(cur, doc, journal_repo=journal_repo)
         timings["publisher"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        journal_id = upsert_journal(cur, doc, publisher_id)
+        journal_id = upsert_journal(cur, doc, publisher_id, journal_repo=journal_repo)
         timings["journal"] = time.perf_counter() - t0
 
         pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
@@ -385,9 +405,18 @@ class ScanrNormalizer(SourceNormalizer):
         logger: Any,
         staging_queries: StagingQueries,
         queries: ScanrNormalizeQueries,
+        journal_repo_factory: Callable[[Any], JournalRepository],
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
+        self._journal_repo_factory = journal_repo_factory
+        self._journal_repo: JournalRepository | None = None
+
+    def preload_caches(self, cur: Any) -> None:
+        self._journal_repo = self._journal_repo_factory(cur)
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        return process_work(cur, self._queries, self.logger, row)
+        assert self._journal_repo is not None, "preload_caches doit être appelé avant"
+        return process_work(
+            cur, self._queries, self.logger, row, journal_repo=self._journal_repo
+        )

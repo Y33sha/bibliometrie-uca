@@ -70,8 +70,7 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 # merge §1.6. Nettoyage suivi en §1.7b : chaque refacto = une ligne retirée.
 ignore_imports = [
     # Services applicatifs → infrastructure.repositories
-    # (3 — config, authorships, addresses, structures levés)
-    "application.journals -> infrastructure.repositories.journal_repository",
+    # (2 — config, authorships, addresses, structures, journals levés)
     "application.publications -> infrastructure.repositories.publication_repository",
     "application.persons -> infrastructure.repositories.person_repository",
     # Pipeline normalize_* → helpers infrastructure (14)

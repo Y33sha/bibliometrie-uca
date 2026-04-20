@@ -7,13 +7,20 @@ from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
 from infrastructure.db.queries.staging import PgStagingQueries
 from infrastructure.log import setup_logger
+from infrastructure.repositories import journal_repository
 
 logger = setup_logger("normalize_openalex", os.path.join(os.path.dirname(__file__), "logs"))
 
 
 def main() -> None:
     conn = get_connection()
-    OpenalexNormalizer(conn, logger, PgStagingQueries(), PgOpenalexNormalizeQueries()).run()
+    OpenalexNormalizer(
+        conn,
+        logger,
+        PgStagingQueries(),
+        PgOpenalexNormalizeQueries(),
+        journal_repo_factory=journal_repository,
+    ).run()
 
 
 if __name__ == "__main__":

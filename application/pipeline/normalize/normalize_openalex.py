@@ -17,6 +17,7 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
 import re
+from collections.abc import Callable
 from typing import Any
 
 from psycopg2.extras import Json
@@ -35,6 +36,7 @@ from application.publications import (
 from application.publications import find_or_create as find_or_create_publication
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
+from domain.ports.journal_repository import JournalRepository
 from domain.publication import clean_doi, extract_hal_id_from_url
 from infrastructure.addresses import link_addresses
 from infrastructure.db_helpers import mark_staging_done
@@ -186,7 +188,9 @@ def is_repository_source(work: dict) -> bool:
 # =============================================================
 
 
-def upsert_publisher(cur: Any, work: dict) -> int | None:
+def upsert_publisher(
+    cur: Any, work: dict, *, journal_repo: JournalRepository
+) -> int | None:
     """Extrait et trouve/crée l'éditeur depuis le work OpenAlex."""
     location = work.get("primary_location") or {}
     source = location.get("source") or {}
@@ -194,10 +198,14 @@ def upsert_publisher(cur: Any, work: dict) -> int | None:
     if not publisher_name:
         return None
     openalex_id = extract_short_id(source.get("host_organization") or "")
-    return find_or_create_publisher(cur, publisher_name, openalex_id=openalex_id or None)
+    return find_or_create_publisher(
+        cur, publisher_name, openalex_id=openalex_id or None, repo=journal_repo
+    )
 
 
-def upsert_journal(cur: Any, work: dict, publisher_id: int | None) -> int | None:
+def upsert_journal(
+    cur: Any, work: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+) -> int | None:
     """Extrait et trouve/crée la revue depuis le work OpenAlex."""
     location = work.get("primary_location") or {}
     source = location.get("source") or {}
@@ -233,6 +241,7 @@ def upsert_journal(cur: Any, work: dict, publisher_id: int | None) -> int | None
         publisher_id=publisher_id,
         openalex_id=openalex_id or None,
         oa_model=oa_model,
+        repo=journal_repo,
     )
 
 
@@ -560,6 +569,8 @@ def process_work(
     queries: OpenalexNormalizeQueries,
     logger: Any,
     staging_row: tuple,
+    *,
+    journal_repo: JournalRepository,
 ) -> bool | None:
     """Traite un work du staging OpenAlex."""
     if isinstance(staging_row, dict):
@@ -595,8 +606,10 @@ def process_work(
             publisher_id = None
             journal_id = None
         else:
-            publisher_id = upsert_publisher(cur, work)
-            journal_id = upsert_journal(cur, work, publisher_id)
+            publisher_id = upsert_publisher(cur, work, journal_repo=journal_repo)
+            journal_id = upsert_journal(
+                cur, work, publisher_id, journal_repo=journal_repo
+            )
 
         pub_meta = extract_pub_metadata(work, journal_id)
 
@@ -662,12 +675,21 @@ class OpenalexNormalizer(SourceNormalizer):
         logger: Any,
         staging_queries: StagingQueries,
         queries: OpenalexNormalizeQueries,
+        journal_repo_factory: Callable[[Any], JournalRepository],
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
+        self._journal_repo_factory = journal_repo_factory
+        self._journal_repo: JournalRepository | None = None
+
+    def preload_caches(self, cur: Any) -> None:
+        self._journal_repo = self._journal_repo_factory(cur)
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        return process_work(cur, self._queries, self.logger, row)
+        assert self._journal_repo is not None, "preload_caches doit être appelé avant"
+        return process_work(
+            cur, self._queries, self.logger, row, journal_repo=self._journal_repo
+        )
 
     def summary_stats(self, cur: Any) -> list[str]:
         return [
