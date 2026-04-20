@@ -60,6 +60,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 * [ ] sortir hal-problems du routeur persons, ça n'a rien à y faire
 * [ ] logique bizarre à corriger: if is_thesis and has_hal_link: priority = _PRIORITY_THESIS_HAL_LINKED
 * [ ] renommage de routeurs (admin/, public/; pub_stats, stats)
+* [ ] renommage/réorganisation des phases du pipeline
 # Interface
 ## Admin
 * [ ] interface pour consulter l'audit trail

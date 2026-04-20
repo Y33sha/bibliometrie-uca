@@ -210,17 +210,3 @@ class SourceNormalizer(ABC):
             raise
         finally:
             self.conn.close()
-
-
-def run_normalizer(cls: type[SourceNormalizer], logger: Any) -> None:
-    """Shim de transition pour les normalizers pas encore migrés (theses, OA, WoS, HAL).
-
-    Instancie la connexion et l'adapter staging. À supprimer quand tous les
-    normalizers auront leur propre entry point dans `interfaces/cli/pipeline/`
-    qui injecte à la fois `StagingQueries` et le port spécifique à la source.
-    """
-    from infrastructure.db.connection import get_connection
-    from infrastructure.db.queries.staging import PgStagingQueries
-
-    conn = get_connection()
-    cls(conn, logger, PgStagingQueries()).run()  # type: ignore[call-arg]

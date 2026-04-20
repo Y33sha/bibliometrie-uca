@@ -407,10 +407,14 @@ def _insert_hal_staging(cur, docs):
 
 def _run_normalize_hal(cur):
     """Exécute la normalisation HAL via un curseur tuple (comme le vrai script)."""
+    import logging
+
     plain_cur = cur.connection.cursor()
-    from application.pipeline.normalize.normalize_hal import (
-        process_work,  # still uses module-level fns
-    )
+    from application.pipeline.normalize.normalize_hal import process_work
+    from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
+
+    queries = PgHalNormalizeQueries()
+    logger = logging.getLogger("test")
 
     plain_cur.execute("""
         Select id, source_id AS halid, doi, raw_data, hal_collections
@@ -419,7 +423,7 @@ def _run_normalize_hal(cur):
     rows = plain_cur.fetchall()
     processed = 0
     for row in rows:
-        if process_work(plain_cur, row):
+        if process_work(plain_cur, queries, logger, row):
             processed += 1
     return processed
 

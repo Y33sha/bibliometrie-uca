@@ -111,7 +111,7 @@ def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **k
         # OpenAlex : le filtre from_updated_date requiert un plan payant
         # (429 "Plan upgrade required"). Les changefiles couvrent tout OA
         # (plusieurs Go/jour), pas filtrable par institution.
-        # OpenAlex est rattrapé par le mode weekly (année en cours + hash).
+        # OpenAlex est rattrapé par le mode weekly.
     elif mode == "weekly":
         log.info("Mode hebdomadaire (WoS exclu)")
         if "openalex" in sources:
@@ -179,7 +179,7 @@ def phase_normalize(**kw: Any) -> Any:
     if "openalex" in sources:
         _run_normalize_openalex()
     if "hal" in sources:
-        run_python("processing/normalize_hal.py")
+        _run_normalize_hal()
     if "wos" in sources:
         _run_normalize_wos()
     if "scanr" in sources:
@@ -394,6 +394,19 @@ def _run_merge_pubs_by_hal_id() -> None:
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
+
+
+def _run_normalize_hal() -> None:
+    from application.pipeline.normalize.normalize_hal import HalNormalizer
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
+
+    log.info("▶ normalize_hal")
+    t0 = time.time()
+    conn = get_connection()
+    HalNormalizer(conn, log, PgStagingQueries(), PgHalNormalizeQueries()).run([])
+    log.info("✓ normalize_hal terminé en %.1fs", time.time() - t0)
 
 
 def _run_normalize_wos() -> None:
