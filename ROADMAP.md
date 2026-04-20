@@ -4,15 +4,15 @@
 
 Synthèse de l'audit DSI (avril 2026) — ROI décroissant (impact / effort) :
 
-1. **§1.7b** — Lever les 14 `ignore_imports` pipeline. Effort faible, débloque la testabilité unitaire des `normalize_*` et fige la cohérence DDD avant transmission.
-2. **§2.10** — Découper les 4 fichiers backend monolithiques (`queries/publications.py` 1140 LOC, `queries/persons.py` 711, `repositories/person_repository.py` 665, `queries/stats.py` 630). Effort moyen, impact maintenabilité + testabilité.
-3. **§2.1 +§2.2** — Remonter `fail_under` de 49 → 60+ en ciblant `infrastructure/db/queries/*` (unitaires). Effort moyen, réduit le risque de régression en prod.
-4. **§2.7.4** — Découper les 3 routes Svelte > 1000 LOC (`admin/structures` 1572, `admin/persons` 1263, `publications/[id]` 1132). Effort moyen, impact UX + maintenabilité.
-5. **§2.7.3** — Généraliser les types OpenAPI aux ~29 endpoints restants (~88 interfaces locales à éliminer). Effort moyen, impact cohérence front/back.
-6. **§2.6** — `CONTRIBUTING.md` + descriptions OpenAPI. Effort faible, impact onboarding DSI.
-7. **§2.7.5** — Amorcer des tests frontend (Vitest composables + Playwright parcours critiques). Nouveau.
-8. **§2.4** — Convention `NNN_down.sql` pour rollbacks d'urgence. Effort très faible, résilience prod.
-9. **§2.11** — Migration psycopg2 → psycopg3 (fin de support annoncée ~2025). Effort moyen, sécurité long terme.
+1. [x] **§1.7b** — Lever les 14 `ignore_imports` pipeline. Effort faible, débloque la testabilité unitaire des `normalize_*` et fige la cohérence DDD avant transmission. *Clôturé le 2026-04-20.*
+2. [ ] **§2.10** — Découper les 4 fichiers backend monolithiques (`queries/publications.py` 1140 LOC, `queries/persons.py` 711, `repositories/person_repository.py` 665, `queries/stats.py` 630). Effort moyen, impact maintenabilité + testabilité.
+3. [ ] **§2.1 +§2.2** — Remonter `fail_under` de 49 → 60+ en ciblant `infrastructure/db/queries/*` (unitaires). Effort moyen, réduit le risque de régression en prod.
+4. [ ] **§2.7.4** — Découper les 3 routes Svelte > 1000 LOC (`admin/structures` 1572, `admin/persons` 1263, `publications/[id]` 1132). Effort moyen, impact UX + maintenabilité.
+5. [ ] **§2.7.3** — Généraliser les types OpenAPI aux ~29 endpoints restants (~88 interfaces locales à éliminer). Effort moyen, impact cohérence front/back.
+6. [ ] **§2.6** — `CONTRIBUTING.md` + descriptions OpenAPI. Effort faible, impact onboarding DSI.
+7. [ ] **§2.7.5** — Amorcer des tests frontend (Vitest composables + Playwright parcours critiques). Nouveau.
+8. [ ] **§2.4** — Convention `NNN_down.sql` pour rollbacks d'urgence. Effort très faible, résilience prod.
+9. [ ] **§2.11** — Migration psycopg2 → psycopg3 (fin de support annoncée ~2025). Effort moyen, sécurité long terme.
 
 Les chantiers `§1.1`, `§1.2`, `§1.6`, `§1.8`, `§2.3`, `§2.5`, `§2.9`, ainsi que le **Chantier fonctionnalités**, restent en fil rouge et ne figurent pas dans cette priorisation.
 
@@ -120,17 +120,23 @@ application > domain` (siblings au même niveau — ni l'un ni l'autre
 ne peut importer l'autre ; les deux peuvent importer domain ;
 interfaces peut tout importer). Vérifié en pre-commit + CI.
 
-#### §1.7b — Lever les `ignore_imports` (grandfather clause)
-Services applicatifs → ports/adapters : 7/7 repositories faits
-(config, authorships, addresses, structures, journals, persons,
-publications). Chaque nettoyage restant = une ligne retirée de
-`ignore_imports` dans `pyproject.toml`.
-- [ ] Pipeline normalize_* → déplacer ou porter les helpers infrastructure :
-  `link_addresses` (4), `mark_staging_done` (5), `StepTimer` (2),
-  `resolve_zenodo_doi`/`is_zenodo_doi` (2), `extract_nnt_from_openalex`/
-  `is_theses_fr_source` (1).
-- [ ] `application.authorships → infrastructure.perimeter.
-  get_persons_structure_ids_list` (1) — cas isolé.
+#### §1.7b — Lever les `ignore_imports` (grandfather clause) — clôturé
+- [x] 7/7 repositories portés (config, authorships, addresses, structures,
+  journals, persons, publications).
+- [x] Helpers purs déplacés hors de `infrastructure/` : `is_zenodo_doi` +
+  `ZenodoResolutionError` → `domain/zenodo.py`, `is_theses_fr_source` +
+  `extract_nnt_from_openalex` → `application/pipeline/normalize/openalex_parsing.py`,
+  `StepTimer` → `application/pipeline/timings.py`.
+- [x] `resolve_zenodo_doi` (HTTP) → port `ZenodoResolver` +
+  adapter `HttpZenodoResolver`.
+- [x] `link_addresses` (SQL) → port `AddressLinker` + adapter
+  `PgAddressLinker` (cache instance-level).
+- [x] `mark_staging_done` (SQL) → méthode `mark_done` sur le port
+  `StagingQueries` existant.
+- [x] `get_persons_structure_ids_list` → port `PerimeterQueries` +
+  adapter `PgPerimeterQueries`.
+- Les 15 lignes `ignore_imports` ont été retirées ; le contrat
+  `layers` de import-linter n'a plus de clause de grandfathering.
 
 ### 1.8 Audit périodique
 - [x] Parcours régulier pour repérer : SQL mal placé, dépendances dans le

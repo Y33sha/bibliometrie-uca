@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 from application.authorships import propagate_uca_for_addresses
+from application.ports.perimeter import PerimeterQueries
 from domain.ports.address_repository import AddressRepository
 from domain.ports.authorship_repository import AuthorshipRepository
 
@@ -29,6 +30,7 @@ def review_structure_link(
     *,
     repo: AddressRepository,
     authorship_repo: AuthorshipRepository,
+    perimeter_queries: PerimeterQueries,
 ) -> None:
     """Upsert le lien address ↔ structure (validation manuelle).
 
@@ -42,7 +44,9 @@ def review_structure_link(
         repo.reset_manual_link(address_id, structure_id)
     else:
         repo.upsert_structure_link(address_id, structure_id, is_confirmed)
-    propagate_uca_for_addresses(cur, [address_id], repo=authorship_repo)
+    propagate_uca_for_addresses(
+        cur, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
+    )
 
 
 def batch_review_structure_link(
@@ -53,6 +57,7 @@ def batch_review_structure_link(
     *,
     repo: AddressRepository,
     authorship_repo: AuthorshipRepository,
+    perimeter_queries: PerimeterQueries,
 ) -> int:
     """Comme review_structure_link mais sur un lot d'adresses.
 
@@ -68,7 +73,9 @@ def batch_review_structure_link(
         repo.batch_upsert_structure_links(address_ids, structure_id, is_confirmed)
         updated = len(address_ids)
 
-    propagate_uca_for_addresses(cur, address_ids, repo=authorship_repo)
+    propagate_uca_for_addresses(
+        cur, address_ids, repo=authorship_repo, perimeter_queries=perimeter_queries
+    )
     return updated
 
 
@@ -79,6 +86,7 @@ def unassign_manual_structure(
     *,
     repo: AddressRepository,
     authorship_repo: AuthorshipRepository,
+    perimeter_queries: PerimeterQueries,
 ) -> bool:
     """Supprime uniquement le lien manuel (matched_form_id IS NULL) entre
     une adresse et une structure. Les liens auto-détectés et leurs is_confirmed
@@ -88,7 +96,9 @@ def unassign_manual_structure(
     Retourne True si un lien manuel a été supprimé, False sinon.
     """
     deleted = repo.delete_manual_structure_link(address_id, structure_id)
-    propagate_uca_for_addresses(cur, [address_id], repo=authorship_repo)
+    propagate_uca_for_addresses(
+        cur, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
+    )
     return deleted
 
 
