@@ -61,7 +61,7 @@ def create_structure(
     api_ids: dict | None = None,
     repo: StructureRepository,
 ) -> dict:
-    """Crée une structure. Retourne la ligne insérée (RealDictRow)."""
+    """Crée une structure. Retourne la ligne insérée (dict)."""
     return repo.create_structure(
         code=code,
         name=name,
