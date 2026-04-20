@@ -2171,6 +2171,18 @@ export interface components {
             /** Structure Id */
             structure_id: number;
         };
+        /** ApcFacet */
+        ApcFacet: {
+            /**
+             * Value
+             * @enum {string}
+             */
+            value: "uca" | "non_uca" | "none";
+            /** Text */
+            text: string;
+            /** Count */
+            count: number;
+        };
         /** AssignOrphanAuthorship */
         AssignOrphanAuthorship: {
             /** Source */
@@ -2395,6 +2407,54 @@ export interface components {
             /** Pub Count */
             pub_count: number;
         };
+        /** JournalStatsResponse */
+        JournalStatsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Journals */
+            journals: components["schemas"]["JournalStatsRow"][];
+        };
+        /** JournalStatsRow */
+        JournalStatsRow: {
+            /** Pub Count */
+            pub_count: number;
+            /** Apc Uca */
+            apc_uca: number;
+            /** Gold */
+            gold: number;
+            /** Diamond */
+            diamond: number;
+            /** Hybrid */
+            hybrid: number;
+            /** Bronze */
+            bronze: number;
+            /** Green */
+            green: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
+            /** Journal Id */
+            journal_id: number;
+            /** Journal Title */
+            journal_title: string;
+            /** Issn */
+            issn: string | null;
+            /** Eissn */
+            eissn: string | null;
+            /** Publisher Name */
+            publisher_name: string | null;
+            /** Is Predatory */
+            is_predatory: boolean;
+            /** Apc Amount */
+            apc_amount: number | null;
+        };
         /** JournalUpdate */
         JournalUpdate: {
             /** Title */
@@ -2421,6 +2481,55 @@ export interface components {
             apc_amount?: number | null;
             /** Notes */
             notes?: string | null;
+        };
+        /** LabFacet */
+        LabFacet: {
+            /** Value */
+            value: number;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+        };
+        /** LabStatsResponse */
+        LabStatsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Labs */
+            labs: components["schemas"]["LabStatsRow"][];
+        };
+        /** LabStatsRow */
+        LabStatsRow: {
+            /** Pub Count */
+            pub_count: number;
+            /** Apc Uca */
+            apc_uca: number;
+            /** Gold */
+            gold: number;
+            /** Diamond */
+            diamond: number;
+            /** Hybrid */
+            hybrid: number;
+            /** Bronze */
+            bronze: number;
+            /** Green */
+            green: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
+            /** Lab Id */
+            lab_id: number;
+            /** Lab Acronym */
+            lab_acronym: string | null;
+            /** Lab Name */
+            lab_name: string;
         };
         /**
          * LinkedAuthorOut
@@ -2564,6 +2673,13 @@ export interface components {
             is_excluding?: boolean | null;
             /** Requires Context Of */
             requires_context_of?: number[] | null;
+        };
+        /** OaFacet */
+        OaFacet: {
+            /** Value */
+            value: string;
+            /** Count */
+            count: number;
         };
         /**
          * OkResponse
@@ -2950,6 +3066,46 @@ export interface components {
             /** Departments */
             departments: number;
         };
+        /** PublisherStatsResponse */
+        PublisherStatsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Publishers */
+            publishers: components["schemas"]["PublisherStatsRow"][];
+        };
+        /** PublisherStatsRow */
+        PublisherStatsRow: {
+            /** Pub Count */
+            pub_count: number;
+            /** Apc Uca */
+            apc_uca: number;
+            /** Gold */
+            gold: number;
+            /** Diamond */
+            diamond: number;
+            /** Hybrid */
+            hybrid: number;
+            /** Bronze */
+            bronze: number;
+            /** Green */
+            green: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
+            /** Publisher Id */
+            publisher_id: number;
+            /** Publisher Name */
+            publisher_name: string;
+            /** Journal Count */
+            journal_count: number;
+        };
         /** PublisherUpdate */
         PublisherUpdate: {
             /** Name */
@@ -3038,6 +3194,44 @@ export interface components {
             source: string;
             /** Authorship Id */
             authorship_id: number;
+        };
+        /** StatsFacetsResponse */
+        StatsFacetsResponse: {
+            /** Years */
+            years: components["schemas"]["YearFacet"][];
+            /** Labs */
+            labs: components["schemas"]["LabFacet"][];
+            /** Oa Statuses */
+            oa_statuses: components["schemas"]["OaFacet"][];
+            /** Apc */
+            apc: components["schemas"]["ApcFacet"][];
+        };
+        /**
+         * StatsSummary
+         * @description Totaux globaux pour la page stats.
+         *
+         *     Pas de champ `diamond` — le résumé remonte gold/hybrid/green/bronze/
+         *     closed/unknown uniquement (diamond non distingué côté summary SQL).
+         */
+        StatsSummary: {
+            /** Total Pubs */
+            total_pubs: number;
+            /** Gold */
+            gold: number;
+            /** Hybrid */
+            hybrid: number;
+            /** Green */
+            green: number;
+            /** Bronze */
+            bronze: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
+            /** Publisher Count */
+            publisher_count: number;
+            /** Journal Count */
+            journal_count: number;
         };
         /** StructureCreate */
         StructureCreate: {
@@ -3202,6 +3396,37 @@ export interface components {
             value: string;
             /** Confirmed */
             confirmed: boolean;
+        };
+        /** YearFacet */
+        YearFacet: {
+            /** Value */
+            value: number;
+            /** Count */
+            count: number;
+        };
+        /**
+         * YearStatsRow
+         * @description Ventilation d'une année : pub_count + détail OA.
+         */
+        YearStatsRow: {
+            /** Pub Year */
+            pub_year: number;
+            /** Pub Count */
+            pub_count: number;
+            /** Gold */
+            gold: number;
+            /** Diamond */
+            diamond: number;
+            /** Hybrid */
+            hybrid: number;
+            /** Bronze */
+            bronze: number;
+            /** Green */
+            green: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
         };
         /** YesNoCount */
         YesNoCount: {
@@ -3387,7 +3612,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PublisherStatsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3426,7 +3651,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["JournalStatsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3462,7 +3687,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["YearStatsRow"][];
                 };
             };
             /** @description Validation Error */
@@ -3498,7 +3723,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StatsSummary"];
                 };
             };
             /** @description Validation Error */
@@ -3537,7 +3762,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LabStatsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3566,7 +3791,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": number[];
                 };
             };
         };
@@ -3593,7 +3818,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StatsFacetsResponse"];
                 };
             };
             /** @description Validation Error */
