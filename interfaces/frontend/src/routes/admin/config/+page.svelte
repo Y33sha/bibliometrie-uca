@@ -6,18 +6,10 @@
 
   type StructureListItem = components["schemas"]["StructureListItem"];
 
-  interface ConfigItem {
-    key: string;
-    value: any;
-    description: string | null;
-    updated_at: string;
-  }
+  type ConfigItem = components["schemas"]["ConfigItem"];
   type PerimeterStructure = components["schemas"]["PerimeterStructureItem"];
   type Perimeter = components["schemas"]["PerimeterOut"];
-  interface HalCollections {
-    collections: Record<string, string>;
-    count: number;
-  }
+  type HalCollections = components["schemas"]["HalCollectionsResponse"];
 
   let configs: ConfigItem[] = $state([]);
   let perimeters: Perimeter[] = $state([]);

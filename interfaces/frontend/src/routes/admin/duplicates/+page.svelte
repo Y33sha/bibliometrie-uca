@@ -6,25 +6,9 @@
   import { onMount } from "svelte";
   import { sanitizeTitle, halDocUrl } from "$lib/utils";
 
-  interface PubDetail {
-    id: number;
-    title: string;
-    title_normalized: string;
-    doi: string | null;
-    pub_year: number;
-    doc_type: string | null;
-    container_title: string | null;
-    oa_status: string | null;
-    language: string | null;
-    journal: { id: number; title: string; issn: string | null; eissn: string | null } | null;
-    sources: { source: string; source_id: string }[];
-    authors: { author_position: number | null; in_perimeter: boolean; person_id: number | null; last_name: string | null; first_name: string | null; full_name: string | null }[];
-  }
-  interface NextResponse {
-    total: number;
-    offset: number;
-    pair: { pub_a: PubDetail; pub_b: PubDetail } | null;
-  }
+  import type { components } from "$lib/api/schema";
+  type PubDetail = components["schemas"]["PubDedupDetail"];
+  type NextResponse = components["schemas"]["PubDuplicateNextResponse"];
 
   // Restore state from URL
   const params = new URLSearchParams($page.url.search);

@@ -2354,12 +2354,101 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** AuthCheckResponse */
+        AuthCheckResponse: {
+            /** Authenticated */
+            authenticated: boolean;
+        };
         /** AuthorshipExcludeResponse */
         AuthorshipExcludeResponse: {
             /** Id */
             id: number;
             /** Excluded */
             excluded: boolean;
+        };
+        /**
+         * AuthorshipsAuthorOut
+         * @description Ligne de la liste paginée /api/authorships.
+         */
+        AuthorshipsAuthorOut: {
+            /** Id */
+            id: number;
+            /** Source */
+            source: string;
+            /** Full Name */
+            full_name: string;
+            /** Last Name */
+            last_name: string | null;
+            /** First Name */
+            first_name: string | null;
+            /** Orcid */
+            orcid: string | null;
+            /** Idhal */
+            idhal: string | null;
+            /** Openalex Id */
+            openalex_id: string | null;
+            /** Person Id */
+            person_id: number | null;
+            /** Uca Pub Count */
+            uca_pub_count: number;
+            person: components["schemas"]["AuthorshipsAuthorPerson"] | null;
+        };
+        /**
+         * AuthorshipsAuthorPerson
+         * @description Personne liée à un auteur source (sous-objet `person`).
+         */
+        AuthorshipsAuthorPerson: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Department Name */
+            department_name: string | null;
+            /** Role Title */
+            role_title: string | null;
+            /** Has Rh */
+            has_rh: boolean;
+        };
+        /**
+         * AuthorshipsFacets
+         * @description Facettes pour la page admin authorships (réutilise LabBinaryFacet
+         *     et LabeledIntFacet définis plus haut).
+         */
+        AuthorshipsFacets: {
+            linked: components["schemas"]["LabBinaryFacet"];
+            orcid: components["schemas"]["LabBinaryFacet"];
+            idhal: components["schemas"]["LabBinaryFacet"];
+            /** Labs */
+            labs: components["schemas"]["LabeledIntFacet"][];
+        };
+        /** AuthorshipsListResponse */
+        AuthorshipsListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Authors */
+            authors: components["schemas"]["AuthorshipsAuthorOut"][];
+        };
+        /**
+         * AuthorshipsStats
+         * @description Compteurs auteurs UCA (total, liés, identifiés ORCID/idHAL).
+         */
+        AuthorshipsStats: {
+            /** Total Uca Authors */
+            total_uca_authors: number;
+            /** Linked To Person */
+            linked_to_person: number;
+            /** With Orcid */
+            with_orcid: number;
+            /** With Idhal */
+            with_idhal: number;
         };
         /** BatchAssignOrphanAuthorships */
         BatchAssignOrphanAuthorships: {
@@ -2418,6 +2507,23 @@ export interface components {
         BatchUpdatedResponse: {
             /** Updated */
             updated: number;
+        };
+        /**
+         * ConfigItem
+         * @description Ligne de la table `config` (paramètres applicatifs clé/valeur).
+         */
+        ConfigItem: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: unknown;
+            /** Description */
+            description: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /**
          * ConfigValueUpdate
@@ -2713,6 +2819,18 @@ export interface components {
             name: string;
             /** Hal Collection */
             hal_collection: string;
+        };
+        /**
+         * HalCollectionsResponse
+         * @description GET /api/config/hal-collections.
+         */
+        HalCollectionsResponse: {
+            /** Collections */
+            collections: {
+                [key: string]: string;
+            };
+            /** Count */
+            count: number;
         };
         /**
          * HalDocSummary
@@ -4010,12 +4128,96 @@ export interface components {
             /** Budget Structure Id */
             budget_structure_id: number | null;
         };
+        /** PubDedupAuthor */
+        PubDedupAuthor: {
+            /** Author Position */
+            author_position: number | null;
+            /** In Perimeter */
+            in_perimeter: boolean;
+            /** Person Id */
+            person_id: number | null;
+            /** Last Name */
+            last_name: string | null;
+            /** First Name */
+            first_name: string | null;
+            /** Full Name */
+            full_name: string | null;
+        };
+        /**
+         * PubDedupDetail
+         * @description Détail d'une publication pour la page de déduplication.
+         */
+        PubDedupDetail: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Title Normalized */
+            title_normalized: string;
+            /** Doi */
+            doi: string | null;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Container Title */
+            container_title: string | null;
+            /** Oa Status */
+            oa_status: string;
+            /** Language */
+            language: string | null;
+            journal: components["schemas"]["PubDedupJournal"] | null;
+            /** Sources */
+            sources: components["schemas"]["PubDedupSource"][];
+            /** Authors */
+            authors: components["schemas"]["PubDedupAuthor"][];
+        };
+        /** PubDedupJournal */
+        PubDedupJournal: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string | null;
+            /** Issn */
+            issn: string | null;
+            /** Eissn */
+            eissn: string | null;
+        };
+        /** PubDedupSource */
+        PubDedupSource: {
+            /** Source */
+            source: string;
+            /** Source Id */
+            source_id: string;
+        };
+        /** PubDuplicateNextResponse */
+        PubDuplicateNextResponse: {
+            /** Total */
+            total: number;
+            /** Offset */
+            offset: number;
+            pair: components["schemas"]["PubDuplicatePair"] | null;
+        };
+        /** PubDuplicatePair */
+        PubDuplicatePair: {
+            pub_a: components["schemas"]["PubDedupDetail"];
+            pub_b: components["schemas"]["PubDedupDetail"];
+        };
         /** PubLabItem */
         PubLabItem: {
             /** Id */
             id: number;
             /** Label */
             label: string;
+        };
+        /** PubMergeResponse */
+        PubMergeResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Target Id */
+            target_id: number;
+            /** Source Id */
+            source_id: number;
         };
         /**
          * PublicationDetailCore
@@ -4796,7 +4998,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4827,7 +5029,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthCheckResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4856,7 +5058,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
         };
@@ -5345,7 +5547,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PubDuplicateNextResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5378,7 +5580,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PubMergeResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5411,7 +5613,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6471,7 +6673,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthorshipsStats"];
                 };
             };
             /** @description Validation Error */
@@ -6505,7 +6707,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthorshipsFacets"];
                 };
             };
             /** @description Validation Error */
@@ -6542,7 +6744,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthorshipsListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7790,7 +7992,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ConfigItem"][];
                 };
             };
         };
@@ -7810,7 +8012,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalCollectionsResponse"];
                 };
             };
         };
@@ -7836,7 +8038,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ConfigItem"];
                 };
             };
             /** @description Validation Error */

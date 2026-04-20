@@ -1109,6 +1109,147 @@ class PublisherBasic(BaseModel):
     name: str
 
 
+# ----- Auth (output) -----
+
+
+class AuthCheckResponse(BaseModel):
+    authenticated: bool
+
+
+# ----- Config (output) -----
+
+
+class ConfigItem(BaseModel):
+    """Ligne de la table `config` (paramètres applicatifs clé/valeur)."""
+
+    key: str
+    value: Any
+    description: str | None
+    updated_at: datetime
+
+
+class HalCollectionsResponse(BaseModel):
+    """GET /api/config/hal-collections."""
+
+    collections: dict[str, str]
+    count: int
+
+
+# ----- Authorships admin (output) -----
+
+
+class AuthorshipsStats(BaseModel):
+    """Compteurs auteurs UCA (total, liés, identifiés ORCID/idHAL)."""
+
+    total_uca_authors: int
+    linked_to_person: int
+    with_orcid: int
+    with_idhal: int
+
+
+class AuthorshipsFacets(BaseModel):
+    """Facettes pour la page admin authorships (réutilise LabBinaryFacet
+    et LabeledIntFacet définis plus haut)."""
+
+    linked: LabBinaryFacet
+    orcid: LabBinaryFacet
+    idhal: LabBinaryFacet
+    labs: list[LabeledIntFacet]
+
+
+class AuthorshipsAuthorPerson(BaseModel):
+    """Personne liée à un auteur source (sous-objet `person`)."""
+
+    id: int
+    last_name: str
+    first_name: str
+    department_name: str | None
+    role_title: str | None
+    has_rh: bool
+
+
+class AuthorshipsAuthorOut(BaseModel):
+    """Ligne de la liste paginée /api/authorships."""
+
+    id: int
+    source: str
+    full_name: str
+    last_name: str | None
+    first_name: str | None
+    orcid: str | None
+    idhal: str | None
+    openalex_id: str | None
+    person_id: int | None
+    uca_pub_count: int
+    person: AuthorshipsAuthorPerson | None
+
+
+class AuthorshipsListResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    authors: list[AuthorshipsAuthorOut]
+
+
+# ----- Admin duplicates (publications) (output) -----
+
+
+class PubDedupJournal(BaseModel):
+    id: int
+    title: str | None
+    issn: str | None
+    eissn: str | None
+
+
+class PubDedupSource(BaseModel):
+    source: str
+    source_id: str
+
+
+class PubDedupAuthor(BaseModel):
+    author_position: int | None
+    in_perimeter: bool
+    person_id: int | None
+    last_name: str | None
+    first_name: str | None
+    full_name: str | None
+
+
+class PubDedupDetail(BaseModel):
+    """Détail d'une publication pour la page de déduplication."""
+
+    id: int
+    title: str
+    title_normalized: str
+    doi: str | None
+    pub_year: int | None
+    doc_type: str
+    container_title: str | None
+    oa_status: str
+    language: str | None
+    journal: PubDedupJournal | None
+    sources: list[PubDedupSource]
+    authors: list[PubDedupAuthor]
+
+
+class PubDuplicatePair(BaseModel):
+    pub_a: PubDedupDetail
+    pub_b: PubDedupDetail
+
+
+class PubDuplicateNextResponse(BaseModel):
+    total: int
+    offset: int
+    pair: PubDuplicatePair | None
+
+
+class PubMergeResponse(BaseModel):
+    ok: bool
+    target_id: int
+    source_id: int
+
+
 # ----- Persons -----
 
 

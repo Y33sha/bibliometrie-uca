@@ -13,13 +13,13 @@ from interfaces.api.deps import (
     _sign_token,
     _verify_token,
 )
-from interfaces.api.models import LoginRequest
+from interfaces.api.models import AuthCheckResponse, LoginRequest, OkResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/api/auth/login")
+@router.post("/api/auth/login", response_model=OkResponse)
 async def auth_login(data: LoginRequest, response: Response) -> Any:
     from fastapi import HTTPException
 
@@ -38,14 +38,14 @@ async def auth_login(data: LoginRequest, response: Response) -> Any:
     return {"ok": True}
 
 
-@router.get("/api/auth/check")
+@router.get("/api/auth/check", response_model=AuthCheckResponse)
 async def auth_check(session: str | None = Cookie(None, alias="session")) -> Any:
     if session and _verify_token(session):
         return {"authenticated": True}
     return {"authenticated": False}
 
 
-@router.post("/api/auth/logout")
+@router.post("/api/auth/logout", response_model=OkResponse)
 async def auth_logout(response: Response) -> Any:
     response.delete_cookie(key="session", path="/")
     return {"ok": True}
