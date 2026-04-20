@@ -990,6 +990,63 @@ class PipelineReportContent(BaseModel):
     content: str
 
 
+# ----- Admin feedback (output) -----
+
+
+class FeedbackStats(BaseModel):
+    """GET /api/admin/feedback/stats : qualité de la détection d'adresses."""
+
+    total_reviewed: int
+    detection_rate: float | None
+    false_negatives: int
+    false_positives: int
+    concordant_valid: int
+    pending: int
+
+
+class FeedbackLabDetected(BaseModel):
+    """Lien adresse↔structure tel que vu sur la page feedback.
+
+    Distinct de AddressStructureSummary : `structure_id` au lieu de `id`.
+    """
+
+    structure_id: int
+    name: str
+    acronym: str | None
+    is_detected: bool
+    is_confirmed: bool | None
+
+
+class FeedbackMatchedForm(BaseModel):
+    """Forme de nom ayant matché lors de la détection (faux positif)."""
+
+    form_id: int
+    form_text: str
+    structure_name: str
+    requires_context_of: list[int] | None
+
+
+class FeedbackAddressItem(BaseModel):
+    """Ligne d'adresse dans false-negatives / false-positives.
+
+    `matched_forms` n'est rempli que pour les faux positifs.
+    """
+
+    id: int
+    raw_text: str
+    pub_count: int
+    labs: list[FeedbackLabDetected]
+    matched_forms: list[FeedbackMatchedForm] | None = None
+
+
+class FeedbackAddressesResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    addresses: list[FeedbackAddressItem]
+
+
 # ----- Persons -----
 
 

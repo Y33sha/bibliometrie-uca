@@ -2563,6 +2563,87 @@ export interface components {
             /** Count */
             count: number;
         };
+        /**
+         * FeedbackAddressItem
+         * @description Ligne d'adresse dans false-negatives / false-positives.
+         *
+         *     `matched_forms` n'est rempli que pour les faux positifs.
+         */
+        FeedbackAddressItem: {
+            /** Id */
+            id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Pub Count */
+            pub_count: number;
+            /** Labs */
+            labs: components["schemas"]["FeedbackLabDetected"][];
+            /** Matched Forms */
+            matched_forms?: components["schemas"]["FeedbackMatchedForm"][] | null;
+        };
+        /** FeedbackAddressesResponse */
+        FeedbackAddressesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Addresses */
+            addresses: components["schemas"]["FeedbackAddressItem"][];
+        };
+        /**
+         * FeedbackLabDetected
+         * @description Lien adresse↔structure tel que vu sur la page feedback.
+         *
+         *     Distinct de AddressStructureSummary : `structure_id` au lieu de `id`.
+         */
+        FeedbackLabDetected: {
+            /** Structure Id */
+            structure_id: number;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Is Detected */
+            is_detected: boolean;
+            /** Is Confirmed */
+            is_confirmed: boolean | null;
+        };
+        /**
+         * FeedbackMatchedForm
+         * @description Forme de nom ayant matché lors de la détection (faux positif).
+         */
+        FeedbackMatchedForm: {
+            /** Form Id */
+            form_id: number;
+            /** Form Text */
+            form_text: string;
+            /** Structure Name */
+            structure_name: string;
+            /** Requires Context Of */
+            requires_context_of: number[] | null;
+        };
+        /**
+         * FeedbackStats
+         * @description GET /api/admin/feedback/stats : qualité de la détection d'adresses.
+         */
+        FeedbackStats: {
+            /** Total Reviewed */
+            total_reviewed: number;
+            /** Detection Rate */
+            detection_rate: number | null;
+            /** False Negatives */
+            false_negatives: number;
+            /** False Positives */
+            false_positives: number;
+            /** Concordant Valid */
+            concordant_valid: number;
+            /** Pending */
+            pending: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -5673,7 +5754,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FeedbackStats"];
                 };
             };
             /** @description Validation Error */
@@ -5707,7 +5788,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FeedbackAddressesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5741,7 +5822,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FeedbackAddressesResponse"];
                 };
             };
             /** @description Validation Error */
