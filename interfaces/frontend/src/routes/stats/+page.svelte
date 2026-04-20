@@ -14,12 +14,12 @@
 	Chart.register(...registerables, ChartDataLabels);
 
 	// --- Types ---
-	interface Summary { total_pubs: number; publisher_count: number; journal_count: number; }
-	interface YearData { pub_year: number; gold: number; diamond: number; hybrid: number; bronze: number; green: number; closed: number; unknown: number; }
-	interface OaRow { pub_count: number; apc_uca: number; gold: number; diamond: number; hybrid: number; bronze: number; green: number; closed: number; unknown: number; }
-	interface PublisherRow extends OaRow { publisher_id: number; publisher_name: string; journal_count: number; }
-	interface JournalRow extends OaRow { journal_id: number; journal_title: string; publisher_name: string | null; }
-	interface LabRow extends OaRow { lab_id: number; lab_name: string; lab_acronym: string | null; }
+	import type { components } from '$lib/api/schema';
+	type Summary = components['schemas']['StatsSummary'];
+	type YearData = components['schemas']['YearStatsRow'];
+	type PublisherRow = components['schemas']['PublisherStatsRow'];
+	type JournalRow = components['schemas']['JournalStatsRow'];
+	type LabRow = components['schemas']['LabStatsRow'];
 
 	// --- State ---
 	type View = 'top' | 'publisher_detail' | 'journal_detail';
@@ -46,7 +46,10 @@
 		return field;
 	}
 
-	let summary: Summary = $state({ total_pubs: 0, publisher_count: 0, journal_count: 0 });
+	let summary: Summary = $state({
+		total_pubs: 0, gold: 0, hybrid: 0, green: 0, bronze: 0, closed: 0, unknown: 0,
+		publisher_count: 0, journal_count: 0,
+	});
 
 	let chartCanvas: HTMLCanvasElement;
 	let yearChart: Chart | null = null;
