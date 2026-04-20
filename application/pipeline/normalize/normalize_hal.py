@@ -28,6 +28,7 @@ from application.journals import find_or_create_journal, find_or_create_publishe
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.normalize_hal import HalNormalizeQueries
 from application.ports.staging import StagingQueries
+from application.ports.zenodo_resolver import ZenodoResolver
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
@@ -36,10 +37,9 @@ from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import clean_doi, normalize_nnt
+from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
 from infrastructure.addresses import link_addresses
 from infrastructure.db_helpers import mark_staging_done
-from domain.zenodo import is_zenodo_doi
-from infrastructure.zenodo import ZenodoResolutionError, resolve_zenodo_doi
 
 # =============================================================
 # MAPPINGS
@@ -622,6 +622,7 @@ def process_work(
     *,
     journal_repo: JournalRepository,
     pub_repo: PublicationRepository,
+    zenodo_resolver: ZenodoResolver,
     struct_cache: dict | None = None,
     struct_name_cache: dict | None = None,
 ) -> bool:
@@ -642,7 +643,7 @@ def process_work(
         raw_doi = clean_doi(as_str(doc.get("doiId_s")))
         if raw_doi and is_zenodo_doi(raw_doi):
             try:
-                version_doi = resolve_zenodo_doi(raw_doi)
+                version_doi = zenodo_resolver.resolve(raw_doi)
             except ZenodoResolutionError as e:
                 logger.warning(f"  {hal_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
                 return False
@@ -737,6 +738,7 @@ class HalNormalizer(SourceNormalizer):
         queries: HalNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
         pub_repo_factory: Callable[[Any], PublicationRepository],
+        zenodo_resolver: ZenodoResolver,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -744,6 +746,7 @@ class HalNormalizer(SourceNormalizer):
         self._journal_repo: JournalRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
+        self._zenodo_resolver = zenodo_resolver
         self._struct_cache: dict[str, int] = {}
         self._struct_name_cache: dict[int, str] = {}
 
@@ -765,6 +768,7 @@ class HalNormalizer(SourceNormalizer):
             row,
             journal_repo=self._journal_repo,
             pub_repo=self._pub_repo,
+            zenodo_resolver=self._zenodo_resolver,
             struct_cache=self._struct_cache,
             struct_name_cache=self._struct_name_cache,
         )

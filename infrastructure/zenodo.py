@@ -1,11 +1,13 @@
-"""Résolution HTTP des DOI Zenodo (concept → version). Le test de format est
-dans `domain.zenodo`."""
+"""Adapter HTTP pour `application.ports.zenodo_resolver.ZenodoResolver`.
+
+Le format des DOI Zenodo et l'erreur du contrat sont dans `domain.zenodo`.
+"""
 
 import time
 
 import requests
 
-from domain.zenodo import ZENODO_DOI_RE
+from domain.zenodo import ZENODO_DOI_RE, ZenodoResolutionError
 from infrastructure.api_limits import ZENODO_DELAY
 from infrastructure.log import setup_logger
 
@@ -17,10 +19,11 @@ _INITIAL_BACKOFF = 2  # secondes
 _last_request_time = 0.0
 
 
-class ZenodoResolutionError(Exception):
-    """Erreur temporaire de résolution Zenodo (rate-limit, timeout)."""
+class HttpZenodoResolver:
+    """Adapter HTTP pour `application.ports.zenodo_resolver.ZenodoResolver`."""
 
-    pass
+    def resolve(self, doi: str) -> str | None:
+        return resolve_zenodo_doi(doi)
 
 
 def resolve_zenodo_doi(doi: str) -> str | None:
