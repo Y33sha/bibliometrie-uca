@@ -241,9 +241,17 @@ API + logique métier.
     interfaces locales remplacées dans admin/persons, persons/,
     persons/[id], admin/orphan-authorships ; wrappers api/persons.ts,
     api/authorships.ts, api/orphanAuthorships.ts typés via schema.ts.
-  - [ ] Routers restants : structures, addresses, publishers,
-    publications, laboratories, perimeters, admin_*, pub_stats,
-    authorships, config. ~85 endpoints + ~100 interfaces locales.
+  - [x] `/api/structures` (11 endpoints, 2026-04-20) : GET list/detail,
+    CRUD structure, POST/DELETE relation, CRUD name-form annotés ;
+    modèles StructureListItem, StructureOut, RelatedStructureOut,
+    NameFormOut, StructureDetailResponse,
+    StructureRelationCreateResponse, DeletedResponse ; admin/structures
+    + admin/config migrés ; wrappers api/structures.ts +
+    api/nameForms.ts typés ; bugfix latent `struct_type → type` sur
+    les enfants de /api/structures/{id}.
+  - [ ] Routers restants : addresses, publishers, publications,
+    laboratories, perimeters, admin_*, pub_stats, authorships, config.
+    ~74 endpoints + ~90 interfaces locales.
 
 #### 2.7.4 Découpe des routes monolithiques — fait 2026-04-20
 Audit initial : 3 routes dépassaient 1000 LOC et mêlaient UI + état +
