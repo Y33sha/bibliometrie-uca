@@ -333,3 +333,63 @@ def delete_hal_orphan_source_persons(cur: Any) -> int:
           )
     """)
     return cur.rowcount
+
+
+class PgHalNormalizeQueries:
+    """Adapter PostgreSQL pour `application.ports.normalize_hal.HalNormalizeQueries`."""
+
+    def upsert_hal_source_publication(self, cur: Any, **kwargs: Any) -> int:
+        return upsert_hal_source_publication(cur, **kwargs)
+
+    def upsert_hal_source_person(self, cur: Any, **kwargs: Any) -> int:
+        return upsert_hal_source_person(cur, **kwargs)
+
+    def find_hal_source_person_nokey(
+        self, cur: Any, *, full_name: str, first_name: str | None
+    ) -> int | None:
+        return find_hal_source_person_nokey(cur, full_name=full_name, first_name=first_name)
+
+    def enrich_hal_source_person(
+        self,
+        cur: Any,
+        *,
+        source_person_id: int,
+        orcid: str | None,
+        source_ids_json: Any,
+    ) -> None:
+        enrich_hal_source_person(
+            cur,
+            source_person_id=source_person_id,
+            orcid=orcid,
+            source_ids_json=source_ids_json,
+        )
+
+    def insert_hal_source_person_new(self, cur: Any, **kwargs: Any) -> int:
+        return insert_hal_source_person_new(cur, **kwargs)
+
+    def upsert_hal_source_structure(self, cur: Any, *, source_id: str, name: str) -> int:
+        return upsert_hal_source_structure(cur, source_id=source_id, name=name)
+
+    def fetch_hal_source_structure_ids(self, cur: Any, source_ids: list[str]) -> list[int]:
+        return fetch_hal_source_structure_ids(cur, source_ids)
+
+    def upsert_hal_source_authorship(self, cur: Any, **kwargs: Any) -> int:
+        return upsert_hal_source_authorship(cur, **kwargs)
+
+    def staging_has_hal_doi(self, cur: Any, doi: str) -> bool:
+        return staging_has_hal_doi(cur, doi)
+
+    def get_hal_publication_id(self, cur: Any, hal_id: str) -> int | None:
+        return get_hal_publication_id(cur, hal_id)
+
+    def fetch_hal_source_structures_for_cache(self, cur: Any) -> list[tuple[str, int, str]]:
+        return fetch_hal_source_structures_for_cache(cur)
+
+    def delete_hal_duplicate_authorship_addresses(self, cur: Any) -> None:
+        delete_hal_duplicate_authorship_addresses(cur)
+
+    def delete_hal_duplicate_authorships(self, cur: Any) -> int:
+        return delete_hal_duplicate_authorships(cur)
+
+    def delete_hal_orphan_source_persons(self, cur: Any) -> int:
+        return delete_hal_orphan_source_persons(cur)

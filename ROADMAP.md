@@ -59,6 +59,27 @@ Ajouter au fur et à mesure : `ROR`, `RNSR` (identifiants de structure),
 normalisation explicite émerge.
 
 ### 1.6 Inversion de dépendance complète
+**WIP branch `feature/pipeline-ports`** (pushée, pas mergée). Orchestrateurs
+`application/pipeline/*` dépendent maintenant de ports (`application/ports/*`),
+adapters PostgreSQL dans `infrastructure/db/queries/*`, composition roots dans
+`interfaces/cli/pipeline/*`, `run_pipeline.py` appelle les orchestrateurs
+via imports Python directs.
+
+**Reste à fixer** (détecté juste avant le push) :
+- `application/pipeline/normalize/normalize_hal.py` : le module-level
+  `logger = setup_logger(...)` a été retiré à tort en même temps que
+  `import os` / `setup_logger`, et le code restant référence encore
+  `logger` dans process_work / except. Collection des tests échoue
+  (`NameError: name 'setup_logger' is not defined`) via
+  `tests/unit/application/test_normalize.py`. Soit réinjecter le logger
+  au niveau module (simple), soit le threader en param comme theses/openalex
+  (cohérent avec le pattern). Même vérif à faire sur les 4 autres
+  normalize_* : certains ont peut-être gardé `logger` module-level par erreur.
+- Vérifier aussi que `run_pipeline.py` a bien `_run_normalize_hal` défini
+  avant usage (ordre des `def`).
+- Les tests d'intégration passaient avant ce dernier edit, le fix est
+  probablement de 10 lignes.
+
 - [x] **Extraction SQL des scripts pipeline vers `infrastructure/db/queries/`**
   (branche `feature/pipeline-di`, 13 commits atomiques). 153 `cur.execute`
   dispersés dans `application/pipeline/*` → 9 restants (tous des SAVEPOINT
@@ -226,6 +247,11 @@ Le détail est dans `TODO_LAURA.md`. Grands axes :
 - **Cas particuliers** et bizarreries à élucider
 
 ---
+## A explorer:
+
+**SQLAlchemy Core** (pas ORM), pour la construction dynamique de requêtes. SQLAlchemy a deux couches : Core (query builder, paramétrage sûr, abstraction du dialecte) et ORM (mapping objets-tables). Tu peux utiliser Core sans ORM : tu écris des requêtes via son API Python (select(...).where(...).order_by(...)) qui génèrent du SQL sûr et paramétré, mais tu n'introduis pas de couche ORM. C'est particulièrement utile pour les requêtes dynamiques avec filtres variables. Tes requêtes "statiques" peuvent rester en SQL brut pour la clarté.
+**Alembic** pour les migrations. Indépendant de l'usage d'ORM. Tu continues à écrire ton schéma en SQL brut si tu veux, mais tu versionnes et orchestres les migrations avec Alembic. Gain de maintenance réel, coût d'adoption modéré.
+**psycopg3** avec des curseurs typés, si tu n'y es pas déjà. Psycopg3 supporte bien les Row classes typées et les dict_row, ce qui rend ton SQL brut plus sûr à manipuler côté Python sans introduire un ORM.
 
 ## Items évalués et retirés
 
