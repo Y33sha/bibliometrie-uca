@@ -7,19 +7,26 @@ from fastapi import APIRouter, HTTPException, Query
 
 from infrastructure.db.queries import laboratories as lab_queries
 from interfaces.api.deps import get_cursor
+from interfaces.api.models import (
+    LaboratoryAddressesResponse,
+    LaboratoryDashboardResponse,
+    LaboratoryDetailResponse,
+    LaboratoryListItem,
+    LaboratoryPersonsResponse,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/api/laboratories")
+@router.get("/api/laboratories", response_model=list[LaboratoryListItem])
 async def list_laboratories() -> Any:
     """Liste des labos du périmètre."""
     with get_cursor() as (cur, _conn):
         return lab_queries.list_laboratories(cur)
 
 
-@router.get("/api/laboratories/{lab_id}")
+@router.get("/api/laboratories/{lab_id}", response_model=LaboratoryDetailResponse)
 async def get_laboratory(lab_id: int) -> Any:
     """Profil public d'un laboratoire."""
     with get_cursor() as (cur, _conn):
@@ -29,7 +36,7 @@ async def get_laboratory(lab_id: int) -> Any:
         return result
 
 
-@router.get("/api/laboratories/{lab_id}/persons")
+@router.get("/api/laboratories/{lab_id}/persons", response_model=LaboratoryPersonsResponse)
 async def get_laboratory_persons(
     lab_id: int,
     page: int = Query(1, ge=1),
@@ -53,7 +60,7 @@ async def get_laboratory_persons(
         )
 
 
-@router.get("/api/laboratories/{lab_id}/addresses")
+@router.get("/api/laboratories/{lab_id}/addresses", response_model=LaboratoryAddressesResponse)
 async def get_laboratory_addresses(
     lab_id: int,
     page: int = Query(1, ge=1),
@@ -64,7 +71,7 @@ async def get_laboratory_addresses(
         return lab_queries.get_laboratory_addresses(cur, lab_id, page=page, per_page=per_page)
 
 
-@router.get("/api/laboratories/{lab_id}/dashboard")
+@router.get("/api/laboratories/{lab_id}/dashboard", response_model=LaboratoryDashboardResponse)
 async def get_laboratory_dashboard(lab_id: int) -> Any:
     """Dashboard labo : publications par an + répartition OA."""
     with get_cursor() as (cur, _conn):
