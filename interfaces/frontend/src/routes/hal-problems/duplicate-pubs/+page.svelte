@@ -8,27 +8,11 @@
 	import { sanitizeTitle, halDocUrl } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
 
-	interface HalDoc {
-		halid: string;
-		collections: string[] | null;
-		author_count: number;
-		hal_doc_type: string | null;
-		hal_pub_year: number | null;
-		hal_title: string | null;
-	}
-	interface PubDetail {
-		id: number;
-		title: string;
-		pub_year: number | null;
-		doc_type: string | null;
-		doi: string | null;
-		container_title: string | null;
-		hal_docs: HalDoc[];
-	}
-	interface DoiPair { doi: string; halids: string[]; publication: PubDetail }
-	interface MetaPair { pub_a: PubDetail; pub_b: PubDetail }
-	interface DoiResponse { total: number; page: number; pages: number; pairs: DoiPair[] }
-	interface MetaResponse { total: number; page: number; pages: number; pairs: MetaPair[] }
+	import type { components } from '$lib/api/schema';
+	type DoiPair = components['schemas']['HalDoiDuplicatePair'];
+	type MetaPair = components['schemas']['HalMetaDuplicatePair'];
+	type DoiResponse = components['schemas']['HalDoiDuplicatesResponse'];
+	type MetaResponse = components['schemas']['HalMetaDuplicatesResponse'];
 
 	let activeTab: 'doi' | 'meta' = $state('doi');
 

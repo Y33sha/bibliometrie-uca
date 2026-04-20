@@ -2573,6 +2573,200 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HalAccountSummary */
+        HalAccountSummary: {
+            /** Hal Person Id */
+            hal_person_id: number;
+            /** Full Name */
+            full_name: string;
+            /** Idhal */
+            idhal: string | null;
+            /** Orcid */
+            orcid: string | null;
+            /** Pub Count */
+            pub_count: number;
+        };
+        /** HalAffiliationConflictPub */
+        HalAffiliationConflictPub: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Doi */
+            doi: string | null;
+            /** Halids */
+            halids: string[] | null;
+            /** Labs */
+            labs: string | null;
+        };
+        /** HalAffiliationConflictsResponse */
+        HalAffiliationConflictsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Publications */
+            publications: components["schemas"]["HalAffiliationConflictPub"][];
+        };
+        /**
+         * HalCollectionLab
+         * @description Labo configuré avec une collection HAL (sélecteur missing-collections).
+         */
+        HalCollectionLab: {
+            /** Id */
+            id: number;
+            /** Acronym */
+            acronym: string | null;
+            /** Name */
+            name: string;
+            /** Hal Collection */
+            hal_collection: string;
+        };
+        /**
+         * HalDocSummary
+         * @description Détail d'un dépôt HAL rattaché à une publication.
+         */
+        HalDocSummary: {
+            /** Halid */
+            halid: string;
+            /** Hal Collections */
+            hal_collections: string[] | null;
+            /** Hal Doc Type */
+            hal_doc_type: string | null;
+            /** Hal Pub Year */
+            hal_pub_year: number | null;
+            /** Hal Title */
+            hal_title: string | null;
+            /** Author Count */
+            author_count: number;
+        };
+        /** HalDoiDuplicatePair */
+        HalDoiDuplicatePair: {
+            /** Doi */
+            doi: string;
+            /** Halids */
+            halids: string[];
+            publication: components["schemas"]["HalPubDetail"];
+        };
+        /** HalDoiDuplicatesResponse */
+        HalDoiDuplicatesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Pairs */
+            pairs: components["schemas"]["HalDoiDuplicatePair"][];
+        };
+        /** HalDuplicateAccountPerson */
+        HalDuplicateAccountPerson: {
+            /** Person Id */
+            person_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Hal Accounts */
+            hal_accounts: components["schemas"]["HalAccountSummary"][];
+        };
+        /** HalDuplicateAccountsResponse */
+        HalDuplicateAccountsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Persons */
+            persons: components["schemas"]["HalDuplicateAccountPerson"][];
+        };
+        /** HalMetaDuplicatePair */
+        HalMetaDuplicatePair: {
+            pub_a: components["schemas"]["HalPubDetail"];
+            pub_b: components["schemas"]["HalPubDetail"];
+        };
+        /** HalMetaDuplicatesResponse */
+        HalMetaDuplicatesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Pairs */
+            pairs: components["schemas"]["HalMetaDuplicatePair"][];
+        };
+        /** HalMissingCollectionPub */
+        HalMissingCollectionPub: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Doi */
+            doi: string | null;
+            /** Halids */
+            halids: string[] | null;
+            /** Hors Uca */
+            hors_uca: boolean;
+        };
+        /** HalMissingCollectionsResponse */
+        HalMissingCollectionsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Lab Acronym */
+            lab_acronym: string | null;
+            /** Hal Collection */
+            hal_collection: string;
+            /** Publications */
+            publications: components["schemas"]["HalMissingCollectionPub"][];
+        };
+        /**
+         * HalPubDetail
+         * @description Métadonnées + dépôts HAL d'une publication (commun aux doublons HAL).
+         */
+        HalPubDetail: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Doi */
+            doi: string | null;
+            /** Container Title */
+            container_title: string | null;
+            /** Hal Docs */
+            hal_docs: components["schemas"]["HalDocSummary"][];
+        };
         /** IdentifierReassignResponse */
         IdentifierReassignResponse: {
             /** Id */
@@ -7037,7 +7231,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalDuplicateAccountsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7069,7 +7263,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalDoiDuplicatesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7101,7 +7295,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalMetaDuplicatesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7134,7 +7328,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalMissingCollectionsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7163,7 +7357,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalCollectionLab"][];
                 };
             };
         };
@@ -7186,7 +7380,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalAffiliationConflictsResponse"];
                 };
             };
             /** @description Validation Error */
