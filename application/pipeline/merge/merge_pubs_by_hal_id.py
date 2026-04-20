@@ -10,31 +10,20 @@ Deux cas :
 2. Les deux pointent vers des publications différentes → on garde celle du HAL,
    on fusionne l'autre dedans
 
-Le SQL est isolé dans `infrastructure/db/queries/merge.py`.
-
-Usage:
-    python merge_pubs_by_hal_id.py              # fusionner
-    python merge_pubs_by_hal_id.py --dry-run    # lister sans fusionner
+L'orchestrateur dépend du port `MergeQueries`. Le point d'entrée CLI est
+dans `interfaces/cli/pipeline/merge_pubs_by_hal_id.py`.
 """
 
-import argparse
-import os
 from typing import Any
 
+from application.ports.merge import MergeQueries
 from application.publications import merge_publications as _merge_pub
 from application.publications import update_sources
-from infrastructure.db.connection import get_connection
-from infrastructure.db.queries.merge import (
-    fetch_hal_source_publications,
-    fetch_source_publications_with_hal_external_id,
-    link_source_publication_to_publication,
-)
-from infrastructure.log import setup_logger
-
-log = setup_logger("merge_pubs_by_hal_id", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def find_duplicates(cur: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def find_duplicates(
+    cur: Any, queries: MergeQueries
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Croise `source_publications` OA/ScanR (avec hal_id) et HAL.
 
     Retourne deux listes :
@@ -42,7 +31,7 @@ def find_duplicates(cur: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]
       - `merge_needed` : publications distinctes à fusionner
     """
     src_by_halid: dict[str, dict[str, Any]] = {}
-    for r in fetch_source_publications_with_hal_external_id(cur):
+    for r in queries.fetch_source_publications_with_hal_external_id(cur):
         hid = r["hal_id"]
         if hid not in src_by_halid:
             src_by_halid[hid] = {
@@ -52,7 +41,7 @@ def find_duplicates(cur: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]
                 "src_pub_id": r["src_pub_id"],
             }
 
-    hal_by_id = {r["halid"]: r for r in fetch_hal_source_publications(cur)}
+    hal_by_id = {r["halid"]: r for r in queries.fetch_hal_source_publications(cur)}
 
     link_only: list[dict[str, Any]] = []
     merge_needed: list[dict[str, Any]] = []
@@ -72,7 +61,9 @@ def find_duplicates(cur: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]
     return link_only, merge_needed
 
 
-def link_hal_to_publication(cur: Any, items: Any, dry_run: bool = False) -> int:
+def link_hal_to_publication(
+    cur: Any, queries: MergeQueries, items: Any, logger: Any, dry_run: bool = False
+) -> int:
     """Case 1: HAL doc has no publication_id → link to source's publication."""
     for item in items:
         hal_doc_id = item["hal_doc_id"]
@@ -80,15 +71,15 @@ def link_hal_to_publication(cur: Any, items: Any, dry_run: bool = False) -> int:
         halid = item["halid"]
 
         if dry_run:
-            log.info(f"  [LINK] [{item['source']}] hal_doc {halid} → pub {src_pub_id}")
+            logger.info(f"  [LINK] [{item['source']}] hal_doc {halid} → pub {src_pub_id}")
             continue
 
-        link_source_publication_to_publication(cur, hal_doc_id, src_pub_id)
+        queries.link_source_publication_to_publication(cur, hal_doc_id, src_pub_id)
         update_sources(cur, src_pub_id)
     return len(items)
 
 
-def merge_publications(cur: Any, items: Any, dry_run: bool = False) -> tuple[int, int]:
+def merge_publications(cur: Any, items: Any, logger: Any, dry_run: bool = False) -> tuple[int, int]:
     """
     Case 2: Both have different publication_id.
     Keep the HAL publication, merge the other into it.
@@ -114,7 +105,7 @@ def merge_publications(cur: Any, items: Any, dry_run: bool = False) -> tuple[int
             continue
 
         if dry_run:
-            log.info(
+            logger.info(
                 f"  [MERGE] [{item['source']}] {item['src_id']} pub={src_pub_id}"
                 f" → {item['halid']} pub={hal_pub_id}"
             )
@@ -129,57 +120,48 @@ def merge_publications(cur: Any, items: Any, dry_run: bool = False) -> tuple[int
 
         except Exception as e:
             cur.execute("ROLLBACK TO SAVEPOINT merge_pub")
-            log.warning(f"  Échec fusion {item['src_id']}: {e}")
+            logger.warning(f"  Échec fusion {item['src_id']}: {e}")
             errors += 1
 
     return merged, errors
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser(
-        description="Fusionne les publications par identifiant HAL (OpenAlex + ScanR)"
-    )
-    parser.add_argument("--dry-run", action="store_true", help="Lister sans fusionner")
-    args = parser.parse_args()
-
-    conn = get_connection()
-    conn.autocommit = False
-    cur = conn.cursor()
-
+def run_merge(
+    cur: Any,
+    conn: Any,
+    queries: MergeQueries,
+    logger: Any,
+    *,
+    dry_run: bool = False,
+) -> None:
     try:
-        log.info("Recherche des doublons par identifiant HAL (OpenAlex + ScanR)...")
-        link_only, merge_needed = find_duplicates(cur)
+        logger.info("Recherche des doublons par identifiant HAL (OpenAlex + ScanR)...")
+        link_only, merge_needed = find_duplicates(cur, queries)
 
-        log.info(f"  HAL sans publication (lien simple) : {len(link_only)}")
-        log.info(f"  Publications distinctes à fusionner : {len(merge_needed)}")
+        logger.info(f"  HAL sans publication (lien simple) : {len(link_only)}")
+        logger.info(f"  Publications distinctes à fusionner : {len(merge_needed)}")
 
         if not link_only and not merge_needed:
-            log.info("Rien à faire.")
+            logger.info("Rien à faire.")
             return
 
         if link_only:
-            log.info("\n--- Liaison HAL → publication existante ---")
-            n = link_hal_to_publication(cur, link_only, dry_run=args.dry_run)
-            log.info(f"  {n} source_publications HAL reliés")
+            logger.info("\n--- Liaison HAL → publication existante ---")
+            n = link_hal_to_publication(cur, queries, link_only, logger, dry_run=dry_run)
+            logger.info(f"  {n} source_publications HAL reliés")
 
         if merge_needed:
-            log.info("\n--- Fusion de publications ---")
-            n, errs = merge_publications(cur, merge_needed, dry_run=args.dry_run)
-            log.info(f"  {n} publications fusionnées, {errs} erreurs")
+            logger.info("\n--- Fusion de publications ---")
+            n, errs = merge_publications(cur, merge_needed, logger, dry_run=dry_run)
+            logger.info(f"  {n} publications fusionnées, {errs} erreurs")
 
-        if not args.dry_run:
+        if not dry_run:
             conn.commit()
-            log.info("Commit OK.")
+            logger.info("Commit OK.")
         else:
-            log.info("[DRY RUN] Aucune modification.")
+            logger.info("[DRY RUN] Aucune modification.")
 
     except Exception as e:
         conn.rollback()
-        log.error(f"Erreur : {e}")
+        logger.error(f"Erreur : {e}")
         raise
-    finally:
-        conn.close()
-
-
-if __name__ == "__main__":
-    main()

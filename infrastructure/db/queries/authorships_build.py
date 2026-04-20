@@ -172,3 +172,31 @@ def count_authorships_in_perimeter(cur: Any) -> int:
     """Compte les `authorships` avec `in_perimeter = TRUE`."""
     cur.execute("SELECT COUNT(*) FROM authorships WHERE in_perimeter = TRUE")
     return cur.fetchone()[0]
+
+
+class PgAuthorshipsBuildQueries:
+    """Adapter PostgreSQL pour `application.ports.authorships_build.AuthorshipsBuildQueries`."""
+
+    def insert_missing_authorships(self, cur: Any) -> int:
+        return insert_missing_authorships(cur)
+
+    def link_source_authorships_to_authorship_for(self, cur: Any, source: str) -> int:
+        return link_source_authorships_to_authorship_for(cur, source)
+
+    def propagate_author_position(self, cur: Any) -> int:
+        return propagate_author_position(cur)
+
+    def propagate_is_corresponding(self, cur: Any) -> int:
+        return propagate_is_corresponding(cur)
+
+    def propagate_roles(self, cur: Any) -> int:
+        return propagate_roles(cur)
+
+    def reset_authorships_perimeter_and_structures(self, cur: Any) -> int:
+        return reset_authorships_perimeter_and_structures(cur)
+
+    def propagate_perimeter_and_structures_from(self, cur: Any, source: str) -> int:
+        return propagate_perimeter_and_structures_from(cur, source)
+
+    def count_authorships_in_perimeter(self, cur: Any) -> int:
+        return count_authorships_in_perimeter(cur)

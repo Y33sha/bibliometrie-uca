@@ -1,0 +1,30 @@
+"""Point d'entrée CLI : création des publications depuis les source_publications in-perimeter."""
+
+import argparse
+import os
+
+from application.pipeline.create.create_publications import run
+from infrastructure.db.connection import get_connection
+from infrastructure.db.queries.publications_create import PgPublicationsCreateQueries
+from infrastructure.log import setup_logger
+
+logger = setup_logger("create_publications", os.path.join(os.path.dirname(__file__), "logs"))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Cree les publications pour les source_publications in-perimeter orphelins"
+    )
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        run(cur, conn, PgPublicationsCreateQueries(), logger, dry_run=args.dry_run)
+    finally:
+        conn.close()
+
+
+if __name__ == "__main__":
+    main()

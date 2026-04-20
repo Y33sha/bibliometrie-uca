@@ -8,8 +8,8 @@ Usage:
     python run_pipeline.py --only extract     # Exécuter une seule phase
     python run_pipeline.py --list             # Lister les phases
     python run_pipeline.py --dry-run          # Afficher sans exécuter
-    python run_pipeline.py --mode daily       # Import quotidien (HAL + OpenAlex, depuis dernier run)
-    python run_pipeline.py --mode weekly      # Import incrémental (6 derniers mois)
+    python run_pipeline.py --mode daily       # Import quotidien (HAL depuis dernier run)
+    python run_pipeline.py --mode weekly      # Import années n et n-1
     python run_pipeline.py --mode monthly     # Repasse complète + cross-imports
     python run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement
     python run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
@@ -111,7 +111,7 @@ def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **k
         # OpenAlex : le filtre from_updated_date requiert un plan payant
         # (429 "Plan upgrade required"). Les changefiles couvrent tout OA
         # (plusieurs Go/jour), pas filtrable par institution.
-        # OpenAlex est rattrapé par le mode weekly (année en cours + hash).
+        # OpenAlex est rattrapé par le mode weekly.
     elif mode == "weekly":
         log.info("Mode hebdomadaire (WoS exclu)")
         if "openalex" in sources:
@@ -177,18 +177,18 @@ def phase_normalize(**kw: Any) -> Any:
     """
     sources = kw.get("sources", set(ALL_SOURCES_SET))
     if "openalex" in sources:
-        run_python("processing/normalize_openalex.py")
+        _run_normalize_openalex()
     if "hal" in sources:
-        run_python("processing/normalize_hal.py")
+        _run_normalize_hal()
     if "wos" in sources:
-        run_python("processing/normalize_wos.py")
+        _run_normalize_wos()
     if "scanr" in sources:
-        run_python("processing/normalize_scanr.py")
+        _run_normalize_scanr()
     if "theses" in sources:
-        run_python("processing/normalize_theses.py")
+        _run_normalize_theses()
     if "hal" in sources:
         if kw.get("mode", "full") in ("full", "monthly"):
-            run_python("processing/harvest_hal_identifiers.py")
+            _run_harvest_hal_identifiers()
     # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
     mode = kw.get("mode", "full")
     if mode in ("full", "monthly"):
@@ -219,8 +219,8 @@ def phase_affiliations(**kw: Any) -> Any:
     sources = kw.get("sources", set(ALL_SOURCES_SET))
     source_args = ",".join(sorted(sources))
     mode = kw.get("mode", "full")
-    run_python("processing/resolve_addresses.py", "--mode", mode)
-    run_python("processing/populate_affiliations.py", "--sources", source_args, "--mode", mode)
+    _run_resolve_addresses(mode)
+    _run_populate_affiliations(sources=set(source_args.split(",")), mode=mode)
 
 
 def phase_publications(**kw: Any) -> Any:
@@ -230,9 +230,9 @@ def phase_publications(**kw: Any) -> Any:
     une source_authorship in_perimeter (evite de creer des publications
     hors perimetre). Applique ensuite les merges inter-sources (HAL-ID, NNT).
     """
-    run_python("processing/create_publications.py")
-    run_python("processing/merge_pubs_by_hal_id.py")
-    run_python("processing/merge_pubs_by_nnt.py")
+    _run_create_publications()
+    _run_merge_pubs_by_hal_id()
+    _run_merge_pubs_by_nnt()
 
 
 def phase_persons(**kw: Any) -> Any:
@@ -242,8 +242,8 @@ def phase_persons(**kw: Any) -> Any:
     Exclut les publications de type memoir (v_active_publications).
     Rattache aussi les authorships theses hors-perimetre par IdRef.
     """
-    run_python("processing/create_persons_from_source_authorships.py")
-    run_python("processing/populate_person_name_forms.py")
+    _run_create_persons()
+    _run_populate_person_name_forms()
 
 
 def phase_authorships(**kw: Any) -> Any:
@@ -254,17 +254,308 @@ def phase_authorships(**kw: Any) -> Any:
     et structure_ids propages.
     """
     sources = kw.get("sources")
-    if sources and sources != ALL_SOURCES_SET:
-        run_python("processing/build_authorships.py", "--sources", ",".join(sorted(sources)))
-    else:
-        run_python("processing/build_authorships.py")
+    _run_build_authorships(sources if sources and sources != ALL_SOURCES_SET else None)
 
 
 def phase_countries(**kw: Any) -> Any:
     """Detection des pays des adresses et recalcul sur les publications."""
     run_python("scripts/detect_address_countries.py", "--direct", "--apply")
     run_python("scripts/suggest_address_countries.py")
-    run_python("processing/refresh_publication_countries.py")
+    _run_refresh_publication_countries()
+
+
+def _run_create_publications() -> None:
+    from application.pipeline.create.create_publications import run
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.publications_create import PgPublicationsCreateQueries
+
+    log.info("▶ create_publications")
+    t0 = time.time()
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        run(cur, conn, PgPublicationsCreateQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ create_publications terminé en %.1fs", time.time() - t0)
+
+
+def _run_create_persons() -> None:
+    from application.pipeline.create.create_persons_from_source_authorships import run
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
+
+    log.info("▶ create_persons_from_source_authorships")
+    t0 = time.time()
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        run(cur, conn, PgPersonsCreateQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ create_persons_from_source_authorships terminé en %.1fs", time.time() - t0)
+
+
+def _run_build_authorships(sources: Any = None) -> None:
+    from application.pipeline.build.build_authorships import build
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.authorships_build import PgAuthorshipsBuildQueries
+
+    log.info("▶ build_authorships %s", f"sources={sorted(sources)}" if sources else "")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        build(cur, PgAuthorshipsBuildQueries(), log, sources=sources)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ build_authorships terminé en %.1fs", time.time() - t0)
+
+
+def _run_populate_affiliations(*, sources: set, mode: str) -> None:
+    from application.pipeline.build.populate_affiliations import run_populate
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.affiliations import PgAffiliationsQueries
+    from infrastructure.perimeter import (
+        get_affiliations_structure_ids,
+        get_persons_structure_ids,
+    )
+
+    log.info("▶ populate_affiliations --mode %s --sources %s", mode, ",".join(sorted(sources)))
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        perimeter_ids = get_persons_structure_ids(cur)
+        wide_ids = get_affiliations_structure_ids(cur)
+        run_populate(
+            cur,
+            conn,
+            PgAffiliationsQueries(),
+            log,
+            perimeter_ids,
+            wide_ids,
+            sources=sources,
+            mode=mode,
+        )
+    finally:
+        conn.close()
+    log.info("✓ populate_affiliations terminé en %.1fs", time.time() - t0)
+
+
+def _run_populate_person_name_forms() -> None:
+    from application.pipeline.build.populate_person_name_forms import populate
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.name_forms import PgNameFormsQueries
+
+    log.info("▶ populate_person_name_forms")
+    t0 = time.time()
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        populate(cur, conn, PgNameFormsQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ populate_person_name_forms terminé en %.1fs", time.time() - t0)
+
+
+def _run_merge_pubs_by_nnt() -> None:
+    from application.pipeline.merge.merge_pubs_by_nnt import run_merge
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.merge import PgMergeQueries
+
+    log.info("▶ merge_pubs_by_nnt")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        run_merge(cur, conn, PgMergeQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ merge_pubs_by_nnt terminé en %.1fs", time.time() - t0)
+
+
+def _run_merge_pubs_by_hal_id() -> None:
+    from application.pipeline.merge.merge_pubs_by_hal_id import run_merge
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.merge import PgMergeQueries
+
+    log.info("▶ merge_pubs_by_hal_id")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        run_merge(cur, conn, PgMergeQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
+
+
+def _run_normalize_hal() -> None:
+    from application.pipeline.normalize.normalize_hal import HalNormalizer
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
+
+    log.info("▶ normalize_hal")
+    t0 = time.time()
+    conn = get_connection()
+    HalNormalizer(conn, log, PgStagingQueries(), PgHalNormalizeQueries()).run([])
+    log.info("✓ normalize_hal terminé en %.1fs", time.time() - t0)
+
+
+def _run_normalize_wos() -> None:
+    from application.pipeline.normalize.normalize_wos import WosNormalizer
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
+
+    log.info("▶ normalize_wos")
+    t0 = time.time()
+    conn = get_connection()
+    WosNormalizer(conn, log, PgStagingQueries(), PgWosNormalizeQueries()).run([])
+    log.info("✓ normalize_wos terminé en %.1fs", time.time() - t0)
+
+
+def _run_normalize_openalex() -> None:
+    from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
+
+    log.info("▶ normalize_openalex")
+    t0 = time.time()
+    conn = get_connection()
+    OpenalexNormalizer(conn, log, PgStagingQueries(), PgOpenalexNormalizeQueries()).run([])
+    log.info("✓ normalize_openalex terminé en %.1fs", time.time() - t0)
+
+
+def _run_normalize_scanr() -> None:
+    from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
+
+    log.info("▶ normalize_scanr")
+    t0 = time.time()
+    conn = get_connection()
+    ScanrNormalizer(conn, log, PgStagingQueries(), PgScanrNormalizeQueries()).run([])
+    log.info("✓ normalize_scanr terminé en %.1fs", time.time() - t0)
+
+
+def _run_normalize_theses() -> None:
+    from application.pipeline.normalize.normalize_theses import ThesesNormalizer
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.normalize_theses import PgThesesNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
+
+    log.info("▶ normalize_theses")
+    t0 = time.time()
+    conn = get_connection()
+    ThesesNormalizer(conn, log, PgStagingQueries(), PgThesesNormalizeQueries()).run([])
+    log.info("✓ normalize_theses terminé en %.1fs", time.time() - t0)
+
+
+def _run_harvest_hal_identifiers() -> None:
+    from application.pipeline.harvest.harvest_hal_identifiers import run_harvest
+    from infrastructure.api_limits import HAL_DELAY
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.harvest import PgHarvestQueries
+
+    log.info("▶ harvest_hal_identifiers")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        run_harvest(cur, conn, PgHarvestQueries(), log, rate_delay=HAL_DELAY)
+    finally:
+        conn.close()
+    log.info("✓ harvest_hal_identifiers terminé en %.1fs", time.time() - t0)
+
+
+def _run_enrich_oa_status() -> None:
+    from application.pipeline.enrich.enrich_oa_status import run_enrich
+    from infrastructure.api_limits import UNPAYWALL_DELAY
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.enrich import PgEnrichQueries
+
+    log.info("▶ enrich_oa_status")
+    t0 = time.time()
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        run_enrich(cur, conn, PgEnrichQueries(), log, rate_delay=UNPAYWALL_DELAY)
+    finally:
+        conn.close()
+    log.info("✓ enrich_oa_status terminé en %.1fs", time.time() - t0)
+
+
+def _run_enrich_journal_apc() -> None:
+    from application.pipeline.enrich.enrich_journal_apc import run_enrich
+    from infrastructure.api_limits import DOAJ_DELAY
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.enrich import PgEnrichQueries
+
+    log.info("▶ enrich_journal_apc")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        run_enrich(
+            cur,
+            conn,
+            PgEnrichQueries(),
+            log,
+            mailto="bibliometrie@uca.fr",
+            rate_delay=DOAJ_DELAY,
+        )
+    finally:
+        conn.close()
+    log.info("✓ enrich_journal_apc terminé en %.1fs", time.time() - t0)
+
+
+def _run_resolve_addresses(mode: str) -> None:
+    from application.pipeline.addresses.resolve_addresses import run_resolution
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.address_resolution import PgAddressResolutionQueries
+    from infrastructure.perimeter import get_persons_structure_ids
+
+    log.info("▶ resolve_addresses --mode %s", mode)
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        perimeter_ids = get_persons_structure_ids(cur)
+        run_resolution(cur, conn, PgAddressResolutionQueries(), perimeter_ids, log, mode=mode)
+    finally:
+        conn.close()
+    log.info("✓ resolve_addresses terminé en %.1fs", time.time() - t0)
+
+
+def _run_refresh_publication_countries() -> None:
+    from application.pipeline.countries.refresh_publication_countries import refresh
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.countries import PgCountryQueries
+
+    log.info("▶ refresh_publication_countries")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        refresh(cur, PgCountryQueries(), log)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ refresh_publication_countries terminé en %.1fs", time.time() - t0)
 
 
 def phase_enrich(mode: Any = "full", **kw: Any) -> Any:
@@ -274,8 +565,8 @@ def phase_enrich(mode: Any = "full", **kw: Any) -> Any:
     - APC revues (import fichiers budget)
     """
     if mode in ("full", "monthly"):
-        run_python("processing/enrich_oa_status.py")
-        run_python("processing/enrich_journal_apc.py")
+        _run_enrich_oa_status()
+        _run_enrich_journal_apc()
     else:
         log.info("Enrichissements ignorés en mode hebdomadaire")
 

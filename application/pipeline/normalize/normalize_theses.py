@@ -22,12 +22,13 @@ Particularités theses.fr :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
-import os
 from typing import Any
 
 from psycopg2.extras import Json
 
-from application.pipeline.normalize.base import SourceNormalizer, run_normalizer
+from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.normalize_theses import ThesesNormalizeQueries
+from application.ports.staging import StagingQueries
 from application.publications import (
     find_or_create,
     find_thesis_by_title,
@@ -39,22 +40,7 @@ from domain.names import names_compatible
 from domain.normalize import normalize_name, normalize_text
 from domain.publication import normalize_nnt
 from infrastructure.addresses import link_addresses
-from infrastructure.db.queries.normalize_theses import (
-    count_theses_table,
-    fetch_thesis_primary_author,
-    find_theses_source_person_by_name,
-    get_theses_publication_id,
-    insert_theses_source_person_new,
-    merge_publication_meta,
-    upsert_theses_source_authorship,
-    upsert_theses_source_person_by_ppn,
-    upsert_theses_source_publication,
-)
 from infrastructure.db_helpers import mark_staging_done
-from infrastructure.log import setup_logger
-
-logger = setup_logger("normalize_theses", os.path.join(os.path.dirname(__file__), "logs"))
-
 
 # =============================================================
 # PUBLICATIONS
@@ -72,9 +58,11 @@ def _extract_thesis_author(these: dict) -> tuple[str, str] | None:
     return (ln, fn) if ln else None
 
 
-def _thesis_author_compatible(cur: Any, pub_id: int, author: tuple[str, str]) -> bool:
+def _thesis_author_compatible(
+    cur: Any, queries: ThesesNormalizeQueries, pub_id: int, author: tuple[str, str]
+) -> bool:
     """Vérifie si l'auteur d'une thèse existante est compatible avec author."""
-    primary = fetch_thesis_primary_author(cur, pub_id)
+    primary = queries.fetch_thesis_primary_author(cur, pub_id)
     if primary is None:
         # Pas d'auteur connu → on accepte le match (titre+année suffisent)
         return True
@@ -130,7 +118,7 @@ def extract_pub_metadata(these: dict) -> dict:
     )
 
 
-def find_publication(cur: Any, these: dict) -> int | None:
+def find_publication(cur: Any, queries: ThesesNormalizeQueries, these: dict) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None.
 
     Déduplication en 2 étapes :
@@ -168,7 +156,7 @@ def find_publication(cur: Any, these: dict) -> int | None:
         if candidates:
             author = _extract_thesis_author(these)
             for cand in candidates:
-                if not author or _thesis_author_compatible(cur, cand.id, author):
+                if not author or _thesis_author_compatible(cur, queries, cand.id, author):
                     # Match trouvé → attribuer le DOI si nécessaire
                     try_merge_by_doi(cur, cand.id, doi)
                     return cand.id
@@ -187,7 +175,9 @@ def _parse_date_iso(date_str: str | None) -> str | None:
         return None
 
 
-def _update_thesis_meta(cur: Any, pub_id: int, these: dict) -> Any:
+def _update_thesis_meta(
+    cur: Any, queries: ThesesNormalizeQueries, pub_id: int, these: dict
+) -> None:
     """Met à jour publications.meta avec les dates de thèse."""
     meta = {}
     ds = _parse_date_iso(these.get("dateSoutenance"))
@@ -198,7 +188,7 @@ def _update_thesis_meta(cur: Any, pub_id: int, these: dict) -> Any:
         meta["date_inscription"] = di
     if not meta:
         return
-    merge_publication_meta(cur, pub_id, Json(meta))
+    queries.merge_publication_meta(cur, pub_id, Json(meta))
 
 
 # =============================================================
@@ -237,6 +227,7 @@ def _build_source_meta(these: dict) -> dict | None:
 
 def insert_source_document(
     cur: Any,
+    queries: ThesesNormalizeQueries,
     these: dict,
     staging_id: int,
     theses_id: str,
@@ -290,7 +281,7 @@ def insert_source_document(
     language = pub_meta.get("language") if pub_meta else None
     container_title = pub_meta.get("container_title") if pub_meta else None
 
-    return upsert_theses_source_publication(
+    return queries.upsert_theses_source_publication(
         cur,
         theses_id=theses_id,
         doi=doi,
@@ -315,7 +306,7 @@ def insert_source_document(
 # =============================================================
 
 
-def upsert_source_author(cur: Any, person: dict) -> int | None:
+def upsert_source_author(cur: Any, queries: ThesesNormalizeQueries, person: dict) -> int | None:
     """Insère/retrouve un auteur theses.fr. Déduplique par PPN IdRef."""
     nom = person.get("nom")
     prenom = person.get("prenom")
@@ -327,15 +318,17 @@ def upsert_source_author(cur: Any, person: dict) -> int | None:
 
     # Par PPN (clé fiable)
     if ppn:
-        return upsert_theses_source_person_by_ppn(
+        return queries.upsert_theses_source_person_by_ppn(
             cur, ppn=ppn, full_name=full_name, last_name=nom, first_name=prenom
         )
 
-    existing = find_theses_source_person_by_name(cur, full_name=full_name, first_name=prenom)
+    existing = queries.find_theses_source_person_by_name(
+        cur, full_name=full_name, first_name=prenom
+    )
     if existing is not None:
         return existing
 
-    return insert_theses_source_person_new(
+    return queries.insert_theses_source_person_new(
         cur, full_name=full_name, last_name=nom, first_name=prenom
     )
 
@@ -345,7 +338,9 @@ def upsert_source_author(cur: Any, person: dict) -> int | None:
 # =============================================================
 
 
-def process_persons(cur: Any, these: dict, source_publication_id: int) -> Any:
+def process_persons(
+    cur: Any, queries: ThesesNormalizeQueries, these: dict, source_publication_id: int
+) -> None:
     """Traite tous les rôles d'une thèse : auteurs, directeurs, rapporteurs, etc.
 
     Une même personne peut apparaître dans plusieurs champs (ex: directeur + jury).
@@ -384,7 +379,7 @@ def process_persons(cur: Any, these: dict, source_publication_id: int) -> Any:
     # Insérer les authorships avec rôles fusionnés
     position = 0
     for _key, info in person_roles.items():
-        source_person_id = upsert_source_author(cur, info["person"])
+        source_person_id = upsert_source_author(cur, queries, info["person"])
         if not source_person_id:
             continue
 
@@ -395,7 +390,7 @@ def process_persons(cur: Any, these: dict, source_publication_id: int) -> Any:
             info["person"].get("prenom", "") + " " + info["person"].get("nom", "")
         ).strip()
 
-        sa_id = upsert_theses_source_authorship(
+        sa_id = queries.upsert_theses_source_authorship(
             cur,
             source_publication_id=source_publication_id,
             source_person_id=source_person_id,
@@ -415,7 +410,7 @@ def process_persons(cur: Any, these: dict, source_publication_id: int) -> Any:
 # =============================================================
 
 
-def process_work(cur: Any, row: dict) -> bool:
+def process_work(cur: Any, queries: ThesesNormalizeQueries, logger: Any, row: dict) -> bool:
     """Traite une thèse du staging."""
     staging_id = row["id"]
     theses_id = row["source_id"]
@@ -427,36 +422,24 @@ def process_work(cur: Any, row: dict) -> bool:
             logger.warning(f"Thèse {theses_id} sans titre — skip")
             return False
 
-        # Métadonnées de publication (stockées sur source_publications)
         pub_meta = extract_pub_metadata(these)
 
-        # Chercher une publication existante (sans créer)
-        publication_id = None
-
-        # Idempotence : réutiliser le publication_id existant
-        publication_id = get_theses_publication_id(cur, theses_id)
-
-        # Recherche par DOI/NNT/titre (sans création)
+        publication_id = queries.get_theses_publication_id(cur, theses_id)
         if not publication_id:
-            publication_id = find_publication(cur, these)
+            publication_id = find_publication(cur, queries, these)
 
-        # Enrichir la publication existante si trouvée
-        # (try_merge_by_doi gère les fusions DOI, refresh_from_sources recalcule après)
         if publication_id:
             publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
 
-        # Document (source_publications) — publication_id peut être NULL
         source_publication_id = insert_source_document(
-            cur, these, staging_id, theses_id, publication_id, pub_meta
+            cur, queries, these, staging_id, theses_id, publication_id, pub_meta
         )
 
-        # Personnes et authorships (avec rôles)
-        process_persons(cur, these, source_publication_id)
+        process_persons(cur, queries, these, source_publication_id)
 
-        # Recalcul complet des métadonnées depuis toutes les sources
         if publication_id:
             refresh_from_sources(cur, publication_id)
-            _update_thesis_meta(cur, publication_id, these)
+            _update_thesis_meta(cur, queries, publication_id, these)
 
         mark_staging_done(cur, staging_id)
 
@@ -471,19 +454,21 @@ class ThesesNormalizer(SourceNormalizer):
     SOURCE = "theses"
     DEFAULT_BATCH_SIZE = 100
 
+    def __init__(
+        self,
+        conn: Any,
+        logger: Any,
+        staging_queries: StagingQueries,
+        queries: ThesesNormalizeQueries,
+    ) -> None:
+        super().__init__(conn, logger, staging_queries)
+        self._queries = queries
+
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        return process_work(cur, row)
+        return process_work(cur, self._queries, self.logger, row)
 
     def summary_stats(self, cur: Any) -> list[str]:
         return [
-            f"  {table} (theses) : {count_theses_table(cur, table)}"
+            f"  {table} (theses) : {self._queries.count_theses_table(cur, table)}"
             for table in ("source_publications", "source_persons", "source_authorships")
         ]
-
-
-def main() -> None:
-    run_normalizer(ThesesNormalizer, logger)
-
-
-if __name__ == "__main__":
-    main()

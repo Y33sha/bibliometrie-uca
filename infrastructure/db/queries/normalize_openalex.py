@@ -238,6 +238,40 @@ def get_openalex_publication_id(cur: Any, openalex_id: str) -> int | None:
     return pid if pid else None
 
 
+class PgOpenalexNormalizeQueries:
+    """Adapter PostgreSQL pour `application.ports.normalize_openalex.OpenalexNormalizeQueries`."""
+
+    def fetch_publication_id_for_hal_source(self, cur: Any, hal_id: str) -> int | None:
+        return fetch_publication_id_for_hal_source(cur, hal_id)
+
+    def upsert_openalex_source_publication(self, cur: Any, **kwargs: Any) -> int:
+        return upsert_openalex_source_publication(cur, **kwargs)
+
+    def upsert_openalex_source_person(self, cur: Any, **kwargs: Any) -> int:
+        return upsert_openalex_source_person(cur, **kwargs)
+
+    def find_openalex_source_structure(self, cur: Any, openalex_id: str) -> int | None:
+        return find_openalex_source_structure(cur, openalex_id)
+
+    def upsert_openalex_source_structure(self, cur: Any, **kwargs: Any) -> int:
+        return upsert_openalex_source_structure(cur, **kwargs)
+
+    def delete_openalex_source_authorships_for(self, cur: Any, source_publication_id: int) -> None:
+        delete_openalex_source_authorships_for(cur, source_publication_id)
+
+    def upsert_openalex_source_authorship(self, cur: Any, **kwargs: Any) -> int:
+        return upsert_openalex_source_authorship(cur, **kwargs)
+
+    def staging_has_openalex_doi(self, cur: Any, doi: str) -> bool:
+        return staging_has_openalex_doi(cur, doi)
+
+    def get_openalex_publication_id(self, cur: Any, openalex_id: str) -> int | None:
+        return get_openalex_publication_id(cur, openalex_id)
+
+    def count_openalex_table(self, cur: Any, table: str) -> int:
+        return count_openalex_table(cur, table)
+
+
 def count_openalex_table(cur: Any, table: str) -> int:
     """Compte les lignes d'une table avec `source = 'openalex'` (liste blanche)."""
     if table not in ("source_publications", "source_persons", "source_structures"):

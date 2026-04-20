@@ -79,3 +79,22 @@ def fill_source_person_idref_if_null(cur: Any, source_person_id: int, idref: str
         (idref, source_person_id),
     )
     return cur.rowcount > 0
+
+
+class PgHarvestQueries:
+    """Adapter PostgreSQL pour `application.ports.harvest.HarvestQueries`."""
+
+    def fetch_hal_persons_missing_idref(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_hal_persons_missing_idref(cur)
+
+    def fetch_hal_persons_missing_identifiers(self, cur: Any) -> list[tuple[int, int, int | None]]:
+        return fetch_hal_persons_missing_identifiers(cur)
+
+    def update_source_person_idref(self, cur: Any, source_person_id: int, idref: str) -> None:
+        update_source_person_idref(cur, source_person_id, idref)
+
+    def fill_source_person_orcid_if_null(self, cur: Any, source_person_id: int, orcid: str) -> bool:
+        return fill_source_person_orcid_if_null(cur, source_person_id, orcid)
+
+    def fill_source_person_idref_if_null(self, cur: Any, source_person_id: int, idref: str) -> bool:
+        return fill_source_person_idref_if_null(cur, source_person_id, idref)
