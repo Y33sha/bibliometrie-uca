@@ -3,7 +3,7 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import { replaceState } from '$app/navigation';
-	import { api } from '$lib/api';
+	import { addresses as addressesApi, api, ApiError } from '$lib/api';
 	import { esc, sanitizeTitle } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
 
@@ -217,17 +217,10 @@
 
 	async function reviewAddr(addrId: number, isConfirmed: boolean | null): Promise<void> {
 		try {
-			const resp = await fetch(`${base}/api/addresses/${addrId}/review`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ structure_id: currentStructureId, is_confirmed: isConfirmed })
-			});
-			if (!resp.ok) {
-				const err = await resp.json().catch(() => ({}));
-				alert(`Erreur ${resp.status} : ${err.detail || resp.statusText}`);
-				return;
-			}
-			const result = await resp.json();
+			const result = await addressesApi.review(addrId, {
+				structure_id: currentStructureId,
+				is_confirmed: isConfirmed
+			}) as { is_confirmed: boolean; is_detected: boolean; structures: AddressStructure[] };
 
 			// Mise à jour locale : mettre à jour puis retirer si ne correspond plus au filtre
 			const updated = { ...addresses.find((a) => a.id === addrId)!, is_confirmed: result.is_confirmed, is_detected: result.is_detected, structures: result.structures };
@@ -238,6 +231,11 @@
 			if (!keep) totalAddresses--;
 			loadStats();
 		} catch (e: unknown) {
+			if (e instanceof ApiError) {
+				const detail = (e.detail as { detail?: string })?.detail;
+				alert(`Erreur ${e.status} : ${detail || 'inconnue'}`);
+				return;
+			}
 			const msg = e instanceof Error ? e.message : String(e);
 			alert('Erreur réseau : ' + msg);
 		}
@@ -245,14 +243,10 @@
 
 	async function batchReview(isConfirmed: boolean | null): Promise<void> {
 		const ids = Array.from(selectedIds);
-		await fetch(base + '/api/addresses/batch-review', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				address_ids: ids,
-				structure_id: currentStructureId,
-				is_confirmed: isConfirmed
-			})
+		await addressesApi.batchReview({
+			address_ids: ids,
+			structure_id: currentStructureId,
+			is_confirmed: isConfirmed
 		});
 		selectedIds = new Set();
 		loadStats();

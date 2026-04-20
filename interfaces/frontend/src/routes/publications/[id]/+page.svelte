@@ -2,7 +2,7 @@
   import { page } from "$app/stores";
   import { base } from "$app/paths";
   import { onMount } from "svelte";
-  import { api } from "$lib/api";
+  import { api, auth, publications } from "$lib/api";
   import { titleCase, sanitizeTitle, halDocUrl, scanrPubUrl } from "$lib/utils";
   import { typeLabels as baseTypeLabels } from "$lib/labels";
   import Tooltip from "$lib/components/Tooltip.svelte";
@@ -143,11 +143,7 @@
 
   async function toggleExclude(source: string, a: SourceAuthorship) {
     const newExcluded = !a.excluded;
-    await fetch(`${base}/api/source-authorships/${source}/${a.id}/exclude`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ excluded: newExcluded }),
-    });
+    await publications.excludeSourceAuthorship(source, a.id, { excluded: newExcluded });
     // Recharger la page
     await loadData();
   }
@@ -218,9 +214,7 @@
 
   onMount(async () => {
     canGoBack = (window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin);
-    fetch(base + "/api/auth/check")
-      .then((r) => r.json())
-      .then((d) => {
+    auth.check().then((d) => {
         isAdmin = !!d.authenticated;
       })
       .catch(() => {});

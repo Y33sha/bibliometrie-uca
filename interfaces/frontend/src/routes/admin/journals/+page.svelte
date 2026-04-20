@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
-	import { api } from '$lib/api';
+	import { api, ApiError, journals as journalsApi } from '$lib/api';
 	import Pagination from '$lib/components/Pagination.svelte';
 
 	interface Journal {
@@ -103,14 +103,13 @@
 		body.apc_amount = editModal.apc_amount ? parseFloat(editModal.apc_amount) : null;
 		if (editModal.notes.trim()) body.notes = editModal.notes.trim();
 		try {
-			const res = await fetch(base + '/api/journals/' + editModal.id, {
-				method: 'PUT', headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body),
-			});
-			if (!res.ok) throw new Error(await res.text());
+			await journalsApi.update(editModal.id, body);
 			editModal = null;
 			await load();
-		} catch (e: any) { alert('Erreur : ' + e.message); }
+		} catch (e: any) {
+			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
+			alert('Erreur : ' + msg);
+		}
 	}
 
 	// Merge
@@ -137,19 +136,15 @@
 	async function doMerge(sourceId: number) {
 		if (!mergeTargetId) return;
 		try {
-			const res = await fetch(`${base}/api/journals/${mergeTargetId}/merge`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ source_id: sourceId }),
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				try { alert(JSON.parse(text).detail); } catch { alert(`Erreur ${res.status}: ${text}`); }
-				return;
-			}
+			await journalsApi.merge(mergeTargetId, sourceId);
 			closeMerge();
 			await load();
 		} catch (e: any) {
+			if (e instanceof ApiError) {
+				const detail = (e.detail as { detail?: string })?.detail;
+				alert(detail || `Erreur ${e.status}: ${JSON.stringify(e.detail)}`);
+				return;
+			}
 			alert('Erreur réseau : ' + e.message);
 		}
 	}
