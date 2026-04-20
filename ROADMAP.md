@@ -12,7 +12,7 @@ Synthèse de l'audit DSI (avril 2026) — ROI décroissant (impact / effort) :
 6. [ ] **§2.6** — `CONTRIBUTING.md` + descriptions OpenAPI. Effort faible, impact onboarding DSI.
 7. [ ] **§2.7.5** — Amorcer des tests frontend (Vitest composables + Playwright parcours critiques). Nouveau.
 8. [ ] **§2.4** — Convention `NNN_down.sql` pour rollbacks d'urgence. Effort très faible, résilience prod.
-9. [ ] **§2.11** — Migration psycopg2 → psycopg3 (fin de support annoncée ~2025). Effort moyen, sécurité long terme.
+9. [x] **§2.11** — Migration psycopg2 → psycopg3. *Clôturé le 2026-04-20 : `psycopg2-binary` retiré, `psycopg[binary]==3.3.3` + `psycopg-pool==3.3.0` en place. Pool `ConnectionPool` avec `row_factory=dict_row` global. 24 sites `Json(...)` migrés vers `psycopg.types.json.Jsonb`. 10 appels `execute_values` migrés vers `cur.executemany` (perf préservée par le pipeline mode psycopg3). Adaptations psycopg3 strict typing : casts `%s::int`/`%s::text[]` sur les `IS NULL`, `IN %s` → `= ANY(%s)`, `ARRAY[%s::int]`. Tests 910/910 verts.*
 
 Les chantiers `§1.1`, `§1.2`, `§1.6`, `§1.8`, `§2.3`, `§2.5`, `§2.9`, ainsi que le **Chantier fonctionnalités**, restent en fil rouge et ne figurent pas dans cette priorisation.
 
@@ -354,19 +354,40 @@ n'est détecté qu'en UI manuel.
 - Règle future : quand un fichier `queries/*` ou `repositories/*`
   dépasse 500 LOC, scinder dans le même chantier.
 
-### 2.11 Migration psycopg2 → psycopg3 — nouveau
-`psycopg2-binary` est en fin de support (upstream a déclaré psycopg3
+### 2.11 Migration psycopg2 → psycopg3 — clôturé 2026-04-20
+`psycopg2-binary` était en fin de support (upstream a déclaré psycopg3
 comme successeur, maintenance minimale sur psycopg2). Migration
-naturelle : psycopg3 supporte les `row_factory` typés (dict_row,
-class_row), ce qui rendrait le SQL brut plus sûr côté Python sans
-introduire d'ORM.
-- [ ] Audit des points de contact (connexion, curseurs, `RealDictCursor`,
-  gestion transactionnelle, `execute_batch`).
-- [ ] Migration en une passe (pas de double run) — pas de versions
-  compatibles en parallèle.
-- [ ] Profiter du chantier pour typer les rows retournées via
-  `row_factory` dans les repositories critiques (Person, Publication,
-  Structure).
+réalisée en 3 commits sur la branche `feature/psycopg3-migration`
+(merge `1700ced`+1) :
+- [x] **Étape A — deps** : ajout de `psycopg[binary]==3.3.3` +
+  `psycopg-pool==3.3.0`, cohabitation transitoire avec `psycopg2-binary`.
+- [x] **Étape B — migration core** (un commit, indissociable car les
+  sous-étapes cassaient les tests si séparées) :
+  - Pool `ThreadedConnectionPool` → `psycopg_pool.ConnectionPool` avec
+    `kwargs={"row_factory": dict_row}` global.
+  - 14 CLIs + base `SourceNormalizer` + repositories : suppression de
+    `cursor(cursor_factory=RealDictCursor)` (la connexion porte déjà
+    `row_factory=dict_row`).
+  - 24 sites `Json(...)` : import `from psycopg.types.json import Jsonb as Json`
+    (API compatible, aucun call site touché).
+  - 8 fichiers, 10 appels `execute_values` → `cur.executemany` avec
+    template inliné dans `VALUES (...)`. Perf préservée par le
+    pipeline mode psycopg3.
+  - Adaptations psycopg3 strict typing : `cur.fetchone()[0]` → alias
+    SQL + accès dict, `WHERE id IN %s` → `= ANY(%s)`, `%s IS NULL` →
+    `%s::int IS NULL` / `%s::text[] IS NULL` (l'IndeterminateDatatype
+    n'est plus toléré), `ARRAY[%s]` → `ARRAY[%s::int]`.
+  - Tests pipeline qui voulaient explicitement un cursor tuple :
+    `cursor()` → `cursor(row_factory=tuple_row)`.
+  - `psycopg2.errors.UniqueViolation` → `psycopg.errors.UniqueViolation`.
+- [x] **Étape C — drop psycopg2** : retrait de `psycopg2-binary` du
+  pyproject + uv.lock, dernières docstrings actualisées, mypy clean.
+- [ ] **Pas fait dans ce chantier** : `row_factory=class_row(...)` pour
+  un mapping direct rows → Pydantic Out (sucre sympa pour les
+  repositories critiques, mais hors scope strict). À faire si une
+  régression de typage le justifie.
+
+Tests : 336 unit + 574 intégration verts avec psycopg2 désinstallé du venv.
 
 ---
 
