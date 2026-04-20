@@ -16,10 +16,12 @@ from application.publications import update_sources
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.publication import normalize_nnt
+from infrastructure.repositories import publication_repository
 
 
 def _create_all_publications(cur):
     """Crée les publications pour tous les source_publications orphelins."""
+    repo = publication_repository(cur)
     cur.execute("""
         SELECT id, source, doi, title, pub_year, doc_type, journal_id,
                oa_status, language, container_title, external_ids
@@ -50,13 +52,14 @@ def _create_all_publications(cur):
             container_title=doc["container_title"],
             language=doc["language"],
             allow_create=True,
+            repo=repo,
         )
         if pub_id:
             cur.execute(
                 "UPDATE source_publications SET publication_id = %s WHERE id = %s",
                 (pub_id, doc["id"]),
             )
-            update_sources(cur, pub_id)
+            update_sources(cur, pub_id, repo=repo)
 
 
 # ── Données HAL minimales ───────────────────────────────────────
@@ -100,10 +103,18 @@ def _run_normalize_hal(dict_cur):
     Le normaliseur HAL utilise un curseur tuple (accès par index),
     on en crée un temporaire sur la même connexion.
     """
+    import logging
+
     from application.pipeline.normalize.normalize_hal import process_work
+    from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
+    from infrastructure.repositories import journal_repository, publication_repository
 
     conn = dict_cur.connection
     tuple_cur = conn.cursor()  # curseur standard (tuple)
+    queries = PgHalNormalizeQueries()
+    logger = logging.getLogger("test")
+    journal_repo = journal_repository(tuple_cur)
+    pub_repo = publication_repository(tuple_cur)
     try:
         tuple_cur.execute("""
             SELECT id, source_id, doi, raw_data, hal_collections
@@ -114,7 +125,14 @@ def _run_normalize_hal(dict_cur):
         rows = tuple_cur.fetchall()
         processed = 0
         for row in rows:
-            if process_work(tuple_cur, row):
+            if process_work(
+                tuple_cur,
+                queries,
+                logger,
+                row,
+                journal_repo=journal_repo,
+                pub_repo=pub_repo,
+            ):
                 processed += 1
         return processed
     finally:

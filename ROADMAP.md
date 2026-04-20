@@ -97,27 +97,28 @@ normalisation explicite émerge.
   peuvent importer domain ; interfaces peut tout importer). Enforce en
   plus `application ↛ infrastructure` — **nouvelle règle** vs les 4
   forbidden précédents.
-- [ ] **§1.7b — Lever les 22 `ignore_imports`** (grandfather clause
+- [ ] **§1.7b — Lever les `ignore_imports`** (grandfather clause
   verrouillant les violations existantes `application → infrastructure`).
   Chaque nettoyage = une ligne retirée de `ignore_imports` dans
   `pyproject.toml`.
-  - Services applicatifs → ports/adapters pour `infrastructure.
-    repositories.*` (3/7 faits : **config**, **authorships**, **addresses**.
-    Reste 4 : journals, publications, persons, structures). Pattern :
-    service accepte `repo: XRepository` en kwarg ; callers (routers,
-    tests) créent l'instance via `X_repository(cur)` et la passent.
-    Pas de Depends FastAPI (pattern `with get_cursor()` conservé).
-    Ports déjà définis dans `domain/ports/*_repository.py`,
-    implémentations dans `infrastructure/repositories/*`. Pour les
-    services appelés depuis d'autres services (ex: `authorships`
-    depuis `addresses`/`persons`), le kwarg se propage (`authorship_repo`
-    dans les signatures d'addresses/persons), verrouillé en attendant
-    leur propre refacto.
-  - Pipeline normalize_* → déplacer ou porter les helpers infrastructure :
+  - [x] **Services applicatifs → ports/adapters** pour
+    `infrastructure.repositories.*` (7/7 faits : config, authorships,
+    addresses, structures, journals, persons, publications —
+    branche `feature/1.7b-services-di`). Pattern :
+    service accepte `repo: XRepository` en kwarg ; callers directs
+    (routers, tests, scripts CLI) créent l'instance via
+    `X_repository(cur)` et la passent. Pour les orchestrateurs
+    pipeline dans `application/pipeline/*` qui ne peuvent pas importer
+    `infrastructure.repositories`, pattern factory callable
+    `*_repo_factory: Callable[[Any], XRepository]` passé au
+    constructeur ; l'orchestrateur instancie le repo dans
+    `preload_caches(cur)` ou au début de `run()`. Ports déjà définis
+    dans `domain/ports/*_repository.py`.
+  - [ ] Pipeline normalize_* → déplacer ou porter les helpers infrastructure :
     `link_addresses` (4), `mark_staging_done` (5), `StepTimer` (2),
     `resolve_zenodo_doi`/`is_zenodo_doi` (2), `extract_nnt_from_openalex`/
     `is_theses_fr_source` (1).
-  - `application.authorships → infrastructure.perimeter.
+  - [ ] `application.authorships → infrastructure.perimeter.
     get_persons_structure_ids_list` (1) — cas isolé.
 
 ### 1.8 Audit périodique
@@ -125,6 +126,12 @@ Parcours régulier pour repérer : SQL mal placé, dépendances dans le
 mauvais sens, logique métier qui a migré dans infrastructure, code
 dupliqué entre agrégats.
 
+
+
+- Bounded contexts
+- Ubiquitous language
+- Aggregates and aggregate roots
+- Event storming and modelling 
 ---
 
 ## Chantier qualité du code : maintenabilité, auditabilité, scalabilité

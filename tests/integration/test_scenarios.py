@@ -6,12 +6,17 @@ import pytest
 from application.persons import merge_person
 from application.publications import find_or_create, refresh_from_sources
 from domain.errors import ConflictError
-from infrastructure.repositories import person_repository
+from infrastructure.repositories import person_repository, publication_repository
 
 
 @pytest.fixture
 def person_repo(db):
     return person_repository(db)
+
+
+@pytest.fixture
+def pub_repo(db):
+    return publication_repository(db)
 
 # ── Helpers ──
 
@@ -81,7 +86,7 @@ class TestDoiCaseInsensitive:
 
 
 class TestPublicationService:
-    def test_create_new(self, db):
+    def test_create_new(self, db, pub_repo):
         pub_id, is_new = find_or_create(
             db,
             title="Test Article",
@@ -89,17 +94,19 @@ class TestPublicationService:
             pub_year=2024,
             doc_type="article",
             doi="10.1234/test",
+            repo=pub_repo,
         )
         assert pub_id is not None
         assert is_new is True
 
-    def test_find_by_doi_case_insensitive(self, db):
+    def test_find_by_doi_case_insensitive(self, db, pub_repo):
         pub_id1, _ = find_or_create(
             db,
             title="Pub A",
             title_normalized="pub a",
             pub_year=2024,
             doi="10.1103/PhysRevC.111.024905",
+            repo=pub_repo,
         )
         pub_id2, is_new = find_or_create(
             db,
@@ -107,11 +114,12 @@ class TestPublicationService:
             title_normalized="pub a variant",
             pub_year=2024,
             doi="10.1103/physrevc.111.024905",
+            repo=pub_repo,
         )
         assert pub_id2 == pub_id1
         assert is_new is False
 
-    def test_same_title_year_journal_no_merge_without_doi(self, db):
+    def test_same_title_year_journal_no_merge_without_doi(self, db, pub_repo):
         """Sans DOI commun, meme titre+annee+journal -> pas de fusion."""
         journal_id = create_journal(db, "Nature")
         pub_id1, _ = find_or_create(
@@ -121,6 +129,7 @@ class TestPublicationService:
             pub_year=2024,
             doc_type="article",
             journal_id=journal_id,
+            repo=pub_repo,
         )
         pub_id2, is_new = find_or_create(
             db,
@@ -129,22 +138,33 @@ class TestPublicationService:
             pub_year=2024,
             doc_type="article",
             journal_id=journal_id,
+            repo=pub_repo,
         )
         assert pub_id2 != pub_id1
         assert is_new is True
 
-    def test_no_title_match_without_journal(self, db):
+    def test_no_title_match_without_journal(self, db, pub_repo):
         """Sans journal_id, pas de dédup par titre — deux publications créées."""
         pub_id1, _ = find_or_create(
-            db, title="My Article", title_normalized="my article", pub_year=2024, doc_type="article"
+            db,
+            title="My Article",
+            title_normalized="my article",
+            pub_year=2024,
+            doc_type="article",
+            repo=pub_repo,
         )
         pub_id2, is_new = find_or_create(
-            db, title="My Article", title_normalized="my article", pub_year=2024, doc_type="article"
+            db,
+            title="My Article",
+            title_normalized="my article",
+            pub_year=2024,
+            doc_type="article",
+            repo=pub_repo,
         )
         assert pub_id2 != pub_id1
         assert is_new is True
 
-    def test_enrich_via_refresh(self, db):
+    def test_enrich_via_refresh(self, db, pub_repo):
         """refresh_from_sources enrichit les métadonnées depuis les source_publications."""
         journal_id = create_journal(db, "Science")
         pub_id, _ = find_or_create(
@@ -154,6 +174,7 @@ class TestPublicationService:
             pub_year=2024,
             doi="10.5555/enrich-test",
             oa_status="unknown",
+            repo=pub_repo,
         )
         # Créer un source_document avec plus d'info
         db.execute(
@@ -164,15 +185,20 @@ class TestPublicationService:
         """,
             (pub_id, journal_id),
         )
-        refresh_from_sources(db, pub_id)
+        refresh_from_sources(db, pub_id, repo=pub_repo)
         db.execute("SELECT oa_status, journal_id FROM publications WHERE id = %s", (pub_id,))
         row = db.fetchone()
         assert row["journal_id"] == journal_id
         assert row["oa_status"] == "gold"
 
-    def test_allow_create_false(self, db):
+    def test_allow_create_false(self, db, pub_repo):
         pub_id, is_new = find_or_create(
-            db, title="Ghost", title_normalized="ghost", pub_year=2024, allow_create=False
+            db,
+            title="Ghost",
+            title_normalized="ghost",
+            pub_year=2024,
+            allow_create=False,
+            repo=pub_repo,
         )
         assert pub_id is None
         assert is_new is False

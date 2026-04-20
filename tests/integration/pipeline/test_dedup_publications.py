@@ -8,6 +8,7 @@ Chaque test tourne dans une transaction rollbackée (isolation complète).
 from psycopg2.extras import Json
 
 from application.publications import find_by_nnt, find_or_create, refresh_from_sources
+from infrastructure.repositories import publication_repository
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ def _create(db, **kwargs):
         "journal_id": None,
     }
     defaults.update(kwargs)
-    return find_or_create(db, **defaults)
+    return find_or_create(db, **defaults, repo=publication_repository(db))
 
 
 def _create_journal(db, title="Test Journal"):
@@ -310,7 +311,7 @@ class TestRefreshFromSources:
             db, doi="10.1234/enrich", oa_status="closed", pub_year=2024, doc_type="article"
         )
         self._insert_sd(db, id1, "hal", language="en", oa_status="closed")
-        refresh_from_sources(db, id1)
+        refresh_from_sources(db, id1, repo=publication_repository(db))
 
         db.execute("SELECT language FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["language"] == "en"
@@ -320,7 +321,7 @@ class TestRefreshFromSources:
         id1, _ = _create(db, doi="10.1234/oa", oa_status="closed")
         self._insert_sd(db, id1, "hal", oa_status="closed")
         self._insert_sd(db, id1, "openalex", oa_status="green")
-        refresh_from_sources(db, id1)
+        refresh_from_sources(db, id1, repo=publication_repository(db))
 
         db.execute("SELECT oa_status FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["oa_status"] == "green"
@@ -330,7 +331,7 @@ class TestRefreshFromSources:
         id1, _ = _create(db, doi="10.1234/dia", oa_status="gold")
         self._insert_sd(db, id1, "hal", oa_status="gold")
         self._insert_sd(db, id1, "openalex", oa_status="diamond")
-        refresh_from_sources(db, id1)
+        refresh_from_sources(db, id1, repo=publication_repository(db))
 
         db.execute("SELECT oa_status FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["oa_status"] == "diamond"
@@ -340,7 +341,7 @@ class TestRefreshFromSources:
         id1, _ = _create(db, doi="10.1234/prio", pub_year=2024, doc_type="article")
         self._insert_sd(db, id1, "openalex", language="en")
         self._insert_sd(db, id1, "hal", language="fr")
-        refresh_from_sources(db, id1)
+        refresh_from_sources(db, id1, repo=publication_repository(db))
 
         db.execute("SELECT language FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["language"] == "fr"
@@ -350,7 +351,7 @@ class TestRefreshFromSources:
         id1, _ = _create(db, doi="10.1234/thesis-prio", pub_year=2024, doc_type="thesis")
         self._insert_sd(db, id1, "hal", language="en", doc_type="THESE")
         self._insert_sd(db, id1, "theses", language="fr", doc_type="thesis")
-        refresh_from_sources(db, id1)
+        refresh_from_sources(db, id1, repo=publication_repository(db))
 
         db.execute("SELECT language FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["language"] == "fr"
@@ -359,7 +360,7 @@ class TestRefreshFromSources:
         """Les doc_types bruts sont mappés vers l'enum canonique."""
         id1, _ = _create(db, pub_year=2024, doc_type="other")
         self._insert_sd(db, id1, "hal", doc_type="ART")
-        refresh_from_sources(db, id1)
+        refresh_from_sources(db, id1, repo=publication_repository(db))
 
         db.execute("SELECT doc_type FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["doc_type"] == "article"
@@ -368,7 +369,7 @@ class TestRefreshFromSources:
         """Un ongoing_thesis passe à thesis quand theses.fr le dit."""
         id1, _ = _create(db, pub_year=2024, doc_type="ongoing_thesis")
         self._insert_sd(db, id1, "theses", doc_type="thesis")
-        refresh_from_sources(db, id1)
+        refresh_from_sources(db, id1, repo=publication_repository(db))
 
         db.execute("SELECT doc_type FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["doc_type"] == "thesis"
@@ -384,7 +385,7 @@ class TestRefreshFromSources:
         """,
             (id1, id1),
         )
-        refresh_from_sources(db, id1)
+        refresh_from_sources(db, id1, repo=publication_repository(db))
 
         db.execute("SELECT keywords FROM publications WHERE id = %s", (id1,))
         kw = db.fetchone()["keywords"]
@@ -409,7 +410,7 @@ class TestRefreshFromSources:
         """,
             (id1, id1),
         )
-        refresh_from_sources(db, id1)
+        refresh_from_sources(db, id1, repo=publication_repository(db))
 
         db.execute("SELECT topics FROM publications WHERE id = %s", (id1,))
         topics = db.fetchone()["topics"]
@@ -431,7 +432,7 @@ class TestRefreshFromSources:
         """,
             (id1, id1),
         )
-        refresh_from_sources(db, id1)
+        refresh_from_sources(db, id1, repo=publication_repository(db))
 
         db.execute("SELECT topics FROM publications WHERE id = %s", (id1,))
         topics = db.fetchone()["topics"]
@@ -452,7 +453,7 @@ class TestRefreshFromSources:
         """,
             (id1, id1),
         )
-        refresh_from_sources(db, id1)
+        refresh_from_sources(db, id1, repo=publication_repository(db))
 
         db.execute("SELECT is_retracted FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["is_retracted"] is True
@@ -460,7 +461,12 @@ class TestRefreshFromSources:
     def test_allow_create_false(self, db):
         """allow_create=False → retourne None si non trouvée."""
         result, _ = find_or_create(
-            db, title="X", title_normalized="x", pub_year=2024, allow_create=False
+            db,
+            title="X",
+            title_normalized="x",
+            pub_year=2024,
+            allow_create=False,
+            repo=publication_repository(db),
         )
         assert result is None
 
@@ -585,7 +591,7 @@ class TestDedupByNnt:
         )
         _create_source_doc_with_nnt(db, id1, "theses", "2023UCFA0069", "2023UCFA0069")
 
-        result = find_by_nnt(db, "2023UCFA0069")
+        result = find_by_nnt(db, "2023UCFA0069", repo=publication_repository(db))
         assert result is not None
         assert result.id == id1
 
@@ -596,6 +602,6 @@ class TestDedupByNnt:
         )
         _create_source_doc_with_nnt(db, id1, "theses", "2023UCFA0069", "2023UCFA0069")
 
-        result = find_by_nnt(db, "2023ucfa0069")
+        result = find_by_nnt(db, "2023ucfa0069", repo=publication_repository(db))
         assert result is not None
         assert result.id == id1

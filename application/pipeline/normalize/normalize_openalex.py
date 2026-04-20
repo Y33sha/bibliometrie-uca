@@ -37,6 +37,7 @@ from application.publications import find_or_create as find_or_create_publicatio
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
+from domain.ports.publication_repository import PublicationRepository
 from domain.publication import clean_doi, extract_hal_id_from_url
 from infrastructure.addresses import link_addresses
 from infrastructure.db_helpers import mark_staging_done
@@ -295,14 +296,20 @@ def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
     )
 
 
-def find_publication(cur: Any, work: dict, journal_id: int | None) -> int | None:
+def find_publication(
+    cur: Any,
+    work: dict,
+    journal_id: int | None,
+    *,
+    pub_repo: PublicationRepository,
+) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None."""
     meta = extract_pub_metadata(work, journal_id)
     if not meta["pub_year"] or not meta["title"]:
         return None
     # Mapper le doc_type pour find_or_create (resolve_doi_conflict a besoin du type canonique)
     meta["doc_type"] = map_doc_type(meta["doc_type"], "openalex")
-    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
+    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False, repo=pub_repo)
     return pub_id
 
 
@@ -571,6 +578,7 @@ def process_work(
     staging_row: tuple,
     *,
     journal_repo: JournalRepository,
+    pub_repo: PublicationRepository,
 ) -> bool | None:
     """Traite un work du staging OpenAlex."""
     if isinstance(staging_row, dict):
@@ -619,7 +627,7 @@ def process_work(
         if not publication_id and theses_fr:
             nnt = extract_nnt_from_openalex(work)
             if nnt:
-                existing = find_by_nnt(cur, nnt)
+                existing = find_by_nnt(cur, nnt, repo=pub_repo)
                 if existing:
                     publication_id = existing.id
 
@@ -627,12 +635,12 @@ def process_work(
             publication_id = queries.get_openalex_publication_id(cur, openalex_id)
 
         if not publication_id:
-            publication_id = find_publication(cur, work, journal_id)
+            publication_id = find_publication(cur, work, journal_id, pub_repo=pub_repo)
 
         if publication_id:
             enrich_doi = pub_meta["doi"]
             if enrich_doi:
-                existing_by_doi = find_by_doi(cur, enrich_doi)
+                existing_by_doi = find_by_doi(cur, enrich_doi, repo=pub_repo)
                 if existing_by_doi and existing_by_doi.id != publication_id:
                     original_doi = enrich_doi
                     enrich_doi, _ = resolve_doi_conflict(
@@ -641,10 +649,11 @@ def process_work(
                         pub_meta["doc_type"],
                         pub_meta["title_normalized"],
                         existing_by_doi,
+                        repo=pub_repo,
                     )
                     if enrich_doi != original_doi:
                         pub_meta["source_doi"] = original_doi
-            publication_id = try_merge_by_doi(cur, publication_id, enrich_doi)
+            publication_id = try_merge_by_doi(cur, publication_id, enrich_doi, repo=pub_repo)
 
         source_publication_id = insert_openalex_document(
             cur, queries, work, staging_id, publication_id, pub_meta
@@ -653,7 +662,7 @@ def process_work(
         process_authorships(cur, queries, work, source_publication_id)
 
         if publication_id:
-            refresh_from_sources(cur, publication_id)
+            refresh_from_sources(cur, publication_id, repo=pub_repo)
 
         mark_staging_done(cur, staging_id)
         return True
@@ -676,19 +685,28 @@ class OpenalexNormalizer(SourceNormalizer):
         staging_queries: StagingQueries,
         queries: OpenalexNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
+        pub_repo_factory: Callable[[Any], PublicationRepository],
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._journal_repo_factory = journal_repo_factory
         self._journal_repo: JournalRepository | None = None
+        self._pub_repo_factory = pub_repo_factory
+        self._pub_repo: PublicationRepository | None = None
 
     def preload_caches(self, cur: Any) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
+        self._pub_repo = self._pub_repo_factory(cur)
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        assert self._journal_repo is not None, "preload_caches doit être appelé avant"
+        assert self._journal_repo is not None and self._pub_repo is not None
         return process_work(
-            cur, self._queries, self.logger, row, journal_repo=self._journal_repo
+            cur,
+            self._queries,
+            self.logger,
+            row,
+            journal_repo=self._journal_repo,
+            pub_repo=self._pub_repo,
         )
 
     def summary_stats(self, cur: Any) -> list[str]:

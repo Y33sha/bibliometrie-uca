@@ -25,10 +25,18 @@ from application.publications import (
 )
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
+from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
 
 
-def process_document(cur: Any, queries: PublicationsCreateQueries, doc: Any, dry_run: bool) -> bool:
+def process_document(
+    cur: Any,
+    queries: PublicationsCreateQueries,
+    doc: Any,
+    dry_run: bool,
+    *,
+    pub_repo: PublicationRepository,
+) -> bool:
     """Crée ou rattache une publication pour un source_document orphelin."""
     title = doc["title"] or ""
     pub_year = doc["pub_year"]
@@ -64,13 +72,14 @@ def process_document(cur: Any, queries: PublicationsCreateQueries, doc: Any, dry
         container_title=container_title,
         language=language,
         allow_create=True,
+        repo=pub_repo,
     )
 
     if not pub_id:
         return False
 
     queries.link_source_publication_to_publication(cur, doc["id"], pub_id)
-    refresh_from_sources(cur, pub_id)
+    refresh_from_sources(cur, pub_id, repo=pub_repo)
 
     return True
 
@@ -81,6 +90,7 @@ def run(
     queries: PublicationsCreateQueries,
     logger: Any,
     *,
+    pub_repo: PublicationRepository,
     dry_run: bool = False,
 ) -> None:
     try:
@@ -94,7 +104,7 @@ def run(
         created = 0
         skipped = 0
         for i, doc in enumerate(docs):
-            if process_document(cur, queries, doc, dry_run):
+            if process_document(cur, queries, doc, dry_run, pub_repo=pub_repo):
                 created += 1
             else:
                 skipped += 1
