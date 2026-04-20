@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
 	import { replaceState } from '$app/navigation';
-	import { api } from '$lib/api';
+	import { api, orphanAuthorships } from '$lib/api';
 	import { titleCase } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
 
@@ -52,10 +52,10 @@
 	}
 
 	async function assign(orphan: any, personId: number) {
-		await fetch(`${base}/api/admin/orphan-authorships/assign`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ source: orphan.source, authorship_id: orphan.authorship_id, person_id: personId })
+		await orphanAuthorships.assign({
+			source: orphan.source,
+			authorship_id: orphan.authorship_id,
+			person_id: personId,
 		});
 		assignSearch = {};
 		loadOrphans();
@@ -101,13 +101,9 @@
 
 	async function batchAssign(personId: number) {
 		const items = orphans.filter(o => selectedIds.has(`${o.source}-${o.authorship_id}`));
-		await fetch(`${base}/api/admin/orphan-authorships/batch-assign`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				person_id: personId,
-				authorships: items.map(o => ({ source: o.source, authorship_id: o.authorship_id }))
-			})
+		await orphanAuthorships.batchAssign({
+			person_id: personId,
+			authorships: items.map(o => ({ source: o.source, authorship_id: o.authorship_id })),
 		});
 		selectedIds = new Set();
 		batchSearch = '';
@@ -133,26 +129,18 @@
 		if (!createModal) return;
 		const { lastName, firstName, items } = createModal;
 		// Créer la personne avec la première authorship
-		const resp = await fetch(`${base}/api/admin/orphan-authorships/assign`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				source: items[0].source, authorship_id: items[0].authorship_id,
-				create_person: { last_name: lastName, first_name: firstName }
-			})
-		});
-		const data = await resp.json();
+		const data = await orphanAuthorships.assign({
+			source: items[0].source,
+			authorship_id: items[0].authorship_id,
+			create_person: { last_name: lastName, first_name: firstName },
+		}) as { person_id?: number };
 		if (!data.person_id) return;
 		// Attribuer le reste
 		const remaining = items.slice(1);
 		if (remaining.length) {
-			await fetch(`${base}/api/admin/orphan-authorships/batch-assign`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					person_id: data.person_id,
-					authorships: remaining.map((o: any) => ({ source: o.source, authorship_id: o.authorship_id }))
-				})
+			await orphanAuthorships.batchAssign({
+				person_id: data.person_id,
+				authorships: remaining.map((o: any) => ({ source: o.source, authorship_id: o.authorship_id })),
 			});
 		}
 		createModal = null;

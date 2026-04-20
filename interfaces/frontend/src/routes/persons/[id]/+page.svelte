@@ -2,7 +2,7 @@
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { api } from '$lib/api';
+	import { api, auth, authorships } from '$lib/api';
 	import { titleCase, formatDate, sanitizeTitle, halDocUrl, scanrPubUrl } from '$lib/utils';
 	import { typeLabels, docTypeLabelsMap, oaLabelsMap } from '$lib/labels';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
@@ -281,7 +281,7 @@
 
 	async function excludeAuthorship(authorshipId: number, pubId: number) {
 		if (!confirm('Exclure ce lien auteur–publication ? Il ne sera pas recréé automatiquement.')) return;
-		await fetch(base + `/api/authorships/${authorshipId}/exclude`, { method: 'PATCH' });
+		await authorships.exclude(authorshipId);
 		pubs.items = pubs.items.filter(p => p.id !== pubId);
 	}
 
@@ -317,7 +317,7 @@
 
 	onMount(async () => {
 		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
-		fetch(base + '/api/auth/check').then(r => r.json()).then(d => { isAdmin = !!d.authenticated; }).catch(() => {});
+		auth.check().then(d => { isAdmin = !!d.authenticated; }).catch(() => {});
 		if (personId) await loadProfile(personId);
 	});
 
