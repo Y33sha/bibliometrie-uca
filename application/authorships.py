@@ -15,11 +15,11 @@ from typing import Any
 
 from application.audit import emit_event
 from domain.errors import NotFoundError, ValidationError
+from domain.ports.authorship_repository import AuthorshipRepository
 from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
-from infrastructure.repositories import authorship_repository
 
 
-def exclude_authorship(cur: Any, authorship_id: int) -> dict:
+def exclude_authorship(cur: Any, authorship_id: int, *, repo: AuthorshipRepository) -> dict:
     """Marque une authorship vérité comme exclue et détache les authorships sources.
 
     1. Marque l'authorship vérité excluded = TRUE
@@ -28,7 +28,6 @@ def exclude_authorship(cur: Any, authorship_id: int) -> dict:
 
     Lève NotFoundError si l'authorship n'existe pas.
     """
-    repo = authorship_repository(cur)
     row = repo.get_authorship_person(authorship_id)
     if not row:
         raise NotFoundError(f"Authorship {authorship_id} introuvable")
@@ -49,7 +48,12 @@ def exclude_authorship(cur: Any, authorship_id: int) -> dict:
 
 
 def set_source_authorship_excluded(
-    cur: Any, source_authorship_id: int, source: str, excluded: bool
+    cur: Any,
+    source_authorship_id: int,
+    source: str,
+    excluded: bool,
+    *,
+    repo: AuthorshipRepository,
 ) -> None:
     """Marque ou démarque une authorship source comme exclue.
 
@@ -62,12 +66,11 @@ def set_source_authorship_excluded(
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
-    repo = authorship_repository(cur)
     if not repo.set_source_authorship_excluded(source_authorship_id, source, excluded):
         raise NotFoundError(f"Authorship source {source}:{source_authorship_id} introuvable")
 
     if excluded:
-        detach_source(cur, source_authorship_id, source)
+        detach_source(cur, source_authorship_id, source, repo=repo)
 
     emit_event(
         cur,
@@ -78,7 +81,9 @@ def set_source_authorship_excluded(
     )
 
 
-def detach_source(cur: Any, source_authorship_id: int, source: str) -> bool:
+def detach_source(
+    cur: Any, source_authorship_id: int, source: str, *, repo: AuthorshipRepository
+) -> bool:
     """Détache une authorship source de son authorship vérité.
     Si plus aucune source ne l'atteste, supprime l'authorship vérité.
 
@@ -88,7 +93,6 @@ def detach_source(cur: Any, source_authorship_id: int, source: str) -> bool:
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
-    repo = authorship_repository(cur)
     truth_id = repo.get_source_authorship_truth_id(source_authorship_id, source)
     if not truth_id:
         return False
@@ -101,16 +105,24 @@ def detach_source(cur: Any, source_authorship_id: int, source: str) -> bool:
     return False
 
 
-def delete_orphan_authorships(cur: Any, person_id: int) -> int:
+def delete_orphan_authorships(
+    cur: Any, person_id: int, *, repo: AuthorshipRepository
+) -> int:
     """Supprime les authorships vérité d'une personne qui ne sont plus attestées
     par aucune authorship source.
     Retourne le nombre d'authorships supprimées.
     """
-    return authorship_repository(cur).delete_orphan_authorships_for_person(person_id)
+    return repo.delete_orphan_authorships_for_person(person_id)
 
 
 def move_authorships_for_source(
-    cur: Any, source: str, source_authorship_ids: list[int], from_pub_id: int, to_pub_id: int
+    cur: Any,
+    source: str,
+    source_authorship_ids: list[int],
+    from_pub_id: int,
+    to_pub_id: int,
+    *,
+    repo: AuthorshipRepository,
 ) -> None:
     """Déplace des authorships vérité d'une publication à une autre,
     pour les authorships liées aux source_authorship_ids donnés.
@@ -120,12 +132,17 @@ def move_authorships_for_source(
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
-    repo = authorship_repository(cur)
     for sa_id in source_authorship_ids:
         repo.move_authorships_for_source_authorship(sa_id, from_pub_id, to_pub_id)
 
 
-def sync_person_id_from_source(cur: Any, source: str, source_authorship_ids: list[int]) -> int:
+def sync_person_id_from_source(
+    cur: Any,
+    source: str,
+    source_authorship_ids: list[int],
+    *,
+    repo: AuthorshipRepository,
+) -> int:
     """Propage le person_id des authorships sources vers les authorships vérité.
     Évite les doublons (publication_id, person_id).
     Utilisé par fix_oa_person_conflicts.
@@ -134,10 +151,12 @@ def sync_person_id_from_source(cur: Any, source: str, source_authorship_ids: lis
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
-    return authorship_repository(cur).sync_person_id_from_sources(source_authorship_ids)
+    return repo.sync_person_id_from_sources(source_authorship_ids)
 
 
-def propagate_uca_for_addresses(cur: Any, address_ids: list[int]) -> None:
+def propagate_uca_for_addresses(
+    cur: Any, address_ids: list[int], *, repo: AuthorshipRepository
+) -> None:
     """Recalcule in_perimeter sur source_authorships et authorships vérité
     pour tous les authorships liés aux adresses données.
 
@@ -153,7 +172,6 @@ def propagate_uca_for_addresses(cur: Any, address_ids: list[int]) -> None:
     if not perimeter_ids:
         return
 
-    repo = authorship_repository(cur)
     affected_sa_ids = repo.find_source_authorships_by_addresses(address_ids)
     if not affected_sa_ids:
         return

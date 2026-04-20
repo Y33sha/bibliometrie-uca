@@ -14,6 +14,7 @@ from application.authorships import (
 )
 from infrastructure.db.queries import publications as pub_queries
 from infrastructure.db.queries.publications import FacetFilters, ListFilters
+from infrastructure.repositories import authorship_repository
 from interfaces.api.deps import get_cursor, get_root_structure_id
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 from interfaces.api.models import ExcludeSourceAuthorship
@@ -141,7 +142,9 @@ async def exclude_source_authorship(
     celle-ci est supprimée.
     """
     with get_cursor() as (cur, _conn):
-        _set_source_authorship_excluded(cur, authorship_id, source, body.excluded)
+        _set_source_authorship_excluded(
+            cur, authorship_id, source, body.excluded, repo=authorship_repository(cur)
+        )
         return {"ok": True, "excluded": body.excluded}
 
 
