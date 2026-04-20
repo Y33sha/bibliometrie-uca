@@ -51,3 +51,13 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
+
+      # Régénère uv.lock si pyproject.toml a changé (pattern ruff --fix).
+      # Si le lockfile est modifié, pre-commit bloque le commit : re-stage
+      # et recommit.
+      - id: uv-lock
+        name: uv-lock (régénère si pyproject.toml a changé)
+        entry: uv lock
+        language: system
+        pass_filenames: false
+        files: ^(pyproject\.toml|uv\.lock)$
