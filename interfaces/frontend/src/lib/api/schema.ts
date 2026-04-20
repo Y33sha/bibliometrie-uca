@@ -2145,6 +2145,27 @@ export interface components {
             /** Id Value */
             id_value: string;
         };
+        /**
+         * AddIdentifierResponse
+         * @description Réponse de `POST /api/persons/{id}/identifiers`.
+         *
+         *     Polymorphe selon le chemin :
+         *     - doublon exact : `added=False` + `reason`
+         *     - ajout normal  : `added=True` + `id_type` + `id_value`
+         *     - réattribution : en plus, `reassigned=True`
+         */
+        AddIdentifierResponse: {
+            /** Added */
+            added: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Id Type */
+            id_type?: string | null;
+            /** Id Value */
+            id_value?: string | null;
+            /** Reassigned */
+            reassigned?: boolean | null;
+        };
         /** AddPerimeterStructure */
         AddPerimeterStructure: {
             /** Structure Id */
@@ -2164,6 +2185,13 @@ export interface components {
         AssignStructureAction: {
             /** Structure Id */
             structure_id: number;
+        };
+        /** AuthorshipExcludeResponse */
+        AuthorshipExcludeResponse: {
+            /** Id */
+            id: number;
+            /** Excluded */
+            excluded: boolean;
         };
         /** BatchAssignOrphanAuthorships */
         BatchAssignOrphanAuthorships: {
@@ -2226,6 +2254,21 @@ export interface components {
              */
             first_name: string;
         };
+        /** DeletedResponse */
+        DeletedResponse: {
+            /**
+             * Deleted
+             * @default true
+             */
+            deleted: boolean;
+        };
+        /** DepartmentCount */
+        DepartmentCount: {
+            /** Department Name */
+            department_name: string;
+            /** Count */
+            count: number;
+        };
         /** DetachAuthorships */
         DetachAuthorships: {
             /** Authorships */
@@ -2236,10 +2279,27 @@ export interface components {
              */
             name_form: string;
         };
+        /** DetachAuthorshipsResponse */
+        DetachAuthorshipsResponse: {
+            /** Detached */
+            detached: number;
+            /** Deleted Authorships */
+            deleted_authorships: number;
+            /** Cleaned Form */
+            cleaned_form: boolean;
+        };
         /** DetachNameForm */
         DetachNameForm: {
             /** Name Form */
             name_form: string;
+        };
+        /** DetachedResponse */
+        DetachedResponse: {
+            /**
+             * Detached
+             * @default true
+             */
+            detached: boolean;
         };
         /** ExcludeSourceAuthorship */
         ExcludeSourceAuthorship: {
@@ -2249,10 +2309,33 @@ export interface components {
              */
             excluded: boolean;
         };
+        /** FacetValueCount */
+        FacetValueCount: {
+            /** Value */
+            value: string;
+            /** Count */
+            count: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** IdentifierReassignResponse */
+        IdentifierReassignResponse: {
+            /** Id */
+            id: number;
+            /** Person Id */
+            person_id: number;
+            /** Status */
+            status: string;
+        };
+        /** IdentifierStatusResponse */
+        IdentifierStatusResponse: {
+            /** Id */
+            id: number;
+            /** Status */
+            status: string;
         };
         /** JournalListResponse */
         JournalListResponse: {
@@ -2339,6 +2422,18 @@ export interface components {
             /** Notes */
             notes?: string | null;
         };
+        /**
+         * LinkedAuthorOut
+         * @description Auteur source (HAL/OpenAlex/WoS) lié à une personne.
+         */
+        LinkedAuthorOut: {
+            /** Id */
+            id: number;
+            /** Source */
+            source: string;
+            /** Full Name */
+            full_name: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Username */
@@ -2377,6 +2472,37 @@ export interface components {
             /** Source Id */
             source_id: number;
         };
+        /** MergeResponse */
+        MergeResponse: {
+            /** Merged */
+            merged: boolean;
+            /** Source Id */
+            source_id: number;
+            /** Target Id */
+            target_id: number;
+        };
+        /** NameFormAuthorshipRef */
+        NameFormAuthorshipRef: {
+            /** Source */
+            source: string;
+            /** Authorship Id */
+            authorship_id: number;
+            /** Pub Id */
+            pub_id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doi */
+            doi: string | null;
+        };
+        /** NameFormAuthorshipsResponse */
+        NameFormAuthorshipsResponse: {
+            /** Authorships */
+            authorships: components["schemas"]["NameFormAuthorshipRef"][];
+            /** Other Persons */
+            other_persons: components["schemas"]["OtherPersonOut"][];
+        };
         /** NameFormCreate */
         NameFormCreate: {
             /** Structure Id */
@@ -2396,6 +2522,38 @@ export interface components {
             /** Requires Context Of */
             requires_context_of?: number[] | null;
         };
+        /**
+         * NameFormOut
+         * @description Forme de nom d'une structure.
+         */
+        NameFormOut: {
+            /** Id */
+            id: number;
+            /** Structure Id */
+            structure_id: number;
+            /** Form Text */
+            form_text: string;
+            /** Is Word Boundary */
+            is_word_boundary: boolean;
+            /** Is Excluding */
+            is_excluding: boolean;
+            /** Requires Context Of */
+            requires_context_of: number[] | null;
+            /** Created At */
+            created_at?: string | null;
+        };
+        /**
+         * NameFormSummaryOut
+         * @description Forme de nom observée pour une personne (liste admin).
+         */
+        NameFormSummaryOut: {
+            /** Name Form */
+            name_form: string;
+            /** Sources */
+            sources: string[];
+            /** Ambiguous */
+            ambiguous: boolean;
+        };
         /** NameFormUpdate */
         NameFormUpdate: {
             /** Form Text */
@@ -2406,6 +2564,81 @@ export interface components {
             is_excluding?: boolean | null;
             /** Requires Context Of */
             requires_context_of?: number[] | null;
+        };
+        /**
+         * OkResponse
+         * @description Réponse minimale d'acquittement (pas de données).
+         */
+        OkResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+        };
+        /** OrphanAssignResponse */
+        OrphanAssignResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /** Person Id */
+            person_id: number;
+        };
+        /** OrphanAuthorshipOut */
+        OrphanAuthorshipOut: {
+            /** Source */
+            source: string;
+            /** Authorship Id */
+            authorship_id: number;
+            /** Full Name */
+            full_name: string;
+            /** Publication Id */
+            publication_id: number;
+            /** Pub Title */
+            pub_title: string;
+            /** Pub Year */
+            pub_year: number | null;
+        };
+        /** OrphanAuthorshipsResponse */
+        OrphanAuthorshipsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Pages */
+            pages: number;
+            /** Authorships */
+            authorships: components["schemas"]["OrphanAuthorshipOut"][];
+        };
+        /** OrphanBatchAssignResponse */
+        OrphanBatchAssignResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /** Assigned */
+            assigned: number;
+        };
+        /** OrphanCountResponse */
+        OrphanCountResponse: {
+            /** Total */
+            total: number;
+        };
+        /** OtherPersonOut */
+        OtherPersonOut: {
+            /** Id */
+            id: number;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Department Name */
+            department_name: string | null;
+            /** Has Rh */
+            has_rh: boolean;
         };
         /** PerimeterCreate */
         PerimeterCreate: {
@@ -2424,6 +2657,298 @@ export interface components {
             description?: string | null;
             /** Structure Ids */
             structure_ids?: number[] | null;
+        };
+        /** PersonAddressOut */
+        PersonAddressOut: {
+            /** Id */
+            id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Structures */
+            structures: components["schemas"]["PersonAddressStruct"][] | null;
+        };
+        /** PersonAddressStruct */
+        PersonAddressStruct: {
+            /** Id */
+            id: number;
+            /** Acronym */
+            acronym: string | null;
+            /** Name */
+            name: string;
+        };
+        /** PersonAddressesResponse */
+        PersonAddressesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Pages */
+            pages: number;
+            /** Addresses */
+            addresses: components["schemas"]["PersonAddressOut"][];
+        };
+        /**
+         * PersonDetail
+         * @description Réponse de `/api/persons/{id}` (détail + auteurs liés).
+         */
+        PersonDetail: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name Normalized */
+            last_name_normalized: string;
+            /** First Name Normalized */
+            first_name_normalized: string;
+            /** Role Title */
+            role_title: string | null;
+            /** Department Name */
+            department_name: string | null;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Linked Authors */
+            linked_authors: components["schemas"]["LinkedAuthorOut"][] | null;
+            /** Identifiers */
+            identifiers: components["schemas"]["PersonIdentifierOut"][] | null;
+        };
+        /**
+         * PersonDirectoryEntry
+         * @description Ligne de l'annuaire public `/api/persons/directory`.
+         */
+        PersonDirectoryEntry: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Role Title */
+            role_title: string | null;
+            /** Department Name */
+            department_name: string | null;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Orcids */
+            orcids: components["schemas"]["ValueConfirmedOut"][] | null;
+            /** Idhals */
+            idhals: components["schemas"]["ValueConfirmedOut"][] | null;
+        };
+        /** PersonDirectoryResponse */
+        PersonDirectoryResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Persons */
+            persons: components["schemas"]["PersonDirectoryEntry"][];
+        };
+        /**
+         * PersonIdentifierOut
+         * @description Identifiant (ORCID, idHAL, idRef) attaché à une personne.
+         */
+        PersonIdentifierOut: {
+            /** Id */
+            id: number;
+            /** Id Type */
+            id_type: string;
+            /** Id Value */
+            id_value: string;
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "confirmed" | "rejected";
+        };
+        /** PersonListResponse */
+        PersonListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Persons */
+            persons: components["schemas"]["PersonOut"][];
+        };
+        /**
+         * PersonOut
+         * @description Ligne de `/api/persons` (liste admin).
+         */
+        PersonOut: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name Normalized */
+            last_name_normalized: string;
+            /** First Name Normalized */
+            first_name_normalized: string;
+            /** Role Title */
+            role_title: string | null;
+            /** Department Name */
+            department_name: string | null;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Rejected */
+            rejected: boolean;
+            /** Pub Count */
+            pub_count: number;
+            /** Uca Pub Count */
+            uca_pub_count: number;
+            /** Identifiers */
+            identifiers: components["schemas"]["PersonIdentifierOut"][] | null;
+            /** Name Forms */
+            name_forms: components["schemas"]["NameFormSummaryOut"][] | null;
+        };
+        /**
+         * PersonProfileAuthor
+         * @description Auteur source dans `/api/persons/{id}/profile` (vue publique enrichie).
+         */
+        PersonProfileAuthor: {
+            /** Id */
+            id: number;
+            /** Source */
+            source: string;
+            /** Full Name */
+            full_name: string;
+            /** Orcid */
+            orcid: string | null;
+            /** Idhal */
+            idhal: string | null;
+            /** Hal Person Id */
+            hal_person_id?: number | null;
+            /** Openalex Id */
+            openalex_id: string | null;
+            /** Uca Pub Count */
+            uca_pub_count: number;
+        };
+        /**
+         * PersonProfileCore
+         * @description Bloc `person` de `/api/persons/{id}/profile`.
+         */
+        PersonProfileCore: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Role Title */
+            role_title: string | null;
+            /** Department Name */
+            department_name: string | null;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+        };
+        /** PersonProfileResponse */
+        PersonProfileResponse: {
+            person: components["schemas"]["PersonProfileCore"];
+            /** Identifiers */
+            identifiers: components["schemas"]["PersonIdentifierOut"][];
+            /** Authors */
+            authors: components["schemas"]["PersonProfileAuthor"][];
+            /** Theses Count */
+            theses_count: number;
+        };
+        /**
+         * PersonSearchResult
+         * @description Résultat d'autocomplete `/api/persons/search`.
+         */
+        PersonSearchResult: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Department Name */
+            department_name: string | null;
+            /** Has Rh */
+            has_rh: boolean;
+        };
+        /** PersonThesesResponse */
+        PersonThesesResponse: {
+            /** Sections */
+            sections: components["schemas"]["PersonThesesSection"][];
+            /** Total */
+            total: number;
+            /** Structures */
+            structures: {
+                [key: string]: components["schemas"]["StructureRef"];
+            };
+        };
+        /** PersonThesesSection */
+        PersonThesesSection: {
+            /** Role */
+            role: string;
+            /** Label */
+            label: string;
+            /** Theses */
+            theses: components["schemas"]["PersonThesis"][];
+        };
+        /** PersonThesis */
+        PersonThesis: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doi */
+            doi: string | null;
+            /** Author Name */
+            author_name: string | null;
+            /** Author Person Id */
+            author_person_id: number | null;
+            /** Structure Ids */
+            structure_ids: number[];
+        };
+        /**
+         * PersonsFacetsResponse
+         * @description Réponse de `/api/persons/facets`.
+         */
+        PersonsFacetsResponse: {
+            /** Departments */
+            departments: components["schemas"]["FacetValueCount"][];
+            /** Roles */
+            roles: components["schemas"]["FacetValueCount"][];
+            orcid: components["schemas"]["YesNoCount"];
+            idhal: components["schemas"]["YesNoCount"];
+            rh: components["schemas"]["YesNoCount"];
+            linked: components["schemas"]["YesNoCount"];
+        };
+        /** PersonsStatsResponse */
+        PersonsStatsResponse: {
+            /** Total Persons */
+            total_persons: number;
+            /** Linked Persons */
+            linked_persons: number;
+            /** Linked Authors */
+            linked_authors: number;
+            /** Departments */
+            departments: number;
         };
         /** PublisherUpdate */
         PublisherUpdate: {
@@ -2451,6 +2976,26 @@ export interface components {
              */
             rejected: boolean;
         };
+        /**
+         * RelatedStructureOut
+         * @description Structure voisine (parent/enfant) dans le détail d'une structure.
+         */
+        RelatedStructureOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+            /** Relation Id */
+            relation_id: number;
+            /** Relation Type */
+            relation_type: string;
+        };
         /** RelationCreate */
         RelationCreate: {
             /** Parent Id */
@@ -2460,12 +3005,27 @@ export interface components {
             /** Relation Type */
             relation_type: string;
         };
+        /** RemovedResponse */
+        RemovedResponse: {
+            /**
+             * Removed
+             * @default true
+             */
+            removed: boolean;
+        };
         /** ReviewAction */
         ReviewAction: {
             /** Structure Id */
             structure_id: number;
             /** Is Confirmed */
             is_confirmed: boolean | null;
+        };
+        /** RoleCount */
+        RoleCount: {
+            /** Role Title */
+            role_title: string;
+            /** Count */
+            count: number;
         };
         /** SetCountry */
         SetCountry: {
@@ -2499,6 +3059,89 @@ export interface components {
             api_ids?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * StructureDetailResponse
+         * @description Détail complet renvoyé par GET /api/structures/{id}.
+         */
+        StructureDetailResponse: {
+            structure: components["schemas"]["StructureOut"];
+            /** Parents */
+            parents: components["schemas"]["RelatedStructureOut"][];
+            /** Children */
+            children: components["schemas"]["RelatedStructureOut"][];
+            /** Forms */
+            forms: components["schemas"]["NameFormOut"][];
+        };
+        /**
+         * StructureListItem
+         * @description Ligne résumée de `/api/structures` (liste + recherche).
+         */
+        StructureListItem: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+        };
+        /**
+         * StructureOut
+         * @description Structure complète — renvoyée par GET/POST/PUT sur `/api/structures`.
+         */
+        StructureOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+            /** Ror Id */
+            ror_id: string | null;
+            /** Rnsr Id */
+            rnsr_id: string | null;
+            /** Hal Collection */
+            hal_collection: string | null;
+            /** Api Ids */
+            api_ids: {
+                [key: string]: string[];
+            } | null;
+        };
+        /**
+         * StructureRef
+         * @description Référence courte à une structure (acronyme + nom).
+         */
+        StructureRef: {
+            /** Acronym */
+            acronym: string | null;
+            /** Name */
+            name: string;
+        };
+        /**
+         * StructureRelationCreateResponse
+         * @description Réponse de POST /api/structure-relations.
+         *
+         *     Polymorphe : soit la relation créée, soit `{status: "already_exists"}`.
+         */
+        StructureRelationCreateResponse: {
+            /** Id */
+            id?: number | null;
+            /** Parent Id */
+            parent_id?: number | null;
+            /** Child Id */
+            child_id?: number | null;
+            /** Relation Type */
+            relation_type?: string | null;
+            /** Status */
+            status?: string | null;
         };
         /** StructureUpdate */
         StructureUpdate: {
@@ -2549,6 +3192,23 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * ValueConfirmedOut
+         * @description Identifiant sous forme condensée (annuaire public).
+         */
+        ValueConfirmedOut: {
+            /** Value */
+            value: string;
+            /** Confirmed */
+            confirmed: boolean;
+        };
+        /** YesNoCount */
+        YesNoCount: {
+            /** Yes */
+            yes: number;
+            /** No */
+            no: number;
         };
     };
     responses: never;
@@ -3958,7 +4618,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StructureListItem"][];
                 };
             };
             /** @description Validation Error */
@@ -3991,7 +4651,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StructureOut"];
                 };
             };
             /** @description Validation Error */
@@ -4022,7 +4682,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StructureDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4057,7 +4717,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StructureOut"];
                 };
             };
             /** @description Validation Error */
@@ -4088,7 +4748,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DeletedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4121,7 +4781,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StructureRelationCreateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4152,7 +4812,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DeletedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4183,7 +4843,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["NameFormOut"];
                 };
             };
             /** @description Validation Error */
@@ -4218,7 +4878,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["NameFormOut"];
                 };
             };
             /** @description Validation Error */
@@ -4249,7 +4909,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DeletedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4282,7 +4942,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["NameFormOut"];
                 };
             };
             /** @description Validation Error */
@@ -4423,7 +5083,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonDirectoryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4455,7 +5115,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonSearchResult"][];
                 };
             };
             /** @description Validation Error */
@@ -4495,7 +5155,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4531,7 +5191,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonsFacetsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4560,7 +5220,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DepartmentCount"][];
                 };
             };
         };
@@ -4580,7 +5240,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["RoleCount"][];
                 };
             };
         };
@@ -4600,7 +5260,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonsStatsResponse"];
                 };
             };
         };
@@ -4622,7 +5282,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonDetail"];
                 };
             };
             /** @description Validation Error */
@@ -4653,7 +5313,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4684,7 +5344,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonThesesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4718,7 +5378,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonAddressesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4753,7 +5413,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddIdentifierResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4786,7 +5446,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["RemovedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4821,7 +5481,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["IdentifierStatusResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4856,7 +5516,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["IdentifierReassignResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4887,7 +5547,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthorshipExcludeResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4922,7 +5582,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4957,7 +5617,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4992,7 +5652,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MergeResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5021,7 +5681,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrphanCountResponse"];
                 };
             };
         };
@@ -5045,7 +5705,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrphanAuthorshipsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5078,7 +5738,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrphanAssignResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5111,7 +5771,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrphanBatchAssignResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5144,7 +5804,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["NameFormAuthorshipsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5179,7 +5839,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DetachAuthorshipsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5214,7 +5874,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DetachedResponse"];
                 };
             };
             /** @description Validation Error */

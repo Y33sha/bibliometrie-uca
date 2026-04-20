@@ -1,5 +1,6 @@
 """Pydantic models shared across routers."""
 
+from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -86,6 +87,92 @@ class NameFormUpdate(BaseModel):
     is_word_boundary: bool | None = None
     is_excluding: bool | None = None
     requires_context_of: list[int] | None = None
+
+
+# ----- Structures (output) -----
+
+
+class StructureListItem(BaseModel):
+    """Ligne résumée de `/api/structures` (liste + recherche)."""
+
+    id: int
+    code: str
+    name: str
+    acronym: str | None
+    type: str
+
+
+class StructureOut(BaseModel):
+    """Structure complète — renvoyée par GET/POST/PUT sur `/api/structures`."""
+
+    id: int
+    code: str
+    name: str
+    acronym: str | None
+    type: str
+    ror_id: str | None
+    rnsr_id: str | None
+    hal_collection: str | None
+    api_ids: dict[str, list[str]] | None
+
+
+class RelatedStructureOut(BaseModel):
+    """Structure voisine (parent/enfant) dans le détail d'une structure."""
+
+    id: int
+    code: str
+    name: str
+    acronym: str | None
+    type: str
+    relation_id: int
+    relation_type: str
+
+
+class NameFormOut(BaseModel):
+    """Forme de nom d'une structure."""
+
+    id: int
+    structure_id: int
+    form_text: str
+    is_word_boundary: bool
+    is_excluding: bool
+    requires_context_of: list[int] | None
+    created_at: datetime | None = None
+
+
+class StructureDetailResponse(BaseModel):
+    """Détail complet renvoyé par GET /api/structures/{id}."""
+
+    structure: StructureOut
+    parents: list[RelatedStructureOut]
+    children: list[RelatedStructureOut]
+    forms: list[NameFormOut]
+
+
+class StructureRelationOut(BaseModel):
+    """Relation structure-à-structure."""
+
+    id: int
+    parent_id: int
+    child_id: int
+    relation_type: str
+
+
+class StructureRelationCreateResponse(BaseModel):
+    """Réponse de POST /api/structure-relations.
+
+    Polymorphe : soit la relation créée, soit `{status: "already_exists"}`.
+    """
+
+    id: int | None = None
+    parent_id: int | None = None
+    child_id: int | None = None
+    relation_type: str | None = None
+    status: str | None = None
+
+
+class DeletedResponse(BaseModel):
+    deleted: bool = True
 
 
 # ----- Journals / Publishers -----
@@ -239,6 +326,349 @@ class DetachAuthorships(BaseModel):
 
 class DetachNameForm(BaseModel):
     name_form: str
+
+
+# ----- Persons (output) -----
+
+
+class PersonIdentifierOut(BaseModel):
+    """Identifiant (ORCID, idHAL, idRef) attaché à une personne."""
+
+    id: int
+    id_type: str
+    id_value: str
+    source: str
+    status: Literal["pending", "confirmed", "rejected"]
+
+
+class LinkedAuthorOut(BaseModel):
+    """Auteur source (HAL/OpenAlex/WoS) lié à une personne."""
+
+    id: int
+    source: str
+    full_name: str
+
+
+class NameFormSummaryOut(BaseModel):
+    """Forme de nom observée pour une personne (liste admin)."""
+
+    name_form: str
+    sources: list[str]
+    ambiguous: bool
+
+
+class ValueConfirmedOut(BaseModel):
+    """Identifiant sous forme condensée (annuaire public)."""
+
+    value: str
+    confirmed: bool
+
+
+class PersonDirectoryEntry(BaseModel):
+    """Ligne de l'annuaire public `/api/persons/directory`."""
+
+    id: int
+    last_name: str
+    first_name: str
+    role_title: str | None
+    department_name: str | None
+    has_rh: bool
+    orcids: list[ValueConfirmedOut] | None
+    idhals: list[ValueConfirmedOut] | None
+
+
+class PersonDirectoryResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    persons: list[PersonDirectoryEntry]
+
+
+class PersonSearchResult(BaseModel):
+    """Résultat d'autocomplete `/api/persons/search`."""
+
+    id: int
+    last_name: str
+    first_name: str
+    department_name: str | None
+    has_rh: bool
+
+
+class PersonOut(BaseModel):
+    """Ligne de `/api/persons` (liste admin)."""
+
+    id: int
+    last_name: str
+    first_name: str
+    last_name_normalized: str
+    first_name_normalized: str
+    role_title: str | None
+    department_name: str | None
+    start_date: date | None
+    end_date: date | None
+    has_rh: bool
+    rejected: bool
+    pub_count: int
+    uca_pub_count: int
+    identifiers: list[PersonIdentifierOut] | None
+    name_forms: list[NameFormSummaryOut] | None
+
+
+class PersonListResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    persons: list[PersonOut]
+
+
+class FacetValueCount(BaseModel):
+    value: str
+    count: int
+
+
+class YesNoCount(BaseModel):
+    yes: int
+    no: int
+
+
+class PersonsFacetsResponse(BaseModel):
+    """Réponse de `/api/persons/facets`."""
+
+    departments: list[FacetValueCount]
+    roles: list[FacetValueCount]
+    orcid: YesNoCount
+    idhal: YesNoCount
+    rh: YesNoCount
+    linked: YesNoCount
+
+
+class DepartmentCount(BaseModel):
+    department_name: str
+    count: int
+
+
+class RoleCount(BaseModel):
+    role_title: str
+    count: int
+
+
+class PersonsStatsResponse(BaseModel):
+    total_persons: int
+    linked_persons: int
+    linked_authors: int
+    departments: int
+
+
+class PersonDetail(BaseModel):
+    """Réponse de `/api/persons/{id}` (détail + auteurs liés)."""
+
+    id: int
+    last_name: str
+    first_name: str
+    last_name_normalized: str
+    first_name_normalized: str
+    role_title: str | None
+    department_name: str | None
+    start_date: date | None
+    end_date: date | None
+    has_rh: bool
+    linked_authors: list[LinkedAuthorOut] | None
+    identifiers: list[PersonIdentifierOut] | None
+
+
+class PersonProfileCore(BaseModel):
+    """Bloc `person` de `/api/persons/{id}/profile`."""
+
+    id: int
+    last_name: str
+    first_name: str
+    role_title: str | None
+    department_name: str | None
+    start_date: date | None
+    end_date: date | None
+
+
+class PersonProfileAuthor(BaseModel):
+    """Auteur source dans `/api/persons/{id}/profile` (vue publique enrichie)."""
+
+    id: int
+    source: str
+    full_name: str
+    orcid: str | None
+    idhal: str | None
+    hal_person_id: int | None = None
+    openalex_id: str | None
+    uca_pub_count: int
+
+
+class PersonProfileResponse(BaseModel):
+    person: PersonProfileCore
+    identifiers: list[PersonIdentifierOut]
+    authors: list[PersonProfileAuthor]
+    theses_count: int
+
+
+class PersonThesis(BaseModel):
+    id: int
+    title: str
+    pub_year: int | None
+    doi: str | None
+    author_name: str | None
+    author_person_id: int | None
+    structure_ids: list[int]
+
+
+class PersonThesesSection(BaseModel):
+    role: str
+    label: str
+    theses: list[PersonThesis]
+
+
+class StructureRef(BaseModel):
+    """Référence courte à une structure (acronyme + nom)."""
+
+    acronym: str | None
+    name: str
+
+
+class PersonThesesResponse(BaseModel):
+    sections: list[PersonThesesSection]
+    total: int
+    structures: dict[int, StructureRef]
+
+
+class PersonAddressStruct(BaseModel):
+    id: int
+    acronym: str | None
+    name: str
+
+
+class PersonAddressOut(BaseModel):
+    id: int
+    raw_text: str
+    structures: list[PersonAddressStruct] | None
+
+
+class PersonAddressesResponse(BaseModel):
+    total: int
+    page: int
+    pages: int
+    addresses: list[PersonAddressOut]
+
+
+class NameFormAuthorshipRef(BaseModel):
+    source: str
+    authorship_id: int
+    pub_id: int
+    title: str
+    pub_year: int | None
+    doi: str | None
+
+
+class OtherPersonOut(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    department_name: str | None
+    has_rh: bool
+
+
+class NameFormAuthorshipsResponse(BaseModel):
+    authorships: list[NameFormAuthorshipRef]
+    other_persons: list[OtherPersonOut]
+
+
+class OrphanCountResponse(BaseModel):
+    total: int
+
+
+class OrphanAuthorshipOut(BaseModel):
+    source: str
+    authorship_id: int
+    full_name: str
+    publication_id: int
+    pub_title: str
+    pub_year: int | None
+
+
+class OrphanAuthorshipsResponse(BaseModel):
+    total: int
+    page: int
+    pages: int
+    authorships: list[OrphanAuthorshipOut]
+
+
+# ----- Persons (mutation responses) -----
+
+
+class OkResponse(BaseModel):
+    """Réponse minimale d'acquittement (pas de données)."""
+
+    ok: bool = True
+
+
+class RemovedResponse(BaseModel):
+    removed: bool = True
+
+
+class DetachedResponse(BaseModel):
+    detached: bool = True
+
+
+class AddIdentifierResponse(BaseModel):
+    """Réponse de `POST /api/persons/{id}/identifiers`.
+
+    Polymorphe selon le chemin :
+    - doublon exact : `added=False` + `reason`
+    - ajout normal  : `added=True` + `id_type` + `id_value`
+    - réattribution : en plus, `reassigned=True`
+    """
+
+    added: bool
+    reason: str | None = None
+    id_type: str | None = None
+    id_value: str | None = None
+    reassigned: bool | None = None
+
+
+class IdentifierStatusResponse(BaseModel):
+    id: int
+    status: str
+
+
+class IdentifierReassignResponse(BaseModel):
+    id: int
+    person_id: int
+    status: str
+
+
+class AuthorshipExcludeResponse(BaseModel):
+    id: int
+    excluded: bool
+
+
+class MergeResponse(BaseModel):
+    merged: bool
+    source_id: int
+    target_id: int
+
+
+class OrphanAssignResponse(BaseModel):
+    ok: bool = True
+    person_id: int
+
+
+class OrphanBatchAssignResponse(BaseModel):
+    ok: bool = True
+    assigned: int
+
+
+class DetachAuthorshipsResponse(BaseModel):
+    detached: int
+    deleted_authorships: int
+    cleaned_form: bool
 
 
 # ----- Config / Perimeters -----

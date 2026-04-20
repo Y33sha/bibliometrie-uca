@@ -1,85 +1,28 @@
 /**
  * Types partagés par la page `admin/persons` et ses sous-composants.
+ *
+ * Les types de réponses API proviennent du schéma OpenAPI généré
+ * (`$lib/api/schema.ts`) ; seuls les états d'UI locaux restent définis ici.
  */
 
-export interface PersonStats {
-  total_persons: number;
-  linked_persons: number;
-  linked_authors: number;
-  departments: number;
-}
+import type { components } from "$lib/api/schema";
 
-export interface LinkedAuthor {
-  id: number;
-  source: string;
-  full_name: string;
-  orcid?: string;
-  idhal?: string;
-}
+// ── Types API (générés) ──
+export type PersonStats = components["schemas"]["PersonsStatsResponse"];
+export type LinkedAuthor = components["schemas"]["LinkedAuthorOut"];
+export type PersonIdentifier = components["schemas"]["PersonIdentifierOut"];
+export type NameForm = components["schemas"]["NameFormSummaryOut"];
+export type Person = components["schemas"]["PersonOut"];
+export type PersonListResponse = components["schemas"]["PersonListResponse"];
+export type OtherPerson = components["schemas"]["OtherPersonOut"];
+export type PersonSearchResult = components["schemas"]["PersonSearchResult"];
 
-export interface PersonIdentifier {
-  id: number;
-  id_type: string;
-  id_value: string;
-  source: string;
-  status: "pending" | "confirmed" | "rejected";
-}
-
-export interface NameForm {
-  name_form: string;
-  ambiguous: boolean;
-}
-
-export interface Person {
-  id: number;
-  first_name: string;
-  last_name: string;
-  department_name?: string;
-  role_title?: string;
-  start_date?: string;
-  end_date?: string;
-  has_rh?: boolean;
-  rejected?: boolean;
-  pub_count?: number;
-  uca_pub_count?: number;
-  linked_authors?: LinkedAuthor[];
-  identifiers?: PersonIdentifier[];
-  name_forms?: NameForm[];
-}
-
-export interface PersonListResponse {
-  total: number;
-  page: number;
-  pages: number;
-  persons: Person[];
-}
-
-export interface DetachAuthorship {
-  source: string;
-  authorship_id: number;
-  pub_id: number;
-  title: string;
-  pub_year: number | null;
-  doi: string | null;
+// ── Extensions UI (champs ajoutés côté front) ──
+export type DetachAuthorship = components["schemas"]["NameFormAuthorshipRef"] & {
   checked: boolean;
-}
+};
 
-export interface OtherPerson {
-  id: number;
-  first_name: string;
-  last_name: string;
-  department_name: string | null;
-  has_rh: boolean;
-}
-
-export interface PersonSearchResult {
-  id: number;
-  first_name: string;
-  last_name: string;
-  department_name: string | null;
-  has_rh: boolean;
-}
-
+// ── États UI locaux ──
 export interface EditNameState {
   personId: number;
   lastName: string;
