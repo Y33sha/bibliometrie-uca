@@ -6,6 +6,29 @@ Architecture hexagonale en place : 4 couches `domain/`, `application/`,
 `infrastructure/`, `interfaces/` ; ports Protocol pour les 7
 repositories ; SQL extrait des services et des orchestrateurs pipeline.
 
+**Position volontaire : DDD-lite.** On a pris le DDD tactique côté
+technique (layering, ports/adapters, DI, value objects sur les
+identifiants clés, fonctions pures et mappings dans `domain/`). On
+ne pousse **pas** vers le DDD complet — entités riches avec
+invariants protégés, aggregate roots, domain events, bounded
+contexts formels — parce que le rapport coût/bénéfice ne le
+justifie pas à ce stade :
+
+- Équipe solo + transmission DSI, pas de collaboration pluri-domaine
+  qui bénéficierait d'une ubiquitous language ancrée dans le code.
+- Règles métier modérées ; les invariants existants (ex. un ORCID =
+  une personne confirmée, pas de fusion entre deux personnes RH)
+  sont protégés au niveau des services, sans casser.
+- Les `domain/publication.py`, `domain/person.py`, etc. contiennent
+  déjà la logique pure (DOI, normalisation, formes de noms,
+  extraction HAL-ID) — les passer en classes stateful ne
+  changerait pas les garanties.
+
+Critère de déclenchement pour faire évoluer ce choix : une règle
+métier devient **dispersée et fragile** (plusieurs sites
+l'appliquent avec des drifts) → l'extraire en entité ou
+aggregate root à **ce moment-là**, pas avant.
+
 ### 1.1 Sortir le SQL qui traîne encore dans les routers
 Extraction faite sur les 7 routers critiques (pub_stats, publications,
 persons, addresses, laboratories, duplicates, authorships) — SQL
@@ -38,17 +61,31 @@ dynamique (SQLAlchemy Core, cf. "À explorer"), il remplacera
 naturellement cette surface — autant éviter d'inventer une
 abstraction intermédiaire à jeter ensuite.
 
-### 1.4 Entités riches dans le domaine
-- [ ] Aujourd'hui le domaine contient des value objects (DOI, ORCID, …) et
-  des modèles JSONB, mais pas d'entités au sens DDD. Passer à de vraies
-  entités `Person`, `Publication`, `Structure` avec identité + invariants
-  devient intéressant quand émergent des règles complexes (ex. un idHAL
-  ne peut être associé qu'à un seul compte actif).
+### 1.4 Entités riches dans le domaine — opportuniste
+Cohérent avec la position DDD-lite : on ne fait **pas** de
+refactor proactif pour passer `Person`, `Publication`, `Structure`
+en entités stateful avec méthodes + invariants. Les services
+(`application/persons.py`, etc.) orchestrent les règles via les
+repositories ; le domain layer fournit les value objects et les
+fonctions pures.
 
-### 1.5 Value objects supplémentaires
-Ajouter au fur et à mesure : `ROR`, `RNSR` (identifiants de structure),
-`ISSN` / `eISSN` (journaux) — dès qu'un besoin de validation ou de
-normalisation explicite émerge.
+Quand déclencher une extraction en entité riche :
+- une règle devient complexe (workflow d'approbation, permissions,
+  chaîne d'invariants inter-champs) ;
+- la règle est **dispersée** dans plusieurs services et drift ;
+- ajouter un test unitaire pur sur cette règle demande aujourd'hui
+  trop de plomberie.
+
+Exemples de candidats plausibles si le besoin émerge : fusion
+`Person`, assignation d'identifiants (ORCID/idHAL) avec statuts
+pending/confirmed/rejected.
+
+### 1.5 Value objects supplémentaires — opportuniste
+Ajouter au fur et à mesure quand un besoin de validation ou de
+normalisation explicite émerge : `ROR`, `RNSR` (identifiants de
+structure), `ISSN` / `eISSN` (journaux). Pas de plan à dérouler,
+juste la règle « quand on écrit la 3ᵉ fonction de parsing d'un
+même identifiant, on extrait en VO ».
 
 ### 1.6 Inversion de dépendance
 Extraction SQL pipeline → `infrastructure/db/queries/` faite.
