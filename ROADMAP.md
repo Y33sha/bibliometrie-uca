@@ -1,5 +1,23 @@
 # Roadmap transmission DSI
 
+## Priorisation (ordre d'attaque)
+
+Synthèse de l'audit DSI (avril 2026) — ROI décroissant (impact / effort) :
+
+1. **§1.7b** — Lever les 14 `ignore_imports` pipeline. Effort faible, débloque la testabilité unitaire des `normalize_*` et fige la cohérence DDD avant transmission.
+2. **§2.10** — Découper les 4 fichiers backend monolithiques (`queries/publications.py` 1140 LOC, `queries/persons.py` 711, `repositories/person_repository.py` 665, `queries/stats.py` 630). Effort moyen, impact maintenabilité + testabilité.
+3. **§2.1 +§2.2** — Remonter `fail_under` de 49 → 60+ en ciblant `infrastructure/db/queries/*` (unitaires). Effort moyen, réduit le risque de régression en prod.
+4. **§2.7.4** — Découper les 3 routes Svelte > 1000 LOC (`admin/structures` 1572, `admin/persons` 1263, `publications/[id]` 1132). Effort moyen, impact UX + maintenabilité.
+5. **§2.7.3** — Généraliser les types OpenAPI aux ~29 endpoints restants (~88 interfaces locales à éliminer). Effort moyen, impact cohérence front/back.
+6. **§2.6** — `CONTRIBUTING.md` + descriptions OpenAPI. Effort faible, impact onboarding DSI.
+7. **§2.7.5** — Amorcer des tests frontend (Vitest composables + Playwright parcours critiques). Nouveau.
+8. **§2.4** — Convention `NNN_down.sql` pour rollbacks d'urgence. Effort très faible, résilience prod.
+9. **§2.11** — Migration psycopg2 → psycopg3 (fin de support annoncée ~2025). Effort moyen, sécurité long terme.
+
+Les chantiers `§1.1`, `§1.2`, `§1.6`, `§1.8`, `§2.3`, `§2.5`, `§2.9`, ainsi que le **Chantier fonctionnalités**, restent en fil rouge et ne figurent pas dans cette priorisation.
+
+---
+
 ## Chantier transition DDD
 
 Architecture hexagonale en place : 4 couches `domain/`, `application/`,
@@ -227,6 +245,36 @@ API + logique métier.
   les composants qui la consomment. ~88 interfaces locales à
   éliminer progressivement.
 
+#### 2.7.4 Découpe des routes monolithiques — nouveau
+Audit : 3 routes dépassent 1000 LOC et mêlent UI + état + appels API +
+logique métier. Coût de lecture et d'onboarding élevé, surface à bug
+étendue, impossible à tester en l'état.
+- [ ] `admin/structures/+page.svelte` (**1572 LOC**) — extraire :
+  modales CRUD, recherche facettée, logique d'arborescence
+  parent/enfant (est_tutelle_de / est_partenaire_de) en composables
+  + sous-composants.
+- [ ] `admin/persons/+page.svelte` (**1263 LOC**) — extraire : modale
+  fusion, formulaire identifiants (ORCID/idHAL), dropdown de détachement
+  d'authorships.
+- [ ] `publications/[id]/+page.svelte` (**1132 LOC**) — extraire :
+  sections authorships, journaux, topics, affiliations en composants
+  autonomes.
+- Méthode : pas de bulk, découper à l'occasion des prochaines touches
+  fonctionnelles sur chaque route. Cible : aucun fichier `+page.svelte`
+  au-dessus de ~600 LOC.
+
+#### 2.7.5 Tests frontend — nouveau
+Audit : 0 test frontend (ni unit ni e2e). `svelte-check` couvre les
+types mais pas le comportement. Un bug régressif sur un composant admin
+n'est détecté qu'en UI manuel.
+- [ ] Installer **Vitest** + `@testing-library/svelte` pour tester les
+  composables (`useDebouncedSearch`, `useFacets`, `useUrlFilters`,
+  `usePaginatedFetch`, `useColumnVisibility`) — ce sont les zones
+  métier et les plus réutilisées.
+- [ ] Installer **Playwright** pour 2-3 parcours e2e critiques :
+  login admin, recherche publication, fusion de personnes.
+- [ ] Ajouter au pre-commit + CI une fois une baseline établie.
+
 ### 2.8 Observabilité et robustesse production
 - [x] **Structured logs JSON** : `infrastructure/log.py` émet en JSON
   par défaut (un record = une ligne), prêts pour Loki/ELK/fluentd.
@@ -254,6 +302,41 @@ API + logique métier.
   `domain/names.py`, SQL dans `admin_person_duplicates.py`) — à
   unifier si la logique diverge.
 
+### 2.10 Découpe des modules backend monolithiques — nouveau
+Audit : 4 fichiers concentrent une part disproportionnée de la logique
+SQL ; impossible de tester une fonction isolée sans charger tout le
+fichier. Cible : aucun fichier au-dessus de ~400 LOC dans `queries/`
+et `repositories/`.
+- [ ] `infrastructure/db/queries/publications.py` (**1140 LOC**) —
+  scinder par thème : `publications_read.py` (list, find_by_*),
+  `publications_facets.py` (le `_PublicationFacetsBuilder` et ses
+  `_facet_*`), `publications_merge.py` (JSONB, priorités sources,
+  topics, OA status).
+- [ ] `infrastructure/db/queries/persons.py` (**711 LOC**) — scinder :
+  `persons_read.py`, `persons_facets.py`, `persons_write.py`.
+- [ ] `infrastructure/repositories/person_repository.py` (**665 LOC**)
+  — scinder : `person_repository_read.py` (find_by_*),
+  `person_repository_write.py` (batch ops, merge).
+- [ ] `infrastructure/db/queries/stats.py` (**630 LOC**) — scinder par
+  type d'agrégat (publications / personnes / laboratoires / time
+  series).
+- Règle future : quand un fichier `queries/*` ou `repositories/*`
+  dépasse 500 LOC, scinder dans le même chantier.
+
+### 2.11 Migration psycopg2 → psycopg3 — nouveau
+`psycopg2-binary` est en fin de support (upstream a déclaré psycopg3
+comme successeur, maintenance minimale sur psycopg2). Migration
+naturelle : psycopg3 supporte les `row_factory` typés (dict_row,
+class_row), ce qui rendrait le SQL brut plus sûr côté Python sans
+introduire d'ORM.
+- [ ] Audit des points de contact (connexion, curseurs, `RealDictCursor`,
+  gestion transactionnelle, `execute_batch`).
+- [ ] Migration en une passe (pas de double run) — pas de versions
+  compatibles en parallèle.
+- [ ] Profiter du chantier pour typer les rows retournées via
+  `row_factory` dans les repositories critiques (Person, Publication,
+  Structure).
+
 ---
 
 ## Chantier fonctionnalités
@@ -277,7 +360,5 @@ Le détail est dans `TODO_LAURA.md`. Grands axes :
 **SQLAlchemy Core** (pas ORM), pour la construction dynamique de requêtes. SQLAlchemy a deux couches : Core (query builder, paramétrage sûr, abstraction du dialecte) et ORM (mapping objets-tables). Tu peux utiliser Core sans ORM : tu écris des requêtes via son API Python (select(...).where(...).order_by(...)) qui génèrent du SQL sûr et paramétré, mais tu n'introduis pas de couche ORM. C'est particulièrement utile pour les requêtes dynamiques avec filtres variables. Tes requêtes "statiques" peuvent rester en SQL brut pour la clarté.
 
 **Alembic** pour les migrations. Indépendant de l'usage d'ORM. Tu continues à écrire ton schéma en SQL brut si tu veux, mais tu versionnes et orchestres les migrations avec Alembic. Gain de maintenance réel, coût d'adoption modéré.
-
-**psycopg3** avec des curseurs typés, si tu n'y es pas déjà. Psycopg3 supporte bien les Row classes typées et les dict_row, ce qui rend ton SQL brut plus sûr à manipuler côté Python sans introduire un ORM.
 
 **environnement virtuel**?
