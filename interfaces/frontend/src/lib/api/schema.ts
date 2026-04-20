@@ -620,6 +620,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/addresses/{addr_id}/assign-structure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assign Structure
+         * @description Assigne manuellement une structure à une adresse.
+         */
+        post: operations["assign_structure_api_addresses__addr_id__assign_structure_post"];
+        /**
+         * Unassign Structure
+         * @description Supprime l'assignation manuelle d'une structure.
+         */
+        delete: operations["unassign_structure_api_addresses__addr_id__assign_structure_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/address-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Address Stats
+         * @description Compteurs d'adresses par détection/validation pour une structure.
+         */
+        get: operations["admin_address_stats_api_admin_address_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/feedback/stats": {
         parameters: {
             query?: never;
@@ -675,30 +719,6 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/addresses/{addr_id}/assign-structure": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Assign Structure
-         * @description Assigne manuellement une structure à une adresse.
-         */
-        post: operations["assign_structure_api_addresses__addr_id__assign_structure_post"];
-        /**
-         * Unassign Structure
-         * @description Supprime l'assignation manuelle d'une structure.
-         */
-        delete: operations["unassign_structure_api_addresses__addr_id__assign_structure_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -816,26 +836,6 @@ export interface paths {
          * @description Dashboard labo : publications par an + répartition OA.
          */
         get: operations["get_laboratory_dashboard_api_laboratories__lab_id__dashboard_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/address-stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Stats
-         * @description Compteurs d'adresses par détection/validation pour une structure.
-         */
-        get: operations["get_stats_api_admin_address_stats_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1231,7 +1231,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/persons/{person_id}/identifier": {
+    "/api/persons/{person_id}/identifiers": {
         parameters: {
             query?: never;
             header?: never;
@@ -1244,14 +1244,14 @@ export interface paths {
          * Add Person Identifier
          * @description Ajoute manuellement un identifiant (ORCID ou idHAL) à une personne.
          */
-        post: operations["add_person_identifier_api_persons__person_id__identifier_post"];
+        post: operations["add_person_identifier_api_persons__person_id__identifiers_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/persons/{person_id}/identifier/{id_type}/{id_value}": {
+    "/api/persons/{person_id}/identifiers/{id_type}/{id_value}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1265,7 +1265,7 @@ export interface paths {
          * Remove Person Identifier
          * @description Supprime un identifiant d'une personne.
          */
-        delete: operations["remove_person_identifier_api_persons__person_id__identifier__id_type___id_value__delete"];
+        delete: operations["remove_person_identifier_api_persons__person_id__identifiers__id_type___id_value__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1531,6 +1531,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/person-duplicates/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count Person Duplicates
+         * @description Comptage des paires candidates doublons-personnes.
+         */
+        get: operations["count_person_duplicates_api_admin_person_duplicates_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/person-duplicates/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Next Person Duplicate
+         * @description Renvoie la paire doublon-personne à la position offset.
+         */
+        get: operations["next_person_duplicate_api_admin_person_duplicates_next_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/person-duplicates/mark-distinct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Persons Distinct
+         * @description Marque deux personnes comme distinctes (non-doublon).
+         */
+        post: operations["mark_persons_distinct_api_admin_person_duplicates_mark_distinct_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/person-duplicates/conflicts/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count Person Conflict Pairs
+         * @description Nombre de paires de personnes en conflit sur des publications.
+         */
+        get: operations["count_person_conflict_pairs_api_admin_person_duplicates_conflicts_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/person-duplicates/conflicts/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Next Person Conflict
+         * @description Renvoie la paire en conflit à la position offset.
+         */
+        get: operations["next_person_conflict_api_admin_person_duplicates_conflicts_next_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/hal-problems/duplicate-accounts": {
         parameters: {
             query?: never;
@@ -1643,106 +1743,6 @@ export interface paths {
          * @description Publications affiliées UCA dans HAL mais pas dans OA/WoS.
          */
         get: operations["hal_affiliation_conflicts_api_hal_problems_affiliation_conflicts_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/person-duplicates/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Count Person Duplicates
-         * @description Comptage des paires candidates doublons-personnes.
-         */
-        get: operations["count_person_duplicates_api_admin_person_duplicates_count_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/person-duplicates/next": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Next Person Duplicate
-         * @description Renvoie la paire doublon-personne à la position offset.
-         */
-        get: operations["next_person_duplicate_api_admin_person_duplicates_next_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/person-duplicates/mark-distinct": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Mark Persons Distinct
-         * @description Marque deux personnes comme distinctes (non-doublon).
-         */
-        post: operations["mark_persons_distinct_api_admin_person_duplicates_mark_distinct_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/person-duplicates/conflicts/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Count Person Conflict Pairs
-         * @description Nombre de paires de personnes en conflit sur des publications.
-         */
-        get: operations["count_person_conflict_pairs_api_admin_person_duplicates_conflicts_count_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/person-duplicates/conflicts/next": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Next Person Conflict
-         * @description Renvoie la paire en conflit à la position offset.
-         */
-        get: operations["next_person_conflict_api_admin_person_duplicates_conflicts_next_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1886,6 +1886,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/perimeters/{perimeter_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Perimeter
+         * @description Met à jour un périmètre (nom, description, structures).
+         */
+        put: operations["update_perimeter_api_perimeters__perimeter_id__put"];
+        post?: never;
+        /**
+         * Delete Perimeter
+         * @description Supprime un périmètre (interdit si utilisé dans la config pipeline).
+         */
+        delete: operations["delete_perimeter_api_perimeters__perimeter_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/perimeters/{perimeter_id}/structures": {
         parameters: {
             query?: never;
@@ -1915,30 +1939,6 @@ export interface paths {
         post?: never;
         /** Remove Perimeter Structure */
         delete: operations["remove_perimeter_structure_api_perimeters__perimeter_id__structures__structure_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/perimeters/{perimeter_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Perimeter
-         * @description Met à jour un périmètre (nom, description, structures).
-         */
-        put: operations["update_perimeter_api_perimeters__perimeter_id__put"];
-        post?: never;
-        /**
-         * Delete Perimeter
-         * @description Supprime un périmètre (interdit si utilisé dans la config pipeline).
-         */
-        delete: operations["delete_perimeter_api_perimeters__perimeter_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3567,6 +3567,105 @@ export interface operations {
             };
         };
     };
+    assign_structure_api_addresses__addr_id__assign_structure_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                addr_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignStructureAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unassign_structure_api_addresses__addr_id__assign_structure_delete: {
+        parameters: {
+            query: {
+                structure_id: number;
+            };
+            header?: never;
+            path: {
+                addr_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_address_stats_api_admin_address_stats_get: {
+        parameters: {
+            query?: {
+                structure_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     feedback_stats_api_admin_feedback_stats_get: {
         parameters: {
             query: {
@@ -3642,74 +3741,6 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    assign_structure_api_addresses__addr_id__assign_structure_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                addr_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AssignStructureAction"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    unassign_structure_api_addresses__addr_id__assign_structure_delete: {
-        parameters: {
-            query: {
-                structure_id: number;
-            };
-            header?: never;
-            path: {
-                addr_id: number;
-            };
             cookie?: never;
         };
         requestBody?: never;
@@ -3885,37 +3916,6 @@ export interface operations {
             path: {
                 lab_id: number;
             };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_stats_api_admin_address_stats_get: {
-        parameters: {
-            query?: {
-                structure_id?: number | null;
-            };
-            header?: never;
-            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -4732,7 +4732,7 @@ export interface operations {
             };
         };
     };
-    add_person_identifier_api_persons__person_id__identifier_post: {
+    add_person_identifier_api_persons__person_id__identifiers_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -4767,7 +4767,7 @@ export interface operations {
             };
         };
     };
-    remove_person_identifier_api_persons__person_id__identifier__id_type___id_value__delete: {
+    remove_person_identifier_api_persons__person_id__identifiers__id_type___id_value__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -5228,6 +5228,143 @@ export interface operations {
             };
         };
     };
+    count_person_duplicates_api_admin_person_duplicates_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    next_person_duplicate_api_admin_person_duplicates_next_get: {
+        parameters: {
+            query?: {
+                skip?: string;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_persons_distinct_api_admin_person_duplicates_mark_distinct_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkPersonsDistinct"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    count_person_conflict_pairs_api_admin_person_duplicates_conflicts_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    next_person_conflict_api_admin_person_duplicates_conflicts_next_get: {
+        parameters: {
+            query?: {
+                skip?: string;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     hal_duplicate_accounts_api_hal_problems_duplicate_accounts_get: {
         parameters: {
             query?: {
@@ -5382,143 +5519,6 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    count_person_duplicates_api_admin_person_duplicates_count_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    next_person_duplicate_api_admin_person_duplicates_next_get: {
-        parameters: {
-            query?: {
-                skip?: string;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    mark_persons_distinct_api_admin_person_duplicates_mark_distinct_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MarkPersonsDistinct"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    count_person_conflict_pairs_api_admin_person_duplicates_conflicts_count_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    next_person_conflict_api_admin_person_duplicates_conflicts_next_get: {
-        parameters: {
-            query?: {
-                skip?: string;
-                offset?: number;
             };
             header?: never;
             path?: never;
@@ -5745,6 +5745,72 @@ export interface operations {
             };
         };
     };
+    update_perimeter_api_perimeters__perimeter_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                perimeter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PerimeterUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_perimeter_api_perimeters__perimeter_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                perimeter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     add_perimeter_structure_api_perimeters__perimeter_id__structures_post: {
         parameters: {
             query?: never;
@@ -5787,72 +5853,6 @@ export interface operations {
             path: {
                 perimeter_id: number;
                 structure_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_perimeter_api_perimeters__perimeter_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                perimeter_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PerimeterUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_perimeter_api_perimeters__perimeter_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                perimeter_id: number;
             };
             cookie?: never;
         };

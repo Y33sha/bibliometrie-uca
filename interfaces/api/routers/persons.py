@@ -206,7 +206,7 @@ async def person_addresses(
 ORCID_RE = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
 
 
-@router.post("/api/persons/{person_id}/identifier")
+@router.post("/api/persons/{person_id}/identifiers")
 async def add_person_identifier(person_id: int, data: AddIdentifier) -> Any:
     """Ajoute manuellement un identifiant (ORCID ou idHAL) à une personne."""
     if data.id_type not in ("orcid", "idhal", "idref"):
@@ -254,7 +254,7 @@ async def add_person_identifier(person_id: int, data: AddIdentifier) -> Any:
         return result
 
 
-@router.delete("/api/persons/{person_id}/identifier/{id_type}/{id_value:path}")
+@router.delete("/api/persons/{person_id}/identifiers/{id_type}/{id_value:path}")
 async def remove_person_identifier(person_id: int, id_type: str, id_value: str) -> Any:
     """Supprime un identifiant d'une personne."""
     with get_cursor() as (cur, _conn):

@@ -33,7 +33,7 @@ export function addIdentifier(
 	personId: number,
 	body: Record<string, unknown>
 ): Promise<unknown> {
-	return post(`/api/persons/${personId}/identifier`, body);
+	return post(`/api/persons/${personId}/identifiers`, body);
 }
 
 export function deleteIdentifier(
@@ -41,7 +41,7 @@ export function deleteIdentifier(
 	idType: string,
 	idValue: string
 ): Promise<null> {
-	const url = `/api/persons/${personId}/identifier/${idType}/${encodeURIComponent(idValue)}`;
+	const url = `/api/persons/${personId}/identifiers/${idType}/${encodeURIComponent(idValue)}`;
 	return del<null>(url);
 }
 
