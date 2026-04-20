@@ -22,7 +22,7 @@ import time
 from typing import Any
 
 import requests
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from infrastructure.api_limits import OPENALEX_DELAY
 from infrastructure.app_config import get_openalex_api_key, get_openalex_email

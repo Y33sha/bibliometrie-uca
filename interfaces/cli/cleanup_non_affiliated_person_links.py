@@ -18,8 +18,6 @@ import argparse
 import os
 from typing import Any
 
-from psycopg2.extras import RealDictCursor
-
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 
@@ -82,7 +80,7 @@ def main() -> None:
 
     conn = get_connection()
     conn.autocommit = False
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     counts = count_affected(cur)
     total = sum(counts.values())

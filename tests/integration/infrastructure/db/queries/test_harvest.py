@@ -81,7 +81,7 @@ class TestFetchHalPersonsMissingIdentifiers:
         )
 
         rows = fetch_hal_persons_missing_identifiers(db)
-        # Le curseur de test est RealDictCursor → rows de dicts
+        # Le curseur de test est dict_row → rows de dicts
         ids = [r["id"] for r in rows]
         assert missing_orcid in ids
         assert missing_idref in ids

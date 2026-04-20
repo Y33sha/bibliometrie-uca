@@ -21,12 +21,10 @@ import argparse
 import logging
 from typing import Any
 
-from psycopg2.extras import RealDictCursor
-
 from application.publications import find_or_create, update_sources
-from infrastructure.repositories import publication_repository
 from domain.normalize import normalize_text
 from infrastructure.db.connection import get_connection
+from infrastructure.repositories import publication_repository
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
@@ -123,7 +121,7 @@ def rebuild_doc(cur: Any, doc: Any) -> Any:
 
 
 def fix(conn: Any, dry_run: Any = False) -> Any:
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     bad = find_bad_merges(cur)
     log.info(f"{len(bad)} publications avec fusion chapitre/ouvrage erronée")

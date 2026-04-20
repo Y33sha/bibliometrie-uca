@@ -15,9 +15,10 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
 import time
+from collections.abc import Callable
 from typing import Any
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
 from application.pipeline.normalize.base import SourceNormalizer
@@ -26,7 +27,6 @@ from application.ports.normalize_scanr import ScanrNormalizeQueries
 from application.ports.staging import StagingQueries
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
-from collections.abc import Callable
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
@@ -59,9 +59,7 @@ def get_title(doc: dict) -> str | None:
     return title
 
 
-def upsert_publisher(
-    cur: Any, doc: dict, *, journal_repo: JournalRepository
-) -> int | None:
+def upsert_publisher(cur: Any, doc: dict, *, journal_repo: JournalRepository) -> int | None:
     publisher_name = (doc.get("source") or {}).get("publisher")
     if not publisher_name:
         return None
@@ -327,9 +325,7 @@ def process_authors(
         )
 
         if addr_parts:
-            address_linker.link(
-                cur, sa_id, addr_parts, countries=detected_countries or None
-            )
+            address_linker.link(cur, sa_id, addr_parts, countries=detected_countries or None)
 
 
 # =============================================================
@@ -374,9 +370,7 @@ def process_work(
         t0 = time.perf_counter()
         publication_id = queries.get_scanr_publication_id(cur, scanr_id)
         if not publication_id:
-            publication_id = find_publication(
-                cur, doc, journal_id, scanr_id, pub_repo=pub_repo
-            )
+            publication_id = find_publication(cur, doc, journal_id, scanr_id, pub_repo=pub_repo)
         timings["publication"] = time.perf_counter() - t0
 
         if publication_id:
@@ -389,9 +383,7 @@ def process_work(
         timings["scanr_doc"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        process_authors(
-            cur, queries, doc, source_publication_id, address_linker=address_linker
-        )
+        process_authors(cur, queries, doc, source_publication_id, address_linker=address_linker)
         timings["authors"] = time.perf_counter() - t0
 
         if publication_id:

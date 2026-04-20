@@ -11,9 +11,8 @@ import csv
 import os
 import time
 
-import psycopg2
+import psycopg
 import requests
-from psycopg2.extras import RealDictCursor
 
 from infrastructure.api_limits import UNPAYWALL_DELAY
 from infrastructure.settings import settings
@@ -55,8 +54,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    conn = psycopg2.connect(**settings.db_args)
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    conn = psycopg.connect(**settings.db_args)
+    cur = conn.cursor()
 
     # Récupérer les pubs avec DOI, statut connu, et source OpenAlex
     query = """

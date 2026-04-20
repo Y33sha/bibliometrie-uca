@@ -15,8 +15,6 @@ import argparse
 import os
 from typing import Any
 
-from psycopg2.extras import RealDictCursor
-
 from application.publications import merge_publications
 from domain.names import names_compatible
 from domain.normalize import normalize_name
@@ -107,7 +105,7 @@ def main() -> None:
 
     conn = get_connection()
     conn.autocommit = False
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     try:
         groups = find_duplicate_groups(cur)

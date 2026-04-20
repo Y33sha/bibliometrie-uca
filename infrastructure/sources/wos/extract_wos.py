@@ -21,7 +21,7 @@ import time
 from typing import Any
 
 import requests
-from psycopg2.extras import Json, execute_values
+from psycopg.types.json import Jsonb as Json
 
 from infrastructure.api_limits import WOS_DELAY, WOS_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
@@ -143,7 +143,7 @@ def insert_batch(conn: Any, batch: list[tuple]) -> Any:
     """
     query = """
         INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-        VALUES %s
+        VALUES (%s, %s, %s, %s::jsonb, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             raw_data = CASE
                 WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
@@ -155,7 +155,7 @@ def insert_batch(conn: Any, batch: list[tuple]) -> Any:
             last_seen_at = now()
     """
     with conn.cursor() as cur:
-        execute_values(cur, query, batch, template="(%s, %s, %s, %s::jsonb, %s)")
+        cur.executemany(query, batch)
     conn.commit()
 
 

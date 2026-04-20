@@ -16,7 +16,7 @@ import os
 import time
 
 import requests
-from psycopg2.extras import Json, RealDictCursor
+from psycopg.types.json import Jsonb as Json
 
 from infrastructure.api_limits import OPENALEX_DELAY
 from infrastructure.app_config import get_openalex_api_key, get_openalex_email
@@ -59,7 +59,7 @@ def main() -> None:
     args = parser.parse_args()
 
     conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
     init_auth(api_key=get_openalex_api_key(cur), email=get_openalex_email(cur))
 
     # Détecter les works avec exactement 100 authorships dans le staging

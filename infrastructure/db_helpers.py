@@ -1,13 +1,13 @@
 from typing import Any
 
-"""Helpers pour l'acces aux rows psycopg2, compatibles tuple et RealDictCursor."""
+"""Helpers pour l'accès aux rows psycopg3, compatibles tuple et dict_row."""
 
 
 def rows_as_dicts(cur: Any) -> list[dict[str, Any]]:
     """`cur.fetchall()` mais garantit des dicts.
 
     Supporte les curseurs tuple (remappés via `cur.description`) et les
-    RealDictCursor (déjà dict-like, juste copiés en dict standard).
+    curseurs dict_row (déjà dict-like, juste copiés en dict standard).
     """
     rows = cur.fetchall()
     if not rows:
@@ -19,11 +19,11 @@ def rows_as_dicts(cur: Any) -> list[dict[str, Any]]:
 
 
 def row_val(row: Any, index_or_key: Any, default: Any = None) -> Any:
-    """Extrait une valeur d'une row psycopg2, quel que soit le type de curseur.
+    """Extrait une valeur d'une row psycopg3, quel que soit le type de curseur.
 
-    Supporte les tuples (accès par index) et les RealDictRow (accès par clé).
+    Supporte les tuples (accès par index) et les rows dict (accès par clé).
     Avec un index entier, tente d'abord l'accès par position, puis par
-    position dans les valeurs du dict si c'est un RealDictRow.
+    position dans les valeurs du dict si c'est une row dict.
     """
     if row is None:
         return default

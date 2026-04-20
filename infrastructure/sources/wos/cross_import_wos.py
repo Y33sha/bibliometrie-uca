@@ -15,7 +15,7 @@ import os
 import time
 
 import requests
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from infrastructure.api_limits import WOS_DELAY, WOS_PER_PAGE
 from infrastructure.app_config import get_api_base_urls, get_wos_api_key

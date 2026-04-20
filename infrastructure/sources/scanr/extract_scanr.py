@@ -15,7 +15,7 @@ import os
 import time
 from typing import Any
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from infrastructure.api_limits import SCANR_DELAY, SCANR_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
@@ -185,9 +185,7 @@ class ScanrExtractor(SourceExtractor):
         }
 
     def setup_logging(self, args: argparse.Namespace, config: dict[str, Any]) -> None:
-        self.logger.info(
-            f"=== Extraction ScanR : {len(config['affiliation_ids'])} structures ==="
-        )
+        self.logger.info(f"=== Extraction ScanR : {len(config['affiliation_ids'])} structures ===")
 
     def extract_all(
         self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set

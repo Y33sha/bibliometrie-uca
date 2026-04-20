@@ -7,7 +7,7 @@ compter les résultats, relancer, vérifier que les compteurs n'ont pas bougé.
 Ces tests tournent sur la base bibliometrie_test (cf. conftest.py).
 """
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import update_sources
@@ -428,7 +428,9 @@ def _run_normalize_hal(cur):
     """Exécute la normalisation HAL via un curseur tuple (comme le vrai script)."""
     import logging
 
-    plain_cur = cur.connection.cursor()
+    from psycopg.rows import tuple_row
+
+    plain_cur = cur.connection.cursor(row_factory=tuple_row)
     from application.pipeline.normalize.normalize_hal import process_work
     from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
@@ -734,7 +736,9 @@ def _insert_wos_staging(cur, docs):
 def _run_normalize_wos(cur):
     import logging
 
-    plain_cur = cur.connection.cursor()
+    from psycopg.rows import tuple_row
+
+    plain_cur = cur.connection.cursor(row_factory=tuple_row)
     from application.pipeline.normalize.normalize_wos import process_record
     from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries

@@ -10,7 +10,6 @@ from typing import Any
 import bcrypt
 from fastapi import Cookie, HTTPException
 from fastapi.staticfiles import StaticFiles
-from psycopg2.extras import RealDictCursor
 
 from infrastructure.settings import settings
 
@@ -73,7 +72,8 @@ def require_admin(session: str | None = Cookie(None, alias="session")) -> Any:
 
 # ----- DB helpers -----
 
-from psycopg2.pool import ThreadedConnectionPool
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 _pool = None
 
@@ -84,8 +84,12 @@ def _get_pool() -> Any:
         db_args = settings.db_args
         if os.environ.get("BIBLIOMETRIE_SANDBOX") == "1":
             db_args["dbname"] = "bibliometrie_sandbox"
-        _pool = ThreadedConnectionPool(
-            minconn=settings.db_pool_min, maxconn=settings.db_pool_max, **db_args
+        _pool = ConnectionPool(
+            conninfo="",
+            min_size=settings.db_pool_min,
+            max_size=settings.db_pool_max,
+            kwargs={**db_args, "row_factory": dict_row},
+            open=True,
         )
     return _pool
 
@@ -95,7 +99,7 @@ def get_cursor() -> Any:
     pool = _get_pool()
     conn = pool.getconn()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn.cursor() as cur:
             yield cur, conn
         conn.commit()
     except Exception:

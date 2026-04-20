@@ -23,7 +23,7 @@ import time
 from typing import Any
 
 import requests
-from psycopg2.extras import Json, RealDictCursor
+from psycopg.types.json import Jsonb as Json
 
 from domain.publication import extract_hal_id_from_url
 from infrastructure.api_limits import HAL_DELAY
@@ -297,7 +297,7 @@ def main() -> Any:
     args = parser.parse_args()
 
     conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     # 1. Trouver les HAL IDs manquants depuis OpenAlex et ScanR
     log.info("Recherche des works OpenAlex avec primary_location HAL...")

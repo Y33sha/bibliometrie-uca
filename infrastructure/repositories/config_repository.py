@@ -62,7 +62,7 @@ class PgConfigRepository:
             """
             UPDATE perimeters
             SET structure_ids = array_append(structure_ids, %s)
-            WHERE id = %s AND NOT structure_ids @> ARRAY[%s]
+            WHERE id = %s AND NOT structure_ids @> ARRAY[%s::int]
             RETURNING id
             """,
             (structure_id, perimeter_id, structure_id),

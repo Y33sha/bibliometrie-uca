@@ -1,14 +1,12 @@
 """Query service : SQL du normaliseur Web of Science.
 
 Appelé par `application/pipeline/normalize/normalize_wos.py`. Regroupe les
-UPSERT batch (via `psycopg2.extras.execute_values`) sur `source_persons`,
+UPSERT batch (via `cur.executemany`) sur `source_persons`,
 `source_structures`, `source_authorships`, `source_authorship_addresses`,
 et les lectures/préchargements de caches.
 """
 
 from typing import Any
-
-from psycopg2.extras import execute_values
 
 
 def upsert_wos_source_publication(
@@ -124,12 +122,11 @@ def upsert_wos_source_persons_batch(
     """Batch UPSERT de `source_persons` WoS. Retourne `[(id, source_id), ...]`."""
     if not values:
         return []
-    execute_values(
-        cur,
+    cur.executemany(
         """
         INSERT INTO source_persons
             (source, source_id, full_name, last_name, first_name, orcid, source_ids)
-        VALUES %s
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
             full_name = EXCLUDED.full_name,
@@ -162,11 +159,10 @@ def upsert_addresses_batch(cur: Any, values: list[tuple[str, str]]) -> None:
     """INSERT INTO addresses ON CONFLICT DO NOTHING pour un batch `(raw_text, normalized_text)`."""
     if not values:
         return
-    execute_values(
-        cur,
+    cur.executemany(
         """
         INSERT INTO addresses (raw_text, normalized_text)
-        VALUES %s
+        VALUES (%s, %s)
         ON CONFLICT (md5(raw_text)) DO NOTHING
         """,
         values,
@@ -186,14 +182,13 @@ def upsert_wos_source_authorships_batch(cur: Any, values: list[tuple[Any, ...]])
     """Batch UPSERT de `source_authorships` WoS."""
     if not values:
         return
-    execute_values(
-        cur,
+    cur.executemany(
         """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              is_corresponding, author_name_normalized,
              source_struct_ids, roles, raw_author_name)
-        VALUES %s
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
             is_corresponding = EXCLUDED.is_corresponding OR source_authorships.is_corresponding,
             author_name_normalized = COALESCE(
@@ -229,11 +224,10 @@ def insert_source_authorship_addresses_batch(cur: Any, values: list[tuple[int, i
     """Batch INSERT de liens `source_authorship_addresses`."""
     if not values:
         return
-    execute_values(
-        cur,
+    cur.executemany(
         """
         INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
-        VALUES %s
+        VALUES (%s, %s)
         ON CONFLICT (source_authorship_id, address_id) DO NOTHING
         """,
         values,
