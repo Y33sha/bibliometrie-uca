@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 from application.authorships import propagate_uca_for_addresses
+from domain.ports.authorship_repository import AuthorshipRepository
 from infrastructure.repositories import address_repository
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,12 @@ logger = logging.getLogger(__name__)
 
 
 def review_structure_link(
-    cur: Any, address_id: int, structure_id: int, is_confirmed: bool | None
+    cur: Any,
+    address_id: int,
+    structure_id: int,
+    is_confirmed: bool | None,
+    *,
+    authorship_repo: AuthorshipRepository,
 ) -> None:
     """Upsert le lien address ↔ structure (validation manuelle).
 
@@ -36,11 +42,16 @@ def review_structure_link(
         repo.reset_manual_link(address_id, structure_id)
     else:
         repo.upsert_structure_link(address_id, structure_id, is_confirmed)
-    propagate_uca_for_addresses(cur, [address_id])
+    propagate_uca_for_addresses(cur, [address_id], repo=authorship_repo)
 
 
 def batch_review_structure_link(
-    cur: Any, address_ids: list[int], structure_id: int, is_confirmed: bool | None
+    cur: Any,
+    address_ids: list[int],
+    structure_id: int,
+    is_confirmed: bool | None,
+    *,
+    authorship_repo: AuthorshipRepository,
 ) -> int:
     """Comme review_structure_link mais sur un lot d'adresses.
 
@@ -57,11 +68,17 @@ def batch_review_structure_link(
         repo.batch_upsert_structure_links(address_ids, structure_id, is_confirmed)
         updated = len(address_ids)
 
-    propagate_uca_for_addresses(cur, address_ids)
+    propagate_uca_for_addresses(cur, address_ids, repo=authorship_repo)
     return updated
 
 
-def unassign_manual_structure(cur: Any, address_id: int, structure_id: int) -> bool:
+def unassign_manual_structure(
+    cur: Any,
+    address_id: int,
+    structure_id: int,
+    *,
+    authorship_repo: AuthorshipRepository,
+) -> bool:
     """Supprime uniquement le lien manuel (matched_form_id IS NULL) entre
     une adresse et une structure. Les liens auto-détectés et leurs is_confirmed
     ne sont pas touchés (contrairement à review_structure_link(None)).
@@ -70,7 +87,7 @@ def unassign_manual_structure(cur: Any, address_id: int, structure_id: int) -> b
     Retourne True si un lien manuel a été supprimé, False sinon.
     """
     deleted = address_repository(cur).delete_manual_structure_link(address_id, structure_id)
-    propagate_uca_for_addresses(cur, [address_id])
+    propagate_uca_for_addresses(cur, [address_id], repo=authorship_repo)
     return deleted
 
 

@@ -102,13 +102,17 @@ normalisation explicite émerge.
   Chaque nettoyage = une ligne retirée de `ignore_imports` dans
   `pyproject.toml`.
   - Services applicatifs → ports/adapters pour `infrastructure.
-    repositories.*` (1/7 fait : **config**. Reste 6 : journals,
-    authorships, publications, addresses, persons, structures).
-    Pattern : service accepte `repo: XRepository` en kwarg ; callers
-    (routers, tests) créent l'instance via `X_repository(cur)` et la
-    passent. Pas de Depends FastAPI (pattern `with get_cursor()`
-    conservé). Ports déjà définis dans `domain/ports/*_repository.py`,
-    implémentations dans `infrastructure/repositories/*`.
+    repositories.*` (2/7 faits : **config**, **authorships**. Reste 5 :
+    journals, publications, addresses, persons, structures). Pattern :
+    service accepte `repo: XRepository` en kwarg ; callers (routers,
+    tests) créent l'instance via `X_repository(cur)` et la passent.
+    Pas de Depends FastAPI (pattern `with get_cursor()` conservé).
+    Ports déjà définis dans `domain/ports/*_repository.py`,
+    implémentations dans `infrastructure/repositories/*`. Pour les
+    services appelés depuis d'autres services (ex: `authorships`
+    depuis `addresses`/`persons`), le kwarg se propage (`authorship_repo`
+    dans les signatures d'addresses/persons), verrouillé en attendant
+    leur propre refacto.
   - Pipeline normalize_* → déplacer ou porter les helpers infrastructure :
     `link_addresses` (4), `mark_staging_done` (5), `StepTimer` (2),
     `resolve_zenodo_doi`/`is_zenodo_doi` (2), `extract_nnt_from_openalex`/

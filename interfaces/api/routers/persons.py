@@ -18,6 +18,7 @@ from application.authorships import exclude_authorship as _exclude_authorship
 from application.persons import (
     add_identifier as _add_identifier,
 )
+from infrastructure.repositories import authorship_repository
 from application.persons import (
     assign_orphan_authorship as _assign_orphan,
 )
@@ -303,7 +304,7 @@ async def reassign_identifier(ident_id: int, body: ReassignIdentifier) -> Any:
 async def toggle_authorship_excluded(authorship_id: int) -> Any:
     """Marque un authorship comme exclu."""
     with get_cursor() as (cur, _conn):
-        row = _exclude_authorship(cur, authorship_id)
+        row = _exclude_authorship(cur, authorship_id, repo=authorship_repository(cur))
         return {"id": row["id"], "excluded": row["excluded"]}
 
 
@@ -429,6 +430,7 @@ async def detach_authorships(person_id: int, body: DetachAuthorships) -> Any:
                 {"source": a.source, "authorship_id": a.authorship_id} for a in body.authorships
             ],
             name_form=body.name_form,
+            authorship_repo=authorship_repository(cur),
         )
 
 

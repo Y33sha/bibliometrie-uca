@@ -18,6 +18,12 @@ from application.authorships import (
     sync_person_id_from_source,
 )
 from domain.errors import NotFoundError, ValidationError
+from infrastructure.repositories import authorship_repository
+
+
+@pytest.fixture
+def repo(db):
+    return authorship_repository(db)
 
 # ── Helpers ────────────────────────────────────────────────────────
 
@@ -179,7 +185,7 @@ class TestExcludeAuthorship:
     """exclude_authorship marque l'authorship vérité comme excluded et
     détache les source_authorships qui y référaient."""
 
-    def test_marks_excluded_and_detaches_sources(self, db):
+    def test_marks_excluded_and_detaches_sources(self, db, repo):
         person_id = _create_person(db)
         pub_id = _create_publication(db)
         sp_id = _create_source_publication(db, pub_id)
@@ -189,7 +195,7 @@ class TestExcludeAuthorship:
             db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        result = exclude_authorship(db, authorship_id)
+        result = exclude_authorship(db, authorship_id, repo=repo)
 
         assert result is not None
         assert result["excluded"] is True
@@ -203,11 +209,11 @@ class TestExcludeAuthorship:
         assert row["person_id"] is None
         assert row["authorship_id"] is None
 
-    def test_raises_not_found(self, db):
+    def test_raises_not_found(self, db, repo):
         with pytest.raises(NotFoundError):
-            exclude_authorship(db, 999999)
+            exclude_authorship(db, 999999, repo=repo)
 
-    def test_does_not_detach_unrelated_sources(self, db):
+    def test_does_not_detach_unrelated_sources(self, db, repo):
         """Les sources d'autres personnes sur la même pub ne sont pas touchées."""
         pub_id = _create_publication(db)
         sp_id = _create_source_publication(db, pub_id)
@@ -221,7 +227,7 @@ class TestExcludeAuthorship:
         sa1 = _create_source_authorship(db, sp_id, sp1, person_id=p1, authorship_id=a1)
         sa2 = _create_source_authorship(db, sp_id, sp2, person_id=p2, authorship_id=a2)
 
-        exclude_authorship(db, a1)
+        exclude_authorship(db, a1, repo=repo)
 
         # sa1 détachée
         db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa1,))
@@ -238,20 +244,20 @@ class TestDetachSource:
     """detach_source retire le lien FK d'une source_authorship vers l'authorship
     vérité. Supprime l'authorship vérité si plus aucune source ne l'atteste."""
 
-    def test_raises_on_invalid_source(self, db):
+    def test_raises_on_invalid_source(self, db, repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            detach_source(db, 1, "invalid_source")
+            detach_source(db, 1, "invalid_source", repo=repo)
 
-    def test_returns_false_if_no_authorship_linked(self, db):
+    def test_returns_false_if_no_authorship_linked(self, db, repo):
         pub_id = _create_publication(db)
         sp_id = _create_source_publication(db, pub_id)
         src_person_id = _create_source_person(db)
         # source_authorship sans authorship_id
         sa_id = _create_source_authorship(db, sp_id, src_person_id)
 
-        assert detach_source(db, sa_id, "hal") is False
+        assert detach_source(db, sa_id, "hal", repo=repo) is False
 
-    def test_deletes_authorship_when_last_source_removed(self, db):
+    def test_deletes_authorship_when_last_source_removed(self, db, repo):
         """Une seule source atteste l'authorship → le détacher supprime l'authorship."""
         person_id = _create_person(db)
         pub_id = _create_publication(db)
@@ -262,12 +268,12 @@ class TestDetachSource:
             db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        assert detach_source(db, sa_id, "hal") is True
+        assert detach_source(db, sa_id, "hal", repo=repo) is True
 
         db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
         assert db.fetchone() is None
 
-    def test_keeps_authorship_when_other_sources_remain(self, db):
+    def test_keeps_authorship_when_other_sources_remain(self, db, repo):
         """Deux sources attestent l'authorship → détacher une garde l'authorship."""
         person_id = _create_person(db)
         pub_id = _create_publication(db)
@@ -283,7 +289,7 @@ class TestDetachSource:
             db, sp_oa, p_oa, source="openalex", person_id=person_id, authorship_id=authorship_id
         )
 
-        assert detach_source(db, sa_hal, "hal") is False
+        assert detach_source(db, sa_hal, "hal", repo=repo) is False
 
         # Authorship toujours présente
         db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
@@ -292,7 +298,7 @@ class TestDetachSource:
         db.execute("SELECT authorship_id FROM source_authorships WHERE id = %s", (sa_hal,))
         assert db.fetchone()["authorship_id"] is None
 
-    def test_excluded_sources_do_not_keep_authorship_alive(self, db):
+    def test_excluded_sources_do_not_keep_authorship_alive(self, db, repo):
         """Si les autres sources sont marquées excluded, l'authorship doit être supprimée."""
         person_id = _create_person(db)
         pub_id = _create_publication(db)
@@ -314,7 +320,7 @@ class TestDetachSource:
             excluded=True,
         )
 
-        assert detach_source(db, sa_hal, "hal") is True
+        assert detach_source(db, sa_hal, "hal", repo=repo) is True
 
         db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
         assert db.fetchone() is None
@@ -327,18 +333,18 @@ class TestDeleteOrphanAuthorships:
     """delete_orphan_authorships supprime les authorships vérité d'une
     personne qui ne sont attestées par aucune source_authorship active."""
 
-    def test_deletes_authorship_without_source(self, db):
+    def test_deletes_authorship_without_source(self, db, repo):
         person_id = _create_person(db)
         pub_id = _create_publication(db)
         _create_authorship(db, pub_id, person_id)
 
-        n = delete_orphan_authorships(db, person_id)
+        n = delete_orphan_authorships(db, person_id, repo=repo)
 
         assert n == 1
         db.execute("SELECT id FROM authorships WHERE person_id = %s", (person_id,))
         assert db.fetchall() == []
 
-    def test_keeps_authorship_with_attesting_source(self, db):
+    def test_keeps_authorship_with_attesting_source(self, db, repo):
         person_id = _create_person(db)
         pub_id = _create_publication(db)
         sp_id = _create_source_publication(db, pub_id)
@@ -348,13 +354,13 @@ class TestDeleteOrphanAuthorships:
             db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        n = delete_orphan_authorships(db, person_id)
+        n = delete_orphan_authorships(db, person_id, repo=repo)
 
         assert n == 0
         db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
         assert db.fetchone() is not None
 
-    def test_ignores_excluded_sources(self, db):
+    def test_ignores_excluded_sources(self, db, repo):
         """Si la seule source attestante est excluded, l'authorship est orpheline."""
         person_id = _create_person(db)
         pub_id = _create_publication(db)
@@ -370,15 +376,15 @@ class TestDeleteOrphanAuthorships:
             excluded=True,
         )
 
-        n = delete_orphan_authorships(db, person_id)
+        n = delete_orphan_authorships(db, person_id, repo=repo)
 
         assert n == 1
 
-    def test_returns_zero_when_no_authorships(self, db):
+    def test_returns_zero_when_no_authorships(self, db, repo):
         person_id = _create_person(db)
-        assert delete_orphan_authorships(db, person_id) == 0
+        assert delete_orphan_authorships(db, person_id, repo=repo) == 0
 
-    def test_scoped_to_person(self, db):
+    def test_scoped_to_person(self, db, repo):
         """Ne touche que les authorships de la personne demandée."""
         p1 = _create_person(db, "Dupont", "Jean")
         p2 = _create_person(db, "Martin", "Sophie")
@@ -387,7 +393,7 @@ class TestDeleteOrphanAuthorships:
         pub2 = _create_publication(db, title="Autre")
         _create_authorship(db, pub2, p2)
 
-        n = delete_orphan_authorships(db, p1)
+        n = delete_orphan_authorships(db, p1, repo=repo)
 
         assert n == 1
         db.execute("SELECT id FROM authorships WHERE person_id = %s", (p2,))
@@ -402,11 +408,11 @@ class TestMoveAuthorshipsForSource:
     publication à une autre, quand un split_bad_merges relie une
     source_authorship à une autre publication."""
 
-    def test_raises_on_invalid_source(self, db):
+    def test_raises_on_invalid_source(self, db, repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            move_authorships_for_source(db, "invalid", [1], 1, 2)
+            move_authorships_for_source(db, "invalid", [1], 1, 2, repo=repo)
 
-    def test_moves_authorship_to_target_pub(self, db):
+    def test_moves_authorship_to_target_pub(self, db, repo):
         person_id = _create_person(db)
         pub1 = _create_publication(db, title="Pub 1")
         pub2 = _create_publication(db, title="Pub 2")
@@ -417,12 +423,14 @@ class TestMoveAuthorshipsForSource:
             db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        move_authorships_for_source(db, "hal", [sa_id], from_pub_id=pub1, to_pub_id=pub2)
+        move_authorships_for_source(
+            db, "hal", [sa_id], from_pub_id=pub1, to_pub_id=pub2, repo=repo
+        )
 
         db.execute("SELECT publication_id FROM authorships WHERE id = %s", (authorship_id,))
         assert db.fetchone()["publication_id"] == pub2
 
-    def test_noop_if_authorship_not_on_source_pub(self, db):
+    def test_noop_if_authorship_not_on_source_pub(self, db, repo):
         """Si l'authorship est déjà ailleurs, pas de changement."""
         person_id = _create_person(db)
         pub1 = _create_publication(db, title="Pub 1")
@@ -436,7 +444,9 @@ class TestMoveAuthorshipsForSource:
             db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        move_authorships_for_source(db, "hal", [sa_id], from_pub_id=pub1, to_pub_id=pub3)
+        move_authorships_for_source(
+            db, "hal", [sa_id], from_pub_id=pub1, to_pub_id=pub3, repo=repo
+        )
 
         db.execute("SELECT publication_id FROM authorships WHERE id = %s", (authorship_id,))
         assert db.fetchone()["publication_id"] == pub2  # inchangé
@@ -449,11 +459,11 @@ class TestSyncPersonIdFromSource:
     """sync_person_id_from_source propage le person_id d'une source vers
     l'authorship vérité, sans créer de doublon (publication, person)."""
 
-    def test_raises_on_invalid_source(self, db):
+    def test_raises_on_invalid_source(self, db, repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            sync_person_id_from_source(db, "invalid", [1])
+            sync_person_id_from_source(db, "invalid", [1], repo=repo)
 
-    def test_sets_person_id_on_authorship(self, db):
+    def test_sets_person_id_on_authorship(self, db, repo):
         person_id = _create_person(db)
         pub_id = _create_publication(db)
         sp_id = _create_source_publication(db, pub_id)
@@ -464,13 +474,13 @@ class TestSyncPersonIdFromSource:
             db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        n = sync_person_id_from_source(db, "hal", [sa_id])
+        n = sync_person_id_from_source(db, "hal", [sa_id], repo=repo)
 
         assert n == 1
         db.execute("SELECT person_id FROM authorships WHERE id = %s", (authorship_id,))
         assert db.fetchone()["person_id"] == person_id
 
-    def test_skips_if_already_equal(self, db):
+    def test_skips_if_already_equal(self, db, repo):
         """Si person_id est déjà égal, pas de mise à jour."""
         person_id = _create_person(db)
         pub_id = _create_publication(db)
@@ -481,9 +491,9 @@ class TestSyncPersonIdFromSource:
             db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        assert sync_person_id_from_source(db, "hal", [sa_id]) == 0
+        assert sync_person_id_from_source(db, "hal", [sa_id], repo=repo) == 0
 
-    def test_skips_if_source_person_id_is_null(self, db):
+    def test_skips_if_source_person_id_is_null(self, db, repo):
         """Si la source n'a pas de person_id, pas de propagation."""
         pub_id = _create_publication(db)
         sp_id = _create_source_publication(db, pub_id)
@@ -493,9 +503,9 @@ class TestSyncPersonIdFromSource:
             db, sp_id, src_person_id, person_id=None, authorship_id=authorship_id
         )
 
-        assert sync_person_id_from_source(db, "hal", [sa_id]) == 0
+        assert sync_person_id_from_source(db, "hal", [sa_id], repo=repo) == 0
 
-    def test_skips_on_conflict_with_existing_authorship(self, db):
+    def test_skips_on_conflict_with_existing_authorship(self, db, repo):
         """Si une autre authorship a déjà (pub, person), la sync est bloquée
         pour préserver l'unicité."""
         p1 = _create_person(db, "Dupont", "Jean")
@@ -513,7 +523,7 @@ class TestSyncPersonIdFromSource:
             db, sp_id, src_person_id, person_id=p1, authorship_id=orphan
         )
 
-        n = sync_person_id_from_source(db, "hal", [sa_id])
+        n = sync_person_id_from_source(db, "hal", [sa_id], repo=repo)
 
         assert n == 0  # bloqué par l'existence de (pub_id, p1)
 
@@ -533,18 +543,18 @@ class TestPropagateUcaForAddresses:
         _set_config(db, "perimeter_persons", "uca")
         return uca_id
 
-    def test_noop_on_empty_address_ids(self, db):
+    def test_noop_on_empty_address_ids(self, db, repo):
         self._setup_uca(db)
-        propagate_uca_for_addresses(db, [])
+        propagate_uca_for_addresses(db, [], repo=repo)
         # Pas d'assertion négative utile : on vérifie juste qu'aucune exception
 
-    def test_noop_if_no_perimeter_configured(self, db):
+    def test_noop_if_no_perimeter_configured(self, db, repo):
         """Si aucun périmètre configuré, la fonction sort sans rien faire."""
         addr_id = _create_address(db)
         # Aucun set_config perimeter_persons
-        propagate_uca_for_addresses(db, [addr_id])
+        propagate_uca_for_addresses(db, [addr_id], repo=repo)
 
-    def test_sets_in_perimeter_when_address_confirmed(self, db):
+    def test_sets_in_perimeter_when_address_confirmed(self, db, repo):
         uca_id = self._setup_uca(db)
         person_id = _create_person(db)
         pub_id = _create_publication(db)
@@ -558,7 +568,7 @@ class TestPropagateUcaForAddresses:
         _link_address_structure(db, addr_id, uca_id, is_confirmed=True)
         _link_sa_address(db, sa_id, addr_id)
 
-        propagate_uca_for_addresses(db, [addr_id])
+        propagate_uca_for_addresses(db, [addr_id], repo=repo)
 
         db.execute(
             "SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = %s",
@@ -576,7 +586,7 @@ class TestPropagateUcaForAddresses:
         assert a["in_perimeter"] is True
         assert a["structure_ids"] == [uca_id]
 
-    def test_unsets_in_perimeter_when_address_rejected(self, db):
+    def test_unsets_in_perimeter_when_address_rejected(self, db, repo):
         """Si l'adresse est rejetée (is_confirmed=False), la structure ne compte pas."""
         uca_id = self._setup_uca(db)
         person_id = _create_person(db)
@@ -598,7 +608,7 @@ class TestPropagateUcaForAddresses:
         _link_address_structure(db, addr_id, uca_id, is_confirmed=False)
         _link_sa_address(db, sa_id, addr_id)
 
-        propagate_uca_for_addresses(db, [addr_id])
+        propagate_uca_for_addresses(db, [addr_id], repo=repo)
 
         db.execute(
             "SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = %s",
@@ -613,27 +623,27 @@ class TestPropagateUcaForAddresses:
 
 
 class TestSetSourceAuthorshipExcluded:
-    def test_raises_on_invalid_source(self, db):
+    def test_raises_on_invalid_source(self, db, repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            set_source_authorship_excluded(db, 1, "invalid", True)
+            set_source_authorship_excluded(db, 1, "invalid", True, repo=repo)
 
-    def test_raises_not_found(self, db):
+    def test_raises_not_found(self, db, repo):
         with pytest.raises(NotFoundError):
-            set_source_authorship_excluded(db, 999999, "hal", True)
+            set_source_authorship_excluded(db, 999999, "hal", True, repo=repo)
 
-    def test_marks_excluded(self, db):
+    def test_marks_excluded(self, db, repo):
         person_id = _create_person(db)
         pub_id = _create_publication(db)
         sp_id = _create_source_publication(db, pub_id)
         src_person_id = _create_source_person(db)
         sa_id = _create_source_authorship(db, sp_id, src_person_id, person_id=person_id)
 
-        set_source_authorship_excluded(db, sa_id, "hal", True)
+        set_source_authorship_excluded(db, sa_id, "hal", True, repo=repo)
 
         db.execute("SELECT excluded FROM source_authorships WHERE id = %s", (sa_id,))
         assert db.fetchone()["excluded"] is True
 
-    def test_unmark_excluded_does_not_touch_authorship(self, db):
+    def test_unmark_excluded_does_not_touch_authorship(self, db, repo):
         """Remettre excluded=False ne doit pas toucher à l'authorship vérité."""
         person_id = _create_person(db)
         pub_id = _create_publication(db)
@@ -649,12 +659,12 @@ class TestSetSourceAuthorshipExcluded:
             excluded=True,
         )
 
-        set_source_authorship_excluded(db, sa_id, "hal", False)
+        set_source_authorship_excluded(db, sa_id, "hal", False, repo=repo)
 
         db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
         assert db.fetchone() is not None  # authorship vérité toujours là
 
-    def test_exclude_triggers_detach_source(self, db):
+    def test_exclude_triggers_detach_source(self, db, repo):
         """Exclure la seule source attestante doit supprimer l'authorship vérité."""
         person_id = _create_person(db)
         pub_id = _create_publication(db)
@@ -665,7 +675,7 @@ class TestSetSourceAuthorshipExcluded:
             db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        set_source_authorship_excluded(db, sa_id, "hal", True)
+        set_source_authorship_excluded(db, sa_id, "hal", True, repo=repo)
 
         db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
         assert db.fetchone() is None  # authorship vérité supprimée

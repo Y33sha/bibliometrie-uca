@@ -25,6 +25,12 @@ from application.persons import (
     update_name,
 )
 from domain.errors import NotFoundError, ValidationError
+from infrastructure.repositories import authorship_repository
+
+
+@pytest.fixture
+def authorship_repo(db):
+    return authorship_repository(db)
 
 # ── Helpers ────────────────────────────────────────────────────────
 
@@ -398,7 +404,7 @@ class TestBatchAssignOrphanAuthorships:
 
 
 class TestDetachAuthorships:
-    def test_detaches_and_removes_truth_if_orphan(self, db):
+    def test_detaches_and_removes_truth_if_orphan(self, db, authorship_repo):
         person_id = _insert_person(db)
         pub_id = _insert_publication(db)
         sp_id = _insert_source_publication(db, pub_id)
@@ -418,6 +424,7 @@ class TestDetachAuthorships:
             db,
             person_id,
             authorships=[{"source": "hal", "authorship_id": sa_id}],
+            authorship_repo=authorship_repo,
         )
 
         assert result["detached"] == 1
@@ -429,12 +436,18 @@ class TestDetachAuthorships:
         db.execute("SELECT id FROM authorships WHERE id = %s", (auth_id,))
         assert db.fetchone() is None
 
-    def test_cleans_name_form_when_no_remaining(self, db):
+    def test_cleans_name_form_when_no_remaining(self, db, authorship_repo):
         person_id = create_person(db, "Dupont", "Jean")
         # add_name_form simulé via create_person
 
         # Pas de source_authorship portant "dupont jean" → la forme est nettoyée
-        result = detach_authorships(db, person_id, authorships=[], name_form="dupont jean")
+        result = detach_authorships(
+            db,
+            person_id,
+            authorships=[],
+            name_form="dupont jean",
+            authorship_repo=authorship_repo,
+        )
         assert result["cleaned_form"] is True
 
         db.execute("SELECT id FROM person_name_forms WHERE name_form = 'dupont jean'")
@@ -444,7 +457,7 @@ class TestDetachAuthorships:
             db.execute("SELECT person_ids FROM person_name_forms WHERE name_form = 'dupont jean'")
             assert person_id not in (db.fetchone()["person_ids"] or [])
 
-    def test_keeps_name_form_if_another_authorship_uses_it(self, db):
+    def test_keeps_name_form_if_another_authorship_uses_it(self, db, authorship_repo):
         person_id = create_person(db, "Dupont", "Jean")
         pub_id = _insert_publication(db)
         sp_id = _insert_source_publication(db, pub_id)
@@ -454,7 +467,13 @@ class TestDetachAuthorships:
             db, sp_id, sp_person, person_id=person_id, author_name_normalized="dupont jean"
         )
 
-        result = detach_authorships(db, person_id, authorships=[], name_form="dupont jean")
+        result = detach_authorships(
+            db,
+            person_id,
+            authorships=[],
+            name_form="dupont jean",
+            authorship_repo=authorship_repo,
+        )
 
         assert result["cleaned_form"] is False
 

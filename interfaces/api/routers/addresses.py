@@ -11,6 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 from application import addresses as addresses_service
 from infrastructure.db.queries import addresses as addr_queries
+from infrastructure.repositories import authorship_repository
 from interfaces.api.deps import get_cursor, require_admin
 from interfaces.api.models import (
     BatchReviewAction,
@@ -97,7 +98,11 @@ async def review_address(addr_id: int, action: ReviewAction) -> Any:
     """Confirme, rejette ou reset le lien adresse ↔ structure."""
     with get_cursor() as (cur, _conn):
         addresses_service.review_structure_link(
-            cur, addr_id, action.structure_id, action.is_confirmed
+            cur,
+            addr_id,
+            action.structure_id,
+            action.is_confirmed,
+            authorship_repo=authorship_repository(cur),
         )
         structures = addr_queries.get_address_structures(cur, addr_id)
         link = addr_queries.get_structure_link(cur, addr_id, action.structure_id)
@@ -114,7 +119,11 @@ async def batch_review(data: BatchReviewAction) -> Any:
     """Confirme/rejette/reset en batch."""
     with get_cursor() as (cur, _conn):
         updated = addresses_service.batch_review_structure_link(
-            cur, data.address_ids, data.structure_id, data.is_confirmed
+            cur,
+            data.address_ids,
+            data.structure_id,
+            data.is_confirmed,
+            authorship_repo=authorship_repository(cur),
         )
         return {"updated": updated}
 

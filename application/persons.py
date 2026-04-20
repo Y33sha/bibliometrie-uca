@@ -16,6 +16,7 @@ from application.audit import emit_event
 from application.authorships import delete_orphan_authorships
 from domain.errors import ConflictError, ValidationError
 from domain.person import compute_person_name_forms
+from domain.ports.authorship_repository import AuthorshipRepository
 from domain.sources import ALL_SOURCES_SET
 from infrastructure.repositories import person_repository
 
@@ -310,7 +311,12 @@ def batch_assign_orphan_authorships(cur: Any, person_id: int, sa_ids: list[int])
 
 
 def detach_authorships(
-    cur: Any, person_id: int, authorships: list[dict], name_form: str | None = None
+    cur: Any,
+    person_id: int,
+    authorships: list[dict],
+    name_form: str | None = None,
+    *,
+    authorship_repo: AuthorshipRepository,
 ) -> dict:
     """Détache un lot d'authorships sources d'une personne et nettoie les
     authorships vérité devenues orphelines.
@@ -325,7 +331,7 @@ def detach_authorships(
         if a["source"] in ALL_SOURCES_SET:
             repo.unlink_authorship(person_id, a["source"], a["authorship_id"])
 
-    deleted = delete_orphan_authorships(cur, person_id)
+    deleted = delete_orphan_authorships(cur, person_id, repo=authorship_repo)
 
     cleaned_form = False
     if name_form and repo.count_authorships_with_name_form(person_id, name_form) == 0:

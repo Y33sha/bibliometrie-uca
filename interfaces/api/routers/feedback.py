@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from application import addresses as addresses_service
+from infrastructure.repositories import authorship_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import AssignStructureAction
 
@@ -211,7 +212,9 @@ async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Structure not found")
 
-        addresses_service.review_structure_link(cur, addr_id, action.structure_id, True)
+        addresses_service.review_structure_link(
+            cur, addr_id, action.structure_id, True, authorship_repo=authorship_repository(cur)
+        )
         return {"id": addr_id, "structure_id": action.structure_id, "status": "assigned"}
 
 
@@ -261,7 +264,9 @@ async def feedback_rerun() -> Any:
 async def unassign_structure(addr_id: int, structure_id: int = Query(...)) -> Any:
     """Supprime l'assignation manuelle d'une structure."""
     with get_cursor() as (cur, conn):
-        deleted = addresses_service.unassign_manual_structure(cur, addr_id, structure_id)
+        deleted = addresses_service.unassign_manual_structure(
+            cur, addr_id, structure_id, authorship_repo=authorship_repository(cur)
+        )
         return {"deleted": deleted}
 
 
