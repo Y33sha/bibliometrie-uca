@@ -121,8 +121,8 @@ class PgJournalRepository:
             SELECT nf.journal_id FROM journal_name_forms nf
             JOIN journals j ON j.id = nf.journal_id
             WHERE nf.form_normalized = %s
-              AND (nf.publisher_id IS NOT DISTINCT FROM %s
-                   OR nf.publisher_id IS NULL OR %s IS NULL)
+              AND (nf.publisher_id IS NOT DISTINCT FROM %s::int
+                   OR nf.publisher_id IS NULL OR %s::int IS NULL)
             ORDER BY (j.eissn IS NOT NULL) DESC, j.id ASC
             LIMIT 1
             """,

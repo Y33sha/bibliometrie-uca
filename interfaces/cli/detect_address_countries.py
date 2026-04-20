@@ -139,12 +139,9 @@ def main() -> None:
 
 
 def _apply_batch(cur: Any, batch: Any, column: Any) -> Any:
-    from psycopg2.extras import execute_values
-
-    execute_values(
-        cur,
-        f"UPDATE addresses SET {column} = data.countries FROM (VALUES %s) AS data(id, countries) WHERE addresses.id = data.id",
-        batch,
+    cur.executemany(
+        f"UPDATE addresses SET {column} = %s WHERE id = %s",
+        [(countries, addr_id) for addr_id, countries in batch],
     )
 
 

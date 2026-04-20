@@ -9,7 +9,7 @@ restent autorisées dans les routers (convention du projet).
 
 from typing import Any
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 from pydantic import ValidationError as PydanticValidationError
 
 from application.audit import emit_event
@@ -104,9 +104,7 @@ def update_structure(
     return repo.update_structure_fields(structure_id, sql_fragments, params)
 
 
-def delete_structure(
-    cur: Any, structure_id: int, *, repo: StructureRepository
-) -> None:
+def delete_structure(cur: Any, structure_id: int, *, repo: StructureRepository) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas."""
     row = repo.delete_structure(structure_id)
     if not row:
@@ -139,9 +137,7 @@ def create_relation(
     )
 
 
-def delete_relation(
-    cur: Any, relation_id: int, *, repo: StructureRepository
-) -> None:
+def delete_relation(cur: Any, relation_id: int, *, repo: StructureRepository) -> None:
     """Supprime une relation. Lève NotFoundError si elle n'existe pas."""
     row = repo.delete_relation(relation_id)
     if not row:
@@ -183,9 +179,7 @@ def create_name_form(
     )
 
 
-def update_name_form(
-    cur: Any, form_id: int, *, fields: dict, repo: StructureRepository
-) -> dict:
+def update_name_form(cur: Any, form_id: int, *, fields: dict, repo: StructureRepository) -> dict:
     """Met à jour une forme de nom. Retourne la ligne modifiée.
 
     Lève NotFoundError si la forme n'existe pas.
@@ -216,9 +210,7 @@ def update_name_form(
     return repo.update_name_form_fields(form_id, sql_fragments, params)
 
 
-def delete_name_form(
-    cur: Any, form_id: int, *, repo: StructureRepository
-) -> None:
+def delete_name_form(cur: Any, form_id: int, *, repo: StructureRepository) -> None:
     """Supprime une forme de nom. Lève NotFoundError si elle n'existe pas."""
     row = repo.delete_name_form(form_id)
     if not row:

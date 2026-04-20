@@ -261,15 +261,14 @@ async def metrics() -> Any:
     (champs `method`, `path`, `status`, `duration_ms` en JSON structuré).
     """
     pool = _get_pool()
-    # Les attributs _pool et _used sont des internals de psycopg2.ThreadedConnectionPool,
-    # mais stables depuis des années et sans API publique équivalente.
-    available = len(getattr(pool, "_pool", []))
-    in_use = len(getattr(pool, "_used", {}))
+    stats = pool.get_stats()
+    pool_size = stats.get("pool_size", 0)
+    available = stats.get("pool_available", 0)
     return {
         "db_pool": {
-            "minconn": pool.minconn,
-            "maxconn": pool.maxconn,
-            "in_use": in_use,
+            "minconn": pool.min_size,
+            "maxconn": pool.max_size,
+            "in_use": pool_size - available,
             "available": available,
         },
     }

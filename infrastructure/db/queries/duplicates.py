@@ -123,8 +123,8 @@ def get_publications_basic(cur: Any, pub_ids: list[int]) -> dict[int, Any]:
     """Résout un lot de publications (existence check + métadonnées de base)."""
     cur.execute(
         "SELECT id, doi, journal_id, oa_status::text, language, container_title "
-        "FROM publications WHERE id IN %s",
-        (tuple(pub_ids),),
+        "FROM publications WHERE id = ANY(%s)",
+        (list(pub_ids),),
     )
     return {r["id"]: r for r in cur.fetchall()}
 
@@ -432,8 +432,6 @@ def next_person_conflict(
     cur: Any, conn: Any, *, skip_pairs: set, offset: int
 ) -> dict[str, Any] | None:
     """Renvoie la paire en conflit à la position offset (ou None)."""
-    import psycopg2.extras
-
     cur.execute(CONFLICT_PAIRS_SQL)
     skipped = 0
     for row in cur:
@@ -448,7 +446,7 @@ def next_person_conflict(
         conflict_pubs = []
         for c in row["conflicts"]:
             pub_id = c["pub_id"]
-            cur2 = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cur2 = conn.cursor()
             cur2.execute(
                 "SELECT id, title, pub_year, doc_type::text FROM publications WHERE id = %s",
                 (pub_id,),

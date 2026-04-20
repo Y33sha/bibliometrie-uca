@@ -20,7 +20,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
 from application.pipeline.normalize.base import SourceNormalizer
@@ -192,9 +192,7 @@ def is_repository_source(work: dict) -> bool:
 # =============================================================
 
 
-def upsert_publisher(
-    cur: Any, work: dict, *, journal_repo: JournalRepository
-) -> int | None:
+def upsert_publisher(cur: Any, work: dict, *, journal_repo: JournalRepository) -> int | None:
     """Extrait et trouve/crée l'éditeur depuis le work OpenAlex."""
     location = work.get("primary_location") or {}
     source = location.get("source") or {}
@@ -623,9 +621,7 @@ def process_work(
             journal_id = None
         else:
             publisher_id = upsert_publisher(cur, work, journal_repo=journal_repo)
-            journal_id = upsert_journal(
-                cur, work, publisher_id, journal_repo=journal_repo
-            )
+            journal_id = upsert_journal(cur, work, publisher_id, journal_repo=journal_repo)
 
         pub_meta = extract_pub_metadata(work, journal_id)
 

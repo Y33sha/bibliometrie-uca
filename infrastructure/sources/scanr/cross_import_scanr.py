@@ -18,7 +18,7 @@ import os
 import time
 
 import requests
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from infrastructure.api_limits import SCANR_DELAY
 from infrastructure.app_config import get_scanr_credentials

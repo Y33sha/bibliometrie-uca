@@ -4,8 +4,6 @@ propagations vers source_publications/publications.countries.
 
 from typing import Any
 
-from psycopg2.extras import execute_values
-
 
 class PgAddressRepository:
     """Accès PostgreSQL à l'agrégat Address."""
@@ -79,12 +77,11 @@ class PgAddressRepository:
         structure_id: int,
         is_confirmed: bool,
     ) -> None:
-        """Upsert en batch via execute_values."""
-        execute_values(
-            self._cur,
+        """Upsert en batch via executemany."""
+        self._cur.executemany(
             """
             INSERT INTO address_structures (address_id, structure_id, is_confirmed)
-            VALUES %s
+            VALUES (%s, %s, %s)
             ON CONFLICT (address_id, structure_id) DO UPDATE
                 SET is_confirmed = EXCLUDED.is_confirmed
             """,

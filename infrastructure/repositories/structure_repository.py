@@ -4,7 +4,7 @@
 
 from typing import Any
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 
 class PgStructureRepository:
