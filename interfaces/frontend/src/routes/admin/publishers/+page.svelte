@@ -4,16 +4,8 @@
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 
-	interface Publisher {
-		id: number;
-		name: string;
-		openalex_id: string | null;
-		country: string | null;
-		doi_prefix: string | null;
-		is_predatory: boolean;
-		journal_count: number;
-		pub_count: number;
-	}
+	import type { components } from '$lib/api/schema';
+	type Publisher = components['schemas']['PublisherListItem'];
 
 	// Modal édition
 	let editModal: { id: number; name: string; country: string; doi_prefix: string; is_predatory: boolean; notes: string } | null = $state(null);
