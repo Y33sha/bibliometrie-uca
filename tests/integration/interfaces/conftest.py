@@ -69,14 +69,16 @@ for router_module in [
         "authorships",
         "admin_duplicates",
         "admin_person_duplicates",
+        "admin_feedback",
+        "admin_pipeline",
         "pub_stats",
-        "feedback",
         "config",
         "publishers",
         "journals",
         "docs",
         "auth",
         "hal_problems",
+        "perimeters",
     ]
 ]:
     if router_module and hasattr(router_module, "get_cursor"):

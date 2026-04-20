@@ -38,17 +38,18 @@ configure_root_logging()
 from interfaces.api.routers import (  # noqa: E402
     addresses,
     admin_duplicates,
+    admin_feedback,
     admin_person_duplicates,
+    admin_pipeline,
     auth,
     authorships,
     config,
     docs,
-    feedback,
     hal_problems,
     journals,
     laboratories,
+    perimeters,
     persons,
-    pipeline,
     pub_stats,
     publications,
     publishers,
@@ -289,7 +290,7 @@ app.include_router(pub_stats.router)
 app.include_router(publications.router)
 app.include_router(admin_duplicates.router)
 app.include_router(addresses.router)
-app.include_router(feedback.router)
+app.include_router(admin_feedback.router)
 app.include_router(laboratories.router)
 app.include_router(structures.router)
 app.include_router(authorships.router)
@@ -298,9 +299,10 @@ app.include_router(admin_person_duplicates.router)
 app.include_router(hal_problems.router)
 app.include_router(docs.router)
 app.include_router(config.router)
+app.include_router(perimeters.router)
 app.include_router(publishers.router)
 app.include_router(journals.router)
-app.include_router(pipeline.router)
+app.include_router(admin_pipeline.router)
 
 
 if __name__ == "__main__":
