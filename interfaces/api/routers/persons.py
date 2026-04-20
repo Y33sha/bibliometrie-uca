@@ -18,7 +18,7 @@ from application.authorships import exclude_authorship as _exclude_authorship
 from application.persons import (
     add_identifier as _add_identifier,
 )
-from infrastructure.repositories import authorship_repository
+from infrastructure.repositories import authorship_repository, person_repository
 from application.persons import (
     assign_orphan_authorship as _assign_orphan,
 )
@@ -267,7 +267,9 @@ async def add_person_identifier(person_id: int, data: AddIdentifier) -> Any:
                 )
             was_reassigned = True
 
-        _add_identifier(cur, person_id, data.id_type, id_value, source="manual")
+        _add_identifier(
+            cur, person_id, data.id_type, id_value, source="manual", repo=person_repository(cur)
+        )
         result = {"added": True, "id_type": data.id_type, "id_value": id_value}
         if was_reassigned:
             result["reassigned"] = True
@@ -278,7 +280,7 @@ async def add_person_identifier(person_id: int, data: AddIdentifier) -> Any:
 async def remove_person_identifier(person_id: int, id_type: str, id_value: str) -> Any:
     """Supprime un identifiant d'une personne."""
     with get_cursor() as (cur, _conn):
-        _remove_identifier(cur, person_id, id_type, id_value)
+        _remove_identifier(cur, person_id, id_type, id_value, repo=person_repository(cur))
         return {"removed": True}
 
 
@@ -286,7 +288,7 @@ async def remove_person_identifier(person_id: int, id_type: str, id_value: str) 
 async def update_identifier_status(ident_id: int, body: UpdateIdentifierStatus) -> Any:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
     with get_cursor() as (cur, _conn):
-        row = _update_identifier_status(cur, ident_id, body.status)
+        row = _update_identifier_status(cur, ident_id, body.status, repo=person_repository(cur))
         return {"id": row["id"], "status": row["status"]}
 
 
@@ -296,7 +298,7 @@ async def reassign_identifier(ident_id: int, body: ReassignIdentifier) -> Any:
     with get_cursor() as (cur, _conn):
         if not admin_queries.person_exists(cur, body.person_id):
             raise HTTPException(status_code=404, detail="Personne cible introuvable")
-        _reassign_identifier(cur, ident_id, body.person_id)
+        _reassign_identifier(cur, ident_id, body.person_id, repo=person_repository(cur))
         return {"id": ident_id, "person_id": body.person_id, "status": "pending"}
 
 
@@ -312,7 +314,7 @@ async def toggle_authorship_excluded(authorship_id: int) -> Any:
 async def reject_person(person_id: int, body: RejectPerson) -> Any:
     """Marque/démarque une personne comme rejetée."""
     with get_cursor() as (cur, _conn):
-        _set_rejected(cur, person_id, body.rejected)
+        _set_rejected(cur, person_id, body.rejected, repo=person_repository(cur))
         return {"ok": True}
 
 
@@ -324,7 +326,7 @@ async def update_person_name(person_id: int, body: UpdatePersonName) -> Any:
     if not last_name:
         raise HTTPException(status_code=400, detail="Le nom est requis")
     with get_cursor() as (cur, _conn):
-        _update_name(cur, person_id, last_name, first_name)
+        _update_name(cur, person_id, last_name, first_name, repo=person_repository(cur))
         return {"ok": True}
 
 
@@ -343,7 +345,7 @@ async def merge_persons(person_id: int, body: MergePersons) -> Any:
         if source_id not in found:
             raise HTTPException(status_code=404, detail="Personne source introuvable")
 
-        _merge_person(cur, person_id, source_id)
+        _merge_person(cur, person_id, source_id, repo=person_repository(cur))
         return {"merged": True, "source_id": source_id, "target_id": person_id}
 
 
@@ -383,14 +385,16 @@ async def assign_orphan_authorship_endpoint(body: AssignOrphanAuthorship) -> Any
             fn = body.create_person.first_name.strip()
             if not ln:
                 raise HTTPException(status_code=400, detail="Nom requis")
-            person_id = _create_person(cur, ln, fn)
+            person_id = _create_person(cur, ln, fn, repo=person_repository(cur))
         elif not person_id:
             raise HTTPException(status_code=400, detail="person_id ou create_person requis")
 
         if not admin_queries.person_exists(cur, person_id):
             raise HTTPException(status_code=404, detail="Personne introuvable")
 
-        _assign_orphan(cur, person_id, body.source, body.authorship_id)
+        _assign_orphan(
+            cur, person_id, body.source, body.authorship_id, repo=person_repository(cur)
+        )
         return {"ok": True, "person_id": person_id}
 
 
@@ -405,7 +409,7 @@ async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships) ->
     with get_cursor() as (cur, _conn):
         if not admin_queries.person_exists(cur, person_id):
             raise HTTPException(status_code=404, detail="Personne introuvable")
-        assigned = _batch_assign_orphan(cur, person_id, sa_ids)
+        assigned = _batch_assign_orphan(cur, person_id, sa_ids, repo=person_repository(cur))
         return {"ok": True, "assigned": assigned}
 
 
@@ -430,6 +434,7 @@ async def detach_authorships(person_id: int, body: DetachAuthorships) -> Any:
                 {"source": a.source, "authorship_id": a.authorship_id} for a in body.authorships
             ],
             name_form=body.name_form,
+            repo=person_repository(cur),
             authorship_repo=authorship_repository(cur),
         )
 
@@ -443,7 +448,7 @@ async def detach_name_form(person_id: int, body: DetachNameForm) -> Any:
             raise HTTPException(
                 status_code=400, detail="Cette forme a encore des authorships liées"
             )
-        _detach_name_form(cur, person_id, body.name_form)
+        _detach_name_form(cur, person_id, body.name_form, repo=person_repository(cur))
         return {"detached": True}
 
 

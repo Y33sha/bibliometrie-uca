@@ -14,6 +14,7 @@ import requests
 
 from application.persons import add_identifier
 from application.ports.harvest import HarvestQueries
+from domain.ports.person_repository import PersonRepository
 
 HAL_AUTHOR_API = "https://api.archives-ouvertes.fr/ref/author/"
 
@@ -54,6 +55,7 @@ def run_harvest(
     queries: HarvestQueries,
     logger: Any,
     *,
+    person_repo: PersonRepository,
     dry_run: bool = False,
     rate_delay: float = 0.1,
 ) -> None:
@@ -67,7 +69,9 @@ def run_harvest(
             found += 1
             if not dry_run:
                 queries.update_source_person_idref(cur, a["ha_id"], idref)
-                add_identifier(cur, a["person_id"], "idref", idref, source="hal")
+                add_identifier(
+                    cur, a["person_id"], "idref", idref, source="hal", repo=person_repo
+                )
             logger.info(f"  {a['full_name']}: {idref}")
 
         if (i + 1) % 100 == 0:

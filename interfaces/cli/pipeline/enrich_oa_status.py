@@ -8,6 +8,7 @@ from infrastructure.api_limits import UNPAYWALL_DELAY
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.enrich import PgEnrichQueries
 from infrastructure.log import setup_logger
+from infrastructure.repositories import publication_repository
 
 logger = setup_logger("enrich_oa_unpaywall", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -28,6 +29,7 @@ def main() -> None:
             conn,
             PgEnrichQueries(),
             logger,
+            pub_repo=publication_repository(cur),
             limit=args.limit,
             dry_run=args.dry_run,
             rate_delay=UNPAYWALL_DELAY,

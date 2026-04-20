@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from application import structures as structures_service
+from infrastructure.repositories import structure_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import (
     NameFormCreate,
@@ -134,6 +135,7 @@ async def create_structure(data: StructureCreate) -> Any:
             rnsr_id=data.rnsr_id,
             hal_collection=data.hal_collection,
             api_ids=data.api_ids,
+            repo=structure_repository(cur),
         )
 
 
@@ -141,13 +143,15 @@ async def create_structure(data: StructureCreate) -> Any:
 async def update_structure(structure_id: int, data: StructureUpdate) -> Any:
     fields = data.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
-        return structures_service.update_structure(cur, structure_id, fields=fields)
+        return structures_service.update_structure(
+            cur, structure_id, fields=fields, repo=structure_repository(cur)
+        )
 
 
 @router.delete("/api/structures/{structure_id}")
 async def delete_structure(structure_id: int) -> Any:
     with get_cursor() as (cur, conn):
-        structures_service.delete_structure(cur, structure_id)
+        structures_service.delete_structure(cur, structure_id, repo=structure_repository(cur))
         return {"deleted": True}
 
 
@@ -159,6 +163,7 @@ async def create_relation(data: RelationCreate) -> Any:
             parent_id=data.parent_id,
             child_id=data.child_id,
             relation_type=data.relation_type,
+            repo=structure_repository(cur),
         )
         if row is None:
             return {"status": "already_exists"}
@@ -168,7 +173,7 @@ async def create_relation(data: RelationCreate) -> Any:
 @router.delete("/api/structure-relations/{relation_id}")
 async def delete_relation(relation_id: int) -> Any:
     with get_cursor() as (cur, conn):
-        structures_service.delete_relation(cur, relation_id)
+        structures_service.delete_relation(cur, relation_id, repo=structure_repository(cur))
         return {"deleted": True}
 
 
@@ -192,6 +197,7 @@ async def create_name_form(data: NameFormCreate) -> Any:
             is_word_boundary=data.is_word_boundary,
             is_excluding=data.is_excluding,
             requires_context_of=data.requires_context_of,
+            repo=structure_repository(cur),
         )
 
 
@@ -199,13 +205,15 @@ async def create_name_form(data: NameFormCreate) -> Any:
 async def update_name_form(form_id: int, data: NameFormUpdate) -> Any:
     fields = data.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
-        return structures_service.update_name_form(cur, form_id, fields=fields)
+        return structures_service.update_name_form(
+            cur, form_id, fields=fields, repo=structure_repository(cur)
+        )
 
 
 @router.delete("/api/name-forms/{form_id}")
 async def delete_name_form(form_id: int) -> Any:
     with get_cursor() as (cur, conn):
-        structures_service.delete_name_form(cur, form_id)
+        structures_service.delete_name_form(cur, form_id, repo=structure_repository(cur))
         return {"deleted": True}
 
 

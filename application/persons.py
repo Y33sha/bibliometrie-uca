@@ -17,8 +17,8 @@ from application.authorships import delete_orphan_authorships
 from domain.errors import ConflictError, ValidationError
 from domain.person import compute_person_name_forms
 from domain.ports.authorship_repository import AuthorshipRepository
+from domain.ports.person_repository import PersonRepository
 from domain.sources import ALL_SOURCES_SET
-from infrastructure.repositories import person_repository
 
 __all__ = [
     # Domain re-export pour les callers existants (scripts, tests)
@@ -48,29 +48,38 @@ __all__ = [
 # ── Création ──
 
 
-def create_person(cur: Any, last_name: str, first_name: str = "") -> int:
+def create_person(
+    cur: Any, last_name: str, first_name: str = "", *, repo: PersonRepository
+) -> int:
     """Crée une personne et retourne son id."""
-    repo = person_repository(cur)
     person_id = repo.create(last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
     return person_id
 
 
-def set_rejected(cur: Any, person_id: int, rejected: bool) -> None:
+def set_rejected(
+    cur: Any, person_id: int, rejected: bool, *, repo: PersonRepository
+) -> None:
     """Marque ou démarque une personne comme rejetée (fausse entité).
 
     Lève NotFoundError si la personne n'existe pas.
     """
-    person_repository(cur).set_rejected(person_id, rejected)
+    repo.set_rejected(person_id, rejected)
     emit_event(cur, "person.rejected", "person", person_id, {"rejected": rejected})
 
 
-def update_name(cur: Any, person_id: int, last_name: str, first_name: str) -> None:
+def update_name(
+    cur: Any,
+    person_id: int,
+    last_name: str,
+    first_name: str,
+    *,
+    repo: PersonRepository,
+) -> None:
     """Met à jour le nom/prénom d'une personne et rafraîchit ses formes de nom.
 
     Lève NotFoundError si la personne n'existe pas.
     """
-    repo = person_repository(cur)
     repo.update_name(person_id, last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
 
@@ -86,6 +95,7 @@ def link_authorship(
     *,
     source_person_id: int | None = None,
     has_hal_person_id: bool = False,
+    repo: PersonRepository,
 ) -> None:
     """Rattache une authorship source à une personne (pipeline).
 
@@ -94,7 +104,7 @@ def link_authorship(
     """
     if source not in ALL_SOURCES_SET:
         return
-    person_repository(cur).link_authorship(
+    repo.link_authorship(
         person_id,
         source,
         authorship_id,
@@ -103,7 +113,9 @@ def link_authorship(
     )
 
 
-def link_authorships(cur: Any, person_id: int, authorships: list[dict]) -> None:
+def link_authorships(
+    cur: Any, person_id: int, authorships: list[dict], *, repo: PersonRepository
+) -> None:
     """Rattache un groupe d'authorships à une personne (pipeline).
 
     Chaque dict doit avoir 'source' et 'authorship_id',
@@ -117,13 +129,16 @@ def link_authorships(cur: Any, person_id: int, authorships: list[dict]) -> None:
             a["authorship_id"],
             source_person_id=a.get("source_person_id"),
             has_hal_person_id=a.get("has_hal_person_id", False),
+            repo=repo,
         )
 
 
-def unlink_authorship(cur: Any, person_id: int, source: str, authorship_id: int) -> None:
+def unlink_authorship(
+    cur: Any, person_id: int, source: str, authorship_id: int, *, repo: PersonRepository
+) -> None:
     """Détache une authorship source d'une personne (met person_id à NULL)."""
     if source in ALL_SOURCES_SET:
-        person_repository(cur).unlink_authorship(person_id, source, authorship_id)
+        repo.unlink_authorship(person_id, source, authorship_id)
 
 
 # ── Identifiants ──
@@ -136,6 +151,8 @@ def add_identifier(
     id_value: str,
     source: str = "auto",
     status: str = "pending",
+    *,
+    repo: PersonRepository,
 ) -> None:
     """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
 
@@ -143,15 +160,22 @@ def add_identifier(
     (nouveau person_id, statut pending). Si 'pending' ou 'confirmed',
     ne fait rien.
     """
-    person_repository(cur).add_identifier(person_id, id_type, id_value, source, status)
+    repo.add_identifier(person_id, id_type, id_value, source, status)
 
 
-def remove_identifier(cur: Any, person_id: int, id_type: str, id_value: str) -> None:
+def remove_identifier(
+    cur: Any,
+    person_id: int,
+    id_type: str,
+    id_value: str,
+    *,
+    repo: PersonRepository,
+) -> None:
     """Supprime un identifiant d'une personne.
 
     Lève NotFoundError si l'identifiant n'existe pas.
     """
-    person_repository(cur).remove_identifier(person_id, id_type, id_value)
+    repo.remove_identifier(person_id, id_type, id_value)
     emit_event(
         cur,
         "person_identifier.removed",
@@ -161,13 +185,15 @@ def remove_identifier(cur: Any, person_id: int, id_type: str, id_value: str) -> 
     )
 
 
-def update_identifier_status(cur: Any, ident_id: int, status: str) -> dict:
+def update_identifier_status(
+    cur: Any, ident_id: int, status: str, *, repo: PersonRepository
+) -> dict:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
     Retourne la ligne {id, status} mise à jour.
     Lève NotFoundError si l'identifiant n'existe pas.
     """
-    row = person_repository(cur).update_identifier_status(ident_id, status)
+    row = repo.update_identifier_status(ident_id, status)
     emit_event(
         cur,
         "person_identifier.status_changed",
@@ -178,12 +204,14 @@ def update_identifier_status(cur: Any, ident_id: int, status: str) -> dict:
     return {"id": row["id"], "status": row["status"]}
 
 
-def reassign_identifier(cur: Any, ident_id: int, target_person_id: int) -> None:
+def reassign_identifier(
+    cur: Any, ident_id: int, target_person_id: int, *, repo: PersonRepository
+) -> None:
     """Réattribue un identifiant à une autre personne (status → pending).
 
     Lève NotFoundError si l'identifiant n'existe pas.
     """
-    person_repository(cur).reassign_identifier(ident_id, target_person_id)
+    repo.reassign_identifier(ident_id, target_person_id)
     emit_event(
         cur,
         "person_identifier.reassigned",
@@ -193,19 +221,23 @@ def reassign_identifier(cur: Any, ident_id: int, target_person_id: int) -> None:
     )
 
 
-def add_identifiers_from_authorships(cur: Any, person_id: int, authorships: list[dict]) -> None:
+def add_identifiers_from_authorships(
+    cur: Any, person_id: int, authorships: list[dict], *, repo: PersonRepository
+) -> None:
     """Ajoute les ORCID, idHAL et IdRef trouvés dans un groupe d'authorships."""
     seen = set()
     for a in authorships:
         if a.get("orcid") and ("orcid", a["orcid"]) not in seen:
-            add_identifier(cur, person_id, "orcid", a["orcid"])
+            add_identifier(cur, person_id, "orcid", a["orcid"], repo=repo)
             seen.add(("orcid", a["orcid"]))
         if a.get("idhal") and ("idhal", a["idhal"]) not in seen:
-            add_identifier(cur, person_id, "idhal", a["idhal"])
+            add_identifier(cur, person_id, "idhal", a["idhal"], repo=repo)
             seen.add(("idhal", a["idhal"]))
         if a.get("idref") and ("idref", a["idref"]) not in seen:
             idref_source = a.get("source", "hal")
-            add_identifier(cur, person_id, "idref", a["idref"], source=idref_source)
+            add_identifier(
+                cur, person_id, "idref", a["idref"], source=idref_source, repo=repo
+            )
             seen.add(("idref", a["idref"]))
 
 
@@ -216,24 +248,40 @@ def add_identifiers_from_authorships(cur: Any, person_id: int, authorships: list
 # La règle vit dans domain/person.py (logique pure, pas d'accès DB).
 
 
-def refresh_person_name_forms(cur: Any, person_id: int, last_name: str, first_name: str) -> None:
+def refresh_person_name_forms(
+    cur: Any,
+    person_id: int,
+    last_name: str,
+    first_name: str,
+    *,
+    repo: PersonRepository,
+) -> None:
     """Recalcule les formes de nom source 'persons' d'une personne.
 
     Shim : calcule les formes via le domaine et délègue au repository.
     """
     forms = compute_person_name_forms(last_name, first_name)
-    person_repository(cur).refresh_name_forms(person_id, forms)
+    repo.refresh_name_forms(person_id, forms)
 
 
-def add_name_form(cur: Any, person_id: int, full_name: str, source: str | None = None) -> None:
+def add_name_form(
+    cur: Any,
+    person_id: int,
+    full_name: str,
+    source: str | None = None,
+    *,
+    repo: PersonRepository,
+) -> None:
     """Ajoute une forme de nom à person_name_forms si elle n'existe pas déjà."""
-    person_repository(cur).add_name_form(person_id, full_name, source=source)
+    repo.add_name_form(person_id, full_name, source=source)
 
 
-def detach_name_form(cur: Any, person_id: int, name_form: str) -> None:
+def detach_name_form(
+    cur: Any, person_id: int, name_form: str, *, repo: PersonRepository
+) -> None:
     """Détache une personne d'une forme de nom. Supprime la forme si
     person_ids devient vide."""
-    person_repository(cur).detach_name_form(person_id, name_form)
+    repo.detach_name_form(person_id, name_form)
 
 
 # ── Rattachement / détachement par auteur source ──
@@ -274,7 +322,14 @@ _SOURCE_CONFIG = {
 # ── Attribution d'authorships orphelines ──
 
 
-def assign_orphan_authorship(cur: Any, person_id: int, source: str, authorship_id: int) -> bool:
+def assign_orphan_authorship(
+    cur: Any,
+    person_id: int,
+    source: str,
+    authorship_id: int,
+    *,
+    repo: PersonRepository,
+) -> bool:
     """Attribue une authorship orpheline (person_id IS NULL) à une personne.
 
     1. Valide la source
@@ -287,7 +342,6 @@ def assign_orphan_authorship(cur: Any, person_id: int, source: str, authorship_i
     if source not in _SOURCE_CONFIG:
         raise ValidationError(f"Source inconnue : {source}")
 
-    repo = person_repository(cur)
     row = repo.assign_orphan_sa(person_id, source, authorship_id)
     if not row:
         return False
@@ -301,13 +355,15 @@ def assign_orphan_authorship(cur: Any, person_id: int, source: str, authorship_i
     return True
 
 
-def batch_assign_orphan_authorships(cur: Any, person_id: int, sa_ids: list[int]) -> int:
+def batch_assign_orphan_authorships(
+    cur: Any, person_id: int, sa_ids: list[int], *, repo: PersonRepository
+) -> int:
     """Attribue en batch plusieurs authorships sources orphelines à une personne.
 
     Retourne le nombre de source_authorships effectivement rattachées
     (celles qui étaient orphelines).
     """
-    return person_repository(cur).batch_assign_orphans(person_id, sa_ids)
+    return repo.batch_assign_orphans(person_id, sa_ids)
 
 
 def detach_authorships(
@@ -316,6 +372,7 @@ def detach_authorships(
     authorships: list[dict],
     name_form: str | None = None,
     *,
+    repo: PersonRepository,
     authorship_repo: AuthorshipRepository,
 ) -> dict:
     """Détache un lot d'authorships sources d'une personne et nettoie les
@@ -326,7 +383,6 @@ def detach_authorships(
 
     Retourne {"detached": N, "deleted_authorships": M, "cleaned_form": bool}.
     """
-    repo = person_repository(cur)
     for a in authorships:
         if a["source"] in ALL_SOURCES_SET:
             repo.unlink_authorship(person_id, a["source"], a["authorship_id"])
@@ -348,13 +404,15 @@ def detach_authorships(
 # ── Fusion ──
 
 
-def mark_distinct(cur: Any, person_id_a: int, person_id_b: int) -> None:
+def mark_distinct(
+    cur: Any, person_id_a: int, person_id_b: int, *, repo: PersonRepository
+) -> None:
     """Marque deux personnes comme distinctes (non-doublon) dans
     `distinct_persons`. Idempotent.
 
     Les IDs sont triés pour garantir l'unicité de la paire.
     """
-    inserted = person_repository(cur).mark_distinct(person_id_a, person_id_b)
+    inserted = repo.mark_distinct(person_id_a, person_id_b)
     # Audit seulement si une ligne a été insérée (la paire n'existait pas déjà)
     if inserted:
         emit_event(
@@ -366,7 +424,9 @@ def mark_distinct(cur: Any, person_id_a: int, person_id_b: int) -> None:
         )
 
 
-def merge_person(cur: Any, target_id: int, source_id: int) -> None:
+def merge_person(
+    cur: Any, target_id: int, source_id: int, *, repo: PersonRepository
+) -> None:
     """Fusionne la personne `source_id` dans `target_id`.
 
     Invariant métier : refus si les deux personnes ont chacune une
@@ -375,7 +435,6 @@ def merge_person(cur: Any, target_id: int, source_id: int) -> None:
     Lève ConflictError si l'invariant est violé. Émet un événement
     d'audit `person.merged` si l'utilisateur est dans le contexte.
     """
-    repo = person_repository(cur)
     if repo.has_distinct_rh(target_id, source_id):
         raise ConflictError(
             f"REFUS de fusion : les personnes #{target_id} et #{source_id} "

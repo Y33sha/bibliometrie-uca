@@ -56,7 +56,7 @@ logging.basicConfig(
 log = logging.getLogger("pipeline")
 
 BASE = Path(__file__).resolve().parent
-STATUS_FILE = BASE / "pipeline" / "status.json"
+STATUS_FILE = BASE / "application" / "pipeline" / "status.json"
 
 
 def _write_status(
@@ -107,7 +107,7 @@ def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **k
         since = str((datetime.datetime.now() - datetime.timedelta(hours=36)).date())
         log.info("Mode quotidien : HAL depuis %s", since)
         if "hal" in sources:
-            run_python("extraction/hal/extract_hal.py", "--since", since)
+            run_python("infrastructure/sources/hal/extract_hal.py", "--since", since)
         # OpenAlex : le filtre from_updated_date requiert un plan payant
         # (429 "Plan upgrade required"). Les changefiles couvrent tout OA
         # (plusieurs Go/jour), pas filtrable par institution.
@@ -115,27 +115,27 @@ def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **k
     elif mode == "weekly":
         log.info("Mode hebdomadaire (WoS exclu)")
         if "openalex" in sources:
-            run_python("extraction/openalex/extract_openalex.py", "--mode", "weekly", *year_args)
+            run_python("infrastructure/sources/openalex/extract_openalex.py", "--mode", "weekly", *year_args)
         if "hal" in sources:
-            run_python("extraction/hal/extract_hal.py", "--mode", "weekly", *year_args)
+            run_python("infrastructure/sources/hal/extract_hal.py", "--mode", "weekly", *year_args)
         if "scanr" in sources:
-            run_python("extraction/scanr/extract_scanr.py", *year_args)
+            run_python("infrastructure/sources/scanr/extract_scanr.py", *year_args)
         if "theses" in sources:
-            run_python("extraction/theses/extract_theses.py")
+            run_python("infrastructure/sources/theses/extract_theses.py")
     else:
         if "openalex" in sources:
-            run_python("extraction/openalex/extract_openalex.py", "--mode", mode, *year_args)
+            run_python("infrastructure/sources/openalex/extract_openalex.py", "--mode", mode, *year_args)
         if "hal" in sources:
-            run_python("extraction/hal/extract_hal.py", "--mode", mode, *year_args)
+            run_python("infrastructure/sources/hal/extract_hal.py", "--mode", mode, *year_args)
         if "wos" in sources:
-            run_python("extraction/wos/extract_wos.py", "--mode", mode, *year_args)
+            run_python("infrastructure/sources/wos/extract_wos.py", "--mode", mode, *year_args)
         if "scanr" in sources:
-            run_python("extraction/scanr/extract_scanr.py", *year_args)
+            run_python("infrastructure/sources/scanr/extract_scanr.py", *year_args)
         if "theses" in sources:
-            run_python("extraction/theses/extract_theses.py")
+            run_python("infrastructure/sources/theses/extract_theses.py")
     # Re-fetch des publications OA tronquées à 100 auteurs (sauf mode daily)
     if mode != "daily" and "openalex" in (sources or {"openalex"}):
-        run_python("extraction/openalex/refetch_truncated.py")
+        run_python("infrastructure/sources/openalex/refetch_truncated.py")
 
 
 def phase_cross_imports(
@@ -157,14 +157,14 @@ def phase_cross_imports(
         return
 
     if "hal" in sources:
-        run_python("extraction/hal/fetch_missing_hal.py", *full_flag, "--mode", mode)
-        run_python("extraction/hal/cross_import_hal.py", *full_flag)
+        run_python("infrastructure/sources/hal/fetch_missing_hal.py", *full_flag, "--mode", mode)
+        run_python("infrastructure/sources/hal/cross_import_hal.py", *full_flag)
     if "openalex" in sources:
-        run_python("extraction/openalex/cross_import_openalex.py", *full_flag)
+        run_python("infrastructure/sources/openalex/cross_import_openalex.py", *full_flag)
     if "wos" in sources and mode not in ("daily", "weekly"):
-        run_python("extraction/wos/cross_import_wos.py", *full_flag)
+        run_python("infrastructure/sources/wos/cross_import_wos.py", *full_flag)
     if "scanr" in sources:
-        run_python("extraction/scanr/cross_import_scanr.py", *full_flag)
+        run_python("infrastructure/sources/scanr/cross_import_scanr.py", *full_flag)
 
 
 def phase_normalize(**kw: Any) -> Any:
@@ -259,8 +259,8 @@ def phase_authorships(**kw: Any) -> Any:
 
 def phase_countries(**kw: Any) -> Any:
     """Detection des pays des adresses et recalcul sur les publications."""
-    run_python("scripts/detect_address_countries.py", "--direct", "--apply")
-    run_python("scripts/suggest_address_countries.py")
+    run_python("interfaces/cli/detect_address_countries.py", "--direct", "--apply")
+    run_python("interfaces/cli/suggest_address_countries.py")
     _run_refresh_publication_countries()
 
 
@@ -268,13 +268,20 @@ def _run_create_publications() -> None:
     from application.pipeline.create.create_publications import run
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.publications_create import PgPublicationsCreateQueries
+    from infrastructure.repositories import publication_repository
 
     log.info("▶ create_publications")
     t0 = time.time()
     conn = get_connection()
     try:
         cur = conn.cursor()
-        run(cur, conn, PgPublicationsCreateQueries(), log)
+        run(
+            cur,
+            conn,
+            PgPublicationsCreateQueries(),
+            log,
+            pub_repo=publication_repository(cur),
+        )
     finally:
         conn.close()
     log.info("✓ create_publications terminé en %.1fs", time.time() - t0)
@@ -284,13 +291,20 @@ def _run_create_persons() -> None:
     from application.pipeline.create.create_persons_from_source_authorships import run
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
+    from infrastructure.repositories import person_repository
 
     log.info("▶ create_persons_from_source_authorships")
     t0 = time.time()
     conn = get_connection()
     try:
         cur = conn.cursor()
-        run(cur, conn, PgPersonsCreateQueries(), log)
+        run(
+            cur,
+            conn,
+            PgPersonsCreateQueries(),
+            log,
+            person_repo=person_repository(cur),
+        )
     finally:
         conn.close()
     log.info("✓ create_persons_from_source_authorships terminé en %.1fs", time.time() - t0)
@@ -366,6 +380,7 @@ def _run_merge_pubs_by_nnt() -> None:
     from application.pipeline.merge.merge_pubs_by_nnt import run_merge
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.merge import PgMergeQueries
+    from infrastructure.repositories import publication_repository
 
     log.info("▶ merge_pubs_by_nnt")
     t0 = time.time()
@@ -373,7 +388,9 @@ def _run_merge_pubs_by_nnt() -> None:
     conn.autocommit = False
     try:
         cur = conn.cursor()
-        run_merge(cur, conn, PgMergeQueries(), log)
+        run_merge(
+            cur, conn, PgMergeQueries(), log, pub_repo=publication_repository(cur)
+        )
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_nnt terminé en %.1fs", time.time() - t0)
@@ -383,6 +400,7 @@ def _run_merge_pubs_by_hal_id() -> None:
     from application.pipeline.merge.merge_pubs_by_hal_id import run_merge
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.merge import PgMergeQueries
+    from infrastructure.repositories import publication_repository
 
     log.info("▶ merge_pubs_by_hal_id")
     t0 = time.time()
@@ -390,7 +408,9 @@ def _run_merge_pubs_by_hal_id() -> None:
     conn.autocommit = False
     try:
         cur = conn.cursor()
-        run_merge(cur, conn, PgMergeQueries(), log)
+        run_merge(
+            cur, conn, PgMergeQueries(), log, pub_repo=publication_repository(cur)
+        )
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
@@ -401,11 +421,16 @@ def _run_normalize_hal() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.repositories import journal_repository, publication_repository
 
     log.info("▶ normalize_hal")
     t0 = time.time()
     conn = get_connection()
-    HalNormalizer(conn, log, PgStagingQueries(), PgHalNormalizeQueries()).run([])
+    HalNormalizer(
+        conn, log, PgStagingQueries(), PgHalNormalizeQueries(),
+        journal_repo_factory=journal_repository,
+        pub_repo_factory=publication_repository,
+    ).run([])
     log.info("✓ normalize_hal terminé en %.1fs", time.time() - t0)
 
 
@@ -414,11 +439,16 @@ def _run_normalize_wos() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.repositories import journal_repository, publication_repository
 
     log.info("▶ normalize_wos")
     t0 = time.time()
     conn = get_connection()
-    WosNormalizer(conn, log, PgStagingQueries(), PgWosNormalizeQueries()).run([])
+    WosNormalizer(
+        conn, log, PgStagingQueries(), PgWosNormalizeQueries(),
+        journal_repo_factory=journal_repository,
+        pub_repo_factory=publication_repository,
+    ).run([])
     log.info("✓ normalize_wos terminé en %.1fs", time.time() - t0)
 
 
@@ -427,11 +457,16 @@ def _run_normalize_openalex() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.repositories import journal_repository, publication_repository
 
     log.info("▶ normalize_openalex")
     t0 = time.time()
     conn = get_connection()
-    OpenalexNormalizer(conn, log, PgStagingQueries(), PgOpenalexNormalizeQueries()).run([])
+    OpenalexNormalizer(
+        conn, log, PgStagingQueries(), PgOpenalexNormalizeQueries(),
+        journal_repo_factory=journal_repository,
+        pub_repo_factory=publication_repository,
+    ).run([])
     log.info("✓ normalize_openalex terminé en %.1fs", time.time() - t0)
 
 
@@ -440,11 +475,16 @@ def _run_normalize_scanr() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.repositories import journal_repository, publication_repository
 
     log.info("▶ normalize_scanr")
     t0 = time.time()
     conn = get_connection()
-    ScanrNormalizer(conn, log, PgStagingQueries(), PgScanrNormalizeQueries()).run([])
+    ScanrNormalizer(
+        conn, log, PgStagingQueries(), PgScanrNormalizeQueries(),
+        journal_repo_factory=journal_repository,
+        pub_repo_factory=publication_repository,
+    ).run([])
     log.info("✓ normalize_scanr terminé en %.1fs", time.time() - t0)
 
 
@@ -453,11 +493,18 @@ def _run_normalize_theses() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_theses import PgThesesNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.repositories import publication_repository
 
     log.info("▶ normalize_theses")
     t0 = time.time()
     conn = get_connection()
-    ThesesNormalizer(conn, log, PgStagingQueries(), PgThesesNormalizeQueries()).run([])
+    ThesesNormalizer(
+        conn,
+        log,
+        PgStagingQueries(),
+        PgThesesNormalizeQueries(),
+        pub_repo_factory=publication_repository,
+    ).run([])
     log.info("✓ normalize_theses terminé en %.1fs", time.time() - t0)
 
 
@@ -484,13 +531,21 @@ def _run_enrich_oa_status() -> None:
     from infrastructure.api_limits import UNPAYWALL_DELAY
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.enrich import PgEnrichQueries
+    from infrastructure.repositories import publication_repository
 
     log.info("▶ enrich_oa_status")
     t0 = time.time()
     conn = get_connection()
     try:
         cur = conn.cursor()
-        run_enrich(cur, conn, PgEnrichQueries(), log, rate_delay=UNPAYWALL_DELAY)
+        run_enrich(
+            cur,
+            conn,
+            PgEnrichQueries(),
+            log,
+            pub_repo=publication_repository(cur),
+            rate_delay=UNPAYWALL_DELAY,
+        )
     finally:
         conn.close()
     log.info("✓ enrich_oa_status terminé en %.1fs", time.time() - t0)
@@ -501,6 +556,7 @@ def _run_enrich_journal_apc() -> None:
     from infrastructure.api_limits import DOAJ_DELAY
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.enrich import PgEnrichQueries
+    from infrastructure.repositories import journal_repository
 
     log.info("▶ enrich_journal_apc")
     t0 = time.time()
@@ -513,6 +569,7 @@ def _run_enrich_journal_apc() -> None:
             conn,
             PgEnrichQueries(),
             log,
+            journal_repo=journal_repository(cur),
             mailto="bibliometrie@uca.fr",
             rate_delay=DOAJ_DELAY,
         )

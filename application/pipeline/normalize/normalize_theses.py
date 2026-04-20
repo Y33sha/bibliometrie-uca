@@ -22,6 +22,7 @@ Particularités theses.fr :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
+from collections.abc import Callable
 from typing import Any
 
 from psycopg2.extras import Json
@@ -38,6 +39,7 @@ from application.publications import (
 from domain.authorship_roles import THESES_FIELD_ROLES, merge_roles
 from domain.names import names_compatible
 from domain.normalize import normalize_name, normalize_text
+from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
 from infrastructure.addresses import link_addresses
 from infrastructure.db_helpers import mark_staging_done
@@ -118,7 +120,13 @@ def extract_pub_metadata(these: dict) -> dict:
     )
 
 
-def find_publication(cur: Any, queries: ThesesNormalizeQueries, these: dict) -> int | None:
+def find_publication(
+    cur: Any,
+    queries: ThesesNormalizeQueries,
+    these: dict,
+    *,
+    pub_repo: PublicationRepository,
+) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None.
 
     Déduplication en 2 étapes :
@@ -146,19 +154,20 @@ def find_publication(cur: Any, queries: ThesesNormalizeQueries, these: dict) -> 
         doi=doi,
         nnt=nnt_clean,
         allow_create=False,
+        repo=pub_repo,
     )
     if pub_id:
         return pub_id
 
     # 2. Dédup spécifique thèses : titre + année + auteur compatible
     if pub_year and title_norm:
-        candidates = find_thesis_by_title(cur, title_norm, pub_year)
+        candidates = find_thesis_by_title(cur, title_norm, pub_year, repo=pub_repo)
         if candidates:
             author = _extract_thesis_author(these)
             for cand in candidates:
                 if not author or _thesis_author_compatible(cur, queries, cand.id, author):
                     # Match trouvé → attribuer le DOI si nécessaire
-                    try_merge_by_doi(cur, cand.id, doi)
+                    try_merge_by_doi(cur, cand.id, doi, repo=pub_repo)
                     return cand.id
 
     return None
@@ -410,7 +419,14 @@ def process_persons(
 # =============================================================
 
 
-def process_work(cur: Any, queries: ThesesNormalizeQueries, logger: Any, row: dict) -> bool:
+def process_work(
+    cur: Any,
+    queries: ThesesNormalizeQueries,
+    logger: Any,
+    row: dict,
+    *,
+    pub_repo: PublicationRepository,
+) -> bool:
     """Traite une thèse du staging."""
     staging_id = row["id"]
     theses_id = row["source_id"]
@@ -426,10 +442,10 @@ def process_work(cur: Any, queries: ThesesNormalizeQueries, logger: Any, row: di
 
         publication_id = queries.get_theses_publication_id(cur, theses_id)
         if not publication_id:
-            publication_id = find_publication(cur, queries, these)
+            publication_id = find_publication(cur, queries, these, pub_repo=pub_repo)
 
         if publication_id:
-            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
+            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"], repo=pub_repo)
 
         source_publication_id = insert_source_document(
             cur, queries, these, staging_id, theses_id, publication_id, pub_meta
@@ -438,7 +454,7 @@ def process_work(cur: Any, queries: ThesesNormalizeQueries, logger: Any, row: di
         process_persons(cur, queries, these, source_publication_id)
 
         if publication_id:
-            refresh_from_sources(cur, publication_id)
+            refresh_from_sources(cur, publication_id, repo=pub_repo)
             _update_thesis_meta(cur, queries, publication_id, these)
 
         mark_staging_done(cur, staging_id)
@@ -460,12 +476,21 @@ class ThesesNormalizer(SourceNormalizer):
         logger: Any,
         staging_queries: StagingQueries,
         queries: ThesesNormalizeQueries,
+        pub_repo_factory: Callable[[Any], PublicationRepository],
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
+        self._pub_repo_factory = pub_repo_factory
+        self._pub_repo: PublicationRepository | None = None
+
+    def preload_caches(self, cur: Any) -> None:
+        self._pub_repo = self._pub_repo_factory(cur)
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        return process_work(cur, self._queries, self.logger, row)
+        assert self._pub_repo is not None
+        return process_work(
+            cur, self._queries, self.logger, row, pub_repo=self._pub_repo
+        )
 
     def summary_stats(self, cur: Any) -> list[str]:
         return [

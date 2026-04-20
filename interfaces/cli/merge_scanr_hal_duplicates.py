@@ -18,6 +18,7 @@ from typing import Any
 from psycopg2.extras import RealDictCursor
 
 from application.publications import merge_publications
+from infrastructure.repositories import publication_repository
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 
@@ -115,7 +116,12 @@ def main() -> None:
             continue  # Déjà résolu par une fusion précédente
 
         try:
-            merge_publications(cur, target_id=hal_pub_id, source_id=scanr_pub_id)
+            merge_publications(
+                cur,
+                target_id=hal_pub_id,
+                source_id=scanr_pub_id,
+                repo=publication_repository(cur),
+            )
             merged_into[scanr_pub_id] = hal_pub_id
             merged += 1
 

@@ -24,6 +24,7 @@ from typing import Any
 from psycopg2.extras import RealDictCursor
 
 from application.publications import find_or_create, update_sources
+from infrastructure.repositories import publication_repository
 from domain.normalize import normalize_text
 from infrastructure.db.connection import get_connection
 
@@ -116,6 +117,7 @@ def rebuild_doc(cur: Any, doc: Any) -> Any:
         pub_year=pub_year,
         doc_type=doc_type,
         doi=doi,
+        repo=publication_repository(cur),
     )
     return pub_id
 
@@ -184,7 +186,7 @@ def fix(conn: Any, dry_run: Any = False) -> Any:
                     f"UPDATE {d['table']} SET publication_id = %s WHERE id = %s",
                     (new_pub_id, d["id"]),
                 )
-                update_sources(cur, new_pub_id)
+                update_sources(cur, new_pub_id, repo=publication_repository(cur))
                 log.info(f"  [{d['src']}] #{d['id']} → publication {new_pub_id}")
             else:
                 log.warning(f"  [{d['src']}] #{d['id']} — pas de titre/année, ignoré")

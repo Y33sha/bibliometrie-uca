@@ -20,6 +20,7 @@ import requests
 
 from application.ports.enrich import EnrichQueries
 from application.publications import update_oa_status
+from domain.ports.publication_repository import PublicationRepository
 
 # Email requis par Unpaywall (politesse, pas d'auth)
 UNPAYWALL_EMAIL = "bibliometrie@uca.fr"
@@ -73,6 +74,7 @@ def run_enrich(
     queries: EnrichQueries,
     logger: Any,
     *,
+    pub_repo: PublicationRepository,
     limit: int = 0,
     dry_run: bool = False,
     rate_delay: float = 0.1,
@@ -113,7 +115,7 @@ def run_enrich(
             if dry_run:
                 logger.info(f"  [DRY] {doi} : {current_status} → {status}")
             else:
-                update_oa_status(cur, pub_id, status)
+                update_oa_status(cur, pub_id, status, repo=pub_repo)
             updated += 1
         elif status is None:
             not_found += 1

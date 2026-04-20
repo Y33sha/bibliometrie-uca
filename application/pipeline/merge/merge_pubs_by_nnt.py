@@ -13,6 +13,7 @@ from typing import Any
 
 from application.ports.merge import MergeQueries
 from application.publications import merge_publications as _merge_pub
+from domain.ports.publication_repository import PublicationRepository
 
 
 def run_merge(
@@ -21,6 +22,7 @@ def run_merge(
     queries: MergeQueries,
     logger: Any,
     *,
+    pub_repo: PublicationRepository,
     dry_run: bool = False,
 ) -> None:
     try:
@@ -56,7 +58,7 @@ def run_merge(
 
                 try:
                     cur.execute("SAVEPOINT merge_nnt")
-                    _merge_pub(cur, target["id"], source["id"])
+                    _merge_pub(cur, target["id"], source["id"], repo=pub_repo)
                     cur.execute("RELEASE SAVEPOINT merge_nnt")
                     logger.info(f"  [MERGE] {label}")
                     merged += 1

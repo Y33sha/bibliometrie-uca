@@ -20,7 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest==9.0.3",             # CVE-2025-71176 fixed
+    "pytest==9.0.3",                   # CVE-2025-71176 fixed
     "pytest-cov==7.1.0",
     "httpx==0.27.2",
     "ruff==0.15.11",
@@ -65,20 +65,13 @@ root_packages = ["domain", "application", "infrastructure", "interfaces"]
 [[tool.importlinter.contracts]]
 name = "Couches DDD (layered)"
 type = "layers"
-layers = [
-    "interfaces",
-    "infrastructure | application",
-    "domain",
-]
+layers = ["interfaces", "infrastructure | application", "domain"]
 # Violations connues `application → infrastructure` verrouillées à date du
 # merge §1.6. Nettoyage suivi en §1.7b : chaque refacto = une ligne retirée.
 ignore_imports = [
-    # Services applicatifs → infrastructure.repositories
-    # (4 — config, authorships, addresses levés)
-    "application.journals -> infrastructure.repositories.journal_repository",
-    "application.publications -> infrastructure.repositories.publication_repository",
-    "application.persons -> infrastructure.repositories.person_repository",
-    "application.structures -> infrastructure.repositories.structure_repository",
+    # Services applicatifs → infrastructure.repositories : 0 restant
+    # (tous levés : config, authorships, addresses, structures, journals,
+    # persons, publications)
     # Pipeline normalize_* → helpers infrastructure (14)
     "application.pipeline.normalize.normalize_hal -> infrastructure.addresses",
     "application.pipeline.normalize.normalize_openalex -> infrastructure.addresses",
@@ -138,9 +131,9 @@ select = [
 ]
 # Ignorés le temps d'assainir progressivement
 ignore = [
-    "E501",   # ligne trop longue — à durcir plus tard
-    "E402",   # module-level import not at top — quelques cas légitimes
-    "B008",   # function call in default argument — FastAPI Depends() idiomatique
+    "E501", # ligne trop longue — à durcir plus tard
+    "E402", # module-level import not at top — quelques cas légitimes
+    "B008", # function call in default argument — FastAPI Depends() idiomatique
 ]
 
 [tool.ruff.lint.mccabe]
@@ -150,11 +143,13 @@ ignore = [
 max-complexity = 15
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E402"]       # imports après setup de conftest
-"interfaces/cli/*" = ["E402", "C901"]     # scripts one-shot, complexité tolérée
-"application/pipeline/*" = ["C901"]          # normalisation par source, nombreuses branches métier
-"infrastructure/sources/*" = ["C901"]          # idem pour les extracteurs
-"interfaces/api/routers/*" = ["E402"]     # imports tardifs fréquents
+"tests/*" = ["E402"] # imports après setup de conftest
+"interfaces/cli/*" = ["E402", "C901"] # scripts one-shot, complexité tolérée
+"application/pipeline/*" = [
+    "C901",
+] # normalisation par source, nombreuses branches métier
+"infrastructure/sources/*" = ["C901"] # idem pour les extracteurs
+"interfaces/api/routers/*" = ["E402"] # imports tardifs fréquents
 
 # ----------------------------------------------------------------------
 # Pytest + coverage

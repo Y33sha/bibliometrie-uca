@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from application.journals import merge_publishers
 from application.journals import update_publisher as _update_publisher
+from infrastructure.repositories import journal_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import MergeRequest, PublisherUpdate
 
@@ -86,7 +87,7 @@ async def update_publisher(publisher_id: int, body: PublisherUpdate) -> Any:
     """Met à jour un éditeur."""
     fields = body.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
-        _update_publisher(cur, publisher_id, fields=fields)
+        _update_publisher(cur, publisher_id, fields=fields, repo=journal_repository(cur))
         return {"ok": True}
 
 
@@ -102,5 +103,5 @@ async def merge(publisher_id: int, body: MergeRequest) -> Any:
         if body.source_id not in found:
             raise HTTPException(status_code=404, detail="Éditeur source introuvable")
 
-        merge_publishers(cur, publisher_id, body.source_id)
+        merge_publishers(cur, publisher_id, body.source_id, repo=journal_repository(cur))
         return {"merged": True, "source_id": body.source_id, "target_id": publisher_id}

@@ -17,6 +17,7 @@ import requests
 
 from application.journals import reset_journal_apc, update_journal_apc
 from application.ports.enrich import EnrichQueries
+from domain.ports.journal_repository import JournalRepository
 
 OPENALEX_API = "https://api.openalex.org/sources"
 OPENALEX_PREFIX = "https://openalex.org/"
@@ -102,6 +103,7 @@ def run_enrich(
     queries: EnrichQueries,
     logger: Any,
     *,
+    journal_repo: JournalRepository,
     mailto: str,
     limit: int = 0,
     dry_run: bool = False,
@@ -110,7 +112,7 @@ def run_enrich(
 ) -> None:
     try:
         if reset:
-            count = reset_journal_apc(cur)
+            count = reset_journal_apc(cur, repo=journal_repo)
             conn.commit()
             logger.info(f"Reset : {count} revues réinitialisées.")
 
@@ -151,6 +153,7 @@ def run_enrich(
                         apc_amount=apc_amount,
                         apc_currency=apc_currency,
                         is_in_doaj=is_in_doaj,
+                        repo=journal_repo,
                     )
 
                 updated += 1

@@ -11,13 +11,17 @@ from typing import Any
 from application.audit import emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
-from infrastructure.repositories import journal_repository
+from domain.ports.journal_repository import JournalRepository
 
 # ── Publishers ──
 
 
 def find_or_create_publisher(
-    cur: Any, name: str | None, *, openalex_id: str | None = None
+    cur: Any,
+    name: str | None,
+    *,
+    openalex_id: str | None = None,
+    repo: JournalRepository,
 ) -> int | None:
     """Trouve ou crée un éditeur.
 
@@ -34,8 +38,6 @@ def find_or_create_publisher(
     name_normalized = normalize_text(name)
     if not name_normalized:
         return None
-
-    repo = journal_repository(cur)
 
     # 1. Par openalex_id
     if openalex_id:
@@ -74,6 +76,7 @@ def find_or_create_journal(
     publisher_id: int | None = None,
     openalex_id: str | None = None,
     oa_model: str | None = None,
+    repo: JournalRepository,
 ) -> int | None:
     """Trouve ou crée un journal.
 
@@ -92,7 +95,6 @@ def find_or_create_journal(
         return None
 
     title_normalized = normalize_text(title)
-    repo = journal_repository(cur)
 
     def _match_and_enrich(journal_id: int, *, with_openalex: bool = True) -> int:
         """Enrichit le journal trouvé et rattache la forme de nom. Retourne son id."""
@@ -153,7 +155,9 @@ def find_or_create_journal(
     return journal_id
 
 
-def update_journal(cur: Any, journal_id: int, *, fields: dict) -> None:
+def update_journal(
+    cur: Any, journal_id: int, *, fields: dict, repo: JournalRepository
+) -> None:
     """Met à jour une revue. Le `title` est automatiquement normalisé en
     `title_normalized`.
 
@@ -163,7 +167,6 @@ def update_journal(cur: Any, journal_id: int, *, fields: dict) -> None:
     if not fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    repo = journal_repository(cur)
     if not repo.journal_exists(journal_id):
         raise NotFoundError(f"Revue {journal_id} introuvable")
 
@@ -173,7 +176,9 @@ def update_journal(cur: Any, journal_id: int, *, fields: dict) -> None:
     repo.update_journal_fields(journal_id, fields)
 
 
-def update_publisher(cur: Any, publisher_id: int, *, fields: dict) -> None:
+def update_publisher(
+    cur: Any, publisher_id: int, *, fields: dict, repo: JournalRepository
+) -> None:
     """Met à jour un éditeur. Le `name` est automatiquement normalisé en
     `name_normalized`.
 
@@ -183,7 +188,6 @@ def update_publisher(cur: Any, publisher_id: int, *, fields: dict) -> None:
     if not fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    repo = journal_repository(cur)
     if not repo.publisher_exists(publisher_id):
         raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
@@ -200,9 +204,10 @@ def update_journal_apc(
     apc_amount: float | None = None,
     apc_currency: str | None = None,
     is_in_doaj: bool | None = None,
+    repo: JournalRepository,
 ) -> None:
     """Met à jour les informations APC/DOAJ d'un journal."""
-    journal_repository(cur).update_journal_apc(
+    repo.update_journal_apc(
         journal_id,
         apc_amount=apc_amount,
         apc_currency=apc_currency,
@@ -210,15 +215,17 @@ def update_journal_apc(
     )
 
 
-def reset_journal_apc(cur: Any) -> int:
+def reset_journal_apc(cur: Any, *, repo: JournalRepository) -> int:
     """Réinitialise les APC/DOAJ de toutes les revues avec openalex_id."""
-    return journal_repository(cur).reset_journal_apc()
+    return repo.reset_journal_apc()
 
 
 # ── Fusions ──
 
 
-def merge_publishers(cur: Any, target_id: int, source_id: int) -> None:
+def merge_publishers(
+    cur: Any, target_id: int, source_id: int, *, repo: JournalRepository
+) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible.
 
     Invariant métier : s'il y a des journaux aux titres partagés entre
@@ -228,8 +235,6 @@ def merge_publishers(cur: Any, target_id: int, source_id: int) -> None:
     """
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un éditeur avec lui-même")
-
-    repo = journal_repository(cur)
 
     # 1. Détecter les journaux partageant un titre entre les deux éditeurs,
     #    vérifier les conflits ISSN, puis les fusionner.
@@ -244,7 +249,7 @@ def merge_publishers(cur: Any, target_id: int, source_id: int) -> None:
                     f"source #{pair['source_journal_id']}: {sv}). "
                     f"Fusionner les revues manuellement d'abord."
                 )
-        merge_journals(cur, pair["target_journal_id"], pair["source_journal_id"])
+        merge_journals(cur, pair["target_journal_id"], pair["source_journal_id"], repo=repo)
 
     # 2-6. Le reste de la fusion (transferts, enrichissement, delete).
     repo.merge_publisher_into(target_id, source_id)
@@ -252,10 +257,12 @@ def merge_publishers(cur: Any, target_id: int, source_id: int) -> None:
     emit_event(cur, "publisher.merged", "publisher", target_id, {"source_id": source_id})
 
 
-def merge_journals(cur: Any, target_id: int, source_id: int) -> None:
+def merge_journals(
+    cur: Any, target_id: int, source_id: int, *, repo: JournalRepository
+) -> None:
     """Fusionne le journal source dans le journal cible."""
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un journal avec lui-même")
 
-    journal_repository(cur).merge_journal_into(target_id, source_id)
+    repo.merge_journal_into(target_id, source_id)
     emit_event(cur, "journal.merged", "journal", target_id, {"source_id": source_id})

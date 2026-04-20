@@ -8,6 +8,7 @@ from infrastructure.api_limits import DOAJ_DELAY
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.enrich import PgEnrichQueries
 from infrastructure.log import setup_logger
+from infrastructure.repositories import journal_repository
 
 logger = setup_logger("enrich_journal_apc", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -36,6 +37,7 @@ def main() -> None:
             conn,
             PgEnrichQueries(),
             logger,
+            journal_repo=journal_repository(cur),
             mailto=MAILTO,
             limit=args.limit,
             dry_run=args.dry_run,

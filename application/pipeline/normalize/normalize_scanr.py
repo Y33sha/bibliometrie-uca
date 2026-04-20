@@ -25,8 +25,11 @@ from application.ports.normalize_scanr import ScanrNormalizeQueries
 from application.ports.staging import StagingQueries
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
+from collections.abc import Callable
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
+from domain.ports.journal_repository import JournalRepository
+from domain.ports.publication_repository import PublicationRepository
 from domain.publication import clean_doi
 from infrastructure.addresses import link_addresses
 from infrastructure.db_helpers import mark_staging_done
@@ -57,21 +60,32 @@ def get_title(doc: dict) -> str | None:
     return title
 
 
-def upsert_publisher(cur: Any, doc: dict) -> int | None:
+def upsert_publisher(
+    cur: Any, doc: dict, *, journal_repo: JournalRepository
+) -> int | None:
     publisher_name = (doc.get("source") or {}).get("publisher")
     if not publisher_name:
         return None
-    return find_or_create_publisher(cur, publisher_name)
+    return find_or_create_publisher(cur, publisher_name, repo=journal_repo)
 
 
-def upsert_journal(cur: Any, doc: dict, publisher_id: int | None) -> int | None:
+def upsert_journal(
+    cur: Any, doc: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+) -> int | None:
     source = doc.get("source") or {}
     title = source.get("title")
     if not title:
         return None
     issn = source.get("issn")
     eissn = source.get("eissn")
-    return find_or_create_journal(cur, title, issn=issn, eissn=eissn, publisher_id=publisher_id)
+    return find_or_create_journal(
+        cur,
+        title,
+        issn=issn,
+        eissn=eissn,
+        publisher_id=publisher_id,
+        repo=journal_repo,
+    )
 
 
 def _extract_nnt_from_scanr_id(scanr_id: str) -> str | None:
@@ -105,7 +119,12 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
 
 
 def find_publication(
-    cur: Any, doc: dict, journal_id: int | None, scanr_id: str | None = None
+    cur: Any,
+    doc: dict,
+    journal_id: int | None,
+    scanr_id: str | None = None,
+    *,
+    pub_repo: PublicationRepository,
 ) -> int | None:
     from domain.doc_types import map_doc_type
 
@@ -113,7 +132,7 @@ def find_publication(
     if not meta["pub_year"] or not meta["title"]:
         return None
     meta["doc_type"] = map_doc_type(meta["doc_type"], "scanr")
-    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
+    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False, repo=pub_repo)
     return pub_id
 
 
@@ -312,7 +331,15 @@ def process_authors(
 # =============================================================
 
 
-def process_work(cur: Any, queries: ScanrNormalizeQueries, logger: Any, staging_row: Any) -> bool:
+def process_work(
+    cur: Any,
+    queries: ScanrNormalizeQueries,
+    logger: Any,
+    staging_row: Any,
+    *,
+    journal_repo: JournalRepository,
+    pub_repo: PublicationRepository,
+) -> bool:
     staging_id = staging_row["id"]
     scanr_id = staging_row["scanr_id"]
     raw_data = staging_row["raw_data"]
@@ -327,11 +354,11 @@ def process_work(cur: Any, queries: ScanrNormalizeQueries, logger: Any, staging_
             return False
 
         t0 = time.perf_counter()
-        publisher_id = upsert_publisher(cur, doc)
+        publisher_id = upsert_publisher(cur, doc, journal_repo=journal_repo)
         timings["publisher"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        journal_id = upsert_journal(cur, doc, publisher_id)
+        journal_id = upsert_journal(cur, doc, publisher_id, journal_repo=journal_repo)
         timings["journal"] = time.perf_counter() - t0
 
         pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
@@ -339,11 +366,13 @@ def process_work(cur: Any, queries: ScanrNormalizeQueries, logger: Any, staging_
         t0 = time.perf_counter()
         publication_id = queries.get_scanr_publication_id(cur, scanr_id)
         if not publication_id:
-            publication_id = find_publication(cur, doc, journal_id, scanr_id)
+            publication_id = find_publication(
+                cur, doc, journal_id, scanr_id, pub_repo=pub_repo
+            )
         timings["publication"] = time.perf_counter() - t0
 
         if publication_id:
-            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
+            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"], repo=pub_repo)
 
         t0 = time.perf_counter()
         source_publication_id = insert_scanr_document(
@@ -356,7 +385,7 @@ def process_work(cur: Any, queries: ScanrNormalizeQueries, logger: Any, staging_
         timings["authors"] = time.perf_counter() - t0
 
         if publication_id:
-            refresh_from_sources(cur, publication_id)
+            refresh_from_sources(cur, publication_id, repo=pub_repo)
 
         mark_staging_done(cur, staging_id)
 
@@ -385,9 +414,27 @@ class ScanrNormalizer(SourceNormalizer):
         logger: Any,
         staging_queries: StagingQueries,
         queries: ScanrNormalizeQueries,
+        journal_repo_factory: Callable[[Any], JournalRepository],
+        pub_repo_factory: Callable[[Any], PublicationRepository],
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
+        self._journal_repo_factory = journal_repo_factory
+        self._journal_repo: JournalRepository | None = None
+        self._pub_repo_factory = pub_repo_factory
+        self._pub_repo: PublicationRepository | None = None
+
+    def preload_caches(self, cur: Any) -> None:
+        self._journal_repo = self._journal_repo_factory(cur)
+        self._pub_repo = self._pub_repo_factory(cur)
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        return process_work(cur, self._queries, self.logger, row)
+        assert self._journal_repo is not None and self._pub_repo is not None
+        return process_work(
+            cur,
+            self._queries,
+            self.logger,
+            row,
+            journal_repo=self._journal_repo,
+            pub_repo=self._pub_repo,
+        )

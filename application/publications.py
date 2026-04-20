@@ -13,13 +13,13 @@ from typing import Any
 
 from application.audit import emit_event
 from domain.doc_types import map_doc_type
+from domain.ports.publication_repository import PublicationRepository
 from domain.publication import (
     PubByDoi,
     PubByNnt,
     PubByTitle,
     PubThesisCandidate,
 )
-from infrastructure.repositories import publication_repository
 
 # Re-export des namedtuples pour les call sites historiques (scripts,
 # processing) qui font `from application.publications import PubByDoi`.
@@ -32,31 +32,42 @@ __all__ = [
 ]
 
 
-def find_by_doi(cur: Any, doi: str) -> PubByDoi | None:
+def find_by_doi(cur: Any, doi: str, *, repo: PublicationRepository) -> PubByDoi | None:
     """Cherche une publication par DOI (case-insensitive)."""
-    return publication_repository(cur).find_by_doi(doi)
+    return repo.find_by_doi(doi)
 
 
-def find_by_nnt(cur: Any, nnt: str) -> PubByNnt | None:
+def find_by_nnt(cur: Any, nnt: str, *, repo: PublicationRepository) -> PubByNnt | None:
     """Cherche une publication via NNT (source_publications.external_ids)."""
-    return publication_repository(cur).find_by_nnt(nnt)
+    return repo.find_by_nnt(nnt)
 
 
 def find_by_title(
-    cur: Any, title_normalized: str, pub_year: int, journal_id: int
+    cur: Any,
+    title_normalized: str,
+    pub_year: int,
+    journal_id: int,
+    *,
+    repo: PublicationRepository,
 ) -> PubByTitle | None:
     """Cherche une publication par titre normalisé + année + journal."""
-    return publication_repository(cur).find_by_title(title_normalized, pub_year, journal_id)
+    return repo.find_by_title(title_normalized, pub_year, journal_id)
 
 
 def find_thesis_by_title(
-    cur: Any, title_normalized: str, pub_year: int
+    cur: Any,
+    title_normalized: str,
+    pub_year: int,
+    *,
+    repo: PublicationRepository,
 ) -> list[PubThesisCandidate]:
     """Cherche des thèses par titre normalisé + année (sans journal_id)."""
-    return publication_repository(cur).find_thesis_by_title(title_normalized, pub_year)
+    return repo.find_thesis_by_title(title_normalized, pub_year)
 
 
-def try_merge_by_doi(cur: Any, pub_id: int, doi: str | None) -> int:
+def try_merge_by_doi(
+    cur: Any, pub_id: int, doi: str | None, *, repo: PublicationRepository
+) -> int:
     """Tente de fusionner via DOI si la publication n'en a pas encore.
 
     Si pub_id n'a pas de DOI et qu'une autre publication porte ce DOI,
@@ -67,13 +78,12 @@ def try_merge_by_doi(cur: Any, pub_id: int, doi: str | None) -> int:
     """
     if not doi:
         return pub_id
-    repo = publication_repository(cur)
     if repo.get_doi(pub_id):
         return pub_id
     # La pub n'a pas de DOI : vérifier si une autre l'a
     existing = repo.find_by_doi(doi)
     if existing and existing.id != pub_id:
-        merge_publications(cur, existing.id, pub_id)
+        merge_publications(cur, existing.id, pub_id, repo=repo)
         return existing.id
     # Attribuer le DOI
     repo.set_doi(pub_id, doi)
@@ -81,7 +91,13 @@ def try_merge_by_doi(cur: Any, pub_id: int, doi: str | None) -> int:
 
 
 def resolve_doi_conflict(
-    cur: Any, doi: str, doc_type: str, title_normalized: str, existing: Any
+    cur: Any,
+    doi: str,
+    doc_type: str,
+    title_normalized: str,
+    existing: Any,
+    *,
+    repo: PublicationRepository,
 ) -> tuple[str | None, int | None]:
     """Gere les conflits de DOI entre chapitres et ouvrages.
 
@@ -92,7 +108,6 @@ def resolve_doi_conflict(
     - doi_corrige : le DOI a utiliser pour le nouveau document (None si retire)
     - publication_id_si_fusion : l'id de la publication existante si fusion, None sinon
     """
-    repo = publication_repository(cur)
     ex_type = existing.doc_type or ""
     chapter_types = ("book_chapter", "book-chapter", "chapter")
     book_types = ("book",)
@@ -131,6 +146,7 @@ def find_or_create(
     container_title: str | None = None,
     language: str | None = None,
     allow_create: bool = True,
+    repo: PublicationRepository,
 ) -> tuple[int | None, bool]:
     """Trouve ou cree une publication.
 
@@ -145,13 +161,13 @@ def find_or_create(
     if not pub_year or not title:
         return None, False
 
-    repo = publication_repository(cur)
-
     # 1. Chercher par DOI
     if doi:
         existing = repo.find_by_doi(doi)
         if existing:
-            doi, merge_id = resolve_doi_conflict(cur, doi, doc_type, title_normalized, existing)
+            doi, merge_id = resolve_doi_conflict(
+                cur, doi, doc_type, title_normalized, existing, repo=repo
+            )
             if merge_id:
                 return merge_id, False
 
@@ -159,7 +175,7 @@ def find_or_create(
     if nnt:
         existing_nnt = repo.find_by_nnt(nnt)
         if existing_nnt:
-            try_merge_by_doi(cur, existing_nnt.id, doi)
+            try_merge_by_doi(cur, existing_nnt.id, doi, repo=repo)
             return existing_nnt.id, False
 
     # 2. Creer
@@ -180,19 +196,23 @@ def find_or_create(
     return pub_id, True
 
 
-def update_oa_status(cur: Any, pub_id: int, oa_status: str) -> None:
+def update_oa_status(
+    cur: Any, pub_id: int, oa_status: str, *, repo: PublicationRepository
+) -> None:
     """Met à jour le statut OA d'une publication."""
-    publication_repository(cur).update_oa_status(pub_id, oa_status)
+    repo.update_oa_status(pub_id, oa_status)
 
 
-def update_countries(cur: Any, pub_id: int, countries: list[str]) -> None:
+def update_countries(
+    cur: Any, pub_id: int, countries: list[str], *, repo: PublicationRepository
+) -> None:
     """Met à jour les pays d'une publication."""
-    publication_repository(cur).update_countries(pub_id, countries)
+    repo.update_countries(pub_id, countries)
 
 
-def update_sources(cur: Any, pub_id: int) -> None:
+def update_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) -> None:
     """Recalcule publications.sources depuis source_publications."""
-    publication_repository(cur).update_sources(pub_id)
+    repo.update_sources(pub_id)
 
 
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
@@ -296,7 +316,7 @@ def _first_doc_type(rows: list[dict[str, Any]]) -> str:
     return "other"
 
 
-def refresh_from_sources(cur: Any, pub_id: int) -> None:
+def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) -> None:
     """Recalcule les métadonnées d'une publication depuis ses source_publications.
 
     Contrairement à l'ancien _enrich() qui faisait du COALESCE incrémental (premier arrivé
@@ -331,7 +351,6 @@ def refresh_from_sources(cur: Any, pub_id: int) -> None:
     Ne touche PAS à : title, title_normalized, notes, sources (utiliser
     update_sources() séparément).
     """
-    repo = publication_repository(cur)
     rows = repo.get_source_rows(pub_id)
     if not rows:
         return
@@ -360,13 +379,15 @@ def refresh_from_sources(cur: Any, pub_id: int) -> None:
     repo.update_sources(pub_id)
 
 
-def mark_distinct(cur: Any, pub_id_a: int, pub_id_b: int) -> None:
+def mark_distinct(
+    cur: Any, pub_id_a: int, pub_id_b: int, *, repo: PublicationRepository
+) -> None:
     """Marque deux publications comme distinctes (non-doublon) dans
     `distinct_publications`. Idempotent.
 
     Les IDs sont triés pour garantir l'unicité de la paire.
     """
-    inserted = publication_repository(cur).mark_distinct(pub_id_a, pub_id_b)
+    inserted = repo.mark_distinct(pub_id_a, pub_id_b)
     if inserted:
         emit_event(
             cur,
@@ -377,7 +398,9 @@ def mark_distinct(cur: Any, pub_id_a: int, pub_id_b: int) -> None:
         )
 
 
-def merge_publications(cur: Any, target_id: int, source_id: int) -> None:
+def merge_publications(
+    cur: Any, target_id: int, source_id: int, *, repo: PublicationRepository
+) -> None:
     """Fusionne la publication `source_id` dans `target_id`.
 
     Orchestration :
@@ -385,7 +408,6 @@ def merge_publications(cur: Any, target_id: int, source_id: int) -> None:
     2. Recalcule le tableau `sources` de la cible
     3. Émet l'événement d'audit (silencieusement no-op hors contexte HTTP)
     """
-    repo = publication_repository(cur)
     repo.merge_into(target_id, source_id)
     repo.update_sources(target_id)
     emit_event(
