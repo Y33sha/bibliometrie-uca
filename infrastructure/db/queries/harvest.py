@@ -60,7 +60,7 @@ def fill_source_person_orcid_if_null(cur: Any, source_person_id: int, orcid: str
     cur.execute(
         """
         UPDATE source_persons
-        SET orcid = COALESCE(orcid, %s), updated_at = now()
+        SET orcid = COALESCE(orcid, %s)
         WHERE id = %s AND orcid IS NULL
         """,
         (orcid, source_person_id),
@@ -73,7 +73,7 @@ def fill_source_person_idref_if_null(cur: Any, source_person_id: int, idref: str
     cur.execute(
         """
         UPDATE source_persons
-        SET idref = COALESCE(idref, %s), updated_at = now()
+        SET idref = COALESCE(idref, %s)
         WHERE id = %s AND idref IS NULL
         """,
         (idref, source_person_id),
