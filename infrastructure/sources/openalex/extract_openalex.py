@@ -22,12 +22,17 @@ from infrastructure.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import (
     get_api_base_urls,
+    get_extraction_api_ids,
     get_openalex_api_key,
     get_openalex_email,
-    get_openalex_institution_ids,
     get_years,
 )
-from infrastructure.sources.base import ExtractionStats, SourceExtractor, run_extractor
+from infrastructure.sources.base import (
+    ExtractionConfigError,
+    ExtractionStats,
+    SourceExtractor,
+    run_extractor,
+)
 from infrastructure.sources.common import compute_hash, setup_logger
 from infrastructure.sources.openalex import (
     SELECT_FIELDS,
@@ -250,7 +255,12 @@ class OpenalexExtractor(SourceExtractor):
         )
 
     def load_config(self, cur: Any) -> dict[str, Any]:
-        institution_ids = get_openalex_institution_ids(cur)
+        institution_ids = get_extraction_api_ids(cur, "openalex")
+        if not institution_ids:
+            raise ExtractionConfigError(
+                "aucun institution_id OpenAlex configuré "
+                "(structures.api_ids->'openalex' vide pour le périmètre d'extraction)"
+            )
         init_auth(api_key=get_openalex_api_key(cur), email=get_openalex_email(cur))
         return {
             "institution_ids": institution_ids,

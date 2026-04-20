@@ -18,7 +18,6 @@ L'identifiant unique est :
 
 import argparse
 import os
-import sys
 import time
 from typing import Any
 
@@ -26,8 +25,13 @@ from psycopg2.extras import Json
 
 from infrastructure.api_limits import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
-from infrastructure.app_config import get_api_base_urls, get_theses_etab_ppns
-from infrastructure.sources.base import ExtractionStats, SourceExtractor, run_extractor
+from infrastructure.app_config import get_api_base_urls, get_extraction_api_ids
+from infrastructure.sources.base import (
+    ExtractionConfigError,
+    ExtractionStats,
+    SourceExtractor,
+    run_extractor,
+)
 from infrastructure.sources.common import compute_hash, setup_logger
 
 logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
@@ -183,18 +187,20 @@ class ThesesExtractor(SourceExtractor):
         parser.add_argument("--en-cours", action="store_true", help="Thèses en cours uniquement")
 
     def load_config(self, cur: Any) -> dict[str, Any]:
+        ppns = get_extraction_api_ids(cur, "theses")
+        if not ppns:
+            raise ExtractionConfigError(
+                "aucun PPN d'établissement theses.fr configuré "
+                "(structures.api_ids->'theses' vide pour le périmètre d'extraction)"
+            )
         return {
-            "ppns": get_theses_etab_ppns(cur),
+            "ppns": ppns,
             "base_url": get_api_base_urls(cur).get(
                 "theses", "https://theses.fr/api/v1/theses/recherche/"
             ),
         }
 
     def setup_logging(self, args: argparse.Namespace, config: dict[str, Any]) -> None:
-        if not config["ppns"]:
-            self.logger.error("Aucun PPN configuré (clé 'theses_etab_ppns' dans config)")
-            self.conn.close()
-            sys.exit(1)
         self.logger.info(f"Établissements PPN : {config['ppns']}")
         self.logger.info(f"Statuts : {_resolve_statuses(args)}")
 
