@@ -1,8 +1,7 @@
 """Persons router: directory, search, list, profile, merge, identifiers, admin.
 
 Toutes les queries SQL sont dans :
-- `infrastructure/db/queries/persons.py` (endpoints principaux)
-- `infrastructure/db/queries/persons_admin.py` (orphan-authorships)
+- `infrastructure/db/queries/persons/` (lectures principales + admin)
 - `infrastructure/db/queries/duplicates.py` (doublons personnes)
 
 Les mutations délèguent à `application.persons` et `application.authorships`.
@@ -31,7 +30,7 @@ from application.persons import (
 )
 from domain.sources import ALL_SOURCES_SET
 from infrastructure.db.queries import persons as persons_queries
-from infrastructure.db.queries import persons_admin as admin_queries
+from infrastructure.db.queries.persons import admin as admin_queries
 from infrastructure.repositories import authorship_repository, person_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.filters import parse_str_csv
