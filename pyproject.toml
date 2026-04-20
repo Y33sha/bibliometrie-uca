@@ -63,28 +63,42 @@ optional_dependencies_dev_groups = ["dev"]
 root_packages = ["domain", "application", "infrastructure", "interfaces"]
 
 [[tool.importlinter.contracts]]
-name = "Le domaine est un noyau pur"
-type = "forbidden"
-source_modules = ["domain"]
-forbidden_modules = ["application", "infrastructure", "interfaces"]
-
-[[tool.importlinter.contracts]]
-name = "Application ne dépend pas de interfaces"
-type = "forbidden"
-source_modules = ["application"]
-forbidden_modules = ["interfaces"]
-
-[[tool.importlinter.contracts]]
-name = "Infrastructure ne dépend pas de interfaces"
-type = "forbidden"
-source_modules = ["infrastructure"]
-forbidden_modules = ["interfaces"]
-
-[[tool.importlinter.contracts]]
-name = "Infrastructure ne dépend pas de application"
-type = "forbidden"
-source_modules = ["infrastructure"]
-forbidden_modules = ["application"]
+name = "Couches DDD (layered)"
+type = "layers"
+layers = [
+    "interfaces",
+    "infrastructure | application",
+    "domain",
+]
+# Violations connues `application → infrastructure` verrouillées à date du
+# merge §1.6. Nettoyage suivi en §1.7b : chaque refacto = une ligne retirée.
+ignore_imports = [
+    # Services applicatifs → infrastructure.repositories (7)
+    "application.config -> infrastructure.repositories.config_repository",
+    "application.journals -> infrastructure.repositories.journal_repository",
+    "application.authorships -> infrastructure.repositories.authorship_repository",
+    "application.publications -> infrastructure.repositories.publication_repository",
+    "application.addresses -> infrastructure.repositories.address_repository",
+    "application.persons -> infrastructure.repositories.person_repository",
+    "application.structures -> infrastructure.repositories.structure_repository",
+    # Pipeline normalize_* → helpers infrastructure (14)
+    "application.pipeline.normalize.normalize_hal -> infrastructure.addresses",
+    "application.pipeline.normalize.normalize_openalex -> infrastructure.addresses",
+    "application.pipeline.normalize.normalize_theses -> infrastructure.addresses",
+    "application.pipeline.normalize.normalize_scanr -> infrastructure.addresses",
+    "application.pipeline.normalize.normalize_hal -> infrastructure.db_helpers",
+    "application.pipeline.normalize.normalize_wos -> infrastructure.db_helpers",
+    "application.pipeline.normalize.normalize_openalex -> infrastructure.db_helpers",
+    "application.pipeline.normalize.normalize_theses -> infrastructure.db_helpers",
+    "application.pipeline.normalize.normalize_scanr -> infrastructure.db_helpers",
+    "application.pipeline.normalize.normalize_hal -> infrastructure.zenodo",
+    "application.pipeline.normalize.normalize_openalex -> infrastructure.zenodo",
+    "application.pipeline.normalize.normalize_openalex -> infrastructure.openalex",
+    "application.pipeline.normalize.normalize_hal -> infrastructure.timings",
+    "application.pipeline.normalize.normalize_wos -> infrastructure.timings",
+    # application.authorships → infrastructure.perimeter (1)
+    "application.authorships -> infrastructure.perimeter",
+]
 
 [tool.deptry.per_rule_ignores]
 # python-dotenv n'est pas importé directement, mais pydantic-settings
