@@ -1,44 +1,19 @@
 /**
  * Types et helpers partagés par la page `admin/structures` et ses sous-composants.
+ *
+ * Les types de réponses API proviennent du schéma OpenAPI généré
+ * (`$lib/api/schema.ts`) ; seuls les états d'UI locaux et helpers restent ici.
  */
 
-export interface Structure {
-  id: number;
-  code: string;
-  name: string;
-  acronym: string | null;
-  type: string;
-  ror_id: string | null;
-  rnsr_id: string | null;
-  hal_collection: string | null;
-  api_ids: Record<string, string[]> | null;
-}
+import type { components } from "$lib/api/schema";
 
-export interface RelatedStructure {
-  id: number;
-  code: string;
-  name: string;
-  acronym: string | null;
-  type: string;
-  relation_id: number;
-  relation_type: string;
-}
+// ── Types API (générés) ──
+export type Structure = components["schemas"]["StructureOut"];
+export type RelatedStructure = components["schemas"]["RelatedStructureOut"];
+export type NameForm = components["schemas"]["NameFormOut"];
+export type StructureDetail = components["schemas"]["StructureDetailResponse"];
 
-export interface NameForm {
-  id: number;
-  form_text: string;
-  is_word_boundary: boolean;
-  is_excluding: boolean;
-  requires_context_of: number[] | null;
-}
-
-export interface StructureDetail {
-  structure: Structure;
-  parents: RelatedStructure[];
-  children: RelatedStructure[];
-  forms: NameForm[];
-}
-
+// ── État UI local ──
 export interface EditFormState {
   id: number;
   form_text: string;
@@ -46,6 +21,7 @@ export interface EditFormState {
   is_excluding: boolean;
 }
 
+// ── Constantes ──
 export const API_SOURCES = ["openalex", "wos", "scanr", "theses"] as const;
 
 export const API_SOURCE_LABELS: Record<string, string> = {
@@ -55,6 +31,7 @@ export const API_SOURCE_LABELS: Record<string, string> = {
   theses: "theses.fr (PPN IdRef)",
 };
 
+// ── Helpers ──
 export function rorShortId(rorId: string): string {
   return rorId.replace("https://ror.org/", "");
 }
