@@ -401,3 +401,247 @@ class TestExtractNntFromOpenalex:
 
     def test_no_location(self):
         assert extract_nnt_from_openalex({}) is None
+
+
+# ── theses.fr ────────────────────────────────────────────────────
+
+from application.pipeline.normalize.normalize_theses import (
+    _build_source_meta,
+    _extract_thesis_author,
+    _parse_date_iso,
+    _thesis_author_compatible,
+    extract_pub_metadata,
+)
+
+
+class TestThesesExtractAuthor:
+    def test_standard(self):
+        these = {"auteurs": [{"nom": "Dupont", "prenom": "Jean"}]}
+        assert _extract_thesis_author(these) == ("dupont", "jean")
+
+    def test_uppercase_and_accents(self):
+        these = {"auteurs": [{"nom": "LÉCOZ", "prenom": "Héloïse"}]}
+        assert _extract_thesis_author(these) == ("lecoz", "heloise")
+
+    def test_no_auteurs(self):
+        assert _extract_thesis_author({}) is None
+        assert _extract_thesis_author({"auteurs": []}) is None
+
+    def test_only_firstname(self):
+        """Pas de nom → None (ln vide)."""
+        these = {"auteurs": [{"nom": "", "prenom": "Jean"}]}
+        assert _extract_thesis_author(these) is None
+
+    def test_missing_first_name(self):
+        these = {"auteurs": [{"nom": "Dupont"}]}
+        assert _extract_thesis_author(these) == ("dupont", "")
+
+
+class TestThesesParseDateIso:
+    def test_standard(self):
+        assert _parse_date_iso("15/03/2023") == "2023-03-15"
+
+    def test_leading_spaces(self):
+        assert _parse_date_iso("  15/03/2023  ") == "2023-03-15"
+
+    def test_none(self):
+        assert _parse_date_iso(None) is None
+
+    def test_empty(self):
+        assert _parse_date_iso("") is None
+
+    def test_malformed(self):
+        """Moins de 3 parties → IndexError capturée → None."""
+        assert _parse_date_iso("2023") is None
+        assert _parse_date_iso("15/03") is None
+
+
+class TestThesesExtractPubMetadata:
+    def test_soutenue(self):
+        these = {
+            "titrePrincipal": "Titre de la thèse",
+            "dateSoutenance": "15/03/2023",
+            "doi": "10.1234/test",
+            "nnt": "2023ucfa0069",
+        }
+        meta = extract_pub_metadata(these)
+        assert meta["title"] == "Titre de la thèse"
+        assert meta["doc_type"] == "thesis"
+        assert meta["pub_year"] == 2023
+        assert meta["doi"] == "10.1234/test"
+        assert meta["nnt"] == "2023UCFA0069"
+        assert meta["oa_status"] == "closed"
+        assert meta["journal_id"] is None
+        assert meta["title_normalized"]  # non vide
+
+    def test_en_cours_falls_back_to_inscription(self):
+        these = {
+            "titrePrincipal": "Thèse en cours",
+            "datePremiereInscriptionDoctorat": "01/09/2022",
+        }
+        meta = extract_pub_metadata(these)
+        assert meta["doc_type"] == "ongoing_thesis"
+        assert meta["pub_year"] == 2022
+        assert meta["doi"] is None
+        assert meta["nnt"] is None
+
+    def test_no_dates(self):
+        meta = extract_pub_metadata({"titrePrincipal": "X"})
+        assert meta["doc_type"] == "ongoing_thesis"
+        assert meta["pub_year"] is None
+
+    def test_malformed_date(self):
+        """Date non parseable → pub_year reste None."""
+        meta = extract_pub_metadata(
+            {"titrePrincipal": "X", "dateSoutenance": "date-invalide"}
+        )
+        assert meta["pub_year"] is None
+
+    def test_no_title(self):
+        meta = extract_pub_metadata({})
+        assert meta["title"] is None
+        assert meta["title_normalized"] is None
+
+
+class TestThesesBuildSourceMeta:
+    def test_full(self):
+        these = {
+            "dateSoutenance": "15/03/2023",
+            "datePremiereInscriptionDoctorat": "01/09/2020",
+            "discipline": "Informatique",
+            "ecolesDoctorale": [{"nom": "SPI", "ppn": "028"}, {"nom": ""}],
+            "partenairesDeRecherche": [
+                {"nom": "LIMOS", "type": "lab"},
+                {"nom": "CNRS", "type": "org"},
+            ],
+        }
+        meta = _build_source_meta(these)
+        assert meta == {
+            "date_soutenance": "2023-03-15",
+            "date_inscription": "2020-09-01",
+            "discipline": "Informatique",
+            "ecoles_doctorales": [{"nom": "SPI", "ppn": "028"}],
+            "partenaires": [
+                {"nom": "LIMOS", "type": "lab"},
+                {"nom": "CNRS", "type": "org"},
+            ],
+        }
+
+    def test_empty(self):
+        """Sans aucun champ exploitable → None."""
+        assert _build_source_meta({}) is None
+
+    def test_partial(self):
+        meta = _build_source_meta({"discipline": "Physique"})
+        assert meta == {"discipline": "Physique"}
+
+    def test_filters_entries_without_nom(self):
+        these = {
+            "ecolesDoctorale": [{"nom": ""}, {"ppn": "123"}],
+            "partenairesDeRecherche": [{"type": "lab"}],
+        }
+        assert _build_source_meta(these) is None
+
+
+class TestThesesAuthorCompatible:
+    """_thesis_author_compatible accepte des variations d'ordre/particules."""
+
+    class _StubQueries:
+        def __init__(self, primary):
+            self._primary = primary
+
+        def fetch_thesis_primary_author(self, cur, pub_id):
+            return self._primary
+
+    def test_exact_match(self):
+        q = self._StubQueries(("Dupont", "Jean"))
+        assert _thesis_author_compatible(None, q, 1, ("dupont", "jean")) is True
+
+    def test_no_primary_author_accepts(self):
+        """Pas d'auteur connu → on accepte le match (titre+année suffisent)."""
+        q = self._StubQueries(None)
+        assert _thesis_author_compatible(None, q, 1, ("dupont", "jean")) is True
+
+    def test_empty_primary_last_name_accepts(self):
+        q = self._StubQueries(("", ""))
+        assert _thesis_author_compatible(None, q, 1, ("dupont", "jean")) is True
+
+    def test_incompatible_names(self):
+        q = self._StubQueries(("Martin", "Paul"))
+        assert _thesis_author_compatible(None, q, 1, ("dupont", "jean")) is False
+
+    def test_token_fallback_particule(self):
+        """Gère les particules (Ben, Le…) via set des tokens identiques."""
+        q = self._StubQueries(("Ben Ali", "Mohammed"))
+        assert (
+            _thesis_author_compatible(None, q, 1, ("mohammed", "ben ali")) is True
+        )
+
+
+# ── authorship_roles ─────────────────────────────────────────────
+
+from domain.authorship_roles import map_role, merge_roles
+
+
+class TestMapRole:
+    def test_hal_standard(self):
+        assert map_role("hal", "aut") == (["author"], False)
+
+    def test_hal_corresponding(self):
+        assert map_role("hal", "crp") == (["author"], True)
+
+    def test_wos_author(self):
+        assert map_role("wos", "author") == (["author"], False)
+
+    def test_scanr_thesis_director(self):
+        assert map_role("scanr", "directeurthese") == (["thesis_director"], False)
+
+    def test_empty_role_defaults_to_author(self):
+        assert map_role("hal", None) == (["author"], False)
+        assert map_role("hal", "") == (["author"], False)
+
+    def test_unknown_source_defaults_to_author(self):
+        assert map_role("unknown", "aut") == (["author"], False)
+
+    def test_unknown_role_returns_other(self):
+        assert map_role("hal", "no_such_role_xyz") == (["other"], False)
+
+    def test_case_insensitive_fallback(self):
+        assert map_role("hal", "AUT") == (["author"], False)
+
+    def test_strips_whitespace(self):
+        assert map_role("hal", "  aut  ") == (["author"], False)
+
+
+class TestMergeRoles:
+    def test_single_role(self):
+        assert merge_roles([["author"]]) == ["author"]
+
+    def test_dedup(self):
+        assert merge_roles([["author"], ["author"]]) == ["author"]
+
+    def test_union(self):
+        assert merge_roles([["author"], ["editor"]]) == ["author", "editor"]
+
+    def test_sorted_output(self):
+        """Le résultat est trié alphabétiquement."""
+        result = merge_roles([["editor", "author", "translator"]])
+        assert result == sorted(result)
+
+    def test_drops_jury_member_when_specific_role_present(self):
+        """Si thesis_director/rapporteur/jury_president → jury_member redondant."""
+        assert "jury_member" not in merge_roles(
+            [["thesis_director", "jury_member"]]
+        )
+        assert "jury_member" not in merge_roles([["rapporteur", "jury_member"]])
+        assert "jury_member" not in merge_roles(
+            [["jury_president", "jury_member"]]
+        )
+
+    def test_keeps_jury_member_alone(self):
+        """Sans rôle spécifique, jury_member est conservé."""
+        assert merge_roles([["jury_member"]]) == ["jury_member"]
+
+    def test_empty(self):
+        assert merge_roles([[]]) == []
+        assert merge_roles([]) == []
