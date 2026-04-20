@@ -2487,6 +2487,14 @@ export interface components {
              */
             first_name: string;
         };
+        /**
+         * CreatedIdResponse
+         * @description Réponse générique : `{id: int}` après création.
+         */
+        CreatedIdResponse: {
+            /** Id */
+            id: number;
+        };
         /** DeletedResponse */
         DeletedResponse: {
             /**
@@ -3515,6 +3523,37 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /**
+         * PerimeterOut
+         * @description Périmètre + ses structures racines (résolues + comptage effectif).
+         */
+        PerimeterOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Structure Ids */
+            structure_ids: number[];
+            /** Structures */
+            structures: components["schemas"]["PerimeterStructureItem"][];
+            /** Structure Count */
+            structure_count: number;
+        };
+        /** PerimeterStructureItem */
+        PerimeterStructureItem: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Code */
+            code: string;
+        };
         /** PerimeterUpdate */
         PerimeterUpdate: {
             /** Name */
@@ -4352,6 +4391,14 @@ export interface components {
             publisher_count: number;
             /** Journal Count */
             journal_count: number;
+        };
+        /**
+         * StatusResponse
+         * @description Réponse générique : `{status: str}` (mutations sans corps utile).
+         */
+        StatusResponse: {
+            /** Status */
+            status: string;
         };
         /** StrValueFacet */
         StrValueFacet: {
@@ -7778,7 +7825,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PerimeterOut"][];
                 };
             };
         };
@@ -7802,7 +7849,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedIdResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7837,7 +7884,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7868,7 +7915,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7903,7 +7950,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StatusResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7935,7 +7982,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StatusResponse"];
                 };
             };
             /** @description Validation Error */
