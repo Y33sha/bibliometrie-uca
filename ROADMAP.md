@@ -6,7 +6,7 @@ Synthèse de l'audit DSI (avril 2026) — ROI décroissant (impact / effort) :
 
 1. [x] **§1.7b** — Lever les 14 `ignore_imports` pipeline. Effort faible, débloque la testabilité unitaire des `normalize_*` et fige la cohérence DDD avant transmission. *Clôturé le 2026-04-20.*
 2. [x] **§2.10** — Découper les 4 fichiers backend monolithiques (`queries/publications.py` 1140 LOC, `queries/persons.py` 711, `repositories/person_repository.py` 665, `queries/stats.py` 630). Effort moyen, impact maintenabilité + testabilité. *Clôturé le 2026-04-20.*
-3. [ ] **§2.1 +§2.2** — Remonter `fail_under` de 49 → 60+ en ciblant `infrastructure/db/queries/*` (unitaires). Effort moyen, réduit le risque de régression en prod.
+3. [~] **§2.1 +§2.2** — Remonter `fail_under` de 49 → 60+ en ciblant `infrastructure/db/queries/*`. Effort moyen, réduit le risque de régression en prod. *Partiel au 2026-04-20 : phases A→C faites, couverture 50.27 % → 56.34 %, `fail_under = 55`. Pour franchir 60 il faudrait élargir aux routers API (phase D non faite).*
 4. [ ] **§2.7.4** — Découper les 3 routes Svelte > 1000 LOC (`admin/structures` 1572, `admin/persons` 1263, `publications/[id]` 1132). Effort moyen, impact UX + maintenabilité.
 5. [ ] **§2.7.3** — Généraliser les types OpenAPI aux ~29 endpoints restants (~88 interfaces locales à éliminer). Effort moyen, impact cohérence front/back.
 6. [ ] **§2.6** — `CONTRIBUTING.md` + descriptions OpenAPI. Effort faible, impact onboarding DSI.
@@ -135,10 +135,14 @@ pytest-unit). Mypy strict (`check_untyped_defs` + `disallow_untyped_defs`)
 en CI et pre-commit, 0 erreur. Toutes les fonctions annotées (souvent
 `Any` pragmatique pour les params DB).
 - [x] **Couverture** : `pytest --cov` en CI. Seuil actuel
-  `fail_under = 49`, baseline réelle ~49.7%. `interfaces/cli/*`
+  `fail_under = 55`, baseline réelle ~56.3 %. `interfaces/cli/*`
   exclu (scripts one-shot, logique utile testée via
-  application/infrastructure). À faire remonter par paliers quand un
-  chantier touche un module 0% (enrich, merge, harvest, queries/*).
+  application/infrastructure). Remontée de 49 → 55 dans le chantier
+  §2.1 (phases A→C : tests ajoutés sur 14 modules `queries/*`, 2 bugs
+  latents exposés et corrigés — `authorships_stats` et
+  `harvest.fill_source_person_*_if_null`). Pour dépasser 60, phase D
+  (tests sur les routers les moins couverts : `addresses`, `persons`)
+  non planifiée pour l'instant.
 
 ### 2.2 Organisation des tests
 `tests/unit/` + `tests/integration/` (sous-dossiers `domain/`,
