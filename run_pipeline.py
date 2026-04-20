@@ -56,7 +56,7 @@ logging.basicConfig(
 log = logging.getLogger("pipeline")
 
 BASE = Path(__file__).resolve().parent
-STATUS_FILE = BASE / "application" / "pipeline" / "status.json"
+STATUS_FILE = BASE / "logs" / "status.json"
 
 
 def _write_status(

@@ -1,8 +1,8 @@
 # Imports manuels (RH, APC, exports WoS)
 imports_manuels/
 
-# Logs
-*.log
+# Logs, rapports pipeline et status.json
+logs/
 
 # Python
 __pycache__/
@@ -32,6 +32,3 @@ db/backup/
 
 # Claude Code
 .claude/
-pipeline/reports/*.md
-pipeline/reports/sandbox/
-pipeline/status.json

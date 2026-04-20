@@ -10,9 +10,9 @@ from fastapi import APIRouter, HTTPException
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-BASE = Path(__file__).resolve().parent.parent.parent
-REPORTS_DIR = BASE / "pipeline" / "reports"
-STATUS_FILE = BASE / "pipeline" / "status.json"
+BASE = Path(__file__).resolve().parent.parent.parent.parent
+REPORTS_DIR = BASE / "logs" / "reports"
+STATUS_FILE = BASE / "logs" / "status.json"
 
 
 @router.get("/api/admin/pipeline/status")
@@ -26,7 +26,7 @@ async def pipeline_status() -> Any:
         return None
 
 
-CRON_LOG = BASE / "processing" / "logs" / "cron.log"
+CRON_LOG = BASE / "logs" / "cron.log"
 
 
 @router.get("/api/admin/pipeline/logs")
