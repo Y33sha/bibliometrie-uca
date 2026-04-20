@@ -40,7 +40,10 @@ class PgAddressLinker:
         else:
             cur.execute("SELECT id FROM addresses WHERE md5(raw_text) = md5(%s)", (text,))
             row = cur.fetchone()
-            addr_id = row[0] if row else None
+            if row:
+                addr_id = row[0] if isinstance(row, tuple) else row["id"]
+            else:
+                addr_id = None
 
         if addr_id:
             self._cache[text] = addr_id
