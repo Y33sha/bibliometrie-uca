@@ -52,7 +52,7 @@ def read_new_logs(offsets: dict[str, int]) -> str:
             content = fh.read().rstrip()
         if content:
             rel = f.relative_to(BASE)
-            parts.append(f"### {rel}\n```\n{content}\n```")
+            parts.append(f"### {rel.as_posix()}\n```\n{content}\n```")
     return "\n\n".join(parts)
 
 
