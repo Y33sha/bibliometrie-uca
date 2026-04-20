@@ -263,7 +263,7 @@ def phase_countries(**kw: Any) -> Any:
 def _run_create_publications() -> None:
     from application.pipeline.publications.create_publications import run
     from infrastructure.db.connection import get_connection
-    from infrastructure.db.queries.publications_create import PgPublicationsCreateQueries
+    from infrastructure.db.queries.publications.create import PgPublicationsCreateQueries
     from infrastructure.repositories import publication_repository
 
     log.info("▶ create_publications")
@@ -286,7 +286,7 @@ def _run_create_publications() -> None:
 def _run_create_persons() -> None:
     from application.pipeline.persons.create_persons_from_source_authorships import run
     from infrastructure.db.connection import get_connection
-    from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
+    from infrastructure.db.queries.persons.create import PgPersonsCreateQueries
     from infrastructure.repositories import person_repository
 
     log.info("▶ create_persons_from_source_authorships")

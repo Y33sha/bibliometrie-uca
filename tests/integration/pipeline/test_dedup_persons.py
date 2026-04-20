@@ -8,7 +8,7 @@ Chaque test tourne dans une transaction rollbackée (isolation complète).
 import logging
 
 from application.persons import add_identifier, add_name_form, create_person
-from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
+from infrastructure.db.queries.persons.create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
 
 _queries = PgPersonsCreateQueries()

@@ -5,7 +5,7 @@
 Synthèse de l'audit DSI (avril 2026) — ROI décroissant (impact / effort) :
 
 1. [x] **§1.7b** — Lever les 14 `ignore_imports` pipeline. Effort faible, débloque la testabilité unitaire des `normalize_*` et fige la cohérence DDD avant transmission. *Clôturé le 2026-04-20.*
-2. [ ] **§2.10** — Découper les 4 fichiers backend monolithiques (`queries/publications.py` 1140 LOC, `queries/persons.py` 711, `repositories/person_repository.py` 665, `queries/stats.py` 630). Effort moyen, impact maintenabilité + testabilité.
+2. [x] **§2.10** — Découper les 4 fichiers backend monolithiques (`queries/publications.py` 1140 LOC, `queries/persons.py` 711, `repositories/person_repository.py` 665, `queries/stats.py` 630). Effort moyen, impact maintenabilité + testabilité. *Clôturé le 2026-04-20.*
 3. [ ] **§2.1 +§2.2** — Remonter `fail_under` de 49 → 60+ en ciblant `infrastructure/db/queries/*` (unitaires). Effort moyen, réduit le risque de régression en prod.
 4. [ ] **§2.7.4** — Découper les 3 routes Svelte > 1000 LOC (`admin/structures` 1572, `admin/persons` 1263, `publications/[id]` 1132). Effort moyen, impact UX + maintenabilité.
 5. [ ] **§2.7.3** — Généraliser les types OpenAPI aux ~29 endpoints restants (~88 interfaces locales à éliminer). Effort moyen, impact cohérence front/back.
@@ -119,24 +119,6 @@ Contrat `layers` unique actif : `interfaces > infrastructure |
 application > domain` (siblings au même niveau — ni l'un ni l'autre
 ne peut importer l'autre ; les deux peuvent importer domain ;
 interfaces peut tout importer). Vérifié en pre-commit + CI.
-
-#### §1.7b — Lever les `ignore_imports` (grandfather clause) — clôturé
-- [x] 7/7 repositories portés (config, authorships, addresses, structures,
-  journals, persons, publications).
-- [x] Helpers purs déplacés hors de `infrastructure/` : `is_zenodo_doi` +
-  `ZenodoResolutionError` → `domain/zenodo.py`, `is_theses_fr_source` +
-  `extract_nnt_from_openalex` → `application/pipeline/normalize/openalex_parsing.py`,
-  `StepTimer` → `application/pipeline/timings.py`.
-- [x] `resolve_zenodo_doi` (HTTP) → port `ZenodoResolver` +
-  adapter `HttpZenodoResolver`.
-- [x] `link_addresses` (SQL) → port `AddressLinker` + adapter
-  `PgAddressLinker` (cache instance-level).
-- [x] `mark_staging_done` (SQL) → méthode `mark_done` sur le port
-  `StagingQueries` existant.
-- [x] `get_persons_structure_ids_list` → port `PerimeterQueries` +
-  adapter `PgPerimeterQueries`.
-- Les 15 lignes `ignore_imports` ont été retirées ; le contrat
-  `layers` de import-linter n'a plus de clause de grandfathering.
 
 ### 1.8 Audit périodique
 - [x] Parcours régulier pour repérer : SQL mal placé, dépendances dans le
@@ -308,24 +290,25 @@ n'est détecté qu'en UI manuel.
   `domain/names.py`, SQL dans `admin_person_duplicates.py`) — à
   unifier si la logique diverge.
 
-### 2.10 Découpe des modules backend monolithiques — nouveau
-Audit : 4 fichiers concentrent une part disproportionnée de la logique
-SQL ; impossible de tester une fonction isolée sans charger tout le
-fichier. Cible : aucun fichier au-dessus de ~400 LOC dans `queries/`
-et `repositories/`.
-- [ ] `infrastructure/db/queries/publications.py` (**1140 LOC**) —
-  scinder par thème : `publications_read.py` (list, find_by_*),
-  `publications_facets.py` (le `_PublicationFacetsBuilder` et ses
-  `_facet_*`), `publications_merge.py` (JSONB, priorités sources,
-  topics, OA status).
-- [ ] `infrastructure/db/queries/persons.py` (**711 LOC**) — scinder :
-  `persons_read.py`, `persons_facets.py`, `persons_write.py`.
-- [ ] `infrastructure/repositories/person_repository.py` (**665 LOC**)
-  — scinder : `person_repository_read.py` (find_by_*),
-  `person_repository_write.py` (batch ops, merge).
-- [ ] `infrastructure/db/queries/stats.py` (**630 LOC**) — scinder par
-  type d'agrégat (publications / personnes / laboratoires / time
-  series).
+### 2.10 Découpe des modules backend monolithiques — clôturé
+- [x] `infrastructure/db/queries/publications.py` (1140 LOC) →
+  package `publications/` : `list.py`, `facets.py`, `detail.py` +
+  `create.py` absorbé depuis `publications_create.py`.
+- [x] `infrastructure/db/queries/persons.py` (711 LOC) → package
+  `persons/` : `list.py`, `facets.py`, `detail.py`, `admin.py`
+  (orphan authorships + HAL duplicate accounts) + `create.py` absorbé
+  depuis `persons_create.py`. La partie qualité HAL au niveau des
+  publications (initialement dans `persons_admin.py`) a été extraite
+  dans le nouveau `hal_problems.py`, miroir du router du même nom.
+- [x] `infrastructure/repositories/person_repository.py` (665 LOC) →
+  package `person_repository/` : `_core.py`, `_identifiers.py`,
+  `_authorships.py`, `_name_forms.py`. La classe
+  `PgPersonRepository` dans `__init__.py` délègue aux fonctions
+  libres de chaque sous-module, elle ne contient plus de SQL.
+- [x] `infrastructure/db/queries/stats.py` (630 LOC) → package
+  `stats/` : `publishers.py`, `journals.py`, `labs.py`, `summary.py`
+  (by_year + summary + facets + available_years) + `_shared.py`
+  (filtre APC + pagination).
 - Règle future : quand un fichier `queries/*` ou `repositories/*`
   dépasse 500 LOC, scinder dans le même chantier.
 

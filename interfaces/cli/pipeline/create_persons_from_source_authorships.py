@@ -5,7 +5,7 @@ import os
 
 from application.pipeline.persons.create_persons_from_source_authorships import run
 from infrastructure.db.connection import get_connection
-from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
+from infrastructure.db.queries.persons.create import PgPersonsCreateQueries
 from infrastructure.log import setup_logger
 from infrastructure.repositories import person_repository
 

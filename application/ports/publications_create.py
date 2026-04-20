@@ -1,6 +1,6 @@
 """Port : SQL du script `create_publications`.
 
-Implémenté par `infrastructure.db.queries.publications_create.PgPublicationsCreateQueries`.
+Implémenté par `infrastructure.db.queries.publications.create.PgPublicationsCreateQueries`.
 """
 
 from typing import Any, Protocol

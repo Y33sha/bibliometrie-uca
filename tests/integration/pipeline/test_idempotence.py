@@ -960,7 +960,7 @@ def _run_create_persons(db):
         step2_orcid,
         step3_name_forms,
     )
-    from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
+    from infrastructure.db.queries.persons.create import PgPersonsCreateQueries
     from infrastructure.repositories import person_repository
 
     queries = PgPersonsCreateQueries()
