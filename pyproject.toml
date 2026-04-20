@@ -8,7 +8,9 @@ version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
     "requests==2.33.0",          # CVE-2024-35195, CVE-2024-47081, CVE-2026-25645 fixed
-    "psycopg2-binary==2.9.11",
+    "psycopg2-binary==2.9.11",  # à retirer en fin de migration psycopg3
+    "psycopg[binary]==3.3.3",
+    "psycopg-pool==3.3.0",
     "fastapi==0.128.2",
     "uvicorn==0.40.0",
     "bcrypt==5.0.0",
@@ -78,6 +80,7 @@ DEP002 = ["python-dotenv"]
 # différer : `psycopg2-binary` installe le module `psycopg2`, etc.).
 [tool.deptry.package_module_name_map]
 psycopg2-binary = "psycopg2"
+psycopg-pool = "psycopg_pool"
 pydantic-settings = "pydantic_settings"
 
 # ----------------------------------------------------------------------
