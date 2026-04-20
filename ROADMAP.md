@@ -2,218 +2,120 @@
 
 ## Chantier transition DDD
 
-La transition vers une architecture hexagonale est bien avancée : les
-4 couches `domain/`, `application/`, `infrastructure/`, `interfaces/`
-sont en place, les ports Protocol existent pour les 7 repositories,
-le SQL est extrait des services. Ce qui reste :
+Architecture hexagonale en place : 4 couches `domain/`, `application/`,
+`infrastructure/`, `interfaces/` ; ports Protocol pour les 7
+repositories ; SQL extrait des services et des orchestrateurs pipeline.
 
 ### 1.1 Sortir le SQL qui traîne encore dans les routers
-- [x] Nouveau module `infrastructure/db/queries/` : accueille les
-  query services extraits (CQRS-lite, SQL = infrastructure).
-- [x] `filters.py` SQL (PUB_IS_UCA, apply_*_filter) déplacé de
-  `interfaces/api/filters.py` vers `infrastructure/db/queries/filters.py`.
-- [x] **pub_stats** : 643 → 175 lignes (`stats.py`)
-- [x] **publications** : 1222 → 199 lignes (`publications.py`)
-- [x] **persons** : 1807 → 512 lignes (`persons.py` + `persons_admin.py`)
-- [x] **addresses** : 487 → 197 lignes (`addresses.py`)
-- [x] **laboratories** : 449 → 70 lignes (`laboratories.py`)
-- [x] **admin_duplicates + admin_person_duplicates** : 595 → 125 lignes
-  (`duplicates.py` consolidé)
-- [x] **authorships** : 273 → 51 lignes (`authorships.py`)
+Extraction faite sur les 7 routers critiques (pub_stats, publications,
+persons, addresses, laboratories, duplicates, authorships) — SQL
+centralisé dans `infrastructure/db/queries/`.
 - [ ] **Reliquat** (petits routers — existence checks + lookups simples,
   acceptables selon CQRS-lite) : feedback, structures, journals,
   publishers, config, stats. ~30 `cur.execute` au total, la plupart
   étant des `SELECT id WHERE id = %s`.
 
 ### 1.2 Factoriser la logique commune aux sources
-- [x] **SourceNormalizer** (`application/pipeline/normalize/base.py`) :
-  capture argparse + cycle connexion + --reset + comptage + boucle +
-  commit périodique + summary. Hooks pour variations (USE_DICT_CURSOR,
-  USE_SAVEPOINT, FETCH_SUB_BATCH, preload_caches, post_process).
-  5 normalizers migrés, chaque `main()` passe de 50-130 lignes à 10.
-- [x] **SourceExtractor** (`infrastructure/sources/base.py`) :
-  capture argparse + cycle connexion + existing_ids + try/except
-  (HTTPError, KeyboardInterrupt) + summary. Chaque source drive sa
-  propre itération (cursor / search_after / firstRecord / collections
-  × pages) via `extract_all()`. 5 extractors migrés.
-- [ ] Ajouter une nouvelle source (CrossRef, ArXiv, PubMed,
-  DataCite) : ne nécessite plus qu'un subclass + `load_config()` +
-  `extract_all()` côté extractor, `process_work()` côté normalizer.
+`SourceNormalizer` et `SourceExtractor` factorisent le boilerplate
+(argparse, cycle connexion, try/except, summary). Ajouter une nouvelle
+source (CrossRef, ArXiv, PubMed, DataCite) = un subclass +
+`load_config()` + `extract_all()` côté extractor, `process_work()`
+côté normalizer.
 
 ### 1.3 Module `facets`
 - [ ] La logique de facettes dynamiques est dupliquée entre plusieurs
-routers (publications, persons, laboratoires). À factoriser dans un
-module dédié — typiquement un specification pattern ou un query
-builder spécialisé.
+  routers (publications, persons, laboratoires). À factoriser dans un
+  module dédié — typiquement un specification pattern ou un query
+  builder spécialisé.
 
 ### 1.4 Entités riches dans le domaine
 - [ ] Aujourd'hui le domaine contient des value objects (DOI, ORCID, …) et
-des modèles JSONB, mais pas d'entités au sens DDD. Passer à de vraies
-entités `Person`, `Publication`, `Structure` avec identité + invariants
-devient intéressant quand émergent des règles complexes (ex. un idHAL
-ne peut être associé qu'à un seul compte actif).
+  des modèles JSONB, mais pas d'entités au sens DDD. Passer à de vraies
+  entités `Person`, `Publication`, `Structure` avec identité + invariants
+  devient intéressant quand émergent des règles complexes (ex. un idHAL
+  ne peut être associé qu'à un seul compte actif).
 
 ### 1.5 Value objects supplémentaires
 Ajouter au fur et à mesure : `ROR`, `RNSR` (identifiants de structure),
 `ISSN` / `eISSN` (journaux) — dès qu'un besoin de validation ou de
 normalisation explicite émerge.
 
-### 1.6 Inversion de dépendance complète
-- [x] **Extraction SQL des scripts pipeline vers `infrastructure/db/queries/`**
-  (branche `feature/pipeline-di`, 13 commits atomiques). 153 `cur.execute`
-  dispersés dans `application/pipeline/*` → 9 restants (tous des SAVEPOINT
-  de contrôle de transaction). Nouveaux modules par sous-dossier :
-  `countries`, `address_resolution`, `enrich`, `harvest`, `merge`,
-  `publications_create` + `persons_create`, `authorships_build` +
-  `affiliations` + `name_forms`, `staging` + `normalize_{scanr,theses,
-  openalex,wos,hal}`. Même pattern que §1.1 pour les routers : chaque
-  orchestrateur pipeline ne contient plus que de la logique Python pure
-  (parsing, boucles, conditions métier) et délègue la persistance.
-- [x] **Injection canonique via ports (Protocol) côté pipeline**
-  (branche `feature/pipeline-ports`, 13 commits atomiques countries →
-  normalize/hal). Orchestrateurs `application/pipeline/*` dépendent de
-  ports (`application/ports/*`) au lieu d'importer `infrastructure.db.
-  queries.*` directement. Adapters PostgreSQL dans `infrastructure/db/
-  queries/*` (déjà en place depuis §1.6 partie 1) implémentent ces
-  Protocols. Composition roots dans `interfaces/cli/pipeline/*` : chaque
-  entry point CLI instancie les `Pg*Queries` et les injecte dans
-  l'orchestrateur. `run_pipeline.py` appelle les orchestrateurs via
-  imports Python directs. `logger` également threadé en param dans les
-  5 `normalize_*` (pattern cohérent, plus aucun `setup_logger` module-
-  level dans `application/`). Zéro import `infrastructure.db.queries`
-  depuis `application/` : §1.7 a pu basculer en `layered`.
+### 1.6 Inversion de dépendance
+Extraction SQL pipeline → `infrastructure/db/queries/` faite.
+Orchestrateurs `application/pipeline/*` dépendent de ports
+(`application/ports/*`) ; adapters PostgreSQL injectés via les
+composition roots (`interfaces/cli/pipeline/*`, `run_pipeline.py`).
 - [ ] Reste côté API : factories FastAPI `Depends` pour injecter les
   query services dans les routers (équivalent unit-of-work). Mécanique
   si la couverture de tests devient un objectif.
 
 ### 1.7 Verrouiller les acquis : import-linter
-- [x] Contrats initiaux dans `pyproject.toml` (`[tool.importlinter]`),
-  vérifiés en pre-commit + CI. 4 contrats `forbidden` qui verrouillent :
-  (1) domain = noyau pur, (2) application ↛ interfaces,
-  (3) infrastructure ↛ interfaces, (4) infrastructure ↛ application.
-- [x] **Contrat `layers` unique remplace les 4 `forbidden`** :
-  `interfaces > infrastructure | application > domain` (siblings au
-  même niveau, ni l'un ni l'autre ne peut importer l'autre ; les deux
-  peuvent importer domain ; interfaces peut tout importer). Enforce en
-  plus `application ↛ infrastructure` — **nouvelle règle** vs les 4
-  forbidden précédents.
-- [ ] **§1.7b — Lever les `ignore_imports`** (grandfather clause
-  verrouillant les violations existantes `application → infrastructure`).
-  Chaque nettoyage = une ligne retirée de `ignore_imports` dans
-  `pyproject.toml`.
-  - [x] **Services applicatifs → ports/adapters** pour
-    `infrastructure.repositories.*` (7/7 faits : config, authorships,
-    addresses, structures, journals, persons, publications —
-    branche `feature/1.7b-services-di`). Pattern :
-    service accepte `repo: XRepository` en kwarg ; callers directs
-    (routers, tests, scripts CLI) créent l'instance via
-    `X_repository(cur)` et la passent. Pour les orchestrateurs
-    pipeline dans `application/pipeline/*` qui ne peuvent pas importer
-    `infrastructure.repositories`, pattern factory callable
-    `*_repo_factory: Callable[[Any], XRepository]` passé au
-    constructeur ; l'orchestrateur instancie le repo dans
-    `preload_caches(cur)` ou au début de `run()`. Ports déjà définis
-    dans `domain/ports/*_repository.py`.
-  - [ ] Pipeline normalize_* → déplacer ou porter les helpers infrastructure :
-    `link_addresses` (4), `mark_staging_done` (5), `StepTimer` (2),
-    `resolve_zenodo_doi`/`is_zenodo_doi` (2), `extract_nnt_from_openalex`/
-    `is_theses_fr_source` (1).
-  - [ ] `application.authorships → infrastructure.perimeter.
-    get_persons_structure_ids_list` (1) — cas isolé.
+Contrat `layers` unique actif : `interfaces > infrastructure |
+application > domain` (siblings au même niveau — ni l'un ni l'autre
+ne peut importer l'autre ; les deux peuvent importer domain ;
+interfaces peut tout importer). Vérifié en pre-commit + CI.
+
+#### §1.7b — Lever les `ignore_imports` (grandfather clause)
+Services applicatifs → ports/adapters : 7/7 repositories faits
+(config, authorships, addresses, structures, journals, persons,
+publications). Chaque nettoyage restant = une ligne retirée de
+`ignore_imports` dans `pyproject.toml`.
+- [ ] Pipeline normalize_* → déplacer ou porter les helpers infrastructure :
+  `link_addresses` (4), `mark_staging_done` (5), `StepTimer` (2),
+  `resolve_zenodo_doi`/`is_zenodo_doi` (2), `extract_nnt_from_openalex`/
+  `is_theses_fr_source` (1).
+- [ ] `application.authorships → infrastructure.perimeter.
+  get_persons_structure_ids_list` (1) — cas isolé.
 
 ### 1.8 Audit périodique
-Parcours régulier pour repérer : SQL mal placé, dépendances dans le
-mauvais sens, logique métier qui a migré dans infrastructure, code
-dupliqué entre agrégats.
+- [x] Parcours régulier pour repérer : SQL mal placé, dépendances dans le
+  mauvais sens, logique métier qui a migré dans infrastructure, code
+  dupliqué entre agrégats.
 
-
-
-- Bounded contexts
-- Ubiquitous language
-- Aggregates and aggregate roots
-- Event storming and modelling 
 ---
 
 ## Chantier qualité du code : maintenabilité, auditabilité, scalabilité
 
 ### 2.1 Tooling & CI
-- [x] **Pre-commit hook** : ruff check (+ auto-fix) + ruff format
-  + checks basiques (trailing whitespace, EOF, YAML/TOML, merge conflicts)
-  + lint-imports (contrats DDD) + pytest unitaires (tests/unit/).
-  Config dans `.pre-commit-config.yaml`.
-- [x] Mypy strict en CI + pre-commit : `check_untyped_defs` +
-  `disallow_untyped_defs` globalement activés. Toutes les fonctions
-  sont annotées (domain, application, infrastructure, interfaces,
-  run_pipeline) — beaucoup en `Any` pragmatique pour les params DB
-  (`cur: Any`, `conn: Any`) et les helpers internes. Les nouveaux
-  ajouts seront donc typés par défaut.
-- [x] Couverture `pytest --cov` en CI avec seuil à **41%**
-  (`fail_under` dans `[tool.coverage.report]`). Baseline actuelle : 42%
-  hors `interfaces/cli/*` (scripts one-shot exclus de la mesure, car
-  leur logique utile est factorisée dans application/infrastructure et
-  testée là). À faire remonter par paliers : +5% quand chantier §1.1
-  sera fait (nouveaux tests de caractérisation sur les routers).
+Pre-commit hook (ruff + ruff format + checks basiques + lint-imports +
+pytest-unit). Mypy strict (`check_untyped_defs` + `disallow_untyped_defs`)
+en CI et pre-commit, 0 erreur. Toutes les fonctions annotées (souvent
+`Any` pragmatique pour les params DB).
+- [x] **Couverture** : `pytest --cov` en CI. Seuil actuel
+  `fail_under = 49`, baseline réelle ~49.7%. `interfaces/cli/*`
+  exclu (scripts one-shot, logique utile testée via
+  application/infrastructure). À faire remonter par paliers quand un
+  chantier touche un module 0% (enrich, merge, harvest, queries/*).
 
 ### 2.2 Organisation des tests
-- [x] Réorganisation `tests/unit/` + `tests/integration/`, sous-dossiers
-  par couche (`domain/`, `application/`, `pipeline/`, `interfaces/`).
-  274 unit en ~1.3s, 326 integration en ~26s.
-- [x] Conftest splitté : `tests/conftest.py` pour le cross-cutting
-  (mock logger, caches), `tests/integration/conftest.py` pour le
-  setup BDD + fixture `db`.
-- [x] Hook pre-commit `pytest-unit` qui lance uniquement `tests/unit/`.
-  CI fait les deux en étapes séparées.
-- [x] Tests de caractérisation sur les routers critiques (publications,
-  persons, pub_stats) avant l'extraction SQL §1.1. 63 tests qui exercent
-  les combinaisons de filtres et la construction dynamique des WHERE/ORDER BY.
-  Seuil couverture remonté à 44%.
+`tests/unit/` + `tests/integration/` (sous-dossiers `domain/`,
+`application/`, `pipeline/`, `interfaces/`). Conftest splitté
+(cross-cutting vs setup BDD). Hook pre-commit `pytest-unit` sur
+`tests/unit/` seulement ; CI fait les deux.
+- [x] Tests de caractérisation sur les routers critiques à maintenir
+  quand on touche aux combinaisons de filtres / construction dynamique
+  de WHERE/ORDER BY.
 
 ### 2.3 Dette externe / dépendances
-- [x] **Source unique des dépendances** : `[project.dependencies]` +
-  `[project.optional-dependencies.dev]` dans `pyproject.toml`
-  (ex-`requirements.txt` supprimé, installation via `pip install ".[dev]"`)
-- [x] **Lockfile** des dépendances : `uv.lock` (75 paquets figés, 1726 lignes).
-  `uv` lit le `pyproject.toml` PEP 621 existant sans migration. Installation
-  reproductible via `uv sync` (ou `pip install -e ".[dev]"` continue de
-  fonctionner pour qui n'a pas `uv`). Le `uv.lock` est committé, versionné
-  avec `pyproject.toml`.
-- [x] `deptry` pour repérer les paquets installés mais inutilisés
-- [x] `pip-audit` pour les vulnérabilités connues (à ajouter en CI ensuite)
-- Version Python supportée documentée et alignée avec prod DSI
+`pyproject.toml` source unique (PEP 621) + `uv.lock` committé.
+`deptry` et `pip-audit` en place.
+- [ ] Version Python supportée documentée et alignée avec prod DSI.
 
-### 2.4 Migrations BDD : évaluer Alembic
-- [x] **Évaluation** : ne pas migrer. Raisons :
-  1. Le système maison (`migrate.py`, 120 lignes) a géré 70+ migrations
-     historiques (pré-squashing) + 6 depuis, 0 downgrade utilisé.
-  2. La génération auto — vrai gain d'Alembic — nécessite SQLAlchemy,
-     qui demanderait un chantier disproportionné (pas sur la roadmap).
-  3. Pour la DSI : le système maison est lisible en 2 min. Alembic
-     n'apporterait qu'un standard connu, sans gain fonctionnel prouvé.
+### 2.4 Migrations BDD
+- [x] **Évaluation Alembic** : ne pas migrer. Système maison
+  `migrate.py` (~120 lignes) lisible en 2 min, 70+ migrations gérées
+  sans downgrade utilisé. Alembic nécessiterait SQLAlchemy (chantier
+  disproportionné). Décision à revisiter si downgrades deviennent
+  récurrents ou si la DSI l'exige.
 - [ ] Si downgrades deviennent utiles : convention `NNN_down.sql`
   optionnelle, ~10 lignes à ajouter dans `migrate.py`.
 
 ### 2.5 Code hygiene
-- [x] **Complexité cyclomatique** : seuil ruff C901 à **15** après
-  décomposition de 4 fonctions (`publications_facets` 25→<10 via
-  `_PublicationFacetsBuilder`, `_build_list_conditions` 17→<15 via
-  3 helpers, `refresh_from_sources` 24→<15 via extraction des helpers
-  au module-level, `export_publications_csv` 23→<15 via
-  `_build_export_conditions`). Prochaine cible 10 : demande encore
-  ~9 fonctions à décomposer, rendement décroissant.
-- [x] **Mypy** strict : `check_untyped_defs` + `disallow_untyped_defs`
-  globalement activés, 0 erreur. Durcissement futur possible : remplacer
-  les `Any` pragmatiques par des types plus précis (en particulier sur
-  les signatures métier — les `cur: Any` pour psycopg2 peuvent rester).
-- [x] **Dédoublonnage** : audit via pylint `duplicate-code`. Résultats :
-  `harvest_hal_orcids.py` supprimé (orphelin, superseded par
-  `harvest_hal_identifiers.py`). Les autres duplications détectées
-  (forme des dicts `extract_pub_metadata`) sont liées à la logique
-  source-spécifique, pas factorisables sans perte.
-- [x] **Magic values** : `OA_CLOSED_STATUSES` centralisée aux côtés
-  d'`OA_OPEN_STATUSES` dans `filters.py`, +helper `_sql_list()` pour
-  injection SQL littérale. 7 occurrences inline remplacées. Les autres
-  constantes métier (`doc_types`, `sources`, `authorship_roles`) sont
-  déjà factorisées dans `domain/`.
+Seuil ruff C901 (complexité cyclomatique) à 15. Mypy strict sans erreur.
+Dédoublonnage via pylint `duplicate-code` fait. Magic values métier
+centralisées dans `domain/` + `filters.py`.
+- [x] À auditer périodiquement : nouvelles fonctions > C901=15,
+  nouvelles duplications, nouvelles magic values inline.
 
 ### 2.6 Documentation et DX
 - [ ] **README** : permettre à une nouvelle personne (ou toi-dans-2-ans)
@@ -234,26 +136,29 @@ dupliqué entre agrégats.
   manuellement (évite la dérive silencieuse backend/front)
 
 ### 2.8 Observabilité et robustesse production
+- [x] **Structured logs JSON** : `infrastructure/log.py` émet en JSON
+  par défaut (un record = une ligne), prêts pour Loki/ELK/fluentd.
+  Format texte en dev via `LOG_FORMAT=text`. Tous les `.log` et
+  `status.json` consolidés sous `logs/`.
 - [ ] ~~**Alerting sur échec pipeline**~~ — **délégué à la DSI après
-  transmission**. La DSI a ses propres outils et il ne sert à rien de déployer une solution dev qui sera remplacée.
-  En dev local, monitoring manuel des lancements.
+  transmission**. La DSI a ses propres outils et il ne sert à rien de
+  déployer une solution dev qui sera remplacée. En dev local,
+  monitoring manuel des lancements.
 - [ ] **Checks automatiques post-pipeline** : comptages, orphelins,
   anomalies (type tests de caractérisation sur les données produites)
 - [ ] Dashboard métriques (temps de réponse, pool DB, taux d'erreur) —
   partiellement en place, à consolider
-- [ ] Structured logs (JSON) prêts pour agrégateur externe (Loki / ELK
-  selon ce qu'installera la DSI)
 
 ### 2.9 Audits transversaux périodiques
-- **12-factor app** : pointeurs dans *Beyond the Twelve-Factor App*
+- [x] **12-factor app** : pointeurs dans *Beyond the Twelve-Factor App*
   (Kevin Hoffman, 2016) qui revisite les 12 facteurs originaux et en
   ajoute 3 à l'ère Kubernetes
-- **SOLID** sur le code existant : détecter les violations (surtout ISP
+- [x] **SOLID** sur le code existant : détecter les violations (surtout ISP
   et DIP qui sont les plus courantes quand on vient d'une base procédurale)
-- **Revue code dupliqué / uniformisation** : ex. les fonctions de
+- [x] **Revue code dupliqué / uniformisation** : ex. les fonctions de
   compatibilité de noms existent en deux versions (Python dans
   `domain/names.py`, SQL dans `admin_person_duplicates.py`) — à
-  unifier (cf. `TODO_CLAUDE.md`)
+  unifier si la logique diverge.
 
 ---
 
@@ -273,9 +178,12 @@ Le détail est dans `TODO_LAURA.md`. Grands axes :
 - **Cas particuliers** et bizarreries à élucider
 
 ---
-## A explorer:
+## A explorer
 
 **SQLAlchemy Core** (pas ORM), pour la construction dynamique de requêtes. SQLAlchemy a deux couches : Core (query builder, paramétrage sûr, abstraction du dialecte) et ORM (mapping objets-tables). Tu peux utiliser Core sans ORM : tu écris des requêtes via son API Python (select(...).where(...).order_by(...)) qui génèrent du SQL sûr et paramétré, mais tu n'introduis pas de couche ORM. C'est particulièrement utile pour les requêtes dynamiques avec filtres variables. Tes requêtes "statiques" peuvent rester en SQL brut pour la clarté.
+
 **Alembic** pour les migrations. Indépendant de l'usage d'ORM. Tu continues à écrire ton schéma en SQL brut si tu veux, mais tu versionnes et orchestres les migrations avec Alembic. Gain de maintenance réel, coût d'adoption modéré.
+
 **psycopg3** avec des curseurs typés, si tu n'y es pas déjà. Psycopg3 supporte bien les Row classes typées et les dict_row, ce qui rend ton SQL brut plus sûr à manipuler côté Python sans introduire un ORM.
+
 **environnement virtuel**?
