@@ -69,9 +69,9 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 # Violations connues `application → infrastructure` verrouillées à date du
 # merge §1.6. Nettoyage suivi en §1.7b : chaque refacto = une ligne retirée.
 ignore_imports = [
-    # Services applicatifs → infrastructure.repositories
-    # (1 — config, authorships, addresses, structures, journals, persons levés)
-    "application.publications -> infrastructure.repositories.publication_repository",
+    # Services applicatifs → infrastructure.repositories : 0 restant
+    # (tous levés : config, authorships, addresses, structures, journals,
+    # persons, publications)
     # Pipeline normalize_* → helpers infrastructure (14)
     "application.pipeline.normalize.normalize_hal -> infrastructure.addresses",
     "application.pipeline.normalize.normalize_openalex -> infrastructure.addresses",

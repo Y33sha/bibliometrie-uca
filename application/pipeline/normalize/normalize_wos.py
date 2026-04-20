@@ -33,6 +33,7 @@ from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
+from domain.ports.publication_repository import PublicationRepository
 from domain.publication import clean_doi
 from infrastructure.db_helpers import mark_staging_done
 
@@ -426,14 +427,20 @@ def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
     )
 
 
-def find_publication(cur: Any, rec: dict, journal_id: int | None) -> int | None:
+def find_publication(
+    cur: Any,
+    rec: dict,
+    journal_id: int | None,
+    *,
+    pub_repo: PublicationRepository,
+) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None."""
     meta = extract_pub_metadata(rec, journal_id)
     if not meta["pub_year"] or not meta["title"] or meta["title"] == "(sans titre)":
         return None
     # Mapper le doc_type pour find_or_create (resolve_doi_conflict a besoin du type canonique)
     meta["doc_type"] = map_doc_type(meta["doc_type"])
-    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
+    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False, repo=pub_repo)
     return pub_id
 
 
@@ -709,6 +716,7 @@ def process_record(
     staging_row: tuple,
     *,
     journal_repo: JournalRepository,
+    pub_repo: PublicationRepository,
 ) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
     from infrastructure.timings import StepTimer
@@ -731,11 +739,11 @@ def process_record(
         publication_id = queries.get_wos_publication_id(cur, rec["ut"])
 
         if not publication_id:
-            publication_id = find_publication(cur, rec, journal_id)
+            publication_id = find_publication(cur, rec, journal_id, pub_repo=pub_repo)
         t.mark("publication")
 
         if publication_id:
-            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
+            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"], repo=pub_repo)
 
         source_publication_id = insert_wos_document(
             cur, queries, rec, staging_id, publication_id, pub_meta
@@ -746,7 +754,7 @@ def process_record(
         t.mark("authors")
 
         if publication_id:
-            refresh_from_sources(cur, publication_id)
+            refresh_from_sources(cur, publication_id, repo=pub_repo)
         t.mark("refresh")
 
         mark_staging_done(cur, staging_id)
@@ -773,14 +781,18 @@ class WosNormalizer(SourceNormalizer):
         staging_queries: StagingQueries,
         queries: WosNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
+        pub_repo_factory: Callable[[Any], PublicationRepository],
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._journal_repo_factory = journal_repo_factory
         self._journal_repo: JournalRepository | None = None
+        self._pub_repo_factory = pub_repo_factory
+        self._pub_repo: PublicationRepository | None = None
 
     def preload_caches(self, cur: Any) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
+        self._pub_repo = self._pub_repo_factory(cur)
         for src_id, pid in self._queries.fetch_wos_source_structures(cur):
             _wos_institution_cache[src_id] = pid
         for src_id, pid in self._queries.fetch_wos_source_persons_with_daisng(cur):
@@ -791,9 +803,14 @@ class WosNormalizer(SourceNormalizer):
         )
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        assert self._journal_repo is not None, "preload_caches doit être appelé avant"
+        assert self._journal_repo is not None and self._pub_repo is not None
         return process_record(
-            cur, self._queries, self.logger, row, journal_repo=self._journal_repo
+            cur,
+            self._queries,
+            self.logger,
+            row,
+            journal_repo=self._journal_repo,
+            pub_repo=self._pub_repo,
         )
 
     def cleanup(self) -> None:

@@ -19,6 +19,7 @@ from typing import Any
 from application.ports.merge import MergeQueries
 from application.publications import merge_publications as _merge_pub
 from application.publications import update_sources
+from domain.ports.publication_repository import PublicationRepository
 
 
 def find_duplicates(
@@ -62,7 +63,13 @@ def find_duplicates(
 
 
 def link_hal_to_publication(
-    cur: Any, queries: MergeQueries, items: Any, logger: Any, dry_run: bool = False
+    cur: Any,
+    queries: MergeQueries,
+    items: Any,
+    logger: Any,
+    dry_run: bool = False,
+    *,
+    pub_repo: PublicationRepository,
 ) -> int:
     """Case 1: HAL doc has no publication_id → link to source's publication."""
     for item in items:
@@ -75,11 +82,18 @@ def link_hal_to_publication(
             continue
 
         queries.link_source_publication_to_publication(cur, hal_doc_id, src_pub_id)
-        update_sources(cur, src_pub_id)
+        update_sources(cur, src_pub_id, repo=pub_repo)
     return len(items)
 
 
-def merge_publications(cur: Any, items: Any, logger: Any, dry_run: bool = False) -> tuple[int, int]:
+def merge_publications(
+    cur: Any,
+    items: Any,
+    logger: Any,
+    dry_run: bool = False,
+    *,
+    pub_repo: PublicationRepository,
+) -> tuple[int, int]:
     """
     Case 2: Both have different publication_id.
     Keep the HAL publication, merge the other into it.
@@ -113,7 +127,7 @@ def merge_publications(cur: Any, items: Any, logger: Any, dry_run: bool = False)
 
         try:
             cur.execute("SAVEPOINT merge_pub")
-            _merge_pub(cur, hal_pub_id, src_pub_id)
+            _merge_pub(cur, hal_pub_id, src_pub_id, repo=pub_repo)
             cur.execute("RELEASE SAVEPOINT merge_pub")
             merged_into[src_pub_id] = hal_pub_id
             merged += 1
@@ -132,6 +146,7 @@ def run_merge(
     queries: MergeQueries,
     logger: Any,
     *,
+    pub_repo: PublicationRepository,
     dry_run: bool = False,
 ) -> None:
     try:
@@ -147,12 +162,16 @@ def run_merge(
 
         if link_only:
             logger.info("\n--- Liaison HAL → publication existante ---")
-            n = link_hal_to_publication(cur, queries, link_only, logger, dry_run=dry_run)
+            n = link_hal_to_publication(
+                cur, queries, link_only, logger, dry_run=dry_run, pub_repo=pub_repo
+            )
             logger.info(f"  {n} source_publications HAL reliés")
 
         if merge_needed:
             logger.info("\n--- Fusion de publications ---")
-            n, errs = merge_publications(cur, merge_needed, logger, dry_run=dry_run)
+            n, errs = merge_publications(
+                cur, merge_needed, logger, dry_run=dry_run, pub_repo=pub_repo
+            )
             logger.info(f"  {n} publications fusionnées, {errs} erreurs")
 
         if not dry_run:

@@ -268,13 +268,20 @@ def _run_create_publications() -> None:
     from application.pipeline.create.create_publications import run
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.publications_create import PgPublicationsCreateQueries
+    from infrastructure.repositories import publication_repository
 
     log.info("▶ create_publications")
     t0 = time.time()
     conn = get_connection()
     try:
         cur = conn.cursor()
-        run(cur, conn, PgPublicationsCreateQueries(), log)
+        run(
+            cur,
+            conn,
+            PgPublicationsCreateQueries(),
+            log,
+            pub_repo=publication_repository(cur),
+        )
     finally:
         conn.close()
     log.info("✓ create_publications terminé en %.1fs", time.time() - t0)
@@ -373,6 +380,7 @@ def _run_merge_pubs_by_nnt() -> None:
     from application.pipeline.merge.merge_pubs_by_nnt import run_merge
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.merge import PgMergeQueries
+    from infrastructure.repositories import publication_repository
 
     log.info("▶ merge_pubs_by_nnt")
     t0 = time.time()
@@ -380,7 +388,9 @@ def _run_merge_pubs_by_nnt() -> None:
     conn.autocommit = False
     try:
         cur = conn.cursor()
-        run_merge(cur, conn, PgMergeQueries(), log)
+        run_merge(
+            cur, conn, PgMergeQueries(), log, pub_repo=publication_repository(cur)
+        )
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_nnt terminé en %.1fs", time.time() - t0)
@@ -390,6 +400,7 @@ def _run_merge_pubs_by_hal_id() -> None:
     from application.pipeline.merge.merge_pubs_by_hal_id import run_merge
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.merge import PgMergeQueries
+    from infrastructure.repositories import publication_repository
 
     log.info("▶ merge_pubs_by_hal_id")
     t0 = time.time()
@@ -397,7 +408,9 @@ def _run_merge_pubs_by_hal_id() -> None:
     conn.autocommit = False
     try:
         cur = conn.cursor()
-        run_merge(cur, conn, PgMergeQueries(), log)
+        run_merge(
+            cur, conn, PgMergeQueries(), log, pub_repo=publication_repository(cur)
+        )
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
@@ -408,7 +421,7 @@ def _run_normalize_hal() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
-    from infrastructure.repositories import journal_repository
+    from infrastructure.repositories import journal_repository, publication_repository
 
     log.info("▶ normalize_hal")
     t0 = time.time()
@@ -416,6 +429,7 @@ def _run_normalize_hal() -> None:
     HalNormalizer(
         conn, log, PgStagingQueries(), PgHalNormalizeQueries(),
         journal_repo_factory=journal_repository,
+        pub_repo_factory=publication_repository,
     ).run([])
     log.info("✓ normalize_hal terminé en %.1fs", time.time() - t0)
 
@@ -425,7 +439,7 @@ def _run_normalize_wos() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
-    from infrastructure.repositories import journal_repository
+    from infrastructure.repositories import journal_repository, publication_repository
 
     log.info("▶ normalize_wos")
     t0 = time.time()
@@ -433,6 +447,7 @@ def _run_normalize_wos() -> None:
     WosNormalizer(
         conn, log, PgStagingQueries(), PgWosNormalizeQueries(),
         journal_repo_factory=journal_repository,
+        pub_repo_factory=publication_repository,
     ).run([])
     log.info("✓ normalize_wos terminé en %.1fs", time.time() - t0)
 
@@ -442,7 +457,7 @@ def _run_normalize_openalex() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
-    from infrastructure.repositories import journal_repository
+    from infrastructure.repositories import journal_repository, publication_repository
 
     log.info("▶ normalize_openalex")
     t0 = time.time()
@@ -450,6 +465,7 @@ def _run_normalize_openalex() -> None:
     OpenalexNormalizer(
         conn, log, PgStagingQueries(), PgOpenalexNormalizeQueries(),
         journal_repo_factory=journal_repository,
+        pub_repo_factory=publication_repository,
     ).run([])
     log.info("✓ normalize_openalex terminé en %.1fs", time.time() - t0)
 
@@ -459,7 +475,7 @@ def _run_normalize_scanr() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
-    from infrastructure.repositories import journal_repository
+    from infrastructure.repositories import journal_repository, publication_repository
 
     log.info("▶ normalize_scanr")
     t0 = time.time()
@@ -467,6 +483,7 @@ def _run_normalize_scanr() -> None:
     ScanrNormalizer(
         conn, log, PgStagingQueries(), PgScanrNormalizeQueries(),
         journal_repo_factory=journal_repository,
+        pub_repo_factory=publication_repository,
     ).run([])
     log.info("✓ normalize_scanr terminé en %.1fs", time.time() - t0)
 
@@ -476,11 +493,18 @@ def _run_normalize_theses() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_theses import PgThesesNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.repositories import publication_repository
 
     log.info("▶ normalize_theses")
     t0 = time.time()
     conn = get_connection()
-    ThesesNormalizer(conn, log, PgStagingQueries(), PgThesesNormalizeQueries()).run([])
+    ThesesNormalizer(
+        conn,
+        log,
+        PgStagingQueries(),
+        PgThesesNormalizeQueries(),
+        pub_repo_factory=publication_repository,
+    ).run([])
     log.info("✓ normalize_theses terminé en %.1fs", time.time() - t0)
 
 
@@ -507,13 +531,21 @@ def _run_enrich_oa_status() -> None:
     from infrastructure.api_limits import UNPAYWALL_DELAY
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.enrich import PgEnrichQueries
+    from infrastructure.repositories import publication_repository
 
     log.info("▶ enrich_oa_status")
     t0 = time.time()
     conn = get_connection()
     try:
         cur = conn.cursor()
-        run_enrich(cur, conn, PgEnrichQueries(), log, rate_delay=UNPAYWALL_DELAY)
+        run_enrich(
+            cur,
+            conn,
+            PgEnrichQueries(),
+            log,
+            pub_repo=publication_repository(cur),
+            rate_delay=UNPAYWALL_DELAY,
+        )
     finally:
         conn.close()
     log.info("✓ enrich_oa_status terminé en %.1fs", time.time() - t0)

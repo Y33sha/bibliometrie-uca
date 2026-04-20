@@ -18,6 +18,7 @@ from typing import Any
 from application.publications import merge_publications
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
+from infrastructure.repositories import publication_repository
 from infrastructure.zenodo import resolve_zenodo_doi
 
 logger = setup_logger(
@@ -83,7 +84,7 @@ def do_merge(
         return True
 
     try:
-        merge_publications(cur, target_id, source_id)
+        merge_publications(cur, target_id, source_id, repo=publication_repository(cur))
         # Supprimer le source_document du concept DOI (maintenant rattaché à target)
         cur.execute(
             """

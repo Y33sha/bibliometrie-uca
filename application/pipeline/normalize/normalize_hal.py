@@ -34,6 +34,7 @@ from domain.authorship_roles import map_role
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
+from domain.ports.publication_repository import PublicationRepository
 from domain.publication import clean_doi, normalize_nnt
 from infrastructure.addresses import link_addresses
 from infrastructure.db_helpers import mark_staging_done
@@ -153,12 +154,18 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
     )
 
 
-def find_publication(cur: Any, doc: dict, journal_id: int | None) -> int | None:
+def find_publication(
+    cur: Any,
+    doc: dict,
+    journal_id: int | None,
+    *,
+    pub_repo: PublicationRepository,
+) -> int | None:
     """Cherche une publication existante sans en créer. Retourne l'id ou None."""
     meta = extract_pub_metadata(doc, journal_id)
     if not meta["pub_year"] or not meta["title"]:
         return None
-    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False)
+    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False, repo=pub_repo)
     return pub_id
 
 
@@ -613,6 +620,7 @@ def process_work(
     staging_row: tuple,
     *,
     journal_repo: JournalRepository,
+    pub_repo: PublicationRepository,
     struct_cache: dict | None = None,
     struct_name_cache: dict | None = None,
 ) -> bool:
@@ -660,21 +668,21 @@ def process_work(
         publication_id = None
         old_pub_id = queries.get_hal_publication_id(cur, hal_id)
         if old_pub_id:
-            publication_id = find_publication(cur, doc, journal_id)
+            publication_id = find_publication(cur, doc, journal_id, pub_repo=pub_repo)
             if publication_id and publication_id != old_pub_id:
                 from application.publications import merge_publications
 
                 logger.info(f"  {hal_id} : fusion pub {old_pub_id} → {publication_id} (DOI/NNT)")
-                merge_publications(cur, publication_id, old_pub_id)
+                merge_publications(cur, publication_id, old_pub_id, repo=pub_repo)
             elif not publication_id:
                 publication_id = old_pub_id
         else:
-            publication_id = find_publication(cur, doc, journal_id)
+            publication_id = find_publication(cur, doc, journal_id, pub_repo=pub_repo)
         t.mark("publication")
 
         if publication_id:
             publication_id = try_merge_by_doi(
-                cur, publication_id, clean_doi(as_str(doc.get("doiId_s")))
+                cur, publication_id, clean_doi(as_str(doc.get("doiId_s"))), repo=pub_repo
             )
 
         source_publication_id = insert_hal_document(
@@ -700,7 +708,7 @@ def process_work(
         t.mark("authors")
 
         if publication_id:
-            refresh_from_sources(cur, publication_id)
+            refresh_from_sources(cur, publication_id, repo=pub_repo)
         t.mark("refresh")
 
         mark_staging_done(cur, staging_id)
@@ -727,16 +735,20 @@ class HalNormalizer(SourceNormalizer):
         staging_queries: StagingQueries,
         queries: HalNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
+        pub_repo_factory: Callable[[Any], PublicationRepository],
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._journal_repo_factory = journal_repo_factory
         self._journal_repo: JournalRepository | None = None
+        self._pub_repo_factory = pub_repo_factory
+        self._pub_repo: PublicationRepository | None = None
         self._struct_cache: dict[str, int] = {}
         self._struct_name_cache: dict[int, str] = {}
 
     def preload_caches(self, cur: Any) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
+        self._pub_repo = self._pub_repo_factory(cur)
         rows = self._queries.fetch_hal_source_structures_for_cache(cur)
         self._struct_cache = {src: pid for src, pid, _ in rows}
         self._struct_name_cache = {pid: name for _, pid, name in rows}
@@ -744,12 +756,14 @@ class HalNormalizer(SourceNormalizer):
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
         assert self._journal_repo is not None, "preload_caches doit être appelé avant"
+        assert self._pub_repo is not None, "preload_caches doit être appelé avant"
         return process_work(
             cur,
             self._queries,
             self.logger,
             row,
             journal_repo=self._journal_repo,
+            pub_repo=self._pub_repo,
             struct_cache=self._struct_cache,
             struct_name_cache=self._struct_name_cache,
         )

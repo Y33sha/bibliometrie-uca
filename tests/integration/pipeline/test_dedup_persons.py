@@ -9,6 +9,7 @@ import logging
 
 from application.persons import add_identifier, add_name_form, create_person
 from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
+from infrastructure.repositories import person_repository
 
 _queries = PgPersonsCreateQueries()
 _logger = logging.getLogger("test")
@@ -171,7 +172,7 @@ class TestStep0HalAccounts:
         pub2 = _insert_publication(db, "Pub 2")
 
         # Personne existante + hal_author rattaché
-        person_id = create_person(db, "Dupont", "Jean")
+        person_id = create_person(db, "Dupont", "Jean", repo=person_repository(db))
         ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=12345)
         db.execute("UPDATE source_persons SET person_id = %s WHERE id = %s", (person_id, ha))
 
@@ -182,7 +183,7 @@ class TestStep0HalAccounts:
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
-        step0_hal_accounts(db, _queries, _logger, all_as, linked_ids, dry_run=False)
+        step0_hal_accounts(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
 
         assert _get_person_id_of_hal_authorship(db, has1) == person_id
         assert _get_person_id_of_hal_authorship(db, has2) == person_id
@@ -201,7 +202,7 @@ class TestStep0HalAccounts:
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
-        step0_hal_accounts(db, _queries, _logger, all_as, linked_ids, dry_run=False)
+        step0_hal_accounts(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
 
         # Pas de rattachement en passe 0
         assert _get_person_id_of_hal_authorship(db, has_id) is None
@@ -219,7 +220,7 @@ class TestStep0HalAccounts:
         pub = _insert_publication(db)
 
         # Personne existante (créée par un import précédent)
-        person_id = create_person(db, "Bensoussan", "Népomucène")
+        person_id = create_person(db, "Bensoussan", "Népomucène", repo=person_repository(db))
 
         # Nouveau hal_author vierge, même nom
         ha = _insert_hal_author(
@@ -232,12 +233,12 @@ class TestStep0HalAccounts:
         linked_ids = set()
 
         # Passe 0 : ignoré
-        step0_hal_accounts(db, _queries, _logger, all_as, linked_ids, dry_run=False)
+        step0_hal_accounts(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
         assert _get_person_id_of_hal_authorship(db, has_id) is None
 
         # Passe 3 : rattaché par nom
         name_form_map = _queries.fetch_name_form_map(db)
-        step3_name_forms(db, _logger, all_as, linked_ids, name_form_map, dry_run=False)
+        step3_name_forms(db, _logger, all_as, linked_ids, name_form_map, dry_run=False, person_repo=person_repository(db))
         assert _get_person_id_of_hal_authorship(db, has_id) == person_id
 
 
@@ -256,7 +257,7 @@ class TestStep1CrossSource:
         pub = _insert_publication(db, "Shared Publication")
 
         # Personne existante rattachée via HAL
-        person_id = create_person(db, "Dupont", "Jean")
+        person_id = create_person(db, "Dupont", "Jean", repo=person_repository(db))
         ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=111)
         hd = _insert_hal_document(db, "hal-100", pub)
         _insert_hal_authorship(db, hd, ha, position=3, person_id=person_id)
@@ -269,7 +270,7 @@ class TestStep1CrossSource:
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
         linked_index = load_linked_authorships_by_pub(db, _queries)
-        step1_cross_source(db, _logger, all_as, linked_ids, linked_index, dry_run=False)
+        step1_cross_source(db, _logger, all_as, linked_ids, linked_index, dry_run=False, person_repo=person_repository(db))
 
         assert _get_person_id_of_oa_authorship(db, oa_as) == person_id
 
@@ -283,7 +284,7 @@ class TestStep1CrossSource:
 
         pub = _insert_publication(db)
 
-        person_id = create_person(db, "Dupont", "Jean")
+        person_id = create_person(db, "Dupont", "Jean", repo=person_repository(db))
         ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=111)
         hd = _insert_hal_document(db, "hal-id-test", pub)
         _insert_hal_authorship(db, hd, ha, position=0, person_id=person_id)
@@ -296,7 +297,7 @@ class TestStep1CrossSource:
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
         linked_index = load_linked_authorships_by_pub(db, _queries)
-        step1_cross_source(db, _logger, all_as, linked_ids, linked_index, dry_run=False)
+        step1_cross_source(db, _logger, all_as, linked_ids, linked_index, dry_run=False, person_repo=person_repository(db))
 
         ids = _get_person_identifiers(db, person_id)
         assert ("orcid", "0000-0001-9999-8888") in ids
@@ -311,7 +312,7 @@ class TestStep1CrossSource:
 
         pub = _insert_publication(db)
 
-        person_id = create_person(db, "Dupont", "Jean")
+        person_id = create_person(db, "Dupont", "Jean", repo=person_repository(db))
         ha = _insert_hal_author(db, "Jean Dupont", hal_person_id=222)
         hd = _insert_hal_document(db, "hal-200", pub)
         _insert_hal_authorship(db, hd, ha, position=0, person_id=person_id)
@@ -323,7 +324,7 @@ class TestStep1CrossSource:
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
         linked_index = load_linked_authorships_by_pub(db, _queries)
-        step1_cross_source(db, _logger, all_as, linked_ids, linked_index, dry_run=False)
+        step1_cross_source(db, _logger, all_as, linked_ids, linked_index, dry_run=False, person_repo=person_repository(db))
 
         assert _get_person_id_of_oa_authorship(db, oa_as) is None
 
@@ -340,9 +341,15 @@ class TestStep2Orcid:
         )
 
         pub = _insert_publication(db)
-        person_id = create_person(db, "Dupont", "Jean")
+        person_id = create_person(db, "Dupont", "Jean", repo=person_repository(db))
         add_identifier(
-            db, person_id, "orcid", "0000-0001-2345-6789", source="hal", status="confirmed"
+            db,
+            person_id,
+            "orcid",
+            "0000-0001-2345-6789",
+            source="hal",
+            status="confirmed",
+            repo=person_repository(db),
         )
 
         oa_author = _insert_oa_author(db, "J Dupont", "A333", orcid="0000-0001-2345-6789")
@@ -357,7 +364,7 @@ class TestStep2Orcid:
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
-        step2_orcid(db, _queries, _logger, all_as, linked_ids, dry_run=False)
+        step2_orcid(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
 
         assert _get_person_id_of_oa_authorship(db, oa_as) == person_id
 
@@ -369,9 +376,15 @@ class TestStep2Orcid:
         )
 
         pub = _insert_publication(db)
-        person_id = create_person(db, "Dupont", "Jean")
+        person_id = create_person(db, "Dupont", "Jean", repo=person_repository(db))
         add_identifier(
-            db, person_id, "orcid", "0000-0001-2345-6789", source="hal", status="confirmed"
+            db,
+            person_id,
+            "orcid",
+            "0000-0001-2345-6789",
+            source="hal",
+            status="confirmed",
+            repo=person_repository(db),
         )
 
         # HAL author avec même ORCID + un IdRef
@@ -384,7 +397,7 @@ class TestStep2Orcid:
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
-        step2_orcid(db, _queries, _logger, all_as, linked_ids, dry_run=False)
+        step2_orcid(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
 
         ids = _get_person_identifiers(db, person_id)
         assert ("idref", "123456789") in ids
@@ -397,9 +410,15 @@ class TestStep2Orcid:
         )
 
         pub = _insert_publication(db)
-        person_id = create_person(db, "Dupont", "Jean")
+        person_id = create_person(db, "Dupont", "Jean", repo=person_repository(db))
         add_identifier(
-            db, person_id, "orcid", "0000-0001-9999-0000", source="hal", status="rejected"
+            db,
+            person_id,
+            "orcid",
+            "0000-0001-9999-0000",
+            source="hal",
+            status="rejected",
+            repo=person_repository(db),
         )
 
         oa_author = _insert_oa_author(db, "J Dupont", "A444")
@@ -414,7 +433,7 @@ class TestStep2Orcid:
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
-        step2_orcid(db, _queries, _logger, all_as, linked_ids, dry_run=False)
+        step2_orcid(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
 
         assert _get_person_id_of_oa_authorship(db, oa_as) is None
 
@@ -438,7 +457,7 @@ class TestStep2Orcid:
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
-        step2_orcid(db, _queries, _logger, all_as, linked_ids, dry_run=False)
+        step2_orcid(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
 
         assert _get_person_id_of_oa_authorship(db, oa_as) is None
 
@@ -455,7 +474,7 @@ class TestStep3NameForms:
         )
 
         pub = _insert_publication(db)
-        person_id = create_person(db, "Martin", "Pierre")
+        person_id = create_person(db, "Martin", "Pierre", repo=person_repository(db))
         # create_person crée déjà les name_forms via refresh_person_name_forms
 
         oa_author = _insert_oa_author(db, "Pierre Martin", "A666")
@@ -467,7 +486,7 @@ class TestStep3NameForms:
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
         name_form_map = _queries.fetch_name_form_map(db)
-        step3_name_forms(db, _logger, all_as, linked_ids, name_form_map, dry_run=False)
+        step3_name_forms(db, _logger, all_as, linked_ids, name_form_map, dry_run=False, person_repo=person_repository(db))
 
         assert _get_person_id_of_oa_authorship(db, oa_as) == person_id
 
@@ -479,11 +498,11 @@ class TestStep3NameForms:
         )
 
         pub = _insert_publication(db)
-        pid1 = create_person(db, "Dupont", "Jean")
-        pid2 = create_person(db, "Dupont", "Jacques")
+        pid1 = create_person(db, "Dupont", "Jean", repo=person_repository(db))
+        pid2 = create_person(db, "Dupont", "Jacques", repo=person_repository(db))
         # "j dupont" est une forme ambiguë (initiale J → match les deux)
-        add_name_form(db, pid1, "J Dupont")
-        add_name_form(db, pid2, "J Dupont")
+        add_name_form(db, pid1, "J Dupont", repo=person_repository(db))
+        add_name_form(db, pid2, "J Dupont", repo=person_repository(db))
 
         oa_author = _insert_oa_author(db, "J Dupont", "A777")
         oa_doc = _insert_oa_document(db, "W777", pub)
@@ -492,7 +511,7 @@ class TestStep3NameForms:
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
         name_form_map = _queries.fetch_name_form_map(db)
-        step3_name_forms(db, _logger, all_as, linked_ids, name_form_map, dry_run=False)
+        step3_name_forms(db, _logger, all_as, linked_ids, name_form_map, dry_run=False, person_repo=person_repository(db))
 
         # Doit rester orphelin
         assert _get_person_id_of_oa_authorship(db, oa_as) is None
@@ -514,7 +533,7 @@ class TestStep3NameForms:
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
         name_form_map = _queries.fetch_name_form_map(db)
-        step3_name_forms(db, _logger, all_as, linked_ids, name_form_map, dry_run=False)
+        step3_name_forms(db, _logger, all_as, linked_ids, name_form_map, dry_run=False, person_repo=person_repository(db))
 
         pid = _get_person_id_of_oa_authorship(db, oa_as)
         assert pid is not None

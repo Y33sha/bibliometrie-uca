@@ -14,6 +14,7 @@ from application.publications import update_sources
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.publication import normalize_nnt
+from infrastructure.repositories import publication_repository
 
 
 def _create_all_publications(cur):
@@ -21,6 +22,7 @@ def _create_all_publications(cur):
 
     Simule la phase 'publications' du pipeline dans les tests.
     """
+    repo = publication_repository(cur)
     cur.execute("""
         SELECT id, source, doi, title, pub_year, doc_type, journal_id,
                oa_status, language, container_title, external_ids
@@ -51,13 +53,14 @@ def _create_all_publications(cur):
             container_title=doc["container_title"],
             language=doc["language"],
             allow_create=True,
+            repo=repo,
         )
         if pub_id:
             cur.execute(
                 "UPDATE source_publications SET publication_id = %s WHERE id = %s",
                 (pub_id, doc["id"]),
             )
-            update_sources(cur, pub_id)
+            update_sources(cur, pub_id, repo=repo)
 
 
 # ── Fixtures de données ScanR ────────────────────────────────────
@@ -222,9 +225,12 @@ def _run_normalize_scanr(cur):
 
     from application.pipeline.normalize.normalize_scanr import process_work
     from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
+    from infrastructure.repositories import journal_repository, publication_repository
 
     queries = PgScanrNormalizeQueries()
     logger = logging.getLogger("test")
+    journal_repo = journal_repository(cur)
+    pub_repo = publication_repository(cur)
 
     cur.execute("""
         SELECT id, source_id AS scanr_id, doi, raw_data
@@ -235,7 +241,7 @@ def _run_normalize_scanr(cur):
     rows = cur.fetchall()
     processed = 0
     for row in rows:
-        if process_work(cur, queries, logger, row):
+        if process_work(cur, queries, logger, row, journal_repo=journal_repo, pub_repo=pub_repo):
             processed += 1
     return processed
 
@@ -412,9 +418,12 @@ def _run_normalize_hal(cur):
     plain_cur = cur.connection.cursor()
     from application.pipeline.normalize.normalize_hal import process_work
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
+    from infrastructure.repositories import journal_repository, publication_repository
 
     queries = PgHalNormalizeQueries()
     logger = logging.getLogger("test")
+    journal_repo = journal_repository(plain_cur)
+    pub_repo = publication_repository(plain_cur)
 
     plain_cur.execute("""
         Select id, source_id AS halid, doi, raw_data, hal_collections
@@ -423,7 +432,9 @@ def _run_normalize_hal(cur):
     rows = plain_cur.fetchall()
     processed = 0
     for row in rows:
-        if process_work(plain_cur, queries, logger, row):
+        if process_work(
+            plain_cur, queries, logger, row, journal_repo=journal_repo, pub_repo=pub_repo
+        ):
             processed += 1
     return processed
 
@@ -563,9 +574,12 @@ def _run_normalize_oa(cur):
 
     from application.pipeline.normalize.normalize_openalex import process_work
     from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
+    from infrastructure.repositories import journal_repository, publication_repository
 
     queries = PgOpenalexNormalizeQueries()
     logger = logging.getLogger("test")
+    journal_repo = journal_repository(cur)
+    pub_repo = publication_repository(cur)
 
     cur.execute("""
         SELECT id, source_id AS openalex_id, doi, raw_data
@@ -574,7 +588,7 @@ def _run_normalize_oa(cur):
     rows = cur.fetchall()
     processed = 0
     for row in rows:
-        if process_work(cur, queries, logger, row):
+        if process_work(cur, queries, logger, row, journal_repo=journal_repo, pub_repo=pub_repo):
             processed += 1
     return processed
 
@@ -680,9 +694,12 @@ def _run_normalize_wos(cur):
     plain_cur = cur.connection.cursor()
     from application.pipeline.normalize.normalize_wos import process_record
     from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
+    from infrastructure.repositories import journal_repository, publication_repository
 
     queries = PgWosNormalizeQueries()
     logger = logging.getLogger("test")
+    journal_repo = journal_repository(plain_cur)
+    pub_repo = publication_repository(plain_cur)
 
     plain_cur.execute("""
         SELECT id, source_id AS ut, doi, raw_data
@@ -691,7 +708,9 @@ def _run_normalize_wos(cur):
     rows = plain_cur.fetchall()
     processed = 0
     for row in rows:
-        if process_record(plain_cur, queries, logger, row):
+        if process_record(
+            plain_cur, queries, logger, row, journal_repo=journal_repo, pub_repo=pub_repo
+        ):
             processed += 1
     return processed
 
@@ -942,18 +961,40 @@ def _run_create_persons(db):
         step3_name_forms,
     )
     from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
+    from infrastructure.repositories import person_repository
 
     queries = PgPersonsCreateQueries()
     logger = logging.getLogger("test")
+    person_repo = person_repository(db)
     all_authorships = get_all_unlinked_authorships(db, queries)
     linked_ids: set = set()
 
-    step0_hal_accounts(db, queries, logger, all_authorships, linked_ids, dry_run=False)
+    step0_hal_accounts(
+        db, queries, logger, all_authorships, linked_ids, dry_run=False, person_repo=person_repo
+    )
     linked_index = load_linked_authorships_by_pub(db, queries)
-    step1_cross_source(db, logger, all_authorships, linked_ids, linked_index, dry_run=False)
-    step2_orcid(db, queries, logger, all_authorships, linked_ids, dry_run=False)
+    step1_cross_source(
+        db,
+        logger,
+        all_authorships,
+        linked_ids,
+        linked_index,
+        dry_run=False,
+        person_repo=person_repo,
+    )
+    step2_orcid(
+        db, queries, logger, all_authorships, linked_ids, dry_run=False, person_repo=person_repo
+    )
     name_form_map = queries.fetch_name_form_map(db)
-    step3_name_forms(db, logger, all_authorships, linked_ids, name_form_map, dry_run=False)
+    step3_name_forms(
+        db,
+        logger,
+        all_authorships,
+        linked_ids,
+        name_form_map,
+        dry_run=False,
+        person_repo=person_repo,
+    )
 
     return len(linked_ids)
 

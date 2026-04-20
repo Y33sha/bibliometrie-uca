@@ -7,6 +7,7 @@ from application.pipeline.merge.merge_pubs_by_nnt import run_merge
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.merge import PgMergeQueries
 from infrastructure.log import setup_logger
+from infrastructure.repositories import publication_repository
 
 logger = setup_logger("merge_pubs_by_nnt", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -20,7 +21,14 @@ def main() -> None:
     conn.autocommit = False
     try:
         cur = conn.cursor()
-        run_merge(cur, conn, PgMergeQueries(), logger, dry_run=args.dry_run)
+        run_merge(
+            cur,
+            conn,
+            PgMergeQueries(),
+            logger,
+            pub_repo=publication_repository(cur),
+            dry_run=args.dry_run,
+        )
     finally:
         conn.close()
 
