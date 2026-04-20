@@ -1,25 +1,29 @@
 # Bibliométrie UCA
 
 Suivi de la production scientifique de l'Université Clermont Auvergne.
-Intègre trois sources bibliographiques (HAL, OpenAlex, Web of Science) dans un
-référentiel dédupliqué de publications, personnes et laboratoires.
+Intègre cinq sources bibliographiques (HAL, OpenAlex, Web of Science,
+ScanR, theses.fr) dans un référentiel dédupliqué de publications,
+personnes et laboratoires.
 
 ## Stack technique
 
 - **Frontend** : SvelteKit (Svelte 5) — `interfaces/frontend/`
-- **Backend** : FastAPI + PostgreSQL (psycopg2) — `backend/`
-- **Pipeline** : scripts Python — `processing/`, `extraction/`
-- **Base de données** : PostgreSQL 18
+- **Backend** : FastAPI + PostgreSQL 18 (psycopg2) — `interfaces/api/`
+- **Pipeline** : Python — `application/pipeline/` (orchestrateur
+  `run_pipeline.py`), extracteurs dans `infrastructure/sources/`
+- **Architecture** : DDD en 4 couches (`domain/`, `application/`,
+  `infrastructure/`, `interfaces/`) — voir
+  [docs/architecture.md](docs/architecture.md)
 
 ## Prérequis
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (recommandé)
 
-Ou, pour une installation sans Docker :
-
+Ou, installation sans Docker :
 - Python 3.10+
 - Node.js 20+ / npm 10+
 - PostgreSQL 18+ avec extensions `pg_trgm`, `unaccent`
+- [`uv`](https://docs.astral.sh/uv/) recommandé pour l'install des deps
 
 ## Installation avec Docker (recommandé)
 
@@ -29,7 +33,7 @@ Ou, pour une installation sans Docker :
 cp .env.example .env
 ```
 
-Editer `.env` avec vos valeurs (credentials DB, admin, clés API).
+Éditer `.env` avec vos valeurs (credentials DB, admin, clés API).
 
 ### 2. Lancement (dev)
 
@@ -38,35 +42,31 @@ docker compose up
 ```
 
 - Frontend : http://localhost:5176/bibliometrie
-- Backend / API : http://localhost:8003
+- API : http://localhost:8003
 
-Le code est monté en volume : les modifications sont prises en compte en temps réel (hot reload backend + frontend).
+Le code est monté en volume : hot reload backend + frontend.
 
 ### 3. Importer une base existante
 
 ```bash
-# Copier le dump dans le conteneur
 docker cp bibliometrie.dump bibliometrie-uca-db-1:/tmp/
-
-# Restaurer
 docker compose exec db bash -c "pg_restore -U lalecoz -d bibliometrie --no-owner -j 4 /tmp/bibliometrie.dump"
 ```
 
-Pour créer une base vide à la place :
+Ou créer une base vide :
 
 ```bash
-docker compose exec db psql -U postgres -d bibliometrie -f /app/db/schema.sql
+docker compose exec db psql -U postgres -d bibliometrie -f /app/infrastructure/db/schema.sql
+docker compose exec backend python -m infrastructure.db.migrate
 ```
 
-### 4. Pipeline de données
+### 4. Pipeline
 
 ```bash
 docker compose exec backend python run_pipeline.py
 ```
 
-### 5. Lancement (prod)
-
-En production, le backend sert l'API et le frontend buildé (image unique) :
+### 5. Production
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d
@@ -76,7 +76,7 @@ docker compose -f docker-compose.prod.yml up -d
 
 ```bash
 docker compose down        # Arrêter les conteneurs
-docker compose down -v     # Arrêter et supprimer le volume PostgreSQL
+docker compose down -v     # + supprimer le volume PostgreSQL
 docker compose logs -f     # Suivre les logs
 docker compose exec backend bash   # Shell dans le conteneur backend
 ```
@@ -87,35 +87,38 @@ docker compose exec backend bash   # Shell dans le conteneur backend
 
 ```bash
 createdb bibliometrie
-psql -d bibliometrie -f db/schema.sql
-python db/migrate.py
+psql -d bibliometrie -f infrastructure/db/schema.sql
+python -m infrastructure.db.migrate
 ```
 
 Deux options pour initialiser les données :
 
-**Option A — Restaurer un dump complet** (base existante) :
+**Option A — Restaurer un dump complet** :
 ```bash
 pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 ```
 
-**Option B — Démarrer de zéro** (seed minimal) :
+**Option B — Démarrer de zéro** :
 ```bash
-psql -d bibliometrie -f db/seed.sql
+psql -d bibliometrie -f infrastructure/db/seed.sql
 ```
-Le seed contient les données de référence (structures, relations, pays, config).
-Les credentials API (clés WoS, ScanR, etc.) sont remplacés par des placeholders :
-les renseigner dans la table `config` avant de lancer le pipeline.
+Le seed contient les données de référence (structures, relations, pays,
+config). Les credentials API sont des placeholders : à renseigner dans
+la table `config` avant le pipeline.
 
-Pour régénérer le seed depuis une base existante : `python scripts/generate_seed.py`
+Pour régénérer le seed depuis une base existante :
+`python interfaces/cli/generate_seed.py`.
 
 ### Backend
 
 ```bash
-pip install ".[dev]"   # runtime + outils de dev (pytest, ruff, mypy, …)
-# ou, pour un déploiement sans dev tools :
-pip install .
+# Avec uv (recommandé)
+uv sync
 
-# Installer le hook pre-commit (lance ruff + checks YAML/TOML avant chaque commit)
+# Ou avec pip
+pip install ".[dev]"   # runtime + dev tools (pytest, ruff, mypy, …)
+
+# Hook pre-commit (ruff + mypy + lint-imports + pytest-unit)
 pre-commit install
 ```
 
@@ -130,44 +133,41 @@ npm install
 
 ### Développement
 
-```bash
-# Backend (port 8003 par défaut)
-uvicorn interfaces.api.app:app --reload
+Tout-en-un (backend port 8003 + frontend port 5176) :
 
-# Frontend (port 5173 par défaut)
-cd frontend && npm run dev
+```bash
+bash start.sh
+```
+
+Ou séparément :
+
+```bash
+python -m uvicorn interfaces.api.app:app --reload --port 8003
+cd interfaces/frontend && npm run dev -- --port 5176
 ```
 
 ### Production
 
 ```bash
-# Build du frontend
-cd frontend && npm run build
+# Build frontend
+cd interfaces/frontend && npm run build
 
 # Backend via pm2
-pm2 start backend/app.py --name bibliometrie --interpreter python3
+pm2 start interfaces/api/app.py --name bibliometrie --interpreter python3
 ```
 
-Voir [docs/deploiement](memory/reference_deployment.md) pour la configuration
-nginx et pm2.
+Voir [docs/exploitation.md](docs/exploitation.md) pour nginx et pm2.
 
 ## Pipeline de données
 
 ```bash
-# Pipeline complet
-python run_pipeline.py
-
-# Reprise à partir d'une phase
-python run_pipeline.py --from persons
-
-# Une seule phase
-python run_pipeline.py --only authorships
-
-# Dry-run
-python run_pipeline.py --dry-run
-
-# Lister les phases disponibles
-python run_pipeline.py --list
+python run_pipeline.py                    # Complet (9 phases)
+python run_pipeline.py --from persons     # Reprise depuis une phase
+python run_pipeline.py --only authorships # Une seule phase
+python run_pipeline.py --list             # Liste des phases
+python run_pipeline.py --dry-run          # Sans exécuter
+python run_pipeline.py --mode weekly      # Import hebdomadaire (WoS exclu)
+python run_pipeline.py --sources hal,openalex  # Sources spécifiques
 ```
 
 Voir [docs/pipeline.md](docs/pipeline.md) pour le détail des 9 phases.
@@ -175,7 +175,11 @@ Voir [docs/pipeline.md](docs/pipeline.md) pour le détail des 9 phases.
 ## Tests
 
 ```bash
-python -m pytest tests/ -v
+export DB_PASSWORD=...                      # Requis pour les tests d'intégration
+python -m pytest tests/ -v                  # Tout
+python -m pytest tests/unit/ -q             # Unitaires seuls (~1s)
+python -m pytest tests/integration/ -q      # Intégration (~10s, base bibliometrie_test)
+python -m pytest tests/ --cov               # Avec couverture (seuil 49%)
 ```
 
 Les tests d'intégration utilisent une base `bibliometrie_test` créée
@@ -185,42 +189,37 @@ automatiquement.
 
 ```
 bibliometrie-uca/
-├── backend/              API FastAPI
-│   ├── app.py            Point d'entrée
-│   ├── routers/          Endpoints par domaine
-│   ├── deps.py           Dépendances (connexion DB, auth)
-│   ├── filters.py        Filtres SQL partagés
-│   └── models.py         Modèles Pydantic
-├── interfaces/frontend/             Application SvelteKit
-│   └── src/
-│       ├── routes/       Pages (publiques + admin)
-│       └── lib/          Composants et styles partagés
-├── processing/           Scripts du pipeline
-├── extraction/           Moissonnage des sources
-│   ├── hal/
-│   ├── openalex/
-│   └── wos/
-├── services/             Logique métier (persons, authorships, publications, journals)
-├── db/                   Schéma SQL, connexion, scripts SQL
-├── scripts/              Scripts manuels (imports, corrections)
-├── tests/                Tests (pytest)
-├── utils/                Utilitaires partagés (normalisation)
-├── config/               Configuration (settings.py)
-├── run_pipeline.py       Orchestrateur du pipeline
-└── docs/                 Documentation
-    ├── architecture.md   Schéma, principes de conception, tables
-    ├── pipeline.md       Pipeline détaillé (11 phases)
-    ├── sources.md        Sources de données (API, imports, particularités)
-    ├── exploitation.md   Guide d'exploitation (lancement, reprise, supervision)
-    ├── glossaire.md      Termes métier
-    └── guide-utilisateur.md  Fonctionnalités de l'application
+├── domain/              Entités, value objects, règles pures (zéro I/O)
+├── application/         Services métier, orchestrateurs
+│   └── pipeline/        Phases du pipeline (normalize, build, enrich, …)
+├── infrastructure/      Adapters sortants (SQL, API sources, settings)
+│   ├── db/              Schéma SQL, migrations, query services
+│   ├── sources/         Extracteurs API (hal, openalex, wos, scanr, theses)
+│   └── repositories/    Adapters PostgreSQL pour les ports domain/
+├── interfaces/          Adapters entrants
+│   ├── api/             FastAPI (routers, models Pydantic, middlewares)
+│   ├── frontend/        SvelteKit
+│   └── cli/             Scripts one-shot (imports, debug, corrections)
+├── tests/               pytest (unit + integration)
+├── logs/                Logs consolidés (JSON), status.json, rapports pipeline
+├── run_pipeline.py      Orchestrateur du pipeline
+├── start.sh             Lancement dev (backend + frontend)
+└── docs/                Documentation
 ```
+
+Voir [docs/architecture.md](docs/architecture.md) pour les règles
+d'import entre couches (vérifiées par import-linter en pre-commit + CI).
 
 ## Documentation
 
-- [Architecture des données](docs/architecture.md) — schéma, principes de conception, diagramme ER
-- [Pipeline](docs/pipeline.md) — les 11 phases de traitement, utilitaires partagés
-- [Sources de données](docs/sources.md) — API, imports manuels, particularités de chaque source
-- [Guide d'exploitation](docs/exploitation.md) — lancement du pipeline, reprise, supervision, limites connues
+- [Architecture des données](docs/architecture.md) — schéma, principes de conception
+- [Pipeline](docs/pipeline.md) — les 9 phases de traitement
+- [Sources de données](docs/sources.md) — API, imports manuels, particularités par source
+- [Guide d'exploitation](docs/exploitation.md) — lancement, reprise, supervision, déploiement
 - [Glossaire](docs/glossaire.md) — définitions des termes métier
-- [Guide utilisateur](docs/guide-utilisateur.md) — pages et fonctionnalités de l'application
+- [Guide utilisateur](docs/guide-utilisateur.md) — pages et fonctionnalités
+
+## Roadmap
+
+Voir [ROADMAP.md](ROADMAP.md) pour l'état des chantiers (architecture,
+qualité, documentation) et la liste des points d'audit périodique.
