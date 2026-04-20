@@ -128,22 +128,67 @@ centralisées dans `domain/` + `filters.py`.
   nouvelles duplications, nouvelles magic values inline.
 
 ### 2.6 Documentation et DX
-- [ ] **README** : permettre à une nouvelle personne (ou toi-dans-2-ans)
-  de monter un env de dev en 15 minutes, depuis zéro
+- [x] **README** refait : quickstart Docker + sans Docker, arborescence
+  DDD à jour, commandes pipeline / tests / coverage. Démarrage en
+  15 min depuis zéro.
+- [x] **Schéma d'architecture** : `docs/architecture.md` (archi
+  logicielle — 4 couches DDD, règles d'import, patterns d'injection,
+  composition roots) et `docs/donnees.md` (modèle de données, tables,
+  domaines fonctionnels).
 - [ ] **CONTRIBUTING.md** (ou équivalent) : "comment ajouter une nouvelle
   source de données", "comment ajouter une phase au pipeline",
   "comment ajouter un endpoint"
-- [ ] **Schéma d'architecture versionné** dans `docs/` : diagramme des
-  couches, liste des agrégats et de leurs repositories, flux du pipeline
-- [ ] **Descriptions OpenAPI** : Pydantic permet de les générer gratuitement
-  depuis les modèles — à compléter endpoint par endpoint
+- [ ] **Descriptions OpenAPI** : Pydantic permet de les générer
+  gratuitement depuis les modèles — à compléter endpoint par endpoint.
+  Pilote fait sur `/api/journals` (§2.7.3) ; à généraliser aux ~29
+  autres endpoints.
 
 ### 2.7 Frontend
-- [ ] Audit de la séparation stores vs composants (est-ce que la logique
-  métier se fait dans les composants ou dans des stores dédiés ?)
-- [ ] Centralisation des appels API dans un client dédié (`interfaces/frontend/src/lib/api/`)
-- [ ] **Types TypeScript générés depuis OpenAPI** plutôt que réécrits
-  manuellement (évite la dérive silencieuse backend/front)
+
+#### 2.7.1 Séparation logique métier / composants — partiel
+Audit initial : 0 store Svelte formel, 4 composables existants
+(`usePaginatedFetch`, `useFacets`, `useColumnVisibility`,
+`useUrlFilters`), routes à 500-650 LOC qui mêlent UI + état + appels
+API + logique métier.
+- [x] Nouveau composable `useDebouncedSearch` (search API avec
+  debounce, annulation des requêtes obsolètes, compteur `seq`).
+  Appliqué aux 4 routes concernées (admin/journals, admin/publishers,
+  admin/orphan-authorships, admin/persons) ; les dicts keyés par id
+  ont été simplifiés en « 1 instance + 1 activeKey » puisqu'ils ne
+  supportaient qu'une entrée ouverte à la fois.
+- [ ] Les routes restantes (admin/structures, admin/addresses,
+  admin/countries, laboratories/[id]) utilisent un debounce-filter
+  différent (pas de results dropdown) — pattern différent,
+  extraction optionnelle via un futur `useDebouncedEffect` si le
+  gain devient sensible.
+- [ ] Extraction de logique métier spécifique (identifier form,
+  detach modal, edit modals dans les gros composants admin) — à
+  faire au fil des prochaines touches sur ces composants, pas en
+  bulk.
+
+#### 2.7.2 Centralisation des appels API — fait
+- [x] `src/lib/api/` : client étendu avec `post`/`put`/`patch`/`del`
+  et `ApiError` typé, 13 modules d'endpoints par domaine (auth,
+  persons, publications, authorships, journals, publishers,
+  structures, perimeters, config, nameForms, addresses,
+  orphanAuthorships, duplicates). Migration des 57 `fetch()` directs
+  dans `src/routes/*` → 0 restant hors de `lib/api/`.
+
+#### 2.7.3 Types TypeScript générés depuis OpenAPI — pilote
+- [x] **Pilote `/api/journals`** : `JournalOut` + `JournalListResponse`
+  Pydantic côté backend, `response_model` exposé dans le schéma
+  OpenAPI ; `openapi-typescript` en devDep ; script
+  `interfaces/cli/dump_openapi.py` qui dumpe le schéma offline ;
+  `npm run types:gen` enchaîne dump + génération + cleanup ;
+  `src/lib/api/schema.ts` committé comme source de vérité ;
+  interface `Journal` locale du composant admin/journals remplacée
+  par le type généré.
+- [ ] **Généraliser aux ~29 autres endpoints** (publishers, persons,
+  publications, laboratories, structures, addresses…) : pour chaque
+  endpoint, (A) ajouter un `XxxOut` Pydantic + `response_model`, (B)
+  régénérer le schema, (C) remplacer l'interface locale dans le ou
+  les composants qui la consomment. ~88 interfaces locales à
+  éliminer progressivement.
 
 ### 2.8 Observabilité et robustesse production
 - [x] **Structured logs JSON** : `infrastructure/log.py` émet en JSON
@@ -160,12 +205,14 @@ centralisées dans `domain/` + `filters.py`.
   partiellement en place, à consolider
 
 ### 2.9 Audits transversaux périodiques
-- [x] **12-factor app** : pointeurs dans *Beyond the Twelve-Factor App*
-  (Kevin Hoffman, 2016) qui revisite les 12 facteurs originaux et en
-  ajoute 3 à l'ère Kubernetes
-- [x] **SOLID** sur le code existant : détecter les violations (surtout ISP
-  et DIP qui sont les plus courantes quand on vient d'une base procédurale)
-- [x] **Revue code dupliqué / uniformisation** : ex. les fonctions de
+À faire passer périodiquement — non commencés à ce jour.
+- [ ] **12-factor app** : confronter le projet aux pointeurs de
+  *Beyond the Twelve-Factor App* (Kevin Hoffman, 2016) qui revisite
+  les 12 facteurs originaux et en ajoute 3 à l'ère Kubernetes.
+- [ ] **SOLID** sur le code existant : détecter les violations
+  (surtout ISP et DIP, les plus courantes quand on vient d'une base
+  procédurale).
+- [ ] **Revue code dupliqué / uniformisation** : ex. les fonctions de
   compatibilité de noms existent en deux versions (Python dans
   `domain/names.py`, SQL dans `admin_person_duplicates.py`) — à
   unifier si la logique diverge.
