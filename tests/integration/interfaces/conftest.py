@@ -71,7 +71,7 @@ for router_module in [
         "admin_person_duplicates",
         "admin_feedback",
         "admin_pipeline",
-        "pub_stats",
+        "stats",
         "config",
         "publishers",
         "journals",

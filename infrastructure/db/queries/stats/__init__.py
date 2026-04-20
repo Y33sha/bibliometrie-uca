@@ -1,4 +1,4 @@
-"""Query services pour /api/stats/* (router pub_stats).
+"""Query services pour /api/stats/* (router stats).
 
 Le package est organisé par thème d'agrégat :
 - `publishers` : `publisher_stats`

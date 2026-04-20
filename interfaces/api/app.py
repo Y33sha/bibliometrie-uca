@@ -50,9 +50,9 @@ from interfaces.api.routers import (  # noqa: E402
     laboratories,
     perimeters,
     persons,
-    pub_stats,
     publications,
     publishers,
+    stats,
     structures,
 )
 
@@ -286,7 +286,7 @@ async def root() -> Any:
 # ----- Include routers -----
 
 app.include_router(auth.router)
-app.include_router(pub_stats.router)
+app.include_router(stats.router)
 app.include_router(publications.router)
 app.include_router(admin_duplicates.router)
 app.include_router(addresses.router)
