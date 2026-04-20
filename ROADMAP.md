@@ -59,27 +59,6 @@ Ajouter au fur et à mesure : `ROR`, `RNSR` (identifiants de structure),
 normalisation explicite émerge.
 
 ### 1.6 Inversion de dépendance complète
-**WIP branch `feature/pipeline-ports`** (pushée, pas mergée). Orchestrateurs
-`application/pipeline/*` dépendent maintenant de ports (`application/ports/*`),
-adapters PostgreSQL dans `infrastructure/db/queries/*`, composition roots dans
-`interfaces/cli/pipeline/*`, `run_pipeline.py` appelle les orchestrateurs
-via imports Python directs.
-
-**Reste à fixer** (détecté juste avant le push) :
-- `application/pipeline/normalize/normalize_hal.py` : le module-level
-  `logger = setup_logger(...)` a été retiré à tort en même temps que
-  `import os` / `setup_logger`, et le code restant référence encore
-  `logger` dans process_work / except. Collection des tests échoue
-  (`NameError: name 'setup_logger' is not defined`) via
-  `tests/unit/application/test_normalize.py`. Soit réinjecter le logger
-  au niveau module (simple), soit le threader en param comme theses/openalex
-  (cohérent avec le pattern). Même vérif à faire sur les 4 autres
-  normalize_* : certains ont peut-être gardé `logger` module-level par erreur.
-- Vérifier aussi que `run_pipeline.py` a bien `_run_normalize_hal` défini
-  avant usage (ordre des `def`).
-- Les tests d'intégration passaient avant ce dernier edit, le fix est
-  probablement de 10 lignes.
-
 - [x] **Extraction SQL des scripts pipeline vers `infrastructure/db/queries/`**
   (branche `feature/pipeline-di`, 13 commits atomiques). 153 `cur.execute`
   dispersés dans `application/pipeline/*` → 9 restants (tous des SAVEPOINT
@@ -90,21 +69,31 @@ via imports Python directs.
   openalex,wos,hal}`. Même pattern que §1.1 pour les routers : chaque
   orchestrateur pipeline ne contient plus que de la logique Python pure
   (parsing, boucles, conditions métier) et délègue la persistance.
-- [ ] Reste : injection canonique via ports (Protocol) + factories
-  FastAPI `Depends` côté API, équivalent unit-of-work côté pipeline.
-  À faire si la couverture de tests devient un objectif. Avec §1.6
-  comme socle, le pas restant est mécanique (aucun SQL à déplacer,
-  juste passer les query services en paramètre).
+- [x] **Injection canonique via ports (Protocol) côté pipeline**
+  (branche `feature/pipeline-ports`, 13 commits atomiques countries →
+  normalize/hal). Orchestrateurs `application/pipeline/*` dépendent de
+  ports (`application/ports/*`) au lieu d'importer `infrastructure.db.
+  queries.*` directement. Adapters PostgreSQL dans `infrastructure/db/
+  queries/*` (déjà en place depuis §1.6 partie 1) implémentent ces
+  Protocols. Composition roots dans `interfaces/cli/pipeline/*` : chaque
+  entry point CLI instancie les `Pg*Queries` et les injecte dans
+  l'orchestrateur. `run_pipeline.py` appelle les orchestrateurs via
+  imports Python directs. `logger` également threadé en param dans les
+  5 `normalize_*` (pattern cohérent, plus aucun `setup_logger` module-
+  level dans `application/`). Zéro import `infrastructure.db.queries`
+  depuis `application/` : §1.7 peut passer en `layered` strict.
+- [ ] Reste côté API : factories FastAPI `Depends` pour injecter les
+  query services dans les routers (équivalent unit-of-work). Mécanique
+  si la couverture de tests devient un objectif.
 
 ### 1.7 Verrouiller les acquis : import-linter
 - [x] Contrats initiaux dans `pyproject.toml` (`[tool.importlinter]`),
   vérifiés en pre-commit + CI. 4 contrats `forbidden` qui verrouillent :
   (1) domain = noyau pur, (2) application ↛ interfaces,
   (3) infrastructure ↛ interfaces, (4) infrastructure ↛ application.
-- [ ] Durcir en contrat `layered` strict — toujours bloqué par la DI
-  canonique (§1.6 partie 2) : le SQL est extrait, mais `application/`
-  importe encore les query services depuis `infrastructure.db.queries`.
-  À faire quand les ports seront posés.
+- [ ] Durcir en contrat `layered` strict — débloqué par §1.6 (ports
+  posés côté pipeline, plus aucun import `infrastructure.db.queries`
+  depuis `application/`). Prochain chantier.
 
 ### 1.8 Audit périodique
 Parcours régulier pour repérer : SQL mal placé, dépendances dans le
