@@ -25,6 +25,7 @@ from typing import Any
 from domain.errors import NotFoundError
 from domain.normalize import normalize_name
 from domain.person import compute_person_name_forms
+from infrastructure.db_helpers import row_val as _val
 
 
 class PgPersonRepository:
@@ -52,7 +53,9 @@ class PgPersonRepository:
             """,
             (last_name, first_name, normalize_name(last_name), normalize_name(first_name)),
         )
-        return self._cur.fetchone()["id"]
+        # _val rend la méthode agnostique au type de curseur (tuple en
+        # pipeline, RealDictCursor côté API).
+        return _val(self._cur.fetchone(), 0)
 
     def update_name(self, person_id: int, last_name: str, first_name: str) -> None:
         """Met à jour nom/prénom. Lève NotFoundError si la personne n'existe pas."""
@@ -98,7 +101,7 @@ class PgPersonRepository:
             "SELECT COUNT(*) AS n FROM persons_rh WHERE person_id IN (%s, %s)",
             (id_a, id_b),
         )
-        return self._cur.fetchone()["n"] >= 2
+        return _val(self._cur.fetchone(), 0) >= 2
 
     def merge_into(self, target_id: int, source_id: int) -> None:
         """Fusionne la personne `source_id` dans `target_id`.
@@ -216,7 +219,7 @@ class PgPersonRepository:
         row = self._cur.fetchone()
         if not row:
             return None
-        return row["person_id_a"], row["person_id_b"]
+        return _val(row, 0), _val(row, 1)
 
     # ── person_identifiers ─────────────────────────────────────────
 
@@ -455,9 +458,9 @@ class PgPersonRepository:
             (authorship_id, source),
         )
         row = self._cur.fetchone()
-        if not row or not row["publication_id"]:
+        pub_id = _val(row, 0) if row else None
+        if not pub_id:
             return
-        pub_id = row["publication_id"]
 
         # 1. INSERT si pas déjà existant
         self._cur.execute(
@@ -551,7 +554,7 @@ class PgPersonRepository:
             """,
             (person_id, name_form),
         )
-        return self._cur.fetchone()["n"]
+        return _val(self._cur.fetchone(), 0)
 
     # ── person_name_forms ──────────────────────────────────────────
 
