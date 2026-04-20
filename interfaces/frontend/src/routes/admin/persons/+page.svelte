@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { base } from "$app/paths";
   import { replaceState } from "$app/navigation";
-  import { api } from "$lib/api";
+  import { api, ApiError, orphanAuthorships, persons as personsApi } from "$lib/api";
   import { sanitizeTitle, titleCase } from "$lib/utils";
   import FacetDropdown from "$lib/components/FacetDropdown.svelte";
   import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
@@ -313,15 +313,14 @@
     const form = idForms[personId];
     if (!form || !form.id_value.trim()) return;
 
-    const resp = await fetch(`${base}/api/persons/${personId}/identifier`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id_type: form.id_type, id_value: form.id_value.trim() }),
-    });
-
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: "Erreur inconnue" }));
-      idForms = { ...idForms, [personId]: { ...form, error: err.detail || `Erreur ${resp.status}` } };
+    try {
+      await personsApi.addIdentifier(personId, {
+        id_type: form.id_type,
+        id_value: form.id_value.trim(),
+      });
+    } catch (e) {
+      const detail = e instanceof ApiError ? (e.detail as { detail?: string })?.detail : null;
+      idForms = { ...idForms, [personId]: { ...form, error: detail || "Erreur inconnue" } };
       return;
     }
 
@@ -333,18 +332,12 @@
   }
 
   async function removeIdentifier(personId: number, idType: string, idValue: string) {
-    await fetch(`${base}/api/persons/${personId}/identifier/${idType}/${encodeURIComponent(idValue)}`, {
-      method: "DELETE",
-    });
+    await personsApi.deleteIdentifier(personId, idType, idValue);
     await loadTable();
   }
 
   async function setIdentifierStatus(identId: number, status: string) {
-    await fetch(`${base}/api/person-identifiers/${identId}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
+    await personsApi.setIdentifierStatus(identId, status);
     await loadTable();
   }
 
@@ -356,18 +349,14 @@
     if (!targetIdStr) return;
     const targetPersonId = parseInt(targetIdStr);
     if (isNaN(targetPersonId)) return;
-    const resp = await fetch(`${base}/api/person-identifiers/${identId}/reassign`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ person_id: targetPersonId }),
-    });
-    if (resp.ok) {
+    try {
+      await personsApi.reassignIdentifier(identId, { person_id: targetPersonId });
       delete reassignState[identId];
       reassignState = reassignState;
       await loadTable();
-    } else {
-      const err = await resp.json().catch(() => null);
-      alert(err?.detail || "Erreur");
+    } catch (e) {
+      const detail = e instanceof ApiError ? (e.detail as { detail?: string })?.detail : null;
+      alert(detail || "Erreur");
     }
   }
 
@@ -407,10 +396,10 @@
   }
 
   async function assignOrphan(orphan: any, personId: number) {
-    await fetch(`${base}/api/admin/orphan-authorships/assign`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source: orphan.source, authorship_id: orphan.authorship_id, person_id: personId }),
+    await orphanAuthorships.assign({
+      source: orphan.source,
+      authorship_id: orphan.authorship_id,
+      person_id: personId,
     });
     orphanAssignSearch = {};
     loadOrphans();
@@ -423,14 +412,10 @@
       : [orphan.full_name.split(" ").slice(-1)[0], orphan.full_name.split(" ").slice(0, -1).join(" ")];
     const lastName = parts[0] || orphan.full_name;
     const firstName = parts[1] || "";
-    await fetch(`${base}/api/admin/orphan-authorships/assign`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source: orphan.source,
-        authorship_id: orphan.authorship_id,
-        create_person: { last_name: lastName, first_name: firstName },
-      }),
+    await orphanAuthorships.assign({
+      source: orphan.source,
+      authorship_id: orphan.authorship_id,
+      create_person: { last_name: lastName, first_name: firstName },
     });
     orphanAssignSearch = {};
     loadOrphans();
@@ -441,14 +426,12 @@
 
   async function savePersonName() {
     if (!editNameModal) return;
-    const resp = await fetch(`${base}/api/persons/${editNameModal.personId}/name`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ last_name: editNameModal.lastName, first_name: editNameModal.firstName }),
-    });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: `Erreur ${resp.status}` }));
-      alert(err.detail || `Erreur ${resp.status}`);
+    try {
+      await personsApi.rename(editNameModal.personId, editNameModal.lastName, editNameModal.firstName);
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : "?";
+      const detail = e instanceof ApiError ? (e.detail as { detail?: string })?.detail : null;
+      alert(detail || `Erreur ${status}`);
       return;
     }
     editNameModal = null;
@@ -456,11 +439,7 @@
   }
 
   async function toggleRejectPerson(personId: number, rejected: boolean) {
-    await fetch(`${base}/api/persons/${personId}/reject`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rejected }),
-    });
+    await personsApi.setRejected(personId, rejected);
     editNameModal = null;
     loadTable();
   }
@@ -487,13 +466,9 @@
       return;
     }
 
-    await fetch(`${base}/api/persons/${detachModal.personId}/detach-authorships`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        authorships: toDetach.map((a) => ({ source: a.source, authorship_id: a.authorship_id })),
-        name_form: detachModal.nameForm,
-      }),
+    await personsApi.detachAuthorships(detachModal.personId, {
+      authorships: toDetach.map((a) => ({ source: a.source, authorship_id: a.authorship_id })),
+      name_form: detachModal.nameForm,
     });
     detachModal = null;
     loadStats();
@@ -502,11 +477,7 @@
 
   async function detachNameForm() {
     if (!detachModal) return;
-    await fetch(`${base}/api/persons/${detachModal.personId}/detach-name-form`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name_form: detachModal.nameForm }),
-    });
+    await personsApi.detachNameForm(detachModal.personId, { name_form: detachModal.nameForm });
     detachModal = null;
     loadStats();
     loadTable();
@@ -545,11 +516,7 @@
   }
 
   async function mergeInto(targetId: number, sourceId: number) {
-    await fetch(`${base}/api/persons/${targetId}/merge`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source_id: sourceId }),
-    });
+    await personsApi.merge(targetId, sourceId);
     closeMergeSearch(targetId);
     loadStats();
     loadTable();
@@ -558,11 +525,7 @@
   async function mergeFromModal(sourceId: number) {
     if (!detachModal) return;
     const targetId = detachModal.personId;
-    await fetch(`${base}/api/persons/${targetId}/merge`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source_id: sourceId }),
-    });
+    await personsApi.merge(targetId, sourceId);
     detachModal = null;
     loadStats();
     loadTable();

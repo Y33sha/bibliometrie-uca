@@ -3,14 +3,14 @@
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import type { Snippet } from 'svelte';
+	import { auth } from '$lib/api';
 
 	let { children }: { children: Snippet } = $props();
 	let checked = $state(false);
 
 	onMount(async () => {
 		try {
-			const res = await fetch(base + '/api/auth/check');
-			const data = await res.json();
+			const data = await auth.check();
 			if (!data.authenticated) {
 				goto(base + '/login', { replaceState: true });
 				return;

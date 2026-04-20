@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { api } from '$lib/api';
+	import { api, ApiError, persons as personsApi } from '$lib/api';
 	import { base } from '$app/paths';
 	import { replaceState } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -122,20 +122,17 @@
 	async function mergePair(targetId: number, sourceId: number) {
 		acting = true;
 		try {
-			const res = await fetch(`${base}/api/persons/${targetId}/merge`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ source_id: sourceId }),
-			});
-			if (!res.ok) {
-				const detail = await res.json().catch(() => ({}));
-				throw new Error(detail.detail || `Erreur ${res.status}`);
-			}
+			await personsApi.merge(targetId, sourceId);
 			mergedCount++;
 			// Après fusion, la paire disparaît : même offset = paire suivante
 			await loadAt(offset);
 		} catch (e: any) {
-			error = e.message || 'Erreur de fusion';
+			if (e instanceof ApiError) {
+				const detail = (e.detail as { detail?: string })?.detail;
+				error = detail || `Erreur ${e.status}`;
+			} else {
+				error = e.message || 'Erreur de fusion';
+			}
 			console.error(e);
 		}
 		acting = false;
@@ -144,11 +141,7 @@
 	async function markDistinct(idA: number, idB: number) {
 		acting = true;
 		try {
-			await fetch(`${base}/api/admin/person-duplicates/mark-distinct`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ person_id_a: idA, person_id_b: idB }),
-			});
+			await personsApi.markDistinct(idA, idB);
 			distinctCount++;
 			// Après marquage, la paire disparaît : même offset = paire suivante
 			await loadAt(offset);

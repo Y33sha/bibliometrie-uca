@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api } from "$lib/api";
+  import { api, duplicates } from "$lib/api";
   import { base } from "$app/paths";
   import { replaceState } from "$app/navigation";
   import { page } from "$app/stores";
@@ -71,11 +71,7 @@
   async function mergePair(targetId: number, sourceId: number) {
     acting = true;
     try {
-      await fetch(`${base}/api/admin/duplicates/merge`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_id: targetId, source_id: sourceId }),
-      });
+      await duplicates.mergePublications({ target_id: targetId, source_id: sourceId });
       mergedCount++;
       // Après fusion, la paire disparaît : même offset = paire suivante
       await loadAt(offset);
@@ -89,11 +85,7 @@
   async function markDistinct(pubIdA: number, pubIdB: number) {
     acting = true;
     try {
-      await fetch(`${base}/api/admin/duplicates/mark-distinct`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pub_id_a: pubIdA, pub_id_b: pubIdB }),
-      });
+      await duplicates.markPublicationsDistinct({ pub_id_a: pubIdA, pub_id_b: pubIdB });
       distinctCount++;
       // Après marquage, la paire disparaît : même offset = paire suivante
       await loadAt(offset);

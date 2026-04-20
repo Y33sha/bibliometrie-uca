@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
+	import { ApiError, auth } from '$lib/api';
 
 	let username = $state('');
 	let password = $state('');
@@ -12,19 +13,10 @@
 		error = '';
 		loading = true;
 		try {
-			const res = await fetch(base + '/api/auth/login', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ username, password })
-			});
-			if (!res.ok) {
-				error = 'Identifiants incorrects';
-				loading = false;
-				return;
-			}
+			await auth.login(username, password);
 			goto(base + '/admin/addresses');
-		} catch {
-			error = 'Erreur de connexion';
+		} catch (e) {
+			error = e instanceof ApiError ? 'Identifiants incorrects' : 'Erreur de connexion';
 			loading = false;
 		}
 	}

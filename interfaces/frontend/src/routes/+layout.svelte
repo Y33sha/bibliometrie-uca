@@ -6,14 +6,14 @@
   import { base } from "$app/paths";
   import { onMount } from "svelte";
   import type { Snippet } from "svelte";
+  import { auth } from "$lib/api";
 
   let { children }: { children: Snippet } = $props();
   let isSandbox = $state(false);
 
   onMount(async () => {
     try {
-      const resp = await fetch(base + "/api/health");
-      const data = await resp.json();
+      const data = await auth.health();
       isSandbox = !!data.sandbox;
     } catch {}
   });
@@ -37,7 +37,7 @@
   }
 
   async function logout() {
-    await fetch(base + "/api/auth/logout", { method: "POST" });
+    await auth.logout();
     goto(base + "/login");
   }
 </script>

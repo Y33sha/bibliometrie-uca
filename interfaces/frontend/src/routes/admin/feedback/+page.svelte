@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { base } from "$app/paths";
   import { replaceState } from "$app/navigation";
-  import { api } from "$lib/api";
+  import { api, nameForms } from "$lib/api";
   import { esc } from "$lib/utils";
   import Pagination from "$lib/components/Pagination.svelte";
 
@@ -230,7 +230,7 @@
   async function deleteForm(formId: number) {
     if (!confirm("Supprimer cette forme de nom ? Cela affectera la détection après relance.")) return;
     try {
-      await fetch(base + "/api/name-forms/" + formId, { method: "DELETE" });
+      await nameForms.remove(formId);
       loadTable();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -264,11 +264,7 @@
       const ctx = formData.requires_context_of || [];
       if (!ctx.includes(item)) ctx.push(item);
 
-      await fetch(base + "/api/name-forms/" + formId, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requires_context_of: ctx }),
-      });
+      await nameForms.update(formId, { requires_context_of: ctx });
       loadTable();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
