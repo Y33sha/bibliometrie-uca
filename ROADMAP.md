@@ -7,7 +7,7 @@ Synthèse de l'audit DSI (avril 2026) — ROI décroissant (impact / effort) :
 1. [x] **§1.7b** — Lever les 14 `ignore_imports` pipeline. Effort faible, débloque la testabilité unitaire des `normalize_*` et fige la cohérence DDD avant transmission. *Clôturé le 2026-04-20.*
 2. [x] **§2.10** — Découper les 4 fichiers backend monolithiques (`queries/publications.py` 1140 LOC, `queries/persons.py` 711, `repositories/person_repository.py` 665, `queries/stats.py` 630). Effort moyen, impact maintenabilité + testabilité. *Clôturé le 2026-04-20.*
 3. [~] **§2.1 +§2.2** — Remonter `fail_under` de 49 → 60+ en ciblant `infrastructure/db/queries/*`. Effort moyen, réduit le risque de régression en prod. *Partiel au 2026-04-20 : phases A→C faites, couverture 50.27 % → 56.34 %, `fail_under = 55`. Pour franchir 60 il faudrait élargir aux routers API (phase D non faite).*
-4. [ ] **§2.7.4** — Découper les 3 routes Svelte > 1000 LOC (`admin/structures` 1572, `admin/persons` 1263, `publications/[id]` 1132). Effort moyen, impact UX + maintenabilité.
+4. [x] **§2.7.4** — Découper les 3 routes Svelte > 1000 LOC. *Fait 2026-04-20 : `publications/[id]` 1132 → 206, `admin/persons` 1263 → 642, `admin/structures` 1572 → 797. 14 composants extraits, 0 erreur svelte-check.*
 5. [ ] **§2.7.3** — Généraliser les types OpenAPI aux ~29 endpoints restants (~88 interfaces locales à éliminer). Effort moyen, impact cohérence front/back.
 6. [ ] **§2.6** — `CONTRIBUTING.md` + descriptions OpenAPI. Effort faible, impact onboarding DSI.
 7. [ ] **§2.7.5** — Amorcer des tests frontend (Vitest composables + Playwright parcours critiques). Nouveau.
@@ -239,23 +239,18 @@ API + logique métier.
   les composants qui la consomment. ~88 interfaces locales à
   éliminer progressivement.
 
-#### 2.7.4 Découpe des routes monolithiques — nouveau
-Audit : 3 routes dépassent 1000 LOC et mêlent UI + état + appels API +
-logique métier. Coût de lecture et d'onboarding élevé, surface à bug
-étendue, impossible à tester en l'état.
-- [ ] `admin/structures/+page.svelte` (**1572 LOC**) — extraire :
-  modales CRUD, recherche facettée, logique d'arborescence
-  parent/enfant (est_tutelle_de / est_partenaire_de) en composables
-  + sous-composants.
-- [ ] `admin/persons/+page.svelte` (**1263 LOC**) — extraire : modale
-  fusion, formulaire identifiants (ORCID/idHAL), dropdown de détachement
-  d'authorships.
-- [ ] `publications/[id]/+page.svelte` (**1132 LOC**) — extraire :
-  sections authorships, journaux, topics, affiliations en composants
-  autonomes.
-- Méthode : pas de bulk, découper à l'occasion des prochaines touches
-  fonctionnelles sur chaque route. Cible : aucun fichier `+page.svelte`
-  au-dessus de ~600 LOC.
+#### 2.7.4 Découpe des routes monolithiques — fait 2026-04-20
+Audit initial : 3 routes dépassaient 1000 LOC et mêlaient UI + état +
+appels API + logique métier.
+- [x] `publications/[id]/+page.svelte` : 1132 → 206 LOC. Extraits :
+  `types.ts`, `PublicationHeader`, `ThesisBlock`, `TruthAuthorshipsTable`,
+  `SourceComparison`.
+- [x] `admin/persons/+page.svelte` : 1263 → 642 LOC. Extraits :
+  `types.ts`, `PersonsToolbar`, `EditNameModal`, `DetachNameFormModal`,
+  `IdentifiersCell`, `MergeSearchCell`.
+- [x] `admin/structures/+page.svelte` : 1572 → 797 LOC. Extraits :
+  `types.ts`, `StructureList`, `RelationsSection`, `NameFormsSection`,
+  `EditFormModal`, `StructureFormModal`.
 
 #### 2.7.5 Tests frontend — nouveau
 Audit : 0 test frontend (ni unit ni e2e). `svelte-check` couvre les
