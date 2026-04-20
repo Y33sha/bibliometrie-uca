@@ -7,6 +7,8 @@ commit séparé (Phase B).
 
 import json
 
+import pytest
+
 from application.addresses import (
     batch_review_structure_link,
     batch_set_country_by_filter,
@@ -17,6 +19,17 @@ from application.addresses import (
     set_country,
     unassign_manual_structure,
 )
+from infrastructure.repositories import address_repository, authorship_repository
+
+
+@pytest.fixture
+def repo(db):
+    return address_repository(db)
+
+
+@pytest.fixture
+def authorship_repo(db):
+    return authorship_repository(db)
 
 # ── Helpers ────────────────────────────────────────────────────────
 
@@ -96,45 +109,47 @@ def _get_link(db, address_id, structure_id):
 
 
 class TestReviewStructureLink:
-    def test_confirm_creates_link_if_absent(self, db):
+    def test_confirm_creates_link_if_absent(self, db, repo, authorship_repo):
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
 
-        review_structure_link(db, addr, uca, True)
+        review_structure_link(db, addr, uca, True, repo=repo, authorship_repo=authorship_repo)
 
         link = _get_link(db, addr, uca)
         assert link is not None
         assert link["is_confirmed"] is True
 
-    def test_reject_creates_link_if_absent(self, db):
+    def test_reject_creates_link_if_absent(self, db, repo, authorship_repo):
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
 
-        review_structure_link(db, addr, uca, False)
+        review_structure_link(db, addr, uca, False, repo=repo, authorship_repo=authorship_repo)
 
         link = _get_link(db, addr, uca)
         assert link["is_confirmed"] is False
 
-    def test_confirm_updates_existing_link(self, db):
+    def test_confirm_updates_existing_link(self, db, repo, authorship_repo):
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
         _insert_address_structure(db, addr, uca, is_confirmed=False)
 
-        review_structure_link(db, addr, uca, True)
+        review_structure_link(db, addr, uca, True, repo=repo, authorship_repo=authorship_repo)
 
         assert _get_link(db, addr, uca)["is_confirmed"] is True
 
-    def test_reset_deletes_manual_link(self, db):
+    def test_reset_deletes_manual_link(self, db, repo, authorship_repo):
         """Reset supprime le lien manuel (matched_form_id IS NULL)."""
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
         _insert_address_structure(db, addr, uca, is_confirmed=True)  # manuel
 
-        review_structure_link(db, addr, uca, None)
+        review_structure_link(db, addr, uca, None, repo=repo, authorship_repo=authorship_repo)
 
         assert _get_link(db, addr, uca) is None
 
-    def test_reset_preserves_auto_link_but_clears_confirmation(self, db):
+    def test_reset_preserves_auto_link_but_clears_confirmation(
+        self, db, repo, authorship_repo
+    ):
         """Reset sur un lien auto-détecté : le lien reste, is_confirmed → NULL."""
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
@@ -149,7 +164,7 @@ class TestReviewStructureLink:
         form_id = db.fetchone()["id"]
         _insert_address_structure(db, addr, uca, is_confirmed=False, matched_form_id=form_id)
 
-        review_structure_link(db, addr, uca, None)
+        review_structure_link(db, addr, uca, None, repo=repo, authorship_repo=authorship_repo)
 
         link = _get_link(db, addr, uca)
         assert link is not None  # lien auto préservé
@@ -161,37 +176,48 @@ class TestReviewStructureLink:
 
 
 class TestBatchReviewStructureLink:
-    def test_empty_returns_zero(self, db):
+    def test_empty_returns_zero(self, db, repo, authorship_repo):
         uca = _setup_uca_perimeter(db)
-        assert batch_review_structure_link(db, [], uca, True) == 0
+        assert (
+            batch_review_structure_link(
+                db, [], uca, True, repo=repo, authorship_repo=authorship_repo
+            )
+            == 0
+        )
 
-    def test_confirm_upserts_lot(self, db):
+    def test_confirm_upserts_lot(self, db, repo, authorship_repo):
         uca = _setup_uca_perimeter(db)
         addrs = [_create_address(db, raw_text=f"adr{i}") for i in range(3)]
 
-        updated = batch_review_structure_link(db, addrs, uca, True)
+        updated = batch_review_structure_link(
+            db, addrs, uca, True, repo=repo, authorship_repo=authorship_repo
+        )
 
         assert updated == 3
         for aid in addrs:
             assert _get_link(db, aid, uca)["is_confirmed"] is True
 
-    def test_reject_lot(self, db):
+    def test_reject_lot(self, db, repo, authorship_repo):
         uca = _setup_uca_perimeter(db)
         addrs = [_create_address(db, raw_text=f"x{i}") for i in range(2)]
 
-        batch_review_structure_link(db, addrs, uca, False)
+        batch_review_structure_link(
+            db, addrs, uca, False, repo=repo, authorship_repo=authorship_repo
+        )
 
         for aid in addrs:
             assert _get_link(db, aid, uca)["is_confirmed"] is False
 
-    def test_reset_lot(self, db):
+    def test_reset_lot(self, db, repo, authorship_repo):
         uca = _setup_uca_perimeter(db)
         a1 = _create_address(db, raw_text="a1")
         a2 = _create_address(db, raw_text="a2")
         _insert_address_structure(db, a1, uca, is_confirmed=True)
         _insert_address_structure(db, a2, uca, is_confirmed=False)
 
-        batch_review_structure_link(db, [a1, a2], uca, None)
+        batch_review_structure_link(
+            db, [a1, a2], uca, None, repo=repo, authorship_repo=authorship_repo
+        )
 
         # Les 2 liens manuels ont été supprimés
         assert _get_link(db, a1, uca) is None
@@ -202,15 +228,20 @@ class TestBatchReviewStructureLink:
 
 
 class TestUnassignManualStructure:
-    def test_deletes_manual_link(self, db):
+    def test_deletes_manual_link(self, db, repo, authorship_repo):
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
         _insert_address_structure(db, addr, uca, is_confirmed=True)  # manuel
 
-        assert unassign_manual_structure(db, addr, uca) is True
+        assert (
+            unassign_manual_structure(
+                db, addr, uca, repo=repo, authorship_repo=authorship_repo
+            )
+            is True
+        )
         assert _get_link(db, addr, uca) is None
 
-    def test_preserves_auto_link(self, db):
+    def test_preserves_auto_link(self, db, repo, authorship_repo):
         """Un lien auto-détecté (matched_form_id non NULL) n'est pas supprimé."""
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
@@ -221,15 +252,25 @@ class TestUnassignManualStructure:
         form_id = db.fetchone()["id"]
         _insert_address_structure(db, addr, uca, is_confirmed=True, matched_form_id=form_id)
 
-        assert unassign_manual_structure(db, addr, uca) is False  # rien supprimé
+        assert (
+            unassign_manual_structure(
+                db, addr, uca, repo=repo, authorship_repo=authorship_repo
+            )
+            is False
+        )  # rien supprimé
         link = _get_link(db, addr, uca)
         assert link is not None  # lien auto préservé
         assert link["is_confirmed"] is True  # is_confirmed NON touché
 
-    def test_returns_false_if_no_link(self, db):
+    def test_returns_false_if_no_link(self, db, repo, authorship_repo):
         uca = _setup_uca_perimeter(db)
         addr = _create_address(db)
-        assert unassign_manual_structure(db, addr, uca) is False
+        assert (
+            unassign_manual_structure(
+                db, addr, uca, repo=repo, authorship_repo=authorship_repo
+            )
+            is False
+        )
 
 
 # ── set_country ─────────────────────────────────────────────────────
@@ -248,21 +289,21 @@ def _get_countries(db, address_id):
 
 
 class TestSetCountry:
-    def test_assigns_countries(self, db):
+    def test_assigns_countries(self, db, repo):
         _ensure_country(db, "FR")
         addr = _create_address(db)
-        affected = set_country(db, addr, ["FR"])
+        affected = set_country(db, addr, ["FR"], repo=repo)
         assert affected == [addr]
         assert _get_countries(db, addr) == ["FR"]
 
-    def test_none_clears_countries(self, db):
+    def test_none_clears_countries(self, db, repo):
         _ensure_country(db, "FR")
         addr = _create_address(db)
-        set_country(db, addr, ["FR"])
-        set_country(db, addr, None)
+        set_country(db, addr, ["FR"], repo=repo)
+        set_country(db, addr, None, repo=repo)
         assert _get_countries(db, addr) is None
 
-    def test_propagates_to_same_normalized_text(self, db):
+    def test_propagates_to_same_normalized_text(self, db, repo):
         """Les adresses avec même normalized_text héritent des countries."""
         _ensure_country(db, "FR")
         a1 = _create_address(db, raw_text="UCA A")
@@ -272,11 +313,11 @@ class TestSetCountry:
             "UPDATE addresses SET normalized_text = 'universite clermont auvergne' WHERE id IN (%s, %s)",
             (a1, a2),
         )
-        set_country(db, a1, ["FR"])
+        set_country(db, a1, ["FR"], repo=repo)
         assert _get_countries(db, a1) == ["FR"]
         assert _get_countries(db, a2) == ["FR"]  # propagé
 
-    def test_no_propagation_on_short_normalized(self, db):
+    def test_no_propagation_on_short_normalized(self, db, repo):
         """Pas de propagation si normalized_text < 5 chars."""
         _ensure_country(db, "FR")
         a1 = _create_address(db, raw_text="addr short A")
@@ -285,7 +326,7 @@ class TestSetCountry:
             "UPDATE addresses SET normalized_text = 'abc' WHERE id IN (%s, %s)",
             (a1, a2),
         )
-        set_country(db, a1, ["FR"])
+        set_country(db, a1, ["FR"], repo=repo)
         assert _get_countries(db, a2) is None
 
 
@@ -293,28 +334,28 @@ class TestSetCountry:
 
 
 class TestBatchSetCountryByIds:
-    def test_adds_to_empty_countries(self, db):
+    def test_adds_to_empty_countries(self, db, repo):
         _ensure_country(db, "FR")
         addrs = [_create_address(db, raw_text=f"a{i}") for i in range(3)]
-        modified = batch_set_country_by_ids(db, "FR", addrs)
+        modified = batch_set_country_by_ids(db, "FR", addrs, repo=repo)
         assert set(modified) == set(addrs)
         for a in addrs:
             assert _get_countries(db, a) == ["FR"]
 
-    def test_appends_to_existing_countries(self, db):
+    def test_appends_to_existing_countries(self, db, repo):
         _ensure_country(db, "FR")
         _ensure_country(db, "US")
         addr = _create_address(db)
-        set_country(db, addr, ["FR"])
-        batch_set_country_by_ids(db, "US", [addr])
+        set_country(db, addr, ["FR"], repo=repo)
+        batch_set_country_by_ids(db, "US", [addr], repo=repo)
         countries = _get_countries(db, addr)
         assert "FR" in countries and "US" in countries
 
-    def test_idempotent_if_already_present(self, db):
+    def test_idempotent_if_already_present(self, db, repo):
         _ensure_country(db, "FR")
         addr = _create_address(db)
-        set_country(db, addr, ["FR"])
-        batch_set_country_by_ids(db, "FR", [addr])
+        set_country(db, addr, ["FR"], repo=repo)
+        batch_set_country_by_ids(db, "FR", [addr], repo=repo)
         assert _get_countries(db, addr) == ["FR"]  # pas de doublon
 
 
@@ -322,21 +363,21 @@ class TestBatchSetCountryByIds:
 
 
 class TestBatchSetCountryByFilter:
-    def test_filter_by_search(self, db):
+    def test_filter_by_search(self, db, repo):
         _ensure_country(db, "FR")
         match = _create_address(db, raw_text="Université Clermont")
         other = _create_address(db, raw_text="MIT Boston")
-        modified = batch_set_country_by_filter(db, "FR", search="Clermont")
+        modified = batch_set_country_by_filter(db, "FR", search="Clermont", repo=repo)
         assert match in modified
         assert other not in modified
 
-    def test_filter_has_country_no(self, db):
+    def test_filter_has_country_no(self, db, repo):
         _ensure_country(db, "FR")
         _ensure_country(db, "US")
         addr_no = _create_address(db, raw_text="sans pays")
         addr_yes = _create_address(db, raw_text="avec pays")
-        set_country(db, addr_yes, ["US"])
-        modified = batch_set_country_by_filter(db, "FR", has_country="no")
+        set_country(db, addr_yes, ["US"], repo=repo)
+        modified = batch_set_country_by_filter(db, "FR", has_country="no", repo=repo)
         assert addr_no in modified
         assert addr_yes not in modified
 
@@ -345,7 +386,7 @@ class TestBatchSetCountryByFilter:
 
 
 class TestPropagateCountriesToSimilar:
-    def test_propagates_divergent_values(self, db):
+    def test_propagates_divergent_values(self, db, repo):
         """Deux adresses de même normalized_text avec countries différents :
         la 2e reçoit les countries de la 1ère."""
         _ensure_country(db, "FR")
@@ -358,7 +399,7 @@ class TestPropagateCountriesToSimilar:
         # a1 a FR, a2 n'a rien
         db.execute("UPDATE addresses SET countries = %s WHERE id = %s", (["FR"], a1))
 
-        propagated = propagate_countries_to_similar(db)
+        propagated = propagate_countries_to_similar(db, repo=repo)
 
         assert a2 in propagated
         assert _get_countries(db, a2) == ["FR"]
@@ -368,10 +409,10 @@ class TestPropagateCountriesToSimilar:
 
 
 class TestPropagateCountriesToPublications:
-    def test_empty_is_noop(self, db):
-        propagate_countries_to_publications(db, [])  # pas d'exception
+    def test_empty_is_noop(self, db, repo):
+        propagate_countries_to_publications(db, [], repo=repo)  # pas d'exception
 
-    def test_propagates_to_source_pub_and_publication(self, db):
+    def test_propagates_to_source_pub_and_publication(self, db, repo):
         """Test d'intégration minimal : une adresse avec countries liée à
         une source_authorship, le pays doit remonter jusqu'à publications.countries."""
         _ensure_country(db, "FR")
@@ -408,7 +449,7 @@ class TestPropagateCountriesToPublications:
             (sa_id, addr),
         )
 
-        propagate_countries_to_publications(db, [addr])
+        propagate_countries_to_publications(db, [addr], repo=repo)
 
         # source_publications.countries mis à jour
         db.execute("SELECT countries FROM source_publications WHERE id = %s", (sp_id,))

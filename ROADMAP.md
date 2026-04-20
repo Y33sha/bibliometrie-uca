@@ -102,8 +102,8 @@ normalisation explicite émerge.
   Chaque nettoyage = une ligne retirée de `ignore_imports` dans
   `pyproject.toml`.
   - Services applicatifs → ports/adapters pour `infrastructure.
-    repositories.*` (2/7 faits : **config**, **authorships**. Reste 5 :
-    journals, publications, addresses, persons, structures). Pattern :
+    repositories.*` (3/7 faits : **config**, **authorships**, **addresses**.
+    Reste 4 : journals, publications, persons, structures). Pattern :
     service accepte `repo: XRepository` en kwarg ; callers (routers,
     tests) créent l'instance via `X_repository(cur)` et la passent.
     Pas de Depends FastAPI (pattern `with get_cursor()` conservé).

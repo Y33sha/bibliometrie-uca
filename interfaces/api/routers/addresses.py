@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 from application import addresses as addresses_service
 from infrastructure.db.queries import addresses as addr_queries
-from infrastructure.repositories import authorship_repository
+from infrastructure.repositories import address_repository, authorship_repository
 from interfaces.api.deps import get_cursor, require_admin
 from interfaces.api.models import (
     BatchReviewAction,
@@ -31,7 +31,9 @@ def _bg_propagate_countries(address_ids: list[int]) -> None:
     try:
         conn = get_connection()
         cur = conn.cursor()
-        addresses_service.propagate_countries_to_publications(cur, address_ids)
+        addresses_service.propagate_countries_to_publications(
+            cur, address_ids, repo=address_repository(cur)
+        )
         conn.commit()
         cur.close()
         conn.close()
@@ -102,6 +104,7 @@ async def review_address(addr_id: int, action: ReviewAction) -> Any:
             addr_id,
             action.structure_id,
             action.is_confirmed,
+            repo=address_repository(cur),
             authorship_repo=authorship_repository(cur),
         )
         structures = addr_queries.get_address_structures(cur, addr_id)
@@ -123,6 +126,7 @@ async def batch_review(data: BatchReviewAction) -> Any:
             data.address_ids,
             data.structure_id,
             data.is_confirmed,
+            repo=address_repository(cur),
             authorship_repo=authorship_repository(cur),
         )
         return {"updated": updated}
@@ -178,7 +182,9 @@ async def set_address_country(
         for c in body.countries or []:
             if not addr_queries.country_exists(cur, c):
                 raise HTTPException(status_code=400, detail=f"Code pays inconnu: {c}")
-        affected = addresses_service.set_country(cur, addr_id, body.countries)
+        affected = addresses_service.set_country(
+            cur, addr_id, body.countries, repo=address_repository(cur)
+        )
     bg.add_task(_bg_propagate_countries, affected)
     return {"ok": True}
 
@@ -196,9 +202,10 @@ async def batch_set_country(
         if not addr_queries.country_exists(cur, country_code):
             raise HTTPException(status_code=400, detail=f"Code pays inconnu: {country_code}")
 
+        addr_repo = address_repository(cur)
         if body.address_ids:
             modified_ids = addresses_service.batch_set_country_by_ids(
-                cur, country_code, body.address_ids
+                cur, country_code, body.address_ids, repo=addr_repo
             )
         else:
             modified_ids = addresses_service.batch_set_country_by_filter(
@@ -208,10 +215,11 @@ async def batch_set_country(
                 has_country=body.has_country,
                 country_code_filter=body.country_code_filter,
                 suggested_country=body.suggested_country,
+                repo=addr_repo,
             )
         updated = len(modified_ids)
 
-        propagated_ids = addresses_service.propagate_countries_to_similar(cur)
+        propagated_ids = addresses_service.propagate_countries_to_similar(cur, repo=addr_repo)
         propagated = len(propagated_ids)
         all_ids = modified_ids + propagated_ids
 
