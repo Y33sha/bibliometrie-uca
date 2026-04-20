@@ -12,6 +12,8 @@ venv/
 *.egg-info/
 .coverage
 htmlcov/
+build/
+dist/
 
 # Frontend (SvelteKit)
 interfaces/frontend/node_modules/

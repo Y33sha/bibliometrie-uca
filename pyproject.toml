@@ -121,6 +121,8 @@ extend-exclude = [
     "bibliometrie_uca.egg-info",
     ".venv",
     "venv",
+    "build",
+    "dist",
 ]
 
 [tool.ruff.lint]
