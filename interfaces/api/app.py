@@ -44,6 +44,7 @@ from interfaces.api.routers import (  # noqa: E402
     config,
     docs,
     feedback,
+    hal_problems,
     journals,
     laboratories,
     persons,
@@ -51,7 +52,6 @@ from interfaces.api.routers import (  # noqa: E402
     pub_stats,
     publications,
     publishers,
-    stats,
     structures,
 )
 
@@ -291,11 +291,11 @@ app.include_router(admin_duplicates.router)
 app.include_router(addresses.router)
 app.include_router(feedback.router)
 app.include_router(laboratories.router)
-app.include_router(stats.router)
 app.include_router(structures.router)
 app.include_router(authorships.router)
 app.include_router(persons.router)
 app.include_router(admin_person_duplicates.router)
+app.include_router(hal_problems.router)
 app.include_router(docs.router)
 app.include_router(config.router)
 app.include_router(publishers.router)

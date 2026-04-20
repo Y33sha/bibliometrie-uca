@@ -79,7 +79,6 @@ async def list_journals(
         }
 
 
-@router.put("/api/journals/{journal_id}")
 @router.get("/api/journals/{journal_id}")
 async def get_journal(journal_id: int) -> Any:
     with get_cursor() as (cur, conn):

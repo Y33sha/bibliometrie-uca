@@ -70,13 +70,13 @@ for router_module in [
         "admin_duplicates",
         "admin_person_duplicates",
         "pub_stats",
-        "stats",
         "feedback",
         "config",
         "publishers",
         "journals",
         "docs",
         "auth",
+        "hal_problems",
     ]
 ]:
     if router_module and hasattr(router_module, "get_cursor"):
