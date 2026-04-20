@@ -170,12 +170,12 @@ class PgPublicationRepository:
         une publication, avec les champs nécessaires au recalcul
         d'agrégation (refresh_from_sources).
 
-        Utilise un RealDictCursor interne pour garantir l'accès par
+        Utilise un cursor dict_row interne pour garantir l'accès par
         nom de colonne, quel que soit le type de curseur du caller.
         """
-        from psycopg2.extras import RealDictCursor
+        from psycopg.rows import dict_row
 
-        dict_cur = self._cur.connection.cursor(cursor_factory=RealDictCursor)
+        dict_cur = self._cur.connection.cursor(row_factory=dict_row)
         try:
             dict_cur.execute(
                 """
@@ -216,7 +216,7 @@ class PgPublicationRepository:
         fusionnées. Le caller garde la responsabilité d'appeler
         ensuite `update_sources` pour le tableau `sources`.
         """
-        from psycopg2.extras import Json
+        from psycopg.types.json import Jsonb as Json
 
         self._cur.execute(
             """
@@ -356,10 +356,10 @@ class PgPublicationRepository:
                 language = COALESCE(language, %s),
                 container_title = COALESCE(container_title, %s),
                 countries = CASE
-                    WHEN countries IS NULL THEN %s
-                    WHEN %s IS NULL THEN countries
+                    WHEN countries IS NULL THEN %s::text[]
+                    WHEN %s::text[] IS NULL THEN countries
                     ELSE (SELECT array_agg(DISTINCT c ORDER BY c)
-                          FROM unnest(countries || %s) AS c)
+                          FROM unnest(countries || %s::text[]) AS c)
                     END,
                 updated_at = now()
             WHERE id = %s

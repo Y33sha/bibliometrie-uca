@@ -3,7 +3,7 @@ Service Référentiel bibliographique — accès exclusif en écriture
 aux tables `publishers` et `journals`.
 
 Toute création ou recherche de journal/éditeur passe par ce module.
-Compatible avec les curseurs tuples (standard) et RealDictCursor.
+Compatible avec les curseurs tuples (standard) et dict_row.
 """
 
 from typing import Any
@@ -155,9 +155,7 @@ def find_or_create_journal(
     return journal_id
 
 
-def update_journal(
-    cur: Any, journal_id: int, *, fields: dict, repo: JournalRepository
-) -> None:
+def update_journal(cur: Any, journal_id: int, *, fields: dict, repo: JournalRepository) -> None:
     """Met à jour une revue. Le `title` est automatiquement normalisé en
     `title_normalized`.
 
@@ -176,9 +174,7 @@ def update_journal(
     repo.update_journal_fields(journal_id, fields)
 
 
-def update_publisher(
-    cur: Any, publisher_id: int, *, fields: dict, repo: JournalRepository
-) -> None:
+def update_publisher(cur: Any, publisher_id: int, *, fields: dict, repo: JournalRepository) -> None:
     """Met à jour un éditeur. Le `name` est automatiquement normalisé en
     `name_normalized`.
 
@@ -223,9 +219,7 @@ def reset_journal_apc(cur: Any, *, repo: JournalRepository) -> int:
 # ── Fusions ──
 
 
-def merge_publishers(
-    cur: Any, target_id: int, source_id: int, *, repo: JournalRepository
-) -> None:
+def merge_publishers(cur: Any, target_id: int, source_id: int, *, repo: JournalRepository) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible.
 
     Invariant métier : s'il y a des journaux aux titres partagés entre
@@ -257,9 +251,7 @@ def merge_publishers(
     emit_event(cur, "publisher.merged", "publisher", target_id, {"source_id": source_id})
 
 
-def merge_journals(
-    cur: Any, target_id: int, source_id: int, *, repo: JournalRepository
-) -> None:
+def merge_journals(cur: Any, target_id: int, source_id: int, *, repo: JournalRepository) -> None:
     """Fusionne le journal source dans le journal cible."""
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un journal avec lui-même")

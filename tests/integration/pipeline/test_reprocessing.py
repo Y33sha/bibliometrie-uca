@@ -9,7 +9,7 @@ la mise à jour des métadonnées lors d'un re-traitement.
 
 import copy
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import update_sources
@@ -105,6 +105,8 @@ def _run_normalize_hal(dict_cur):
     """
     import logging
 
+    from psycopg.rows import tuple_row
+
     from application.pipeline.normalize.normalize_hal import process_work
     from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
@@ -113,7 +115,7 @@ def _run_normalize_hal(dict_cur):
     from infrastructure.zenodo import HttpZenodoResolver
 
     conn = dict_cur.connection
-    tuple_cur = conn.cursor()  # curseur standard (tuple)
+    tuple_cur = conn.cursor(row_factory=tuple_row)  # curseur standard (tuple)
     queries = PgHalNormalizeQueries()
     staging_queries = PgStagingQueries()
     address_linker = PgAddressLinker()

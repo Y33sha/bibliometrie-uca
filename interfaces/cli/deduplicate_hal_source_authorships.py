@@ -29,8 +29,6 @@ import argparse
 import os
 from typing import Any
 
-from psycopg2.extras import RealDictCursor
-
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 
@@ -263,7 +261,7 @@ def merge_duplicate_authors(cur: Any, group: Any, dry_run: Any) -> Any:
 def run(dry_run: Any = True) -> Any:
     conn = get_connection()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn.cursor() as cur:
             # ── Phase 1 : source_authorships en double ──
             logger.info("=== Phase 1 : source_authorships en double ===")
             groups = find_duplicate_groups(cur)

@@ -16,10 +16,10 @@ session par le conftest racine intégration (schema.sql frais).
 import os
 from contextlib import contextmanager
 
-import psycopg2
+import psycopg
 import pytest
-from psycopg2.extras import RealDictCursor
-from psycopg2.pool import ThreadedConnectionPool
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 DB_USER = os.environ.get("DB_USER", "lalecoz")
 DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
@@ -30,7 +30,13 @@ _test_db_args = {"dbname": "bibliometrie_test", "user": DB_USER, "host": DB_HOST
 if DB_PASSWORD:
     _test_db_args["password"] = DB_PASSWORD
 
-_test_pool = ThreadedConnectionPool(minconn=1, maxconn=3, **_test_db_args)
+_test_pool = ConnectionPool(
+    conninfo="",
+    min_size=1,
+    max_size=3,
+    kwargs={**_test_db_args, "row_factory": dict_row},
+    open=True,
+)
 
 
 @contextmanager
@@ -41,17 +47,17 @@ def _test_get_cursor():
     try:
         with conn.cursor() as _ping:
             _ping.execute("SELECT 1")
-    except psycopg2.Error:
+    except psycopg.Error:
         _test_pool.putconn(conn, close=True)
         conn = _test_pool.getconn()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn.cursor() as cur:
             yield cur, conn
         conn.commit()
     except Exception:
         try:
             conn.rollback()
-        except psycopg2.InterfaceError:
+        except psycopg.InterfaceError:
             pass  # connexion déjà fermée côté serveur, rien à rollback
         raise
     finally:
@@ -124,7 +130,7 @@ def pool_cursor():
     """Curseur sur le pool de test, avec commit au sortir (visible depuis l'API)."""
     conn = _test_pool.getconn()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn.cursor() as cur:
             yield cur
         conn.commit()
     except Exception:

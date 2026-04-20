@@ -17,8 +17,6 @@ Usage:
 import argparse
 from typing import Any
 
-from psycopg2.extras import RealDictCursor
-
 from application.persons import merge_person
 from infrastructure.db.connection import get_connection
 from infrastructure.repositories import person_repository
@@ -102,7 +100,7 @@ def main() -> None:
     args = parser.parse_args()
 
     conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     cur.execute(PAIRS_SQL)
     pairs = cur.fetchall()

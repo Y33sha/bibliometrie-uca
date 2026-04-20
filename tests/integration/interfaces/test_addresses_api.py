@@ -9,9 +9,9 @@ status code sur une base non-contrôlée, ajouter un seed minimal
 import os
 from contextlib import contextmanager
 
-import psycopg2
+import psycopg
 import pytest
-from psycopg2.extras import RealDictCursor
+from psycopg.rows import dict_row
 
 _DB_ARGS = {
     "dbname": "bibliometrie_test",
@@ -28,10 +28,10 @@ def _pool():
     """Connexion directe (hors pool) pour le seed. Évite les interactions
     subtiles avec le pool partagé par l'API (qui peut fermer ses curseurs
     à des moments inattendus)."""
-    conn = psycopg2.connect(**_DB_ARGS)
+    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
     conn.autocommit = True
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn.cursor() as cur:
             yield cur
     finally:
         conn.close()
@@ -130,9 +130,7 @@ class TestListAddresses:
         assert r.status_code == 200
 
     def test_search_not_contains(self, client):
-        r = client.get(
-            "/api/addresses", params={"search": "X", "search_mode": "not_contains"}
-        )
+        r = client.get("/api/addresses", params={"search": "X", "search_mode": "not_contains"})
         assert r.status_code == 200
 
 
@@ -282,16 +280,12 @@ class TestSetAddressCountry:
         assert r.status_code in (401, 403)
 
     def test_404_missing_address(self, auth_client):
-        r = auth_client.post(
-            "/api/addresses/999999999/country", json={"countries": ["FR"]}
-        )
+        r = auth_client.post("/api/addresses/999999999/country", json={"countries": ["FR"]})
         assert r.status_code == 404
 
     def test_400_unknown_country_code(self, auth_client):
         addr = _seed_address("Set country bad")
-        r = auth_client.post(
-            f"/api/addresses/{addr}/country", json={"countries": ["ZZ"]}
-        )
+        r = auth_client.post(f"/api/addresses/{addr}/country", json={"countries": ["ZZ"]})
         assert r.status_code == 400
 
     def test_ok_with_valid_country(self, auth_client):
@@ -369,9 +363,7 @@ class TestAssignStructure:
 
 class TestUnassignStructure:
     def test_requires_admin(self, client):
-        r = client.delete(
-            "/api/addresses/1/assign-structure", params={"structure_id": 1}
-        )
+        r = client.delete("/api/addresses/1/assign-structure", params={"structure_id": 1})
         assert r.status_code == 401
 
     def test_returns_ok_even_when_no_link(self, auth_client):

@@ -6,7 +6,7 @@ Les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres
 traitements appellent ces fonctions au lieu de faire du SQL direct.
 
 Les fonctions find_by_* retournent des namedtuples pour un accès par nom
-indépendant du type de curseur (tuple ou RealDictCursor).
+indépendant du type de curseur (tuple ou dict_row).
 """
 
 from typing import Any
@@ -65,9 +65,7 @@ def find_thesis_by_title(
     return repo.find_thesis_by_title(title_normalized, pub_year)
 
 
-def try_merge_by_doi(
-    cur: Any, pub_id: int, doi: str | None, *, repo: PublicationRepository
-) -> int:
+def try_merge_by_doi(cur: Any, pub_id: int, doi: str | None, *, repo: PublicationRepository) -> int:
     """Tente de fusionner via DOI si la publication n'en a pas encore.
 
     Si pub_id n'a pas de DOI et qu'une autre publication porte ce DOI,
@@ -196,9 +194,7 @@ def find_or_create(
     return pub_id, True
 
 
-def update_oa_status(
-    cur: Any, pub_id: int, oa_status: str, *, repo: PublicationRepository
-) -> None:
+def update_oa_status(cur: Any, pub_id: int, oa_status: str, *, repo: PublicationRepository) -> None:
     """Met à jour le statut OA d'une publication."""
     repo.update_oa_status(pub_id, oa_status)
 
@@ -379,9 +375,7 @@ def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) 
     repo.update_sources(pub_id)
 
 
-def mark_distinct(
-    cur: Any, pub_id_a: int, pub_id_b: int, *, repo: PublicationRepository
-) -> None:
+def mark_distinct(cur: Any, pub_id_a: int, pub_id_b: int, *, repo: PublicationRepository) -> None:
     """Marque deux publications comme distinctes (non-doublon) dans
     `distinct_publications`. Idempotent.
 

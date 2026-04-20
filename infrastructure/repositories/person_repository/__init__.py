@@ -25,7 +25,7 @@ class PgPersonRepository:
     """Accès PostgreSQL à l'agrégat Person."""
 
     def __init__(self, cur: Any) -> None:
-        """cur : curseur psycopg2 dans la transaction courante."""
+        """cur : curseur psycopg3 dans la transaction courante."""
         self._cur = cur
 
     # ── persons ────────────────────────────────────────────────────
@@ -49,9 +49,7 @@ class PgPersonRepository:
 
     # ── distinct_persons ───────────────────────────────────────────
 
-    def mark_distinct(
-        self, person_id_a: int, person_id_b: int
-    ) -> tuple[int, int] | None:
+    def mark_distinct(self, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
         return _core.mark_distinct(self._cur, person_id_a, person_id_b)
 
     # ── person_identifiers ─────────────────────────────────────────
@@ -64,9 +62,7 @@ class PgPersonRepository:
         source: str = "auto",
         status: str = "pending",
     ) -> None:
-        _identifiers.add_identifier(
-            self._cur, person_id, id_type, id_value, source, status
-        )
+        _identifiers.add_identifier(self._cur, person_id, id_type, id_value, source, status)
 
     def remove_identifier(self, person_id: int, id_type: str, id_value: str) -> None:
         _identifiers.remove_identifier(self._cur, person_id, id_type, id_value)
@@ -100,34 +96,24 @@ class PgPersonRepository:
     def unlink_authorship(self, person_id: int, source: str, authorship_id: int) -> None:
         _authorships.unlink_authorship(self._cur, person_id, source, authorship_id)
 
-    def assign_orphan_sa(
-        self, person_id: int, source: str, authorship_id: int
-    ) -> dict | None:
+    def assign_orphan_sa(self, person_id: int, source: str, authorship_id: int) -> dict | None:
         return _authorships.assign_orphan_sa(self._cur, person_id, source, authorship_id)
 
     def batch_assign_orphans(self, person_id: int, sa_ids: list[int]) -> int:
         return _authorships.batch_assign_orphans(self._cur, person_id, sa_ids)
 
-    def ensure_truth_authorship(
-        self, person_id: int, source: str, authorship_id: int
-    ) -> None:
-        _authorships.ensure_truth_authorship(
-            self._cur, person_id, source, authorship_id
-        )
+    def ensure_truth_authorship(self, person_id: int, source: str, authorship_id: int) -> None:
+        _authorships.ensure_truth_authorship(self._cur, person_id, source, authorship_id)
 
     def count_authorships_with_name_form(self, person_id: int, name_form: str) -> int:
-        return _authorships.count_authorships_with_name_form(
-            self._cur, person_id, name_form
-        )
+        return _authorships.count_authorships_with_name_form(self._cur, person_id, name_form)
 
     # ── person_name_forms ──────────────────────────────────────────
 
     def refresh_name_forms(self, person_id: int, forms: set[str]) -> None:
         _name_forms.refresh_name_forms(self._cur, person_id, forms)
 
-    def add_name_form(
-        self, person_id: int, full_name: str, source: str | None = None
-    ) -> None:
+    def add_name_form(self, person_id: int, full_name: str, source: str | None = None) -> None:
         _name_forms.add_name_form(self._cur, person_id, full_name, source)
 
     def detach_name_form(self, person_id: int, name_form: str) -> None:

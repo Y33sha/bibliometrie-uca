@@ -19,7 +19,7 @@ import argparse
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar
 
-from psycopg2.extras import RealDictCursor
+from psycopg.rows import dict_row
 
 from application.ports.staging import StagingQueries
 
@@ -30,7 +30,7 @@ class SourceNormalizer(ABC):
     Override points :
     - `SOURCE` : identifiant source (obligatoire, ex: "hal", "openalex")
     - `DEFAULT_BATCH_SIZE` : taille de commit (défaut 500)
-    - `USE_DICT_CURSOR` : `True` = RealDictCursor (défaut), `False` = tuple cursor
+    - `USE_DICT_CURSOR` : `True` = row_factory=dict_row (défaut), `False` = tuple cursor
     - `USE_SAVEPOINT` : `True` pour encadrer chaque `process_work` dans un SAVEPOINT
     - `FETCH_SUB_BATCH` : si défini, charge les ids puis fetch par sous-lots de cette taille
     - `FETCH_COLUMNS` : colonnes du SELECT (défaut "id, source_id, doi, raw_data")
@@ -92,7 +92,7 @@ class SourceNormalizer(ABC):
 
     def _make_cursor(self) -> Any:
         if self.USE_DICT_CURSOR:
-            return self.conn.cursor(cursor_factory=RealDictCursor)
+            return self.conn.cursor(row_factory=dict_row)
         return self.conn.cursor()
 
     def _reset(self, cur: Any) -> int:

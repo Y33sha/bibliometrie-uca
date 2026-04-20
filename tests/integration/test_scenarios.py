@@ -1,6 +1,6 @@
 """Tests d'intégration — nécessitent la base bibliometrie_test."""
 
-import psycopg2
+import psycopg
 import pytest
 
 from application.persons import merge_person
@@ -17,6 +17,7 @@ def person_repo(db):
 @pytest.fixture
 def pub_repo(db):
     return publication_repository(db)
+
 
 # ── Helpers ──
 
@@ -70,7 +71,7 @@ class TestDoiCaseInsensitive:
 
     def test_unique_constraint_blocks_case_variant(self, db):
         create_publication(db, "Pub A", doi="10.1103/PhysRevC.111.024905")
-        with pytest.raises(psycopg2.errors.UniqueViolation):
+        with pytest.raises(psycopg.errors.UniqueViolation):
             create_publication(db, "Pub B", doi="10.1103/physrevc.111.024905")
 
     def test_lookup_finds_case_variant(self, db):

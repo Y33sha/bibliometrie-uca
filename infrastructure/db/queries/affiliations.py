@@ -181,18 +181,19 @@ def set_theses_structure_ids(cur: Any, *, wide_ids: list[int], daily: bool) -> i
 
 def count_source_authorships_stats(cur: Any, source: str) -> tuple[int, int, int]:
     """Retourne `(total, in_perimeter, with_structure_ids)` pour une source."""
-    cur.execute("SELECT COUNT(*) FROM source_authorships WHERE source = %s", (source,))
-    total = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) AS n FROM source_authorships WHERE source = %s", (source,))
+    total = cur.fetchone()["n"]
     cur.execute(
-        "SELECT COUNT(*) FROM source_authorships WHERE source = %s AND in_perimeter = TRUE",
+        "SELECT COUNT(*) AS n FROM source_authorships WHERE source = %s AND in_perimeter = TRUE",
         (source,),
     )
-    uca = cur.fetchone()[0]
+    uca = cur.fetchone()["n"]
     cur.execute(
-        "SELECT COUNT(*) FROM source_authorships WHERE source = %s AND structure_ids IS NOT NULL",
+        "SELECT COUNT(*) AS n FROM source_authorships "
+        "WHERE source = %s AND structure_ids IS NOT NULL",
         (source,),
     )
-    with_structs = cur.fetchone()[0]
+    with_structs = cur.fetchone()["n"]
     return total, uca, with_structs
 
 

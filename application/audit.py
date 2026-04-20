@@ -19,7 +19,7 @@ import contextvars
 import logging
 from typing import Any
 
-from psycopg2.extras import Json
+from psycopg.types.json import Jsonb as Json
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ def emit_event(
     actions admin explicites.
 
     Args:
-        cur: curseur DB (psycopg2) dans la transaction courante.
+        cur: curseur DB (psycopg3) dans la transaction courante.
         event_type: notation pointée, ex. "person.merged",
             "publication.excluded", "structure.deleted".
         aggregate_type: type de l'entité affectée
