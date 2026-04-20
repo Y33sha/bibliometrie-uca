@@ -106,3 +106,41 @@ def insert_name_form_with_merge(
 def delete_name_form(cur: Any, form_id: int) -> None:
     """Supprime une ligne de `person_name_forms` par id."""
     cur.execute("DELETE FROM person_name_forms WHERE id = %s", (form_id,))
+
+
+class PgNameFormsQueries:
+    """Adapter PostgreSQL pour `application.ports.name_forms.NameFormsQueries`."""
+
+    def fetch_active_persons_names(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_active_persons_names(cur)
+
+    def fetch_source_authorship_name_forms(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_source_authorship_name_forms(cur)
+
+    def create_temp_raw_forms_table(self, cur: Any) -> None:
+        create_temp_raw_forms_table(cur)
+
+    def insert_raw_forms_batch(self, cur: Any, rows: list[tuple[str, int, str]]) -> None:
+        insert_raw_forms_batch(cur, rows)
+
+    def fetch_normalized_forms_from_temp(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_normalized_forms_from_temp(cur)
+
+    def drop_temp_raw_forms_table(self, cur: Any) -> None:
+        drop_temp_raw_forms_table(cur)
+
+    def fetch_existing_name_forms(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_existing_name_forms(cur)
+
+    def update_name_form(
+        self, cur: Any, form_id: int, person_ids: list[int], sources: list[str]
+    ) -> None:
+        update_name_form(cur, form_id, person_ids, sources)
+
+    def insert_name_form_with_merge(
+        self, cur: Any, name_form: str, person_ids: list[int], sources: list[str]
+    ) -> None:
+        insert_name_form_with_merge(cur, name_form, person_ids, sources)
+
+    def delete_name_form(self, cur: Any, form_id: int) -> None:
+        delete_name_form(cur, form_id)

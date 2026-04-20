@@ -34,3 +34,20 @@ def fetch_orphan_in_perimeter_source_publications(cur: Any) -> list[dict[str, An
         ORDER BY sd.id
     """)
     return rows_as_dicts(cur)
+
+
+class PgPublicationsCreateQueries:
+    """Adapter PostgreSQL pour `application.ports.publications_create.PublicationsCreateQueries`.
+
+    Délègue `link_source_publication_to_publication` à `queries.merge` (même SQL).
+    """
+
+    def fetch_orphan_in_perimeter_source_publications(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_orphan_in_perimeter_source_publications(cur)
+
+    def link_source_publication_to_publication(
+        self, cur: Any, source_publication_id: int, publication_id: int
+    ) -> None:
+        from infrastructure.db.queries.merge import link_source_publication_to_publication
+
+        link_source_publication_to_publication(cur, source_publication_id, publication_id)

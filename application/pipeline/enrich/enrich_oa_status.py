@@ -5,29 +5,21 @@ Pour les publications ayant un DOI, interroge Unpaywall et met à jour
 le statut OA. Écrase les valeurs existantes, SAUF : ne remplace jamais
 'diamond' par 'gold' (Unpaywall ne connaît pas le diamond OA).
 
-Usage:
-    python enrich_oa_unpaywall.py              # traiter toutes les publis avec DOI
-    python enrich_oa_unpaywall.py --limit 500  # traiter N publis (pour test)
-    python enrich_oa_unpaywall.py --dry-run    # afficher sans modifier
+L'orchestrateur dépend du port `EnrichQueries` ; le point d'entrée
+CLI (argparse + connexion + rate limiter) est dans
+`interfaces/cli/pipeline/enrich_oa_status.py`.
 
 API: https://api.unpaywall.org/v2/{doi}?email=...
 Rate limit: 100 000 req/jour, ~10 req/s recommandé
 """
 
-import argparse
-import os
 import time
 from typing import Any
 
 import requests
 
+from application.ports.enrich import EnrichQueries
 from application.publications import update_oa_status
-from infrastructure.api_limits import UNPAYWALL_DELAY
-from infrastructure.db.connection import get_connection
-from infrastructure.db.queries.enrich import fetch_publications_with_doi
-from infrastructure.log import setup_logger
-
-log = setup_logger("enrich_oa_unpaywall", os.path.join(os.path.dirname(__file__), "logs"))
 
 # Email requis par Unpaywall (politesse, pas d'auth)
 UNPAYWALL_EMAIL = "bibliometrie@uca.fr"
@@ -45,7 +37,7 @@ OA_MAP = {
 BATCH_SIZE = 50
 
 
-def fetch_oa_status(doi: str) -> str | None:
+def fetch_oa_status(doi: str, logger: Any) -> str | None:
     """Interroge Unpaywall pour un DOI. Retourne le statut OA ou None."""
     for attempt in range(3):
         try:
@@ -53,14 +45,14 @@ def fetch_oa_status(doi: str) -> str | None:
             resp = requests.get(url, timeout=10)
 
             if resp.status_code == 404:
-                return None  # DOI inconnu d'Unpaywall
+                return None
             if resp.status_code == 429:
                 wait = 5 * (attempt + 1)
-                log.warning(f"Rate limited, pause {wait}s (tentative {attempt + 1}/3)...")
+                logger.warning(f"Rate limited, pause {wait}s (tentative {attempt + 1}/3)...")
                 time.sleep(wait)
                 continue
             if resp.status_code != 200:
-                log.warning(f"  HTTP {resp.status_code} pour {doi}")
+                logger.warning(f"  HTTP {resp.status_code} pour {doi}")
                 return None
 
             data = resp.json()
@@ -68,30 +60,28 @@ def fetch_oa_status(doi: str) -> str | None:
             return OA_MAP.get(oa_status)
 
         except requests.RequestException as e:
-            log.warning(f"  Erreur réseau pour {doi}: {e}")
+            logger.warning(f"  Erreur réseau pour {doi}: {e}")
             return None
 
-    log.warning(f"  Échec après 3 tentatives pour {doi}")
+    logger.warning(f"  Échec après 3 tentatives pour {doi}")
     return None
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--limit", type=int, default=0, help="Nombre max de publis à traiter (0=toutes)"
-    )
-    parser.add_argument("--dry-run", action="store_true", help="Afficher sans modifier la base")
-    args = parser.parse_args()
-
-    conn = get_connection()
-    cur = conn.cursor()
-
-    pubs = fetch_publications_with_doi(cur, limit=args.limit)
+def run_enrich(
+    cur: Any,
+    conn: Any,
+    queries: EnrichQueries,
+    logger: Any,
+    *,
+    limit: int = 0,
+    dry_run: bool = False,
+    rate_delay: float = 0.1,
+) -> None:
+    pubs = queries.fetch_publications_with_doi(cur, limit=limit or None)
     total = len(pubs)
-    log.info(f"{total} publications avec DOI à vérifier sur Unpaywall")
+    logger.info(f"{total} publications avec DOI à vérifier sur Unpaywall")
 
     if not total:
-        conn.close()
         return
 
     updated = 0
@@ -101,29 +91,27 @@ def main() -> Any:
 
     for i, (pub_id, doi, current_status) in enumerate(pubs):
         if i > 0 and i % BATCH_SIZE == 0:
-            if not args.dry_run:
+            if not dry_run:
                 conn.commit()
-            log.info(
+            logger.info(
                 f"  {i}/{total} — {updated} mis à jour, {skipped} inchangés, {not_found} non trouvés"
             )
 
-        status = fetch_oa_status(doi)
+        status = fetch_oa_status(doi, logger)
 
         if status:
-            # Ne pas écraser diamond par gold (Unpaywall ne connaît pas diamond)
             if current_status == "diamond" and status == "gold":
                 skipped += 1
-                time.sleep(UNPAYWALL_DELAY)
+                time.sleep(rate_delay)
                 continue
 
-            # Ne pas mettre à jour si le statut est identique
             if status == current_status:
                 skipped += 1
-                time.sleep(UNPAYWALL_DELAY)
+                time.sleep(rate_delay)
                 continue
 
-            if args.dry_run:
-                log.info(f"  [DRY] {doi} : {current_status} → {status}")
+            if dry_run:
+                logger.info(f"  [DRY] {doi} : {current_status} → {status}")
             else:
                 update_oa_status(cur, pub_id, status)
             updated += 1
@@ -132,16 +120,12 @@ def main() -> Any:
         else:
             errors += 1
 
-        time.sleep(UNPAYWALL_DELAY)
+        time.sleep(rate_delay)
 
-    if not args.dry_run:
+    if not dry_run:
         conn.commit()
 
-    log.info(
-        f"Terminé : {updated} mis à jour, {skipped} inchangés, {not_found} non trouvés sur Unpaywall, {errors} erreurs"
+    logger.info(
+        f"Terminé : {updated} mis à jour, {skipped} inchangés, "
+        f"{not_found} non trouvés sur Unpaywall, {errors} erreurs"
     )
-    conn.close()
-
-
-if __name__ == "__main__":
-    main()

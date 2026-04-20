@@ -19,13 +19,14 @@ via populate_affiliations.py, pas ici. Ce script ne fait que stocker les source_
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
-import os
 from typing import Any
 
 from psycopg2.extras import Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
-from application.pipeline.normalize.base import SourceNormalizer, run_normalizer
+from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.normalize_hal import HalNormalizeQueries
+from application.ports.staging import StagingQueries
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
@@ -33,29 +34,8 @@ from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.publication import clean_doi, normalize_nnt
 from infrastructure.addresses import link_addresses
-from infrastructure.db.queries.normalize_hal import (
-    delete_hal_duplicate_authorship_addresses,
-    delete_hal_duplicate_authorships,
-    delete_hal_orphan_source_persons,
-    enrich_hal_source_person,
-    fetch_hal_source_structure_ids,
-    fetch_hal_source_structures_for_cache,
-    find_hal_source_person_nokey,
-    get_hal_publication_id,
-    insert_hal_source_person_new,
-    staging_has_hal_doi,
-    upsert_hal_source_authorship,
-    upsert_hal_source_person,
-    upsert_hal_source_publication,
-    upsert_hal_source_structure,
-)
 from infrastructure.db_helpers import mark_staging_done
-from infrastructure.log import setup_logger
 from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
-
-# ----- Logging -----
-logger = setup_logger("normalize_hal", os.path.join(os.path.dirname(__file__), "logs"))
-
 
 # =============================================================
 # MAPPINGS
@@ -182,6 +162,7 @@ def find_publication(cur: Any, doc: dict, journal_id: int | None) -> int | None:
 
 def insert_hal_document(
     cur: Any,
+    queries: HalNormalizeQueries,
     doc: dict,
     staging_id: int,
     hal_id: str,
@@ -253,7 +234,7 @@ def insert_hal_document(
     uri = as_str(doc.get("uri_s"))
     urls = [uri] if uri else None
 
-    return upsert_hal_source_publication(
+    return queries.upsert_hal_source_publication(
         cur,
         hal_id=hal_id,
         doi=doi,
@@ -302,6 +283,7 @@ _hal_author_cache: dict[str, int] = {}
 
 def upsert_hal_author(
     cur: Any,
+    queries: HalNormalizeQueries,
     full_name: str,
     hal_person_id: int | None,
     idhal: str | None,
@@ -344,7 +326,7 @@ def upsert_hal_author(
         src_id = _hal_source_id(hal_person_id, hal_form_id)
         if src_id in _hal_author_cache:
             return _hal_author_cache[src_id]
-        result = upsert_hal_source_person(
+        result = queries.upsert_hal_source_person(
             cur,
             source_id=src_id,
             full_name=full_name,
@@ -361,7 +343,7 @@ def upsert_hal_author(
         src_id = _hal_source_id(None, hal_form_id)
         if src_id in _hal_author_cache:
             return _hal_author_cache[src_id]
-        result = upsert_hal_source_person(
+        result = queries.upsert_hal_source_person(
             cur,
             source_id=src_id,
             full_name=full_name,
@@ -378,10 +360,12 @@ def upsert_hal_author(
     if cache_key in _hal_author_cache:
         return _hal_author_cache[cache_key]
 
-    existing_id = find_hal_source_person_nokey(cur, full_name=full_name, first_name=first_name)
+    existing_id = queries.find_hal_source_person_nokey(
+        cur, full_name=full_name, first_name=first_name
+    )
     if existing_id is not None:
         if orcid or source_ids_json:
-            enrich_hal_source_person(
+            queries.enrich_hal_source_person(
                 cur,
                 source_person_id=existing_id,
                 orcid=orcid,
@@ -391,7 +375,7 @@ def upsert_hal_author(
         return existing_id
 
     # 4. Nouveau sans identifiant — on génère un source_id séquentiel
-    result = insert_hal_source_person_new(
+    result = queries.insert_hal_source_person_new(
         cur,
         full_name=full_name,
         last_name=last_name,
@@ -411,6 +395,7 @@ def upsert_hal_author(
 def parse_author_structures(
     doc: dict,
     cur: Any = None,
+    queries: HalNormalizeQueries | None = None,
     struct_cache: dict | None = None,
     struct_name_cache: dict | None = None,
 ) -> dict[int, set[int]]:
@@ -456,8 +441,13 @@ def parse_author_structures(
         form_structs.setdefault(form_id, set()).add(struct_id)
 
         # Créer la source_structure si pas encore en cache
-        if cur and struct_cache is not None and str(struct_id) not in struct_cache:
-            ss_id = upsert_hal_source_structure(
+        if (
+            cur
+            and queries is not None
+            and struct_cache is not None
+            and str(struct_id) not in struct_cache
+        ):
+            ss_id = queries.upsert_hal_source_structure(
                 cur,
                 source_id=str(struct_id),
                 name=(struct_name[:500] if struct_name else str(struct_id)),
@@ -471,11 +461,12 @@ def parse_author_structures(
 
 def process_authors(
     cur: Any,
+    queries: HalNormalizeQueries,
     doc: dict,
     source_publication_id: int,
     struct_cache: dict | None = None,
     struct_name_cache: dict | None = None,
-) -> Any:
+) -> None:
     """
     Traite les auteurs d'un document HAL :
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
@@ -536,7 +527,11 @@ def process_authors(
 
     # authIdHasStructure_fs → {form_id: set of hal_struct_id bruts}
     form_struct_map = parse_author_structures(
-        doc, cur=cur, struct_cache=struct_cache, struct_name_cache=struct_name_cache
+        doc,
+        cur=cur,
+        queries=queries,
+        struct_cache=struct_cache,
+        struct_name_cache=struct_name_cache,
     )
 
     for position, name in enumerate(names):
@@ -553,7 +548,9 @@ def process_authors(
         roles, is_corresponding_from_role = map_role("hal", quality)
         is_corresponding = is_corresponding_from_role
 
-        source_person_id = upsert_hal_author(cur, name, hal_person_id, idhal, form_id, orcid=orcid)
+        source_person_id = upsert_hal_author(
+            cur, queries, name, hal_person_id, idhal, form_id, orcid=orcid
+        )
         if not source_person_id:
             continue
 
@@ -567,7 +564,9 @@ def process_authors(
                     struct_cache[str(hid)] for hid in raw_hal_ids if str(hid) in struct_cache
                 ]
             else:
-                resolved = fetch_hal_source_structure_ids(cur, [str(hid) for hid in raw_hal_ids])
+                resolved = queries.fetch_hal_source_structure_ids(
+                    cur, [str(hid) for hid in raw_hal_ids]
+                )
             if resolved:
                 source_struct_ids = sorted(resolved)
 
@@ -580,7 +579,7 @@ def process_authors(
                 if sid in struct_name_cache and struct_name_cache[sid].strip()
             ]
 
-        sa_id = upsert_hal_source_authorship(
+        sa_id = queries.upsert_hal_source_authorship(
             cur,
             source_publication_id=source_publication_id,
             source_person_id=source_person_id,
@@ -602,6 +601,8 @@ def process_authors(
 
 def process_work(
     cur: Any,
+    queries: HalNormalizeQueries,
+    logger: Any,
     staging_row: tuple,
     struct_cache: dict | None = None,
     struct_name_cache: dict | None = None,
@@ -620,17 +621,15 @@ def process_work(
             logger.warning(f"Impossible d'insérer {hal_id} — titre ou année manquant")
             return False
 
-        # Zenodo : si le DOI est un concept DOI, vérifier si le version DOI
-        # est déjà en staging → skip pour éviter les doublons
         raw_doi = clean_doi(as_str(doc.get("doiId_s")))
         if raw_doi and is_zenodo_doi(raw_doi):
             try:
                 version_doi = resolve_zenodo_doi(raw_doi)
             except ZenodoResolutionError as e:
                 logger.warning(f"  {hal_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
-                return False  # ne pas marquer processed
+                return False
             if version_doi:
-                if staging_has_hal_doi(cur, version_doi):
+                if queries.staging_has_hal_doi(cur, version_doi):
                     logger.info(
                         f"  {hal_id} concept DOI Zenodo {raw_doi} -> "
                         f"version {version_doi} deja en staging, skip"
@@ -643,20 +642,13 @@ def process_work(
         journal_id = upsert_journal(cur, doc, publisher_id)
         t.mark("publisher+journal")
 
-        # Métadonnées de publication (stockées sur source_publications)
         pub_meta = extract_pub_metadata(doc, journal_id)
 
-        # Chercher une publication existante (sans créer)
         publication_id = None
-
-        # Idempotence : si source_publications a déjà ce source_id avec un publication_id,
-        # le réutiliser au lieu de risquer un doublon
-        old_pub_id = get_hal_publication_id(cur, hal_id)
+        old_pub_id = queries.get_hal_publication_id(cur, hal_id)
         if old_pub_id:
-            # Re-traitement : relancer find pour détecter les fusions par DOI/NNT
             publication_id = find_publication(cur, doc, journal_id)
             if publication_id and publication_id != old_pub_id:
-                # DOI/NNT pointe vers une autre publication → fusionner
                 from application.publications import merge_publications
 
                 logger.info(f"  {hal_id} : fusion pub {old_pub_id} → {publication_id} (DOI/NNT)")
@@ -664,26 +656,29 @@ def process_work(
             elif not publication_id:
                 publication_id = old_pub_id
         else:
-            # Recherche par DOI/NNT/titre (sans création)
             publication_id = find_publication(cur, doc, journal_id)
         t.mark("publication")
 
-        # Enrichir la publication existante si trouvée
-        # (try_merge_by_doi gère les fusions DOI, refresh_from_sources recalcule après)
         if publication_id:
             publication_id = try_merge_by_doi(
                 cur, publication_id, clean_doi(as_str(doc.get("doiId_s")))
             )
 
-        # Document HAL (source_publications) — publication_id peut être NULL
         source_publication_id = insert_hal_document(
-            cur, doc, staging_id, hal_id, hal_collections_staging, publication_id, pub_meta
+            cur,
+            queries,
+            doc,
+            staging_id,
+            hal_id,
+            hal_collections_staging,
+            publication_id,
+            pub_meta,
         )
         t.mark("hal_doc")
 
-        # Auteurs et authorships (avec source_struct_ids)
         process_authors(
             cur,
+            queries,
             doc,
             source_publication_id,
             struct_cache=struct_cache,
@@ -691,7 +686,6 @@ def process_work(
         )
         t.mark("authors")
 
-        # Recalcul complet des métadonnées depuis toutes les sources
         if publication_id:
             refresh_from_sources(cur, publication_id)
         t.mark("refresh")
@@ -713,15 +707,20 @@ class HalNormalizer(SourceNormalizer):
     USE_SAVEPOINT = True
     FETCH_COLUMNS = "id, source_id, doi, raw_data, hal_collections"
 
-    def __init__(self, conn: Any, logger: Any) -> None:
-        super().__init__(conn, logger)
+    def __init__(
+        self,
+        conn: Any,
+        logger: Any,
+        staging_queries: StagingQueries,
+        queries: HalNormalizeQueries,
+    ) -> None:
+        super().__init__(conn, logger, staging_queries)
+        self._queries = queries
         self._struct_cache: dict[str, int] = {}
         self._struct_name_cache: dict[int, str] = {}
 
     def preload_caches(self, cur: Any) -> None:
-        # Cache source_structures HAL (source_id → id + nom) pour éviter une
-        # requête par auteur dans process_work.
-        rows = fetch_hal_source_structures_for_cache(cur)
+        rows = self._queries.fetch_hal_source_structures_for_cache(cur)
         self._struct_cache = {src: pid for src, pid, _ in rows}
         self._struct_name_cache = {pid: name for _, pid, name in rows}
         self.logger.info(f"Cache source_structures : {len(self._struct_cache)} entrées")
@@ -729,19 +728,20 @@ class HalNormalizer(SourceNormalizer):
     def process_work(self, cur: Any, row: Any) -> bool | None:
         return process_work(
             cur,
+            self._queries,
+            self.logger,
             row,
             struct_cache=self._struct_cache,
             struct_name_cache=self._struct_name_cache,
         )
 
     def post_process(self, cur: Any) -> None:
-        # Doublons de position : garder le plus récent
-        delete_hal_duplicate_authorship_addresses(cur)
-        deleted_dups = delete_hal_duplicate_authorships(cur)
+        self._queries.delete_hal_duplicate_authorship_addresses(cur)
+        deleted_dups = self._queries.delete_hal_duplicate_authorships(cur)
         if deleted_dups:
             self.logger.info(f"Doublons de position supprimés : {deleted_dups}")
 
-        orphans = delete_hal_orphan_source_persons(cur)
+        orphans = self._queries.delete_hal_orphan_source_persons(cur)
         if orphans:
             self.logger.info(f"Source_authors orphelins supprimés : {orphans}")
 
@@ -749,11 +749,3 @@ class HalNormalizer(SourceNormalizer):
         self._struct_cache.clear()
         self._struct_name_cache.clear()
         _hal_author_cache.clear()
-
-
-def main() -> None:
-    run_normalizer(HalNormalizer, logger)
-
-
-if __name__ == "__main__":
-    main()

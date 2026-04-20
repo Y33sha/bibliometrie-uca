@@ -5,42 +5,22 @@ Lit les formes de noms depuis la table structure_name_forms,
 et enregistre dans address_structures avec matched_form_id pour
 la traçabilité (boucle de rétroaction).
 
-Le SQL de la pipeline est isolé dans
-`infrastructure/db/queries/address_resolution.py`.
+L'orchestration dépend du port `AddressResolutionQueries` ; le point
+d'entrée CLI est dans
+`interfaces/cli/pipeline/resolve_addresses.py` (composition root).
 
 Schéma v2 :
   - address_structures (address_id, structure_id, matched_form_id, is_confirmed)
   - matched_form_id IS NOT NULL = détection auto
   - matched_form_id IS NULL + is_confirmed = assignation manuelle
-
-Usage:
-    python resolve_addresses.py              # résoudre les adresses non traitées
-    python resolve_addresses.py --reset      # remettre à zéro (auto uniquement)
-    python resolve_addresses.py --rerun      # reset auto + relancer tout
 """
 
-import argparse
-import os
 import re
 import time
 from typing import Any
 
+from application.ports.address_resolution import AddressResolutionQueries
 from domain.normalize import normalize_text as normalize
-from infrastructure.db.connection import get_connection
-from infrastructure.db.queries.address_resolution import (
-    delete_obsolete_detections,
-    fetch_addresses_to_resolve,
-    load_name_forms,
-    mark_address_resolved,
-    reset_all_resolved_at,
-    reset_auto_detected,
-    unflag_obsolete_detections,
-    upsert_detected_structure,
-)
-from infrastructure.log import setup_logger
-from infrastructure.perimeter import get_persons_structure_ids
-
-logger = setup_logger("resolve_addresses", os.path.join(os.path.dirname(__file__), "logs"))
 
 BATCH_SIZE = 1000
 
@@ -127,59 +107,58 @@ def resolve_address(text_normalized: Any, forms: Any, forms_by_structure: Any) -
     return matches
 
 
-# ─── Main ────────────────────────────────────────────────────────
+# ─── Run ─────────────────────────────────────────────────────────
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--reset", action="store_true", help="Supprime les affiliations auto")
-    parser.add_argument(
-        "--rerun", action="store_true", help="Reset auto puis relance la résolution complète"
-    )
-    parser.add_argument(
-        "--mode",
-        choices=["full", "weekly", "monthly", "daily"],
-        default="full",
-        help="Mode d'exécution (daily = incrémental)",
-    )
-    args = parser.parse_args()
-
-    conn = get_connection()
-    conn.autocommit = False
-    cur = conn.cursor()
-
-    if args.reset or args.rerun:
-        affils = reset_auto_detected(cur)
-        reset_all_resolved_at(cur)
+def run_resolution(
+    cur: Any,
+    conn: Any,
+    queries: AddressResolutionQueries,
+    perimeter_ids: set[int],
+    logger: Any,
+    *,
+    mode: str = "full",
+    reset: bool = False,
+    rerun: bool = False,
+) -> None:
+    """Exécute le pipeline de résolution. `conn` nécessaire pour commit batch."""
+    if reset or rerun:
+        affils = queries.reset_auto_detected(cur)
+        queries.reset_all_resolved_at(cur)
         conn.commit()
         logger.info(f"Reset : {affils} affiliations auto supprimées")
-        if args.reset and not args.rerun:
-            conn.close()
+        if reset and not rerun:
             return
 
     logger.info("Chargement des structures et formes...")
-    forms = load_name_forms(cur)
+    forms = queries.load_name_forms(cur)
     logger.info(f"  {len(forms)} formes chargées")
     forms_by_structure = build_forms_by_structure(forms)
-    perimeter = get_persons_structure_ids(cur)
-    logger.info(f"  {len(perimeter)} structures dans le périmètre")
+    logger.info(f"  {len(perimeter_ids)} structures dans le périmètre")
 
-    incremental = args.mode == "daily"
+    incremental = mode == "daily"
     if incremental:
         logger.info("Mode incrémental : adresses non résolues uniquement")
-    rows = fetch_addresses_to_resolve(cur, incremental=incremental)
+    rows = queries.fetch_addresses_to_resolve(cur, incremental=incremental)
     total = len(rows)
     logger.info(f"  {total} adresses à résoudre")
 
     if total > 0:
-        process_addresses(cur, conn, rows, forms, forms_by_structure, perimeter)
-
-    conn.close()
+        process_addresses(
+            cur, conn, queries, rows, forms, forms_by_structure, perimeter_ids, logger
+        )
 
 
 def process_addresses(
-    cur: Any, conn: Any, rows: Any, forms: Any, forms_by_structure: Any, perimeter: Any
-) -> Any:
+    cur: Any,
+    conn: Any,
+    queries: AddressResolutionQueries,
+    rows: Any,
+    forms: Any,
+    forms_by_structure: Any,
+    perimeter: Any,
+    logger: Any,
+) -> tuple[int, int]:
     """Traite une liste d'adresses : détection + affiliations."""
     t_start = time.perf_counter()
     total = len(rows)
@@ -198,14 +177,14 @@ def process_addresses(
 
         detected_structure_ids = [sid for sid, _ in matches]
 
-        removed_count += delete_obsolete_detections(cur, addr_id, detected_structure_ids)
-        unflag_obsolete_detections(cur, addr_id, detected_structure_ids)
+        removed_count += queries.delete_obsolete_detections(cur, addr_id, detected_structure_ids)
+        queries.unflag_obsolete_detections(cur, addr_id, detected_structure_ids)
 
         for structure_id, form_id in matches:
             affil_count += 1
-            upsert_detected_structure(cur, addr_id, structure_id, form_id)
+            queries.upsert_detected_structure(cur, addr_id, structure_id, form_id)
 
-        mark_address_resolved(cur, addr_id)
+        queries.mark_address_resolved(cur, addr_id)
         processed += 1
         if processed % BATCH_SIZE == 0:
             conn.commit()
@@ -229,7 +208,3 @@ def process_addresses(
         logger.info(f"  Obsolètes supprimés  : {removed_count}")
 
     return uca_count, affil_count
-
-
-if __name__ == "__main__":
-    main()

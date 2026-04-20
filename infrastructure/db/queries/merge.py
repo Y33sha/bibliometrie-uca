@@ -95,3 +95,26 @@ def link_source_publication_to_publication(
         "UPDATE source_publications SET publication_id = %s WHERE id = %s",
         (publication_id, source_publication_id),
     )
+
+
+class PgMergeQueries:
+    """Adapter PostgreSQL pour `application.ports.merge.MergeQueries`."""
+
+    def find_nnt_duplicates(self, cur: Any) -> list[dict[str, Any]]:
+        return find_nnt_duplicates(cur)
+
+    def rank_publications_by_merge_priority(
+        self, cur: Any, publication_ids: list[int]
+    ) -> list[dict[str, Any]]:
+        return rank_publications_by_merge_priority(cur, publication_ids)
+
+    def fetch_source_publications_with_hal_external_id(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_source_publications_with_hal_external_id(cur)
+
+    def fetch_hal_source_publications(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_hal_source_publications(cur)
+
+    def link_source_publication_to_publication(
+        self, cur: Any, source_publication_id: int, publication_id: int
+    ) -> None:
+        link_source_publication_to_publication(cur, source_publication_id, publication_id)

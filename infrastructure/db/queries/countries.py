@@ -6,6 +6,9 @@ Trois étapes (write-only) appelées par l'orchestrateur pipeline
 1. HAL  : `source_structures.country` → `source_publications.countries`
 2. OA/WoS/ScanR : `addresses.countries` → `source_publications.countries`
 3. Union de tous les `source_publications.countries` → `publications.countries`
+
+Fonctions module-level pour compat avec le code existant ;
+`PgCountryQueries` est l'adapter qui implémente `application.ports.countries.CountryQueries`.
 """
 
 from typing import Any
@@ -85,3 +88,16 @@ def refresh_publication_countries(cur: Any) -> int:
           AND p.countries IS DISTINCT FROM sub.all_countries
     """)
     return cur.rowcount
+
+
+class PgCountryQueries:
+    """Adapter PostgreSQL implémentant `application.ports.countries.CountryQueries`."""
+
+    def refresh_hal_source_countries(self, cur: Any) -> int:
+        return refresh_hal_source_countries(cur)
+
+    def refresh_address_source_countries(self, cur: Any) -> int:
+        return refresh_address_source_countries(cur)
+
+    def refresh_publication_countries(self, cur: Any) -> int:
+        return refresh_publication_countries(cur)

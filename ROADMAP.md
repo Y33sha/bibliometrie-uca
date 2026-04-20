@@ -69,21 +69,31 @@ normalisation explicite émerge.
   openalex,wos,hal}`. Même pattern que §1.1 pour les routers : chaque
   orchestrateur pipeline ne contient plus que de la logique Python pure
   (parsing, boucles, conditions métier) et délègue la persistance.
-- [ ] Reste : injection canonique via ports (Protocol) + factories
-  FastAPI `Depends` côté API, équivalent unit-of-work côté pipeline.
-  À faire si la couverture de tests devient un objectif. Avec §1.6
-  comme socle, le pas restant est mécanique (aucun SQL à déplacer,
-  juste passer les query services en paramètre).
+- [x] **Injection canonique via ports (Protocol) côté pipeline**
+  (branche `feature/pipeline-ports`, 13 commits atomiques countries →
+  normalize/hal). Orchestrateurs `application/pipeline/*` dépendent de
+  ports (`application/ports/*`) au lieu d'importer `infrastructure.db.
+  queries.*` directement. Adapters PostgreSQL dans `infrastructure/db/
+  queries/*` (déjà en place depuis §1.6 partie 1) implémentent ces
+  Protocols. Composition roots dans `interfaces/cli/pipeline/*` : chaque
+  entry point CLI instancie les `Pg*Queries` et les injecte dans
+  l'orchestrateur. `run_pipeline.py` appelle les orchestrateurs via
+  imports Python directs. `logger` également threadé en param dans les
+  5 `normalize_*` (pattern cohérent, plus aucun `setup_logger` module-
+  level dans `application/`). Zéro import `infrastructure.db.queries`
+  depuis `application/` : §1.7 peut passer en `layered` strict.
+- [ ] Reste côté API : factories FastAPI `Depends` pour injecter les
+  query services dans les routers (équivalent unit-of-work). Mécanique
+  si la couverture de tests devient un objectif.
 
 ### 1.7 Verrouiller les acquis : import-linter
 - [x] Contrats initiaux dans `pyproject.toml` (`[tool.importlinter]`),
   vérifiés en pre-commit + CI. 4 contrats `forbidden` qui verrouillent :
   (1) domain = noyau pur, (2) application ↛ interfaces,
   (3) infrastructure ↛ interfaces, (4) infrastructure ↛ application.
-- [ ] Durcir en contrat `layered` strict — toujours bloqué par la DI
-  canonique (§1.6 partie 2) : le SQL est extrait, mais `application/`
-  importe encore les query services depuis `infrastructure.db.queries`.
-  À faire quand les ports seront posés.
+- [ ] Durcir en contrat `layered` strict — débloqué par §1.6 (ports
+  posés côté pipeline, plus aucun import `infrastructure.db.queries`
+  depuis `application/`). Prochain chantier.
 
 ### 1.8 Audit périodique
 Parcours régulier pour repérer : SQL mal placé, dépendances dans le
@@ -226,6 +236,11 @@ Le détail est dans `TODO_LAURA.md`. Grands axes :
 - **Cas particuliers** et bizarreries à élucider
 
 ---
+## A explorer:
+
+**SQLAlchemy Core** (pas ORM), pour la construction dynamique de requêtes. SQLAlchemy a deux couches : Core (query builder, paramétrage sûr, abstraction du dialecte) et ORM (mapping objets-tables). Tu peux utiliser Core sans ORM : tu écris des requêtes via son API Python (select(...).where(...).order_by(...)) qui génèrent du SQL sûr et paramétré, mais tu n'introduis pas de couche ORM. C'est particulièrement utile pour les requêtes dynamiques avec filtres variables. Tes requêtes "statiques" peuvent rester en SQL brut pour la clarté.
+**Alembic** pour les migrations. Indépendant de l'usage d'ORM. Tu continues à écrire ton schéma en SQL brut si tu veux, mais tu versionnes et orchestres les migrations avec Alembic. Gain de maintenance réel, coût d'adoption modéré.
+**psycopg3** avec des curseurs typés, si tu n'y es pas déjà. Psycopg3 supporte bien les Row classes typées et les dict_row, ce qui rend ton SQL brut plus sûr à manipuler côté Python sans introduire un ORM.
 
 ## Items évalués et retirés
 

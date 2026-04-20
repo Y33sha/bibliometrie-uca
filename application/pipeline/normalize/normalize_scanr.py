@@ -1,57 +1,35 @@
 """
 Normalisation des données ScanR : staging → tables structurées.
 
-Usage:
-    python normalize_scanr.py              # traiter tous les works non traités
-    python normalize_scanr.py --limit 100  # traiter N works (pour test)
-    python normalize_scanr.py --reset      # remettre tous les works à processed=FALSE
+L'orchestrateur (classe `ScanrNormalizer`) dépend des ports
+`StagingQueries` + `ScanrNormalizeQueries`. Le point d'entrée CLI est
+dans `interfaces/cli/pipeline/normalize_scanr.py`.
 
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
-    source_publications                        (lien staging ↔ publication, source='scanr')
+    source_publications                     (lien staging ↔ publication, source='scanr')
     source_persons                          (auteurs unifiés, source='scanr')
-    source_authorships                      (lien document × auteur, source='scanr', avec affiliations)
-
-La résolution UCA (source_authorships.structure_ids, in_perimeter) se fait en post-traitement
-via populate_affiliations.py, pas ici.
+    source_authorships                      (lien document × auteur, source='scanr')
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
-import os
 import time
 from typing import Any
 
 from psycopg2.extras import Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
-from application.pipeline.normalize.base import SourceNormalizer, run_normalizer
+from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.normalize_scanr import ScanrNormalizeQueries
+from application.ports.staging import StagingQueries
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
-from domain.publication import clean_doi, normalize_nnt
+from domain.publication import clean_doi
 from infrastructure.addresses import link_addresses
-from infrastructure.db.queries.normalize_scanr import (
-    find_scanr_source_person_by_name,
-    get_scanr_publication_id,
-    insert_scanr_source_person_new,
-    upsert_scanr_source_authorship,
-    upsert_scanr_source_person_by_idref,
-    upsert_scanr_source_publication,
-)
 from infrastructure.db_helpers import mark_staging_done
-from infrastructure.log import setup_logger
-
-logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__), "logs"))
-
-
-# =============================================================
-# MAPPINGS
-# =============================================================
-
-# ScanR type → notre enum doc_type
-
 
 # =============================================================
 # UTILITAIRES
@@ -59,7 +37,6 @@ logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__),
 
 
 def extract_doi(doc: dict) -> str | None:
-    """Extrait le DOI depuis les externalIds."""
     for ext in doc.get("externalIds") or []:
         if ext.get("type") == "doi":
             return clean_doi(ext.get("id"))
@@ -67,7 +44,6 @@ def extract_doi(doc: dict) -> str | None:
 
 
 def extract_hal_id(doc: dict) -> str | None:
-    """Extrait le HAL ID depuis les externalIds."""
     for ext in doc.get("externalIds") or []:
         if ext.get("type") == "hal":
             return ext.get("id")
@@ -75,71 +51,46 @@ def extract_hal_id(doc: dict) -> str | None:
 
 
 def get_title(doc: dict) -> str | None:
-    """Extrait le titre."""
-    title = doc.get("title") or {}
-    return title.get("default") or title.get("en") or title.get("fr")
-
-
-# =============================================================
-# PUBLISHERS & JOURNALS (via services/journals.py)
-# =============================================================
+    title = doc.get("title")
+    if isinstance(title, dict):
+        return title.get("default") or title.get("en") or title.get("fr")
+    return title
 
 
 def upsert_publisher(cur: Any, doc: dict) -> int | None:
-    """Extrait et trouve/crée l'éditeur depuis les champs ScanR."""
-    source = doc.get("source") or {}
-    publisher_name = source.get("publisher")
+    publisher_name = (doc.get("source") or {}).get("publisher")
     if not publisher_name:
         return None
     return find_or_create_publisher(cur, publisher_name)
 
 
 def upsert_journal(cur: Any, doc: dict, publisher_id: int | None) -> int | None:
-    """Extrait et trouve/crée le journal depuis les champs ScanR."""
     source = doc.get("source") or {}
     title = source.get("title")
     if not title:
         return None
-
-    issns = source.get("journalIssns") or []
-    issn = issns[0] if len(issns) >= 1 else None
-    eissn = issns[1] if len(issns) >= 2 else None
-
+    issn = source.get("issn")
+    eissn = source.get("eissn")
     return find_or_create_journal(cur, title, issn=issn, eissn=eissn, publisher_id=publisher_id)
 
 
-# =============================================================
-# PUBLICATIONS (via services/publications.py)
-# =============================================================
-
-
 def _extract_nnt_from_scanr_id(scanr_id: str) -> str | None:
-    """Extrait le NNT depuis un source_id ScanR (format nnt{NNT})."""
-    if scanr_id and scanr_id.lower().startswith("nnt"):
-        return normalize_nnt(scanr_id[3:])
+    if scanr_id and scanr_id.startswith("these"):
+        return scanr_id[5:].upper()
     return None
 
 
 def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None = None) -> dict:
-    """Extrait les métadonnées de publication d'un document ScanR.
-
-    Retourne un dict utilisable par find_or_create_publication.
-    """
     doi = extract_doi(doc)
     title = get_title(doc)
     pub_year = doc.get("year")
-
     doc_type = doc.get("type") or "other"
-
     oa_status = "green" if doc.get("isOa") else "closed"
-
     container_title = None
     if not journal_id:
         source = doc.get("source") or {}
         container_title = source.get("title")
-
     nnt = _extract_nnt_from_scanr_id(scanr_id) if scanr_id else None
-
     return dict(
         title=title,
         title_normalized=normalize_text(title) if title else None,
@@ -156,7 +107,6 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
 def find_publication(
     cur: Any, doc: dict, journal_id: int | None, scanr_id: str | None = None
 ) -> int | None:
-    """Cherche une publication existante sans en créer. Retourne l'id ou None."""
     from domain.doc_types import map_doc_type
 
     meta = extract_pub_metadata(doc, journal_id, scanr_id)
@@ -174,21 +124,20 @@ def find_publication(
 
 def insert_scanr_document(
     cur: Any,
+    queries: ScanrNormalizeQueries,
     doc: dict,
     staging_id: int,
     scanr_id: str,
     publication_id: int | None,
     pub_meta: dict | None = None,
 ) -> int:
-    """Crée/retrouve l'entrée source_publications pour ScanR. Retourne source_publications.id."""
     doi = extract_doi(doc)
     hal_id = extract_hal_id(doc)
     title = get_title(doc) or ""
     pub_year = doc.get("year")
     doc_type = doc.get("type")
 
-    # external_ids : identifiants cross-source (hal, nnt, pmid, etc.)
-    ext = {}
+    ext: dict[str, Any] = {}
     if hal_id:
         ext["hal"] = hal_id
     nnt = _extract_nnt_from_scanr_id(scanr_id)
@@ -203,11 +152,9 @@ def insert_scanr_document(
                 ext["hal"] = eid["id"]
     external_ids = Json(ext) if ext else None
 
-    # Abstract
     summary = doc.get("summary") or {}
     abstract = summary.get("default") or summary.get("en") or summary.get("fr")
 
-    # Keywords
     kw_raw = doc.get("keywords") or {}
     kw_val = kw_raw.get("default") or kw_raw.get("en") or kw_raw.get("fr")
     if isinstance(kw_val, list):
@@ -217,20 +164,16 @@ def insert_scanr_document(
     else:
         keywords = None
 
-    # Topics (meme format qu'OpenAlex)
     topics_raw = doc.get("topics")
     topics = Json(topics_raw) if topics_raw else None
-    # Fallback : domains ScanR
     if not topics_raw:
         domains = doc.get("domains")
         if domains:
             topics = Json(domains)
 
-    # Citations
     cbc = doc.get("cited_by_counts_by_year") or {}
     cited_by_count = sum(cbc.values()) if cbc else None
 
-    # URLs
     urls = []
     seen = set()
     for field in ("landingPage", "doiUrl", "pdfUrl"):
@@ -245,13 +188,12 @@ def insert_scanr_document(
             seen.add(u)
             urls.append(u)
 
-    # Metadonnees de publication (pour creation differee)
     journal_id = pub_meta.get("journal_id") if pub_meta else None
     oa_status = pub_meta.get("oa_status") if pub_meta else None
     language = pub_meta.get("language") if pub_meta else None
     container_title = pub_meta.get("container_title") if pub_meta else None
 
-    return upsert_scanr_source_publication(
+    return queries.upsert_scanr_source_publication(
         cur,
         scanr_id=scanr_id,
         doi=doi,
@@ -274,18 +216,15 @@ def insert_scanr_document(
 
 
 # =============================================================
-# SCANR AUTHORS (source_persons, source='scanr')
+# SCANR AUTHORS
 # =============================================================
 
 
-def upsert_scanr_author(cur: Any, author: dict) -> int | None:
-    """Insère/retrouve un auteur ScanR dans source_persons (source='scanr').
-    Déduplique par idref (via source_id). L'idref va dans BOTH source_id et idref."""
+def upsert_scanr_author(cur: Any, queries: ScanrNormalizeQueries, author: dict) -> int | None:
     full_name = author.get("fullName")
     if not full_name:
         return None
 
-    # Séparer nom/prénom (heuristique : "Prénom Nom")
     parts = full_name.strip().split()
     if len(parts) >= 2:
         first_name = " ".join(parts[:-1])
@@ -298,9 +237,8 @@ def upsert_scanr_author(cur: Any, author: dict) -> int | None:
     idref = denorm.get("idref")
     orcid = denorm.get("orcid")
 
-    # 1. Par idref (clé fiable)
     if idref:
-        return upsert_scanr_source_person_by_idref(
+        return queries.upsert_scanr_source_person_by_idref(
             cur,
             idref=idref,
             full_name=full_name,
@@ -309,13 +247,13 @@ def upsert_scanr_author(cur: Any, author: dict) -> int | None:
             orcid=orcid,
         )
 
-    # 2. Par nom exact (auteurs sans idref)
-    existing = find_scanr_source_person_by_name(cur, full_name=full_name, first_name=first_name)
+    existing = queries.find_scanr_source_person_by_name(
+        cur, full_name=full_name, first_name=first_name
+    )
     if existing is not None:
         return existing
 
-    # 3. Nouveau sans identifiant
-    return insert_scanr_source_person_new(
+    return queries.insert_scanr_source_person_new(
         cur,
         full_name=full_name,
         last_name=last_name,
@@ -329,22 +267,22 @@ def upsert_scanr_author(cur: Any, author: dict) -> int | None:
 # =============================================================
 
 
-def process_authors(cur: Any, doc: dict, source_publication_id: int) -> Any:
-    """Traite les auteurs d'un document ScanR."""
+def process_authors(
+    cur: Any, queries: ScanrNormalizeQueries, doc: dict, source_publication_id: int
+) -> None:
     authors = doc.get("authors") or []
 
     for position, author_data in enumerate(authors):
-        source_person_id = upsert_scanr_author(cur, author_data)
+        source_person_id = upsert_scanr_author(cur, queries, author_data)
         if not source_person_id:
             continue
 
         raw_role = author_data.get("role")
         roles, _ = map_role("scanr", raw_role)
 
-        # Affiliations par auteur : extraire noms (adresses) et pays
         author_affiliations = author_data.get("affiliations") or []
         addr_parts = []
-        detected_countries = []
+        detected_countries: list[str] = []
 
         for aff in author_affiliations:
             name = (aff.get("name") or "").strip()
@@ -356,7 +294,7 @@ def process_authors(cur: Any, doc: dict, source_publication_id: int) -> Any:
 
         author_full_name = author_data.get("fullName")
 
-        sa_id = upsert_scanr_source_authorship(
+        sa_id = queries.upsert_scanr_source_authorship(
             cur,
             source_publication_id=source_publication_id,
             source_person_id=source_person_id,
@@ -374,14 +312,12 @@ def process_authors(cur: Any, doc: dict, source_publication_id: int) -> Any:
 # =============================================================
 
 
-def process_work(cur: Any, staging_row: Any) -> bool:
-    """Traite un work du staging ScanR."""
+def process_work(cur: Any, queries: ScanrNormalizeQueries, logger: Any, staging_row: Any) -> bool:
     staging_id = staging_row["id"]
     scanr_id = staging_row["scanr_id"]
-    staging_row["doi"]
     raw_data = staging_row["raw_data"]
     doc = raw_data
-    timings = {}
+    timings: dict[str, float] = {}
 
     try:
         title = get_title(doc)
@@ -398,51 +334,27 @@ def process_work(cur: Any, staging_row: Any) -> bool:
         journal_id = upsert_journal(cur, doc, publisher_id)
         timings["journal"] = time.perf_counter() - t0
 
-        # Métadonnées de publication (stockées sur source_publications)
         pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
 
         t0 = time.perf_counter()
-        # Chercher une publication existante (sans créer)
-        publication_id = None
-
-        # Idempotence : réutiliser le publication_id existant
-        publication_id = get_scanr_publication_id(cur, scanr_id)
-
-        # Recherche par DOI/NNT/titre (sans création)
+        publication_id = queries.get_scanr_publication_id(cur, scanr_id)
         if not publication_id:
             publication_id = find_publication(cur, doc, journal_id, scanr_id)
         timings["publication"] = time.perf_counter() - t0
 
-        # Enrichir la publication existante si trouvée
         if publication_id:
-            # Extraire les champs enrichis
-            summary = doc.get("summary") or {}
-            summary.get("default") or summary.get("en") or summary.get("fr")
-            kw_raw = doc.get("keywords") or {}
-            kw_val = kw_raw.get("default") or kw_raw.get("en") or kw_raw.get("fr")
-            if isinstance(kw_val, list):
-                [str(k).strip() for k in kw_val if k] or None
-            elif isinstance(kw_val, str) and kw_val:
-                [k.strip() for k in kw_val.split(",") if k.strip()] or None
-            else:
-                pass
-            doc.get("topics") or doc.get("domains")
-
             publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"])
 
-        # Document ScanR (source_publications) — publication_id peut être NULL
         t0 = time.perf_counter()
         source_publication_id = insert_scanr_document(
-            cur, doc, staging_id, scanr_id, publication_id, pub_meta
+            cur, queries, doc, staging_id, scanr_id, publication_id, pub_meta
         )
         timings["scanr_doc"] = time.perf_counter() - t0
 
-        # Auteurs et authorships
         t0 = time.perf_counter()
-        process_authors(cur, doc, source_publication_id)
+        process_authors(cur, queries, doc, source_publication_id)
         timings["authors"] = time.perf_counter() - t0
 
-        # Recalcul complet des métadonnées depuis toutes les sources
         if publication_id:
             refresh_from_sources(cur, publication_id)
 
@@ -467,13 +379,15 @@ class ScanrNormalizer(SourceNormalizer):
     DEFAULT_BATCH_SIZE = 100
     FETCH_COLUMNS = "id, source_id AS scanr_id, doi, raw_data"
 
+    def __init__(
+        self,
+        conn: Any,
+        logger: Any,
+        staging_queries: StagingQueries,
+        queries: ScanrNormalizeQueries,
+    ) -> None:
+        super().__init__(conn, logger, staging_queries)
+        self._queries = queries
+
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        return process_work(cur, row)
-
-
-def main() -> None:
-    run_normalizer(ScanrNormalizer, logger)
-
-
-if __name__ == "__main__":
-    main()
+        return process_work(cur, self._queries, self.logger, row)

@@ -218,7 +218,13 @@ def _count_tables(cur) -> dict:
 
 def _run_normalize_scanr(cur):
     """Exécute la normalisation ScanR sur le curseur de test."""
+    import logging
+
     from application.pipeline.normalize.normalize_scanr import process_work
+    from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
+
+    queries = PgScanrNormalizeQueries()
+    logger = logging.getLogger("test")
 
     cur.execute("""
         SELECT id, source_id AS scanr_id, doi, raw_data
@@ -229,7 +235,7 @@ def _run_normalize_scanr(cur):
     rows = cur.fetchall()
     processed = 0
     for row in rows:
-        if process_work(cur, row):
+        if process_work(cur, queries, logger, row):
             processed += 1
     return processed
 
@@ -401,8 +407,14 @@ def _insert_hal_staging(cur, docs):
 
 def _run_normalize_hal(cur):
     """Exécute la normalisation HAL via un curseur tuple (comme le vrai script)."""
+    import logging
+
     plain_cur = cur.connection.cursor()
     from application.pipeline.normalize.normalize_hal import process_work
+    from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
+
+    queries = PgHalNormalizeQueries()
+    logger = logging.getLogger("test")
 
     plain_cur.execute("""
         Select id, source_id AS halid, doi, raw_data, hal_collections
@@ -411,7 +423,7 @@ def _run_normalize_hal(cur):
     rows = plain_cur.fetchall()
     processed = 0
     for row in rows:
-        if process_work(plain_cur, row):
+        if process_work(plain_cur, queries, logger, row):
             processed += 1
     return processed
 
@@ -547,7 +559,13 @@ def _insert_oa_staging(cur, docs):
 
 
 def _run_normalize_oa(cur):
+    import logging
+
     from application.pipeline.normalize.normalize_openalex import process_work
+    from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
+
+    queries = PgOpenalexNormalizeQueries()
+    logger = logging.getLogger("test")
 
     cur.execute("""
         SELECT id, source_id AS openalex_id, doi, raw_data
@@ -556,7 +574,7 @@ def _run_normalize_oa(cur):
     rows = cur.fetchall()
     processed = 0
     for row in rows:
-        if process_work(cur, row):
+        if process_work(cur, queries, logger, row):
             processed += 1
     return processed
 
@@ -657,8 +675,14 @@ def _insert_wos_staging(cur, docs):
 
 
 def _run_normalize_wos(cur):
+    import logging
+
     plain_cur = cur.connection.cursor()
     from application.pipeline.normalize.normalize_wos import process_record
+    from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
+
+    queries = PgWosNormalizeQueries()
+    logger = logging.getLogger("test")
 
     plain_cur.execute("""
         SELECT id, source_id AS ut, doi, raw_data
@@ -667,7 +691,7 @@ def _run_normalize_wos(cur):
     rows = plain_cur.fetchall()
     processed = 0
     for row in rows:
-        if process_record(plain_cur, row):
+        if process_record(plain_cur, queries, logger, row):
             processed += 1
     return processed
 
@@ -907,6 +931,8 @@ def _setup_persons_test_data(db):
 
 def _run_create_persons(db):
     """Exécute create_persons sur le curseur de test."""
+    import logging
+
     from application.pipeline.create.create_persons_from_source_authorships import (
         get_all_unlinked_authorships,
         load_linked_authorships_by_pub,
@@ -915,17 +941,19 @@ def _run_create_persons(db):
         step2_orcid,
         step3_name_forms,
     )
-    from infrastructure.db.queries.persons_create import fetch_name_form_map
+    from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
 
-    all_authorships = get_all_unlinked_authorships(db)
-    linked_ids = set()
+    queries = PgPersonsCreateQueries()
+    logger = logging.getLogger("test")
+    all_authorships = get_all_unlinked_authorships(db, queries)
+    linked_ids: set = set()
 
-    step0_hal_accounts(db, all_authorships, linked_ids, dry_run=False)
-    linked_index = load_linked_authorships_by_pub(db)
-    step1_cross_source(db, all_authorships, linked_ids, linked_index, dry_run=False)
-    step2_orcid(db, all_authorships, linked_ids, dry_run=False)
-    name_form_map = fetch_name_form_map(db)
-    step3_name_forms(db, all_authorships, linked_ids, name_form_map, dry_run=False)
+    step0_hal_accounts(db, queries, logger, all_authorships, linked_ids, dry_run=False)
+    linked_index = load_linked_authorships_by_pub(db, queries)
+    step1_cross_source(db, logger, all_authorships, linked_ids, linked_index, dry_run=False)
+    step2_orcid(db, queries, logger, all_authorships, linked_ids, dry_run=False)
+    name_form_map = queries.fetch_name_form_map(db)
+    step3_name_forms(db, logger, all_authorships, linked_ids, name_form_map, dry_run=False)
 
     return len(linked_ids)
 
@@ -1001,10 +1029,13 @@ class TestCreatePersonsIdempotence:
 
 def _run_build_authorships(db):
     """Exécute build_authorships sur le curseur de test (plain cursor)."""
+    import logging
+
     plain_cur = db.connection.cursor()
     from application.pipeline.build.build_authorships import build
+    from infrastructure.db.queries.authorships_build import PgAuthorshipsBuildQueries
 
-    build(plain_cur)
+    build(plain_cur, PgAuthorshipsBuildQueries(), logging.getLogger("test"))
 
 
 def _count_authorships_tables(db) -> dict:
@@ -1145,15 +1176,23 @@ def _setup_affiliations_test_data(db):
 
 def _run_populate_affiliations(db):
     """Exécute populate_affiliations sur le curseur de test."""
-    from application.pipeline.build.populate_affiliations import _step_address_source, step3d_theses
+    import logging
+
+    from application.pipeline.build.populate_affiliations import (
+        _step_address_source,
+        step3d_theses,
+    )
+    from infrastructure.db.queries.affiliations import PgAffiliationsQueries
     from infrastructure.perimeter import get_affiliations_structure_ids, get_persons_structure_ids
 
     perimeter_ids = get_persons_structure_ids(db)
     wide_ids = get_affiliations_structure_ids(db)
+    queries = PgAffiliationsQueries()
+    logger = logging.getLogger("test")
 
     for source in ["hal", "openalex", "wos", "scanr"]:
-        _step_address_source(db, source, perimeter_ids, wide_ids)
-    step3d_theses(db, wide_ids)
+        _step_address_source(db, queries, logger, source, perimeter_ids, wide_ids)
+    step3d_theses(db, queries, logger, wide_ids)
 
 
 def _count_affiliations(db) -> dict:

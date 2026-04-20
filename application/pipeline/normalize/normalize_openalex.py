@@ -16,14 +16,15 @@ Tables peuplées :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
-import os
 import re
 from typing import Any
 
 from psycopg2.extras import Json
 
 from application.journals import find_or_create_journal, find_or_create_publisher
-from application.pipeline.normalize.base import SourceNormalizer, run_normalizer
+from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.normalize_openalex import OpenalexNormalizeQueries
+from application.ports.staging import StagingQueries
 from application.publications import (
     find_by_doi,
     find_by_nnt,
@@ -36,26 +37,9 @@ from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.publication import clean_doi, extract_hal_id_from_url
 from infrastructure.addresses import link_addresses
-from infrastructure.db.queries.normalize_openalex import (
-    count_openalex_table,
-    delete_openalex_source_authorships_for,
-    fetch_publication_id_for_hal_source,
-    find_openalex_source_structure,
-    get_openalex_publication_id,
-    staging_has_openalex_doi,
-    upsert_openalex_source_authorship,
-    upsert_openalex_source_person,
-    upsert_openalex_source_publication,
-    upsert_openalex_source_structure,
-)
 from infrastructure.db_helpers import mark_staging_done
-from infrastructure.log import setup_logger
 from infrastructure.openalex import extract_nnt_from_openalex, is_theses_fr_source
 from infrastructure.zenodo import ZenodoResolutionError, is_zenodo_doi, resolve_zenodo_doi
-
-# ----- Logging -----
-logger = setup_logger("normalize_openalex", os.path.join(os.path.dirname(__file__), "logs"))
-
 
 # =============================================================
 # MAPPINGS
@@ -180,18 +164,14 @@ def is_hal_primary_location(work: dict) -> bool:
     return False
 
 
-def find_hal_publication_id(cur: Any, work: dict) -> int | None:
-    """
-    Si le work OpenAlex pointe vers un document HAL existant,
-    retourne le publication_id associé (pour éviter les doublons).
-    """
+def find_hal_publication_id(cur: Any, queries: OpenalexNormalizeQueries, work: dict) -> int | None:
+    """Si le work OpenAlex pointe vers un document HAL existant, retourne le publication_id."""
     location = work.get("primary_location") or {}
     url = location.get("landing_page_url") or ""
     hal_id = extract_hal_id_from_url(url)
     if not hal_id:
         return None
-
-    return fetch_publication_id_for_hal_source(cur, hal_id)
+    return queries.fetch_publication_id_for_hal_source(cur, hal_id)
 
 
 def is_repository_source(work: dict) -> bool:
@@ -323,7 +303,12 @@ def find_publication(cur: Any, work: dict, journal_id: int | None) -> int | None
 
 
 def insert_openalex_document(
-    cur: Any, work: dict, staging_id: int, publication_id: int | None, pub_meta: dict | None = None
+    cur: Any,
+    queries: OpenalexNormalizeQueries,
+    work: dict,
+    staging_id: int,
+    publication_id: int | None,
+    pub_meta: dict | None = None,
 ) -> int:
     """
     Crée/retrouve l'entrée source_publications pour OpenAlex.
@@ -378,7 +363,7 @@ def insert_openalex_document(
     language = pub_meta.get("language") if pub_meta else None
     container_title = pub_meta.get("container_title") if pub_meta else None
 
-    return upsert_openalex_source_publication(
+    return queries.upsert_openalex_source_publication(
         cur,
         openalex_id=openalex_id,
         doi=doi,
@@ -407,7 +392,9 @@ def insert_openalex_document(
 # =============================================================
 
 
-def upsert_openalex_author(cur: Any, authorship: dict) -> int | None:
+def upsert_openalex_author(
+    cur: Any, queries: OpenalexNormalizeQueries, authorship: dict
+) -> int | None:
     """
     Insère/retrouve un auteur OpenAlex dans source_persons (source='openalex').
     Déduplique par openalex_id (clé unique via source_id).
@@ -441,7 +428,7 @@ def upsert_openalex_author(cur: Any, authorship: dict) -> int | None:
         first_name = None
         last_name = display_name
 
-    return upsert_openalex_source_person(
+    return queries.upsert_openalex_source_person(
         cur,
         source_id=source_id,
         full_name=display_name,
@@ -456,11 +443,10 @@ def upsert_openalex_author(cur: Any, authorship: dict) -> int | None:
 # =============================================================
 
 
-def upsert_openalex_institution(cur: Any, institution: dict) -> int | None:
-    """
-    Insère/retrouve une institution OpenAlex dans source_structures.
-    Retourne source_structures.id ou None.
-    """
+def upsert_openalex_institution(
+    cur: Any, queries: OpenalexNormalizeQueries, institution: dict
+) -> int | None:
+    """Insère/retrouve une institution OpenAlex. Retourne source_structures.id ou None."""
     inst_id_url = institution.get("id")
     if not inst_id_url:
         return None
@@ -472,11 +458,11 @@ def upsert_openalex_institution(cur: Any, institution: dict) -> int | None:
     inst_type = institution.get("type")
 
     if not name:
-        return find_openalex_source_structure(cur, openalex_id)
+        return queries.find_openalex_source_structure(cur, openalex_id)
 
     source_data = Json({"type": inst_type}) if inst_type else None
 
-    return upsert_openalex_source_structure(
+    return queries.upsert_openalex_source_structure(
         cur,
         openalex_id=openalex_id,
         name=name,
@@ -491,7 +477,12 @@ def upsert_openalex_institution(cur: Any, institution: dict) -> int | None:
 # =============================================================
 
 
-def process_authorships(cur: Any, work: dict, source_publication_id: int) -> Any:
+def process_authorships(
+    cur: Any,
+    queries: OpenalexNormalizeQueries,
+    work: dict,
+    source_publication_id: int,
+) -> None:
     """
     Traite les authorships d'un work OpenAlex :
     - Insère/retrouve chaque auteur dans source_persons (source='openalex')
@@ -503,10 +494,10 @@ def process_authorships(cur: Any, work: dict, source_publication_id: int) -> Any
 
     # Supprimer les anciennes authorships de ce document
     # (nécessaire quand un work refetché a changé d'auteurs/positions)
-    delete_openalex_source_authorships_for(cur, source_publication_id)
+    queries.delete_openalex_source_authorships_for(cur, source_publication_id)
 
     for position, authorship in enumerate(authorships):
-        source_person_id = upsert_openalex_author(cur, authorship)
+        source_person_id = upsert_openalex_author(cur, queries, authorship)
         if not source_person_id:
             continue
 
@@ -528,7 +519,7 @@ def process_authorships(cur: Any, work: dict, source_publication_id: int) -> Any
         # Institutions OpenAlex → source_structures.id
         source_struct_ids = []
         for inst in authorship.get("institutions") or []:
-            ss_id = upsert_openalex_institution(cur, inst)
+            ss_id = upsert_openalex_institution(cur, queries, inst)
             if ss_id:
                 source_struct_ids.append(ss_id)
 
@@ -545,7 +536,7 @@ def process_authorships(cur: Any, work: dict, source_publication_id: int) -> Any
             )
         )
 
-        sa_id = upsert_openalex_source_authorship(
+        sa_id = queries.upsert_openalex_source_authorship(
             cur,
             source_publication_id=source_publication_id,
             source_person_id=source_person_id,
@@ -564,11 +555,13 @@ def process_authorships(cur: Any, work: dict, source_publication_id: int) -> Any
 # =============================================================
 
 
-def process_work(cur: Any, staging_row: tuple) -> bool | None:
-    """
-    Traite un work du staging OpenAlex.
-    Retourne True si traité, False en cas d'erreur, None si skippé.
-    """
+def process_work(
+    cur: Any,
+    queries: OpenalexNormalizeQueries,
+    logger: Any,
+    staging_row: tuple,
+) -> bool | None:
+    """Traite un work du staging OpenAlex."""
     if isinstance(staging_row, dict):
         staging_id = staging_row["id"]
         openalex_id = staging_row["openalex_id"]
@@ -578,48 +571,38 @@ def process_work(cur: Any, staging_row: tuple) -> bool | None:
         staging_id, openalex_id, doi, work = staging_row
 
     try:
-        # Zenodo : si le DOI est un concept DOI, vérifier si le version DOI
-        # est déjà en staging → skip pour éviter les doublons
         raw_doi = clean_doi(doi)
         if raw_doi and is_zenodo_doi(raw_doi):
             try:
                 version_doi = resolve_zenodo_doi(raw_doi)
             except ZenodoResolutionError as e:
                 logger.warning(f"  {openalex_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
-                return None  # ne pas marquer processed
+                return None
             if version_doi:
-                if staging_has_openalex_doi(cur, version_doi):
+                if queries.staging_has_openalex_doi(cur, version_doi):
                     logger.info(
                         f"  {openalex_id} concept DOI Zenodo {raw_doi} -> "
                         f"version {version_doi} deja en staging, skip"
                     )
                     mark_staging_done(cur, staging_id)
-                    return None  # skip, pas une erreur
+                    return None
 
-        # Détecter si la primary_location pointe vers HAL, theses.fr ou un repository
         hal_location = is_hal_primary_location(work)
         theses_fr = is_theses_fr_source(work)
         repo_location = is_repository_source(work)
 
-        if hal_location or theses_fr:
-            publisher_id = None
-            journal_id = None
-        elif repo_location:
+        if hal_location or theses_fr or repo_location:
             publisher_id = None
             journal_id = None
         else:
             publisher_id = upsert_publisher(cur, work)
             journal_id = upsert_journal(cur, work, publisher_id)
 
-        # Métadonnées de publication (stockées sur source_publications)
         pub_meta = extract_pub_metadata(work, journal_id)
 
-        # Chercher une publication existante (sans créer)
         publication_id = None
-
-        # Via HAL ou theses.fr (cross-référence)
         if hal_location:
-            publication_id = find_hal_publication_id(cur, work)
+            publication_id = find_hal_publication_id(cur, queries, work)
         if not publication_id and theses_fr:
             nnt = extract_nnt_from_openalex(work)
             if nnt:
@@ -627,18 +610,14 @@ def process_work(cur: Any, staging_row: tuple) -> bool | None:
                 if existing:
                     publication_id = existing.id
 
-        # Idempotence : réutiliser le publication_id existant
         if not publication_id:
-            publication_id = get_openalex_publication_id(cur, openalex_id)
+            publication_id = queries.get_openalex_publication_id(cur, openalex_id)
 
-        # Recherche par DOI/NNT/titre (sans création)
         if not publication_id:
             publication_id = find_publication(cur, work, journal_id)
 
-        # Enrichir la publication existante si trouvée
         if publication_id:
             enrich_doi = pub_meta["doi"]
-            # Résoudre les conflits de DOI chapitre/ouvrage
             if enrich_doi:
                 existing_by_doi = find_by_doi(cur, enrich_doi)
                 if existing_by_doi and existing_by_doi.id != publication_id:
@@ -652,37 +631,18 @@ def process_work(cur: Any, staging_row: tuple) -> bool | None:
                     )
                     if enrich_doi != original_doi:
                         pub_meta["source_doi"] = original_doi
-            # Extraire les champs enrichis depuis le work
-            reconstruct_abstract(work.get("abstract_inverted_index"))
-            kw_raw = work.get("keywords")
-            enrich_keywords = None
-            if isinstance(kw_raw, list):
-                enrich_keywords = [k.get("keyword") if isinstance(k, dict) else k for k in kw_raw]
-                enrich_keywords = [k for k in enrich_keywords if k] or None
-            extract_topics(work)
-            raw_biblio = work.get("biblio") or {}
-            {
-                k: raw_biblio[k]
-                for k in ("volume", "issue", "first_page", "last_page")
-                if raw_biblio.get(k)
-            } or None
-
             publication_id = try_merge_by_doi(cur, publication_id, enrich_doi)
 
-        # Document OpenAlex (source_publications) — publication_id peut être NULL
         source_publication_id = insert_openalex_document(
-            cur, work, staging_id, publication_id, pub_meta
+            cur, queries, work, staging_id, publication_id, pub_meta
         )
 
-        # Auteurs et authorships
-        process_authorships(cur, work, source_publication_id)
+        process_authorships(cur, queries, work, source_publication_id)
 
-        # Recalcul complet des métadonnées depuis toutes les sources
         if publication_id:
             refresh_from_sources(cur, publication_id)
 
         mark_staging_done(cur, staging_id)
-
         return True
 
     except Exception as e:
@@ -696,19 +656,21 @@ class OpenalexNormalizer(SourceNormalizer):
     FETCH_SUB_BATCH = 50
     FETCH_COLUMNS = "id, source_id AS openalex_id, doi, raw_data"
 
+    def __init__(
+        self,
+        conn: Any,
+        logger: Any,
+        staging_queries: StagingQueries,
+        queries: OpenalexNormalizeQueries,
+    ) -> None:
+        super().__init__(conn, logger, staging_queries)
+        self._queries = queries
+
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        return process_work(cur, row)
+        return process_work(cur, self._queries, self.logger, row)
 
     def summary_stats(self, cur: Any) -> list[str]:
         return [
-            f"  {table} (openalex) : {count_openalex_table(cur, table)} enregistrements"
+            f"  {table} (openalex) : {self._queries.count_openalex_table(cur, table)} enregistrements"
             for table in ("source_structures", "source_persons", "source_publications")
         ]
-
-
-def main() -> None:
-    run_normalizer(OpenalexNormalizer, logger)
-
-
-if __name__ == "__main__":
-    main()

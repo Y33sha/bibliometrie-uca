@@ -3,32 +3,24 @@
 Pour chaque hal_author ayant un idhal et un person_id, interroge l'API HAL
 et insère l'IdRef dans person_identifiers.
 
-Usage:
-    python processing/harvest_hal_idrefs.py [--dry-run]
+L'orchestrateur dépend du port `HarvestQueries`. Le point d'entrée CLI
+est dans `interfaces/cli/pipeline/harvest_hal_idrefs.py`.
 """
 
-import argparse
-import os
 import time
 from typing import Any
 
 import requests
 
 from application.persons import add_identifier
-from infrastructure.api_limits import HAL_DELAY
-from infrastructure.db.connection import get_connection
-from infrastructure.db.queries.harvest import (
-    fetch_hal_persons_missing_idref,
-    update_source_person_idref,
-)
-from infrastructure.log import setup_logger
-
-logger = setup_logger("harvest_hal_idrefs", os.path.join(os.path.dirname(__file__), "logs"))
+from application.ports.harvest import HarvestQueries
 
 HAL_AUTHOR_API = "https://api.archives-ouvertes.fr/ref/author/"
 
 
-def fetch_idref(hal_person_id: int = None, idhal: str = None) -> str | None:
+def fetch_idref(
+    logger: Any, hal_person_id: int | None = None, idhal: str | None = None
+) -> str | None:
     """Interroge l'API HAL pour récupérer l'IdRef d'un auteur."""
     try:
         if idhal:
@@ -56,39 +48,35 @@ def fetch_idref(hal_person_id: int = None, idhal: str = None) -> str | None:
     return None
 
 
-def main() -> Any:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dry-run", action="store_true")
-    args = parser.parse_args()
-
-    conn = get_connection()
-    cur = conn.cursor()
-
-    authors = fetch_hal_persons_missing_idref(cur)
+def run_harvest(
+    cur: Any,
+    conn: Any,
+    queries: HarvestQueries,
+    logger: Any,
+    *,
+    dry_run: bool = False,
+    rate_delay: float = 0.1,
+) -> None:
+    authors = queries.fetch_hal_persons_missing_idref(cur)
     logger.info(f"{len(authors)} auteurs HAL à interroger")
 
     found = 0
     for i, a in enumerate(authors):
-        idref = fetch_idref(hal_person_id=a["hal_person_id"], idhal=a["idhal"])
+        idref = fetch_idref(logger, hal_person_id=a["hal_person_id"], idhal=a["idhal"])
         if idref:
             found += 1
-            if not args.dry_run:
-                update_source_person_idref(cur, a["ha_id"], idref)
+            if not dry_run:
+                queries.update_source_person_idref(cur, a["ha_id"], idref)
                 add_identifier(cur, a["person_id"], "idref", idref, source="hal")
             logger.info(f"  {a['full_name']}: {idref}")
 
         if (i + 1) % 100 == 0:
-            if not args.dry_run:
+            if not dry_run:
                 conn.commit()
             logger.info(f"  {i + 1}/{len(authors)} traités, {found} IdRef trouvés")
-            time.sleep(HAL_DELAY)
+            time.sleep(rate_delay)
 
-    if not args.dry_run:
+    if not dry_run:
         conn.commit()
 
     logger.info(f"Terminé: {found} IdRef trouvés sur {len(authors)} auteurs")
-    conn.close()
-
-
-if __name__ == "__main__":
-    main()

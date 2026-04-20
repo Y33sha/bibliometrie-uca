@@ -269,3 +269,53 @@ def fetch_wos_source_persons_with_daisng(cur: Any) -> list[tuple[str, int]]:
         "AND source_id NOT LIKE 'wos-%%'"
     )
     return [(r[0], r[1]) for r in cur.fetchall()]
+
+
+class PgWosNormalizeQueries:
+    """Adapter PostgreSQL pour `application.ports.normalize_wos.WosNormalizeQueries`."""
+
+    def upsert_wos_source_publication(self, cur: Any, **kwargs: Any) -> int:
+        return upsert_wos_source_publication(cur, **kwargs)
+
+    def upsert_wos_source_person(self, cur: Any, **kwargs: Any) -> int:
+        return upsert_wos_source_person(cur, **kwargs)
+
+    def upsert_wos_source_persons_batch(
+        self, cur: Any, values: list[tuple[Any, ...]]
+    ) -> list[tuple[int, str]]:
+        return upsert_wos_source_persons_batch(cur, values)
+
+    def upsert_wos_source_structure(self, cur: Any, *, name: str, ror_id: str | None) -> int:
+        return upsert_wos_source_structure(cur, name=name, ror_id=ror_id)
+
+    def upsert_addresses_batch(self, cur: Any, values: list[tuple[str, str]]) -> None:
+        upsert_addresses_batch(cur, values)
+
+    def fetch_address_ids_by_raw_text(self, cur: Any, raw_texts: list[str]) -> dict[str, int]:
+        return fetch_address_ids_by_raw_text(cur, raw_texts)
+
+    def upsert_wos_source_authorships_batch(self, cur: Any, values: list[tuple[Any, ...]]) -> None:
+        upsert_wos_source_authorships_batch(cur, values)
+
+    def fetch_source_authorship_ids(
+        self, cur: Any, *, source_publication_id: int, source_person_ids: list[int]
+    ) -> dict[int, int]:
+        return fetch_source_authorship_ids(
+            cur,
+            source_publication_id=source_publication_id,
+            source_person_ids=source_person_ids,
+        )
+
+    def insert_source_authorship_addresses_batch(
+        self, cur: Any, values: list[tuple[int, int]]
+    ) -> None:
+        insert_source_authorship_addresses_batch(cur, values)
+
+    def get_wos_publication_id(self, cur: Any, ut: str) -> int | None:
+        return get_wos_publication_id(cur, ut)
+
+    def fetch_wos_source_structures(self, cur: Any) -> list[tuple[str, int]]:
+        return fetch_wos_source_structures(cur)
+
+    def fetch_wos_source_persons_with_daisng(self, cur: Any) -> list[tuple[str, int]]:
+        return fetch_wos_source_persons_with_daisng(cur)
