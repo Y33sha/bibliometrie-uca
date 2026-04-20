@@ -9,10 +9,16 @@ from application import structures as structures_service
 from infrastructure.repositories import structure_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import (
+    DeletedResponse,
     NameFormCreate,
+    NameFormOut,
     NameFormUpdate,
     RelationCreate,
     StructureCreate,
+    StructureDetailResponse,
+    StructureListItem,
+    StructureOut,
+    StructureRelationCreateResponse,
     StructureUpdate,
 )
 
@@ -20,7 +26,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/api/structures")
+@router.get("/api/structures", response_model=list[StructureListItem])
 async def list_structures(
     type: str | None = Query(None),
     search: str = Query(""),
@@ -60,7 +66,7 @@ async def list_structures(
         return cur.fetchall()
 
 
-@router.get("/api/structures/{structure_id}")
+@router.get("/api/structures/{structure_id}", response_model=StructureDetailResponse)
 async def get_structure(structure_id: int) -> Any:
     with get_cursor() as (cur, conn):
         cur.execute(
@@ -79,7 +85,7 @@ async def get_structure(structure_id: int) -> Any:
         cur.execute(
             """
             SELECT sr.id AS relation_id, sr.relation_type::text,
-                   sp.id, sp.code, sp.name, sp.acronym, sp.structure_type::text AS struct_type
+                   sp.id, sp.code, sp.name, sp.acronym, sp.structure_type::text AS type
             FROM structure_relations sr
             JOIN structures sp ON sp.id = sr.parent_id
             WHERE sr.child_id = %s
@@ -93,7 +99,7 @@ async def get_structure(structure_id: int) -> Any:
         cur.execute(
             """
             SELECT sr.id AS relation_id, sr.relation_type::text,
-                   sc.id, sc.code, sc.name, sc.acronym, sc.structure_type::text AS struct_type
+                   sc.id, sc.code, sc.name, sc.acronym, sc.structure_type::text AS type
             FROM structure_relations sr
             JOIN structures sc ON sc.id = sr.child_id
             WHERE sr.parent_id = %s
@@ -122,7 +128,7 @@ async def get_structure(structure_id: int) -> Any:
         }
 
 
-@router.post("/api/structures")
+@router.post("/api/structures", response_model=StructureOut)
 async def create_structure(data: StructureCreate) -> Any:
     with get_cursor() as (cur, conn):
         return structures_service.create_structure(
@@ -139,7 +145,7 @@ async def create_structure(data: StructureCreate) -> Any:
         )
 
 
-@router.put("/api/structures/{structure_id}")
+@router.put("/api/structures/{structure_id}", response_model=StructureOut)
 async def update_structure(structure_id: int, data: StructureUpdate) -> Any:
     fields = data.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
@@ -148,14 +154,14 @@ async def update_structure(structure_id: int, data: StructureUpdate) -> Any:
         )
 
 
-@router.delete("/api/structures/{structure_id}")
+@router.delete("/api/structures/{structure_id}", response_model=DeletedResponse)
 async def delete_structure(structure_id: int) -> Any:
     with get_cursor() as (cur, conn):
         structures_service.delete_structure(cur, structure_id, repo=structure_repository(cur))
         return {"deleted": True}
 
 
-@router.post("/api/structure-relations")
+@router.post("/api/structure-relations", response_model=StructureRelationCreateResponse)
 async def create_relation(data: RelationCreate) -> Any:
     with get_cursor() as (cur, conn):
         row = structures_service.create_relation(
@@ -170,14 +176,14 @@ async def create_relation(data: RelationCreate) -> Any:
         return row
 
 
-@router.delete("/api/structure-relations/{relation_id}")
+@router.delete("/api/structure-relations/{relation_id}", response_model=DeletedResponse)
 async def delete_relation(relation_id: int) -> Any:
     with get_cursor() as (cur, conn):
         structures_service.delete_relation(cur, relation_id, repo=structure_repository(cur))
         return {"deleted": True}
 
 
-@router.get("/api/name-forms/{form_id}")
+@router.get("/api/name-forms/{form_id}", response_model=NameFormOut)
 async def get_name_form(form_id: int) -> Any:
     with get_cursor() as (cur, conn):
         cur.execute("SELECT * FROM structure_name_forms WHERE id = %s", (form_id,))
@@ -187,7 +193,7 @@ async def get_name_form(form_id: int) -> Any:
         return row
 
 
-@router.post("/api/name-forms")
+@router.post("/api/name-forms", response_model=NameFormOut)
 async def create_name_form(data: NameFormCreate) -> Any:
     with get_cursor() as (cur, conn):
         return structures_service.create_name_form(
@@ -201,7 +207,7 @@ async def create_name_form(data: NameFormCreate) -> Any:
         )
 
 
-@router.put("/api/name-forms/{form_id}")
+@router.put("/api/name-forms/{form_id}", response_model=NameFormOut)
 async def update_name_form(form_id: int, data: NameFormUpdate) -> Any:
     fields = data.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
@@ -210,15 +216,8 @@ async def update_name_form(form_id: int, data: NameFormUpdate) -> Any:
         )
 
 
-@router.delete("/api/name-forms/{form_id}")
+@router.delete("/api/name-forms/{form_id}", response_model=DeletedResponse)
 async def delete_name_form(form_id: int) -> Any:
     with get_cursor() as (cur, conn):
         structures_service.delete_name_form(cur, form_id, repo=structure_repository(cur))
         return {"deleted": True}
-
-
-# =============================================================
-
-# =============================================================
-# AUTHORSHIPS (auteurs UCA)
-# =============================================================
