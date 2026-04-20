@@ -11,7 +11,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --threshold error",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "vitest run",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"types:gen": "cd ../.. && python -m interfaces.cli.dump_openapi && cd interfaces/frontend && openapi-typescript openapi.json -o src/lib/api/schema.ts && rm openapi.json"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.0",
@@ -20,6 +21,7 @@
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
 		"@types/katex": "^0.16.8",
 		"@types/node": "^25.6.0",
+		"openapi-typescript": "^7.13.0",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
 		"typescript": "^5.9.3",
