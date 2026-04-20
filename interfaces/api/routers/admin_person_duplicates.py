@@ -9,20 +9,26 @@ from application.persons import mark_distinct as _mark_persons_distinct
 from infrastructure.db.queries import duplicates as dup_queries
 from infrastructure.repositories import person_repository
 from interfaces.api.deps import get_cursor
-from interfaces.api.models import MarkPersonsDistinct
+from interfaces.api.models import (
+    MarkPersonsDistinct,
+    OkResponse,
+    PersonConflictPairResponse,
+    PersonDuplicatePairResponse,
+    TotalCountResponse,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/api/admin/person-duplicates/count")
+@router.get("/api/admin/person-duplicates/count", response_model=TotalCountResponse)
 async def count_person_duplicates() -> Any:
     """Comptage des paires candidates doublons-personnes."""
     with get_cursor() as (cur, _conn):
         return {"total": dup_queries.count_person_duplicates(cur)}
 
 
-@router.get("/api/admin/person-duplicates/next")
+@router.get("/api/admin/person-duplicates/next", response_model=PersonDuplicatePairResponse)
 async def next_person_duplicate(
     skip: str = Query("", alias="skip"),
     offset: int = Query(0, ge=0),
@@ -34,7 +40,7 @@ async def next_person_duplicate(
         return {"pair": pair}
 
 
-@router.post("/api/admin/person-duplicates/mark-distinct")
+@router.post("/api/admin/person-duplicates/mark-distinct", response_model=OkResponse)
 async def mark_persons_distinct(body: MarkPersonsDistinct) -> Any:
     """Marque deux personnes comme distinctes (non-doublon)."""
     if body.person_id_a == body.person_id_b:
@@ -42,20 +48,20 @@ async def mark_persons_distinct(body: MarkPersonsDistinct) -> Any:
             status_code=400, detail="person_id_a et person_id_b doivent être différents"
         )
     with get_cursor() as (cur, _conn):
-        _mark_persons_distinct(
-            cur, body.person_id_a, body.person_id_b, repo=person_repository(cur)
-        )
+        _mark_persons_distinct(cur, body.person_id_a, body.person_id_b, repo=person_repository(cur))
         return {"ok": True}
 
 
-@router.get("/api/admin/person-duplicates/conflicts/count")
+@router.get("/api/admin/person-duplicates/conflicts/count", response_model=TotalCountResponse)
 async def count_person_conflict_pairs() -> Any:
     """Nombre de paires de personnes en conflit sur des publications."""
     with get_cursor() as (cur, _conn):
         return {"total": dup_queries.count_person_conflict_pairs(cur)}
 
 
-@router.get("/api/admin/person-duplicates/conflicts/next")
+@router.get(
+    "/api/admin/person-duplicates/conflicts/next", response_model=PersonConflictPairResponse
+)
 async def next_person_conflict(
     skip: str = Query("", alias="skip"),
     offset: int = Query(0, ge=0),

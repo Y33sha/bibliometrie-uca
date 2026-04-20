@@ -18,7 +18,6 @@ from interfaces.api.deps import get_cursor, require_admin
 from interfaces.api.models import (
     AddressesCountriesResponse,
     AddressListResponse,
-    AddressOkResponse,
     AddressPublicationsResponse,
     AddressReviewResponse,
     AddressStatsResponse,
@@ -30,6 +29,7 @@ from interfaces.api.models import (
     BatchUpdatedResponse,
     CountryOut,
     CountrySuggestionsResponse,
+    OkResponse,
     ReviewAction,
     SetCountry,
     UnassignStructureResponse,
@@ -188,7 +188,7 @@ async def suggest_countries(
         return addr_queries.suggest_countries(cur, search)
 
 
-@router.post("/api/addresses/{addr_id}/country", response_model=AddressOkResponse)
+@router.post("/api/addresses/{addr_id}/country", response_model=OkResponse)
 async def set_address_country(
     addr_id: int, body: SetCountry, bg: BackgroundTasks, _: Any = Depends(require_admin)
 ) -> Any:

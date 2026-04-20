@@ -2209,11 +2209,6 @@ export interface components {
             /** Requires Search */
             requires_search?: boolean | null;
         };
-        /** AddressOkResponse */
-        AddressOkResponse: {
-            /** Ok */
-            ok: boolean;
-        };
         /**
          * AddressOut
          * @description Ligne de `/api/addresses` (liste paginée pour validation).
@@ -3477,6 +3472,97 @@ export interface components {
             /** Addresses */
             addresses: components["schemas"]["PersonAddressOut"][];
         };
+        /** PersonConflictPair */
+        PersonConflictPair: {
+            person_a: components["schemas"]["PersonDedupDetail"];
+            person_b: components["schemas"]["PersonDedupDetail"];
+            /** Conflict Pubs */
+            conflict_pubs: components["schemas"]["PersonConflictPub"][];
+        };
+        /** PersonConflictPairResponse */
+        PersonConflictPairResponse: {
+            pair: components["schemas"]["PersonConflictPair"] | null;
+        };
+        /** PersonConflictPub */
+        PersonConflictPub: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Position */
+            position: number;
+        };
+        /**
+         * PersonDedupDetail
+         * @description Profil d'une personne pour la page de déduplication.
+         */
+        PersonDedupDetail: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name Normalized */
+            last_name_normalized: string;
+            /** First Name Normalized */
+            first_name_normalized: string;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Role Title */
+            role_title: string | null;
+            /** Department Name */
+            department_name: string | null;
+            /** Identifiers */
+            identifiers: components["schemas"]["PersonDedupIdentifier"][];
+            /** Publications */
+            publications: components["schemas"]["PersonDedupPublication"][];
+            /** Pub Count */
+            pub_count: number;
+            /** Labs */
+            labs: components["schemas"]["PersonDedupLab"][];
+        };
+        /** PersonDedupIdentifier */
+        PersonDedupIdentifier: {
+            /** Id */
+            id: number;
+            /** Id Type */
+            id_type: string;
+            /** Id Value */
+            id_value: string;
+            /** Source */
+            source: string;
+            /** Status */
+            status: string;
+        };
+        /** PersonDedupLab */
+        PersonDedupLab: {
+            /** Id */
+            id: number;
+            /** Acronym */
+            acronym: string | null;
+            /** Name */
+            name: string;
+        };
+        /** PersonDedupPublication */
+        PersonDedupPublication: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doi */
+            doi: string | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Sources */
+            sources: string[];
+        };
         /**
          * PersonDetail
          * @description Réponse de `/api/persons/{id}` (détail + auteurs liés).
@@ -3541,6 +3627,15 @@ export interface components {
             pages: number;
             /** Persons */
             persons: components["schemas"]["PersonDirectoryEntry"][];
+        };
+        /** PersonDuplicatePair */
+        PersonDuplicatePair: {
+            person_a: components["schemas"]["PersonDedupDetail"];
+            person_b: components["schemas"]["PersonDedupDetail"];
+        };
+        /** PersonDuplicatePairResponse */
+        PersonDuplicatePairResponse: {
+            pair: components["schemas"]["PersonDuplicatePair"] | null;
         };
         /**
          * PersonIdentifierOut
@@ -4313,6 +4408,14 @@ export interface components {
             date_soutenance: string | null;
             /** Date Inscription */
             date_inscription: string | null;
+        };
+        /**
+         * TotalCountResponse
+         * @description Compteur générique : `{total: int}` (utilisé par les endpoints `/count`).
+         */
+        TotalCountResponse: {
+            /** Total */
+            total: number;
         };
         /** UnassignStructureResponse */
         UnassignStructureResponse: {
@@ -5366,7 +5469,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AddressOkResponse"];
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7091,7 +7194,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TotalCountResponse"];
                 };
             };
         };
@@ -7114,7 +7217,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonDuplicatePairResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7147,7 +7250,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7176,7 +7279,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TotalCountResponse"];
                 };
             };
         };
@@ -7199,7 +7302,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonConflictPairResponse"];
                 };
             };
             /** @description Validation Error */
