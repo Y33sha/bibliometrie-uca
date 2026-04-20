@@ -197,7 +197,8 @@ class TestBatchReviewStructureLink:
         addrs = [_create_address(db, raw_text=f"adr{i}") for i in range(3)]
 
         updated = batch_review_structure_link(
-            db, addrs, uca, True, repo=repo, authorship_repo=authorship_repo
+            db, addrs, uca, True, repo=repo, authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         assert updated == 3
@@ -209,7 +210,8 @@ class TestBatchReviewStructureLink:
         addrs = [_create_address(db, raw_text=f"x{i}") for i in range(2)]
 
         batch_review_structure_link(
-            db, addrs, uca, False, repo=repo, authorship_repo=authorship_repo
+            db, addrs, uca, False, repo=repo, authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         for aid in addrs:
@@ -223,7 +225,8 @@ class TestBatchReviewStructureLink:
         _insert_address_structure(db, a2, uca, is_confirmed=False)
 
         batch_review_structure_link(
-            db, [a1, a2], uca, None, repo=repo, authorship_repo=authorship_repo
+            db, [a1, a2], uca, None, repo=repo, authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         # Les 2 liens manuels ont été supprimés
