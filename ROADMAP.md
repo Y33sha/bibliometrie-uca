@@ -51,7 +51,7 @@ builder spécialisé.
 des modèles JSONB, mais pas d'entités au sens DDD. Passer à de vraies
 entités `Person`, `Publication`, `Structure` avec identité + invariants
 devient intéressant quand émergent des règles complexes (ex. un idHAL
-ne peut être associé qu'à un seul compte actif). Pas urgent.
+ne peut être associé qu'à un seul compte actif).
 
 ### 1.5 Value objects supplémentaires
 Ajouter au fur et à mesure : `ROR`, `RNSR` (identifiants de structure),
@@ -157,8 +157,11 @@ dupliqué entre agrégats.
 - [x] **Source unique des dépendances** : `[project.dependencies]` +
   `[project.optional-dependencies.dev]` dans `pyproject.toml`
   (ex-`requirements.txt` supprimé, installation via `pip install ".[dev]"`)
-- [ ] **Lockfile** des dépendances : `uv.lock` ou `poetry.lock` (prochaine étape
-  pour figer les versions transitives)
+- [x] **Lockfile** des dépendances : `uv.lock` (75 paquets figés, 1726 lignes).
+  `uv` lit le `pyproject.toml` PEP 621 existant sans migration. Installation
+  reproductible via `uv sync` (ou `pip install -e ".[dev]"` continue de
+  fonctionner pour qui n'a pas `uv`). Le `uv.lock` est committé, versionné
+  avec `pyproject.toml`.
 - [x] `deptry` pour repérer les paquets installés mais inutilisés
 - [x] `pip-audit` pour les vulnérabilités connues (à ajouter en CI ensuite)
 - Version Python supportée documentée et alignée avec prod DSI
