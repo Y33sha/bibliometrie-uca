@@ -8,12 +8,20 @@ from fastapi import APIRouter, Query
 from infrastructure.db.queries import stats as stats_queries
 from interfaces.api.deps import get_cursor, get_root_structure_id
 from interfaces.api.filters import parse_int_csv
+from interfaces.api.models import (
+    JournalStatsResponse,
+    LabStatsResponse,
+    PublisherStatsResponse,
+    StatsFacetsResponse,
+    StatsSummary,
+    YearStatsRow,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/api/stats/publishers")
+@router.get("/api/stats/publishers", response_model=PublisherStatsResponse)
 async def publisher_stats(
     lab_id: str = Query(""),
     year: str = Query(""),
@@ -40,7 +48,7 @@ async def publisher_stats(
         )
 
 
-@router.get("/api/stats/journals")
+@router.get("/api/stats/journals", response_model=JournalStatsResponse)
 async def journal_stats(
     lab_id: str = Query(""),
     year: str = Query(""),
@@ -69,7 +77,7 @@ async def journal_stats(
         )
 
 
-@router.get("/api/stats/by-year")
+@router.get("/api/stats/by-year", response_model=list[YearStatsRow])
 async def stats_by_year(
     lab_id: str = Query(""),
     year: str = Query(""),
@@ -92,7 +100,7 @@ async def stats_by_year(
         )
 
 
-@router.get("/api/stats/summary")
+@router.get("/api/stats/summary", response_model=StatsSummary)
 async def stats_summary(
     lab_id: str = Query(""),
     year: str = Query(""),
@@ -115,7 +123,7 @@ async def stats_summary(
         )
 
 
-@router.get("/api/stats/labs")
+@router.get("/api/stats/labs", response_model=LabStatsResponse)
 async def stats_labs(
     lab_id: str = Query(""),
     year: str = Query(""),
@@ -144,14 +152,14 @@ async def stats_labs(
         )
 
 
-@router.get("/api/stats/years")
+@router.get("/api/stats/years", response_model=list[int])
 async def available_years() -> Any:
     """Années disponibles (validées uniquement)."""
     with get_cursor() as (cur, _conn):
         return stats_queries.available_years(cur)
 
 
-@router.get("/api/stats/facets")
+@router.get("/api/stats/facets", response_model=StatsFacetsResponse)
 async def stats_facets(
     lab_id: str = Query(""),
     year: str = Query(""),

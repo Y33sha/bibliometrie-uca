@@ -258,6 +258,998 @@ class ExcludeSourceAuthorship(BaseModel):
     excluded: bool = True
 
 
+# ----- Publications (output) -----
+
+
+class PubLabItem(BaseModel):
+    id: int
+    label: str
+
+
+class PubApcPayment(BaseModel):
+    """Détail d'un paiement APC (une ligne d'`apc` dans la liste)."""
+
+    amount: float
+    institution: str | None
+    lab_id: int | None
+    lab_acronym: str | None
+    budget_structure_id: int | None
+
+
+class PublicationListItem(BaseModel):
+    """Ligne de `/api/publications` (liste + recherche)."""
+
+    id: int
+    title: str
+    pub_year: int | None
+    doi: str | None
+    doc_type: str
+    oa_status: str
+    journal: str | None
+    publisher: str | None
+    hal_id: str | None
+    openalex_id: str | None
+    scanr_id: str | None
+    wos_id: str | None
+    theses_id: str | None
+    date_soutenance: str | None
+    date_inscription: str | None
+    labs: str | None
+    lab_items: list[PubLabItem] | None
+    apc: list[PubApcPayment] | None
+    is_corresponding: bool | None
+    authorship_id: int | None
+    hal_collections: list[str] | None
+
+
+class PublicationListResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    publications: list[PublicationListItem]
+
+
+# --- Publications facets (génériques réutilisables) ---
+
+
+class IntValueFacet(BaseModel):
+    value: int
+    count: int
+
+
+class StrValueFacet(BaseModel):
+    value: str
+    count: int
+
+
+class LabeledIntFacet(BaseModel):
+    value: int
+    label: str
+    count: int
+
+
+class TextStrFacet(BaseModel):
+    value: str
+    text: str
+    count: int
+
+
+class PublicationsFacetsResponse(BaseModel):
+    """Facettes dynamiques pour la page publications.
+
+    Chaque facette exclut son propre filtre mais applique tous les
+    autres. `hal_status` est vide tant qu'un labo unique n'est pas
+    sélectionné. `corresponding`, `in_perimeter` sont vides sans
+    `person_id`.
+    """
+
+    years: list[IntValueFacet]
+    labs: list[LabeledIntFacet]
+    no_lab_count: int
+    doc_types: list[StrValueFacet]
+    access: list[TextStrFacet]
+    oa_statuses: list[StrValueFacet]
+    corresponding: list[StrValueFacet]
+    source_counts: dict[str, int]
+    apc: list[TextStrFacet]
+    countries: list[TextStrFacet]
+    hal_status: list[TextStrFacet]
+    in_perimeter: list[TextStrFacet]
+
+
+# --- Publication detail ---
+
+
+class PublicationDetailCore(BaseModel):
+    """Métadonnées de la publication (bloc `publication` du détail)."""
+
+    id: int
+    title: str
+    pub_year: int | None
+    doi: str | None
+    doc_type: str
+    oa_status: str
+    language: str | None
+    container_title: str | None
+    abstract: str | None
+    journal_id: int | None
+    journal_title: str | None
+    issn: str | None
+    eissn: str | None
+    journal_predatory: bool | None
+    apc_amount: float | None
+    apc_currency: str | None
+    oa_model: str | None
+    publisher_id: int | None
+    publisher_name: str | None
+    publisher_predatory: bool | None
+
+
+class SourcePublicationOut(BaseModel):
+    source: str
+    source_id: str
+    doi: str | None
+    hal_collections: list[str] | None
+    countries: list[str] | None
+
+
+class ConsolidatedAuthorshipOut(BaseModel):
+    """Authorship consolidée (liens certifiés person ↔ publication)."""
+
+    author_position: int
+    in_perimeter: bool
+    is_corresponding: bool | None
+    structure_ids: list[int] | None
+    source_hal: bool
+    source_openalex: bool
+    source_wos: bool
+    person_id: int
+    last_name: str
+    first_name: str
+
+
+class SourceAuthorshipOut(BaseModel):
+    """Authorship source (HAL / OpenAlex / WoS).
+
+    `raw_affiliation` n'est calculé que pour OpenAlex et WoS ; absent
+    côté HAL (défaut None).
+    """
+
+    id: int
+    author_position: int | None
+    full_name: str
+    person_id: int | None
+    in_perimeter: bool
+    structure_ids: list[int] | None
+    raw_affiliation: str | None = None
+    excluded: bool
+    countries: list[str] | None
+
+
+class ThesesAuthorshipOut(BaseModel):
+    id: int
+    author_position: int | None
+    full_name: str
+    person_id: int | None
+    roles: list[str]
+    in_perimeter: bool
+
+
+class EcoleDoctorale(BaseModel):
+    nom: str
+    ppn: str | None = None
+
+
+class PartenaireThese(BaseModel):
+    nom: str
+    type: str | None = None
+
+
+class ThesisMeta(BaseModel):
+    discipline: str | None
+    ecoles_doctorales: list[EcoleDoctorale] | None
+    partenaires: list[PartenaireThese] | None
+    date_soutenance: str | None
+    date_inscription: str | None
+
+
+class StructureInfo(BaseModel):
+    acronym: str | None
+    name: str
+    type: str
+
+
+class PublicationDetailResponse(BaseModel):
+    """Détail complet d'une publication : métadonnées + sources + authorships."""
+
+    publication: PublicationDetailCore
+    sources: list[SourcePublicationOut]
+    authorships: list[ConsolidatedAuthorshipOut]
+    hal_authorships: list[SourceAuthorshipOut]
+    openalex_authorships: list[SourceAuthorshipOut]
+    wos_authorships: list[SourceAuthorshipOut]
+    theses_authorships: list[ThesesAuthorshipOut]
+    thesis_meta: ThesisMeta | None
+    structures: dict[str, StructureInfo]
+
+
+class ExcludeSourceAuthorshipResponse(BaseModel):
+    ok: bool
+    excluded: bool
+
+
+# ----- Laboratories (output) -----
+
+
+class LabTutelle(BaseModel):
+    """Tutelle d'un labo (établissement, EPST, etc.) dans la liste."""
+
+    id: int
+    name: str
+    acronym: str | None
+    type: str
+
+
+class LaboratoryListItem(BaseModel):
+    """Ligne de `/api/laboratories` (liste du périmètre)."""
+
+    id: int
+    code: str
+    name: str
+    acronym: str | None
+    ror_id: str | None
+    hal_collection: str | None
+    tutelles: list[LabTutelle] | None
+
+
+class LabStructureCore(BaseModel):
+    """Métadonnées du labo (bloc `structure` du détail)."""
+
+    id: int
+    code: str
+    name: str
+    acronym: str | None
+    type: str
+    ror_id: str | None
+    rnsr_id: str | None
+    hal_collection: str | None
+
+
+class LabRelatedStructure(BaseModel):
+    """Structure voisine (tutelle, sous-labo) dans le détail d'un labo.
+
+    Distinct de `RelatedStructureOut` (utilisé pour les structures
+    génériques) — pas de `code` ni `relation_id` côté labo.
+    """
+
+    id: int
+    name: str
+    acronym: str | None
+    type: str
+    relation_type: str
+
+
+class LaboratoryDetailResponse(BaseModel):
+    structure: LabStructureCore
+    parents: list[LabRelatedStructure]
+    children: list[LabRelatedStructure]
+    theses_count: int
+
+
+class LabOrcidIdentifier(BaseModel):
+    value: str
+    confirmed: bool
+
+
+class LabPersonOut(BaseModel):
+    """Personne liée à un labo (onglet `persons`)."""
+
+    id: int
+    last_name: str
+    first_name: str
+    role_title: str | None
+    department_name: str | None
+    has_rh: bool
+    pub_count: int
+    orcids: list[LabOrcidIdentifier] | None
+
+
+class LabBinaryFacet(BaseModel):
+    """Facette binaire yes/no (compteur pour chaque option)."""
+
+    yes: int
+    no: int
+
+
+class LabPersonsFacets(BaseModel):
+    rh: LabBinaryFacet
+    orcid: LabBinaryFacet
+    idhal: LabBinaryFacet
+
+
+class LabOrphanAuthorships(BaseModel):
+    total: int
+
+
+class LaboratoryPersonsResponse(BaseModel):
+    total_persons: int
+    page: int
+    per_page: int
+    pages: int
+    persons: list[LabPersonOut]
+    orphan_authorships: LabOrphanAuthorships
+    facets: LabPersonsFacets
+
+
+class LabAddressOut(BaseModel):
+    id: int
+    raw_text: str
+    is_confirmed: bool | None
+
+
+class LaboratoryAddressesResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    addresses: list[LabAddressOut]
+
+
+class LabPubYearCount(BaseModel):
+    year: int
+    count: int
+
+
+class LabDashboardOa(BaseModel):
+    open_access: int
+    closed: int
+    unknown: int
+    total: int
+
+
+class LabDashboardCollab(BaseModel):
+    total_articles: int
+    international: int
+    domestic: int
+
+
+class LabTopCountry(BaseModel):
+    code: str
+    name: str
+    count: int
+
+
+class LaboratoryDashboardResponse(BaseModel):
+    pubs_by_year: list[LabPubYearCount]
+    oa: LabDashboardOa
+    collab: LabDashboardCollab
+    top_countries: list[LabTopCountry]
+
+
+# ----- Addresses (output) -----
+
+
+class AddressStructureSummary(BaseModel):
+    """Lien adresse ↔ structure (élément de `structures` dans la liste/review)."""
+
+    id: int
+    name: str
+    acronym: str | None
+    is_confirmed: bool | None
+    is_detected: bool
+
+
+class AddressOut(BaseModel):
+    """Ligne de `/api/addresses` (liste paginée pour validation)."""
+
+    id: int
+    raw_text: str
+    is_confirmed: bool | None
+    is_detected: bool
+    structures: list[AddressStructureSummary]
+    pub_count: int
+
+
+class AddressListResponse(BaseModel):
+    """Réponse paginée de `/api/addresses`.
+
+    `requires_search=True` quand le caller utilise un filtre trop large
+    (no/all + pas de search) et que le serveur a renvoyé une liste vide
+    par garde-fou.
+    """
+
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    addresses: list[AddressOut]
+    requires_search: bool | None = None
+
+
+class AddressPublicationItem(BaseModel):
+    id: int
+    title: str
+    pub_year: int | None
+    doi: str | None
+    doc_type: str
+    journal_title: str | None
+    author_name: str | None
+    source_id: str | None
+
+
+class AddressPublicationsResponse(BaseModel):
+    address_id: int
+    raw_text: str
+    publications: list[AddressPublicationItem]
+
+
+class AddressReviewResponse(BaseModel):
+    """Réponse de POST /api/addresses/{addr_id}/review."""
+
+    id: int
+    is_confirmed: bool | None
+    is_detected: bool
+    structures: list[AddressStructureSummary]
+
+
+class BatchUpdatedResponse(BaseModel):
+    updated: int
+
+
+class BatchCountryResponse(BaseModel):
+    """POST /api/addresses/batch-country : modifs directes + propagation."""
+
+    updated: int
+    propagated: int
+
+
+class AssignStructureResponse(BaseModel):
+    id: int
+    structure_id: int
+    status: str
+
+
+class UnassignStructureResponse(BaseModel):
+    deleted: bool
+
+
+class CountryOut(BaseModel):
+    code: str
+    name: str
+
+
+class CountrySuggestion(BaseModel):
+    code: str
+    count: int
+
+
+class AddressForCountryAttribution(BaseModel):
+    """Ligne de `/api/addresses/countries`."""
+
+    id: int
+    raw_text: str
+    countries: list[str] | None
+    suggested_countries: list[CountrySuggestion]
+    pub_count: int
+
+
+class AddressesCountriesResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    addresses: list[AddressForCountryAttribution]
+    suggestion_facets: list[CountrySuggestion] | None = None
+    country_facets: list[CountrySuggestion]
+
+
+class CountrySuggestionsResponse(BaseModel):
+    """GET /api/addresses/suggest-countries (admin)."""
+
+    suggestions: list[CountrySuggestion]
+    without_country: int
+
+
+class AddressStatsResponse(BaseModel):
+    """GET /api/admin/address-stats."""
+
+    total: int
+    detected: int
+    pending: int
+    rejected: int
+    confirmed: int
+
+
+# ----- HAL problems (output) -----
+
+
+class HalDocSummary(BaseModel):
+    """Détail d'un dépôt HAL rattaché à une publication."""
+
+    halid: str
+    hal_collections: list[str] | None
+    hal_doc_type: str | None
+    hal_pub_year: int | None
+    hal_title: str | None
+    author_count: int
+
+
+class HalPubDetail(BaseModel):
+    """Métadonnées + dépôts HAL d'une publication (commun aux doublons HAL)."""
+
+    id: int
+    title: str
+    pub_year: int | None
+    doc_type: str
+    doi: str | None
+    container_title: str | None
+    hal_docs: list[HalDocSummary]
+
+
+class HalDoiDuplicatePair(BaseModel):
+    doi: str
+    halids: list[str]
+    publication: HalPubDetail
+
+
+class HalDoiDuplicatesResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    pairs: list[HalDoiDuplicatePair]
+
+
+class HalMetaDuplicatePair(BaseModel):
+    pub_a: HalPubDetail
+    pub_b: HalPubDetail
+
+
+class HalMetaDuplicatesResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    pairs: list[HalMetaDuplicatePair]
+
+
+class HalCollectionLab(BaseModel):
+    """Labo configuré avec une collection HAL (sélecteur missing-collections)."""
+
+    id: int
+    acronym: str | None
+    name: str
+    hal_collection: str
+
+
+class HalMissingCollectionPub(BaseModel):
+    id: int
+    title: str
+    pub_year: int | None
+    doc_type: str
+    doi: str | None
+    halids: list[str] | None
+    hors_uca: bool
+
+
+class HalMissingCollectionsResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    lab_acronym: str | None
+    hal_collection: str
+    publications: list[HalMissingCollectionPub]
+
+
+class HalAffiliationConflictPub(BaseModel):
+    id: int
+    title: str
+    pub_year: int | None
+    doc_type: str
+    doi: str | None
+    halids: list[str] | None
+    labs: str | None
+
+
+class HalAffiliationConflictsResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    publications: list[HalAffiliationConflictPub]
+
+
+class HalAccountSummary(BaseModel):
+    hal_person_id: int
+    full_name: str
+    idhal: str | None
+    orcid: str | None
+    pub_count: int
+
+
+class HalDuplicateAccountPerson(BaseModel):
+    person_id: int
+    last_name: str
+    first_name: str
+    has_rh: bool
+    hal_accounts: list[HalAccountSummary]
+
+
+class HalDuplicateAccountsResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    persons: list[HalDuplicateAccountPerson]
+
+
+# ----- Person duplicates (output) -----
+
+
+class TotalCountResponse(BaseModel):
+    """Compteur générique : `{total: int}` (utilisé par les endpoints `/count`)."""
+
+    total: int
+
+
+class PersonDedupIdentifier(BaseModel):
+    id: int
+    id_type: str
+    id_value: str
+    source: str
+    status: str
+
+
+class PersonDedupPublication(BaseModel):
+    id: int
+    title: str
+    pub_year: int | None
+    doi: str | None
+    doc_type: str
+    sources: list[str]
+
+
+class PersonDedupLab(BaseModel):
+    id: int
+    acronym: str | None
+    name: str
+
+
+class PersonDedupDetail(BaseModel):
+    """Profil d'une personne pour la page de déduplication."""
+
+    id: int
+    last_name: str
+    first_name: str
+    last_name_normalized: str
+    first_name_normalized: str
+    has_rh: bool
+    role_title: str | None
+    department_name: str | None
+    identifiers: list[PersonDedupIdentifier]
+    publications: list[PersonDedupPublication]
+    pub_count: int
+    labs: list[PersonDedupLab]
+
+
+class PersonDuplicatePair(BaseModel):
+    person_a: PersonDedupDetail
+    person_b: PersonDedupDetail
+
+
+class PersonConflictPub(BaseModel):
+    id: int
+    title: str
+    pub_year: int | None
+    doc_type: str
+    position: int
+
+
+class PersonConflictPair(BaseModel):
+    person_a: PersonDedupDetail
+    person_b: PersonDedupDetail
+    conflict_pubs: list[PersonConflictPub]
+
+
+class PersonDuplicatePairResponse(BaseModel):
+    pair: PersonDuplicatePair | None
+
+
+class PersonConflictPairResponse(BaseModel):
+    pair: PersonConflictPair | None
+
+
+# ----- Admin pipeline (output) -----
+
+
+class PipelineStatus(BaseModel):
+    """État du pipeline en cours (lu depuis logs/status.json)."""
+
+    running: bool
+    mode: str
+    phase: str
+    started_at: str
+    phase_started_at: str
+    phases_done: int
+    phases_total: int
+
+
+class PipelineLogsResponse(BaseModel):
+    content: str
+
+
+class PipelineReportItem(BaseModel):
+    filename: str
+    label: str
+
+
+class PipelineReportContent(BaseModel):
+    filename: str
+    content: str
+
+
+# ----- Admin feedback (output) -----
+
+
+class FeedbackStats(BaseModel):
+    """GET /api/admin/feedback/stats : qualité de la détection d'adresses."""
+
+    total_reviewed: int
+    detection_rate: float | None
+    false_negatives: int
+    false_positives: int
+    concordant_valid: int
+    pending: int
+
+
+class FeedbackLabDetected(BaseModel):
+    """Lien adresse↔structure tel que vu sur la page feedback.
+
+    Distinct de AddressStructureSummary : `structure_id` au lieu de `id`.
+    """
+
+    structure_id: int
+    name: str
+    acronym: str | None
+    is_detected: bool
+    is_confirmed: bool | None
+
+
+class FeedbackMatchedForm(BaseModel):
+    """Forme de nom ayant matché lors de la détection (faux positif)."""
+
+    form_id: int
+    form_text: str
+    structure_name: str
+    requires_context_of: list[int] | None
+
+
+class FeedbackAddressItem(BaseModel):
+    """Ligne d'adresse dans false-negatives / false-positives.
+
+    `matched_forms` n'est rempli que pour les faux positifs.
+    """
+
+    id: int
+    raw_text: str
+    pub_count: int
+    labs: list[FeedbackLabDetected]
+    matched_forms: list[FeedbackMatchedForm] | None = None
+
+
+class FeedbackAddressesResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    addresses: list[FeedbackAddressItem]
+
+
+# ----- Perimeters (output) -----
+
+
+class PerimeterStructureItem(BaseModel):
+    id: int
+    name: str
+    acronym: str | None
+    code: str
+
+
+class PerimeterOut(BaseModel):
+    """Périmètre + ses structures racines (résolues + comptage effectif)."""
+
+    id: int
+    code: str
+    name: str
+    description: str | None
+    structure_ids: list[int]
+    structures: list[PerimeterStructureItem]
+    structure_count: int
+
+
+class CreatedIdResponse(BaseModel):
+    """Réponse générique : `{id: int}` après création."""
+
+    id: int
+
+
+class StatusResponse(BaseModel):
+    """Réponse générique : `{status: str}` (mutations sans corps utile)."""
+
+    status: str
+
+
+# ----- Publishers (output) -----
+
+
+class PublisherListItem(BaseModel):
+    id: int
+    name: str
+    openalex_id: str | None
+    country: str | None
+    doi_prefix: str | None
+    is_predatory: bool
+    journal_count: int
+    pub_count: int
+
+
+class PublisherListResponse(BaseModel):
+    total: int
+    page: int
+    pages: int
+    publishers: list[PublisherListItem]
+
+
+class PublisherBasic(BaseModel):
+    """GET /api/publishers/{id} : juste id + name (recherche par id)."""
+
+    id: int
+    name: str
+
+
+# ----- Auth (output) -----
+
+
+class AuthCheckResponse(BaseModel):
+    authenticated: bool
+
+
+# ----- Config (output) -----
+
+
+class ConfigItem(BaseModel):
+    """Ligne de la table `config` (paramètres applicatifs clé/valeur)."""
+
+    key: str
+    value: Any
+    description: str | None
+    updated_at: datetime
+
+
+class HalCollectionsResponse(BaseModel):
+    """GET /api/config/hal-collections."""
+
+    collections: dict[str, str]
+    count: int
+
+
+# ----- Authorships admin (output) -----
+
+
+class AuthorshipsStats(BaseModel):
+    """Compteurs auteurs UCA (total, liés, identifiés ORCID/idHAL)."""
+
+    total_uca_authors: int
+    linked_to_person: int
+    with_orcid: int
+    with_idhal: int
+
+
+class AuthorshipsFacets(BaseModel):
+    """Facettes pour la page admin authorships (réutilise LabBinaryFacet
+    et LabeledIntFacet définis plus haut)."""
+
+    linked: LabBinaryFacet
+    orcid: LabBinaryFacet
+    idhal: LabBinaryFacet
+    labs: list[LabeledIntFacet]
+
+
+class AuthorshipsAuthorPerson(BaseModel):
+    """Personne liée à un auteur source (sous-objet `person`)."""
+
+    id: int
+    last_name: str
+    first_name: str
+    department_name: str | None
+    role_title: str | None
+    has_rh: bool
+
+
+class AuthorshipsAuthorOut(BaseModel):
+    """Ligne de la liste paginée /api/authorships."""
+
+    id: int
+    source: str
+    full_name: str
+    last_name: str | None
+    first_name: str | None
+    orcid: str | None
+    idhal: str | None
+    openalex_id: str | None
+    person_id: int | None
+    uca_pub_count: int
+    person: AuthorshipsAuthorPerson | None
+
+
+class AuthorshipsListResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    authors: list[AuthorshipsAuthorOut]
+
+
+# ----- Admin duplicates (publications) (output) -----
+
+
+class PubDedupJournal(BaseModel):
+    id: int
+    title: str | None
+    issn: str | None
+    eissn: str | None
+
+
+class PubDedupSource(BaseModel):
+    source: str
+    source_id: str
+
+
+class PubDedupAuthor(BaseModel):
+    author_position: int | None
+    in_perimeter: bool
+    person_id: int | None
+    last_name: str | None
+    first_name: str | None
+    full_name: str | None
+
+
+class PubDedupDetail(BaseModel):
+    """Détail d'une publication pour la page de déduplication."""
+
+    id: int
+    title: str
+    title_normalized: str
+    doi: str | None
+    pub_year: int | None
+    doc_type: str
+    container_title: str | None
+    oa_status: str
+    language: str | None
+    journal: PubDedupJournal | None
+    sources: list[PubDedupSource]
+    authors: list[PubDedupAuthor]
+
+
+class PubDuplicatePair(BaseModel):
+    pub_a: PubDedupDetail
+    pub_b: PubDedupDetail
+
+
+class PubDuplicateNextResponse(BaseModel):
+    total: int
+    offset: int
+    pair: PubDuplicatePair | None
+
+
+class PubMergeResponse(BaseModel):
+    ok: bool
+    target_id: int
+    source_id: int
+
+
 # ----- Persons -----
 
 
@@ -694,3 +1686,130 @@ class PerimeterUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     structure_ids: list[int] | None = None
+
+
+# ----- Stats (output) -----
+
+
+class OaCounts(BaseModel):
+    """Agrégats communs aux lignes de stats (éditeurs, revues, labos).
+
+    `apc_uca` est toujours numérique (coalescé à 0 côté SQL).
+    """
+
+    pub_count: int
+    apc_uca: float
+    gold: int
+    diamond: int
+    hybrid: int
+    bronze: int
+    green: int
+    closed: int
+    unknown: int
+
+
+class PublisherStatsRow(OaCounts):
+    publisher_id: int
+    publisher_name: str
+    journal_count: int
+
+
+class JournalStatsRow(OaCounts):
+    journal_id: int
+    journal_title: str
+    issn: str | None
+    eissn: str | None
+    publisher_name: str | None
+    is_predatory: bool
+    apc_amount: float | None
+
+
+class LabStatsRow(OaCounts):
+    lab_id: int
+    lab_acronym: str | None
+    lab_name: str
+
+
+class PublisherStatsResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    publishers: list[PublisherStatsRow]
+
+
+class JournalStatsResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    journals: list[JournalStatsRow]
+
+
+class LabStatsResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    labs: list[LabStatsRow]
+
+
+class YearStatsRow(BaseModel):
+    """Ventilation d'une année : pub_count + détail OA."""
+
+    pub_year: int
+    pub_count: int
+    gold: int
+    diamond: int
+    hybrid: int
+    bronze: int
+    green: int
+    closed: int
+    unknown: int
+
+
+class StatsSummary(BaseModel):
+    """Totaux globaux pour la page stats.
+
+    Pas de champ `diamond` — le résumé remonte gold/hybrid/green/bronze/
+    closed/unknown uniquement (diamond non distingué côté summary SQL).
+    """
+
+    total_pubs: int
+    gold: int
+    hybrid: int
+    green: int
+    bronze: int
+    closed: int
+    unknown: int
+    publisher_count: int
+    journal_count: int
+
+
+class YearFacet(BaseModel):
+    value: int
+    count: int
+
+
+class LabFacet(BaseModel):
+    value: int
+    label: str
+    count: int
+
+
+class OaFacet(BaseModel):
+    value: str
+    count: int
+
+
+class ApcFacet(BaseModel):
+    value: Literal["uca", "non_uca", "none"]
+    text: str
+    count: int
+
+
+class StatsFacetsResponse(BaseModel):
+    years: list[YearFacet]
+    labs: list[LabFacet]
+    oa_statuses: list[OaFacet]
+    apc: list[ApcFacet]

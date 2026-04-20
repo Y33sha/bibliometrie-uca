@@ -91,7 +91,7 @@ def _rebase_log_dir(log_dir: str) -> Path:
     try:
         rel = p.resolve().relative_to(_PROJECT_ROOT)
     except ValueError:
-        rel = Path(*(part for part in p.parts if part not in ("/", "\\", "")))
+        rel = Path(*p.resolve().parts[1:])
     parts = list(rel.parts)
     while parts and parts[-1] == "logs":
         parts.pop()

@@ -8,18 +8,9 @@
 	import { sanitizeTitle, halDocUrl } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
 
-	interface Pub {
-		id: number;
-		title: string;
-		pub_year: number | null;
-		doc_type: string | null;
-		doi: string | null;
-		halids: string[] | null;
-		labs: string | null;
-	}
-	interface Response {
-		total: number; page: number; pages: number; publications: Pub[];
-	}
+	import type { components } from '$lib/api/schema';
+	type Pub = components['schemas']['HalAffiliationConflictPub'];
+	type Response = components['schemas']['HalAffiliationConflictsResponse'];
 
 	let pubs: Pub[] = $state([]);
 	let total = $state(0);

@@ -16,11 +16,23 @@ from infrastructure.db.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import address_repository, authorship_repository
 from interfaces.api.deps import get_cursor, require_admin
 from interfaces.api.models import (
+    AddressesCountriesResponse,
+    AddressListResponse,
+    AddressPublicationsResponse,
+    AddressReviewResponse,
+    AddressStatsResponse,
     AssignStructureAction,
+    AssignStructureResponse,
+    BatchCountryResponse,
     BatchReviewAction,
     BatchSetCountry,
+    BatchUpdatedResponse,
+    CountryOut,
+    CountrySuggestionsResponse,
+    OkResponse,
     ReviewAction,
     SetCountry,
+    UnassignStructureResponse,
 )
 
 router = APIRouter()
@@ -44,7 +56,7 @@ def _bg_propagate_countries(address_ids: list[int]) -> None:
         logger.exception("Erreur propagation pays en background")
 
 
-@router.get("/api/addresses")
+@router.get("/api/addresses", response_model=AddressListResponse)
 async def list_addresses(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
@@ -83,7 +95,7 @@ async def list_addresses(
         )
 
 
-@router.get("/api/addresses/{addr_id}/publications")
+@router.get("/api/addresses/{addr_id}/publications", response_model=AddressPublicationsResponse)
 async def get_address_publications(addr_id: int, limit: int = Query(20)) -> Any:
     """Échantillon de publications liées à une adresse."""
     with get_cursor() as (cur, _conn):
@@ -98,7 +110,7 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)) -> Any:
         }
 
 
-@router.post("/api/addresses/{addr_id}/review")
+@router.post("/api/addresses/{addr_id}/review", response_model=AddressReviewResponse)
 async def review_address(addr_id: int, action: ReviewAction) -> Any:
     """Confirme, rejette ou reset le lien adresse ↔ structure."""
     with get_cursor() as (cur, _conn):
@@ -121,7 +133,7 @@ async def review_address(addr_id: int, action: ReviewAction) -> Any:
         }
 
 
-@router.post("/api/addresses/batch-review")
+@router.post("/api/addresses/batch-review", response_model=BatchUpdatedResponse)
 async def batch_review(data: BatchReviewAction) -> Any:
     """Confirme/rejette/reset en batch."""
     with get_cursor() as (cur, _conn):
@@ -137,14 +149,14 @@ async def batch_review(data: BatchReviewAction) -> Any:
         return {"updated": updated}
 
 
-@router.get("/api/countries")
+@router.get("/api/countries", response_model=list[CountryOut])
 async def list_countries() -> Any:
     """Liste des pays."""
     with get_cursor() as (cur, _conn):
         return addr_queries.list_countries(cur)
 
 
-@router.get("/api/addresses/countries")
+@router.get("/api/addresses/countries", response_model=AddressesCountriesResponse)
 async def addresses_countries(
     search: str = Query(""),
     has_country: str = Query(""),
@@ -166,7 +178,7 @@ async def addresses_countries(
         return addr_queries.addresses_countries(cur, filters=filters, page=page, per_page=per_page)
 
 
-@router.get("/api/addresses/suggest-countries")
+@router.get("/api/addresses/suggest-countries", response_model=CountrySuggestionsResponse)
 async def suggest_countries(
     search: str = Query(""),
     _: Any = Depends(require_admin),
@@ -176,7 +188,7 @@ async def suggest_countries(
         return addr_queries.suggest_countries(cur, search)
 
 
-@router.post("/api/addresses/{addr_id}/country")
+@router.post("/api/addresses/{addr_id}/country", response_model=OkResponse)
 async def set_address_country(
     addr_id: int, body: SetCountry, bg: BackgroundTasks, _: Any = Depends(require_admin)
 ) -> Any:
@@ -194,7 +206,7 @@ async def set_address_country(
     return {"ok": True}
 
 
-@router.post("/api/addresses/batch-country")
+@router.post("/api/addresses/batch-country", response_model=BatchCountryResponse)
 async def batch_set_country(
     body: BatchSetCountry, bg: BackgroundTasks, _: Any = Depends(require_admin)
 ) -> Any:
@@ -232,7 +244,7 @@ async def batch_set_country(
     return {"updated": updated, "propagated": propagated}
 
 
-@router.post("/api/addresses/{addr_id}/assign-structure")
+@router.post("/api/addresses/{addr_id}/assign-structure", response_model=AssignStructureResponse)
 async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
     """Assigne manuellement une structure à une adresse."""
     with get_cursor() as (cur, _conn):
@@ -256,7 +268,9 @@ async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
         return {"id": addr_id, "structure_id": action.structure_id, "status": "assigned"}
 
 
-@router.delete("/api/addresses/{addr_id}/assign-structure")
+@router.delete(
+    "/api/addresses/{addr_id}/assign-structure", response_model=UnassignStructureResponse
+)
 async def unassign_structure(addr_id: int, structure_id: int = Query(...)) -> Any:
     """Supprime l'assignation manuelle d'une structure."""
     with get_cursor() as (cur, _conn):
@@ -271,7 +285,7 @@ async def unassign_structure(addr_id: int, structure_id: int = Query(...)) -> An
         return {"deleted": deleted}
 
 
-@router.get("/api/admin/address-stats")
+@router.get("/api/admin/address-stats", response_model=AddressStatsResponse)
 async def admin_address_stats(structure_id: int | None = Query(None)) -> Any:
     """Compteurs d'adresses par détection/validation pour une structure."""
     with get_cursor() as (cur, _conn):

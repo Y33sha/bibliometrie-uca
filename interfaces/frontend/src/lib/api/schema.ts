@@ -2171,6 +2171,165 @@ export interface components {
             /** Structure Id */
             structure_id: number;
         };
+        /**
+         * AddressForCountryAttribution
+         * @description Ligne de `/api/addresses/countries`.
+         */
+        AddressForCountryAttribution: {
+            /** Id */
+            id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Countries */
+            countries: string[] | null;
+            /** Suggested Countries */
+            suggested_countries: components["schemas"]["CountrySuggestion"][];
+            /** Pub Count */
+            pub_count: number;
+        };
+        /**
+         * AddressListResponse
+         * @description Réponse paginée de `/api/addresses`.
+         *
+         *     `requires_search=True` quand le caller utilise un filtre trop large
+         *     (no/all + pas de search) et que le serveur a renvoyé une liste vide
+         *     par garde-fou.
+         */
+        AddressListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Addresses */
+            addresses: components["schemas"]["AddressOut"][];
+            /** Requires Search */
+            requires_search?: boolean | null;
+        };
+        /**
+         * AddressOut
+         * @description Ligne de `/api/addresses` (liste paginée pour validation).
+         */
+        AddressOut: {
+            /** Id */
+            id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Is Confirmed */
+            is_confirmed: boolean | null;
+            /** Is Detected */
+            is_detected: boolean;
+            /** Structures */
+            structures: components["schemas"]["AddressStructureSummary"][];
+            /** Pub Count */
+            pub_count: number;
+        };
+        /** AddressPublicationItem */
+        AddressPublicationItem: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doi */
+            doi: string | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Journal Title */
+            journal_title: string | null;
+            /** Author Name */
+            author_name: string | null;
+            /** Source Id */
+            source_id: string | null;
+        };
+        /** AddressPublicationsResponse */
+        AddressPublicationsResponse: {
+            /** Address Id */
+            address_id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Publications */
+            publications: components["schemas"]["AddressPublicationItem"][];
+        };
+        /**
+         * AddressReviewResponse
+         * @description Réponse de POST /api/addresses/{addr_id}/review.
+         */
+        AddressReviewResponse: {
+            /** Id */
+            id: number;
+            /** Is Confirmed */
+            is_confirmed: boolean | null;
+            /** Is Detected */
+            is_detected: boolean;
+            /** Structures */
+            structures: components["schemas"]["AddressStructureSummary"][];
+        };
+        /**
+         * AddressStatsResponse
+         * @description GET /api/admin/address-stats.
+         */
+        AddressStatsResponse: {
+            /** Total */
+            total: number;
+            /** Detected */
+            detected: number;
+            /** Pending */
+            pending: number;
+            /** Rejected */
+            rejected: number;
+            /** Confirmed */
+            confirmed: number;
+        };
+        /**
+         * AddressStructureSummary
+         * @description Lien adresse ↔ structure (élément de `structures` dans la liste/review).
+         */
+        AddressStructureSummary: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Is Confirmed */
+            is_confirmed: boolean | null;
+            /** Is Detected */
+            is_detected: boolean;
+        };
+        /** AddressesCountriesResponse */
+        AddressesCountriesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Addresses */
+            addresses: components["schemas"]["AddressForCountryAttribution"][];
+            /** Suggestion Facets */
+            suggestion_facets?: components["schemas"]["CountrySuggestion"][] | null;
+            /** Country Facets */
+            country_facets: components["schemas"]["CountrySuggestion"][];
+        };
+        /** ApcFacet */
+        ApcFacet: {
+            /**
+             * Value
+             * @enum {string}
+             */
+            value: "uca" | "non_uca" | "none";
+            /** Text */
+            text: string;
+            /** Count */
+            count: number;
+        };
         /** AssignOrphanAuthorship */
         AssignOrphanAuthorship: {
             /** Source */
@@ -2186,6 +2345,20 @@ export interface components {
             /** Structure Id */
             structure_id: number;
         };
+        /** AssignStructureResponse */
+        AssignStructureResponse: {
+            /** Id */
+            id: number;
+            /** Structure Id */
+            structure_id: number;
+            /** Status */
+            status: string;
+        };
+        /** AuthCheckResponse */
+        AuthCheckResponse: {
+            /** Authenticated */
+            authenticated: boolean;
+        };
         /** AuthorshipExcludeResponse */
         AuthorshipExcludeResponse: {
             /** Id */
@@ -2193,12 +2366,106 @@ export interface components {
             /** Excluded */
             excluded: boolean;
         };
+        /**
+         * AuthorshipsAuthorOut
+         * @description Ligne de la liste paginée /api/authorships.
+         */
+        AuthorshipsAuthorOut: {
+            /** Id */
+            id: number;
+            /** Source */
+            source: string;
+            /** Full Name */
+            full_name: string;
+            /** Last Name */
+            last_name: string | null;
+            /** First Name */
+            first_name: string | null;
+            /** Orcid */
+            orcid: string | null;
+            /** Idhal */
+            idhal: string | null;
+            /** Openalex Id */
+            openalex_id: string | null;
+            /** Person Id */
+            person_id: number | null;
+            /** Uca Pub Count */
+            uca_pub_count: number;
+            person: components["schemas"]["AuthorshipsAuthorPerson"] | null;
+        };
+        /**
+         * AuthorshipsAuthorPerson
+         * @description Personne liée à un auteur source (sous-objet `person`).
+         */
+        AuthorshipsAuthorPerson: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Department Name */
+            department_name: string | null;
+            /** Role Title */
+            role_title: string | null;
+            /** Has Rh */
+            has_rh: boolean;
+        };
+        /**
+         * AuthorshipsFacets
+         * @description Facettes pour la page admin authorships (réutilise LabBinaryFacet
+         *     et LabeledIntFacet définis plus haut).
+         */
+        AuthorshipsFacets: {
+            linked: components["schemas"]["LabBinaryFacet"];
+            orcid: components["schemas"]["LabBinaryFacet"];
+            idhal: components["schemas"]["LabBinaryFacet"];
+            /** Labs */
+            labs: components["schemas"]["LabeledIntFacet"][];
+        };
+        /** AuthorshipsListResponse */
+        AuthorshipsListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Authors */
+            authors: components["schemas"]["AuthorshipsAuthorOut"][];
+        };
+        /**
+         * AuthorshipsStats
+         * @description Compteurs auteurs UCA (total, liés, identifiés ORCID/idHAL).
+         */
+        AuthorshipsStats: {
+            /** Total Uca Authors */
+            total_uca_authors: number;
+            /** Linked To Person */
+            linked_to_person: number;
+            /** With Orcid */
+            with_orcid: number;
+            /** With Idhal */
+            with_idhal: number;
+        };
         /** BatchAssignOrphanAuthorships */
         BatchAssignOrphanAuthorships: {
             /** Authorships */
             authorships: components["schemas"]["SourceAuthorshipRef"][];
             /** Person Id */
             person_id: number;
+        };
+        /**
+         * BatchCountryResponse
+         * @description POST /api/addresses/batch-country : modifs directes + propagation.
+         */
+        BatchCountryResponse: {
+            /** Updated */
+            updated: number;
+            /** Propagated */
+            propagated: number;
         };
         /** BatchReviewAction */
         BatchReviewAction: {
@@ -2236,6 +2503,28 @@ export interface components {
              */
             suggested_country: string;
         };
+        /** BatchUpdatedResponse */
+        BatchUpdatedResponse: {
+            /** Updated */
+            updated: number;
+        };
+        /**
+         * ConfigItem
+         * @description Ligne de la table `config` (paramètres applicatifs clé/valeur).
+         */
+        ConfigItem: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: unknown;
+            /** Description */
+            description: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /**
          * ConfigValueUpdate
          * @description Corps de PUT /api/config/{key} : value JSON-sérialisable arbitraire.
@@ -2243,6 +2532,56 @@ export interface components {
         ConfigValueUpdate: {
             /** Value */
             value: unknown;
+        };
+        /**
+         * ConsolidatedAuthorshipOut
+         * @description Authorship consolidée (liens certifiés person ↔ publication).
+         */
+        ConsolidatedAuthorshipOut: {
+            /** Author Position */
+            author_position: number;
+            /** In Perimeter */
+            in_perimeter: boolean;
+            /** Is Corresponding */
+            is_corresponding: boolean | null;
+            /** Structure Ids */
+            structure_ids: number[] | null;
+            /** Source Hal */
+            source_hal: boolean;
+            /** Source Openalex */
+            source_openalex: boolean;
+            /** Source Wos */
+            source_wos: boolean;
+            /** Person Id */
+            person_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+        };
+        /** CountryOut */
+        CountryOut: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+        };
+        /** CountrySuggestion */
+        CountrySuggestion: {
+            /** Code */
+            code: string;
+            /** Count */
+            count: number;
+        };
+        /**
+         * CountrySuggestionsResponse
+         * @description GET /api/addresses/suggest-countries (admin).
+         */
+        CountrySuggestionsResponse: {
+            /** Suggestions */
+            suggestions: components["schemas"]["CountrySuggestion"][];
+            /** Without Country */
+            without_country: number;
         };
         /** CreatePersonName */
         CreatePersonName: {
@@ -2253,6 +2592,14 @@ export interface components {
              * @default
              */
             first_name: string;
+        };
+        /**
+         * CreatedIdResponse
+         * @description Réponse générique : `{id: int}` après création.
+         */
+        CreatedIdResponse: {
+            /** Id */
+            id: number;
         };
         /** DeletedResponse */
         DeletedResponse: {
@@ -2301,12 +2648,26 @@ export interface components {
              */
             detached: boolean;
         };
+        /** EcoleDoctorale */
+        EcoleDoctorale: {
+            /** Nom */
+            nom: string;
+            /** Ppn */
+            ppn?: string | null;
+        };
         /** ExcludeSourceAuthorship */
         ExcludeSourceAuthorship: {
             /**
              * Excluded
              * @default true
              */
+            excluded: boolean;
+        };
+        /** ExcludeSourceAuthorshipResponse */
+        ExcludeSourceAuthorshipResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Excluded */
             excluded: boolean;
         };
         /** FacetValueCount */
@@ -2316,10 +2677,297 @@ export interface components {
             /** Count */
             count: number;
         };
+        /**
+         * FeedbackAddressItem
+         * @description Ligne d'adresse dans false-negatives / false-positives.
+         *
+         *     `matched_forms` n'est rempli que pour les faux positifs.
+         */
+        FeedbackAddressItem: {
+            /** Id */
+            id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Pub Count */
+            pub_count: number;
+            /** Labs */
+            labs: components["schemas"]["FeedbackLabDetected"][];
+            /** Matched Forms */
+            matched_forms?: components["schemas"]["FeedbackMatchedForm"][] | null;
+        };
+        /** FeedbackAddressesResponse */
+        FeedbackAddressesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Addresses */
+            addresses: components["schemas"]["FeedbackAddressItem"][];
+        };
+        /**
+         * FeedbackLabDetected
+         * @description Lien adresse↔structure tel que vu sur la page feedback.
+         *
+         *     Distinct de AddressStructureSummary : `structure_id` au lieu de `id`.
+         */
+        FeedbackLabDetected: {
+            /** Structure Id */
+            structure_id: number;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Is Detected */
+            is_detected: boolean;
+            /** Is Confirmed */
+            is_confirmed: boolean | null;
+        };
+        /**
+         * FeedbackMatchedForm
+         * @description Forme de nom ayant matché lors de la détection (faux positif).
+         */
+        FeedbackMatchedForm: {
+            /** Form Id */
+            form_id: number;
+            /** Form Text */
+            form_text: string;
+            /** Structure Name */
+            structure_name: string;
+            /** Requires Context Of */
+            requires_context_of: number[] | null;
+        };
+        /**
+         * FeedbackStats
+         * @description GET /api/admin/feedback/stats : qualité de la détection d'adresses.
+         */
+        FeedbackStats: {
+            /** Total Reviewed */
+            total_reviewed: number;
+            /** Detection Rate */
+            detection_rate: number | null;
+            /** False Negatives */
+            false_negatives: number;
+            /** False Positives */
+            false_positives: number;
+            /** Concordant Valid */
+            concordant_valid: number;
+            /** Pending */
+            pending: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HalAccountSummary */
+        HalAccountSummary: {
+            /** Hal Person Id */
+            hal_person_id: number;
+            /** Full Name */
+            full_name: string;
+            /** Idhal */
+            idhal: string | null;
+            /** Orcid */
+            orcid: string | null;
+            /** Pub Count */
+            pub_count: number;
+        };
+        /** HalAffiliationConflictPub */
+        HalAffiliationConflictPub: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Doi */
+            doi: string | null;
+            /** Halids */
+            halids: string[] | null;
+            /** Labs */
+            labs: string | null;
+        };
+        /** HalAffiliationConflictsResponse */
+        HalAffiliationConflictsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Publications */
+            publications: components["schemas"]["HalAffiliationConflictPub"][];
+        };
+        /**
+         * HalCollectionLab
+         * @description Labo configuré avec une collection HAL (sélecteur missing-collections).
+         */
+        HalCollectionLab: {
+            /** Id */
+            id: number;
+            /** Acronym */
+            acronym: string | null;
+            /** Name */
+            name: string;
+            /** Hal Collection */
+            hal_collection: string;
+        };
+        /**
+         * HalCollectionsResponse
+         * @description GET /api/config/hal-collections.
+         */
+        HalCollectionsResponse: {
+            /** Collections */
+            collections: {
+                [key: string]: string;
+            };
+            /** Count */
+            count: number;
+        };
+        /**
+         * HalDocSummary
+         * @description Détail d'un dépôt HAL rattaché à une publication.
+         */
+        HalDocSummary: {
+            /** Halid */
+            halid: string;
+            /** Hal Collections */
+            hal_collections: string[] | null;
+            /** Hal Doc Type */
+            hal_doc_type: string | null;
+            /** Hal Pub Year */
+            hal_pub_year: number | null;
+            /** Hal Title */
+            hal_title: string | null;
+            /** Author Count */
+            author_count: number;
+        };
+        /** HalDoiDuplicatePair */
+        HalDoiDuplicatePair: {
+            /** Doi */
+            doi: string;
+            /** Halids */
+            halids: string[];
+            publication: components["schemas"]["HalPubDetail"];
+        };
+        /** HalDoiDuplicatesResponse */
+        HalDoiDuplicatesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Pairs */
+            pairs: components["schemas"]["HalDoiDuplicatePair"][];
+        };
+        /** HalDuplicateAccountPerson */
+        HalDuplicateAccountPerson: {
+            /** Person Id */
+            person_id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Hal Accounts */
+            hal_accounts: components["schemas"]["HalAccountSummary"][];
+        };
+        /** HalDuplicateAccountsResponse */
+        HalDuplicateAccountsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Persons */
+            persons: components["schemas"]["HalDuplicateAccountPerson"][];
+        };
+        /** HalMetaDuplicatePair */
+        HalMetaDuplicatePair: {
+            pub_a: components["schemas"]["HalPubDetail"];
+            pub_b: components["schemas"]["HalPubDetail"];
+        };
+        /** HalMetaDuplicatesResponse */
+        HalMetaDuplicatesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Pairs */
+            pairs: components["schemas"]["HalMetaDuplicatePair"][];
+        };
+        /** HalMissingCollectionPub */
+        HalMissingCollectionPub: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Doi */
+            doi: string | null;
+            /** Halids */
+            halids: string[] | null;
+            /** Hors Uca */
+            hors_uca: boolean;
+        };
+        /** HalMissingCollectionsResponse */
+        HalMissingCollectionsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Lab Acronym */
+            lab_acronym: string | null;
+            /** Hal Collection */
+            hal_collection: string;
+            /** Publications */
+            publications: components["schemas"]["HalMissingCollectionPub"][];
+        };
+        /**
+         * HalPubDetail
+         * @description Métadonnées + dépôts HAL d'une publication (commun aux doublons HAL).
+         */
+        HalPubDetail: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Doi */
+            doi: string | null;
+            /** Container Title */
+            container_title: string | null;
+            /** Hal Docs */
+            hal_docs: components["schemas"]["HalDocSummary"][];
         };
         /** IdentifierReassignResponse */
         IdentifierReassignResponse: {
@@ -2336,6 +2984,13 @@ export interface components {
             id: number;
             /** Status */
             status: string;
+        };
+        /** IntValueFacet */
+        IntValueFacet: {
+            /** Value */
+            value: number;
+            /** Count */
+            count: number;
         };
         /** JournalListResponse */
         JournalListResponse: {
@@ -2395,6 +3050,54 @@ export interface components {
             /** Pub Count */
             pub_count: number;
         };
+        /** JournalStatsResponse */
+        JournalStatsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Journals */
+            journals: components["schemas"]["JournalStatsRow"][];
+        };
+        /** JournalStatsRow */
+        JournalStatsRow: {
+            /** Pub Count */
+            pub_count: number;
+            /** Apc Uca */
+            apc_uca: number;
+            /** Gold */
+            gold: number;
+            /** Diamond */
+            diamond: number;
+            /** Hybrid */
+            hybrid: number;
+            /** Bronze */
+            bronze: number;
+            /** Green */
+            green: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
+            /** Journal Id */
+            journal_id: number;
+            /** Journal Title */
+            journal_title: string;
+            /** Issn */
+            issn: string | null;
+            /** Eissn */
+            eissn: string | null;
+            /** Publisher Name */
+            publisher_name: string | null;
+            /** Is Predatory */
+            is_predatory: boolean;
+            /** Apc Amount */
+            apc_amount: number | null;
+        };
         /** JournalUpdate */
         JournalUpdate: {
             /** Title */
@@ -2421,6 +3124,281 @@ export interface components {
             apc_amount?: number | null;
             /** Notes */
             notes?: string | null;
+        };
+        /** LabAddressOut */
+        LabAddressOut: {
+            /** Id */
+            id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Is Confirmed */
+            is_confirmed: boolean | null;
+        };
+        /**
+         * LabBinaryFacet
+         * @description Facette binaire yes/no (compteur pour chaque option).
+         */
+        LabBinaryFacet: {
+            /** Yes */
+            yes: number;
+            /** No */
+            no: number;
+        };
+        /** LabDashboardCollab */
+        LabDashboardCollab: {
+            /** Total Articles */
+            total_articles: number;
+            /** International */
+            international: number;
+            /** Domestic */
+            domestic: number;
+        };
+        /** LabDashboardOa */
+        LabDashboardOa: {
+            /** Open Access */
+            open_access: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
+            /** Total */
+            total: number;
+        };
+        /** LabFacet */
+        LabFacet: {
+            /** Value */
+            value: number;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+        };
+        /** LabOrcidIdentifier */
+        LabOrcidIdentifier: {
+            /** Value */
+            value: string;
+            /** Confirmed */
+            confirmed: boolean;
+        };
+        /** LabOrphanAuthorships */
+        LabOrphanAuthorships: {
+            /** Total */
+            total: number;
+        };
+        /**
+         * LabPersonOut
+         * @description Personne liée à un labo (onglet `persons`).
+         */
+        LabPersonOut: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Role Title */
+            role_title: string | null;
+            /** Department Name */
+            department_name: string | null;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Pub Count */
+            pub_count: number;
+            /** Orcids */
+            orcids: components["schemas"]["LabOrcidIdentifier"][] | null;
+        };
+        /** LabPersonsFacets */
+        LabPersonsFacets: {
+            rh: components["schemas"]["LabBinaryFacet"];
+            orcid: components["schemas"]["LabBinaryFacet"];
+            idhal: components["schemas"]["LabBinaryFacet"];
+        };
+        /** LabPubYearCount */
+        LabPubYearCount: {
+            /** Year */
+            year: number;
+            /** Count */
+            count: number;
+        };
+        /**
+         * LabRelatedStructure
+         * @description Structure voisine (tutelle, sous-labo) dans le détail d'un labo.
+         *
+         *     Distinct de `RelatedStructureOut` (utilisé pour les structures
+         *     génériques) — pas de `code` ni `relation_id` côté labo.
+         */
+        LabRelatedStructure: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+            /** Relation Type */
+            relation_type: string;
+        };
+        /** LabStatsResponse */
+        LabStatsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Labs */
+            labs: components["schemas"]["LabStatsRow"][];
+        };
+        /** LabStatsRow */
+        LabStatsRow: {
+            /** Pub Count */
+            pub_count: number;
+            /** Apc Uca */
+            apc_uca: number;
+            /** Gold */
+            gold: number;
+            /** Diamond */
+            diamond: number;
+            /** Hybrid */
+            hybrid: number;
+            /** Bronze */
+            bronze: number;
+            /** Green */
+            green: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
+            /** Lab Id */
+            lab_id: number;
+            /** Lab Acronym */
+            lab_acronym: string | null;
+            /** Lab Name */
+            lab_name: string;
+        };
+        /**
+         * LabStructureCore
+         * @description Métadonnées du labo (bloc `structure` du détail).
+         */
+        LabStructureCore: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+            /** Ror Id */
+            ror_id: string | null;
+            /** Rnsr Id */
+            rnsr_id: string | null;
+            /** Hal Collection */
+            hal_collection: string | null;
+        };
+        /** LabTopCountry */
+        LabTopCountry: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Count */
+            count: number;
+        };
+        /**
+         * LabTutelle
+         * @description Tutelle d'un labo (établissement, EPST, etc.) dans la liste.
+         */
+        LabTutelle: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+        };
+        /** LabeledIntFacet */
+        LabeledIntFacet: {
+            /** Value */
+            value: number;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+        };
+        /** LaboratoryAddressesResponse */
+        LaboratoryAddressesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Addresses */
+            addresses: components["schemas"]["LabAddressOut"][];
+        };
+        /** LaboratoryDashboardResponse */
+        LaboratoryDashboardResponse: {
+            /** Pubs By Year */
+            pubs_by_year: components["schemas"]["LabPubYearCount"][];
+            oa: components["schemas"]["LabDashboardOa"];
+            collab: components["schemas"]["LabDashboardCollab"];
+            /** Top Countries */
+            top_countries: components["schemas"]["LabTopCountry"][];
+        };
+        /** LaboratoryDetailResponse */
+        LaboratoryDetailResponse: {
+            structure: components["schemas"]["LabStructureCore"];
+            /** Parents */
+            parents: components["schemas"]["LabRelatedStructure"][];
+            /** Children */
+            children: components["schemas"]["LabRelatedStructure"][];
+            /** Theses Count */
+            theses_count: number;
+        };
+        /**
+         * LaboratoryListItem
+         * @description Ligne de `/api/laboratories` (liste du périmètre).
+         */
+        LaboratoryListItem: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Ror Id */
+            ror_id: string | null;
+            /** Hal Collection */
+            hal_collection: string | null;
+            /** Tutelles */
+            tutelles: components["schemas"]["LabTutelle"][] | null;
+        };
+        /** LaboratoryPersonsResponse */
+        LaboratoryPersonsResponse: {
+            /** Total Persons */
+            total_persons: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Persons */
+            persons: components["schemas"]["LabPersonOut"][];
+            orphan_authorships: components["schemas"]["LabOrphanAuthorships"];
+            facets: components["schemas"]["LabPersonsFacets"];
         };
         /**
          * LinkedAuthorOut
@@ -2565,6 +3543,13 @@ export interface components {
             /** Requires Context Of */
             requires_context_of?: number[] | null;
         };
+        /** OaFacet */
+        OaFacet: {
+            /** Value */
+            value: string;
+            /** Count */
+            count: number;
+        };
         /**
          * OkResponse
          * @description Réponse minimale d'acquittement (pas de données).
@@ -2640,6 +3625,13 @@ export interface components {
             /** Has Rh */
             has_rh: boolean;
         };
+        /** PartenaireThese */
+        PartenaireThese: {
+            /** Nom */
+            nom: string;
+            /** Type */
+            type?: string | null;
+        };
         /** PerimeterCreate */
         PerimeterCreate: {
             /** Code */
@@ -2648,6 +3640,37 @@ export interface components {
             name: string;
             /** Description */
             description?: string | null;
+        };
+        /**
+         * PerimeterOut
+         * @description Périmètre + ses structures racines (résolues + comptage effectif).
+         */
+        PerimeterOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Structure Ids */
+            structure_ids: number[];
+            /** Structures */
+            structures: components["schemas"]["PerimeterStructureItem"][];
+            /** Structure Count */
+            structure_count: number;
+        };
+        /** PerimeterStructureItem */
+        PerimeterStructureItem: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Code */
+            code: string;
         };
         /** PerimeterUpdate */
         PerimeterUpdate: {
@@ -2686,6 +3709,97 @@ export interface components {
             pages: number;
             /** Addresses */
             addresses: components["schemas"]["PersonAddressOut"][];
+        };
+        /** PersonConflictPair */
+        PersonConflictPair: {
+            person_a: components["schemas"]["PersonDedupDetail"];
+            person_b: components["schemas"]["PersonDedupDetail"];
+            /** Conflict Pubs */
+            conflict_pubs: components["schemas"]["PersonConflictPub"][];
+        };
+        /** PersonConflictPairResponse */
+        PersonConflictPairResponse: {
+            pair: components["schemas"]["PersonConflictPair"] | null;
+        };
+        /** PersonConflictPub */
+        PersonConflictPub: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Position */
+            position: number;
+        };
+        /**
+         * PersonDedupDetail
+         * @description Profil d'une personne pour la page de déduplication.
+         */
+        PersonDedupDetail: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name Normalized */
+            last_name_normalized: string;
+            /** First Name Normalized */
+            first_name_normalized: string;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Role Title */
+            role_title: string | null;
+            /** Department Name */
+            department_name: string | null;
+            /** Identifiers */
+            identifiers: components["schemas"]["PersonDedupIdentifier"][];
+            /** Publications */
+            publications: components["schemas"]["PersonDedupPublication"][];
+            /** Pub Count */
+            pub_count: number;
+            /** Labs */
+            labs: components["schemas"]["PersonDedupLab"][];
+        };
+        /** PersonDedupIdentifier */
+        PersonDedupIdentifier: {
+            /** Id */
+            id: number;
+            /** Id Type */
+            id_type: string;
+            /** Id Value */
+            id_value: string;
+            /** Source */
+            source: string;
+            /** Status */
+            status: string;
+        };
+        /** PersonDedupLab */
+        PersonDedupLab: {
+            /** Id */
+            id: number;
+            /** Acronym */
+            acronym: string | null;
+            /** Name */
+            name: string;
+        };
+        /** PersonDedupPublication */
+        PersonDedupPublication: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doi */
+            doi: string | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Sources */
+            sources: string[];
         };
         /**
          * PersonDetail
@@ -2751,6 +3865,15 @@ export interface components {
             pages: number;
             /** Persons */
             persons: components["schemas"]["PersonDirectoryEntry"][];
+        };
+        /** PersonDuplicatePair */
+        PersonDuplicatePair: {
+            person_a: components["schemas"]["PersonDedupDetail"];
+            person_b: components["schemas"]["PersonDedupDetail"];
+        };
+        /** PersonDuplicatePairResponse */
+        PersonDuplicatePairResponse: {
+            pair: components["schemas"]["PersonDuplicatePair"] | null;
         };
         /**
          * PersonIdentifierOut
@@ -2950,6 +4073,400 @@ export interface components {
             /** Departments */
             departments: number;
         };
+        /** PipelineLogsResponse */
+        PipelineLogsResponse: {
+            /** Content */
+            content: string;
+        };
+        /** PipelineReportContent */
+        PipelineReportContent: {
+            /** Filename */
+            filename: string;
+            /** Content */
+            content: string;
+        };
+        /** PipelineReportItem */
+        PipelineReportItem: {
+            /** Filename */
+            filename: string;
+            /** Label */
+            label: string;
+        };
+        /**
+         * PipelineStatus
+         * @description État du pipeline en cours (lu depuis logs/status.json).
+         */
+        PipelineStatus: {
+            /** Running */
+            running: boolean;
+            /** Mode */
+            mode: string;
+            /** Phase */
+            phase: string;
+            /** Started At */
+            started_at: string;
+            /** Phase Started At */
+            phase_started_at: string;
+            /** Phases Done */
+            phases_done: number;
+            /** Phases Total */
+            phases_total: number;
+        };
+        /**
+         * PubApcPayment
+         * @description Détail d'un paiement APC (une ligne d'`apc` dans la liste).
+         */
+        PubApcPayment: {
+            /** Amount */
+            amount: number;
+            /** Institution */
+            institution: string | null;
+            /** Lab Id */
+            lab_id: number | null;
+            /** Lab Acronym */
+            lab_acronym: string | null;
+            /** Budget Structure Id */
+            budget_structure_id: number | null;
+        };
+        /** PubDedupAuthor */
+        PubDedupAuthor: {
+            /** Author Position */
+            author_position: number | null;
+            /** In Perimeter */
+            in_perimeter: boolean;
+            /** Person Id */
+            person_id: number | null;
+            /** Last Name */
+            last_name: string | null;
+            /** First Name */
+            first_name: string | null;
+            /** Full Name */
+            full_name: string | null;
+        };
+        /**
+         * PubDedupDetail
+         * @description Détail d'une publication pour la page de déduplication.
+         */
+        PubDedupDetail: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Title Normalized */
+            title_normalized: string;
+            /** Doi */
+            doi: string | null;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Container Title */
+            container_title: string | null;
+            /** Oa Status */
+            oa_status: string;
+            /** Language */
+            language: string | null;
+            journal: components["schemas"]["PubDedupJournal"] | null;
+            /** Sources */
+            sources: components["schemas"]["PubDedupSource"][];
+            /** Authors */
+            authors: components["schemas"]["PubDedupAuthor"][];
+        };
+        /** PubDedupJournal */
+        PubDedupJournal: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string | null;
+            /** Issn */
+            issn: string | null;
+            /** Eissn */
+            eissn: string | null;
+        };
+        /** PubDedupSource */
+        PubDedupSource: {
+            /** Source */
+            source: string;
+            /** Source Id */
+            source_id: string;
+        };
+        /** PubDuplicateNextResponse */
+        PubDuplicateNextResponse: {
+            /** Total */
+            total: number;
+            /** Offset */
+            offset: number;
+            pair: components["schemas"]["PubDuplicatePair"] | null;
+        };
+        /** PubDuplicatePair */
+        PubDuplicatePair: {
+            pub_a: components["schemas"]["PubDedupDetail"];
+            pub_b: components["schemas"]["PubDedupDetail"];
+        };
+        /** PubLabItem */
+        PubLabItem: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+        };
+        /** PubMergeResponse */
+        PubMergeResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Target Id */
+            target_id: number;
+            /** Source Id */
+            source_id: number;
+        };
+        /**
+         * PublicationDetailCore
+         * @description Métadonnées de la publication (bloc `publication` du détail).
+         */
+        PublicationDetailCore: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doi */
+            doi: string | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Oa Status */
+            oa_status: string;
+            /** Language */
+            language: string | null;
+            /** Container Title */
+            container_title: string | null;
+            /** Abstract */
+            abstract: string | null;
+            /** Journal Id */
+            journal_id: number | null;
+            /** Journal Title */
+            journal_title: string | null;
+            /** Issn */
+            issn: string | null;
+            /** Eissn */
+            eissn: string | null;
+            /** Journal Predatory */
+            journal_predatory: boolean | null;
+            /** Apc Amount */
+            apc_amount: number | null;
+            /** Apc Currency */
+            apc_currency: string | null;
+            /** Oa Model */
+            oa_model: string | null;
+            /** Publisher Id */
+            publisher_id: number | null;
+            /** Publisher Name */
+            publisher_name: string | null;
+            /** Publisher Predatory */
+            publisher_predatory: boolean | null;
+        };
+        /**
+         * PublicationDetailResponse
+         * @description Détail complet d'une publication : métadonnées + sources + authorships.
+         */
+        PublicationDetailResponse: {
+            publication: components["schemas"]["PublicationDetailCore"];
+            /** Sources */
+            sources: components["schemas"]["SourcePublicationOut"][];
+            /** Authorships */
+            authorships: components["schemas"]["ConsolidatedAuthorshipOut"][];
+            /** Hal Authorships */
+            hal_authorships: components["schemas"]["SourceAuthorshipOut"][];
+            /** Openalex Authorships */
+            openalex_authorships: components["schemas"]["SourceAuthorshipOut"][];
+            /** Wos Authorships */
+            wos_authorships: components["schemas"]["SourceAuthorshipOut"][];
+            /** Theses Authorships */
+            theses_authorships: components["schemas"]["ThesesAuthorshipOut"][];
+            thesis_meta: components["schemas"]["ThesisMeta"] | null;
+            /** Structures */
+            structures: {
+                [key: string]: components["schemas"]["StructureInfo"];
+            };
+        };
+        /**
+         * PublicationListItem
+         * @description Ligne de `/api/publications` (liste + recherche).
+         */
+        PublicationListItem: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doi */
+            doi: string | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Oa Status */
+            oa_status: string;
+            /** Journal */
+            journal: string | null;
+            /** Publisher */
+            publisher: string | null;
+            /** Hal Id */
+            hal_id: string | null;
+            /** Openalex Id */
+            openalex_id: string | null;
+            /** Scanr Id */
+            scanr_id: string | null;
+            /** Wos Id */
+            wos_id: string | null;
+            /** Theses Id */
+            theses_id: string | null;
+            /** Date Soutenance */
+            date_soutenance: string | null;
+            /** Date Inscription */
+            date_inscription: string | null;
+            /** Labs */
+            labs: string | null;
+            /** Lab Items */
+            lab_items: components["schemas"]["PubLabItem"][] | null;
+            /** Apc */
+            apc: components["schemas"]["PubApcPayment"][] | null;
+            /** Is Corresponding */
+            is_corresponding: boolean | null;
+            /** Authorship Id */
+            authorship_id: number | null;
+            /** Hal Collections */
+            hal_collections: string[] | null;
+        };
+        /** PublicationListResponse */
+        PublicationListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Publications */
+            publications: components["schemas"]["PublicationListItem"][];
+        };
+        /**
+         * PublicationsFacetsResponse
+         * @description Facettes dynamiques pour la page publications.
+         *
+         *     Chaque facette exclut son propre filtre mais applique tous les
+         *     autres. `hal_status` est vide tant qu'un labo unique n'est pas
+         *     sélectionné. `corresponding`, `in_perimeter` sont vides sans
+         *     `person_id`.
+         */
+        PublicationsFacetsResponse: {
+            /** Years */
+            years: components["schemas"]["IntValueFacet"][];
+            /** Labs */
+            labs: components["schemas"]["LabeledIntFacet"][];
+            /** No Lab Count */
+            no_lab_count: number;
+            /** Doc Types */
+            doc_types: components["schemas"]["StrValueFacet"][];
+            /** Access */
+            access: components["schemas"]["TextStrFacet"][];
+            /** Oa Statuses */
+            oa_statuses: components["schemas"]["StrValueFacet"][];
+            /** Corresponding */
+            corresponding: components["schemas"]["StrValueFacet"][];
+            /** Source Counts */
+            source_counts: {
+                [key: string]: number;
+            };
+            /** Apc */
+            apc: components["schemas"]["TextStrFacet"][];
+            /** Countries */
+            countries: components["schemas"]["TextStrFacet"][];
+            /** Hal Status */
+            hal_status: components["schemas"]["TextStrFacet"][];
+            /** In Perimeter */
+            in_perimeter: components["schemas"]["TextStrFacet"][];
+        };
+        /**
+         * PublisherBasic
+         * @description GET /api/publishers/{id} : juste id + name (recherche par id).
+         */
+        PublisherBasic: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** PublisherListItem */
+        PublisherListItem: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Openalex Id */
+            openalex_id: string | null;
+            /** Country */
+            country: string | null;
+            /** Doi Prefix */
+            doi_prefix: string | null;
+            /** Is Predatory */
+            is_predatory: boolean;
+            /** Journal Count */
+            journal_count: number;
+            /** Pub Count */
+            pub_count: number;
+        };
+        /** PublisherListResponse */
+        PublisherListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Pages */
+            pages: number;
+            /** Publishers */
+            publishers: components["schemas"]["PublisherListItem"][];
+        };
+        /** PublisherStatsResponse */
+        PublisherStatsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Publishers */
+            publishers: components["schemas"]["PublisherStatsRow"][];
+        };
+        /** PublisherStatsRow */
+        PublisherStatsRow: {
+            /** Pub Count */
+            pub_count: number;
+            /** Apc Uca */
+            apc_uca: number;
+            /** Gold */
+            gold: number;
+            /** Diamond */
+            diamond: number;
+            /** Hybrid */
+            hybrid: number;
+            /** Bronze */
+            bronze: number;
+            /** Green */
+            green: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
+            /** Publisher Id */
+            publisher_id: number;
+            /** Publisher Name */
+            publisher_name: string;
+            /** Journal Count */
+            journal_count: number;
+        };
         /** PublisherUpdate */
         PublisherUpdate: {
             /** Name */
@@ -3032,12 +4549,105 @@ export interface components {
             /** Countries */
             countries?: string[] | null;
         };
+        /**
+         * SourceAuthorshipOut
+         * @description Authorship source (HAL / OpenAlex / WoS).
+         *
+         *     `raw_affiliation` n'est calculé que pour OpenAlex et WoS ; absent
+         *     côté HAL (défaut None).
+         */
+        SourceAuthorshipOut: {
+            /** Id */
+            id: number;
+            /** Author Position */
+            author_position: number | null;
+            /** Full Name */
+            full_name: string;
+            /** Person Id */
+            person_id: number | null;
+            /** In Perimeter */
+            in_perimeter: boolean;
+            /** Structure Ids */
+            structure_ids: number[] | null;
+            /** Raw Affiliation */
+            raw_affiliation?: string | null;
+            /** Excluded */
+            excluded: boolean;
+            /** Countries */
+            countries: string[] | null;
+        };
         /** SourceAuthorshipRef */
         SourceAuthorshipRef: {
             /** Source */
             source: string;
             /** Authorship Id */
             authorship_id: number;
+        };
+        /** SourcePublicationOut */
+        SourcePublicationOut: {
+            /** Source */
+            source: string;
+            /** Source Id */
+            source_id: string;
+            /** Doi */
+            doi: string | null;
+            /** Hal Collections */
+            hal_collections: string[] | null;
+            /** Countries */
+            countries: string[] | null;
+        };
+        /** StatsFacetsResponse */
+        StatsFacetsResponse: {
+            /** Years */
+            years: components["schemas"]["YearFacet"][];
+            /** Labs */
+            labs: components["schemas"]["LabFacet"][];
+            /** Oa Statuses */
+            oa_statuses: components["schemas"]["OaFacet"][];
+            /** Apc */
+            apc: components["schemas"]["ApcFacet"][];
+        };
+        /**
+         * StatsSummary
+         * @description Totaux globaux pour la page stats.
+         *
+         *     Pas de champ `diamond` — le résumé remonte gold/hybrid/green/bronze/
+         *     closed/unknown uniquement (diamond non distingué côté summary SQL).
+         */
+        StatsSummary: {
+            /** Total Pubs */
+            total_pubs: number;
+            /** Gold */
+            gold: number;
+            /** Hybrid */
+            hybrid: number;
+            /** Green */
+            green: number;
+            /** Bronze */
+            bronze: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
+            /** Publisher Count */
+            publisher_count: number;
+            /** Journal Count */
+            journal_count: number;
+        };
+        /**
+         * StatusResponse
+         * @description Réponse générique : `{status: str}` (mutations sans corps utile).
+         */
+        StatusResponse: {
+            /** Status */
+            status: string;
+        };
+        /** StrValueFacet */
+        StrValueFacet: {
+            /** Value */
+            value: string;
+            /** Count */
+            count: number;
         };
         /** StructureCreate */
         StructureCreate: {
@@ -3072,6 +4682,15 @@ export interface components {
             children: components["schemas"]["RelatedStructureOut"][];
             /** Forms */
             forms: components["schemas"]["NameFormOut"][];
+        };
+        /** StructureInfo */
+        StructureInfo: {
+            /** Acronym */
+            acronym: string | null;
+            /** Name */
+            name: string;
+            /** Type */
+            type: string;
         };
         /**
          * StructureListItem
@@ -3162,6 +4781,56 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** TextStrFacet */
+        TextStrFacet: {
+            /** Value */
+            value: string;
+            /** Text */
+            text: string;
+            /** Count */
+            count: number;
+        };
+        /** ThesesAuthorshipOut */
+        ThesesAuthorshipOut: {
+            /** Id */
+            id: number;
+            /** Author Position */
+            author_position: number | null;
+            /** Full Name */
+            full_name: string;
+            /** Person Id */
+            person_id: number | null;
+            /** Roles */
+            roles: string[];
+            /** In Perimeter */
+            in_perimeter: boolean;
+        };
+        /** ThesisMeta */
+        ThesisMeta: {
+            /** Discipline */
+            discipline: string | null;
+            /** Ecoles Doctorales */
+            ecoles_doctorales: components["schemas"]["EcoleDoctorale"][] | null;
+            /** Partenaires */
+            partenaires: components["schemas"]["PartenaireThese"][] | null;
+            /** Date Soutenance */
+            date_soutenance: string | null;
+            /** Date Inscription */
+            date_inscription: string | null;
+        };
+        /**
+         * TotalCountResponse
+         * @description Compteur générique : `{total: int}` (utilisé par les endpoints `/count`).
+         */
+        TotalCountResponse: {
+            /** Total */
+            total: number;
+        };
+        /** UnassignStructureResponse */
+        UnassignStructureResponse: {
+            /** Deleted */
+            deleted: boolean;
+        };
         /** UpdateIdentifierStatus */
         UpdateIdentifierStatus: {
             /**
@@ -3202,6 +4871,37 @@ export interface components {
             value: string;
             /** Confirmed */
             confirmed: boolean;
+        };
+        /** YearFacet */
+        YearFacet: {
+            /** Value */
+            value: number;
+            /** Count */
+            count: number;
+        };
+        /**
+         * YearStatsRow
+         * @description Ventilation d'une année : pub_count + détail OA.
+         */
+        YearStatsRow: {
+            /** Pub Year */
+            pub_year: number;
+            /** Pub Count */
+            pub_count: number;
+            /** Gold */
+            gold: number;
+            /** Diamond */
+            diamond: number;
+            /** Hybrid */
+            hybrid: number;
+            /** Bronze */
+            bronze: number;
+            /** Green */
+            green: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
         };
         /** YesNoCount */
         YesNoCount: {
@@ -3298,7 +4998,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3329,7 +5029,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthCheckResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3358,7 +5058,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
         };
@@ -3387,7 +5087,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PublisherStatsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3426,7 +5126,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["JournalStatsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3462,7 +5162,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["YearStatsRow"][];
                 };
             };
             /** @description Validation Error */
@@ -3498,7 +5198,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StatsSummary"];
                 };
             };
             /** @description Validation Error */
@@ -3537,7 +5237,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LabStatsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3566,7 +5266,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": number[];
                 };
             };
         };
@@ -3593,7 +5293,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StatsFacetsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3638,7 +5338,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PublicationsFacetsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3667,7 +5367,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": number[];
                 };
             };
         };
@@ -3730,7 +5430,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PublicationDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3766,7 +5466,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ExcludeSourceAuthorshipResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3815,7 +5515,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PublicationListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3847,7 +5547,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PubDuplicateNextResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3880,7 +5580,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PubMergeResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3913,7 +5613,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3950,7 +5650,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddressListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3983,7 +5683,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddressPublicationsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4018,7 +5718,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddressReviewResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4051,7 +5751,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["BatchUpdatedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4080,7 +5780,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CountryOut"][];
                 };
             };
         };
@@ -4108,7 +5808,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddressesCountriesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4141,7 +5841,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CountrySuggestionsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4178,7 +5878,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4213,7 +5913,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["BatchCountryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4248,7 +5948,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AssignStructureResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4281,7 +5981,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["UnassignStructureResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4312,7 +6012,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AddressStatsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4343,7 +6043,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FeedbackStats"];
                 };
             };
             /** @description Validation Error */
@@ -4377,7 +6077,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FeedbackAddressesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4411,7 +6111,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FeedbackAddressesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4460,7 +6160,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LaboratoryListItem"][];
                 };
             };
         };
@@ -4482,7 +6182,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LaboratoryDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4521,7 +6221,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LaboratoryPersonsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4555,7 +6255,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LaboratoryAddressesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4586,7 +6286,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LaboratoryDashboardResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4973,7 +6673,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthorshipsStats"];
                 };
             };
             /** @description Validation Error */
@@ -5007,7 +6707,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthorshipsFacets"];
                 };
             };
             /** @description Validation Error */
@@ -5044,7 +6744,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthorshipsListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5903,7 +7603,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TotalCountResponse"];
                 };
             };
         };
@@ -5926,7 +7626,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonDuplicatePairResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5959,7 +7659,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5988,7 +7688,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TotalCountResponse"];
                 };
             };
         };
@@ -6011,7 +7711,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PersonConflictPairResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6043,7 +7743,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalDuplicateAccountsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6075,7 +7775,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalDoiDuplicatesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6107,7 +7807,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalMetaDuplicatesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6140,7 +7840,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalMissingCollectionsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6169,7 +7869,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalCollectionLab"][];
                 };
             };
         };
@@ -6192,7 +7892,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalAffiliationConflictsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6292,7 +7992,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ConfigItem"][];
                 };
             };
         };
@@ -6312,7 +8012,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HalCollectionsResponse"];
                 };
             };
         };
@@ -6338,7 +8038,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ConfigItem"];
                 };
             };
             /** @description Validation Error */
@@ -6367,7 +8067,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PerimeterOut"][];
                 };
             };
         };
@@ -6391,7 +8091,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CreatedIdResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6426,7 +8126,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6457,7 +8157,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6492,7 +8192,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StatusResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6524,7 +8224,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["StatusResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6558,7 +8258,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PublisherListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6589,7 +8289,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PublisherBasic"];
                 };
             };
             /** @description Validation Error */
@@ -6624,7 +8324,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6659,7 +8359,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MergeResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6824,7 +8524,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PipelineStatus"] | null;
                 };
             };
         };
@@ -6846,7 +8546,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PipelineLogsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6875,7 +8575,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PipelineReportItem"][];
                 };
             };
         };
@@ -6897,7 +8597,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PipelineReportContent"];
                 };
             };
             /** @description Validation Error */

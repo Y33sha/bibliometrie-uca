@@ -13,20 +13,20 @@ from fastapi import APIRouter
 from application import config as config_service
 from infrastructure.repositories import config_repository
 from interfaces.api.deps import get_cursor
-from interfaces.api.models import ConfigValueUpdate
+from interfaces.api.models import ConfigItem, ConfigValueUpdate, HalCollectionsResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/api/config")
+@router.get("/api/config", response_model=list[ConfigItem])
 async def list_config() -> Any:
     with get_cursor() as (cur, _conn):
         cur.execute("SELECT key, value, description, updated_at FROM config ORDER BY key")
         return cur.fetchall()
 
 
-@router.get("/api/config/hal-collections")
+@router.get("/api/config/hal-collections", response_model=HalCollectionsResponse)
 async def get_hal_collections() -> Any:
     """Retourne les collections HAL dérivées des structures du périmètre UCA."""
     with get_cursor() as (cur, _conn):
@@ -36,9 +36,7 @@ async def get_hal_collections() -> Any:
         return {"collections": collections, "count": len(collections)}
 
 
-@router.put("/api/config/{key}")
+@router.put("/api/config/{key}", response_model=ConfigItem)
 async def update_config(key: str, body: ConfigValueUpdate) -> Any:
     with get_cursor() as (cur, _conn):
-        return config_service.update_config_value(
-            cur, key, body.value, repo=config_repository(cur)
-        )
+        return config_service.update_config_value(cur, key, body.value, repo=config_repository(cur))

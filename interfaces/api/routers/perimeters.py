@@ -17,15 +17,19 @@ from infrastructure.repositories import config_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import (
     AddPerimeterStructure,
+    CreatedIdResponse,
+    OkResponse,
     PerimeterCreate,
+    PerimeterOut,
     PerimeterUpdate,
+    StatusResponse,
 )
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/api/perimeters")
+@router.get("/api/perimeters", response_model=list[PerimeterOut])
 async def list_perimeters() -> Any:
     with get_cursor() as (cur, _conn):
         cur.execute("SELECT id, code, name, description, structure_ids FROM perimeters ORDER BY id")
@@ -49,7 +53,7 @@ async def list_perimeters() -> Any:
         return perimeters
 
 
-@router.post("/api/perimeters")
+@router.post("/api/perimeters", response_model=CreatedIdResponse)
 async def create_perimeter(body: PerimeterCreate) -> Any:
     """Crée un nouveau périmètre."""
     code = body.code.strip()
@@ -62,7 +66,7 @@ async def create_perimeter(body: PerimeterCreate) -> Any:
         return {"id": pid}
 
 
-@router.put("/api/perimeters/{perimeter_id}")
+@router.put("/api/perimeters/{perimeter_id}", response_model=OkResponse)
 async def update_perimeter(perimeter_id: int, body: PerimeterUpdate) -> Any:
     """Met à jour un périmètre (nom, description, structures)."""
     fields = body.model_dump(exclude_unset=True)
@@ -78,7 +82,7 @@ async def update_perimeter(perimeter_id: int, body: PerimeterUpdate) -> Any:
         return {"ok": True}
 
 
-@router.delete("/api/perimeters/{perimeter_id}")
+@router.delete("/api/perimeters/{perimeter_id}", response_model=OkResponse)
 async def delete_perimeter(perimeter_id: int) -> Any:
     """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
     with get_cursor() as (cur, _conn):
@@ -86,7 +90,7 @@ async def delete_perimeter(perimeter_id: int) -> Any:
         return {"ok": True}
 
 
-@router.post("/api/perimeters/{perimeter_id}/structures")
+@router.post("/api/perimeters/{perimeter_id}/structures", response_model=StatusResponse)
 async def add_perimeter_structure(perimeter_id: int, body: AddPerimeterStructure) -> Any:
     with get_cursor() as (cur, _conn):
         status = config_service.add_perimeter_structure(
@@ -95,7 +99,9 @@ async def add_perimeter_structure(perimeter_id: int, body: AddPerimeterStructure
         return {"status": status}
 
 
-@router.delete("/api/perimeters/{perimeter_id}/structures/{structure_id}")
+@router.delete(
+    "/api/perimeters/{perimeter_id}/structures/{structure_id}", response_model=StatusResponse
+)
 async def remove_perimeter_structure(perimeter_id: int, structure_id: int) -> Any:
     with get_cursor() as (cur, _conn):
         config_service.remove_perimeter_structure(

@@ -35,9 +35,9 @@
     const halMap = new Map<number, SourceAuthorship>();
     const oaMap = new Map<number, SourceAuthorship>();
     const wosMap = new Map<number, SourceAuthorship>();
-    for (const a of data.hal_authorships) halMap.set(a.author_position, a);
-    for (const a of data.openalex_authorships) oaMap.set(a.author_position, a);
-    for (const a of data.wos_authorships) wosMap.set(a.author_position, a);
+    for (const a of data.hal_authorships) if (a.author_position != null) halMap.set(a.author_position, a);
+    for (const a of data.openalex_authorships) if (a.author_position != null) oaMap.set(a.author_position, a);
+    for (const a of data.wos_authorships) if (a.author_position != null) wosMap.set(a.author_position, a);
 
     const allPos = new Set([...halMap.keys(), ...oaMap.keys(), ...wosMap.keys()]);
     const rows: SourceRow[] = [];
