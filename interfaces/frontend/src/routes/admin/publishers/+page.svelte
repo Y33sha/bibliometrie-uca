@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api, ApiError, publishers as publishersApi } from '$lib/api';
+	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 
 	interface Publisher {
@@ -55,12 +56,17 @@
 	let sort = $state('-pubs');
 	let searchTimer: ReturnType<typeof setTimeout>;
 
-	// Merge state
+	// Merge state : recherche avec debounce + cible en cours de fusion
 	let mergeTargetId: number | null = $state(null);
-	let mergeQuery = $state('');
-	let mergeResults: Publisher[] = $state([]);
-	let mergeLoading = $state(false);
-	let mergeTimer: ReturnType<typeof setTimeout>;
+	const mergeSearch = useDebouncedSearch<Publisher>({
+		search: async (q) => {
+			const data = await api<{ publishers: Publisher[] }>(
+				`/api/publishers?search=${encodeURIComponent(q)}&per_page=10`,
+			);
+			return data.publishers;
+		},
+		transform: (results) => results.filter((p) => p.id !== mergeTargetId),
+	});
 
 	async function load() {
 		const params = new URLSearchParams({ page: String(page), per_page: String(perPage), sort });
@@ -82,22 +88,12 @@
 	// Merge
 	function openMerge(id: number) {
 		mergeTargetId = id;
-		mergeQuery = '';
-		mergeResults = [];
+		mergeSearch.clear();
 	}
 
-	function closeMerge() { mergeTargetId = null; }
-
-	function onMergeSearch(query: string) {
-		mergeQuery = query;
-		clearTimeout(mergeTimer);
-		if (query.length < 2) { mergeResults = []; return; }
-		mergeLoading = true;
-		mergeTimer = setTimeout(async () => {
-			const data = await api<any>(`/api/publishers?search=${encodeURIComponent(query)}&per_page=10`);
-			mergeResults = data.publishers.filter((p: Publisher) => p.id !== mergeTargetId);
-			mergeLoading = false;
-		}, 300);
+	function closeMerge() {
+		mergeTargetId = null;
+		mergeSearch.clear();
 	}
 
 	async function doMerge(sourceId: number) {
@@ -159,21 +155,21 @@
 				<td class="actions">
 					{#if mergeTargetId === pub.id}
 						<div class="merge-search">
-							<input type="text" placeholder="Fusionner avec…" value={mergeQuery}
-								oninput={(e) => onMergeSearch((e.target as HTMLInputElement).value)}
+							<input type="text" placeholder="Fusionner avec…" value={mergeSearch.query}
+								oninput={(e) => mergeSearch.setQuery((e.target as HTMLInputElement).value)}
 								class="merge-input" />
 							<button class="btn btn-sm" onclick={closeMerge}>Annuler</button>
-							{#if mergeLoading}
+							{#if mergeSearch.loading}
 								<div class="merge-results"><span class="muted">Recherche…</span></div>
-							{:else if mergeResults.length > 0}
+							{:else if mergeSearch.results.length > 0}
 								<div class="merge-results">
-									{#each mergeResults as r (r.id)}
+									{#each mergeSearch.results as r (r.id)}
 										<button class="merge-result" onclick={() => doMerge(r.id)}>
 											{r.name} <span class="muted">({r.journal_count} revues, {r.pub_count} publis)</span>
 										</button>
 									{/each}
 								</div>
-							{:else if mergeQuery.length >= 2}
+							{:else if mergeSearch.query.length >= 2}
 								<div class="merge-results"><span class="muted">Aucun résultat</span></div>
 							{/if}
 						</div>
