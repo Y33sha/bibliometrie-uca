@@ -23,7 +23,7 @@ le SQL est extrait des services. Ce qui reste :
 - [ ] **Reliquat** (petits routers — existence checks + lookups simples,
   acceptables selon CQRS-lite) : feedback, structures, journals,
   publishers, config, stats. ~30 `cur.execute` au total, la plupart
-  étant des `SELECT id WHERE id = %s` (OK en router selon Opus 4.7).
+  étant des `SELECT id WHERE id = %s`.
 
 ### 1.2 Factoriser la logique commune aux sources
 - [x] **SourceNormalizer** (`application/pipeline/normalize/base.py`) :
@@ -219,7 +219,9 @@ dupliqué entre agrégats.
   manuellement (évite la dérive silencieuse backend/front)
 
 ### 2.8 Observabilité et robustesse production
-- [ ] **Alerting sur échec pipeline** (email ou webhook)
+- [ ] ~~**Alerting sur échec pipeline**~~ — **délégué à la DSI après
+  transmission**. La DSI a ses propres outils et il ne sert à rien de déployer une solution dev qui sera remplacée.
+  En dev local, monitoring manuel des lancements.
 - [ ] **Checks automatiques post-pipeline** : comptages, orphelins,
   anomalies (type tests de caractérisation sur les données produites)
 - [ ] Dashboard métriques (temps de réponse, pool DB, taux d'erreur) —
