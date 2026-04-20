@@ -23,80 +23,15 @@
 	let canGoBack = $state(false);
 
 	// --- Types ---
-	interface Structure {
-		id: number;
-		code: string;
-		name: string;
-		acronym: string | null;
-		type: string;
-		ror_id: string | null;
-		rnsr_id: string | null;
-		hal_collection: string | null;
-	}
-	interface RelatedStructure {
-		id: number;
-		name: string;
-		acronym: string | null;
-		type: string;
-		relation_type: string;
-	}
-	interface LabProfile {
-		structure: Structure;
-		parents: RelatedStructure[];
-		children: RelatedStructure[];
-		theses_count: number;
-	}
-	interface Publication {
-		id: number;
-		title: string;
-		pub_year: number | null;
-		doi: string | null;
-		doc_type: string | null;
-		oa_status: string | null;
-		journal: string | null;
-		hal_id: string | null;
-		openalex_id: string | null;
-		scanr_id: string | null;
-		wos_id: string | null;
-		hal_collections: string[] | null;
-		labs: string | null;
-		lab_items: { id: number; label: string }[] | null;
-		apc: { amount: number; institution: string | null; lab_id: number | null; lab_acronym: string | null; budget_structure_id: number | null }[] | null;
-	}
-	interface LabPerson {
-		id: number;
-		last_name: string;
-		first_name: string;
-		role_title: string | null;
-		department_name: string | null;
-		has_rh: boolean;
-		pub_count: number;
-		orcids: { value: string; confirmed: boolean }[] | null;
-	}
-	interface PersonsResponse {
-		total_persons: number;
-		page: number;
-		per_page: number;
-		pages: number;
-		persons: LabPerson[];
-		orphan_authorships: { hal: number; openalex: number; total: number };
-		facets?: {
-			rh: { yes: number; no: number };
-			orcid: { yes: number; no: number };
-			idhal: { yes: number; no: number };
-		};
-	}
-	interface LabAddress {
-		id: number;
-		raw_text: string;
-		is_confirmed: boolean | null;
-	}
-	interface AddressesResponse {
-		total: number;
-		page: number;
-		pages: number;
-		addresses: LabAddress[];
-	}
+	import type { components } from '$lib/api/schema';
+	type Structure = components['schemas']['LabStructureCore'];
+	type RelatedStructure = components['schemas']['LabRelatedStructure'];
+	type LabProfile = components['schemas']['LaboratoryDetailResponse'];
+	type Publication = components['schemas']['PublicationListItem'];
+	type LabPerson = components['schemas']['LabPersonOut'];
+	type PersonsResponse = components['schemas']['LaboratoryPersonsResponse'];
+	type LabAddress = components['schemas']['LabAddressOut'];
+	type AddressesResponse = components['schemas']['LaboratoryAddressesResponse'];
 
 	// --- State ---
 	let lab: Structure | null = $state(null);

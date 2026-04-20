@@ -2529,6 +2529,45 @@ export interface components {
             /** Notes */
             notes?: string | null;
         };
+        /** LabAddressOut */
+        LabAddressOut: {
+            /** Id */
+            id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Is Confirmed */
+            is_confirmed: boolean | null;
+        };
+        /**
+         * LabBinaryFacet
+         * @description Facette binaire yes/no (compteur pour chaque option).
+         */
+        LabBinaryFacet: {
+            /** Yes */
+            yes: number;
+            /** No */
+            no: number;
+        };
+        /** LabDashboardCollab */
+        LabDashboardCollab: {
+            /** Total Articles */
+            total_articles: number;
+            /** International */
+            international: number;
+            /** Domestic */
+            domestic: number;
+        };
+        /** LabDashboardOa */
+        LabDashboardOa: {
+            /** Open Access */
+            open_access: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
+            /** Total */
+            total: number;
+        };
         /** LabFacet */
         LabFacet: {
             /** Value */
@@ -2537,6 +2576,72 @@ export interface components {
             label: string;
             /** Count */
             count: number;
+        };
+        /** LabOrcidIdentifier */
+        LabOrcidIdentifier: {
+            /** Value */
+            value: string;
+            /** Confirmed */
+            confirmed: boolean;
+        };
+        /** LabOrphanAuthorships */
+        LabOrphanAuthorships: {
+            /** Total */
+            total: number;
+        };
+        /**
+         * LabPersonOut
+         * @description Personne liée à un labo (onglet `persons`).
+         */
+        LabPersonOut: {
+            /** Id */
+            id: number;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
+            /** Role Title */
+            role_title: string | null;
+            /** Department Name */
+            department_name: string | null;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Pub Count */
+            pub_count: number;
+            /** Orcids */
+            orcids: components["schemas"]["LabOrcidIdentifier"][] | null;
+        };
+        /** LabPersonsFacets */
+        LabPersonsFacets: {
+            rh: components["schemas"]["LabBinaryFacet"];
+            orcid: components["schemas"]["LabBinaryFacet"];
+            idhal: components["schemas"]["LabBinaryFacet"];
+        };
+        /** LabPubYearCount */
+        LabPubYearCount: {
+            /** Year */
+            year: number;
+            /** Count */
+            count: number;
+        };
+        /**
+         * LabRelatedStructure
+         * @description Structure voisine (tutelle, sous-labo) dans le détail d'un labo.
+         *
+         *     Distinct de `RelatedStructureOut` (utilisé pour les structures
+         *     génériques) — pas de `code` ni `relation_id` côté labo.
+         */
+        LabRelatedStructure: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+            /** Relation Type */
+            relation_type: string;
         };
         /** LabStatsResponse */
         LabStatsResponse: {
@@ -2578,6 +2683,51 @@ export interface components {
             /** Lab Name */
             lab_name: string;
         };
+        /**
+         * LabStructureCore
+         * @description Métadonnées du labo (bloc `structure` du détail).
+         */
+        LabStructureCore: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+            /** Ror Id */
+            ror_id: string | null;
+            /** Rnsr Id */
+            rnsr_id: string | null;
+            /** Hal Collection */
+            hal_collection: string | null;
+        };
+        /** LabTopCountry */
+        LabTopCountry: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Count */
+            count: number;
+        };
+        /**
+         * LabTutelle
+         * @description Tutelle d'un labo (établissement, EPST, etc.) dans la liste.
+         */
+        LabTutelle: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+        };
         /** LabeledIntFacet */
         LabeledIntFacet: {
             /** Value */
@@ -2586,6 +2736,73 @@ export interface components {
             label: string;
             /** Count */
             count: number;
+        };
+        /** LaboratoryAddressesResponse */
+        LaboratoryAddressesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Addresses */
+            addresses: components["schemas"]["LabAddressOut"][];
+        };
+        /** LaboratoryDashboardResponse */
+        LaboratoryDashboardResponse: {
+            /** Pubs By Year */
+            pubs_by_year: components["schemas"]["LabPubYearCount"][];
+            oa: components["schemas"]["LabDashboardOa"];
+            collab: components["schemas"]["LabDashboardCollab"];
+            /** Top Countries */
+            top_countries: components["schemas"]["LabTopCountry"][];
+        };
+        /** LaboratoryDetailResponse */
+        LaboratoryDetailResponse: {
+            structure: components["schemas"]["LabStructureCore"];
+            /** Parents */
+            parents: components["schemas"]["LabRelatedStructure"][];
+            /** Children */
+            children: components["schemas"]["LabRelatedStructure"][];
+            /** Theses Count */
+            theses_count: number;
+        };
+        /**
+         * LaboratoryListItem
+         * @description Ligne de `/api/laboratories` (liste du périmètre).
+         */
+        LaboratoryListItem: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Ror Id */
+            ror_id: string | null;
+            /** Hal Collection */
+            hal_collection: string | null;
+            /** Tutelles */
+            tutelles: components["schemas"]["LabTutelle"][] | null;
+        };
+        /** LaboratoryPersonsResponse */
+        LaboratoryPersonsResponse: {
+            /** Total Persons */
+            total_persons: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Persons */
+            persons: components["schemas"]["LabPersonOut"][];
+            orphan_authorships: components["schemas"]["LabOrphanAuthorships"];
+            facets: components["schemas"]["LabPersonsFacets"];
         };
         /**
          * LinkedAuthorOut
@@ -5032,7 +5249,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LaboratoryListItem"][];
                 };
             };
         };
@@ -5054,7 +5271,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LaboratoryDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5093,7 +5310,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LaboratoryPersonsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5127,7 +5344,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LaboratoryAddressesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5158,7 +5375,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LaboratoryDashboardResponse"];
                 };
             };
             /** @description Validation Error */

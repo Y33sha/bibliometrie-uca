@@ -3,22 +3,8 @@
 	import { base } from "$app/paths";
 	import { api } from "$lib/api";
 
-	interface Tutelle {
-		id: number;
-		name: string;
-		acronym: string | null;
-		type: string;
-	}
-
-	interface Lab {
-		id: number;
-		code: string;
-		name: string;
-		acronym: string | null;
-		ror_id: string | null;
-		hal_collection: string | null;
-		tutelles: Tutelle[] | null;
-	}
+	import type { components } from "$lib/api/schema";
+	type Lab = components["schemas"]["LaboratoryListItem"];
 
 	let labs: Lab[] = $state([]);
 	let search = $state("");
