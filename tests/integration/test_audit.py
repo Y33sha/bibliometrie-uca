@@ -11,6 +11,7 @@ from application.audit import (
     reset_current_user,
     set_current_user,
 )
+from infrastructure.repositories import person_repository
 
 
 class TestCurrentUserContext:
@@ -116,7 +117,7 @@ class TestEndToEndServiceIntegration:
         person_id = self._create_person(db)
         token = set_current_user("admin")
         try:
-            set_rejected(db, person_id, True)
+            set_rejected(db, person_id, True, repo=person_repository(db))
         finally:
             reset_current_user(token)
 
@@ -136,7 +137,7 @@ class TestEndToEndServiceIntegration:
         from application.persons import set_rejected
 
         person_id = self._create_person(db)
-        set_rejected(db, person_id, True)
+        set_rejected(db, person_id, True, repo=person_repository(db))
 
         db.execute("SELECT COUNT(*) AS n FROM audit_log")
         assert db.fetchone()["n"] == 0
@@ -148,11 +149,12 @@ class TestEndToEndServiceIntegration:
 
         p1 = self._create_person(db, "A", "A")
         p2 = self._create_person(db, "B", "B")
+        repo = person_repository(db)
         token = set_current_user("admin")
         try:
-            mark_distinct(db, p1, p2)
-            mark_distinct(db, p1, p2)  # doublon → no-op
-            mark_distinct(db, p2, p1)  # même paire dans l'autre sens → no-op
+            mark_distinct(db, p1, p2, repo=repo)
+            mark_distinct(db, p1, p2, repo=repo)  # doublon → no-op
+            mark_distinct(db, p2, p1, repo=repo)  # même paire dans l'autre sens → no-op
         finally:
             reset_current_user(token)
 
