@@ -15,6 +15,7 @@ from infrastructure.db.queries import addresses as addr_queries
 from infrastructure.repositories import address_repository, authorship_repository
 from interfaces.api.deps import get_cursor, require_admin
 from interfaces.api.models import (
+    AssignStructureAction,
     BatchReviewAction,
     BatchSetCountry,
     ReviewAction,
@@ -226,6 +227,43 @@ async def batch_set_country(
 
     bg.add_task(_bg_propagate_countries, all_ids)
     return {"updated": updated, "propagated": propagated}
+
+
+@router.post("/api/addresses/{addr_id}/assign-structure")
+async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
+    """Assigne manuellement une structure à une adresse."""
+    with get_cursor() as (cur, _conn):
+        cur.execute("SELECT id FROM addresses WHERE id = %s", (addr_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Address not found")
+
+        cur.execute("SELECT id FROM structures WHERE id = %s", (action.structure_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Structure not found")
+
+        addresses_service.review_structure_link(
+            cur,
+            addr_id,
+            action.structure_id,
+            True,
+            repo=address_repository(cur),
+            authorship_repo=authorship_repository(cur),
+        )
+        return {"id": addr_id, "structure_id": action.structure_id, "status": "assigned"}
+
+
+@router.delete("/api/addresses/{addr_id}/assign-structure")
+async def unassign_structure(addr_id: int, structure_id: int = Query(...)) -> Any:
+    """Supprime l'assignation manuelle d'une structure."""
+    with get_cursor() as (cur, _conn):
+        deleted = addresses_service.unassign_manual_structure(
+            cur,
+            addr_id,
+            structure_id,
+            repo=address_repository(cur),
+            authorship_repo=authorship_repository(cur),
+        )
+        return {"deleted": deleted}
 
 
 @router.get("/api/admin/address-stats")
