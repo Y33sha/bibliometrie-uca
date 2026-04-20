@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from application.persons import mark_distinct as _mark_persons_distinct
 from infrastructure.db.queries import duplicates as dup_queries
+from infrastructure.repositories import person_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import MarkPersonsDistinct
 
@@ -41,7 +42,9 @@ async def mark_persons_distinct(body: MarkPersonsDistinct) -> Any:
             status_code=400, detail="person_id_a et person_id_b doivent être différents"
         )
     with get_cursor() as (cur, _conn):
-        _mark_persons_distinct(cur, body.person_id_a, body.person_id_b)
+        _mark_persons_distinct(
+            cur, body.person_id_a, body.person_id_b, repo=person_repository(cur)
+        )
         return {"ok": True}
 
 

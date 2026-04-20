@@ -12,6 +12,7 @@ from psycopg2.extras import RealDictCursor
 
 from application.persons import add_name_form
 from infrastructure.db.connection import get_connection
+from infrastructure.repositories import person_repository
 
 
 def main() -> None:
@@ -104,7 +105,7 @@ def main() -> None:
     # Ajouter les formes de nom manquantes
     for (pid, norm), g in groups.items():
         for src in g["sources"]:
-            add_name_form(cur, pid, norm, source=src)
+            add_name_form(cur, pid, norm, source=src, repo=person_repository(cur))
 
     conn.commit()
     print(f"\n  ✓ {assigned} authorships rattachées.\n")
