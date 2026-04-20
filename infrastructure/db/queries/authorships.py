@@ -49,7 +49,7 @@ def authorships_stats(cur: Any, lab_id: int) -> dict[str, Any]:
     cur.execute(
         f"""
         WITH uca_authors AS (
-            SELECT sauth.id, sa.source,
+            SELECT sauth.id, sauth.source,
                    (SELECT sa3.person_id FROM source_authorships sa3
                     WHERE sa3.source_person_id = sauth.id AND sa3.person_id IS NOT NULL LIMIT 1) AS person_id,
                    sauth.orcid, sauth.source_ids->>'idhal' AS idhal
