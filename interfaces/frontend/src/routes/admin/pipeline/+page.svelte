@@ -2,20 +2,9 @@
   import { onMount, onDestroy } from "svelte";
   import { api } from "$lib/api";
 
-  interface Report {
-    filename: string;
-    label: string;
-  }
-
-  interface PipelineStatus {
-    running: boolean;
-    mode: string;
-    phase: string;
-    started_at: string;
-    phase_started_at: string;
-    phases_done: number;
-    phases_total: number;
-  }
+  import type { components } from "$lib/api/schema";
+  type Report = components["schemas"]["PipelineReportItem"];
+  type PipelineStatus = components["schemas"]["PipelineStatus"];
 
   let reports: Report[] = $state([]);
   let selectedReport: string | null = $state(null);

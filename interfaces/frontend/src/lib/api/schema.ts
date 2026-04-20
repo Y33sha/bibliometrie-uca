@@ -3835,6 +3835,45 @@ export interface components {
             /** Departments */
             departments: number;
         };
+        /** PipelineLogsResponse */
+        PipelineLogsResponse: {
+            /** Content */
+            content: string;
+        };
+        /** PipelineReportContent */
+        PipelineReportContent: {
+            /** Filename */
+            filename: string;
+            /** Content */
+            content: string;
+        };
+        /** PipelineReportItem */
+        PipelineReportItem: {
+            /** Filename */
+            filename: string;
+            /** Label */
+            label: string;
+        };
+        /**
+         * PipelineStatus
+         * @description État du pipeline en cours (lu depuis logs/status.json).
+         */
+        PipelineStatus: {
+            /** Running */
+            running: boolean;
+            /** Mode */
+            mode: string;
+            /** Phase */
+            phase: string;
+            /** Started At */
+            started_at: string;
+            /** Phase Started At */
+            phase_started_at: string;
+            /** Phases Done */
+            phases_done: number;
+            /** Phases Total */
+            phases_total: number;
+        };
         /**
          * PubApcPayment
          * @description Détail d'un paiement APC (une ligne d'`apc` dans la liste).
@@ -8115,7 +8154,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PipelineStatus"] | null;
                 };
             };
         };
@@ -8137,7 +8176,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PipelineLogsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8166,7 +8205,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PipelineReportItem"][];
                 };
             };
         };
@@ -8188,7 +8227,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PipelineReportContent"];
                 };
             };
             /** @description Validation Error */

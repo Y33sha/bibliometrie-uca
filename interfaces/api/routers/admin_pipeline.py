@@ -7,6 +7,13 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from interfaces.api.models import (
+    PipelineLogsResponse,
+    PipelineReportContent,
+    PipelineReportItem,
+    PipelineStatus,
+)
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -15,7 +22,7 @@ REPORTS_DIR = BASE / "logs" / "reports"
 STATUS_FILE = BASE / "logs" / "status.json"
 
 
-@router.get("/api/admin/pipeline/status")
+@router.get("/api/admin/pipeline/status", response_model=PipelineStatus | None)
 async def pipeline_status() -> Any:
     """Retourne le statut du pipeline en cours, ou null si aucun ne tourne."""
     if not STATUS_FILE.exists():
@@ -29,7 +36,7 @@ async def pipeline_status() -> Any:
 CRON_LOG = BASE / "logs" / "cron.log"
 
 
-@router.get("/api/admin/pipeline/logs")
+@router.get("/api/admin/pipeline/logs", response_model=PipelineLogsResponse)
 async def pipeline_logs(lines: int = 200) -> Any:
     """Retourne les N dernières lignes du cron.log."""
     if not CRON_LOG.exists():
@@ -42,7 +49,7 @@ async def pipeline_logs(lines: int = 200) -> Any:
         return {"content": ""}
 
 
-@router.get("/api/admin/pipeline/reports")
+@router.get("/api/admin/pipeline/reports", response_model=list[PipelineReportItem])
 async def list_reports() -> Any:
     """Liste les rapports pipeline disponibles (plus récent en premier)."""
     if not REPORTS_DIR.exists():
@@ -60,7 +67,7 @@ async def list_reports() -> Any:
     return reports
 
 
-@router.get("/api/admin/pipeline/reports/{filename}")
+@router.get("/api/admin/pipeline/reports/{filename}", response_model=PipelineReportContent)
 async def get_report(filename: str) -> Any:
     """Retourne le contenu d'un rapport pipeline."""
     # Sécurité : empêcher le path traversal
