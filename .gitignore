@@ -19,6 +19,8 @@ dist/
 interfaces/frontend/node_modules/
 interfaces/frontend/build/
 interfaces/frontend/.svelte-kit/
+# OpenAPI dump intermédiaire (schema.ts généré via types:gen)
+interfaces/frontend/openapi.json
 
 # Backups DB
 db/backup/
