@@ -1,4 +1,4 @@
-"""Résumé global, ventilation annuelle, années disponibles, facettes croisées."""
+"""Résumé global, ventilation annuelle, années disponibles, facettes croisées (§2.12 : async)."""
 
 from typing import Any
 
@@ -11,7 +11,7 @@ from infrastructure.db.queries.filters import (
 from infrastructure.db.queries.stats._shared import apply_stats_apc_filter
 
 
-def stats_by_year(
+async def stats_by_year(
     cur: Any,
     *,
     root_structure_id: int,
@@ -23,7 +23,7 @@ def stats_by_year(
     has_apc: str,
 ) -> list[dict[str, Any]]:
     """Ventilation par année (articles + review, périmètre UCA)."""
-    cur.execute("SET LOCAL jit = off")
+    await cur.execute("SET LOCAL jit = off")
 
     conditions = [
         PUB_IS_UCA,
@@ -43,7 +43,7 @@ def stats_by_year(
     apply_stats_apc_filter(conditions, params, has_apc, root_structure_id)
     where = " AND ".join(conditions)
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             p.pub_year,
@@ -63,10 +63,10 @@ def stats_by_year(
         """,
         params,
     )
-    return cur.fetchall()
+    return await cur.fetchall()
 
 
-def stats_summary(
+async def stats_summary(
     cur: Any,
     *,
     root_structure_id: int,
@@ -78,7 +78,7 @@ def stats_summary(
     has_apc: str,
 ) -> dict[str, Any]:
     """Totaux globaux pour la page stats."""
-    cur.execute("SET LOCAL jit = off")
+    await cur.execute("SET LOCAL jit = off")
 
     conditions = [
         PUB_IS_UCA,
@@ -98,7 +98,7 @@ def stats_summary(
     apply_stats_apc_filter(conditions, params, has_apc, root_structure_id)
     where = " AND ".join(conditions)
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             COUNT(DISTINCT p.id) AS total_pubs,
@@ -116,21 +116,21 @@ def stats_summary(
         """,
         params,
     )
-    return cur.fetchone()
+    return await cur.fetchone()
 
 
-def available_years(cur: Any) -> list[int]:
+async def available_years(cur: Any) -> list[int]:
     """Liste des années de publication disponibles (périmètre UCA)."""
-    cur.execute("SET LOCAL jit = off")
-    cur.execute(f"""
+    await cur.execute("SET LOCAL jit = off")
+    await cur.execute(f"""
         SELECT DISTINCT pub_year FROM publications p
         WHERE {PUB_IS_UCA} AND pub_year IS NOT NULL
         ORDER BY pub_year DESC
     """)
-    return [r["pub_year"] for r in cur.fetchall()]
+    return [r["pub_year"] for r in await cur.fetchall()]
 
 
-def stats_facets(
+async def stats_facets(
     cur: Any,
     *,
     root_structure_id: int,
@@ -143,7 +143,7 @@ def stats_facets(
 ) -> dict[str, list[dict[str, Any]]]:
     """Facettes dynamiques (années, labos, oa_status, apc) : chaque facette
     exclut son propre filtre mais applique tous les autres."""
-    cur.execute("SET LOCAL jit = off")
+    await cur.execute("SET LOCAL jit = off")
 
     base_conditions = [
         PUB_IS_UCA,
@@ -171,7 +171,7 @@ def stats_facets(
     year_conds = list(base_conditions)
     year_params: list[Any] = []
     add_common(year_conds, year_params, skip="year")
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT p.pub_year, COUNT(DISTINCT p.id) AS count
         FROM publications p
@@ -183,13 +183,13 @@ def stats_facets(
         """,
         year_params,
     )
-    year_facets = [{"value": r["pub_year"], "count": r["count"]} for r in cur.fetchall()]
+    year_facets = [{"value": r["pub_year"], "count": r["count"]} for r in await cur.fetchall()]
 
     # --- LABOS ---
     lab_conds = list(base_conditions)
     lab_params: list[Any] = []
     add_common(lab_conds, lab_params, skip="lab")
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT s.id, COALESCE(s.acronym, s.name) AS label,
                COUNT(DISTINCT a.publication_id) AS count
@@ -206,14 +206,14 @@ def stats_facets(
         lab_params,
     )
     lab_facets = [
-        {"value": r["id"], "label": r["label"], "count": r["count"]} for r in cur.fetchall()
+        {"value": r["id"], "label": r["label"], "count": r["count"]} for r in await cur.fetchall()
     ]
 
     # --- OA ---
     oa_conds = list(base_conditions)
     oa_params: list[Any] = []
     add_common(oa_conds, oa_params, skip="oa")
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT p.oa_status::text AS value, COUNT(DISTINCT p.id) AS count
         FROM publications p
@@ -225,14 +225,14 @@ def stats_facets(
         """,
         oa_params,
     )
-    oa_facets = [{"value": r["value"], "count": r["count"]} for r in cur.fetchall()]
+    oa_facets = [{"value": r["value"], "count": r["count"]} for r in await cur.fetchall()]
 
     # --- APC ---
     apc_conds = list(base_conditions)
     apc_params: list[Any] = []
     add_common(apc_conds, apc_params, skip="apc")
     apc_where = " AND ".join(apc_conds) if apc_conds else "TRUE"
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             COUNT(DISTINCT p.id) FILTER (WHERE EXISTS (
@@ -252,7 +252,7 @@ def stats_facets(
         """,
         [root_structure_id, root_structure_id] + apc_params,
     )
-    ar = cur.fetchone()
+    ar = await cur.fetchone()
     apc_facets = [
         {"value": "uca", "text": "APC UCA", "count": ar["apc_uca"]},
         {"value": "non_uca", "text": "APC hors UCA", "count": ar["apc_non_uca"]},
