@@ -1,4 +1,4 @@
-"""Query services pour /api/admin/person-duplicates/* (doublons + conflits personnes)."""
+"""Query services async pour /api/admin/person-duplicates/* (§2.12)."""
 
 from typing import Any
 
@@ -105,9 +105,9 @@ PERSON_DUP_QUERIES = [
 ]
 
 
-def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
+async def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
     """Détail d'une personne pour la page de déduplication."""
-    cur.execute(
+    await cur.execute(
         """
         SELECT p.id, p.last_name, p.first_name,
                p.last_name_normalized, p.first_name_normalized,
@@ -119,11 +119,11 @@ def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    person = cur.fetchone()
+    person = await cur.fetchone()
     if not person:
         return None
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT id, id_type, id_value, source, status::text
         FROM person_identifiers WHERE person_id = %s
@@ -131,9 +131,9 @@ def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    identifiers = [dict(r) for r in cur.fetchall()]
+    identifiers = [dict(r) for r in await cur.fetchall()]
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT pub.id, pub.title, pub.pub_year, pub.doi, pub.doc_type::text,
                (SELECT array_agg(DISTINCT
@@ -152,9 +152,9 @@ def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    publications = [dict(r) for r in cur.fetchall()]
+    publications = [dict(r) for r in await cur.fetchall()]
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT DISTINCT s.id, s.acronym, s.name
         FROM structures s
@@ -167,7 +167,9 @@ def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    labs = [{"id": r["id"], "acronym": r["acronym"], "name": r["name"]} for r in cur.fetchall()]
+    labs = [
+        {"id": r["id"], "acronym": r["acronym"], "name": r["name"]} for r in await cur.fetchall()
+    ]
 
     return {
         "id": person["id"],
@@ -185,7 +187,7 @@ def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
     }
 
 
-def _scan_dup_query(
+async def _scan_dup_query(
     cur: Any,
     sql: str,
     skip_pairs: set | None = None,
@@ -195,13 +197,13 @@ def _scan_dup_query(
     """Parcourt une requête de doublons avec curseur serveur.
     Retourne (found_row_or_None, count_of_valid_pairs, actual_skipped).
     """
-    cur.execute("DECLARE _dup_cur NO SCROLL CURSOR FOR " + sql)
+    await cur.execute("DECLARE _dup_cur NO SCROLL CURSOR FOR " + sql)
     found = None
     count = 0
     skipped = 0
     while True:
-        cur.execute("FETCH 500 FROM _dup_cur")
-        rows = cur.fetchall()
+        await cur.execute("FETCH 500 FROM _dup_cur")
+        rows = await cur.fetchall()
         if not rows:
             break
         for row in rows:
@@ -223,32 +225,32 @@ def _scan_dup_query(
                     break
         if stop_at_first and found:
             break
-    cur.execute("CLOSE _dup_cur")
+    await cur.execute("CLOSE _dup_cur")
     return found, count, skipped
 
 
-def count_person_duplicates(cur: Any) -> int:
+async def count_person_duplicates(cur: Any) -> int:
     """Comptage des paires candidates doublons-personnes."""
     total = 0
     for sql in PERSON_DUP_QUERIES:
-        _, cnt, _ = _scan_dup_query(cur, sql)
+        _, cnt, _ = await _scan_dup_query(cur, sql)
         total += cnt
     return total
 
 
-def next_person_duplicate(
+async def next_person_duplicate(
     cur: Any, *, skip_pairs: set | None, offset: int
 ) -> dict[str, Any] | None:
     """Renvoie la paire doublon-personne à la position offset (ou None)."""
     remaining_skip = offset
     for sql in PERSON_DUP_QUERIES:
-        found, _, actual_skipped = _scan_dup_query(
+        found, _, actual_skipped = await _scan_dup_query(
             cur, sql, skip_pairs, stop_at_first=True, skip_n=remaining_skip
         )
         if found:
             return {
-                "person_a": _get_person_dedup_detail(cur, found["id_a"]),
-                "person_b": _get_person_dedup_detail(cur, found["id_b"]),
+                "person_a": await _get_person_dedup_detail(cur, found["id_a"]),
+                "person_b": await _get_person_dedup_detail(cur, found["id_b"]),
             }
         remaining_skip -= actual_skipped
     return None
@@ -293,19 +295,20 @@ ORDER BY COUNT(*) DESC, LEAST(a1.person_id, a2.person_id)
 """
 
 
-def count_person_conflict_pairs(cur: Any) -> int:
+async def count_person_conflict_pairs(cur: Any) -> int:
     """Nombre de paires de personnes en conflit."""
-    cur.execute(f"SELECT COUNT(*) AS total FROM ({CONFLICT_PAIRS_SQL}) sub")
-    return cur.fetchone()["total"]
+    await cur.execute(f"SELECT COUNT(*) AS total FROM ({CONFLICT_PAIRS_SQL}) sub")
+    row = await cur.fetchone()
+    return row["total"]
 
 
-def next_person_conflict(
+async def next_person_conflict(
     cur: Any, conn: Any, *, skip_pairs: set, offset: int
 ) -> dict[str, Any] | None:
     """Renvoie la paire en conflit à la position offset (ou None)."""
-    cur.execute(CONFLICT_PAIRS_SQL)
+    await cur.execute(CONFLICT_PAIRS_SQL)
     skipped = 0
-    for row in cur:
+    async for row in cur:
         pair = (row["id_a"], row["id_b"])
         if pair in skip_pairs or (pair[1], pair[0]) in skip_pairs:
             continue
@@ -317,12 +320,12 @@ def next_person_conflict(
         conflict_pubs = []
         for c in row["conflicts"]:
             pub_id = c["pub_id"]
-            cur2 = conn.cursor()
-            cur2.execute(
-                "SELECT id, title, pub_year, doc_type::text FROM publications WHERE id = %s",
-                (pub_id,),
-            )
-            pub = cur2.fetchone()
+            async with conn.cursor() as cur2:
+                await cur2.execute(
+                    "SELECT id, title, pub_year, doc_type::text FROM publications WHERE id = %s",
+                    (pub_id,),
+                )
+                pub = await cur2.fetchone()
             if pub:
                 conflict_pubs.append(
                     {
@@ -333,11 +336,10 @@ def next_person_conflict(
                         "position": c["position"],
                     }
                 )
-            cur2.close()
 
         return {
-            "person_a": _get_person_dedup_detail(cur, row["id_a"]),
-            "person_b": _get_person_dedup_detail(cur, row["id_b"]),
+            "person_a": await _get_person_dedup_detail(cur, row["id_a"]),
+            "person_b": await _get_person_dedup_detail(cur, row["id_b"]),
             "conflict_pubs": conflict_pubs,
         }
 

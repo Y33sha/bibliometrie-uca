@@ -12,12 +12,12 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 
 from typing import Any
 
-from application.audit import emit_event
+from application.audit import async_emit_event, emit_event
 from application.authorships import delete_orphan_authorships
 from domain.errors import ConflictError, ValidationError
 from domain.person import compute_person_name_forms
 from domain.ports.authorship_repository import AuthorshipRepository
-from domain.ports.person_repository import PersonRepository
+from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
 from domain.sources import ALL_SOURCES_SET
 
 __all__ = [
@@ -34,6 +34,7 @@ __all__ = [
     "detach_name_form",
     "link_authorship",
     "link_authorships",
+    "async_mark_distinct",
     "mark_distinct",
     "merge_person",
     "reassign_identifier",
@@ -48,18 +49,14 @@ __all__ = [
 # ── Création ──
 
 
-def create_person(
-    cur: Any, last_name: str, first_name: str = "", *, repo: PersonRepository
-) -> int:
+def create_person(cur: Any, last_name: str, first_name: str = "", *, repo: PersonRepository) -> int:
     """Crée une personne et retourne son id."""
     person_id = repo.create(last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
     return person_id
 
 
-def set_rejected(
-    cur: Any, person_id: int, rejected: bool, *, repo: PersonRepository
-) -> None:
+def set_rejected(cur: Any, person_id: int, rejected: bool, *, repo: PersonRepository) -> None:
     """Marque ou démarque une personne comme rejetée (fausse entité).
 
     Lève NotFoundError si la personne n'existe pas.
@@ -235,9 +232,7 @@ def add_identifiers_from_authorships(
             seen.add(("idhal", a["idhal"]))
         if a.get("idref") and ("idref", a["idref"]) not in seen:
             idref_source = a.get("source", "hal")
-            add_identifier(
-                cur, person_id, "idref", a["idref"], source=idref_source, repo=repo
-            )
+            add_identifier(cur, person_id, "idref", a["idref"], source=idref_source, repo=repo)
             seen.add(("idref", a["idref"]))
 
 
@@ -276,9 +271,7 @@ def add_name_form(
     repo.add_name_form(person_id, full_name, source=source)
 
 
-def detach_name_form(
-    cur: Any, person_id: int, name_form: str, *, repo: PersonRepository
-) -> None:
+def detach_name_form(cur: Any, person_id: int, name_form: str, *, repo: PersonRepository) -> None:
     """Détache une personne d'une forme de nom. Supprime la forme si
     person_ids devient vide."""
     repo.detach_name_form(person_id, name_form)
@@ -404,9 +397,7 @@ def detach_authorships(
 # ── Fusion ──
 
 
-def mark_distinct(
-    cur: Any, person_id_a: int, person_id_b: int, *, repo: PersonRepository
-) -> None:
+def mark_distinct(cur: Any, person_id_a: int, person_id_b: int, *, repo: PersonRepository) -> None:
     """Marque deux personnes comme distinctes (non-doublon) dans
     `distinct_persons`. Idempotent.
 
@@ -424,9 +415,22 @@ def mark_distinct(
         )
 
 
-def merge_person(
-    cur: Any, target_id: int, source_id: int, *, repo: PersonRepository
+async def async_mark_distinct(
+    cur: Any, person_id_a: int, person_id_b: int, *, repo: AsyncPersonRepository
 ) -> None:
+    """Variante async de `mark_distinct` (§2.12, API admin_person_duplicates)."""
+    inserted = await repo.mark_distinct(person_id_a, person_id_b)
+    if inserted:
+        await async_emit_event(
+            cur,
+            "person.marked_distinct",
+            "person",
+            inserted[0],
+            {"other_id": inserted[1]},
+        )
+
+
+def merge_person(cur: Any, target_id: int, source_id: int, *, repo: PersonRepository) -> None:
     """Fusionne la personne `source_id` dans `target_id`.
 
     Invariant métier : refus si les deux personnes ont chacune une

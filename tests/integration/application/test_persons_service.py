@@ -11,6 +11,7 @@ from application.persons import (
     add_identifier,
     add_identifiers_from_authorships,
     assign_orphan_authorship,
+    async_mark_distinct,
     batch_assign_orphan_authorships,
     create_person,
     detach_authorships,
@@ -25,7 +26,11 @@ from application.persons import (
     update_name,
 )
 from domain.errors import NotFoundError, ValidationError
-from infrastructure.repositories import authorship_repository, person_repository
+from infrastructure.repositories import (
+    async_person_repository,
+    authorship_repository,
+    person_repository,
+)
 
 
 @pytest.fixture
@@ -36,6 +41,7 @@ def authorship_repo(db):
 @pytest.fixture
 def repo(db):
     return person_repository(db)
+
 
 # ── Helpers ────────────────────────────────────────────────────────
 
@@ -513,6 +519,34 @@ class TestMarkDistinctPersons:
             (min(p1, p2), max(p1, p2)),
         )
         assert db.fetchone()["n"] == 1
+
+
+class TestAsyncMarkDistinctPersons:
+    # Smoke test de la variante async (§2.12) — la logique métier
+    # exhaustive est couverte par la version sync ci-dessus.
+
+    async def test_inserts_ordered_pair(self, async_db):
+        repo = async_person_repository(async_db)
+        await async_db.execute(
+            "INSERT INTO persons (last_name, first_name, "
+            "last_name_normalized, first_name_normalized) "
+            "VALUES ('A', 'A', 'a', 'a') RETURNING id"
+        )
+        p1 = (await async_db.fetchone())["id"]
+        await async_db.execute(
+            "INSERT INTO persons (last_name, first_name, "
+            "last_name_normalized, first_name_normalized) "
+            "VALUES ('B', 'B', 'b', 'b') RETURNING id"
+        )
+        p2 = (await async_db.fetchone())["id"]
+
+        await async_mark_distinct(async_db, p2, p1, repo=repo)  # ordre inverse
+        await async_db.execute(
+            "SELECT COUNT(*) AS n FROM distinct_persons "
+            "WHERE person_id_a = %s AND person_id_b = %s",
+            (min(p1, p2), max(p1, p2)),
+        )
+        assert (await async_db.fetchone())["n"] == 1
 
 
 class TestAddIdentifiersFromAuthorships:
