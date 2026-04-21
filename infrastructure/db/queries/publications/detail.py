@@ -1,24 +1,24 @@
-"""Liste de toutes les années disponibles + détail d'une publication."""
+"""Liste de toutes les années disponibles + détail d'une publication (§2.12 : async)."""
 
 from typing import Any
 
 
-def all_years(cur: Any) -> list[int]:
+async def all_years(cur: Any) -> list[int]:
     """Toutes les années de publication disponibles (hors filtre UCA)."""
-    cur.execute("""
+    await cur.execute("""
         SELECT DISTINCT pub_year FROM publications
         WHERE pub_year IS NOT NULL
         ORDER BY pub_year DESC
     """)
-    return [r["pub_year"] for r in cur.fetchall()]
+    return [r["pub_year"] for r in await cur.fetchall()]
 
 
-def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
+async def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
     """Détail complet d'une publication : métadonnées, sources, authorships.
 
     Retourne None si la publication n'existe pas (caller = 404).
     """
-    cur.execute(
+    await cur.execute(
         """
         SELECT p.id, p.title, p.pub_year, p.doi, p.doc_type::text, p.oa_status::text,
                p.language, p.container_title, p.abstract,
@@ -34,20 +34,20 @@ def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
         """,
         (pub_id,),
     )
-    pub = cur.fetchone()
+    pub = await cur.fetchone()
     if not pub:
         return None
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT sd.source, sd.source_id, sd.doi, sd.hal_collections, sd.countries
         FROM source_publications sd WHERE sd.publication_id = %s
         """,
         (pub_id,),
     )
-    sources = cur.fetchall()
+    sources = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT a.author_position, a.in_perimeter, a.is_corresponding,
                a.structure_ids,
@@ -62,9 +62,9 @@ def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
         """,
         (pub_id,),
     )
-    authorships = cur.fetchall()
+    authorships = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                sa.in_perimeter, sa.structure_ids, sa.excluded, sa.countries
@@ -75,9 +75,9 @@ def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
         """,
         (pub_id,),
     )
-    hal_authorships = cur.fetchall()
+    hal_authorships = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT sa.id, sa.author_position,
                sa.raw_author_name AS full_name,
@@ -100,9 +100,9 @@ def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
         """,
         (pub_id,),
     )
-    oa_authorships = cur.fetchall()
+    oa_authorships = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                sa.in_perimeter, sa.structure_ids,
@@ -123,9 +123,9 @@ def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
         """,
         (pub_id,),
     )
-    wos_authorships = cur.fetchall()
+    wos_authorships = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                sa.roles, sa.in_perimeter
@@ -136,11 +136,11 @@ def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
         """,
         (pub_id,),
     )
-    theses_authorships = cur.fetchall()
+    theses_authorships = await cur.fetchall()
 
     thesis_meta = None
     if pub["doc_type"] in ("thesis", "ongoing_thesis"):
-        cur.execute(
+        await cur.execute(
             """
             SELECT sd.meta AS sd_meta, p.meta AS pub_meta
             FROM publications p
@@ -150,7 +150,7 @@ def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
             """,
             (pub_id,),
         )
-        row = cur.fetchone()
+        row = await cur.fetchone()
         if row:
             sd_meta = row["sd_meta"] or {}
             pub_meta = row["pub_meta"] or {}
@@ -180,14 +180,14 @@ def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
 
     structures: dict[str, Any] = {}
     if all_struct_ids:
-        cur.execute(
+        await cur.execute(
             """
             SELECT id, acronym, name, structure_type AS type FROM structures
             WHERE id = ANY(%s)
             """,
             (list(all_struct_ids),),
         )
-        for s in cur.fetchall():
+        for s in await cur.fetchall():
             structures[str(s["id"])] = {
                 "acronym": s["acronym"],
                 "name": s["name"],

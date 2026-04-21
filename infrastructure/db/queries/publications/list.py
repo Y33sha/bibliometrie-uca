@@ -1,4 +1,4 @@
-"""Liste paginée + export CSV des publications.
+"""Liste paginée + export CSV des publications (§2.12 : async).
 
 Partage `ListFilters` et la construction des conditions SQL communes.
 """
@@ -97,18 +97,20 @@ def _apply_inline_filters(conditions: list[str], params: list[Any], filters: Lis
         params.append(filters.country_values)
 
 
-def _apply_hal_status(
+async def _apply_hal_status(
     cur: Any, conditions: list[str], params: list[Any], filters: ListFilters
 ) -> None:
     """Filtre hal_status (nécessite un seul lab_id pour charger la collection)."""
     if filters.hal_status_values and len(filters.lab_ids) == 1:
-        cur.execute("SELECT hal_collection FROM structures WHERE id = %s", (filters.lab_ids[0],))
-        lab_row = cur.fetchone()
+        await cur.execute(
+            "SELECT hal_collection FROM structures WHERE id = %s", (filters.lab_ids[0],)
+        )
+        lab_row = await cur.fetchone()
         lab_hal_col = lab_row["hal_collection"] if lab_row else None
         apply_hal_status_filter(conditions, params, filters.hal_status_values, lab_hal_col)
 
 
-def _build_list_conditions(
+async def _build_list_conditions(
     cur: Any, filters: ListFilters, root_structure_id: int
 ) -> tuple[list[str], list[Any]]:
     """Construit les (conditions, params) communs à list et export."""
@@ -131,7 +133,7 @@ def _build_list_conditions(
         apply_apc_filter(
             conditions, params, filters.has_apc, root_structure_id, lab_ids=filters.lab_ids
         )
-    _apply_hal_status(cur, conditions, params, filters)
+    await _apply_hal_status(cur, conditions, params, filters)
     apply_in_perimeter_person_filter(conditions, params, filters.in_perimeter, filters.person_id)
     return conditions, params
 
@@ -158,7 +160,7 @@ _ORDER_MAP = {
 # ── Liste paginée ─────────────────────────────────────────────────
 
 
-def list_publications(
+async def list_publications(
     cur: Any,
     *,
     filters: ListFilters,
@@ -168,16 +170,17 @@ def list_publications(
     sort: str,
 ) -> dict[str, Any]:
     """Liste paginée des publications avec sources, labos, journal."""
-    cur.execute("SET LOCAL jit = off")
+    await cur.execute("SET LOCAL jit = off")
     offset = (page - 1) * per_page
-    conditions, params = _build_list_conditions(cur, filters, root_structure_id)
+    conditions, params = await _build_list_conditions(cur, filters, root_structure_id)
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
     order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
 
-    cur.execute(f"SELECT COUNT(*) FROM publications p WHERE {where_clause}", params)
-    total = cur.fetchone()["count"]
+    await cur.execute(f"SELECT COUNT(*) FROM publications p WHERE {where_clause}", params)
+    row = await cur.fetchone()
+    total = row["count"]
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             p.id, p.title, p.pub_year, p.doi, p.doc_type::text,
@@ -271,7 +274,7 @@ def list_publications(
             "authorship_id": r["authorship_id"],
             "hal_collections": r["hal_collections"],
         }
-        for r in cur.fetchall()
+        for r in await cur.fetchall()
     ]
     return {
         "total": total,
@@ -352,7 +355,7 @@ def _build_export_conditions(filters: ListFilters) -> tuple[list[str], list[Any]
     return conditions, params
 
 
-def export_publications_csv(
+async def export_publications_csv(
     cur: Any, *, filters: ListFilters, root_structure_id: int, sort: str
 ) -> str:
     """Export CSV (sans pagination) avec les mêmes filtres que list_publications.
@@ -363,12 +366,12 @@ def export_publications_csv(
     Simplification : les filtres hal_status / in_perimeter ne sont pas
     appliqués dans l'export historique, on reproduit ce comportement.
     """
-    cur.execute("SET LOCAL jit = off")
+    await cur.execute("SET LOCAL jit = off")
     conditions, params = _build_export_conditions(filters)
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
     order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             p.id, p.title, p.pub_year, p.doi, p.doc_type::text,
@@ -420,7 +423,7 @@ def export_publications_csv(
             "WoS",
         ]
     )
-    for row in cur.fetchall():
+    for row in await cur.fetchall():
         hal_url = f"https://hal.science/{row['hal_id']}" if row["hal_id"] else ""
         oa_url = f"https://openalex.org/{row['openalex_id']}" if row["openalex_id"] else ""
         wos_url = (
@@ -444,4 +447,4 @@ def export_publications_csv(
             ]
         )
 
-    return "\ufeff" + buf.getvalue()
+    return "﻿" + buf.getvalue()

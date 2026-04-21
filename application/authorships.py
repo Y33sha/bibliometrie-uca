@@ -13,8 +13,8 @@ et les scripts de correction. Le SQL vit dans
 
 from typing import Any
 
-from application.audit import emit_event
-from application.ports.perimeter import AsyncPerimeterQueries, PerimeterQueries
+from application.audit import async_emit_event, emit_event
+from application.ports.perimeter import AsyncPerimeterQueries
 from domain.errors import NotFoundError, ValidationError
 from domain.ports.authorship_repository import AsyncAuthorshipRepository, AuthorshipRepository
 from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
@@ -106,9 +106,7 @@ def detach_source(
     return False
 
 
-def delete_orphan_authorships(
-    cur: Any, person_id: int, *, repo: AuthorshipRepository
-) -> int:
+def delete_orphan_authorships(cur: Any, person_id: int, *, repo: AuthorshipRepository) -> int:
     """Supprime les authorships vérité d'une personne qui ne sont plus attestées
     par aucune authorship source.
     Retourne le nombre d'authorships supprimées.
@@ -153,6 +151,53 @@ def sync_person_id_from_source(
         raise ValidationError(f"Source inconnue : {source}")
 
     return repo.sync_person_id_from_sources(source_authorship_ids)
+
+
+async def async_set_source_authorship_excluded(
+    cur: Any,
+    source_authorship_id: int,
+    source: str,
+    excluded: bool,
+    *,
+    repo: AsyncAuthorshipRepository,
+) -> None:
+    """Variante async de `set_source_authorship_excluded` (§2.12, router publications)."""
+    if source not in VALID_SOURCES:
+        raise ValidationError(f"Source inconnue : {source}")
+
+    if not await repo.set_source_authorship_excluded(source_authorship_id, source, excluded):
+        raise NotFoundError(f"Authorship source {source}:{source_authorship_id} introuvable")
+
+    if excluded:
+        await async_detach_source(cur, source_authorship_id, source, repo=repo)
+
+    await async_emit_event(
+        cur,
+        "source_authorship.excluded",
+        "source_authorship",
+        source_authorship_id,
+        {"source": source, "excluded": excluded},
+    )
+
+
+async def async_detach_source(
+    cur: Any, source_authorship_id: int, source: str, *, repo: AsyncAuthorshipRepository
+) -> bool:
+    """Variante async de `detach_source` (§2.12, utilisée par
+    async_set_source_authorship_excluded)."""
+    if source not in VALID_SOURCES:
+        raise ValidationError(f"Source inconnue : {source}")
+
+    truth_id = await repo.get_source_authorship_truth_id(source_authorship_id, source)
+    if not truth_id:
+        return False
+
+    await repo.clear_source_authorship_fk(source_authorship_id, source)
+
+    if not await repo.has_active_source_attestation(truth_id):
+        await repo.delete_authorship(truth_id)
+        return True
+    return False
 
 
 async def propagate_uca_for_addresses(
