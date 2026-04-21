@@ -5,10 +5,10 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from application.persons import mark_distinct as _mark_persons_distinct
-from infrastructure.db.queries import duplicates as dup_queries
-from infrastructure.repositories import person_repository
-from interfaces.api.deps import get_cursor
+from application.persons import async_mark_distinct as _mark_persons_distinct
+from infrastructure.db.queries import person_duplicates as dup_queries
+from infrastructure.repositories import async_person_repository
+from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import (
     MarkPersonsDistinct,
     OkResponse,
@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 @router.get("/api/admin/person-duplicates/count", response_model=TotalCountResponse)
 async def count_person_duplicates() -> Any:
     """Comptage des paires candidates doublons-personnes."""
-    with get_cursor() as (cur, _conn):
-        return {"total": dup_queries.count_person_duplicates(cur)}
+    async with get_async_cursor() as (cur, _conn):
+        return {"total": await dup_queries.count_person_duplicates(cur)}
 
 
 @router.get("/api/admin/person-duplicates/next", response_model=PersonDuplicatePairResponse)
@@ -40,8 +40,8 @@ async def next_person_duplicate(
     Renvoie `{"pair": null}` si aucune paire restante.
     """
     skip_pairs = dup_queries.parse_skip_pairs(skip) if skip else None
-    with get_cursor() as (cur, _conn):
-        pair = dup_queries.next_person_duplicate(cur, skip_pairs=skip_pairs, offset=offset)
+    async with get_async_cursor() as (cur, _conn):
+        pair = await dup_queries.next_person_duplicate(cur, skip_pairs=skip_pairs, offset=offset)
         return {"pair": pair}
 
 
@@ -52,8 +52,10 @@ async def mark_persons_distinct(body: MarkPersonsDistinct) -> Any:
         raise HTTPException(
             status_code=400, detail="person_id_a et person_id_b doivent être différents"
         )
-    with get_cursor() as (cur, _conn):
-        _mark_persons_distinct(cur, body.person_id_a, body.person_id_b, repo=person_repository(cur))
+    async with get_async_cursor() as (cur, _conn):
+        await _mark_persons_distinct(
+            cur, body.person_id_a, body.person_id_b, repo=async_person_repository(cur)
+        )
         return {"ok": True}
 
 
@@ -65,8 +67,8 @@ async def count_person_conflict_pairs() -> Any:
     `publication_id` alors que leur forme de nom est compatible →
     suggère un doublon que la déduplication classique n'a pas vu.
     """
-    with get_cursor() as (cur, _conn):
-        return {"total": dup_queries.count_person_conflict_pairs(cur)}
+    async with get_async_cursor() as (cur, _conn):
+        return {"total": await dup_queries.count_person_conflict_pairs(cur)}
 
 
 @router.get(
@@ -83,6 +85,8 @@ async def next_person_conflict(
     candidats de similarité de nom.
     """
     skip_pairs = dup_queries.parse_skip_pairs(skip) if skip else set()
-    with get_cursor() as (cur, conn):
-        pair = dup_queries.next_person_conflict(cur, conn, skip_pairs=skip_pairs, offset=offset)
+    async with get_async_cursor() as (cur, conn):
+        pair = await dup_queries.next_person_conflict(
+            cur, conn, skip_pairs=skip_pairs, offset=offset
+        )
         return {"pair": pair}

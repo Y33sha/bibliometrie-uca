@@ -78,3 +78,59 @@ def get_persons_structure_ids(cur: Any) -> set[int]:
 def get_persons_structure_ids_list(cur: Any) -> list[int]:
     """Variante liste (pour usage dans les requêtes SQL ANY(%s))."""
     return list(get_persons_structure_ids(cur))
+
+
+# ── Variantes async (§2.12) — utilisées par la surface FastAPI ────
+
+
+async def async_get_perimeter_structure_ids(cur: Any, perimeter_code: str) -> set[int]:
+    """Variante async de get_perimeter_structure_ids."""
+    await cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perimeter_code,))
+    row = await cur.fetchone()
+
+    if not row:
+        return set()
+
+    root_ids = row["structure_ids"] if isinstance(row, dict) else row[0]
+    if not root_ids:
+        return set()
+
+    await cur.execute(
+        """
+        WITH RECURSIVE descendants AS (
+            SELECT unnest(%s::int[]) AS id
+            UNION
+            SELECT sr.child_id FROM structure_relations sr
+            JOIN descendants d ON d.id = sr.parent_id
+            WHERE sr.relation_type = 'est_tutelle_de'
+        )
+        SELECT id FROM descendants
+    """,
+        (root_ids,),
+    )
+    rows = await cur.fetchall()
+    return {r["id"] if isinstance(r, dict) else r[0] for r in rows}
+
+
+async def _async_config_perimeter_code(cur: Any, config_key: str, default: str) -> str:
+    """Variante async de _config_perimeter_code."""
+    try:
+        await cur.execute("SELECT value FROM config WHERE key = %s", (config_key,))
+        row = await cur.fetchone()
+        if row:
+            val = row["value"] if isinstance(row, dict) else row[0]
+            return val if isinstance(val, str) else default
+    except Exception:
+        pass
+    return default
+
+
+async def async_get_persons_structure_ids(cur: Any) -> set[int]:
+    """Variante async de get_persons_structure_ids."""
+    code = await _async_config_perimeter_code(cur, "perimeter_persons", "uca")
+    return await async_get_perimeter_structure_ids(cur, code)
+
+
+async def async_get_persons_structure_ids_list(cur: Any) -> list[int]:
+    """Variante async liste (pour ANY(%s))."""
+    return list(await async_get_persons_structure_ids(cur))

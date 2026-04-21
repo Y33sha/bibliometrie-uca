@@ -1,6 +1,7 @@
 """Port : lecture des périmètres (ensembles de structures).
 
-Implémenté par `infrastructure.db.queries.perimeter.PgPerimeterQueries`.
+Implémenté par `infrastructure.db.queries.perimeter.PgPerimeterQueries`
+(sync) et `PgAsyncPerimeterQueries` (async, §2.12).
 """
 
 from typing import Any, Protocol
@@ -12,3 +13,9 @@ class PerimeterQueries(Protocol):
     def get_persons_structure_ids_list(self, cur: Any) -> list[int]:
         """Liste des structure_ids du périmètre personnes (pour ANY(%s))."""
         ...
+
+
+class AsyncPerimeterQueries(Protocol):
+    """Variante async (§2.12)."""
+
+    async def get_persons_structure_ids_list(self, cur: Any) -> list[int]: ...

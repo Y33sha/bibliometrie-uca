@@ -1,4 +1,4 @@
-"""Stats agrégées par revue."""
+"""Stats agrégées par revue (§2.12 : async)."""
 
 from typing import Any
 
@@ -24,7 +24,7 @@ _JOURNAL_SORT_MAP = {
 }
 
 
-def journal_stats(
+async def journal_stats(
     cur: Any,
     *,
     root_structure_id: int,
@@ -40,7 +40,7 @@ def journal_stats(
 ) -> dict[str, Any]:
     """Stats agrégées par revue, paginées."""
     offset = (page - 1) * per_page
-    cur.execute("SET LOCAL jit = off")
+    await cur.execute("SET LOCAL jit = off")
 
     conditions = [
         PUB_IS_UCA,
@@ -61,7 +61,7 @@ def journal_stats(
     apply_stats_apc_filter(conditions, params, has_apc, root_structure_id)
     where = " AND ".join(conditions)
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT COUNT(DISTINCT j.id) AS total
         FROM publications p
@@ -70,10 +70,11 @@ def journal_stats(
         """,
         params,
     )
-    total = cur.fetchone()["total"]
+    row = await cur.fetchone()
+    total = row["total"]
 
     order = _JOURNAL_SORT_MAP.get(sort, "COUNT(DISTINCT p.id) DESC")
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             j.id AS journal_id,
@@ -102,4 +103,4 @@ def journal_stats(
         """,
         [root_structure_id] + params + [per_page, offset],
     )
-    return paginated(total, page, per_page, "journals", cur.fetchall())
+    return paginated(total, page, per_page, "journals", await cur.fetchall())

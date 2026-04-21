@@ -1,4 +1,4 @@
-"""Router /api/publications/* — délègue les queries à infrastructure/db/queries/publications.py.
+"""Router /api/publications/* — délègue les queries à infrastructure/db/queries/publications.
 
 Seul le endpoint POST /api/source-authorships/.../exclude contient encore
 du comportement applicatif (invocation d'un use case), pas une query pure.
@@ -10,12 +10,13 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Response
 
 from application.authorships import (
-    set_source_authorship_excluded as _set_source_authorship_excluded,
+    async_set_source_authorship_excluded as _set_source_authorship_excluded,
 )
 from infrastructure.db.queries import publications as pub_queries
 from infrastructure.db.queries.publications import FacetFilters, ListFilters
-from infrastructure.repositories import authorship_repository
-from interfaces.api.deps import get_cursor, get_root_structure_id
+from infrastructure.repositories import async_authorship_repository
+from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.deps import get_root_structure_id
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 from interfaces.api.models import (
     ExcludeSourceAuthorship,
@@ -75,8 +76,8 @@ async def publications_facets(
         hal_status_values=parse_str_csv(hal_status),
         in_perimeter=in_perimeter,
     )
-    with get_cursor() as (cur, _conn):
-        return pub_queries.publications_facets(
+    async with get_async_cursor() as (cur, _conn):
+        return await pub_queries.publications_facets(
             cur, filters=filters, root_structure_id=get_root_structure_id()
         )
 
@@ -89,8 +90,8 @@ async def all_years() -> Any:
     cet endpoint remonte l'intégralité des `pub_year` distincts pour
     alimenter le filtre « année » côté admin.
     """
-    with get_cursor() as (cur, _conn):
-        return pub_queries.all_years(cur)
+    async with get_async_cursor() as (cur, _conn):
+        return await pub_queries.all_years(cur)
 
 
 @router.get("/api/publications/export.csv")
@@ -122,8 +123,8 @@ async def export_publications_csv(
         excluded_types=parse_str_csv(excluded_doc_type),
         person_id=person_id,
     )
-    with get_cursor() as (cur, _conn):
-        csv_content = pub_queries.export_publications_csv(
+    async with get_async_cursor() as (cur, _conn):
+        csv_content = await pub_queries.export_publications_csv(
             cur, filters=filters, root_structure_id=get_root_structure_id(), sort=sort
         )
     return Response(
@@ -136,8 +137,8 @@ async def export_publications_csv(
 @router.get("/api/publications/{pub_id}", response_model=PublicationDetailResponse)
 async def get_publication(pub_id: int) -> Any:
     """Détail complet d'une publication."""
-    with get_cursor() as (cur, _conn):
-        detail = pub_queries.get_publication_detail(cur, pub_id)
+    async with get_async_cursor() as (cur, _conn):
+        detail = await pub_queries.get_publication_detail(cur, pub_id)
         if detail is None:
             raise HTTPException(status_code=404, detail="Publication not found")
         return detail
@@ -155,9 +156,9 @@ async def exclude_source_authorship(
     Si aucune source non exclue n'atteste plus l'authorship consolidée,
     celle-ci est supprimée.
     """
-    with get_cursor() as (cur, _conn):
-        _set_source_authorship_excluded(
-            cur, authorship_id, source, body.excluded, repo=authorship_repository(cur)
+    async with get_async_cursor() as (cur, _conn):
+        await _set_source_authorship_excluded(
+            cur, authorship_id, source, body.excluded, repo=async_authorship_repository(cur)
         )
         return {"ok": True, "excluded": body.excluded}
 
@@ -212,8 +213,8 @@ async def list_publications(
         hal_status_values=parse_str_csv(hal_status),
         in_perimeter=in_perimeter,
     )
-    with get_cursor() as (cur, _conn):
-        return pub_queries.list_publications(
+    async with get_async_cursor() as (cur, _conn):
+        return await pub_queries.list_publications(
             cur,
             filters=filters,
             root_structure_id=get_root_structure_id(),

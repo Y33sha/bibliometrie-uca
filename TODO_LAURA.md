@@ -4,7 +4,7 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 ## Pipeline
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
-* [ ] y a-t-il un cross-import sur le cross-import au run suivant?
+* [ ] y a-t-il un cross-import sur le cross-import au run suivant? vérifier la logique
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
 * [ ] 2026-04-20 12:13:42 [ERROR] Erreur sur W4206741675: ERREUR:  une instruction insert ou update sur la table « source_authorship_addresses » viole la contrainte de clé
 étrangère « source_authorship_addresses_address_id_fkey »
@@ -16,12 +16,8 @@ DETAIL:  La clé (address_id)=(4283651) n'est pas présente dans la table « add
 * [ ] authorships excluded: info perdue si réimport (grave?)
 ## Imports csv
 * [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer) => pas urgent, pas d'imports csv à terme en prod
-## Chantiers au long cours
-* [ ] chercher des moyens d'optimiser la taille de la base: supprimer données qui ne sont plus utiles? ex.: supprimer *_authors et *_structures (sauf hal)? chercher colonnes jamais utilisées. Externaliser dans des fichiers json par publi les authorships sources.
-* [ ] audit complet du code pour retrouver tous les trucs hardcodés qu'on pourrait abstraire, ou le SQL à simplifier suite aux fusions des tables sources.
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
-* [ ] auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques)
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
 # Données
 ## Explorer autres sources possibles
@@ -64,6 +60,7 @@ DETAIL:  La clé (address_id)=(4283651) n'est pas présente dans la table « add
 * [ ] logique bizarre à corriger: if is_thesis and has_hal_link: priority = _PRIORITY_THESIS_HAL_LINKED
 * [ ] vérifier si certains ports ne seraient pas mieux placés dans application/ (critère: sont-ils importés par domain/ ou pas?)
 * [ ] faire le ménage dans db/queries: trop de choses mal rangées ou mal nommées
+* [ ] auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques)
 # Interface
 * [ ] documentation: affichage cassé
 ## Admin

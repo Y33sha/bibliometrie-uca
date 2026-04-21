@@ -8,29 +8,31 @@ restent autorisées dans les routers (convention du projet).
 
 from typing import Any
 
-from application.audit import emit_event
+from application.audit import async_emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from domain.ports.config_repository import ConfigRepository
+from domain.ports.config_repository import AsyncConfigRepository
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
 
-def update_config_value(cur: Any, key: str, value: Any, *, repo: ConfigRepository) -> dict:
-    """Met à jour la valeur d'un paramètre de config existant.
+async def update_config_value(
+    cur: Any, key: str, value: Any, *, repo: AsyncConfigRepository
+) -> dict:
+    """Met à jour la valeur d'un paramètre de config existant (§2.12).
 
     `value` est sérialisé en JSON. Retourne la ligne mise à jour.
     Lève NotFoundError si la clé n'existe pas.
     """
-    if not repo.config_key_exists(key):
+    if not await repo.config_key_exists(key):
         raise NotFoundError(f"Paramètre '{key}' introuvable")
-    return repo.update_config_value(key, value)
+    return await repo.update_config_value(key, value)
 
 
 # ── Perimeters — structures membres ──────────────────────────────
 
 
-def add_perimeter_structure(
-    cur: Any, perimeter_id: int, structure_id: int, *, repo: ConfigRepository
+async def add_perimeter_structure(
+    cur: Any, perimeter_id: int, structure_id: int, *, repo: AsyncConfigRepository
 ) -> str:
     """Ajoute une structure au périmètre (idempotent).
 
@@ -40,36 +42,36 @@ def add_perimeter_structure(
 
     Lève NotFoundError si le périmètre n'existe pas.
     """
-    if repo.add_structure_to_perimeter(perimeter_id, structure_id):
+    if await repo.add_structure_to_perimeter(perimeter_id, structure_id):
         return "added"
 
     # Pas d'UPDATE → soit déjà présent, soit périmètre inexistant
-    if repo.perimeter_exists(perimeter_id):
+    if await repo.perimeter_exists(perimeter_id):
         return "already_present"
     raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
 
-def remove_perimeter_structure(
-    cur: Any, perimeter_id: int, structure_id: int, *, repo: ConfigRepository
+async def remove_perimeter_structure(
+    cur: Any, perimeter_id: int, structure_id: int, *, repo: AsyncConfigRepository
 ) -> None:
     """Retire une structure d'un périmètre (idempotent).
 
     Lève NotFoundError si le périmètre n'existe pas.
     """
-    if not repo.remove_structure_from_perimeter(perimeter_id, structure_id):
+    if not await repo.remove_structure_from_perimeter(perimeter_id, structure_id):
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
 
 # ── Perimeters — CRUD ────────────────────────────────────────────
 
 
-def create_perimeter(
+async def create_perimeter(
     cur: Any,
     *,
     code: str,
     name: str,
     description: str | None = None,
-    repo: ConfigRepository,
+    repo: AsyncConfigRepository,
 ) -> int:
     """Crée un nouveau périmètre. Retourne l'id créé.
 
@@ -79,20 +81,20 @@ def create_perimeter(
     if not code or not name:
         raise ValidationError("Code et nom requis")
 
-    if repo.perimeter_code_exists(code):
+    if await repo.perimeter_code_exists(code):
         raise ConflictError(f"Le code '{code}' existe déjà")
-    return repo.create_perimeter(code=code, name=name, description=description)
+    return await repo.create_perimeter(code=code, name=name, description=description)
 
 
-def update_perimeter(
-    cur: Any, perimeter_id: int, *, fields: dict, repo: ConfigRepository
+async def update_perimeter(
+    cur: Any, perimeter_id: int, *, fields: dict, repo: AsyncConfigRepository
 ) -> None:
     """Met à jour un périmètre (name, description, structure_ids).
 
     Lève NotFoundError si le périmètre n'existe pas.
     Lève ValidationError si `fields` est vide ou ne contient aucun champ valide.
     """
-    if not repo.perimeter_exists(perimeter_id):
+    if not await repo.perimeter_exists(perimeter_id):
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
     allowed = {"name", "description", "structure_ids"}
@@ -100,35 +102,26 @@ def update_perimeter(
     if not clean:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    repo.update_perimeter_fields(perimeter_id, clean)
+    await repo.update_perimeter_fields(perimeter_id, clean)
 
 
-def perimeter_usage(
-    cur: Any, perimeter_code: str, *, repo: ConfigRepository
-) -> list[str]:
-    """Retourne la liste des clés config qui référencent ce périmètre
-    (ex: ["perimeter_extraction", "perimeter_persons"]).
-    """
-    return repo.config_keys_referencing_perimeter(perimeter_code)
-
-
-def delete_perimeter(cur: Any, perimeter_id: int, *, repo: ConfigRepository) -> None:
+async def delete_perimeter(cur: Any, perimeter_id: int, *, repo: AsyncConfigRepository) -> None:
     """Supprime un périmètre.
 
     Lève NotFoundError si le périmètre n'existe pas.
     Lève ConflictError si le périmètre est utilisé par la config pipeline ;
     le message contient la liste des clés qui le référencent.
     """
-    code = repo.get_perimeter_code(perimeter_id)
+    code = await repo.get_perimeter_code(perimeter_id)
     if code is None:
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
-    used_by = repo.config_keys_referencing_perimeter(code)
+    used_by = await repo.config_keys_referencing_perimeter(code)
     if used_by:
         raise ConflictError(f"Ce périmètre est utilisé par : {', '.join(used_by)}")
 
-    repo.delete_perimeter(perimeter_id)
-    emit_event(
+    await repo.delete_perimeter(perimeter_id)
+    await async_emit_event(
         cur,
         "perimeter.deleted",
         "perimeter",

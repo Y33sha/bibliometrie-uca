@@ -87,3 +87,25 @@ def emit_event(
         """,
         (event_type, aggregate_type, aggregate_id, Json(payload or {}), user_id),
     )
+
+
+async def async_emit_event(
+    cur: Any,
+    event_type: str,
+    aggregate_type: str,
+    aggregate_id: int | None = None,
+    payload: dict[str, Any] | None = None,
+) -> None:
+    """Variante async d'`emit_event` (§2.12). Même sémantique, curseur async."""
+    user_id = get_current_user()
+    if user_id is None:
+        return
+
+    await cur.execute(
+        """
+        INSERT INTO audit_log (event_type, aggregate_type, aggregate_id,
+                               payload, user_id)
+        VALUES (%s, %s, %s, %s, %s)
+        """,
+        (event_type, aggregate_type, aggregate_id, Json(payload or {}), user_id),
+    )

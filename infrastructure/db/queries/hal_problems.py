@@ -1,24 +1,25 @@
-"""Query services pour le router `/api/hal-problems/*` : contrôles qualité
-HAL au niveau des publications (doublons de dépôts, manques dans les collections,
-conflits d'affiliation).
+"""Query services async pour le router `/api/hal-problems/*` (§2.12).
+
+Contrôles qualité HAL au niveau des publications (doublons de dépôts,
+manques dans les collections, conflits d'affiliation).
 """
 
 from typing import Any
 
 
-def _hal_pub_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
+async def _hal_pub_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
     """Détail publication pour doublons HAL."""
-    cur.execute(
+    await cur.execute(
         """
         SELECT p.id, p.title, p.pub_year, p.doc_type::text, p.doi, p.container_title
         FROM publications p WHERE p.id = %s
         """,
         (pub_id,),
     )
-    pub = cur.fetchone()
+    pub = await cur.fetchone()
     if not pub:
         return None
-    cur.execute(
+    await cur.execute(
         """
         SELECT sd.source_id AS halid, sd.hal_collections, sd.doc_type AS hal_doc_type,
                sd.pub_year AS hal_pub_year, sd.title AS hal_title,
@@ -29,14 +30,14 @@ def _hal_pub_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
         """,
         (pub_id,),
     )
-    hal_docs = [dict(r) for r in cur.fetchall()]
+    hal_docs = [dict(r) for r in await cur.fetchall()]
     return {**dict(pub), "hal_docs": hal_docs}
 
 
-def hal_duplicate_pubs_by_doi(cur: Any, *, page: int, per_page: int) -> dict[str, Any]:
+async def hal_duplicate_pubs_by_doi(cur: Any, *, page: int, per_page: int) -> dict[str, Any]:
     """Dépôts HAL avec DOI identique rattachés à la même publication."""
     offset = (page - 1) * per_page
-    cur.execute("""
+    await cur.execute("""
         SELECT COUNT(*) FROM (
             SELECT sd.publication_id, LOWER(sd.doi)
             FROM source_publications sd
@@ -45,9 +46,10 @@ def hal_duplicate_pubs_by_doi(cur: Any, *, page: int, per_page: int) -> dict[str
             HAVING COUNT(*) >= 2
         ) sub
     """)
-    total = cur.fetchone()["count"]
+    row = await cur.fetchone()
+    total = row["count"]
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT LOWER(sd.doi) AS doi,
                sd.publication_id AS pub_id,
@@ -61,9 +63,10 @@ def hal_duplicate_pubs_by_doi(cur: Any, *, page: int, per_page: int) -> dict[str
         """,
         (per_page, offset),
     )
+    rows = await cur.fetchall()
     pairs = []
-    for r in cur.fetchall():
-        pub = _hal_pub_detail(cur, r["pub_id"])
+    for r in rows:
+        pub = await _hal_pub_detail(cur, r["pub_id"])
         if pub:
             pairs.append({"doi": r["doi"], "halids": r["halids"], "publication": pub})
 
@@ -76,7 +79,7 @@ def hal_duplicate_pubs_by_doi(cur: Any, *, page: int, per_page: int) -> dict[str
     }
 
 
-def hal_duplicate_pubs_by_metadata(cur: Any, *, page: int, per_page: int) -> dict[str, Any]:
+async def hal_duplicate_pubs_by_metadata(cur: Any, *, page: int, per_page: int) -> dict[str, Any]:
     """Doublons possibles : dépôts HAL avec métadonnées identiques."""
     offset = (page - 1) * per_page
     dup_query = """
@@ -98,10 +101,11 @@ def hal_duplicate_pubs_by_metadata(cur: Any, *, page: int, per_page: int) -> dic
                           WHERE dp.pub_id_a = LEAST(p1.id, p2.id) AND dp.pub_id_b = GREATEST(p1.id, p2.id))
     """
 
-    cur.execute(f"SELECT COUNT(*) {dup_query}")
-    total = cur.fetchone()["count"]
+    await cur.execute(f"SELECT COUNT(*) {dup_query}")
+    row = await cur.fetchone()
+    total = row["count"]
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT p1.id AS id_a, p2.id AS id_b
         {dup_query}
@@ -110,10 +114,11 @@ def hal_duplicate_pubs_by_metadata(cur: Any, *, page: int, per_page: int) -> dic
         """,
         (per_page, offset),
     )
+    rows = await cur.fetchall()
     pairs = []
-    for r in cur.fetchall():
-        pub_a = _hal_pub_detail(cur, r["id_a"])
-        pub_b = _hal_pub_detail(cur, r["id_b"])
+    for r in rows:
+        pub_a = await _hal_pub_detail(cur, r["id_a"])
+        pub_b = await _hal_pub_detail(cur, r["id_b"])
         if pub_a and pub_b:
             pairs.append({"pub_a": pub_a, "pub_b": pub_b})
 
@@ -129,22 +134,24 @@ def hal_duplicate_pubs_by_metadata(cur: Any, *, page: int, per_page: int) -> dic
 # ── HAL missing collections ──────────────────────────────────────
 
 
-def hal_missing_collections_labs(cur: Any) -> list[dict[str, Any]]:
+async def hal_missing_collections_labs(cur: Any) -> list[dict[str, Any]]:
     """Liste des labos avec collection HAL configurée."""
-    cur.execute("""
+    await cur.execute("""
         SELECT s.id, s.acronym, s.name, s.hal_collection
         FROM structures s
         WHERE s.hal_collection IS NOT NULL AND s.structure_type = 'labo'
         ORDER BY s.acronym
     """)
-    return [dict(r) for r in cur.fetchall()]
+    return [dict(r) for r in await cur.fetchall()]
 
 
-def hal_missing_collections(cur: Any, *, lab_id: int, page: int, per_page: int) -> dict[str, Any]:
+async def hal_missing_collections(
+    cur: Any, *, lab_id: int, page: int, per_page: int
+) -> dict[str, Any]:
     """Publications affiliées à un labo sur OA/WoS, présentes dans HAL,
     mais absentes de la collection HAL du labo."""
-    cur.execute("SELECT acronym, hal_collection FROM structures WHERE id = %s", (lab_id,))
-    lab = cur.fetchone()
+    await cur.execute("SELECT acronym, hal_collection FROM structures WHERE id = %s", (lab_id,))
+    lab = await cur.fetchone()
     if not lab or not lab["hal_collection"]:
         return {"error": "no_collection"}
 
@@ -163,10 +170,11 @@ def hal_missing_collections(cur: Any, *, lab_id: int, page: int, per_page: int) 
     """
     params: list[Any] = [lab_arr, col]
 
-    cur.execute(f"SELECT COUNT(DISTINCT p.id) {base_where}", params)
-    total = cur.fetchone()["count"]
+    await cur.execute(f"SELECT COUNT(DISTINCT p.id) {base_where}", params)
+    row = await cur.fetchone()
+    total = row["count"]
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT DISTINCT p.id, p.title, p.pub_year, p.doc_type::text, p.doi,
                (SELECT array_agg(sd2.source_id) FROM source_publications sd2
@@ -180,7 +188,7 @@ def hal_missing_collections(cur: Any, *, lab_id: int, page: int, per_page: int) 
         """,
         params + [per_page, offset],
     )
-    pubs = [dict(r) for r in cur.fetchall()]
+    pubs = [dict(r) for r in await cur.fetchall()]
 
     return {
         "total": total,
@@ -196,9 +204,9 @@ def hal_missing_collections(cur: Any, *, lab_id: int, page: int, per_page: int) 
 # ── HAL affiliation conflicts ────────────────────────────────────
 
 
-def hal_affiliation_conflicts(cur: Any, *, page: int, per_page: int) -> dict[str, Any]:
+async def hal_affiliation_conflicts(cur: Any, *, page: int, per_page: int) -> dict[str, Any]:
     """Publications affiliées UCA dans HAL mais pas dans OA/WoS."""
-    cur.execute("SET LOCAL jit = off")
+    await cur.execute("SET LOCAL jit = off")
     offset = (page - 1) * per_page
     base_where = """
         FROM authorships a
@@ -232,10 +240,11 @@ def hal_affiliation_conflicts(cur: Any, *, page: int, per_page: int) -> dict[str
           )
     """
 
-    cur.execute(f"SELECT COUNT(DISTINCT p.id) {base_where}")
-    total = cur.fetchone()["count"]
+    await cur.execute(f"SELECT COUNT(DISTINCT p.id) {base_where}")
+    row = await cur.fetchone()
+    total = row["count"]
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT DISTINCT p.id, p.title, p.pub_year, p.doc_type::text, p.doi,
                (SELECT array_agg(sd2.source_id) FROM source_publications sd2
@@ -259,7 +268,7 @@ def hal_affiliation_conflicts(cur: Any, *, page: int, per_page: int) -> dict[str
             "halids": r["halids"],
             "labs": r["labs"],
         }
-        for r in cur.fetchall()
+        for r in await cur.fetchall()
     ]
 
     return {

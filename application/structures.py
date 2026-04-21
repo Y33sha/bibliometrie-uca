@@ -12,10 +12,10 @@ from typing import Any
 from psycopg.types.json import Jsonb as Json
 from pydantic import ValidationError as PydanticValidationError
 
-from application.audit import emit_event
+from application.audit import async_emit_event
 from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
-from domain.ports.structure_repository import StructureRepository
+from domain.ports.structure_repository import AsyncStructureRepository
 from domain.structure import StructureApiIds
 
 
@@ -48,7 +48,7 @@ _STRUCTURE_FIELD_MAP = {
 # ── structures ────────────────────────────────────────────────────
 
 
-def create_structure(
+async def create_structure(
     cur: Any,
     *,
     code: str,
@@ -59,10 +59,10 @@ def create_structure(
     rnsr_id: str | None = None,
     hal_collection: str | None = None,
     api_ids: dict | None = None,
-    repo: StructureRepository,
+    repo: AsyncStructureRepository,
 ) -> dict:
     """Crée une structure. Retourne la ligne insérée (dict)."""
-    return repo.create_structure(
+    return await repo.create_structure(
         code=code,
         name=name,
         acronym=acronym,
@@ -74,15 +74,15 @@ def create_structure(
     )
 
 
-def update_structure(
-    cur: Any, structure_id: int, *, fields: dict, repo: StructureRepository
+async def update_structure(
+    cur: Any, structure_id: int, *, fields: dict, repo: AsyncStructureRepository
 ) -> dict:
     """Met à jour une structure. Retourne la ligne modifiée.
 
     Lève NotFoundError si la structure n'existe pas.
     Lève ValidationError si `fields` ne contient aucun champ valide.
     """
-    if not repo.structure_exists(structure_id):
+    if not await repo.structure_exists(structure_id):
         raise NotFoundError(f"Structure {structure_id} introuvable")
 
     sql_fragments: list[str] = []
@@ -101,15 +101,17 @@ def update_structure(
     if not sql_fragments:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    return repo.update_structure_fields(structure_id, sql_fragments, params)
+    return await repo.update_structure_fields(structure_id, sql_fragments, params)
 
 
-def delete_structure(cur: Any, structure_id: int, *, repo: StructureRepository) -> None:
+async def delete_structure(
+    cur: Any, structure_id: int, *, repo: AsyncStructureRepository
+) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas."""
-    row = repo.delete_structure(structure_id)
+    row = await repo.delete_structure(structure_id)
     if not row:
         raise NotFoundError(f"Structure {structure_id} introuvable")
-    emit_event(
+    await async_emit_event(
         cur,
         "structure.deleted",
         "structure",
@@ -121,28 +123,30 @@ def delete_structure(cur: Any, structure_id: int, *, repo: StructureRepository) 
 # ── structure_relations ───────────────────────────────────────────
 
 
-def create_relation(
+async def create_relation(
     cur: Any,
     *,
     parent_id: int,
     child_id: int,
     relation_type: str,
-    repo: StructureRepository,
+    repo: AsyncStructureRepository,
 ) -> dict | None:
     """Crée une relation. Retourne la ligne insérée, ou None si elle existait déjà."""
-    return repo.create_relation(
+    return await repo.create_relation(
         parent_id=parent_id,
         child_id=child_id,
         relation_type=relation_type,
     )
 
 
-def delete_relation(cur: Any, relation_id: int, *, repo: StructureRepository) -> None:
+async def delete_relation(
+    cur: Any, relation_id: int, *, repo: AsyncStructureRepository
+) -> None:
     """Supprime une relation. Lève NotFoundError si elle n'existe pas."""
-    row = repo.delete_relation(relation_id)
+    row = await repo.delete_relation(relation_id)
     if not row:
         raise NotFoundError(f"Relation {relation_id} introuvable")
-    emit_event(
+    await async_emit_event(
         cur,
         "structure_relation.deleted",
         "structure",
@@ -159,7 +163,7 @@ def delete_relation(cur: Any, relation_id: int, *, repo: StructureRepository) ->
 # ── structure_name_forms ──────────────────────────────────────────
 
 
-def create_name_form(
+async def create_name_form(
     cur: Any,
     *,
     structure_id: int,
@@ -167,10 +171,10 @@ def create_name_form(
     is_word_boundary: bool = False,
     is_excluding: bool = False,
     requires_context_of: list | None = None,
-    repo: StructureRepository,
+    repo: AsyncStructureRepository,
 ) -> dict:
     """Crée une forme de nom. Retourne la ligne insérée."""
-    return repo.create_name_form(
+    return await repo.create_name_form(
         structure_id=structure_id,
         form_text_normalized=normalize_text(form_text),
         is_word_boundary=is_word_boundary,
@@ -179,13 +183,15 @@ def create_name_form(
     )
 
 
-def update_name_form(cur: Any, form_id: int, *, fields: dict, repo: StructureRepository) -> dict:
+async def update_name_form(
+    cur: Any, form_id: int, *, fields: dict, repo: AsyncStructureRepository
+) -> dict:
     """Met à jour une forme de nom. Retourne la ligne modifiée.
 
     Lève NotFoundError si la forme n'existe pas.
     Lève ValidationError si `fields` ne contient aucun champ valide.
     """
-    if not repo.name_form_exists(form_id):
+    if not await repo.name_form_exists(form_id):
         raise NotFoundError(f"Forme {form_id} introuvable")
 
     sql_fragments: list[str] = []
@@ -207,15 +213,15 @@ def update_name_form(cur: Any, form_id: int, *, fields: dict, repo: StructureRep
     if not sql_fragments:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    return repo.update_name_form_fields(form_id, sql_fragments, params)
+    return await repo.update_name_form_fields(form_id, sql_fragments, params)
 
 
-def delete_name_form(cur: Any, form_id: int, *, repo: StructureRepository) -> None:
+async def delete_name_form(cur: Any, form_id: int, *, repo: AsyncStructureRepository) -> None:
     """Supprime une forme de nom. Lève NotFoundError si elle n'existe pas."""
-    row = repo.delete_name_form(form_id)
+    row = await repo.delete_name_form(form_id)
     if not row:
         raise NotFoundError(f"Forme {form_id} introuvable")
-    emit_event(
+    await async_emit_event(
         cur,
         "structure_name_form.deleted",
         "structure",

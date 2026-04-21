@@ -2,8 +2,8 @@
 
 Un `perimeter` (table `perimeters`) nomme un ensemble de structures
 racines (colonne `structure_ids`) ; l'ensemble effectif est résolu par
-`infrastructure.perimeter.get_perimeter_structure_ids` qui descend les
-relations (est_tutelle_de, est_partenaire_de).
+`infrastructure.perimeter.async_get_perimeter_structure_ids` qui descend
+les relations (est_tutelle_de, est_partenaire_de).
 """
 
 import logging
@@ -12,9 +12,9 @@ from typing import Any
 from fastapi import APIRouter
 
 from application import config as config_service
-from infrastructure.perimeter import get_perimeter_structure_ids
-from infrastructure.repositories import config_repository
-from interfaces.api.deps import get_cursor
+from infrastructure.perimeter import async_get_perimeter_structure_ids
+from infrastructure.repositories import async_config_repository
+from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import (
     AddPerimeterStructure,
     CreatedIdResponse,
@@ -38,24 +38,25 @@ async def list_perimeters() -> Any:
     relations (`structure_count`). Le décompte inclut donc les
     sous-structures rattachées par `est_tutelle_de` / `est_partenaire_de`.
     """
-    with get_cursor() as (cur, _conn):
-        cur.execute("SELECT id, code, name, description, structure_ids FROM perimeters ORDER BY id")
-        perimeters = cur.fetchall()
+    async with get_async_cursor() as (cur, _conn):
+        await cur.execute(
+            "SELECT id, code, name, description, structure_ids FROM perimeters ORDER BY id"
+        )
+        perimeters = await cur.fetchall()
         for p in perimeters:
-            # Résoudre les noms des structures racines
             root_ids = p["structure_ids"] or []
             if root_ids:
-                cur.execute(
+                await cur.execute(
                     """
                     SELECT id, name, acronym, code FROM structures
                     WHERE id = ANY(%s) ORDER BY name
                 """,
                     (root_ids,),
                 )
-                p["structures"] = cur.fetchall()
+                p["structures"] = await cur.fetchall()
             else:
                 p["structures"] = []
-            resolved = get_perimeter_structure_ids(cur, p["code"])
+            resolved = await async_get_perimeter_structure_ids(cur, p["code"])
             p["structure_count"] = len(resolved)
         return perimeters
 
@@ -66,9 +67,9 @@ async def create_perimeter(body: PerimeterCreate) -> Any:
     code = body.code.strip()
     name = body.name.strip()
     description = (body.description or "").strip() or None
-    with get_cursor() as (cur, _conn):
-        pid = config_service.create_perimeter(
-            cur, code=code, name=name, description=description, repo=config_repository(cur)
+    async with get_async_cursor() as (cur, _conn):
+        pid = await config_service.create_perimeter(
+            cur, code=code, name=name, description=description, repo=async_config_repository(cur)
         )
         return {"id": pid}
 
@@ -82,9 +83,9 @@ async def update_perimeter(perimeter_id: int, body: PerimeterUpdate) -> Any:
         fields["name"] = fields["name"].strip()
     if "description" in fields and isinstance(fields["description"], str):
         fields["description"] = fields["description"].strip() or None
-    with get_cursor() as (cur, _conn):
-        config_service.update_perimeter(
-            cur, perimeter_id, fields=fields, repo=config_repository(cur)
+    async with get_async_cursor() as (cur, _conn):
+        await config_service.update_perimeter(
+            cur, perimeter_id, fields=fields, repo=async_config_repository(cur)
         )
         return {"ok": True}
 
@@ -92,8 +93,10 @@ async def update_perimeter(perimeter_id: int, body: PerimeterUpdate) -> Any:
 @router.delete("/api/perimeters/{perimeter_id}", response_model=OkResponse)
 async def delete_perimeter(perimeter_id: int) -> Any:
     """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
-    with get_cursor() as (cur, _conn):
-        config_service.delete_perimeter(cur, perimeter_id, repo=config_repository(cur))
+    async with get_async_cursor() as (cur, _conn):
+        await config_service.delete_perimeter(
+            cur, perimeter_id, repo=async_config_repository(cur)
+        )
         return {"ok": True}
 
 
@@ -104,9 +107,9 @@ async def add_perimeter_structure(perimeter_id: int, body: AddPerimeterStructure
     Renvoie `{"status": "added"}` ou `"already_exists"` si la
     structure était déjà racine.
     """
-    with get_cursor() as (cur, _conn):
-        status = config_service.add_perimeter_structure(
-            cur, perimeter_id, body.structure_id, repo=config_repository(cur)
+    async with get_async_cursor() as (cur, _conn):
+        status = await config_service.add_perimeter_structure(
+            cur, perimeter_id, body.structure_id, repo=async_config_repository(cur)
         )
         return {"status": status}
 
@@ -117,8 +120,8 @@ async def add_perimeter_structure(perimeter_id: int, body: AddPerimeterStructure
 async def remove_perimeter_structure(perimeter_id: int, structure_id: int) -> Any:
     """Retire une structure racine du périmètre. N'affecte pas ses
     sous-structures tant qu'elles sont rattachées à d'autres racines."""
-    with get_cursor() as (cur, _conn):
-        config_service.remove_perimeter_structure(
-            cur, perimeter_id, structure_id, repo=config_repository(cur)
+    async with get_async_cursor() as (cur, _conn):
+        await config_service.remove_perimeter_structure(
+            cur, perimeter_id, structure_id, repo=async_config_repository(cur)
         )
         return {"status": "removed"}

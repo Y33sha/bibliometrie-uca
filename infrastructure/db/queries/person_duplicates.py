@@ -1,135 +1,6 @@
-"""Query services pour /api/admin/duplicates/* et /api/admin/person-duplicates/*."""
+"""Query services async pour /api/admin/person-duplicates/* (§2.12)."""
 
 from typing import Any
-
-# ── Doublons publications ────────────────────────────────────────
-
-
-_PUB_CANDIDATE_WHERE = """
-    FROM publications p1
-    JOIN publications p2
-      ON p1.title_normalized = p2.title_normalized AND p1.id < p2.id
-    WHERE LENGTH(p1.title_normalized) > %s
-      AND NOT (p1.doi IS NOT NULL AND p2.doi IS NOT NULL AND LOWER(p1.doi) <> LOWER(p2.doi)
-               AND NOT (LOWER(p1.doi) LIKE '10.5281/zenodo.%%' AND LOWER(p2.doi) LIKE '10.5281/zenodo.%%'))
-      AND NOT (
-          (p1.doc_type IN ('article', 'review') AND p2.doc_type = 'conference_paper')
-          OR (p2.doc_type IN ('article', 'review') AND p1.doc_type = 'conference_paper'))
-      AND NOT (EXISTS (SELECT 1 FROM source_publications WHERE publication_id = p1.id AND source = 'hal')
-               AND EXISTS (SELECT 1 FROM source_publications WHERE publication_id = p2.id AND source = 'hal'))
-      AND NOT (EXISTS (SELECT 1 FROM source_publications WHERE publication_id = p1.id AND source = 'openalex')
-               AND EXISTS (SELECT 1 FROM source_publications WHERE publication_id = p2.id AND source = 'openalex'))
-      AND NOT (EXISTS (SELECT 1 FROM source_publications WHERE publication_id = p1.id AND source = 'wos')
-               AND EXISTS (SELECT 1 FROM source_publications WHERE publication_id = p2.id AND source = 'wos'))
-      AND NOT EXISTS (
-          SELECT 1 FROM distinct_publications dp
-          WHERE dp.pub_id_a = LEAST(p1.id, p2.id) AND dp.pub_id_b = GREATEST(p1.id, p2.id))
-"""
-
-
-def _get_pub_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
-    """Détail d'une publication pour la page de déduplication."""
-    cur.execute(
-        """
-        SELECT p.id, p.title, p.title_normalized, p.doi, p.pub_year,
-               p.doc_type::text, p.container_title, p.oa_status::text,
-               p.language, p.journal_id,
-               j.title AS journal_title, j.issn, j.eissn
-        FROM publications p
-        LEFT JOIN journals j ON j.id = p.journal_id
-        WHERE p.id = %s
-        """,
-        (pub_id,),
-    )
-    pub = cur.fetchone()
-    if not pub:
-        return None
-
-    cur.execute(
-        "SELECT source, source_id FROM source_publications WHERE publication_id = %s",
-        (pub_id,),
-    )
-    sources = [{"source": r["source"], "source_id": r["source_id"]} for r in cur.fetchall()]
-
-    cur.execute(
-        """
-        SELECT a.author_position, a.in_perimeter, a.person_id,
-               COALESCE(p2.last_name) AS last_name,
-               COALESCE(p2.first_name) AS first_name,
-               COALESCE(p2.last_name || ' ' || p2.first_name,
-                        sa_hal.raw_author_name, sa_oa.raw_author_name, sa_wos.raw_author_name) AS full_name
-        FROM authorships a
-        LEFT JOIN persons p2 ON p2.id = a.person_id
-        LEFT JOIN source_authorships sa_hal ON sa_hal.authorship_id = a.id AND sa_hal.source = 'hal'
-        LEFT JOIN source_authorships sa_oa ON sa_oa.authorship_id = a.id AND sa_oa.source = 'openalex'
-        LEFT JOIN source_authorships sa_wos ON sa_wos.authorship_id = a.id AND sa_wos.source = 'wos'
-        WHERE a.publication_id = %s AND NOT a.excluded
-        ORDER BY a.author_position NULLS LAST
-        """,
-        (pub_id,),
-    )
-    authors = [dict(r) for r in cur.fetchall()]
-
-    return {
-        "id": pub["id"],
-        "title": pub["title"],
-        "title_normalized": pub["title_normalized"],
-        "doi": pub["doi"],
-        "pub_year": pub["pub_year"],
-        "doc_type": pub["doc_type"],
-        "container_title": pub["container_title"],
-        "oa_status": pub["oa_status"],
-        "language": pub["language"],
-        "journal": {
-            "id": pub["journal_id"],
-            "title": pub["journal_title"],
-            "issn": pub["issn"],
-            "eissn": pub["eissn"],
-        }
-        if pub["journal_id"]
-        else None,
-        "sources": sources,
-        "authors": authors,
-    }
-
-
-def next_pub_duplicate(cur: Any, *, min_title_len: int, offset: int) -> dict[str, Any]:
-    """Renvoie la paire candidate doublon-publications à la position offset."""
-    cur.execute(
-        f"SELECT COUNT(*) AS total FROM (SELECT p1.id {_PUB_CANDIDATE_WHERE}) sub",
-        (min_title_len,),
-    )
-    total = cur.fetchone()["total"]
-
-    cur.execute(
-        f"SELECT p1.id AS id_a, p2.id AS id_b {_PUB_CANDIDATE_WHERE} LIMIT 1 OFFSET %s",
-        (min_title_len, offset),
-    )
-    row = cur.fetchone()
-    if not row:
-        return {"total": total, "offset": offset, "pair": None}
-
-    return {
-        "total": total,
-        "offset": offset,
-        "pair": {
-            "pub_a": _get_pub_detail(cur, row["id_a"]),
-            "pub_b": _get_pub_detail(cur, row["id_b"]),
-        },
-    }
-
-
-def get_publications_basic(cur: Any, pub_ids: list[int]) -> dict[int, Any]:
-    """Résout un lot de publications (existence check + métadonnées de base)."""
-    cur.execute(
-        "SELECT id, doi, journal_id, oa_status::text, language, container_title "
-        "FROM publications WHERE id = ANY(%s)",
-        (list(pub_ids),),
-    )
-    return {r["id"]: r for r in cur.fetchall()}
-
-
-# ── Doublons personnes ───────────────────────────────────────────
 
 
 def _person_name_tokens(ln_norm: str, fn_norm: str) -> set[str]:
@@ -234,9 +105,9 @@ PERSON_DUP_QUERIES = [
 ]
 
 
-def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
+async def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
     """Détail d'une personne pour la page de déduplication."""
-    cur.execute(
+    await cur.execute(
         """
         SELECT p.id, p.last_name, p.first_name,
                p.last_name_normalized, p.first_name_normalized,
@@ -248,11 +119,11 @@ def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    person = cur.fetchone()
+    person = await cur.fetchone()
     if not person:
         return None
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT id, id_type, id_value, source, status::text
         FROM person_identifiers WHERE person_id = %s
@@ -260,9 +131,9 @@ def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    identifiers = [dict(r) for r in cur.fetchall()]
+    identifiers = [dict(r) for r in await cur.fetchall()]
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT pub.id, pub.title, pub.pub_year, pub.doi, pub.doc_type::text,
                (SELECT array_agg(DISTINCT
@@ -281,9 +152,9 @@ def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    publications = [dict(r) for r in cur.fetchall()]
+    publications = [dict(r) for r in await cur.fetchall()]
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT DISTINCT s.id, s.acronym, s.name
         FROM structures s
@@ -296,7 +167,9 @@ def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    labs = [{"id": r["id"], "acronym": r["acronym"], "name": r["name"]} for r in cur.fetchall()]
+    labs = [
+        {"id": r["id"], "acronym": r["acronym"], "name": r["name"]} for r in await cur.fetchall()
+    ]
 
     return {
         "id": person["id"],
@@ -314,7 +187,7 @@ def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] | None:
     }
 
 
-def _scan_dup_query(
+async def _scan_dup_query(
     cur: Any,
     sql: str,
     skip_pairs: set | None = None,
@@ -324,13 +197,13 @@ def _scan_dup_query(
     """Parcourt une requête de doublons avec curseur serveur.
     Retourne (found_row_or_None, count_of_valid_pairs, actual_skipped).
     """
-    cur.execute("DECLARE _dup_cur NO SCROLL CURSOR FOR " + sql)
+    await cur.execute("DECLARE _dup_cur NO SCROLL CURSOR FOR " + sql)
     found = None
     count = 0
     skipped = 0
     while True:
-        cur.execute("FETCH 500 FROM _dup_cur")
-        rows = cur.fetchall()
+        await cur.execute("FETCH 500 FROM _dup_cur")
+        rows = await cur.fetchall()
         if not rows:
             break
         for row in rows:
@@ -352,32 +225,32 @@ def _scan_dup_query(
                     break
         if stop_at_first and found:
             break
-    cur.execute("CLOSE _dup_cur")
+    await cur.execute("CLOSE _dup_cur")
     return found, count, skipped
 
 
-def count_person_duplicates(cur: Any) -> int:
+async def count_person_duplicates(cur: Any) -> int:
     """Comptage des paires candidates doublons-personnes."""
     total = 0
     for sql in PERSON_DUP_QUERIES:
-        _, cnt, _ = _scan_dup_query(cur, sql)
+        _, cnt, _ = await _scan_dup_query(cur, sql)
         total += cnt
     return total
 
 
-def next_person_duplicate(
+async def next_person_duplicate(
     cur: Any, *, skip_pairs: set | None, offset: int
 ) -> dict[str, Any] | None:
     """Renvoie la paire doublon-personne à la position offset (ou None)."""
     remaining_skip = offset
     for sql in PERSON_DUP_QUERIES:
-        found, _, actual_skipped = _scan_dup_query(
+        found, _, actual_skipped = await _scan_dup_query(
             cur, sql, skip_pairs, stop_at_first=True, skip_n=remaining_skip
         )
         if found:
             return {
-                "person_a": _get_person_dedup_detail(cur, found["id_a"]),
-                "person_b": _get_person_dedup_detail(cur, found["id_b"]),
+                "person_a": await _get_person_dedup_detail(cur, found["id_a"]),
+                "person_b": await _get_person_dedup_detail(cur, found["id_b"]),
             }
         remaining_skip -= actual_skipped
     return None
@@ -422,19 +295,20 @@ ORDER BY COUNT(*) DESC, LEAST(a1.person_id, a2.person_id)
 """
 
 
-def count_person_conflict_pairs(cur: Any) -> int:
+async def count_person_conflict_pairs(cur: Any) -> int:
     """Nombre de paires de personnes en conflit."""
-    cur.execute(f"SELECT COUNT(*) AS total FROM ({CONFLICT_PAIRS_SQL}) sub")
-    return cur.fetchone()["total"]
+    await cur.execute(f"SELECT COUNT(*) AS total FROM ({CONFLICT_PAIRS_SQL}) sub")
+    row = await cur.fetchone()
+    return row["total"]
 
 
-def next_person_conflict(
+async def next_person_conflict(
     cur: Any, conn: Any, *, skip_pairs: set, offset: int
 ) -> dict[str, Any] | None:
     """Renvoie la paire en conflit à la position offset (ou None)."""
-    cur.execute(CONFLICT_PAIRS_SQL)
+    await cur.execute(CONFLICT_PAIRS_SQL)
     skipped = 0
-    for row in cur:
+    async for row in cur:
         pair = (row["id_a"], row["id_b"])
         if pair in skip_pairs or (pair[1], pair[0]) in skip_pairs:
             continue
@@ -446,12 +320,12 @@ def next_person_conflict(
         conflict_pubs = []
         for c in row["conflicts"]:
             pub_id = c["pub_id"]
-            cur2 = conn.cursor()
-            cur2.execute(
-                "SELECT id, title, pub_year, doc_type::text FROM publications WHERE id = %s",
-                (pub_id,),
-            )
-            pub = cur2.fetchone()
+            async with conn.cursor() as cur2:
+                await cur2.execute(
+                    "SELECT id, title, pub_year, doc_type::text FROM publications WHERE id = %s",
+                    (pub_id,),
+                )
+                pub = await cur2.fetchone()
             if pub:
                 conflict_pubs.append(
                     {
@@ -462,11 +336,10 @@ def next_person_conflict(
                         "position": c["position"],
                     }
                 )
-            cur2.close()
 
         return {
-            "person_a": _get_person_dedup_detail(cur, row["id_a"]),
-            "person_b": _get_person_dedup_detail(cur, row["id_b"]),
+            "person_a": await _get_person_dedup_detail(cur, row["id_a"]),
+            "person_b": await _get_person_dedup_detail(cur, row["id_b"]),
             "conflict_pubs": conflict_pubs,
         }
 

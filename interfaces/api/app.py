@@ -12,6 +12,7 @@ import logging
 import os
 import time
 import traceback
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,7 @@ from domain.errors import (
     UnauthorizedError,
     ValidationError,
 )
+from infrastructure.db.async_connection import build_async_pool, set_async_pool
 from infrastructure.log import configure_root_logging
 from interfaces.api.deps import _get_pool, _verify_token, get_cursor
 
@@ -58,7 +60,27 @@ from interfaces.api.routers import (  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Bibliométrie UCA")
+
+# ----- Lifespan -----
+#
+# Ouvre/ferme le pool async psycopg3 (§2.12). Le pool sync de
+# `interfaces.api.deps` reste disponible tant que les routers ne sont pas
+# tous migrés.
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> Any:
+    pool = build_async_pool()
+    await pool.open()
+    set_async_pool(pool)
+    try:
+        yield
+    finally:
+        await pool.close()
+        set_async_pool(None)
+
+
+app = FastAPI(title="Bibliométrie UCA", lifespan=lifespan)
 
 
 # ----- Exception handlers -----

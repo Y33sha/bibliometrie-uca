@@ -1,8 +1,8 @@
-"""Persons router: directory, search, list, profile, merge, identifiers, admin.
+"""Persons router: directory, search, list, profile, merge, identifiers, admin (§2.12 : async).
 
 Toutes les queries SQL sont dans :
 - `infrastructure/db/queries/persons/` (lectures principales + admin)
-- `infrastructure/db/queries/duplicates.py` (doublons personnes)
+- `infrastructure/db/queries/person_duplicates.py` (doublons personnes)
 
 Les mutations délèguent à `application.persons` et `application.authorships`.
 """
@@ -13,26 +13,48 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from application.authorships import exclude_authorship as _exclude_authorship
+from application.authorships import async_exclude_authorship as _exclude_authorship
 from application.persons import (
-    add_identifier as _add_identifier,
-    assign_orphan_authorship as _assign_orphan,
-    batch_assign_orphan_authorships as _batch_assign_orphan,
-    create_person as _create_person,
-    detach_authorships as _detach_authorships_service,
-    detach_name_form as _detach_name_form,
-    merge_person as _merge_person,
-    reassign_identifier as _reassign_identifier,
-    remove_identifier as _remove_identifier,
-    set_rejected as _set_rejected,
-    update_identifier_status as _update_identifier_status,
-    update_name as _update_name,
+    async_add_identifier as _add_identifier,
+)
+from application.persons import (
+    async_assign_orphan_authorship as _assign_orphan,
+)
+from application.persons import (
+    async_batch_assign_orphan_authorships as _batch_assign_orphan,
+)
+from application.persons import (
+    async_create_person as _create_person,
+)
+from application.persons import (
+    async_detach_authorships as _detach_authorships_service,
+)
+from application.persons import (
+    async_detach_name_form as _detach_name_form,
+)
+from application.persons import (
+    async_merge_person as _merge_person,
+)
+from application.persons import (
+    async_reassign_identifier as _reassign_identifier,
+)
+from application.persons import (
+    async_remove_identifier as _remove_identifier,
+)
+from application.persons import (
+    async_set_rejected as _set_rejected,
+)
+from application.persons import (
+    async_update_identifier_status as _update_identifier_status,
+)
+from application.persons import (
+    async_update_name as _update_name,
 )
 from domain.sources import ALL_SOURCES_SET
 from infrastructure.db.queries import persons as persons_queries
 from infrastructure.db.queries.persons import admin as admin_queries
-from infrastructure.repositories import authorship_repository, person_repository
-from interfaces.api.deps import get_cursor
+from infrastructure.repositories import async_authorship_repository, async_person_repository
+from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
     AddIdentifier,
@@ -100,8 +122,8 @@ async def persons_directory(
         has_idhal=has_idhal,
         has_rh=has_rh,
     )
-    with get_cursor() as (cur, _conn):
-        return persons_queries.persons_directory(
+    async with get_async_cursor() as (cur, _conn):
+        return await persons_queries.persons_directory(
             cur, filters=filters, page=page, per_page=per_page, sort=sort
         )
 
@@ -111,8 +133,8 @@ async def search_persons(
     q: str = Query("", min_length=2), limit: int = Query(10, ge=1, le=30)
 ) -> Any:
     """Recherche rapide de personnes (autocomplete)."""
-    with get_cursor() as (cur, _conn):
-        return persons_queries.search_persons(cur, q=q, limit=limit)
+    async with get_async_cursor() as (cur, _conn):
+        return await persons_queries.search_persons(cur, q=q, limit=limit)
 
 
 @router.get("/api/persons", response_model=PersonListResponse)
@@ -138,8 +160,8 @@ async def list_persons(
         has_idhal=has_idhal,
         has_rh=has_rh,
     )
-    with get_cursor() as (cur, _conn):
-        return persons_queries.list_persons(
+    async with get_async_cursor() as (cur, _conn):
+        return await persons_queries.list_persons(
             cur, filters=filters, page=page, per_page=per_page, sort=sort
         )
 
@@ -162,36 +184,36 @@ async def persons_facets(
         has_rh=has_rh,
         linked=linked,
     )
-    with get_cursor() as (cur, _conn):
-        return persons_queries.persons_facets(cur, filters=filters)
+    async with get_async_cursor() as (cur, _conn):
+        return await persons_queries.persons_facets(cur, filters=filters)
 
 
 @router.get("/api/persons/departments", response_model=list[DepartmentCount])
 async def list_departments() -> Any:
     """Liste des départements distincts."""
-    with get_cursor() as (cur, _conn):
-        return persons_queries.list_departments(cur)
+    async with get_async_cursor() as (cur, _conn):
+        return await persons_queries.list_departments(cur)
 
 
 @router.get("/api/persons/roles", response_model=list[RoleCount])
 async def list_roles() -> Any:
     """Liste des rôles distincts."""
-    with get_cursor() as (cur, _conn):
-        return persons_queries.list_roles(cur)
+    async with get_async_cursor() as (cur, _conn):
+        return await persons_queries.list_roles(cur)
 
 
 @router.get("/api/persons/stats", response_model=PersonsStatsResponse)
 async def persons_stats() -> Any:
     """Statistiques sur les personnes et l'alignement."""
-    with get_cursor() as (cur, _conn):
-        return persons_queries.persons_stats(cur)
+    async with get_async_cursor() as (cur, _conn):
+        return await persons_queries.persons_stats(cur)
 
 
 @router.get("/api/persons/{person_id}", response_model=PersonDetail)
 async def get_person(person_id: int) -> Any:
     """Détail d'une personne avec auteurs liés."""
-    with get_cursor() as (cur, _conn):
-        person = persons_queries.get_person(cur, person_id)
+    async with get_async_cursor() as (cur, _conn):
+        person = await persons_queries.get_person(cur, person_id)
         if not person:
             raise HTTPException(status_code=404, detail="Person not found")
         return person
@@ -200,8 +222,8 @@ async def get_person(person_id: int) -> Any:
 @router.get("/api/persons/{person_id}/profile", response_model=PersonProfileResponse)
 async def person_profile(person_id: int) -> Any:
     """Profil public complet d'une personne."""
-    with get_cursor() as (cur, _conn):
-        profile = persons_queries.person_profile(cur, person_id)
+    async with get_async_cursor() as (cur, _conn):
+        profile = await persons_queries.person_profile(cur, person_id)
         if not profile:
             raise HTTPException(status_code=404, detail="Person not found")
         return profile
@@ -210,8 +232,8 @@ async def person_profile(person_id: int) -> Any:
 @router.get("/api/persons/{person_id}/theses", response_model=PersonThesesResponse)
 async def person_theses(person_id: int) -> Any:
     """Thèses liées à cette personne avec un rôle non-auteur."""
-    with get_cursor() as (cur, _conn):
-        return persons_queries.person_theses(cur, person_id)
+    async with get_async_cursor() as (cur, _conn):
+        return await persons_queries.person_theses(cur, person_id)
 
 
 @router.get("/api/persons/{person_id}/addresses", response_model=PersonAddressesResponse)
@@ -221,8 +243,8 @@ async def person_addresses(
     per_page: int = Query(50, ge=1, le=200),
 ) -> Any:
     """Adresses distinctes utilisées dans les authorships sources de cette personne."""
-    with get_cursor() as (cur, _conn):
-        return persons_queries.person_addresses(cur, person_id, page=page, per_page=per_page)
+    async with get_async_cursor() as (cur, _conn):
+        return await persons_queries.person_addresses(cur, person_id, page=page, per_page=per_page)
 
 
 # ── Gestion des identifiants ─────────────────────────────────────
@@ -249,15 +271,15 @@ async def add_person_identifier(person_id: int, data: AddIdentifier) -> Any:
     if not id_value:
         raise HTTPException(status_code=400, detail="Valeur vide")
 
-    with get_cursor() as (cur, _conn):
-        if not admin_queries.person_exists(cur, person_id):
+    async with get_async_cursor() as (cur, _conn):
+        if not await admin_queries.person_exists(cur, person_id):
             raise HTTPException(status_code=404, detail="Personne introuvable")
 
-        cur.execute(
+        await cur.execute(
             "SELECT id, person_id, status::text FROM person_identifiers WHERE id_type = %s AND id_value = %s",
             (data.id_type, id_value),
         )
-        existing = cur.fetchone()
+        existing = await cur.fetchone()
         was_reassigned = False
         if existing:
             if existing["person_id"] == person_id:
@@ -269,8 +291,13 @@ async def add_person_identifier(person_id: int, data: AddIdentifier) -> Any:
                 )
             was_reassigned = True
 
-        _add_identifier(
-            cur, person_id, data.id_type, id_value, source="manual", repo=person_repository(cur)
+        await _add_identifier(
+            cur,
+            person_id,
+            data.id_type,
+            id_value,
+            source="manual",
+            repo=async_person_repository(cur),
         )
         result = {"added": True, "id_type": data.id_type, "id_value": id_value}
         if was_reassigned:
@@ -284,16 +311,20 @@ async def add_person_identifier(person_id: int, data: AddIdentifier) -> Any:
 )
 async def remove_person_identifier(person_id: int, id_type: str, id_value: str) -> Any:
     """Supprime un identifiant d'une personne."""
-    with get_cursor() as (cur, _conn):
-        _remove_identifier(cur, person_id, id_type, id_value, repo=person_repository(cur))
+    async with get_async_cursor() as (cur, _conn):
+        await _remove_identifier(
+            cur, person_id, id_type, id_value, repo=async_person_repository(cur)
+        )
         return {"removed": True}
 
 
 @router.patch("/api/person-identifiers/{ident_id}/status", response_model=IdentifierStatusResponse)
 async def update_identifier_status(ident_id: int, body: UpdateIdentifierStatus) -> Any:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
-    with get_cursor() as (cur, _conn):
-        row = _update_identifier_status(cur, ident_id, body.status, repo=person_repository(cur))
+    async with get_async_cursor() as (cur, _conn):
+        row = await _update_identifier_status(
+            cur, ident_id, body.status, repo=async_person_repository(cur)
+        )
         return {"id": row["id"], "status": row["status"]}
 
 
@@ -302,26 +333,26 @@ async def update_identifier_status(ident_id: int, body: UpdateIdentifierStatus) 
 )
 async def reassign_identifier(ident_id: int, body: ReassignIdentifier) -> Any:
     """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
-    with get_cursor() as (cur, _conn):
-        if not admin_queries.person_exists(cur, body.person_id):
+    async with get_async_cursor() as (cur, _conn):
+        if not await admin_queries.person_exists(cur, body.person_id):
             raise HTTPException(status_code=404, detail="Personne cible introuvable")
-        _reassign_identifier(cur, ident_id, body.person_id, repo=person_repository(cur))
+        await _reassign_identifier(cur, ident_id, body.person_id, repo=async_person_repository(cur))
         return {"id": ident_id, "person_id": body.person_id, "status": "pending"}
 
 
 @router.patch("/api/authorships/{authorship_id}/exclude", response_model=AuthorshipExcludeResponse)
 async def toggle_authorship_excluded(authorship_id: int) -> Any:
     """Marque un authorship comme exclu."""
-    with get_cursor() as (cur, _conn):
-        row = _exclude_authorship(cur, authorship_id, repo=authorship_repository(cur))
+    async with get_async_cursor() as (cur, _conn):
+        row = await _exclude_authorship(cur, authorship_id, repo=async_authorship_repository(cur))
         return {"id": row["id"], "excluded": row["excluded"]}
 
 
 @router.patch("/api/persons/{person_id}/reject", response_model=OkResponse)
 async def reject_person(person_id: int, body: RejectPerson) -> Any:
     """Marque/démarque une personne comme rejetée."""
-    with get_cursor() as (cur, _conn):
-        _set_rejected(cur, person_id, body.rejected, repo=person_repository(cur))
+    async with get_async_cursor() as (cur, _conn):
+        await _set_rejected(cur, person_id, body.rejected, repo=async_person_repository(cur))
         return {"ok": True}
 
 
@@ -332,8 +363,8 @@ async def update_person_name(person_id: int, body: UpdatePersonName) -> Any:
     first_name = body.first_name.strip()
     if not last_name:
         raise HTTPException(status_code=400, detail="Le nom est requis")
-    with get_cursor() as (cur, _conn):
-        _update_name(cur, person_id, last_name, first_name, repo=person_repository(cur))
+    async with get_async_cursor() as (cur, _conn):
+        await _update_name(cur, person_id, last_name, first_name, repo=async_person_repository(cur))
         return {"ok": True}
 
 
@@ -344,15 +375,15 @@ async def merge_persons(person_id: int, body: MergePersons) -> Any:
     if source_id == person_id:
         raise HTTPException(status_code=400, detail="source_id invalide")
 
-    with get_cursor() as (cur, _conn):
-        cur.execute("SELECT id FROM persons WHERE id IN (%s, %s)", (person_id, source_id))
-        found = {row["id"] for row in cur.fetchall()}
+    async with get_async_cursor() as (cur, _conn):
+        await cur.execute("SELECT id FROM persons WHERE id IN (%s, %s)", (person_id, source_id))
+        found = {row["id"] for row in await cur.fetchall()}
         if person_id not in found:
             raise HTTPException(status_code=404, detail="Personne cible introuvable")
         if source_id not in found:
             raise HTTPException(status_code=404, detail="Personne source introuvable")
 
-        _merge_person(cur, person_id, source_id, repo=person_repository(cur))
+        await _merge_person(cur, person_id, source_id, repo=async_person_repository(cur))
         return {"merged": True, "source_id": source_id, "target_id": person_id}
 
 
@@ -362,8 +393,8 @@ async def merge_persons(person_id: int, body: MergePersons) -> Any:
 @router.get("/api/admin/orphan-authorships/count", response_model=OrphanCountResponse)
 async def orphan_authorships_count() -> Any:
     """Nombre d'authorships UCA sans person_id."""
-    with get_cursor() as (cur, _conn):
-        return admin_queries.orphan_authorships_count(cur)
+    async with get_async_cursor() as (cur, _conn):
+        return await admin_queries.orphan_authorships_count(cur)
 
 
 @router.get("/api/admin/orphan-authorships", response_model=OrphanAuthorshipsResponse)
@@ -373,8 +404,8 @@ async def list_orphan_authorships(
     search: str = Query(""),
 ) -> Any:
     """Liste les authorships UCA sans person_id."""
-    with get_cursor() as (cur, _conn):
-        return admin_queries.list_orphan_authorships(
+    async with get_async_cursor() as (cur, _conn):
+        return await admin_queries.list_orphan_authorships(
             cur, search=search, page=page, per_page=per_page
         )
 
@@ -386,28 +417,26 @@ async def assign_orphan_authorship_endpoint(body: AssignOrphanAuthorship) -> Any
         raise HTTPException(status_code=400, detail=f"Source inconnue: {body.source}")
 
     person_id = body.person_id
-    with get_cursor() as (cur, _conn):
+    async with get_async_cursor() as (cur, _conn):
         if body.create_person:
             ln = body.create_person.last_name.strip()
             fn = body.create_person.first_name.strip()
             if not ln:
                 raise HTTPException(status_code=400, detail="Nom requis")
-            person_id = _create_person(cur, ln, fn, repo=person_repository(cur))
+            person_id = await _create_person(cur, ln, fn, repo=async_person_repository(cur))
         elif not person_id:
             raise HTTPException(status_code=400, detail="person_id ou create_person requis")
 
-        if not admin_queries.person_exists(cur, person_id):
+        if not await admin_queries.person_exists(cur, person_id):
             raise HTTPException(status_code=404, detail="Personne introuvable")
 
-        _assign_orphan(
-            cur, person_id, body.source, body.authorship_id, repo=person_repository(cur)
+        await _assign_orphan(
+            cur, person_id, body.source, body.authorship_id, repo=async_person_repository(cur)
         )
         return {"ok": True, "person_id": person_id}
 
 
-@router.post(
-    "/api/admin/orphan-authorships/batch-assign", response_model=OrphanBatchAssignResponse
-)
+@router.post("/api/admin/orphan-authorships/batch-assign", response_model=OrphanBatchAssignResponse)
 async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships) -> Any:
     """Attribue plusieurs authorships orphelines à une même personne."""
     person_id = body.person_id
@@ -415,10 +444,12 @@ async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships) ->
     if not sa_ids:
         return {"ok": True, "assigned": 0}
 
-    with get_cursor() as (cur, _conn):
-        if not admin_queries.person_exists(cur, person_id):
+    async with get_async_cursor() as (cur, _conn):
+        if not await admin_queries.person_exists(cur, person_id):
             raise HTTPException(status_code=404, detail="Personne introuvable")
-        assigned = _batch_assign_orphan(cur, person_id, sa_ids, repo=person_repository(cur))
+        assigned = await _batch_assign_orphan(
+            cur, person_id, sa_ids, repo=async_person_repository(cur)
+        )
         return {"ok": True, "assigned": assigned}
 
 
@@ -431,8 +462,8 @@ async def batch_assign_orphan_authorships(body: BatchAssignOrphanAuthorships) ->
 )
 async def name_form_authorships(person_id: int, name_form: str = Query(...)) -> Any:
     """Authorships sources + autres personnes partageant une forme de nom."""
-    with get_cursor() as (cur, _conn):
-        return admin_queries.name_form_authorships(cur, person_id, name_form)
+    async with get_async_cursor() as (cur, _conn):
+        return await admin_queries.name_form_authorships(cur, person_id, name_form)
 
 
 @router.post(
@@ -440,29 +471,31 @@ async def name_form_authorships(person_id: int, name_form: str = Query(...)) -> 
 )
 async def detach_authorships(person_id: int, body: DetachAuthorships) -> Any:
     """Détache des authorships sources d'une personne et nettoie les formes de noms."""
-    with get_cursor() as (cur, _conn):
-        return _detach_authorships_service(
+    async with get_async_cursor() as (cur, _conn):
+        return await _detach_authorships_service(
             cur,
             person_id,
             authorships=[
                 {"source": a.source, "authorship_id": a.authorship_id} for a in body.authorships
             ],
             name_form=body.name_form,
-            repo=person_repository(cur),
-            authorship_repo=authorship_repository(cur),
+            repo=async_person_repository(cur),
+            authorship_repo=async_authorship_repository(cur),
         )
 
 
 @router.post("/api/persons/{person_id}/detach-name-form", response_model=DetachedResponse)
 async def detach_name_form(person_id: int, body: DetachNameForm) -> Any:
     """Détache une forme de nom d'une personne (quand aucune authorship n'y est liée)."""
-    with get_cursor() as (cur, _conn):
-        remaining = admin_queries.name_form_remaining_authorships(cur, person_id, body.name_form)
+    async with get_async_cursor() as (cur, _conn):
+        remaining = await admin_queries.name_form_remaining_authorships(
+            cur, person_id, body.name_form
+        )
         if remaining > 0:
             raise HTTPException(
                 status_code=400, detail="Cette forme a encore des authorships liées"
             )
-        _detach_name_form(cur, person_id, body.name_form, repo=person_repository(cur))
+        await _detach_name_form(cur, person_id, body.name_form, repo=async_person_repository(cur))
         return {"detached": True}
 
 
