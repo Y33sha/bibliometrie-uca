@@ -13,8 +13,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from application import structures as structures_service
-from infrastructure.repositories import structure_repository
-from interfaces.api.deps import get_cursor
+from infrastructure.repositories import async_structure_repository
+from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import (
     DeletedResponse,
     NameFormCreate,
@@ -46,7 +46,7 @@ async def list_structures(
     type (labo > universite > onr > chu > ecole > site > autre) puis
     nom.
     """
-    with get_cursor() as (cur, conn):
+    async with get_async_cursor() as (cur, conn):
         conditions = []
         params = []
 
@@ -61,7 +61,7 @@ async def list_structures(
 
         where = " AND ".join(conditions) if conditions else "TRUE"
 
-        cur.execute(
+        await cur.execute(
             f"""
             SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text AS type
             FROM structures s
@@ -78,7 +78,7 @@ async def list_structures(
         """,
             params,
         )
-        return cur.fetchall()
+        return await cur.fetchall()
 
 
 @router.get("/api/structures/{structure_id}", response_model=StructureDetailResponse)
@@ -90,8 +90,8 @@ async def get_structure(structure_id: int) -> Any:
     dans `structure_relations` ; les enfants inversement. 404 si la
     structure n'existe pas.
     """
-    with get_cursor() as (cur, conn):
-        cur.execute(
+    async with get_async_cursor() as (cur, conn):
+        await cur.execute(
             """
             SELECT id, code, name, acronym, structure_type::text AS type,
                    ror_id, rnsr_id, hal_collection, api_ids
@@ -99,12 +99,12 @@ async def get_structure(structure_id: int) -> Any:
         """,
             (structure_id,),
         )
-        structure = cur.fetchone()
+        structure = await cur.fetchone()
         if not structure:
             raise HTTPException(status_code=404, detail="Structure not found")
 
         # Relations : ses tutelles (parents)
-        cur.execute(
+        await cur.execute(
             """
             SELECT sr.id AS relation_id, sr.relation_type::text,
                    sp.id, sp.code, sp.name, sp.acronym, sp.structure_type::text AS type
@@ -115,10 +115,10 @@ async def get_structure(structure_id: int) -> Any:
         """,
             (structure_id,),
         )
-        parents = cur.fetchall()
+        parents = await cur.fetchall()
 
         # Relations : ses enfants
-        cur.execute(
+        await cur.execute(
             """
             SELECT sr.id AS relation_id, sr.relation_type::text,
                    sc.id, sc.code, sc.name, sc.acronym, sc.structure_type::text AS type
@@ -129,10 +129,10 @@ async def get_structure(structure_id: int) -> Any:
         """,
             (structure_id,),
         )
-        children = cur.fetchall()
+        children = await cur.fetchall()
 
         # Formes de noms
-        cur.execute(
+        await cur.execute(
             """
             SELECT * FROM structure_name_forms
             WHERE structure_id = %s
@@ -140,7 +140,7 @@ async def get_structure(structure_id: int) -> Any:
         """,
             (structure_id,),
         )
-        forms = cur.fetchall()
+        forms = await cur.fetchall()
 
         return {
             "structure": structure,
@@ -153,8 +153,8 @@ async def get_structure(structure_id: int) -> Any:
 @router.post("/api/structures", response_model=StructureOut)
 async def create_structure(data: StructureCreate) -> Any:
     """Crée une structure. Lève 409 si le `code` est déjà utilisé."""
-    with get_cursor() as (cur, conn):
-        return structures_service.create_structure(
+    async with get_async_cursor() as (cur, conn):
+        return await structures_service.create_structure(
             cur,
             code=data.code,
             name=data.name,
@@ -164,7 +164,7 @@ async def create_structure(data: StructureCreate) -> Any:
             rnsr_id=data.rnsr_id,
             hal_collection=data.hal_collection,
             api_ids=data.api_ids,
-            repo=structure_repository(cur),
+            repo=async_structure_repository(cur),
         )
 
 
@@ -176,9 +176,9 @@ async def update_structure(structure_id: int, data: StructureUpdate) -> Any:
     404 si la structure n'existe pas.
     """
     fields = data.model_dump(exclude_unset=True)
-    with get_cursor() as (cur, conn):
-        return structures_service.update_structure(
-            cur, structure_id, fields=fields, repo=structure_repository(cur)
+    async with get_async_cursor() as (cur, conn):
+        return await structures_service.update_structure(
+            cur, structure_id, fields=fields, repo=async_structure_repository(cur)
         )
 
 
@@ -186,8 +186,10 @@ async def update_structure(structure_id: int, data: StructureUpdate) -> Any:
 async def delete_structure(structure_id: int) -> Any:
     """Supprime une structure. Cascade sur les relations et formes de
     noms liées. 404 si inconnue."""
-    with get_cursor() as (cur, conn):
-        structures_service.delete_structure(cur, structure_id, repo=structure_repository(cur))
+    async with get_async_cursor() as (cur, conn):
+        await structures_service.delete_structure(
+            cur, structure_id, repo=async_structure_repository(cur)
+        )
         return {"deleted": True}
 
 
@@ -199,13 +201,13 @@ async def create_relation(data: RelationCreate) -> Any:
     existe, renvoie `{"status": "already_exists"}` au lieu de la
     recréer.
     """
-    with get_cursor() as (cur, conn):
-        row = structures_service.create_relation(
+    async with get_async_cursor() as (cur, conn):
+        row = await structures_service.create_relation(
             cur,
             parent_id=data.parent_id,
             child_id=data.child_id,
             relation_type=data.relation_type,
-            repo=structure_repository(cur),
+            repo=async_structure_repository(cur),
         )
         if row is None:
             return {"status": "already_exists"}
@@ -215,17 +217,19 @@ async def create_relation(data: RelationCreate) -> Any:
 @router.delete("/api/structure-relations/{relation_id}", response_model=DeletedResponse)
 async def delete_relation(relation_id: int) -> Any:
     """Supprime une relation structure. 404 si l'id n'existe pas."""
-    with get_cursor() as (cur, conn):
-        structures_service.delete_relation(cur, relation_id, repo=structure_repository(cur))
+    async with get_async_cursor() as (cur, conn):
+        await structures_service.delete_relation(
+            cur, relation_id, repo=async_structure_repository(cur)
+        )
         return {"deleted": True}
 
 
 @router.get("/api/name-forms/{form_id}", response_model=NameFormOut)
 async def get_name_form(form_id: int) -> Any:
     """Récupère une forme de nom par son id. 404 si inconnue."""
-    with get_cursor() as (cur, conn):
-        cur.execute("SELECT * FROM structure_name_forms WHERE id = %s", (form_id,))
-        row = cur.fetchone()
+    async with get_async_cursor() as (cur, conn):
+        await cur.execute("SELECT * FROM structure_name_forms WHERE id = %s", (form_id,))
+        row = await cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Form not found")
         return row
@@ -242,15 +246,15 @@ async def create_name_form(data: NameFormCreate) -> Any:
     `requires_context_of` : liste d'ids de structures qui doivent
     elles-mêmes matcher l'adresse pour que cette forme active.
     """
-    with get_cursor() as (cur, conn):
-        return structures_service.create_name_form(
+    async with get_async_cursor() as (cur, conn):
+        return await structures_service.create_name_form(
             cur,
             structure_id=data.structure_id,
             form_text=data.form_text,
             is_word_boundary=data.is_word_boundary,
             is_excluding=data.is_excluding,
             requires_context_of=data.requires_context_of,
-            repo=structure_repository(cur),
+            repo=async_structure_repository(cur),
         )
 
 
@@ -258,15 +262,17 @@ async def create_name_form(data: NameFormCreate) -> Any:
 async def update_name_form(form_id: int, data: NameFormUpdate) -> Any:
     """Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue."""
     fields = data.model_dump(exclude_unset=True)
-    with get_cursor() as (cur, conn):
-        return structures_service.update_name_form(
-            cur, form_id, fields=fields, repo=structure_repository(cur)
+    async with get_async_cursor() as (cur, conn):
+        return await structures_service.update_name_form(
+            cur, form_id, fields=fields, repo=async_structure_repository(cur)
         )
 
 
 @router.delete("/api/name-forms/{form_id}", response_model=DeletedResponse)
 async def delete_name_form(form_id: int) -> Any:
     """Supprime une forme de nom. 404 si inconnue."""
-    with get_cursor() as (cur, conn):
-        structures_service.delete_name_form(cur, form_id, repo=structure_repository(cur))
+    async with get_async_cursor() as (cur, conn):
+        await structures_service.delete_name_form(
+            cur, form_id, repo=async_structure_repository(cur)
+        )
         return {"deleted": True}

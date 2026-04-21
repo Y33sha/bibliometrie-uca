@@ -1,4 +1,4 @@
-"""Stats agrégées par éditeur."""
+"""Stats agrégées par éditeur (§2.12 : async)."""
 
 from typing import Any
 
@@ -24,7 +24,7 @@ _PUBLISHER_SORT_MAP = {
 }
 
 
-def publisher_stats(
+async def publisher_stats(
     cur: Any,
     *,
     root_structure_id: int,
@@ -39,7 +39,7 @@ def publisher_stats(
 ) -> dict[str, Any]:
     """Stats agrégées par éditeur, paginées."""
     offset = (page - 1) * per_page
-    cur.execute("SET LOCAL jit = off")
+    await cur.execute("SET LOCAL jit = off")
 
     conditions = [
         PUB_IS_UCA,
@@ -56,7 +56,7 @@ def publisher_stats(
         params.append(f"%{search}%")
     where = " AND ".join(conditions)
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT COUNT(DISTINCT pub.id) AS total
         FROM publications p
@@ -66,10 +66,11 @@ def publisher_stats(
         """,
         params,
     )
-    total = cur.fetchone()["total"]
+    row = await cur.fetchone()
+    total = row["total"]
 
     order = _PUBLISHER_SORT_MAP.get(sort, "COUNT(DISTINCT p.id) DESC")
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             pub.id AS publisher_id,
@@ -94,4 +95,4 @@ def publisher_stats(
         """,
         [root_structure_id] + params + [per_page, offset],
     )
-    return paginated(total, page, per_page, "publishers", cur.fetchall())
+    return paginated(total, page, per_page, "publishers", await cur.fetchall())

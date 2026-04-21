@@ -10,11 +10,12 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 from application import addresses as addresses_service
-from infrastructure.app_config import _get_from_db
+from infrastructure.app_config import _async_get_from_db
 from infrastructure.db.queries import addresses as addr_queries
-from infrastructure.db.queries.perimeter import PgPerimeterQueries
-from infrastructure.repositories import address_repository, authorship_repository
-from interfaces.api.deps import get_cursor, require_admin
+from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
+from infrastructure.repositories import async_address_repository, async_authorship_repository
+from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.deps import require_admin
 from interfaces.api.models import (
     AddressesCountriesResponse,
     AddressListResponse,
@@ -39,19 +40,13 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _bg_propagate_countries(address_ids: list[int]) -> None:
-    """Propagation pays en tâche de fond (connexion séparée)."""
-    from infrastructure.db.connection import get_connection
-
+async def _bg_propagate_countries(address_ids: list[int]) -> None:
+    """Propagation pays en tâche de fond (sur le pool async FastAPI)."""
     try:
-        conn = get_connection()
-        cur = conn.cursor()
-        addresses_service.propagate_countries_to_publications(
-            cur, address_ids, repo=address_repository(cur)
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
+        async with get_async_cursor() as (cur, _conn):
+            await addresses_service.propagate_countries_to_publications(
+                cur, address_ids, repo=async_address_repository(cur)
+            )
     except Exception:
         logger.exception("Erreur propagation pays en background")
 
@@ -84,13 +79,13 @@ async def list_addresses(
         search=search,
         search_mode=search_mode,
     )
-    with get_cursor() as (cur, _conn):
+    async with get_async_cursor() as (cur, _conn):
         sid = (
             structure_id
             if structure_id is not None
-            else addr_queries.resolve_default_structure_id(cur)
+            else await addr_queries.resolve_default_structure_id(cur)
         )
-        return addr_queries.list_addresses(
+        return await addr_queries.list_addresses(
             cur, structure_id=sid, filters=filters, page=page, per_page=per_page
         )
 
@@ -98,11 +93,11 @@ async def list_addresses(
 @router.get("/api/addresses/{addr_id}/publications", response_model=AddressPublicationsResponse)
 async def get_address_publications(addr_id: int, limit: int = Query(20)) -> Any:
     """Échantillon de publications liées à une adresse."""
-    with get_cursor() as (cur, _conn):
-        addr = addr_queries.get_address_basic(cur, addr_id)
+    async with get_async_cursor() as (cur, _conn):
+        addr = await addr_queries.get_address_basic(cur, addr_id)
         if not addr:
             raise HTTPException(status_code=404, detail="Address not found")
-        publications = addr_queries.get_address_publications(cur, addr_id, limit)
+        publications = await addr_queries.get_address_publications(cur, addr_id, limit)
         return {
             "address_id": addr_id,
             "raw_text": addr["raw_text"],
@@ -113,18 +108,18 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)) -> Any:
 @router.post("/api/addresses/{addr_id}/review", response_model=AddressReviewResponse)
 async def review_address(addr_id: int, action: ReviewAction) -> Any:
     """Confirme, rejette ou reset le lien adresse ↔ structure."""
-    with get_cursor() as (cur, _conn):
-        addresses_service.review_structure_link(
+    async with get_async_cursor() as (cur, _conn):
+        await addresses_service.review_structure_link(
             cur,
             addr_id,
             action.structure_id,
             action.is_confirmed,
-            repo=address_repository(cur),
-            authorship_repo=authorship_repository(cur),
-            perimeter_queries=PgPerimeterQueries(),
+            repo=async_address_repository(cur),
+            authorship_repo=async_authorship_repository(cur),
+            perimeter_queries=PgAsyncPerimeterQueries(),
         )
-        structures = addr_queries.get_address_structures(cur, addr_id)
-        link = addr_queries.get_structure_link(cur, addr_id, action.structure_id)
+        structures = await addr_queries.get_address_structures(cur, addr_id)
+        link = await addr_queries.get_structure_link(cur, addr_id, action.structure_id)
         return {
             "id": addr_id,
             "is_confirmed": link["is_confirmed"] if link else None,
@@ -136,15 +131,15 @@ async def review_address(addr_id: int, action: ReviewAction) -> Any:
 @router.post("/api/addresses/batch-review", response_model=BatchUpdatedResponse)
 async def batch_review(data: BatchReviewAction) -> Any:
     """Confirme/rejette/reset en batch."""
-    with get_cursor() as (cur, _conn):
-        updated = addresses_service.batch_review_structure_link(
+    async with get_async_cursor() as (cur, _conn):
+        updated = await addresses_service.batch_review_structure_link(
             cur,
             data.address_ids,
             data.structure_id,
             data.is_confirmed,
-            repo=address_repository(cur),
-            authorship_repo=authorship_repository(cur),
-            perimeter_queries=PgPerimeterQueries(),
+            repo=async_address_repository(cur),
+            authorship_repo=async_authorship_repository(cur),
+            perimeter_queries=PgAsyncPerimeterQueries(),
         )
         return {"updated": updated}
 
@@ -152,8 +147,8 @@ async def batch_review(data: BatchReviewAction) -> Any:
 @router.get("/api/countries", response_model=list[CountryOut])
 async def list_countries() -> Any:
     """Liste des pays."""
-    with get_cursor() as (cur, _conn):
-        return addr_queries.list_countries(cur)
+    async with get_async_cursor() as (cur, _conn):
+        return await addr_queries.list_countries(cur)
 
 
 @router.get("/api/addresses/countries", response_model=AddressesCountriesResponse)
@@ -174,8 +169,10 @@ async def addresses_countries(
         suggested_country=suggested_country,
         suggest=suggest,
     )
-    with get_cursor() as (cur, _conn):
-        return addr_queries.addresses_countries(cur, filters=filters, page=page, per_page=per_page)
+    async with get_async_cursor() as (cur, _conn):
+        return await addr_queries.addresses_countries(
+            cur, filters=filters, page=page, per_page=per_page
+        )
 
 
 @router.get("/api/addresses/suggest-countries", response_model=CountrySuggestionsResponse)
@@ -184,8 +181,8 @@ async def suggest_countries(
     _: Any = Depends(require_admin),
 ) -> Any:
     """Distribution des pays des adresses matchantes + compte des sans-pays."""
-    with get_cursor() as (cur, _conn):
-        return addr_queries.suggest_countries(cur, search)
+    async with get_async_cursor() as (cur, _conn):
+        return await addr_queries.suggest_countries(cur, search)
 
 
 @router.post("/api/addresses/{addr_id}/country", response_model=OkResponse)
@@ -193,14 +190,14 @@ async def set_address_country(
     addr_id: int, body: SetCountry, bg: BackgroundTasks, _: Any = Depends(require_admin)
 ) -> Any:
     """Attribue des pays à une adresse."""
-    with get_cursor() as (cur, _conn):
-        if not addr_queries.address_exists(cur, addr_id):
+    async with get_async_cursor() as (cur, _conn):
+        if not await addr_queries.address_exists(cur, addr_id):
             raise HTTPException(status_code=404, detail="Adresse introuvable")
         for c in body.countries or []:
-            if not addr_queries.country_exists(cur, c):
+            if not await addr_queries.country_exists(cur, c):
                 raise HTTPException(status_code=400, detail=f"Code pays inconnu: {c}")
-        affected = addresses_service.set_country(
-            cur, addr_id, body.countries, repo=address_repository(cur)
+        affected = await addresses_service.set_country(
+            cur, addr_id, body.countries, repo=async_address_repository(cur)
         )
     bg.add_task(_bg_propagate_countries, affected)
     return {"ok": True}
@@ -215,17 +212,17 @@ async def batch_set_country(
     if not country_code:
         raise HTTPException(status_code=400, detail="country_code requis")
 
-    with get_cursor() as (cur, _conn):
-        if not addr_queries.country_exists(cur, country_code):
+    async with get_async_cursor() as (cur, _conn):
+        if not await addr_queries.country_exists(cur, country_code):
             raise HTTPException(status_code=400, detail=f"Code pays inconnu: {country_code}")
 
-        addr_repo = address_repository(cur)
+        addr_repo = async_address_repository(cur)
         if body.address_ids:
-            modified_ids = addresses_service.batch_set_country_by_ids(
+            modified_ids = await addresses_service.batch_set_country_by_ids(
                 cur, country_code, body.address_ids, repo=addr_repo
             )
         else:
-            modified_ids = addresses_service.batch_set_country_by_filter(
+            modified_ids = await addresses_service.batch_set_country_by_filter(
                 cur,
                 country_code,
                 search=body.search,
@@ -236,7 +233,9 @@ async def batch_set_country(
             )
         updated = len(modified_ids)
 
-        propagated_ids = addresses_service.propagate_countries_to_similar(cur, repo=addr_repo)
+        propagated_ids = await addresses_service.propagate_countries_to_similar(
+            cur, repo=addr_repo
+        )
         propagated = len(propagated_ids)
         all_ids = modified_ids + propagated_ids
 
@@ -247,23 +246,23 @@ async def batch_set_country(
 @router.post("/api/addresses/{addr_id}/assign-structure", response_model=AssignStructureResponse)
 async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
     """Assigne manuellement une structure à une adresse."""
-    with get_cursor() as (cur, _conn):
-        cur.execute("SELECT id FROM addresses WHERE id = %s", (addr_id,))
-        if not cur.fetchone():
+    async with get_async_cursor() as (cur, _conn):
+        await cur.execute("SELECT id FROM addresses WHERE id = %s", (addr_id,))
+        if not await cur.fetchone():
             raise HTTPException(status_code=404, detail="Address not found")
 
-        cur.execute("SELECT id FROM structures WHERE id = %s", (action.structure_id,))
-        if not cur.fetchone():
+        await cur.execute("SELECT id FROM structures WHERE id = %s", (action.structure_id,))
+        if not await cur.fetchone():
             raise HTTPException(status_code=404, detail="Structure not found")
 
-        addresses_service.review_structure_link(
+        await addresses_service.review_structure_link(
             cur,
             addr_id,
             action.structure_id,
             True,
-            repo=address_repository(cur),
-            authorship_repo=authorship_repository(cur),
-            perimeter_queries=PgPerimeterQueries(),
+            repo=async_address_repository(cur),
+            authorship_repo=async_authorship_repository(cur),
+            perimeter_queries=PgAsyncPerimeterQueries(),
         )
         return {"id": addr_id, "structure_id": action.structure_id, "status": "assigned"}
 
@@ -273,14 +272,14 @@ async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
 )
 async def unassign_structure(addr_id: int, structure_id: int = Query(...)) -> Any:
     """Supprime l'assignation manuelle d'une structure."""
-    with get_cursor() as (cur, _conn):
-        deleted = addresses_service.unassign_manual_structure(
+    async with get_async_cursor() as (cur, _conn):
+        deleted = await addresses_service.unassign_manual_structure(
             cur,
             addr_id,
             structure_id,
-            repo=address_repository(cur),
-            authorship_repo=authorship_repository(cur),
-            perimeter_queries=PgPerimeterQueries(),
+            repo=async_address_repository(cur),
+            authorship_repo=async_authorship_repository(cur),
+            perimeter_queries=PgAsyncPerimeterQueries(),
         )
         return {"deleted": deleted}
 
@@ -288,19 +287,21 @@ async def unassign_structure(addr_id: int, structure_id: int = Query(...)) -> An
 @router.get("/api/admin/address-stats", response_model=AddressStatsResponse)
 async def admin_address_stats(structure_id: int | None = Query(None)) -> Any:
     """Compteurs d'adresses par détection/validation pour une structure."""
-    with get_cursor() as (cur, _conn):
+    async with get_async_cursor() as (cur, _conn):
         # Résoudre la structure (défaut = première racine du périmètre)
         if structure_id is None:
-            perim_code = _get_from_db(cur, "perimeter_persons") or "uca"
-            cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,))
-            row = cur.fetchone()
+            perim_code = await _async_get_from_db(cur, "perimeter_persons") or "uca"
+            await cur.execute(
+                "SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,)
+            )
+            row = await cur.fetchone()
             root_ids = (row["structure_ids"] if isinstance(row, dict) else row[0]) if row else []
             structure_id = root_ids[0] if root_ids else 0
 
-        cur.execute("SELECT COUNT(*) AS total FROM addresses")
-        total = cur.fetchone()["total"]
+        await cur.execute("SELECT COUNT(*) AS total FROM addresses")
+        total = (await cur.fetchone())["total"]
 
-        cur.execute(
+        await cur.execute(
             """
             SELECT
                 COUNT(*) FILTER (WHERE ast.matched_form_id IS NOT NULL) AS detected,
@@ -312,7 +313,7 @@ async def admin_address_stats(structure_id: int | None = Query(None)) -> Any:
             """,
             (structure_id,),
         )
-        row = cur.fetchone()
+        row = await cur.fetchone()
 
         return {
             "total": total,

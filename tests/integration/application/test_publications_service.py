@@ -8,6 +8,8 @@ merge_publications. find_or_create est déjà couvert par test_integration.py.
 import pytest
 
 from application.publications import (
+    async_mark_distinct,
+    async_merge_publications,
     find_by_doi,
     find_by_nnt,
     find_by_title,
@@ -19,7 +21,7 @@ from application.publications import (
     update_countries,
     update_oa_status,
 )
-from infrastructure.repositories import publication_repository
+from infrastructure.repositories import async_publication_repository, publication_repository
 
 
 @pytest.fixture
@@ -243,9 +245,7 @@ class TestResolveDoiConflict:
         )
         existing = PubByDoi(id=existing_id, doc_type="book_chapter", title_normalized="chapitre")
 
-        doi, merge_id = resolve_doi_conflict(
-            db, "10.x/book", "book", "livre", existing, repo=repo
-        )
+        doi, merge_id = resolve_doi_conflict(db, "10.x/book", "book", "livre", existing, repo=repo)
         assert doi == "10.x/book"
         assert merge_id is None
         db.execute("SELECT doi FROM publications WHERE id = %s", (existing_id,))
@@ -416,3 +416,50 @@ class TestMarkDistinct:
         merge_publications(db, target, source, repo=repo)
         db.execute("SELECT oa_status FROM publications WHERE id = %s", (target,))
         assert db.fetchone()["oa_status"] == "gold"
+
+
+# ── Variantes async (§2.12) ────────────────────────────────────────
+#
+# Smoke tests qui vérifient que les async_* préservent la sémantique
+# des fonctions sync (la logique métier exhaustive est couverte
+# ci-dessus par les tests sync — le pipeline utilise la version sync).
+
+
+async def _a_insert_publication(db, title="Test", doi=None, oa_status="unknown"):
+    await db.execute(
+        """
+        INSERT INTO publications (title, title_normalized, pub_year, doi,
+                                  doc_type, oa_status)
+        VALUES (%s, lower(%s), 2024, %s, 'article'::doc_type, %s::oa_type)
+        RETURNING id
+        """,
+        (title, title, doi, oa_status),
+    )
+    row = await db.fetchone()
+    return row["id"]
+
+
+class TestAsyncMergePublications:
+    async def test_merges_source_into_target(self, async_db):
+        repo = async_publication_repository(async_db)
+        target = await _a_insert_publication(async_db, title="Target")
+        source = await _a_insert_publication(async_db, title="Source")
+
+        await async_merge_publications(async_db, target, source, repo=repo)
+
+        await async_db.execute("SELECT id FROM publications WHERE id = %s", (source,))
+        assert await async_db.fetchone() is None
+
+
+class TestAsyncMarkDistinct:
+    async def test_inserts_ordered_pair(self, async_db):
+        repo = async_publication_repository(async_db)
+        p1 = await _a_insert_publication(async_db, title="A")
+        p2 = await _a_insert_publication(async_db, title="B")
+        await async_mark_distinct(async_db, p2, p1, repo=repo)  # ordre inverse exprès
+        await async_db.execute(
+            "SELECT pub_id_a, pub_id_b FROM distinct_publications "
+            "WHERE pub_id_a = %s AND pub_id_b = %s",
+            (min(p1, p2), max(p1, p2)),
+        )
+        assert await async_db.fetchone() is not None

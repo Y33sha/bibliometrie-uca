@@ -22,6 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest==9.0.3",                   # CVE-2025-71176 fixed
+    "pytest-asyncio==1.3.0",           # §2.12 : tests async pour migration FastAPI
     "pytest-cov==7.1.0",
     "httpx==0.27.2",
     "ruff==0.15.11",
@@ -136,6 +137,10 @@ max-complexity = 15
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+# §2.12 : pytest-asyncio mode auto — les fonctions `async def test_*` sont
+# reconnues automatiquement sans décorateur. Loop scope par fonction
+# (défaut) : chaque test async a sa propre boucle.
+asyncio_mode = "auto"
 
 [tool.coverage.run]
 branch = true

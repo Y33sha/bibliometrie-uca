@@ -118,3 +118,118 @@ class JournalRepository(Protocol):
     def merge_publisher_into(self, target_id: int, source_id: int) -> None: ...
 
     def merge_journal_into(self, target_id: int, source_id: int) -> None: ...
+
+
+class AsyncJournalRepository(Protocol):
+    """Variante async de JournalRepository (§2.12).
+
+    Implémentée par infrastructure/repositories/async_journal_repository.py.
+    """
+
+    # ── publisher_name_forms ───────────────────────────────────────
+
+    async def add_publisher_name_form(
+        self,
+        publisher_id: int,
+        form_normalized: str,
+    ) -> None: ...
+
+    async def find_publisher_by_name_form(self, form_normalized: str) -> int | None: ...
+
+    # ── publishers ─────────────────────────────────────────────────
+
+    async def find_publisher_by_openalex_id(self, openalex_id: str) -> int | None: ...
+
+    async def set_publisher_openalex_id_if_missing(
+        self,
+        publisher_id: int,
+        openalex_id: str,
+    ) -> None: ...
+
+    async def create_publisher(
+        self,
+        *,
+        name: str,
+        name_normalized: str,
+        openalex_id: str | None,
+    ) -> int: ...
+
+    # ── journal_name_forms ─────────────────────────────────────────
+
+    async def add_journal_name_form(
+        self,
+        journal_id: int,
+        form_normalized: str,
+        publisher_id: int | None,
+    ) -> None: ...
+
+    async def find_journal_by_name_form(
+        self,
+        form_normalized: str,
+        publisher_id: int | None,
+    ) -> int | None: ...
+
+    # ── journals ───────────────────────────────────────────────────
+
+    async def find_journal_by_openalex_id(self, openalex_id: str) -> int | None: ...
+
+    async def find_journal_by_issn_any(self, issn_value: str) -> int | None: ...
+
+    async def enrich_journal(
+        self,
+        journal_id: int,
+        *,
+        issn: str | None = None,
+        eissn: str | None = None,
+        publisher_id: int | None = None,
+        openalex_id: str | None = None,
+        oa_model: str | None = None,
+    ) -> None: ...
+
+    async def create_journal(
+        self,
+        *,
+        title: str,
+        title_normalized: str,
+        issn: str | None,
+        eissn: str | None,
+        issnl: str | None,
+        publisher_id: int | None,
+        openalex_id: str | None,
+        oa_model: str | None,
+    ) -> int: ...
+
+    # ── Updates génériques ─────────────────────────────────────────
+
+    async def journal_exists(self, journal_id: int) -> bool: ...
+
+    async def publisher_exists(self, publisher_id: int) -> bool: ...
+
+    async def update_journal_fields(self, journal_id: int, fields: dict) -> None: ...
+
+    async def update_publisher_fields(self, publisher_id: int, fields: dict) -> None: ...
+
+    # ── APC / DOAJ ─────────────────────────────────────────────────
+
+    async def update_journal_apc(
+        self,
+        journal_id: int,
+        *,
+        apc_amount: float | None = None,
+        apc_currency: str | None = None,
+        is_in_doaj: bool | None = None,
+    ) -> None: ...
+
+    async def reset_journal_apc(self) -> int: ...
+
+    # ── Fusion ─────────────────────────────────────────────────────
+
+    async def find_shared_title_journal_pairs(
+        self,
+        target_publisher_id: int,
+        source_publisher_id: int,
+    ) -> list[dict]: ...
+
+    async def merge_publisher_into(self, target_id: int, source_id: int) -> None: ...
+
+    async def merge_journal_into(self, target_id: int, source_id: int) -> None: ...

@@ -12,18 +12,18 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 
 from typing import Any
 
-from application.audit import emit_event
-from application.authorships import delete_orphan_authorships
+from application.audit import async_emit_event, emit_event
+from application.authorships import async_delete_orphan_authorships, delete_orphan_authorships
 from domain.errors import ConflictError, ValidationError
 from domain.person import compute_person_name_forms
-from domain.ports.authorship_repository import AuthorshipRepository
-from domain.ports.person_repository import PersonRepository
+from domain.ports.authorship_repository import AsyncAuthorshipRepository, AuthorshipRepository
+from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
 from domain.sources import ALL_SOURCES_SET
 
 __all__ = [
     # Domain re-export pour les callers existants (scripts, tests)
     "compute_person_name_forms",
-    # Reste de l'API publique du service
+    # Sync (pipeline, CLI, tests)
     "add_identifier",
     "add_identifiers_from_authorships",
     "add_name_form",
@@ -43,23 +43,33 @@ __all__ = [
     "unlink_authorship",
     "update_identifier_status",
     "update_name",
+    # Async (§2.12, router persons / admin_person_duplicates)
+    "async_add_identifier",
+    "async_assign_orphan_authorship",
+    "async_batch_assign_orphan_authorships",
+    "async_create_person",
+    "async_detach_authorships",
+    "async_detach_name_form",
+    "async_mark_distinct",
+    "async_merge_person",
+    "async_reassign_identifier",
+    "async_remove_identifier",
+    "async_set_rejected",
+    "async_update_identifier_status",
+    "async_update_name",
 ]
 
 # ── Création ──
 
 
-def create_person(
-    cur: Any, last_name: str, first_name: str = "", *, repo: PersonRepository
-) -> int:
+def create_person(cur: Any, last_name: str, first_name: str = "", *, repo: PersonRepository) -> int:
     """Crée une personne et retourne son id."""
     person_id = repo.create(last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
     return person_id
 
 
-def set_rejected(
-    cur: Any, person_id: int, rejected: bool, *, repo: PersonRepository
-) -> None:
+def set_rejected(cur: Any, person_id: int, rejected: bool, *, repo: PersonRepository) -> None:
     """Marque ou démarque une personne comme rejetée (fausse entité).
 
     Lève NotFoundError si la personne n'existe pas.
@@ -235,9 +245,7 @@ def add_identifiers_from_authorships(
             seen.add(("idhal", a["idhal"]))
         if a.get("idref") and ("idref", a["idref"]) not in seen:
             idref_source = a.get("source", "hal")
-            add_identifier(
-                cur, person_id, "idref", a["idref"], source=idref_source, repo=repo
-            )
+            add_identifier(cur, person_id, "idref", a["idref"], source=idref_source, repo=repo)
             seen.add(("idref", a["idref"]))
 
 
@@ -276,9 +284,7 @@ def add_name_form(
     repo.add_name_form(person_id, full_name, source=source)
 
 
-def detach_name_form(
-    cur: Any, person_id: int, name_form: str, *, repo: PersonRepository
-) -> None:
+def detach_name_form(cur: Any, person_id: int, name_form: str, *, repo: PersonRepository) -> None:
     """Détache une personne d'une forme de nom. Supprime la forme si
     person_ids devient vide."""
     repo.detach_name_form(person_id, name_form)
@@ -404,9 +410,7 @@ def detach_authorships(
 # ── Fusion ──
 
 
-def mark_distinct(
-    cur: Any, person_id_a: int, person_id_b: int, *, repo: PersonRepository
-) -> None:
+def mark_distinct(cur: Any, person_id_a: int, person_id_b: int, *, repo: PersonRepository) -> None:
     """Marque deux personnes comme distinctes (non-doublon) dans
     `distinct_persons`. Idempotent.
 
@@ -424,9 +428,22 @@ def mark_distinct(
         )
 
 
-def merge_person(
-    cur: Any, target_id: int, source_id: int, *, repo: PersonRepository
+async def async_mark_distinct(
+    cur: Any, person_id_a: int, person_id_b: int, *, repo: AsyncPersonRepository
 ) -> None:
+    """Variante async de `mark_distinct` (§2.12, API admin_person_duplicates)."""
+    inserted = await repo.mark_distinct(person_id_a, person_id_b)
+    if inserted:
+        await async_emit_event(
+            cur,
+            "person.marked_distinct",
+            "person",
+            inserted[0],
+            {"other_id": inserted[1]},
+        )
+
+
+def merge_person(cur: Any, target_id: int, source_id: int, *, repo: PersonRepository) -> None:
     """Fusionne la personne `source_id` dans `target_id`.
 
     Invariant métier : refus si les deux personnes ont chacune une
@@ -442,3 +459,181 @@ def merge_person(
         )
     repo.merge_into(target_id, source_id)
     emit_event(cur, "person.merged", "person", target_id, {"source_id": source_id})
+
+
+# ── Variantes async (§2.12, router persons) ──────────────────────
+# Ajoutées en parallèle des versions sync. Les sync restent utilisées
+# par le pipeline (create_person, merge_person, add_identifier) et par
+# les tests exhaustifs. Les 10 autres async variantes sont
+# consommées uniquement par le router persons ; les sync sont
+# candidates au cleanup en phase 5 si les tests sont aussi migrés.
+
+
+async def async_create_person(
+    cur: Any, last_name: str, first_name: str = "", *, repo: AsyncPersonRepository
+) -> int:
+    """Variante async de `create_person`."""
+    person_id = await repo.create(last_name, first_name)
+    await repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
+    return person_id
+
+
+async def async_set_rejected(
+    cur: Any, person_id: int, rejected: bool, *, repo: AsyncPersonRepository
+) -> None:
+    """Variante async de `set_rejected`."""
+    await repo.set_rejected(person_id, rejected)
+    await async_emit_event(cur, "person.rejected", "person", person_id, {"rejected": rejected})
+
+
+async def async_update_name(
+    cur: Any,
+    person_id: int,
+    last_name: str,
+    first_name: str,
+    *,
+    repo: AsyncPersonRepository,
+) -> None:
+    """Variante async de `update_name`."""
+    await repo.update_name(person_id, last_name, first_name)
+    await repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
+
+
+async def async_add_identifier(
+    cur: Any,
+    person_id: int,
+    id_type: str,
+    id_value: str,
+    source: str = "auto",
+    status: str = "pending",
+    *,
+    repo: AsyncPersonRepository,
+) -> None:
+    """Variante async de `add_identifier`."""
+    await repo.add_identifier(person_id, id_type, id_value, source, status)
+
+
+async def async_remove_identifier(
+    cur: Any,
+    person_id: int,
+    id_type: str,
+    id_value: str,
+    *,
+    repo: AsyncPersonRepository,
+) -> None:
+    """Variante async de `remove_identifier`."""
+    await repo.remove_identifier(person_id, id_type, id_value)
+    await async_emit_event(
+        cur,
+        "person_identifier.removed",
+        "person",
+        person_id,
+        {"id_type": id_type, "id_value": id_value},
+    )
+
+
+async def async_update_identifier_status(
+    cur: Any, ident_id: int, status: str, *, repo: AsyncPersonRepository
+) -> dict:
+    """Variante async de `update_identifier_status`."""
+    row = await repo.update_identifier_status(ident_id, status)
+    await async_emit_event(
+        cur,
+        "person_identifier.status_changed",
+        "person",
+        row["person_id"],
+        {"ident_id": ident_id, "status": status},
+    )
+    return {"id": row["id"], "status": row["status"]}
+
+
+async def async_reassign_identifier(
+    cur: Any, ident_id: int, target_person_id: int, *, repo: AsyncPersonRepository
+) -> None:
+    """Variante async de `reassign_identifier`."""
+    await repo.reassign_identifier(ident_id, target_person_id)
+    await async_emit_event(
+        cur,
+        "person_identifier.reassigned",
+        "person",
+        target_person_id,
+        {"ident_id": ident_id},
+    )
+
+
+async def async_assign_orphan_authorship(
+    cur: Any,
+    person_id: int,
+    source: str,
+    authorship_id: int,
+    *,
+    repo: AsyncPersonRepository,
+) -> bool:
+    """Variante async de `assign_orphan_authorship`."""
+    if source not in _SOURCE_CONFIG:
+        raise ValidationError(f"Source inconnue : {source}")
+
+    row = await repo.assign_orphan_sa(person_id, source, authorship_id)
+    if not row:
+        return False
+
+    if row["author_name_normalized"] and not row.get("excluded"):
+        await repo.add_name_form(person_id, row["author_name_normalized"], source=source)
+
+    await repo.ensure_truth_authorship(person_id, source, authorship_id)
+    return True
+
+
+async def async_batch_assign_orphan_authorships(
+    cur: Any, person_id: int, sa_ids: list[int], *, repo: AsyncPersonRepository
+) -> int:
+    """Variante async de `batch_assign_orphan_authorships`."""
+    return await repo.batch_assign_orphans(person_id, sa_ids)
+
+
+async def async_detach_authorships(
+    cur: Any,
+    person_id: int,
+    authorships: list[dict],
+    name_form: str | None = None,
+    *,
+    repo: AsyncPersonRepository,
+    authorship_repo: AsyncAuthorshipRepository,
+) -> dict:
+    """Variante async de `detach_authorships`."""
+    for a in authorships:
+        if a["source"] in ALL_SOURCES_SET:
+            await repo.unlink_authorship(person_id, a["source"], a["authorship_id"])
+
+    deleted = await async_delete_orphan_authorships(cur, person_id, repo=authorship_repo)
+
+    cleaned_form = False
+    if name_form and await repo.count_authorships_with_name_form(person_id, name_form) == 0:
+        await repo.detach_name_form(person_id, name_form)
+        cleaned_form = True
+
+    return {
+        "detached": len(authorships),
+        "deleted_authorships": deleted,
+        "cleaned_form": cleaned_form,
+    }
+
+
+async def async_detach_name_form(
+    cur: Any, person_id: int, name_form: str, *, repo: AsyncPersonRepository
+) -> None:
+    """Variante async de `detach_name_form`."""
+    await repo.detach_name_form(person_id, name_form)
+
+
+async def async_merge_person(
+    cur: Any, target_id: int, source_id: int, *, repo: AsyncPersonRepository
+) -> None:
+    """Variante async de `merge_person`."""
+    if await repo.has_distinct_rh(target_id, source_id):
+        raise ConflictError(
+            f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
+            f"ont chacune une fiche RH distincte."
+        )
+    await repo.merge_into(target_id, source_id)
+    await async_emit_event(cur, "person.merged", "person", target_id, {"source_id": source_id})

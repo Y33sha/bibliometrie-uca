@@ -1,5 +1,5 @@
-"""Query services admin pour les personnes : orphan authorships,
-name-form authorships, HAL duplicate accounts."""
+"""Query services admin async pour les personnes : orphan authorships,
+name-form authorships, HAL duplicate accounts (§2.12)."""
 
 from typing import Any
 
@@ -21,19 +21,21 @@ _ORPHAN_BASE = f"""
 """
 
 
-def orphan_authorships_count(cur: Any) -> dict[str, Any]:
+async def orphan_authorships_count(cur: Any) -> dict[str, Any]:
     """Nombre d'authorships UCA sans person_id."""
-    cur.execute(f"""
+    await cur.execute(f"""
         SELECT COUNT(*) AS total
         FROM source_authorships sa
         JOIN source_publications sd ON sd.id = sa.source_publication_id
         JOIN publications p ON p.id = sd.publication_id
         WHERE {_ORPHAN_BASE}
     """)
-    return cur.fetchone()
+    return await cur.fetchone()
 
 
-def list_orphan_authorships(cur: Any, *, search: str, page: int, per_page: int) -> dict[str, Any]:
+async def list_orphan_authorships(
+    cur: Any, *, search: str, page: int, per_page: int
+) -> dict[str, Any]:
     """Liste paginée des authorships orphelines avec publication."""
     offset = (page - 1) * per_page
     search_cond = ""
@@ -42,7 +44,7 @@ def list_orphan_authorships(cur: Any, *, search: str, page: int, per_page: int) 
         params.append(f"%{search.strip()}%")
         search_cond = "AND unaccent(lower(sa.raw_author_name)) LIKE unaccent(lower(%s))"
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT COUNT(*) FROM source_authorships sa
         JOIN source_publications sd ON sd.id = sa.source_publication_id
@@ -52,9 +54,10 @@ def list_orphan_authorships(cur: Any, *, search: str, page: int, per_page: int) 
         """,
         params,
     )
-    total = cur.fetchone()["count"]
+    row = await cur.fetchone()
+    total = row["count"]
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT sa.source, sa.id AS authorship_id,
                sa.raw_author_name AS full_name,
@@ -74,23 +77,23 @@ def list_orphan_authorships(cur: Any, *, search: str, page: int, per_page: int) 
         "total": total,
         "page": page,
         "pages": (total + per_page - 1) // per_page or 1,
-        "authorships": cur.fetchall(),
+        "authorships": await cur.fetchall(),
     }
 
 
-def person_exists(cur: Any, person_id: int) -> bool:
+async def person_exists(cur: Any, person_id: int) -> bool:
     """Vérifie qu'une personne existe."""
-    cur.execute("SELECT id FROM persons WHERE id = %s", (person_id,))
-    return cur.fetchone() is not None
+    await cur.execute("SELECT id FROM persons WHERE id = %s", (person_id,))
+    return (await cur.fetchone()) is not None
 
 
 # ── Name-form authorships ────────────────────────────────────────
 
 
-def name_form_authorships(cur: Any, person_id: int, name_form: str) -> dict[str, Any]:
+async def name_form_authorships(cur: Any, person_id: int, name_form: str) -> dict[str, Any]:
     """Authorships sources liées à une personne pour une forme de nom donnée
     + autres personnes partageant cette forme."""
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT sa.source, sa.id AS authorship_id,
                sd.publication_id AS pub_id, sd.title, sd.pub_year, sd.doi
@@ -102,9 +105,9 @@ def name_form_authorships(cur: Any, person_id: int, name_form: str) -> dict[str,
         """,
         (person_id, name_form),
     )
-    authorships = cur.fetchall()
+    authorships = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT p.id, p.first_name, p.last_name,
                pr.department_name,
@@ -120,13 +123,13 @@ def name_form_authorships(cur: Any, person_id: int, name_form: str) -> dict[str,
         """,
         (name_form, person_id),
     )
-    other_persons = cur.fetchall()
+    other_persons = await cur.fetchall()
     return {"authorships": authorships, "other_persons": other_persons}
 
 
-def name_form_remaining_authorships(cur: Any, person_id: int, name_form: str) -> int:
+async def name_form_remaining_authorships(cur: Any, person_id: int, name_form: str) -> int:
     """Compte les authorships qui restent liées à une personne pour un name_form."""
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT COUNT(*) FROM source_authorships sa
         WHERE sa.person_id = %s AND sa.author_name_normalized = %s
@@ -134,16 +137,17 @@ def name_form_remaining_authorships(cur: Any, person_id: int, name_form: str) ->
         """,
         (person_id, name_form),
     )
-    return cur.fetchone()["count"]
+    row = await cur.fetchone()
+    return row["count"]
 
 
 # ── HAL duplicate accounts ───────────────────────────────────────
 
 
-def hal_duplicate_accounts(cur: Any, *, page: int, per_page: int) -> dict[str, Any]:
+async def hal_duplicate_accounts(cur: Any, *, page: int, per_page: int) -> dict[str, Any]:
     """Personnes liées à 2+ comptes HAL distincts."""
     offset = (page - 1) * per_page
-    cur.execute("""
+    await cur.execute("""
         SELECT COUNT(*) FROM (
             SELECT person_id
             FROM source_persons
@@ -153,9 +157,10 @@ def hal_duplicate_accounts(cur: Any, *, page: int, per_page: int) -> dict[str, A
             HAVING COUNT(DISTINCT source_ids->>'hal_person_id') >= 2
         ) sub
     """)
-    total = cur.fetchone()["count"]
+    row = await cur.fetchone()
+    total = row["count"]
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT p.id AS person_id, p.last_name, p.first_name,
                (prh.id IS NOT NULL) AS has_rh,
@@ -186,7 +191,7 @@ def hal_duplicate_accounts(cur: Any, *, page: int, per_page: int) -> dict[str, A
         """,
         (per_page, offset),
     )
-    persons = [dict(r) for r in cur.fetchall()]
+    persons = [dict(r) for r in await cur.fetchall()]
 
     return {
         "total": total,

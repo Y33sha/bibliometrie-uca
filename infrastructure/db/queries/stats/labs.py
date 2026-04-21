@@ -1,4 +1,4 @@
-"""Stats agrégées par laboratoire."""
+"""Stats agrégées par laboratoire (§2.12 : async)."""
 
 from typing import Any
 
@@ -31,7 +31,7 @@ _STRUCTS_CTE = """
 """
 
 
-def stats_labs(
+async def stats_labs(
     cur: Any,
     *,
     root_structure_id: int,
@@ -47,7 +47,7 @@ def stats_labs(
 ) -> dict[str, Any]:
     """Stats agrégées par laboratoire, paginées."""
     offset = (page - 1) * per_page
-    cur.execute("SET LOCAL jit = off")
+    await cur.execute("SET LOCAL jit = off")
 
     conditions = [
         "p.doc_type IN ('article', 'review')",
@@ -68,7 +68,7 @@ def stats_labs(
     apply_stats_apc_filter(conditions, params, has_apc, root_structure_id)
     where = " AND ".join(conditions)
 
-    cur.execute(
+    await cur.execute(
         f"""
         WITH {_STRUCTS_CTE}
         SELECT COUNT(DISTINCT s.id) AS total
@@ -80,10 +80,11 @@ def stats_labs(
         """,
         params,
     )
-    total = cur.fetchone()["total"]
+    row = await cur.fetchone()
+    total = row["total"]
 
     order = _LAB_SORT_MAP.get(sort, "COUNT(DISTINCT p.id) DESC")
-    cur.execute(
+    await cur.execute(
         f"""
         WITH {_STRUCTS_CTE}
         SELECT
@@ -111,4 +112,4 @@ def stats_labs(
         """,
         params + [per_page, offset],
     )
-    return paginated(total, page, per_page, "labs", cur.fetchall())
+    return paginated(total, page, per_page, "labs", await cur.fetchall())

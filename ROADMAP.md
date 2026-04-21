@@ -1,4 +1,4 @@
-# Roadmap transmission DSI
+# Roadmap
 
 ## Chantier transition DDD
 
@@ -134,8 +134,8 @@ n'est détecté qu'en UI manuel.
 
 ### 2.8 Observabilité et robustesse production
 - [ ] ~~**Alerting sur échec pipeline**~~ — **délégué à la DSI après
-  transmission**. La DSI a ses propres outils et il ne sert à rien de
-  déployer une solution dev qui sera remplacée. En dev local,
+  transmission**. La DSI a sans doute ses propres outils et il ne sert 
+  à rien de déployer une solution dev qui sera remplacée. En dev local,
   monitoring manuel des lancements.
 - [ ] **Checks automatiques post-pipeline** : comptages, orphelins,
   anomalies (type tests de caractérisation sur les données produites)
@@ -155,11 +155,139 @@ n'est détecté qu'en UI manuel.
   `domain/names.py`, SQL dans `admin_person_duplicates.py`) — à
   unifier si la logique diverge.
 
-### 2.11 Migration psycopg2 → psycopg3 — clôturé 2026-04-20
-- [ ] **Pas fait dans ce chantier** : `row_factory=class_row(...)` pour
-  un mapping direct rows → Pydantic Out (sucre sympa pour les
-  repositories critiques, mais hors scope strict). À faire si une
-  régression de typage le justifie.
+### 2.12 Migration async API — chantier en cours
+
+**Motivation** : 115 routers déclarés `async def` utilisent psycopg3 en
+mode sync → chaque `cur.execute()` bloque l'event loop uvicorn. Sous
+charge concurrente, un endpoint lent gèle tous les autres. Cible : stack
+100 % async jusqu'à la DB sur la surface FastAPI.
+
+**Scope retenu** : **API seule** passe en async, pipeline et CLI
+restent sync. Raison : pipeline mono-processus one-shot, aucun gain de
+concurrence, et on évite de polluer `run_pipeline.py` avec des
+`asyncio.run()`. Dette temporaire assumée — repositories et queries
+partagés existent en double (sync pour pipeline, async pour API) ; la
+version sync disparaît si le pipeline migre aussi un jour.
+
+**Architecture** :
+- Ports async dupliqués (`AsyncPersonRepository`, etc.) dans
+  `domain/ports/`, implémentations dans `infrastructure/repositories/`
+  (fichiers `async_*.py` en parallèle des sync).
+- Deux pools côte à côte : `AsyncConnectionPool` ouvert au lifespan
+  FastAPI dans `interfaces/api/app.py`, `ConnectionPool` sync
+  inchangé dans `infrastructure/db/connection.py` pour pipeline/CLI.
+- Migration **bottom-up** : chaque étape intermédiaire laisse l'API
+  fonctionnelle.
+
+**Phases** :
+- [x] **Phase 1** — Infra async parallèle : `infrastructure/db/async_connection.py`,
+  `interfaces/api/async_deps.py`, lifespan dans `interfaces/api/app.py`.
+- [x] **Phase 2** — Ports async + repositories async : 7 ports exposent
+  `Async<Nom>Repository(Protocol)`, 7 implémentations `PgAsync*` dans
+  `infrastructure/repositories/async_*_repository*.py`, factories
+  `async_*_repository` dans `infrastructure/repositories/__init__.py`.
+  Duplication justifiée : repositories partagés pipeline/API.
+- [ ] **Phase 3** — `tests/integration/interfaces/conftest.py` supporte
+  async **avant** les migrations verticales : `AsyncConnectionPool`
+  côte à côte du pool sync, `async_pool_cursor` fixture, patch de
+  `get_async_cursor` dans les 18 routers. `pool_cursor()` sync
+  conservé (seed intégration).
+- [ ] **Phase 4** — Migration verticale par router. Pour chaque
+  router (18 au total, du plus simple au plus complexe) : migration
+  en **un seul commit** de {queries utilisées, services applicables,
+  router, tests du router, tests directs des queries}. Les queries
+  ne sont **pas dupliquées** — remplacement en place (aucune n'est
+  utilisée par le pipeline, vérifié). Partage avec pipeline possible
+  sur `infrastructure/perimeter.py` et `infrastructure/app_config.py`
+  → variantes async ajoutées en parallèle au cas par cas dans ces
+  fichiers (pipeline garde le sync).
+- [ ] **Phase 5** — Nettoyage : suppression des ports/repositories/
+  factories sync orphelins (API-only : certains repositories ne sont
+  utilisés que par l'API et peuvent être supprimés complètement),
+  retrait de `_get_pool` sync + `get_cursor` de `deps.py`, retrait
+  de l'import-linter sur le pattern sync si applicable. Activer
+  `RUF029` et la famille ruff `ASYNC` dans `pyproject.toml` pour
+  verrouiller la régression.
+
+**Total** : ~60-70 fichiers modifiés, ~25-30 commits. Pas de duplication
+intermédiaire des modules de queries API (~3000 LOC économisées
+vs approche parallèle abandonnée). Tests verts à la fin de chaque
+commit de la Phase 4 (l'API reste fonctionnelle à chaque slice).
+
+**Arbitrages tranchés** :
+- Pipeline reste sync.
+- Ports sync+async dupliqués (Protocol ne peut pas abstraire `async
+  def`/`def`).
+- Queries API **remplacées en place** (vérification : aucun module
+  partagé pipeline/API dans le scope).
+- `infrastructure/perimeter.py` et `infrastructure/app_config.py`
+  (seuls helpers partagés) : variantes async ajoutées au fil des
+  slices.
+- Ajouter `pytest-asyncio` (mode `auto`) à `pyproject.toml` dev deps.
+
+### 2.13 Exploitation psycopg3 — séquence après §2.12
+
+Fonctionnalités spécifiques non exploitées aujourd'hui. Certains items
+dépendent d'async (§2.12), d'autres peuvent être menés en parallèle
+(COPY, prepare_threshold).
+
+#### 2.13.1 `row_factory=class_row(...)` sur les repositories critiques
+Candidats par ordre d'impact :
+- [ ] `PgPublicationRepository` (22 exec, beaucoup de mapping via `_val`)
+- [ ] `PgPersonRepository/_core.py` (16 exec)
+- [ ] `infrastructure/db/queries/publications/list.py` + `detail.py`
+- [ ] `infrastructure/db/queries/persons/list.py` + `detail.py`
+- [ ] `infrastructure/db/queries/stats/*`
+
+~50 call sites au total, ~8-10 commits. **Ne pas** appliquer au pool
+global (casse les queries `dict_row` existantes) — appliquer au cursor
+à chaque call site. Choix Pydantic vs dataclass à trancher en début de
+chantier (préférence dataclass pour la perf, cohérent avec
+`domain/publication.py`).
+
+#### 2.13.2 `COPY FROM STDIN` sur les imports massifs
+Hotspots par ordre d'impact :
+- [ ] `infrastructure/db/queries/normalize_wos.py` (4 `executemany`,
+  appelé sur tout le corpus à chaque normalize)
+- [ ] `infrastructure/sources/openalex/extract_openalex.py` (batch par
+  page API)
+- [ ] `infrastructure/sources/wos/extract_wos.py`
+- [ ] `infrastructure/repositories/address_repository.py:81`
+- [ ] `interfaces/cli/import_apc.py` — ROI faible, laisser si chantier
+  complet
+
+Stratégie upsert : `COPY INTO temp table` + `INSERT … ON CONFLICT …
+SELECT FROM temp`. ~4-6 commits, benchmark avant/après dans chaque
+message de commit. Indépendant de §2.12 (le pipeline reste sync).
+
+#### 2.13.3 `cursor.stream()` sur gros SELECT — à investiguer d'abord
+`build_authorships` **n'est pas** candidat (UPDATE massifs, pas de
+`fetchall` côté Python). Vrais candidats possibles : normalizers qui
+itèrent sur `PgStagingQueries.fetch_*`, `harvest_hal_identifiers`.
+- [ ] Grep ciblé `cur.fetchall()` dans `application/pipeline/` avant
+  d'engager. Si aucun gros fetchall, skip.
+
+#### 2.13.4 `connection.pipeline()` — POC d'abord
+Candidat principal : **phase 2 de `build_authorships`**
+(`infrastructure/db/queries/authorships_build.py:38`) — 5 UPDATE
+séquentielles sans dépendance inter → 1 round-trip au lieu de 5.
+- [ ] POC sur `build_authorships` phase 2, benchmark avant/après sur
+  sandbox, delta dans le message de commit.
+- [ ] Si gain > 20 % : étendre à `populate_affiliations`,
+  `merge_pubs_by_*`.
+
+#### 2.13.5 `prepare_threshold` sur le pool API
+Aujourd'hui non configuré → défaut psycopg3 = 5. Pour l'API, régler à
+**1** sur le pool async (queries répétées type `find_by_doi`, `list
+publications` préparées dès le 1er appel).
+- [ ] 1 commit dans `infrastructure/db/async_connection.py` (après
+  phase 1 de §2.12).
+
+#### 2.13.6 Adaptateurs de types custom — à skipper sauf besoin
+Enums PostgreSQL (doc_type, oa_status, roles) pourraient avoir un
+`TypeInfo.fetch()` + `EnumInfo`. Gain marginal, bug de typage jamais
+remonté. Skip par défaut ; revisiter si un cast pose un problème
+concret.
 
 ---
 

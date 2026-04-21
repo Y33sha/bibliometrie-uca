@@ -70,3 +70,71 @@ class StructureRepository(Protocol):
     ) -> dict: ...
 
     def delete_name_form(self, form_id: int) -> dict | None: ...
+
+
+class AsyncStructureRepository(Protocol):
+    """Variante async de StructureRepository (§2.12).
+
+    Implémentée par infrastructure/repositories/async_structure_repository.py.
+    """
+
+    # ── structures ─────────────────────────────────────────────────
+
+    async def structure_exists(self, structure_id: int) -> bool: ...
+
+    async def create_structure(
+        self,
+        *,
+        code: str,
+        name: str,
+        acronym: str | None,
+        type: str,
+        ror_id: str | None,
+        rnsr_id: str | None,
+        hal_collection: str | None,
+        api_ids: dict | None,
+    ) -> dict: ...
+
+    async def update_structure_fields(
+        self,
+        structure_id: int,
+        sql_fragments: list[str],
+        params: list,
+    ) -> dict: ...
+
+    async def delete_structure(self, structure_id: int) -> dict | None: ...
+
+    # ── structure_relations ────────────────────────────────────────
+
+    async def create_relation(
+        self,
+        *,
+        parent_id: int,
+        child_id: int,
+        relation_type: str,
+    ) -> dict | None: ...
+
+    async def delete_relation(self, relation_id: int) -> dict | None: ...
+
+    # ── structure_name_forms ───────────────────────────────────────
+
+    async def name_form_exists(self, form_id: int) -> bool: ...
+
+    async def create_name_form(
+        self,
+        *,
+        structure_id: int,
+        form_text_normalized: str,
+        is_word_boundary: bool,
+        is_excluding: bool,
+        requires_context_of: list | None,
+    ) -> dict: ...
+
+    async def update_name_form_fields(
+        self,
+        form_id: int,
+        sql_fragments: list[str],
+        params: list,
+    ) -> dict: ...
+
+    async def delete_name_form(self, form_id: int) -> dict | None: ...

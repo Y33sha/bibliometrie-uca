@@ -18,7 +18,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from interfaces.api.deps import get_cursor
+from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import FeedbackAddressesResponse, FeedbackStats
 
 router = APIRouter()
@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 @router.get("/api/admin/feedback/stats", response_model=FeedbackStats)
 async def feedback_stats(structure_id: int = Query(...)) -> Any:
     """Statistiques de qualité de la détection pour une structure donnée."""
-    with get_cursor() as (cur, conn):
-        cur.execute(
+    async with get_async_cursor() as (cur, conn):
+        await cur.execute(
             """
             SELECT
                 COUNT(*) FILTER (WHERE is_confirmed IS NOT NULL) AS total_reviewed,
@@ -43,7 +43,7 @@ async def feedback_stats(structure_id: int = Query(...)) -> Any:
         """,
             (structure_id,),
         )
-        row = cur.fetchone()
+        row = await cur.fetchone()
 
         reviewed = (
             (row["concordant_valid"] or 0)
@@ -73,7 +73,7 @@ async def feedback_false_negatives(
     """Adresses confirmées manuellement pour cette structure mais non détectées par le script."""
     offset = (page - 1) * per_page
 
-    with get_cursor() as (cur, conn):
+    async with get_async_cursor() as (cur, conn):
         conditions = [
             "ast.structure_id = %s",
             "ast.is_confirmed = TRUE",
@@ -87,7 +87,7 @@ async def feedback_false_negatives(
 
         where = " AND ".join(conditions)
 
-        cur.execute(
+        await cur.execute(
             f"""
             SELECT COUNT(*)
             FROM address_structures ast
@@ -96,9 +96,9 @@ async def feedback_false_negatives(
         """,
             params,
         )
-        total = cur.fetchone()["count"]
+        total = (await cur.fetchone())["count"]
 
-        cur.execute(
+        await cur.execute(
             f"""
             SELECT
                 a.id, a.raw_text, a.pub_count,
@@ -125,7 +125,7 @@ async def feedback_false_negatives(
             "page": page,
             "per_page": per_page,
             "pages": (total + per_page - 1) // per_page,
-            "addresses": cur.fetchall(),
+            "addresses": await cur.fetchall(),
         }
 
 
@@ -139,7 +139,7 @@ async def feedback_false_positives(
     """Adresses détectées pour cette structure mais rejetées manuellement."""
     offset = (page - 1) * per_page
 
-    with get_cursor() as (cur, conn):
+    async with get_async_cursor() as (cur, conn):
         conditions = [
             "ast.structure_id = %s",
             "ast.is_confirmed = FALSE",
@@ -153,7 +153,7 @@ async def feedback_false_positives(
 
         where = " AND ".join(conditions)
 
-        cur.execute(
+        await cur.execute(
             f"""
             SELECT COUNT(*)
             FROM address_structures ast
@@ -162,9 +162,9 @@ async def feedback_false_positives(
         """,
             params,
         )
-        total = cur.fetchone()["count"]
+        total = (await cur.fetchone())["count"]
 
-        cur.execute(
+        await cur.execute(
             f"""
             SELECT
                 a.id, a.raw_text, a.pub_count,
@@ -206,7 +206,7 @@ async def feedback_false_positives(
             "page": page,
             "per_page": per_page,
             "pages": (total + per_page - 1) // per_page,
-            "addresses": cur.fetchall(),
+            "addresses": await cur.fetchall(),
         }
 
 

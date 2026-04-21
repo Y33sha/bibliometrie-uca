@@ -1,4 +1,4 @@
-"""Router /api/stats/* — délègue les requêtes à infrastructure/db/queries/stats.py."""
+"""Router /api/stats/* — délègue les requêtes à infrastructure/db/queries/stats/*."""
 
 import logging
 from typing import Any
@@ -6,7 +6,8 @@ from typing import Any
 from fastapi import APIRouter, Query
 
 from infrastructure.db.queries import stats as stats_queries
-from interfaces.api.deps import get_cursor, get_root_structure_id
+from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.deps import get_root_structure_id
 from interfaces.api.filters import parse_int_csv
 from interfaces.api.models import (
     JournalStatsResponse,
@@ -39,8 +40,8 @@ async def publisher_stats(
     `has_apc=yes|no|""` : filtre sur la présence d'un paiement APC
     connu.
     """
-    with get_cursor() as (cur, _conn):
-        return stats_queries.publisher_stats(
+    async with get_async_cursor() as (cur, _conn):
+        return await stats_queries.publisher_stats(
             cur,
             root_structure_id=get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),
@@ -67,8 +68,8 @@ async def journal_stats(
     sort: str = Query("-pubs"),
 ) -> Any:
     """Stats d'articles par revue."""
-    with get_cursor() as (cur, _conn):
-        return stats_queries.journal_stats(
+    async with get_async_cursor() as (cur, _conn):
+        return await stats_queries.journal_stats(
             cur,
             root_structure_id=get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),
@@ -93,8 +94,8 @@ async def stats_by_year(
     has_apc: str = Query(""),
 ) -> Any:
     """Ventilation par année (pour les graphiques)."""
-    with get_cursor() as (cur, _conn):
-        return stats_queries.stats_by_year(
+    async with get_async_cursor() as (cur, _conn):
+        return await stats_queries.stats_by_year(
             cur,
             root_structure_id=get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),
@@ -120,8 +121,8 @@ async def stats_summary(
     Alimente la bande de cartes en haut du dashboard statistiques.
     Mêmes filtres que les autres endpoints de /api/stats.
     """
-    with get_cursor() as (cur, _conn):
-        return stats_queries.stats_summary(
+    async with get_async_cursor() as (cur, _conn):
+        return await stats_queries.stats_summary(
             cur,
             root_structure_id=get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),
@@ -146,8 +147,8 @@ async def stats_labs(
     sort: str = Query("-pubs"),
 ) -> Any:
     """Stats d'articles par laboratoire."""
-    with get_cursor() as (cur, _conn):
-        return stats_queries.stats_labs(
+    async with get_async_cursor() as (cur, _conn):
+        return await stats_queries.stats_labs(
             cur,
             root_structure_id=get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),
@@ -170,8 +171,8 @@ async def available_years() -> Any:
     `years_validated` : les autres existent en base mais ne sont pas
     publiées dans le dashboard (pipeline encore partiel).
     """
-    with get_cursor() as (cur, _conn):
-        return stats_queries.available_years(cur)
+    async with get_async_cursor() as (cur, _conn):
+        return await stats_queries.available_years(cur)
 
 
 @router.get("/api/stats/facets", response_model=StatsFacetsResponse)
@@ -185,8 +186,8 @@ async def stats_facets(
 ) -> Any:
     """Facettes dynamiques : années, labos, oa_status, apc (chaque facette
     exclut son propre filtre mais applique tous les autres)."""
-    with get_cursor() as (cur, _conn):
-        return stats_queries.stats_facets(
+    async with get_async_cursor() as (cur, _conn):
+        return await stats_queries.stats_facets(
             cur,
             root_structure_id=get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),

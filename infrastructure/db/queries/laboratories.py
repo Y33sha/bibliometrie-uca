@@ -1,4 +1,4 @@
-"""Query services pour /api/laboratories/*."""
+"""Query services async pour /api/laboratories/* (§2.12)."""
 
 import datetime
 from dataclasses import dataclass
@@ -12,18 +12,18 @@ from infrastructure.db.queries.filters import (
 )
 
 
-def list_laboratories(cur: Any) -> list[dict[str, Any]]:
+async def list_laboratories(cur: Any) -> list[dict[str, Any]]:
     """Liste des labos du périmètre, avec leurs tutelles (hors racines du périmètre)."""
-    from infrastructure.app_config import _get_from_db
-    from infrastructure.perimeter import get_persons_structure_ids
+    from infrastructure.app_config import _async_get_from_db
+    from infrastructure.perimeter import async_get_persons_structure_ids
 
-    perimeter_ids = list(get_persons_structure_ids(cur))
-    perim_code = _get_from_db(cur, "perimeter_persons") or "uca"
-    cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,))
-    row = cur.fetchone()
+    perimeter_ids = list(await async_get_persons_structure_ids(cur))
+    perim_code = await _async_get_from_db(cur, "perimeter_persons") or "uca"
+    await cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,))
+    row = await cur.fetchone()
     root_ids = (row["structure_ids"] if isinstance(row, dict) else row[0]) if row else []
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT s.id, s.code, s.name, s.acronym,
                s.ror_id, s.hal_collection,
@@ -44,12 +44,12 @@ def list_laboratories(cur: Any) -> list[dict[str, Any]]:
         """,
         (root_ids, perimeter_ids),
     )
-    return cur.fetchall()
+    return await cur.fetchall()
 
 
-def get_laboratory(cur: Any, lab_id: int) -> dict[str, Any] | None:
+async def get_laboratory(cur: Any, lab_id: int) -> dict[str, Any] | None:
     """Profil public d'un laboratoire (None si absent)."""
-    cur.execute(
+    await cur.execute(
         """
         SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text AS type,
                s.ror_id, s.rnsr_id, s.hal_collection
@@ -58,11 +58,11 @@ def get_laboratory(cur: Any, lab_id: int) -> dict[str, Any] | None:
         """,
         (lab_id,),
     )
-    struct = cur.fetchone()
+    struct = await cur.fetchone()
     if not struct:
         return None
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT sp.id, sp.name, sp.acronym, sp.structure_type::text AS type,
                sr.relation_type
@@ -73,9 +73,9 @@ def get_laboratory(cur: Any, lab_id: int) -> dict[str, Any] | None:
         """,
         (lab_id,),
     )
-    parents = cur.fetchall()
+    parents = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT sc.id, sc.name, sc.acronym, sc.structure_type::text AS type,
                sr.relation_type
@@ -86,9 +86,9 @@ def get_laboratory(cur: Any, lab_id: int) -> dict[str, Any] | None:
         """,
         (lab_id,),
     )
-    children = cur.fetchall()
+    children = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT COUNT(*) AS count
         FROM publications p
@@ -99,7 +99,8 @@ def get_laboratory(cur: Any, lab_id: int) -> dict[str, Any] | None:
         """,
         (lab_id,),
     )
-    theses_count = cur.fetchone()["count"]
+    row = await cur.fetchone()
+    theses_count = row["count"]
 
     return {
         "structure": struct,
@@ -117,7 +118,7 @@ class LabPersonsFilters:
     has_idhal: str = ""
 
 
-def get_laboratory_persons(  # noqa: C901 (4 facettes × similar conditions)
+async def get_laboratory_persons(  # noqa: C901 (4 facettes × similar conditions)
     cur: Any, lab_id: int, *, filters: LabPersonsFilters, page: int, per_page: int, sort: str
 ) -> dict[str, Any]:
     """Personnes liées à un labo + authorships orphelines + facettes."""
@@ -138,7 +139,7 @@ def get_laboratory_persons(  # noqa: C901 (4 facettes × similar conditions)
     apply_person_has_identifier_filter(extra_conds, "idhal", filters.has_idhal)
     extra_where = (" AND " + " AND ".join(extra_conds)) if extra_conds else ""
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT COUNT(DISTINCT a.person_id)
         FROM authorships a
@@ -151,10 +152,11 @@ def get_laboratory_persons(  # noqa: C901 (4 facettes × similar conditions)
         """,
         [lab_arr] + extra_params,
     )
-    total_persons = cur.fetchone()["count"]
+    row = await cur.fetchone()
+    total_persons = row["count"]
 
     order_clause = persons_sort_clause(sort)
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT p.id, p.last_name, p.first_name,
                prh.role_title, prh.department_name,
@@ -181,9 +183,9 @@ def get_laboratory_persons(  # noqa: C901 (4 facettes × similar conditions)
         """,
         [lab_arr] + extra_params + [per_page, offset],
     )
-    persons = cur.fetchall()
+    persons = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT COUNT(DISTINCT a.id)
         FROM authorships a
@@ -193,7 +195,8 @@ def get_laboratory_persons(  # noqa: C901 (4 facettes × similar conditions)
         """,
         (lab_arr,),
     )
-    orphan_total = cur.fetchone()["count"]
+    row = await cur.fetchone()
+    orphan_total = row["count"]
 
     # Facettes (chacune exclut son propre filtre)
     def facet_base(*, skip: str) -> tuple[str, list[Any]]:
@@ -232,9 +235,9 @@ def get_laboratory_persons(  # noqa: C901 (4 facettes × similar conditions)
                     )
         return " AND ".join(conds), p
 
-    def run_facet(skip: str) -> dict[str, Any]:
+    async def run_facet(skip: str) -> dict[str, Any]:
         w, p = facet_base(skip=skip)
-        cur.execute(
+        await cur.execute(
             f"""
             SELECT
                 COUNT(DISTINCT per.id) FILTER (WHERE prh.id IS NOT NULL) AS rh_yes,
@@ -258,11 +261,11 @@ def get_laboratory_persons(  # noqa: C901 (4 facettes × similar conditions)
             """,
             p,
         )
-        return cur.fetchone()
+        return await cur.fetchone()
 
-    facet_rh = run_facet("has_rh")
-    facet_orcid = run_facet("has_orcid")
-    facet_idhal = run_facet("has_idhal")
+    facet_rh = await run_facet("has_rh")
+    facet_orcid = await run_facet("has_orcid")
+    facet_idhal = await run_facet("has_idhal")
 
     return {
         "total_persons": total_persons,
@@ -279,10 +282,12 @@ def get_laboratory_persons(  # noqa: C901 (4 facettes × similar conditions)
     }
 
 
-def get_laboratory_addresses(cur: Any, lab_id: int, *, page: int, per_page: int) -> dict[str, Any]:
+async def get_laboratory_addresses(
+    cur: Any, lab_id: int, *, page: int, per_page: int
+) -> dict[str, Any]:
     """Adresses liées à un laboratoire."""
     offset = (page - 1) * per_page
-    cur.execute(
+    await cur.execute(
         """
         SELECT COUNT(*)
         FROM addresses a
@@ -292,9 +297,10 @@ def get_laboratory_addresses(cur: Any, lab_id: int, *, page: int, per_page: int)
         """,
         (lab_id,),
     )
-    total = cur.fetchone()["count"]
+    row = await cur.fetchone()
+    total = row["count"]
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT a.id, a.raw_text, ast.is_confirmed
         FROM addresses a
@@ -306,7 +312,7 @@ def get_laboratory_addresses(cur: Any, lab_id: int, *, page: int, per_page: int)
         """,
         (lab_id, per_page, offset),
     )
-    addresses = cur.fetchall()
+    addresses = await cur.fetchall()
     return {
         "total": total,
         "page": page,
@@ -316,12 +322,12 @@ def get_laboratory_addresses(cur: Any, lab_id: int, *, page: int, per_page: int)
     }
 
 
-def get_laboratory_dashboard(cur: Any, lab_id: int) -> dict[str, Any]:
+async def get_laboratory_dashboard(cur: Any, lab_id: int) -> dict[str, Any]:
     """Dashboard labo : publis/an, répartition OA, collab internationales, top pays."""
     lab_arr = [lab_id]
     current_year = datetime.date.today().year
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT p.pub_year, COUNT(DISTINCT p.id) AS count
         FROM publications p
@@ -336,9 +342,9 @@ def get_laboratory_dashboard(cur: Any, lab_id: int) -> dict[str, Any]:
         """,
         (lab_arr, current_year - 6),
     )
-    pubs_by_year = [{"year": r["pub_year"], "count": r["count"]} for r in cur.fetchall()]
+    pubs_by_year = [{"year": r["pub_year"], "count": r["count"]} for r in await cur.fetchall()]
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status NOT IN {OA_CLOSED_SQL} AND p.oa_status IS NOT NULL) AS open_access,
@@ -353,9 +359,9 @@ def get_laboratory_dashboard(cur: Any, lab_id: int) -> dict[str, Any]:
         """,
         (lab_arr,),
     )
-    oa = cur.fetchone()
+    oa = await cur.fetchone()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT
             COUNT(DISTINCT p.id) AS total_articles,
@@ -372,9 +378,9 @@ def get_laboratory_dashboard(cur: Any, lab_id: int) -> dict[str, Any]:
         """,
         (lab_arr,),
     )
-    collab = cur.fetchone()
+    collab = await cur.fetchone()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT co.code, co.name, COUNT(DISTINCT p.id) AS count
         FROM publications p
@@ -393,7 +399,8 @@ def get_laboratory_dashboard(cur: Any, lab_id: int) -> dict[str, Any]:
         (lab_arr,),
     )
     top_countries = [
-        {"code": r["code"].strip(), "name": r["name"], "count": r["count"]} for r in cur.fetchall()
+        {"code": r["code"].strip(), "name": r["name"], "count": r["count"]}
+        for r in await cur.fetchall()
     ]
 
     return {
