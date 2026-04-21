@@ -195,3 +195,64 @@ def hal_duplicate_accounts(cur: Any, *, page: int, per_page: int) -> dict[str, A
         "pages": (total + per_page - 1) // per_page or 1,
         "persons": persons,
     }
+
+
+async def async_hal_duplicate_accounts(cur: Any, *, page: int, per_page: int) -> dict[str, Any]:
+    """Variante async de `hal_duplicate_accounts` (§2.12, router hal_problems).
+
+    La version sync reste utilisée par le router persons (migration 4.p).
+    """
+    offset = (page - 1) * per_page
+    await cur.execute("""
+        SELECT COUNT(*) FROM (
+            SELECT person_id
+            FROM source_persons
+            WHERE source = 'hal' AND person_id IS NOT NULL
+              AND (source_ids->>'hal_person_id') IS NOT NULL
+            GROUP BY person_id
+            HAVING COUNT(DISTINCT source_ids->>'hal_person_id') >= 2
+        ) sub
+    """)
+    row = await cur.fetchone()
+    total = row["count"]
+
+    await cur.execute(
+        """
+        SELECT p.id AS person_id, p.last_name, p.first_name,
+               (prh.id IS NOT NULL) AS has_rh,
+               (SELECT json_agg(json_build_object(
+                   'hal_person_id', (sa.source_ids->>'hal_person_id')::int,
+                   'full_name', sa.full_name,
+                   'idhal', sa.source_ids->>'idhal',
+                   'orcid', sa.orcid,
+                   'pub_count', (SELECT COUNT(*) FROM source_authorships sa2
+                                 WHERE sa2.source = 'hal' AND sa2.source_person_id = sa.id)
+               ) ORDER BY (sa.source_ids->>'hal_person_id')::int)
+                FROM source_persons sa
+                WHERE sa.source = 'hal' AND sa.person_id = p.id
+                  AND (sa.source_ids->>'hal_person_id') IS NOT NULL
+               ) AS hal_accounts
+        FROM persons p
+        LEFT JOIN persons_rh prh ON prh.person_id = p.id
+        WHERE p.id IN (
+            SELECT person_id
+            FROM source_persons
+            WHERE source = 'hal' AND person_id IS NOT NULL
+              AND (source_ids->>'hal_person_id') IS NOT NULL
+            GROUP BY person_id
+            HAVING COUNT(DISTINCT source_ids->>'hal_person_id') >= 2
+        )
+        ORDER BY LOWER(p.last_name), LOWER(p.first_name)
+        LIMIT %s OFFSET %s
+        """,
+        (per_page, offset),
+    )
+    persons = [dict(r) for r in await cur.fetchall()]
+
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page or 1,
+        "persons": persons,
+    }
