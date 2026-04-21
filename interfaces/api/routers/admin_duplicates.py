@@ -5,8 +5,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from application.publications import async_mark_distinct as _mark_pubs_distinct
 from application.publications import async_merge_publications
+from application.publications import mark_distinct as _mark_pubs_distinct
 from infrastructure.db.queries import publication_duplicates as dup_queries
 from infrastructure.repositories import async_publication_repository
 from interfaces.api.async_deps import get_async_cursor
