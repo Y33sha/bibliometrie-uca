@@ -213,19 +213,31 @@ Fonctionnalités spécifiques non exploitées aujourd'hui. Certains items
 dépendent d'async (§2.12), d'autres peuvent être menés en parallèle
 (COPY, prepare_threshold).
 
-#### 2.13.1 `row_factory=class_row(...)` sur les repositories critiques
-Candidats par ordre d'impact :
-- [ ] `PgPublicationRepository` (22 exec, beaucoup de mapping via `_val`)
-- [ ] `PgPersonRepository/_core.py` (16 exec)
-- [ ] `infrastructure/db/queries/publications/list.py` + `detail.py`
-- [ ] `infrastructure/db/queries/persons/list.py` + `detail.py`
-- [ ] `infrastructure/db/queries/stats/*`
+#### 2.13.1 `row_factory=class_row(...)` — partiellement fait
+Choix retenu : **dataclass** (pas Pydantic) — validation inutile sur des
+données déjà garanties par PostgreSQL, construction plus rapide, aligné
+sur `domain/publication.py`. Helper `row_as` / `async_row_as` dans
+`infrastructure/db_helpers.py` pour basculer la `row_factory` d'un
+curseur le temps d'un bloc (sans toucher au pool global qui reste en
+`dict_row`).
 
-~50 call sites au total, ~8-10 commits. **Ne pas** appliquer au pool
-global (casse les queries `dict_row` existantes) — appliquer au cursor
-à chaque call site. Choix Pydantic vs dataclass à trancher en début de
-chantier (préférence dataclass pour la perf, cohérent avec
-`domain/publication.py`).
+- [x] `PgPublicationRepository.find_by_*` : les 4 types de résultats
+  (`PubByDoi`, `PubByNnt`, `PubByTitle`, `PubThesisCandidate`) sont
+  passés de `namedtuple` à `@dataclass(frozen=True, slots=True)` ;
+  les 4 méthodes sync + async utilisent `class_row`.
+- **Autres candidats évalués puis écartés** :
+  - `PgPersonRepository/_core.py` : returns scalaires (`int`, `bool`)
+    ou tuples ad-hoc (`tuple[int, int] | None`). Pas de shape typée
+    à construire, `class_row` ne s'applique pas.
+  - `queries/publications/list.py` + `detail.py`, `queries/persons/*`,
+    `queries/stats/*` : renvoient des dicts complexes **1:1 avec les
+    `response_model` Pydantic** de `interfaces/api/models.py`. Créer
+    des dataclasses parallèles dupliquerait la hiérarchie de types sans
+    bénéfice métier — mieux vaut garder la séparation nette "dict repo →
+    Pydantic API" quand la forme ne diffère pas.
+
+À revisiter si un besoin de shape interne typée émerge indépendamment
+du modèle API exposé.
 
 #### 2.13.2 `COPY FROM STDIN` sur les imports massifs — skip (ROI trop faible)
 Benchmark sur `bibliometrie_test` (moyenne sur 3 runs, median) pour
