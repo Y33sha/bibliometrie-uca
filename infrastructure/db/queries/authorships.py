@@ -1,4 +1,4 @@
-"""Query services pour /api/authorships/* (router admin authorships)."""
+"""Query services async pour /api/authorships/* (router admin authorships, §2.12)."""
 
 from typing import Any
 
@@ -38,7 +38,7 @@ def _uca_authors_cte(lab_id: int = 0, with_pub_count: bool = False) -> tuple[str
     return cte, params
 
 
-def authorships_stats(cur: Any, lab_id: int) -> dict[str, Any]:
+async def authorships_stats(cur: Any, lab_id: int) -> dict[str, Any]:
     """Statistiques auteurs UCA (total, liés, avec ORCID/idHAL)."""
     lab_filter = ""
     params: list[Any] = []
@@ -46,7 +46,7 @@ def authorships_stats(cur: Any, lab_id: int) -> dict[str, Any]:
         lab_filter = " AND sa.structure_ids && %s::int[]"
         params = [[lab_id]]
 
-    cur.execute(
+    await cur.execute(
         f"""
         WITH uca_authors AS (
             SELECT sauth.id, sauth.source,
@@ -69,10 +69,10 @@ def authorships_stats(cur: Any, lab_id: int) -> dict[str, Any]:
         """,
         params,
     )
-    return cur.fetchone()
+    return await cur.fetchone()
 
 
-def authorships_facets(
+async def authorships_facets(
     cur: Any, *, linked: str, has_orcid: str, has_idhal: str, lab_id: int
 ) -> dict[str, Any]:
     """Facettes dynamiques pour la page authorships admin (chaque facette exclut son filtre)."""
@@ -99,7 +99,7 @@ def authorships_facets(
         return where, []
 
     where, p = build_where(skip="linked")
-    cur.execute(
+    await cur.execute(
         f"""{cte}
         SELECT
             COUNT(*) FILTER (WHERE ua.person_id IS NOT NULL) AS yes,
@@ -108,10 +108,10 @@ def authorships_facets(
         """,
         cte_params + p,
     )
-    linked_counts = cur.fetchone()
+    linked_counts = await cur.fetchone()
 
     where, p = build_where(skip="has_orcid")
-    cur.execute(
+    await cur.execute(
         f"""{cte}
         SELECT
             COUNT(*) FILTER (WHERE ua.orcid IS NOT NULL) AS yes,
@@ -120,10 +120,10 @@ def authorships_facets(
         """,
         cte_params + p,
     )
-    orcid_counts = cur.fetchone()
+    orcid_counts = await cur.fetchone()
 
     where, p = build_where(skip="has_idhal")
-    cur.execute(
+    await cur.execute(
         f"""{cte}
         SELECT
             COUNT(*) FILTER (WHERE ua.idhal IS NOT NULL) AS yes,
@@ -132,7 +132,7 @@ def authorships_facets(
         """,
         cte_params + p,
     )
-    idhal_counts = cur.fetchone()
+    idhal_counts = await cur.fetchone()
 
     where, p = build_where(skip="lab")
     lab_cte, lab_params = _uca_authors_cte(lab_id=0)
@@ -145,7 +145,7 @@ def authorships_facets(
               AND sauth.source IN {AUTHOR_SOURCES_SQL}
         )
     """
-    cur.execute(
+    await cur.execute(
         f"""{lab_cte}
         SELECT s.id AS value, COALESCE(s.acronym, s.name) AS label,
                COUNT(DISTINCT (ast.author_id, ast.source)) AS count
@@ -158,7 +158,7 @@ def authorships_facets(
         """,
         lab_params + p,
     )
-    lab_facets = cur.fetchall()
+    lab_facets = await cur.fetchall()
 
     return {
         "linked": {"yes": linked_counts["yes"], "no": linked_counts["no"]},
@@ -168,7 +168,7 @@ def authorships_facets(
     }
 
 
-def list_authorships(
+async def list_authorships(
     cur: Any,
     *,
     search: str,
@@ -206,15 +206,16 @@ def list_authorships(
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
-    cur.execute(
+    await cur.execute(
         f"""{cte}
         SELECT COUNT(*) FROM uca_authors ua {where}
         """,
         cte_params + params,
     )
-    total = cur.fetchone()["count"]
+    row = await cur.fetchone()
+    total = row["count"]
 
-    cur.execute(
+    await cur.execute(
         f"""{cte}
         SELECT ua.id, ua.source, ua.full_name, ua.last_name, ua.first_name,
                ua.orcid, ua.idhal, ua.openalex_id, ua.person_id,
@@ -234,10 +235,11 @@ def list_authorships(
         """,
         cte_params + params + [offset, per_page],
     )
+    authors = await cur.fetchall()
     return {
         "total": total,
         "page": page,
         "per_page": per_page,
         "pages": (total + per_page - 1) // per_page,
-        "authors": cur.fetchall(),
+        "authors": authors,
     }
