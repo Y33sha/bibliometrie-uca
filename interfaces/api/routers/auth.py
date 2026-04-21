@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/api/auth/login", response_model=OkResponse)
-async def auth_login(data: LoginRequest, response: Response) -> Any:
+def auth_login(data: LoginRequest, response: Response) -> Any:
     """Authentifie l'admin et pose un cookie de session signé.
 
     Renvoie 401 si les identifiants ne correspondent pas à ceux
@@ -47,7 +47,7 @@ async def auth_login(data: LoginRequest, response: Response) -> Any:
 
 
 @router.get("/api/auth/check", response_model=AuthCheckResponse)
-async def auth_check(session: str | None = Cookie(None, alias="session")) -> Any:
+def auth_check(session: str | None = Cookie(None, alias="session")) -> Any:
     """Indique si le cookie de session en cours est valide et non expiré.
 
     Ne renvoie jamais 401 — c'est un endpoint de diagnostic pour le
@@ -59,7 +59,7 @@ async def auth_check(session: str | None = Cookie(None, alias="session")) -> Any
 
 
 @router.post("/api/auth/logout", response_model=OkResponse)
-async def auth_logout(response: Response) -> Any:
+def auth_logout(response: Response) -> Any:
     """Supprime le cookie de session (déconnexion côté client)."""
     response.delete_cookie(key="session", path="/")
     return {"ok": True}
