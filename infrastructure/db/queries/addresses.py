@@ -1,4 +1,4 @@
-"""Query services pour /api/addresses/* et /api/countries."""
+"""Query services async pour /api/addresses/* et /api/countries (§2.12)."""
 
 from dataclasses import dataclass
 from typing import Any
@@ -12,18 +12,18 @@ class AddressListFilters:
     search_mode: str = "contains"  # contains, not_contains
 
 
-def resolve_default_structure_id(cur: Any) -> int:
+async def resolve_default_structure_id(cur: Any) -> int:
     """Résout la structure de travail par défaut (première racine du périmètre)."""
-    from infrastructure.app_config import _get_from_db
+    from infrastructure.app_config import _async_get_from_db
 
-    perim_code = _get_from_db(cur, "perimeter_persons") or "uca"
-    cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,))
-    row = cur.fetchone()
+    perim_code = await _async_get_from_db(cur, "perimeter_persons") or "uca"
+    await cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,))
+    row = await cur.fetchone()
     root_ids = (row["structure_ids"] if isinstance(row, dict) else row[0]) if row else []
     return root_ids[0] if root_ids else 0
 
 
-def list_addresses(
+async def list_addresses(
     cur: Any,
     *,
     structure_id: int,
@@ -68,10 +68,10 @@ def list_addresses(
         WHERE TRUE {where_clause}
     """
 
-    cur.execute(f"SELECT COUNT(*) AS total {from_clause}", params)
-    total = cur.fetchone()["total"]
+    await cur.execute(f"SELECT COUNT(*) AS total {from_clause}", params)
+    total = (await cur.fetchone())["total"]
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT a.id, a.raw_text, a.pub_count,
                ast_filter.is_confirmed,
@@ -101,7 +101,7 @@ def list_addresses(
             "structures": r["structures"] or [],
             "pub_count": r["pub_count"],
         }
-        for r in cur.fetchall()
+        for r in await cur.fetchall()
     ]
 
     return {
@@ -113,15 +113,15 @@ def list_addresses(
     }
 
 
-def get_address_basic(cur: Any, addr_id: int) -> dict[str, Any] | None:
+async def get_address_basic(cur: Any, addr_id: int) -> dict[str, Any] | None:
     """Récupère id + raw_text d'une adresse (None si absente)."""
-    cur.execute("SELECT id, raw_text FROM addresses WHERE id = %s", (addr_id,))
-    return cur.fetchone()
+    await cur.execute("SELECT id, raw_text FROM addresses WHERE id = %s", (addr_id,))
+    return await cur.fetchone()
 
 
-def get_address_publications(cur: Any, addr_id: int, limit: int) -> list[dict[str, Any]]:
+async def get_address_publications(cur: Any, addr_id: int, limit: int) -> list[dict[str, Any]]:
     """Publications liées à une adresse (échantillon)."""
-    cur.execute(
+    await cur.execute(
         """
         SELECT DISTINCT ON (p.id)
             p.id, p.title, p.pub_year, p.doi,
@@ -140,12 +140,12 @@ def get_address_publications(cur: Any, addr_id: int, limit: int) -> list[dict[st
         """,
         (addr_id, limit),
     )
-    return cur.fetchall()
+    return await cur.fetchall()
 
 
-def get_address_structures(cur: Any, addr_id: int) -> list[dict[str, Any]]:
+async def get_address_structures(cur: Any, addr_id: int) -> list[dict[str, Any]]:
     """Structures liées à une adresse (pour rafraîchir le client après review)."""
-    cur.execute(
+    await cur.execute(
         """
         SELECT json_agg(json_build_object(
                    'id', s.id, 'name', s.name, 'acronym', s.acronym,
@@ -158,13 +158,15 @@ def get_address_structures(cur: Any, addr_id: int) -> list[dict[str, Any]]:
         """,
         (addr_id,),
     )
-    row = cur.fetchone()
+    row = await cur.fetchone()
     return row["json_agg"] if row and row["json_agg"] else []
 
 
-def get_structure_link(cur: Any, addr_id: int, structure_id: int) -> dict[str, Any] | None:
+async def get_structure_link(
+    cur: Any, addr_id: int, structure_id: int
+) -> dict[str, Any] | None:
     """Retourne is_confirmed + is_detected pour un lien adresse ↔ structure."""
-    cur.execute(
+    await cur.execute(
         """
         SELECT is_confirmed, (matched_form_id IS NOT NULL) AS is_detected
         FROM address_structures
@@ -172,25 +174,25 @@ def get_structure_link(cur: Any, addr_id: int, structure_id: int) -> dict[str, A
         """,
         (addr_id, structure_id),
     )
-    return cur.fetchone()
+    return await cur.fetchone()
 
 
-def list_countries(cur: Any) -> list[dict[str, Any]]:
+async def list_countries(cur: Any) -> list[dict[str, Any]]:
     """Liste des pays (code + nom)."""
-    cur.execute("SELECT code, name FROM countries ORDER BY (code = 'xx') DESC, name")
-    return cur.fetchall()
+    await cur.execute("SELECT code, name FROM countries ORDER BY (code = 'xx') DESC, name")
+    return await cur.fetchall()
 
 
-def country_exists(cur: Any, code: str) -> bool:
+async def country_exists(cur: Any, code: str) -> bool:
     """Vérifie qu'un code pays existe."""
-    cur.execute("SELECT code FROM countries WHERE code = %s", (code,))
-    return cur.fetchone() is not None
+    await cur.execute("SELECT code FROM countries WHERE code = %s", (code,))
+    return (await cur.fetchone()) is not None
 
 
-def address_exists(cur: Any, addr_id: int) -> bool:
+async def address_exists(cur: Any, addr_id: int) -> bool:
     """Vérifie qu'une adresse existe."""
-    cur.execute("SELECT id FROM addresses WHERE id = %s", (addr_id,))
-    return cur.fetchone() is not None
+    await cur.execute("SELECT id FROM addresses WHERE id = %s", (addr_id,))
+    return (await cur.fetchone()) is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,7 +204,7 @@ class AddressCountriesFilters:
     suggest: bool = False
 
 
-def addresses_countries(
+async def addresses_countries(
     cur: Any, *, filters: AddressCountriesFilters, page: int, per_page: int
 ) -> dict[str, Any]:
     """Liste des adresses pour l'attribution de pays + facettes."""
@@ -226,10 +228,10 @@ def addresses_countries(
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
-    cur.execute(f"SELECT COUNT(*) FROM addresses a {where}", params)
-    total = cur.fetchone()["count"]
+    await cur.execute(f"SELECT COUNT(*) FROM addresses a {where}", params)
+    total = (await cur.fetchone())["count"]
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT a.id, a.raw_text, a.countries, a.suggested_countries, a.pub_count
         FROM addresses a
@@ -239,7 +241,7 @@ def addresses_countries(
         """,
         params + [per_page, offset],
     )
-    addresses = [dict(r) for r in cur.fetchall()]
+    addresses = [dict(r) for r in await cur.fetchall()]
 
     for a in addresses:
         sc = a.pop("suggested_countries", None)
@@ -260,7 +262,7 @@ def addresses_countries(
         sug_where = where
         extra = "a.suggested_countries IS NOT NULL"
         sug_where = f"{sug_where} AND {extra}" if sug_where else f"WHERE {extra}"
-        cur.execute(
+        await cur.execute(
             f"""
             SELECT c AS code, COUNT(*) AS cnt
             FROM addresses a, unnest(a.suggested_countries) AS c
@@ -270,7 +272,7 @@ def addresses_countries(
             params,
         )
         result["suggestion_facets"] = [
-            {"code": r["code"].strip(), "count": r["cnt"]} for r in cur.fetchall()
+            {"code": r["code"].strip(), "count": r["cnt"]} for r in await cur.fetchall()
         ]
 
     # Facette pays (exclut country_code, garde le reste + a.countries IS NOT NULL)
@@ -288,7 +290,7 @@ def addresses_countries(
         cf_params.append(filters.suggested_country)
     cf_conditions.append("a.countries IS NOT NULL")
     cf_where = "WHERE " + " AND ".join(cf_conditions)
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT c AS code, COUNT(*) AS cnt
         FROM addresses a, unnest(a.countries) AS c
@@ -298,13 +300,13 @@ def addresses_countries(
         cf_params,
     )
     result["country_facets"] = [
-        {"code": r["code"].strip(), "count": r["cnt"]} for r in cur.fetchall()
+        {"code": r["code"].strip(), "count": r["cnt"]} for r in await cur.fetchall()
     ]
 
     return result
 
 
-def suggest_countries(cur: Any, search: str) -> dict[str, Any]:
+async def suggest_countries(cur: Any, search: str) -> dict[str, Any]:
     """Distribution des pays des adresses matchant un filtre + compte des sans-pays."""
     where_clause = ""
     params: list[Any] = []
@@ -317,7 +319,7 @@ def suggest_countries(cur: Any, search: str) -> dict[str, Any]:
         if where_clause
         else "WHERE a.countries IS NOT NULL"
     )
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT c, COUNT(*) AS cnt
         FROM addresses a, unnest(a.countries) AS c
@@ -326,14 +328,16 @@ def suggest_countries(cur: Any, search: str) -> dict[str, Any]:
         """,
         params,
     )
-    suggestions = [{"code": r["c"].strip(), "count": r["cnt"]} for r in cur.fetchall()]
+    suggestions = [
+        {"code": r["c"].strip(), "count": r["cnt"]} for r in await cur.fetchall()
+    ]
 
     no_country_where = (
         where_clause.replace("WHERE", "WHERE countries IS NULL AND")
         if where_clause
         else "WHERE countries IS NULL"
     )
-    cur.execute(f"SELECT COUNT(*) FROM addresses a {no_country_where}", params)
-    without_country = cur.fetchone()["count"]
+    await cur.execute(f"SELECT COUNT(*) FROM addresses a {no_country_where}", params)
+    without_country = (await cur.fetchone())["count"]
 
     return {"suggestions": suggestions, "without_country": without_country}

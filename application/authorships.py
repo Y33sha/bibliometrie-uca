@@ -14,9 +14,9 @@ et les scripts de correction. Le SQL vit dans
 from typing import Any
 
 from application.audit import emit_event
-from application.ports.perimeter import PerimeterQueries
+from application.ports.perimeter import AsyncPerimeterQueries, PerimeterQueries
 from domain.errors import NotFoundError, ValidationError
-from domain.ports.authorship_repository import AuthorshipRepository
+from domain.ports.authorship_repository import AsyncAuthorshipRepository, AuthorshipRepository
 from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
 
 
@@ -155,15 +155,15 @@ def sync_person_id_from_source(
     return repo.sync_person_id_from_sources(source_authorship_ids)
 
 
-def propagate_uca_for_addresses(
+async def propagate_uca_for_addresses(
     cur: Any,
     address_ids: list[int],
     *,
-    repo: AuthorshipRepository,
-    perimeter_queries: PerimeterQueries,
+    repo: AsyncAuthorshipRepository,
+    perimeter_queries: AsyncPerimeterQueries,
 ) -> None:
     """Recalcule in_perimeter sur source_authorships et authorships vérité
-    pour tous les authorships liés aux adresses données.
+    pour tous les authorships liés aux adresses données (§2.12).
 
     Appelé après chaque review/assign/unassign d'adresse pour
     propagation en temps réel.
@@ -171,13 +171,13 @@ def propagate_uca_for_addresses(
     if not address_ids:
         return
 
-    perimeter_ids = perimeter_queries.get_persons_structure_ids_list(cur)
+    perimeter_ids = await perimeter_queries.get_persons_structure_ids_list(cur)
     if not perimeter_ids:
         return
 
-    affected_sa_ids = repo.find_source_authorships_by_addresses(address_ids)
+    affected_sa_ids = await repo.find_source_authorships_by_addresses(address_ids)
     if not affected_sa_ids:
         return
 
-    repo.recompute_in_perimeter_on_source_authorships(affected_sa_ids, perimeter_ids)
-    repo.propagate_in_perimeter_to_truth_authorships(affected_sa_ids)
+    await repo.recompute_in_perimeter_on_source_authorships(affected_sa_ids, perimeter_ids)
+    await repo.propagate_in_perimeter_to_truth_authorships(affected_sa_ids)
