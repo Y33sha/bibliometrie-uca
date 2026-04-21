@@ -3,6 +3,7 @@
 import json
 
 from infrastructure.db.queries.persons.admin import (
+    async_hal_duplicate_accounts,
     hal_duplicate_accounts,
     list_orphan_authorships,
     name_form_authorships,
@@ -40,7 +41,14 @@ def _create_sd(db, pub_id, source="hal", source_id="h1"):
 
 
 def _create_sp(
-    db, source="hal", source_id="sp1", person_id=None, full_name="X", hal_person_id=None, idhal=None, orcid=None
+    db,
+    source="hal",
+    source_id="sp1",
+    person_id=None,
+    full_name="X",
+    hal_person_id=None,
+    idhal=None,
+    orcid=None,
 ):
     source_ids = {}
     if hal_person_id is not None:
@@ -52,7 +60,14 @@ def _create_sp(
         INSERT INTO source_persons (source, source_id, full_name, person_id, source_ids, orcid)
         VALUES (%s, %s, %s, %s, %s::jsonb, %s) RETURNING id
         """,
-        (source, source_id, full_name, person_id, json.dumps(source_ids) if source_ids else None, orcid),
+        (
+            source,
+            source_id,
+            full_name,
+            person_id,
+            json.dumps(source_ids) if source_ids else None,
+            orcid,
+        ),
     )
     return db.fetchone()["id"]
 
@@ -136,9 +151,7 @@ class TestListOrphanAuthorships:
         sd = _create_sd(db, pub)
         sp1 = _create_sp(db, source_id="sp-m", full_name="SpecialName")
         sp2 = _create_sp(db, source_id="sp-o", full_name="Autre")
-        sa_match = _create_sa(
-            db, sd, sp1, person_id=None, raw_author_name="SpecialName"
-        )
+        sa_match = _create_sa(db, sd, sp1, person_id=None, raw_author_name="SpecialName")
         _create_sa(db, sd, sp2, person_id=None, raw_author_name="Autre")
 
         res = list_orphan_authorships(db, search="Special", page=1, per_page=50)
@@ -203,3 +216,27 @@ class TestHalDuplicateAccounts:
         _create_sp(db, source_id="hal-1", person_id=pid, hal_person_id=42)
         res = hal_duplicate_accounts(db, page=1, per_page=50)
         assert not any(p["person_id"] == pid for p in res["persons"])
+
+
+class TestAsyncHalDuplicateAccounts:
+    # Smoke test de la variante async (§2.12) — la logique métier
+    # exhaustive est couverte par les tests sync ci-dessus.
+
+    async def test_detects_person_with_two_hal_accounts(self, async_db):
+        await async_db.execute(
+            "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
+            "VALUES ('A', 'Z', 'a', 'z') RETURNING id"
+        )
+        pid = (await async_db.fetchone())["id"]
+        for sid, hpid in [("hal-1", 42), ("hal-2", 43)]:
+            await async_db.execute(
+                "INSERT INTO source_persons (source, source_id, full_name, person_id, source_ids) "
+                "VALUES ('hal', %s, 'X', %s, %s::jsonb)",
+                (sid, pid, json.dumps({"hal_person_id": hpid})),
+            )
+
+        res = await async_hal_duplicate_accounts(async_db, page=1, per_page=50)
+        assert res["total"] >= 1
+        ours = next((p for p in res["persons"] if p["person_id"] == pid), None)
+        assert ours is not None
+        assert len(ours["hal_accounts"]) == 2
