@@ -48,7 +48,10 @@ def _test_get_cursor():
         with conn.cursor() as _ping:
             _ping.execute("SELECT 1")
     except psycopg.Error:
-        _test_pool.putconn(conn, close=True)
+        # psycopg_pool n'a pas de flag close=True ; on ferme la connexion
+        # nous-mêmes, la pool la discardera au putconn suivant.
+        conn.close()
+        _test_pool.putconn(conn)
         conn = _test_pool.getconn()
     try:
         with conn.cursor() as cur:

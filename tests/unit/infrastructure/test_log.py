@@ -1,7 +1,5 @@
 """Tests de la consolidation des logs (infrastructure/log.py)."""
 
-from pathlib import Path
-
 from infrastructure.log import _PROJECT_ROOT, _rebase_log_dir
 
 
@@ -59,9 +57,7 @@ class TestSetupLoggerFileLocation:
         spec.loader.exec_module(fresh)
         monkeypatch.setattr(fresh, "_PROJECT_ROOT", tmp_path)
 
-        logger = fresh.setup_logger(
-            "pytest_fake_logger", str(tmp_path / "foo" / "bar" / "logs")
-        )
+        logger = fresh.setup_logger("pytest_fake_logger", str(tmp_path / "foo" / "bar" / "logs"))
         try:
             logger.info("marker")
             for h in logger.handlers:
@@ -83,8 +79,13 @@ class TestMakeFormatter:
 
         fmt = _make_formatter()
         record = _logging.LogRecord(
-            name="t", level=_logging.INFO, pathname="", lineno=0,
-            msg="hello", args=None, exc_info=None,
+            name="t",
+            level=_logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="hello",
+            args=None,
+            exc_info=None,
         )
         line = fmt.format(record)
         assert line.startswith("{") and '"message": "hello"' in line
@@ -97,8 +98,13 @@ class TestMakeFormatter:
         monkeypatch.setenv("LOG_FORMAT", "text")
         fmt = _make_formatter()
         record = _logging.LogRecord(
-            name="t", level=_logging.INFO, pathname="", lineno=0,
-            msg="hello", args=None, exc_info=None,
+            name="t",
+            level=_logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="hello",
+            args=None,
+            exc_info=None,
         )
         line = fmt.format(record)
         assert "hello" in line and "INFO" in line and not line.startswith("{")
@@ -113,8 +119,13 @@ class TestJsonFormatter:
 
         fmt = JsonFormatter()
         record = _logging.LogRecord(
-            name="t", level=_logging.INFO, pathname="", lineno=0,
-            msg="payload", args=None, exc_info=None,
+            name="t",
+            level=_logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="payload",
+            args=None,
+            exc_info=None,
         )
         record.foo = "bar"  # extra
         data = json.loads(fmt.format(record))
@@ -135,21 +146,30 @@ class TestJsonFormatter:
         except ValueError:
             exc_info = _sys.exc_info()
         record = _logging.LogRecord(
-            name="t", level=_logging.ERROR, pathname="", lineno=0,
-            msg="fail", args=None, exc_info=exc_info,
+            name="t",
+            level=_logging.ERROR,
+            pathname="",
+            lineno=0,
+            msg="fail",
+            args=None,
+            exc_info=exc_info,
         )
         data = json.loads(fmt.format(record))
         assert "ValueError: boom" in data["exception"]
 
 
 class TestConfigureRootLogging:
-    def test_replaces_handlers(self):
+    def test_replaces_handlers(self, monkeypatch):
+        """Sans pytest dans l'env, un StreamHandler est attaché au root."""
         import logging as _logging
+
+        # Retirer le marqueur pytest pour exercer la branche "prod"
+        monkeypatch.delenv("PYTEST_VERSION", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
 
         from infrastructure.log import configure_root_logging
 
         root = _logging.getLogger()
-        # Ajoute un handler bidon
         dummy = _logging.NullHandler()
         root.addHandler(dummy)
         try:
@@ -157,6 +177,27 @@ class TestConfigureRootLogging:
             assert dummy not in root.handlers
             assert len(root.handlers) == 1
             assert root.level == _logging.INFO
+        finally:
+            for h in list(root.handlers):
+                root.removeHandler(h)
+
+    def test_skips_handler_under_pytest(self, monkeypatch):
+        """Sous pytest, aucun StreamHandler n'est attaché : pytest a son
+        propre LogCaptureHandler, attacher en plus polluerait la sortie
+        des tests (duplications, échappement de la capture)."""
+        import logging as _logging
+
+        monkeypatch.setenv("PYTEST_VERSION", "test")
+
+        from infrastructure.log import configure_root_logging
+
+        root = _logging.getLogger()
+        dummy = _logging.NullHandler()
+        root.addHandler(dummy)
+        try:
+            configure_root_logging()
+            assert dummy not in root.handlers
+            assert len(root.handlers) == 0
         finally:
             for h in list(root.handlers):
                 root.removeHandler(h)

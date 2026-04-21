@@ -196,7 +196,9 @@ async def feedback_false_positives(
             ORDER BY a.pub_count DESC, a.id
             LIMIT %s OFFSET %s
         """,
-            params + [structure_id, per_page, offset],
+            # Ordre texte des placeholders : matched_forms.structure_id
+            # (sous-requête en tête) > WHERE {where} > LIMIT/OFFSET.
+            [structure_id] + params + [per_page, offset],
         )
 
         return {

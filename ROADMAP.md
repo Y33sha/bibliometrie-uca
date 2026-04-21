@@ -6,7 +6,7 @@ Synthèse de l'audit DSI (avril 2026) — ROI décroissant (impact / effort) :
 
 1. [x] **§1.7b** — Lever les 14 `ignore_imports` pipeline. Effort faible, débloque la testabilité unitaire des `normalize_*` et fige la cohérence DDD avant transmission. *Clôturé le 2026-04-20.*
 2. [x] **§2.10** — Découper les 4 fichiers backend monolithiques (`queries/publications.py` 1140 LOC, `queries/persons.py` 711, `repositories/person_repository.py` 665, `queries/stats.py` 630). Effort moyen, impact maintenabilité + testabilité. *Clôturé le 2026-04-20.*
-3. [~] **§2.1 +§2.2** — Remonter `fail_under` de 49 → 60+ en ciblant `infrastructure/db/queries/*`. Effort moyen, réduit le risque de régression en prod. *Partiel au 2026-04-20 : phases A→C faites, couverture 50.27 % → 56.34 %, `fail_under = 55`. Pour franchir 60 il faudrait élargir aux routers API (phase D non faite).*
+3. [x] **§2.1 +§2.2** — Remonter `fail_under` de 49 → 60+ en ciblant `infrastructure/db/queries/*` puis les routers API. *Clôturé le 2026-04-21 : phases A→D faites, couverture 49.59 % → 62.50 %, `fail_under = 62`. Phase D : routers persons (40 % → 99 %), structures (33 % → 100 %), publishers (31 % → 100 %), admin_feedback (22 % → 69 % — le SSE /rerun reste non couvert). Bugs latents corrigés en chemin : logging JSON polluant la sortie pytest (StreamHandler stdout sous pytest), reliquat psycopg2 `putconn(close=True)` dans le conftest, ordre des placeholders SQL cassé dans `feedback_false_positives` avec `search`.*
 4. [x] **§2.7.4** — Découper les 3 routes Svelte > 1000 LOC. *Fait 2026-04-20 : `publications/[id]` 1132 → 206, `admin/persons` 1263 → 642, `admin/structures` 1572 → 797. 14 composants extraits, 0 erreur svelte-check.*
 5. [x] **§2.7.3** — Généraliser les types OpenAPI aux endpoints restants. *Clôturé le 2026-04-20 : 14 routers couverts (stats, publications, laboratories, addresses, hal_problems, admin_person_duplicates, admin_pipeline, admin_feedback, perimeters, publishers, auth, config, authorships, admin_duplicates) ; ~63 endpoints supplémentaires annotés `response_model` ; ~62 interfaces TS locales remplacées par les types générés.*
 6. [ ] **§2.6** — `CONTRIBUTING.md` + descriptions OpenAPI. Effort faible, impact onboarding DSI.
@@ -135,15 +135,20 @@ pytest-unit). Mypy strict (`check_untyped_defs` + `disallow_untyped_defs`)
 en CI et pre-commit, 0 erreur. Toutes les fonctions annotées (souvent
 `Any` pragmatique pour les params DB).
 - [x] **Couverture** : `pytest --cov` en CI. Seuil actuel
-  `fail_under = 56`, baseline réelle ~57.3 %. `interfaces/cli/*`
+  `fail_under = 62`, baseline réelle ~62.50 %. `interfaces/cli/*`
   exclu (scripts one-shot, logique utile testée via
-  application/infrastructure). Remontée de 49 → 56 dans le chantier
-  §2.1 (phases A→C : tests ajoutés sur 14 modules `queries/*` ; phase D
-  partielle : router `addresses` 0 → 99 %). 3 bugs latents exposés et
-  corrigés en chemin (`PgAddressLinker` fallback RealDictCursor,
-  `authorships_stats` scope `sa.source`, `harvest.fill_source_person_*_if_null`
-  colonne `updated_at` inexistante). Pour dépasser 60, finir phase D
-  sur `persons`, `publishers`, `structures`, `admin_feedback`.
+  application/infrastructure). Remontée de 49 → 62.5 dans le chantier
+  §2.1. Phases A→C : tests ajoutés sur 14 modules `queries/*`. Phase D
+  (routers API) : addresses 0 → 99 %, persons 40 → 99 %, structures
+  33 → 100 %, publishers 31 → 100 %, admin_feedback 22 → 69 %
+  (SSE /rerun reste non couvert). 6 bugs latents exposés et corrigés
+  en chemin (`PgAddressLinker` fallback RealDictCursor,
+  `authorships_stats` scope `sa.source`,
+  `harvest.fill_source_person_*_if_null` colonne `updated_at`
+  inexistante, logging JSON qui polluait la sortie pytest,
+  reliquat psycopg2 `putconn(close=True)` dans le conftest intégration,
+  ordre des placeholders cassé dans `feedback_false_positives` avec
+  `search`).
 
 ### 2.2 Organisation des tests
 `tests/unit/` + `tests/integration/` (sous-dossiers `domain/`,
