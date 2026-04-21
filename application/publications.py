@@ -11,9 +11,12 @@ indépendant du type de curseur (tuple ou dict_row).
 
 from typing import Any
 
-from application.audit import emit_event
+from application.audit import async_emit_event, emit_event
 from domain.doc_types import map_doc_type
-from domain.ports.publication_repository import PublicationRepository
+from domain.ports.publication_repository import (
+    AsyncPublicationRepository,
+    PublicationRepository,
+)
 from domain.publication import (
     PubByDoi,
     PubByNnt,
@@ -405,6 +408,36 @@ def merge_publications(
     repo.merge_into(target_id, source_id)
     repo.update_sources(target_id)
     emit_event(
+        cur,
+        "publication.merged",
+        "publication",
+        target_id,
+        {"source_id": source_id},
+    )
+
+
+async def async_mark_distinct(
+    cur: Any, pub_id_a: int, pub_id_b: int, *, repo: AsyncPublicationRepository
+) -> None:
+    """Variante async de `mark_distinct` (§2.12, API admin_duplicates)."""
+    inserted = await repo.mark_distinct(pub_id_a, pub_id_b)
+    if inserted:
+        await async_emit_event(
+            cur,
+            "publication.marked_distinct",
+            "publication",
+            inserted[0],
+            {"other_id": inserted[1]},
+        )
+
+
+async def async_merge_publications(
+    cur: Any, target_id: int, source_id: int, *, repo: AsyncPublicationRepository
+) -> None:
+    """Variante async de `merge_publications` (§2.12, API admin_duplicates)."""
+    await repo.merge_into(target_id, source_id)
+    await repo.update_sources(target_id)
+    await async_emit_event(
         cur,
         "publication.merged",
         "publication",

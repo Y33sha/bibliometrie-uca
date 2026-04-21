@@ -1,4 +1,4 @@
-"""Query services pour /api/admin/duplicates/* (doublons publications)."""
+"""Query services async pour /api/admin/duplicates/* (§2.12)."""
 
 from typing import Any
 
@@ -24,9 +24,9 @@ _PUB_CANDIDATE_WHERE = """
 """
 
 
-def _get_pub_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
+async def _get_pub_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
     """Détail d'une publication pour la page de déduplication."""
-    cur.execute(
+    await cur.execute(
         """
         SELECT p.id, p.title, p.title_normalized, p.doi, p.pub_year,
                p.doc_type::text, p.container_title, p.oa_status::text,
@@ -38,17 +38,17 @@ def _get_pub_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
         """,
         (pub_id,),
     )
-    pub = cur.fetchone()
+    pub = await cur.fetchone()
     if not pub:
         return None
 
-    cur.execute(
+    await cur.execute(
         "SELECT source, source_id FROM source_publications WHERE publication_id = %s",
         (pub_id,),
     )
-    sources = [{"source": r["source"], "source_id": r["source_id"]} for r in cur.fetchall()]
+    sources = [{"source": r["source"], "source_id": r["source_id"]} for r in await cur.fetchall()]
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT a.author_position, a.in_perimeter, a.person_id,
                COALESCE(p2.last_name) AS last_name,
@@ -65,7 +65,7 @@ def _get_pub_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
         """,
         (pub_id,),
     )
-    authors = [dict(r) for r in cur.fetchall()]
+    authors = [dict(r) for r in await cur.fetchall()]
 
     return {
         "id": pub["id"],
@@ -90,19 +90,20 @@ def _get_pub_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
     }
 
 
-def next_pub_duplicate(cur: Any, *, min_title_len: int, offset: int) -> dict[str, Any]:
+async def next_pub_duplicate(cur: Any, *, min_title_len: int, offset: int) -> dict[str, Any]:
     """Renvoie la paire candidate doublon-publications à la position offset."""
-    cur.execute(
+    await cur.execute(
         f"SELECT COUNT(*) AS total FROM (SELECT p1.id {_PUB_CANDIDATE_WHERE}) sub",
         (min_title_len,),
     )
-    total = cur.fetchone()["total"]
+    row = await cur.fetchone()
+    total = row["total"]
 
-    cur.execute(
+    await cur.execute(
         f"SELECT p1.id AS id_a, p2.id AS id_b {_PUB_CANDIDATE_WHERE} LIMIT 1 OFFSET %s",
         (min_title_len, offset),
     )
-    row = cur.fetchone()
+    row = await cur.fetchone()
     if not row:
         return {"total": total, "offset": offset, "pair": None}
 
@@ -110,17 +111,17 @@ def next_pub_duplicate(cur: Any, *, min_title_len: int, offset: int) -> dict[str
         "total": total,
         "offset": offset,
         "pair": {
-            "pub_a": _get_pub_detail(cur, row["id_a"]),
-            "pub_b": _get_pub_detail(cur, row["id_b"]),
+            "pub_a": await _get_pub_detail(cur, row["id_a"]),
+            "pub_b": await _get_pub_detail(cur, row["id_b"]),
         },
     }
 
 
-def get_publications_basic(cur: Any, pub_ids: list[int]) -> dict[int, Any]:
+async def get_publications_basic(cur: Any, pub_ids: list[int]) -> dict[int, Any]:
     """Résout un lot de publications (existence check + métadonnées de base)."""
-    cur.execute(
+    await cur.execute(
         "SELECT id, doi, journal_id, oa_status::text, language, container_title "
         "FROM publications WHERE id = ANY(%s)",
         (list(pub_ids),),
     )
-    return {r["id"]: r for r in cur.fetchall()}
+    return {r["id"]: r for r in await cur.fetchall()}
