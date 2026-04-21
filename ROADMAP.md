@@ -271,6 +271,41 @@ Enums PostgreSQL (doc_type, oa_status, roles) pourraient avoir un
 remonté. Skip par défaut ; revisiter si un cast pose un problème
 concret.
 
+### 2.14 Async des extractions HTTP pipeline
+
+Différent du chantier §2.12 qui ciblait la concurrence **entre requêtes
+entrantes** sur l'API. Ici l'objectif est de paralléliser les **appels
+HTTP sortants** dans un pipeline mono-processus, pour maximiser le
+débit autorisé par les rate-limits des APIs sources.
+
+**Constat** : extractions actuelles séquentielles (latence ~500 ms par
+requête paginée × N pages). On sature ~20 % du débit permis. HAL ≈ 2h,
+OpenAlex corpus complet ≈ 20 min, etc.
+
+**Approche** : migrer `requests` → `httpx.AsyncClient` + `asyncio.Semaphore`
+par source (borné au QPS documenté). Backoff exponentiel sur 429. Îlot
+async encapsulé via `asyncio.run()` en début d'étape pipeline ; le
+reste du pipeline reste sync.
+
+**Candidats (ROI décroissant)** :
+- [ ] **Extracteurs de sources** (~1400 LOC, 5 fichiers) : HAL, OpenAlex,
+  WoS, ScanR, theses.fr. Gain attendu ×5 sur le temps d'extraction.
+- [ ] Scripts d'enrichissement : `enrich_journal_apc.py`,
+  `enrich_oa_status.py`.
+- [ ] Scripts cross-import + fetch ciblé : `cross_import_*`,
+  `fetch_missing_hal`, `refetch_truncated`, `harvest_hal_identifiers`.
+
+**Dépendances** :
+- `httpx` ajouté aux deps prod (il est déjà en dev pour les tests
+  FastAPI — juste le déplacer).
+- Mock côté tests : `respx` ou `pytest-httpx` (migration depuis les
+  mocks `requests` actuels).
+- `infrastructure/api_retry.py` dupliqué en variante async (pattern
+  §2.12).
+
+**Pas en scope** : les étapes CPU-bound du pipeline (normalisation,
+build_authorships, dédup). Async n'aide pas là-dessus.
+
 ---
 
 ## Chantier fonctionnalités
