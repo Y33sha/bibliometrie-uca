@@ -7,8 +7,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from application.journals import merge_journals
 from application.journals import update_journal as _update_journal
-from infrastructure.repositories import journal_repository
-from interfaces.api.deps import get_cursor
+from infrastructure.repositories import async_journal_repository
+from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import JournalListResponse, JournalUpdate, MergeRequest
 
 router = APIRouter()
@@ -30,7 +30,7 @@ async def list_journals(
     `sort` : `title` / `-title` / `publisher` / `-publisher` /
     `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
     """
-    with get_cursor() as (cur, conn):
+    async with get_async_cursor() as (cur, conn):
         conditions = []
         params: list[Any] = []
 
@@ -45,8 +45,8 @@ async def list_journals(
         where = " AND ".join(conditions) if conditions else "TRUE"
 
         # Count
-        cur.execute(f"SELECT COUNT(*) FROM journals j WHERE {where}", params)
-        total = cur.fetchone()["count"]
+        await cur.execute(f"SELECT COUNT(*) FROM journals j WHERE {where}", params)
+        total = (await cur.fetchone())["count"]
 
         # Sort
         sort_map = {
@@ -60,7 +60,7 @@ async def list_journals(
         order = sort_map.get(sort, sort_map["title"])
 
         offset = (page - 1) * per_page
-        cur.execute(
+        await cur.execute(
             f"""
             SELECT j.id, j.title, j.issn, j.eissn, j.issnl,
                    j.publisher_id, p.name AS pub_name,
@@ -82,16 +82,16 @@ async def list_journals(
             "total": total,
             "page": page,
             "pages": (total + per_page - 1) // per_page,
-            "journals": cur.fetchall(),
+            "journals": await cur.fetchall(),
         }
 
 
 @router.get("/api/journals/{journal_id}")
 async def get_journal(journal_id: int) -> Any:
     """Récupère une revue par son id (titre uniquement). 404 si inconnue."""
-    with get_cursor() as (cur, conn):
-        cur.execute("SELECT id, title FROM journals WHERE id = %s", (journal_id,))
-        row = cur.fetchone()
+    async with get_async_cursor() as (cur, conn):
+        await cur.execute("SELECT id, title FROM journals WHERE id = %s", (journal_id,))
+        row = await cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Revue introuvable")
         return row
@@ -105,8 +105,8 @@ async def update_journal(journal_id: int, body: JournalUpdate) -> Any:
     (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
     """
     fields = body.model_dump(exclude_unset=True)
-    with get_cursor() as (cur, conn):
-        _update_journal(cur, journal_id, fields=fields, repo=journal_repository(cur))
+    async with get_async_cursor() as (cur, conn):
+        await _update_journal(cur, journal_id, fields=fields, repo=async_journal_repository(cur))
         return {"ok": True}
 
 
@@ -118,13 +118,17 @@ async def merge(journal_id: int, body: MergeRequest) -> Any:
     la cible ; la source est supprimée. 404 si l'une des deux est
     introuvable.
     """
-    with get_cursor() as (cur, conn):
-        cur.execute("SELECT id FROM journals WHERE id IN (%s, %s)", (journal_id, body.source_id))
-        found = {row["id"] for row in cur.fetchall()}
+    async with get_async_cursor() as (cur, conn):
+        await cur.execute(
+            "SELECT id FROM journals WHERE id IN (%s, %s)", (journal_id, body.source_id)
+        )
+        found = {row["id"] for row in await cur.fetchall()}
         if journal_id not in found:
             raise HTTPException(status_code=404, detail="Revue cible introuvable")
         if body.source_id not in found:
             raise HTTPException(status_code=404, detail="Revue source introuvable")
 
-        merge_journals(cur, journal_id, body.source_id, repo=journal_repository(cur))
+        await merge_journals(
+            cur, journal_id, body.source_id, repo=async_journal_repository(cur)
+        )
         return {"merged": True, "source_id": body.source_id, "target_id": journal_id}
