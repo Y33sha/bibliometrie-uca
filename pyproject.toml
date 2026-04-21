@@ -156,7 +156,7 @@ skip_empty = true
 show_missing = true
 # Seuil progressif : ne jamais régresser. À faire remonter au fur et à
 # mesure qu'on ajoute des tests.
-fail_under = 56
+fail_under = 62
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",

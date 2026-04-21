@@ -149,6 +149,12 @@ def configure_root_logging(level: int = logging.INFO) -> None:
     # Nettoyer les handlers par défaut (uvicorn peut en ajouter après)
     for h in list(root.handlers):
         root.removeHandler(h)
+    # Sous pytest, ne pas attacher de StreamHandler : pytest pose son
+    # propre LogCaptureHandler (accessible via la fixture `caplog` et
+    # affiché automatiquement sur échec). Attacher un handler stdout en
+    # plus duplique les records et pollue la sortie des tests.
+    if os.environ.get("PYTEST_VERSION") or os.environ.get("PYTEST_CURRENT_TEST"):
+        return
     handler = logging.StreamHandler(stream=sys.stdout)
     handler.setFormatter(_make_formatter())
     root.addHandler(handler)
