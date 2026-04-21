@@ -1,7 +1,4 @@
-"""Dépendances async FastAPI : curseur async via AsyncConnectionPool (§2.12).
-
-Parallèle à `interfaces/api/deps.get_cursor` pendant la migration. À
-utiliser dans les routers migrés vers async.
+"""Dépendances async FastAPI : curseur async via AsyncConnectionPool.
 
 `pool.connection()` gère automatiquement commit (succès) / rollback
 (exception) et la restitution au pool, cf. psycopg_pool.
@@ -20,3 +17,33 @@ async def get_async_cursor() -> AsyncIterator[tuple[Any, Any]]:
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             yield cur, conn
+
+
+# ----- Perimeter root -----
+
+_root_structure_id: int | None = None
+
+
+async def get_root_structure_id() -> int:
+    """Retourne l'ID de la structure racine du périmètre principal.
+
+    Lit perimeters.structure_ids[1] pour le périmètre configuré dans
+    config.perimeter_persons. Valeur cachée après le premier appel
+    (lookup unique par vie du processus).
+    """
+    global _root_structure_id
+    if _root_structure_id is not None:
+        return _root_structure_id
+    async with get_async_cursor() as (cur, _):
+        await cur.execute("""
+            SELECT p.structure_ids[1] AS root_id
+            FROM config c
+            JOIN perimeters p ON p.code = c.value #>> '{}'
+            WHERE c.key = 'perimeter_persons'
+        """)
+        row = await cur.fetchone()
+        if row and row["root_id"]:
+            _root_structure_id = row["root_id"]
+        else:
+            _root_structure_id = 0  # Périmètre non configuré — les filtres APC seront sans effet
+    return _root_structure_id

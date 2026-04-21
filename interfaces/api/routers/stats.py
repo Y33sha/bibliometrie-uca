@@ -6,8 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 
 from infrastructure.db.queries import stats as stats_queries
-from interfaces.api.async_deps import get_async_cursor
-from interfaces.api.deps import get_root_structure_id
+from interfaces.api.async_deps import get_async_cursor, get_root_structure_id
 from interfaces.api.filters import parse_int_csv
 from interfaces.api.models import (
     JournalStatsResponse,
@@ -43,7 +42,7 @@ async def publisher_stats(
     async with get_async_cursor() as (cur, _conn):
         return await stats_queries.publisher_stats(
             cur,
-            root_structure_id=get_root_structure_id(),
+            root_structure_id=await get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),
             oa_status=oa_status,
@@ -71,7 +70,7 @@ async def journal_stats(
     async with get_async_cursor() as (cur, _conn):
         return await stats_queries.journal_stats(
             cur,
-            root_structure_id=get_root_structure_id(),
+            root_structure_id=await get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),
             publisher_id=publisher_id,
@@ -97,7 +96,7 @@ async def stats_by_year(
     async with get_async_cursor() as (cur, _conn):
         return await stats_queries.stats_by_year(
             cur,
-            root_structure_id=get_root_structure_id(),
+            root_structure_id=await get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),
             publisher_id=publisher_id,
@@ -124,7 +123,7 @@ async def stats_summary(
     async with get_async_cursor() as (cur, _conn):
         return await stats_queries.stats_summary(
             cur,
-            root_structure_id=get_root_structure_id(),
+            root_structure_id=await get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),
             publisher_id=publisher_id,
@@ -150,7 +149,7 @@ async def stats_labs(
     async with get_async_cursor() as (cur, _conn):
         return await stats_queries.stats_labs(
             cur,
-            root_structure_id=get_root_structure_id(),
+            root_structure_id=await get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),
             publisher_id=publisher_id,
@@ -189,7 +188,7 @@ async def stats_facets(
     async with get_async_cursor() as (cur, _conn):
         return await stats_queries.stats_facets(
             cur,
-            root_structure_id=get_root_structure_id(),
+            root_structure_id=await get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),
             publisher_id=publisher_id,

@@ -29,9 +29,10 @@ from domain.errors import (
     UnauthorizedError,
     ValidationError,
 )
-from infrastructure.db.async_connection import build_async_pool, set_async_pool
+from infrastructure.db.async_connection import build_async_pool, get_async_pool, set_async_pool
 from infrastructure.log import configure_root_logging
-from interfaces.api.deps import _get_pool, _verify_token, get_cursor
+from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.deps import _verify_token
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
 # À faire AVANT l'import des routers qui peuvent créer leur propre logger.
@@ -63,9 +64,7 @@ logger = logging.getLogger(__name__)
 
 # ----- Lifespan -----
 #
-# Ouvre/ferme le pool async psycopg3 (§2.12). Le pool sync de
-# `interfaces.api.deps` reste disponible tant que les routers ne sont pas
-# tous migrés.
+# Ouvre/ferme le pool async psycopg3 pour toute la surface API.
 
 
 @asynccontextmanager
@@ -236,12 +235,12 @@ async def health() -> Any:
     """
     sandbox = os.environ.get("BIBLIOMETRIE_SANDBOX") == "1"
     try:
-        with get_cursor() as (cur, conn):
-            cur.execute("SELECT 1")
-            cur.execute(
+        async with get_async_cursor() as (cur, conn):
+            await cur.execute("SELECT 1")
+            await cur.execute(
                 "SELECT source, MAX(created_at) AS last_at FROM source_publications GROUP BY source"
             )
-            rows = cur.fetchall()
+            rows = await cur.fetchall()
     except Exception as e:
         return JSONResponse(status_code=503, content={"status": "error", "db": str(e)})
 
@@ -282,7 +281,7 @@ async def metrics() -> Any:
     Le timing des requêtes est émis via le middleware `timing_middleware`
     (champs `method`, `path`, `status`, `duration_ms` en JSON structuré).
     """
-    pool = _get_pool()
+    pool = get_async_pool()
     stats = pool.get_stats()
     pool_size = stats.get("pool_size", 0)
     available = stats.get("pool_available", 0)

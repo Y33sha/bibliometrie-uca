@@ -242,8 +242,8 @@ Créer ou éditer `interfaces/api/routers/<domaine>.py` :
 ```python
 from fastapi import APIRouter
 from application import foos as foos_service
-from infrastructure.repositories import foo_repository
-from interfaces.api.deps import get_cursor
+from infrastructure.repositories import async_foo_repository
+from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import FooCreate, FooOut
 
 router = APIRouter()
@@ -251,9 +251,9 @@ router = APIRouter()
 @router.post("/api/foos", response_model=FooOut)
 async def create_foo(data: FooCreate):
     """Crée un foo. Renvoie 409 si un foo du même nom existe déjà."""
-    with get_cursor() as (cur, _conn):
-        return foos_service.create_foo(
-            cur, name=data.name, active=data.active, repo=foo_repository(cur)
+    async with get_async_cursor() as (cur, _conn):
+        return await foos_service.create_foo(
+            cur, name=data.name, active=data.active, repo=async_foo_repository(cur)
         )
 ```
 
