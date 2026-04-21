@@ -213,41 +213,64 @@ Fonctionnalités spécifiques non exploitées aujourd'hui. Certains items
 dépendent d'async (§2.12), d'autres peuvent être menés en parallèle
 (COPY, prepare_threshold).
 
-#### 2.13.1 `row_factory=class_row(...)` sur les repositories critiques
-Candidats par ordre d'impact :
-- [ ] `PgPublicationRepository` (22 exec, beaucoup de mapping via `_val`)
-- [ ] `PgPersonRepository/_core.py` (16 exec)
-- [ ] `infrastructure/db/queries/publications/list.py` + `detail.py`
-- [ ] `infrastructure/db/queries/persons/list.py` + `detail.py`
-- [ ] `infrastructure/db/queries/stats/*`
+#### 2.13.1 `row_factory=class_row(...)` — partiellement fait
+Choix retenu : **dataclass** (pas Pydantic) — validation inutile sur des
+données déjà garanties par PostgreSQL, construction plus rapide, aligné
+sur `domain/publication.py`. Helper `row_as` / `async_row_as` dans
+`infrastructure/db_helpers.py` pour basculer la `row_factory` d'un
+curseur le temps d'un bloc (sans toucher au pool global qui reste en
+`dict_row`).
 
-~50 call sites au total, ~8-10 commits. **Ne pas** appliquer au pool
-global (casse les queries `dict_row` existantes) — appliquer au cursor
-à chaque call site. Choix Pydantic vs dataclass à trancher en début de
-chantier (préférence dataclass pour la perf, cohérent avec
-`domain/publication.py`).
+- [x] `PgPublicationRepository.find_by_*` : les 4 types de résultats
+  (`PubByDoi`, `PubByNnt`, `PubByTitle`, `PubThesisCandidate`) sont
+  passés de `namedtuple` à `@dataclass(frozen=True, slots=True)` ;
+  les 4 méthodes sync + async utilisent `class_row`.
+- **Autres candidats évalués puis écartés** :
+  - `PgPersonRepository/_core.py` : returns scalaires (`int`, `bool`)
+    ou tuples ad-hoc (`tuple[int, int] | None`). Pas de shape typée
+    à construire, `class_row` ne s'applique pas.
+  - `queries/publications/list.py` + `detail.py`, `queries/persons/*`,
+    `queries/stats/*` : renvoient des dicts complexes **1:1 avec les
+    `response_model` Pydantic** de `interfaces/api/models.py`. Créer
+    des dataclasses parallèles dupliquerait la hiérarchie de types sans
+    bénéfice métier — mieux vaut garder la séparation nette "dict repo →
+    Pydantic API" quand la forme ne diffère pas.
 
-#### 2.13.2 `COPY FROM STDIN` sur les imports massifs
-Hotspots par ordre d'impact :
-- [ ] `infrastructure/db/queries/normalize_wos.py` (4 `executemany`,
-  appelé sur tout le corpus à chaque normalize)
-- [ ] `infrastructure/sources/openalex/extract_openalex.py` (batch par
-  page API)
-- [ ] `infrastructure/sources/wos/extract_wos.py`
-- [ ] `infrastructure/repositories/address_repository.py:81`
-- [ ] `interfaces/cli/import_apc.py` — ROI faible, laisser si chantier
-  complet
+À revisiter si un besoin de shape interne typée émerge indépendamment
+du modèle API exposé.
 
-Stratégie upsert : `COPY INTO temp table` + `INSERT … ON CONFLICT …
-SELECT FROM temp`. ~4-6 commits, benchmark avant/après dans chaque
-message de commit. Indépendant de §2.12 (le pipeline reste sync).
+#### 2.13.2 `COPY FROM STDIN` sur les imports massifs — skip (ROI trop faible)
+Benchmark sur `bibliometrie_test` (moyenne sur 3 runs, median) pour
+l'upsert d'adresses via temp table + INSERT ON CONFLICT :
 
-#### 2.13.3 `cursor.stream()` sur gros SELECT — à investiguer d'abord
-`build_authorships` **n'est pas** candidat (UPDATE massifs, pas de
-`fetchall` côté Python). Vrais candidats possibles : normalizers qui
-itèrent sur `PgStagingQueries.fetch_*`, `harvest_hal_identifiers`.
-- [ ] Grep ciblé `cur.fetchall()` dans `application/pipeline/` avant
-  d'engager. Si aucun gros fetchall, skip.
+| Batch   | `executemany` | `COPY` + `INSERT` | Ratio |
+|---------|---------------|--------------------|-------|
+| 10      | 1.1 ms        | 3.1 ms             | 0.35× |
+| 100     | 3.6 ms        | 5.3 ms             | 0.68× |
+| 1 000   | 34.8 ms       | 21.6 ms            | 1.61× |
+| 10 000  | 353.8 ms      | 211.0 ms           | 1.68× |
+
+Seuil de rentabilité ≈ 500-1 000 lignes par batch. En-dessous, le coût
+`CREATE TEMP TABLE` + `INSERT … SELECT … ON CONFLICT` dépasse le gain.
+
+Sur ce projet, aucun hotspot ne dépasse ce seuil :
+- `upsert_addresses_batch` (normalize_wos) : 5-20 lignes par doc.
+- `insert_batch` (extracteurs) : ~200 lignes par page API.
+
+psycopg3 optimise déjà `executemany` en pipeline interne (contrairement
+à psycopg2), ce qui réduit drastiquement le gain attendu de COPY par
+rapport à la littérature psycopg2-era.
+
+À revisiter si un futur use case introduit un bulk import >1 000 lignes
+en une opération (reprocess complet d'un corpus, import CSV massif…).
+
+#### 2.13.3 `cursor.stream()` sur gros SELECT — skip (aucun candidat)
+- [x] Audit fait : zéro `fetchall()` dans `application/pipeline/`. Les
+  fetchall dans `infrastructure/db/queries/` sont tous bornés (pagination
+  via `LIMIT` dans `PgStagingQueries.fetch_*`) ou sont des retours
+  `RETURNING` d'`executemany` de taille contrôlée. Pas de gros fetchall
+  non borné → pas de gain à attendre de `stream()`. À revisiter si un
+  futur agrégat introduit ce pattern.
 
 #### 2.13.4 `connection.pipeline()` — POC d'abord
 Candidat principal : **phase 2 de `build_authorships`**
@@ -258,12 +281,12 @@ séquentielles sans dépendance inter → 1 round-trip au lieu de 5.
 - [ ] Si gain > 20 % : étendre à `populate_affiliations`,
   `merge_pubs_by_*`.
 
-#### 2.13.5 `prepare_threshold` sur le pool API
-Aujourd'hui non configuré → défaut psycopg3 = 5. Pour l'API, régler à
-**1** sur le pool async (queries répétées type `find_by_doi`, `list
-publications` préparées dès le 1er appel).
-- [ ] 1 commit dans `infrastructure/db/async_connection.py` (après
-  phase 1 de §2.12).
+#### 2.13.5 `prepare_threshold` sur le pool API — clôturé
+- [x] `prepare_threshold=1` sur le pool async (prod + conftest test) :
+  les requêtes répétées de l'API (`find_by_doi`, list publications,
+  facets) sont préparées dès le 1er appel au lieu du 5ᵉ (défaut
+  psycopg3). Économie ~20-30 µs par requête + plan réutilisé côté
+  PostgreSQL.
 
 #### 2.13.6 Adaptateurs de types custom — à skipper sauf besoin
 Enums PostgreSQL (doc_type, oa_status, roles) pourraient avoir un

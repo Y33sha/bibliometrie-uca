@@ -21,7 +21,6 @@ pour les identifiants), sérialisent en dict pour l'écriture en base.
 """
 
 import re
-from collections import namedtuple
 from dataclasses import dataclass
 from typing import Any
 
@@ -33,11 +32,37 @@ from domain.errors import ValidationError
 # Utilisés par le port PublicationRepository et ses implémentations.
 # Vivent dans le domaine car ils décrivent la forme d'un résultat
 # métier, pas un détail d'infrastructure.
+#
+# Dataclasses avec `slots=True` pour occuper le mappage fait par
+# `psycopg.rows.class_row(...)` : les noms de champs correspondent aux
+# colonnes SELECT du repo.
 
-PubByDoi = namedtuple("PubByDoi", ["id", "doc_type", "title_normalized"])
-PubByNnt = namedtuple("PubByNnt", ["id", "doc_type", "title_normalized"])
-PubByTitle = namedtuple("PubByTitle", ["id", "doi"])
-PubThesisCandidate = namedtuple("PubThesisCandidate", ["id", "doi"])
+
+@dataclass(frozen=True, slots=True)
+class PubByDoi:
+    id: int
+    doc_type: str | None
+    title_normalized: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class PubByNnt:
+    id: int
+    doc_type: str | None
+    title_normalized: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class PubByTitle:
+    id: int
+    doi: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class PubThesisCandidate:
+    id: int
+    doi: str | None
+
 
 # ── DOI ────────────────────────────────────────────────────────────
 

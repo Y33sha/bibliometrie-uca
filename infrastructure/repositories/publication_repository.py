@@ -13,6 +13,7 @@ from domain.publication import (  # noqa: F401 — re-export pour compat
     PubThesisCandidate,
 )
 from infrastructure.db.queries.filters import OA_CLOSED_SQL
+from infrastructure.db_helpers import row_as
 from infrastructure.db_helpers import row_val as _val
 
 
@@ -28,29 +29,30 @@ class PgPublicationRepository:
         """Cherche une publication par DOI (case-insensitive)."""
         if not doi:
             return None
-        self._cur.execute(
-            "SELECT id, doc_type, title_normalized FROM publications WHERE lower(doi) = lower(%s)",
-            (doi,),
-        )
-        row = self._cur.fetchone()
-        return PubByDoi(_val(row, 0), _val(row, 1), _val(row, 2)) if row else None
+        with row_as(self._cur, PubByDoi) as cur:
+            cur.execute(
+                "SELECT id, doc_type, title_normalized FROM publications "
+                "WHERE lower(doi) = lower(%s)",
+                (doi,),
+            )
+            return cur.fetchone()
 
     def find_by_nnt(self, nnt: str) -> PubByNnt | None:
         """Cherche une publication via NNT stocké dans source_publications.external_ids."""
         if not nnt:
             return None
-        self._cur.execute(
-            """
-            SELECT p.id, p.doc_type, p.title_normalized
-            FROM publications p
-            JOIN source_publications sd ON sd.publication_id = p.id
-            WHERE sd.external_ids->>'nnt' = %s
-            LIMIT 1
-            """,
-            (nnt.upper(),),
-        )
-        row = self._cur.fetchone()
-        return PubByNnt(_val(row, 0), _val(row, 1), _val(row, 2)) if row else None
+        with row_as(self._cur, PubByNnt) as cur:
+            cur.execute(
+                """
+                SELECT p.id, p.doc_type, p.title_normalized
+                FROM publications p
+                JOIN source_publications sd ON sd.publication_id = p.id
+                WHERE sd.external_ids->>'nnt' = %s
+                LIMIT 1
+                """,
+                (nnt.upper(),),
+            )
+            return cur.fetchone()
 
     def find_by_title(
         self,
@@ -62,16 +64,16 @@ class PgPublicationRepository:
         Ne matche que les articles avec journal connu."""
         if not title_normalized or not journal_id:
             return None
-        self._cur.execute(
-            """
-            SELECT id, doi FROM publications
-            WHERE title_normalized = %s AND pub_year = %s AND journal_id = %s
-            LIMIT 1
-            """,
-            (title_normalized, pub_year, journal_id),
-        )
-        row = self._cur.fetchone()
-        return PubByTitle(_val(row, 0), _val(row, 1)) if row else None
+        with row_as(self._cur, PubByTitle) as cur:
+            cur.execute(
+                """
+                SELECT id, doi FROM publications
+                WHERE title_normalized = %s AND pub_year = %s AND journal_id = %s
+                LIMIT 1
+                """,
+                (title_normalized, pub_year, journal_id),
+            )
+            return cur.fetchone()
 
     def find_thesis_by_title(
         self,
@@ -85,17 +87,17 @@ class PgPublicationRepository:
         """
         if not title_normalized or not pub_year:
             return []
-        self._cur.execute(
-            """
-            SELECT id, doi FROM publications
-            WHERE title_normalized = %s AND pub_year = %s
-              AND doc_type IN ('thesis', 'ongoing_thesis')
-            ORDER BY id
-            """,
-            (title_normalized, pub_year),
-        )
-        rows = self._cur.fetchall()
-        return [PubThesisCandidate(_val(row, 0), _val(row, 1)) for row in rows]
+        with row_as(self._cur, PubThesisCandidate) as cur:
+            cur.execute(
+                """
+                SELECT id, doi FROM publications
+                WHERE title_normalized = %s AND pub_year = %s
+                  AND doc_type IN ('thesis', 'ongoing_thesis')
+                ORDER BY id
+                """,
+                (title_normalized, pub_year),
+            )
+            return cur.fetchall()
 
     # ── Écritures simples ──────────────────────────────────────────
 
