@@ -12,6 +12,7 @@ from domain.publication import (
     PubThesisCandidate,
 )
 from infrastructure.db.queries.filters import OA_CLOSED_SQL
+from infrastructure.db_helpers import async_row_as
 from infrastructure.db_helpers import row_val as _val
 
 
@@ -26,28 +27,29 @@ class PgAsyncPublicationRepository:
     async def find_by_doi(self, doi: str) -> PubByDoi | None:
         if not doi:
             return None
-        await self._cur.execute(
-            "SELECT id, doc_type, title_normalized FROM publications WHERE lower(doi) = lower(%s)",
-            (doi,),
-        )
-        row = await self._cur.fetchone()
-        return PubByDoi(_val(row, 0), _val(row, 1), _val(row, 2)) if row else None
+        async with async_row_as(self._cur, PubByDoi) as cur:
+            await cur.execute(
+                "SELECT id, doc_type, title_normalized FROM publications "
+                "WHERE lower(doi) = lower(%s)",
+                (doi,),
+            )
+            return await cur.fetchone()
 
     async def find_by_nnt(self, nnt: str) -> PubByNnt | None:
         if not nnt:
             return None
-        await self._cur.execute(
-            """
-            SELECT p.id, p.doc_type, p.title_normalized
-            FROM publications p
-            JOIN source_publications sd ON sd.publication_id = p.id
-            WHERE sd.external_ids->>'nnt' = %s
-            LIMIT 1
-            """,
-            (nnt.upper(),),
-        )
-        row = await self._cur.fetchone()
-        return PubByNnt(_val(row, 0), _val(row, 1), _val(row, 2)) if row else None
+        async with async_row_as(self._cur, PubByNnt) as cur:
+            await cur.execute(
+                """
+                SELECT p.id, p.doc_type, p.title_normalized
+                FROM publications p
+                JOIN source_publications sd ON sd.publication_id = p.id
+                WHERE sd.external_ids->>'nnt' = %s
+                LIMIT 1
+                """,
+                (nnt.upper(),),
+            )
+            return await cur.fetchone()
 
     async def find_by_title(
         self,
@@ -57,16 +59,16 @@ class PgAsyncPublicationRepository:
     ) -> PubByTitle | None:
         if not title_normalized or not journal_id:
             return None
-        await self._cur.execute(
-            """
-            SELECT id, doi FROM publications
-            WHERE title_normalized = %s AND pub_year = %s AND journal_id = %s
-            LIMIT 1
-            """,
-            (title_normalized, pub_year, journal_id),
-        )
-        row = await self._cur.fetchone()
-        return PubByTitle(_val(row, 0), _val(row, 1)) if row else None
+        async with async_row_as(self._cur, PubByTitle) as cur:
+            await cur.execute(
+                """
+                SELECT id, doi FROM publications
+                WHERE title_normalized = %s AND pub_year = %s AND journal_id = %s
+                LIMIT 1
+                """,
+                (title_normalized, pub_year, journal_id),
+            )
+            return await cur.fetchone()
 
     async def find_thesis_by_title(
         self,
@@ -75,17 +77,17 @@ class PgAsyncPublicationRepository:
     ) -> list[PubThesisCandidate]:
         if not title_normalized or not pub_year:
             return []
-        await self._cur.execute(
-            """
-            SELECT id, doi FROM publications
-            WHERE title_normalized = %s AND pub_year = %s
-              AND doc_type IN ('thesis', 'ongoing_thesis')
-            ORDER BY id
-            """,
-            (title_normalized, pub_year),
-        )
-        rows = await self._cur.fetchall()
-        return [PubThesisCandidate(_val(row, 0), _val(row, 1)) for row in rows]
+        async with async_row_as(self._cur, PubThesisCandidate) as cur:
+            await cur.execute(
+                """
+                SELECT id, doi FROM publications
+                WHERE title_normalized = %s AND pub_year = %s
+                  AND doc_type IN ('thesis', 'ongoing_thesis')
+                ORDER BY id
+                """,
+                (title_normalized, pub_year),
+            )
+            return await cur.fetchall()
 
     # ── Écritures simples ──────────────────────────────────────────
 
