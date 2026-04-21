@@ -13,7 +13,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from application.authorships import async_exclude_authorship as _exclude_authorship
+from application.authorships import exclude_authorship as _exclude_authorship
 from application.persons import (
     async_add_identifier as _add_identifier,
 )

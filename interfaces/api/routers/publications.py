@@ -10,7 +10,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Response
 
 from application.authorships import (
-    async_set_source_authorship_excluded as _set_source_authorship_excluded,
+    set_source_authorship_excluded as _set_source_authorship_excluded,
 )
 from infrastructure.db.queries import publications as pub_queries
 from infrastructure.db.queries.publications import FacetFilters, ListFilters
