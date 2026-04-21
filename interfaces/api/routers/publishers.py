@@ -29,6 +29,12 @@ async def list_publishers(
     search: str | None = None,
     sort: str = "name",
 ) -> Any:
+    """Liste paginée des éditeurs avec comptage revues + publications.
+
+    `search` : recherche sur le nom normalisé, ignorée si < 2
+    caractères. `sort` : `name` / `-name` / `journals` / `-journals`
+    / `pubs` / `-pubs` ; fallback sur `name` si inconnu.
+    """
     with get_cursor() as (cur, conn):
         conditions = []
         params = []
@@ -81,6 +87,7 @@ async def list_publishers(
 
 @router.get("/api/publishers/{publisher_id}", response_model=PublisherBasic)
 async def get_publisher(publisher_id: int) -> Any:
+    """Récupère un éditeur par son id (nom uniquement). 404 si inconnu."""
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id, name FROM publishers WHERE id = %s", (publisher_id,))
         row = cur.fetchone()
@@ -91,7 +98,11 @@ async def get_publisher(publisher_id: int) -> Any:
 
 @router.put("/api/publishers/{publisher_id}", response_model=OkResponse)
 async def update_publisher(publisher_id: int, body: PublisherUpdate) -> Any:
-    """Met à jour un éditeur."""
+    """Met à jour un éditeur (modification sélective des champs fournis).
+
+    Seuls les champs explicitement présents dans le body sont écrits
+    (`exclude_unset=True`). Lève 404 si l'éditeur n'existe pas.
+    """
     fields = body.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
         _update_publisher(cur, publisher_id, fields=fields, repo=journal_repository(cur))
@@ -100,6 +111,12 @@ async def update_publisher(publisher_id: int, body: PublisherUpdate) -> Any:
 
 @router.post("/api/publishers/{publisher_id}/merge", response_model=MergeResponse)
 async def merge(publisher_id: int, body: MergeRequest) -> Any:
+    """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
+
+    Les revues et publications rattachées à la source sont
+    transférées à la cible ; la source est supprimée. 404 si l'un
+    des deux éditeurs est introuvable.
+    """
     with get_cursor() as (cur, conn):
         cur.execute(
             "SELECT id FROM publishers WHERE id IN (%s, %s)", (publisher_id, body.source_id)

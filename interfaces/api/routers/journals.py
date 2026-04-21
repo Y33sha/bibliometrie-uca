@@ -23,6 +23,13 @@ async def list_journals(
     publisher_id: int | None = None,
     sort: str = "title",
 ) -> Any:
+    """Liste paginée des revues avec comptage des publications rattachées.
+
+    `search` : recherche insensible à la casse sur le titre normalisé,
+    ignorée si < 2 caractères. `publisher_id` : filtre par éditeur.
+    `sort` : `title` / `-title` / `publisher` / `-publisher` /
+    `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
+    """
     with get_cursor() as (cur, conn):
         conditions = []
         params: list[Any] = []
@@ -81,6 +88,7 @@ async def list_journals(
 
 @router.get("/api/journals/{journal_id}")
 async def get_journal(journal_id: int) -> Any:
+    """Récupère une revue par son id (titre uniquement). 404 si inconnue."""
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id, title FROM journals WHERE id = %s", (journal_id,))
         row = cur.fetchone()
@@ -91,7 +99,11 @@ async def get_journal(journal_id: int) -> Any:
 
 @router.put("/api/journals/{journal_id}")
 async def update_journal(journal_id: int, body: JournalUpdate) -> Any:
-    """Met à jour une revue."""
+    """Met à jour une revue (modification sélective des champs fournis).
+
+    Seuls les champs explicitement présents dans le body sont écrits
+    (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
+    """
     fields = body.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
         _update_journal(cur, journal_id, fields=fields, repo=journal_repository(cur))
@@ -100,6 +112,12 @@ async def update_journal(journal_id: int, body: JournalUpdate) -> Any:
 
 @router.post("/api/journals/{journal_id}/merge")
 async def merge(journal_id: int, body: MergeRequest) -> Any:
+    """Fusionne la revue `source_id` dans la revue `journal_id`.
+
+    Les publications et métadonnées de la source sont transférées à
+    la cible ; la source est supprimée. 404 si l'une des deux est
+    introuvable.
+    """
     with get_cursor() as (cur, conn):
         cur.execute("SELECT id FROM journals WHERE id IN (%s, %s)", (journal_id, body.source_id))
         found = {row["id"] for row in cur.fetchall()}

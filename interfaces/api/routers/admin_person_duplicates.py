@@ -33,7 +33,12 @@ async def next_person_duplicate(
     skip: str = Query("", alias="skip"),
     offset: int = Query(0, ge=0),
 ) -> Any:
-    """Renvoie la paire doublon-personne à la position offset."""
+    """Renvoie la paire personne-candidate au dédoublonnage à l'offset donné.
+
+    `skip` : liste CSV de paires `idA-idB` à ignorer pour cette
+    session (défilement côté front sans revoir les mêmes candidats).
+    Renvoie `{"pair": null}` si aucune paire restante.
+    """
     skip_pairs = dup_queries.parse_skip_pairs(skip) if skip else None
     with get_cursor() as (cur, _conn):
         pair = dup_queries.next_person_duplicate(cur, skip_pairs=skip_pairs, offset=offset)
@@ -54,7 +59,12 @@ async def mark_persons_distinct(body: MarkPersonsDistinct) -> Any:
 
 @router.get("/api/admin/person-duplicates/conflicts/count", response_model=TotalCountResponse)
 async def count_person_conflict_pairs() -> Any:
-    """Nombre de paires de personnes en conflit sur des publications."""
+    """Nombre de paires de personnes co-auteurs d'une même publication.
+
+    Un conflit = deux `person_id` distincts rattachés à la même
+    `publication_id` alors que leur forme de nom est compatible →
+    suggère un doublon que la déduplication classique n'a pas vu.
+    """
     with get_cursor() as (cur, _conn):
         return {"total": dup_queries.count_person_conflict_pairs(cur)}
 
@@ -66,7 +76,12 @@ async def next_person_conflict(
     skip: str = Query("", alias="skip"),
     offset: int = Query(0, ge=0),
 ) -> Any:
-    """Renvoie la paire en conflit à la position offset."""
+    """Renvoie la paire personnes-en-conflit à l'offset donné.
+
+    Même protocole que `/person-duplicates/next` (paire + skip +
+    offset) mais pour les conflits co-auteurs plutôt que les
+    candidats de similarité de nom.
+    """
     skip_pairs = dup_queries.parse_skip_pairs(skip) if skip else set()
     with get_cursor() as (cur, conn):
         pair = dup_queries.next_person_conflict(cur, conn, skip_pairs=skip_pairs, offset=offset)

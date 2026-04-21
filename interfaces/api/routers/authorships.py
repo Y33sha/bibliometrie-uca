@@ -19,7 +19,12 @@ logger = logging.getLogger(__name__)
 
 @router.get("/api/authorships/stats", response_model=AuthorshipsStats)
 async def authorships_stats(lab_id: int = Query(0)) -> Any:
-    """Statistiques auteurs UCA."""
+    """Compteurs globaux des authorships UCA (total, rattachées à une
+    personne, avec ORCID/idHAL).
+
+    `lab_id=0` (défaut) = périmètre UCA complet ; sinon restreint
+    au laboratoire donné.
+    """
     with get_cursor() as (cur, _conn):
         return auth_queries.authorships_stats(cur, lab_id)
 
@@ -31,7 +36,13 @@ async def authorships_facets(
     has_idhal: str = Query(""),
     lab_id: int = Query(0),
 ) -> Any:
-    """Facettes dynamiques pour la page authorships admin."""
+    """Facettes dynamiques (compteurs par valeur) pour la page admin authorships.
+
+    Chaque facette est calculée en « skip filter » : elle exclut le
+    filtre homonyme actif pour que l'utilisateur voie toujours les
+    autres valeurs disponibles. Paramètres `yes`/`no`/empty comme pour
+    le endpoint de liste.
+    """
     with get_cursor() as (cur, _conn):
         return auth_queries.authorships_facets(
             cur, linked=linked, has_orcid=has_orcid, has_idhal=has_idhal, lab_id=lab_id
@@ -48,7 +59,14 @@ async def list_authorships(
     has_idhal: str = Query(""),
     lab_id: int = Query(0),
 ) -> Any:
-    """Liste des auteurs UCA avec filtres."""
+    """Liste paginée des authorships UCA avec filtres admin.
+
+    `search` : portion de nom auteur (case/accent-insensible).
+    `linked=yes|no` : avec/sans person_id rattaché.
+    `has_orcid=yes|no`, `has_idhal=yes|no` : présence de ces
+    identifiants sur la personne liée. `lab_id=0` = pas de
+    restriction laboratoire.
+    """
     with get_cursor() as (cur, _conn):
         return auth_queries.list_authorships(
             cur,

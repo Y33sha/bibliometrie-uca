@@ -9,7 +9,7 @@ Synthèse de l'audit DSI (avril 2026) — ROI décroissant (impact / effort) :
 3. [x] **§2.1 +§2.2** — Remonter `fail_under` de 49 → 60+ en ciblant `infrastructure/db/queries/*` puis les routers API. *Clôturé le 2026-04-21 : phases A→D faites, couverture 49.59 % → 62.50 %, `fail_under = 62`. Phase D : routers persons (40 % → 99 %), structures (33 % → 100 %), publishers (31 % → 100 %), admin_feedback (22 % → 69 % — le SSE /rerun reste non couvert). Bugs latents corrigés en chemin : logging JSON polluant la sortie pytest (StreamHandler stdout sous pytest), reliquat psycopg2 `putconn(close=True)` dans le conftest, ordre des placeholders SQL cassé dans `feedback_false_positives` avec `search`.*
 4. [x] **§2.7.4** — Découper les 3 routes Svelte > 1000 LOC. *Fait 2026-04-20 : `publications/[id]` 1132 → 206, `admin/persons` 1263 → 642, `admin/structures` 1572 → 797. 14 composants extraits, 0 erreur svelte-check.*
 5. [x] **§2.7.3** — Généraliser les types OpenAPI aux endpoints restants. *Clôturé le 2026-04-20 : 14 routers couverts (stats, publications, laboratories, addresses, hal_problems, admin_person_duplicates, admin_pipeline, admin_feedback, perimeters, publishers, auth, config, authorships, admin_duplicates) ; ~63 endpoints supplémentaires annotés `response_model` ; ~62 interfaces TS locales remplacées par les types générés.*
-6. [ ] **§2.6** — `CONTRIBUTING.md` + descriptions OpenAPI. Effort faible, impact onboarding DSI.
+6. [x] **§2.6** — `CONTRIBUTING.md` + descriptions OpenAPI. *Clôturé le 2026-04-21 : [CONTRIBUTING.md](CONTRIBUTING.md) rédigé avec 3 HOW-TO (ajouter une source, une phase pipeline, un endpoint) + rappel des conventions transverses et workflow commit. Docstrings OpenAPI enrichies sur 11 routers (auth, config, journals, publishers, admin_duplicates, authorships, admin_person_duplicates, perimeters, stats, publications, structures) — notamment `structures.py` qui n'avait aucun docstring endpoint et un module docstring placeholder (`"""Auto-extracted router."""`).*
 7. [ ] **§2.7.5** — Amorcer des tests frontend (Vitest composables + Playwright parcours critiques). Nouveau.
 8. [ ] **§2.4** — Convention `NNN_down.sql` pour rollbacks d'urgence. Effort très faible, résilience prod.
 9. [x] **§2.11** — Migration psycopg2 → psycopg3. *Clôturé le 2026-04-20 : `psycopg2-binary` retiré, `psycopg[binary]==3.3.3` + `psycopg-pool==3.3.0` en place. Pool `ConnectionPool` avec `row_factory=dict_row` global. 24 sites `Json(...)` migrés vers `psycopg.types.json.Jsonb`. 10 appels `execute_values` migrés vers `cur.executemany` (perf préservée par le pipeline mode psycopg3). Adaptations psycopg3 strict typing : casts `%s::int`/`%s::text[]` sur les `IS NULL`, `IN %s` → `= ANY(%s)`, `ARRAY[%s::int]`. Tests 910/910 verts.*
@@ -188,13 +188,16 @@ centralisées dans `domain/` + `filters.py`.
   logicielle — 4 couches DDD, règles d'import, patterns d'injection,
   composition roots) et `docs/donnees.md` (modèle de données, tables,
   domaines fonctionnels).
-- [ ] **CONTRIBUTING.md** (ou équivalent) : "comment ajouter une nouvelle
-  source de données", "comment ajouter une phase au pipeline",
-  "comment ajouter un endpoint"
-- [ ] **Descriptions OpenAPI** : Pydantic permet de les générer
-  gratuitement depuis les modèles — à compléter endpoint par endpoint.
-  Pilote fait sur `/api/journals` (§2.7.3) ; à généraliser aux ~29
-  autres endpoints.
+- [x] **CONTRIBUTING.md** : rédigé 2026-04-21 avec 3 HOW-TO (ajouter
+  une source, une phase pipeline, un endpoint), rappel des
+  conventions transverses (SQL paramétré, logging, DDD layering,
+  pre-commit) et workflow commit/test.
+- [x] **Descriptions OpenAPI** : docstrings enrichies sur 11 routers
+  (clôturé le 2026-04-21). `persons.py` et `addresses.py` étaient
+  déjà bien dotés ; les plus maigres (auth/config/journals avec 1-3
+  docstrings chacun, et `structures.py` qui n'en avait aucun) ont
+  été complétés avec le comportement attendu, les valeurs valides
+  des filtres, et les cas d'erreur.
 
 ### 2.7 Frontend
 

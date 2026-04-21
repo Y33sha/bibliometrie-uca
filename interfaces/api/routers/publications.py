@@ -83,7 +83,12 @@ async def publications_facets(
 
 @router.get("/api/publications/years", response_model=list[int])
 async def all_years() -> Any:
-    """Toutes les années disponibles."""
+    """Liste de toutes les années présentes en base (validées ou non).
+
+    Contrairement à `/stats/years` qui restreint aux années validées,
+    cet endpoint remonte l'intégralité des `pub_year` distincts pour
+    alimenter le filtre « année » côté admin.
+    """
     with get_cursor() as (cur, _conn):
         return pub_queries.all_years(cur)
 
@@ -179,7 +184,14 @@ async def list_publications(
     hal_status: str = Query(""),
     in_perimeter: str = Query(""),
 ) -> Any:
-    """Liste des publications avec sources, labos, journal."""
+    """Liste paginée des publications avec sources, labos et journal rattachés.
+
+    Filtres multiples cumulables. `lab_id` et `year` acceptent des
+    listes CSV ; `lab_id=none` = publications sans labo rattaché.
+    `sort` : `year_desc` / `year_asc` / `title` / `cited_by`.
+    `in_perimeter=yes|no|""` sélectionne les publications dont au
+    moins un auteur est in_perimeter.
+    """
     lab_ids, lab_none = _parse_lab_id(lab_id)
     filters = ListFilters(
         search=search,

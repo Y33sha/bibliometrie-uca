@@ -31,6 +31,13 @@ logger = logging.getLogger(__name__)
 
 @router.get("/api/perimeters", response_model=list[PerimeterOut])
 async def list_perimeters() -> Any:
+    """Liste tous les périmètres avec leurs structures racines résolues.
+
+    Pour chaque périmètre, renvoie les structures racines directes
+    (`structures`) et le décompte total après descente récursive des
+    relations (`structure_count`). Le décompte inclut donc les
+    sous-structures rattachées par `est_tutelle_de` / `est_partenaire_de`.
+    """
     with get_cursor() as (cur, _conn):
         cur.execute("SELECT id, code, name, description, structure_ids FROM perimeters ORDER BY id")
         perimeters = cur.fetchall()
@@ -92,6 +99,11 @@ async def delete_perimeter(perimeter_id: int) -> Any:
 
 @router.post("/api/perimeters/{perimeter_id}/structures", response_model=StatusResponse)
 async def add_perimeter_structure(perimeter_id: int, body: AddPerimeterStructure) -> Any:
+    """Ajoute une structure racine au périmètre.
+
+    Renvoie `{"status": "added"}` ou `"already_exists"` si la
+    structure était déjà racine.
+    """
     with get_cursor() as (cur, _conn):
         status = config_service.add_perimeter_structure(
             cur, perimeter_id, body.structure_id, repo=config_repository(cur)
@@ -103,6 +115,8 @@ async def add_perimeter_structure(perimeter_id: int, body: AddPerimeterStructure
     "/api/perimeters/{perimeter_id}/structures/{structure_id}", response_model=StatusResponse
 )
 async def remove_perimeter_structure(perimeter_id: int, structure_id: int) -> Any:
+    """Retire une structure racine du périmètre. N'affecte pas ses
+    sous-structures tant qu'elles sont rattachées à d'autres racines."""
     with get_cursor() as (cur, _conn):
         config_service.remove_perimeter_structure(
             cur, perimeter_id, structure_id, repo=config_repository(cur)

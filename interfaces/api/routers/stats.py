@@ -32,7 +32,13 @@ async def publisher_stats(
     search: str = Query(""),
     sort: str = Query("-pubs"),
 ) -> Any:
-    """Stats d'articles par éditeur."""
+    """Classement des éditeurs par volume de publications filtrées.
+
+    `lab_id`, `year` : listes CSV d'entiers. `oa_status` : valeur
+    unique (`gold`/`green`/`hybrid`/`bronze`/`closed`/`unknown`).
+    `has_apc=yes|no|""` : filtre sur la présence d'un paiement APC
+    connu.
+    """
     with get_cursor() as (cur, _conn):
         return stats_queries.publisher_stats(
             cur,
@@ -109,7 +115,11 @@ async def stats_summary(
     oa_status: str = Query(""),
     has_apc: str = Query(""),
 ) -> Any:
-    """Résumé global."""
+    """Agrégats globaux (total, taux OA, total APC, etc.) pour le jeu de filtres.
+
+    Alimente la bande de cartes en haut du dashboard statistiques.
+    Mêmes filtres que les autres endpoints de /api/stats.
+    """
     with get_cursor() as (cur, _conn):
         return stats_queries.stats_summary(
             cur,
@@ -154,7 +164,12 @@ async def stats_labs(
 
 @router.get("/api/stats/years", response_model=list[int])
 async def available_years() -> Any:
-    """Années disponibles (validées uniquement)."""
+    """Liste des années présentes dans les publications validées (tri asc).
+
+    Une année est « validée » quand elle figure dans la config
+    `years_validated` : les autres existent en base mais ne sont pas
+    publiées dans le dashboard (pipeline encore partiel).
+    """
     with get_cursor() as (cur, _conn):
         return stats_queries.available_years(cur)
 
