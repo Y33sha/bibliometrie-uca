@@ -14,19 +14,23 @@ Usage :
 
     def set_rejected(cur, person_id, rejected):
         person_repository(cur).set_rejected(person_id, rejected)
+
+Les agrégats Address, Config et Structure ne sont exposés qu'en async
+(seuls consommateurs = routers API). Authorship, Journal, Person et
+Publication existent dans les deux variantes (sync pour pipeline/CLI,
+async pour API).
 """
 
 from typing import Any
 
-from domain.ports.address_repository import AddressRepository, AsyncAddressRepository
+from domain.ports.address_repository import AsyncAddressRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository, AuthorshipRepository
-from domain.ports.config_repository import AsyncConfigRepository, ConfigRepository
+from domain.ports.config_repository import AsyncConfigRepository
 from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
 from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
 from domain.ports.publication_repository import AsyncPublicationRepository, PublicationRepository
-from domain.ports.structure_repository import AsyncStructureRepository, StructureRepository
+from domain.ports.structure_repository import AsyncStructureRepository
 
-from .address_repository import PgAddressRepository
 from .async_address_repository import PgAsyncAddressRepository
 from .async_authorship_repository import PgAsyncAuthorshipRepository
 from .async_config_repository import PgAsyncConfigRepository
@@ -35,26 +39,14 @@ from .async_person_repository import PgAsyncPersonRepository
 from .async_publication_repository import PgAsyncPublicationRepository
 from .async_structure_repository import PgAsyncStructureRepository
 from .authorship_repository import PgAuthorshipRepository
-from .config_repository import PgConfigRepository
 from .journal_repository import PgJournalRepository
 from .person_repository import PgPersonRepository
 from .publication_repository import PgPublicationRepository
-from .structure_repository import PgStructureRepository
-
-
-def address_repository(cur: Any) -> AddressRepository:
-    """Retourne un AddressRepository lié au curseur donné."""
-    return PgAddressRepository(cur)
 
 
 def authorship_repository(cur: Any) -> AuthorshipRepository:
     """Retourne un AuthorshipRepository lié au curseur donné."""
     return PgAuthorshipRepository(cur)
-
-
-def config_repository(cur: Any) -> ConfigRepository:
-    """Retourne un ConfigRepository lié au curseur donné."""
-    return PgConfigRepository(cur)
 
 
 def journal_repository(cur: Any) -> JournalRepository:
@@ -72,12 +64,7 @@ def publication_repository(cur: Any) -> PublicationRepository:
     return PgPublicationRepository(cur)
 
 
-def structure_repository(cur: Any) -> StructureRepository:
-    """Retourne un StructureRepository lié au curseur donné."""
-    return PgStructureRepository(cur)
-
-
-# ── Factories async (§2.12) — câblées après migration des routers ──
+# ── Factories async (§2.12) ────────────────────────────────────────
 
 
 def async_address_repository(cur: Any) -> AsyncAddressRepository:
