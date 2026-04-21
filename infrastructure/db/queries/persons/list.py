@@ -1,4 +1,4 @@
-"""Annuaire public + autocomplete + liste admin des personnes."""
+"""Annuaire public + autocomplete + liste admin des personnes (§2.12 : async)."""
 
 from dataclasses import dataclass, field
 from typing import Any
@@ -28,7 +28,7 @@ _DIR_SORT_MAP = {
 }
 
 
-def persons_directory(
+async def persons_directory(
     cur: Any, *, filters: DirectoryFilters, page: int, per_page: int, sort: str
 ) -> dict[str, Any]:
     """Annuaire public des personnes avec ORCID et idHAL."""
@@ -55,13 +55,14 @@ def persons_directory(
     where = "WHERE " + " AND ".join(conditions)
     order = _DIR_SORT_MAP.get(sort, _DIR_SORT_MAP["name"])
 
-    cur.execute(
+    await cur.execute(
         f"SELECT COUNT(*) FROM persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id {where}",
         params,
     )
-    total = cur.fetchone()["count"]
+    row = await cur.fetchone()
+    total = row["count"]
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             p.id, p.last_name, p.first_name,
@@ -88,14 +89,14 @@ def persons_directory(
         "page": page,
         "per_page": per_page,
         "pages": (total + per_page - 1) // per_page,
-        "persons": cur.fetchall(),
+        "persons": await cur.fetchall(),
     }
 
 
 # ── Autocomplete ─────────────────────────────────────────────────
 
 
-def search_persons(cur: Any, *, q: str, limit: int) -> list[dict[str, Any]]:
+async def search_persons(cur: Any, *, q: str, limit: int) -> list[dict[str, Any]]:
     """Recherche rapide (autocomplete) : chaque mot doit matcher dans last ou first name."""
     words = q.strip().split()
     if not words:
@@ -109,7 +110,7 @@ def search_persons(cur: Any, *, q: str, limit: int) -> list[dict[str, Any]]:
         )
         params.extend([s, s])
     params.append(limit)
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT p.id, p.last_name, p.first_name, prh.department_name,
                (prh.id IS NOT NULL) AS has_rh
@@ -121,7 +122,7 @@ def search_persons(cur: Any, *, q: str, limit: int) -> list[dict[str, Any]]:
         """,
         params,
     )
-    return cur.fetchall()
+    return await cur.fetchall()
 
 
 # ── Liste admin ──────────────────────────────────────────────────
@@ -148,7 +149,7 @@ _LIST_SORT_MAP = {
 }
 
 
-def list_persons(
+async def list_persons(
     cur: Any, *, filters: ListFilters, page: int, per_page: int, sort: str
 ) -> dict[str, Any]:
     """Liste des personnes avec filtres (admin)."""
@@ -177,13 +178,14 @@ def list_persons(
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     order = _LIST_SORT_MAP.get(sort, _LIST_SORT_MAP["name"])
 
-    cur.execute(
+    await cur.execute(
         f"SELECT COUNT(*) FROM persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id {where}",
         params,
     )
-    total = cur.fetchone()["count"]
+    row = await cur.fetchone()
+    total = row["count"]
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT p.id, p.last_name, p.first_name,
             p.last_name_normalized, p.first_name_normalized,
@@ -199,12 +201,12 @@ def list_persons(
         """,
         params + [per_page, offset],
     )
-    persons_rows = cur.fetchall()
+    persons_rows = await cur.fetchall()
     person_ids = [p["id"] for p in persons_rows]
 
     identifiers_map: dict[int, Any] = {}
     if person_ids:
-        cur.execute(
+        await cur.execute(
             """
             SELECT pi.person_id,
                    json_agg(json_build_object(
@@ -217,12 +219,12 @@ def list_persons(
             """,
             (person_ids,),
         )
-        for r in cur.fetchall():
+        for r in await cur.fetchall():
             identifiers_map[r["person_id"]] = r["identifiers"]
 
     name_forms_map: dict[int, Any] = {}
     if person_ids:
-        cur.execute(
+        await cur.execute(
             """
             SELECT pid AS person_id,
                    json_agg(json_build_object(
@@ -239,7 +241,7 @@ def list_persons(
             """,
             (person_ids,),
         )
-        for r in cur.fetchall():
+        for r in await cur.fetchall():
             name_forms_map[r["person_id"]] = r["name_forms"]
 
     for p in persons_rows:
