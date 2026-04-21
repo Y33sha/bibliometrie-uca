@@ -41,6 +41,7 @@ def repo(db):
 def async_repo(async_db):
     return async_authorship_repository(async_db)
 
+
 # ── Helpers ────────────────────────────────────────────────────────
 
 
@@ -194,7 +195,7 @@ def _link_sa_address(db, source_authorship_id, address_id):
     )
 
 
-# ── Helpers async (§2.12 : uniquement TestPropagateUcaForAddresses) ─
+# ── Helpers async ──────────────────────────────────────────────────
 
 
 async def _a_create_person(db, last="Dupont", first="Jean"):
@@ -365,56 +366,60 @@ class TestExcludeAuthorship:
     """exclude_authorship marque l'authorship vérité comme excluded et
     détache les source_authorships qui y référaient."""
 
-    def test_marks_excluded_and_detaches_sources(self, db, repo):
-        person_id = _create_person(db)
-        pub_id = _create_publication(db)
-        sp_id = _create_source_publication(db, pub_id)
-        src_person_id = _create_source_person(db)
-        authorship_id = _create_authorship(db, pub_id, person_id)
-        sa_id = _create_source_authorship(
-            db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
+    async def test_marks_excluded_and_detaches_sources(self, async_db, async_repo):
+        person_id = await _a_create_person(async_db)
+        pub_id = await _a_create_publication(async_db)
+        sp_id = await _a_create_source_publication(async_db, pub_id)
+        src_person_id = await _a_create_source_person(async_db)
+        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
+        sa_id = await _a_create_source_authorship(
+            async_db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        result = exclude_authorship(db, authorship_id, repo=repo)
+        result = await exclude_authorship(async_db, authorship_id, repo=async_repo)
 
         assert result is not None
         assert result["excluded"] is True
 
         # Source détachée : person_id et authorship_id remis à NULL
-        db.execute(
+        await async_db.execute(
             "SELECT person_id, authorship_id FROM source_authorships WHERE id = %s",
             (sa_id,),
         )
-        row = db.fetchone()
+        row = await async_db.fetchone()
         assert row["person_id"] is None
         assert row["authorship_id"] is None
 
-    def test_raises_not_found(self, db, repo):
+    async def test_raises_not_found(self, async_db, async_repo):
         with pytest.raises(NotFoundError):
-            exclude_authorship(db, 999999, repo=repo)
+            await exclude_authorship(async_db, 999999, repo=async_repo)
 
-    def test_does_not_detach_unrelated_sources(self, db, repo):
+    async def test_does_not_detach_unrelated_sources(self, async_db, async_repo):
         """Les sources d'autres personnes sur la même pub ne sont pas touchées."""
-        pub_id = _create_publication(db)
-        sp_id = _create_source_publication(db, pub_id)
+        pub_id = await _a_create_publication(async_db)
+        sp_id = await _a_create_source_publication(async_db, pub_id)
 
-        p1 = _create_person(db, "Dupont", "Jean")
-        p2 = _create_person(db, "Martin", "Sophie")
-        sp1 = _create_source_person(db, source_id="hal-p-1")
-        sp2 = _create_source_person(db, source_id="hal-p-2")
-        a1 = _create_authorship(db, pub_id, p1)
-        a2 = _create_authorship(db, pub_id, p2)
-        sa1 = _create_source_authorship(db, sp_id, sp1, person_id=p1, authorship_id=a1)
-        sa2 = _create_source_authorship(db, sp_id, sp2, person_id=p2, authorship_id=a2)
+        p1 = await _a_create_person(async_db, "Dupont", "Jean")
+        p2 = await _a_create_person(async_db, "Martin", "Sophie")
+        sp1 = await _a_create_source_person(async_db, source_id="hal-p-1")
+        sp2 = await _a_create_source_person(async_db, source_id="hal-p-2")
+        a1 = await _a_create_authorship(async_db, pub_id, p1)
+        a2 = await _a_create_authorship(async_db, pub_id, p2)
+        sa1 = await _a_create_source_authorship(
+            async_db, sp_id, sp1, person_id=p1, authorship_id=a1
+        )
+        sa2 = await _a_create_source_authorship(
+            async_db, sp_id, sp2, person_id=p2, authorship_id=a2
+        )
 
-        exclude_authorship(db, a1, repo=repo)
+        await exclude_authorship(async_db, a1, repo=async_repo)
 
         # sa1 détachée
-        db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa1,))
-        assert db.fetchone()["person_id"] is None
+        await async_db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa1,))
+        assert (await async_db.fetchone())["person_id"] is None
         # sa2 intacte
-        db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa2,))
-        assert db.fetchone()["person_id"] == p2
+        await async_db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa2,))
+        assert (await async_db.fetchone())["person_id"] == p2
 
 
 # ── detach_source ──────────────────────────────────────────────────
@@ -424,74 +429,99 @@ class TestDetachSource:
     """detach_source retire le lien FK d'une source_authorship vers l'authorship
     vérité. Supprime l'authorship vérité si plus aucune source ne l'atteste."""
 
-    def test_raises_on_invalid_source(self, db, repo):
+    async def test_raises_on_invalid_source(self, async_db, async_repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            detach_source(db, 1, "invalid_source", repo=repo)
+            await detach_source(async_db, 1, "invalid_source", repo=async_repo)
 
-    def test_returns_false_if_no_authorship_linked(self, db, repo):
-        pub_id = _create_publication(db)
-        sp_id = _create_source_publication(db, pub_id)
-        src_person_id = _create_source_person(db)
+    async def test_returns_false_if_no_authorship_linked(self, async_db, async_repo):
+        pub_id = await _a_create_publication(async_db)
+        sp_id = await _a_create_source_publication(async_db, pub_id)
+        src_person_id = await _a_create_source_person(async_db)
         # source_authorship sans authorship_id
-        sa_id = _create_source_authorship(db, sp_id, src_person_id)
+        sa_id = await _a_create_source_authorship(async_db, sp_id, src_person_id)
 
-        assert detach_source(db, sa_id, "hal", repo=repo) is False
+        assert await detach_source(async_db, sa_id, "hal", repo=async_repo) is False
 
-    def test_deletes_authorship_when_last_source_removed(self, db, repo):
+    async def test_deletes_authorship_when_last_source_removed(self, async_db, async_repo):
         """Une seule source atteste l'authorship → le détacher supprime l'authorship."""
-        person_id = _create_person(db)
-        pub_id = _create_publication(db)
-        sp_id = _create_source_publication(db, pub_id)
-        src_person_id = _create_source_person(db)
-        authorship_id = _create_authorship(db, pub_id, person_id)
-        sa_id = _create_source_authorship(
-            db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
+        person_id = await _a_create_person(async_db)
+        pub_id = await _a_create_publication(async_db)
+        sp_id = await _a_create_source_publication(async_db, pub_id)
+        src_person_id = await _a_create_source_person(async_db)
+        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
+        sa_id = await _a_create_source_authorship(
+            async_db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        assert detach_source(db, sa_id, "hal", repo=repo) is True
+        assert await detach_source(async_db, sa_id, "hal", repo=async_repo) is True
 
-        db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
-        assert db.fetchone() is None
+        await async_db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
+        assert await async_db.fetchone() is None
 
-    def test_keeps_authorship_when_other_sources_remain(self, db, repo):
+    async def test_keeps_authorship_when_other_sources_remain(self, async_db, async_repo):
         """Deux sources attestent l'authorship → détacher une garde l'authorship."""
-        person_id = _create_person(db)
-        pub_id = _create_publication(db)
-        sp_hal = _create_source_publication(db, pub_id, source="hal", source_id="hal-1")
-        sp_oa = _create_source_publication(db, pub_id, source="openalex", source_id="W1")
-        p_hal = _create_source_person(db, source="hal", source_id="hal-p-1")
-        p_oa = _create_source_person(db, source="openalex", source_id="oa-p-1")
-        authorship_id = _create_authorship(db, pub_id, person_id)
-        sa_hal = _create_source_authorship(
-            db, sp_hal, p_hal, source="hal", person_id=person_id, authorship_id=authorship_id
+        person_id = await _a_create_person(async_db)
+        pub_id = await _a_create_publication(async_db)
+        sp_hal = await _a_create_source_publication(
+            async_db, pub_id, source="hal", source_id="hal-1"
         )
-        _create_source_authorship(
-            db, sp_oa, p_oa, source="openalex", person_id=person_id, authorship_id=authorship_id
+        sp_oa = await _a_create_source_publication(
+            async_db, pub_id, source="openalex", source_id="W1"
+        )
+        p_hal = await _a_create_source_person(async_db, source="hal", source_id="hal-p-1")
+        p_oa = await _a_create_source_person(async_db, source="openalex", source_id="oa-p-1")
+        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
+        sa_hal = await _a_create_source_authorship(
+            async_db,
+            sp_hal,
+            p_hal,
+            source="hal",
+            person_id=person_id,
+            authorship_id=authorship_id,
+        )
+        await _a_create_source_authorship(
+            async_db,
+            sp_oa,
+            p_oa,
+            source="openalex",
+            person_id=person_id,
+            authorship_id=authorship_id,
         )
 
-        assert detach_source(db, sa_hal, "hal", repo=repo) is False
+        assert await detach_source(async_db, sa_hal, "hal", repo=async_repo) is False
 
         # Authorship toujours présente
-        db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
-        assert db.fetchone() is not None
+        await async_db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
+        assert await async_db.fetchone() is not None
         # sa_hal détachée
-        db.execute("SELECT authorship_id FROM source_authorships WHERE id = %s", (sa_hal,))
-        assert db.fetchone()["authorship_id"] is None
-
-    def test_excluded_sources_do_not_keep_authorship_alive(self, db, repo):
-        """Si les autres sources sont marquées excluded, l'authorship doit être supprimée."""
-        person_id = _create_person(db)
-        pub_id = _create_publication(db)
-        sp_hal = _create_source_publication(db, pub_id, source="hal", source_id="hal-1")
-        sp_oa = _create_source_publication(db, pub_id, source="openalex", source_id="W1")
-        p_hal = _create_source_person(db, source="hal", source_id="hal-p-1")
-        p_oa = _create_source_person(db, source="openalex", source_id="oa-p-1")
-        authorship_id = _create_authorship(db, pub_id, person_id)
-        sa_hal = _create_source_authorship(
-            db, sp_hal, p_hal, source="hal", person_id=person_id, authorship_id=authorship_id
+        await async_db.execute(
+            "SELECT authorship_id FROM source_authorships WHERE id = %s", (sa_hal,)
         )
-        _create_source_authorship(
-            db,
+        assert (await async_db.fetchone())["authorship_id"] is None
+
+    async def test_excluded_sources_do_not_keep_authorship_alive(self, async_db, async_repo):
+        """Si les autres sources sont marquées excluded, l'authorship doit être supprimée."""
+        person_id = await _a_create_person(async_db)
+        pub_id = await _a_create_publication(async_db)
+        sp_hal = await _a_create_source_publication(
+            async_db, pub_id, source="hal", source_id="hal-1"
+        )
+        sp_oa = await _a_create_source_publication(
+            async_db, pub_id, source="openalex", source_id="W1"
+        )
+        p_hal = await _a_create_source_person(async_db, source="hal", source_id="hal-p-1")
+        p_oa = await _a_create_source_person(async_db, source="openalex", source_id="oa-p-1")
+        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
+        sa_hal = await _a_create_source_authorship(
+            async_db,
+            sp_hal,
+            p_hal,
+            source="hal",
+            person_id=person_id,
+            authorship_id=authorship_id,
+        )
+        await _a_create_source_authorship(
+            async_db,
             sp_oa,
             p_oa,
             source="openalex",
@@ -500,10 +530,10 @@ class TestDetachSource:
             excluded=True,
         )
 
-        assert detach_source(db, sa_hal, "hal", repo=repo) is True
+        assert await detach_source(async_db, sa_hal, "hal", repo=async_repo) is True
 
-        db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
-        assert db.fetchone() is None
+        await async_db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
+        assert await async_db.fetchone() is None
 
 
 # ── delete_orphan_authorships ──────────────────────────────────────
@@ -603,9 +633,7 @@ class TestMoveAuthorshipsForSource:
             db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        move_authorships_for_source(
-            db, "hal", [sa_id], from_pub_id=pub1, to_pub_id=pub2, repo=repo
-        )
+        move_authorships_for_source(db, "hal", [sa_id], from_pub_id=pub1, to_pub_id=pub2, repo=repo)
 
         db.execute("SELECT publication_id FROM authorships WHERE id = %s", (authorship_id,))
         assert db.fetchone()["publication_id"] == pub2
@@ -624,9 +652,7 @@ class TestMoveAuthorshipsForSource:
             db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        move_authorships_for_source(
-            db, "hal", [sa_id], from_pub_id=pub1, to_pub_id=pub3, repo=repo
-        )
+        move_authorships_for_source(db, "hal", [sa_id], from_pub_id=pub1, to_pub_id=pub3, repo=repo)
 
         db.execute("SELECT publication_id FROM authorships WHERE id = %s", (authorship_id,))
         assert db.fetchone()["publication_id"] == pub2  # inchangé
@@ -723,9 +749,7 @@ class TestPropagateUcaForAddresses:
         await _a_set_config(db, "perimeter_persons", "uca")
         return uca_id
 
-    async def test_noop_on_empty_address_ids(
-        self, async_db, async_repo, async_perimeter_queries
-    ):
+    async def test_noop_on_empty_address_ids(self, async_db, async_repo, async_perimeter_queries):
         await self._setup_uca(async_db)
         await propagate_uca_for_addresses(
             async_db, [], repo=async_repo, perimeter_queries=async_perimeter_queries
@@ -819,35 +843,37 @@ class TestPropagateUcaForAddresses:
 
 
 class TestSetSourceAuthorshipExcluded:
-    def test_raises_on_invalid_source(self, db, repo):
+    async def test_raises_on_invalid_source(self, async_db, async_repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            set_source_authorship_excluded(db, 1, "invalid", True, repo=repo)
+            await set_source_authorship_excluded(async_db, 1, "invalid", True, repo=async_repo)
 
-    def test_raises_not_found(self, db, repo):
+    async def test_raises_not_found(self, async_db, async_repo):
         with pytest.raises(NotFoundError):
-            set_source_authorship_excluded(db, 999999, "hal", True, repo=repo)
+            await set_source_authorship_excluded(async_db, 999999, "hal", True, repo=async_repo)
 
-    def test_marks_excluded(self, db, repo):
-        person_id = _create_person(db)
-        pub_id = _create_publication(db)
-        sp_id = _create_source_publication(db, pub_id)
-        src_person_id = _create_source_person(db)
-        sa_id = _create_source_authorship(db, sp_id, src_person_id, person_id=person_id)
+    async def test_marks_excluded(self, async_db, async_repo):
+        person_id = await _a_create_person(async_db)
+        pub_id = await _a_create_publication(async_db)
+        sp_id = await _a_create_source_publication(async_db, pub_id)
+        src_person_id = await _a_create_source_person(async_db)
+        sa_id = await _a_create_source_authorship(
+            async_db, sp_id, src_person_id, person_id=person_id
+        )
 
-        set_source_authorship_excluded(db, sa_id, "hal", True, repo=repo)
+        await set_source_authorship_excluded(async_db, sa_id, "hal", True, repo=async_repo)
 
-        db.execute("SELECT excluded FROM source_authorships WHERE id = %s", (sa_id,))
-        assert db.fetchone()["excluded"] is True
+        await async_db.execute("SELECT excluded FROM source_authorships WHERE id = %s", (sa_id,))
+        assert (await async_db.fetchone())["excluded"] is True
 
-    def test_unmark_excluded_does_not_touch_authorship(self, db, repo):
+    async def test_unmark_excluded_does_not_touch_authorship(self, async_db, async_repo):
         """Remettre excluded=False ne doit pas toucher à l'authorship vérité."""
-        person_id = _create_person(db)
-        pub_id = _create_publication(db)
-        sp_id = _create_source_publication(db, pub_id)
-        src_person_id = _create_source_person(db)
-        authorship_id = _create_authorship(db, pub_id, person_id)
-        sa_id = _create_source_authorship(
-            db,
+        person_id = await _a_create_person(async_db)
+        pub_id = await _a_create_publication(async_db)
+        sp_id = await _a_create_source_publication(async_db, pub_id)
+        src_person_id = await _a_create_source_person(async_db)
+        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
+        sa_id = await _a_create_source_authorship(
+            async_db,
             sp_id,
             src_person_id,
             person_id=person_id,
@@ -855,23 +881,27 @@ class TestSetSourceAuthorshipExcluded:
             excluded=True,
         )
 
-        set_source_authorship_excluded(db, sa_id, "hal", False, repo=repo)
+        await set_source_authorship_excluded(async_db, sa_id, "hal", False, repo=async_repo)
 
-        db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
-        assert db.fetchone() is not None  # authorship vérité toujours là
+        await async_db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
+        assert await async_db.fetchone() is not None  # authorship vérité toujours là
 
-    def test_exclude_triggers_detach_source(self, db, repo):
+    async def test_exclude_triggers_detach_source(self, async_db, async_repo):
         """Exclure la seule source attestante doit supprimer l'authorship vérité."""
-        person_id = _create_person(db)
-        pub_id = _create_publication(db)
-        sp_id = _create_source_publication(db, pub_id)
-        src_person_id = _create_source_person(db)
-        authorship_id = _create_authorship(db, pub_id, person_id)
-        sa_id = _create_source_authorship(
-            db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
+        person_id = await _a_create_person(async_db)
+        pub_id = await _a_create_publication(async_db)
+        sp_id = await _a_create_source_publication(async_db, pub_id)
+        src_person_id = await _a_create_source_person(async_db)
+        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
+        sa_id = await _a_create_source_authorship(
+            async_db,
+            sp_id,
+            src_person_id,
+            person_id=person_id,
+            authorship_id=authorship_id,
         )
 
-        set_source_authorship_excluded(db, sa_id, "hal", True, repo=repo)
+        await set_source_authorship_excluded(async_db, sa_id, "hal", True, repo=async_repo)
 
-        db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
-        assert db.fetchone() is None  # authorship vérité supprimée
+        await async_db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
+        assert await async_db.fetchone() is None  # authorship vérité supprimée
