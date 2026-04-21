@@ -184,39 +184,49 @@ version sync disparaît si le pipeline migre aussi un jour.
   fonctionnelle.
 
 **Phases** :
-- [ ] **Phase 1** — Infra async parallèle (pas encore câblée) :
-  `infrastructure/db/async_connection.py`,
-  `interfaces/api/async_deps.py`, lifespan dans `interfaces/api/app.py`
-  (~1 commit, 0 test impacté).
-- [ ] **Phase 2** — Ports async + repositories async : 7 ports + 7
-  repos, ~148 `cur.execute` à `await`-er (~3-5 commits, 0 test impacté).
-- [ ] **Phase 3** — Queries partagées API/pipeline → versions async :
-  `persons/`, `publications/`, `stats/`, `duplicates.py`,
-  `laboratories.py`, `addresses.py`, `hal_problems.py`, `filters.py`,
-  `authorships.py`, `perimeter.py` (~12 fichiers, ~160 `cur.execute`,
-  ~4-6 commits).
-- [ ] **Phase 4** — Services `application/` consommés par l'API
-  (variantes async ajoutées en parallèle, ~7 fichiers, ~3-4 commits).
-- [ ] **Phase 5** — Refactor `tests/integration/interfaces/conftest.py`
-  en async **avant** phase 6 (1 commit, helper `pool_cursor()` seed
-  reste sync sur une connexion séparée pour ne pas rendre toutes les
-  fixtures async).
-- [ ] **Phase 6** — Routers migrés un par un (18 fichiers, 1
-  commit/router, du plus simple — `auth`, `docs`, `config` — au plus
-  gros — `persons` avec 26 `cur.execute`). Le reliquat SQL inline §1.1
-  se résorbe en même temps.
-- [ ] **Phase 7** — Nettoyage : suppression des stubs sync orphelins,
-  retrait de l'ancien `_get_pool` sync de `deps.py` si plus utilisé
-  (~1 commit).
+- [x] **Phase 1** — Infra async parallèle : `infrastructure/db/async_connection.py`,
+  `interfaces/api/async_deps.py`, lifespan dans `interfaces/api/app.py`.
+- [x] **Phase 2** — Ports async + repositories async : 7 ports exposent
+  `Async<Nom>Repository(Protocol)`, 7 implémentations `PgAsync*` dans
+  `infrastructure/repositories/async_*_repository*.py`, factories
+  `async_*_repository` dans `infrastructure/repositories/__init__.py`.
+  Duplication justifiée : repositories partagés pipeline/API.
+- [ ] **Phase 3** — `tests/integration/interfaces/conftest.py` supporte
+  async **avant** les migrations verticales : `AsyncConnectionPool`
+  côte à côte du pool sync, `async_pool_cursor` fixture, patch de
+  `get_async_cursor` dans les 18 routers. `pool_cursor()` sync
+  conservé (seed intégration).
+- [ ] **Phase 4** — Migration verticale par router. Pour chaque
+  router (18 au total, du plus simple au plus complexe) : migration
+  en **un seul commit** de {queries utilisées, services applicables,
+  router, tests du router, tests directs des queries}. Les queries
+  ne sont **pas dupliquées** — remplacement en place (aucune n'est
+  utilisée par le pipeline, vérifié). Partage avec pipeline possible
+  sur `infrastructure/perimeter.py` et `infrastructure/app_config.py`
+  → variantes async ajoutées en parallèle au cas par cas dans ces
+  fichiers (pipeline garde le sync).
+- [ ] **Phase 5** — Nettoyage : suppression des ports/repositories/
+  factories sync orphelins (API-only : certains repositories ne sont
+  utilisés que par l'API et peuvent être supprimés complètement),
+  retrait de `_get_pool` sync + `get_cursor` de `deps.py`, retrait
+  de l'import-linter sur le pattern sync si applicable. Activer
+  `RUF029` et la famille ruff `ASYNC` dans `pyproject.toml` pour
+  verrouiller la régression.
 
-**Total** : ~60-70 fichiers modifiés, ~25-30 commits. Tests
-d'intégration API verts à la fin de chaque phase mergeable.
+**Total** : ~60-70 fichiers modifiés, ~25-30 commits. Pas de duplication
+intermédiaire des modules de queries API (~3000 LOC économisées
+vs approche parallèle abandonnée). Tests verts à la fin de chaque
+commit de la Phase 4 (l'API reste fonctionnelle à chaque slice).
 
 **Arbitrages tranchés** :
-- Pipeline reste sync (cf. scope ci-dessus).
-- Ports dupliqués plutôt que `Protocol` générique (psycopg3 impose des
-  signatures `async def`/`def` distinctes, `Protocol` ne les abstrait
-  pas proprement).
+- Pipeline reste sync.
+- Ports sync+async dupliqués (Protocol ne peut pas abstraire `async
+  def`/`def`).
+- Queries API **remplacées en place** (vérification : aucun module
+  partagé pipeline/API dans le scope).
+- `infrastructure/perimeter.py` et `infrastructure/app_config.py`
+  (seuls helpers partagés) : variantes async ajoutées au fil des
+  slices.
 - Ajouter `pytest-asyncio` (mode `auto`) à `pyproject.toml` dev deps.
 
 ### 2.13 Exploitation psycopg3 — séquence après §2.12
