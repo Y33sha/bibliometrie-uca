@@ -13,7 +13,7 @@ from application.config import (
     update_perimeter,
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from infrastructure.repositories import config_repository
+from infrastructure.repositories import async_config_repository, config_repository
 
 
 @pytest.fixture
@@ -21,11 +21,23 @@ def repo(db):
     return config_repository(db)
 
 
+@pytest.fixture
+def async_repo(async_db):
+    return async_config_repository(async_db)
+
+
 # ── Helpers ────────────────────────────────────────────────────────
 
 
 def _insert_config(db, key, value, description="desc"):
     db.execute(
+        "INSERT INTO config (key, value, description) VALUES (%s, %s::jsonb, %s)",
+        (key, json.dumps(value), description),
+    )
+
+
+async def _async_insert_config(db, key, value, description="desc"):
+    await db.execute(
         "INSERT INTO config (key, value, description) VALUES (%s, %s::jsonb, %s)",
         (key, json.dumps(value), description),
     )
@@ -39,23 +51,23 @@ def _insert_perimeter(db, code="test", name="Test", structure_ids=None):
     return db.fetchone()["id"]
 
 
-# ── update_config_value ────────────────────────────────────────────
+# ── update_config_value (§2.12 : async) ────────────────────────────
 
 
 class TestUpdateConfigValue:
-    def test_raises_not_found(self, db, repo):
+    async def test_raises_not_found(self, async_db, async_repo):
         with pytest.raises(NotFoundError):
-            update_config_value(db, "nonexistent", "x", repo=repo)
+            await update_config_value(async_db, "nonexistent", "x", repo=async_repo)
 
-    def test_updates_existing(self, db, repo):
-        _insert_config(db, "test_key", "old")
-        row = update_config_value(db, "test_key", "new", repo=repo)
+    async def test_updates_existing(self, async_db, async_repo):
+        await _async_insert_config(async_db, "test_key", "old")
+        row = await update_config_value(async_db, "test_key", "new", repo=async_repo)
         assert row is not None
         assert row["value"] == "new"
 
-    def test_updates_with_dict_value(self, db, repo):
-        _insert_config(db, "test_key", {})
-        row = update_config_value(db, "test_key", {"a": 1, "b": 2}, repo=repo)
+    async def test_updates_with_dict_value(self, async_db, async_repo):
+        await _async_insert_config(async_db, "test_key", {})
+        row = await update_config_value(async_db, "test_key", {"a": 1, "b": 2}, repo=async_repo)
         assert row["value"] == {"a": 1, "b": 2}
 
 
