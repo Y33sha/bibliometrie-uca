@@ -328,11 +328,11 @@ class TestWoSDocTypeMap:
 
 # ── NNT ─────────────────────────────────────────────────────────
 
-from domain.publication import normalize_nnt
 from application.pipeline.normalize.openalex_parsing import (
     extract_nnt_from_openalex,
     is_theses_fr_source,
 )
+from domain.publication import normalize_nnt
 
 
 class TestNormalizeNnt:
@@ -495,9 +495,7 @@ class TestThesesExtractPubMetadata:
 
     def test_malformed_date(self):
         """Date non parseable → pub_year reste None."""
-        meta = extract_pub_metadata(
-            {"titrePrincipal": "X", "dateSoutenance": "date-invalide"}
-        )
+        meta = extract_pub_metadata({"titrePrincipal": "X", "dateSoutenance": "date-invalide"})
         assert meta["pub_year"] is None
 
     def test_no_title(self):
@@ -576,9 +574,7 @@ class TestThesesAuthorCompatible:
     def test_token_fallback_particule(self):
         """Gère les particules (Ben, Le…) via set des tokens identiques."""
         q = self._StubQueries(("Ben Ali", "Mohammed"))
-        assert (
-            _thesis_author_compatible(None, q, 1, ("mohammed", "ben ali")) is True
-        )
+        assert _thesis_author_compatible(None, q, 1, ("mohammed", "ben ali")) is True
 
 
 # ── authorship_roles ─────────────────────────────────────────────
@@ -633,13 +629,9 @@ class TestMergeRoles:
 
     def test_drops_jury_member_when_specific_role_present(self):
         """Si thesis_director/rapporteur/jury_president → jury_member redondant."""
-        assert "jury_member" not in merge_roles(
-            [["thesis_director", "jury_member"]]
-        )
+        assert "jury_member" not in merge_roles([["thesis_director", "jury_member"]])
         assert "jury_member" not in merge_roles([["rapporteur", "jury_member"]])
-        assert "jury_member" not in merge_roles(
-            [["jury_president", "jury_member"]]
-        )
+        assert "jury_member" not in merge_roles([["jury_president", "jury_member"]])
 
     def test_keeps_jury_member_alone(self):
         """Sans rôle spécifique, jury_member est conservé."""
