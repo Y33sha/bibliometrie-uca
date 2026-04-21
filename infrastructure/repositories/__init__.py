@@ -18,15 +18,22 @@ Usage :
 
 from typing import Any
 
-from domain.ports.address_repository import AddressRepository
-from domain.ports.authorship_repository import AuthorshipRepository
-from domain.ports.config_repository import ConfigRepository
-from domain.ports.journal_repository import JournalRepository
-from domain.ports.person_repository import PersonRepository
-from domain.ports.publication_repository import PublicationRepository
-from domain.ports.structure_repository import StructureRepository
+from domain.ports.address_repository import AddressRepository, AsyncAddressRepository
+from domain.ports.authorship_repository import AsyncAuthorshipRepository, AuthorshipRepository
+from domain.ports.config_repository import AsyncConfigRepository, ConfigRepository
+from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
+from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
+from domain.ports.publication_repository import AsyncPublicationRepository, PublicationRepository
+from domain.ports.structure_repository import AsyncStructureRepository, StructureRepository
 
 from .address_repository import PgAddressRepository
+from .async_address_repository import PgAsyncAddressRepository
+from .async_authorship_repository import PgAsyncAuthorshipRepository
+from .async_config_repository import PgAsyncConfigRepository
+from .async_journal_repository import PgAsyncJournalRepository
+from .async_person_repository import PgAsyncPersonRepository
+from .async_publication_repository import PgAsyncPublicationRepository
+from .async_structure_repository import PgAsyncStructureRepository
 from .authorship_repository import PgAuthorshipRepository
 from .config_repository import PgConfigRepository
 from .journal_repository import PgJournalRepository
@@ -68,3 +75,34 @@ def publication_repository(cur: Any) -> PublicationRepository:
 def structure_repository(cur: Any) -> StructureRepository:
     """Retourne un StructureRepository lié au curseur donné."""
     return PgStructureRepository(cur)
+
+
+# ── Factories async (§2.12) — câblées après migration des routers ──
+
+
+def async_address_repository(cur: Any) -> AsyncAddressRepository:
+    return PgAsyncAddressRepository(cur)
+
+
+def async_authorship_repository(cur: Any) -> AsyncAuthorshipRepository:
+    return PgAsyncAuthorshipRepository(cur)
+
+
+def async_config_repository(cur: Any) -> AsyncConfigRepository:
+    return PgAsyncConfigRepository(cur)
+
+
+def async_journal_repository(cur: Any) -> AsyncJournalRepository:
+    return PgAsyncJournalRepository(cur)
+
+
+def async_person_repository(cur: Any) -> AsyncPersonRepository:
+    return PgAsyncPersonRepository(cur)
+
+
+def async_publication_repository(cur: Any) -> AsyncPublicationRepository:
+    return PgAsyncPublicationRepository(cur)
+
+
+def async_structure_repository(cur: Any) -> AsyncStructureRepository:
+    return PgAsyncStructureRepository(cur)
