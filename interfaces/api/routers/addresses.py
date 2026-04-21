@@ -233,9 +233,7 @@ async def batch_set_country(
             )
         updated = len(modified_ids)
 
-        propagated_ids = await addresses_service.propagate_countries_to_similar(
-            cur, repo=addr_repo
-        )
+        propagated_ids = await addresses_service.propagate_countries_to_similar(cur, repo=addr_repo)
         propagated = len(propagated_ids)
         all_ids = modified_ids + propagated_ids
 
@@ -291,9 +289,7 @@ async def admin_address_stats(structure_id: int | None = Query(None)) -> Any:
         # Résoudre la structure (défaut = première racine du périmètre)
         if structure_id is None:
             perim_code = await _async_get_from_db(cur, "perimeter_persons") or "uca"
-            await cur.execute(
-                "SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,)
-            )
+            await cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,))
             row = await cur.fetchone()
             root_ids = (row["structure_ids"] if isinstance(row, dict) else row[0]) if row else []
             structure_id = root_ids[0] if root_ids else 0

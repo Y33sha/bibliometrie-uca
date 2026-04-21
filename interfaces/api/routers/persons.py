@@ -13,42 +13,42 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from application.authorships import async_exclude_authorship as _exclude_authorship
+from application.authorships import exclude_authorship as _exclude_authorship
+from application.persons import (
+    assign_orphan_authorship as _assign_orphan,
+)
 from application.persons import (
     async_add_identifier as _add_identifier,
-)
-from application.persons import (
-    async_assign_orphan_authorship as _assign_orphan,
-)
-from application.persons import (
-    async_batch_assign_orphan_authorships as _batch_assign_orphan,
 )
 from application.persons import (
     async_create_person as _create_person,
 )
 from application.persons import (
-    async_detach_authorships as _detach_authorships_service,
-)
-from application.persons import (
-    async_detach_name_form as _detach_name_form,
-)
-from application.persons import (
     async_merge_person as _merge_person,
 )
 from application.persons import (
-    async_reassign_identifier as _reassign_identifier,
+    batch_assign_orphan_authorships as _batch_assign_orphan,
 )
 from application.persons import (
-    async_remove_identifier as _remove_identifier,
+    detach_authorships as _detach_authorships_service,
 )
 from application.persons import (
-    async_set_rejected as _set_rejected,
+    detach_name_form as _detach_name_form,
 )
 from application.persons import (
-    async_update_identifier_status as _update_identifier_status,
+    reassign_identifier as _reassign_identifier,
 )
 from application.persons import (
-    async_update_name as _update_name,
+    remove_identifier as _remove_identifier,
+)
+from application.persons import (
+    set_rejected as _set_rejected,
+)
+from application.persons import (
+    update_identifier_status as _update_identifier_status,
+)
+from application.persons import (
+    update_name as _update_name,
 )
 from domain.sources import ALL_SOURCES_SET
 from infrastructure.db.queries import persons as persons_queries

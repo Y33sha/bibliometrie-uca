@@ -10,13 +10,12 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Response
 
 from application.authorships import (
-    async_set_source_authorship_excluded as _set_source_authorship_excluded,
+    set_source_authorship_excluded as _set_source_authorship_excluded,
 )
 from infrastructure.db.queries import publications as pub_queries
 from infrastructure.db.queries.publications import FacetFilters, ListFilters
 from infrastructure.repositories import async_authorship_repository
-from interfaces.api.async_deps import get_async_cursor
-from interfaces.api.deps import get_root_structure_id
+from interfaces.api.async_deps import get_async_cursor, get_root_structure_id
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 from interfaces.api.models import (
     ExcludeSourceAuthorship,
@@ -78,7 +77,7 @@ async def publications_facets(
     )
     async with get_async_cursor() as (cur, _conn):
         return await pub_queries.publications_facets(
-            cur, filters=filters, root_structure_id=get_root_structure_id()
+            cur, filters=filters, root_structure_id=await get_root_structure_id()
         )
 
 
@@ -125,7 +124,7 @@ async def export_publications_csv(
     )
     async with get_async_cursor() as (cur, _conn):
         csv_content = await pub_queries.export_publications_csv(
-            cur, filters=filters, root_structure_id=get_root_structure_id(), sort=sort
+            cur, filters=filters, root_structure_id=await get_root_structure_id(), sort=sort
         )
     return Response(
         content=csv_content,
@@ -217,7 +216,7 @@ async def list_publications(
         return await pub_queries.list_publications(
             cur,
             filters=filters,
-            root_structure_id=get_root_structure_id(),
+            root_structure_id=await get_root_structure_id(),
             page=page,
             per_page=per_page,
             sort=sort,
