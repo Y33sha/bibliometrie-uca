@@ -10,20 +10,22 @@ from typing import Any
 
 from application.audit import emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from domain.ports.config_repository import ConfigRepository
+from domain.ports.config_repository import AsyncConfigRepository, ConfigRepository
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
 
-def update_config_value(cur: Any, key: str, value: Any, *, repo: ConfigRepository) -> dict:
-    """Met à jour la valeur d'un paramètre de config existant.
+async def update_config_value(
+    cur: Any, key: str, value: Any, *, repo: AsyncConfigRepository
+) -> dict:
+    """Met à jour la valeur d'un paramètre de config existant (§2.12).
 
     `value` est sérialisé en JSON. Retourne la ligne mise à jour.
     Lève NotFoundError si la clé n'existe pas.
     """
-    if not repo.config_key_exists(key):
+    if not await repo.config_key_exists(key):
         raise NotFoundError(f"Paramètre '{key}' introuvable")
-    return repo.update_config_value(key, value)
+    return await repo.update_config_value(key, value)
 
 
 # ── Perimeters — structures membres ──────────────────────────────

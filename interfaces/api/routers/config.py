@@ -11,8 +11,8 @@ from typing import Any
 from fastapi import APIRouter
 
 from application import config as config_service
-from infrastructure.repositories import config_repository
-from interfaces.api.deps import get_cursor
+from infrastructure.repositories import async_config_repository
+from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import ConfigItem, ConfigValueUpdate, HalCollectionsResponse
 
 router = APIRouter()
@@ -27,18 +27,18 @@ async def list_config() -> Any:
     renvoyées telles quelles (jsonb) — la sémantique de chaque clé
     est documentée dans `docs/exploitation.md`.
     """
-    with get_cursor() as (cur, _conn):
-        cur.execute("SELECT key, value, description, updated_at FROM config ORDER BY key")
-        return cur.fetchall()
+    async with get_async_cursor() as (cur, _conn):
+        await cur.execute("SELECT key, value, description, updated_at FROM config ORDER BY key")
+        return await cur.fetchall()
 
 
 @router.get("/api/config/hal-collections", response_model=HalCollectionsResponse)
 async def get_hal_collections() -> Any:
     """Retourne les collections HAL dérivées des structures du périmètre UCA."""
-    with get_cursor() as (cur, _conn):
-        from infrastructure.app_config import get_hal_collections as _get
+    async with get_async_cursor() as (cur, _conn):
+        from infrastructure.app_config import async_get_hal_collections
 
-        collections = _get(cur)
+        collections = await async_get_hal_collections(cur)
         return {"collections": collections, "count": len(collections)}
 
 
@@ -50,5 +50,7 @@ async def update_config(key: str, body: ConfigValueUpdate) -> Any:
     clés sont déclarées dans les migrations). 404 si la clé est
     inconnue.
     """
-    with get_cursor() as (cur, _conn):
-        return config_service.update_config_value(cur, key, body.value, repo=config_repository(cur))
+    async with get_async_cursor() as (cur, _conn):
+        return await config_service.update_config_value(
+            cur, key, body.value, repo=async_config_repository(cur)
+        )
