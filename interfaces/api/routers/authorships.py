@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 
 from infrastructure.db.queries import authorships as auth_queries
-from interfaces.api.deps import get_cursor
+from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import (
     AuthorshipsFacets,
     AuthorshipsListResponse,
@@ -25,8 +25,8 @@ async def authorships_stats(lab_id: int = Query(0)) -> Any:
     `lab_id=0` (défaut) = périmètre UCA complet ; sinon restreint
     au laboratoire donné.
     """
-    with get_cursor() as (cur, _conn):
-        return auth_queries.authorships_stats(cur, lab_id)
+    async with get_async_cursor() as (cur, _conn):
+        return await auth_queries.authorships_stats(cur, lab_id)
 
 
 @router.get("/api/authorships/facets", response_model=AuthorshipsFacets)
@@ -43,8 +43,8 @@ async def authorships_facets(
     autres valeurs disponibles. Paramètres `yes`/`no`/empty comme pour
     le endpoint de liste.
     """
-    with get_cursor() as (cur, _conn):
-        return auth_queries.authorships_facets(
+    async with get_async_cursor() as (cur, _conn):
+        return await auth_queries.authorships_facets(
             cur, linked=linked, has_orcid=has_orcid, has_idhal=has_idhal, lab_id=lab_id
         )
 
@@ -67,8 +67,8 @@ async def list_authorships(
     identifiants sur la personne liée. `lab_id=0` = pas de
     restriction laboratoire.
     """
-    with get_cursor() as (cur, _conn):
-        return auth_queries.list_authorships(
+    async with get_async_cursor() as (cur, _conn):
+        return await auth_queries.list_authorships(
             cur,
             search=search,
             linked=linked,
