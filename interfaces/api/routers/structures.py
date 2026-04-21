@@ -1,4 +1,11 @@
-"""Auto-extracted router."""
+"""Router structures — CRUD structures, relations parent-enfant, formes de noms.
+
+Les structures couvrent les entités organisationnelles (labos, UFR,
+universités, CHU, écoles, sites). Les relations `structure_relations`
+expriment les tutelles (`est_tutelle_de`, `est_partenaire_de`) et les
+formes de nom `structure_name_forms` servent au matching d'adresses
+(phase pipeline `addresses`).
+"""
 
 import logging
 from typing import Any
@@ -31,6 +38,14 @@ async def list_structures(
     type: str | None = Query(None),
     search: str = Query(""),
 ) -> Any:
+    """Liste des structures, filtrable par type et par texte libre.
+
+    `type` : enum `structure_type` (`labo`, `universite`, `onr`,
+    `chu`, `ecole`, `site`, `equipe`, `autre`). `search` : matching
+    accent-insensible sur nom / acronyme / code. Tri canonique par
+    type (labo > universite > onr > chu > ecole > site > autre) puis
+    nom.
+    """
     with get_cursor() as (cur, conn):
         conditions = []
         params = []
@@ -68,6 +83,13 @@ async def list_structures(
 
 @router.get("/api/structures/{structure_id}", response_model=StructureDetailResponse)
 async def get_structure(structure_id: int) -> Any:
+    """Détail complet d'une structure : identifiants + parents + enfants + formes de nom.
+
+    Retourne `{structure, parents, children, forms}`. Les parents
+    sont les structures qui ont cette structure comme `child_id`
+    dans `structure_relations` ; les enfants inversement. 404 si la
+    structure n'existe pas.
+    """
     with get_cursor() as (cur, conn):
         cur.execute(
             """
@@ -130,6 +152,7 @@ async def get_structure(structure_id: int) -> Any:
 
 @router.post("/api/structures", response_model=StructureOut)
 async def create_structure(data: StructureCreate) -> Any:
+    """Crée une structure. Lève 409 si le `code` est déjà utilisé."""
     with get_cursor() as (cur, conn):
         return structures_service.create_structure(
             cur,
@@ -147,6 +170,11 @@ async def create_structure(data: StructureCreate) -> Any:
 
 @router.put("/api/structures/{structure_id}", response_model=StructureOut)
 async def update_structure(structure_id: int, data: StructureUpdate) -> Any:
+    """Met à jour une structure (mise à jour sélective des champs fournis).
+
+    Seuls les champs explicitement présents dans le body sont écrits.
+    404 si la structure n'existe pas.
+    """
     fields = data.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
         return structures_service.update_structure(
@@ -156,6 +184,8 @@ async def update_structure(structure_id: int, data: StructureUpdate) -> Any:
 
 @router.delete("/api/structures/{structure_id}", response_model=DeletedResponse)
 async def delete_structure(structure_id: int) -> Any:
+    """Supprime une structure. Cascade sur les relations et formes de
+    noms liées. 404 si inconnue."""
     with get_cursor() as (cur, conn):
         structures_service.delete_structure(cur, structure_id, repo=structure_repository(cur))
         return {"deleted": True}
@@ -163,6 +193,12 @@ async def delete_structure(structure_id: int) -> Any:
 
 @router.post("/api/structure-relations", response_model=StructureRelationCreateResponse)
 async def create_relation(data: RelationCreate) -> Any:
+    """Crée une relation parent-enfant entre deux structures.
+
+    Idempotent : si une relation identique (même parent, child, type)
+    existe, renvoie `{"status": "already_exists"}` au lieu de la
+    recréer.
+    """
     with get_cursor() as (cur, conn):
         row = structures_service.create_relation(
             cur,
@@ -178,6 +214,7 @@ async def create_relation(data: RelationCreate) -> Any:
 
 @router.delete("/api/structure-relations/{relation_id}", response_model=DeletedResponse)
 async def delete_relation(relation_id: int) -> Any:
+    """Supprime une relation structure. 404 si l'id n'existe pas."""
     with get_cursor() as (cur, conn):
         structures_service.delete_relation(cur, relation_id, repo=structure_repository(cur))
         return {"deleted": True}
@@ -185,6 +222,7 @@ async def delete_relation(relation_id: int) -> Any:
 
 @router.get("/api/name-forms/{form_id}", response_model=NameFormOut)
 async def get_name_form(form_id: int) -> Any:
+    """Récupère une forme de nom par son id. 404 si inconnue."""
     with get_cursor() as (cur, conn):
         cur.execute("SELECT * FROM structure_name_forms WHERE id = %s", (form_id,))
         row = cur.fetchone()
@@ -195,6 +233,15 @@ async def get_name_form(form_id: int) -> Any:
 
 @router.post("/api/name-forms", response_model=NameFormOut)
 async def create_name_form(data: NameFormCreate) -> Any:
+    """Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
+
+    `form_text` est normalisé (accents, casse, ponctuation) par le
+    service avant insertion. `is_word_boundary` : le match exige
+    une frontière de mot dans l'adresse brute. `is_excluding` :
+    forme à exclure, pas à matcher (anti-pattern).
+    `requires_context_of` : liste d'ids de structures qui doivent
+    elles-mêmes matcher l'adresse pour que cette forme active.
+    """
     with get_cursor() as (cur, conn):
         return structures_service.create_name_form(
             cur,
@@ -209,6 +256,7 @@ async def create_name_form(data: NameFormCreate) -> Any:
 
 @router.put("/api/name-forms/{form_id}", response_model=NameFormOut)
 async def update_name_form(form_id: int, data: NameFormUpdate) -> Any:
+    """Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue."""
     fields = data.model_dump(exclude_unset=True)
     with get_cursor() as (cur, conn):
         return structures_service.update_name_form(
@@ -218,6 +266,7 @@ async def update_name_form(form_id: int, data: NameFormUpdate) -> Any:
 
 @router.delete("/api/name-forms/{form_id}", response_model=DeletedResponse)
 async def delete_name_form(form_id: int) -> Any:
+    """Supprime une forme de nom. 404 si inconnue."""
     with get_cursor() as (cur, conn):
         structures_service.delete_name_form(cur, form_id, repo=structure_repository(cur))
         return {"deleted": True}
