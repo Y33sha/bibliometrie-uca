@@ -3,23 +3,25 @@
 Fournit :
 - `client` : TestClient FastAPI pointant sur bibliometrie_test (module-scoped).
 - `auth_client` : TestClient avec cookie session admin valide.
-- `pool_cursor` : helper pour insérer des données via le même pool que
-  celui utilisé par l'API (visible depuis les endpoints testés).
-- `seed_publications` : fixture data-seeding pour les tests de
-  caractérisation de `/api/publications`, `/api/persons`, etc.
+- `pool_cursor` : helper sync pour seeder via le même pool que l'API.
+- `async_pool_cursor` : helper async pour tester directement des queries
+  async (hors TestClient). Le pool sync existant reste utilisable pour
+  les seeds de tests API (le lifespan FastAPI + TestClient gèrent leur
+  propre pool async via le monkey-patch de build_async_pool).
 
-Le pool est créé sur bibliometrie_test et remplace get_cursor dans les
-modules routers via monkey-patching. La base est recréée à chaque
-session par le conftest racine intégration (schema.sql frais).
+Le pool sync remplace get_cursor dans les modules routers via
+monkey-patching. Le pool async remplace build_async_pool via
+monkey-patching, ce qui redirige le lifespan FastAPI vers
+bibliometrie_test.
 """
 
 import os
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 
 import psycopg
 import pytest
 from psycopg.rows import dict_row
-from psycopg_pool import ConnectionPool
+from psycopg_pool import AsyncConnectionPool, ConnectionPool
 
 DB_USER = os.environ.get("DB_USER", "lalecoz")
 DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
@@ -37,6 +39,30 @@ _test_pool = ConnectionPool(
     kwargs={**_test_db_args, "row_factory": dict_row},
     open=True,
 )
+
+
+# ── Pool async pour le lifespan FastAPI (§2.12) ────────────────
+#
+# Monkey-patch de build_async_pool : le lifespan l'appelle pour créer
+# son pool, on lui fournit un pool pointant sur bibliometrie_test. Le
+# lifespan se charge ensuite d'ouvrir/fermer ce pool normalement.
+
+
+def _build_test_async_pool() -> AsyncConnectionPool:
+    """Pool async non ouvert, sur bibliometrie_test. Ouvert par le lifespan."""
+    return AsyncConnectionPool(
+        conninfo="",
+        min_size=1,
+        max_size=3,
+        kwargs={**_test_db_args, "row_factory": dict_row},
+        open=False,
+    )
+
+
+# Patcher AVANT import de l'app
+import infrastructure.db.async_connection as _async_conn  # noqa: E402
+
+_async_conn.build_async_pool = _build_test_async_pool
 
 
 @contextmanager
@@ -76,6 +102,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import interfaces.api.app as _app_module  # noqa: E402
 from interfaces.api.app import app  # noqa: E402
+
+# Patcher aussi build_async_pool dans app.py (import-time capture du nom)
+_app_module.build_async_pool = _build_test_async_pool
 
 # Patcher les copies locales de get_cursor dans les routers
 _app_module.get_cursor = _test_get_cursor
@@ -130,7 +159,7 @@ def auth_client() -> TestClient:
 
 @contextmanager
 def pool_cursor():
-    """Curseur sur le pool de test, avec commit au sortir (visible depuis l'API)."""
+    """Curseur sync sur le pool de test, commit au sortir (visible depuis l'API)."""
     conn = _test_pool.getconn()
     try:
         with conn.cursor() as cur:
@@ -141,6 +170,27 @@ def pool_cursor():
         raise
     finally:
         _test_pool.putconn(conn)
+
+
+@asynccontextmanager
+async def async_pool_cursor():
+    """Curseur async sur une connexion dédiée à bibliometrie_test.
+
+    Pour les tests qui appellent directement les fonctions async de
+    `infrastructure/db/queries/` hors du TestClient. Connexion fraîche
+    à chaque appel (pas de pool partagé) pour éviter les conflits de
+    loop entre pytest-asyncio (loop par test) et le lifespan TestClient.
+    """
+    conn = await psycopg.AsyncConnection.connect(**_test_db_args, row_factory=dict_row)
+    try:
+        async with conn.cursor() as cur:
+            yield cur
+        await conn.commit()
+    except Exception:
+        await conn.rollback()
+        raise
+    finally:
+        await conn.close()
 
 
 def truncate_all() -> None:
