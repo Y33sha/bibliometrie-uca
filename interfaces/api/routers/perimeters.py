@@ -94,9 +94,7 @@ async def update_perimeter(perimeter_id: int, body: PerimeterUpdate) -> Any:
 async def delete_perimeter(perimeter_id: int) -> Any:
     """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
     async with get_async_cursor() as (cur, _conn):
-        await config_service.delete_perimeter(
-            cur, perimeter_id, repo=async_config_repository(cur)
-        )
+        await config_service.delete_perimeter(cur, perimeter_id, repo=async_config_repository(cur))
         return {"ok": True}
 
 

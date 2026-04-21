@@ -1,10 +1,9 @@
-"""Shared dependencies: DB connection, auth helpers."""
+"""Shared dependencies: SPA static files, auth helpers."""
 
 import hashlib
 import hmac
 import os
 import time
-from contextlib import contextmanager
 from typing import Any
 
 import bcrypt
@@ -68,71 +67,3 @@ def require_admin(session: str | None = Cookie(None, alias="session")) -> Any:
     """Dépendance FastAPI : vérifie que l'utilisateur est authentifié."""
     if not session or not _verify_token(session):
         raise HTTPException(status_code=401, detail="Non authentifié")
-
-
-# ----- DB helpers -----
-
-from psycopg.rows import dict_row
-from psycopg_pool import ConnectionPool
-
-_pool = None
-
-
-def _get_pool() -> Any:
-    global _pool
-    if _pool is None:
-        db_args = settings.db_args
-        if os.environ.get("BIBLIOMETRIE_SANDBOX") == "1":
-            db_args["dbname"] = "bibliometrie_sandbox"
-        _pool = ConnectionPool(
-            conninfo="",
-            min_size=settings.db_pool_min,
-            max_size=settings.db_pool_max,
-            kwargs={**db_args, "row_factory": dict_row},
-            open=True,
-        )
-    return _pool
-
-
-@contextmanager
-def get_cursor() -> Any:
-    pool = _get_pool()
-    conn = pool.getconn()
-    try:
-        with conn.cursor() as cur:
-            yield cur, conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        pool.putconn(conn)
-
-
-# ----- Perimeter root -----
-
-_root_structure_id: int | None = None
-
-
-def get_root_structure_id() -> int:
-    """Retourne l'ID de la structure racine du périmètre principal.
-
-    Lit perimeters.structure_ids[1] pour le périmètre configuré dans
-    config.perimeter_persons. Valeur cachée après le premier appel.
-    """
-    global _root_structure_id
-    if _root_structure_id is not None:
-        return _root_structure_id
-    with get_cursor() as (cur, _):
-        cur.execute("""
-            SELECT p.structure_ids[1] AS root_id
-            FROM config c
-            JOIN perimeters p ON p.code = c.value #>> '{}'
-            WHERE c.key = 'perimeter_persons'
-        """)
-        row = cur.fetchone()
-        if row and row["root_id"]:
-            _root_structure_id = row["root_id"]
-        else:
-            _root_structure_id = 0  # Périmètre non configuré — les filtres APC seront sans effet
-    return _root_structure_id

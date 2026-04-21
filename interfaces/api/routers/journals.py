@@ -128,7 +128,5 @@ async def merge(journal_id: int, body: MergeRequest) -> Any:
         if body.source_id not in found:
             raise HTTPException(status_code=404, detail="Revue source introuvable")
 
-        await merge_journals(
-            cur, journal_id, body.source_id, repo=async_journal_repository(cur)
-        )
+        await merge_journals(cur, journal_id, body.source_id, repo=async_journal_repository(cur))
         return {"merged": True, "source_id": body.source_id, "target_id": journal_id}
