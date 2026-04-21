@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from infrastructure.db.queries import laboratories as lab_queries
-from interfaces.api.deps import get_cursor
+from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import (
     LaboratoryAddressesResponse,
     LaboratoryDashboardResponse,
@@ -22,15 +22,15 @@ logger = logging.getLogger(__name__)
 @router.get("/api/laboratories", response_model=list[LaboratoryListItem])
 async def list_laboratories() -> Any:
     """Liste des labos du périmètre."""
-    with get_cursor() as (cur, _conn):
-        return lab_queries.list_laboratories(cur)
+    async with get_async_cursor() as (cur, _conn):
+        return await lab_queries.list_laboratories(cur)
 
 
 @router.get("/api/laboratories/{lab_id}", response_model=LaboratoryDetailResponse)
 async def get_laboratory(lab_id: int) -> Any:
     """Profil public d'un laboratoire."""
-    with get_cursor() as (cur, _conn):
-        result = lab_queries.get_laboratory(cur, lab_id)
+    async with get_async_cursor() as (cur, _conn):
+        result = await lab_queries.get_laboratory(cur, lab_id)
         if not result:
             raise HTTPException(404, "Laboratory not found")
         return result
@@ -54,8 +54,8 @@ async def get_laboratory_persons(
         has_orcid=has_orcid,
         has_idhal=has_idhal,
     )
-    with get_cursor() as (cur, _conn):
-        return lab_queries.get_laboratory_persons(
+    async with get_async_cursor() as (cur, _conn):
+        return await lab_queries.get_laboratory_persons(
             cur, lab_id, filters=filters, page=page, per_page=per_page, sort=sort
         )
 
@@ -67,12 +67,12 @@ async def get_laboratory_addresses(
     per_page: int = Query(50, ge=10, le=200),
 ) -> Any:
     """Adresses liées à un laboratoire."""
-    with get_cursor() as (cur, _conn):
-        return lab_queries.get_laboratory_addresses(cur, lab_id, page=page, per_page=per_page)
+    async with get_async_cursor() as (cur, _conn):
+        return await lab_queries.get_laboratory_addresses(cur, lab_id, page=page, per_page=per_page)
 
 
 @router.get("/api/laboratories/{lab_id}/dashboard", response_model=LaboratoryDashboardResponse)
 async def get_laboratory_dashboard(lab_id: int) -> Any:
     """Dashboard labo : publications par an + répartition OA."""
-    with get_cursor() as (cur, _conn):
-        return lab_queries.get_laboratory_dashboard(cur, lab_id)
+    async with get_async_cursor() as (cur, _conn):
+        return await lab_queries.get_laboratory_dashboard(cur, lab_id)
