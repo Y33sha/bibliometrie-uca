@@ -32,12 +32,16 @@ if DB_PASSWORD:
 
 
 def _build_test_async_pool() -> AsyncConnectionPool:
-    """Pool async non ouvert, sur bibliometrie_test. Ouvert par le lifespan."""
+    """Pool async non ouvert, sur bibliometrie_test. Ouvert par le lifespan.
+
+    Même config que le pool prod (cf. `build_async_pool`) — notamment
+    `prepare_threshold=1` pour coller au comportement réel.
+    """
     return AsyncConnectionPool(
         conninfo="",
         min_size=1,
         max_size=3,
-        kwargs={**_test_db_args, "row_factory": dict_row},
+        kwargs={**_test_db_args, "row_factory": dict_row, "prepare_threshold": 1},
         open=False,
     )
 
