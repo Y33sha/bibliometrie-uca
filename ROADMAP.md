@@ -134,8 +134,8 @@ n'est détecté qu'en UI manuel.
 
 ### 2.8 Observabilité et robustesse production
 - [ ] ~~**Alerting sur échec pipeline**~~ — **délégué à la DSI après
-  transmission**. La DSI a ses propres outils et il ne sert à rien de
-  déployer une solution dev qui sera remplacée. En dev local,
+  transmission**. La DSI a sans doute ses propres outils et il ne sert 
+  à rien de déployer une solution dev qui sera remplacée. En dev local,
   monitoring manuel des lancements.
 - [ ] **Checks automatiques post-pipeline** : comptages, orphelins,
   anomalies (type tests de caractérisation sur les données produites)
@@ -154,10 +154,6 @@ n'est détecté qu'en UI manuel.
   compatibilité de noms existent en deux versions (Python dans
   `domain/names.py`, SQL dans `admin_person_duplicates.py`) — à
   unifier si la logique diverge.
-
-### 2.11 Migration psycopg2 → psycopg3 — clôturé 2026-04-20
-Exploitation des fonctionnalités spécifiques psycopg3 (`class_row`,
-`COPY`, `stream`, `pipeline`, async) reportée → §2.12 et §2.13.
 
 ### 2.12 Migration async API — chantier en cours
 
