@@ -101,14 +101,18 @@ extend-exclude = [
 [tool.ruff.lint]
 # Règles activées — on démarre permissif, à durcir au fil du temps.
 select = [
-    "E",    # pycodestyle errors
-    "W",    # pycodestyle warnings
-    "F",    # pyflakes (undefined names, unused imports, etc.)
-    "I",    # isort (ordre des imports)
-    "UP",   # pyupgrade (syntaxe obsolète)
-    "B",    # flake8-bugbear (pièges courants)
-    "C901", # complexité cyclomatique
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes (undefined names, unused imports, etc.)
+    "I",      # isort (ordre des imports)
+    "UP",     # pyupgrade (syntaxe obsolète)
+    "B",      # flake8-bugbear (pièges courants)
+    "C901",   # complexité cyclomatique
+    "ASYNC",  # flake8-async : I/O bloquantes dans une async def, etc.
 ]
+# RUF029 (async def sans await) serait utile mais reste en preview chez
+# ruff à ce jour : l'activer exigerait `preview = true` qui allume
+# d'autres règles preview non évaluées. À ajouter quand elle stabilise.
 # Ignorés le temps d'assainir progressivement
 ignore = [
     "E501", # ligne trop longue — à durcir plus tard

@@ -24,6 +24,12 @@ from interfaces.api.models import FeedbackAddressesResponse, FeedbackStats
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+_RESOLVE_ADDRESSES_SCRIPT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "processing",
+    "resolve_addresses.py",
+)
+
 
 @router.get("/api/admin/feedback/stats", response_model=FeedbackStats)
 async def feedback_stats(structure_id: int = Query(...)) -> Any:
@@ -215,19 +221,14 @@ async def feedback_rerun() -> Any:
     """Lance resolve_addresses en SSE (détection complète sur toutes les adresses)."""
     import asyncio
 
-    script = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "processing",
-        "resolve_addresses.py",
-    )
-    if not os.path.exists(script):
+    if not os.path.exists(_RESOLVE_ADDRESSES_SCRIPT):  # noqa: ASYNC240
         raise HTTPException(status_code=500, detail="Script resolve_addresses.py introuvable")
 
     async def event_stream() -> Any:
         proc = await asyncio.create_subprocess_exec(
             sys.executable,
             "-u",
-            script,
+            _RESOLVE_ADDRESSES_SCRIPT,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
