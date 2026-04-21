@@ -8,7 +8,6 @@ merge_publications. find_or_create est déjà couvert par test_integration.py.
 import pytest
 
 from application.publications import (
-    async_mark_distinct,
     async_merge_publications,
     find_by_doi,
     find_by_nnt,
@@ -379,29 +378,6 @@ class TestMergePublications:
         db.execute("SELECT doi FROM publications WHERE id = %s", (target,))
         assert db.fetchone()["doi"] == "10.1234/target"
 
-
-class TestMarkDistinct:
-    def test_inserts_ordered_pair(self, db, repo):
-        p1 = _insert_publication(db, title="A")
-        p2 = _insert_publication(db, title="B")
-        mark_distinct(db, p2, p1, repo=repo)  # ordre inverse exprès
-        db.execute(
-            "SELECT pub_id_a, pub_id_b FROM distinct_publications WHERE pub_id_a = %s AND pub_id_b = %s",
-            (min(p1, p2), max(p1, p2)),
-        )
-        assert db.fetchone() is not None
-
-    def test_idempotent(self, db, repo):
-        p1 = _insert_publication(db, title="A")
-        p2 = _insert_publication(db, title="B")
-        mark_distinct(db, p1, p2, repo=repo)
-        mark_distinct(db, p1, p2, repo=repo)  # ON CONFLICT DO NOTHING
-        db.execute(
-            "SELECT COUNT(*) AS n FROM distinct_publications WHERE pub_id_a = %s AND pub_id_b = %s",
-            (min(p1, p2), max(p1, p2)),
-        )
-        assert db.fetchone()["n"] == 1
-
     def test_oa_status_upgrade_diamond_wins(self, db, repo):
         """Si source est diamond, la cible devient diamond même si elle avait gold."""
         target = _insert_publication(db, title="Target", oa_status="gold")
@@ -418,13 +394,6 @@ class TestMarkDistinct:
         assert db.fetchone()["oa_status"] == "gold"
 
 
-# ── Variantes async (§2.12) ────────────────────────────────────────
-#
-# Smoke tests qui vérifient que les async_* préservent la sémantique
-# des fonctions sync (la logique métier exhaustive est couverte
-# ci-dessus par les tests sync — le pipeline utilise la version sync).
-
-
 async def _a_insert_publication(db, title="Test", doi=None, oa_status="unknown"):
     await db.execute(
         """
@@ -439,6 +408,32 @@ async def _a_insert_publication(db, title="Test", doi=None, oa_status="unknown")
     return row["id"]
 
 
+class TestMarkDistinct:
+    async def test_inserts_ordered_pair(self, async_db):
+        repo = async_publication_repository(async_db)
+        p1 = await _a_insert_publication(async_db, title="A")
+        p2 = await _a_insert_publication(async_db, title="B")
+        await mark_distinct(async_db, p2, p1, repo=repo)  # ordre inverse exprès
+        await async_db.execute(
+            "SELECT pub_id_a, pub_id_b FROM distinct_publications "
+            "WHERE pub_id_a = %s AND pub_id_b = %s",
+            (min(p1, p2), max(p1, p2)),
+        )
+        assert await async_db.fetchone() is not None
+
+    async def test_idempotent(self, async_db):
+        repo = async_publication_repository(async_db)
+        p1 = await _a_insert_publication(async_db, title="A")
+        p2 = await _a_insert_publication(async_db, title="B")
+        await mark_distinct(async_db, p1, p2, repo=repo)
+        await mark_distinct(async_db, p1, p2, repo=repo)  # ON CONFLICT DO NOTHING
+        await async_db.execute(
+            "SELECT COUNT(*) AS n FROM distinct_publications WHERE pub_id_a = %s AND pub_id_b = %s",
+            (min(p1, p2), max(p1, p2)),
+        )
+        assert (await async_db.fetchone())["n"] == 1
+
+
 class TestAsyncMergePublications:
     async def test_merges_source_into_target(self, async_db):
         repo = async_publication_repository(async_db)
@@ -449,17 +444,3 @@ class TestAsyncMergePublications:
 
         await async_db.execute("SELECT id FROM publications WHERE id = %s", (source,))
         assert await async_db.fetchone() is None
-
-
-class TestAsyncMarkDistinct:
-    async def test_inserts_ordered_pair(self, async_db):
-        repo = async_publication_repository(async_db)
-        p1 = await _a_insert_publication(async_db, title="A")
-        p2 = await _a_insert_publication(async_db, title="B")
-        await async_mark_distinct(async_db, p2, p1, repo=repo)  # ordre inverse exprès
-        await async_db.execute(
-            "SELECT pub_id_a, pub_id_b FROM distinct_publications "
-            "WHERE pub_id_a = %s AND pub_id_b = %s",
-            (min(p1, p2), max(p1, p2)),
-        )
-        assert await async_db.fetchone() is not None

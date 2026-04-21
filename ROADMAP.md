@@ -134,7 +134,7 @@ n'est détecté qu'en UI manuel.
 
 ### 2.8 Observabilité et robustesse production
 - [ ] ~~**Alerting sur échec pipeline**~~ — **délégué à la DSI après
-  transmission**. La DSI a sans doute ses propres outils et il ne sert 
+  transmission**. La DSI a sans doute ses propres outils et il ne sert
   à rien de déployer une solution dev qui sera remplacée. En dev local,
   monitoring manuel des lancements.
 - [ ] **Checks automatiques post-pipeline** : comptages, orphelins,
@@ -155,75 +155,57 @@ n'est détecté qu'en UI manuel.
   `domain/names.py`, SQL dans `admin_person_duplicates.py`) — à
   unifier si la logique diverge.
 
-### 2.12 Migration async API — chantier en cours
+### 2.12 Migration async API — clôturé
 
-**Motivation** : 115 routers déclarés `async def` utilisent psycopg3 en
-mode sync → chaque `cur.execute()` bloque l'event loop uvicorn. Sous
-charge concurrente, un endpoint lent gèle tous les autres. Cible : stack
-100 % async jusqu'à la DB sur la surface FastAPI.
+**Motivation** : les routers déclarés `async def` utilisaient psycopg3
+en mode sync → chaque `cur.execute()` bloquait l'event loop uvicorn.
+Sous charge concurrente, un endpoint lent gelait tous les autres. Cible
+atteinte : stack 100 % async jusqu'à la DB sur la surface FastAPI.
 
 **Scope retenu** : **API seule** passe en async, pipeline et CLI
 restent sync. Raison : pipeline mono-processus one-shot, aucun gain de
 concurrence, et on évite de polluer `run_pipeline.py` avec des
-`asyncio.run()`. Dette temporaire assumée — repositories et queries
-partagés existent en double (sync pour pipeline, async pour API) ; la
-version sync disparaît si le pipeline migre aussi un jour.
-
-**Architecture** :
-- Ports async dupliqués (`AsyncPersonRepository`, etc.) dans
-  `domain/ports/`, implémentations dans `infrastructure/repositories/`
-  (fichiers `async_*.py` en parallèle des sync).
-- Deux pools côte à côte : `AsyncConnectionPool` ouvert au lifespan
-  FastAPI dans `interfaces/api/app.py`, `ConnectionPool` sync
-  inchangé dans `infrastructure/db/connection.py` pour pipeline/CLI.
-- Migration **bottom-up** : chaque étape intermédiaire laisse l'API
-  fonctionnelle.
+`asyncio.run()`. Quand une fonction ou un repository est partagé
+pipeline/API, la variante sync est conservée en parallèle de l'async ;
+les fonctions/ports uniquement consommés par l'API ont été supprimés.
 
 **Phases** :
 - [x] **Phase 1** — Infra async parallèle : `infrastructure/db/async_connection.py`,
   `interfaces/api/async_deps.py`, lifespan dans `interfaces/api/app.py`.
 - [x] **Phase 2** — Ports async + repositories async : 7 ports exposent
-  `Async<Nom>Repository(Protocol)`, 7 implémentations `PgAsync*` dans
-  `infrastructure/repositories/async_*_repository*.py`, factories
-  `async_*_repository` dans `infrastructure/repositories/__init__.py`.
-  Duplication justifiée : repositories partagés pipeline/API.
-- [ ] **Phase 3** — `tests/integration/interfaces/conftest.py` supporte
-  async **avant** les migrations verticales : `AsyncConnectionPool`
-  côte à côte du pool sync, `async_pool_cursor` fixture, patch de
-  `get_async_cursor` dans les 18 routers. `pool_cursor()` sync
-  conservé (seed intégration).
-- [ ] **Phase 4** — Migration verticale par router. Pour chaque
-  router (18 au total, du plus simple au plus complexe) : migration
-  en **un seul commit** de {queries utilisées, services applicables,
-  router, tests du router, tests directs des queries}. Les queries
-  ne sont **pas dupliquées** — remplacement en place (aucune n'est
-  utilisée par le pipeline, vérifié). Partage avec pipeline possible
-  sur `infrastructure/perimeter.py` et `infrastructure/app_config.py`
-  → variantes async ajoutées en parallèle au cas par cas dans ces
-  fichiers (pipeline garde le sync).
-- [ ] **Phase 5** — Nettoyage : suppression des ports/repositories/
-  factories sync orphelins (API-only : certains repositories ne sont
-  utilisés que par l'API et peuvent être supprimés complètement),
-  retrait de `_get_pool` sync + `get_cursor` de `deps.py`, retrait
-  de l'import-linter sur le pattern sync si applicable. Activer
-  `RUF029` et la famille ruff `ASYNC` dans `pyproject.toml` pour
-  verrouiller la régression.
+  `Async<Nom>Repository(Protocol)`, 7 implémentations `PgAsync*`,
+  factories `async_*_repository` dans
+  `infrastructure/repositories/__init__.py`.
+- [x] **Phase 3** — `tests/integration/interfaces/conftest.py` supporte
+  async parallèle au sync.
+- [x] **Phase 4** — Migration verticale des 18 routers (16 slices 4.a→4.p),
+  chacune en un commit autosuffisant {queries, services, router, tests}.
+  Queries remplacées en place (aucune partagée avec le pipeline) ;
+  services partagés dédoublés (sync pour pipeline, async pour API).
+- [x] **Phase 5** — Nettoyage :
+  - [x] **5.a** : suppression des 3 repos sync orphelins (address,
+    config, structure — API-only).
+  - [x] **5.b** : retrait de `_get_pool` sync + `get_cursor` de
+    `deps.py` ; `get_root_structure_id` migré dans `async_deps.py` ;
+    `/api/health` + `/api/metrics` passent par le pool async.
+  - [x] **5.c** : activation de la famille ruff `ASYNC` (verrouille les
+    I/O bloquantes dans une async def). RUF029 reste en preview chez
+    ruff et sera ajoutée quand elle stabilise.
+  - [x] **5.d** : authorships — suppression des sync `exclude_authorship`,
+    `set_source_authorship_excluded`, `detach_source` (tests migrés async).
+  - [x] **5.e** : persons — suppression des 10 sync `set_rejected`,
+    `update_name`, `remove_identifier`, `update_identifier_status`,
+    `reassign_identifier`, `assign_orphan_authorship`,
+    `batch_assign_orphan_authorships`, `detach_authorships`,
+    `detach_name_form`, `mark_distinct` (tests migrés async).
+  - [x] **5.f** : publications — suppression du sync `mark_distinct`
+    (tests migrés async).
 
-**Total** : ~60-70 fichiers modifiés, ~25-30 commits. Pas de duplication
-intermédiaire des modules de queries API (~3000 LOC économisées
-vs approche parallèle abandonnée). Tests verts à la fin de chaque
-commit de la Phase 4 (l'API reste fonctionnelle à chaque slice).
+**Résultat** : 1026 tests verts. Les fonctions et ports sync qui
+subsistent le sont explicitement pour le pipeline/CLI ; plus aucun sync
+n'existe "pour l'API". La famille `ASYNC` de ruff empêche la
+réintroduction d'I/O bloquantes dans les async def.
 
-**Arbitrages tranchés** :
-- Pipeline reste sync.
-- Ports sync+async dupliqués (Protocol ne peut pas abstraire `async
-  def`/`def`).
-- Queries API **remplacées en place** (vérification : aucun module
-  partagé pipeline/API dans le scope).
-- `infrastructure/perimeter.py` et `infrastructure/app_config.py`
-  (seuls helpers partagés) : variantes async ajoutées au fil des
-  slices.
-- Ajouter `pytest-asyncio` (mode `auto`) à `pyproject.toml` dev deps.
 
 ### 2.13 Exploitation psycopg3 — séquence après §2.12
 
