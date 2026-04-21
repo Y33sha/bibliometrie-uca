@@ -1,6 +1,9 @@
+"""Helpers pour l'accès aux rows psycopg3, compatibles tuple et dict_row."""
+
+from contextlib import asynccontextmanager, contextmanager
 from typing import Any
 
-"""Helpers pour l'accès aux rows psycopg3, compatibles tuple et dict_row."""
+from psycopg.rows import class_row
 
 
 def rows_as_dicts(cur: Any) -> list[dict[str, Any]]:
@@ -36,3 +39,32 @@ def row_val(row: Any, index_or_key: Any, default: Any = None) -> Any:
             except (AttributeError, IndexError):
                 pass
         return default
+
+
+@contextmanager
+def row_as(cur: Any, cls: type) -> Any:
+    """Sur un curseur sync, bascule `row_factory` sur `class_row(cls)` le temps
+    d'un bloc. Restaure la factory précédente en sortie.
+
+    Usage :
+        with row_as(self._cur, PubByDoi) as cur:
+            cur.execute("SELECT id, doc_type, title_normalized FROM ...")
+            return cur.fetchone()
+    """
+    old = cur.row_factory
+    cur.row_factory = class_row(cls)
+    try:
+        yield cur
+    finally:
+        cur.row_factory = old
+
+
+@asynccontextmanager
+async def async_row_as(cur: Any, cls: type) -> Any:
+    """Variante async de `row_as` pour les curseurs `psycopg.AsyncCursor`."""
+    old = cur.row_factory
+    cur.row_factory = class_row(cls)
+    try:
+        yield cur
+    finally:
+        cur.row_factory = old
