@@ -4,13 +4,21 @@
   écrivent dans les fichiers log de production.
 - Fixture `_clear_caches` (autouse) qui vide les caches module-level
   entre chaque test.
+- Sur Windows, impose la WindowsSelectorEventLoopPolicy : psycopg3
+  async refuse le ProactorEventLoop (défaut Windows depuis Python 3.8).
 
 Le setup de la base de test et la fixture `db` sont dans
 `tests/integration/conftest.py` — ils ne se déclenchent que si on
 cible `tests/integration/` (ou `tests/` complet).
 """
 
+import asyncio
+import sys
+
 import pytest
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 def pytest_configure(config):
