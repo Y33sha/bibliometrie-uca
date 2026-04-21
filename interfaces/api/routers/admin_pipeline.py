@@ -23,7 +23,7 @@ STATUS_FILE = BASE / "logs" / "status.json"
 
 
 @router.get("/api/admin/pipeline/status", response_model=PipelineStatus | None)
-async def pipeline_status() -> Any:
+defpipeline_status() -> Any:
     """Retourne le statut du pipeline en cours, ou null si aucun ne tourne."""
     if not STATUS_FILE.exists():
         return None
@@ -37,7 +37,7 @@ CRON_LOG = BASE / "logs" / "cron.log"
 
 
 @router.get("/api/admin/pipeline/logs", response_model=PipelineLogsResponse)
-async def pipeline_logs(lines: int = 200) -> Any:
+defpipeline_logs(lines: int = 200) -> Any:
     """Retourne les N dernières lignes du cron.log."""
     if not CRON_LOG.exists():
         return {"content": ""}
@@ -50,7 +50,7 @@ async def pipeline_logs(lines: int = 200) -> Any:
 
 
 @router.get("/api/admin/pipeline/reports", response_model=list[PipelineReportItem])
-async def list_reports() -> Any:
+deflist_reports() -> Any:
     """Liste les rapports pipeline disponibles (plus récent en premier)."""
     if not REPORTS_DIR.exists():
         return []
@@ -68,7 +68,7 @@ async def list_reports() -> Any:
 
 
 @router.get("/api/admin/pipeline/reports/{filename}", response_model=PipelineReportContent)
-async def get_report(filename: str) -> Any:
+defget_report(filename: str) -> Any:
     """Retourne le contenu d'un rapport pipeline."""
     # Sécurité : empêcher le path traversal
     if "/" in filename or "\\" in filename or ".." in filename:
