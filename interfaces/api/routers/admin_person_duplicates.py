@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from application.persons import mark_distinct as _mark_persons_distinct
-from infrastructure.db.queries import duplicates as dup_queries
+from infrastructure.db.queries import person_duplicates as dup_queries
 from infrastructure.repositories import person_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import (

@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from application.publications import mark_distinct as _mark_pubs_distinct
 from application.publications import merge_publications
-from infrastructure.db.queries import duplicates as dup_queries
+from infrastructure.db.queries import publication_duplicates as dup_queries
 from infrastructure.repositories import publication_repository
 from interfaces.api.deps import get_cursor
 from interfaces.api.models import (
