@@ -114,6 +114,36 @@ def delete_orphan_authorships(cur: Any, person_id: int, *, repo: AuthorshipRepos
     return repo.delete_orphan_authorships_for_person(person_id)
 
 
+async def async_exclude_authorship(
+    cur: Any, authorship_id: int, *, repo: AsyncAuthorshipRepository
+) -> dict:
+    """Variante async de `exclude_authorship` (§2.12, router persons)."""
+    row = await repo.get_authorship_person(authorship_id)
+    if not row:
+        raise NotFoundError(f"Authorship {authorship_id} introuvable")
+
+    person_id = row["person_id"]
+    result = await repo.mark_authorship_excluded(authorship_id)
+    if person_id:
+        await repo.detach_source_authorships_for_person(authorship_id, person_id)
+
+    await async_emit_event(
+        cur,
+        "authorship.excluded",
+        "authorship",
+        authorship_id,
+        {"person_id": person_id},
+    )
+    return result
+
+
+async def async_delete_orphan_authorships(
+    cur: Any, person_id: int, *, repo: AsyncAuthorshipRepository
+) -> int:
+    """Variante async de `delete_orphan_authorships`."""
+    return await repo.delete_orphan_authorships_for_person(person_id)
+
+
 def move_authorships_for_source(
     cur: Any,
     source: str,

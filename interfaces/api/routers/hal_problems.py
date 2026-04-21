@@ -33,9 +33,7 @@ async def hal_duplicate_accounts(
 ) -> Any:
     """Personnes liées à 2+ comptes HAL distincts."""
     async with get_async_cursor() as (cur, _conn):
-        return await persons_admin_queries.async_hal_duplicate_accounts(
-            cur, page=page, per_page=per_page
-        )
+        return await persons_admin_queries.hal_duplicate_accounts(cur, page=page, per_page=per_page)
 
 
 @router.get("/api/hal-problems/duplicate-pubs-doi", response_model=HalDoiDuplicatesResponse)

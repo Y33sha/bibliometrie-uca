@@ -1,11 +1,11 @@
-"""Détail d'une personne : profil, auteurs liés, thèses encadrées, adresses."""
+"""Détail d'une personne : profil, auteurs liés, thèses encadrées, adresses (§2.12 : async)."""
 
 from typing import Any
 
 
-def get_person(cur: Any, person_id: int) -> dict[str, Any] | None:
+async def get_person(cur: Any, person_id: int) -> dict[str, Any] | None:
     """Détail d'une personne avec auteurs liés (admin)."""
-    cur.execute(
+    await cur.execute(
         """
         SELECT p.id, p.last_name, p.first_name,
             p.last_name_normalized, p.first_name_normalized,
@@ -30,12 +30,12 @@ def get_person(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    return cur.fetchone()
+    return await cur.fetchone()
 
 
-def person_profile(cur: Any, person_id: int) -> dict[str, Any] | None:
+async def person_profile(cur: Any, person_id: int) -> dict[str, Any] | None:
     """Profil public : infos + identifiants + auteurs liés."""
-    cur.execute(
+    await cur.execute(
         """
         SELECT p.id, p.last_name, p.first_name,
                prh.role_title, prh.department_name,
@@ -46,20 +46,20 @@ def person_profile(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    person = cur.fetchone()
+    person = await cur.fetchone()
     if not person:
         return None
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT id, id_type, id_value, source, status
         FROM person_identifiers WHERE person_id = %s
         """,
         (person_id,),
     )
-    identifiers = cur.fetchall()
+    identifiers = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT DISTINCT sauth.id, 'hal' AS source, sauth.full_name, sauth.orcid,
                sauth.source_ids->>'idhal' AS idhal,
@@ -74,9 +74,9 @@ def person_profile(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    hal_authors = cur.fetchall()
+    hal_authors = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT MIN(sa.id) AS id,
                sa.raw_author_name AS full_name,
@@ -89,9 +89,9 @@ def person_profile(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    oa_authors = cur.fetchall()
+    oa_authors = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT sauth.id, 'wos' AS source, sa.raw_author_name AS full_name, sauth.orcid,
                NULL::text AS idhal, NULL::text AS openalex_id,
@@ -105,9 +105,9 @@ def person_profile(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    wos_authors = cur.fetchall()
+    wos_authors = await cur.fetchall()
 
-    cur.execute(
+    await cur.execute(
         """
         SELECT COUNT(*) AS count
         FROM source_authorships sa
@@ -119,7 +119,8 @@ def person_profile(cur: Any, person_id: int) -> dict[str, Any] | None:
         """,
         (person_id,),
     )
-    theses_count = cur.fetchone()["count"]
+    row = await cur.fetchone()
+    theses_count = row["count"]
 
     return {
         "person": person,
@@ -141,9 +142,9 @@ _THESIS_ROLE_LABELS = {
 }
 
 
-def person_theses(cur: Any, person_id: int) -> dict[str, Any]:
+async def person_theses(cur: Any, person_id: int) -> dict[str, Any]:
     """Thèses liées à cette personne avec un rôle non-auteur."""
-    cur.execute(
+    await cur.execute(
         """
         SELECT p.id, p.title, p.pub_year, p.doi,
                sa.roles,
@@ -178,7 +179,7 @@ def person_theses(cur: Any, person_id: int) -> dict[str, Any]:
         """,
         (person_id,),
     )
-    rows = cur.fetchall()
+    rows = await cur.fetchall()
 
     all_struct_ids: set[int] = set()
     for row in rows:
@@ -187,11 +188,11 @@ def person_theses(cur: Any, person_id: int) -> dict[str, Any]:
 
     structures: dict[int, Any] = {}
     if all_struct_ids:
-        cur.execute(
+        await cur.execute(
             "SELECT id, acronym, name FROM structures WHERE id = ANY(%s)",
             (list(all_struct_ids),),
         )
-        for s in cur.fetchall():
+        for s in await cur.fetchall():
             structures[s["id"]] = {"acronym": s["acronym"], "name": s["name"]}
 
     by_role: dict[str, list[dict[str, Any]]] = {}
@@ -225,7 +226,7 @@ def person_theses(cur: Any, person_id: int) -> dict[str, Any]:
 # ── Adresses ─────────────────────────────────────────────────────
 
 
-def person_addresses(cur: Any, person_id: int, *, page: int, per_page: int) -> dict[str, Any]:
+async def person_addresses(cur: Any, person_id: int, *, page: int, per_page: int) -> dict[str, Any]:
     """Adresses distinctes utilisées dans les authorships sources de cette personne."""
     base_where = """a.id IN (
             SELECT DISTINCT saa.address_id
@@ -233,13 +234,14 @@ def person_addresses(cur: Any, person_id: int, *, page: int, per_page: int) -> d
             JOIN source_authorships sa ON sa.id = saa.source_authorship_id
             WHERE sa.person_id = %s
         )"""
-    cur.execute(f"SELECT COUNT(*) AS total FROM addresses a WHERE {base_where}", (person_id,))
-    total = cur.fetchone()["total"]
+    await cur.execute(f"SELECT COUNT(*) AS total FROM addresses a WHERE {base_where}", (person_id,))
+    row = await cur.fetchone()
+    total = row["total"]
     pages = max(1, (total + per_page - 1) // per_page)
     page = min(page, pages)
     offset = (page - 1) * per_page
 
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT a.id, a.raw_text,
                (SELECT jsonb_agg(jsonb_build_object(
@@ -260,5 +262,5 @@ def person_addresses(cur: Any, person_id: int, *, page: int, per_page: int) -> d
         "total": total,
         "page": page,
         "pages": pages,
-        "addresses": cur.fetchall(),
+        "addresses": await cur.fetchall(),
     }

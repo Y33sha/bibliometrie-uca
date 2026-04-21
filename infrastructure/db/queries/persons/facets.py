@@ -1,4 +1,4 @@
-"""Facettes dynamiques + listes de référence (départements, rôles, stats)."""
+"""Facettes dynamiques + listes de référence (départements, rôles, stats) (§2.12 : async)."""
 
 from dataclasses import dataclass, field
 from typing import Any
@@ -20,7 +20,7 @@ class FacetFilters:
     linked: str = ""
 
 
-def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
+async def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
     """Facettes dynamiques (chaque facette exclut son propre filtre)."""
 
     def base_filters(*, skip: str) -> tuple[list[str], list[Any]]:
@@ -47,7 +47,7 @@ def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
     # DÉPARTEMENTS
     c, p = base_filters(skip="department")
     where = ("WHERE " + " AND ".join(c)) if c else ""
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT prh.department_name AS value, COUNT(*) AS count
         FROM {base_from}
@@ -56,12 +56,12 @@ def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
         """,
         p,
     )
-    dept_facets = cur.fetchall()
+    dept_facets = await cur.fetchall()
 
     # RÔLES
     c, p = base_filters(skip="role")
     where = ("WHERE " + " AND ".join(c)) if c else ""
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT prh.role_title AS value, COUNT(*) AS count
         FROM {base_from}
@@ -70,12 +70,12 @@ def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
         """,
         p,
     )
-    role_facets = cur.fetchall()
+    role_facets = await cur.fetchall()
 
     # ORCID
     c, p = base_filters(skip="has_orcid")
     where = ("WHERE " + " AND ".join(c)) if c else ""
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             COUNT(*) FILTER (WHERE EXISTS (
@@ -90,12 +90,12 @@ def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
         """,
         p,
     )
-    orcid_counts = cur.fetchone()
+    orcid_counts = await cur.fetchone()
 
     # IDHAL
     c, p = base_filters(skip="has_idhal")
     where = ("WHERE " + " AND ".join(c)) if c else ""
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             COUNT(*) FILTER (WHERE
@@ -108,12 +108,12 @@ def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
         """,
         p,
     )
-    idhal_counts = cur.fetchone()
+    idhal_counts = await cur.fetchone()
 
     # RH
     c, p = base_filters(skip="has_rh")
     where = ("WHERE " + " AND ".join(c)) if c else ""
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             COUNT(*) FILTER (WHERE prh.id IS NOT NULL) AS yes,
@@ -122,12 +122,12 @@ def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
         """,
         p,
     )
-    rh_counts = cur.fetchone()
+    rh_counts = await cur.fetchone()
 
     # LINKED
     c, p = base_filters(skip="linked")
     where = ("WHERE " + " AND ".join(c)) if c else ""
-    cur.execute(
+    await cur.execute(
         f"""
         SELECT
             COUNT(*) FILTER (WHERE
@@ -140,7 +140,7 @@ def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
         """,
         p,
     )
-    linked_counts = cur.fetchone()
+    linked_counts = await cur.fetchone()
 
     return {
         "departments": dept_facets,
@@ -155,33 +155,33 @@ def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
 # ── Listes de référence ──────────────────────────────────────────
 
 
-def list_departments(cur: Any) -> list[dict[str, Any]]:
+async def list_departments(cur: Any) -> list[dict[str, Any]]:
     """Liste des départements distincts."""
-    cur.execute("""
+    await cur.execute("""
         SELECT department_name, COUNT(*) AS count
         FROM persons_rh
         WHERE department_name IS NOT NULL
         GROUP BY department_name
         ORDER BY count DESC
     """)
-    return cur.fetchall()
+    return await cur.fetchall()
 
 
-def list_roles(cur: Any) -> list[dict[str, Any]]:
+async def list_roles(cur: Any) -> list[dict[str, Any]]:
     """Liste des rôles distincts."""
-    cur.execute("""
+    await cur.execute("""
         SELECT role_title, COUNT(*) AS count
         FROM persons_rh
         WHERE role_title IS NOT NULL
         GROUP BY role_title
         ORDER BY count DESC
     """)
-    return cur.fetchall()
+    return await cur.fetchall()
 
 
-def persons_stats(cur: Any) -> dict[str, Any]:
+async def persons_stats(cur: Any) -> dict[str, Any]:
     """Statistiques globales personnes."""
-    cur.execute("""
+    await cur.execute("""
         SELECT
             (SELECT COUNT(*) FROM persons) AS total_persons,
             (SELECT COUNT(DISTINCT person_id) FROM authorships WHERE person_id IS NOT NULL) AS linked_persons,
@@ -189,4 +189,4 @@ def persons_stats(cur: Any) -> dict[str, Any]:
             (SELECT COUNT(DISTINCT department_name)
              FROM persons_rh WHERE department_name IS NOT NULL) AS departments
     """)
-    return cur.fetchone()
+    return await cur.fetchone()
