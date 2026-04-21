@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from application.persons import async_mark_distinct as _mark_persons_distinct
+from application.persons import mark_distinct as _mark_persons_distinct
 from infrastructure.db.queries import person_duplicates as dup_queries
 from infrastructure.repositories import async_person_repository
 from interfaces.api.async_deps import get_async_cursor
