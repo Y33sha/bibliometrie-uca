@@ -7,8 +7,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from application.journals import merge_publishers
 from application.journals import update_publisher as _update_publisher
-from infrastructure.repositories import journal_repository
-from interfaces.api.deps import get_cursor
+from infrastructure.repositories import async_journal_repository
+from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import (
     MergeRequest,
     MergeResponse,
@@ -35,7 +35,7 @@ async def list_publishers(
     caractères. `sort` : `name` / `-name` / `journals` / `-journals`
     / `pubs` / `-pubs` ; fallback sur `name` si inconnu.
     """
-    with get_cursor() as (cur, conn):
+    async with get_async_cursor() as (cur, conn):
         conditions = []
         params = []
 
@@ -46,8 +46,8 @@ async def list_publishers(
         where = " AND ".join(conditions) if conditions else "TRUE"
 
         # Count
-        cur.execute(f"SELECT COUNT(*) FROM publishers p WHERE {where}", params)
-        total = cur.fetchone()["count"]
+        await cur.execute(f"SELECT COUNT(*) FROM publishers p WHERE {where}", params)
+        total = (await cur.fetchone())["count"]
 
         # Sort
         sort_map = {
@@ -61,7 +61,7 @@ async def list_publishers(
         order = sort_map.get(sort, sort_map["name"])
 
         offset = (page - 1) * per_page
-        cur.execute(
+        await cur.execute(
             f"""
             SELECT p.id, p.name, p.openalex_id, p.country,
                    p.doi_prefix, p.is_predatory,
@@ -81,16 +81,16 @@ async def list_publishers(
             "total": total,
             "page": page,
             "pages": (total + per_page - 1) // per_page,
-            "publishers": cur.fetchall(),
+            "publishers": await cur.fetchall(),
         }
 
 
 @router.get("/api/publishers/{publisher_id}", response_model=PublisherBasic)
 async def get_publisher(publisher_id: int) -> Any:
     """Récupère un éditeur par son id (nom uniquement). 404 si inconnu."""
-    with get_cursor() as (cur, conn):
-        cur.execute("SELECT id, name FROM publishers WHERE id = %s", (publisher_id,))
-        row = cur.fetchone()
+    async with get_async_cursor() as (cur, conn):
+        await cur.execute("SELECT id, name FROM publishers WHERE id = %s", (publisher_id,))
+        row = await cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Éditeur introuvable")
         return row
@@ -104,8 +104,10 @@ async def update_publisher(publisher_id: int, body: PublisherUpdate) -> Any:
     (`exclude_unset=True`). Lève 404 si l'éditeur n'existe pas.
     """
     fields = body.model_dump(exclude_unset=True)
-    with get_cursor() as (cur, conn):
-        _update_publisher(cur, publisher_id, fields=fields, repo=journal_repository(cur))
+    async with get_async_cursor() as (cur, conn):
+        await _update_publisher(
+            cur, publisher_id, fields=fields, repo=async_journal_repository(cur)
+        )
         return {"ok": True}
 
 
@@ -117,15 +119,17 @@ async def merge(publisher_id: int, body: MergeRequest) -> Any:
     transférées à la cible ; la source est supprimée. 404 si l'un
     des deux éditeurs est introuvable.
     """
-    with get_cursor() as (cur, conn):
-        cur.execute(
+    async with get_async_cursor() as (cur, conn):
+        await cur.execute(
             "SELECT id FROM publishers WHERE id IN (%s, %s)", (publisher_id, body.source_id)
         )
-        found = {row["id"] for row in cur.fetchall()}
+        found = {row["id"] for row in await cur.fetchall()}
         if publisher_id not in found:
             raise HTTPException(status_code=404, detail="Éditeur cible introuvable")
         if body.source_id not in found:
             raise HTTPException(status_code=404, detail="Éditeur source introuvable")
 
-        merge_publishers(cur, publisher_id, body.source_id, repo=journal_repository(cur))
+        await merge_publishers(
+            cur, publisher_id, body.source_id, repo=async_journal_repository(cur)
+        )
         return {"merged": True, "source_id": body.source_id, "target_id": publisher_id}

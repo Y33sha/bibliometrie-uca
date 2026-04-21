@@ -8,10 +8,10 @@ Compatible avec les curseurs tuples (standard) et dict_row.
 
 from typing import Any
 
-from application.audit import emit_event
+from application.audit import async_emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
-from domain.ports.journal_repository import JournalRepository
+from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
 
 # ── Publishers ──
 
@@ -155,7 +155,9 @@ def find_or_create_journal(
     return journal_id
 
 
-def update_journal(cur: Any, journal_id: int, *, fields: dict, repo: JournalRepository) -> None:
+async def update_journal(
+    cur: Any, journal_id: int, *, fields: dict, repo: AsyncJournalRepository
+) -> None:
     """Met à jour une revue. Le `title` est automatiquement normalisé en
     `title_normalized`.
 
@@ -165,16 +167,18 @@ def update_journal(cur: Any, journal_id: int, *, fields: dict, repo: JournalRepo
     if not fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    if not repo.journal_exists(journal_id):
+    if not await repo.journal_exists(journal_id):
         raise NotFoundError(f"Revue {journal_id} introuvable")
 
     fields = dict(fields)
     if "title" in fields:
         fields["title_normalized"] = normalize_text(fields["title"])
-    repo.update_journal_fields(journal_id, fields)
+    await repo.update_journal_fields(journal_id, fields)
 
 
-def update_publisher(cur: Any, publisher_id: int, *, fields: dict, repo: JournalRepository) -> None:
+async def update_publisher(
+    cur: Any, publisher_id: int, *, fields: dict, repo: AsyncJournalRepository
+) -> None:
     """Met à jour un éditeur. Le `name` est automatiquement normalisé en
     `name_normalized`.
 
@@ -184,13 +188,13 @@ def update_publisher(cur: Any, publisher_id: int, *, fields: dict, repo: Journal
     if not fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    if not repo.publisher_exists(publisher_id):
+    if not await repo.publisher_exists(publisher_id):
         raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
     fields = dict(fields)
     if "name" in fields:
         fields["name_normalized"] = normalize_text(fields["name"])
-    repo.update_publisher_fields(publisher_id, fields)
+    await repo.update_publisher_fields(publisher_id, fields)
 
 
 def update_journal_apc(
@@ -219,7 +223,9 @@ def reset_journal_apc(cur: Any, *, repo: JournalRepository) -> int:
 # ── Fusions ──
 
 
-def merge_publishers(cur: Any, target_id: int, source_id: int, *, repo: JournalRepository) -> None:
+async def merge_publishers(
+    cur: Any, target_id: int, source_id: int, *, repo: AsyncJournalRepository
+) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible.
 
     Invariant métier : s'il y a des journaux aux titres partagés entre
@@ -232,7 +238,7 @@ def merge_publishers(cur: Any, target_id: int, source_id: int, *, repo: JournalR
 
     # 1. Détecter les journaux partageant un titre entre les deux éditeurs,
     #    vérifier les conflits ISSN, puis les fusionner.
-    for pair in repo.find_shared_title_journal_pairs(target_id, source_id):
+    for pair in await repo.find_shared_title_journal_pairs(target_id, source_id):
         for field in ("issn", "eissn", "issnl"):
             tv = pair[f"t_{field}"]
             sv = pair[f"s_{field}"]
@@ -243,18 +249,26 @@ def merge_publishers(cur: Any, target_id: int, source_id: int, *, repo: JournalR
                     f"source #{pair['source_journal_id']}: {sv}). "
                     f"Fusionner les revues manuellement d'abord."
                 )
-        merge_journals(cur, pair["target_journal_id"], pair["source_journal_id"], repo=repo)
+        await merge_journals(
+            cur, pair["target_journal_id"], pair["source_journal_id"], repo=repo
+        )
 
     # 2-6. Le reste de la fusion (transferts, enrichissement, delete).
-    repo.merge_publisher_into(target_id, source_id)
+    await repo.merge_publisher_into(target_id, source_id)
 
-    emit_event(cur, "publisher.merged", "publisher", target_id, {"source_id": source_id})
+    await async_emit_event(
+        cur, "publisher.merged", "publisher", target_id, {"source_id": source_id}
+    )
 
 
-def merge_journals(cur: Any, target_id: int, source_id: int, *, repo: JournalRepository) -> None:
+async def merge_journals(
+    cur: Any, target_id: int, source_id: int, *, repo: AsyncJournalRepository
+) -> None:
     """Fusionne le journal source dans le journal cible."""
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un journal avec lui-même")
 
-    repo.merge_journal_into(target_id, source_id)
-    emit_event(cur, "journal.merged", "journal", target_id, {"source_id": source_id})
+    await repo.merge_journal_into(target_id, source_id)
+    await async_emit_event(
+        cur, "journal.merged", "journal", target_id, {"source_id": source_id}
+    )
