@@ -1,4 +1,4 @@
-"""Facettes dynamiques pour /api/publications/facets.
+"""Facettes dynamiques pour /api/publications/facets (§2.12 : async).
 
 Chaque facette exclut son propre filtre mais applique tous les autres.
 Décomposition : une méthode privée par facette + un orchestrateur `build()`.
@@ -51,7 +51,7 @@ class FacetFilters:
 
 
 class _PublicationFacetsBuilder:
-    """Construit les 15 facettes dynamiques pour /api/publications/facets.
+    """Construit les facettes dynamiques pour /api/publications/facets.
 
     Chaque facette exclut son propre filtre mais applique tous les autres.
     Décomposition : une méthode privée par facette + un orchestrateur `build()`.
@@ -62,18 +62,17 @@ class _PublicationFacetsBuilder:
         self.filters = filters
         self.root_structure_id = root_structure_id
         self.lab_hal_col: Any = None
-        self._preload_lab_hal_col()
 
     # ── Utilitaires internes ────────────────────────────────────
 
-    def _preload_lab_hal_col(self) -> None:
+    async def _preload_lab_hal_col(self) -> None:
         """Charge la hal_collection du labo (si un seul labo est sélectionné)."""
         if len(self.filters.lab_ids) == 1:
-            self.cur.execute(
+            await self.cur.execute(
                 "SELECT hal_collection FROM structures WHERE id = %s",
                 (self.filters.lab_ids[0],),
             )
-            row = self.cur.fetchone()
+            row = await self.cur.fetchone()
             self.lab_hal_col = row["hal_collection"] if row else None
 
     def _base_conds(self) -> tuple[list[str], list[Any]]:
@@ -129,9 +128,9 @@ class _PublicationFacetsBuilder:
 
     # ── Facettes ────────────────────────────────────────────────
 
-    def _facet_years(self) -> list[dict[str, Any]]:
+    async def _facet_years(self) -> list[dict[str, Any]]:
         c, p = self._conds_skipping("year")
-        self.cur.execute(
+        await self.cur.execute(
             f"""
             SELECT p.pub_year AS value, COUNT(*) AS count
             FROM publications p
@@ -140,11 +139,11 @@ class _PublicationFacetsBuilder:
             """,
             p,
         )
-        return self.cur.fetchall()
+        return await self.cur.fetchall()
 
-    def _facet_labs(self) -> tuple[list[dict[str, Any]], int]:
+    async def _facet_labs(self) -> tuple[list[dict[str, Any]], int]:
         c, p = self._conds_skipping("lab")
-        self.cur.execute(
+        await self.cur.execute(
             f"""
             SELECT s.id AS value, COALESCE(s.acronym, s.name) AS label,
                    COUNT(DISTINCT a.publication_id) AS count
@@ -159,9 +158,9 @@ class _PublicationFacetsBuilder:
             """,
             p,
         )
-        labs = self.cur.fetchall()
+        labs = await self.cur.fetchall()
 
-        self.cur.execute(
+        await self.cur.execute(
             f"""
             SELECT COUNT(*) AS count FROM publications p
             WHERE {self._where_sql(c)}
@@ -175,12 +174,13 @@ class _PublicationFacetsBuilder:
             """,
             p,
         )
-        no_lab_count = self.cur.fetchone()["count"]
+        row = await self.cur.fetchone()
+        no_lab_count = row["count"]
         return labs, no_lab_count
 
-    def _facet_doc_types(self) -> list[dict[str, Any]]:
+    async def _facet_doc_types(self) -> list[dict[str, Any]]:
         c, p = self._conds_skipping("doc_type")
-        self.cur.execute(
+        await self.cur.execute(
             f"""
             SELECT p.doc_type::text AS value, COUNT(*) AS count
             FROM publications p
@@ -189,11 +189,11 @@ class _PublicationFacetsBuilder:
             """,
             p,
         )
-        return self.cur.fetchall()
+        return await self.cur.fetchall()
 
-    def _facet_access(self) -> list[dict[str, Any]]:
+    async def _facet_access(self) -> list[dict[str, Any]]:
         c, p = self._conds_skipping("access")
-        self.cur.execute(
+        await self.cur.execute(
             f"""
             SELECT
                 COUNT(*) FILTER (WHERE p.oa_status::text IN {OA_OPEN_SQL}) AS open_count,
@@ -203,15 +203,15 @@ class _PublicationFacetsBuilder:
             """,
             p,
         )
-        r = self.cur.fetchone()
+        r = await self.cur.fetchone()
         return [
             {"value": "open", "text": "Ouvert", "count": r["open_count"]},
             {"value": "closed", "text": "Fermé", "count": r["closed_count"]},
         ]
 
-    def _facet_oa_statuses(self) -> list[dict[str, Any]]:
+    async def _facet_oa_statuses(self) -> list[dict[str, Any]]:
         c, p = self._conds_skipping("oa_status")
-        self.cur.execute(
+        await self.cur.execute(
             f"""
             SELECT p.oa_status::text AS value, COUNT(*) AS count
             FROM publications p
@@ -220,13 +220,13 @@ class _PublicationFacetsBuilder:
             """,
             p,
         )
-        return self.cur.fetchall()
+        return await self.cur.fetchall()
 
-    def _facet_corresponding(self) -> list[dict[str, Any]]:
+    async def _facet_corresponding(self) -> list[dict[str, Any]]:
         if not self.filters.person_id:
             return []
         c, p = self._conds_skipping("corresponding")
-        self.cur.execute(
+        await self.cur.execute(
             f"""
             SELECT
                 COUNT(*) FILTER (WHERE EXISTS (
@@ -244,15 +244,15 @@ class _PublicationFacetsBuilder:
             """,
             [self.filters.person_id, self.filters.person_id] + p,
         )
-        row = self.cur.fetchone()
+        row = await self.cur.fetchone()
         return [
             {"value": "yes", "count": row["yes_count"]},
             {"value": "no", "count": row["no_count"]},
         ]
 
-    def _facet_source_counts(self) -> dict[str, int]:
+    async def _facet_source_counts(self) -> dict[str, int]:
         c, p = self._conds_skipping("source")
-        self.cur.execute(
+        await self.cur.execute(
             f"""
             SELECT
                 COUNT(*) FILTER (WHERE p.sources @> ARRAY['hal'::source_type]) AS hal_count,
@@ -265,7 +265,7 @@ class _PublicationFacetsBuilder:
             """,
             p,
         )
-        row = self.cur.fetchone()
+        row = await self.cur.fetchone()
         return {
             "hal": row["hal_count"],
             "oa": row["oa_count"],
@@ -274,17 +274,17 @@ class _PublicationFacetsBuilder:
             "theses": row["theses_count"],
         }
 
-    def _facet_apc(self) -> list[dict[str, Any]]:
+    async def _facet_apc(self) -> list[dict[str, Any]]:
         """APC : variante à 4 catégories si un labo est sélectionné, sinon 3."""
         c, p = self._conds_skipping("apc")
         where = self._where_sql(c)
         if self.filters.lab_ids:
-            return self._facet_apc_with_lab(where, p)
-        return self._facet_apc_without_lab(where, p)
+            return await self._facet_apc_with_lab(where, p)
+        return await self._facet_apc_without_lab(where, p)
 
-    def _facet_apc_with_lab(self, where: str, p: list[Any]) -> list[dict[str, Any]]:
+    async def _facet_apc_with_lab(self, where: str, p: list[Any]) -> list[dict[str, Any]]:
         lab_ids = self.filters.lab_ids
-        self.cur.execute(
+        await self.cur.execute(
             f"""
             SELECT
                 COUNT(*) FILTER (WHERE EXISTS (
@@ -312,12 +312,13 @@ class _PublicationFacetsBuilder:
             """,
             [lab_ids, self.root_structure_id, lab_ids, self.root_structure_id] + p,
         )
-        r = self.cur.fetchone()
-        self.cur.execute(
+        r = await self.cur.fetchone()
+        await self.cur.execute(
             "SELECT COALESCE(acronym, name) AS label FROM structures WHERE id = %s",
             (lab_ids[0],),
         )
-        lab_label = self.cur.fetchone()["label"] if self.cur.rowcount else "ce labo"
+        row = await self.cur.fetchone()
+        lab_label = row["label"] if row else "ce labo"
         return [
             {"value": "this_lab", "text": f"APC — {lab_label}", "count": r["apc_this_lab"]},
             {"value": "other_uca", "text": "APC — autres UCA", "count": r["apc_other_uca"]},
@@ -325,8 +326,8 @@ class _PublicationFacetsBuilder:
             {"value": "none", "text": "Sans APC", "count": r["apc_none"]},
         ]
 
-    def _facet_apc_without_lab(self, where: str, p: list[Any]) -> list[dict[str, Any]]:
-        self.cur.execute(
+    async def _facet_apc_without_lab(self, where: str, p: list[Any]) -> list[dict[str, Any]]:
+        await self.cur.execute(
             f"""
             SELECT
                 COUNT(*) FILTER (WHERE EXISTS (
@@ -347,16 +348,16 @@ class _PublicationFacetsBuilder:
             """,
             [self.root_structure_id, self.root_structure_id] + p,
         )
-        r = self.cur.fetchone()
+        r = await self.cur.fetchone()
         return [
             {"value": "uca", "text": "APC — UCA", "count": r["apc_uca"]},
             {"value": "other", "text": "APC — autres", "count": r["apc_other"]},
             {"value": "none", "text": "Sans APC", "count": r["apc_none"]},
         ]
 
-    def _facet_countries(self) -> list[dict[str, Any]]:
+    async def _facet_countries(self) -> list[dict[str, Any]]:
         c, p = self._conds_skipping("country")
-        self.cur.execute(
+        await self.cur.execute(
             f"""
             SELECT co.code, co.name, COUNT(*) AS count
             FROM (
@@ -372,18 +373,18 @@ class _PublicationFacetsBuilder:
         )
         return [
             {"value": r["code"].strip(), "text": r["name"], "count": r["count"]}
-            for r in self.cur.fetchall()
+            for r in await self.cur.fetchall()
             if r["code"].strip() != "xx"
         ]
 
-    def _facet_hal_status(self) -> list[dict[str, Any]]:
+    async def _facet_hal_status(self) -> list[dict[str, Any]]:
         """HAL status : seulement si un seul labo est sélectionné."""
         if len(self.filters.lab_ids) != 1:
             return []
         c, p = self._conds_skipping("hal_status")
         col = self.lab_hal_col
         if col:
-            self.cur.execute(
+            await self.cur.execute(
                 f"""
                 SELECT
                     COUNT(*) FILTER (WHERE NOT EXISTS (
@@ -414,7 +415,7 @@ class _PublicationFacetsBuilder:
                 [col, col, col] + p,
             )
         else:
-            self.cur.execute(
+            await self.cur.execute(
                 f"""
                 SELECT
                     COUNT(*) FILTER (WHERE NOT EXISTS (
@@ -432,7 +433,7 @@ class _PublicationFacetsBuilder:
                 """,
                 p,
             )
-        r = self.cur.fetchone()
+        r = await self.cur.fetchone()
         return [
             {"value": "ok", "text": "OK", "count": r["ok"]},
             {"value": "notice", "text": "Notice", "count": r["notice"]},
@@ -440,11 +441,11 @@ class _PublicationFacetsBuilder:
             {"value": "hors_hal", "text": "Hors HAL", "count": r["hors_hal"]},
         ]
 
-    def _facet_in_perimeter(self) -> list[dict[str, Any]]:
+    async def _facet_in_perimeter(self) -> list[dict[str, Any]]:
         if not self.filters.person_id:
             return []
         c, p = self._conds_skipping("in_perimeter")
-        self.cur.execute(
+        await self.cur.execute(
             f"""
             SELECT
                 COUNT(*) FILTER (WHERE EXISTS (
@@ -462,7 +463,7 @@ class _PublicationFacetsBuilder:
             """,
             [self.filters.person_id, self.filters.person_id] + p,
         )
-        r = self.cur.fetchone()
+        r = await self.cur.fetchone()
         return [
             {"value": "yes", "text": "UCA", "count": r["yes"]},
             {"value": "no", "text": "Hors périmètre", "count": r["no"]},
@@ -470,28 +471,29 @@ class _PublicationFacetsBuilder:
 
     # ── Orchestrateur ──────────────────────────────────────────
 
-    def build(self) -> dict[str, Any]:
-        labs, no_lab_count = self._facet_labs()
+    async def build(self) -> dict[str, Any]:
+        await self._preload_lab_hal_col()
+        labs, no_lab_count = await self._facet_labs()
         return {
-            "years": self._facet_years(),
+            "years": await self._facet_years(),
             "labs": labs,
             "no_lab_count": no_lab_count,
-            "doc_types": self._facet_doc_types(),
-            "access": self._facet_access(),
-            "oa_statuses": self._facet_oa_statuses(),
-            "corresponding": self._facet_corresponding(),
-            "source_counts": self._facet_source_counts(),
-            "apc": self._facet_apc(),
-            "countries": self._facet_countries(),
-            "hal_status": self._facet_hal_status(),
-            "in_perimeter": self._facet_in_perimeter(),
+            "doc_types": await self._facet_doc_types(),
+            "access": await self._facet_access(),
+            "oa_statuses": await self._facet_oa_statuses(),
+            "corresponding": await self._facet_corresponding(),
+            "source_counts": await self._facet_source_counts(),
+            "apc": await self._facet_apc(),
+            "countries": await self._facet_countries(),
+            "hal_status": await self._facet_hal_status(),
+            "in_perimeter": await self._facet_in_perimeter(),
         }
 
 
-def publications_facets(
+async def publications_facets(
     cur: Any, *, filters: FacetFilters, root_structure_id: int
 ) -> dict[str, Any]:
     """Facettes dynamiques : chaque facette exclut son propre filtre mais
     applique tous les autres. Décomposé dans `_PublicationFacetsBuilder`."""
-    cur.execute("SET LOCAL jit = off")
-    return _PublicationFacetsBuilder(cur, filters, root_structure_id).build()
+    await cur.execute("SET LOCAL jit = off")
+    return await _PublicationFacetsBuilder(cur, filters, root_structure_id).build()
