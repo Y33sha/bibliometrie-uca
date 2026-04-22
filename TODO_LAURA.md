@@ -32,12 +32,11 @@ DETAIL:  La clé (address_id)=(4283651) n'est pas présente dans la table « add
 * [ ] hal_authors importés sans id par un script de cross-import: ça ne devrait pas être possible. Auditer.
 * [ ] publis OpenAlex avec date correspondant au dépôt dans HAL: ex. 8651 => si dates différentes, utiliser l'autre. Si OA cite HAL comme source, prendre métadonnées HAL
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
-* [ ] investiguer les 388k doublons de position WoS (source_authorships, même publi, même position)
-
+* [ ] investiguer les 388k doublons de position WoS (source_authorships, même publi, même position auteur)
 ### Problèmes spécifiques HAL
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
 * [ ] https://hal.science/hal-03874894 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
-* [ ] DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
+* [ ] DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
 * [ ] trous dans la numérotation des auteurs: diagnostiquer et résoudre
 * à quoi sert VRAIMENT la colonne collections du staging_hal?
 * [ ] embargos (HAL, theses.fr): afficher dates (existent-elles dans le retour api)?
@@ -57,7 +56,7 @@ DETAIL:  La clé (address_id)=(4283651) n'est pas présente dans la table « add
 * [ ] utiliser DOAJ pour enrichir données journals et s'en servir pour contrôler oa_status?
 * [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
 # Code
-* [ ] logique bizarre à corriger: if is_thesis and has_hal_link: priority = _PRIORITY_THESIS_HAL_LINKED
+* [x] logique bizarre à corriger: if is_thesis and has_hal_link: priority = _PRIORITY_THESIS_HAL_LINKED
 * [ ] vérifier si certains ports ne seraient pas mieux placés dans application/ (critère: sont-ils importés par domain/ ou pas?)
 * [ ] faire le ménage dans db/queries: trop de choses mal rangées ou mal nommées
 * [ ] auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques)

@@ -79,43 +79,6 @@ composition roots (`interfaces/cli/pipeline/*`, `run_pipeline.py`).
   query services dans les routers (équivalent unit-of-work). Mécanique
   si la couverture de tests devient un objectif.
 
-### 1.7 Extraction des règles pures `application/` → `domain/`
-
-Les services `application/*.py` contiennent aujourd'hui des règles
-métier (constantes de priorité, ordres de classement, prédicats de
-fusion) qui ne font aucun I/O et devraient vivre dans `domain/`.
-Symptôme : `domain/publication.py` contient les VO et modèles JSONB
-mais aucune règle *opérant* sur ces concepts — toute la logique est
-remontée dans les orchestrateurs d'application par accident
-d'historique. Domaine anémique.
-
-À ne **pas** confondre avec §1.4 (entités riches) : il ne s'agit pas
-de transformer `Publication` ou `Person` en objets stateful. Il
-s'agit d'extraire des fonctions pures et des constantes de règles
-métier vers `domain/`, en gardant `application/` comme couche
-d'orchestration (repos, audit, transaction).
-
-Candidats identifiés, regroupés par concept de domaine :
-- [x] **`domain/publication.py`** : `SOURCE_PRIORITY` (ordre des sources
-  pour l'agrégation), `OA_RANK` + `best_oa_status(statuses)`,
-  `resolve_doi_conflict(...)` en fonction pure renvoyant une
-  `DoiConflictResolution` (le wrapper `application/` applique l'effet
-  de bord `repo.clear_doi` quand la règle le demande).
-- [x] **`domain/person.py`** : `check_can_merge_persons(has_distinct_rh,
-  target_id, source_id)` (invariant « refus si les deux ont une fiche
-  RH distincte »).
-- [x] Audit complémentaire — `application/journals.py` et
-  `application/authorships.py` : rien à extraire. Les règles sont soit
-  déjà côté domain (`source in VALID_SOURCES` via `domain/sources.py`),
-  soit du SQL pur côté repo (cascade ISSN/name_form), soit des
-  validateurs sur rows renvoyées par une requête dédiée
-  (`find_shared_title_journal_pairs`) — pas des règles pures
-  réutilisables.
-
-Bénéfices : tests unitaires purs sans plomberie de base, règles
-concentrées à un endroit, contrat domaine/application plus lisible
-pour la DSI.
-
 ### 1.8 Audit périodique
 - [ ] Parcours régulier pour repérer : SQL mal placé, dépendances dans le
   mauvais sens, logique métier qui a migré dans infrastructure, code
@@ -181,12 +144,12 @@ n'est détecté qu'en UI manuel.
 
 ### 2.9 Audits transversaux périodiques
 À faire passer périodiquement — non commencés à ce jour.
-- [ ] **12-factor app** : confronter le projet aux pointeurs de
+- [x] **12-factor app** : confronter le projet aux pointeurs de
   *Beyond the Twelve-Factor App* (Kevin Hoffman, 2016) qui revisite
   les 12 facteurs originaux et en ajoute 3 à l'ère Kubernetes.
-- [ ] **SOLID** sur le code existant : détecter les violations
+- [x] **SOLID** sur le code existant : détecter les violations
   (surtout ISP et DIP, les plus courantes quand on vient d'une base
-  procédurale).
+  procédurale). SRP, OCP, LSP, ISP, DIP
 - [ ] **Revue code dupliqué / uniformisation** : ex. les fonctions de
   compatibilité de noms existent en deux versions (Python dans
   `domain/names.py`, SQL dans `admin_person_duplicates.py`) — à

@@ -14,7 +14,8 @@ DOCS_DIR = Path(__file__).parent.parent.parent / "docs"
 
 # Pages de doc et leur titre pour la sidebar (dans l'ordre d'affichage)
 DOC_PAGES = [
-    {"slug": "architecture", "title": "Architecture données"},
+    {"slug": "architecture", "title": "Architecture projet"},
+    {"slug": "donnees", "title": "Schéma de données"},
     {"slug": "sources", "title": "Sources de données"},
     {"slug": "pipeline", "title": "Pipeline de traitement"},
     {"slug": "exploitation", "title": "Guide d'exploitation"},
