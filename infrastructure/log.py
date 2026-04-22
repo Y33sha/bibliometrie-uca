@@ -99,19 +99,21 @@ def _rebase_log_dir(log_dir: str) -> Path:
 
 
 def setup_logger(name: str, log_dir: str) -> logging.Logger:
-    """Configure un logger avec sortie console + fichier.
+    """Configure un logger avec sortie console, et fichier optionnel.
 
-    Le ``log_dir`` passé par le caller est rebasé vers
+    Le FileHandler est **opt-in** via ``LOG_TO_FILE=true`` (12-factor :
+    par défaut, l'app n'écrit pas sur disque — c'est à l'orchestrateur
+    qui tourne autour de décider quoi faire de stdout). Activer en dev
+    local pour garder un historique sans avoir à rediriger à la main.
+
+    Quand activé, le ``log_dir`` passé par le caller est rebasé vers
     ``PROJECT_ROOT/logs/<relpath>/`` (voir ``_rebase_log_dir``) afin que
     tous les fichiers ``.log`` soient regroupés sous une arborescence
     unique. Crée le répertoire si nécessaire.
+
     Configure uniquement le logger nommé (pas le root logger).
     Format : JSON par défaut, texte si LOG_FORMAT=text.
     """
-    target_dir = _rebase_log_dir(log_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    log_file = str(target_dir / f"{name}.log")
-
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
 
@@ -127,12 +129,14 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     utf8_stream.close = lambda: None  # type: ignore[method-assign]  # Empêcher la fermeture de stdout.buffer
     console = logging.StreamHandler(stream=utf8_stream)
     console.setFormatter(fmt)
-
-    file_handler = logging.FileHandler(log_file, encoding="utf-8")
-    file_handler.setFormatter(fmt)
-
     logger.addHandler(console)
-    logger.addHandler(file_handler)
+
+    if os.environ.get("LOG_TO_FILE", "").lower() == "true":
+        target_dir = _rebase_log_dir(log_dir)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(str(target_dir / f"{name}.log"), encoding="utf-8")
+        file_handler.setFormatter(fmt)
+        logger.addHandler(file_handler)
 
     return logger
 

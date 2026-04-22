@@ -56,6 +56,9 @@ class TestSetupLoggerFileLocation:
         fresh = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(fresh)
         monkeypatch.setattr(fresh, "_PROJECT_ROOT", tmp_path)
+        # Le FileHandler est opt-in via LOG_TO_FILE ; ce test vérifie
+        # l'emplacement du fichier quand il est activé.
+        monkeypatch.setenv("LOG_TO_FILE", "true")
 
         logger = fresh.setup_logger("pytest_fake_logger", str(tmp_path / "foo" / "bar" / "logs"))
         try:
