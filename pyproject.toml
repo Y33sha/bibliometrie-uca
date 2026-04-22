@@ -13,7 +13,7 @@ dependencies = [
     "fastapi==0.128.2",
     "uvicorn==0.40.0",
     "bcrypt==5.0.0",
-    "python-dotenv==1.2.1",      # requis par pydantic-settings pour env_file
+    "python-dotenv==1.2.2",      # requis par pydantic-settings pour env_file ; CVE-2026-28684 fixed
     "pydantic==2.12.5",          # requis par pydantic-settings et utilisé directement
     "pydantic-settings==2.13.1",
     "openpyxl==3.1.5",           # utilisé par interfaces/cli/import_persons.py
