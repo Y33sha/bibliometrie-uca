@@ -22,7 +22,7 @@ from typing import Any
 
 from psycopg.types.json import Jsonb as Json
 
-from application.journals import find_or_create_journal, find_or_create_publisher
+from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.normalize.openalex_parsing import (
     extract_nnt_from_openalex,
@@ -40,6 +40,7 @@ from application.publications import (
     try_merge_by_doi,
 )
 from application.publications import find_or_create as find_or_create_publication
+from application.publishers import find_or_create_publisher
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository

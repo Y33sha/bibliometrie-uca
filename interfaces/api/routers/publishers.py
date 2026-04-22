@@ -5,8 +5,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from application.journals import merge_publishers
-from application.journals import update_publisher as _update_publisher
+from application.publishers import merge_publishers
+from application.publishers import update_publisher as _update_publisher
 from infrastructure.repositories import async_journal_repository, async_publisher_repository
 from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import (
