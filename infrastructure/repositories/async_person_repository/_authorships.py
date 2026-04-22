@@ -2,7 +2,12 @@
 
 from typing import Any
 
-from domain.sources import AUTHOR_SOURCES_SQL
+from domain.sources import (
+    AUTHOR_SOURCES_SQL,
+    SOURCE_PRIORITY,
+    SOURCE_PRIORITY_IS_CORRESPONDING,
+    source_case_sql,
+)
 from infrastructure.db_helpers import row_val as _val
 from infrastructure.repositories.async_person_repository import _name_forms
 
@@ -71,7 +76,7 @@ async def batch_assign_orphans(cur: Any, person_id: int, sa_ids: list[int]) -> i
 
     # 2. Créer les authorships vérité manquantes
     await cur.execute(
-        """
+        f"""
         INSERT INTO authorships (publication_id, person_id,
             author_position, in_perimeter, is_corresponding, structure_ids)
         SELECT DISTINCT ON (sd.publication_id)
@@ -80,8 +85,7 @@ async def batch_assign_orphans(cur: Any, person_id: int, sa_ids: list[int]) -> i
         FROM source_authorships sa
         JOIN source_publications sd ON sd.id = sa.source_publication_id
         WHERE sa.id = ANY(%s) AND sd.publication_id IS NOT NULL
-        ORDER BY sd.publication_id,
-            CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 WHEN 'wos' THEN 3 END
+        ORDER BY sd.publication_id, {source_case_sql(SOURCE_PRIORITY)}
         ON CONFLICT (publication_id, person_id) DO NOTHING
         """,
         (person_id, sa_ids),
@@ -166,17 +170,17 @@ async def ensure_truth_authorship(
 
     # 3. author_position et is_corresponding
     await cur.execute(
-        """
+        f"""
         UPDATE authorships a
         SET author_position = sub.pos,
             is_corresponding = COALESCE(a.is_corresponding, sub.corr)
         FROM (
             SELECT sa.authorship_id,
                    (array_agg(sa.author_position ORDER BY
-                       CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 WHEN 'wos' THEN 3 END
+                       {source_case_sql(SOURCE_PRIORITY)}
                    ))[1] AS pos,
                    (array_agg(sa.is_corresponding ORDER BY
-                       CASE sa.source WHEN 'wos' THEN 1 WHEN 'openalex' THEN 2 WHEN 'hal' THEN 3 END
+                       {source_case_sql(SOURCE_PRIORITY_IS_CORRESPONDING)}
                    ))[1] AS corr
             FROM source_authorships sa
             WHERE sa.authorship_id IS NOT NULL AND NOT sa.excluded

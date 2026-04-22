@@ -16,6 +16,7 @@ import time
 from typing import Any
 
 from application.ports.affiliations import AffiliationsQueries
+from domain.sources import BIBLIO_SOURCES
 
 
 def _step_address_source(
@@ -96,7 +97,7 @@ def run_populate(
     if daily:
         logger.info("Mode daily : traitement des authorships récentes uniquement")
 
-    for source in ["hal", "openalex", "wos", "scanr"]:
+    for source in BIBLIO_SOURCES:
         if source in sources:
             _step_address_source(cur, queries, logger, source, perimeter_ids, wide_ids, daily=daily)
     if "theses" in sources:

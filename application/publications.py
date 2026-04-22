@@ -18,7 +18,6 @@ from domain.ports.publication_repository import (
     PublicationRepository,
 )
 from domain.publication import (
-    SOURCE_PRIORITY,
     PubByDoi,
     PubByNnt,
     PubByTitle,
@@ -26,6 +25,7 @@ from domain.publication import (
     best_oa_status,
 )
 from domain.publication import resolve_doi_conflict as _domain_resolve_doi_conflict
+from domain.sources import SOURCE_PRIORITY
 
 # Re-export des namedtuples pour les call sites historiques (scripts,
 # processing) qui font `from application.publications import PubByDoi`.

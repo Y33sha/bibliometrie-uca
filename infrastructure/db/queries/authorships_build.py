@@ -7,6 +7,12 @@ Appelé par `application/pipeline/build/build_authorships.py`. Regroupe les
 
 from typing import Any
 
+from domain.sources import (
+    SOURCE_PRIORITY,
+    SOURCE_PRIORITY_IS_CORRESPONDING,
+    source_case_sql,
+)
+
 
 def insert_missing_authorships(cur: Any) -> int:
     """Étape 1 : crée les `authorships` manquantes à partir des sources.
@@ -59,15 +65,15 @@ def link_source_authorships_to_authorship_for(cur: Any, source: str) -> int:
 
 
 def propagate_author_position(cur: Any) -> int:
-    """Étape 3 : pose `authorships.author_position` par priorité de source."""
-    cur.execute("""
+    """Étape 3 : pose `authorships.author_position` par priorité de source
+    (ordre général `SOURCE_PRIORITY`)."""
+    cur.execute(f"""
         UPDATE authorships a
         SET author_position = sub.pos
         FROM (
             SELECT sa.authorship_id,
                    (array_agg(sa.author_position ORDER BY
-                       CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2
-                                      WHEN 'scanr' THEN 3 WHEN 'wos' THEN 4 END
+                       {source_case_sql(SOURCE_PRIORITY)}
                    ))[1] AS pos
             FROM source_authorships sa
             WHERE sa.authorship_id IS NOT NULL
@@ -82,15 +88,16 @@ def propagate_author_position(cur: Any) -> int:
 
 
 def propagate_is_corresponding(cur: Any) -> int:
-    """Étape 3 : pose `authorships.is_corresponding` (priorité WoS > OA > HAL)."""
-    cur.execute("""
+    """Étape 3 : pose `authorships.is_corresponding` selon
+    `SOURCE_PRIORITY_IS_CORRESPONDING` (WoS > OA > HAL — marqueur
+    reprint_author plus fiable côté WoS)."""
+    cur.execute(f"""
         UPDATE authorships a
         SET is_corresponding = sub.corr
         FROM (
             SELECT sa.authorship_id,
                    (array_agg(sa.is_corresponding ORDER BY
-                       CASE sa.source WHEN 'wos' THEN 1 WHEN 'openalex' THEN 2
-                                      WHEN 'hal' THEN 3 END
+                       {source_case_sql(SOURCE_PRIORITY_IS_CORRESPONDING)}
                    ))[1] AS corr
             FROM source_authorships sa
             WHERE sa.authorship_id IS NOT NULL

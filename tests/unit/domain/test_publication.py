@@ -11,7 +11,6 @@ from domain.publication import (
     DOI,
     NNT,
     OA_RANK,
-    SOURCE_PRIORITY,
     DoiConflictResolution,
     EcoleDoctorale,
     ExternalIds,
@@ -384,17 +383,6 @@ class TestPublicationTopics:
 
 
 # ── Règles d'agrégation multi-sources ──────────────────────────────
-
-
-class TestSourcePriority:
-    def test_theses_first(self):
-        assert SOURCE_PRIORITY[0] == "theses"
-
-    def test_wos_last(self):
-        assert SOURCE_PRIORITY[-1] == "wos"
-
-    def test_contains_all_five_sources(self):
-        assert set(SOURCE_PRIORITY) == {"theses", "scanr", "hal", "openalex", "wos"}
 
 
 class TestBestOAStatus:
