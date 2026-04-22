@@ -4,7 +4,8 @@
   import { replaceState } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { sanitizeTitle, halDocUrl } from "$lib/utils";
+  import { sanitizeTitle, sourceExternalUrl } from "$lib/utils";
+  import { sourceLabels, sourceBadgeClasses } from "$lib/labels";
 
   import type { components } from "$lib/api/schema";
   type PubDetail = components["schemas"]["PubDedupDetail"];
@@ -80,25 +81,6 @@
     acting = false;
   }
 
-  function sourceBadgeClass(src: string): string {
-    if (src === "hal") return "badge-hal";
-    if (src === "openalex") return "badge-oa";
-    if (src === "wos") return "badge-wos";
-    return "";
-  }
-  function sourceBadgeLabel(src: string): string {
-    if (src === "hal") return "HAL";
-    if (src === "openalex") return "OpenAlex";
-    if (src === "wos") return "WoS";
-    return src;
-  }
-  function sourceUrl(src: string, sourceId: string): string {
-    if (src === "hal") return halDocUrl(sourceId);
-    if (src === "openalex") return `https://openalex.org/${sourceId}`;
-    if (src === "wos") return `https://www.webofscience.com/wos/woscc/full-record/${sourceId}`;
-    return "#";
-  }
-
   onMount(() => {
     loadAt(offset);
   });
@@ -152,7 +134,7 @@
           <div class="pub-col">
             <div class="pub-sources">
               {#each pub.sources as src}
-                <a href={sourceUrl(src.source, src.source_id)} target="_blank" rel="noopener" class="source-badge {sourceBadgeClass(src.source)}">{sourceBadgeLabel(src.source)}</a>
+                <a href={sourceExternalUrl(src.source, src.source_id)} target="_blank" rel="noopener" class="source-badge {sourceBadgeClasses[src.source] ?? ''}">{sourceLabels[src.source] ?? src.source}</a>
               {/each}
             </div>
             <div class="pub-meta">

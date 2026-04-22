@@ -74,7 +74,16 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Auth Login */
+        /**
+         * Auth Login
+         * @description Authentifie l'admin et pose un cookie de session signé.
+         *
+         *     Renvoie 401 si les identifiants ne correspondent pas à ceux
+         *     configurés (`ADMIN_USER` / `ADMIN_PASSWORD_HASH` côté serveur).
+         *     Sur succès, un cookie `session` (httponly, samesite=strict,
+         *     durée `SESSION_MAX_AGE`) est posé et autorise toutes les
+         *     mutations POST/PUT/PATCH/DELETE.
+         */
         post: operations["auth_login_api_auth_login_post"];
         delete?: never;
         options?: never;
@@ -89,7 +98,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Auth Check */
+        /**
+         * Auth Check
+         * @description Indique si le cookie de session en cours est valide et non expiré.
+         *
+         *     Ne renvoie jamais 401 — c'est un endpoint de diagnostic pour le
+         *     frontend, qui s'en sert pour afficher le bouton login/logout.
+         */
         get: operations["auth_check_api_auth_check_get"];
         put?: never;
         post?: never;
@@ -108,7 +123,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Auth Logout */
+        /**
+         * Auth Logout
+         * @description Supprime le cookie de session (déconnexion côté client).
+         */
         post: operations["auth_logout_api_auth_logout_post"];
         delete?: never;
         options?: never;
@@ -125,7 +143,12 @@ export interface paths {
         };
         /**
          * Publisher Stats
-         * @description Stats d'articles par éditeur.
+         * @description Classement des éditeurs par volume de publications filtrées.
+         *
+         *     `lab_id`, `year` : listes CSV d'entiers. `oa_status` : valeur
+         *     unique (`gold`/`green`/`hybrid`/`bronze`/`closed`/`unknown`).
+         *     `has_apc=yes|no|""` : filtre sur la présence d'un paiement APC
+         *     connu.
          */
         get: operations["publisher_stats_api_stats_publishers_get"];
         put?: never;
@@ -185,7 +208,10 @@ export interface paths {
         };
         /**
          * Stats Summary
-         * @description Résumé global.
+         * @description Agrégats globaux (total, taux OA, total APC, etc.) pour le jeu de filtres.
+         *
+         *     Alimente la bande de cartes en haut du dashboard statistiques.
+         *     Mêmes filtres que les autres endpoints de /api/stats.
          */
         get: operations["stats_summary_api_stats_summary_get"];
         put?: never;
@@ -225,7 +251,11 @@ export interface paths {
         };
         /**
          * Available Years
-         * @description Années disponibles (validées uniquement).
+         * @description Liste des années présentes dans les publications validées (tri asc).
+         *
+         *     Une année est « validée » quand elle figure dans la config
+         *     `years_validated` : les autres existent en base mais ne sont pas
+         *     publiées dans le dashboard (pipeline encore partiel).
          */
         get: operations["available_years_api_stats_years_get"];
         put?: never;
@@ -286,7 +316,11 @@ export interface paths {
         };
         /**
          * All Years
-         * @description Toutes les années disponibles.
+         * @description Liste de toutes les années présentes en base (validées ou non).
+         *
+         *     Contrairement à `/stats/years` qui restreint aux années validées,
+         *     cet endpoint remonte l'intégralité des `pub_year` distincts pour
+         *     alimenter le filtre « année » côté admin.
          */
         get: operations["all_years_api_publications_years_get"];
         put?: never;
@@ -369,7 +403,13 @@ export interface paths {
         };
         /**
          * List Publications
-         * @description Liste des publications avec sources, labos, journal.
+         * @description Liste paginée des publications avec sources, labos et journal rattachés.
+         *
+         *     Filtres multiples cumulables. `lab_id` et `year` acceptent des
+         *     listes CSV ; `lab_id=none` = publications sans labo rattaché.
+         *     `sort` : `year_desc` / `year_asc` / `title` / `cited_by`.
+         *     `in_perimeter=yes|no|""` sélectionne les publications dont au
+         *     moins un auteur est in_perimeter.
          */
         get: operations["list_publications_api_publications_get"];
         put?: never;
@@ -389,7 +429,12 @@ export interface paths {
         };
         /**
          * Next Duplicate Candidate
-         * @description Renvoie la paire candidate à la position offset.
+         * @description Renvoie la paire de publications candidate au dédoublonnage à l'offset donné.
+         *
+         *     Les candidats sont produits par la requête `next_pub_duplicate`
+         *     (similarité de titre + proximité pub_year + DOI convergents) ;
+         *     `min_title_len` filtre les titres trop courts pour être
+         *     discriminants. Permet au front d'itérer pair par pair via offset.
          */
         get: operations["next_duplicate_candidate_api_admin_duplicates_next_get"];
         put?: never;
@@ -411,7 +456,13 @@ export interface paths {
         put?: never;
         /**
          * Merge Duplicate Publications
-         * @description Fusionne source_id dans target_id.
+         * @description Fusionne la publication `source_id` dans `target_id`.
+         *
+         *     Les authorships, sources, adresses et métadonnées de la source
+         *     sont transférées à la cible ; la source est supprimée.
+         *     Encadrée par un SAVEPOINT : un échec rollback la fusion sans
+         *     impacter la transaction englobante. 400 si les ids sont égaux,
+         *     404 si une des publications est introuvable.
          */
         post: operations["merge_duplicate_publications_api_admin_duplicates_merge_post"];
         delete?: never;
@@ -431,7 +482,11 @@ export interface paths {
         put?: never;
         /**
          * Mark Publications Distinct
-         * @description Marque deux publications comme distinctes (non-doublon).
+         * @description Marque deux publications comme distinctes (non-doublon confirmé).
+         *
+         *     Persiste l'annotation dans `publication_distinctions` : la paire
+         *     ne sera plus proposée par `/duplicates/next` lors des prochaines
+         *     revues. 400 si `pub_id_a == pub_id_b`.
          */
         post: operations["mark_publications_distinct_api_admin_duplicates_mark_distinct_post"];
         delete?: never;
@@ -664,6 +719,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/feedback/structures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Feedback Structures
+         * @description Structures éligibles au tableau de bord feedback, groupées par type.
+         *
+         *     Encode deux règles métier :
+         *     - seuls les types listés dans `_FEEDBACK_STRUCTURE_TYPES` sont
+         *       éligibles (universités, organismes, CHU, écoles, labos) ;
+         *     - la structure UCA (code = "uca") est sélectionnée par défaut si
+         *       elle existe, sinon la première structure du premier type non vide.
+         */
+        get: operations["feedback_structures_api_admin_feedback_structures_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/feedback/stats": {
         parameters: {
             query?: never;
@@ -851,10 +932,22 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Structures */
+        /**
+         * List Structures
+         * @description Liste des structures, filtrable par type et par texte libre.
+         *
+         *     `type` : enum `structure_type` (`labo`, `universite`, `onr`,
+         *     `chu`, `ecole`, `site`, `equipe`, `autre`). `search` : matching
+         *     accent-insensible sur nom / acronyme / code. Tri canonique par
+         *     type (labo > universite > onr > chu > ecole > site > autre) puis
+         *     nom.
+         */
         get: operations["list_structures_api_structures_get"];
         put?: never;
-        /** Create Structure */
+        /**
+         * Create Structure
+         * @description Crée une structure. Lève 409 si le `code` est déjà utilisé.
+         */
         post: operations["create_structure_api_structures_post"];
         delete?: never;
         options?: never;
@@ -869,12 +962,30 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Structure */
+        /**
+         * Get Structure
+         * @description Détail complet d'une structure : identifiants + parents + enfants + formes de nom.
+         *
+         *     Retourne `{structure, parents, children, forms}`. Les parents
+         *     sont les structures qui ont cette structure comme `child_id`
+         *     dans `structure_relations` ; les enfants inversement. 404 si la
+         *     structure n'existe pas.
+         */
         get: operations["get_structure_api_structures__structure_id__get"];
-        /** Update Structure */
+        /**
+         * Update Structure
+         * @description Met à jour une structure (mise à jour sélective des champs fournis).
+         *
+         *     Seuls les champs explicitement présents dans le body sont écrits.
+         *     404 si la structure n'existe pas.
+         */
         put: operations["update_structure_api_structures__structure_id__put"];
         post?: never;
-        /** Delete Structure */
+        /**
+         * Delete Structure
+         * @description Supprime une structure. Cascade sur les relations et formes de
+         *     noms liées. 404 si inconnue.
+         */
         delete: operations["delete_structure_api_structures__structure_id__delete"];
         options?: never;
         head?: never;
@@ -890,7 +1001,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create Relation */
+        /**
+         * Create Relation
+         * @description Crée une relation parent-enfant entre deux structures.
+         *
+         *     Idempotent : si une relation identique (même parent, child, type)
+         *     existe, renvoie `{"status": "already_exists"}` au lieu de la
+         *     recréer.
+         */
         post: operations["create_relation_api_structure_relations_post"];
         delete?: never;
         options?: never;
@@ -908,7 +1026,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete Relation */
+        /**
+         * Delete Relation
+         * @description Supprime une relation structure. 404 si l'id n'existe pas.
+         */
         delete: operations["delete_relation_api_structure_relations__relation_id__delete"];
         options?: never;
         head?: never;
@@ -922,12 +1043,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Name Form */
+        /**
+         * Get Name Form
+         * @description Récupère une forme de nom par son id. 404 si inconnue.
+         */
         get: operations["get_name_form_api_name_forms__form_id__get"];
-        /** Update Name Form */
+        /**
+         * Update Name Form
+         * @description Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue.
+         */
         put: operations["update_name_form_api_name_forms__form_id__put"];
         post?: never;
-        /** Delete Name Form */
+        /**
+         * Delete Name Form
+         * @description Supprime une forme de nom. 404 si inconnue.
+         */
         delete: operations["delete_name_form_api_name_forms__form_id__delete"];
         options?: never;
         head?: never;
@@ -943,7 +1073,17 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create Name Form */
+        /**
+         * Create Name Form
+         * @description Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
+         *
+         *     `form_text` est normalisé (accents, casse, ponctuation) par le
+         *     service avant insertion. `is_word_boundary` : le match exige
+         *     une frontière de mot dans l'adresse brute. `is_excluding` :
+         *     forme à exclure, pas à matcher (anti-pattern).
+         *     `requires_context_of` : liste d'ids de structures qui doivent
+         *     elles-mêmes matcher l'adresse pour que cette forme active.
+         */
         post: operations["create_name_form_api_name_forms_post"];
         delete?: never;
         options?: never;
@@ -960,7 +1100,11 @@ export interface paths {
         };
         /**
          * Authorships Stats
-         * @description Statistiques auteurs UCA.
+         * @description Compteurs globaux des authorships UCA (total, rattachées à une
+         *     personne, avec ORCID/idHAL).
+         *
+         *     `lab_id=0` (défaut) = périmètre UCA complet ; sinon restreint
+         *     au laboratoire donné.
          */
         get: operations["authorships_stats_api_authorships_stats_get"];
         put?: never;
@@ -980,7 +1124,12 @@ export interface paths {
         };
         /**
          * Authorships Facets
-         * @description Facettes dynamiques pour la page authorships admin.
+         * @description Facettes dynamiques (compteurs par valeur) pour la page admin authorships.
+         *
+         *     Chaque facette est calculée en « skip filter » : elle exclut le
+         *     filtre homonyme actif pour que l'utilisateur voie toujours les
+         *     autres valeurs disponibles. Paramètres `yes`/`no`/empty comme pour
+         *     le endpoint de liste.
          */
         get: operations["authorships_facets_api_authorships_facets_get"];
         put?: never;
@@ -1000,7 +1149,13 @@ export interface paths {
         };
         /**
          * List Authorships
-         * @description Liste des auteurs UCA avec filtres.
+         * @description Liste paginée des authorships UCA avec filtres admin.
+         *
+         *     `search` : portion de nom auteur (case/accent-insensible).
+         *     `linked=yes|no` : avec/sans person_id rattaché.
+         *     `has_orcid=yes|no`, `has_idhal=yes|no` : présence de ces
+         *     identifiants sur la personne liée. `lab_id=0` = pas de
+         *     restriction laboratoire.
          */
         get: operations["list_authorships_api_authorships_get"];
         put?: never;
@@ -1560,7 +1715,11 @@ export interface paths {
         };
         /**
          * Next Person Duplicate
-         * @description Renvoie la paire doublon-personne à la position offset.
+         * @description Renvoie la paire personne-candidate au dédoublonnage à l'offset donné.
+         *
+         *     `skip` : liste CSV de paires `idA-idB` à ignorer pour cette
+         *     session (défilement côté front sans revoir les mêmes candidats).
+         *     Renvoie `{"pair": null}` si aucune paire restante.
          */
         get: operations["next_person_duplicate_api_admin_person_duplicates_next_get"];
         put?: never;
@@ -1600,7 +1759,11 @@ export interface paths {
         };
         /**
          * Count Person Conflict Pairs
-         * @description Nombre de paires de personnes en conflit sur des publications.
+         * @description Nombre de paires de personnes co-auteurs d'une même publication.
+         *
+         *     Un conflit = deux `person_id` distincts rattachés à la même
+         *     `publication_id` alors que leur forme de nom est compatible →
+         *     suggère un doublon que la déduplication classique n'a pas vu.
          */
         get: operations["count_person_conflict_pairs_api_admin_person_duplicates_conflicts_count_get"];
         put?: never;
@@ -1620,7 +1783,11 @@ export interface paths {
         };
         /**
          * Next Person Conflict
-         * @description Renvoie la paire en conflit à la position offset.
+         * @description Renvoie la paire personnes-en-conflit à l'offset donné.
+         *
+         *     Même protocole que `/person-duplicates/next` (paire + skip +
+         *     offset) mais pour les conflits co-auteurs plutôt que les
+         *     candidats de similarité de nom.
          */
         get: operations["next_person_conflict_api_admin_person_duplicates_conflicts_next_get"];
         put?: never;
@@ -1818,7 +1985,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Config */
+        /**
+         * List Config
+         * @description Liste tous les paramètres applicatifs (clé, valeur JSON, description).
+         *
+         *     Retourne la table `config` triée par clé. Les valeurs sont
+         *     renvoyées telles quelles (jsonb) — la sémantique de chaque clé
+         *     est documentée dans `docs/exploitation.md`.
+         */
         get: operations["list_config_api_config_get"];
         put?: never;
         post?: never;
@@ -1856,7 +2030,14 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Config */
+        /**
+         * Update Config
+         * @description Met à jour la valeur d'un paramètre de config.
+         *
+         *     La clé doit préexister (pas de création via cet endpoint — les
+         *     clés sont déclarées dans les migrations). 404 si la clé est
+         *     inconnue.
+         */
         put: operations["update_config_api_config__key__put"];
         post?: never;
         delete?: never;
@@ -1872,7 +2053,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Perimeters */
+        /**
+         * List Perimeters
+         * @description Liste tous les périmètres avec leurs structures racines résolues.
+         *
+         *     Pour chaque périmètre, renvoie les structures racines directes
+         *     (`structures`) et le décompte total après descente récursive des
+         *     relations (`structure_count`). Le décompte inclut donc les
+         *     sous-structures rattachées par `est_tutelle_de` / `est_partenaire_de`.
+         */
         get: operations["list_perimeters_api_perimeters_get"];
         put?: never;
         /**
@@ -1919,7 +2108,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Perimeter Structure */
+        /**
+         * Add Perimeter Structure
+         * @description Ajoute une structure racine au périmètre.
+         *
+         *     Renvoie `{"status": "added"}` ou `"already_exists"` si la
+         *     structure était déjà racine.
+         */
         post: operations["add_perimeter_structure_api_perimeters__perimeter_id__structures_post"];
         delete?: never;
         options?: never;
@@ -1937,7 +2132,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove Perimeter Structure */
+        /**
+         * Remove Perimeter Structure
+         * @description Retire une structure racine du périmètre. N'affecte pas ses
+         *     sous-structures tant qu'elles sont rattachées à d'autres racines.
+         */
         delete: operations["remove_perimeter_structure_api_perimeters__perimeter_id__structures__structure_id__delete"];
         options?: never;
         head?: never;
@@ -1951,7 +2150,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Publishers */
+        /**
+         * List Publishers
+         * @description Liste paginée des éditeurs avec comptage revues + publications.
+         *
+         *     `search` : recherche sur le nom normalisé, ignorée si < 2
+         *     caractères. `sort` : `name` / `-name` / `journals` / `-journals`
+         *     / `pubs` / `-pubs` ; fallback sur `name` si inconnu.
+         */
         get: operations["list_publishers_api_publishers_get"];
         put?: never;
         post?: never;
@@ -1968,11 +2174,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Publisher */
+        /**
+         * Get Publisher
+         * @description Récupère un éditeur par son id (nom uniquement). 404 si inconnu.
+         */
         get: operations["get_publisher_api_publishers__publisher_id__get"];
         /**
          * Update Publisher
-         * @description Met à jour un éditeur.
+         * @description Met à jour un éditeur (modification sélective des champs fournis).
+         *
+         *     Seuls les champs explicitement présents dans le body sont écrits
+         *     (`exclude_unset=True`). Lève 404 si l'éditeur n'existe pas.
          */
         put: operations["update_publisher_api_publishers__publisher_id__put"];
         post?: never;
@@ -1991,7 +2203,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Merge */
+        /**
+         * Merge
+         * @description Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
+         *
+         *     Les revues et publications rattachées à la source sont
+         *     transférées à la cible ; la source est supprimée. 404 si l'un
+         *     des deux éditeurs est introuvable.
+         */
         post: operations["merge_api_publishers__publisher_id__merge_post"];
         delete?: never;
         options?: never;
@@ -2006,7 +2225,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Journals */
+        /**
+         * List Journals
+         * @description Liste paginée des revues avec comptage des publications rattachées.
+         *
+         *     `search` : recherche insensible à la casse sur le titre normalisé,
+         *     ignorée si < 2 caractères. `publisher_id` : filtre par éditeur.
+         *     `sort` : `title` / `-title` / `publisher` / `-publisher` /
+         *     `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
+         */
         get: operations["list_journals_api_journals_get"];
         put?: never;
         post?: never;
@@ -2023,11 +2250,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Journal */
+        /**
+         * Get Journal
+         * @description Récupère une revue par son id (titre uniquement). 404 si inconnue.
+         */
         get: operations["get_journal_api_journals__journal_id__get"];
         /**
          * Update Journal
-         * @description Met à jour une revue.
+         * @description Met à jour une revue (modification sélective des champs fournis).
+         *
+         *     Seuls les champs explicitement présents dans le body sont écrits
+         *     (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
          */
         put: operations["update_journal_api_journals__journal_id__put"];
         post?: never;
@@ -2046,7 +2279,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Merge */
+        /**
+         * Merge
+         * @description Fusionne la revue `source_id` dans la revue `journal_id`.
+         *
+         *     Les publications et métadonnées de la source sont transférées à
+         *     la cible ; la source est supprimée. 404 si l'une des deux est
+         *     introuvable.
+         */
         post: operations["merge_api_journals__journal_id__merge_post"];
         delete?: never;
         options?: never;
@@ -2757,6 +2997,32 @@ export interface components {
             concordant_valid: number;
             /** Pending */
             pending: number;
+        };
+        /** FeedbackStructureItem */
+        FeedbackStructureItem: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Acronym */
+            acronym: string | null;
+            /** Type */
+            type: string;
+        };
+        /**
+         * FeedbackStructuresResponse
+         * @description Structures éligibles au tableau de bord feedback, groupées par type,
+         *     avec la structure à sélectionner par défaut (UCA si présente).
+         */
+        FeedbackStructuresResponse: {
+            /** By Type */
+            by_type: {
+                [key: string]: components["schemas"]["FeedbackStructureItem"][];
+            };
+            /** Default Structure Id */
+            default_structure_id: number | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -3579,6 +3845,10 @@ export interface components {
             authorship_id: number;
             /** Full Name */
             full_name: string;
+            /** Last Name */
+            last_name: string;
+            /** First Name */
+            first_name: string;
             /** Publication Id */
             publication_id: number;
             /** Pub Title */
@@ -6022,6 +6292,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feedback_structures_api_admin_feedback_structures_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackStructuresResponse"];
                 };
             };
         };

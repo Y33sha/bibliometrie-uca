@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { esc, sanitizeTitle, titleCase, formatDate, halDocUrl, scanrPubUrl } from './utils';
+import {
+	esc,
+	sanitizeTitle,
+	titleCase,
+	formatDate,
+	halDocUrl,
+	scanrPubUrl,
+	sourceExternalUrl,
+	deriveStructDetectionStatus
+} from './utils';
 
 // ── esc (HTML escaping) ────────────────────────────────────────
 // esc() utilise document.createElement, non testable sans DOM.
@@ -100,5 +109,51 @@ describe('scanrPubUrl', () => {
 	it('construit une URL ScanR correcte', () => {
 		expect(scanrPubUrl('doi/10.1234/test')).toContain('scanr.enseignementsup-recherche.gouv.fr');
 		expect(scanrPubUrl('doi/10.1234/test')).toContain(encodeURIComponent('doi/10.1234/test'));
+	});
+});
+
+// ── sourceExternalUrl ──────────────────────────────────────────
+
+describe('sourceExternalUrl', () => {
+	it('délègue à halDocUrl pour HAL', () => {
+		expect(sourceExternalUrl('hal', 'hal-04579115')).toBe('https://hal.science/hal-04579115');
+	});
+
+	it('construit une URL OpenAlex', () => {
+		expect(sourceExternalUrl('openalex', 'W12345')).toBe('https://openalex.org/W12345');
+	});
+
+	it('construit une URL WoS', () => {
+		expect(sourceExternalUrl('wos', 'WOS:000123')).toBe(
+			'https://www.webofscience.com/wos/woscc/full-record/WOS:000123'
+		);
+	});
+
+	it('retourne # pour une source inconnue', () => {
+		expect(sourceExternalUrl('mystery', 'abc')).toBe('#');
+	});
+});
+
+// ── deriveStructDetectionStatus ────────────────────────────────
+
+describe('deriveStructDetectionStatus', () => {
+	it('confirmed a la priorité absolue', () => {
+		expect(deriveStructDetectionStatus(true, true)).toBe('confirmed');
+		expect(deriveStructDetectionStatus(true, false)).toBe('confirmed');
+	});
+
+	it('rejected prime sur detected', () => {
+		expect(deriveStructDetectionStatus(false, true)).toBe('rejected');
+	});
+
+	it('detected si is_confirmed est null et is_detected true', () => {
+		expect(deriveStructDetectionStatus(null, true)).toBe('detected');
+		expect(deriveStructDetectionStatus(undefined, true)).toBe('detected');
+	});
+
+	it('manual par défaut', () => {
+		expect(deriveStructDetectionStatus(null, false)).toBe('manual');
+		expect(deriveStructDetectionStatus(null, null)).toBe('manual');
+		expect(deriveStructDetectionStatus(undefined, undefined)).toBe('manual');
 	});
 });

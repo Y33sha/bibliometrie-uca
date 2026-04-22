@@ -131,3 +131,32 @@ export function halDocUrl(halid: string, oaStatus?: string | null): string {
 export function scanrPubUrl(scanrId: string): string {
 	return `https://scanr.enseignementsup-recherche.gouv.fr/publications/${encodeURIComponent(scanrId)}`;
 }
+
+/** URL externe d'un document sur son portail source.
+ * Utilisé par les vues doublons pour ouvrir la notice d'origine. */
+export function sourceExternalUrl(source: string, sourceId: string): string {
+	if (source === 'hal') return halDocUrl(sourceId);
+	if (source === 'openalex') return `https://openalex.org/${sourceId}`;
+	if (source === 'wos')
+		return `https://www.webofscience.com/wos/woscc/full-record/${sourceId}`;
+	return '#';
+}
+
+/** Dérive le statut de détection d'une structure à partir des flags
+ * `is_confirmed` (tri-state nullable) et `is_detected` (booléen).
+ *
+ * Règle : confirmed > rejected > detected > manual.
+ *  - `is_confirmed === true`  → confirmed (validée manuellement)
+ *  - `is_confirmed === false` → rejected (invalidée manuellement)
+ *  - `is_detected`            → detected (trouvée par le script, non revue)
+ *  - sinon                    → manual (saisie manuelle sans détection)
+ */
+export function deriveStructDetectionStatus(
+	isConfirmed: boolean | null | undefined,
+	isDetected: boolean | null | undefined
+): 'confirmed' | 'rejected' | 'detected' | 'manual' {
+	if (isConfirmed === true) return 'confirmed';
+	if (isConfirmed === false) return 'rejected';
+	if (isDetected) return 'detected';
+	return 'manual';
+}

@@ -61,13 +61,10 @@
 		loadOrphans();
 	}
 
-	function createAndAssign(orphan: any) {
-		const parts = orphan.full_name.includes(',')
-			? orphan.full_name.split(',').map((s: string) => s.trim())
-			: [orphan.full_name.split(' ').slice(-1)[0], orphan.full_name.split(' ').slice(0, -1).join(' ')];
+	function createAndAssign(orphan: OrphanAuthorship) {
 		createModal = {
-			lastName: parts[0] || orphan.full_name,
-			firstName: parts[1] || '',
+			lastName: orphan.last_name || orphan.full_name,
+			firstName: orphan.first_name,
 			items: [orphan],
 		};
 		closeAssign();
@@ -102,13 +99,10 @@
 	function openCreateModal() {
 		const items = orphans.filter(o => selectedIds.has(`${o.source}-${o.authorship_id}`));
 		if (!items.length) return;
-		const name = items[0].full_name;
-		const parts = name.includes(',')
-			? name.split(',').map((s: string) => s.trim())
-			: [name.split(' ').slice(-1)[0], name.split(' ').slice(0, -1).join(' ')];
+		const first = items[0];
 		createModal = {
-			lastName: parts[0] || name,
-			firstName: parts[1] || '',
+			lastName: first.last_name || first.full_name,
+			firstName: first.first_name,
 			items,
 		};
 	}

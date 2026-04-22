@@ -3,6 +3,7 @@ name-form authorships, HAL duplicate accounts (§2.12)."""
 
 from typing import Any
 
+from domain.names import parse_raw_author_name
 from domain.sources import AUTHOR_SOURCES_SQL
 
 # ── Orphan authorships ───────────────────────────────────────────
@@ -73,11 +74,22 @@ async def list_orphan_authorships(
         """,
         params + [per_page, offset],
     )
+    # Décompose `raw_author_name` en last_name/first_name côté domain,
+    # pour éviter de dupliquer la règle de parsing dans le frontend
+    # (cf. domain/names.py::parse_raw_author_name).
+    authorships = []
+    for row in await cur.fetchall():
+        data = dict(row)
+        last_name, first_name = parse_raw_author_name(data["full_name"])
+        data["last_name"] = last_name
+        data["first_name"] = first_name
+        authorships.append(data)
+
     return {
         "total": total,
         "page": page,
         "pages": (total + per_page - 1) // per_page or 1,
-        "authorships": await cur.fetchall(),
+        "authorships": authorships,
     }
 
 
