@@ -79,6 +79,43 @@ composition roots (`interfaces/cli/pipeline/*`, `run_pipeline.py`).
   query services dans les routers (équivalent unit-of-work). Mécanique
   si la couverture de tests devient un objectif.
 
+### 1.7 Extraction des règles pures `application/` → `domain/`
+
+Les services `application/*.py` contiennent aujourd'hui des règles
+métier (constantes de priorité, ordres de classement, prédicats de
+fusion) qui ne font aucun I/O et devraient vivre dans `domain/`.
+Symptôme : `domain/publication.py` contient les VO et modèles JSONB
+mais aucune règle *opérant* sur ces concepts — toute la logique est
+remontée dans les orchestrateurs d'application par accident
+d'historique. Domaine anémique.
+
+À ne **pas** confondre avec §1.4 (entités riches) : il ne s'agit pas
+de transformer `Publication` ou `Person` en objets stateful. Il
+s'agit d'extraire des fonctions pures et des constantes de règles
+métier vers `domain/`, en gardant `application/` comme couche
+d'orchestration (repos, audit, transaction).
+
+Candidats identifiés, regroupés par concept de domaine :
+- [x] **`domain/publication.py`** : `SOURCE_PRIORITY` (ordre des sources
+  pour l'agrégation), `OA_RANK` + `best_oa_status(statuses)`,
+  `resolve_doi_conflict(...)` en fonction pure renvoyant une
+  `DoiConflictResolution` (le wrapper `application/` applique l'effet
+  de bord `repo.clear_doi` quand la règle le demande).
+- [x] **`domain/person.py`** : `check_can_merge_persons(has_distinct_rh,
+  target_id, source_id)` (invariant « refus si les deux ont une fiche
+  RH distincte »).
+- [x] Audit complémentaire — `application/journals.py` et
+  `application/authorships.py` : rien à extraire. Les règles sont soit
+  déjà côté domain (`source in VALID_SOURCES` via `domain/sources.py`),
+  soit du SQL pur côté repo (cascade ISSN/name_form), soit des
+  validateurs sur rows renvoyées par une requête dédiée
+  (`find_shared_title_journal_pairs`) — pas des règles pures
+  réutilisables.
+
+Bénéfices : tests unitaires purs sans plomberie de base, règles
+concentrées à un endroit, contrat domaine/application plus lisible
+pour la DSI.
+
 ### 1.8 Audit périodique
 - [ ] Parcours régulier pour repérer : SQL mal placé, dépendances dans le
   mauvais sens, logique métier qui a migré dans infrastructure, code
@@ -155,122 +192,11 @@ n'est détecté qu'en UI manuel.
   `domain/names.py`, SQL dans `admin_person_duplicates.py`) — à
   unifier si la logique diverge.
 
-### 2.12 Migration async API — clôturé
+### 2.13 Exploitation psycopg3
 
-**Motivation** : les routers déclarés `async def` utilisaient psycopg3
-en mode sync → chaque `cur.execute()` bloquait l'event loop uvicorn.
-Sous charge concurrente, un endpoint lent gelait tous les autres. Cible
-atteinte : stack 100 % async jusqu'à la DB sur la surface FastAPI.
-
-**Scope retenu** : **API seule** passe en async, pipeline et CLI
-restent sync. Raison : pipeline mono-processus one-shot, aucun gain de
-concurrence, et on évite de polluer `run_pipeline.py` avec des
-`asyncio.run()`. Quand une fonction ou un repository est partagé
-pipeline/API, la variante sync est conservée en parallèle de l'async ;
-les fonctions/ports uniquement consommés par l'API ont été supprimés.
-
-**Phases** :
-- [x] **Phase 1** — Infra async parallèle : `infrastructure/db/async_connection.py`,
-  `interfaces/api/async_deps.py`, lifespan dans `interfaces/api/app.py`.
-- [x] **Phase 2** — Ports async + repositories async : 7 ports exposent
-  `Async<Nom>Repository(Protocol)`, 7 implémentations `PgAsync*`,
-  factories `async_*_repository` dans
-  `infrastructure/repositories/__init__.py`.
-- [x] **Phase 3** — `tests/integration/interfaces/conftest.py` supporte
-  async parallèle au sync.
-- [x] **Phase 4** — Migration verticale des 18 routers (16 slices 4.a→4.p),
-  chacune en un commit autosuffisant {queries, services, router, tests}.
-  Queries remplacées en place (aucune partagée avec le pipeline) ;
-  services partagés dédoublés (sync pour pipeline, async pour API).
-- [x] **Phase 5** — Nettoyage :
-  - [x] **5.a** : suppression des 3 repos sync orphelins (address,
-    config, structure — API-only).
-  - [x] **5.b** : retrait de `_get_pool` sync + `get_cursor` de
-    `deps.py` ; `get_root_structure_id` migré dans `async_deps.py` ;
-    `/api/health` + `/api/metrics` passent par le pool async.
-  - [x] **5.c** : activation de la famille ruff `ASYNC` (verrouille les
-    I/O bloquantes dans une async def). RUF029 reste en preview chez
-    ruff et sera ajoutée quand elle stabilise.
-  - [x] **5.d** : authorships — suppression des sync `exclude_authorship`,
-    `set_source_authorship_excluded`, `detach_source` (tests migrés async).
-  - [x] **5.e** : persons — suppression des 10 sync `set_rejected`,
-    `update_name`, `remove_identifier`, `update_identifier_status`,
-    `reassign_identifier`, `assign_orphan_authorship`,
-    `batch_assign_orphan_authorships`, `detach_authorships`,
-    `detach_name_form`, `mark_distinct` (tests migrés async).
-  - [x] **5.f** : publications — suppression du sync `mark_distinct`
-    (tests migrés async).
-
-**Résultat** : 1026 tests verts. Les fonctions et ports sync qui
-subsistent le sont explicitement pour le pipeline/CLI ; plus aucun sync
-n'existe "pour l'API". La famille `ASYNC` de ruff empêche la
-réintroduction d'I/O bloquantes dans les async def.
-
-
-### 2.13 Exploitation psycopg3 — séquence après §2.12
-
-Fonctionnalités spécifiques non exploitées aujourd'hui. Certains items
-dépendent d'async (§2.12), d'autres peuvent être menés en parallèle
-(COPY, prepare_threshold).
-
-#### 2.13.1 `row_factory=class_row(...)` — partiellement fait
-Choix retenu : **dataclass** (pas Pydantic) — validation inutile sur des
-données déjà garanties par PostgreSQL, construction plus rapide, aligné
-sur `domain/publication.py`. Helper `row_as` / `async_row_as` dans
-`infrastructure/db_helpers.py` pour basculer la `row_factory` d'un
-curseur le temps d'un bloc (sans toucher au pool global qui reste en
-`dict_row`).
-
-- [x] `PgPublicationRepository.find_by_*` : les 4 types de résultats
-  (`PubByDoi`, `PubByNnt`, `PubByTitle`, `PubThesisCandidate`) sont
-  passés de `namedtuple` à `@dataclass(frozen=True, slots=True)` ;
-  les 4 méthodes sync + async utilisent `class_row`.
-- **Autres candidats évalués puis écartés** :
-  - `PgPersonRepository/_core.py` : returns scalaires (`int`, `bool`)
-    ou tuples ad-hoc (`tuple[int, int] | None`). Pas de shape typée
-    à construire, `class_row` ne s'applique pas.
-  - `queries/publications/list.py` + `detail.py`, `queries/persons/*`,
-    `queries/stats/*` : renvoient des dicts complexes **1:1 avec les
-    `response_model` Pydantic** de `interfaces/api/models.py`. Créer
-    des dataclasses parallèles dupliquerait la hiérarchie de types sans
-    bénéfice métier — mieux vaut garder la séparation nette "dict repo →
-    Pydantic API" quand la forme ne diffère pas.
-
-À revisiter si un besoin de shape interne typée émerge indépendamment
-du modèle API exposé.
-
-#### 2.13.2 `COPY FROM STDIN` sur les imports massifs — skip (ROI trop faible)
-Benchmark sur `bibliometrie_test` (moyenne sur 3 runs, median) pour
-l'upsert d'adresses via temp table + INSERT ON CONFLICT :
-
-| Batch   | `executemany` | `COPY` + `INSERT` | Ratio |
-|---------|---------------|--------------------|-------|
-| 10      | 1.1 ms        | 3.1 ms             | 0.35× |
-| 100     | 3.6 ms        | 5.3 ms             | 0.68× |
-| 1 000   | 34.8 ms       | 21.6 ms            | 1.61× |
-| 10 000  | 353.8 ms      | 211.0 ms           | 1.68× |
-
-Seuil de rentabilité ≈ 500-1 000 lignes par batch. En-dessous, le coût
-`CREATE TEMP TABLE` + `INSERT … SELECT … ON CONFLICT` dépasse le gain.
-
-Sur ce projet, aucun hotspot ne dépasse ce seuil :
-- `upsert_addresses_batch` (normalize_wos) : 5-20 lignes par doc.
-- `insert_batch` (extracteurs) : ~200 lignes par page API.
-
-psycopg3 optimise déjà `executemany` en pipeline interne (contrairement
-à psycopg2), ce qui réduit drastiquement le gain attendu de COPY par
-rapport à la littérature psycopg2-era.
-
-À revisiter si un futur use case introduit un bulk import >1 000 lignes
-en une opération (reprocess complet d'un corpus, import CSV massif…).
-
-#### 2.13.3 `cursor.stream()` sur gros SELECT — skip (aucun candidat)
-- [x] Audit fait : zéro `fetchall()` dans `application/pipeline/`. Les
-  fetchall dans `infrastructure/db/queries/` sont tous bornés (pagination
-  via `LIMIT` dans `PgStagingQueries.fetch_*`) ou sont des retours
-  `RETURNING` d'`executemany` de taille contrôlée. Pas de gros fetchall
-  non borné → pas de gain à attendre de `stream()`. À revisiter si un
-  futur agrégat introduit ce pattern.
+Audit terminé sur la majorité des fonctionnalités (`class_row`,
+`COPY FROM STDIN`, `cursor.stream()`, `prepare_threshold`, adaptateurs
+de types custom). Seule subsiste la piste `connection.pipeline()`.
 
 #### 2.13.4 `connection.pipeline()` — POC d'abord
 Candidat principal : **phase 2 de `build_authorships`**
@@ -280,19 +206,6 @@ séquentielles sans dépendance inter → 1 round-trip au lieu de 5.
   sandbox, delta dans le message de commit.
 - [ ] Si gain > 20 % : étendre à `populate_affiliations`,
   `merge_pubs_by_*`.
-
-#### 2.13.5 `prepare_threshold` sur le pool API — clôturé
-- [x] `prepare_threshold=1` sur le pool async (prod + conftest test) :
-  les requêtes répétées de l'API (`find_by_doi`, list publications,
-  facets) sont préparées dès le 1er appel au lieu du 5ᵉ (défaut
-  psycopg3). Économie ~20-30 µs par requête + plan réutilisé côté
-  PostgreSQL.
-
-#### 2.13.6 Adaptateurs de types custom — à skipper sauf besoin
-Enums PostgreSQL (doc_type, oa_status, roles) pourraient avoir un
-`TypeInfo.fetch()` + `EnumInfo`. Gain marginal, bug de typage jamais
-remonté. Skip par défaut ; revisiter si un cast pose un problème
-concret.
 
 ### 2.14 Async des extractions HTTP pipeline
 

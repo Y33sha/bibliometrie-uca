@@ -21,6 +21,7 @@ pour les identifiants), sérialisent en dict pour l'écriture en base.
 """
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -442,3 +443,113 @@ def extract_hal_id_from_url(url: str | None) -> str | None:
     'hal-04123456'
     """
     return _normalize_hal_id(url)
+
+
+# ── Règles métier d'agrégation multi-sources ────────────────────────
+
+# Ordre de priorité des sources pour le recalcul des métadonnées
+# (`refresh_from_sources` dans l'application). theses.fr fait autorité
+# sur les thèses ; pour les documents hors-thèse la clé n'apparaît
+# simplement pas dans les rows et l'ordre se réduit aux sources
+# restantes.
+SOURCE_PRIORITY: tuple[str, ...] = ("theses", "scanr", "hal", "openalex", "wos")
+
+
+# Classement des statuts OA : plus la valeur est grande, plus le
+# statut est « ouvert ». Utilisé par `best_oa_status` pour choisir le
+# statut le plus ouvert entre plusieurs sources.
+OA_RANK: dict[str, int] = {
+    "diamond": 7,
+    "gold": 6,
+    "hybrid": 5,
+    "bronze": 4,
+    "green": 3,
+    "closed": 2,
+    "unknown": 1,
+}
+
+
+def best_oa_status(statuses: Iterable[str | None]) -> str | None:
+    """Retourne le statut OA le plus ouvert parmi `statuses`.
+
+    Ordre décroissant : diamond > gold > hybrid > bronze > green > closed > unknown.
+    Les valeurs None, vides ou inconnues sont ignorées. Retourne None
+    si aucune valeur exploitable n'est fournie.
+    """
+    best: str | None = None
+    best_rank = 0
+    for s in statuses:
+        if not s:
+            continue
+        r = OA_RANK.get(s, 0)
+        if r > best_rank:
+            best, best_rank = s, r
+    return best
+
+
+# ── Règle de résolution de conflit sur DOI ──────────────────────────
+
+_CHAPTER_DOC_TYPES: frozenset[str] = frozenset({"book_chapter", "book-chapter", "chapter"})
+_BOOK_DOC_TYPES: frozenset[str] = frozenset({"book"})
+
+
+@dataclass(frozen=True, slots=True)
+class DoiConflictResolution:
+    """Décision pure pour un conflit DOI entre deux documents.
+
+    - `accepted_doi` : DOI à utiliser pour le nouveau document (None =
+      ne pas lui attribuer ce DOI).
+    - `merge_with_id` : id de la publication existante à fusionner avec
+      (None = pas de fusion).
+    - `clear_existing_doi` : True si le DOI doit être retiré de la
+      publication existante (effet de bord à appliquer par l'appelant).
+    """
+
+    accepted_doi: str | None
+    merge_with_id: int | None
+    clear_existing_doi: bool
+
+
+def resolve_doi_conflict(
+    new_doi: str,
+    new_doc_type: str,
+    new_title_normalized: str,
+    existing_doc_type: str | None,
+    existing_title_normalized: str | None,
+    existing_id: int,
+) -> DoiConflictResolution:
+    """Règle pure : gère les conflits de DOI entre chapitres et ouvrages.
+
+    Quand un DOI existe déjà sur une publication d'un type incompatible
+    (chapitre vs ouvrage), le DOI est retiré de l'un ou des deux côtés
+    au lieu de fusionner. Dans tous les autres cas, les types sont
+    considérés compatibles et on fusionne.
+    """
+    ex_type = existing_doc_type or ""
+
+    # Chapitre vs ouvrage : le DOI est celui de l'ouvrage, pas du chapitre
+    if new_doc_type in _CHAPTER_DOC_TYPES and ex_type in _BOOK_DOC_TYPES:
+        return DoiConflictResolution(
+            accepted_doi=None, merge_with_id=None, clear_existing_doi=False
+        )
+
+    if new_doc_type in _BOOK_DOC_TYPES and ex_type in _CHAPTER_DOC_TYPES:
+        return DoiConflictResolution(
+            accepted_doi=new_doi, merge_with_id=None, clear_existing_doi=True
+        )
+
+    # Deux chapitres avec titres différents : DOI erroné des deux côtés
+    if new_doc_type in _CHAPTER_DOC_TYPES and ex_type in _CHAPTER_DOC_TYPES:
+        ex_title = existing_title_normalized or ""
+        if new_title_normalized != ex_title:
+            return DoiConflictResolution(
+                accepted_doi=None, merge_with_id=None, clear_existing_doi=True
+            )
+        return DoiConflictResolution(
+            accepted_doi=new_doi, merge_with_id=existing_id, clear_existing_doi=False
+        )
+
+    # Cas normal : même DOI, types compatibles → fusion
+    return DoiConflictResolution(
+        accepted_doi=new_doi, merge_with_id=existing_id, clear_existing_doi=False
+    )

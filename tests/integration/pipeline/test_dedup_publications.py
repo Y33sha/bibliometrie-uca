@@ -356,6 +356,16 @@ class TestRefreshFromSources:
         db.execute("SELECT language FROM publications WHERE id = %s", (id1,))
         assert db.fetchone()["language"] == "fr"
 
+    def test_source_priority_scanr_over_hal(self, db):
+        """Pour les non-thèses, ScanR est prioritaire sur HAL."""
+        id1, _ = _create(db, doi="10.1234/scanr-prio", pub_year=2024, doc_type="article")
+        self._insert_sd(db, id1, "hal", language="en", doc_type="ART")
+        self._insert_sd(db, id1, "scanr", language="fr", doc_type="article")
+        refresh_from_sources(db, id1, repo=publication_repository(db))
+
+        db.execute("SELECT language FROM publications WHERE id = %s", (id1,))
+        assert db.fetchone()["language"] == "fr"
+
     def test_doc_type_mapping(self, db):
         """Les doc_types bruts sont mappés vers l'enum canonique."""
         id1, _ = _create(db, pub_year=2024, doc_type="other")

@@ -18,11 +18,14 @@ from domain.ports.publication_repository import (
     PublicationRepository,
 )
 from domain.publication import (
+    SOURCE_PRIORITY,
     PubByDoi,
     PubByNnt,
     PubByTitle,
     PubThesisCandidate,
+    best_oa_status,
 )
+from domain.publication import resolve_doi_conflict as _domain_resolve_doi_conflict
 
 # Re-export des namedtuples pour les call sites historiques (scripts,
 # processing) qui font `from application.publications import PubByDoi`.
@@ -100,37 +103,24 @@ def resolve_doi_conflict(
     *,
     repo: PublicationRepository,
 ) -> tuple[str | None, int | None]:
-    """Gere les conflits de DOI entre chapitres et ouvrages.
+    """Applique la règle `domain.publication.resolve_doi_conflict` et ses effets.
 
-    Quand un DOI existe deja sur une publication d'un type incompatible
-    (chapitre vs ouvrage), le DOI est retire de l'un ou des deux cotes.
+    Délègue la décision au domaine (fonction pure), puis réalise l'effet
+    de bord `clear_doi` via le repository quand la règle le demande.
 
     Retourne (doi_corrige, publication_id_si_fusion).
-    - doi_corrige : le DOI a utiliser pour le nouveau document (None si retire)
-    - publication_id_si_fusion : l'id de la publication existante si fusion, None sinon
     """
-    ex_type = existing.doc_type or ""
-    chapter_types = ("book_chapter", "book-chapter", "chapter")
-    book_types = ("book",)
-
-    # Chapitre vs ouvrage : le DOI est celui de l'ouvrage, pas du chapitre
-    if doc_type in chapter_types and ex_type in book_types:
-        return None, None
-
-    if doc_type in book_types and ex_type in chapter_types:
+    decision = _domain_resolve_doi_conflict(
+        new_doi=doi,
+        new_doc_type=doc_type,
+        new_title_normalized=title_normalized,
+        existing_doc_type=existing.doc_type,
+        existing_title_normalized=existing.title_normalized,
+        existing_id=existing.id,
+    )
+    if decision.clear_existing_doi:
         repo.clear_doi(existing.id)
-        return doi, None
-
-    # Deux chapitres avec titres differents : DOI errone des deux cotes
-    if doc_type in chapter_types and ex_type in chapter_types:
-        ex_title = existing.title_normalized or ""
-        if title_normalized != ex_title:
-            repo.clear_doi(existing.id)
-            return None, None
-        return doi, existing.id
-
-    # Cas normal : meme DOI, types compatibles -> fusion
-    return doi, existing.id
+    return decision.accepted_doi, decision.merge_with_id
 
 
 def find_or_create(
@@ -216,45 +206,6 @@ def update_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) -> Non
 
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
 
-# Ordre de priorité des sources pour les champs scalaires.
-# Pour les thèses, theses.fr est toujours prioritaire.
-# Cas particulier : si un document OpenAlex référence un HAL-ID
-# (external_ids->>'hal'), HAL passe devant theses.fr même pour les thèses.
-_PRIORITY_THESIS = ["theses", "hal", "openalex", "wos", "scanr"]
-_PRIORITY_DEFAULT = ["hal", "openalex", "wos", "scanr", "theses"]
-_PRIORITY_THESIS_HAL_LINKED = ["hal", "theses", "openalex", "wos", "scanr"]
-
-# Classement des statuts OA : le plus ouvert gagne.
-_OA_RANK = {
-    "diamond": 7,
-    "gold": 6,
-    "hybrid": 5,
-    "bronze": 4,
-    "green": 3,
-    "closed": 2,
-    "unknown": 1,
-}
-
-
-def _choose_priority(rows: list[dict[str, Any]]) -> list[str]:
-    """Sélectionne l'ordre de priorité des sources selon le contexte.
-
-    - Thèses avec un OpenAlex liant vers HAL : ordre HAL-linked
-    - Thèses : theses.fr > HAL > OA > WoS > ScanR
-    - Autres : HAL > OA > WoS > ScanR > theses.fr
-    """
-    has_hal_link = any(
-        r["source"] == "openalex" and (r["external_ids"] or {}).get("hal") for r in rows
-    )
-    is_thesis = any(
-        map_doc_type(r["doc_type"], r["source"]) in ("thesis", "ongoing_thesis") for r in rows
-    )
-    if is_thesis and has_hal_link:
-        return _PRIORITY_THESIS_HAL_LINKED
-    if is_thesis:
-        return _PRIORITY_THESIS
-    return _PRIORITY_DEFAULT
-
 
 def _first_non_null(rows: list[dict[str, Any]], field: str) -> Any:
     for r in rows:
@@ -298,16 +249,6 @@ def _topics_by_source(rows: list[dict[str, Any]]) -> dict | None:
     return out or None
 
 
-def _best_oa_status(rows: list[dict[str, Any]]) -> str | None:
-    best: str | None = None
-    best_rank = 0
-    for r in rows:
-        s = r["oa_status"]
-        if s and _OA_RANK.get(s, 0) > best_rank:
-            best, best_rank = s, _OA_RANK[s]
-    return best
-
-
 def _first_doc_type(rows: list[dict[str, Any]]) -> str:
     for r in rows:
         if r["doc_type"]:
@@ -326,10 +267,9 @@ def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) 
 
     Règles de priorité entre sources :
     ─────────────────────────────────
-    • Thèses (doc_type thesis/ongoing_thesis) : theses.fr > HAL > OA > WoS > ScanR
-    • Autres publications :                      HAL > OA > WoS > ScanR > theses.fr
-    • Si un document OpenAlex référence un HAL-ID (external_ids->>'hal'),
-      HAL passe prioritaire même pour les thèses.
+    Ordre unique : theses.fr > ScanR > HAL > OpenAlex > WoS.
+    Pour les documents hors thèse, la clé `theses` n'apparaît pas dans
+    les rows, l'ordre se réduit donc à ScanR > HAL > OpenAlex > WoS.
 
     Règles de fusion par type de champ :
     ────────────────────────────────────
@@ -354,8 +294,7 @@ def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) 
     if not rows:
         return
 
-    priority = _choose_priority(rows)
-    rank = {s: i for i, s in enumerate(priority)}
+    rank = {s: i for i, s in enumerate(SOURCE_PRIORITY)}
     rows.sort(key=lambda r: rank.get(r["source"], 99))
 
     repo.update_aggregated(
@@ -364,7 +303,7 @@ def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) 
         doc_type=_first_doc_type(rows),
         pub_year=_first_non_null(rows, "pub_year"),
         journal_id=_first_non_null(rows, "journal_id"),
-        oa_status=_best_oa_status(rows),
+        oa_status=best_oa_status(r["oa_status"] for r in rows),
         container_title=_first_non_null(rows, "container_title"),
         language=_first_non_null(rows, "language"),
         abstract=_first_non_null(rows, "abstract"),
