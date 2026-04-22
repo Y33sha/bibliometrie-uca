@@ -43,7 +43,17 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install ".[dev]"
+        run: |
+          # Upgrade pip + setuptools (les versions bootstrap du venv ont
+          # des CVE documentées ; pip-audit les signalerait sinon).
+          pip install --upgrade pip setuptools
+          pip install ".[dev]"
+
+      - name: Dependency hygiene (deptry)
+        run: deptry .
+
+      - name: Vulnerability scan (pip-audit)
+        run: pip-audit
 
       - name: Lint (ruff)
         run: ruff check .
