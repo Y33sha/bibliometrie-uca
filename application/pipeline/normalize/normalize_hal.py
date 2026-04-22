@@ -37,6 +37,7 @@ from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
+from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi, normalize_nnt
 from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
 
@@ -76,10 +77,10 @@ def get_title(doc: dict) -> str:
 
 
 def upsert_publisher(
-    cur: Any, publisher_name: str, *, journal_repo: JournalRepository
+    cur: Any, publisher_name: str, *, publisher_repo: PublisherRepository
 ) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
-    return find_or_create_publisher(cur, publisher_name, repo=journal_repo)
+    return find_or_create_publisher(cur, publisher_name, repo=publisher_repo)
 
 
 def upsert_journal(
@@ -622,6 +623,7 @@ def process_work(
     staging_row: tuple,
     *,
     journal_repo: JournalRepository,
+    publisher_repo: PublisherRepository,
     pub_repo: PublicationRepository,
     zenodo_resolver: ZenodoResolver,
     staging_queries: StagingQueries,
@@ -661,7 +663,7 @@ def process_work(
 
         publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
         publisher_id = (
-            upsert_publisher(cur, publisher_name, journal_repo=journal_repo)
+            upsert_publisher(cur, publisher_name, publisher_repo=publisher_repo)
             if publisher_name
             else None
         )
@@ -741,6 +743,7 @@ class HalNormalizer(SourceNormalizer):
         staging_queries: StagingQueries,
         queries: HalNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
+        publisher_repo_factory: Callable[[Any], PublisherRepository],
         pub_repo_factory: Callable[[Any], PublicationRepository],
         zenodo_resolver: ZenodoResolver,
         address_linker: AddressLinker,
@@ -749,6 +752,8 @@ class HalNormalizer(SourceNormalizer):
         self._queries = queries
         self._journal_repo_factory = journal_repo_factory
         self._journal_repo: JournalRepository | None = None
+        self._publisher_repo_factory = publisher_repo_factory
+        self._publisher_repo: PublisherRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
         self._zenodo_resolver = zenodo_resolver
@@ -758,6 +763,7 @@ class HalNormalizer(SourceNormalizer):
 
     def preload_caches(self, cur: Any) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
+        self._publisher_repo = self._publisher_repo_factory(cur)
         self._pub_repo = self._pub_repo_factory(cur)
         rows = self._queries.fetch_hal_source_structures_for_cache(cur)
         self._struct_cache = {src: pid for src, pid, _ in rows}
@@ -766,6 +772,7 @@ class HalNormalizer(SourceNormalizer):
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
         assert self._journal_repo is not None, "preload_caches doit être appelé avant"
+        assert self._publisher_repo is not None, "preload_caches doit être appelé avant"
         assert self._pub_repo is not None, "preload_caches doit être appelé avant"
         return process_work(
             cur,
@@ -773,6 +780,7 @@ class HalNormalizer(SourceNormalizer):
             self.logger,
             row,
             journal_repo=self._journal_repo,
+            publisher_repo=self._publisher_repo,
             pub_repo=self._pub_repo,
             zenodo_resolver=self._zenodo_resolver,
             staging_queries=self._staging,

@@ -227,13 +227,18 @@ def _run_normalize_scanr(cur):
     from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
-    from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.repositories import (
+        journal_repository,
+        publication_repository,
+        publisher_repository,
+    )
 
     queries = PgScanrNormalizeQueries()
     staging_queries = PgStagingQueries()
     address_linker = PgAddressLinker()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(cur)
+    publisher_repo = publisher_repository(cur)
     pub_repo = publication_repository(cur)
 
     cur.execute("""
@@ -251,6 +256,7 @@ def _run_normalize_scanr(cur):
             logger,
             row,
             journal_repo=journal_repo,
+            publisher_repo=publisher_repo,
             pub_repo=pub_repo,
             staging_queries=staging_queries,
             address_linker=address_linker,
@@ -435,7 +441,11 @@ def _run_normalize_hal(cur):
     from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
-    from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.repositories import (
+        journal_repository,
+        publication_repository,
+        publisher_repository,
+    )
     from infrastructure.zenodo import HttpZenodoResolver
 
     queries = PgHalNormalizeQueries()
@@ -444,6 +454,7 @@ def _run_normalize_hal(cur):
     zenodo_resolver = HttpZenodoResolver()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(plain_cur)
+    publisher_repo = publisher_repository(plain_cur)
     pub_repo = publication_repository(plain_cur)
 
     plain_cur.execute("""
@@ -459,6 +470,7 @@ def _run_normalize_hal(cur):
             logger,
             row,
             journal_repo=journal_repo,
+            publisher_repo=publisher_repo,
             pub_repo=pub_repo,
             zenodo_resolver=zenodo_resolver,
             staging_queries=staging_queries,
@@ -605,7 +617,11 @@ def _run_normalize_oa(cur):
     from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
-    from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.repositories import (
+        journal_repository,
+        publication_repository,
+        publisher_repository,
+    )
     from infrastructure.zenodo import HttpZenodoResolver
 
     queries = PgOpenalexNormalizeQueries()
@@ -614,6 +630,7 @@ def _run_normalize_oa(cur):
     zenodo_resolver = HttpZenodoResolver()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(cur)
+    publisher_repo = publisher_repository(cur)
     pub_repo = publication_repository(cur)
 
     cur.execute("""
@@ -629,6 +646,7 @@ def _run_normalize_oa(cur):
             logger,
             row,
             journal_repo=journal_repo,
+            publisher_repo=publisher_repo,
             pub_repo=pub_repo,
             zenodo_resolver=zenodo_resolver,
             staging_queries=staging_queries,
@@ -742,12 +760,17 @@ def _run_normalize_wos(cur):
     from application.pipeline.normalize.normalize_wos import process_record
     from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
-    from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.repositories import (
+        journal_repository,
+        publication_repository,
+        publisher_repository,
+    )
 
     queries = PgWosNormalizeQueries()
     staging_queries = PgStagingQueries()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(plain_cur)
+    publisher_repo = publisher_repository(plain_cur)
     pub_repo = publication_repository(plain_cur)
 
     plain_cur.execute("""
@@ -763,6 +786,7 @@ def _run_normalize_wos(cur):
             logger,
             row,
             journal_repo=journal_repo,
+            publisher_repo=publisher_repo,
             pub_repo=pub_repo,
             staging_queries=staging_queries,
         ):

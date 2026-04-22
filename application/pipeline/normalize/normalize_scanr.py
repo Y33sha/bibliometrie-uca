@@ -31,6 +31,7 @@ from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
+from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
 
 # =============================================================
@@ -59,11 +60,11 @@ def get_title(doc: dict) -> str | None:
     return title
 
 
-def upsert_publisher(cur: Any, doc: dict, *, journal_repo: JournalRepository) -> int | None:
+def upsert_publisher(cur: Any, doc: dict, *, publisher_repo: PublisherRepository) -> int | None:
     publisher_name = (doc.get("source") or {}).get("publisher")
     if not publisher_name:
         return None
-    return find_or_create_publisher(cur, publisher_name, repo=journal_repo)
+    return find_or_create_publisher(cur, publisher_name, repo=publisher_repo)
 
 
 def upsert_journal(
@@ -340,6 +341,7 @@ def process_work(
     staging_row: Any,
     *,
     journal_repo: JournalRepository,
+    publisher_repo: PublisherRepository,
     pub_repo: PublicationRepository,
     staging_queries: StagingQueries,
     address_linker: AddressLinker,
@@ -358,7 +360,7 @@ def process_work(
             return False
 
         t0 = time.perf_counter()
-        publisher_id = upsert_publisher(cur, doc, journal_repo=journal_repo)
+        publisher_id = upsert_publisher(cur, doc, publisher_repo=publisher_repo)
         timings["publisher"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
@@ -417,6 +419,7 @@ class ScanrNormalizer(SourceNormalizer):
         staging_queries: StagingQueries,
         queries: ScanrNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
+        publisher_repo_factory: Callable[[Any], PublisherRepository],
         pub_repo_factory: Callable[[Any], PublicationRepository],
         address_linker: AddressLinker,
     ) -> None:
@@ -424,22 +427,30 @@ class ScanrNormalizer(SourceNormalizer):
         self._queries = queries
         self._journal_repo_factory = journal_repo_factory
         self._journal_repo: JournalRepository | None = None
+        self._publisher_repo_factory = publisher_repo_factory
+        self._publisher_repo: PublisherRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
         self._address_linker = address_linker
 
     def preload_caches(self, cur: Any) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
+        self._publisher_repo = self._publisher_repo_factory(cur)
         self._pub_repo = self._pub_repo_factory(cur)
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        assert self._journal_repo is not None and self._pub_repo is not None
+        assert (
+            self._journal_repo is not None
+            and self._publisher_repo is not None
+            and self._pub_repo is not None
+        )
         return process_work(
             cur,
             self._queries,
             self.logger,
             row,
             journal_repo=self._journal_repo,
+            publisher_repo=self._publisher_repo,
             pub_repo=self._pub_repo,
             staging_queries=self._staging,
             address_linker=self._address_linker,

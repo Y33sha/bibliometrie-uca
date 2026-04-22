@@ -30,9 +30,7 @@ async def link_authorship(
         )
 
 
-async def unlink_authorship(
-    cur: Any, person_id: int, source: str, authorship_id: int
-) -> None:
+async def unlink_authorship(cur: Any, person_id: int, source: str, authorship_id: int) -> None:
     await cur.execute(
         """
         UPDATE source_authorships SET person_id = NULL
@@ -216,9 +214,7 @@ async def ensure_truth_authorship(
     )
 
 
-async def count_authorships_with_name_form(
-    cur: Any, person_id: int, name_form: str
-) -> int:
+async def count_authorships_with_name_form(cur: Any, person_id: int, name_form: str) -> int:
     await cur.execute(
         f"""
         SELECT COUNT(*) AS n FROM source_authorships sa
