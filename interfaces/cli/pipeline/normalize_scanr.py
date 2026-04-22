@@ -8,7 +8,11 @@ from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
 from infrastructure.db.queries.staging import PgStagingQueries
 from infrastructure.log import setup_logger
-from infrastructure.repositories import journal_repository, publication_repository
+from infrastructure.repositories import (
+    journal_repository,
+    publication_repository,
+    publisher_repository,
+)
 
 logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -21,6 +25,7 @@ def main() -> None:
         PgStagingQueries(),
         PgScanrNormalizeQueries(),
         journal_repo_factory=journal_repository,
+        publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
         address_linker=PgAddressLinker(),
     ).run()

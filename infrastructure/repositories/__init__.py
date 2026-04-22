@@ -29,6 +29,7 @@ from domain.ports.config_repository import AsyncConfigRepository
 from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
 from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
 from domain.ports.publication_repository import AsyncPublicationRepository, PublicationRepository
+from domain.ports.publisher_repository import AsyncPublisherRepository, PublisherRepository
 from domain.ports.structure_repository import AsyncStructureRepository
 
 from .async_address_repository import PgAsyncAddressRepository
@@ -37,11 +38,13 @@ from .async_config_repository import PgAsyncConfigRepository
 from .async_journal_repository import PgAsyncJournalRepository
 from .async_person_repository import PgAsyncPersonRepository
 from .async_publication_repository import PgAsyncPublicationRepository
+from .async_publisher_repository import PgAsyncPublisherRepository
 from .async_structure_repository import PgAsyncStructureRepository
 from .authorship_repository import PgAuthorshipRepository
 from .journal_repository import PgJournalRepository
 from .person_repository import PgPersonRepository
 from .publication_repository import PgPublicationRepository
+from .publisher_repository import PgPublisherRepository
 
 
 def authorship_repository(cur: Any) -> AuthorshipRepository:
@@ -62,6 +65,11 @@ def person_repository(cur: Any) -> PersonRepository:
 def publication_repository(cur: Any) -> PublicationRepository:
     """Retourne un PublicationRepository lié au curseur donné."""
     return PgPublicationRepository(cur)
+
+
+def publisher_repository(cur: Any) -> PublisherRepository:
+    """Retourne un PublisherRepository lié au curseur donné."""
+    return PgPublisherRepository(cur)
 
 
 # ── Factories async (§2.12) ────────────────────────────────────────
@@ -89,6 +97,10 @@ def async_person_repository(cur: Any) -> AsyncPersonRepository:
 
 def async_publication_repository(cur: Any) -> AsyncPublicationRepository:
     return PgAsyncPublicationRepository(cur)
+
+
+def async_publisher_repository(cur: Any) -> AsyncPublisherRepository:
+    return PgAsyncPublisherRepository(cur)
 
 
 def async_structure_repository(cur: Any) -> AsyncStructureRepository:

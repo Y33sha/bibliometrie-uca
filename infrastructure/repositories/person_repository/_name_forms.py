@@ -47,9 +47,7 @@ def refresh_name_forms(cur: Any, person_id: int, forms: set[str]) -> None:
         add_name_form(cur, person_id, form, source="persons")
 
 
-def add_name_form(
-    cur: Any, person_id: int, full_name: str, source: str | None = None
-) -> None:
+def add_name_form(cur: Any, person_id: int, full_name: str, source: str | None = None) -> None:
     """Ajoute une forme de nom à person_name_forms si elle n'existe pas déjà.
 
     Si `source` est fourni (ex: 'hal', 'openalex', 'persons'), il est ajouté

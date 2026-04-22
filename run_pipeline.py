@@ -120,13 +120,20 @@ def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **k
         if mode == "weekly":
             log.info("Mode hebdomadaire (WoS exclu)")
         if "openalex" in sources:
-            run_python("infrastructure/sources/openalex/extract_openalex.py", "--mode", sub_mode, *year_args)
+            run_python(
+                "infrastructure/sources/openalex/extract_openalex.py",
+                "--mode",
+                sub_mode,
+                *year_args,
+            )
         if "hal" in sources:
             run_python("infrastructure/sources/hal/extract_hal.py", "--mode", sub_mode, *year_args)
         if "wos" in sources and mode != "weekly":
             run_python("infrastructure/sources/wos/extract_wos.py", "--mode", sub_mode, *year_args)
         if "scanr" in sources:
-            run_python("infrastructure/sources/scanr/extract_scanr.py", "--mode", sub_mode, *year_args)
+            run_python(
+                "infrastructure/sources/scanr/extract_scanr.py", "--mode", sub_mode, *year_args
+            )
         if "theses" in sources:
             run_python("infrastructure/sources/theses/extract_theses.py")
     # Re-fetch des publications OA tronquées à 100 auteurs (sauf mode daily)
@@ -384,9 +391,7 @@ def _run_merge_pubs_by_nnt() -> None:
     conn.autocommit = False
     try:
         cur = conn.cursor()
-        run_merge(
-            cur, conn, PgMergeQueries(), log, pub_repo=publication_repository(cur)
-        )
+        run_merge(cur, conn, PgMergeQueries(), log, pub_repo=publication_repository(cur))
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_nnt terminé en %.1fs", time.time() - t0)
@@ -404,9 +409,7 @@ def _run_merge_pubs_by_hal_id() -> None:
     conn.autocommit = False
     try:
         cur = conn.cursor()
-        run_merge(
-            cur, conn, PgMergeQueries(), log, pub_repo=publication_repository(cur)
-        )
+        run_merge(cur, conn, PgMergeQueries(), log, pub_repo=publication_repository(cur))
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
@@ -418,15 +421,23 @@ def _run_normalize_hal() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
-    from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.repositories import (
+        journal_repository,
+        publication_repository,
+        publisher_repository,
+    )
     from infrastructure.zenodo import HttpZenodoResolver
 
     log.info("▶ normalize_hal")
     t0 = time.time()
     conn = get_connection()
     HalNormalizer(
-        conn, log, PgStagingQueries(), PgHalNormalizeQueries(),
+        conn,
+        log,
+        PgStagingQueries(),
+        PgHalNormalizeQueries(),
         journal_repo_factory=journal_repository,
+        publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
         zenodo_resolver=HttpZenodoResolver(),
         address_linker=PgAddressLinker(),
@@ -439,14 +450,22 @@ def _run_normalize_wos() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
-    from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.repositories import (
+        journal_repository,
+        publication_repository,
+        publisher_repository,
+    )
 
     log.info("▶ normalize_wos")
     t0 = time.time()
     conn = get_connection()
     WosNormalizer(
-        conn, log, PgStagingQueries(), PgWosNormalizeQueries(),
+        conn,
+        log,
+        PgStagingQueries(),
+        PgWosNormalizeQueries(),
         journal_repo_factory=journal_repository,
+        publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
     ).run([])
     log.info("✓ normalize_wos terminé en %.1fs", time.time() - t0)
@@ -458,15 +477,23 @@ def _run_normalize_openalex() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
-    from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.repositories import (
+        journal_repository,
+        publication_repository,
+        publisher_repository,
+    )
     from infrastructure.zenodo import HttpZenodoResolver
 
     log.info("▶ normalize_openalex")
     t0 = time.time()
     conn = get_connection()
     OpenalexNormalizer(
-        conn, log, PgStagingQueries(), PgOpenalexNormalizeQueries(),
+        conn,
+        log,
+        PgStagingQueries(),
+        PgOpenalexNormalizeQueries(),
         journal_repo_factory=journal_repository,
+        publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
         zenodo_resolver=HttpZenodoResolver(),
         address_linker=PgAddressLinker(),
@@ -480,14 +507,22 @@ def _run_normalize_scanr() -> None:
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
-    from infrastructure.repositories import journal_repository, publication_repository
+    from infrastructure.repositories import (
+        journal_repository,
+        publication_repository,
+        publisher_repository,
+    )
 
     log.info("▶ normalize_scanr")
     t0 = time.time()
     conn = get_connection()
     ScanrNormalizer(
-        conn, log, PgStagingQueries(), PgScanrNormalizeQueries(),
+        conn,
+        log,
+        PgStagingQueries(),
+        PgScanrNormalizeQueries(),
         journal_repo_factory=journal_repository,
+        publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
         address_linker=PgAddressLinker(),
     ).run([])

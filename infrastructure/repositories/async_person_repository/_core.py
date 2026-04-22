@@ -143,9 +143,7 @@ async def merge_into(cur: Any, target_id: int, source_id: int) -> None:
     await cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))
 
 
-async def mark_distinct(
-    cur: Any, person_id_a: int, person_id_b: int
-) -> tuple[int, int] | None:
+async def mark_distinct(cur: Any, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
     await cur.execute(
         """
         INSERT INTO distinct_persons (person_id_a, person_id_b)

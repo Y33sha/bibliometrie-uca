@@ -157,9 +157,7 @@ def merge_into(cur: Any, target_id: int, source_id: int) -> None:
     cur.execute("DELETE FROM persons WHERE id = %s", (source_id,))
 
 
-def mark_distinct(
-    cur: Any, person_id_a: int, person_id_b: int
-) -> tuple[int, int] | None:
+def mark_distinct(cur: Any, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
     """Marque deux personnes comme distinctes (idempotent). Retourne (a, b)
     triés si la paire vient d'être insérée, None si elle existait déjà."""
     cur.execute(

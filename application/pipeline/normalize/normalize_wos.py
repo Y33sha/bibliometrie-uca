@@ -34,6 +34,7 @@ from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
+from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
 
 # =============================================================
@@ -377,10 +378,10 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
 
 
 def upsert_publisher(
-    cur: Any, publisher_name: str | None, *, journal_repo: JournalRepository
+    cur: Any, publisher_name: str | None, *, publisher_repo: PublisherRepository
 ) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
-    return find_or_create_publisher(cur, publisher_name, repo=journal_repo)
+    return find_or_create_publisher(cur, publisher_name, repo=publisher_repo)
 
 
 def upsert_journal(
@@ -715,6 +716,7 @@ def process_record(
     staging_row: tuple,
     *,
     journal_repo: JournalRepository,
+    publisher_repo: PublisherRepository,
     pub_repo: PublicationRepository,
     staging_queries: StagingQueries,
 ) -> bool:
@@ -730,7 +732,9 @@ def process_record(
         if not rec["ut"]:
             rec["ut"] = ut
 
-        publisher_id = upsert_publisher(cur, rec.get("publisher_name"), journal_repo=journal_repo)
+        publisher_id = upsert_publisher(
+            cur, rec.get("publisher_name"), publisher_repo=publisher_repo
+        )
         journal_id = upsert_journal(cur, rec, publisher_id, journal_repo=journal_repo)
         t.mark("publisher+journal")
 
@@ -781,17 +785,21 @@ class WosNormalizer(SourceNormalizer):
         staging_queries: StagingQueries,
         queries: WosNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
+        publisher_repo_factory: Callable[[Any], PublisherRepository],
         pub_repo_factory: Callable[[Any], PublicationRepository],
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._journal_repo_factory = journal_repo_factory
         self._journal_repo: JournalRepository | None = None
+        self._publisher_repo_factory = publisher_repo_factory
+        self._publisher_repo: PublisherRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
 
     def preload_caches(self, cur: Any) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
+        self._publisher_repo = self._publisher_repo_factory(cur)
         self._pub_repo = self._pub_repo_factory(cur)
         for src_id, pid in self._queries.fetch_wos_source_structures(cur):
             _wos_institution_cache[src_id] = pid
@@ -803,13 +811,18 @@ class WosNormalizer(SourceNormalizer):
         )
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        assert self._journal_repo is not None and self._pub_repo is not None
+        assert (
+            self._journal_repo is not None
+            and self._publisher_repo is not None
+            and self._pub_repo is not None
+        )
         return process_record(
             cur,
             self._queries,
             self.logger,
             row,
             journal_repo=self._journal_repo,
+            publisher_repo=self._publisher_repo,
             pub_repo=self._pub_repo,
             staging_queries=self._staging,
         )

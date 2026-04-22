@@ -44,6 +44,7 @@ from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
+from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi, extract_hal_id_from_url
 from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
 
@@ -192,7 +193,7 @@ def is_repository_source(work: dict) -> bool:
 # =============================================================
 
 
-def upsert_publisher(cur: Any, work: dict, *, journal_repo: JournalRepository) -> int | None:
+def upsert_publisher(cur: Any, work: dict, *, publisher_repo: PublisherRepository) -> int | None:
     """Extrait et trouve/crée l'éditeur depuis le work OpenAlex."""
     location = work.get("primary_location") or {}
     source = location.get("source") or {}
@@ -201,7 +202,7 @@ def upsert_publisher(cur: Any, work: dict, *, journal_repo: JournalRepository) -
         return None
     openalex_id = extract_short_id(source.get("host_organization") or "")
     return find_or_create_publisher(
-        cur, publisher_name, openalex_id=openalex_id or None, repo=journal_repo
+        cur, publisher_name, openalex_id=openalex_id or None, repo=publisher_repo
     )
 
 
@@ -581,6 +582,7 @@ def process_work(
     staging_row: tuple,
     *,
     journal_repo: JournalRepository,
+    publisher_repo: PublisherRepository,
     pub_repo: PublicationRepository,
     zenodo_resolver: ZenodoResolver,
     staging_queries: StagingQueries,
@@ -620,7 +622,7 @@ def process_work(
             publisher_id = None
             journal_id = None
         else:
-            publisher_id = upsert_publisher(cur, work, journal_repo=journal_repo)
+            publisher_id = upsert_publisher(cur, work, publisher_repo=publisher_repo)
             journal_id = upsert_journal(cur, work, publisher_id, journal_repo=journal_repo)
 
         pub_meta = extract_pub_metadata(work, journal_id)
@@ -691,6 +693,7 @@ class OpenalexNormalizer(SourceNormalizer):
         staging_queries: StagingQueries,
         queries: OpenalexNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
+        publisher_repo_factory: Callable[[Any], PublisherRepository],
         pub_repo_factory: Callable[[Any], PublicationRepository],
         zenodo_resolver: ZenodoResolver,
         address_linker: AddressLinker,
@@ -699,6 +702,8 @@ class OpenalexNormalizer(SourceNormalizer):
         self._queries = queries
         self._journal_repo_factory = journal_repo_factory
         self._journal_repo: JournalRepository | None = None
+        self._publisher_repo_factory = publisher_repo_factory
+        self._publisher_repo: PublisherRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
         self._zenodo_resolver = zenodo_resolver
@@ -706,16 +711,22 @@ class OpenalexNormalizer(SourceNormalizer):
 
     def preload_caches(self, cur: Any) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
+        self._publisher_repo = self._publisher_repo_factory(cur)
         self._pub_repo = self._pub_repo_factory(cur)
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
-        assert self._journal_repo is not None and self._pub_repo is not None
+        assert (
+            self._journal_repo is not None
+            and self._publisher_repo is not None
+            and self._pub_repo is not None
+        )
         return process_work(
             cur,
             self._queries,
             self.logger,
             row,
             journal_repo=self._journal_repo,
+            publisher_repo=self._publisher_repo,
             pub_repo=self._pub_repo,
             zenodo_resolver=self._zenodo_resolver,
             staging_queries=self._staging,

@@ -1,43 +1,22 @@
-"""Port JournalRepository — contrat d'accès aux agrégats Journal et Publisher.
+"""Port JournalRepository — contrat d'accès à l'agrégat Journal.
 
-Implémenté par infrastructure/repositories/journal_repository.py.
-Un seul port pour les deux tables car leurs opérations (notamment les
-fusions éditeur↔journal) sont trop couplées pour être séparées.
+L'agrégat Publisher est dans `publisher_repository.py` depuis §2.9.ISP.
+Les deux agrégats sont liés par `journals.publisher_id` (FK) mais
+manipulés par des opérations distinctes — séparer les ports réduit la
+surface sur laquelle chaque call site s'engage.
+
+La méthode `find_shared_title_journal_pairs` reste ici : c'est une
+query sur la table `journals`, appelée par le service de fusion
+d'éditeurs pour détecter les conflits avant `merge_publisher_into`.
+
+Implémenté par `infrastructure/repositories/journal_repository.py`.
 """
 
 from typing import Protocol
 
 
 class JournalRepository(Protocol):
-    """Contrat d'accès aux agrégats Journal et Publisher."""
-
-    # ── publisher_name_forms ───────────────────────────────────────
-
-    def add_publisher_name_form(
-        self,
-        publisher_id: int,
-        form_normalized: str,
-    ) -> None: ...
-
-    def find_publisher_by_name_form(self, form_normalized: str) -> int | None: ...
-
-    # ── publishers ─────────────────────────────────────────────────
-
-    def find_publisher_by_openalex_id(self, openalex_id: str) -> int | None: ...
-
-    def set_publisher_openalex_id_if_missing(
-        self,
-        publisher_id: int,
-        openalex_id: str,
-    ) -> None: ...
-
-    def create_publisher(
-        self,
-        *,
-        name: str,
-        name_normalized: str,
-        openalex_id: str | None,
-    ) -> int: ...
+    """Contrat d'accès à l'agrégat Journal."""
 
     # ── journal_name_forms ─────────────────────────────────────────
 
@@ -88,11 +67,7 @@ class JournalRepository(Protocol):
 
     def journal_exists(self, journal_id: int) -> bool: ...
 
-    def publisher_exists(self, publisher_id: int) -> bool: ...
-
     def update_journal_fields(self, journal_id: int, fields: dict) -> None: ...
-
-    def update_publisher_fields(self, publisher_id: int, fields: dict) -> None: ...
 
     # ── APC / DOAJ ─────────────────────────────────────────────────
 
@@ -115,44 +90,11 @@ class JournalRepository(Protocol):
         source_publisher_id: int,
     ) -> list[dict]: ...
 
-    def merge_publisher_into(self, target_id: int, source_id: int) -> None: ...
-
     def merge_journal_into(self, target_id: int, source_id: int) -> None: ...
 
 
 class AsyncJournalRepository(Protocol):
-    """Variante async de JournalRepository (§2.12).
-
-    Implémentée par infrastructure/repositories/async_journal_repository.py.
-    """
-
-    # ── publisher_name_forms ───────────────────────────────────────
-
-    async def add_publisher_name_form(
-        self,
-        publisher_id: int,
-        form_normalized: str,
-    ) -> None: ...
-
-    async def find_publisher_by_name_form(self, form_normalized: str) -> int | None: ...
-
-    # ── publishers ─────────────────────────────────────────────────
-
-    async def find_publisher_by_openalex_id(self, openalex_id: str) -> int | None: ...
-
-    async def set_publisher_openalex_id_if_missing(
-        self,
-        publisher_id: int,
-        openalex_id: str,
-    ) -> None: ...
-
-    async def create_publisher(
-        self,
-        *,
-        name: str,
-        name_normalized: str,
-        openalex_id: str | None,
-    ) -> int: ...
+    """Variante async de JournalRepository (§2.12)."""
 
     # ── journal_name_forms ─────────────────────────────────────────
 
@@ -203,11 +145,7 @@ class AsyncJournalRepository(Protocol):
 
     async def journal_exists(self, journal_id: int) -> bool: ...
 
-    async def publisher_exists(self, publisher_id: int) -> bool: ...
-
     async def update_journal_fields(self, journal_id: int, fields: dict) -> None: ...
-
-    async def update_publisher_fields(self, publisher_id: int, fields: dict) -> None: ...
 
     # ── APC / DOAJ ─────────────────────────────────────────────────
 
@@ -229,7 +167,5 @@ class AsyncJournalRepository(Protocol):
         target_publisher_id: int,
         source_publisher_id: int,
     ) -> list[dict]: ...
-
-    async def merge_publisher_into(self, target_id: int, source_id: int) -> None: ...
 
     async def merge_journal_into(self, target_id: int, source_id: int) -> None: ...

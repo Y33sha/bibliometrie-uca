@@ -18,7 +18,12 @@ from application.journals import (
     update_publisher,
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from infrastructure.repositories import async_journal_repository, journal_repository
+from infrastructure.repositories import (
+    async_journal_repository,
+    async_publisher_repository,
+    journal_repository,
+    publisher_repository,
+)
 
 
 @pytest.fixture
@@ -27,8 +32,18 @@ def repo(db):
 
 
 @pytest.fixture
+def pub_repo(db):
+    return publisher_repository(db)
+
+
+@pytest.fixture
 def async_repo(async_db):
     return async_journal_repository(async_db)
+
+
+@pytest.fixture
+def async_pub_repo(async_db):
+    return async_publisher_repository(async_db)
 
 
 # ── Helpers sync (pipeline tests) ──────────────────────────────────
@@ -136,31 +151,31 @@ async def _ainsert_publication(db, title="Pub", pub_year=2024, journal_id=None):
 
 
 class TestFindOrCreatePublisher:
-    def test_returns_none_on_empty_name(self, db, repo):
-        assert find_or_create_publisher(db, None, repo=repo) is None
-        assert find_or_create_publisher(db, "", repo=repo) is None
+    def test_returns_none_on_empty_name(self, db, pub_repo):
+        assert find_or_create_publisher(db, None, repo=pub_repo) is None
+        assert find_or_create_publisher(db, "", repo=pub_repo) is None
 
-    def test_creates_new_publisher(self, db, repo):
-        pub_id = find_or_create_publisher(db, "Elsevier", repo=repo)
+    def test_creates_new_publisher(self, db, pub_repo):
+        pub_id = find_or_create_publisher(db, "Elsevier", repo=pub_repo)
         assert pub_id is not None
         db.execute("SELECT name FROM publishers WHERE id = %s", (pub_id,))
         assert db.fetchone()["name"] == "Elsevier"
 
-    def test_finds_existing_by_openalex_id(self, db, repo):
+    def test_finds_existing_by_openalex_id(self, db, pub_repo):
         existing = _insert_publisher(db, "Elsevier", openalex_id="P4310310871")
         found = find_or_create_publisher(
-            db, "Elsevier BV", openalex_id="P4310310871", repo=repo
+            db, "Elsevier BV", openalex_id="P4310310871", repo=pub_repo
         )
         assert found == existing
 
-    def test_finds_existing_by_name_form(self, db, repo):
-        existing = find_or_create_publisher(db, "Elsevier", repo=repo)
-        found = find_or_create_publisher(db, "elsevier", repo=repo)  # variante casse
+    def test_finds_existing_by_name_form(self, db, pub_repo):
+        existing = find_or_create_publisher(db, "Elsevier", repo=pub_repo)
+        found = find_or_create_publisher(db, "elsevier", repo=pub_repo)  # variante casse
         assert found == existing
 
-    def test_attaches_openalex_id_if_missing(self, db, repo):
-        existing = find_or_create_publisher(db, "Elsevier", repo=repo)
-        find_or_create_publisher(db, "Elsevier", openalex_id="P123", repo=repo)
+    def test_attaches_openalex_id_if_missing(self, db, pub_repo):
+        existing = find_or_create_publisher(db, "Elsevier", repo=pub_repo)
+        find_or_create_publisher(db, "Elsevier", openalex_id="P123", repo=pub_repo)
         db.execute("SELECT openalex_id FROM publishers WHERE id = %s", (existing,))
         assert db.fetchone()["openalex_id"] == "P123"
 
@@ -182,9 +197,7 @@ class TestFindOrCreateJournal:
 
     def test_finds_by_openalex_id(self, db, repo):
         existing = _insert_journal(db, "Nature", openalex_id="S137773608")
-        found = find_or_create_journal(
-            db, "Nature Journal", openalex_id="S137773608", repo=repo
-        )
+        found = find_or_create_journal(db, "Nature Journal", openalex_id="S137773608", repo=repo)
         assert found == existing
 
     def test_finds_by_issn(self, db, repo):
@@ -209,10 +222,10 @@ class TestFindOrCreateJournal:
         assert db.fetchone()["n"] == 1
         assert found is not None
 
-    def test_enriches_metadata_on_match(self, db, repo):
+    def test_enriches_metadata_on_match(self, db, repo, pub_repo):
         """Si on trouve par ISSN, les champs vides (eissn, publisher_id) sont remplis."""
         existing = _insert_journal(db, "Nature", issn="0028-0836")
-        pub_id = find_or_create_publisher(db, "Springer", repo=repo)
+        pub_id = find_or_create_publisher(db, "Springer", repo=pub_repo)
         find_or_create_journal(
             db,
             "Nature",
@@ -287,18 +300,18 @@ class TestUpdateJournal:
 
 
 class TestUpdatePublisher:
-    async def test_raises_not_found(self, async_db, async_repo):
+    async def test_raises_not_found(self, async_db, async_pub_repo):
         with pytest.raises(NotFoundError):
-            await update_publisher(async_db, 999999, fields={"name": "X"}, repo=async_repo)
+            await update_publisher(async_db, 999999, fields={"name": "X"}, repo=async_pub_repo)
 
-    async def test_raises_on_empty_fields(self, async_db, async_repo):
+    async def test_raises_on_empty_fields(self, async_db, async_pub_repo):
         p = await _ainsert_publisher(async_db, "Elsevier")
         with pytest.raises(ValidationError):
-            await update_publisher(async_db, p, fields={}, repo=async_repo)
+            await update_publisher(async_db, p, fields={}, repo=async_pub_repo)
 
-    async def test_updates_name_and_normalizes(self, async_db, async_repo):
+    async def test_updates_name_and_normalizes(self, async_db, async_pub_repo):
         p = await _ainsert_publisher(async_db, "Old Name")
-        await update_publisher(async_db, p, fields={"name": "Springer Nature"}, repo=async_repo)
+        await update_publisher(async_db, p, fields={"name": "Springer Nature"}, repo=async_pub_repo)
         await async_db.execute("SELECT name, name_normalized FROM publishers WHERE id = %s", (p,))
         row = await async_db.fetchone()
         assert row["name"] == "Springer Nature"
@@ -328,17 +341,27 @@ class TestResetJournalApc:
 
 
 class TestMergePublishers:
-    async def test_raises_on_self_merge(self, async_db, async_repo):
+    async def test_raises_on_self_merge(self, async_db, async_repo, async_pub_repo):
         p_id = await _ainsert_publisher(async_db, "Elsevier")
         with pytest.raises(ConflictError, match="lui-même"):
-            await merge_publishers(async_db, p_id, p_id, repo=async_repo)
+            await merge_publishers(
+                async_db,
+                p_id,
+                p_id,
+                publisher_repo=async_pub_repo,
+                journal_repo=async_repo,
+            )
 
-    async def test_transfers_journals_and_deletes_source(self, async_db, async_repo):
+    async def test_transfers_journals_and_deletes_source(
+        self, async_db, async_repo, async_pub_repo
+    ):
         target = await _ainsert_publisher(async_db, "Target")
         source = await _ainsert_publisher(async_db, "Source")
         j1 = await _ainsert_journal(async_db, "Journal 1", publisher_id=source)
 
-        await merge_publishers(async_db, target, source, repo=async_repo)
+        await merge_publishers(
+            async_db, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+        )
 
         await async_db.execute("SELECT id FROM publishers WHERE id = %s", (source,))
         assert await async_db.fetchone() is None  # source supprimée
@@ -346,7 +369,7 @@ class TestMergePublishers:
         row = await async_db.fetchone()
         assert row["publisher_id"] == target
 
-    async def test_merges_same_title_journals(self, async_db, async_repo):
+    async def test_merges_same_title_journals(self, async_db, async_repo, async_pub_repo):
         """Si cible et source ont un journal de même titre, ils sont fusionnés."""
         target = await _ainsert_publisher(async_db, "Target")
         source = await _ainsert_publisher(async_db, "Source")
@@ -354,7 +377,9 @@ class TestMergePublishers:
         js = await _ainsert_journal(async_db, "Nature", publisher_id=source, eissn="1476-4687")
         await _ainsert_publication(async_db, journal_id=js)
 
-        await merge_publishers(async_db, target, source, repo=async_repo)
+        await merge_publishers(
+            async_db, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+        )
 
         # Journal source supprimé
         await async_db.execute("SELECT id FROM journals WHERE id = %s", (js,))
@@ -365,41 +390,53 @@ class TestMergePublishers:
         assert row["issn"] == "0028-0836"
         assert row["eissn"] == "1476-4687"
 
-    async def test_raises_on_issn_conflict(self, async_db, async_repo):
+    async def test_raises_on_issn_conflict(self, async_db, async_repo, async_pub_repo):
         target = await _ainsert_publisher(async_db, "Target")
         source = await _ainsert_publisher(async_db, "Source")
         await _ainsert_journal(async_db, "Nature", publisher_id=target, issn="0028-0836")
         await _ainsert_journal(async_db, "Nature", publisher_id=source, issn="9999-9999")
 
         with pytest.raises(ConflictError, match="Conflit issn"):
-            await merge_publishers(async_db, target, source, repo=async_repo)
+            await merge_publishers(
+                async_db, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+            )
 
-    async def test_enriches_target_flags(self, async_db, async_repo):
+    async def test_enriches_target_flags(self, async_db, async_repo, async_pub_repo):
         """is_predatory = OR logique : vrai si l'une des sources l'était."""
         target = await _ainsert_publisher(async_db, "Target")
         source = await _ainsert_publisher(async_db, "Source")
         await async_db.execute("UPDATE publishers SET is_predatory = TRUE WHERE id = %s", (source,))
 
-        await merge_publishers(async_db, target, source, repo=async_repo)
+        await merge_publishers(
+            async_db, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+        )
 
         await async_db.execute("SELECT is_predatory FROM publishers WHERE id = %s", (target,))
         row = await async_db.fetchone()
         assert row["is_predatory"] is True
 
-    async def test_transfers_openalex_id_when_target_has_none(self, async_db, async_repo):
+    async def test_transfers_openalex_id_when_target_has_none(
+        self, async_db, async_repo, async_pub_repo
+    ):
         """Target sans openalex_id, source avec : la cible reçoit celui de la source."""
         target = await _ainsert_publisher(async_db, "Target", openalex_id=None)
         source = await _ainsert_publisher(async_db, "Source", openalex_id="P999")
-        await merge_publishers(async_db, target, source, repo=async_repo)
+        await merge_publishers(
+            async_db, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+        )
         await async_db.execute("SELECT openalex_id FROM publishers WHERE id = %s", (target,))
         row = await async_db.fetchone()
         assert row["openalex_id"] == "P999"
 
-    async def test_keeps_target_openalex_id_when_both_set(self, async_db, async_repo):
+    async def test_keeps_target_openalex_id_when_both_set(
+        self, async_db, async_repo, async_pub_repo
+    ):
         """Si les deux ont un openalex_id, celui de la cible est conservé."""
         target = await _ainsert_publisher(async_db, "Target", openalex_id="P_TARGET")
         source = await _ainsert_publisher(async_db, "Source", openalex_id="P_SOURCE")
-        await merge_publishers(async_db, target, source, repo=async_repo)
+        await merge_publishers(
+            async_db, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+        )
         await async_db.execute("SELECT openalex_id FROM publishers WHERE id = %s", (target,))
         row = await async_db.fetchone()
         assert row["openalex_id"] == "P_TARGET"

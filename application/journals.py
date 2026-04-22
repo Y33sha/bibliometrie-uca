@@ -4,6 +4,12 @@ aux tables `publishers` et `journals`.
 
 Toute création ou recherche de journal/éditeur passe par ce module.
 Compatible avec les curseurs tuples (standard) et dict_row.
+
+Les opérations sur Publisher et Journal vivent côte à côte ici mais
+utilisent deux ports distincts (`PublisherRepository`,
+`JournalRepository`) pour respecter ISP : un caller qui ne touche
+qu'aux éditeurs n'a pas à implémenter un contrat journal, et vice
+versa.
 """
 
 from typing import Any
@@ -12,6 +18,7 @@ from application.audit import async_emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
 from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
+from domain.ports.publisher_repository import AsyncPublisherRepository, PublisherRepository
 
 # ── Publishers ──
 
@@ -21,7 +28,7 @@ def find_or_create_publisher(
     name: str | None,
     *,
     openalex_id: str | None = None,
-    repo: JournalRepository,
+    repo: PublisherRepository,
 ) -> int | None:
     """Trouve ou crée un éditeur.
 
@@ -177,7 +184,7 @@ async def update_journal(
 
 
 async def update_publisher(
-    cur: Any, publisher_id: int, *, fields: dict, repo: AsyncJournalRepository
+    cur: Any, publisher_id: int, *, fields: dict, repo: AsyncPublisherRepository
 ) -> None:
     """Met à jour un éditeur. Le `name` est automatiquement normalisé en
     `name_normalized`.
@@ -224,7 +231,12 @@ def reset_journal_apc(cur: Any, *, repo: JournalRepository) -> int:
 
 
 async def merge_publishers(
-    cur: Any, target_id: int, source_id: int, *, repo: AsyncJournalRepository
+    cur: Any,
+    target_id: int,
+    source_id: int,
+    *,
+    publisher_repo: AsyncPublisherRepository,
+    journal_repo: AsyncJournalRepository,
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible.
 
@@ -232,13 +244,16 @@ async def merge_publishers(
     les deux éditeurs avec des ISSN/eISSN/ISSN-L différents, la fusion
     est refusée (ConflictError) — on ne veut pas fusionner deux
     journaux qui ont manifestement des identités distinctes.
+
+    La détection est côté `journal_repo` (query sur `journals`), la
+    fusion finale est côté `publisher_repo` (transferts + delete).
     """
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un éditeur avec lui-même")
 
     # 1. Détecter les journaux partageant un titre entre les deux éditeurs,
     #    vérifier les conflits ISSN, puis les fusionner.
-    for pair in await repo.find_shared_title_journal_pairs(target_id, source_id):
+    for pair in await journal_repo.find_shared_title_journal_pairs(target_id, source_id):
         for field in ("issn", "eissn", "issnl"):
             tv = pair[f"t_{field}"]
             sv = pair[f"s_{field}"]
@@ -250,11 +265,11 @@ async def merge_publishers(
                     f"Fusionner les revues manuellement d'abord."
                 )
         await merge_journals(
-            cur, pair["target_journal_id"], pair["source_journal_id"], repo=repo
+            cur, pair["target_journal_id"], pair["source_journal_id"], repo=journal_repo
         )
 
     # 2-6. Le reste de la fusion (transferts, enrichissement, delete).
-    await repo.merge_publisher_into(target_id, source_id)
+    await publisher_repo.merge_publisher_into(target_id, source_id)
 
     await async_emit_event(
         cur, "publisher.merged", "publisher", target_id, {"source_id": source_id}
@@ -269,6 +284,4 @@ async def merge_journals(
         raise ConflictError("Impossible de fusionner un journal avec lui-même")
 
     await repo.merge_journal_into(target_id, source_id)
-    await async_emit_event(
-        cur, "journal.merged", "journal", target_id, {"source_id": source_id}
-    )
+    await async_emit_event(cur, "journal.merged", "journal", target_id, {"source_id": source_id})

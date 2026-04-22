@@ -45,9 +45,7 @@ def unlink_authorship(cur: Any, person_id: int, source: str, authorship_id: int)
     )
 
 
-def assign_orphan_sa(
-    cur: Any, person_id: int, source: str, authorship_id: int
-) -> dict | None:
+def assign_orphan_sa(cur: Any, person_id: int, source: str, authorship_id: int) -> dict | None:
     """Tente de poser person_id sur une source_authorship orpheline.
 
     Retourne un dict {excluded, author_name_normalized} si l'UPDATE a
@@ -134,9 +132,7 @@ def batch_assign_orphans(cur: Any, person_id: int, sa_ids: list[int]) -> int:
     return assigned
 
 
-def ensure_truth_authorship(
-    cur: Any, person_id: int, source: str, authorship_id: int
-) -> None:
+def ensure_truth_authorship(cur: Any, person_id: int, source: str, authorship_id: int) -> None:
     """Crée/synchronise l'authorship vérité pour une paire (pub, person).
 
     Même logique que build_authorships.py mais pour une seule paire :

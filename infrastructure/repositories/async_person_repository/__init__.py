@@ -42,9 +42,7 @@ class PgAsyncPersonRepository:
 
     # ── distinct_persons ───────────────────────────────────────────
 
-    async def mark_distinct(
-        self, person_id_a: int, person_id_b: int
-    ) -> tuple[int, int] | None:
+    async def mark_distinct(self, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
         return await _core.mark_distinct(self._cur, person_id_a, person_id_b)
 
     # ── person_identifiers ─────────────────────────────────────────
@@ -57,9 +55,7 @@ class PgAsyncPersonRepository:
         source: str = "auto",
         status: str = "pending",
     ) -> None:
-        await _identifiers.add_identifier(
-            self._cur, person_id, id_type, id_value, source, status
-        )
+        await _identifiers.add_identifier(self._cur, person_id, id_type, id_value, source, status)
 
     async def remove_identifier(self, person_id: int, id_type: str, id_value: str) -> None:
         await _identifiers.remove_identifier(self._cur, person_id, id_type, id_value)
@@ -90,17 +86,13 @@ class PgAsyncPersonRepository:
             has_hal_person_id=has_hal_person_id,
         )
 
-    async def unlink_authorship(
-        self, person_id: int, source: str, authorship_id: int
-    ) -> None:
+    async def unlink_authorship(self, person_id: int, source: str, authorship_id: int) -> None:
         await _authorships.unlink_authorship(self._cur, person_id, source, authorship_id)
 
     async def assign_orphan_sa(
         self, person_id: int, source: str, authorship_id: int
     ) -> dict | None:
-        return await _authorships.assign_orphan_sa(
-            self._cur, person_id, source, authorship_id
-        )
+        return await _authorships.assign_orphan_sa(self._cur, person_id, source, authorship_id)
 
     async def batch_assign_orphans(self, person_id: int, sa_ids: list[int]) -> int:
         return await _authorships.batch_assign_orphans(self._cur, person_id, sa_ids)
@@ -108,16 +100,10 @@ class PgAsyncPersonRepository:
     async def ensure_truth_authorship(
         self, person_id: int, source: str, authorship_id: int
     ) -> None:
-        await _authorships.ensure_truth_authorship(
-            self._cur, person_id, source, authorship_id
-        )
+        await _authorships.ensure_truth_authorship(self._cur, person_id, source, authorship_id)
 
-    async def count_authorships_with_name_form(
-        self, person_id: int, name_form: str
-    ) -> int:
-        return await _authorships.count_authorships_with_name_form(
-            self._cur, person_id, name_form
-        )
+    async def count_authorships_with_name_form(self, person_id: int, name_form: str) -> int:
+        return await _authorships.count_authorships_with_name_form(self._cur, person_id, name_form)
 
     # ── person_name_forms ──────────────────────────────────────────
 
