@@ -14,8 +14,8 @@ from typing import Any
 
 from application.audit import async_emit_event, emit_event
 from application.authorships import async_delete_orphan_authorships
-from domain.errors import ConflictError, ValidationError
-from domain.person import compute_person_name_forms
+from domain.errors import ValidationError
+from domain.person import check_can_merge_persons, compute_person_name_forms
 from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
 from domain.sources import ALL_SOURCES_SET
@@ -453,11 +453,7 @@ def merge_person(cur: Any, target_id: int, source_id: int, *, repo: PersonReposi
     Lève ConflictError si l'invariant est violé. Émet un événement
     d'audit `person.merged` si l'utilisateur est dans le contexte.
     """
-    if repo.has_distinct_rh(target_id, source_id):
-        raise ConflictError(
-            f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
-            f"ont chacune une fiche RH distincte."
-        )
+    check_can_merge_persons(repo.has_distinct_rh(target_id, source_id), target_id, source_id)
     repo.merge_into(target_id, source_id)
     emit_event(cur, "person.merged", "person", target_id, {"source_id": source_id})
 
@@ -466,10 +462,6 @@ async def async_merge_person(
     cur: Any, target_id: int, source_id: int, *, repo: AsyncPersonRepository
 ) -> None:
     """Variante async de `merge_person`."""
-    if await repo.has_distinct_rh(target_id, source_id):
-        raise ConflictError(
-            f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
-            f"ont chacune une fiche RH distincte."
-        )
+    check_can_merge_persons(await repo.has_distinct_rh(target_id, source_id), target_id, source_id)
     await repo.merge_into(target_id, source_id)
     await async_emit_event(cur, "person.merged", "person", target_id, {"source_id": source_id})

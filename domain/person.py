@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from domain.errors import ValidationError
+from domain.errors import ConflictError, ValidationError
 from domain.normalize import normalize_name
 
 # ── Formes de noms (règle métier) ──────────────────────────────────
@@ -57,6 +57,26 @@ def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
         forms.add(ln)
 
     return forms
+
+
+# ── Règles métier de fusion ────────────────────────────────────────
+
+
+def check_can_merge_persons(has_distinct_rh: bool, target_id: int, source_id: int) -> None:
+    """Valide qu'une fusion de personnes est autorisée.
+
+    Invariant : refus si les deux personnes ont chacune une fiche RH
+    distincte (risque de perdre de l'information humaine).
+
+    Lève `ConflictError` avec le message standardisé si l'invariant est
+    violé. L'appelant reste responsable de fournir l'information
+    `has_distinct_rh` (typiquement via le repository).
+    """
+    if has_distinct_rh:
+        raise ConflictError(
+            f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
+            f"ont chacune une fiche RH distincte."
+        )
 
 
 # ── ORCID ──────────────────────────────────────────────────────────

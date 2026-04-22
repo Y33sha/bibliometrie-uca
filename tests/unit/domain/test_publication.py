@@ -10,6 +10,9 @@ from domain.errors import ValidationError
 from domain.publication import (
     DOI,
     NNT,
+    OA_RANK,
+    SOURCE_PRIORITY,
+    DoiConflictResolution,
     EcoleDoctorale,
     ExternalIds,
     HALId,
@@ -19,6 +22,8 @@ from domain.publication import (
     PublicationMeta,
     PublicationTopics,
     ThesesTopics,
+    best_oa_status,
+    resolve_doi_conflict,
 )
 
 # ── DOI ────────────────────────────────────────────────────────────
@@ -376,3 +381,145 @@ class TestPublicationTopics:
 
     def test_empty(self):
         assert PublicationTopics().to_dict() == {}
+
+
+# ── Règles d'agrégation multi-sources ──────────────────────────────
+
+
+class TestSourcePriority:
+    def test_theses_first(self):
+        assert SOURCE_PRIORITY[0] == "theses"
+
+    def test_wos_last(self):
+        assert SOURCE_PRIORITY[-1] == "wos"
+
+    def test_contains_all_five_sources(self):
+        assert set(SOURCE_PRIORITY) == {"theses", "scanr", "hal", "openalex", "wos"}
+
+
+class TestBestOAStatus:
+    def test_returns_most_open(self):
+        assert best_oa_status(["green", "gold", "closed"]) == "gold"
+
+    def test_diamond_wins_over_gold(self):
+        assert best_oa_status(["gold", "diamond"]) == "diamond"
+
+    def test_ignores_none_and_empty(self):
+        assert best_oa_status([None, "", "bronze"]) == "bronze"
+
+    def test_returns_none_if_no_known_status(self):
+        assert best_oa_status([None, None]) is None
+        assert best_oa_status([]) is None
+
+    def test_ignores_unknown_status_value(self):
+        # un statut absent de OA_RANK est ignoré (rank=0), on garde l'autre
+        assert best_oa_status(["mystery", "green"]) == "green"
+
+    def test_unknown_kept_only_if_nothing_better(self):
+        # le statut "unknown" a un rank > 0 : il gagne face à rien
+        assert best_oa_status(["unknown"]) == "unknown"
+
+    def test_rank_order_is_strict(self):
+        # ordre documenté dans la docstring
+        assert OA_RANK["diamond"] > OA_RANK["gold"] > OA_RANK["hybrid"]
+        assert OA_RANK["hybrid"] > OA_RANK["bronze"] > OA_RANK["green"]
+        assert OA_RANK["green"] > OA_RANK["closed"] > OA_RANK["unknown"]
+
+
+# ── resolve_doi_conflict (règle pure) ──────────────────────────────
+
+
+class TestResolveDoiConflictPure:
+    def test_chapter_vs_book_drops_doi(self):
+        """Chapitre avec DOI qui pointe vers livre : DOI retiré du chapitre."""
+        res = resolve_doi_conflict(
+            new_doi="10.x/book",
+            new_doc_type="book_chapter",
+            new_title_normalized="chapitre",
+            existing_doc_type="book",
+            existing_title_normalized="livre",
+            existing_id=1,
+        )
+        assert res == DoiConflictResolution(
+            accepted_doi=None, merge_with_id=None, clear_existing_doi=False
+        )
+
+    def test_book_vs_chapter_strips_doi_from_chapter(self):
+        """Livre avec DOI existant sur un chapitre : chapitre perd son DOI, livre garde."""
+        res = resolve_doi_conflict(
+            new_doi="10.x/book",
+            new_doc_type="book",
+            new_title_normalized="livre",
+            existing_doc_type="book_chapter",
+            existing_title_normalized="chapitre",
+            existing_id=42,
+        )
+        assert res == DoiConflictResolution(
+            accepted_doi="10.x/book", merge_with_id=None, clear_existing_doi=True
+        )
+
+    def test_two_chapters_different_titles_strip_both(self):
+        res = resolve_doi_conflict(
+            new_doi="10.x/shared",
+            new_doc_type="book_chapter",
+            new_title_normalized="c2",
+            existing_doc_type="book_chapter",
+            existing_title_normalized="c1",
+            existing_id=7,
+        )
+        assert res == DoiConflictResolution(
+            accepted_doi=None, merge_with_id=None, clear_existing_doi=True
+        )
+
+    def test_two_chapters_same_title_merges(self):
+        res = resolve_doi_conflict(
+            new_doi="10.x/shared",
+            new_doc_type="book_chapter",
+            new_title_normalized="same",
+            existing_doc_type="book_chapter",
+            existing_title_normalized="same",
+            existing_id=42,
+        )
+        assert res == DoiConflictResolution(
+            accepted_doi="10.x/shared", merge_with_id=42, clear_existing_doi=False
+        )
+
+    def test_compatible_types_merge(self):
+        res = resolve_doi_conflict(
+            new_doi="10.x/a",
+            new_doc_type="article",
+            new_title_normalized="a",
+            existing_doc_type="article",
+            existing_title_normalized="a",
+            existing_id=42,
+        )
+        assert res == DoiConflictResolution(
+            accepted_doi="10.x/a", merge_with_id=42, clear_existing_doi=False
+        )
+
+    def test_existing_doc_type_none_is_compatible(self):
+        """Pas de doc_type existant → pas de cas spécial, on fusionne."""
+        res = resolve_doi_conflict(
+            new_doi="10.x/a",
+            new_doc_type="article",
+            new_title_normalized="a",
+            existing_doc_type=None,
+            existing_title_normalized="a",
+            existing_id=1,
+        )
+        assert res.accepted_doi == "10.x/a"
+        assert res.merge_with_id == 1
+        assert res.clear_existing_doi is False
+
+    def test_chapter_variants_recognized(self):
+        """Les alias book-chapter et chapter sont traités comme book_chapter."""
+        for alias in ("book-chapter", "chapter"):
+            res = resolve_doi_conflict(
+                new_doi="10.x/b",
+                new_doc_type=alias,
+                new_title_normalized="c",
+                existing_doc_type="book",
+                existing_title_normalized="livre",
+                existing_id=1,
+            )
+            assert res.accepted_doi is None, f"alias {alias} non reconnu"
