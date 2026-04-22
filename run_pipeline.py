@@ -179,16 +179,20 @@ def phase_normalize(**kw: Any) -> Any:
     Pour HAL : enrichit les structures et moissonne les identifiants (ORCID, IdRef).
     """
     sources = kw.get("sources", set(ALL_SOURCES_SET))
-    if "openalex" in sources:
-        _run_normalize_openalex()
-    if "hal" in sources:
-        _run_normalize_hal()
-    if "wos" in sources:
-        _run_normalize_wos()
-    if "scanr" in sources:
-        _run_normalize_scanr()
+    # Ordre d'exécution : source la plus autoritative en premier
+    # (cf. SOURCE_PRIORITY dans domain/sources.py). Les sources suivantes
+    # n'écrasent pas les métadonnées déjà posées par les précédentes
+    # lors de `refresh_from_sources`.
     if "theses" in sources:
         _run_normalize_theses()
+    if "scanr" in sources:
+        _run_normalize_scanr()
+    if "hal" in sources:
+        _run_normalize_hal()
+    if "openalex" in sources:
+        _run_normalize_openalex()
+    if "wos" in sources:
+        _run_normalize_wos()
     if "hal" in sources:
         if kw.get("mode", "full") in ("full", "monthly"):
             _run_harvest_hal_identifiers()

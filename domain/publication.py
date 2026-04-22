@@ -447,14 +447,6 @@ def extract_hal_id_from_url(url: str | None) -> str | None:
 
 # ── Règles métier d'agrégation multi-sources ────────────────────────
 
-# Ordre de priorité des sources pour le recalcul des métadonnées
-# (`refresh_from_sources` dans l'application). theses.fr fait autorité
-# sur les thèses ; pour les documents hors-thèse la clé n'apparaît
-# simplement pas dans les rows et l'ordre se réduit aux sources
-# restantes.
-SOURCE_PRIORITY: tuple[str, ...] = ("theses", "scanr", "hal", "openalex", "wos")
-
-
 # Classement des statuts OA : plus la valeur est grande, plus le
 # statut est « ouvert ». Utilisé par `best_oa_status` pour choisir le
 # statut le plus ouvert entre plusieurs sources.
