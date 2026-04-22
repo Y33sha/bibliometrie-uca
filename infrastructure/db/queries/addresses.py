@@ -13,14 +13,23 @@ class AddressListFilters:
 
 
 async def resolve_default_structure_id(cur: Any) -> int:
-    """Résout la structure de travail par défaut (première racine du périmètre)."""
-    from infrastructure.app_config import _async_get_from_db
+    """Résout la structure de travail par défaut (première racine du périmètre).
 
-    perim_code = await _async_get_from_db(cur, "perimeter_persons") or "uca"
-    await cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,))
+    Lit `perimeters.structure_ids[1]` pour le périmètre configuré dans
+    `config.perimeter_persons`. Retourne 0 si la config est absente ou
+    si le périmètre n'a aucune structure (les filtres aval sont alors
+    sans effet).
+    """
+    await cur.execute("""
+        SELECT p.structure_ids[1] AS root_id
+        FROM config c
+        JOIN perimeters p ON p.code = c.value #>> '{}'
+        WHERE c.key = 'perimeter_persons'
+    """)
     row = await cur.fetchone()
-    root_ids = (row["structure_ids"] if isinstance(row, dict) else row[0]) if row else []
-    return root_ids[0] if root_ids else 0
+    if row and row["root_id"]:
+        return row["root_id"]
+    return 0
 
 
 async def list_addresses(
@@ -162,9 +171,7 @@ async def get_address_structures(cur: Any, addr_id: int) -> list[dict[str, Any]]
     return row["json_agg"] if row and row["json_agg"] else []
 
 
-async def get_structure_link(
-    cur: Any, addr_id: int, structure_id: int
-) -> dict[str, Any] | None:
+async def get_structure_link(cur: Any, addr_id: int, structure_id: int) -> dict[str, Any] | None:
     """Retourne is_confirmed + is_detected pour un lien adresse ↔ structure."""
     await cur.execute(
         """
@@ -328,9 +335,7 @@ async def suggest_countries(cur: Any, search: str) -> dict[str, Any]:
         """,
         params,
     )
-    suggestions = [
-        {"code": r["c"].strip(), "count": r["cnt"]} for r in await cur.fetchall()
-    ]
+    suggestions = [{"code": r["c"].strip(), "count": r["cnt"]} for r in await cur.fetchall()]
 
     no_country_where = (
         where_clause.replace("WHERE", "WHERE countries IS NULL AND")

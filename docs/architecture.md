@@ -5,48 +5,85 @@ voir [donnees.md](donnees.md).
 
 ## Vue d'ensemble
 
-Le projet suit une architecture **hexagonale (DDD)** en 4 couches
-distinctes, vérifiées par `import-linter` en pre-commit et en CI.
+Le projet suit une architecture **hexagonale (DDD)**. Le cœur du
+système est `application/` (use-cases et orchestrateurs), qui
+dépend de `domain/` (noyau pur). Autour de ce cœur, deux bandes
+périphériques d'**adapters frères** qui ne se connaissent pas :
+`interfaces/` (adapters entrants — HTTP, CLI) et `infrastructure/`
+(adapters sortants — DB, APIs externes, logs, settings). La
+neutralité entre ces deux bandes repose sur les **ports**
+(`Protocol`) définis dans `application/ports/` ou `domain/ports/`,
+qui forment une zone neutre dont dépendent tous les autres modules.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  interfaces/       (adapters entrants — HTTP / CLI)     │
-│  ├─ api/           FastAPI : routers, middlewares       │
-│  ├─ frontend/      SvelteKit                            │
-│  └─ cli/           Scripts one-shot (imports, debug)    │
-└────────────────────┬────────────────────────────────────┘
-                     │ peut importer tout le reste
-       ┌─────────────┴─────────────┐
-       ▼                           ▼
-┌─────────────────┐         ┌──────────────────────────┐
-│  application/   │         │  infrastructure/          │
-│  services,      │  ───✗   │  adapters sortants (SQL,  │
-│  orchestrateurs │  (port) │  APIs, settings, logs)    │
-└────────┬────────┘         └──────────────┬────────────┘
-         │                                 │
-         └────────────────┬────────────────┘
-                          ▼
-                  ┌───────────────┐
-                  │  domain/      │
-                  │  entités,     │
-                  │  value objects│
-                  │  règles pures │
-                  └───────────────┘
+                  ┌─────────────────────────────┐
+                  │  domain/                    │
+                  │  entités, value objects,    │
+                  │  règles métier pures        │  (zéro I/O)
+                  └──────────────▲──────────────┘
+                                 │
+                  ┌──────────────┴──────────────┐
+                  │  application/               │
+                  │  ├─ ports/    (Protocol)    │  ← zone neutre
+                  │  └─ use-cases, orchestrateurs
+                  └─────▲────────────────▲──────┘
+                        │                │
+            ┌───────────┘                └──────────────┐
+            │                                           │
+    ┌───────┴─────────┐                       ┌─────────┴─────────┐
+    │  interfaces/    │    ─── ⊥ ───          │  infrastructure/  │
+    │  adapters       │   (pas d'import       │  adapters sortants│
+    │  entrants :     │   direct l'un de      │  (SQL, APIs       │
+    │  routers, CLI   │   l'autre)            │  externes, logs)  │
+    └─────────────────┘                       └───────────────────┘
 ```
 
-Règles dures :
+**Règles dures.**
 
-- `domain/` est le noyau pur : **zéro I/O**, zéro import externe
-  (hormis stdlib). Peut être unit-testé sans DB, sans HTTP, sans
-  mock.
-- `application/` et `infrastructure/` sont **siblings** : ni l'un ni
-  l'autre ne peut importer l'autre directement. Leurs interactions
-  passent par des **ports** (Protocol) définis dans `application/ports/`
-  ou `domain/ports/`.
-- `interfaces/` peut tout importer ; c'est le niveau composition root.
+1. **Noyau pur.** `domain/` contient zéro I/O, zéro import externe
+   hormis `stdlib`. Testable sans DB, sans HTTP, sans mock, en
+   millisecondes.
 
-Le contrat `layers` est dans `pyproject.toml` (`[tool.importlinter]`).
-Toute violation fait échouer pre-commit et la CI.
+2. **Les ports sont une zone neutre.** `application/ports/*` (ports
+   des query services et adapters spécifiques) et `domain/ports/*`
+   (ports repositories d'agrégats) ne contiennent que des Protocol,
+   pas d'implémentation. Tous les autres modules dépendent d'eux ;
+   eux ne dépendent de personne (sauf `domain/` pour les types
+   métier).
+
+3. **Use-cases ⊥ adapters sortants.** `application/*.py` (hors
+   `ports/`) et `infrastructure/` sont frères : aucun import mutuel.
+   Les deux dépendent des ports. Contrôlé par `import-linter`
+   (contrat `layered` dans `pyproject.toml`).
+
+4. **Adapters entrants ⊥ adapters sortants.** Les routers FastAPI et
+   scripts CLI (`interfaces/api/routers/*`, `interfaces/cli/*` hors
+   composition root) **ne doivent pas** importer `infrastructure/`
+   directement. Ils pilotent des use-cases applicatifs et reçoivent
+   leurs dépendances ; ils ne les construisent pas. *État actuel :
+   cible non encore atteinte, cf. ROADMAP §1.6 — les routers
+   instancient encore directement certaines factories de
+   repositories.*
+
+5. **Le composition root est un endroit précis.** L'instanciation
+   concrète des adapters et leur câblage aux use-cases se fait
+   dans **un petit ensemble nommé de fichiers** :
+
+   - `interfaces/api/app.py` + `interfaces/api/async_deps.py` — API HTTP
+   - `run_pipeline.py` — pipeline complet
+   - `interfaces/cli/pipeline/*` — phases pipeline isolées
+   - `interfaces/cli/*` — scripts one-shot
+
+   Ces fichiers sont les **seuls** qui ont légitimement le droit
+   d'importer `infrastructure.repositories`, `infrastructure.db.queries.*`
+   ou toute classe `Pg*` concrète. Partout ailleurs, on passe par un
+   port.
+
+Le contrat `layers` d'`import-linter` (voir `pyproject.toml`,
+section `[tool.importlinter]`) vérifie aujourd'hui les règles 1 à 3.
+Les règles 4 et 5 seront verrouillables quand §1.6 de la ROADMAP
+sera clôturé (durcissement prévu du contrat pour interdire
+`interfaces.api.routers.* → infrastructure.*`).
 
 ## Les 4 couches en détail
 
@@ -86,11 +123,8 @@ Contenu :
   query services (adapters dans `infrastructure/db/queries/*`).
 
 Interdiction : **`application/` ne peut pas importer
-`infrastructure/`**. 15 violations historiques grandfathered dans
-`ignore_imports` (pipeline normalize_* qui utilisent encore
-`infrastructure.addresses`, `db_helpers`, `zenodo`, `openalex`,
-`timings`, `perimeter`). Chaque nettoyage = une ligne retirée
-(cf. ROADMAP §1.7b).
+`infrastructure/`**. §1.7b clôturé — zéro violation historique en
+`ignore_imports`. Toute nouvelle dépendance doit passer par un port.
 
 ### `infrastructure/` — adapters sortants
 
@@ -102,7 +136,8 @@ Contenu :
   - `queries/` — query services SQL (un par agrégat ou phase
     pipeline) ; implémentent les ports définis dans `application/
     ports/*`
-  - `connection.py` — pool psycopg2
+  - `connection.py` / `async_connection.py` — pools psycopg3 (sync
+    pour pipeline/CLI, async pour l'API FastAPI)
 - **`repositories/`** — adapters PostgreSQL implémentant les ports
   `domain/ports/*` : `person_repository.py`, `publication_repository.py`,
   `journal_repository.py`, `structure_repository.py`,
@@ -226,19 +261,28 @@ Couverture actuelle ~49%, seuil `fail_under = 49`
 
 ## Composition roots
 
-Les endroits qui câblent le tout (instanciation concrète des adapters,
-passage aux services/orchestrateurs) :
+Le composition root est l'endroit où les adapters concrets sont
+**instanciés** et **câblés** aux use-cases. Il a, par nature, le
+droit d'importer `infrastructure.*` directement — c'est son rôle.
+Partout ailleurs, on reçoit un port en paramètre.
 
-- `interfaces/api/app.py` + les routers — API HTTP
-- `run_pipeline.py` — orchestrateur pipeline (appelle directement les
-  phases `application/pipeline/*` avec les `Pg*Queries` concrets)
+Les fichiers qui jouent ce rôle :
+
+- `interfaces/api/app.py` — entry point FastAPI (startup, lifespan,
+  montage des routers)
+- `interfaces/api/async_deps.py` — factories partagées par les
+  routers (`get_async_cursor`, `get_root_structure_id`,
+  `get_perimeter_queries`, …)
+- `run_pipeline.py` — orchestrateur pipeline complet
 - `interfaces/cli/pipeline/*` — entry points CLI pour chaque phase
-  (lancés ponctuellement hors pipeline complet)
 - `interfaces/cli/*` — scripts one-shot
 
-Aucun autre endroit ne doit importer `infrastructure.repositories` ou
-`infrastructure.db.queries` : ce sont les seuls points où le domaine
-rencontre ses implémentations concrètes.
+Cible (ROADMAP §1.6) : **seuls** ces fichiers importent
+`infrastructure.repositories`, `infrastructure.db.queries.*` ou toute
+classe `Pg*` concrète. Les routers et CLI applicatifs reçoivent
+leurs dépendances, ne les construisent pas. En attendant, quelques
+routers instancient encore des factories directement — dette
+résiduelle listée dans la roadmap.
 
 ## Pour aller plus loin
 

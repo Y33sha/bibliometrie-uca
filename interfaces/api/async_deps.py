@@ -1,4 +1,5 @@
-"""Dépendances async FastAPI : curseur async via AsyncConnectionPool.
+"""Dépendances async FastAPI : curseur async via AsyncConnectionPool,
+et câblage des adapters sortants vers leurs ports (composition root API).
 
 `pool.connection()` gère automatiquement commit (succès) / rollback
 (exception) et la restitution au pool, cf. psycopg_pool.
@@ -8,7 +9,9 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+from application.ports.perimeter import AsyncPerimeterQueries
 from infrastructure.db.async_connection import get_async_pool
+from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
 
 
 @asynccontextmanager
@@ -17,6 +20,20 @@ async def get_async_cursor() -> AsyncIterator[tuple[Any, Any]]:
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             yield cur, conn
+
+
+# ── Câblage des adapters sortants ──
+
+# PgAsyncPerimeterQueries est sans état (le curseur est passé aux
+# méthodes), donc un singleton par processus suffit. Les routers
+# reçoivent l'objet via le port `AsyncPerimeterQueries` sans connaître
+# l'implémentation concrète.
+_perimeter_queries_singleton: AsyncPerimeterQueries = PgAsyncPerimeterQueries()
+
+
+def get_perimeter_queries() -> AsyncPerimeterQueries:
+    """Retourne l'implémentation enregistrée de `AsyncPerimeterQueries`."""
+    return _perimeter_queries_singleton
 
 
 # ----- Perimeter root -----

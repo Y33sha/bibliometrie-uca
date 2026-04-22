@@ -10,11 +10,9 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 from application import addresses as addresses_service
-from infrastructure.app_config import _async_get_from_db
 from infrastructure.db.queries import addresses as addr_queries
-from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
 from infrastructure.repositories import async_address_repository, async_authorship_repository
-from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.async_deps import get_async_cursor, get_perimeter_queries
 from interfaces.api.deps import require_admin
 from interfaces.api.models import (
     AddressesCountriesResponse,
@@ -116,7 +114,7 @@ async def review_address(addr_id: int, action: ReviewAction) -> Any:
             action.is_confirmed,
             repo=async_address_repository(cur),
             authorship_repo=async_authorship_repository(cur),
-            perimeter_queries=PgAsyncPerimeterQueries(),
+            perimeter_queries=get_perimeter_queries(),
         )
         structures = await addr_queries.get_address_structures(cur, addr_id)
         link = await addr_queries.get_structure_link(cur, addr_id, action.structure_id)
@@ -139,7 +137,7 @@ async def batch_review(data: BatchReviewAction) -> Any:
             data.is_confirmed,
             repo=async_address_repository(cur),
             authorship_repo=async_authorship_repository(cur),
-            perimeter_queries=PgAsyncPerimeterQueries(),
+            perimeter_queries=get_perimeter_queries(),
         )
         return {"updated": updated}
 
@@ -260,7 +258,7 @@ async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
             True,
             repo=async_address_repository(cur),
             authorship_repo=async_authorship_repository(cur),
-            perimeter_queries=PgAsyncPerimeterQueries(),
+            perimeter_queries=get_perimeter_queries(),
         )
         return {"id": addr_id, "structure_id": action.structure_id, "status": "assigned"}
 
@@ -277,7 +275,7 @@ async def unassign_structure(addr_id: int, structure_id: int = Query(...)) -> An
             structure_id,
             repo=async_address_repository(cur),
             authorship_repo=async_authorship_repository(cur),
-            perimeter_queries=PgAsyncPerimeterQueries(),
+            perimeter_queries=get_perimeter_queries(),
         )
         return {"deleted": deleted}
 
@@ -286,13 +284,8 @@ async def unassign_structure(addr_id: int, structure_id: int = Query(...)) -> An
 async def admin_address_stats(structure_id: int | None = Query(None)) -> Any:
     """Compteurs d'adresses par détection/validation pour une structure."""
     async with get_async_cursor() as (cur, _conn):
-        # Résoudre la structure (défaut = première racine du périmètre)
         if structure_id is None:
-            perim_code = await _async_get_from_db(cur, "perimeter_persons") or "uca"
-            await cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,))
-            row = await cur.fetchone()
-            root_ids = (row["structure_ids"] if isinstance(row, dict) else row[0]) if row else []
-            structure_id = root_ids[0] if root_ids else 0
+            structure_id = await addr_queries.resolve_default_structure_id(cur)
 
         await cur.execute("SELECT COUNT(*) AS total FROM addresses")
         total = (await cur.fetchone())["total"]
