@@ -1,7 +1,11 @@
 """Router /api/addresses/* et /api/countries.
 
-Les queries sont dans `infrastructure/db/queries/addresses.py`.
-Les mutations délèguent à `application.addresses`.
+Les queries sont dans `infrastructure/db/queries/addresses.py`. Les
+mutations délèguent à deux services applicatifs distincts :
+- `application.addresses_structures` pour la validation des liens
+  adresse↔structure (review/batch/unassign)
+- `application.addresses_countries` pour l'attribution et la
+  propagation des pays.
 """
 
 import logging
@@ -9,7 +13,8 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
-from application import addresses as addresses_service
+from application import addresses_countries as countries_service
+from application import addresses_structures as structures_service
 from infrastructure.db.queries import addresses as addr_queries
 from infrastructure.repositories import async_address_repository, async_authorship_repository
 from interfaces.api.async_deps import get_async_cursor, get_perimeter_queries
@@ -42,7 +47,7 @@ async def _bg_propagate_countries(address_ids: list[int]) -> None:
     """Propagation pays en tâche de fond (sur le pool async FastAPI)."""
     try:
         async with get_async_cursor() as (cur, _conn):
-            await addresses_service.propagate_countries_to_publications(
+            await countries_service.propagate_countries_to_publications(
                 cur, address_ids, repo=async_address_repository(cur)
             )
     except Exception:
@@ -107,7 +112,7 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)) -> Any:
 async def review_address(addr_id: int, action: ReviewAction) -> Any:
     """Confirme, rejette ou reset le lien adresse ↔ structure."""
     async with get_async_cursor() as (cur, _conn):
-        await addresses_service.review_structure_link(
+        await structures_service.review_structure_link(
             cur,
             addr_id,
             action.structure_id,
@@ -130,7 +135,7 @@ async def review_address(addr_id: int, action: ReviewAction) -> Any:
 async def batch_review(data: BatchReviewAction) -> Any:
     """Confirme/rejette/reset en batch."""
     async with get_async_cursor() as (cur, _conn):
-        updated = await addresses_service.batch_review_structure_link(
+        updated = await structures_service.batch_review_structure_link(
             cur,
             data.address_ids,
             data.structure_id,
@@ -194,7 +199,7 @@ async def set_address_country(
         for c in body.countries or []:
             if not await addr_queries.country_exists(cur, c):
                 raise HTTPException(status_code=400, detail=f"Code pays inconnu: {c}")
-        affected = await addresses_service.set_country(
+        affected = await countries_service.set_country(
             cur, addr_id, body.countries, repo=async_address_repository(cur)
         )
     bg.add_task(_bg_propagate_countries, affected)
@@ -216,11 +221,11 @@ async def batch_set_country(
 
         addr_repo = async_address_repository(cur)
         if body.address_ids:
-            modified_ids = await addresses_service.batch_set_country_by_ids(
+            modified_ids = await countries_service.batch_set_country_by_ids(
                 cur, country_code, body.address_ids, repo=addr_repo
             )
         else:
-            modified_ids = await addresses_service.batch_set_country_by_filter(
+            modified_ids = await countries_service.batch_set_country_by_filter(
                 cur,
                 country_code,
                 search=body.search,
@@ -231,7 +236,7 @@ async def batch_set_country(
             )
         updated = len(modified_ids)
 
-        propagated_ids = await addresses_service.propagate_countries_to_similar(cur, repo=addr_repo)
+        propagated_ids = await countries_service.propagate_countries_to_similar(cur, repo=addr_repo)
         propagated = len(propagated_ids)
         all_ids = modified_ids + propagated_ids
 
@@ -251,7 +256,7 @@ async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
         if not await cur.fetchone():
             raise HTTPException(status_code=404, detail="Structure not found")
 
-        await addresses_service.review_structure_link(
+        await structures_service.review_structure_link(
             cur,
             addr_id,
             action.structure_id,
@@ -269,7 +274,7 @@ async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
 async def unassign_structure(addr_id: int, structure_id: int = Query(...)) -> Any:
     """Supprime l'assignation manuelle d'une structure."""
     async with get_async_cursor() as (cur, _conn):
-        deleted = await addresses_service.unassign_manual_structure(
+        deleted = await structures_service.unassign_manual_structure(
             cur,
             addr_id,
             structure_id,

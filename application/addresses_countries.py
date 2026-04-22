@@ -1,108 +1,22 @@
 """
-Service Addresses — orchestrateur des opérations sur `addresses`,
-`address_structures`, et propagation des pays vers les publications.
+Service Pays des adresses — attribution, propagation horizontale
+(adresses similaires) et verticale (vers source_publications /
+publications).
+
+Séparé de `application/addresses.py` depuis §2.9.SRP : la validation
+des liens adresse↔structure vit dans
+`application/addresses_structures.py`. Les deux surfaces partagent
+l'agrégat Address mais n'interagissent pas entre elles.
 
 Le SQL vit dans `infrastructure/repositories/address_repository.py`.
-Les routers passent par ces fonctions pour toute écriture sur les
-adresses. Les lectures restent autorisées dans les routers (convention
-du projet).
 """
 
 import logging
 from typing import Any
 
-from application.authorships import propagate_uca_for_addresses
-from application.ports.perimeter import AsyncPerimeterQueries
 from domain.ports.address_repository import AsyncAddressRepository
-from domain.ports.authorship_repository import AsyncAuthorshipRepository
 
 logger = logging.getLogger(__name__)
-
-
-# ── Validation des liens adresse ↔ structure ──────────────────────
-
-
-async def review_structure_link(
-    cur: Any,
-    address_id: int,
-    structure_id: int,
-    is_confirmed: bool | None,
-    *,
-    repo: AsyncAddressRepository,
-    authorship_repo: AsyncAuthorshipRepository,
-    perimeter_queries: AsyncPerimeterQueries,
-) -> None:
-    """Upsert le lien address ↔ structure (validation manuelle).
-
-    - is_confirmed = True  → confirme (crée le lien si besoin)
-    - is_confirmed = False → rejette (crée le lien si besoin)
-    - is_confirmed = None  → reset (supprime le lien manuel, remet l'auto à NULL)
-
-    Propage automatiquement l'UCA aux source_authorships et authorships vérité.
-    """
-    if is_confirmed is None:
-        await repo.reset_manual_link(address_id, structure_id)
-    else:
-        await repo.upsert_structure_link(address_id, structure_id, is_confirmed)
-    await propagate_uca_for_addresses(
-        cur, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
-    )
-
-
-async def batch_review_structure_link(
-    cur: Any,
-    address_ids: list[int],
-    structure_id: int,
-    is_confirmed: bool | None,
-    *,
-    repo: AsyncAddressRepository,
-    authorship_repo: AsyncAuthorshipRepository,
-    perimeter_queries: AsyncPerimeterQueries,
-) -> int:
-    """Comme review_structure_link mais sur un lot d'adresses.
-
-    Retourne le nombre d'adresses touchées (pour les reset, nombre de lignes
-    UPDATEes ; pour les upserts, taille du lot passé).
-    """
-    if not address_ids:
-        return 0
-
-    if is_confirmed is None:
-        updated = await repo.batch_reset_manual_links(address_ids, structure_id)
-    else:
-        await repo.batch_upsert_structure_links(address_ids, structure_id, is_confirmed)
-        updated = len(address_ids)
-
-    await propagate_uca_for_addresses(
-        cur, address_ids, repo=authorship_repo, perimeter_queries=perimeter_queries
-    )
-    return updated
-
-
-async def unassign_manual_structure(
-    cur: Any,
-    address_id: int,
-    structure_id: int,
-    *,
-    repo: AsyncAddressRepository,
-    authorship_repo: AsyncAuthorshipRepository,
-    perimeter_queries: AsyncPerimeterQueries,
-) -> bool:
-    """Supprime uniquement le lien manuel (matched_form_id IS NULL) entre
-    une adresse et une structure. Les liens auto-détectés et leurs is_confirmed
-    ne sont pas touchés (contrairement à review_structure_link(None)).
-
-    Propage automatiquement l'UCA.
-    Retourne True si un lien manuel a été supprimé, False sinon.
-    """
-    deleted = await repo.delete_manual_structure_link(address_id, structure_id)
-    await propagate_uca_for_addresses(
-        cur, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
-    )
-    return deleted
-
-
-# ── Attribution des pays ──────────────────────────────────────────
 
 
 async def set_country(
@@ -186,9 +100,6 @@ async def propagate_countries_to_similar(cur: Any, *, repo: AsyncAddressReposito
     référentiel d'adresses. Retourne les IDs propagés.
     """
     return await repo.propagate_countries_across_similar_addresses()
-
-
-# ── Propagation pays vers source_publications et publications ────
 
 
 async def propagate_countries_to_publications(
