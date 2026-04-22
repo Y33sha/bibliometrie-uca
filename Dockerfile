@@ -17,14 +17,21 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY pyproject.toml .
+# Installer uv (utilisé pour `uv sync --frozen` qui installe
+# exactement les versions de uv.lock — mêmes versions que CI + dev).
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock ./
 COPY application/     ./application/
 COPY domain/          ./domain/
 COPY infrastructure/  ./infrastructure/
 COPY interfaces/      ./interfaces/
 COPY run_pipeline.py  .
 
-RUN pip install --no-cache-dir .
+RUN uv sync --frozen --no-dev
+
+# Ajouter le venv de uv au PATH (évite `uv run` à chaque invocation).
+ENV PATH="/app/.venv/bin:${PATH}"
 
 # Frontend buildé (servi par l'API via SPAStaticFiles)
 COPY --from=frontend-build /build/build ./interfaces/frontend/build
