@@ -5,6 +5,7 @@ import os
 
 from application.pipeline.enrich.enrich_journal_apc import run_enrich
 from infrastructure.api_limits import DOAJ_DELAY
+from infrastructure.app_config import get_api_base_urls
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.enrich import PgEnrichQueries
 from infrastructure.log import setup_logger
@@ -39,6 +40,7 @@ def main() -> None:
             logger,
             journal_repo=journal_repository(cur),
             mailto=MAILTO,
+            openalex_sources_api=get_api_base_urls(cur)["openalex_sources"],
             limit=args.limit,
             dry_run=args.dry_run,
             reset=args.reset,

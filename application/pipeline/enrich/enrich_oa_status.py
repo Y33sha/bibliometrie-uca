@@ -24,7 +24,6 @@ from domain.ports.publication_repository import PublicationRepository
 
 # Email requis par Unpaywall (politesse, pas d'auth)
 UNPAYWALL_EMAIL = "bibliometrie@uca.fr"
-UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
 
 # Mapping Unpaywall oa_status → notre enum oa_type
 OA_MAP = {
@@ -38,11 +37,11 @@ OA_MAP = {
 BATCH_SIZE = 50
 
 
-def fetch_oa_status(doi: str, logger: Any) -> str | None:
+def fetch_oa_status(doi: str, logger: Any, *, unpaywall_base: str) -> str | None:
     """Interroge Unpaywall pour un DOI. Retourne le statut OA ou None."""
     for attempt in range(3):
         try:
-            url = f"{UNPAYWALL_BASE}/{doi}?email={UNPAYWALL_EMAIL}"
+            url = f"{unpaywall_base}/{doi}?email={UNPAYWALL_EMAIL}"
             resp = requests.get(url, timeout=10)
 
             if resp.status_code == 404:
@@ -75,6 +74,7 @@ def run_enrich(
     logger: Any,
     *,
     pub_repo: PublicationRepository,
+    unpaywall_base: str,
     limit: int = 0,
     dry_run: bool = False,
     rate_delay: float = 0.1,
@@ -99,7 +99,7 @@ def run_enrich(
                 f"  {i}/{total} — {updated} mis à jour, {skipped} inchangés, {not_found} non trouvés"
             )
 
-        status = fetch_oa_status(doi, logger)
+        status = fetch_oa_status(doi, logger, unpaywall_base=unpaywall_base)
 
         if status:
             if current_status == "diamond" and status == "gold":

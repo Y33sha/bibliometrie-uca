@@ -123,7 +123,7 @@ def _run_normalize_hal(dict_cur):
     queries = PgHalNormalizeQueries()
     staging_queries = PgStagingQueries()
     address_linker = PgAddressLinker()
-    zenodo_resolver = HttpZenodoResolver()
+    zenodo_resolver = HttpZenodoResolver(api_base="https://zenodo.org/api/records")
     logger = logging.getLogger("test")
     journal_repo = journal_repository(tuple_cur)
     publisher_repo = publisher_repository(tuple_cur)

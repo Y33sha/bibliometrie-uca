@@ -5,6 +5,7 @@ import os
 
 from application.pipeline.normalize.harvest_hal_identifiers import run_harvest
 from infrastructure.api_limits import HAL_DELAY
+from infrastructure.app_config import get_api_base_urls
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.harvest import PgHarvestQueries
 from infrastructure.log import setup_logger
@@ -31,6 +32,7 @@ def main() -> None:
             conn,
             PgHarvestQueries(),
             logger,
+            hal_ref_author_api=get_api_base_urls(cur)["hal_ref_author"],
             batch_size=args.batch,
             dry_run=args.dry_run,
             rate_delay=HAL_DELAY,

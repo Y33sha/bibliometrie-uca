@@ -1,8 +1,12 @@
-"""Constantes et utilitaires partagés pour l'extraction OpenAlex."""
+"""Constantes et utilitaires partagés pour l'extraction OpenAlex.
+
+L'URL de base de l'API vit dans la config (`api_base_urls.openalex`).
+Les scripts CLI qui ont accès à un curseur doivent la lire via
+`infrastructure.app_config.get_api_base_urls(cur)["openalex"]` et la
+passer en paramètre aux fonctions `fetch_*`.
+"""
 
 from infrastructure.sources.common import clean_doi, compute_hash
-
-BASE_URL = "https://api.openalex.org/works"
 
 # Paramètres d'authentification — initialisés par le premier script lancé
 _api_key = None

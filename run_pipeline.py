@@ -423,6 +423,7 @@ def _run_merge_pubs_by_hal_id() -> None:
 def _run_normalize_hal() -> None:
     from application.pipeline.normalize.normalize_hal import HalNormalizer
     from infrastructure.addresses import PgAddressLinker
+    from infrastructure.app_config import get_api_base_urls
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
@@ -436,6 +437,8 @@ def _run_normalize_hal() -> None:
     log.info("▶ normalize_hal")
     t0 = time.time()
     conn = get_connection()
+    with conn.cursor() as cur:
+        zenodo_api = get_api_base_urls(cur)["zenodo"]
     HalNormalizer(
         conn,
         log,
@@ -444,7 +447,7 @@ def _run_normalize_hal() -> None:
         journal_repo_factory=journal_repository,
         publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
-        zenodo_resolver=HttpZenodoResolver(),
+        zenodo_resolver=HttpZenodoResolver(api_base=zenodo_api),
         address_linker=PgAddressLinker(),
     ).run([])
     log.info("✓ normalize_hal terminé en %.1fs", time.time() - t0)
@@ -479,6 +482,7 @@ def _run_normalize_wos() -> None:
 def _run_normalize_openalex() -> None:
     from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
     from infrastructure.addresses import PgAddressLinker
+    from infrastructure.app_config import get_api_base_urls
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
@@ -492,6 +496,8 @@ def _run_normalize_openalex() -> None:
     log.info("▶ normalize_openalex")
     t0 = time.time()
     conn = get_connection()
+    with conn.cursor() as cur:
+        zenodo_api = get_api_base_urls(cur)["zenodo"]
     OpenalexNormalizer(
         conn,
         log,
@@ -500,7 +506,7 @@ def _run_normalize_openalex() -> None:
         journal_repo_factory=journal_repository,
         publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
-        zenodo_resolver=HttpZenodoResolver(),
+        zenodo_resolver=HttpZenodoResolver(api_base=zenodo_api),
         address_linker=PgAddressLinker(),
     ).run([])
     log.info("✓ normalize_openalex terminé en %.1fs", time.time() - t0)
@@ -559,6 +565,7 @@ def _run_normalize_theses() -> None:
 def _run_harvest_hal_identifiers() -> None:
     from application.pipeline.normalize.harvest_hal_identifiers import run_harvest
     from infrastructure.api_limits import HAL_DELAY
+    from infrastructure.app_config import get_api_base_urls
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.harvest import PgHarvestQueries
 
@@ -568,7 +575,14 @@ def _run_harvest_hal_identifiers() -> None:
     conn.autocommit = False
     try:
         cur = conn.cursor()
-        run_harvest(cur, conn, PgHarvestQueries(), log, rate_delay=HAL_DELAY)
+        run_harvest(
+            cur,
+            conn,
+            PgHarvestQueries(),
+            log,
+            hal_ref_author_api=get_api_base_urls(cur)["hal_ref_author"],
+            rate_delay=HAL_DELAY,
+        )
     finally:
         conn.close()
     log.info("✓ harvest_hal_identifiers terminé en %.1fs", time.time() - t0)
@@ -577,6 +591,7 @@ def _run_harvest_hal_identifiers() -> None:
 def _run_enrich_oa_status() -> None:
     from application.pipeline.enrich.enrich_oa_status import run_enrich
     from infrastructure.api_limits import UNPAYWALL_DELAY
+    from infrastructure.app_config import get_api_base_urls
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.enrich import PgEnrichQueries
     from infrastructure.repositories import publication_repository
@@ -592,6 +607,7 @@ def _run_enrich_oa_status() -> None:
             PgEnrichQueries(),
             log,
             pub_repo=publication_repository(cur),
+            unpaywall_base=get_api_base_urls(cur)["unpaywall"],
             rate_delay=UNPAYWALL_DELAY,
         )
     finally:
@@ -602,6 +618,7 @@ def _run_enrich_oa_status() -> None:
 def _run_enrich_journal_apc() -> None:
     from application.pipeline.enrich.enrich_journal_apc import run_enrich
     from infrastructure.api_limits import DOAJ_DELAY
+    from infrastructure.app_config import get_api_base_urls
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.enrich import PgEnrichQueries
     from infrastructure.repositories import journal_repository
@@ -619,6 +636,7 @@ def _run_enrich_journal_apc() -> None:
             log,
             journal_repo=journal_repository(cur),
             mailto="bibliometrie@uca.fr",
+            openalex_sources_api=get_api_base_urls(cur)["openalex_sources"],
             rate_delay=DOAJ_DELAY,
         )
     finally:

@@ -13,20 +13,28 @@ from infrastructure.log import setup_logger
 
 logger = setup_logger("zenodo", "processing/logs")
 
-_API_BASE = "https://zenodo.org/api/records"
 _MAX_RETRIES = 3
 _INITIAL_BACKOFF = 2  # secondes
 _last_request_time = 0.0
 
 
 class HttpZenodoResolver:
-    """Adapter HTTP pour `application.ports.zenodo_resolver.ZenodoResolver`."""
+    """Adapter HTTP pour `application.ports.zenodo_resolver.ZenodoResolver`.
+
+    L'URL de base de l'API est injectée au constructeur (12-factor : les
+    backing services sont paramétrés par config, pas par constante en
+    dur). Les call sites récupèrent la valeur depuis
+    `get_api_base_urls(cur)["zenodo"]`.
+    """
+
+    def __init__(self, api_base: str) -> None:
+        self._api_base = api_base
 
     def resolve(self, doi: str) -> str | None:
-        return resolve_zenodo_doi(doi)
+        return resolve_zenodo_doi(doi, api_base=self._api_base)
 
 
-def resolve_zenodo_doi(doi: str) -> str | None:
+def resolve_zenodo_doi(doi: str, *, api_base: str) -> str | None:
     """Résout un DOI Zenodo vers le DOI de la version concrète.
 
     - Si le DOI est déjà un version DOI, retourne None (rien à changer).
@@ -50,7 +58,7 @@ def resolve_zenodo_doi(doi: str) -> str | None:
             if elapsed < ZENODO_DELAY:
                 time.sleep(ZENODO_DELAY - elapsed)
 
-            resp = requests.get(f"{_API_BASE}/{record_id}", timeout=10, allow_redirects=True)
+            resp = requests.get(f"{api_base}/{record_id}", timeout=10, allow_redirects=True)
             _last_request_time = time.time()
             if resp.status_code == 429:
                 wait = backoff * (2**attempt)

@@ -27,14 +27,13 @@ from psycopg.types.json import Jsonb as Json
 
 from domain.publication import extract_hal_id_from_url
 from infrastructure.api_limits import HAL_DELAY
+from infrastructure.app_config import get_api_base_urls
 from infrastructure.db.connection import get_connection
 from infrastructure.hal import HAL_FIELDS_STR
 from infrastructure.log import setup_logger
 from infrastructure.sources.common import compute_hash
 
 log = setup_logger("fetch_missing_hal", os.path.join(os.path.dirname(__file__), "logs"))
-
-HAL_API = "https://api.archives-ouvertes.fr/search"
 
 
 def find_hal_primary_locations(cur: Any) -> list[dict]:
@@ -166,11 +165,11 @@ def find_nnt_without_hal(cur: Any) -> list[dict]:
     ]
 
 
-def fetch_hal_by_nnt(nnt: str) -> dict | None:
+def fetch_hal_by_nnt(nnt: str, *, base_url: str) -> dict | None:
     """Télécharge un document depuis l'API HAL par NNT."""
     try:
         resp = requests.get(
-            HAL_API,
+            base_url,
             params={
                 "q": f"nntId_s:{nnt}",
                 "fl": HAL_FIELDS_STR,
@@ -211,11 +210,11 @@ def find_missing_hal_ids(cur: Any, hal_refs: list[dict]) -> list[dict]:
     return missing
 
 
-def fetch_hal_document(hal_id: str) -> dict | None:
+def fetch_hal_document(hal_id: str, *, base_url: str) -> dict | None:
     """Télécharge un document depuis l'API HAL."""
     try:
         resp = requests.get(
-            HAL_API,
+            base_url,
             params={
                 "q": f"halId_s:{hal_id}",
                 "fl": HAL_FIELDS_STR,
@@ -298,6 +297,7 @@ def main() -> Any:
 
     conn = get_connection()
     cur = conn.cursor()
+    base_url = get_api_base_urls(cur)["hal"]
 
     # 1. Trouver les HAL IDs manquants depuis OpenAlex et ScanR
     log.info("Recherche des works OpenAlex avec primary_location HAL...")
@@ -372,7 +372,7 @@ def main() -> Any:
         log.info(f"\n--- Fetch par halId ({len(missing)} documents) ---")
         for i, ref in enumerate(missing):
             hal_id = ref["hal_id"]
-            doc = fetch_hal_document(hal_id)
+            doc = fetch_hal_document(hal_id, base_url=base_url)
 
             if doc:
                 doi_str = doc.get("doiId_s")
@@ -406,7 +406,7 @@ def main() -> Any:
         nnt_fetched = 0
         nnt_not_found = 0
         for i, ref in enumerate(nnt_refs):
-            doc = fetch_hal_by_nnt(ref["nnt"])
+            doc = fetch_hal_by_nnt(ref["nnt"], base_url=base_url)
 
             if doc:
                 hal_id = doc.get("halId_s")

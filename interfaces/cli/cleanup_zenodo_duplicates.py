@@ -16,6 +16,7 @@ import time
 from typing import Any
 
 from application.publications import merge_publications
+from infrastructure.app_config import get_api_base_urls
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 from infrastructure.repositories import publication_repository
@@ -108,6 +109,7 @@ def main() -> None:
     conn = get_connection()
     conn.autocommit = False
     cur = conn.cursor()
+    zenodo_api = get_api_base_urls(cur)["zenodo"]
 
     merged = 0
     errors = 0
@@ -135,7 +137,7 @@ def main() -> None:
 
             for pub_id, doi in zip(pub_ids, dois, strict=True):
                 time.sleep(API_POLITE_DELAY)
-                version_doi = resolve_zenodo_doi(doi)
+                version_doi = resolve_zenodo_doi(doi, api_base=zenodo_api)
                 if version_doi is None:
                     version_ids.append((pub_id, doi))
                 else:

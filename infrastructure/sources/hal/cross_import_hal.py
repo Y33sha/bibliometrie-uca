@@ -25,6 +25,7 @@ import requests
 from psycopg.types.json import Jsonb as Json
 
 from infrastructure.api_limits import HAL_DELAY
+from infrastructure.app_config import get_api_base_urls
 from infrastructure.db.connection import get_connection
 from infrastructure.hal import HAL_FIELDS_STR
 from infrastructure.sources.common import compute_hash, get_cross_import_dois, setup_logger
@@ -32,10 +33,8 @@ from infrastructure.sources.common import compute_hash, get_cross_import_dois, s
 # ----- Logging -----
 logger = setup_logger("cross_import_hal", os.path.join(os.path.dirname(__file__), "logs"))
 
-HAL_API = "https://api.archives-ouvertes.fr/search"
 
-
-def fetch_by_doi(doi: str) -> dict | None:
+def fetch_by_doi(doi: str, *, base_url: str) -> dict | None:
     """Interroge l'API HAL pour un DOI donné. Retourne le document ou None."""
     params = {
         "q": f'doiId_s:"{doi}"',
@@ -44,7 +43,7 @@ def fetch_by_doi(doi: str) -> dict | None:
         "rows": "1",
     }
     try:
-        resp = requests.get(HAL_API, params=params, timeout=15)
+        resp = requests.get(base_url, params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         docs = data.get("response", {}).get("docs", [])
@@ -119,6 +118,8 @@ def main() -> Any:
 
     conn = get_connection()
     try:
+        with conn.cursor() as cur:
+            base_url = get_api_base_urls(cur)["hal"]
         dois = get_cross_import_dois(conn, "hal", all_staged=args.all)
         logger.info(f"{len(dois)} DOI à chercher sur HAL")
 
@@ -134,7 +135,7 @@ def main() -> Any:
         not_found = 0
 
         for i, doi in enumerate(dois):
-            doc = fetch_by_doi(doi)
+            doc = fetch_by_doi(doi, base_url=base_url)
             if doc:
                 insert_staging(conn, doc)
                 found += 1

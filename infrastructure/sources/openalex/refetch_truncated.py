@@ -19,11 +19,10 @@ import requests
 from psycopg.types.json import Jsonb as Json
 
 from infrastructure.api_limits import OPENALEX_DELAY
-from infrastructure.app_config import get_openalex_api_key, get_openalex_email
+from infrastructure.app_config import get_api_base_urls, get_openalex_api_key, get_openalex_email
 from infrastructure.db.connection import get_connection
 from infrastructure.sources.common import compute_hash, setup_logger
 from infrastructure.sources.openalex import (
-    BASE_URL,
     SELECT_FIELDS,
     auth_params,
     compute_meta_hash,
@@ -33,9 +32,9 @@ from infrastructure.sources.openalex import (
 logger = setup_logger("refetch_truncated", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def fetch_work(openalex_id: str) -> dict | None:
+def fetch_work(openalex_id: str, *, base_url: str) -> dict | None:
     """Fetch un work individuel par son ID OpenAlex (retourne tous les auteurs)."""
-    url = f"{BASE_URL}/{openalex_id}"
+    url = f"{base_url}/{openalex_id}"
     params = {"select": SELECT_FIELDS, **auth_params()}
     try:
         resp = requests.get(url, params=params, timeout=30)
@@ -61,6 +60,7 @@ def main() -> None:
     conn = get_connection()
     cur = conn.cursor()
     init_auth(api_key=get_openalex_api_key(cur), email=get_openalex_email(cur))
+    base_url = get_api_base_urls(cur)["openalex"]
 
     # Détecter les works avec exactement 100 authorships dans le staging
     cur.execute("""
@@ -87,7 +87,7 @@ def main() -> None:
 
     for i, row in enumerate(truncated):
         oa_id = row["source_id"]
-        work = fetch_work(oa_id)
+        work = fetch_work(oa_id, base_url=base_url)
         time.sleep(OPENALEX_DELAY)
 
         if not work:
