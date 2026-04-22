@@ -5,6 +5,7 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { sanitizeTitle } from '$lib/utils';
+	import { sourceLabels, sourceBadgeClasses, identifierStatusClasses } from '$lib/labels';
 
 	import type { components } from '$lib/api/schema';
 	type PersonDetail = components['schemas']['PersonDedupDetail'];
@@ -114,19 +115,6 @@
 			console.error(e);
 		}
 		acting = false;
-	}
-
-	function statusClass(status: string): string {
-		if (status === 'confirmed') return 'id-confirmed';
-		if (status === 'rejected') return 'id-rejected';
-		return 'id-pending';
-	}
-
-	function sourceBadgeClass(src: string): string {
-		if (src === 'HAL') return 'badge-hal';
-		if (src === 'OpenAlex') return 'badge-oa';
-		if (src === 'WoS') return 'badge-wos';
-		return '';
 	}
 
 	onMount(async () => {
@@ -250,7 +238,7 @@
 						{#if person.identifiers.length > 0}
 							<div class="identifiers">
 								{#each person.identifiers as ident}
-									<span class="ident-tag {statusClass(ident.status)}">
+									<span class="ident-tag {identifierStatusClasses[ident.status] ?? 'id-pending'}">
 										<span class="ident-type">{ident.id_type}</span>
 										<span class="ident-value">{ident.id_value}</span>
 									</span>
@@ -265,7 +253,7 @@
 								<div class="pub-item">
 									<div class="pub-sources-mini">
 										{#each pub.sources as src}
-											<span class="source-mini {sourceBadgeClass(src)}">{src}</span>
+											<span class="source-mini {sourceBadgeClasses[src] ?? ''}">{sourceLabels[src] ?? src}</span>
 										{/each}
 									</div>
 									<a href="{base}/publications/{pub.id}" class="pub-link">

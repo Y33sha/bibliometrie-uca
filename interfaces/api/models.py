@@ -1047,6 +1047,22 @@ class FeedbackAddressesResponse(BaseModel):
     addresses: list[FeedbackAddressItem]
 
 
+class FeedbackStructureItem(BaseModel):
+    id: int
+    code: str
+    name: str
+    acronym: str | None
+    type: str
+
+
+class FeedbackStructuresResponse(BaseModel):
+    """Structures éligibles au tableau de bord feedback, groupées par type,
+    avec la structure à sélectionner par défaut (UCA si présente)."""
+
+    by_type: dict[str, list[FeedbackStructureItem]]
+    default_structure_id: int | None
+
+
 # ----- Perimeters (output) -----
 
 
@@ -1580,6 +1596,8 @@ class OrphanAuthorshipOut(BaseModel):
     source: str
     authorship_id: int
     full_name: str
+    last_name: str
+    first_name: str
     publication_id: int
     pub_title: str
     pub_year: int | None

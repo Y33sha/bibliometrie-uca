@@ -102,6 +102,69 @@ def _cleanup_after_module():
         )
 
 
+# ── /api/admin/feedback/structures ──────────────────────────────
+
+
+class TestFeedbackStructures:
+    def test_groups_by_type_and_returns_uca_as_default(self, client):
+        """UCA (code = 'uca') est renvoyée comme default_structure_id."""
+        with _pool() as cur:
+            cur.execute(
+                "INSERT INTO structures (code, name, structure_type) "
+                "VALUES (%s, %s, 'universite'::structure_type) RETURNING id",
+                ("uca", "Université Clermont Auvergne"),
+            )
+            uca_id = cur.fetchone()["id"]
+
+        labo_id = _seed_structure(type_="labo")
+
+        r = client.get("/api/admin/feedback/structures")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["default_structure_id"] == uca_id
+        # Les deux structures sont groupées par type
+        assert uca_id in [s["id"] for s in body["by_type"]["universite"]]
+        assert labo_id in [s["id"] for s in body["by_type"]["labo"]]
+
+    def test_fallback_default_respects_type_order(self, client):
+        """Sans UCA, le default est une structure du type le plus haut dans
+        l'ordre universite > onr > chu > ecole > labo parmi les types
+        présents en base. On vérifie l'ordre, pas un id précis, parce que
+        la base peut déjà contenir d'autres structures d'autres suites."""
+        with _pool() as cur:
+            cur.execute("DELETE FROM structures WHERE code = 'uca'")
+
+        _seed_structure(type_="labo")
+        _seed_structure(type_="chu")
+
+        r = client.get("/api/admin/feedback/structures")
+        assert r.status_code == 200
+        body = r.json()
+        default_id = body["default_structure_id"]
+        assert default_id is not None
+
+        # Retrouver le type du default dans by_type
+        default_type = next(
+            t for t, items in body["by_type"].items() if any(s["id"] == default_id for s in items)
+        )
+        order = ("universite", "onr", "chu", "ecole", "labo")
+        # Le type du default doit être le premier type présent dans `order`
+        first_present = next(t for t in order if body["by_type"].get(t))
+        assert default_type == first_present
+
+    def test_excludes_non_eligible_types(self, client):
+        """Les types hors (universite/onr/chu/ecole/labo) sont ignorés :
+        site, equipe, autre ne doivent pas apparaître."""
+        _seed_structure(type_="site")
+        _seed_structure(type_="autre")
+
+        r = client.get("/api/admin/feedback/structures")
+        assert r.status_code == 200
+        body = r.json()
+        assert "site" not in body["by_type"]
+        assert "autre" not in body["by_type"]
+
+
 # ── /api/admin/feedback/stats ───────────────────────────────────
 
 

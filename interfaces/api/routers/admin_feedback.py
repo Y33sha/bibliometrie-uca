@@ -19,7 +19,26 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from interfaces.api.async_deps import get_async_cursor
-from interfaces.api.models import FeedbackAddressesResponse, FeedbackStats
+from interfaces.api.models import (
+    FeedbackAddressesResponse,
+    FeedbackStats,
+    FeedbackStructuresResponse,
+)
+
+# Types de structures éligibles au tableau de bord feedback, dans l'ordre
+# d'affichage (universités en premier, laboratoires en dernier). Règle
+# métier : le feedback porte sur les entités organisationnelles de
+# haut niveau, pas sur les sites physiques ni les équipes internes.
+_FEEDBACK_STRUCTURE_TYPES: tuple[str, ...] = (
+    "universite",
+    "onr",
+    "chu",
+    "ecole",
+    "labo",
+)
+
+# Code de la structure par défaut (UCA = tenant du projet).
+_DEFAULT_STRUCTURE_CODE = "uca"
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -29,6 +48,47 @@ _RESOLVE_ADDRESSES_SCRIPT = os.path.join(
     "processing",
     "resolve_addresses.py",
 )
+
+
+@router.get("/api/admin/feedback/structures", response_model=FeedbackStructuresResponse)
+async def feedback_structures() -> Any:
+    """Structures éligibles au tableau de bord feedback, groupées par type.
+
+    Encode deux règles métier :
+    - seuls les types listés dans `_FEEDBACK_STRUCTURE_TYPES` sont
+      éligibles (universités, organismes, CHU, écoles, labos) ;
+    - la structure UCA (code = "uca") est sélectionnée par défaut si
+      elle existe, sinon la première structure du premier type non vide.
+    """
+    async with get_async_cursor() as (cur, conn):
+        await cur.execute(
+            """
+            SELECT s.id, s.code, s.name, s.acronym,
+                   s.structure_type::text AS type
+            FROM structures s
+            WHERE s.structure_type::text = ANY(%s)
+            ORDER BY s.name
+            """,
+            (list(_FEEDBACK_STRUCTURE_TYPES),),
+        )
+        rows = await cur.fetchall()
+
+    by_type: dict[str, list[dict[str, Any]]] = {}
+    default_id: int | None = None
+    for row in rows:
+        by_type.setdefault(row["type"], []).append(row)
+        if row["code"] == _DEFAULT_STRUCTURE_CODE:
+            default_id = row["id"]
+
+    if default_id is None:
+        # Fallback : première structure du premier type non vide, dans
+        # l'ordre `_FEEDBACK_STRUCTURE_TYPES`.
+        for t in _FEEDBACK_STRUCTURE_TYPES:
+            if by_type.get(t):
+                default_id = by_type[t][0]["id"]
+                break
+
+    return {"by_type": by_type, "default_structure_id": default_id}
 
 
 @router.get("/api/admin/feedback/stats", response_model=FeedbackStats)

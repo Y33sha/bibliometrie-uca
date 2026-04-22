@@ -136,14 +136,8 @@ async def _get_person_dedup_detail(cur: Any, person_id: int) -> dict[str, Any] |
     await cur.execute(
         """
         SELECT pub.id, pub.title, pub.pub_year, pub.doi, pub.doc_type::text,
-               (SELECT array_agg(DISTINCT
-                   CASE sd.source
-                       WHEN 'hal' THEN 'HAL'
-                       WHEN 'openalex' THEN 'OpenAlex'
-                       WHEN 'wos' THEN 'WoS'
-                       WHEN 'scanr' THEN 'ScanR'
-                   END
-                ) FROM source_publications sd WHERE sd.publication_id = pub.id
+               (SELECT array_agg(DISTINCT sd.source::text)
+                FROM source_publications sd WHERE sd.publication_id = pub.id
                ) AS sources
         FROM authorships a
         JOIN publications pub ON pub.id = a.publication_id

@@ -518,6 +518,28 @@ class TestMergePersons:
 # ── Orphan authorships ──────────────────────────────────────────
 
 
+def _seed_orphan_authorship(raw_author_name: str) -> int:
+    """Insère une source_authorship orpheline (person_id NULL, in_perimeter
+    TRUE) attachée à une publication, pour tester /api/admin/orphan-authorships."""
+    pub_id = _seed_publication(title=_uniq("Pub"))
+    with _pool() as cur:
+        cur.execute(
+            "INSERT INTO source_publications (source, source_id, title, pub_year, publication_id) "
+            "VALUES ('hal', %s, 'T', 2024, %s) RETURNING id",
+            (_uniq("sid"), pub_id),
+        )
+        sp_id = cur.fetchone()["id"]
+    src_person_id = _seed_source_person(source="hal", full_name=raw_author_name)
+    with _pool() as cur:
+        cur.execute(
+            "INSERT INTO source_authorships (source, source_publication_id, source_person_id, "
+            "person_id, in_perimeter, raw_author_name, author_name_normalized) "
+            "VALUES ('hal', %s, %s, NULL, TRUE, %s, lower(%s)) RETURNING id",
+            (sp_id, src_person_id, raw_author_name, raw_author_name),
+        )
+        return cur.fetchone()["id"]
+
+
 class TestOrphanAuthorships:
     def test_count(self, client):
         r = client.get("/api/admin/orphan-authorships/count")
@@ -530,6 +552,33 @@ class TestOrphanAuthorships:
     def test_list_with_search(self, client):
         r = client.get("/api/admin/orphan-authorships", params={"search": "foo"})
         assert r.status_code == 200
+
+    def test_returns_last_name_first_name_from_comma_form(self, client):
+        """Format "Last, First" : parsé en last_name="Last", first_name="First"."""
+        marker = _uniq("Marker").replace("_", "")
+        _seed_orphan_authorship(f"{marker}, Jane")
+
+        r = client.get("/api/admin/orphan-authorships", params={"search": marker})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total"] == 1
+        item = body["authorships"][0]
+        assert item["last_name"] == marker
+        assert item["first_name"] == "Jane"
+        assert item["full_name"] == f"{marker}, Jane"
+
+    def test_returns_last_name_first_name_from_space_form(self, client):
+        """Format "First Last" : parsé en last_name=dernier mot, first_name=reste."""
+        marker = _uniq("Marker").replace("_", "")
+        _seed_orphan_authorship(f"Jane Marie {marker}")
+
+        r = client.get("/api/admin/orphan-authorships", params={"search": marker})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total"] == 1
+        item = body["authorships"][0]
+        assert item["last_name"] == marker
+        assert item["first_name"] == "Jane Marie"
 
 
 class TestAssignOrphanAuthorship:

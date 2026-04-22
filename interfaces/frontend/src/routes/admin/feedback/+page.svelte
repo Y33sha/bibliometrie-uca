@@ -3,7 +3,8 @@
   import { base } from "$app/paths";
   import { replaceState } from "$app/navigation";
   import { api, nameForms } from "$lib/api";
-  import { esc } from "$lib/utils";
+  import { esc, deriveStructDetectionStatus } from "$lib/utils";
+  import { structDetectionClasses, structDetectionLabels } from "$lib/labels";
   import Pagination from "$lib/components/Pagination.svelte";
 
   // ---------- Types ----------
@@ -14,20 +15,9 @@
   type MatchedForm = components["schemas"]["FeedbackMatchedForm"];
   type FeedbackAddress = components["schemas"]["FeedbackAddressItem"];
   type FeedbackPage = components["schemas"]["FeedbackAddressesResponse"];
+  type Structure = components["schemas"]["FeedbackStructureItem"];
 
-  // Types ci-dessous : sources hors router admin_feedback
-  // (picker structures, formes de noms côté nameForms API).
-  interface Structure {
-    id: number;
-    code: string;
-    name: string;
-    acronym: string | null;
-    type: string;
-  }
-
-  interface GroupedStructures {
-    [type: string]: Structure[];
-  }
+  type GroupedStructures = Record<string, Structure[]>;
 
   interface NameForm {
     id: number;
@@ -36,6 +26,10 @@
 
   // ---------- Constants ----------
 
+  // Libellés d'affichage pour les groupes de structures. L'ordre des
+  // clés sert aussi d'ordre d'affichage dans le picker. Les types
+  // éligibles et la sélection par défaut (UCA) sont décidés côté API
+  // par /api/admin/feedback/structures.
   const TYPE_LABELS: Record<string, string> = {
     universite: "Universités",
     onr: "Organismes de recherche",
@@ -43,7 +37,7 @@
     ecole: "Écoles",
     labo: "Laboratoires",
   };
-  const ALLOWED_TYPES = Object.keys(TYPE_LABELS);
+  const TYPE_ORDER = Object.keys(TYPE_LABELS);
 
   // ---------- URL params helpers ----------
 
@@ -117,29 +111,15 @@
   // ---------- Data loading ----------
 
   async function loadStructures(): Promise<void> {
-    const all = await api<Structure[]>("/api/structures");
-    allStructures = all;
-    const grouped: GroupedStructures = {};
-    let ucaId: number | null = null;
-
-    for (const s of all) {
-      if (!ALLOWED_TYPES.includes(s.type)) continue;
-      if (s.code === "uca") ucaId = s.id;
-      if (!grouped[s.type]) grouped[s.type] = [];
-      grouped[s.type].push(s);
-    }
-
-    structures = grouped;
-
-    if (ucaId) {
-      currentStructureId = ucaId;
-    } else {
-      for (const type of ALLOWED_TYPES) {
-        if (grouped[type]?.length) {
-          currentStructureId = grouped[type][0].id;
-          break;
-        }
-      }
+    // L'API filtre les types éligibles et choisit la structure par
+    // défaut (UCA ou fallback selon la règle métier côté backend).
+    const data = await api<components["schemas"]["FeedbackStructuresResponse"]>(
+      "/api/admin/feedback/structures"
+    );
+    structures = data.by_type;
+    allStructures = Object.values(data.by_type).flat();
+    if (data.default_structure_id) {
+      currentStructureId = data.default_structure_id;
     }
   }
 
@@ -302,19 +282,12 @@
     });
   }
 
-  function structTagClass(l: LabDetected): string {
-    if (l.is_confirmed === true) return "struct-tag struct-confirmed";
-    if (l.is_confirmed === false) return "struct-tag struct-rejected";
-    if (l.is_detected) return "struct-tag struct-detected";
-    return "struct-tag struct-manual";
+  function structDetectionStatus(l: LabDetected): 'confirmed' | 'rejected' | 'detected' | 'manual' {
+    return deriveStructDetectionStatus(l.is_confirmed, l.is_detected);
   }
 
   function structTagTitle(l: LabDetected): string {
-    const name = l.name;
-    if (l.is_confirmed === true) return `${name} (confirmé)`;
-    if (l.is_confirmed === false) return `${name} (rejeté)`;
-    if (l.is_detected) return `${name} (détecté auto)`;
-    return `${name} (ajouté manuellement)`;
+    return `${l.name} (${structDetectionLabels[structDetectionStatus(l)]})`;
   }
 
   function formatCtx(ctx: (string | number)[]): string {
@@ -391,7 +364,7 @@
   <!-- Toolbar -->
   <div class="toolbar">
     <select class="structure-filter" value={currentStructureId ?? ""} onchange={onStructureChange}>
-      {#each ALLOWED_TYPES as type}
+      {#each TYPE_ORDER as type}
         {#if structures[type]?.length}
           <optgroup label={TYPE_LABELS[type]}>
             {#each structures[type] as s (s.id)}
@@ -458,7 +431,7 @@
             <td>
               {#if a.labs && a.labs.length > 0}
                 {#each a.labs as l}
-                  <span class={structTagClass(l)} title={structTagTitle(l)}>
+                  <span class={structDetectionClasses[structDetectionStatus(l)]} title={structTagTitle(l)}>
                     {l.acronym || l.name}
                   </span>
                 {/each}
