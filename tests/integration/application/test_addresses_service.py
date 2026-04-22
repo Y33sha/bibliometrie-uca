@@ -1,17 +1,20 @@
-"""Tests de caractérisation pour application/addresses.py (§2.12 : async)."""
+"""Tests de caractérisation pour application/addresses_structures.py
+et application/addresses_countries.py (split §2.9.SRP, §2.12 : async)."""
 
 import json
 
 import pytest
 
-from application.addresses import (
-    batch_review_structure_link,
+from application.addresses_countries import (
     batch_set_country_by_filter,
     batch_set_country_by_ids,
     propagate_countries_to_publications,
     propagate_countries_to_similar,
-    review_structure_link,
     set_country,
+)
+from application.addresses_structures import (
+    batch_review_structure_link,
+    review_structure_link,
     unassign_manual_structure,
 )
 from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
@@ -324,9 +327,7 @@ class TestUnassignManualStructure:
         )
         assert await _get_link(async_db, addr, uca) is None
 
-    async def test_preserves_auto_link(
-        self, async_db, repo, authorship_repo, perimeter_queries
-    ):
+    async def test_preserves_auto_link(self, async_db, repo, authorship_repo, perimeter_queries):
         """Un lien auto-détecté (matched_form_id non NULL) n'est pas supprimé."""
         uca = await _setup_uca_perimeter(async_db)
         addr = await _create_address(async_db)
@@ -467,9 +468,7 @@ class TestBatchSetCountryByFilter:
         await _ensure_country(async_db, "FR")
         match = await _create_address(async_db, raw_text="Université Clermont")
         other = await _create_address(async_db, raw_text="MIT Boston")
-        modified = await batch_set_country_by_filter(
-            async_db, "FR", search="Clermont", repo=repo
-        )
+        modified = await batch_set_country_by_filter(async_db, "FR", search="Clermont", repo=repo)
         assert match in modified
         assert other not in modified
 
@@ -479,9 +478,7 @@ class TestBatchSetCountryByFilter:
         addr_no = await _create_address(async_db, raw_text="sans pays")
         addr_yes = await _create_address(async_db, raw_text="avec pays")
         await set_country(async_db, addr_yes, ["US"], repo=repo)
-        modified = await batch_set_country_by_filter(
-            async_db, "FR", has_country="no", repo=repo
-        )
+        modified = await batch_set_country_by_filter(async_db, "FR", has_country="no", repo=repo)
         assert addr_no in modified
         assert addr_yes not in modified
 
@@ -501,9 +498,7 @@ class TestPropagateCountriesToSimilar:
             (a1, a2),
         )
         # a1 a FR, a2 n'a rien
-        await async_db.execute(
-            "UPDATE addresses SET countries = %s WHERE id = %s", (["FR"], a1)
-        )
+        await async_db.execute("UPDATE addresses SET countries = %s WHERE id = %s", (["FR"], a1))
 
         propagated = await propagate_countries_to_similar(async_db, repo=repo)
 
@@ -550,9 +545,7 @@ class TestPropagateCountriesToPublications:
         )
         sa_id = (await async_db.fetchone())["id"]
         addr = await _create_address(async_db)
-        await async_db.execute(
-            "UPDATE addresses SET countries = %s WHERE id = %s", (["FR"], addr)
-        )
+        await async_db.execute("UPDATE addresses SET countries = %s WHERE id = %s", (["FR"], addr))
         await async_db.execute(
             "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) VALUES (%s, %s)",
             (sa_id, addr),
@@ -561,9 +554,7 @@ class TestPropagateCountriesToPublications:
         await propagate_countries_to_publications(async_db, [addr], repo=repo)
 
         # source_publications.countries mis à jour
-        await async_db.execute(
-            "SELECT countries FROM source_publications WHERE id = %s", (sp_id,)
-        )
+        await async_db.execute("SELECT countries FROM source_publications WHERE id = %s", (sp_id,))
         assert (await async_db.fetchone())["countries"] == ["FR"]
         # publications.countries mis à jour
         await async_db.execute("SELECT countries FROM publications WHERE id = %s", (pub_id,))
