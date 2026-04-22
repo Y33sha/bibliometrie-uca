@@ -5,6 +5,7 @@ import os
 
 from application.pipeline.enrich.enrich_oa_status import run_enrich
 from infrastructure.api_limits import UNPAYWALL_DELAY
+from infrastructure.app_config import get_api_base_urls
 from infrastructure.db.connection import get_connection
 from infrastructure.db.queries.enrich import PgEnrichQueries
 from infrastructure.log import setup_logger
@@ -30,6 +31,7 @@ def main() -> None:
             PgEnrichQueries(),
             logger,
             pub_repo=publication_repository(cur),
+            unpaywall_base=get_api_base_urls(cur)["unpaywall"],
             limit=args.limit,
             dry_run=args.dry_run,
             rate_delay=UNPAYWALL_DELAY,

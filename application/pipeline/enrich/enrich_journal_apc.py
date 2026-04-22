@@ -19,7 +19,6 @@ from application.journals import reset_journal_apc, update_journal_apc
 from application.ports.enrich import EnrichQueries
 from domain.ports.journal_repository import JournalRepository
 
-OPENALEX_API = "https://api.openalex.org/sources"
 OPENALEX_PREFIX = "https://openalex.org/"
 BATCH_SIZE = 50  # max IDs par requête (API limit = 100, on reste prudent)
 COMMIT_EVERY = 500  # commit DB tous les N journals traités
@@ -39,7 +38,9 @@ def to_short_id(full_id: str) -> str:
     return full_id
 
 
-def fetch_sources_batch(openalex_ids: list[str], mailto: str, logger: Any) -> dict[str, dict]:
+def fetch_sources_batch(
+    openalex_ids: list[str], mailto: str, logger: Any, *, openalex_sources_api: str
+) -> dict[str, dict]:
     """Interroge l'API OpenAlex pour un lot d'IDs et retourne un dict short_id → données."""
     full_ids = [to_full_id(oid) for oid in openalex_ids]
     filter_value = "|".join(full_ids)
@@ -52,7 +53,7 @@ def fetch_sources_batch(openalex_ids: list[str], mailto: str, logger: Any) -> di
 
     for attempt in range(3):
         try:
-            resp = requests.get(OPENALEX_API, params=params, timeout=30)
+            resp = requests.get(openalex_sources_api, params=params, timeout=30)
             if resp.status_code == 429:
                 wait = 2 ** (attempt + 1)
                 logger.warning(f"Rate limited (429), attente {wait}s...")
@@ -105,6 +106,7 @@ def run_enrich(
     *,
     journal_repo: JournalRepository,
     mailto: str,
+    openalex_sources_api: str,
     limit: int = 0,
     dry_run: bool = False,
     reset: bool = False,
@@ -134,7 +136,9 @@ def run_enrich(
             oa_ids = [row[1] for row in batch]
             id_map = {row[1]: row[0] for row in batch}
 
-            sources = fetch_sources_batch(oa_ids, mailto, logger)
+            sources = fetch_sources_batch(
+                oa_ids, mailto, logger, openalex_sources_api=openalex_sources_api
+            )
             time.sleep(rate_delay)
 
             for oa_id, journal_id in id_map.items():

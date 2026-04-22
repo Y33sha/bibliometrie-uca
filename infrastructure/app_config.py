@@ -150,18 +150,40 @@ def get_openalex_api_key(cur: Any) -> str | None:
     return None
 
 
+_API_BASE_URLS_DEFAULTS: dict[str, str] = {
+    # Extracteurs principaux (un endpoint par source)
+    "hal": "https://api.archives-ouvertes.fr/search/",
+    "openalex": "https://api.openalex.org/works",
+    "wos": "https://api.clarivate.com/api/wos",
+    "scanr": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
+    "theses": "https://theses.fr/api/v1/theses/recherche/",
+    # Endpoints secondaires
+    "hal_ref_author": "https://api.archives-ouvertes.fr/ref/author/",
+    "openalex_sources": "https://api.openalex.org/sources",
+    "unpaywall": "https://api.unpaywall.org/v2",
+    "zenodo": "https://zenodo.org/api/records",
+}
+
+
 def get_api_base_urls(cur: Any) -> dict[str, str]:
-    """Retourne les URLs de base des API par source."""
+    """Retourne les URLs de base des API (extracteurs + endpoints secondaires).
+
+    Les valeurs définies dans la table `config` écrasent les defaults ;
+    les clés non configurées retombent sur les defaults, pour qu'un
+    nouvel endpoint ajouté en code ne force pas à re-seeder la config.
+    """
     val = _get_from_db(cur, "api_base_urls")
     if val and isinstance(val, dict):
-        return val
-    return {
-        "hal": "https://api.archives-ouvertes.fr/search/",
-        "openalex": "https://api.openalex.org/works",
-        "wos": "https://api.clarivate.com/api/wos",
-        "scanr": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
-        "theses": "https://theses.fr/api/v1/theses/recherche/",
-    }
+        return {**_API_BASE_URLS_DEFAULTS, **val}
+    return dict(_API_BASE_URLS_DEFAULTS)
+
+
+async def async_get_api_base_urls(cur: Any) -> dict[str, str]:
+    """Variante async de `get_api_base_urls` (pour les call sites API)."""
+    val = await _async_get_from_db(cur, "api_base_urls")
+    if val and isinstance(val, dict):
+        return {**_API_BASE_URLS_DEFAULTS, **val}
+    return dict(_API_BASE_URLS_DEFAULTS)
 
 
 def get_extraction_api_ids(cur: Any, source: str) -> list[str]:

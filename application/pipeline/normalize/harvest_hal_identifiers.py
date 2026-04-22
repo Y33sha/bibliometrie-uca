@@ -18,10 +18,10 @@ import requests
 
 from application.ports.harvest import HarvestQueries
 
-API_URL = "https://api.archives-ouvertes.fr/ref/author/"
 
-
-def fetch_identifiers_batch(person_ids: list[int], logger: Any) -> dict[int, dict]:
+def fetch_identifiers_batch(
+    person_ids: list[int], logger: Any, *, hal_ref_author_api: str
+) -> dict[int, dict]:
     """Interroge l'API HAL pour un lot de person_ids.
 
     Retourne {hal_person_id: {"orcid": ..., "idref": ...}} pour ceux qui en ont.
@@ -39,7 +39,7 @@ def fetch_identifiers_batch(person_ids: list[int], logger: Any) -> dict[int, dic
 
     for attempt in range(3):
         try:
-            resp = requests.get(API_URL, params=params, timeout=30)
+            resp = requests.get(hal_ref_author_api, params=params, timeout=30)
             resp.raise_for_status()
             data = resp.json()
             break
@@ -89,6 +89,7 @@ def run_harvest(
     queries: HarvestQueries,
     logger: Any,
     *,
+    hal_ref_author_api: str,
     batch_size: int = 100,
     dry_run: bool = False,
     rate_delay: float = 0.1,
@@ -108,7 +109,9 @@ def run_harvest(
             id_map = {row[1]: (row[0], row[2]) for row in batch}
             person_ids = list(id_map.keys())
 
-            identifiers = fetch_identifiers_batch(person_ids, logger)
+            identifiers = fetch_identifiers_batch(
+                person_ids, logger, hal_ref_author_api=hal_ref_author_api
+            )
 
             if identifiers and not dry_run:
                 for pid, ids in identifiers.items():

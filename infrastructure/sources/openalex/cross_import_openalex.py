@@ -25,11 +25,10 @@ import requests
 from psycopg.types.json import Jsonb as Json
 
 from infrastructure.api_limits import OPENALEX_DELAY
-from infrastructure.app_config import get_openalex_api_key, get_openalex_email
+from infrastructure.app_config import get_api_base_urls, get_openalex_api_key, get_openalex_email
 from infrastructure.db.connection import get_connection
 from infrastructure.sources.common import compute_hash, get_cross_import_dois, setup_logger
 from infrastructure.sources.openalex import (
-    BASE_URL,
     SELECT_FIELDS,
     auth_params,
     extract_doi,
@@ -41,7 +40,7 @@ from infrastructure.sources.openalex import (
 logger = setup_logger("cross_import_openalex", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def fetch_by_doi(doi: str) -> dict | None:
+def fetch_by_doi(doi: str, *, base_url: str) -> dict | None:
     """Interroge l'API OpenAlex pour un DOI donné. Retourne le work ou None."""
     params = {
         "filter": f"doi:{doi}",
@@ -49,7 +48,7 @@ def fetch_by_doi(doi: str) -> dict | None:
         **auth_params(),
     }
     try:
-        resp = requests.get(BASE_URL, params=params, timeout=30)
+        resp = requests.get(base_url, params=params, timeout=30)
         resp.raise_for_status()
         data = resp.json()
         results = data.get("results", [])
@@ -99,6 +98,7 @@ def main() -> Any:
     conn = get_connection()
     cur = conn.cursor()
     init_auth(api_key=get_openalex_api_key(cur), email=get_openalex_email(cur))
+    base_url = get_api_base_urls(cur)["openalex"]
     cur.close()
     try:
         dois = get_cross_import_dois(conn, "openalex", all_staged=args.all)
@@ -117,7 +117,7 @@ def main() -> Any:
         errors = 0
 
         for i, doi in enumerate(dois):
-            work = fetch_by_doi(doi)
+            work = fetch_by_doi(doi, base_url=base_url)
             if work:
                 insert_work(conn, work)
                 found += 1
