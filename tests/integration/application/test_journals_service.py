@@ -1,4 +1,5 @@
-"""Tests de caractérisation pour application/journals.py.
+"""Tests de caractérisation pour application/journals.py et
+application/publishers.py (split §2.9.SRP).
 
 Couvre les fonctions sync (find_or_create_*, update_journal_apc,
 reset_journal_apc — utilisées par le pipeline) et les fonctions async
@@ -9,12 +10,14 @@ import pytest
 
 from application.journals import (
     find_or_create_journal,
-    find_or_create_publisher,
     merge_journals,
-    merge_publishers,
     reset_journal_apc,
     update_journal,
     update_journal_apc,
+)
+from application.publishers import (
+    find_or_create_publisher,
+    merge_publishers,
     update_publisher,
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError

@@ -24,7 +24,7 @@ from typing import Any
 
 from psycopg.types.json import Jsonb as Json
 
-from application.journals import find_or_create_journal, find_or_create_publisher
+from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.address_linker import AddressLinker
 from application.ports.normalize_hal import HalNormalizeQueries
@@ -32,6 +32,7 @@ from application.ports.staging import StagingQueries
 from application.ports.zenodo_resolver import ZenodoResolver
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
+from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
