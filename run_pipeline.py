@@ -40,6 +40,7 @@ import datetime
 import json
 import logging
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -720,7 +721,25 @@ def run_python(script: str, *args: Any) -> Any:
 # ---------------------------------------------------------------------------
 
 
+def _sigterm_raises_keyboard_interrupt(_signum: int, _frame: Any) -> None:
+    raise KeyboardInterrupt
+
+
+def _install_sigterm_handler() -> None:
+    """Convertit SIGTERM en KeyboardInterrupt pour réutiliser le handler
+    existant (log d'interruption, rapport partiel, commande de reprise).
+
+    Utile quand un orchestrateur (systemd, docker stop, kubectl delete)
+    arrête le pipeline poliment. Sans ça, le process est tué silencieusement
+    sans trace du point d'interruption — l'idempotence permettrait quand
+    même la reprise, mais sans rapport sur le run coupé.
+    No-op effectif sur Windows où SIGTERM n'est pas délivré par os.kill.
+    """
+    signal.signal(signal.SIGTERM, _sigterm_raises_keyboard_interrupt)
+
+
 def main() -> None:
+    _install_sigterm_handler()
     parser = argparse.ArgumentParser(description="Orchestrateur pipeline bibliométrique UCA")
     parser.add_argument(
         "--from", dest="from_phase", metavar="PHASE", help="Reprendre depuis cette phase"
