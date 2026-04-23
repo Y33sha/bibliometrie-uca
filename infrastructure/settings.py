@@ -14,16 +14,16 @@ ScanR, collections HAL, années pipeline) sont lus depuis la table `config`
 en base via utils.app_config.
 """
 
-from pathlib import Path
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from infrastructure import PROJECT_ROOT
 
 
 class Settings(BaseSettings):
     """Configuration de l'app — lit .env et les variables d'environnement."""
 
     model_config = SettingsConfigDict(
-        env_file=Path(__file__).resolve().parent.parent / ".env",
+        env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         extra="ignore",  # ignore les env vars non déclarées (POSTGRES_*, CORS_ORIGINS, etc.)
         case_sensitive=False,

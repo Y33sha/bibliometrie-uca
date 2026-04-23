@@ -2,15 +2,16 @@
 
 import logging
 import re
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from infrastructure import PROJECT_ROOT
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-DOCS_DIR = Path(__file__).parent.parent.parent / "docs"
+DOCS_DIR = PROJECT_ROOT / "docs"
 
 # Pages de doc et leur titre pour la sidebar (dans l'ordre d'affichage)
 DOC_PAGES = [
