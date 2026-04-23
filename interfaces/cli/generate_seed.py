@@ -180,8 +180,8 @@ def generate_seed(cur: Any, output_path: str) -> Any:
 
     print(f"Seed généré : {output_path} ({len(rows)} lignes pour la dernière table)")
     for spec in TABLES:
-        cur.execute(f"SELECT COUNT(*) FROM {spec['table']}")
-        count = cur.fetchone()[0]
+        cur.execute(f"SELECT COUNT(*) AS n FROM {spec['table']}")
+        count = cur.fetchone()["n"]
         print(f"  {spec['table']}: {count} lignes")
 
 

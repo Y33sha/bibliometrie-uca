@@ -357,8 +357,8 @@ def main() -> None:
 
         # Compter
         with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM persons")
-            total = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) AS n FROM persons")
+            total = cur.fetchone()["n"]
             logger.info(f"  Total en base : {total} personnes")
 
     finally:

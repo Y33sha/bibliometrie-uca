@@ -52,12 +52,12 @@ def main() -> None:
 
     # Compter les adresses à traiter
     cur.execute("""
-        SELECT COUNT(*) FROM addresses
+        SELECT COUNT(*) AS n FROM addresses
         WHERE countries IS NULL
           AND suggested_countries IS NULL
           AND LENGTH(normalized_text) >= 5
     """)
-    total = cur.fetchone()[0]
+    total = cur.fetchone()["n"]
     logger.info(f"{total} adresses à traiter (batch_size={args.batch_size})")
 
     if total == 0:

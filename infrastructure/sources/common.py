@@ -54,7 +54,7 @@ def get_cross_import_dois(conn: Any, target: str, all_staged: bool = False) -> l
 
     with conn.cursor() as cur:
         cur.execute(query, (target, target))
-        return [row[0] for row in cur.fetchall()]
+        return [row["doi"] for row in cur.fetchall()]
 
 
 def get_existing_ids(conn: Any, source: str) -> set:
@@ -64,4 +64,4 @@ def get_existing_ids(conn: Any, source: str) -> set:
 
     with conn.cursor() as cur:
         cur.execute("SELECT source_id FROM staging WHERE source = %s", (source,))
-        return {row[0] for row in cur.fetchall()}
+        return {row["source_id"] for row in cur.fetchall()}
