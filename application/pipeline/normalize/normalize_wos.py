@@ -584,6 +584,9 @@ def process_authorships(
     cur: Any, queries: WosNormalizeQueries, rec: dict, source_publication_id: int
 ) -> None:
     """Traite les authorships d'un record WoS + crée les liens adresses et institutions."""
+    # Pré-nettoyage : re-traitement → table blanche pour cette publi.
+    queries.clear_source_authorships_for_publication(cur, source_publication_id)
+
     # Résoudre toutes les organisations du document en un seul pass
     all_orgs = set()
     for author in rec.get("authors", []):

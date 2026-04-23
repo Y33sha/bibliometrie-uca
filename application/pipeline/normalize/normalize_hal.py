@@ -545,6 +545,10 @@ def process_authors(
     - Crée/retrouve chaque auteur dans source_persons (source='hal')
     - Crée les source_authorships (source='hal') avec source_struct_ids (source_structures.id)
     """
+    # Pré-nettoyage : un re-traitement peut changer les auteurs/positions,
+    # on repart d'une table blanche pour cette publi.
+    queries.clear_source_authorships_for_publication(cur, source_publication_id)
+
     names = doc.get("authFullName_s") or []
     qualities = doc.get("authQuality_s") or []
     # ORCID et IdRef par auteur : parsés depuis le TEI (label_xml), seul

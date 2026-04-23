@@ -293,6 +293,9 @@ def process_authors(
     *,
     address_linker: AddressLinker,
 ) -> None:
+    # Pré-nettoyage : re-traitement → table blanche pour cette publi.
+    queries.clear_source_authorships_for_publication(cur, source_publication_id)
+
     authors = doc.get("authors") or []
 
     for position, author_data in enumerate(authors):

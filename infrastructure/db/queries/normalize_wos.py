@@ -8,6 +8,10 @@ et les lectures/préchargements de caches.
 
 from typing import Any
 
+from infrastructure.db.queries.source_authorships import (
+    clear_source_authorships_for_publication,
+)
+
 
 def upsert_wos_source_publication(
     cur: Any,
@@ -189,7 +193,7 @@ def upsert_wos_source_authorships_batch(cur: Any, values: list[tuple[Any, ...]])
              is_corresponding, author_name_normalized,
              source_struct_ids, roles, raw_author_name)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
+        ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             is_corresponding = EXCLUDED.is_corresponding OR source_authorships.is_corresponding,
             author_name_normalized = COALESCE(
                 EXCLUDED.author_name_normalized,
@@ -373,3 +377,8 @@ class PgWosNormalizeQueries:
 
     def delete_wos_orphan_legacy_source_persons(self, cur: Any) -> int:
         return delete_wos_orphan_legacy_source_persons(cur)
+
+    def clear_source_authorships_for_publication(
+        self, cur: Any, source_publication_id: int
+    ) -> None:
+        clear_source_authorships_for_publication(cur, source_publication_id)

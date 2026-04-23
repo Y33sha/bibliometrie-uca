@@ -359,6 +359,9 @@ def process_persons(
     Une même personne peut apparaître dans plusieurs champs (ex: directeur + jury).
     On regroupe les rôles par personne (via PPN ou nom).
     """
+    # Pré-nettoyage : re-traitement → table blanche pour cette publi.
+    queries.clear_source_authorships_for_publication(cur, source_publication_id)
+
     # Collecter tous les (personne, rôles) par clé de dédup
     person_roles: dict[str, dict] = {}  # clé → {"person": dict, "roles": list[str]}
 

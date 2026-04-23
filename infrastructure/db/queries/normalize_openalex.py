@@ -8,6 +8,10 @@ d'idempotence et les déduplications Zenodo.
 
 from typing import Any
 
+from infrastructure.db.queries.source_authorships import (
+    clear_source_authorships_for_publication,
+)
+
 
 def fetch_publication_id_for_hal_source(cur: Any, hal_id: str) -> int | None:
     """Retourne `publication_id` du document HAL correspondant (pour cross-référence)."""
@@ -167,14 +171,6 @@ def upsert_openalex_source_structure(
     return row["id"] if isinstance(row, dict) else row[0]
 
 
-def delete_openalex_source_authorships_for(cur: Any, source_publication_id: int) -> None:
-    """Supprime toutes les `source_authorships` OpenAlex d'un document (refetch)."""
-    cur.execute(
-        "DELETE FROM source_authorships WHERE source = 'openalex' AND source_publication_id = %s",
-        (source_publication_id,),
-    )
-
-
 def upsert_openalex_source_authorship(
     cur: Any,
     *,
@@ -193,7 +189,7 @@ def upsert_openalex_source_authorship(
              source_struct_ids,
              author_name_normalized, is_corresponding, raw_author_name)
         VALUES ('openalex', %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
-        ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
+        ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             author_name_normalized = COALESCE(
                 EXCLUDED.author_name_normalized,
                 source_authorships.author_name_normalized
@@ -256,9 +252,6 @@ class PgOpenalexNormalizeQueries:
     def upsert_openalex_source_structure(self, cur: Any, **kwargs: Any) -> int:
         return upsert_openalex_source_structure(cur, **kwargs)
 
-    def delete_openalex_source_authorships_for(self, cur: Any, source_publication_id: int) -> None:
-        delete_openalex_source_authorships_for(cur, source_publication_id)
-
     def upsert_openalex_source_authorship(self, cur: Any, **kwargs: Any) -> int:
         return upsert_openalex_source_authorship(cur, **kwargs)
 
@@ -270,6 +263,11 @@ class PgOpenalexNormalizeQueries:
 
     def count_openalex_table(self, cur: Any, table: str) -> int:
         return count_openalex_table(cur, table)
+
+    def clear_source_authorships_for_publication(
+        self, cur: Any, source_publication_id: int
+    ) -> None:
+        clear_source_authorships_for_publication(cur, source_publication_id)
 
 
 def count_openalex_table(cur: Any, table: str) -> int:

@@ -7,6 +7,10 @@ ainsi que les lectures utiles à l'idempotence et au matching auteurs.
 
 from typing import Any
 
+from infrastructure.db.queries.source_authorships import (
+    clear_source_authorships_for_publication,
+)
+
 
 def fetch_thesis_primary_author(cur: Any, publication_id: int) -> tuple[str, str] | None:
     """Retourne `(last_name, first_name)` de l'auteur principal d'une thèse existante.
@@ -188,7 +192,7 @@ def upsert_theses_source_authorship(
              author_name_normalized, roles,
              raw_author_name)
         VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s)
-        ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
+        ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             roles = EXCLUDED.roles,
             author_name_normalized = EXCLUDED.author_name_normalized,
             raw_author_name = EXCLUDED.raw_author_name
@@ -316,6 +320,11 @@ class PgThesesNormalizeQueries:
 
     def count_theses_table(self, cur: Any, table: str) -> int:
         return count_theses_table(cur, table)
+
+    def clear_source_authorships_for_publication(
+        self, cur: Any, source_publication_id: int
+    ) -> None:
+        clear_source_authorships_for_publication(cur, source_publication_id)
 
 
 def count_theses_table(cur: Any, table: str) -> int:
