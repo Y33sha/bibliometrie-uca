@@ -265,6 +265,60 @@ def fetch_wos_source_persons_with_daisng(cur: Any) -> list[tuple[str, int]]:
     return [(r[0], r[1]) for r in cur.fetchall()]
 
 
+def delete_wos_duplicate_authorships(cur: Any) -> int:
+    """Supprime les `source_authorships` WoS en doublon de position.
+
+    WoS renvoie parfois 2 entrées `name` au même `seq_no` pour les publis
+    consortium (ATLAS/CERN) : typiquement 1 avec un `daisng_id` renseigné
+    et 1 héritée d'un ancien code sans `daisng_id` (source_id synthétique
+    `wos-XXXX`). Le parseur actuel n'y crée plus ce cas (cf. filter
+    `if not daisng_id: continue`), mais les rows historiques subsistent.
+
+    Heuristique : on garde la row dont le ``source_persons`` a un
+    ``daisng_id`` (``source_id NOT LIKE 'wos-%%'``). À égalité
+    (deux daisng_id, auteur désambiguïsé deux fois côté WoS), on garde
+    la row la plus récente (``id`` max). Retourne le nombre de lignes
+    supprimées.
+    """
+    cur.execute("""
+        WITH ranked AS (
+            SELECT sa.id,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY sa.source_publication_id, sa.author_position
+                       ORDER BY
+                           (sp.source_id LIKE 'wos-%%') ASC,
+                           sa.id DESC
+                   ) AS rn
+            FROM source_authorships sa
+            JOIN source_persons sp ON sp.id = sa.source_person_id
+            WHERE sa.source = 'wos' AND sa.author_position IS NOT NULL
+        )
+        DELETE FROM source_authorships
+        WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+    """)
+    return cur.rowcount
+
+
+def delete_wos_orphan_legacy_source_persons(cur: Any) -> int:
+    """Supprime les `source_persons` WoS legacy (``source_id`` ``wos-XXXX``,
+    sans ``daisng_id``) devenus orphelins après cleanup des doublons.
+
+    Ces rows provenaient d'un ancien code qui créait des identifiants
+    synthétiques quand l'API WoS ne renvoyait pas de daisng_id ; le code
+    actuel skip ce cas. Retourne le nombre de lignes supprimées.
+    """
+    cur.execute("""
+        DELETE FROM source_persons
+        WHERE source = 'wos'
+          AND source_id LIKE 'wos-%%'
+          AND NOT EXISTS (
+              SELECT 1 FROM source_authorships
+              WHERE source_person_id = source_persons.id
+          )
+    """)
+    return cur.rowcount
+
+
 class PgWosNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_wos.WosNormalizeQueries`."""
 
@@ -313,3 +367,9 @@ class PgWosNormalizeQueries:
 
     def fetch_wos_source_persons_with_daisng(self, cur: Any) -> list[tuple[str, int]]:
         return fetch_wos_source_persons_with_daisng(cur)
+
+    def delete_wos_duplicate_authorships(self, cur: Any) -> int:
+        return delete_wos_duplicate_authorships(cur)
+
+    def delete_wos_orphan_legacy_source_persons(self, cur: Any) -> int:
+        return delete_wos_orphan_legacy_source_persons(cur)
