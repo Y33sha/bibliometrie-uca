@@ -60,10 +60,6 @@ class OpenalexNormalizeQueries(Protocol):
         source_data: Any,
     ) -> int: ...
 
-    def delete_openalex_source_authorships_for(
-        self, cur: Any, source_publication_id: int
-    ) -> None: ...
-
     def upsert_openalex_source_authorship(
         self,
         cur: Any,
@@ -81,3 +77,7 @@ class OpenalexNormalizeQueries(Protocol):
     def get_openalex_publication_id(self, cur: Any, openalex_id: str) -> int | None: ...
 
     def count_openalex_table(self, cur: Any, table: str) -> int: ...
+
+    def clear_source_authorships_for_publication(
+        self, cur: Any, source_publication_id: int
+    ) -> None: ...

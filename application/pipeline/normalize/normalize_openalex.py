@@ -513,9 +513,9 @@ def process_authorships(
     """
     authorships = work.get("authorships") or []
 
-    # Supprimer les anciennes authorships de ce document
-    # (nécessaire quand un work refetché a changé d'auteurs/positions)
-    queries.delete_openalex_source_authorships_for(cur, source_publication_id)
+    # Pré-nettoyage : un re-traitement peut changer les auteurs/positions,
+    # on repart d'une table blanche pour cette publi.
+    queries.clear_source_authorships_for_publication(cur, source_publication_id)
 
     for position, authorship in enumerate(authorships):
         source_person_id = upsert_openalex_author(cur, queries, authorship)

@@ -7,6 +7,10 @@ et la lecture idempotence.
 
 from typing import Any
 
+from infrastructure.db.queries.source_authorships import (
+    clear_source_authorships_for_publication,
+)
+
 
 def upsert_scanr_source_publication(
     cur: Any,
@@ -172,7 +176,7 @@ def upsert_scanr_source_authorship(
             (source, source_publication_id, source_person_id, author_position, roles,
              author_name_normalized, raw_author_name)
         VALUES ('scanr', %s, %s, %s, %s, normalize_name_form(%s), %s)
-        ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
+        ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             author_name_normalized = EXCLUDED.author_name_normalized,
             roles = EXCLUDED.roles,
             raw_author_name = EXCLUDED.raw_author_name
@@ -311,3 +315,8 @@ class PgScanrNormalizeQueries:
 
     def get_scanr_publication_id(self, cur: Any, scanr_id: str) -> int | None:
         return get_scanr_publication_id(cur, scanr_id)
+
+    def clear_source_authorships_for_publication(
+        self, cur: Any, source_publication_id: int
+    ) -> None:
+        clear_source_authorships_for_publication(cur, source_publication_id)

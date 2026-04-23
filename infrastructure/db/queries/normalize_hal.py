@@ -8,6 +8,10 @@ cleanups de post-traitement (doublons de position, persons orphelins).
 
 from typing import Any
 
+from infrastructure.db.queries.source_authorships import (
+    clear_source_authorships_for_publication,
+)
+
 
 def upsert_hal_source_publication(
     cur: Any,
@@ -240,7 +244,7 @@ def upsert_hal_source_authorship(
             (source, source_publication_id, source_person_id, author_position, source_struct_ids,
              author_name_normalized, is_corresponding, roles, raw_author_name)
         VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
-        ON CONFLICT (source_publication_id, source_person_id) DO UPDATE SET
+        ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             source_struct_ids = COALESCE(
                 EXCLUDED.source_struct_ids,
                 source_authorships.source_struct_ids
@@ -404,3 +408,8 @@ class PgHalNormalizeQueries:
 
     def delete_hal_orphan_source_persons(self, cur: Any) -> int:
         return delete_hal_orphan_source_persons(cur)
+
+    def clear_source_authorships_for_publication(
+        self, cur: Any, source_publication_id: int
+    ) -> None:
+        clear_source_authorships_for_publication(cur, source_publication_id)
