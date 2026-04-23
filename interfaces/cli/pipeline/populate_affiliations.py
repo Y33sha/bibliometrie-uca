@@ -23,7 +23,7 @@ def main() -> None:
     parser.add_argument(
         "--mode",
         default="full",
-        choices=["full", "weekly", "monthly", "daily"],
+        choices=["full", "weekly", "daily"],
         help="Mode d'exécution (daily: incrémental, autres: complet)",
     )
     args = parser.parse_args()
