@@ -1,12 +1,12 @@
 """Endpoints pour consulter les rapports et le statut du pipeline."""
 
-import json
 import logging
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from infrastructure.pipeline_status import read_status
 from interfaces.api.models import (
     PipelineLogsResponse,
     PipelineReportContent,
@@ -19,18 +19,16 @@ logger = logging.getLogger(__name__)
 
 BASE = Path(__file__).resolve().parent.parent.parent.parent
 REPORTS_DIR = BASE / "logs" / "reports"
-STATUS_FILE = BASE / "logs" / "status.json"
 
 
 @router.get("/api/admin/pipeline/status", response_model=PipelineStatus | None)
 def pipeline_status() -> Any:
-    """Retourne le statut du pipeline en cours, ou null si aucun ne tourne."""
-    if not STATUS_FILE.exists():
-        return None
-    try:
-        return json.loads(STATUS_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
+    """Retourne le statut du pipeline en cours, ou null si aucun ne tourne.
+
+    Un status.json orphelin (PID mort) est traité comme "inactif" et
+    nettoyé par ``read_status``.
+    """
+    return read_status()
 
 
 CRON_LOG = BASE / "logs" / "cron.log"

@@ -75,11 +75,14 @@ class TestSetupLoggerFileLocation:
 
 
 class TestMakeFormatter:
-    def test_json_default(self):
+    def test_json_default(self, monkeypatch):
         import logging as _logging
 
         from infrastructure.log import _make_formatter
 
+        # Le .env du projet définit LOG_FORMAT=text ; on isole le test
+        # pour vérifier le fallback "json" quand la var n'est pas posée.
+        monkeypatch.delenv("LOG_FORMAT", raising=False)
         fmt = _make_formatter()
         record = _logging.LogRecord(
             name="t",

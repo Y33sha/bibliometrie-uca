@@ -4,20 +4,16 @@ pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 ## Pipeline
 ### Fix rapides
 * [x] mode daily: ne pas prendre de fenêtre temporelle fixe; prendre la date du dernier rapport de pipeline, mettre l'heure à 00:00
+* [x] système de logging cassé + status.json jamais supprimé quand pipeline mort
 * [ ] évaluer l'intérêt de enrich_source_person
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
 * [ ] 2026-04-20 12:13:42 [ERROR] Erreur sur W4206741675: ERREUR:  une instruction insert ou update sur la table « source_authorship_addresses » viole la contrainte de clé
 étrangère « source_authorship_addresses_address_id_fkey »
 DETAIL:  La clé (address_id)=(4283651) n'est pas présente dans la table « addresses ».
-* [ ] système de logging cassé + status.json jamais supprimé quand pipeline mort
-"Root cause du « logging cassé »
-Commit eea80c3 (2026-04-22) a rendu le FileHandler opt-in via os.environ.get("LOG_TO_FILE"). Tu as bien LOG_TO_FILE=true dans .env, mais le .env n'est pas chargé dans os.environ — il est lu uniquement par pydantic-settings dans settings.py pour ses champs déclarés (db_*, admin_hash, session_secret). Les autres variables de .env (LOG_TO_FILE, LOG_FORMAT, CORS_ORIGINS, etc.) restent invisibles pour os.environ.get(...).
-Donc depuis 2026-04-22 : aucun fichier .log n'est écrit par le pipeline → read_new_logs(offsets) trouve zéro nouveau byte → les rapports montrent les titres de phases sans logs en dessous. Exactement le symptôme que tu décris. Le rapport du 2026-04-21 (avant le commit) avait bien les logs.
-Fix proposé : ajouter load_dotenv() dans infrastructure/init.py (earliest bootstrap, python-dotenv est déjà une dépendance transitive via pydantic-settings). Une ligne, et LOG_TO_FILE/LOG_FORMAT/CORS_ORIGINS/autres deviennent visibles partout.
-Alternative plus lourde : migrer ces vars dans la classe Settings typée. Propre mais plus de churn. Je propose de coller au minimum pour ce bug et noter l'alternative en TODO.
-status.json orphelin
-Problème différent : atexit et les handlers KeyboardInterrupt/RuntimeError couvrent l'exit normal + SIGTERM (via le handler déjà installé). Restent non couverts : SIGKILL, crash C-level, kernel OOM killer. Dans ces cas, status.json persiste et fait croire à un pipeline encore actif.
-Fix proposé : écrire le PID dans status.json au _write_status, et au démarrage d'un nouveau run (début de main()), si status.json existe avec un PID mort (os.kill(pid, 0) → ProcessLookupError), le nettoyer en logguant. Les lecteurs (API qui expose status.json) peuvent aussi faire cette vérif pour afficher "pipeline inactif" au lieu d'un statut fantôme."
+* [ ] hal_authors importés sans id par un script de cross-import: ça ne devrait pas être possible. Auditer.
+* [ ] publis OpenAlex avec date correspondant au dépôt dans HAL: ex. 8651 => si dates différentes, utiliser l'autre. Si OA cite HAL comme source, prendre métadonnées HAL
+* [ ] investiguer les 388k doublons de position WoS (source_authorships, même publi, même position auteur)
+* [ ] comprendre les author position NULL
 ### Chantiers importants
 * [ ] passer en async pour extract
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
@@ -35,16 +31,12 @@ Fix proposé : écrire le PID dans status.json au _write_status, et au démarrag
 * [ ] pour les publis: CrossRef, ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression)
 * [ ] pour les jeux de données: DataCite, autres?
 * [ ] brevets?
-* [ ] divers: ORCID, IdRef, OpenAPC, DOAJ, scraping sites éditeurs pour les adresses manquantes? (soyons fous)
+* [ ] divers: ORCID, IdRef, DOAJ, scraping sites éditeurs pour les adresses manquantes? (soyons fous)
 ## Entités supplémentaires
 * [ ] sujets / mots-clés: exploiter
 ## Qualité des données
 * [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?).
-* [ ] hal_authors importés sans id par un script de cross-import: ça ne devrait pas être possible. Auditer.
-* [ ] publis OpenAlex avec date correspondant au dépôt dans HAL: ex. 8651 => si dates différentes, utiliser l'autre. Si OA cite HAL comme source, prendre métadonnées HAL
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
-* [ ] investiguer les 388k doublons de position WoS (source_authorships, même publi, même position auteur)
-* [ ] comprendre les author position NULL
 ### Problèmes spécifiques HAL
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
 * [ ] https://hal.science/hal-03874894 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
