@@ -289,7 +289,7 @@ def main() -> Any:
     )
     parser.add_argument(
         "--mode",
-        choices=["full", "weekly", "monthly", "daily"],
+        choices=["full", "weekly", "daily"],
         default="full",
         help="Mode pipeline (NNT ignoré en daily/weekly)",
     )
@@ -308,7 +308,7 @@ def main() -> Any:
     hal_refs_scanr = find_hal_ids_from_scanr(cur)
     log.info(f"  {len(hal_refs_scanr)} HAL IDs ScanR absents de staging_hal")
 
-    if args.mode in ("full", "monthly"):
+    if args.mode == "full":
         log.info("Recherche des NNT sans document HAL...")
         nnt_refs = find_nnt_without_hal(cur)
         log.info(f"  {len(nnt_refs)} NNT (thèses soutenues) sans HAL")

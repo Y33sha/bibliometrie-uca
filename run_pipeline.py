@@ -9,11 +9,10 @@ Usage:
     python run_pipeline.py --list             # Lister les phases
     python run_pipeline.py --dry-run          # Afficher sans exécuter
     python run_pipeline.py --mode daily       # Import quotidien (HAL depuis dernier run)
-    python run_pipeline.py --mode weekly      # Import années n et n-1
-    python run_pipeline.py --mode monthly     # Repasse complète + cross-imports
+    python run_pipeline.py --mode weekly      # Import années n et n-1 (WoS exclu)
+    python run_pipeline.py --mode full        # Repasse complète + cross-imports + enrichissements
     python run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement
     python run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
-    python run_pipeline.py --only cross_imports --sources scanr --full-cross-import  # Cross-import ScanR complet
 
 Phases (dans l'ordre d'execution):
     extract        Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
@@ -47,7 +46,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from domain.sources import ALL_SOURCES_SET, BIBLIO_SOURCES_SET
+from domain.pipeline_modes import MODE_NAMES, MODES
+from domain.sources import ALL_SOURCES_SET
 
 logging.basicConfig(
     level=logging.INFO,
@@ -97,77 +97,68 @@ atexit.register(_clear_status)
 def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **kw: Any) -> Any:
     """Phase 1 : Extraction des sources vers staging + refetch truncated.
 
-    Les années sont déterminées par la config DB (pipeline_years_full/weekly).
-    Les scripts d'extraction lisent la config directement.
-    En mode daily, seules HAL et OpenAlex sont interrogées (filtre par date).
-    En mode weekly, WoS est exclu pour économiser le crédit API.
+    La politique du mode (sources à interroger, plage d'années, refetch OA)
+    vit dans `domain/pipeline_modes.py`. Les scripts d'extraction lisent
+    la config DB pour les plages d'années (`pipeline_years_full/weekly`).
     """
-    sources = sources or set(ALL_SOURCES_SET)
+    policy = MODES[mode]
+    effective = (set(sources) if sources else set(policy.extract_sources)) & policy.extract_sources
     year_args = ["--year", str(year)] if year else []
-    if mode == "daily":
+
+    if policy.year_selection == "since_last":
+        # HAL uniquement, depuis le dernier run. OpenAlex n'a pas d'équivalent
+        # (filtre `from_updated_date` payant ; changefiles non filtrables par
+        # institution) et est rattrapé par le mode weekly.
         since = str((datetime.datetime.now() - datetime.timedelta(hours=36)).date())
         log.info("Mode quotidien : HAL depuis %s", since)
-        if "hal" in sources:
+        if "hal" in effective:
             run_python("infrastructure/sources/hal/extract_hal.py", "--since", since)
-        # OpenAlex : le filtre from_updated_date requiert un plan payant
-        # (429 "Plan upgrade required"). Les changefiles couvrent tout OA
-        # (plusieurs Go/jour), pas filtrable par institution.
-        # OpenAlex est rattrapé par le mode weekly.
-    elif mode in ("full", "weekly", "monthly"):
-        # Les extracteurs ne connaissent que full/weekly (plage d'années).
-        # monthly = full pour la sélection d'années, les cross-imports complets
-        # sont gérés dans phase_cross_imports.
-        sub_mode = "weekly" if mode == "weekly" else "full"
+    else:
+        sub_mode = policy.year_selection  # "weekly" ou "full"
         if mode == "weekly":
             log.info("Mode hebdomadaire (WoS exclu)")
-        if "openalex" in sources:
+        if "openalex" in effective:
             run_python(
                 "infrastructure/sources/openalex/extract_openalex.py",
                 "--mode",
                 sub_mode,
                 *year_args,
             )
-        if "hal" in sources:
+        if "hal" in effective:
             run_python("infrastructure/sources/hal/extract_hal.py", "--mode", sub_mode, *year_args)
-        if "wos" in sources and mode != "weekly":
+        if "wos" in effective:
             run_python("infrastructure/sources/wos/extract_wos.py", "--mode", sub_mode, *year_args)
-        if "scanr" in sources:
+        if "scanr" in effective:
             run_python(
                 "infrastructure/sources/scanr/extract_scanr.py", "--mode", sub_mode, *year_args
             )
-        if "theses" in sources:
+        if "theses" in effective:
             run_python("infrastructure/sources/theses/extract_theses.py")
-    # Re-fetch des publications OA tronquées à 100 auteurs (sauf mode daily)
-    if mode != "daily" and "openalex" in (sources or {"openalex"}):
+
+    if policy.refetch_truncated_oa and "openalex" in effective:
         run_python("infrastructure/sources/openalex/refetch_truncated.py")
 
 
-def phase_cross_imports(
-    mode: Any = "full", sources: Any = None, full_cross_import: Any = False, **kw: Any
-) -> Any:
+def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> Any:
     """Phase 2 : Cross-imports entre sources (lit le staging uniquement).
 
-    - daily/weekly : cross-import sur les documents non normalisés (processed=FALSE)
-    - monthly : cross-import complet (--all)
-    - full : selon le flag --full-cross-import
+    Scope (`unprocessed` vs `all`) et sources autorisées viennent de la
+    policy du mode (cf. `domain/pipeline_modes.py`).
     """
-    if mode in ("daily", "weekly"):
-        sources = sources or set(BIBLIO_SOURCES_SET)
-        full_flag = []
-    elif mode in ("full", "monthly"):
-        sources = sources or set(BIBLIO_SOURCES_SET)
-        full_flag = ["--all"] if (full_cross_import or mode == "monthly") else []
-    else:
-        return
+    policy = MODES[mode]
+    effective = (
+        set(sources) if sources else set(policy.cross_import_sources)
+    ) & policy.cross_import_sources
+    full_flag = ["--all"] if policy.cross_import_scope == "all" else []
 
-    if "hal" in sources:
+    if "hal" in effective:
         run_python("infrastructure/sources/hal/fetch_missing_hal.py", *full_flag, "--mode", mode)
         run_python("infrastructure/sources/hal/cross_import_hal.py", *full_flag)
-    if "openalex" in sources:
+    if "openalex" in effective:
         run_python("infrastructure/sources/openalex/cross_import_openalex.py", *full_flag)
-    if "wos" in sources and mode not in ("daily", "weekly"):
+    if "wos" in effective:
         run_python("infrastructure/sources/wos/cross_import_wos.py", *full_flag)
-    if "scanr" in sources:
+    if "scanr" in effective:
         run_python("infrastructure/sources/scanr/cross_import_scanr.py", *full_flag)
 
 
@@ -194,12 +185,12 @@ def phase_normalize(**kw: Any) -> Any:
         _run_normalize_openalex()
     if "wos" in sources:
         _run_normalize_wos()
-    if "hal" in sources:
-        if kw.get("mode", "full") in ("full", "monthly"):
-            _run_harvest_hal_identifiers()
-    # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
     mode = kw.get("mode", "full")
-    if mode in ("full", "monthly"):
+    policy = MODES[mode]
+    if "hal" in sources and policy.harvest_hal_identifiers:
+        _run_harvest_hal_identifiers()
+    # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
+    if policy.vacuum_full:
         log.info("VACUUM FULL staging...")
         _vacuum_staging(full=True)
     else:
@@ -682,16 +673,15 @@ def _run_refresh_publication_countries() -> None:
 
 
 def phase_enrich(mode: Any = "full", **kw: Any) -> Any:
-    """Enrichissements optionnels (mode full/monthly uniquement).
+    """Enrichissements optionnels (Unpaywall, APC revues).
 
-    - Statut OA via Unpaywall
-    - APC revues (import fichiers budget)
+    Gouverné par `ModePolicy.run_enrich` (cf. `domain/pipeline_modes.py`).
     """
-    if mode in ("full", "monthly"):
+    if MODES[mode].run_enrich:
         _run_enrich_oa_status()
         _run_enrich_journal_apc()
     else:
-        log.info("Enrichissements ignorés en mode hebdomadaire")
+        log.info("Enrichissements ignorés en mode %s", mode)
 
 
 # Registre des phases, dans l'ordre
@@ -767,7 +757,7 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Afficher les étapes sans exécuter")
     parser.add_argument(
         "--mode",
-        choices=["full", "weekly", "monthly", "daily"],
+        choices=list(MODE_NAMES),
         default="full",
         help="Mode d'exécution (défaut: full)",
     )
@@ -778,11 +768,6 @@ def main() -> None:
     )
     parser.add_argument(
         "--year", type=int, help="Surcharger l'année d'extraction (une seule année)"
-    )
-    parser.add_argument(
-        "--full-cross-import",
-        action="store_true",
-        help="Cross-imports sur tout le staging (pas seulement les non-normalisés)",
     )
     parser.add_argument(
         "--sandbox", action="store_true", help="Utiliser la base bibliometrie_sandbox"
@@ -851,7 +836,6 @@ def main() -> None:
                 mode=args.mode,
                 sources=sources,
                 year=args.year,
-                full_cross_import=args.full_cross_import,
             )
         except KeyboardInterrupt:
             log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)

@@ -113,7 +113,7 @@ class TestGenerateReport:
     def test_sandbox_label(self, tmp_path, monkeypatch):
         pm = _fresh_module(tmp_path, monkeypatch)
         monkeypatch.setenv("BIBLIOMETRIE_SANDBOX", "1")
-        path = pm.generate_report("monthly", {"hal"}, [], 1.0)
+        path = pm.generate_report("full", {"hal"}, [], 1.0)
         p = Path(path)
         assert p.parent == tmp_path / "logs" / "reports" / "sandbox"
         assert "(SANDBOX)" in p.read_text(encoding="utf-8")
