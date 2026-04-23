@@ -119,3 +119,161 @@
     </div>
   {/if}
 </div>
+
+<style>
+  .pub-header {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+  }
+  .pub-title-main {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 0 0 10px;
+    line-height: 1.4;
+  }
+  .pub-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .lang-badge {
+    background: #f5f0fa;
+    color: #7c5ca7;
+  }
+  .oa-tag {
+    font-size: 0.8rem;
+    padding: 2px 8px;
+  }
+
+  .pub-journal-line {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+  }
+  .journal-name {
+    font-weight: 500;
+    color: var(--text);
+  }
+  .issn {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .publisher-name {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .predatory-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #fde8e8;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #c0392b;
+  }
+
+  .pub-doi {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+  }
+  .doi-label {
+    font-weight: 500;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .pub-doi a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .pub-doi a:hover {
+    text-decoration: underline;
+  }
+
+  .pub-sources {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .source-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .source-hal-link {
+    background: #e8f0f8;
+    color: #3b6b9e;
+  }
+  .source-hal-link:hover {
+    background: #d0e3f4;
+  }
+  .source-oa-link {
+    background: #fef3e0;
+    color: #b8733e;
+  }
+  .source-oa-link:hover {
+    background: #fde8c8;
+  }
+  .source-scanr-link {
+    background: #e0edf5;
+    color: #1b4f72;
+  }
+  .source-scanr-link:hover {
+    background: #cde0ef;
+  }
+  .source-wos-link {
+    background: #f0e8f5;
+    color: #6b4c8a;
+  }
+  .source-wos-link:hover {
+    background: #e4d8f0;
+  }
+  .source-theses-link {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+  .source-theses-link:hover {
+    background: #d0ebd3;
+  }
+  .source-ico {
+    width: 14px;
+    height: 14px;
+  }
+
+  .collections-line {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    margin-top: 6px;
+  }
+  .collections-label {
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .collection-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    background: #f0efec;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+</style>

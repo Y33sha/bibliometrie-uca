@@ -39,7 +39,7 @@ def ensure_migrations_table(cur: Any) -> Any:
 def get_applied(cur: Any) -> set[str]:
     """Retourne les versions déjà appliquées."""
     cur.execute("SELECT version FROM schema_migrations ORDER BY version")
-    return {row[0] for row in cur.fetchall()}
+    return {row["version"] for row in cur.fetchall()}
 
 
 def get_pending(applied: set[str]) -> list[Path]:
