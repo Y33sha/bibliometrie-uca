@@ -1,4 +1,4 @@
-# Architecture des données — Bibliométrie UCA
+# Schéma de données — Bibliométrie UCA
 
 ## Principes de conception
 

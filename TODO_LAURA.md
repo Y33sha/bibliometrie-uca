@@ -2,15 +2,26 @@
 pg_dump -U lalecoz -d bibliometrie -Fc -f bibliometrie.dump
 pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
 ## Pipeline
+### Fix rapides
+* [x] mode daily: ne pas prendre de fenêtre temporelle fixe; prendre la date du dernier rapport de pipeline, mettre l'heure à 00:00
+* [ ] évaluer l'intérêt de enrich_source_person
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
-* [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
-* [ ] y a-t-il un cross-import sur le cross-import au run suivant? vérifier la logique
-* [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
 * [ ] 2026-04-20 12:13:42 [ERROR] Erreur sur W4206741675: ERREUR:  une instruction insert ou update sur la table « source_authorship_addresses » viole la contrainte de clé
 étrangère « source_authorship_addresses_address_id_fkey »
 DETAIL:  La clé (address_id)=(4283651) n'est pas présente dans la table « addresses ».
-* [ ] système de logging cassé
-* [ ] évaluer l'intérêt de enrich_source_person
+* [ ] système de logging cassé + status.json jamais supprimé quand pipeline mort
+"Root cause du « logging cassé »
+Commit eea80c3 (2026-04-22) a rendu le FileHandler opt-in via os.environ.get("LOG_TO_FILE"). Tu as bien LOG_TO_FILE=true dans .env, mais le .env n'est pas chargé dans os.environ — il est lu uniquement par pydantic-settings dans settings.py pour ses champs déclarés (db_*, admin_hash, session_secret). Les autres variables de .env (LOG_TO_FILE, LOG_FORMAT, CORS_ORIGINS, etc.) restent invisibles pour os.environ.get(...).
+Donc depuis 2026-04-22 : aucun fichier .log n'est écrit par le pipeline → read_new_logs(offsets) trouve zéro nouveau byte → les rapports montrent les titres de phases sans logs en dessous. Exactement le symptôme que tu décris. Le rapport du 2026-04-21 (avant le commit) avait bien les logs.
+Fix proposé : ajouter load_dotenv() dans infrastructure/init.py (earliest bootstrap, python-dotenv est déjà une dépendance transitive via pydantic-settings). Une ligne, et LOG_TO_FILE/LOG_FORMAT/CORS_ORIGINS/autres deviennent visibles partout.
+Alternative plus lourde : migrer ces vars dans la classe Settings typée. Propre mais plus de churn. Je propose de coller au minimum pour ce bug et noter l'alternative en TODO.
+status.json orphelin
+Problème différent : atexit et les handlers KeyboardInterrupt/RuntimeError couvrent l'exit normal + SIGTERM (via le handler déjà installé). Restent non couverts : SIGKILL, crash C-level, kernel OOM killer. Dans ces cas, status.json persiste et fait croire à un pipeline encore actif.
+Fix proposé : écrire le PID dans status.json au _write_status, et au démarrage d'un nouveau run (début de main()), si status.json existe avec un PID mort (os.kill(pid, 0) → ProcessLookupError), le nettoyer en logguant. Les lecteurs (API qui expose status.json) peuvent aussi faire cette vérif pour afficher "pipeline inactif" au lieu d'un statut fantôme."
+### Chantiers importants
+* [ ] passer en async pour extract
+* [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
+* [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
 ## Robustesse du pipeline sur le long terme
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
 * [ ] authorships excluded: info perdue si réimport (grave?)
@@ -33,6 +44,7 @@ DETAIL:  La clé (address_id)=(4283651) n'est pas présente dans la table « add
 * [ ] publis OpenAlex avec date correspondant au dépôt dans HAL: ex. 8651 => si dates différentes, utiliser l'autre. Si OA cite HAL comme source, prendre métadonnées HAL
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
 * [ ] investiguer les 388k doublons de position WoS (source_authorships, même publi, même position auteur)
+* [ ] comprendre les author position NULL
 ### Problèmes spécifiques HAL
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
 * [ ] https://hal.science/hal-03874894 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
@@ -60,8 +72,8 @@ DETAIL:  La clé (address_id)=(4283651) n'est pas présente dans la table « add
 * [ ] vérifier si certains ports ne seraient pas mieux placés dans application/ (critère: sont-ils importés par domain/ ou pas?)
 * [ ] faire le ménage dans db/queries: trop de choses mal rangées ou mal nommées
 * [ ] auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques)
+* [ ] problème page affiliation-conflicts: requête beaucoup trop lente
 # Interface
-* [ ] documentation: affichage cassé
 ## Admin
 * [ ] interface pour consulter l'audit trail
 ### Adresses
@@ -109,7 +121,6 @@ DETAIL:  La clé (address_id)=(4283651) n'est pas présente dans la table « add
 * stats en compte fractionnaire vs compte entiers
 * collaborations nationales et internationales: identification structures? compliqué, je pense que pour ça il vaut mieux réutiliser les sources directement
 * creuser le format de données CERIF, voir si c'est pertinent pour mon besoin
-* [ ] OpenAlex et WOS: mapping structures UCA pour pouvoir comparer sources/vérité?
 # Cas particuliers, bizarreries à élucider, à examiner plus tard
 * openalex répète des auteurs : publi 77832
 * [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
