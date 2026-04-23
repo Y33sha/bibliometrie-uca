@@ -7,6 +7,10 @@ Le comportement spécifique à chaque source (endpoint, auth, format de
 requête/réponse, SQL d'insertion) est délégué à un adapter qui implémente
 le protocole `FetchMissingDoiAdapter` défini ci-dessous.
 
+La lecture de la liste des DOI manquants (requête SQL) est injectée en
+tant que callable ``CrossImportDoisReader`` pour respecter l'étanchéité
+DDD : la couche application ne doit pas importer infrastructure.
+
 Utilisé par la phase `fetch_missing_doi` du pipeline, une fois par source
 cible (hal, openalex, wos, scanr).
 """
@@ -15,9 +19,11 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Iterable, Protocol
+from collections.abc import Callable, Iterable
+from typing import Any, Protocol
 
-from infrastructure.sources.common import get_cross_import_dois
+CrossImportDoisReader = Callable[[Any, str, bool], list[str]]
+"""Signature : ``(conn, target, all_staged) -> list[doi]``."""
 
 
 class FetchMissingDoiAdapter(Protocol):
@@ -27,9 +33,9 @@ class FetchMissingDoiAdapter(Protocol):
     Les méthodes encapsulent tout ce qui varie par source (HTTP, SQL).
     """
 
-    source_key: str          # "hal" | "openalex" | "wos" | "scanr"
-    rate_delay: float        # secondes de pause entre deux appels API
-    batch_size: int          # 1 pour un appel par DOI, >1 pour un appel groupé
+    source_key: str  # "hal" | "openalex" | "wos" | "scanr"
+    rate_delay: float  # secondes de pause entre deux appels API
+    batch_size: int  # 1 pour un appel par DOI, >1 pour un appel groupé
 
     def configure(self, cur: Any) -> None:
         """Lit la config (URLs, credentials) depuis la base avant la boucle."""
@@ -48,6 +54,7 @@ def run(
     adapter: FetchMissingDoiAdapter,
     log: logging.Logger,
     *,
+    cross_import_dois_reader: CrossImportDoisReader,
     all_staged: bool = False,
     dry_run: bool = False,
     limit: int | None = None,
@@ -58,6 +65,8 @@ def run(
         conn: connexion psycopg ouverte.
         adapter: instance source-spécifique.
         log: logger.
+        cross_import_dois_reader: callable qui lit en base les DOI
+            présents dans d'autres sources et absents de la cible.
         all_staged: si False, ne considère que les DOI issus de rows
             `processed=FALSE` dans les autres sources.
         dry_run: compte et log sans fetch ni insert.
@@ -70,7 +79,7 @@ def run(
     adapter.configure(cur)
     cur.close()
 
-    dois = get_cross_import_dois(conn, adapter.source_key, all_staged=all_staged)
+    dois = cross_import_dois_reader(conn, adapter.source_key, all_staged)
     log.info("%d DOI manquants pour %s", len(dois), adapter.source_key)
 
     if limit:
@@ -104,9 +113,7 @@ def run(
 
         processed = min(i + adapter.batch_size, total)
         if processed % 100 == 0 or processed >= total:
-            log.info(
-                "  %d/%d — %d trouvés, %d insérés", processed, total, fetched, inserted
-            )
+            log.info("  %d/%d — %d trouvés, %d insérés", processed, total, fetched, inserted)
 
         time.sleep(adapter.rate_delay)
 
