@@ -15,8 +15,9 @@ Usage:
     python run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
 
 Phases (dans l'ordre d'execution):
-    extract        Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
-    cross_imports  Cross-imports entre sources (DOIs manquants, fetch HAL par hal-id/NNT)
+    extract              Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
+    fetch_missing_hal_id Fetch des documents HAL manquants par hal-id/NNT (auto-borné, tourne toujours)
+    fetch_missing_doi    Fetch par DOI des records manquants dans chaque source (scope policy)
     normalize      Normalisation staging -> tables sources (source_publications, source_persons,
                    source_authorships). Rattachement aux publications existantes par DOI/NNT/
                    HAL-ID, mais PAS de creation de publications. Inclut enrichissement
@@ -147,27 +148,40 @@ def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **k
         run_python("infrastructure/sources/openalex/refetch_truncated.py")
 
 
-def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> Any:
-    """Phase 2 : Cross-imports entre sources (lit le staging uniquement).
+def phase_fetch_missing_hal_id(mode: Any = "full", sources: Any = None, **kw: Any) -> Any:
+    """Phase 2a : fetch des documents HAL manquants par hal-id/NNT.
 
-    Scope (`unprocessed` vs `all`) et sources autorisées viennent de la
-    policy du mode (cf. `domain/pipeline_modes.py`).
+    Opération auto-bornée : les hal-ids/NNT introuvables sont marqués
+    `not_found=TRUE` dans staging et ne sont jamais re-interrogés. Tourne
+    donc systématiquement (daily/weekly/full) sans scope.
+    """
+    if sources and "hal" not in sources:
+        return
+    run_python("infrastructure/sources/hal/fetch_missing_hal_id.py", "--mode", mode)
+
+
+def phase_fetch_missing_doi(mode: Any = "full", sources: Any = None, **kw: Any) -> Any:
+    """Phase 2b : fetch des records manquants par DOI dans chaque source.
+
+    Scope (`unprocessed` vs `all`) et sources cibles viennent de la policy
+    du mode (cf. `domain/pipeline_modes.py`). Un seul dispatcher CLI
+    (`interfaces.cli.pipeline.fetch_missing_doi`) est appelé une fois
+    par source cible.
     """
     policy = MODES[mode]
     effective = (
-        set(sources) if sources else set(policy.cross_import_sources)
-    ) & policy.cross_import_sources
-    full_flag = ["--all"] if policy.cross_import_scope == "all" else []
+        set(sources) if sources else set(policy.fetch_missing_doi_sources)
+    ) & policy.fetch_missing_doi_sources
+    scope_flag = ["--all"] if policy.fetch_missing_doi_scope == "all" else []
 
-    if "hal" in effective:
-        run_python("infrastructure/sources/hal/fetch_missing_hal.py", *full_flag, "--mode", mode)
-        run_python("infrastructure/sources/hal/cross_import_hal.py", *full_flag)
-    if "openalex" in effective:
-        run_python("infrastructure/sources/openalex/cross_import_openalex.py", *full_flag)
-    if "wos" in effective:
-        run_python("infrastructure/sources/wos/cross_import_wos.py", *full_flag)
-    if "scanr" in effective:
-        run_python("infrastructure/sources/scanr/cross_import_scanr.py", *full_flag)
+    for target in ("hal", "openalex", "wos", "scanr"):
+        if target in effective:
+            run_python(
+                "interfaces/cli/pipeline/fetch_missing_doi.py",
+                "--target",
+                target,
+                *scope_flag,
+            )
 
 
 def phase_normalize(**kw: Any) -> Any:
@@ -695,7 +709,8 @@ def phase_enrich(mode: Any = "full", **kw: Any) -> Any:
 # Registre des phases, dans l'ordre
 PHASES = [
     ("extract", phase_extract),
-    ("cross_imports", phase_cross_imports),
+    ("fetch_missing_hal_id", phase_fetch_missing_hal_id),
+    ("fetch_missing_doi", phase_fetch_missing_doi),
     ("normalize", phase_normalize),
     ("affiliations", phase_affiliations),
     ("publications", phase_publications),
