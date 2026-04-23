@@ -397,7 +397,7 @@ class SourcePublicationOut(BaseModel):
 class ConsolidatedAuthorshipOut(BaseModel):
     """Authorship consolidée (liens certifiés person ↔ publication)."""
 
-    author_position: int
+    author_position: int | None
     in_perimeter: bool
     is_corresponding: bool | None
     structure_ids: list[int] | None

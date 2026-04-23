@@ -206,53 +206,61 @@ async def hal_missing_collections(
 
 async def hal_affiliation_conflicts(cur: Any, *, page: int, per_page: int) -> dict[str, Any]:
     """Publications affiliées UCA dans HAL mais pas dans OA/WoS."""
-    await cur.execute("SET LOCAL jit = off")
     offset = (page - 1) * per_page
-    base_where = """
+    # CTE en 3 passes :
+    # 1. `hal_uca`     : authorships UCA attestés HAL + rattachés à un labo.
+    # 2. `conflicting` : source_authorships OA/WoS hors-UCA avec adresse
+    #                    (preuve que la source a bien examiné l'affiliation).
+    # 3. `conflict_pubs` : publications où HAL-UCA et OA/WoS-hors-UCA
+    #                     coexistent à la MÊME position d'auteur.
+    # Remplace les EXISTS corrélés imbriqués (ré-évalués à chaque ligne de
+    # `authorships`) par des scans hachés évalués une seule fois.
+    base_cte = """
+    WITH hal_uca AS (
+        SELECT a.publication_id, a.author_position
         FROM authorships a
-        JOIN publications p ON p.id = a.publication_id
         WHERE a.in_perimeter = TRUE
           AND EXISTS (SELECT 1 FROM source_authorships sa
                       WHERE sa.authorship_id = a.id AND sa.source = 'hal')
           AND EXISTS (SELECT 1 FROM structures s
                       WHERE s.id = ANY(a.structure_ids) AND s.structure_type = 'labo')
-          AND (
-              EXISTS (
-                  SELECT 1 FROM source_authorships sa
-                  JOIN source_publications sd ON sd.id = sa.source_publication_id
-                  WHERE sd.publication_id = p.id
-                    AND sa.source = 'openalex'
-                    AND sa.author_position = a.author_position
-                    AND sa.in_perimeter = FALSE
-                    AND EXISTS (SELECT 1 FROM source_authorship_addresses saa
-                                WHERE saa.source_authorship_id = sa.id)
-              )
-              OR EXISTS (
-                  SELECT 1 FROM source_authorships sa
-                  JOIN source_publications sd ON sd.id = sa.source_publication_id
-                  WHERE sd.publication_id = p.id
-                    AND sa.source = 'wos'
-                    AND sa.author_position = a.author_position
-                    AND sa.in_perimeter = FALSE
-                    AND EXISTS (SELECT 1 FROM source_authorship_addresses saa
-                                WHERE saa.source_authorship_id = sa.id)
-              )
-          )
+    ),
+    conflicting AS (
+        SELECT DISTINCT sd.publication_id, sa.author_position
+        FROM source_authorships sa
+        JOIN source_publications sd ON sd.id = sa.source_publication_id
+        WHERE sa.source IN ('openalex', 'wos')
+          AND sa.in_perimeter = FALSE
+          AND EXISTS (SELECT 1 FROM source_authorship_addresses saa
+                      WHERE saa.source_authorship_id = sa.id)
+    ),
+    conflict_pubs AS (
+        SELECT DISTINCT h.publication_id
+        FROM hal_uca h
+        JOIN conflicting c
+          ON c.publication_id = h.publication_id
+         AND c.author_position = h.author_position
+    )
     """
 
-    await cur.execute(f"SELECT COUNT(DISTINCT p.id) {base_where}")
+    await cur.execute(f"{base_cte} SELECT COUNT(*) AS n FROM conflict_pubs")
     row = await cur.fetchone()
-    total = row["count"]
+    total = row["n"]
 
     await cur.execute(
         f"""
-        SELECT DISTINCT p.id, p.title, p.pub_year, p.doc_type::text, p.doi,
+        {base_cte}
+        SELECT p.id, p.title, p.pub_year, p.doc_type::text, p.doi,
                (SELECT array_agg(sd2.source_id) FROM source_publications sd2
                 WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
                (SELECT string_agg(DISTINCT s.acronym, ', ' ORDER BY s.acronym)
-                FROM structures s
-                WHERE s.id = ANY(a.structure_ids) AND s.structure_type = 'labo') AS labs
-        {base_where}
+                FROM authorships a2
+                JOIN structures s ON s.id = ANY(a2.structure_ids)
+                WHERE a2.publication_id = p.id
+                  AND a2.in_perimeter = TRUE
+                  AND s.structure_type = 'labo') AS labs
+        FROM conflict_pubs cp
+        JOIN publications p ON p.id = cp.publication_id
         ORDER BY p.pub_year DESC NULLS LAST, p.id DESC
         LIMIT %s OFFSET %s
         """,
