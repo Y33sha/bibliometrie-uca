@@ -21,7 +21,7 @@ Phases (dans l'ordre d'execution):
     normalize      Normalisation staging -> tables sources (source_publications, source_persons,
                    source_authorships). Rattachement aux publications existantes par DOI/NNT/
                    HAL-ID, mais PAS de creation de publications. Inclut enrichissement
-                   structures HAL et moissonnage identifiants HAL (ORCID, IdRef).
+                   structures HAL et extraction des identifiants ORCID/IdRef depuis le TEI HAL.
                    Crée les adresses et liens source_authorship_addresses.
                    Vide le raw_data du staging apres traitement + VACUUM.
     affiliations   Résolution adresses → structures, puis propagation
@@ -164,7 +164,7 @@ def phase_normalize(**kw: Any) -> Any:
     Rattache aux publications existantes (DOI/NNT/HAL-ID) sans en creer.
     Stocke les metadonnees (abstract, keywords, topics, biblio, etc.) sur
     source_publications. Vide le raw_data du staging apres traitement.
-    Pour HAL : enrichit les structures et moissonne les identifiants (ORCID, IdRef).
+    Pour HAL : enrichit les structures et extrait ORCID/IdRef depuis le TEI.
     """
     sources = kw.get("sources", set(ALL_SOURCES_SET))
     # Ordre d'exécution : source la plus autoritative en premier
@@ -183,8 +183,6 @@ def phase_normalize(**kw: Any) -> Any:
         _run_normalize_wos()
     mode = kw.get("mode", "full")
     policy = MODES[mode]
-    if "hal" in sources and policy.harvest_hal_identifiers:
-        _run_harvest_hal_identifiers()
     # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
     if policy.vacuum_full:
         log.info("VACUUM FULL staging...")
@@ -547,32 +545,6 @@ def _run_normalize_theses() -> None:
         address_linker=PgAddressLinker(),
     ).run([])
     log.info("✓ normalize_theses terminé en %.1fs", time.time() - t0)
-
-
-def _run_harvest_hal_identifiers() -> None:
-    from application.pipeline.normalize.harvest_hal_identifiers import run_harvest
-    from infrastructure.api_limits import HAL_DELAY
-    from infrastructure.app_config import get_api_base_urls
-    from infrastructure.db.connection import get_connection
-    from infrastructure.db.queries.harvest import PgHarvestQueries
-
-    log.info("▶ harvest_hal_identifiers")
-    t0 = time.time()
-    conn = get_connection()
-    conn.autocommit = False
-    try:
-        cur = conn.cursor()
-        run_harvest(
-            cur,
-            conn,
-            PgHarvestQueries(),
-            log,
-            hal_ref_author_api=get_api_base_urls(cur)["hal_ref_author"],
-            rate_delay=HAL_DELAY,
-        )
-    finally:
-        conn.close()
-    log.info("✓ harvest_hal_identifiers terminé en %.1fs", time.time() - t0)
 
 
 def _run_enrich_oa_status() -> None:

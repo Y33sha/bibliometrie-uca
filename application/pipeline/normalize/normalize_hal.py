@@ -19,6 +19,7 @@ via populate_affiliations.py, pas ici. Ce script ne fait que stocker les source_
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
+import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from typing import Any
 
@@ -278,6 +279,53 @@ def insert_hal_document(
 # =============================================================
 
 
+_TEI_NS = {"tei": "http://www.tei-c.org/ns/1.0"}
+
+
+def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
+    """Extrait les identifiants par position d'auteur depuis le TEI HAL.
+
+    L'API search HAL ne fournit pas de champ Solr aligné positionnellement
+    pour ORCID/IdRef (les listes ``authORCIDIdExt_s``/``authIdRefIdExt_s``
+    sont compactées). Seul le TEI (``label_xml``) attache proprement chaque
+    identifiant à son auteur.
+
+    Retourne une liste indexée sur la position d'auteur ; chaque entrée est
+    un dict pouvant contenir ``orcid``, ``idref``, ``idhal`` (formes
+    normalisées : préfixes d'URL strippés). Renvoie ``[]`` si ``label_xml``
+    est absent ou mal formé.
+    """
+    if not label_xml:
+        return []
+    try:
+        root = ET.fromstring(label_xml)
+    except ET.ParseError:
+        return []
+    title_stmt = root.find(".//tei:biblFull/tei:titleStmt", _TEI_NS)
+    if title_stmt is None:
+        return []
+    out: list[dict[str, str]] = []
+    for author in title_stmt.findall("tei:author", _TEI_NS):
+        ids: dict[str, str] = {}
+        for idno in author.findall("tei:idno", _TEI_NS):
+            typ = (idno.get("type") or "").upper()
+            val = (idno.text or "").strip()
+            if not val:
+                continue
+            if typ == "ORCID":
+                ids["orcid"] = (
+                    val.replace("https://orcid.org/", "")
+                    .replace("http://orcid.org/", "")
+                    .strip("/ ")
+                )
+            elif typ == "IDREF":
+                ids["idref"] = val.rsplit("/", 1)[-1].strip()
+            elif typ == "IDHAL":
+                ids["idhal"] = val
+        out.append(ids)
+    return out
+
+
 def _hal_source_id(
     hal_person_id: int | None, hal_form_id: int | None, old_id: int | None = None
 ) -> str:
@@ -305,6 +353,7 @@ def upsert_hal_author(
     idhal: str | None,
     hal_form_id: int | None = None,
     orcid: str | None = None,
+    idref: str | None = None,
 ) -> int | None:
     """
     Insère/retrouve un auteur HAL dans source_persons (source='hal').
@@ -349,6 +398,7 @@ def upsert_hal_author(
             last_name=last_name,
             first_name=first_name,
             orcid=orcid,
+            idref=idref,
             source_ids_json=source_ids_json,
         )
         _hal_author_cache[src_id] = result
@@ -366,6 +416,7 @@ def upsert_hal_author(
             last_name=last_name,
             first_name=first_name,
             orcid=orcid,
+            idref=idref,
             source_ids_json=source_ids_json,
         )
         _hal_author_cache[src_id] = result
@@ -380,11 +431,12 @@ def upsert_hal_author(
         cur, full_name=full_name, first_name=first_name
     )
     if existing_id is not None:
-        if orcid or source_ids_json:
+        if orcid or idref or source_ids_json:
             queries.enrich_hal_source_person(
                 cur,
                 source_person_id=existing_id,
                 orcid=orcid,
+                idref=idref,
                 source_ids_json=source_ids_json,
             )
         _hal_author_cache[cache_key] = existing_id
@@ -397,6 +449,7 @@ def upsert_hal_author(
         last_name=last_name,
         first_name=first_name,
         orcid=orcid,
+        idref=idref,
         source_ids_json=source_ids_json,
     )
     _hal_author_cache[cache_key] = result
@@ -493,8 +546,10 @@ def process_authors(
     - Crée les source_authorships (source='hal') avec source_struct_ids (source_structures.id)
     """
     names = doc.get("authFullName_s") or []
-    orcids = doc.get("authOrcid_s") or []
     qualities = doc.get("authQuality_s") or []
+    # ORCID et IdRef par auteur : parsés depuis le TEI (label_xml), seul
+    # champ HAL qui les attache proprement à chaque position d'auteur.
+    tei_ids = parse_tei_author_identifiers(doc.get("label_xml"))
 
     # authFullNameFormIDPersonIDIDHal_fs :
     #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position
@@ -556,10 +611,13 @@ def process_authors(
         idhal = idhal_by_pos.get(position)
         hal_person_id = hal_person_id_by_pos.get(position)
         form_id = form_id_by_pos.get(position)
-        orcid = orcids[position] if position < len(orcids) else None
-        # authOrcid_s peut contenir des chaînes vides
-        if orcid and not orcid.strip():
-            orcid = None
+
+        author_ids = tei_ids[position] if position < len(tei_ids) else {}
+        orcid = author_ids.get("orcid")
+        idref = author_ids.get("idref")
+        # Si le TEI ne fournit pas idhal mais le composite Solr oui,
+        # on garde celui-ci (composite Solr = fallback hors TEI).
+        idhal = author_ids.get("idhal") or idhal
 
         # authQuality_s : rôle de l'auteur (aut, crp, dir, edt, …)
         quality = qualities[position] if position < len(qualities) else None
@@ -567,7 +625,7 @@ def process_authors(
         is_corresponding = is_corresponding_from_role
 
         source_person_id = upsert_hal_author(
-            cur, queries, name, hal_person_id, idhal, form_id, orcid=orcid
+            cur, queries, name, hal_person_id, idhal, form_id, orcid=orcid, idref=idref
         )
         if not source_person_id:
             continue
