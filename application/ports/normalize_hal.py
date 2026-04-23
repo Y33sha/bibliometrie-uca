@@ -42,6 +42,7 @@ class HalNormalizeQueries(Protocol):
         last_name: str,
         first_name: str | None,
         orcid: str | None,
+        idref: str | None,
         source_ids_json: Any,
     ) -> int: ...
 
@@ -55,6 +56,7 @@ class HalNormalizeQueries(Protocol):
         *,
         source_person_id: int,
         orcid: str | None,
+        idref: str | None,
         source_ids_json: Any,
     ) -> None: ...
 
@@ -66,6 +68,7 @@ class HalNormalizeQueries(Protocol):
         last_name: str,
         first_name: str | None,
         orcid: str | None,
+        idref: str | None,
         source_ids_json: Any,
     ) -> int: ...
 

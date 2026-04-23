@@ -31,3 +31,15 @@ scripts `cross_import_<source>.py` ont été fusionnés en un dispatcher unique
   DOI retentés à chaque run, stocker un `not_found_at TIMESTAMP` sur les DOI
   qu'une source n'a pas pu résoudre, et ne les réessayer qu'après N jours
   (30 ?). Chantier séparé.
+
+## Suite de la suppression de `harvest_hal_identifiers`
+
+ORCID/IdRef des auteurs HAL sont désormais extraits depuis le TEI
+(`label_xml`) pendant la normalisation — la phase dédiée qui interrogeait
+l'API `ref/author` n'existe plus. La clé `hal_ref_author` a été retirée
+de `api_base_urls` (migration 007, `infrastructure/app_config.py`,
+`infrastructure/db/seed.sql`). À vérifier côté docs :
+
+- Références à l'API `ref/author` HAL ou à `harvest_hal_identifiers` à
+  retirer de `docs/pipeline.md`, `docs/sources.md` et `README.md` si
+  présentes.

@@ -158,7 +158,6 @@ _API_BASE_URLS_DEFAULTS: dict[str, str] = {
     "scanr": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
     "theses": "https://theses.fr/api/v1/theses/recherche/",
     # Endpoints secondaires
-    "hal_ref_author": "https://api.archives-ouvertes.fr/ref/author/",
     "openalex_sources": "https://api.openalex.org/sources",
     "unpaywall": "https://api.unpaywall.org/v2",
     "zenodo": "https://zenodo.org/api/records",

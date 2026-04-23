@@ -25,7 +25,6 @@ class ModePolicy:
     refetch_truncated_oa: bool
     fetch_missing_doi_sources: frozenset[str]
     fetch_missing_doi_scope: FetchMissingDoiScope
-    harvest_hal_identifiers: bool
     vacuum_full: bool
     run_enrich: bool
 
@@ -42,7 +41,6 @@ MODES: dict[str, ModePolicy] = {
         refetch_truncated_oa=False,
         fetch_missing_doi_sources=_FETCH_MISSING_DOI_LIGHT,
         fetch_missing_doi_scope="unprocessed",
-        harvest_hal_identifiers=False,
         vacuum_full=False,
         run_enrich=False,
     ),
@@ -52,7 +50,6 @@ MODES: dict[str, ModePolicy] = {
         refetch_truncated_oa=True,
         fetch_missing_doi_sources=_FETCH_MISSING_DOI_LIGHT,
         fetch_missing_doi_scope="unprocessed",
-        harvest_hal_identifiers=False,
         vacuum_full=False,
         run_enrich=False,
     ),
@@ -62,7 +59,6 @@ MODES: dict[str, ModePolicy] = {
         refetch_truncated_oa=True,
         fetch_missing_doi_sources=BIBLIO_SOURCES_SET,
         fetch_missing_doi_scope="all",
-        harvest_hal_identifiers=True,
         vacuum_full=True,
         run_enrich=True,
     ),

@@ -191,8 +191,8 @@ reste du pipeline reste sync.
   WoS, ScanR, theses.fr. Gain attendu ×5 sur le temps d'extraction.
 - [ ] Scripts d'enrichissement : `enrich_journal_apc.py`,
   `enrich_oa_status.py`.
-- [ ] Scripts cross-import + fetch ciblé : `cross_import_*`,
-  `fetch_missing_hal`, `refetch_truncated`, `harvest_hal_identifiers`.
+- [ ] Scripts fetch ciblé : `fetch_missing_hal_id`, `fetch_missing_doi`,
+  `refetch_truncated`.
 
 **Dépendances** :
 - `httpx` ajouté aux deps prod (il est déjà en dev pour les tests

@@ -100,23 +100,25 @@ def upsert_hal_source_person(
     last_name: str,
     first_name: str | None,
     orcid: str | None,
+    idref: str | None,
     source_ids_json: Any,
 ) -> int:
     """UPSERT d'un `source_persons` HAL. Commune aux passes hal_person_id/form_id."""
     cur.execute(
         """
         INSERT INTO source_persons
-            (source, source_id, full_name, last_name, first_name, orcid,
+            (source, source_id, full_name, last_name, first_name, orcid, idref,
              source_ids)
-        VALUES ('hal', %s, %s, %s, %s, %s, %s)
+        VALUES ('hal', %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
+            idref = COALESCE(source_persons.idref, EXCLUDED.idref),
             full_name = EXCLUDED.full_name,
             source_ids = COALESCE(source_persons.source_ids, '{}') ||
                          COALESCE(EXCLUDED.source_ids, '{}')
         RETURNING id
         """,
-        (source_id, full_name, last_name, first_name, orcid, source_ids_json),
+        (source_id, full_name, last_name, first_name, orcid, idref, source_ids_json),
     )
     row = cur.fetchone()
     return row[0] if isinstance(row, tuple) else row["id"]
@@ -142,18 +144,24 @@ def find_hal_source_person_nokey(cur: Any, *, full_name: str, first_name: str | 
 
 
 def enrich_hal_source_person(
-    cur: Any, *, source_person_id: int, orcid: str | None, source_ids_json: Any
+    cur: Any,
+    *,
+    source_person_id: int,
+    orcid: str | None,
+    idref: str | None,
+    source_ids_json: Any,
 ) -> None:
-    """Ajoute `orcid` / `source_ids` sur un `source_persons` HAL existant (nokey)."""
+    """Ajoute `orcid` / `idref` / `source_ids` sur un `source_persons` HAL existant (nokey)."""
     cur.execute(
         """
         UPDATE source_persons SET
             orcid = COALESCE(source_persons.orcid, %s),
+            idref = COALESCE(source_persons.idref, %s),
             source_ids = COALESCE(source_persons.source_ids, '{}') ||
                          COALESCE(%s::jsonb, '{}')
         WHERE id = %s
         """,
-        (orcid, source_ids_json, source_person_id),
+        (orcid, idref, source_ids_json, source_person_id),
     )
 
 
@@ -164,6 +172,7 @@ def insert_hal_source_person_new(
     last_name: str,
     first_name: str | None,
     orcid: str | None,
+    idref: str | None,
     source_ids_json: Any,
 ) -> int:
     """Crée un `source_persons` HAL sans identifiant (source_id = `nokey-<seq>`)."""
@@ -174,12 +183,12 @@ def insert_hal_source_person_new(
     cur.execute(
         """
         INSERT INTO source_persons
-            (id, source, source_id, full_name, last_name, first_name, orcid,
+            (id, source, source_id, full_name, last_name, first_name, orcid, idref,
              source_ids)
-        VALUES (%s, 'hal', %s, %s, %s, %s, %s, %s)
+        VALUES (%s, 'hal', %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
-        (next_id, src_id, full_name, last_name, first_name, orcid, source_ids_json),
+        (next_id, src_id, full_name, last_name, first_name, orcid, idref, source_ids_json),
     )
     inserted = cur.fetchone()
     return inserted[0] if isinstance(inserted, tuple) else inserted["id"]
@@ -355,12 +364,14 @@ class PgHalNormalizeQueries:
         *,
         source_person_id: int,
         orcid: str | None,
+        idref: str | None,
         source_ids_json: Any,
     ) -> None:
         enrich_hal_source_person(
             cur,
             source_person_id=source_person_id,
             orcid=orcid,
+            idref=idref,
             source_ids_json=source_ids_json,
         )
 
