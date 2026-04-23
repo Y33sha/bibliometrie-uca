@@ -138,7 +138,7 @@ def insert_batch(conn: Any, batch: list[tuple]) -> int:
         """,
             (source_ids,),
         )
-        old_hashes = {r[0]: r[1] for r in cur.fetchall()}
+        old_hashes = {r["source_id"]: r["meta_hash"] for r in cur.fetchall()}
 
         cur.executemany(query, batch)
     conn.commit()

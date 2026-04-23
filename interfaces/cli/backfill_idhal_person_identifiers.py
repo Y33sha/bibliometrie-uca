@@ -67,7 +67,7 @@ def backfill_identifier(cur: Any, conn: Any, id_type: Any, column: Any, source_f
     # Vérification des restants (conflits)
     cur.execute(
         f"""
-        SELECT COUNT(*) FROM source_persons sa
+        SELECT COUNT(*) AS n FROM source_persons sa
         WHERE sa.person_id IS NOT NULL
           AND {column} IS NOT NULL
           {where_source}
@@ -80,7 +80,7 @@ def backfill_identifier(cur: Any, conn: Any, id_type: Any, column: Any, source_f
     """,
         (id_type,),
     )
-    remaining = cur.fetchone()[0]
+    remaining = cur.fetchone()["n"]
     if remaining:
         log.warning("%s : encore %d non propagés (conflits)", id_type, remaining)
 

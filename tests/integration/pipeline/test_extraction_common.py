@@ -3,7 +3,7 @@
 import pytest
 
 from domain.publication import clean_doi
-from infrastructure.sources.common import compute_hash, get_existing_ids
+from infrastructure.sources.common import compute_hash, get_cross_import_dois, get_existing_ids
 
 # ── compute_hash ─────────────────────────────────────────────────
 
@@ -84,3 +84,45 @@ class TestGetExistingIds:
         conn = db.connection
         result = get_existing_ids(conn, "hal")
         assert result == set()
+
+    def test_reads_dict_row_cursor(self, db):
+        """Régression : `row[0]` sur une row dict_row lève KeyError.
+
+        La connexion du pipeline utilise `row_factory=dict_row` — il faut
+        accéder aux colonnes par nom, pas par index.
+        """
+        db.execute(
+            "INSERT INTO staging (source, source_id, raw_data) VALUES (%s, %s, %s)",
+            ("hal", "hal-42", "{}"),
+        )
+        db.execute(
+            "INSERT INTO staging (source, source_id, raw_data) VALUES (%s, %s, %s)",
+            ("hal", "hal-43", "{}"),
+        )
+        db.execute(
+            "INSERT INTO staging (source, source_id, raw_data) VALUES (%s, %s, %s)",
+            ("openalex", "W1", "{}"),
+        )
+        result = get_existing_ids(db.connection, "hal")
+        assert result == {"hal-42", "hal-43"}
+
+
+class TestGetCrossImportDois:
+    def test_rejects_unknown_source(self):
+        with pytest.raises(ValueError, match="Source inconnue"):
+            get_cross_import_dois(None, "unknown")
+
+    def test_reads_dict_row_cursor(self, db):
+        """Régression : `row[0]` sur une row dict_row lève KeyError."""
+        db.execute(
+            "INSERT INTO staging (source, source_id, doi, raw_data, processed) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ("openalex", "W1", "10.1234/a", "{}", False),
+        )
+        db.execute(
+            "INSERT INTO staging (source, source_id, doi, raw_data, processed) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ("hal", "hal-1", "10.1234/b", "{}", False),
+        )
+        result = get_cross_import_dois(db.connection, "hal")
+        assert result == ["10.1234/a"]
