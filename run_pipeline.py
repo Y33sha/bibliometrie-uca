@@ -37,7 +37,6 @@ Phases (dans l'ordre d'execution):
 import argparse
 import atexit
 import datetime
-import json
 import logging
 import os
 import signal
@@ -49,6 +48,7 @@ from typing import Any
 
 from domain.pipeline_modes import MODE_NAMES, MODES
 from domain.sources import ALL_SOURCES_SET
+from infrastructure.pipeline_status import clear_status, read_status, write_status
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,36 +58,10 @@ logging.basicConfig(
 log = logging.getLogger("pipeline")
 
 BASE = Path(__file__).resolve().parent
-STATUS_FILE = BASE / "logs" / "status.json"
-
-
-def _write_status(
-    mode: str, phase: str, started_at: str, phases_done: int, phases_total: int
-) -> Any:
-    """Écrit le fichier de statut pour le suivi en temps réel."""
-    STATUS_FILE.write_text(
-        json.dumps(
-            {
-                "running": True,
-                "mode": mode,
-                "phase": phase,
-                "started_at": started_at,
-                "phase_started_at": datetime.datetime.now().isoformat(timespec="seconds"),
-                "phases_done": phases_done,
-                "phases_total": phases_total,
-            }
-        ),
-        encoding="utf-8",
-    )
-
-
-def _clear_status() -> Any:
-    """Supprime le fichier de statut à la fin du pipeline."""
-    STATUS_FILE.unlink(missing_ok=True)
 
 
 # Garantir le nettoyage même en cas de Ctrl+C ou crash
-atexit.register(_clear_status)
+atexit.register(clear_status)
 
 
 # ---------------------------------------------------------------------------
@@ -771,6 +745,10 @@ def _install_sigterm_handler() -> None:
 
 def main() -> None:
     _install_sigterm_handler()
+    # Nettoie un status.json orphelin (PID mort : SIGKILL, crash, OOM)
+    # laissé par un run précédent — sinon le prochain lecteur verrait un
+    # statut fantôme jusqu'à notre premier write_status() de phase.
+    read_status()
     parser = argparse.ArgumentParser(description="Orchestrateur pipeline bibliométrique UCA")
     parser.add_argument(
         "--from", dest="from_phase", metavar="PHASE", help="Reprendre depuis cette phase"
@@ -850,7 +828,13 @@ def main() -> None:
         log.info("PHASE : %s", name)
         log.info("─" * 40)
 
-        _write_status(args.mode, name, pipeline_started_at, i, len(phases_to_run))
+        write_status(
+            mode=args.mode,
+            phase=name,
+            started_at=pipeline_started_at,
+            phases_done=i,
+            phases_total=len(phases_to_run),
+        )
 
         log_offsets = capture_log_offsets()
         t0_phase = time.time()
@@ -867,7 +851,7 @@ def main() -> None:
             phase_results.append((name + " (INTERROMPU)", time.time() - t0_phase, phase_logs))
             report_path = generate_report(args.mode, sources, phase_results, time.time() - t0_total)
             log.info("Rapport partiel : %s", report_path)
-            _clear_status()
+            clear_status()
             sys.exit(130)
         except RuntimeError as e:
             log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
@@ -876,7 +860,7 @@ def main() -> None:
             phase_results.append((name + " (ERREUR)", time.time() - t0_phase, phase_logs))
             report_path = generate_report(args.mode, sources, phase_results, time.time() - t0_total)
             log.info("Rapport partiel : %s", report_path)
-            _clear_status()
+            clear_status()
             sys.exit(1)
 
         duration = time.time() - t0_phase
@@ -889,7 +873,7 @@ def main() -> None:
     report_path = generate_report(args.mode, sources, phase_results, elapsed_total)
     log.info("Rapport : %s", report_path)
 
-    _clear_status()
+    clear_status()
     log.info("=" * 60)
     log.info("PIPELINE TERMINÉ en %.0fs (%.1f min)", elapsed_total, elapsed_total / 60)
     log.info("=" * 60)
