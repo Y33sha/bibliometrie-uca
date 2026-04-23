@@ -16,7 +16,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from infrastructure import PROJECT_ROOT as _PROJECT_ROOT
 
 # Attributs internes de logging.LogRecord à ne PAS inclure dans la sortie JSON
 # (ils sont soit déjà couverts, soit trop verbeux).
