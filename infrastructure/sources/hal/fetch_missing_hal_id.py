@@ -12,9 +12,9 @@ périmètre UCA), ce qui permet de les distinguer des entrées issues
 du portail ou des collections labo.
 
 Usage:
-    python fetch_missing_hal.py              # télécharger les manquants
-    python fetch_missing_hal.py --dry-run    # lister sans télécharger
-    python fetch_missing_hal.py --stats      # statistiques uniquement
+    python fetch_missing_hal_id.py              # télécharger les manquants
+    python fetch_missing_hal_id.py --dry-run    # lister sans télécharger
+    python fetch_missing_hal_id.py --stats      # statistiques uniquement
 """
 
 import argparse
@@ -33,7 +33,7 @@ from infrastructure.hal import HAL_FIELDS_STR
 from infrastructure.log import setup_logger
 from infrastructure.sources.common import compute_hash
 
-log = setup_logger("fetch_missing_hal", os.path.join(os.path.dirname(__file__), "logs"))
+log = setup_logger("fetch_missing_hal_id", os.path.join(os.path.dirname(__file__), "logs"))
 
 
 def find_hal_primary_locations(cur: Any) -> list[dict]:
@@ -282,11 +282,6 @@ def main() -> Any:
     )
     parser.add_argument("--dry-run", action="store_true", help="Lister sans télécharger")
     parser.add_argument("--stats", action="store_true", help="Statistiques uniquement")
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Considérer tout le staging (pas seulement les non-normalisés)",
-    )
     parser.add_argument(
         "--mode",
         choices=["full", "weekly", "daily"],
