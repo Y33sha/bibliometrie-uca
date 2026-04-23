@@ -1,11 +1,35 @@
 """Capture des logs et génération du rapport pipeline."""
 
 import datetime
+import os
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 LOGS_ROOT = BASE / "logs"
 REPORTS_DIR = LOGS_ROOT / "reports"
+
+
+def _current_reports_dir() -> Path:
+    is_sandbox = os.environ.get("BIBLIOMETRIE_SANDBOX") == "1"
+    return REPORTS_DIR / "sandbox" if is_sandbox else REPORTS_DIR
+
+
+def get_last_report_date() -> datetime.date | None:
+    """Date (YYYY-MM-DD) du plus récent rapport de pipeline, ou None.
+
+    Les rapports sont nommés `YYYY-MM-DD_HHMMSS.md` (cf. `generate_report`).
+    Respecte `BIBLIOMETRIE_SANDBOX` pour viser le bon répertoire.
+    """
+    reports_dir = _current_reports_dir()
+    if not reports_dir.exists():
+        return None
+    dates = []
+    for f in reports_dir.glob("*.md"):
+        try:
+            dates.append(datetime.date.fromisoformat(f.name[:10]))
+        except ValueError:
+            continue
+    return max(dates) if dates else None
 
 
 # Fichiers log à exclure de la capture (sortie orchestrateur, loggers parasites)
@@ -63,8 +87,6 @@ def generate_report(
     total_duration: float,
 ) -> str:
     """Génère le rapport Markdown et l'écrit dans logs/reports/."""
-    import os
-
     now = datetime.datetime.now()
     filename = now.strftime("%Y-%m-%d_%H%M%S") + ".md"
     is_sandbox = os.environ.get("BIBLIOMETRIE_SANDBOX") == "1"
@@ -93,7 +115,7 @@ def generate_report(
             lines.append("</details>")
             lines.append("")
 
-    reports_dir = REPORTS_DIR / "sandbox" if is_sandbox else REPORTS_DIR
+    reports_dir = _current_reports_dir()
     reports_dir.mkdir(parents=True, exist_ok=True)
     filepath = reports_dir / filename
     filepath.write_text("\n".join(lines), encoding="utf-8")

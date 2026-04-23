@@ -106,11 +106,19 @@ def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **k
     year_args = ["--year", str(year)] if year else []
 
     if policy.year_selection == "since_last":
-        # HAL uniquement, depuis le dernier run. OpenAlex n'a pas d'équivalent
-        # (filtre `from_updated_date` payant ; changefiles non filtrables par
-        # institution) et est rattrapé par le mode weekly.
-        since = str((datetime.datetime.now() - datetime.timedelta(hours=36)).date())
-        log.info("Mode quotidien : HAL depuis %s", since)
+        # HAL uniquement, depuis le dernier rapport de pipeline (à 00:00).
+        # OpenAlex n'a pas d'équivalent (filtre `from_updated_date` payant ;
+        # changefiles non filtrables par institution) et est rattrapé par
+        # le mode weekly.
+        from infrastructure.pipeline_metrics import get_last_report_date
+
+        last = get_last_report_date()
+        if last is not None:
+            since = last.isoformat()
+            log.info("Mode quotidien : HAL depuis %s (dernier rapport)", since)
+        else:
+            since = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
+            log.info("Mode quotidien : HAL depuis %s (fallback, aucun rapport)", since)
         if "hal" in effective:
             run_python("infrastructure/sources/hal/extract_hal.py", "--since", since)
     else:
