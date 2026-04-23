@@ -1,4 +1,34 @@
 # Roadmap
+1 lancer script pour réparer hal nokey authors
+# 1. Vérifier ce qui va se passer
+python -m interfaces.cli.repair_hal_nokey_source_persons --dry-run
+# 2. Appliquer (nulle 24 hashes, supprime 33 publis + orphelins)
+python -m interfaces.cli.repair_hal_nokey_source_persons
+# 3. Ré-extraction HAL + re-normalisation pour les 24 in-scope
+python run_pipeline.py --mode full --only extract --sources hal
+python run_pipeline.py --mode full --only normalize --sources hal
+
+2 chantier doublons position wos
+# Vérif
+python -m interfaces.cli.cleanup_wos_duplicate_authorships --dry-run
+# Lancement réel (transactionnel)
+python -m interfaces.cli.cleanup_wos_duplicate_authorships
+
+3 dates oa/hal
+# Aperçu
+python -m interfaces.cli.refresh_publications_year_mismatch --dry-run
+# Test réduit avant de tout lancer
+python -m interfaces.cli.refresh_publications_year_mismatch --limit 20
+# Lancement complet
+python -m interfaces.cli.refresh_publications_year_mismatch
+
+4 reset_hashes_for_publis_with_position_gap
+python -m infrastructure.db.migrate                                    # migration 008
+python -m interfaces.cli.reset_hashes_for_publis_with_position_gap --dry-run
+python -m interfaces.cli.reset_hashes_for_publis_with_position_gap    # nulle les hashes
+python run_pipeline.py --mode full --only extract                     # réécrit raw_data
+python run_pipeline.py --mode full --only normalize                   # repeuple les positions
+
 
 ## Chantier transition DDD
 
