@@ -418,7 +418,7 @@ class SourceAuthorshipOut(BaseModel):
 
     id: int
     author_position: int | None
-    full_name: str
+    full_name: str | None
     person_id: int | None
     in_perimeter: bool
     structure_ids: list[int] | None
@@ -430,7 +430,7 @@ class SourceAuthorshipOut(BaseModel):
 class ThesesAuthorshipOut(BaseModel):
     id: int
     author_position: int | None
-    full_name: str
+    full_name: str | None
     person_id: int | None
     roles: list[str]
     in_perimeter: bool
@@ -1503,7 +1503,7 @@ class PersonProfileAuthor(BaseModel):
 
     id: int
     source: str
-    full_name: str
+    full_name: str | None
     orcid: str | None
     idhal: str | None
     hal_person_id: int | None = None
