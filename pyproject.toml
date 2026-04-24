@@ -198,4 +198,5 @@ exclude = [
     "^frontend/",
     "^bibliometrie_uca\\.egg-info/",
     "^\\.venv/",
+    "^build/",
 ]
