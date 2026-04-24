@@ -512,6 +512,12 @@ class ThesesNormalizer(SourceNormalizer):
     def cleanup(self) -> None:
         self._address_linker.clear_cache()
 
+    def on_error(self) -> None:
+        # Le cache peut contenir des address_id insérés dans la transaction
+        # qui vient d'être rollbackée — invalide-le pour éviter les FK
+        # violations sur les works suivants.
+        self._address_linker.clear_cache()
+
     def summary_stats(self, cur: Any) -> list[str]:
         return [
             f"  {table} (theses) : {self._queries.count_theses_table(cur, table)}"

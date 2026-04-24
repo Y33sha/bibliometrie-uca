@@ -72,6 +72,15 @@ class SourceNormalizer(ABC):
     def cleanup(self) -> None:  # noqa: B027 (hook optionnel)
         """Libération des caches in-memory."""
 
+    def on_error(self) -> None:  # noqa: B027 (hook optionnel)
+        """Appelé après chaque rollback (SAVEPOINT ou complet).
+
+        Les caches qui référencent des IDs générés dans la transaction
+        rollbackée doivent être invalidés ici — sinon ils pointent vers
+        des lignes qui n'existent plus, provoquant des FK violations sur
+        les works suivants. Exemple typique : `PgAddressLinker._cache`.
+        """
+
     # ── Template method ────────────────────────────────────────
 
     def parse_args(self, argv: list[str] | None = None) -> argparse.Namespace:
@@ -130,6 +139,7 @@ class SourceNormalizer(ABC):
                     cur.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
                 except Exception:
                     self.conn.rollback()
+                self.on_error()
                 raise
         return self.process_work(cur, row)
 
@@ -168,6 +178,7 @@ class SourceNormalizer(ABC):
                 except Exception:
                     if not self.USE_SAVEPOINT:
                         self.conn.rollback()
+                        self.on_error()
                     errors += 1
                     continue
 
