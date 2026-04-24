@@ -76,6 +76,96 @@ def fetch_page(
     return http_request_with_retry("GET", url, params=params, timeout=30, label=label)
 
 
+# Max imposé par HAL pour `rows` sur une requête Solr
+_HAL_PREVIEW_ROWS = 10000
+
+
+def fetch_collection_ids(url: str, query: str, collection_code: str) -> list[str]:
+    """Liste les halIds d'une collection via une requête Solr légère.
+
+    N'inclut que `halId_s` dans le `fl` — payload minuscule même sur les
+    collections à méga-authorships (le `label_xml` plein chargeait des
+    MB par page et faisait time-outer le serveur HAL, d'où le besoin de
+    cette préview séparée).
+    """
+    all_ids: list[str] = []
+    start = 0
+    total_count = None
+    while True:
+        params = {
+            "q": query,
+            "fl": "halId_s",
+            "rows": _HAL_PREVIEW_ROWS,
+            "start": start,
+            "sort": "docid asc",
+            "wt": "json",
+            "fq": f"collCode_s:{collection_code}",
+        }
+        label = f"HAL preview coll={collection_code} start={start}"
+        data = http_request_with_retry("GET", url, params=params, timeout=30, label=label)
+        resp = data.get("response", {})
+        if total_count is None:
+            total_count = int(resp.get("numFound", 0))
+        docs = resp.get("docs", [])
+        all_ids.extend(d["halId_s"] for d in docs if d.get("halId_s"))
+        start += len(docs)
+        if start >= total_count or not docs:
+            break
+        time.sleep(HAL_DELAY)
+    return all_ids
+
+
+def fetch_single_work(url: str, hal_id: str) -> dict | None:
+    """Récupère un document HAL par halId, avec tous les champs `HAL_FIELDS`.
+
+    Utilisé pour fetcher les orphelins d'une collection umbrella qui
+    n'étaient pas déjà en staging. Un appel = un document.
+    """
+    params = {
+        "q": f'halId_s:"{hal_id}"',
+        "fl": ",".join(HAL_FIELDS),
+        "rows": 1,
+        "wt": "json",
+    }
+    label = f"HAL single halId={hal_id}"
+    data = http_request_with_retry("GET", url, params=params, timeout=30, label=label)
+    docs = data.get("response", {}).get("docs", [])
+    return docs[0] if docs else None
+
+
+def tag_existing_with_collection(
+    conn: Any, hal_ids: list[str], collection_code: str
+) -> int:
+    """Append `collection_code` à `hal_collections` pour les halIds donnés.
+
+    Utilisé quand on a pré-listé les halIds d'une collection et qu'on
+    détecte que certains sont déjà en staging (via une autre collection
+    traitée avant) — pas besoin de re-fetcher leur payload, un UPDATE
+    suffit à les tagger avec la nouvelle collection.
+
+    Retourne le nombre de lignes impactées (pour les stats).
+    """
+    if not hal_ids:
+        return 0
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE staging
+            SET hal_collections = CASE
+                    WHEN hal_collections IS NULL THEN ARRAY[%s]::TEXT[]
+                    WHEN %s = ANY(hal_collections) THEN hal_collections
+                    ELSE hal_collections || %s
+                END,
+                last_seen_at = now()
+            WHERE source = 'hal' AND source_id = ANY(%s)
+            """,
+            (collection_code, collection_code, collection_code, hal_ids),
+        )
+        updated = cur.rowcount
+    conn.commit()
+    return updated
+
+
 def extract_hal_id(doc: dict) -> str:
     """Extrait le halId."""
     return doc.get("halId_s", "")
@@ -122,6 +212,85 @@ def upsert_work(conn: Any, hal_id: str, doi: str | None, raw_data: dict, collect
         )
 
 
+def _extract_full(
+    url: str,
+    query: str,
+    collection_code: str,
+    conn: Any,
+    existing_ids: set,
+    total_count: int,
+) -> int:
+    """Boucle full-fetch classique : paginate tous les papiers avec `label_xml`.
+
+    Retourne le nombre de nouveaux documents insérés en staging.
+    """
+    start = 0
+    total_new = 0
+    while start < total_count:
+        data = fetch_page(url, query, collection_code=collection_code, start=start)
+        docs = data["response"]["docs"]
+        # Safeguard : si l'API retourne une page vide alors qu'on n'a pas
+        # atteint `total_count` (incohérence côté serveur, rare mais observable
+        # en cas de race de réplication Solr), on sort pour éviter une
+        # boucle infinie.
+        if not docs:
+            break
+        new_in_page = 0
+        for doc in docs:
+            hal_id = extract_hal_id(doc)
+            if not hal_id:
+                continue
+            doi = extract_doi(doc)
+            is_new = hal_id not in existing_ids
+            upsert_work(conn, hal_id, doi, doc, collection_code)
+            if is_new:
+                existing_ids.add(hal_id)
+                new_in_page += 1
+        conn.commit()
+        total_new += new_in_page
+        start += len(docs)
+        time.sleep(HAL_DELAY)
+    return total_new
+
+
+def _extract_incremental(
+    url: str,
+    collection_code: str,
+    orphans: list[str],
+    known: list[str],
+    conn: Any,
+    existing_ids: set,
+) -> tuple[int, int]:
+    """Fetch individuel des orphelins + UPDATE SQL pour tagger les connus.
+
+    Retourne (nb_nouveaux, nb_taggés). Choisi par `extract_collection` quand
+    la collection est majoritairement déjà en staging (umbrella type PRES_UCA).
+    """
+    total_new = 0
+    for i, hal_id in enumerate(orphans, 1):
+        try:
+            doc = fetch_single_work(url, hal_id)
+        except Exception as e:
+            logger.warning(f"Échec fetch orphelin {hal_id} : {e}")
+            continue
+        if doc is None:
+            logger.warning(f"Orphelin {hal_id} introuvable côté HAL")
+            continue
+        actual_hal_id = extract_hal_id(doc)
+        if not actual_hal_id:
+            continue
+        doi = extract_doi(doc)
+        upsert_work(conn, actual_hal_id, doi, doc, collection_code)
+        conn.commit()
+        existing_ids.add(actual_hal_id)
+        total_new += 1
+        if i % 100 == 0:
+            logger.info(f"    Orphelins fetchés : {i}/{len(orphans)}")
+        time.sleep(HAL_DELAY)
+    tagged = tag_existing_with_collection(conn, known, collection_code)
+    return total_new, tagged
+
+
 def extract_collection(
     collection_code: str,
     collection_label: str,
@@ -134,50 +303,48 @@ def extract_collection(
 ) -> tuple[int, int]:
     """
     Extrait tous les works d'une collection.
+
+    Stratégie adaptative (collection-agnostique) :
+      1. Preview : liste des halIds de la collection via Solr `fl=halId_s`
+         (payload léger, ~1 call même pour les méga-collections)
+      2. Diff contre `existing_ids` (déjà en staging depuis d'autres collections)
+      3. Heuristique : si `len(orphelins) < nb_pages_full_fetch` → mode incrémental
+         (fetch individuel des orphelins + UPDATE SQL pour les connus).
+         Sinon → mode full-fetch traditionnel (coût habituel sur les collections
+         peu chevauchantes).
+
     Retourne (nb_total, nb_nouveaux).
     """
     url = build_url(base_url)
     query = build_query(years=years, since=since)
 
-    # Premier appel pour le count
-    first_page = fetch_page(url, query, collection_code=collection_code, start=0)
-    total_count = first_page["response"]["numFound"]
+    # Phase 0 — preview IDs-only
+    all_ids = fetch_collection_ids(url, query, collection_code)
+    total_count = len(all_ids)
     logger.info(f"  {collection_code} ({collection_label}) : {total_count} docs")
 
     if dry_run or total_count == 0:
         return total_count, 0
 
-    start = 0
-    total_new = 0
+    orphans = [hid for hid in all_ids if hid not in existing_ids]
+    known = [hid for hid in all_ids if hid in existing_ids]
+    per_page = hal_per_page_for(collection_code)
+    full_fetch_pages = (total_count + per_page - 1) // per_page
 
-    while start < total_count:
-        if start == 0:
-            data = first_page
-        else:
-            data = fetch_page(url, query, collection_code=collection_code, start=start)
-
-        docs = data["response"]["docs"]
-        new_in_page = 0
-
-        for doc in docs:
-            hal_id = extract_hal_id(doc)
-            if not hal_id:
-                continue
-
-            doi = extract_doi(doc)
-            is_new = hal_id not in existing_ids
-
-            upsert_work(conn, hal_id, doi, doc, collection_code)
-
-            if is_new:
-                existing_ids.add(hal_id)
-                new_in_page += 1
-
-        conn.commit()
-        total_new += new_in_page
-        start += len(docs)
-
-        time.sleep(HAL_DELAY)
+    if len(orphans) < full_fetch_pages:
+        logger.info(
+            f"    → mode incrémental ({len(orphans)} orphelins vs "
+            f"{full_fetch_pages} pages full-fetch) — {len(known)} déjà en staging"
+        )
+        total_new, _tagged = _extract_incremental(
+            url, collection_code, orphans, known, conn, existing_ids
+        )
+    else:
+        logger.info(
+            f"    → mode full-fetch ({full_fetch_pages} pages vs "
+            f"{len(orphans)} individual)"
+        )
+        total_new = _extract_full(url, query, collection_code, conn, existing_ids, total_count)
 
     return total_count, total_new
 
