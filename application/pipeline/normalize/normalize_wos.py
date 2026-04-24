@@ -842,3 +842,12 @@ class WosNormalizer(SourceNormalizer):
     def cleanup(self) -> None:
         _wos_institution_cache.clear()
         _wos_author_cache.clear()
+
+    def on_error(self) -> None:
+        # Les caches module-level peuvent contenir des IDs insérés dans
+        # la transaction qui vient d'être rollbackée (SAVEPOINT). On les
+        # vide entièrement : les prochains works re-populeront au fil de
+        # l'eau depuis la DB. Perd la part preload mais évite les FK
+        # violations.
+        _wos_institution_cache.clear()
+        _wos_author_cache.clear()

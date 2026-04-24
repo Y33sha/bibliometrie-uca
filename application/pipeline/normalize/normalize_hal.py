@@ -866,4 +866,12 @@ class HalNormalizer(SourceNormalizer):
         self._struct_cache.clear()
         self._struct_name_cache.clear()
         self._address_linker.clear_cache()
+
+    def on_error(self) -> None:
+        # Les caches peuvent contenir des IDs (adresses, structures)
+        # insérés dans la transaction qui vient d'être rollbackée — les
+        # invalider évite les FK violations sur les works suivants.
+        self._struct_cache.clear()
+        self._struct_name_cache.clear()
+        self._address_linker.clear_cache()
         _hal_author_cache.clear()
