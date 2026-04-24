@@ -12,6 +12,22 @@ quota dépassé) restent localement hardcodés dans chaque script.
 HAL_DELAY = 0.5
 HAL_PER_PAGE = 500  # max autorisé = 10 000
 
+# Overrides par collection : collections de physique des particules avec
+# méga-authorships (3000+ auteurs, collabs CERN/ATLAS/CMS, etc.) produisent
+# des payloads énormes côté `label_xml` — le serveur HAL time-out à 500
+# records/page et renvoie des 500. Descendre à un per_page plus petit
+# stabilise l'extraction sur ces collections.
+HAL_PER_PAGE_OVERRIDES: dict[str, int] = {
+    "LPC-CLERMONT": 50,
+}
+
+
+def hal_per_page_for(collection_code: str | None) -> int:
+    """Retourne le `per_page` HAL à utiliser pour une collection donnée."""
+    if collection_code and collection_code in HAL_PER_PAGE_OVERRIDES:
+        return HAL_PER_PAGE_OVERRIDES[collection_code]
+    return HAL_PER_PAGE
+
 # OpenAlex — polite pool (~5 req/s, 10 req/s toléré)
 OPENALEX_DELAY = 0.2
 OPENALEX_PER_PAGE = 200  # max imposé par l'API
