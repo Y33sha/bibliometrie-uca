@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+from application import addresses_structures as addresses_structures_module
 from application.addresses_countries import (
     batch_set_country_by_filter,
     batch_set_country_by_ids,
@@ -559,3 +560,208 @@ class TestPropagateCountriesToPublications:
         # publications.countries mis à jour
         await async_db.execute("SELECT countries FROM publications WHERE id = %s", (pub_id,))
         assert (await async_db.fetchone())["countries"] == ["FR"]
+
+
+# ── No-op skip (§2.14.bug : éviter les cascades massives inutiles) ──
+
+
+class TestPropagationSkipsNoOp:
+    """Vérifie que la propagation UCA est skippée quand le changement de
+    is_confirmed n'affecte pas le calcul in_perimeter.
+
+    Règle : contribue au périmètre ssi le lien existe ET
+    is_confirmed IS DISTINCT FROM FALSE (NULL ou TRUE).
+    Donc NULL ↔ TRUE ne changent rien, seuls les passages par FALSE comptent.
+    """
+
+    @pytest.fixture
+    def spy_propagate(self, monkeypatch):
+        """Remplace propagate_uca_for_addresses par un spy qui compte les appels."""
+        calls: list[list[int]] = []
+
+        async def fake_propagate(cur, address_ids, **kw):  # noqa: ARG001
+            calls.append(list(address_ids))
+
+        monkeypatch.setattr(
+            addresses_structures_module, "propagate_uca_for_addresses", fake_propagate
+        )
+        return calls
+
+    async def test_confirm_auto_detected_skips_propagation(
+        self, async_db, repo, authorship_repo, perimeter_queries, spy_propagate
+    ):
+        """Click Relier sur une adresse auto-détectée (NULL → TRUE) = no-op."""
+        uca = await _setup_uca_perimeter(async_db)
+        addr = await _create_address(async_db)
+        # Lien auto-détecté, is_confirmed=NULL (cas reproducteur du bug initial)
+        await async_db.execute(
+            "INSERT INTO structure_name_forms (structure_id, form_text) VALUES (%s, 'uca') RETURNING id",
+            (uca,),
+        )
+        form_id = (await async_db.fetchone())["id"]
+        await _insert_address_structure(
+            async_db, addr, uca, is_confirmed=None, matched_form_id=form_id
+        )
+
+        await review_structure_link(
+            async_db, addr, uca, True,
+            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+        )
+
+        assert spy_propagate == []
+        # Le lien a bien été mis à jour
+        assert (await _get_link(async_db, addr, uca))["is_confirmed"] is True
+
+    async def test_reconfirm_already_confirmed_skips_propagation(
+        self, async_db, repo, authorship_repo, perimeter_queries, spy_propagate
+    ):
+        """Cliquer Relier sur un lien déjà TRUE = no-op."""
+        uca = await _setup_uca_perimeter(async_db)
+        addr = await _create_address(async_db)
+        await _insert_address_structure(async_db, addr, uca, is_confirmed=True)
+
+        await review_structure_link(
+            async_db, addr, uca, True,
+            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+        )
+
+        assert spy_propagate == []
+
+    async def test_confirm_rejected_triggers_propagation(
+        self, async_db, repo, authorship_repo, perimeter_queries, spy_propagate
+    ):
+        """FALSE → TRUE : vrai changement, propagation attendue."""
+        uca = await _setup_uca_perimeter(async_db)
+        addr = await _create_address(async_db)
+        await _insert_address_structure(async_db, addr, uca, is_confirmed=False)
+
+        await review_structure_link(
+            async_db, addr, uca, True,
+            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+        )
+
+        assert spy_propagate == [[addr]]
+
+    async def test_reject_confirmed_triggers_propagation(
+        self, async_db, repo, authorship_repo, perimeter_queries, spy_propagate
+    ):
+        """TRUE → FALSE : vrai changement (sort du périmètre), propagation."""
+        uca = await _setup_uca_perimeter(async_db)
+        addr = await _create_address(async_db)
+        await _insert_address_structure(async_db, addr, uca, is_confirmed=True)
+
+        await review_structure_link(
+            async_db, addr, uca, False,
+            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+        )
+
+        assert spy_propagate == [[addr]]
+
+    async def test_reject_absent_creates_and_triggers_propagation(
+        self, async_db, repo, authorship_repo, perimeter_queries, spy_propagate
+    ):
+        """Pas de lien → FALSE : pas de contribution avant ni après, no-op."""
+        uca = await _setup_uca_perimeter(async_db)
+        addr = await _create_address(async_db)
+
+        await review_structure_link(
+            async_db, addr, uca, False,
+            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+        )
+
+        # Avant = pas de lien (ne contribue pas), après = lien FALSE (ne contribue pas)
+        # → no-op, skip propagation
+        assert spy_propagate == []
+
+    async def test_confirm_absent_creates_and_triggers_propagation(
+        self, async_db, repo, authorship_repo, perimeter_queries, spy_propagate
+    ):
+        """Pas de lien → TRUE : contribue maintenant, propagation attendue."""
+        uca = await _setup_uca_perimeter(async_db)
+        addr = await _create_address(async_db)
+
+        await review_structure_link(
+            async_db, addr, uca, True,
+            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+        )
+
+        assert spy_propagate == [[addr]]
+
+    async def test_batch_only_propagates_changed(
+        self, async_db, repo, authorship_repo, perimeter_queries, spy_propagate
+    ):
+        """Batch mixte : certaines adresses changent, d'autres non.
+        Propagation restreinte aux adresses effectivement impactées."""
+        uca = await _setup_uca_perimeter(async_db)
+        # a1 : auto-détectée NULL → TRUE (no-op)
+        # a2 : rejetée FALSE → TRUE (changement)
+        # a3 : pas de lien → TRUE (changement)
+        a1 = await _create_address(async_db, raw_text="a1")
+        a2 = await _create_address(async_db, raw_text="a2")
+        a3 = await _create_address(async_db, raw_text="a3")
+        await async_db.execute(
+            "INSERT INTO structure_name_forms (structure_id, form_text) VALUES (%s, 'uca2') RETURNING id",
+            (uca,),
+        )
+        form_id = (await async_db.fetchone())["id"]
+        await _insert_address_structure(
+            async_db, a1, uca, is_confirmed=None, matched_form_id=form_id
+        )
+        await _insert_address_structure(async_db, a2, uca, is_confirmed=False)
+
+        await batch_review_structure_link(
+            async_db, [a1, a2, a3], uca, True,
+            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+        )
+
+        assert len(spy_propagate) == 1
+        # a1 inchangée (déjà contribuait), a2 et a3 nouvellement contribuent
+        assert set(spy_propagate[0]) == {a2, a3}
+
+    async def test_unassign_nonexistent_skips_propagation(
+        self, async_db, repo, authorship_repo, perimeter_queries, spy_propagate
+    ):
+        """Unassign sur un lien inexistant : rien à faire, skip."""
+        uca = await _setup_uca_perimeter(async_db)
+        addr = await _create_address(async_db)
+
+        deleted = await unassign_manual_structure(
+            async_db, addr, uca,
+            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+        )
+
+        assert deleted is False
+        assert spy_propagate == []
+
+    async def test_unassign_rejected_manual_skips_propagation(
+        self, async_db, repo, authorship_repo, perimeter_queries, spy_propagate
+    ):
+        """Unassign d'un lien manuel FALSE : avant ne contribue pas, après
+        non plus (lien disparu) → skip."""
+        uca = await _setup_uca_perimeter(async_db)
+        addr = await _create_address(async_db)
+        await _insert_address_structure(async_db, addr, uca, is_confirmed=False)
+
+        deleted = await unassign_manual_structure(
+            async_db, addr, uca,
+            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+        )
+
+        assert deleted is True
+        assert spy_propagate == []
+
+    async def test_unassign_confirmed_manual_triggers_propagation(
+        self, async_db, repo, authorship_repo, perimeter_queries, spy_propagate
+    ):
+        """Unassign d'un lien manuel TRUE : contribuait, ne contribue plus → propagation."""
+        uca = await _setup_uca_perimeter(async_db)
+        addr = await _create_address(async_db)
+        await _insert_address_structure(async_db, addr, uca, is_confirmed=True)
+
+        deleted = await unassign_manual_structure(
+            async_db, addr, uca,
+            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+        )
+
+        assert deleted is True
+        assert spy_propagate == [[addr]]

@@ -97,6 +97,30 @@ class PgAsyncAddressRepository:
         )
         return self._cur.rowcount > 0
 
+    async def which_contribute_to_perimeter(
+        self,
+        address_ids: list[int],
+        structure_id: int,
+    ) -> set[int]:
+        """Cf. docstring du port.
+
+        Condition miroir de la clause WHERE de
+        `recompute_in_perimeter_on_source_authorships` — à garder synchronisée.
+        """
+        if not address_ids:
+            return set()
+        await self._cur.execute(
+            """
+            SELECT address_id FROM address_structures
+            WHERE address_id = ANY(%s)
+              AND structure_id = %s
+              AND is_confirmed IS DISTINCT FROM FALSE
+            """,
+            (address_ids, structure_id),
+        )
+        rows = await self._cur.fetchall()
+        return {r["address_id"] for r in rows}
+
     # ── Pays ───────────────────────────────────────────────────────
 
     async def set_countries(
