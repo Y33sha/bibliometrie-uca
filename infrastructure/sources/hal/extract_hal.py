@@ -18,7 +18,7 @@ from typing import Any
 
 from psycopg.types.json import Jsonb as Json
 
-from infrastructure.api_limits import HAL_DELAY, HAL_PER_PAGE
+from infrastructure.api_limits import HAL_DELAY, hal_per_page_for
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import (
     get_api_base_urls,
@@ -64,7 +64,7 @@ def fetch_page(
     params = {
         "q": query,
         "fl": ",".join(HAL_FIELDS),
-        "rows": HAL_PER_PAGE,
+        "rows": hal_per_page_for(collection_code),
         "start": start,
         "sort": "docid asc",
         "wt": "json",
