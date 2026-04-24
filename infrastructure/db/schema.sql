@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1eIyKYHx2LMXmCGTbBc90Npy4E6oCDBa42r6weMqROXUZb3WRRsLm1ONymVFUEv
+\restrict d9GfYNTWWddjVLcc98zoceiJUY5Ma7qw4eSpoJfWNZuONBHyP5gfE9vVOPxkeYy
 
--- Dumped from database version 18.1
--- Dumped by pg_dump version 18.1
+-- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
+-- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -124,6 +124,7 @@ CREATE TYPE public.source_type AS ENUM (
 
 CREATE TYPE public.structure_type AS ENUM (
     'universite',
+    '__epst_deprecated',
     'chu',
     'ecole',
     'labo',
@@ -298,42 +299,42 @@ CREATE TABLE public.audit_log (
 -- Name: TABLE audit_log; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.audit_log IS 'Trace des opÃ©rations destructives/dÃ©cisionnelles dÃ©clenchÃ©es via l''admin HTTP. Les opÃ©rations du pipeline ne sont pas auditÃ©es.';
+COMMENT ON TABLE public.audit_log IS 'Trace des opérations destructives/décisionnelles déclenchées via l''admin HTTP. Les opérations du pipeline ne sont pas auditées.';
 
 
 --
 -- Name: COLUMN audit_log.event_type; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.audit_log.event_type IS 'Type d''Ã©vÃ©nement, notation pointÃ©e : person.merged, publication.excluded, structure.deleted, etc.';
+COMMENT ON COLUMN public.audit_log.event_type IS 'Type d''événement, notation pointée : person.merged, publication.excluded, structure.deleted, etc.';
 
 
 --
 -- Name: COLUMN audit_log.aggregate_type; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.audit_log.aggregate_type IS 'Type de l''entitÃ© affectÃ©e : person, publication, structure, journal, publisher, authorship.';
+COMMENT ON COLUMN public.audit_log.aggregate_type IS 'Type de l''entité affectée : person, publication, structure, journal, publisher, authorship.';
 
 
 --
 -- Name: COLUMN audit_log.aggregate_id; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.audit_log.aggregate_id IS 'ID de l''entitÃ© affectÃ©e, NULL si l''entitÃ© a Ã©tÃ© supprimÃ©e et n''a pas d''Ã©quivalent survivant.';
+COMMENT ON COLUMN public.audit_log.aggregate_id IS 'ID de l''entité affectée, NULL si l''entité a été supprimée et n''a pas d''équivalent survivant.';
 
 
 --
 -- Name: COLUMN audit_log.payload; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.audit_log.payload IS 'DonnÃ©es utiles pour l''audit : source_id d''une fusion, champs modifiÃ©s, raison, etc.';
+COMMENT ON COLUMN public.audit_log.payload IS 'Données utiles pour l''audit : source_id d''une fusion, champs modifiés, raison, etc.';
 
 
 --
 -- Name: COLUMN audit_log.user_id; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.audit_log.user_id IS 'Utilisateur admin authentifiÃ© ayant dÃ©clenchÃ© l''opÃ©ration (middleware auth). NULL thÃ©oriquement impossible quand l''entrÃ©e est Ã©crite.';
+COMMENT ON COLUMN public.audit_log.user_id IS 'Utilisateur admin authentifié ayant déclenché l''opération (middleware auth). NULL théoriquement impossible quand l''entrée est écrite.';
 
 
 --
@@ -941,7 +942,7 @@ ALTER SEQUENCE public.source_authorship_addresses_id_seq OWNED BY public.source_
 CREATE TABLE public.source_authorships (
     id integer NOT NULL,
     source text NOT NULL,
-    source_publication_id integer CONSTRAINT source_authorships_source_document_id_not_null NOT NULL,
+    source_publication_id integer NOT NULL,
     source_person_id integer CONSTRAINT source_authorships_source_author_id_not_null NOT NULL,
     author_position smallint,
     in_perimeter boolean DEFAULT false,
@@ -1023,11 +1024,11 @@ ALTER SEQUENCE public.source_persons_id_seq OWNED BY public.source_persons.id;
 --
 
 CREATE TABLE public.source_publications (
-    id integer CONSTRAINT source_documents_id_not_null NOT NULL,
-    source text CONSTRAINT source_documents_source_not_null NOT NULL,
-    source_id text CONSTRAINT source_documents_source_id_not_null NOT NULL,
+    id integer NOT NULL,
+    source text NOT NULL,
+    source_id text NOT NULL,
     doi text,
-    title text CONSTRAINT source_documents_title_not_null NOT NULL,
+    title text NOT NULL,
     pub_year smallint,
     doc_type text,
     publication_id integer,
@@ -2247,48 +2248,6 @@ CREATE INDEX idx_saa_address ON public.source_authorship_addresses USING btree (
 
 
 --
--- Name: idx_source_docs_countries; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_docs_countries ON public.source_publications USING gin (countries) WHERE (countries IS NOT NULL);
-
-
---
--- Name: idx_source_docs_doi; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_docs_doi ON public.source_publications USING btree (doi) WHERE (doi IS NOT NULL);
-
-
---
--- Name: idx_source_docs_external_ids; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_docs_external_ids ON public.source_publications USING gin (external_ids) WHERE (external_ids IS NOT NULL);
-
-
---
--- Name: idx_source_docs_hal_collections; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_docs_hal_collections ON public.source_publications USING gin (hal_collections) WHERE (hal_collections IS NOT NULL);
-
-
---
--- Name: idx_source_docs_pub; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_docs_pub ON public.source_publications USING btree (publication_id) WHERE (publication_id IS NOT NULL);
-
-
---
--- Name: idx_source_docs_staging; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_docs_staging ON public.source_publications USING btree (staging_id) WHERE (staging_id IS NOT NULL);
-
-
---
 -- Name: idx_source_persons_idref; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2307,6 +2266,48 @@ CREATE INDEX idx_source_persons_orcid ON public.source_persons USING btree (orci
 --
 
 CREATE INDEX idx_source_persons_person ON public.source_persons USING btree (person_id) WHERE (person_id IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_countries; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_countries ON public.source_publications USING gin (countries) WHERE (countries IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_doi; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_doi ON public.source_publications USING btree (doi) WHERE (doi IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_external_ids; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_external_ids ON public.source_publications USING gin (external_ids) WHERE (external_ids IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_hal_collections; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_hal_collections ON public.source_publications USING gin (hal_collections) WHERE (hal_collections IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_pub; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_pub ON public.source_publications USING btree (publication_id) WHERE (publication_id IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_staging; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_staging ON public.source_publications USING btree (staging_id) WHERE (staging_id IS NOT NULL);
 
 
 --
@@ -2633,35 +2634,35 @@ ALTER TABLE ONLY public.source_authorships
 
 
 --
--- Name: source_publications source_documents_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_publications
-    ADD CONSTRAINT source_documents_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES public.journals(id);
-
-
---
--- Name: source_publications source_documents_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_publications
-    ADD CONSTRAINT source_documents_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES public.publications(id) ON DELETE SET NULL;
-
-
---
--- Name: source_publications source_documents_staging_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_publications
-    ADD CONSTRAINT source_documents_staging_id_fkey FOREIGN KEY (staging_id) REFERENCES public.staging(id);
-
-
---
 -- Name: source_persons source_persons_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_persons
     ADD CONSTRAINT source_persons_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE SET NULL;
+
+
+--
+-- Name: source_publications source_publications_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_publications
+    ADD CONSTRAINT source_publications_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES public.journals(id);
+
+
+--
+-- Name: source_publications source_publications_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_publications
+    ADD CONSTRAINT source_publications_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES public.publications(id) ON DELETE SET NULL;
+
+
+--
+-- Name: source_publications source_publications_staging_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_publications
+    ADD CONSTRAINT source_publications_staging_id_fkey FOREIGN KEY (staging_id) REFERENCES public.staging(id);
 
 
 --
@@ -2692,4 +2693,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1eIyKYHx2LMXmCGTbBc90Npy4E6oCDBa42r6weMqROXUZb3WRRsLm1ONymVFUEv
+\unrestrict d9GfYNTWWddjVLcc98zoceiJUY5Ma7qw4eSpoJfWNZuONBHyP5gfE9vVOPxkeYy
+

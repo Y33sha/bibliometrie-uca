@@ -20,7 +20,7 @@
 
   // Perimeter CRUD
   let perimModal: {
-    mode: 'create' | 'edit';
+    mode: "create" | "edit";
     id: number | null;
     code: string;
     name: string;
@@ -32,16 +32,21 @@
   } | null = $state(null);
 
   function openPerimCreate() {
-    perimModal = { mode: 'create', id: null, code: '', name: '', description: '',
-                   structSearch: '', structResults: [], structure_ids: [], structures: [] };
+    perimModal = { mode: "create", id: null, code: "", name: "", description: "", structSearch: "", structResults: [], structure_ids: [], structures: [] };
   }
 
   function openPerimEdit(p: Perimeter) {
-    perimModal = { mode: 'edit', id: p.id, code: p.code, name: p.name,
-                   description: p.description || '',
-                   structSearch: '', structResults: [],
-                   structure_ids: [...p.structure_ids],
-                   structures: [...p.structures] };
+    perimModal = {
+      mode: "edit",
+      id: p.id,
+      code: p.code,
+      name: p.name,
+      description: p.description || "",
+      structSearch: "",
+      structResults: [],
+      structure_ids: [...p.structure_ids],
+      structures: [...p.structures],
+    };
   }
 
   function extractDetail(e: unknown): string {
@@ -49,13 +54,13 @@
       const d = (e.detail as { detail?: string })?.detail;
       return d || `Erreur ${e.status}`;
     }
-    return (e as Error)?.message || 'Erreur';
+    return (e as Error)?.message || "Erreur";
   }
 
   async function savePerimeter() {
     if (!perimModal) return;
     try {
-      if (perimModal.mode === 'create') {
+      if (perimModal.mode === "create") {
         const { id } = await perimetersApi.create({
           code: perimModal.code,
           name: perimModal.name,
@@ -73,15 +78,19 @@
       }
       perimModal = null;
       await load();
-    } catch (e) { alert(extractDetail(e)); }
+    } catch (e) {
+      alert(extractDetail(e));
+    }
   }
 
   async function deletePerimeter(id: number) {
-    if (!confirm('Supprimer ce périmètre ?')) return;
+    if (!confirm("Supprimer ce périmètre ?")) return;
     try {
       await perimetersApi.remove(id);
       await load();
-    } catch (e) { alert(extractDetail(e)); }
+    } catch (e) {
+      alert(extractDetail(e));
+    }
   }
 
   async function perimSearchStructures() {
@@ -96,16 +105,15 @@
     if (!perimModal || perimModal.structure_ids.includes(s.id)) return;
     perimModal.structure_ids = [...perimModal.structure_ids, s.id];
     perimModal.structures = [...perimModal.structures, { id: s.id, name: s.name, acronym: s.acronym, code: s.code }];
-    perimModal.structSearch = '';
+    perimModal.structSearch = "";
     perimModal.structResults = [];
   }
 
   function perimRemoveStruct(sid: number) {
     if (!perimModal) return;
-    perimModal.structure_ids = perimModal.structure_ids.filter(id => id !== sid);
-    perimModal.structures = perimModal.structures.filter(s => s.id !== sid);
+    perimModal.structure_ids = perimModal.structure_ids.filter((id) => id !== sid);
+    perimModal.structures = perimModal.structures.filter((s) => s.id !== sid);
   }
-
 
   function currentYear(): number {
     return new Date().getFullYear();
@@ -174,14 +182,14 @@
           >{key === "openalex_api_key"
             ? "OpenAlex — Clé API"
             : key === "openalex_email"
-            ? "OpenAlex — Email (fallback)"
-            : key === "wos_api_key"
-              ? "WoS — Clé API"
-              : key === "scanr_username"
-                ? "ScanR — Identifiant"
-                : key === "scanr_password"
-                  ? "ScanR — Mot de passe"
-                  : key}</span
+              ? "OpenAlex — Email (fallback)"
+              : key === "wos_api_key"
+                ? "WoS — Clé API"
+                : key === "scanr_username"
+                  ? "ScanR — Identifiant"
+                  : key === "scanr_password"
+                    ? "ScanR — Mot de passe"
+                    : key}</span
         >
         {#if editingKey === key}
           <input
@@ -280,11 +288,7 @@
 
 <h4 class="subsection-title">Rôle des périmètres</h4>
 <div class="config-grid">
-  {#each [
-    { key: "perimeter_extraction", label: "Phase extraction", hint: "Structures interrogées par les API (identifiants dans api_ids + collections HAL)" },
-    { key: "perimeter_affiliations", label: "Phase affiliations", hint: "Résolution structure_ids sur les authorships sources" },
-    { key: "perimeter_persons", label: "Phases publications + persons", hint: "Détermine in_perimeter : seuls les documents avec au moins une authorship in_perimeter génèrent des publications et des personnes" },
-  ] as role}
+  {#each [{ key: "perimeter_extraction", label: "Phase extraction", hint: "Structures interrogées par les API (identifiants dans api_ids + collections HAL)" }, { key: "perimeter_affiliations", label: "Phase affiliations", hint: "Résolution structure_ids sur les authorships sources" }, { key: "perimeter_persons", label: "Phases publications + persons", hint: "Détermine in_perimeter : seuls les documents avec au moins une authorship in_perimeter génèrent des publications et des personnes" }] as role}
     {@const item = configByKey(role.key)}
     {#if item}
       <div class="config-row" style="flex-wrap: wrap;">
@@ -311,7 +315,7 @@
 </div>
 
 <!-- ═══ HAL ═══ -->
-<h3 class="section-title">HAL</h3>
+<h3 class="section-title">HAL : Collections à moissonner</h3>
 <div class="config-grid">
   {#each [{ key: "hal_extra_collections", label: "Collections supplémentaires" }] as field}
     {@const item = configByKey(field.key)}
@@ -319,10 +323,24 @@
       <div class="config-row">
         <span class="config-label">{field.label}</span>
         {#if editingKey === field.key}
-          <input class="config-editor-inline" bind:value={editValue} onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(field.key); } }} />
+          <input
+            class="config-editor-inline"
+            bind:value={editValue}
+            onkeydown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                save(field.key);
+              }
+            }}
+          />
           <span class="config-actions-inline">
             <button class="btn btn-sm btn-primary" onclick={() => save(field.key)} disabled={saving}>OK</button>
-            <button class="btn btn-sm" onclick={() => { editingKey = null; }}>Annuler</button>
+            <button
+              class="btn btn-sm"
+              onclick={() => {
+                editingKey = null;
+              }}>Annuler</button
+            >
           </span>
         {:else}
           <span class="config-value-inline">{Array.isArray(item.value) && item.value.length ? item.value.join(", ") : "(aucune)"}</span>
@@ -346,45 +364,44 @@
 </div>
 
 {#if perimModal}
-<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-<div class="modal-bg" onclick={() => perimModal = null}>
   <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-  <div class="modal" onclick={(e) => e.stopPropagation()}>
-    <h3>{perimModal.mode === 'create' ? 'Nouveau périmètre' : 'Modifier le périmètre'}</h3>
-    <label>Code</label>
-    <input bind:value={perimModal.code} disabled={perimModal.mode === 'edit'} placeholder="ex: uca_wide" />
-    <label>Nom</label>
-    <input bind:value={perimModal.name} placeholder="ex: UCA large" />
-    <label>Description</label>
-    <input bind:value={perimModal.description} />
-    <label>Structures racines</label>
-    <div class="perimeter-rules" style="margin: 4px 0 8px;">
-      {#each perimModal.structures as struct (struct.id)}
-        <span class="tag">
-          {struct.acronym || struct.name}
-          <button class="remove" onclick={() => perimRemoveStruct(struct.id)}>x</button>
-        </span>
-      {/each}
-    </div>
-    <input type="text" placeholder="Rechercher une structure..." bind:value={perimModal.structSearch}
-      oninput={perimSearchStructures} autocomplete="off" />
-    {#if perimModal.structResults.length > 0}
-      <div class="perim-search-results">
-        {#each perimModal.structResults.slice(0, 8) as s (s.id)}
-          <button class="picker-item" onclick={() => perimAddStruct(s)}>
-            {s.acronym ? s.acronym + ' — ' : ''}{s.name}
-          </button>
+  <div class="modal-bg" onclick={() => (perimModal = null)}>
+    <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+    <div class="modal" onclick={(e) => e.stopPropagation()}>
+      <h3>{perimModal.mode === "create" ? "Nouveau périmètre" : "Modifier le périmètre"}</h3>
+      <label>Code</label>
+      <input bind:value={perimModal.code} disabled={perimModal.mode === "edit"} placeholder="ex: uca_wide" />
+      <label>Nom</label>
+      <input bind:value={perimModal.name} placeholder="ex: UCA large" />
+      <label>Description</label>
+      <input bind:value={perimModal.description} />
+      <label>Structures racines</label>
+      <div class="perimeter-rules" style="margin: 4px 0 8px;">
+        {#each perimModal.structures as struct (struct.id)}
+          <span class="tag">
+            {struct.acronym || struct.name}
+            <button class="remove" onclick={() => perimRemoveStruct(struct.id)}>x</button>
+          </span>
         {/each}
       </div>
-    {/if}
-    <div class="modal-actions">
-      <button class="btn" onclick={() => perimModal = null}>Annuler</button>
-      <button class="btn btn-primary" onclick={savePerimeter}>
-        {perimModal.mode === 'create' ? 'Créer' : 'Enregistrer'}
-      </button>
+      <input type="text" placeholder="Rechercher une structure..." bind:value={perimModal.structSearch} oninput={perimSearchStructures} autocomplete="off" />
+      {#if perimModal.structResults.length > 0}
+        <div class="perim-search-results">
+          {#each perimModal.structResults.slice(0, 8) as s (s.id)}
+            <button class="picker-item" onclick={() => perimAddStruct(s)}>
+              {s.acronym ? s.acronym + " — " : ""}{s.name}
+            </button>
+          {/each}
+        </div>
+      {/if}
+      <div class="modal-actions">
+        <button class="btn" onclick={() => (perimModal = null)}>Annuler</button>
+        <button class="btn btn-primary" onclick={savePerimeter}>
+          {perimModal.mode === "create" ? "Créer" : "Enregistrer"}
+        </button>
+      </div>
     </div>
   </div>
-</div>
 {/if}
 
 <style>
