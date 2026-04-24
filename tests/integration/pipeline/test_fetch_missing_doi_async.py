@@ -209,9 +209,7 @@ class TestApiRetryAsync:
     @pytest.mark.asyncio
     @respx.mock
     async def test_raises_on_persistent_network_error(self):
-        respx.get("https://api.example/foo").mock(
-            side_effect=httpx.ConnectError("refused")
-        )
+        respx.get("https://api.example/foo").mock(side_effect=httpx.ConnectError("refused"))
         async with httpx.AsyncClient() as client:
             with pytest.raises(httpx.ConnectError):
                 await http_request_with_retry_async(
@@ -288,16 +286,12 @@ class TestOpenalexFetchAsync:
     async def test_fetch_async_network_error_returns_empty(self):
         """Erreur réseau persistante → l'adapter retourne [] (comportement
         historique : un DOI qui échoue ne fait pas échouer la boucle)."""
-        respx.get("https://api.openalex.org/works").mock(
-            side_effect=httpx.ConnectError("refused")
-        )
+        respx.get("https://api.openalex.org/works").mock(side_effect=httpx.ConnectError("refused"))
         adapter = OpenalexFetchMissingDoiAdapter()
         adapter.base_url = "https://api.openalex.org/works"
 
         async with httpx.AsyncClient() as client:
-            records = list(
-                await adapter.fetch_async(client, ["10.1/net-error"])
-            )
+            records = list(await adapter.fetch_async(client, ["10.1/net-error"]))
         assert records == []
 
 
@@ -311,13 +305,7 @@ class TestHalFetchAsync:
         respx.get("https://api.archives-ouvertes.fr/search/").mock(
             return_value=httpx.Response(
                 200,
-                json={
-                    "response": {
-                        "docs": [
-                            {"halId_s": "hal-00012345", "doiId_s": "10.1/a"}
-                        ]
-                    }
-                },
+                json={"response": {"docs": [{"halId_s": "hal-00012345", "doiId_s": "10.1/a"}]}},
             )
         )
         adapter = HalFetchMissingDoiAdapter()
@@ -379,9 +367,7 @@ class TestScanrFetchAsync:
     @respx.mock
     async def test_fetch_async_auth_failure_returns_empty(self):
         """Erreur HTTP (401/403/500...) → [] sans propager l'exception."""
-        respx.post("https://scanr.example/_search").mock(
-            return_value=httpx.Response(401)
-        )
+        respx.post("https://scanr.example/_search").mock(return_value=httpx.Response(401))
         adapter = ScanrFetchMissingDoiAdapter()
         adapter.url = "https://scanr.example/_search"
         adapter.auth = ("u", "p")
@@ -430,9 +416,7 @@ class TestWosFetchAsync:
     async def test_fetch_async_400_skips_silently(self):
         """WoS 400 = lot sans correspondance → retourne ce qui a été accumulé,
         sans propager l'exception."""
-        respx.get("https://api.clarivate.com/api/wos").mock(
-            return_value=httpx.Response(400)
-        )
+        respx.get("https://api.clarivate.com/api/wos").mock(return_value=httpx.Response(400))
         adapter = WosFetchMissingDoiAdapter()
         adapter.base_url = "https://api.clarivate.com/api/wos"
         adapter.headers = {"X-ApiKey": "k", "Accept": "application/json"}
@@ -454,9 +438,7 @@ class TestWosFetchAsync:
 
         async with httpx.AsyncClient() as client:
             records = list(
-                await adapter.fetch_async(
-                    client, ["10.48550/arxiv.1234", "10.5281/zenodo.1"]
-                )
+                await adapter.fetch_async(client, ["10.48550/arxiv.1234", "10.5281/zenodo.1"])
             )
         assert records == []
         assert route.call_count == 0

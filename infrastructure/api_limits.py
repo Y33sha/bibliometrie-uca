@@ -28,6 +28,7 @@ def hal_per_page_for(collection_code: str | None) -> int:
         return HAL_PER_PAGE_OVERRIDES[collection_code]
     return HAL_PER_PAGE
 
+
 # OpenAlex — polite pool (~5 req/s, 10 req/s toléré)
 OPENALEX_DELAY = 0.2
 OPENALEX_PER_PAGE = 200  # max imposé par l'API

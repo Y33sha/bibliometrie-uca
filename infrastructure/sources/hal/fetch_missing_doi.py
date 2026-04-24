@@ -36,9 +36,7 @@ class HalFetchMissingDoiAdapter:
     def configure(self, cur: Any) -> None:
         self.base_url = get_api_base_urls(cur)["hal"]
 
-    async def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
-    ) -> Iterable[dict]:
+    async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
         doi = dois[0]
         try:
             data = await http_request_with_retry_async(
@@ -71,9 +69,7 @@ class HalFetchMissingDoiAdapter:
             doi = doi[0] if doi else None
 
         coll_codes = record.get("collCode_s") or []
-        hal_collections = (
-            coll_codes if isinstance(coll_codes, list) and coll_codes else None
-        )
+        hal_collections = coll_codes if isinstance(coll_codes, list) and coll_codes else None
         raw_hash = compute_hash(record)
 
         with conn.cursor() as cur:

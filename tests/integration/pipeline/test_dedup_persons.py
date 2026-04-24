@@ -183,7 +183,15 @@ class TestStep0HalAccounts:
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
-        step0_hal_accounts(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
+        step0_hal_accounts(
+            db,
+            _queries,
+            _logger,
+            all_as,
+            linked_ids,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
 
         assert _get_person_id_of_hal_authorship(db, has1) == person_id
         assert _get_person_id_of_hal_authorship(db, has2) == person_id
@@ -202,7 +210,15 @@ class TestStep0HalAccounts:
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
-        step0_hal_accounts(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
+        step0_hal_accounts(
+            db,
+            _queries,
+            _logger,
+            all_as,
+            linked_ids,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
 
         # Pas de rattachement en passe 0
         assert _get_person_id_of_hal_authorship(db, has_id) is None
@@ -233,12 +249,28 @@ class TestStep0HalAccounts:
         linked_ids = set()
 
         # Passe 0 : ignoré
-        step0_hal_accounts(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
+        step0_hal_accounts(
+            db,
+            _queries,
+            _logger,
+            all_as,
+            linked_ids,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
         assert _get_person_id_of_hal_authorship(db, has_id) is None
 
         # Passe 3 : rattaché par nom
         name_form_map = _queries.fetch_name_form_map(db)
-        step3_name_forms(db, _logger, all_as, linked_ids, name_form_map, dry_run=False, person_repo=person_repository(db))
+        step3_name_forms(
+            db,
+            _logger,
+            all_as,
+            linked_ids,
+            name_form_map,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
         assert _get_person_id_of_hal_authorship(db, has_id) == person_id
 
 
@@ -270,7 +302,15 @@ class TestStep1CrossSource:
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
         linked_index = load_linked_authorships_by_pub(db, _queries)
-        step1_cross_source(db, _logger, all_as, linked_ids, linked_index, dry_run=False, person_repo=person_repository(db))
+        step1_cross_source(
+            db,
+            _logger,
+            all_as,
+            linked_ids,
+            linked_index,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
 
         assert _get_person_id_of_oa_authorship(db, oa_as) == person_id
 
@@ -297,7 +337,15 @@ class TestStep1CrossSource:
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
         linked_index = load_linked_authorships_by_pub(db, _queries)
-        step1_cross_source(db, _logger, all_as, linked_ids, linked_index, dry_run=False, person_repo=person_repository(db))
+        step1_cross_source(
+            db,
+            _logger,
+            all_as,
+            linked_ids,
+            linked_index,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
 
         ids = _get_person_identifiers(db, person_id)
         assert ("orcid", "0000-0001-9999-8888") in ids
@@ -324,7 +372,15 @@ class TestStep1CrossSource:
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
         linked_index = load_linked_authorships_by_pub(db, _queries)
-        step1_cross_source(db, _logger, all_as, linked_ids, linked_index, dry_run=False, person_repo=person_repository(db))
+        step1_cross_source(
+            db,
+            _logger,
+            all_as,
+            linked_ids,
+            linked_index,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
 
         assert _get_person_id_of_oa_authorship(db, oa_as) is None
 
@@ -364,7 +420,15 @@ class TestStep2Orcid:
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
-        step2_orcid(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
+        step2_orcid(
+            db,
+            _queries,
+            _logger,
+            all_as,
+            linked_ids,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
 
         assert _get_person_id_of_oa_authorship(db, oa_as) == person_id
 
@@ -397,7 +461,15 @@ class TestStep2Orcid:
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
-        step2_orcid(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
+        step2_orcid(
+            db,
+            _queries,
+            _logger,
+            all_as,
+            linked_ids,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
 
         ids = _get_person_identifiers(db, person_id)
         assert ("idref", "123456789") in ids
@@ -433,7 +505,15 @@ class TestStep2Orcid:
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
-        step2_orcid(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
+        step2_orcid(
+            db,
+            _queries,
+            _logger,
+            all_as,
+            linked_ids,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
 
         assert _get_person_id_of_oa_authorship(db, oa_as) is None
 
@@ -457,7 +537,15 @@ class TestStep2Orcid:
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
-        step2_orcid(db, _queries, _logger, all_as, linked_ids, dry_run=False, person_repo=person_repository(db))
+        step2_orcid(
+            db,
+            _queries,
+            _logger,
+            all_as,
+            linked_ids,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
 
         assert _get_person_id_of_oa_authorship(db, oa_as) is None
 
@@ -486,7 +574,15 @@ class TestStep3NameForms:
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
         name_form_map = _queries.fetch_name_form_map(db)
-        step3_name_forms(db, _logger, all_as, linked_ids, name_form_map, dry_run=False, person_repo=person_repository(db))
+        step3_name_forms(
+            db,
+            _logger,
+            all_as,
+            linked_ids,
+            name_form_map,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
 
         assert _get_person_id_of_oa_authorship(db, oa_as) == person_id
 
@@ -511,7 +607,15 @@ class TestStep3NameForms:
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
         name_form_map = _queries.fetch_name_form_map(db)
-        step3_name_forms(db, _logger, all_as, linked_ids, name_form_map, dry_run=False, person_repo=person_repository(db))
+        step3_name_forms(
+            db,
+            _logger,
+            all_as,
+            linked_ids,
+            name_form_map,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
 
         # Doit rester orphelin
         assert _get_person_id_of_oa_authorship(db, oa_as) is None
@@ -533,7 +637,15 @@ class TestStep3NameForms:
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
         name_form_map = _queries.fetch_name_form_map(db)
-        step3_name_forms(db, _logger, all_as, linked_ids, name_form_map, dry_run=False, person_repo=person_repository(db))
+        step3_name_forms(
+            db,
+            _logger,
+            all_as,
+            linked_ids,
+            name_form_map,
+            dry_run=False,
+            person_repo=person_repository(db),
+        )
 
         pid = _get_person_id_of_oa_authorship(db, oa_as)
         assert pid is not None

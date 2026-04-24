@@ -48,9 +48,7 @@ class AsyncFetchMissingDoiAdapter(Protocol):
     def configure(self, cur: Any) -> None:
         """Lit la config (URLs, credentials) depuis la base avant la boucle."""
 
-    def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
-    ) -> Awaitable[Iterable[dict]]:
+    def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Awaitable[Iterable[dict]]:
         """Interroge l'API pour un lot (1 à `batch_size` DOI) via le client
         async partagé. Retourne les records trouvés (vide si rien trouvé)."""
 
