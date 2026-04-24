@@ -76,20 +76,20 @@ async def _create_pub_with_authorship(
 class TestListLaboratories:
     async def test_lists_labos_in_perimeter(self, async_db):
         lab = await _create_structure(async_db, code="LAB-1", name="Lab 1")
-        await _setup_perimeter(async_db, [lab])
-        labs = await list_laboratories(async_db)
+        root = await _setup_perimeter(async_db, [lab])
+        labs = await list_laboratories(async_db, [root, lab], [root])
         ids = [lab_["id"] for lab_ in labs]
         assert lab in ids
 
     async def test_excludes_root_as_tutelle(self, async_db):
         lab = await _create_structure(async_db, code="LAB-2")
-        await _setup_perimeter(async_db, [lab])
-        labs = await list_laboratories(async_db)
+        root = await _setup_perimeter(async_db, [lab])
+        labs = await list_laboratories(async_db, [root, lab], [root])
         for lab_ in labs:
             if lab_["id"] == lab:
                 # La racine est filtrée des tutelles
                 tutelles_ids = [t["id"] for t in (lab_["tutelles"] or [])]
-                assert all(t != lab for t in tutelles_ids)
+                assert root not in tutelles_ids
 
 
 class TestGetLaboratory:

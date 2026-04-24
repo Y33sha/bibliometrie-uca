@@ -12,17 +12,26 @@ from infrastructure.db.queries.filters import (
 )
 
 
-async def list_laboratories(cur: Any) -> list[dict[str, Any]]:
-    """Liste des labos du périmètre, avec leurs tutelles (hors racines du périmètre)."""
-    from infrastructure.app_config import _async_get_from_db
-    from infrastructure.perimeter import async_get_persons_structure_ids
+async def list_laboratories(
+    cur: Any,
+    perimeter_ids: list[int],
+    root_ids: list[int],
+) -> list[dict[str, Any]]:
+    """Liste des labos du périmètre, avec leurs tutelles (hors racines du périmètre).
 
-    perimeter_ids = list(await async_get_persons_structure_ids(cur))
-    perim_code = await _async_get_from_db(cur, "perimeter_persons") or "uca"
-    await cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perim_code,))
-    row = await cur.fetchone()
-    root_ids = (row["structure_ids"] if isinstance(row, dict) else row[0]) if row else []
+    Args:
+        cur: curseur async.
+        perimeter_ids: clôture transitive du périmètre "persons" (racines + descendants
+            via `est_tutelle_de`), utilisée pour filtrer les labos retournés.
+        root_ids: racines déclaratives du périmètre (entrées de
+            `perimeters.structure_ids`), utilisées pour exclure ces racines
+            de la liste des tutelles affichées pour chaque labo.
 
+    Le caller (router) résout les deux via
+    `infrastructure.perimeter.async_get_persons_structure_ids_list` et
+    `async_get_persons_perimeter_root_ids` — garde cette couche queries
+    purement SQL, sans dépendance à la config.
+    """
     await cur.execute(
         """
         SELECT s.id, s.code, s.name, s.acronym,
