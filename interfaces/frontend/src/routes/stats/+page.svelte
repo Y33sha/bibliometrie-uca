@@ -764,10 +764,8 @@
 	th.sortable.active { color: var(--accent); }
 
 	.name-cell {
-		max-width: 300px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		font-size: 0.9em;
+		word-break: break-word;
 	}
 	.name-cell a { color: var(--accent); text-decoration: none; cursor: pointer; }
 	.name-cell a:hover { text-decoration: underline; }

@@ -285,6 +285,7 @@
 	.facet-count {
 		font-size: 0.8rem;
 		color: #888;
-		margin-left: 2px;
+		margin-left: auto;
+		padding-left: 12px;
 	}
 </style>
