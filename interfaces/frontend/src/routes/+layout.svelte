@@ -19,10 +19,12 @@
   });
 
   const isAdmin = $derived($page.url.pathname.startsWith(base + "/admin"));
+  const isPipeline = $derived($page.url.pathname === base + "/admin/pipeline" || $page.url.pathname === base + "/admin/config");
   const isAddresses = $derived($page.url.pathname === base + "/admin/addresses" || $page.url.pathname === base + "/admin/feedback" || $page.url.pathname === base + "/admin/countries");
   const isDuplicates = $derived($page.url.pathname === base + "/admin/duplicates" || $page.url.pathname === base + "/admin/person-duplicates");
   const isHalProblems = $derived($page.url.pathname.startsWith(base + "/hal-problems"));
 
+  let pipelineDropdownOpen = $state(false);
   let dropdownOpen = $state(false);
   let refDropdownOpen = $state(false);
   let dupDropdownOpen = $state(false);
@@ -57,8 +59,15 @@
       </h1>
     </div>
     <nav class="site-nav">
-      <a href="{base}/admin/pipeline" class="nav-link" class:active={isActive("/admin/pipeline")}>Pipeline</a>
-      <a href="{base}/admin/config" class="nav-link" class:active={isActive("/admin/config")}>Config</a>
+      <div class="nav-dropdown" role="navigation" class:active={isPipeline} onmouseenter={() => (pipelineDropdownOpen = true)} onmouseleave={() => (pipelineDropdownOpen = false)}>
+        <button class="nav-link" class:active={isPipeline}>Pipeline &#x25BE;</button>
+        {#if pipelineDropdownOpen}
+          <div class="nav-dropdown-menu">
+            <a href="{base}/admin/config" class:active={isActive("/admin/config")}>Config</a>
+            <a href="{base}/admin/pipeline" class:active={isActive("/admin/pipeline")}>Logs</a>
+          </div>
+        {/if}
+      </div>
       <a href="{base}/admin/structures" class="nav-link" class:active={isActive("/admin/structures")}>Structures</a>
       <div class="nav-dropdown" role="navigation" class:active={isAddresses} onmouseenter={() => (dropdownOpen = true)} onmouseleave={() => (dropdownOpen = false)}>
         <button class="nav-link" class:active={isAddresses}>Adresses &#x25BE;</button>
