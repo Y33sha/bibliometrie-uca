@@ -272,10 +272,10 @@
 <table class="pub-table">
 	<thead>
 		<tr>
-			<th class="sortable" class:active={titleSortActive} onclick={toggleSortTitle}>
+			<th class="sortable pub-col-title" class:active={titleSortActive} onclick={toggleSortTitle}>
 				Titre <span class="sort-arrow">{titleSortArrow}</span>
 			</th>
-			{#if col('journal')}<th>Revue</th>{/if}
+			{#if col('journal')}<th class="pub-col-journal">Revue</th>{/if}
 			{#if col('type')}<th style="width:80px">Type</th>{/if}
 			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSortActive} onclick={toggleSortYear}>
 				An. <span class="sort-arrow">{yearSortArrow}</span>
@@ -302,7 +302,7 @@
 			{#each pubs.items as p (p.id)}
 				<tr>
 					<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
-					{#if col('journal')}<td class="journal-cell">{p.journal || ''}</td>{/if}
+					{#if col('journal')}<td class="journal-cell pub-col-journal">{p.journal || ''}</td>{/if}
 					{#if col('type')}<td>
 						<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
 					</td>{/if}
@@ -411,7 +411,9 @@
 		background: var(--card);
 		border: 1px solid var(--border);
 		border-radius: 6px;
-		overflow: hidden;
+		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder
+		   sous la dernière ligne sans être clippé (coins arrondis
+		   restent visuellement corrects grâce à border-collapse). */
 	}
 	.pub-table th {
 		background: #f5f4f1;
@@ -431,4 +433,10 @@
 	}
 	.pub-table tr:hover td { background: #fafaf8; }
 	.col-menu-th { position: relative; }
+	/* Titre : prend au moins 30 % de la largeur pour rester lisible
+	   quand plusieurs colonnes optionnelles sont affichées. */
+	.pub-col-title { min-width: 30%; }
+	/* Revue : texte plus petit (le titre de revue est secondaire par
+	   rapport au titre de publi). */
+	.pub-table td.pub-col-journal { font-size: 0.9em; }
 </style>
