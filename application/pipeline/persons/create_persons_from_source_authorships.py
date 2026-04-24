@@ -58,14 +58,8 @@ from domain.ports.person_repository import PersonRepository
 def get_all_unlinked_authorships(cur: Any, queries: PersonsCreateQueries) -> list[dict[str, Any]]:
     """Charge les authorships UCA sans person_id (toutes sources) et les enrichit
     (parsing noms, filtrage ORCID OpenAlex, flag allow_create)."""
-    hal_rows = queries.fetch_unlinked_hal_authorships(cur)
-    oa_rows = queries.fetch_unlinked_openalex_authorships(cur)
-    wos_rows = queries.fetch_unlinked_wos_authorships(cur)
-    scanr_rows = queries.fetch_unlinked_scanr_authorships(cur)
-    theses_rows = queries.fetch_unlinked_theses_authorships(cur)
-
     all_rows = []
-    for r in hal_rows + oa_rows + wos_rows + scanr_rows + theses_rows:
+    for r in queries.fetch_unlinked_authorships(cur):
         if not r.get("last_name"):
             r["last_name"], r["first_name"] = parse_raw_author_name(r["full_name"])
         r["last_norm"] = normalize_name(r["last_name"])

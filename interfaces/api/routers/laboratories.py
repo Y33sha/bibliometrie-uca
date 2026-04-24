@@ -6,6 +6,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from infrastructure.db.queries import laboratories as lab_queries
+from infrastructure.perimeter import (
+    async_get_persons_perimeter_root_ids,
+    async_get_persons_structure_ids_list,
+)
 from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import (
     LaboratoryAddressesResponse,
@@ -23,7 +27,9 @@ logger = logging.getLogger(__name__)
 async def list_laboratories() -> Any:
     """Liste des labos du périmètre."""
     async with get_async_cursor() as (cur, _conn):
-        return await lab_queries.list_laboratories(cur)
+        perimeter_ids = await async_get_persons_structure_ids_list(cur)
+        root_ids = await async_get_persons_perimeter_root_ids(cur)
+        return await lab_queries.list_laboratories(cur, perimeter_ids, root_ids)
 
 
 @router.get("/api/laboratories/{lab_id}", response_model=LaboratoryDetailResponse)
