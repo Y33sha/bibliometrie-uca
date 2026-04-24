@@ -108,7 +108,7 @@ class TestFetchAddressesToResolve:
         todo = _create_address(db, raw_text="Todo")
 
         rows = fetch_addresses_to_resolve(db, incremental=True)
-        ids = [r["id"] for r in rows]
+        ids = [addr_id for addr_id, _ in rows]
         assert todo in ids
         assert resolved not in ids
 
@@ -116,8 +116,22 @@ class TestFetchAddressesToResolve:
         a1 = _create_address(db, raw_text="A1")
         a2 = _create_address(db, raw_text="A2")
         rows = fetch_addresses_to_resolve(db, incremental=False)
-        ids = [r["id"] for r in rows]
+        ids = [addr_id for addr_id, _ in rows]
         assert a1 in ids and a2 in ids
+
+    def test_returns_tuples_not_dicts(self, db):
+        """Régression : la signature déclare `list[tuple[int, str]]`.
+        Sur un cursor `dict_row` (défaut pipeline), il faut une conversion
+        explicite — sinon l'unpack `(addr_id, raw_text)` récupère les clés
+        `"id"` / `"raw_text"` et provoque `InvalidTextRepresentation` dès
+        qu'on les passe à une requête SQL typée integer."""
+        addr_id = _create_address(db, raw_text="Some address")
+        rows = fetch_addresses_to_resolve(db, incremental=False)
+        assert all(isinstance(r, tuple) and len(r) == 2 for r in rows)
+        # Les types sont bien (int, str), pas (str, str)
+        row = next(r for r in rows if r[0] == addr_id)
+        assert isinstance(row[0], int)
+        assert row[1] == "Some address"
 
 
 class TestDeleteObsoleteDetections:

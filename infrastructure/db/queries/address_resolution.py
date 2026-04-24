@@ -43,6 +43,11 @@ def fetch_addresses_to_resolve(cur: Any, *, incremental: bool) -> list[tuple[int
 
     Si `incremental=True` : uniquement celles avec `resolved_at IS NULL`.
     Sinon : toutes les adresses.
+
+    Conversion explicite dict → tuple : la connexion pipeline utilise
+    `row_factory=dict_row`, donc `fetchall` retourne des dicts. L'appelant
+    unpacke `(addr_id, raw_text)` : sans conversion, il récupérerait les
+    clés "id"/"raw_text" au lieu des valeurs.
     """
     if incremental:
         cur.execute(
@@ -50,7 +55,7 @@ def fetch_addresses_to_resolve(cur: Any, *, incremental: bool) -> list[tuple[int
         )
     else:
         cur.execute("SELECT a.id, a.raw_text FROM addresses a ORDER BY a.id")
-    return cur.fetchall()
+    return [(row["id"], row["raw_text"]) for row in cur.fetchall()]
 
 
 def delete_obsolete_detections(cur: Any, addr_id: int, kept_structure_ids: list[int]) -> int:
