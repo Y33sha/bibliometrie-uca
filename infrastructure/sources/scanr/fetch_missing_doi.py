@@ -5,24 +5,31 @@ lot de 50 DOI en un seul appel. Authentification basic.
 
 ScanR stocke les DOI en casse variable ; le matching est case-insensitive
 côté `get_cross_import_dois` (cf. `infrastructure.sources.common`).
+
+§2.14 : adapter async (`AsyncFetchMissingDoiAdapter`).
 """
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
-import requests
+import httpx
 from psycopg.types.json import Jsonb as Json
 
-from infrastructure.api_limits import SCANR_DELAY
+from infrastructure.api_retry_async import http_request_with_retry_async
 from infrastructure.app_config import get_api_base_urls, get_scanr_credentials
 from infrastructure.sources.common import clean_doi, compute_hash
 
 
 class ScanrFetchMissingDoiAdapter:
+    """Adapter async conforme au `AsyncFetchMissingDoiAdapter` Protocol."""
+
     source_key = "scanr"
-    rate_delay = SCANR_DELAY
     batch_size = 50
+    # API ElasticSearch publique, pas de rate limit documenté — 5 req
+    # concurrentes reste courtois sur une API interne DataESR.
+    max_concurrent = 5
 
     url: str
     auth: tuple[str, str]
@@ -35,14 +42,23 @@ class ScanrFetchMissingDoiAdapter:
         username, password = get_scanr_credentials(cur)
         self.auth = (username, password)
 
-    def fetch(self, dois: list[str]) -> Iterable[dict]:
+    async def fetch_async(
+        self, client: httpx.AsyncClient, dois: list[str]
+    ) -> Iterable[dict]:
         query = {"size": len(dois), "query": {"terms": {"externalIds.id.keyword": dois}}}
         try:
-            resp = requests.post(self.url, json=query, auth=self.auth, timeout=30)
-            resp.raise_for_status()
-        except requests.RequestException:
+            data = await http_request_with_retry_async(
+                client,
+                "POST",
+                self.url,
+                json_body=query,
+                auth=self.auth,
+                timeout=30,
+                label=f"batch {len(dois)} DOI",
+            )
+        except (httpx.RequestError, httpx.HTTPStatusError):
             return []
-        return [hit["_source"] for hit in resp.json().get("hits", {}).get("hits", [])]
+        return [hit["_source"] for hit in data.get("hits", {}).get("hits", [])]
 
     def insert(self, conn: Any, record: dict) -> bool:
         scanr_id = record.get("id", "")

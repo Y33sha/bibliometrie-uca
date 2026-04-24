@@ -7,19 +7,25 @@ interne de `WOS_PER_PAGE` records, retries exponentiels sur 429/erreurs.
 Certains DOI (preprints Zenodo, arXiv, SSRN, Research Square...) sont
 systématiquement absents de WoS : on les filtre côté client pour éviter
 les appels inutiles.
+
+§2.14 : adapter async (`AsyncFetchMissingDoiAdapter`). L'instabilité
+historique de WoS était liée aux pages larges ; en requêtes DOI
+individuelles (via batch de 20 et WOS_PER_PAGE=10) l'API est stable.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
-import time
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
-import requests
+import httpx
 from psycopg.types.json import Jsonb as Json
 
 from infrastructure.api_limits import WOS_DELAY, WOS_PER_PAGE
+from infrastructure.api_retry_async import http_request_with_retry_async
 from infrastructure.app_config import get_api_base_urls, get_wos_api_key
 from infrastructure.sources.common import compute_hash
 
@@ -62,9 +68,14 @@ def _extract_doi(rec: dict) -> str | None:
 
 
 class WosFetchMissingDoiAdapter:
+    """Adapter async conforme au `AsyncFetchMissingDoiAdapter` Protocol."""
+
     source_key = "wos"
-    rate_delay = WOS_DELAY
     batch_size = 20
+    # WoS API Clarivate : instable historiquement, mais les soucis étaient
+    # liés aux pages larges (fixé par WOS_PER_PAGE=10). 3 requêtes concurrentes
+    # reste conservateur, à ajuster si besoin.
+    max_concurrent = 3
 
     base_url: str
     headers: dict[str, str]
@@ -75,7 +86,9 @@ class WosFetchMissingDoiAdapter:
         )
         self.headers = {"X-ApiKey": get_wos_api_key(cur), "Accept": "application/json"}
 
-    def fetch(self, dois: list[str]) -> Iterable[dict]:
+    async def fetch_async(
+        self, client: httpx.AsyncClient, dois: list[str]
+    ) -> Iterable[dict]:
         clean = [d for d in (_clean_doi_for_wos(x) for x in dois) if d]
         if not clean:
             return []
@@ -90,7 +103,29 @@ class WosFetchMissingDoiAdapter:
                 "count": WOS_PER_PAGE,
                 "firstRecord": first_record,
             }
-            data = self._fetch_with_retry(params, label=f"rec {first_record}")
+            try:
+                data = await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    self.base_url,
+                    headers=self.headers,
+                    params=params,
+                    timeout=60,
+                    # Backoff initial 4s pour matcher le comportement sync historique
+                    # (2^(attempt+2) = 4, 8, 16, 32, 64)
+                    initial_backoff=4.0,
+                    retry_on_empty_body=True,
+                    label=f"rec {first_record}",
+                )
+            except httpx.HTTPStatusError as e:
+                # WoS 400 = requête mal formée ou lot sans correspondance : skip silencieux
+                if e.response.status_code == 400:
+                    log.warning("WoS 400 rec %d, lot ignoré", first_record)
+                    return records
+                raise
+            except httpx.RequestError:
+                break
+
             if not data:
                 break
             try:
@@ -113,46 +148,9 @@ class WosFetchMissingDoiAdapter:
             if first_record + WOS_PER_PAGE - 1 >= total:
                 break
             first_record += WOS_PER_PAGE
-            time.sleep(self.rate_delay)
+            await asyncio.sleep(WOS_DELAY)
 
         return records
-
-    def _fetch_with_retry(self, params: dict, *, label: str) -> dict:
-        for attempt in range(5):
-            try:
-                resp = requests.get(
-                    self.base_url, headers=self.headers, params=params, timeout=60
-                )
-                if resp.status_code == 429:
-                    wait = 2 ** (attempt + 2)
-                    log.warning("WoS 429 %s, attente %ds", label, wait)
-                    time.sleep(wait)
-                    continue
-                if resp.status_code == 400:
-                    log.warning("WoS 400 %s, lot ignoré", label)
-                    return {}
-                resp.raise_for_status()
-                if not resp.text.strip():
-                    wait = 2 ** (attempt + 1)
-                    log.warning(
-                        "WoS réponse vide %s (%d/5), attente %ds", label, attempt + 1, wait
-                    )
-                    time.sleep(wait)
-                    continue
-                return resp.json()
-            except requests.exceptions.JSONDecodeError:
-                wait = 2 ** (attempt + 1)
-                log.warning("WoS JSON invalide %s (%d/5), attente %ds", label, attempt + 1, wait)
-                time.sleep(wait)
-            except requests.RequestException as e:
-                if attempt < 4:
-                    wait = 2 ** (attempt + 1)
-                    log.warning("WoS erreur %s (%d/5): %s", label, attempt + 1, e)
-                    time.sleep(wait)
-                else:
-                    raise
-        log.error("WoS échec après 5 tentatives %s", label)
-        return {}
 
     def insert(self, conn: Any, record: dict) -> bool:
         ut = _extract_ut(record)

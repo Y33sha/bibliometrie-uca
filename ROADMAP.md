@@ -1,35 +1,3 @@
-# Roadmap
-1 lancer script pour réparer hal nokey authors
-# 1. Vérifier ce qui va se passer
-python -m interfaces.cli.repair_hal_nokey_source_persons --dry-run
-# 2. Appliquer (nulle 24 hashes, supprime 33 publis + orphelins)
-python -m interfaces.cli.repair_hal_nokey_source_persons
-# 3. Ré-extraction HAL + re-normalisation pour les 24 in-scope
-python run_pipeline.py --mode full --only extract --sources hal
-python run_pipeline.py --mode full --only normalize --sources hal
-
-2 chantier doublons position wos
-# Vérif
-python -m interfaces.cli.cleanup_wos_duplicate_authorships --dry-run
-# Lancement réel (transactionnel)
-python -m interfaces.cli.cleanup_wos_duplicate_authorships
-
-3 dates oa/hal
-# Aperçu
-python -m interfaces.cli.refresh_publications_year_mismatch --dry-run
-# Test réduit avant de tout lancer
-python -m interfaces.cli.refresh_publications_year_mismatch --limit 20
-# Lancement complet
-python -m interfaces.cli.refresh_publications_year_mismatch
-
-4 reset_hashes_for_publis_with_position_gap
-python -m infrastructure.db.migrate                                    # migration 008
-python -m interfaces.cli.reset_hashes_for_publis_with_position_gap --dry-run
-python -m interfaces.cli.reset_hashes_for_publis_with_position_gap    # nulle les hashes
-python run_pipeline.py --mode full --only extract                     # réécrit raw_data
-python run_pipeline.py --mode full --only normalize                   # repeuple les positions
-
-
 ## Chantier transition DDD
 
 Architecture hexagonale en place : 4 couches `domain/`, `application/`,
@@ -216,21 +184,27 @@ par source (borné au QPS documenté). Backoff exponentiel sur 429. Îlot
 async encapsulé via `asyncio.run()` en début d'étape pipeline ; le
 reste du pipeline reste sync.
 
-**Candidats (ROI décroissant)** :
-- [ ] **Extracteurs de sources** (~1400 LOC, 5 fichiers) : HAL, OpenAlex,
-  WoS, ScanR, theses.fr. Gain attendu ×5 sur le temps d'extraction.
+**Candidats (ROI décroissant, révisé après exploration)** :
+- [x] **`fetch_missing_doi` — 4 adapters** (OpenAlex, HAL, WoS, ScanR) :
+  boucle embarrassingly parallel (1 requête HTTP par lot, zéro
+  dépendance entre lots). Gain mesuré sur OpenAlex : 18 req/s vs
+  ~5 req/s plafond sync (×3.6). `max_concurrent` par source calibré
+  sous le rate-limit documenté (OA=3, WoS=3, HAL=5, ScanR=5).
 - [ ] Scripts d'enrichissement : `enrich_journal_apc.py`,
-  `enrich_oa_status.py`.
-- [ ] Scripts fetch ciblé : `fetch_missing_hal_id`, `fetch_missing_doi`,
-  `refetch_truncated`.
+  `enrich_oa_status.py` — même pattern, ROI élevé.
+- [ ] Scripts fetch ciblé : `fetch_missing_hal_id`, `refetch_truncated`.
+- [ ] Extracteurs de sources (~1400 LOC, 5 fichiers) : HAL, OpenAlex,
+  WoS, ScanR, theses.fr. Gain attendu plus modéré côté OpenAlex
+  (pagination cursor-based → séquentielle intra-année,
+  parallélisation inter-années limitée à ×2-×3) ; plus élevé côté
+  HAL/theses.fr (pagination offset, parallélisme page par page).
 
 **Dépendances** :
-- `httpx` ajouté aux deps prod (il est déjà en dev pour les tests
-  FastAPI — juste le déplacer).
-- Mock côté tests : `respx` ou `pytest-httpx` (migration depuis les
-  mocks `requests` actuels).
-- `infrastructure/api_retry.py` dupliqué en variante async (pattern
-  §2.12).
+- `httpx` déplacé des deps dev aux deps prod (fait).
+- Mock côté tests : `respx` ajouté en dev (pilote §2.14).
+- `infrastructure/api_retry_async.py` : variante async de
+  `api_retry.py` créée dans le pilote ; factorisation sync↔async à
+  envisager après 2-3 migrations supplémentaires.
 
 **Pas en scope** : les étapes CPU-bound du pipeline (normalisation,
 build_authorships, dédup). Async n'aide pas là-dessus.
