@@ -40,6 +40,20 @@ class AsyncAddressRepository(Protocol):
         structure_id: int,
     ) -> bool: ...
 
+    async def which_contribute_to_perimeter(
+        self,
+        address_ids: list[int],
+        structure_id: int,
+    ) -> set[int]: ...
+    """Sous-ensemble de `address_ids` qui contribue actuellement au calcul
+    `in_perimeter` pour `structure_id` — i.e. lien existant avec
+    `is_confirmed IS DISTINCT FROM FALSE` (NULL ou TRUE).
+
+    Utilisé par les services de validation pour détecter les opérations
+    no-op (ex: cliquer "Relier" sur une adresse déjà auto-détectée) et
+    skipper la propagation UCA inutile.
+    """
+
     # ── Pays ───────────────────────────────────────────────────────
 
     async def set_countries(
