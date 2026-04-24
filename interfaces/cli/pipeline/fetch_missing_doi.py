@@ -1,7 +1,11 @@
 """Point d'entrée CLI : fetch des DOI manquants dans une source cible.
 
-Composition root : sélectionne l'adapter selon `--target`, ouvre la
-connexion, appelle `application.pipeline.fetch_missing_doi.run`.
+Composition root : sélectionne l'adapter async selon `--target`, ouvre
+la connexion, appelle `application.pipeline.fetch_missing_doi.run_async`.
+
+§2.14 : les 4 sources (hal, openalex, wos, scanr) utilisent le chemin
+async (`AsyncFetchMissingDoiAdapter` + `httpx.AsyncClient`). Gain mesuré
+sur OpenAlex : ~×3.6 vs sync (18 req/s vs ~5 req/s plafond sync).
 
 Usage :
     python -m interfaces.cli.pipeline.fetch_missing_doi --target hal
@@ -13,9 +17,10 @@ Usage :
 from __future__ import annotations
 
 import argparse
+import asyncio
 import os
 
-from application.pipeline.fetch_missing_doi import FetchMissingDoiAdapter, run
+from application.pipeline.fetch_missing_doi import AsyncFetchMissingDoiAdapter, run_async
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 from infrastructure.sources.common import get_cross_import_dois
@@ -27,7 +32,7 @@ from infrastructure.sources.wos.fetch_missing_doi import WosFetchMissingDoiAdapt
 logger = setup_logger("fetch_missing_doi", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-ADAPTERS: dict[str, type[FetchMissingDoiAdapter]] = {
+ADAPTERS: dict[str, type[AsyncFetchMissingDoiAdapter]] = {
     "hal": HalFetchMissingDoiAdapter,
     "openalex": OpenalexFetchMissingDoiAdapter,
     "wos": WosFetchMissingDoiAdapter,
@@ -50,14 +55,16 @@ def main() -> None:
     adapter = ADAPTERS[args.target]()
     conn = get_connection()
     try:
-        run(
-            conn,
-            adapter,
-            logger,
-            cross_import_dois_reader=get_cross_import_dois,
-            all_staged=args.all,
-            dry_run=args.dry_run,
-            limit=args.limit,
+        asyncio.run(
+            run_async(
+                conn,
+                adapter,
+                logger,
+                cross_import_dois_reader=get_cross_import_dois,
+                all_staged=args.all,
+                dry_run=args.dry_run,
+                limit=args.limit,
+            )
         )
     finally:
         if not conn.closed:

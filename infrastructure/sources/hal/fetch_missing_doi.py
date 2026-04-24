@@ -3,35 +3,47 @@
 HAL fournit une API Solr ; on interroge par DOI (un appel par DOI).
 L'insertion gère la colonne `hal_collections` avec merge set-union
 sur conflit.
+
+§2.14 : adapter async (`AsyncFetchMissingDoiAdapter`), parallélisme
+embarrassingly parallel par DOI via `httpx.AsyncClient`.
 """
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
-import requests
+import httpx
 from psycopg.types.json import Jsonb as Json
 
-from infrastructure.api_limits import HAL_DELAY
+from infrastructure.api_retry_async import http_request_with_retry_async
 from infrastructure.app_config import get_api_base_urls
 from infrastructure.hal import HAL_FIELDS_STR
 from infrastructure.sources.common import compute_hash
 
 
 class HalFetchMissingDoiAdapter:
+    """Adapter async conforme au `AsyncFetchMissingDoiAdapter` Protocol."""
+
     source_key = "hal"
-    rate_delay = HAL_DELAY
     batch_size = 1
+    # API Solr publique, pas de rate limit documenté — 5 req concurrentes
+    # reste courtois et suffisant pour saturer le pipeline.
+    max_concurrent = 5
 
     base_url: str
 
     def configure(self, cur: Any) -> None:
         self.base_url = get_api_base_urls(cur)["hal"]
 
-    def fetch(self, dois: list[str]) -> Iterable[dict]:
+    async def fetch_async(
+        self, client: httpx.AsyncClient, dois: list[str]
+    ) -> Iterable[dict]:
         doi = dois[0]
         try:
-            resp = requests.get(
+            data = await http_request_with_retry_async(
+                client,
+                "GET",
                 self.base_url,
                 params={
                     "q": f'doiId_s:"{doi}"',
@@ -40,11 +52,11 @@ class HalFetchMissingDoiAdapter:
                     "rows": "1",
                 },
                 timeout=15,
+                label=f"DOI {doi}",
             )
-            resp.raise_for_status()
-        except requests.RequestException:
+        except (httpx.RequestError, httpx.HTTPStatusError):
             return []
-        docs = resp.json().get("response", {}).get("docs", [])
+        docs = data.get("response", {}).get("docs", [])
         return docs[:1]
 
     def insert(self, conn: Any, record: dict) -> bool:
