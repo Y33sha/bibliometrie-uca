@@ -2,40 +2,39 @@
 ## Pipeline
 ### Fix rapides
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
-* [ ] 2026-04-20 12:13:42 [ERROR] Erreur sur W4206741675: ERREUR:  une instruction insert ou update sur la table « source_authorship_addresses » viole la contrainte de clé étrangère « source_authorship_addresses_address_id_fkey » DETAIL:  La clé (address_id)=(4283651) n'est pas présente dans la table « addresses ».
 ### Chantiers plus importants
-* [ ] passer en async pour extract
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
 ## Robustesse du pipeline sur le long terme
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
 * [ ] authorships excluded: info perdue si réimport (grave?)
-* [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?).
+* [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?). + publis du cross-import: re-fetch régulier pour tenir les données à jour
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
-### Problèmes spécifiques HAL
+* [ ] in perimeter: true, false, null? limiter les cross-imports à null et true?
+## Problèmes spécifiques HAL
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
+* [ ] embargos (HAL, theses.fr): afficher dates (existent-elles dans le retour api)?
 * [ ] https://hal.science/hal-03874894 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
 * [ ] DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
-* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire?
-* [ ] embargos (HAL, theses.fr): afficher dates (existent-elles dans le retour api)?
+* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis (authorship ok, author pas ok => vérifier que ce ne sera pas ré-écrasé)
-# Code
+## Code
 * [ ] vérifier si certains ports ne seraient pas mieux placés dans application/ (critère: sont-ils importés par domain/ ou pas?)
 * [ ] faire le ménage dans db/queries: trop de choses mal rangées ou mal nommées
 * [ ] auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques): supprimer les requêtes vers source_authorships pouvant être remplacées par des requêtes vers les tables canoniques
 * [ ] problème page affiliation-conflicts: requête beaucoup trop lente
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
+## Entités supplémentaires
+* [ ] sujets / mots-clés: exploiter
 ## Explorer autres sources possibles
 * [ ] pour les publis: CrossRef, ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression)
 * [ ] pour les jeux de données: DataCite, autres?
 * [ ] brevets? INPI?
 * [ ] divers: ORCID, IdRef, DOAJ, scraping sites éditeurs pour les adresses manquantes? (soyons fous)
-## Entités supplémentaires
-* [ ] sujets / mots-clés: exploiter
 ## Types de documents: fixer l'enum et le mapping, algo de résolution de conflits
 * [ ] types parfois non fiables sur OpenAlex: https://openalex.org/works/W4225722715 (utiliser Unpaywall aussi pour corriger type doc?)
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
@@ -64,6 +63,7 @@
 # Détails à régler au fil de l'eau (interface)
 ## Admin
 * [ ] interface pour consulter l'audit trail
+* [ ] menu: pipeline (config, logs)
 ### Personnes (admin)
 * [ ] quoi faire des entités fausses? a minima, rejeter leurs authorships et s'assurer qu'elles n'apparaissent pas dans orphan-authorships
 * [ ] si source erronée: rejeter authorship source + recalculer affiliations de l'authorship à partir des sources non rejetées / caveat: Clarifier la sémantique de `excluded` sur les authorships sources: est-ce l'authorship qui est fausse, ou son affiliation? (allons plus loin: pourrait-on déclarer fausses certaines colonnes et pas d'autres? via un champ jsonb par exemple)
@@ -87,7 +87,7 @@
 * [ ] Rendre tous les filtres sticky
 * [ ] Rendre tous les tableaux triables
 * [ ] différencier interfaces à usage interne vs externe (users, roles)
-* [ ] accessibilité, responsivité de l'interface
+* [ ] responsivité minimale de l'interface
 * [ ] tableaux personnes: remplacer les identifiants par des icônes (hal orcid idref)
 * [ ] étoffer tests frontend
 * [ ] ajouter export csv tableaux thèses
@@ -98,6 +98,8 @@
 * [ ] décomptes facettes: toujours aligné à droite
 * [ ] ordre des sources pour les thèses: harmoniser page laboratoire avec page thèses
 * [ ] admin/personnes, formes de nom: modal authorships: source affichée: default wos (ajouter les autres sources, et mettre default None)
+* [ ] drpodown choix colonnes: toujours coupé par le bas du tableau Publications!
+* [ ] filtres RH sur page labo
 ## Cas particuliers, bizarreries à élucider, à examiner plus tard
 * openalex répète des auteurs : publi 77832
 * [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
@@ -106,7 +108,7 @@
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
-* collaborations nationales et internationales: identification structures? compliqué, je pense que pour ça il vaut mieux réutiliser les sources directement
+* collaborations nationales et internationales: identification structures? compliqué, je pense que pour ça il vaut mieux réutiliser les sources directement: contrôler seulement cohérence entre sources et corriger quand incohérent?
 
 # Pas nécessaire de le régler, du moment qu'on le documente
 * [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer) => pas urgent, pas d'imports csv à terme en prod
