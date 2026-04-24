@@ -51,9 +51,7 @@ class TestAdaptiveDispatch:
         per_page=500 → full_fetch_pages=10. 5 < 10 → MODE INCRÉMENTAL.
         """
         preview_ids = [f"hal-{i}" for i in range(5000)]
-        monkeypatch.setattr(
-            extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids
-        )
+        monkeypatch.setattr(extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids)
         existing = {f"hal-{i}" for i in range(5, 5000)}
 
         total, new = extract_hal.extract_collection(
@@ -75,9 +73,7 @@ class TestAdaptiveDispatch:
         """100 papiers, staging vide → 100 orphelins, full_fetch_pages=1.
         100 ≥ 1 → MODE FULL-FETCH."""
         preview_ids = [f"hal-{i}" for i in range(100)]
-        monkeypatch.setattr(
-            extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids
-        )
+        monkeypatch.setattr(extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids)
 
         total, new = extract_hal.extract_collection(
             collection_code="FRESH",
@@ -97,9 +93,7 @@ class TestAdaptiveDispatch:
         1000 papiers, 998 connus, 2 orphelins. per_page=500 → pages=2. 2 < 2 = False.
         """
         preview_ids = [f"hal-{i}" for i in range(1000)]
-        monkeypatch.setattr(
-            extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids
-        )
+        monkeypatch.setattr(extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids)
         existing = {f"hal-{i}" for i in range(2, 1000)}
 
         total, new = extract_hal.extract_collection(
@@ -113,15 +107,11 @@ class TestAdaptiveDispatch:
         assert total == 1000
         assert spies["full"] and not spies["incremental"]
 
-    def test_boundary_orphans_less_than_pages_picks_incremental(
-        self, monkeypatch, no_sleep, spies
-    ):
+    def test_boundary_orphans_less_than_pages_picks_incremental(self, monkeypatch, no_sleep, spies):
         """Borne inverse : orphans == pages - 1 → mode incrémental.
         1000 papiers, 999 connus, 1 orphelin. per_page=500 → pages=2. 1 < 2 = True."""
         preview_ids = [f"hal-{i}" for i in range(1000)]
-        monkeypatch.setattr(
-            extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids
-        )
+        monkeypatch.setattr(extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids)
         existing = {f"hal-{i}" for i in range(1, 1000)}
 
         total, _new = extract_hal.extract_collection(
@@ -137,9 +127,7 @@ class TestAdaptiveDispatch:
 
     def test_dry_run_skips_both_paths(self, monkeypatch, no_sleep, spies):
         preview_ids = [f"hal-{i}" for i in range(50)]
-        monkeypatch.setattr(
-            extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids
-        )
+        monkeypatch.setattr(extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids)
 
         total, new = extract_hal.extract_collection(
             collection_code="DRY",
@@ -155,9 +143,7 @@ class TestAdaptiveDispatch:
         assert not spies["full"] and not spies["incremental"]
 
     def test_empty_collection_returns_zero(self, monkeypatch, no_sleep, spies):
-        monkeypatch.setattr(
-            extract_hal, "fetch_collection_ids", lambda *a, **kw: []
-        )
+        monkeypatch.setattr(extract_hal, "fetch_collection_ids", lambda *a, **kw: [])
 
         total, new = extract_hal.extract_collection(
             collection_code="EMPTY",
@@ -175,9 +161,7 @@ class TestAdaptiveDispatch:
 class TestExtractFullSafeguard:
     """Tests du safeguard qui évite les boucles infinies sur `_extract_full`."""
 
-    def test_empty_docs_breaks_loop_even_if_start_below_total(
-        self, monkeypatch, no_sleep
-    ):
+    def test_empty_docs_breaks_loop_even_if_start_below_total(self, monkeypatch, no_sleep):
         """Si l'API retourne une page vide alors que start < total_count
         (incohérence rare côté Solr), on sort du loop au lieu de spinner."""
         # fetch_page retourne toujours une page vide avec numFound=1000 → piège
@@ -214,9 +198,7 @@ class TestTagExistingWithCollection:
         cur.rowcount = 3
         conn.cursor.return_value.__enter__.return_value = cur
 
-        n = extract_hal.tag_existing_with_collection(
-            conn, ["hal-1", "hal-2", "hal-3"], "PRES_UCA"
-        )
+        n = extract_hal.tag_existing_with_collection(conn, ["hal-1", "hal-2", "hal-3"], "PRES_UCA")
         assert n == 3
         sql = cur.execute.call_args[0][0]
         assert "UPDATE staging" in sql

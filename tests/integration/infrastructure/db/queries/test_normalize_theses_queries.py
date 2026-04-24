@@ -108,9 +108,10 @@ class TestThesesSourcePersons:
         assert db.fetchone()["full_name"] == "Nouveau"
 
     def test_find_by_name_returns_none_when_absent(self, db):
-        assert find_theses_source_person_by_name(
-            db, full_name="Personne Inconnue", first_name=None
-        ) is None
+        assert (
+            find_theses_source_person_by_name(db, full_name="Personne Inconnue", first_name=None)
+            is None
+        )
 
     def test_find_by_name_returns_id_when_present(self, db):
         new_id = insert_theses_source_person_new(
@@ -120,9 +121,7 @@ class TestThesesSourcePersons:
         assert found == new_id
 
     def test_insert_new_generates_nokey_source_id(self, db):
-        sp_id = insert_theses_source_person_new(
-            db, full_name="X", last_name="X", first_name=None
-        )
+        sp_id = insert_theses_source_person_new(db, full_name="X", last_name="X", first_name=None)
         db.execute("SELECT source_id FROM source_persons WHERE id = %s", (sp_id,))
         assert db.fetchone()["source_id"].startswith("nokey-")
 

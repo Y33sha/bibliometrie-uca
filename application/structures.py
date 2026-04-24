@@ -104,9 +104,7 @@ async def update_structure(
     return await repo.update_structure_fields(structure_id, sql_fragments, params)
 
 
-async def delete_structure(
-    cur: Any, structure_id: int, *, repo: AsyncStructureRepository
-) -> None:
+async def delete_structure(cur: Any, structure_id: int, *, repo: AsyncStructureRepository) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas."""
     row = await repo.delete_structure(structure_id)
     if not row:
@@ -139,9 +137,7 @@ async def create_relation(
     )
 
 
-async def delete_relation(
-    cur: Any, relation_id: int, *, repo: AsyncStructureRepository
-) -> None:
+async def delete_relation(cur: Any, relation_id: int, *, repo: AsyncStructureRepository) -> None:
     """Supprime une relation. Lève NotFoundError si elle n'existe pas."""
     row = await repo.delete_relation(relation_id)
     if not row:

@@ -51,9 +51,7 @@ class TestOnErrorHook:
     # ── _process_one (chemin SAVEPOINT) ─────────────────────────
 
     def test_savepoint_success_no_on_error(self):
-        normalizer = _SpyNormalizer(
-            MagicMock(), MagicMock(), MagicMock(), use_savepoint=True
-        )
+        normalizer = _SpyNormalizer(MagicMock(), MagicMock(), MagicMock(), use_savepoint=True)
         cur = MagicMock()
         normalizer._process_one(cur, {"id": 1})
         assert normalizer.on_error_calls == 0
@@ -99,9 +97,7 @@ class TestOnErrorHook:
         conn.autocommit = False
         staging = MagicMock()
         staging.count_pending_staging.return_value = 3
-        staging.fetch_pending_staging.return_value = iter(
-            [{"id": 1}, {"id": 42}, {"id": 3}]
-        )
+        staging.fetch_pending_staging.return_value = iter([{"id": 1}, {"id": 42}, {"id": 3}])
 
         normalizer = _SpyNormalizer(
             conn,
@@ -122,12 +118,8 @@ class TestOnErrorHook:
         conn.autocommit = False
         staging = MagicMock()
         staging.count_pending_staging.return_value = 2
-        staging.fetch_pending_staging.return_value = iter(
-            [{"id": 1}, {"id": 2}]
-        )
+        staging.fetch_pending_staging.return_value = iter([{"id": 1}, {"id": 2}])
 
-        normalizer = _SpyNormalizer(
-            conn, MagicMock(), staging, use_savepoint=False
-        )
+        normalizer = _SpyNormalizer(conn, MagicMock(), staging, use_savepoint=False)
         normalizer.run([])
         assert normalizer.on_error_calls == 0

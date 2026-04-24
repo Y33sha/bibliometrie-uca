@@ -166,9 +166,7 @@ class TestExistingNameFormsCrud:
 
         insert_name_form_with_merge(db, "nom-x", [pid2], ["openalex"])
 
-        db.execute(
-            "SELECT person_ids, sources FROM person_name_forms WHERE name_form = 'nom-x'"
-        )
+        db.execute("SELECT person_ids, sources FROM person_name_forms WHERE name_form = 'nom-x'")
         row = db.fetchone()
         assert sorted(row["person_ids"]) == sorted([pid1, pid2])
         assert set(row["sources"]) == {"hal", "openalex"}

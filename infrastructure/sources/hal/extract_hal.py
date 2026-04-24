@@ -133,9 +133,7 @@ def fetch_single_work(url: str, hal_id: str) -> dict | None:
     return docs[0] if docs else None
 
 
-def tag_existing_with_collection(
-    conn: Any, hal_ids: list[str], collection_code: str
-) -> int:
+def tag_existing_with_collection(conn: Any, hal_ids: list[str], collection_code: str) -> int:
     """Append `collection_code` à `hal_collections` pour les halIds donnés.
 
     Utilisé quand on a pré-listé les halIds d'une collection et qu'on
@@ -341,8 +339,7 @@ def extract_collection(
         )
     else:
         logger.info(
-            f"    → mode full-fetch ({full_fetch_pages} pages vs "
-            f"{len(orphans)} individual)"
+            f"    → mode full-fetch ({full_fetch_pages} pages vs {len(orphans)} individual)"
         )
         total_new = _extract_full(url, query, collection_code, conn, existing_ids, total_count)
 

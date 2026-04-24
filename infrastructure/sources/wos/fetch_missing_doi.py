@@ -81,14 +81,10 @@ class WosFetchMissingDoiAdapter:
     headers: dict[str, str]
 
     def configure(self, cur: Any) -> None:
-        self.base_url = get_api_base_urls(cur).get(
-            "wos", "https://api.clarivate.com/api/wos"
-        )
+        self.base_url = get_api_base_urls(cur).get("wos", "https://api.clarivate.com/api/wos")
         self.headers = {"X-ApiKey": get_wos_api_key(cur), "Accept": "application/json"}
 
-    async def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
-    ) -> Iterable[dict]:
+    async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
         clean = [d for d in (_clean_doi_for_wos(x) for x in dois) if d]
         if not clean:
             return []

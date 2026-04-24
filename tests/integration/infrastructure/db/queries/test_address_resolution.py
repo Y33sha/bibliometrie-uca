@@ -154,9 +154,7 @@ class TestDeleteObsoleteDetections:
         count = delete_obsolete_detections(db, addr, kept_structure_ids=[s1])
         # Seul le lien vers s2 supprimé
         assert count == 1
-        db.execute(
-            "SELECT structure_id FROM address_structures WHERE address_id = %s", (addr,)
-        )
+        db.execute("SELECT structure_id FROM address_structures WHERE address_id = %s", (addr,))
         remaining = [r["structure_id"] for r in db.fetchall()]
         assert s1 in remaining and s2 not in remaining
 

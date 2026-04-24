@@ -45,6 +45,7 @@ class AsyncAddressRepository(Protocol):
         address_ids: list[int],
         structure_id: int,
     ) -> set[int]: ...
+
     """Sous-ensemble de `address_ids` qui contribue actuellement au calcul
     `in_perimeter` pour `structure_id` — i.e. lien existant avec
     `is_confirmed IS DISTINCT FROM FALSE` (NULL ou TRUE).

@@ -45,9 +45,7 @@ class OpenalexFetchMissingDoiAdapter:
         init_auth(api_key=get_openalex_api_key(cur), email=get_openalex_email(cur))
         self.base_url = get_api_base_urls(cur)["openalex"]
 
-    async def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
-    ) -> Iterable[dict]:
+    async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
         doi = dois[0]
         params = {
             "filter": f"doi:{doi}",

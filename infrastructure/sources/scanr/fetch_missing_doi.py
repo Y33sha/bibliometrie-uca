@@ -42,9 +42,7 @@ class ScanrFetchMissingDoiAdapter:
         username, password = get_scanr_credentials(cur)
         self.auth = (username, password)
 
-    async def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
-    ) -> Iterable[dict]:
+    async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
         query = {"size": len(dois), "query": {"terms": {"externalIds.id.keyword": dois}}}
         try:
             data = await http_request_with_retry_async(

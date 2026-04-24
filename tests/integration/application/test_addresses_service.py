@@ -604,8 +604,13 @@ class TestPropagationSkipsNoOp:
         )
 
         await review_structure_link(
-            async_db, addr, uca, True,
-            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+            async_db,
+            addr,
+            uca,
+            True,
+            repo=repo,
+            authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         assert spy_propagate == []
@@ -621,8 +626,13 @@ class TestPropagationSkipsNoOp:
         await _insert_address_structure(async_db, addr, uca, is_confirmed=True)
 
         await review_structure_link(
-            async_db, addr, uca, True,
-            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+            async_db,
+            addr,
+            uca,
+            True,
+            repo=repo,
+            authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         assert spy_propagate == []
@@ -636,8 +646,13 @@ class TestPropagationSkipsNoOp:
         await _insert_address_structure(async_db, addr, uca, is_confirmed=False)
 
         await review_structure_link(
-            async_db, addr, uca, True,
-            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+            async_db,
+            addr,
+            uca,
+            True,
+            repo=repo,
+            authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         assert spy_propagate == [[addr]]
@@ -651,8 +666,13 @@ class TestPropagationSkipsNoOp:
         await _insert_address_structure(async_db, addr, uca, is_confirmed=True)
 
         await review_structure_link(
-            async_db, addr, uca, False,
-            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+            async_db,
+            addr,
+            uca,
+            False,
+            repo=repo,
+            authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         assert spy_propagate == [[addr]]
@@ -665,8 +685,13 @@ class TestPropagationSkipsNoOp:
         addr = await _create_address(async_db)
 
         await review_structure_link(
-            async_db, addr, uca, False,
-            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+            async_db,
+            addr,
+            uca,
+            False,
+            repo=repo,
+            authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         # Avant = pas de lien (ne contribue pas), après = lien FALSE (ne contribue pas)
@@ -681,8 +706,13 @@ class TestPropagationSkipsNoOp:
         addr = await _create_address(async_db)
 
         await review_structure_link(
-            async_db, addr, uca, True,
-            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+            async_db,
+            addr,
+            uca,
+            True,
+            repo=repo,
+            authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         assert spy_propagate == [[addr]]
@@ -710,8 +740,13 @@ class TestPropagationSkipsNoOp:
         await _insert_address_structure(async_db, a2, uca, is_confirmed=False)
 
         await batch_review_structure_link(
-            async_db, [a1, a2, a3], uca, True,
-            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+            async_db,
+            [a1, a2, a3],
+            uca,
+            True,
+            repo=repo,
+            authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         assert len(spy_propagate) == 1
@@ -726,8 +761,12 @@ class TestPropagationSkipsNoOp:
         addr = await _create_address(async_db)
 
         deleted = await unassign_manual_structure(
-            async_db, addr, uca,
-            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+            async_db,
+            addr,
+            uca,
+            repo=repo,
+            authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         assert deleted is False
@@ -743,8 +782,12 @@ class TestPropagationSkipsNoOp:
         await _insert_address_structure(async_db, addr, uca, is_confirmed=False)
 
         deleted = await unassign_manual_structure(
-            async_db, addr, uca,
-            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+            async_db,
+            addr,
+            uca,
+            repo=repo,
+            authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         assert deleted is True
@@ -759,8 +802,12 @@ class TestPropagationSkipsNoOp:
         await _insert_address_structure(async_db, addr, uca, is_confirmed=True)
 
         deleted = await unassign_manual_structure(
-            async_db, addr, uca,
-            repo=repo, authorship_repo=authorship_repo, perimeter_queries=perimeter_queries,
+            async_db,
+            addr,
+            uca,
+            repo=repo,
+            authorship_repo=authorship_repo,
+            perimeter_queries=perimeter_queries,
         )
 
         assert deleted is True

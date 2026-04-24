@@ -112,9 +112,7 @@ class TestUpdateStructure:
 
     async def test_none_fields_are_ignored(self, async_db, repo):
         """Les champs à None dans le dict ne sont pas appliqués."""
-        row = await create_structure(
-            async_db, code="X", name="Original", type="labo", repo=repo
-        )
+        row = await create_structure(async_db, code="X", name="Original", type="labo", repo=repo)
         updated = await update_structure(
             async_db,
             row["id"],
@@ -159,9 +157,7 @@ class TestCreateRelation:
 
     async def test_returns_none_on_conflict(self, async_db, repo):
         """Si la relation existe déjà, retourne None (ON CONFLICT DO NOTHING)."""
-        parent = await create_structure(
-            async_db, code="P", name="P", type="universite", repo=repo
-        )
+        parent = await create_structure(async_db, code="P", name="P", type="universite", repo=repo)
         child = await create_structure(async_db, code="C", name="C", type="labo", repo=repo)
         await create_relation(
             async_db,
@@ -186,9 +182,7 @@ class TestDeleteRelation:
             await delete_relation(async_db, 999999, repo=repo)
 
     async def test_deletes_existing(self, async_db, repo):
-        parent = await create_structure(
-            async_db, code="P", name="P", type="universite", repo=repo
-        )
+        parent = await create_structure(async_db, code="P", name="P", type="universite", repo=repo)
         child = await create_structure(async_db, code="C", name="C", type="labo", repo=repo)
         rel = await create_relation(
             async_db,
@@ -237,17 +231,13 @@ class TestUpdateNameForm:
 
     async def test_raises_on_empty_fields(self, async_db, repo):
         s = await create_structure(async_db, code="X", name="X", type="labo", repo=repo)
-        form = await create_name_form(
-            async_db, structure_id=s["id"], form_text="x", repo=repo
-        )
+        form = await create_name_form(async_db, structure_id=s["id"], form_text="x", repo=repo)
         with pytest.raises(ValidationError):
             await update_name_form(async_db, form["id"], fields={}, repo=repo)
 
     async def test_updates_form_text_with_normalization(self, async_db, repo):
         s = await create_structure(async_db, code="X", name="X", type="labo", repo=repo)
-        form = await create_name_form(
-            async_db, structure_id=s["id"], form_text="old", repo=repo
-        )
+        form = await create_name_form(async_db, structure_id=s["id"], form_text="old", repo=repo)
         updated = await update_name_form(
             async_db, form["id"], fields={"form_text": "École NEW"}, repo=repo
         )
@@ -255,9 +245,7 @@ class TestUpdateNameForm:
 
     async def test_updates_flags(self, async_db, repo):
         s = await create_structure(async_db, code="X", name="X", type="labo", repo=repo)
-        form = await create_name_form(
-            async_db, structure_id=s["id"], form_text="x", repo=repo
-        )
+        form = await create_name_form(async_db, structure_id=s["id"], form_text="x", repo=repo)
         updated = await update_name_form(
             async_db,
             form["id"],
@@ -275,9 +263,7 @@ class TestDeleteNameForm:
 
     async def test_deletes_existing(self, async_db, repo):
         s = await create_structure(async_db, code="X", name="X", type="labo", repo=repo)
-        form = await create_name_form(
-            async_db, structure_id=s["id"], form_text="x", repo=repo
-        )
+        form = await create_name_form(async_db, structure_id=s["id"], form_text="x", repo=repo)
         await delete_name_form(async_db, form["id"], repo=repo)
         await async_db.execute("SELECT id FROM structure_name_forms WHERE id = %s", (form["id"],))
         assert await async_db.fetchone() is None
