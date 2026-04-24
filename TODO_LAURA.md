@@ -92,13 +92,10 @@
 * [ ] étoffer tests frontend
 * [ ] ajouter export csv tableaux thèses
 ## Détails d'affichage
-* [ ] titres 30% minimum de la largeur du tableau; diminuer taille titre revue
-* [ ] dropdown titres revues: tronquer, sinon parfois plus large que la page
 * [ ] décomptes sur les onglets: ne pas tenir compte des facettes en place
-* [ ] décomptes facettes: toujours aligné à droite
 * [ ] ordre des sources pour les thèses: harmoniser page laboratoire avec page thèses
 * [ ] admin/personnes, formes de nom: modal authorships: source affichée: default wos (ajouter les autres sources, et mettre default None)
-* [ ] drpodown choix colonnes: toujours coupé par le bas du tableau Publications!
+* [ ] dropdown choix colonnes: toujours coupé par le bas du tableau Publications!
 * [ ] filtres RH sur page labo
 ## Cas particuliers, bizarreries à élucider, à examiner plus tard
 * openalex répète des auteurs : publi 77832
