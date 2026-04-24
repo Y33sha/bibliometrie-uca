@@ -5,12 +5,12 @@
 ### Chantiers plus importants
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
-## Robustesse du pipeline sur le long terme
-* [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation
-* [ ] authorships excluded: info perdue si réimport (grave?)
+* [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation => oui, mais pas authorships canoniques. Pruning dans build_authorships?
 * [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?). + publis du cross-import: re-fetch régulier pour tenir les données à jour
+* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
+* [ ] authorships excluded: info perdue si réimport => grave?
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
 * [ ] in perimeter: true, false, null? limiter les cross-imports à null et true?
@@ -19,7 +19,6 @@
 * [ ] embargos (HAL, theses.fr): afficher dates (existent-elles dans le retour api)?
 * [ ] https://hal.science/hal-03874894 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
 * [ ] DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
-* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis (authorship ok, author pas ok => vérifier que ce ne sera pas ré-écrasé)
 ## Code
 * [ ] vérifier si certains ports ne seraient pas mieux placés dans application/ (critère: sont-ils importés par domain/ ou pas?)
@@ -40,7 +39,7 @@
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
 * [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou revue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); preprints en accès gold selon OpenAlex (?); data papers?
 * [ ] types wos composites: étudier, voir s'il s'agit de types/sous-types
-* "prépublication, document de travail" dans HAL apparaît comme other
+* [ ] "prépublication, document de travail" dans HAL apparaît comme other
 ## Journals/Publishers
 * [ ] publishers: distinguer types d'entités (établissements d'enseignement, sociétés savantes, éditeurs commerciaux)
 * [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
@@ -73,9 +72,8 @@
 * [ ] Tri facettes
 ## Publique
 ### Personnes (public)
-* [ ] ajouter dashboard personne
+* [ ] ajouter dashboard personne (signaler publis HAL non correctement reliées au compte HAL (dans la page problèmes-hal?))
 * [ ] publications: indiquer si premier/dernier auteur
-* [ ] signaler publis HAL non correctement reliées au compte HAL (dans la page problèmes-hal?)
 ### Publications
 * [ ] filtre langue? (y a-t-il un code langue unique trans-sources? sinon, faire une table langues)
 * [ ] ajouter DOI dans les facettes sources
@@ -90,7 +88,7 @@
 * [ ] responsivité minimale de l'interface
 * [ ] tableaux personnes: remplacer les identifiants par des icônes (hal orcid idref)
 * [ ] étoffer tests frontend
-* [ ] ajouter export csv tableaux thèses
+* [ ] *ajouter export csv tableaux thèses
 ## Détails d'affichage
 * [ ] décomptes sur les onglets: ne pas tenir compte des facettes en place
 * [ ] ordre des sources pour les thèses: harmoniser page laboratoire avec page thèses
