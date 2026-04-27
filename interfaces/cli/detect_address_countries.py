@@ -19,6 +19,8 @@ Usage:
 import argparse
 from typing import Any
 
+from psycopg.rows import tuple_row
+
 from domain.normalize import normalize_text
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
@@ -67,7 +69,7 @@ def main() -> None:
     args = parser.parse_args()
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(row_factory=tuple_row)
 
     if args.stats:
         show_stats(cur)

@@ -295,10 +295,15 @@ def get_hal_publication_id(cur: Any, hal_id: str) -> int | None:
 def fetch_hal_source_structures_for_cache(cur: Any) -> list[tuple[str, int, str]]:
     """Charge `(source_id, id, name)` des `source_structures` HAL pour préchargement cache."""
     cur.execute("""
-        SELECT source_id, id, COALESCE(name, '')
+        SELECT source_id, id, COALESCE(name, '') AS name
         FROM source_structures WHERE source = 'hal'
     """)
-    return [(r[0], r[1], r[2]) for r in cur.fetchall()]
+    return [
+        (r[0], r[1], r[2])
+        if isinstance(r, tuple)
+        else (r["source_id"], r["id"], r["name"])
+        for r in cur.fetchall()
+    ]
 
 
 def delete_hal_duplicate_authorship_addresses(cur: Any) -> None:

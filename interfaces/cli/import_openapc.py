@@ -11,6 +11,8 @@ import argparse
 import csv
 import os
 
+from psycopg.rows import tuple_row
+
 from domain.publication import clean_doi
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
@@ -25,7 +27,7 @@ def main() -> None:
     args = parser.parse_args()
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(row_factory=tuple_row)
 
     # Charger tous nos DOI
     cur.execute("SELECT lower(doi), id FROM publications WHERE doi IS NOT NULL")

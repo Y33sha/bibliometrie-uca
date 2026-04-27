@@ -152,7 +152,7 @@ def tag_existing_with_collection(conn: Any, hal_ids: list[str], collection_code:
             SET hal_collections = CASE
                     WHEN hal_collections IS NULL THEN ARRAY[%s]::TEXT[]
                     WHEN %s = ANY(hal_collections) THEN hal_collections
-                    ELSE hal_collections || %s
+                    ELSE hal_collections || %s::TEXT
                 END,
                 last_seen_at = now()
             WHERE source = 'hal' AND source_id = ANY(%s)
