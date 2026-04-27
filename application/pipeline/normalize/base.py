@@ -19,7 +19,7 @@ import argparse
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar
 
-from psycopg.rows import dict_row
+from psycopg.rows import dict_row, tuple_row
 
 from application.ports.staging import StagingQueries
 
@@ -102,7 +102,7 @@ class SourceNormalizer(ABC):
     def _make_cursor(self) -> Any:
         if self.USE_DICT_CURSOR:
             return self.conn.cursor(row_factory=dict_row)
-        return self.conn.cursor()
+        return self.conn.cursor(row_factory=tuple_row)
 
     def _reset(self, cur: Any) -> int:
         return self._staging.reset_processed_flag(cur, self.SOURCE)
@@ -146,6 +146,7 @@ class SourceNormalizer(ABC):
     def run(self, argv: list[str] | None = None) -> None:
         """Entry point : parse args, drive the normalization loop."""
         args = self.parse_args(argv)
+        self.conn.rollback()
         self.conn.autocommit = False
 
         try:

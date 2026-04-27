@@ -212,3 +212,70 @@ class TestTagExistingWithCollection:
             ["hal-1", "hal-2", "hal-3"],
         )
         conn.commit.assert_called_once()
+
+
+class _NoCommitConn:
+    """Wrap une connexion réelle en neutralisant commit() pour que le
+    rollback de la fixture `db` reste effectif."""
+
+    def __init__(self, real_conn):
+        self._conn = real_conn
+
+    def cursor(self):
+        return self._conn.cursor()
+
+    def commit(self):
+        pass
+
+
+class TestTagExistingWithCollectionSql:
+    """Exécute le vrai SQL contre la base de test pour attraper les bugs
+    de typage côté Postgres (ex. cast manquant sur `array || element`)."""
+
+    def test_append_collection_to_existing_array(self, db):
+        db.execute(
+            """
+            INSERT INTO staging (source, source_id, raw_data, hal_collections)
+            VALUES ('hal', 'hal-existing', '{}'::jsonb, ARRAY['OLD']::TEXT[])
+            """
+        )
+        n = extract_hal.tag_existing_with_collection(
+            _NoCommitConn(db.connection), ["hal-existing"], "GEOLAB"
+        )
+        assert n == 1
+        db.execute(
+            "SELECT hal_collections FROM staging WHERE source_id = 'hal-existing'"
+        )
+        assert db.fetchone()["hal_collections"] == ["OLD", "GEOLAB"]
+
+    def test_init_collection_array_when_null(self, db):
+        db.execute(
+            """
+            INSERT INTO staging (source, source_id, raw_data, hal_collections)
+            VALUES ('hal', 'hal-null', '{}'::jsonb, NULL)
+            """
+        )
+        n = extract_hal.tag_existing_with_collection(
+            _NoCommitConn(db.connection), ["hal-null"], "GEOLAB"
+        )
+        assert n == 1
+        db.execute(
+            "SELECT hal_collections FROM staging WHERE source_id = 'hal-null'"
+        )
+        assert db.fetchone()["hal_collections"] == ["GEOLAB"]
+
+    def test_no_duplicate_when_collection_already_present(self, db):
+        db.execute(
+            """
+            INSERT INTO staging (source, source_id, raw_data, hal_collections)
+            VALUES ('hal', 'hal-dup', '{}'::jsonb, ARRAY['GEOLAB']::TEXT[])
+            """
+        )
+        n = extract_hal.tag_existing_with_collection(
+            _NoCommitConn(db.connection), ["hal-dup"], "GEOLAB"
+        )
+        assert n == 1
+        db.execute(
+            "SELECT hal_collections FROM staging WHERE source_id = 'hal-dup'"
+        )
+        assert db.fetchone()["hal_collections"] == ["GEOLAB"]

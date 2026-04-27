@@ -18,6 +18,8 @@ Usage:
 import argparse
 import time
 
+from psycopg.rows import tuple_row
+
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 
@@ -38,7 +40,7 @@ def main() -> None:
     args = parser.parse_args()
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(row_factory=tuple_row)
 
     column = "countries" if args.direct else "suggested_countries"
 
@@ -57,7 +59,7 @@ def main() -> None:
           AND suggested_countries IS NULL
           AND LENGTH(normalized_text) >= 5
     """)
-    total = cur.fetchone()["n"]
+    total = cur.fetchone()[0]
     logger.info(f"{total} adresses à traiter (batch_size={args.batch_size})")
 
     if total == 0:
