@@ -17,7 +17,7 @@ class TestSourcePriority:
     def test_wos_last(self):
         assert SOURCE_PRIORITY[-1] == "wos"
 
-    def test_contains_all_five_sources(self):
+    def test_contains_all_sources(self):
         assert set(SOURCE_PRIORITY) == set(ALL_SOURCES)
 
 
@@ -45,7 +45,8 @@ class TestSourceCaseSql:
     def test_full_source_priority(self):
         sql = source_case_sql(SOURCE_PRIORITY)
         assert "WHEN 'theses' THEN 1" in sql
-        assert "WHEN 'wos' THEN 5" in sql
+        assert "WHEN 'crossref' THEN 2" in sql
+        assert "WHEN 'wos' THEN 6" in sql
 
 
 class TestBiblioSources:
@@ -53,4 +54,4 @@ class TestBiblioSources:
         assert "theses" not in BIBLIO_SOURCES
 
     def test_contains_all_biblio(self):
-        assert set(BIBLIO_SOURCES) == {"hal", "openalex", "wos", "scanr"}
+        assert set(BIBLIO_SOURCES) == {"hal", "openalex", "wos", "scanr", "crossref"}

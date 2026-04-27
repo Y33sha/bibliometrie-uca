@@ -148,7 +148,7 @@ def phase_fetch_missing_doi(mode: Any = "full", sources: Any = None, **kw: Any) 
     ) & policy.fetch_missing_doi_sources
     scope_flag = ["--all"] if policy.fetch_missing_doi_scope == "all" else []
 
-    for target in ("hal", "openalex", "wos", "scanr"):
+    for target in ("hal", "openalex", "wos", "scanr", "crossref"):
         if target in effective:
             run_python(
                 "interfaces/cli/pipeline/fetch_missing_doi.py",

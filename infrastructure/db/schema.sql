@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict d9GfYNTWWddjVLcc98zoceiJUY5Ma7qw4eSpoJfWNZuONBHyP5gfE9vVOPxkeYy
+\restrict G5nf6qXZA7Qg34ccJ0DSXPUdmz03kB5PgbXiAFHvbVj55GYblT5v2KJj5zUzUk6
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -114,7 +114,8 @@ CREATE TYPE public.source_type AS ENUM (
     'openalex',
     'wos',
     'scanr',
-    'theses'
+    'theses',
+    'crossref'
 );
 
 
@@ -2693,5 +2694,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict d9GfYNTWWddjVLcc98zoceiJUY5Ma7qw4eSpoJfWNZuONBHyP5gfE9vVOPxkeYy
+\unrestrict G5nf6qXZA7Qg34ccJ0DSXPUdmz03kB5PgbXiAFHvbVj55GYblT5v2KJj5zUzUk6
 

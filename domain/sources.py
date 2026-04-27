@@ -8,14 +8,14 @@ l'enum source_type en base (via une migration).
 Le test test_normalize.py::TestSourcesEnum vérifie la cohérence.
 """
 
-# Toutes les sources, dans l'ordre conventionnel
-ALL_SOURCES = ("hal", "openalex", "wos", "scanr", "theses")
+# Toutes les sources, dans l'ordre conventionnel (chronologique d'intégration)
+ALL_SOURCES = ("hal", "openalex", "wos", "scanr", "theses", "crossref")
 
 # Sources comme set (pour les tests d'appartenance et les valeurs par défaut)
 ALL_SOURCES_SET = frozenset(ALL_SOURCES)
 
 # Sources bibliographiques (hors theses.fr, qui a un traitement spécifique)
-BIBLIO_SOURCES = ("hal", "openalex", "wos", "scanr")
+BIBLIO_SOURCES = ("hal", "openalex", "wos", "scanr", "crossref")
 BIBLIO_SOURCES_SET = frozenset(BIBLIO_SOURCES)
 
 
@@ -47,10 +47,12 @@ SOURCES_WITH_STRUCTURED_NAMES_SQL = _to_sql(SOURCES_WITH_STRUCTURED_NAMES)
 #   (theses en premier → son autorité métadonnées est appliquée
 #   avant tout enrichissement)
 #
-# theses.fr fait autorité sur les métadonnées de thèse ; pour les
-# documents hors-thèse la clé `theses` n'apparaît simplement pas
-# dans les rows et l'ordre se réduit aux sources restantes.
-SOURCE_PRIORITY: tuple[str, ...] = ("theses", "scanr", "hal", "openalex", "wos")
+# theses.fr fait autorité sur les métadonnées de thèse ; CrossRef est
+# l'autorité officielle de l'enregistrement DOI (métadonnées éditeur
+# canoniques) et passe en 2e après theses ; pour les documents hors-thèse
+# la clé `theses` n'apparaît simplement pas dans les rows et l'ordre se
+# réduit aux sources restantes.
+SOURCE_PRIORITY: tuple[str, ...] = ("theses", "crossref", "scanr", "hal", "openalex", "wos")
 
 # Ordre spécifique pour le marqueur `is_corresponding`. Inversé par
 # rapport à `SOURCE_PRIORITY` : WoS marque explicitement le

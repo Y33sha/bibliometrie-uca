@@ -157,6 +157,9 @@ _API_BASE_URLS_DEFAULTS: dict[str, str] = {
     "wos": "https://api.clarivate.com/api/wos",
     "scanr": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
     "theses": "https://theses.fr/api/v1/theses/recherche/",
+    # CrossRef : racine sans /works, l'adapter compose le chemin selon
+    # l'usage (/works/<doi>, /works?filter=orcid:...)
+    "crossref": "https://api.crossref.org",
     # Endpoints secondaires
     "openalex_sources": "https://api.openalex.org/sources",
     "unpaywall": "https://api.unpaywall.org/v2",
@@ -257,6 +260,15 @@ def get_openalex_email(cur: Any) -> str:
     if val and isinstance(val, str):
         return val
     return "bibliometrie@uca.fr"
+
+
+def get_crossref_email(cur: Any) -> str:
+    """Retourne l'email pour le polite pool CrossRef (envoyé via User-Agent)."""
+    val = _get_from_db(cur, "crossref_email")
+    if val and isinstance(val, str):
+        return val
+    # Fallback partagé avec OpenAlex si la clé dédiée n'est pas configurée.
+    return get_openalex_email(cur)
 
 
 def get_wos_api_key(cur: Any) -> str:

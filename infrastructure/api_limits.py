@@ -45,6 +45,10 @@ SCANR_PER_PAGE = 500  # taille des batchs scroll/search_after
 THESES_DELAY = 0.3
 THESES_PER_PAGE = 500  # max accepté par l'API
 
+# CrossRef — polite pool (avec mailto), pas de seuil documenté ; on
+# reste raisonnable à ~10 req/s
+CROSSREF_DELAY = 0.1
+
 # Unpaywall — ~8 req/s conservateur
 UNPAYWALL_DELAY = 0.12
 
