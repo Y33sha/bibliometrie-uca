@@ -336,6 +336,11 @@ _SOURCE_CONFIG = {
         "id_fields": ["orcid", "idref"],
         "source_ids_fields": {},
     },
+    "crossref": {
+        "author_fk": "source_person_id",
+        "id_fields": ["orcid"],
+        "source_ids_fields": {},
+    },
 }
 
 

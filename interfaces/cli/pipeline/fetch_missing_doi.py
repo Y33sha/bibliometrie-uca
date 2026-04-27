@@ -24,6 +24,7 @@ from application.pipeline.fetch_missing_doi import AsyncFetchMissingDoiAdapter, 
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
 from infrastructure.sources.common import get_cross_import_dois
+from infrastructure.sources.crossref.fetch_missing_doi import CrossrefFetchMissingDoiAdapter
 from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
 from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
 from infrastructure.sources.scanr.fetch_missing_doi import ScanrFetchMissingDoiAdapter
@@ -37,6 +38,7 @@ ADAPTERS: dict[str, type[AsyncFetchMissingDoiAdapter]] = {
     "openalex": OpenalexFetchMissingDoiAdapter,
     "wos": WosFetchMissingDoiAdapter,
     "scanr": ScanrFetchMissingDoiAdapter,
+    "crossref": CrossrefFetchMissingDoiAdapter,
 }
 
 

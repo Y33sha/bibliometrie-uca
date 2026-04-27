@@ -1,0 +1,165 @@
+# Chantier — Exploitation de l'API CrossRef
+
+## Contexte
+
+CrossRef est l'autorité officielle de l'enregistrement des DOI. Ses métadonnées sont déposées par les éditeurs au moment de l'enregistrement et sont, sur certains champs, plus fiables que celles de HAL/OpenAlex/WoS.
+
+Le chantier vise à exploiter CrossRef sur **trois axes complémentaires**, sans en faire une source de découverte primaire (la voie affiliation/ROR a été écartée — voir « Pistes écartées » ci-dessous).
+
+### Trois rôles attendus
+
+1. **Arbitrage de métadonnées** — résolution des conflits inter-sources sur le `doc_type`, complément sur le journal, les dates (issued / online / print), la license, les funders.
+2. **Confirmation d'identité auteur via ORCID article-level** — un ORCID déposé par l'éditeur dans les métadonnées CrossRef est une preuve forte du lien auteur ↔ personne (contrairement à OpenAlex où l'ORCID est attaché à une entité auteur algorithmique, parfois fausse).
+3. **Relations entre publications** — preprint-of, version-of, translation-of, has-dataset, etc. Alimente le chantier « relations entre publications » (TODO_LAURA.md ligne 82).
+
+### Pistes écartées
+
+- **CrossRef comme source de découverte par affiliation** : `query.affiliation` est trop bruité (pas d'opérateurs booléens, pas de match exact), et le filtre `ror-id` souffre d'une adoption insuffisante par les éditeurs (≈16 % des records CrossRef ont des affiliations en mars 2025, ROR encore plus bas). Doublonnerait OpenAlex sans rien apporter.
+- **CrossRef pour enrichir les signatures (labos, équipes, services)** : les métadonnées CrossRef sont aplaties par les éditeurs vers la tutelle générique (« University Clermont Auvergne »), sans labo. Les signatures restent du ressort de HAL/OpenAlex/WoS.
+
+## Périmètre fonctionnel
+
+### Inclus
+
+- Ingestion CrossRef DOI-driven dans les tables `source_*` existantes (`source_publications` / `source_authorships` / `source_persons`) avec `source='crossref'`, à partir des DOI déjà connus dans les autres sources.
+- Discovery secondaire driven-by-ORCID : interrogation par ORCID confirmé pour identifier d'éventuelles publis ratées par les autres sources. **Conditionnée à un travail exploratoire** (cf. phase 4) : abandonnée si le gain s'avère nul.
+- Insertion de `crossref` dans `SOURCE_PRIORITY` (2ᵉ position) → arbitrage automatique de toutes les métadonnées canoniques via `refresh_from_sources` existant.
+- Mapping de la taxonomie `doc_type` CrossRef vers l'enum canonique dans `domain/doc_types.py`.
+- Mécanisme de promotion d'ORCID `pending` → `confirmed` via les ORCIDs CrossRef.
+- Table `publication_relations` (à créer) alimentée par les `relation` CrossRef.
+
+### Exclus
+
+- Aucune modification des signatures existantes (auteurs, affiliations, structures).
+- Aucune découverte par affiliation/ROR.
+- Aucune couverture des DOI DataCite (10.5281 Zenodo, 10.6084 figshare, etc.) — gap connu, à traiter séparément si besoin.
+- Aucune couverture des publis sans DOI (HAL collection-only, etc.).
+
+## Architecture cible
+
+### Tables
+
+CrossRef s'intègre dans l'architecture source-agnostique existante en tant que nouvelle valeur `source = 'crossref'`. **Aucune table dédiée n'est créée pour les publications, authorships, persons ou structures.**
+
+- **`source_publications`** (existante) : insertion avec `source = 'crossref'`, `source_id = doi`. Les champs canoniques sont mappés directement (`doi`, `title`, `pub_year`, `doc_type`, `language`, `container_title`, `cited_by_count`, `oa_status`, `is_retracted`, `keywords`, `journal_id`, `external_ids`). Les spécificités CrossRef (license, funders, dates multiples issued/online/print, indexed-date pour l'idempotence) vont dans `meta jsonb`. La référence ISSN va dans `external_ids` ou `biblio` selon la convention en vigueur (à vérifier sur les autres extracteurs).
+- **`source_authorships`** (existante) : un row par auteur de la publi CrossRef, `source = 'crossref'`. Les chaînes d'affiliation brutes (déjà connues comme génériques/tronquées côté CrossRef) vont dans `source_data jsonb`. **À noter** : pas de `source_authorship_addresses` à alimenter pour CrossRef puisque les affiliations sont des chaînes plates sans adresse exploitable.
+- **`source_persons`** (existante) : un row par auteur unique CrossRef, `source = 'crossref'`, `source_id` synthétique (DOI:position ou hash) faute d'identifiant CrossRef stable côté auteur. `orcid` rempli quand présent dans les métadonnées CrossRef. Le champ `meta`/`source_data` peut tracer le flag `authenticated-orcid` (voir note ci-dessous), à titre informatif uniquement.
+- **`publication_relations`** (**à créer**) : `from_publication_id`, `to_publication_id` (ou DOI si la publi cible n'est pas connue), `relation_type` (preprint, version, translation, has-dataset…), `source` (crossref pour l'instant, extensible). C'est le seul vrai ajout de table — cross-source dès le départ pour ne pas refaire la migration plus tard.
+
+> Note sur `authenticated-orcid` : champ non fiable de l'avis même de CrossRef (la quasi-totalité des ORCIDs sont à `false` parce que les éditeurs n'utilisent pas le workflow OAuth, pas parce que la vérif a échoué). On peut le stocker dans `source_data` pour traçabilité mais on ne s'en sert pas comme filtre de confiance.
+
+### Code
+
+- **`infrastructure/sources/crossref/`** : client API (polite pool avec mailto, gestion 429, retry exponentiel), pagination cursor.
+- **`application/pipeline/normalize/normalize_crossref.py`** + ports + queries : normalizer CrossRef, sur le modèle des autres (cf. `normalize_scanr`, `normalize_theses`, etc.) — alimente `source_publications` / `source_authorships` / `source_persons` avec `source='crossref'`.
+- **`application/pipeline/crossref_promote_orcids.py`** : phase de promotion d'ORCID `pending` → `confirmed`.
+- **Modifications dans `domain/`** :
+  - `domain/sources.py` : ajouter `"crossref"` à `ALL_SOURCES` et à `SOURCE_PRIORITY` (2ᵉ position) ; ajout à l'enum `source_type` côté SQL via migration.
+  - `domain/doc_types.py` : ajouter une entrée `"crossref"` dans `_SOURCE_MAPS`.
+- **Pas de phase d'arbitrage dédiée** : l'arbitrage des métadonnées canoniques est déjà fait par `refresh_from_sources` (`application/publications.py`) via `SOURCE_PRIORITY`, qui prendra automatiquement en compte CrossRef après ingestion.
+
+### Place dans le pipeline
+
+CrossRef s'insère comme **une nouvelle source au même titre que ScanR et theses.fr** :
+- **Phase d'extraction CrossRef** dans le pipeline d'imports (sur le modèle de l'extracteur theses.fr).
+- **Phase `normalize_crossref`** alimente `source_publications` / `source_authorships` / `source_persons`.
+- **Phases existantes** (`build_authorships`, `refresh_from_sources` indirectement, etc.) consomment automatiquement la nouvelle source via `SOURCE_PRIORITY`.
+- **Phase additionnelle `crossref_promote_orcids`** spécifique à CrossRef (cf. phase 3).
+
+Intégration dans `run_pipeline.py` avec ses propres `--only` / `--from` et inclusion dans le filtrage `--sources`.
+
+## Phases d'implémentation
+
+Découpage proposé (chaque phase = chantier autonome mergeable indépendamment) :
+
+### Phase 0 — Spike & validation
+- Tester l'API sur ~50 DOI représentatifs UCA (HAL, OA, WoS)
+- Mesurer la couverture réelle ORCID par tranche d'année
+- Mesurer la couverture des relations (preprint, etc.)
+- Valider le format JSON et identifier les champs réellement exploitables
+- **Livrable** : note de spike (peut rester dans `docs/chantiers/crossref-spike.md`)
+
+### Phase 1 — Extracteur + normalizer DOI-driven
+- Migration SQL : ajout de `'crossref'` à l'enum `source_type`
+- Ajout de `"crossref"` à `ALL_SOURCES` (et donc à `AUTHOR_SOURCES`, `SOURCES_WITH_STRUCTURED_NAMES` selon les besoins) dans `domain/sources.py`
+- Client API `infrastructure/sources/crossref/` (polite pool, retry, cursor)
+- Normalizer CrossRef sur le modèle des autres : ports + queries SQL + adapter, alimentation de `source_publications` / `source_authorships` / `source_persons` (colonnes canoniques + `meta`/`source_data` pour le reste)
+- Tests d'intégration sur un petit lot
+- **Livrable** : `source_publications` / `source_authorships` / `source_persons` alimentées avec `source='crossref'` pour les DOI déjà présents dans `publications`, idempotent
+
+### Phase 2 — Mapping `doc_type` & insertion dans `SOURCE_PRIORITY`
+- Ajouter une entrée `"crossref"` dans `_SOURCE_MAPS` de `domain/doc_types.py` (mapping de la taxonomie CrossRef → enum canonique : `journal-article` → `article`, `posted-content` → `preprint`, `book-chapter` → `book_chapter`, `proceedings-article` → `conference_paper`, etc.)
+- Insérer `"crossref"` en 2ᵉ position dans la constante `SOURCE_PRIORITY`
+- Tests de non-régression sur les `doc_type` actuels (pour vérifier qu'aucune publi non-CrossRef ne voit son `doc_type` changer)
+- **Aucune nouvelle phase pipeline n'est nécessaire** : `refresh_from_sources` (`application/publications.py`) prend automatiquement en compte les nouvelles `source_publications` CrossRef et applique l'ordre de priorité.
+- **Livrable** : `doc_type` canoniques mis à jour automatiquement, CrossRef prioritaire sur HAL/OA/WoS pour toutes les métadonnées canoniques.
+
+### Phase 3 — Promotion d'ORCID `pending` → `confirmed`
+- Pour chaque `source_authorship` CrossRef portant un ORCID, matcher avec `person_identifiers` (id_type=orcid).
+- Si l'ORCID y figure en statut `pending` ET que la `source_authorship` CrossRef est rattachée à la même `person_id` que celle associée à l'ORCID dans `person_identifiers`, alors on dispose d'une **preuve article-level** côté éditeur que cet ORCID appartient bien à cette personne → promotion en `confirmed`.
+- Phase pipeline `crossref_promote_orcids`.
+- **Livrable** : ORCIDs `pending` accumulés via OA promus en `confirmed` quand CrossRef les corrobore.
+
+### Phase 4 — Discovery via ORCID confirmé (conditionnelle)
+**Gate exploratoire avant toute implémentation.**
+- Pour un échantillon d'ORCIDs confirmés, interroger `filter=orcid:<ORCID>` sur CrossRef et confronter aux DOI déjà connus toutes sources confondues.
+- Mesurer combien de DOI **nouveaux** seraient remontés.
+- **Décision conditionnelle** :
+  - Si gain nul ou marginal → abandon de la phase 4.
+  - Si gain significatif → ré-ouvrir la décision sur la politique d'ingestion (auto vs. validation manuelle), puis implémenter.
+- **Livrable de la phase exploratoire** : note chiffrée (peut rejoindre `docs/chantiers/crossref-spike.md`) — go/no-go pour l'implémentation.
+
+### Phase 5 — Relations entre publications
+- Migration : création de `publication_relations` (cross-source dès le départ)
+- Extraction du champ `relation` de CrossRef vers cette table
+- Affichage UI à concevoir séparément (chantier TODO_LAURA.md ligne 82)
+- **Livrable** : table peuplée, exploitable par le frontend dans un chantier ultérieur
+
+## Considérations techniques
+
+- **Polite pool** : mettre `User-Agent` avec mailto, ce qui donne accès au pool prioritaire et évite les rate-limits agressifs.
+- **Pagination** : `offset` capé à 10 000, au-delà utiliser `cursor=*`. Concerne uniquement les requêtes par ORCID (phase 4) — les fetchs par DOI sont unitaires.
+- **Idempotence** : clé `doi`, upsert avec mise à jour si `indexed` (date d'indexation CrossRef) plus récente que `last_fetched_at`.
+- **Volume initial** : à mesurer en phase 0 — combien de DOI uniques dans `publications` aujourd'hui ? À 50ms/req polite pool, 100k DOI ≈ 1h30 séquentiel, parallélisable.
+- **Mises à jour incrémentales** : refetch périodique des DOI dont `indexed` a évolué (filtre `from-index-date`).
+- **Logging** : `setup_logger` standard, traçer les conflits `doc_type` et les ORCIDs promus en `confirmed` pour audit.
+
+## Décisions actées
+
+1. **Position de CrossRef dans l'ordre d'autorité des sources** : insertion en 2ᵉ position dans la constante existante `SOURCE_PRIORITY` (`domain/sources.py`).
+   - Ordre cible : `("theses", "crossref", "scanr", "hal", "openalex", "wos")`.
+   - Aucun nouveau mécanisme à concevoir : `SOURCE_PRIORITY` est déjà la source unique de vérité utilisée par `refresh_from_sources` (`application/publications.py`) pour arbitrer **tous les champs canoniques** (doi, doc_type, pub_year, journal_id, oa_status, container_title, language, abstract, keywords, countries, topics, biblio, meta, is_retracted), ainsi que par `propagate_author_position` dans `build_authorships`.
+   - CrossRef sera donc prioritaire sur HAL/OA/WoS pour l'ensemble de ces champs, et cédera la priorité à theses.fr (qui fait autorité sur les métadonnées de thèse).
+   - Une seule ligne à modifier : la définition de `SOURCE_PRIORITY` dans `domain/sources.py`. L'effet se propage automatiquement partout où la constante est consommée.
+
+2. **Stockage des champs CrossRef-spécifiques** : tout dans `meta jsonb` / `source_data jsonb` des tables `source_*` existantes pour démarrer.
+   - Pas de colonnes dédiées créées maintenant pour `license` et `funders`.
+   - Promotion possible plus tard si un usage le justifie. Pour l'instant : la `license` n'a pas vocation à être exposée dans l'UI (le statut OA ouvert/fermé suffit), et les `funders` ne sont pas une donnée demandée par les utilisateurs (à reconsidérer si besoin).
+
+3. **Fréquence de refetch** : intégration aux deux modes `--mode weekly` et `--mode monthly` (alias full) de `run_pipeline`, avec stratégies distinctes.
+   - **Mode weekly** : interrogation uniquement des DOI **absents du staging CrossRef** (incrémental, pas de refetch des DOI déjà ingérés). Les métadonnées CrossRef qui nous intéressent bougent peu.
+   - **Mode full** : ré-interrogation possible de l'ensemble du corpus et comparaison de hash pour détecter les changements. À mettre en place de manière conservative, et **à évaluer à l'usage** — peut-être pas pertinent en pratique si les variations s'avèrent négligeables.
+
+4. **Discovery via ORCID (Phase 4)** : on s'en tient au **matching DOI uniquement** dans un premier temps. Le matching par ORCID est conditionné à un travail exploratoire préalable.
+   - Avant toute décision d'ingestion, mesurer combien de DOI nouveaux (absents de toutes les sources actuelles) seraient remontés en interrogeant CrossRef avec les ORCIDs confirmés UCA.
+   - Si le gain est nul ou marginal → la phase 4 est abandonnée.
+   - Si le gain est significatif → ré-ouvrir la décision sur la politique d'ingestion (auto vs. validation manuelle).
+
+## Décisions à prendre (avant Phase 2 et au-delà)
+
+Aucune pour l'instant — toutes les décisions structurantes ont été tranchées. De nouvelles questions pourront émerger en phase 0 (mapping `doc_type` notamment).
+
+## Risques & open questions
+
+- **Couverture ORCID inégale** : très bonne post-2018 chez les gros éditeurs commerciaux, médiocre avant. Si la phase 4 (discovery) est conservée à l'issue du gate exploratoire, le recall sera partiel — au mieux un filet de sécurité, jamais une source primaire.
+- **Mapping `doc_type` CrossRef ↔ canonique** : plusieurs cas non triviaux (`posted-content` peut être preprint ou commentary, `book-chapter` vs `monograph` vs `reference-entry`…). À concevoir avec exemples réels en phase 0.
+- **DataCite gap** : tous les DOI Zenodo, figshare, certains datasets ne sont **pas** dans CrossRef. Hors périmètre, mais à documenter clairement pour ne pas semer la confusion sur la couverture.
+- **Promotion d'ORCID erronée** (phase 3) : risque qu'un ORCID CrossRef incorrect (cas rare mais pas nul, surtout sur les vieilles publis où l'éditeur a pu rentrer un ORCID sans vérif) déclenche une promotion `pending → confirmed` injustifiée. Politique conservatrice : exiger que l'ORCID soit déjà connu côté UCA en `pending` ET attaché à la même personne que la `source_authorship` CrossRef.
+- **Volume requêtes** : à mesurer en phase 0 pour calibrer parallélisme et fréquence.
+
+## Liens
+
+- API doc : <https://api.crossref.org/swagger-ui/index.html>
+- Tips REST API : <https://www.crossref.org/documentation/retrieve-metadata/rest-api/tips-for-using-the-crossref-rest-api/>
+- ROR adoption : <https://ror.org/blog/2024-07-25-re-introducing-participation-reports/>
+- TODO_LAURA.md ligne 82 (relations entre publications)

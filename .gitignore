@@ -25,6 +25,9 @@ interfaces/frontend/openapi.json
 # Backups DB
 db/backup/
 
+# Cache local du spike CrossRef (réponses brutes API)
+docs/chantiers/crossref-spike-data/
+
 # IDE
 .vscode/
 .idea/
