@@ -44,16 +44,18 @@ logger = setup_logger("purge_legacy_source_persons", os.path.dirname(__file__))
 
 
 # Catégories de purge : (label, WHERE clause)
+# Note : les patterns LIKE doivent doubler les `%` en `%%` parce que
+# psycopg interprète `%` comme préfixe de placeholder.
 _CATEGORIES: list[tuple[str, str]] = [
     ("OpenAlex (toutes)", "source = 'openalex'"),
     ("WoS (toutes)", "source = 'wos'"),
     ("CrossRef (toutes)", "source = 'crossref'"),
     (
         "HAL synthétiques (0_<form_id> + nokey-*)",
-        "source = 'hal' AND (source_id LIKE '0\\_%' ESCAPE '\\' OR source_id LIKE 'nokey-%')",
+        "source = 'hal' AND (source_id LIKE '0\\_%%' ESCAPE '\\' OR source_id LIKE 'nokey-%%')",
     ),
-    ("ScanR synthétiques (scanr-*)", "source = 'scanr' AND source_id LIKE 'scanr-%'"),
-    ("theses synthétiques (nokey-*)", "source = 'theses' AND source_id LIKE 'nokey-%'"),
+    ("ScanR synthétiques (scanr-*)", "source = 'scanr' AND source_id LIKE 'scanr-%%'"),
+    ("theses synthétiques (nokey-*)", "source = 'theses' AND source_id LIKE 'nokey-%%'"),
 ]
 
 
