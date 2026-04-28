@@ -101,6 +101,8 @@ flowchart LR
     C[API OpenAlex]-->B-->|normalize_openalex|G
     E[API WOS]-->B-->|normalize_wos|G
     K[API ScanR]-->B-->|normalize_scanr|G
+    L[API theses.fr]-->B-->|normalize_theses|G
+    M[API CrossRef]-->B-->|normalize_crossref|G
     classDef new  fill:#bbf
     class G new;
 ```
@@ -182,29 +184,33 @@ Les cas douteux (métadonnées identiques ou similaires) sont préservés et son
 
 **`create_persons_from_source_authorships.py`** — algorithme en 4 étapes :
 
-1. **Comptes HAL** : les authorships HAL liées à un `hal_author` *déjà* identifié (= déjà lié à une `person`) sont rattachées à la même personne. Cette phase ne crée pas de nouvelle personne.
+1. **Comptes HAL** : les authorships HAL liées à un compte HAL identifié (`source_persons` HAL avec `hal_person_id`, *déjà* lié à une `person`) sont rattachées à la même personne. Cette phase ne crée pas de nouvelle personne.
 2. **Même nom + même publication + même position auteur** : pour chaque authorship sans `person_id`, cherche sur la même publication (même position) une *authorship* d'une **autre source** déjà rattachée à une personne. Si le nom est compatible → rattacher. Approche conservatrice (requiert position identique dans la liste des auteurs. TODO: voir si cette condition peut être assouplie sans perte de qualité).
-3. **Identifiant ORCID/Idref connu** : si l'authorship est liée à un ORCID ou un IdRef déjà présent en base (table `person_identifiers`, avec `status ≠ rejected`) → rattacher. Priorité aux IdRef.
+3. **Identifiant ORCID/Idref connu** : si l'authorship est liée à un ORCID ou un IdRef déjà présent en base (table `person_identifiers`, avec `status ≠ rejected`) → rattacher. Priorité aux IdRef. Les ORCID/IdRef sont lus depuis `source_persons.orcid`/`source_persons.idref` quand un `source_persons` existe (HAL+`hal_person_id`, ScanR+idref, theses+PPN), sinon depuis `source_authorships.identifiers`.
 4. **Recherche par nom** : lookup par nom normalisé dans `person_name_forms`.
    - Nom mappé à 1 personne → rattacher
    - Nom mappé à >1 personnes → laisser orphelin (pour traitement manuel via `admin/orphan-authorships`)
    - **Nom inconnu → créer nouvelle personne**
 
-**`populate_person_name_forms.py`** — recalcule les formes de nom depuis les sources (persons, HAL, OpenAlex, WoS, ScanR).
+**`populate_person_name_forms.py`** — recalcule les formes de nom depuis les sources (persons, HAL, OpenAlex, WoS, ScanR, theses, CrossRef).
 - Lors de la création d'une personne (ou d'une correction manuelle du nom/prénom): génération automatique des variantes normalisées "prénom nom", "nom prénom", "initiales nom", "nom initiales".
 - Lors d'un rattachement d'authorship: les formes de nom liées sont ajoutées aux name_forms de cette personne.
 
 Fonctions de compatibilité de noms dans `utils/names.py`.
+
+**Notes sur `source_persons`** (cf. [chantier source_persons](chantiers/source-persons.md)) :
+- La table héberge uniquement les entités auteurs avec un identifiant stable côté source (HAL+`hal_person_id`, ScanR+idref, theses+PPN).
+- Pour les sources sans identifiant stable (OA, WoS, CrossRef, et les comptes HAL non identifiés / ScanR sans idref / theses sans PPN), `source_authorships.source_person_id` reste NULL et les identifiants normalisés vivent sur `source_authorships.identifiers` (JSONB).
 
 
 ### <span id="authorships"></span>Phase 8 — `authorships` : Construction des authorships canoniques
 
 **`build_authorships.py`** construit la table `authorships` en 4 étapes :
 
-1. **Insertion** des paires (publication_id, person_id) manquantes, depuis les authorships sources non exclues
-2. **FK** : rattache chaque authorship canonique à ses authorships sources (`hal_authorship_id`, `openalex_authorship_id`, `wos_authorship_id`)
-3. **Métadonnées** : propage `author_position` et `is_corresponding`
-4. **UCA** : propage `in_perimeter` et `structure_ids` depuis les 3 sources (union). Même logique pour les 3 sources (déjà calculées par `populate_affiliations.py`).
+1. **Insertion** des paires (publication_id, person_id) manquantes, depuis les `source_authorships` non exclues (toutes sources : HAL, OpenAlex, WoS, ScanR, theses, CrossRef)
+2. **FK** : rattache chaque `source_authorships` à son authorship canonique via `source_authorships.authorship_id`
+3. **Métadonnées** : propage `author_position` et `is_corresponding` selon `SOURCE_PRIORITY` (theses > CrossRef > ScanR > HAL > OpenAlex > WoS)
+4. **UCA** : propage `in_perimeter` et `structure_ids` depuis toutes les sources (union, déjà calculées par `populate_affiliations.py`)
 
 Les authorships sources marquées `excluded = TRUE` sont ignorées à toutes les étapes. Les publications de type `peer_review` sont exclues de la propagation UCA.
 

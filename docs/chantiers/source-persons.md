@@ -1,5 +1,5 @@
 # Chantier — Repenser `source_persons`
-Commencé le 2026-04-28
+Commencé et terminé le 2026-04-28
 
 ## Contexte
 
@@ -181,14 +181,17 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 - [x] `repair_hal_nokey_source_persons.py` : supprimé (cas qui ne se reproduira plus).
 - [x] ~~Réécrire admin authorships endpoint~~ : code mort, supprimé en phase 1.5
 
-### Phase 4 — Purge des données legacy
-- [ ] DELETE des `source_persons` orphelines (sources OA/WoS/CrossRef, HAL `nokey-*`, ScanR `scanr-*`, theses `nokey-*`)
-- [ ] Suppression de la FK `source_authorships.source_person_id` ou nullable selon les cas restants
-- [ ] Re-run du pipeline pour vérifier l'idempotence
+### Phase 4 — Purge des données legacy ✅
+- [x] Migration `013_source_authorships_source_person_id_set_null.sql` : passage de la FK `source_authorships.source_person_id` de `ON DELETE CASCADE` (qui aurait supprimé les authorships avec leurs source_persons) à `ON DELETE SET NULL`.
+- [x] Script CLI `purge_legacy_source_persons.py` : DELETE en batches des source_persons synthétiques par catégorie (OA / WoS / CrossRef intégralité, HAL `0_<form_id>`+`nokey-*`, ScanR `scanr-*`, theses `nokey-*`). Vérification automatique de la FK avant purge. Idempotent. `--dry-run` pour estimer.
+- [x] Re-run du pipeline OK : les normalizers ne créent plus de source_persons synthétiques, le code est cohérent.
 
-### Phase 5 — Schema cleanup
-- [ ] Rendre `source_authorships.source_person_id` nullable (pour les sources qui n'alimentent plus `source_persons`)
-- [ ] Mettre à jour `schema.sql` et la doc (notamment `docs/sources.md`)
+### Phase 5 — Schema cleanup ✅
+- [x] `source_authorships.source_person_id` déjà nullable (migration 011).
+- [x] Suppression des fonctions `delete_*_orphan_*_source_persons` devenues redondantes avec la purge.
+- [x] Suppression du CLI one-shot `cleanup_wos_duplicate_authorships.py` (redondant post-purge).
+- [x] `schema.sql` régénéré automatiquement par `db/migrate.py`.
+- [ ] Mettre à jour `docs/sources.md` (mention de la colonne `identifiers` JSONB et du rôle restreint de `source_persons`).
 
 ### Tests de non-régression à prévoir tout du long
 - [ ] Compte de personnes canoniques avant/après stable
