@@ -8,11 +8,10 @@ adresses résolues (`address_structures`) et les périmètres configurés.
 from typing import Any
 
 # Filtre temporel daily : source_documents créés dans les dernières 24h.
-_DAILY_JOIN = """
-    JOIN source_publications sd ON sd.id = sa.source_publication_id
-     AND sd.created_at >= NOW() - INTERVAL '24 hours'
-"""
-
+# Variante CTE (alias `sa2`) : utilisée dans les SELECT internes des CTE,
+# où le JOIN est syntaxiquement valide. Le pendant pour UPDATE direct
+# vit en EXISTS dans `set_in_perimeter_from_addresses` (PostgreSQL
+# n'autorise pas un JOIN directement après SET).
 _DAILY_JOIN_SA2 = """
     JOIN source_publications sd ON sd.id = sa2.source_publication_id
      AND sd.created_at >= NOW() - INTERVAL '24 hours'
@@ -35,41 +34,36 @@ def set_in_perimeter_from_addresses(
     cur: Any, *, source: str, perimeter_ids: list[int], daily: bool
 ) -> int:
     """Pose `in_perimeter = TRUE` pour les authorships matchant le périmètre restreint."""
-    if daily:
-        cur.execute(
-            f"""
-            UPDATE source_authorships sa
-            SET in_perimeter = TRUE
-            {_DAILY_JOIN}
-            WHERE sa.source = %s
+    # Filtre daily exprimé en EXISTS (et non en JOIN) : un JOIN direct dans
+    # un UPDATE après SET n'est pas légal en PostgreSQL.
+    daily_clause = (
+        """
               AND EXISTS (
-                SELECT 1
-                FROM source_authorship_addresses saa
-                JOIN address_structures ast ON ast.address_id = saa.address_id
-                WHERE saa.source_authorship_id = sa.id
-                  AND ast.structure_id = ANY(%s)
-                  AND ast.is_confirmed IS DISTINCT FROM FALSE
+                SELECT 1 FROM source_publications sd
+                WHERE sd.id = sa.source_publication_id
+                  AND sd.created_at >= NOW() - INTERVAL '24 hours'
               )
-            """,
-            (source, perimeter_ids),
-        )
-    else:
-        cur.execute(
-            """
-            UPDATE source_authorships sa
-            SET in_perimeter = TRUE
-            WHERE sa.source = %s
-              AND EXISTS (
-                SELECT 1
-                FROM source_authorship_addresses saa
-                JOIN address_structures ast ON ast.address_id = saa.address_id
-                WHERE saa.source_authorship_id = sa.id
-                  AND ast.structure_id = ANY(%s)
-                  AND ast.is_confirmed IS DISTINCT FROM FALSE
-              )
-            """,
-            (source, perimeter_ids),
-        )
+        """
+        if daily
+        else ""
+    )
+    cur.execute(
+        f"""
+        UPDATE source_authorships sa
+        SET in_perimeter = TRUE
+        WHERE sa.source = %s
+          AND EXISTS (
+            SELECT 1
+            FROM source_authorship_addresses saa
+            JOIN address_structures ast ON ast.address_id = saa.address_id
+            WHERE saa.source_authorship_id = sa.id
+              AND ast.structure_id = ANY(%s)
+              AND ast.is_confirmed IS DISTINCT FROM FALSE
+          )
+          {daily_clause}
+        """,
+        (source, perimeter_ids),
+    )
     return cur.rowcount
 
 
