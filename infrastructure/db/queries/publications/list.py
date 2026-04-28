@@ -439,12 +439,12 @@ async def export_publications_csv(
     writer.writerow(
         [
             "Année",
+            "Type",
             "Titre",
             "DOI",
             "Revue",
             "Éditeur",
             "Laboratoires",
-            "Type",
             "Accès",
             "Sources",
         ]
@@ -468,12 +468,12 @@ async def export_publications_csv(
         writer.writerow(
             [
                 row["pub_year"] or "",
+                row["doc_type"] or "",
                 row["title"] or "",
                 doi_url,
                 row["journal_title"] or "",
                 row["publisher_name"] or "",
                 row["labs"] or "",
-                row["doc_type"] or "",
                 access,
                 json.dumps(sources, ensure_ascii=False) if sources else "",
             ]
