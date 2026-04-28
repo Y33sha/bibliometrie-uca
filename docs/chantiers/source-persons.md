@@ -191,14 +191,22 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 - [x] Suppression des fonctions `delete_*_orphan_*_source_persons` devenues redondantes avec la purge.
 - [x] Suppression du CLI one-shot `cleanup_wos_duplicate_authorships.py` (redondant post-purge).
 - [x] `schema.sql` régénéré automatiquement par `db/migrate.py`.
-- [ ] Mettre à jour `docs/sources.md` (mention de la colonne `identifiers` JSONB et du rôle restreint de `source_persons`).
+- [x] `docs/sources.md` mis à jour : tableau des sources complété (theses.fr + CrossRef ajoutés), section "Nature des entités auteurs" réécrite avec le nouveau rôle restreint de `source_persons` et la colonne `identifiers`.
+- [x] `docs/pipeline.md` mis à jour : diagramme normalize, phases persons et authorships.
 
-### Tests de non-régression à prévoir tout du long
-- [ ] Compte de personnes canoniques avant/après stable
-- [ ] Page personne (UI) montre les mêmes infos
-- [ ] Admin HAL doublons fonctionne identiquement
-- [ ] Étape 0 du pipeline persons propage correctement les `person_id` HAL
-- [ ] Counts par source dans `source_persons` après migration matchent l'attendu (HAL=comptes identifiés uniquement, ScanR=idref-only, theses=PPN-only, autres=0)
+### Tests de non-régression — bilan a posteriori
+
+La plupart des tests listés initialement étaient superflus : les `persons` canoniques sont indépendantes de `source_persons` (création/matching depuis `source_authorships.raw_author_name` + `person_name_forms`, pas depuis `source_persons`). Le seul cas où `source_persons` pèse sur la création de personnes, c'est l'Étape 0 HAL — non touchée par ce chantier. Items non pertinents en pratique :
+
+- ~~Compte de personnes canoniques avant/après stable~~ → aucune raison que ça change
+- ~~Étape 0 du pipeline persons propage correctement les `person_id` HAL~~ → cas conservé intact (HAL+`hal_person_id` continue d'alimenter `source_persons`, dual-write `link_authorship` inchangé)
+- ~~Admin HAL doublons fonctionne identiquement~~ → query inchangée
+
+Vérifications **réellement utiles** post-purge (au prochain run pipeline complet, comparaison avant/après) :
+
+- [ ] `SELECT source, count(*) FROM source_persons GROUP BY source` — doit matcher : HAL avec `hal_person_id` uniquement (~47k), ScanR avec idref uniquement, theses avec PPN uniquement, autres = 0.
+- [ ] Pipeline `normalize` tourne sans erreur sur un run complet (smoke test).
+- [ ] Page personne UI : spot-check sur une dizaine de personnes (la section "comptes HAL" reste visible pour les personnes UCA, la section "auteurs WoS" passe au pattern OA = group by raw_author_name).
 
 ## Lien avec les autres chantiers
 
