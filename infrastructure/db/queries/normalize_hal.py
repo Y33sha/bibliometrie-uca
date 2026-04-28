@@ -128,76 +128,6 @@ def upsert_hal_source_person(
     return row[0] if isinstance(row, tuple) else row["id"]
 
 
-def find_hal_source_person_nokey(cur: Any, *, full_name: str, first_name: str | None) -> int | None:
-    """Cherche un `source_persons` HAL sans identifiant par nom exact."""
-    cur.execute(
-        """
-        SELECT id FROM source_persons
-        WHERE source = 'hal'
-          AND source_id LIKE 'nokey-%%'
-          AND full_name = %s
-          AND first_name IS NOT DISTINCT FROM %s
-        LIMIT 1
-        """,
-        (full_name, first_name),
-    )
-    row = cur.fetchone()
-    if row is None:
-        return None
-    return row[0] if isinstance(row, tuple) else row["id"]
-
-
-def enrich_hal_source_person(
-    cur: Any,
-    *,
-    source_person_id: int,
-    orcid: str | None,
-    idref: str | None,
-    source_ids_json: Any,
-) -> None:
-    """Ajoute `orcid` / `idref` / `source_ids` sur un `source_persons` HAL existant (nokey)."""
-    cur.execute(
-        """
-        UPDATE source_persons SET
-            orcid = COALESCE(source_persons.orcid, %s),
-            idref = COALESCE(source_persons.idref, %s),
-            source_ids = COALESCE(source_persons.source_ids, '{}') ||
-                         COALESCE(%s::jsonb, '{}')
-        WHERE id = %s
-        """,
-        (orcid, idref, source_ids_json, source_person_id),
-    )
-
-
-def insert_hal_source_person_new(
-    cur: Any,
-    *,
-    full_name: str,
-    last_name: str,
-    first_name: str | None,
-    orcid: str | None,
-    idref: str | None,
-    source_ids_json: Any,
-) -> int:
-    """Crée un `source_persons` HAL sans identifiant (source_id = `nokey-<seq>`)."""
-    cur.execute("SELECT nextval('source_persons_id_seq')")
-    row = cur.fetchone()
-    next_id = row[0] if isinstance(row, tuple) else row["nextval"]
-    src_id = f"nokey-{next_id}"
-    cur.execute(
-        """
-        INSERT INTO source_persons
-            (id, source, source_id, full_name, last_name, first_name, orcid, idref,
-             source_ids)
-        VALUES (%s, 'hal', %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-        """,
-        (next_id, src_id, full_name, last_name, first_name, orcid, idref, source_ids_json),
-    )
-    inserted = cur.fetchone()
-    return inserted[0] if isinstance(inserted, tuple) else inserted["id"]
-
-
 def upsert_hal_source_structure(cur: Any, *, source_id: str, name: str) -> int:
     """UPSERT d'une `source_structures` HAL à la volée (parse de `authIdHasStructure_fs`)."""
     cur.execute(
@@ -230,20 +160,28 @@ def upsert_hal_source_authorship(
     cur: Any,
     *,
     source_publication_id: int,
-    source_person_id: int,
+    source_person_id: int | None,
     author_position: int,
     source_struct_ids: list[int] | None,
     raw_author_name: str,
     is_corresponding: bool,
     roles: list[str] | None,
+    identifiers: Any,
 ) -> int:
-    """UPSERT d'une `source_authorships` HAL (inclut `source_struct_ids`)."""
+    """UPSERT d'une `source_authorships` HAL (inclut `source_struct_ids`).
+
+    `source_person_id` peut être NULL : depuis le chantier source_persons,
+    seuls les auteurs avec `hal_person_id` génèrent un row dans
+    `source_persons`. Les autres (sans compte HAL, juste un form_id ou
+    rien) écrivent uniquement la `source_authorships` avec `identifiers`
+    (orcid / idref / idhal selon disponibilité).
+    """
     cur.execute(
         """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position, source_struct_ids,
-             author_name_normalized, is_corresponding, roles, raw_author_name)
-        VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
+             author_name_normalized, is_corresponding, roles, raw_author_name, identifiers)
+        VALUES ('hal', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s, %s)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             source_struct_ids = COALESCE(
                 EXCLUDED.source_struct_ids,
@@ -252,7 +190,8 @@ def upsert_hal_source_authorship(
             author_name_normalized = EXCLUDED.author_name_normalized,
             is_corresponding = EXCLUDED.is_corresponding,
             roles = EXCLUDED.roles,
-            raw_author_name = EXCLUDED.raw_author_name
+            raw_author_name = EXCLUDED.raw_author_name,
+            identifiers = EXCLUDED.identifiers
         RETURNING id
         """,
         (
@@ -264,6 +203,7 @@ def upsert_hal_source_authorship(
             is_corresponding,
             roles,
             raw_author_name,
+            identifiers,
         ),
     )
     row = cur.fetchone()
@@ -361,31 +301,6 @@ class PgHalNormalizeQueries:
 
     def upsert_hal_source_person(self, cur: Any, **kwargs: Any) -> int:
         return upsert_hal_source_person(cur, **kwargs)
-
-    def find_hal_source_person_nokey(
-        self, cur: Any, *, full_name: str, first_name: str | None
-    ) -> int | None:
-        return find_hal_source_person_nokey(cur, full_name=full_name, first_name=first_name)
-
-    def enrich_hal_source_person(
-        self,
-        cur: Any,
-        *,
-        source_person_id: int,
-        orcid: str | None,
-        idref: str | None,
-        source_ids_json: Any,
-    ) -> None:
-        enrich_hal_source_person(
-            cur,
-            source_person_id=source_person_id,
-            orcid=orcid,
-            idref=idref,
-            source_ids_json=source_ids_json,
-        )
-
-    def insert_hal_source_person_new(self, cur: Any, **kwargs: Any) -> int:
-        return insert_hal_source_person_new(cur, **kwargs)
 
     def upsert_hal_source_structure(self, cur: Any, *, source_id: str, name: str) -> int:
         return upsert_hal_source_structure(cur, source_id=source_id, name=name)

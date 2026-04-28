@@ -46,32 +46,6 @@ class HalNormalizeQueries(Protocol):
         source_ids_json: Any,
     ) -> int: ...
 
-    def find_hal_source_person_nokey(
-        self, cur: Any, *, full_name: str, first_name: str | None
-    ) -> int | None: ...
-
-    def enrich_hal_source_person(
-        self,
-        cur: Any,
-        *,
-        source_person_id: int,
-        orcid: str | None,
-        idref: str | None,
-        source_ids_json: Any,
-    ) -> None: ...
-
-    def insert_hal_source_person_new(
-        self,
-        cur: Any,
-        *,
-        full_name: str,
-        last_name: str,
-        first_name: str | None,
-        orcid: str | None,
-        idref: str | None,
-        source_ids_json: Any,
-    ) -> int: ...
-
     def upsert_hal_source_structure(self, cur: Any, *, source_id: str, name: str) -> int: ...
 
     def fetch_hal_source_structure_ids(self, cur: Any, source_ids: list[str]) -> list[int]: ...
@@ -81,12 +55,13 @@ class HalNormalizeQueries(Protocol):
         cur: Any,
         *,
         source_publication_id: int,
-        source_person_id: int,
+        source_person_id: int | None,
         author_position: int,
         source_struct_ids: list[int] | None,
         raw_author_name: str,
         is_corresponding: bool,
         roles: list[str] | None,
+        identifiers: Any,
     ) -> int: ...
 
     def staging_has_hal_doi(self, cur: Any, doi: str) -> bool: ...

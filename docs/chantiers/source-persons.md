@@ -109,7 +109,7 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 - [x] Identifier d'éventuelles autres lectures côté frontend / API → **aucune** côté front/API directs ✅
 - [x] Définir la stratégie de test de non-régression : snapshot avant migration (cf. ci-dessous)
 
-**Carte complète des lecteurs/écritures (post-validation)**
+**Carte complète des lectures/écritures (post-validation)**
 
 | Composant | Type | Cas conservé après migration ? | Action |
 |---|---|---|---|
@@ -168,7 +168,7 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 - [x] **CrossRef** : `insert_crossref_source_person` supprimé (port + queries) ; `process_authors` posté `source_person_id=NULL` avec `identifiers={"orcid": ...}`. Affiliations brutes restent sur `source_data` comme avant. `fetch_unlinked_authorships` étendu pour inclure CrossRef dans le CASE `IN ('openalex', 'wos', 'crossref')`.
 - [x] **theses.fr** : `find_theses_source_person_by_name` + `insert_theses_source_person_new` supprimés. `upsert_source_author` retourne None sans PPN → la `source_authorships` est insérée avec `source_person_id=NULL` et `identifiers={"idref": ppn}` quand PPN. Migration 012 : contrainte UNIQUE relâchée à NULLS DISTINCT (= défaut SQL standard) pour permettre plusieurs `(pub, NULL, NULL)` rows = jurés/rapporteurs theses sans PPN sur une même thèse. Idempotence garantie par `clear_source_authorships_for_publication`, le `ON CONFLICT DO UPDATE` n'est qu'un filet jamais déclenché en pratique. Tests d'intégration adaptés.
 - [x] **ScanR** : `find_scanr_source_person_by_name` + `insert_scanr_source_person_new` supprimés. `upsert_scanr_author` retourne None sans idref → la `source_authorships` est insérée avec `source_person_id=NULL` et `identifiers={"orcid": ..., "idref": ...}` (champs filtrés selon présence). Pas de migration supplémentaire nécessaire (ScanR pose toujours `author_position` non-null, pas de cas `(pub, NULL, NULL)`).
-- [ ] HAL : ne créer `source_persons` qu'avec un `hal_person_id` ; pour les comptes anonymes, identifiants sur `source_authorships.identifiers`
+- [x] **HAL** : `find_hal_source_person_nokey` + `enrich_hal_source_person` + `insert_hal_source_person_new` supprimés. `upsert_hal_author` retourne None si pas de `hal_person_id` (= comptes HAL identifiés uniquement) ; le cas `0_<form_id>` (auteurs HAL sans compte mais avec form_id, ~154k rows existantes) ainsi que les `nokey-*` sont laissés tomber côté nouvelle écriture, leurs `source_authorships` se rabattent sur `source_person_id=NULL` + `identifiers` (orcid/idref/idhal/hal_person_id selon présence). `fetch_unlinked_authorships` ajusté avec `COALESCE(sa.orcid, sa_auth.identifiers->>'orcid')` et idem pour idref/idhal pour absorber les rows HAL post-phase-2 sans `source_persons`. Le dual-write côté `link_authorship` et `add_identifier` reste pertinent (ne se déclenche que quand `source_person_id` non-null et `hal_person_id` présent → cas légitime conservé).
 
 ### Phase 3 — Adapter les lecteurs
 - [ ] `fetch_unlinked_authorships()` : lit les identifiants depuis `source_authorships.identifiers` + JOIN `source_persons` seulement pour les sources éligibles
