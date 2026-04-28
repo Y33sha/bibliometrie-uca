@@ -14,7 +14,7 @@ Ce doc audite l'usage existant et propose un découpage en chantiers dédiés.
 | Source | `source_id` | Stable ? | Champs spécifiques exploités |
 |---|---|---|---|
 | HAL avec compte | `hal_person_id` | ✅ | `source_ids.hal_person_id`, `idhal`, `orcid`, `idref` |
-| HAL sans compte | `nokey-<seq>` | ❌ synthétique | (aucun, just le nom) |
+| HAL sans compte | `nokey-<seq>` | ❌ synthétique | (aucun, juste le nom) |
 | ScanR avec idref | `idref` | ✅ | `idref`, `orcid` |
 | ScanR sans idref | `scanr-<seq>` | ❌ synthétique | (aucun) |
 | Theses avec PPN | `ppn` | ✅ | `idref` |
@@ -195,14 +195,6 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 - [x] `docs/pipeline.md` mis à jour : diagramme normalize, phases persons et authorships.
 
 ### Tests de non-régression — bilan a posteriori
-
-La plupart des tests listés initialement étaient superflus : les `persons` canoniques sont indépendantes de `source_persons` (création/matching depuis `source_authorships.raw_author_name` + `person_name_forms`, pas depuis `source_persons`). Le seul cas où `source_persons` pèse sur la création de personnes, c'est l'Étape 0 HAL — non touchée par ce chantier. Items non pertinents en pratique :
-
-- ~~Compte de personnes canoniques avant/après stable~~ → aucune raison que ça change
-- ~~Étape 0 du pipeline persons propage correctement les `person_id` HAL~~ → cas conservé intact (HAL+`hal_person_id` continue d'alimenter `source_persons`, dual-write `link_authorship` inchangé)
-- ~~Admin HAL doublons fonctionne identiquement~~ → query inchangée
-
-Vérifications **réellement utiles** post-purge (au prochain run pipeline complet, comparaison avant/après) :
 
 - [ ] `SELECT source, count(*) FROM source_persons GROUP BY source` — doit matcher : HAL avec `hal_person_id` uniquement (~47k), ScanR avec idref uniquement, theses avec PPN uniquement, autres = 0.
 - [ ] Pipeline `normalize` tourne sans erreur sur un run complet (smoke test).
