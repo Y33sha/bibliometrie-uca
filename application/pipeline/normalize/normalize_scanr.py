@@ -239,8 +239,19 @@ def insert_scanr_document(
 
 
 def upsert_scanr_author(cur: Any, queries: ScanrNormalizeQueries, author: dict) -> int | None:
+    """Crée un `source_persons` ScanR uniquement quand un idref est fourni.
+
+    Sans idref, retourne None : la `source_authorships` sera insérée
+    avec `source_person_id=NULL` et `identifiers={"orcid": ...}` si
+    présent (cf. chantier source_persons).
+    """
     full_name = author.get("fullName")
     if not full_name:
+        return None
+
+    denorm = author.get("denormalized") or {}
+    idref = denorm.get("idref")
+    if not idref:
         return None
 
     parts = full_name.strip().split()
@@ -251,28 +262,10 @@ def upsert_scanr_author(cur: Any, queries: ScanrNormalizeQueries, author: dict) 
         first_name = None
         last_name = full_name
 
-    denorm = author.get("denormalized") or {}
-    idref = denorm.get("idref")
     orcid = denorm.get("orcid")
-
-    if idref:
-        return queries.upsert_scanr_source_person_by_idref(
-            cur,
-            idref=idref,
-            full_name=full_name,
-            last_name=last_name,
-            first_name=first_name,
-            orcid=orcid,
-        )
-
-    existing = queries.find_scanr_source_person_by_name(
-        cur, full_name=full_name, first_name=first_name
-    )
-    if existing is not None:
-        return existing
-
-    return queries.insert_scanr_source_person_new(
+    return queries.upsert_scanr_source_person_by_idref(
         cur,
+        idref=idref,
         full_name=full_name,
         last_name=last_name,
         first_name=first_name,
@@ -299,9 +292,21 @@ def process_authors(
     authors = doc.get("authors") or []
 
     for position, author_data in enumerate(authors):
-        source_person_id = upsert_scanr_author(cur, queries, author_data)
-        if not source_person_id:
+        author_full_name = author_data.get("fullName")
+        if not author_full_name:
             continue
+
+        # Avec idref : crée le source_persons (cas légitime conservé)
+        # Sans idref : source_person_id reste NULL (ORCID éventuel sur identifiers)
+        source_person_id = upsert_scanr_author(cur, queries, author_data)
+
+        denorm = author_data.get("denormalized") or {}
+        ids: dict = {}
+        if denorm.get("orcid"):
+            ids["orcid"] = denorm["orcid"]
+        if denorm.get("idref"):
+            ids["idref"] = denorm["idref"]
+        identifiers = Json(ids) if ids else None
 
         raw_role = author_data.get("role")
         roles, _ = map_role("scanr", raw_role)
@@ -318,8 +323,6 @@ def process_authors(
                 if c not in detected_countries:
                     detected_countries.append(c)
 
-        author_full_name = author_data.get("fullName")
-
         sa_id = queries.upsert_scanr_source_authorship(
             cur,
             source_publication_id=source_publication_id,
@@ -327,6 +330,7 @@ def process_authors(
             author_position=position,
             roles=roles or None,
             raw_author_name=author_full_name,
+            identifiers=identifiers,
         )
 
         if addr_parts:
