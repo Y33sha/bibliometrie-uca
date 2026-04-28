@@ -1095,7 +1095,9 @@
 		background: var(--card);
 		border: 1px solid var(--border);
 		border-radius: 6px;
-		overflow: hidden;
+		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder
+		   sous la dernière ligne sans être clippé. Les coins arrondis
+		   restent visuellement corrects grâce à border-collapse. */
 	}
 	.tab-content thead th {
 		background: #f5f4f1;
