@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict eRNfjF3k88uwSBRcWJsdg66p6gTHYaBihDaS09ol8wyOPEIfcoNg4RVW4GbUHMl
+\restrict zkMgZp9UmmzYdt7Ac0wVcxyJbaQO1wdyPURsqXiKOrPbMBffaR3fRyIbtfPMqUg
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -944,7 +944,7 @@ CREATE TABLE public.source_authorships (
     id integer NOT NULL,
     source text NOT NULL,
     source_publication_id integer NOT NULL,
-    source_person_id integer CONSTRAINT source_authorships_source_author_id_not_null NOT NULL,
+    source_person_id integer,
     author_position smallint,
     in_perimeter boolean DEFAULT false,
     excluded boolean DEFAULT false,
@@ -1756,7 +1756,7 @@ ALTER TABLE ONLY public.source_authorships
 --
 
 ALTER TABLE ONLY public.source_authorships
-    ADD CONSTRAINT source_authorships_pub_person_pos_key UNIQUE NULLS NOT DISTINCT (source_publication_id, source_person_id, author_position);
+    ADD CONSTRAINT source_authorships_pub_person_pos_key UNIQUE (source_publication_id, source_person_id, author_position);
 
 
 --
@@ -2624,7 +2624,7 @@ ALTER TABLE ONLY public.source_authorships
 --
 
 ALTER TABLE ONLY public.source_authorships
-    ADD CONSTRAINT source_authorships_source_person_id_fkey FOREIGN KEY (source_person_id) REFERENCES public.source_persons(id) ON DELETE CASCADE;
+    ADD CONSTRAINT source_authorships_source_person_id_fkey FOREIGN KEY (source_person_id) REFERENCES public.source_persons(id) ON DELETE SET NULL;
 
 
 --
@@ -2695,5 +2695,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eRNfjF3k88uwSBRcWJsdg66p6gTHYaBihDaS09ol8wyOPEIfcoNg4RVW4GbUHMl
+\unrestrict zkMgZp9UmmzYdt7Ac0wVcxyJbaQO1wdyPURsqXiKOrPbMBffaR3fRyIbtfPMqUg
 
