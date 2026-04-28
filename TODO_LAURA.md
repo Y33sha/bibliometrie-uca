@@ -1,3 +1,8 @@
+2 trucs en attente dans conversation claude:
+- diff issued/published dans données crossref
+- idhal aberrants (1195): examiner label xml
++ relancer pipeline à partir de affiliations
+
 # A régler avant transmission
 ## Pipeline
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
@@ -11,7 +16,6 @@
 * [ ] cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
-* [ ] in perimeter: true, false, null? limiter les cross-imports à null et true?
 ## Problèmes spécifiques HAL
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
 * [ ] embargos (HAL, theses.fr): afficher dates (existent-elles dans le retour api)?
@@ -60,12 +64,10 @@
 # Détails à régler au fil de l'eau (interface)
 ## Admin
 * [ ] interface pour consulter l'audit trail
-* [ ] menu: pipeline (config, logs)
 ### Personnes (admin)
 * [ ] quoi faire des entités fausses? a minima, rejeter leurs authorships et s'assurer qu'elles n'apparaissent pas dans orphan-authorships
 * [ ] si source erronée: rejeter authorship source + recalculer affiliations de l'authorship à partir des sources non rejetées / caveat: Clarifier la sémantique de `excluded` sur les authorships sources: est-ce l'authorship qui est fausse, ou son affiliation? (allons plus loin: pourrait-on déclarer fausses certaines colonnes et pas d'autres? via un champ jsonb par exemple)
 * [ ] date de dernière publication UCA? (permet de filtrer les auteurs "legacy" vs actifs)
-* [ ] aucun intérêt d'afficher le label de chaque identifier
 ### Publishers / Journals
 * [ ] Tri facettes
 ## Publique
@@ -86,18 +88,19 @@
 * [ ] responsivité minimale de l'interface
 * [ ] tableaux personnes: remplacer les identifiants par des icônes (hal orcid idref)
 * [ ] étoffer tests frontend
-* [ ] *ajouter export csv tableaux thèses
 ## Détails d'affichage
 * [ ] décomptes sur les onglets: ne pas tenir compte des facettes en place
 * [ ] ordre des sources pour les thèses: harmoniser page laboratoire avec page thèses
 * [ ] admin/personnes, formes de nom: modal authorships: source affichée: default wos (ajouter les autres sources, et mettre default None)
 * [ ] dropdown choix colonnes: toujours coupé par le bas du tableau Publications!
 * [ ] filtres RH sur page labo
+* [ ] colonne auteur sur la page thèses
 ## Cas particuliers, bizarreries à élucider, à examiner plus tard
 * openalex répète des auteurs : publi 77832
 * [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
 * erreur de parsing OA: publication 113652
 * thèses CHELTER: 3 ou 4?
+* publi 20832: pourquoi pas d'affiliations
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
