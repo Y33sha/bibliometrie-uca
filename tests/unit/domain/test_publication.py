@@ -54,6 +54,14 @@ class TestDOIConstruction:
         """Un .v suivi de non-chiffre ne doit pas être strippé."""
         assert DOI("10.1234/journal.v12.issue3").value == "10.1234/journal.v12.issue3"
 
+    def test_lowercases(self):
+        """Le DOI complet est normalisé en minuscules (le standard CrossRef
+        traite le DOI en case-insensitive ; lowercase évite les faux doublons
+        cross-sources)."""
+        assert DOI("10.1038/Nature").value == "10.1038/nature"
+        assert DOI("10.1038/NATURE").value == "10.1038/nature"
+        assert DOI("https://doi.org/10.1038/NATURE").value == "10.1038/nature"
+
 
 class TestDOIInvalid:
     def test_raises_on_empty(self):
@@ -86,7 +94,7 @@ class TestDOITryParse:
 
     def test_normalizes_on_parse(self):
         d = DOI.try_parse("https://doi.org/10.1234/TEST.v3")
-        assert d.value == "10.1234/TEST"
+        assert d.value == "10.1234/test"
 
 
 class TestDOIImmutable:

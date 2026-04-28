@@ -75,17 +75,21 @@ _DOI_URL_PREFIXES = ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/
 
 
 def _normalize_doi(raw: str | None) -> str | None:
-    """Normalise un DOI brut (préfixe URL, espaces, suffixe de version).
+    """Normalise un DOI brut (préfixe URL, espaces, suffixe de version, casse).
+
+    Lowercase systématique : la spec DOI Handbook précise que le préfixe
+    `10.xxxx` est insensible à la casse, et CrossRef (registre officiel)
+    traite l'ensemble du DOI en case-insensitive. Stocker tout en minuscules
+    évite les faux doublons lors des comparaisons cross-sources.
 
     Séparée de la classe pour rester appelable depuis utils/doi.py
     (compat avec les ~50 sites d'appel existants).
     """
     if not raw:
         return None
-    s = raw.strip()
-    lower = s.lower()
+    s = raw.strip().lower()
     for prefix in _DOI_URL_PREFIXES:
-        if lower.startswith(prefix):
+        if s.startswith(prefix):
             s = s[len(prefix) :]
             break
     s = s.strip()
