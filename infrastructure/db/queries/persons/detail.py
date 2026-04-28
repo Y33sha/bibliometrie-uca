@@ -91,17 +91,20 @@ async def person_profile(cur: Any, person_id: int) -> dict[str, Any] | None:
     )
     oa_authors = await cur.fetchall()
 
+    # WoS post-chantier source_persons : plus de source_persons WoS,
+    # group by raw_author_name comme OpenAlex. ORCID lu depuis
+    # source_authorships.identifiers.
     await cur.execute(
         """
-        SELECT sauth.id, 'wos' AS source, sa.raw_author_name AS full_name, sauth.orcid,
+        SELECT MIN(sa.id) AS id,
+               sa.raw_author_name AS full_name,
+               'wos' AS source,
+               MAX(sa.identifiers->>'orcid') AS orcid,
                NULL::text AS idhal, NULL::text AS openalex_id,
-               (SELECT COUNT(*) FROM source_authorships sa2
-                WHERE sa2.source = 'wos' AND sa2.source_person_id = sauth.id
-                  AND sa2.in_perimeter = TRUE) AS uca_pub_count
-        FROM source_persons sauth
-        JOIN source_authorships sa ON sa.source = 'wos' AND sa.source_person_id = sauth.id
-        WHERE sa.person_id = %s
-        GROUP BY sauth.id, sa.raw_author_name, sauth.orcid
+               COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
+        FROM source_authorships sa
+        WHERE sa.source = 'wos' AND sa.person_id = %s
+        GROUP BY sa.raw_author_name
         """,
         (person_id,),
     )
