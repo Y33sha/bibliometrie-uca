@@ -91,71 +91,43 @@ def upsert_crossref_source_publication(
     return row["id"] if isinstance(row, dict) else row[0]
 
 
-def insert_crossref_source_person(
-    cur: Any,
-    *,
-    doi: str,
-    position: int,
-    full_name: str,
-    last_name: str | None,
-    first_name: str | None,
-    orcid: str | None,
-) -> int:
-    """UPSERT d'un ``source_persons`` CrossRef. ``source_id = '<DOI>:<position>'``.
-
-    CrossRef n'expose pas d'identifiant auteur stable, donc chaque paire
-    (publi, position) génère son propre ``source_persons`` row. La
-    déduplication transverse se fait ensuite par le pipeline persons
-    (source-agnostique, basé sur les ``person_name_forms`` et les ORCIDs).
-    """
-    source_id = f"{doi}:{position}"
-    cur.execute(
-        """
-        INSERT INTO source_persons
-            (source, source_id, full_name, last_name, first_name, orcid)
-        VALUES ('crossref', %s, %s, %s, %s, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            full_name = EXCLUDED.full_name,
-            last_name = EXCLUDED.last_name,
-            first_name = EXCLUDED.first_name,
-            orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid)
-        RETURNING id
-        """,
-        (source_id, full_name, last_name, first_name, orcid),
-    )
-    row = cur.fetchone()
-    return row["id"] if isinstance(row, dict) else row[0]
-
-
 def upsert_crossref_source_authorship(
     cur: Any,
     *,
     source_publication_id: int,
-    source_person_id: int,
     author_position: int,
     raw_author_name: str | None,
     source_data: Any,
+    identifiers: Any,
 ) -> int:
-    """UPSERT d'une ``source_authorships`` CrossRef. Retourne l'id."""
+    """UPSERT d'une ``source_authorships`` CrossRef. Retourne l'id.
+
+    `source_person_id` est NULL : depuis le chantier source_persons,
+    CrossRef n'écrit plus dans `source_persons` (les entités auteurs
+    CrossRef étaient des `<DOI>:<position>` synthétiques 1:1 avec
+    l'authorship — sans bénéfice). L'ORCID, seul identifiant exploitable,
+    vit sur `identifiers`.
+    """
     cur.execute(
         """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
-             author_name_normalized, raw_author_name, source_data)
-        VALUES ('crossref', %s, %s, %s, normalize_name_form(%s), %s, %s)
+             author_name_normalized, raw_author_name, source_data, identifiers)
+        VALUES ('crossref', %s, NULL, %s, normalize_name_form(%s), %s, %s, %s)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             author_name_normalized = EXCLUDED.author_name_normalized,
             raw_author_name = EXCLUDED.raw_author_name,
-            source_data = EXCLUDED.source_data
+            source_data = EXCLUDED.source_data,
+            identifiers = EXCLUDED.identifiers
         RETURNING id
         """,
         (
             source_publication_id,
-            source_person_id,
             author_position,
             raw_author_name,
             raw_author_name,
             source_data,
+            identifiers,
         ),
     )
     row = cur.fetchone()
@@ -218,44 +190,23 @@ class PgCrossrefNormalizeQueries:
             meta=meta,
         )
 
-    def insert_crossref_source_person(
-        self,
-        cur: Any,
-        *,
-        doi: str,
-        position: int,
-        full_name: str,
-        last_name: str | None,
-        first_name: str | None,
-        orcid: str | None,
-    ) -> int:
-        return insert_crossref_source_person(
-            cur,
-            doi=doi,
-            position=position,
-            full_name=full_name,
-            last_name=last_name,
-            first_name=first_name,
-            orcid=orcid,
-        )
-
     def upsert_crossref_source_authorship(
         self,
         cur: Any,
         *,
         source_publication_id: int,
-        source_person_id: int,
         author_position: int,
         raw_author_name: str | None,
         source_data: Any,
+        identifiers: Any,
     ) -> int:
         return upsert_crossref_source_authorship(
             cur,
             source_publication_id=source_publication_id,
-            source_person_id=source_person_id,
             author_position=author_position,
             raw_author_name=raw_author_name,
             source_data=source_data,
+            identifiers=identifiers,
         )
 
     def get_crossref_publication_id(self, cur: Any, doi: str) -> int | None:
