@@ -499,7 +499,7 @@ def insert_wos_document(
 # WOS AUTHORSHIPS — identifiants normalisés sur source_authorships
 # =============================================================
 # Plus d'écriture dans source_persons côté WoS depuis le chantier
-# source_persons (cf. docs/chantiers/source-persons.md) : le `daisng_id`
+# source_persons (cf. docs/chantiers/2026-04-28_source-persons.md) : le `daisng_id`
 # est une entité algorithmique non fiable, et le `researcher_id`
 # (ResearcherID Clarivate) est un identifiant cross-source qui vit mieux
 # directement sur source_authorships.identifiers.
@@ -549,7 +549,7 @@ def process_authorships(
 ) -> None:
     """Traite les authorships d'un record WoS + crée les liens adresses et institutions.
 
-    Plus d'écriture sur `source_persons` (cf. docs/chantiers/source-persons.md).
+    Plus d'écriture sur `source_persons` (cf. docs/chantiers/2026-04-28_source-persons.md).
     Chaque authorship est inséré avec `source_person_id=NULL` et un dict
     `identifiers` (orcid + researcher_id) sur `source_authorships`.
     """

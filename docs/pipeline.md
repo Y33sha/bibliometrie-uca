@@ -198,7 +198,7 @@ Les cas douteux (métadonnées identiques ou similaires) sont préservés et son
 
 Fonctions de compatibilité de noms dans `utils/names.py`.
 
-**Notes sur `source_persons`** (cf. [chantier source_persons](chantiers/source-persons.md)) :
+**Notes sur `source_persons`** (cf. [chantier source_persons](chantiers/2026-04-28_source-persons.md)) :
 - La table héberge uniquement les entités auteurs avec un identifiant stable côté source (HAL+`hal_person_id`, ScanR+idref, theses+PPN).
 - Pour les sources sans identifiant stable (OA, WoS, CrossRef, et les comptes HAL non identifiés / ScanR sans idref / theses sans PPN), `source_authorships.source_person_id` reste NULL et les identifiants normalisés vivent sur `source_authorships.identifiers` (JSONB).
 

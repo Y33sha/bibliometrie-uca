@@ -254,7 +254,7 @@ def count_openalex_table(cur: Any, table: str) -> int:
     """Compte les lignes d'une table avec `source = 'openalex'` (liste blanche).
 
     `source_persons` reste accepté pour permettre de tracer les rows
-    legacy en attendant la phase 4 de purge (cf docs/chantiers/source-persons.md).
+    legacy en attendant la phase 4 de purge (cf docs/chantiers/2026-04-28_source-persons.md).
     """
     if table not in ("source_publications", "source_persons", "source_structures"):
         raise ValueError(f"Table inattendue : {table!r}")
