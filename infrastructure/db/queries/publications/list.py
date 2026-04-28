@@ -536,6 +536,7 @@ async def export_theses_csv(
             SELECT
                 max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
                 max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
+                max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
                 max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id
             FROM source_publications sd WHERE sd.publication_id = p.id
         ) src_ids ON TRUE
@@ -556,17 +557,24 @@ async def export_theses_csv(
             "Titre",
             "DOI",
             "Laboratoires",
-            "Voie OA",
-            "HAL",
-            "theses.fr",
-            "OpenAlex",
+            "Accès",
+            "Sources",
         ]
     )
     for row in await cur.fetchall():
         doi_url = f"https://doi.org/{row['doi']}" if row["doi"] else ""
-        hal_url = f"https://hal.science/{row['hal_id']}" if row["hal_id"] else ""
-        oa_url = f"https://openalex.org/{row['openalex_id']}" if row["openalex_id"] else ""
-        theses_url = f"https://theses.fr/{row['theses_id']}" if row["theses_id"] else ""
+        sources: dict[str, str] = {}
+        if row["hal_id"]:
+            sources["hal"] = f"https://hal.science/{row['hal_id']}"
+        if row["openalex_id"]:
+            sources["openalex"] = f"https://openalex.org/{row['openalex_id']}"
+        if row["scanr_id"]:
+            sources["scanr"] = (
+                f"https://scanr.enseignementsup-recherche.gouv.fr/publications/{row['scanr_id']}"
+            )
+        if row["theses_id"]:
+            sources["theses"] = f"https://theses.fr/{row['theses_id']}"
+        access = "ouvert" if row["oa_status"] in OA_OPEN_STATUSES else "fermé"
         writer.writerow(
             [
                 row["date_inscription"] or "",
@@ -576,10 +584,8 @@ async def export_theses_csv(
                 row["title"] or "",
                 doi_url,
                 row["labs"] or "",
-                row["oa_status"] or "",
-                hal_url,
-                theses_url,
-                oa_url,
+                access,
+                json.dumps(sources, ensure_ascii=False) if sources else "",
             ]
         )
 
