@@ -2,14 +2,16 @@
 
 ## Vue d'ensemble
 
-Le système intègre 4 sources bibliographiques principales, complétées par des imports manuels et des APIs d'enrichissement.
+Le système intègre 6 sources bibliographiques principales, complétées par des imports manuels et des APIs d'enrichissement.
 
 | Source | Type | Couverture | API |
 |--------|------|-----------|-----|
 | HAL | Archive ouverte | Publications déposées par les chercheurs UCA | Solr (search) + ref/author + ref/structure |
 | OpenAlex | Base bibliométrique ouverte | Publications mondiales, rattachement institutionnel par affiliation | REST (works, sources) |
 | Web of Science | Base bibliométrique commerciale | Publications indexées WoS, affiliation OG | REST (Expanded API, quota annuel) |
-| ScanR | Portail officiel du MESRE |  |
+| ScanR | Portail officiel du MESRE | Publications de l'écosystème français de la recherche | Elasticsearch (DataESR) |
+| theses.fr | Portail officiel des thèses françaises | Thèses soutenues + en cours, rattachement par PPN d'établissement | REST (data.gouv.fr) |
+| CrossRef | Registre des DOI (autorité éditeur) | Métadonnées canoniques par DOI : doc_type, journal, dates, license, ORCIDs article-level, relations entre publications | REST (works, polite pool via mailto) |
 | Unpaywall | Enrichissement OA | Statut Open Access par DOI | REST (gratuit, 100k req/jour) |
 | Base RH | Import manuel | Personnel UCA (noms, départements, rôles) | Fichier CSV |
 | Données APC | Import manuel | Paiements APC (montants, éditeurs) | Fichier CSV |
@@ -33,11 +35,24 @@ La résolution des affiliations se fait pendant la [phase `affiliations` du pipe
 
 Chaque source contient ses propres identifiants internes pour les entités auteurs. Le traitement des auteurs correspond à la [phase `personnes`](pipeline#phase-7--persons--création-de-personnes) du pipeline.
 
-- Dans **OpenAlex** et **WoS**, les entités auteurs sont créées de manière algorithmique à partir des auteurs associés aux publications (ORCID si présent, sinon formes de noms). Leur fiabilité est variable. Un même auteur est fréquemment divisé en entités multiples; certaines entités auteurs confondent des personnes manifestement distinctes. Le choix a été fait de ne pas tenter un mapping des `*_authors` avec les `persons` canoniques. On récupère les formes de noms associées aux publications et on s'en sert pour construire les personnes *de novo*. Les ORCID liés sont récupérés dans la table `person_identifiers` avec statut `pending` en attendant leur confirmation manuelle.
+**`source_persons`** est restreinte aux sources avec un **identifiant auteur stable** (cf. [chantier source_persons](chantiers/source-persons.md)) :
+- HAL avec `hal_person_id` (compte HAL identifié)
+- ScanR avec idref
+- Theses avec PPN
 
-- Dans **HAL**, deux cas de figure (pouvant coexister dans la même publication):
-    - Soit l'auteur correspond à un compte HAL identifié: entité fiable, possibilité de récupérer d'autres identifiants (ORCID, IdRef) associés à ce compte par l'auteur lui-même. Dans ce cas: mapping `hal_authors`=>`persons` et propagation du même `person_id` à toutes les authorships liées à ce `hal_author`.
-    - Soit l'auteur n'a pas pu être relié à un compte HAL existant: dans les métadonnés, c'est une simple chaîne de caractères (`full_name`). Dans ce cas on procède comme pour les autres sources.
+Pour les autres cas (OpenAlex, WoS, CrossRef, et les comptes HAL non identifiés / ScanR sans idref / theses sans PPN), aucun `source_persons` n'est créé : `source_authorships.source_person_id` reste NULL et les identifiants normalisés (orcid, idref, idhal, hal_person_id, researcher_id) vivent dans `source_authorships.identifiers` (JSONB).
+
+- Dans **OpenAlex** et **WoS**, les entités auteurs présentes côté API sont algorithmiques et non fiables (un même auteur fréquemment divisé en entités multiples, ou plusieurs personnes confondues). On ne crée plus de `source_persons` pour ces sources : le matching personne se fait *de novo* à partir de `source_authorships.raw_author_name` et de `person_name_forms`. Les ORCIDs sont récupérés dans `source_authorships.identifiers->>'orcid'` puis remontés vers `person_identifiers` avec statut `pending` lors du matching.
+
+- Dans **HAL**, deux cas de figure (pouvant coexister dans la même publication) :
+    - L'auteur correspond à un compte HAL identifié (`hal_person_id` présent) : entité fiable, on crée un `source_persons` avec ce `hal_person_id`. Possibilité de récupérer d'autres identifiants (ORCID, IdRef, idHAL). Le `person_id` canonique est propagé à toutes les `source_authorships` du même compte HAL via l'Étape 0 du pipeline persons.
+    - L'auteur n'est pas relié à un compte HAL identifié (form_id seul ou rien) : pas de `source_persons` HAL. On procède comme pour OpenAlex/WoS via `raw_author_name` + `identifiers`.
+
+- Dans **ScanR** : `source_persons` créés uniquement avec un idref (= IdRef BNF). Sans idref, les ORCID éventuels vont dans `source_authorships.identifiers`.
+
+- Dans **theses.fr** : `source_persons` créés uniquement avec un PPN (= IdRef BNF). Les non-auteurs (jurés, rapporteurs) sans PPN vivent uniquement dans `source_authorships`.
+
+- Dans **CrossRef** : aucun `source_persons` (pas d'identité d'auteur stable côté API). L'ORCID éventuel va dans `source_authorships.identifiers`.
 
 ### HAL
 
@@ -96,7 +111,7 @@ Chaque source contient ses propres identifiants internes pour les entités auteu
 - Le `raw_author_name` de l'authorship est plus fiable que `author.display_name` (ce dernier est un nom unifié par l'algo OA, qui peut être erroné)
 - Le `meta_hash` (hash hors authorships) permet de détecter les vrais changements sans être perturbé par la troncature à 100 auteurs
 - Si la `primary_location` pointe vers HAL (`hal.science/hal-XXXXX`), la publication est rattachée au document HAL existant plutôt que d'en créer une nouvelle
-- Les ORCID OpenAlex sont sur l'entité `openalex_authors.orcid` et utilisés avec prudence dans le pipeline persons (risque d'attribution erronée par l'algo OpenAlex)
+- Les ORCIDs OpenAlex sont sur `source_authorships.identifiers->>'orcid'` et utilisés avec prudence dans le pipeline persons (risque d'attribution erronée par l'algo OpenAlex — le matching nominal est appliqué avant de promouvoir un ORCID en `confirmed`)
 
 
 ### Web of Science
