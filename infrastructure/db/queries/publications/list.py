@@ -183,6 +183,18 @@ async def list_publications(
     row = await cur.fetchone()
     total = row["count"]
 
+    # Sur la vue personne (person_id défini), restreindre la liste des labos
+    # affichée à ceux portés par l'authorship de cette personne — la vue publi
+    # généraliste continue de remonter tous les labos UCA co-signataires.
+    if filters.person_id:
+        person_lab_filter_a3 = "AND a3.person_id = %s"
+        person_lab_filter_a4 = "AND a4.person_id = %s"
+        extra_lab_params: list[Any] = [filters.person_id, filters.person_id]
+    else:
+        person_lab_filter_a3 = ""
+        person_lab_filter_a4 = ""
+        extra_lab_params = []
+
     await cur.execute(
         f"""
         SELECT
@@ -209,6 +221,7 @@ async def list_publications(
              JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
              WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
                AND a3.structure_ids IS NOT NULL
+               {person_lab_filter_a3}
             ) AS labs,
             (SELECT json_agg(sub ORDER BY sub.label)
              FROM (
@@ -218,6 +231,7 @@ async def list_publications(
                 JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
                 WHERE a4.publication_id = p.id AND a4.in_perimeter = TRUE
                   AND a4.structure_ids IS NOT NULL
+                  {person_lab_filter_a4}
              ) sub
             ) AS lab_items,
             (SELECT json_agg(json_build_object(
@@ -250,7 +264,7 @@ async def list_publications(
         ORDER BY {order}
         LIMIT %s OFFSET %s
         """,
-        [filters.person_id, filters.person_id] + params + [per_page, offset],
+        [filters.person_id, filters.person_id] + extra_lab_params + params + [per_page, offset],
     )
 
     publications = [
@@ -374,6 +388,15 @@ async def export_publications_csv(
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
     order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
 
+    # Cf. note dans list_publications : sur la vue personne, restreindre les
+    # labos aux authorships de cette personne.
+    if filters.person_id:
+        person_lab_filter_a3 = "AND a3.person_id = %s"
+        extra_lab_params: list[Any] = [filters.person_id]
+    else:
+        person_lab_filter_a3 = ""
+        extra_lab_params = []
+
     await cur.execute(
         f"""
         SELECT
@@ -390,6 +413,7 @@ async def export_publications_csv(
              JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
              WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
                AND a3.structure_ids IS NOT NULL
+               {person_lab_filter_a3}
             ) AS labs
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
@@ -406,7 +430,7 @@ async def export_publications_csv(
         WHERE {where_clause}
         ORDER BY {order}
         """,
-        params,
+        extra_lab_params + params,
     )
 
     buf = io.StringIO()
