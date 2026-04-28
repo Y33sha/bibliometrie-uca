@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict G5nf6qXZA7Qg34ccJ0DSXPUdmz03kB5PgbXiAFHvbVj55GYblT5v2KJj5zUzUk6
+\restrict eRNfjF3k88uwSBRcWJsdg66p6gTHYaBihDaS09ol8wyOPEIfcoNg4RVW4GbUHMl
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -957,7 +957,8 @@ CREATE TABLE public.source_authorships (
     roles text[] DEFAULT ARRAY['author'::text],
     source_data jsonb,
     authorship_id integer,
-    raw_author_name text
+    raw_author_name text,
+    identifiers jsonb
 );
 
 
@@ -2694,5 +2695,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict G5nf6qXZA7Qg34ccJ0DSXPUdmz03kB5PgbXiAFHvbVj55GYblT5v2KJj5zUzUk6
+\unrestrict eRNfjF3k88uwSBRcWJsdg66p6gTHYaBihDaS09ol8wyOPEIfcoNg4RVW4GbUHMl
 

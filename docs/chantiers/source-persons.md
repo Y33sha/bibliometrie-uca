@@ -103,20 +103,59 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 
 ## Phasage proposé
 
-### Phase 0 — Validation
-- [ ] Re-vérifier les lectures de `source_persons` listées dans l'audit (`fetch_unlinked_authorships`, `person_profile`, `hal_duplicate_accounts`, `repair_hal_nokey_source_persons.py`, `fetch_hal_account_to_person_map`)
-- [ ] Identifier d'éventuelles autres lectures côté frontend / API
-- [ ] Décider de la stratégie de test de non-régression (snapshot des `persons` et `authorships` avant migration)
+### Phase 0 — Validation ✅
+- [x] Re-vérifier les lectures de `source_persons` (cf. liste ci-dessous)
+- [x] Identifier d'éventuelles autres lectures côté frontend / API → **aucune** côté front/API directs ✅
+- [x] Définir la stratégie de test de non-régression : snapshot avant migration (cf. ci-dessous)
+
+**Carte complète des lecteurs/écritures (post-validation)**
+
+| Composant | Type | Cas conservé après migration ? | Action |
+|---|---|---|---|
+| `fetch_unlinked_authorships` (`queries/persons/create.py`) | Read | partiel | Adapter pour lire `source_authorships.identifiers` au lieu du JOIN `source_persons` quand source non-éligible |
+| `fetch_hal_account_to_person_map` (`queries/persons/create.py`) | Read | oui | Inchangé (HAL+hal_person_id conservé) |
+| `person_profile` (`queries/persons/detail.py`) | Read | partiel | SQL HAL/WoS authors adapté pour `identifiers` |
+| `hal_duplicate_accounts` (`queries/persons/admin.py`) | Read | oui | Inchangé |
+| **`authorships_stats` / `authorships_facets` / `_uca_authors_cte` (`queries/authorships.py`)** | Read | non | **Réécrire** : itérer sur `source_authorships` au lieu de `source_persons`, lire `identifiers` JSONB |
+| `link_authorship` dual-write (`person_repository/_authorships.py`) | Write | oui (HAL) | Inchangé |
+| `add_identifier` dual-write (`person_repository/_identifiers.py`) | Write | oui (idhal sur HAL) | Inchangé |
+| `merge_persons` (`person_repository/_core.py`) | Write | oui | Inchangé |
+| `_SOURCE_CONFIG` (`application/persons.py`) | Config | partiel | Retirer entries OA/WoS/CrossRef (et HAL/ScanR/theses sans ID stable) |
+| `repair_hal_nokey_source_persons.py` (CLI) | Write | non | Suppression (cas qui ne se produira plus) |
+| `backfill_idhal_person_identifiers.py` (CLI) | Read | oui (HAL) | Inchangé |
+| `merge_duplicate_theses.py` (CLI) | Read | partiel | Adapter — JOIN conditionnel selon présence PPN |
+| `merge_person_duplicates_by_lab.py` (CLI) | Read | partiel | Compteurs HAL/OA à adapter (OA n'aura plus de `source_person_id`) |
+| `deduplicate_hal_source_authorships.py` (CLI) | Read+Write | oui (HAL) | Restera utile pour les HAL+hal_person_id, à toiletter |
+| `cleanup_wos_duplicate_authorships.py` (CLI) | Write | non | Devient obsolète |
+| `domain/person.py::PersonSourceIds` | Model | oui | Inchangé (encore utilisé pour HAL `source_ids`) |
+
+**Stratégie de test de non-régression**
+- Avant migration : snapshot `pg_dump` des tables `persons`, `person_identifiers`, `source_authorships` (sur la base sandbox).
+- Après chaque phase : compteurs comparatifs :
+  - `SELECT count(*) FROM persons` → strictement stable (ne doit pas changer)
+  - `SELECT source, count(*) FROM source_persons GROUP BY source` → drop attendu pour OA/WoS/CrossRef ; HAL/ScanR/theses doivent baisser proportionnellement aux `nokey-*`/`scanr-<seq>`/`nokey-*` synthétiques
+  - `SELECT count(*) FROM source_authorships WHERE person_id IS NOT NULL` → strictement stable
+  - `SELECT count(*) FROM person_identifiers WHERE status = 'confirmed'` → strictement stable
+- Tests d'intégration impactés (cf. `tests/integration/`) à faire passer entre chaque phase.
+- Smoke test UI : page personne, admin authorships, admin HAL doublons.
 
 ### Phase 1 — Préparer `source_authorships`
-- [ ] Migration SQL : `ALTER TABLE source_authorships ADD COLUMN identifiers jsonb`
-- [ ] Backfill : pour chaque `source_authorships`, copier les champs identifiants de `source_persons` joint via `source_person_id` :
-  - `orcid` → `identifiers.orcid`
-  - `idref` → `identifiers.idref`
-  - `source_ids->>'idhal'` → `identifiers.idhal`
-  - `source_ids->>'hal_person_id'` → `identifiers.hal_person_id`
-  - `source_ids->>'researcher_id'` (WoS) → `identifiers.researcher_id`
-- [ ] Index GIN sur `identifiers` si les requêtes de matching cross-source en justifient le coût
+- [x] Migration SQL : [`010_add_identifiers_to_source_authorships.sql`](../../infrastructure/db/migrations/010_add_identifiers_to_source_authorships.sql) — `ALTER TABLE source_authorships ADD COLUMN identifiers jsonb`. Schema only, **pas de backfill dans la migration**.
+- [x] Script de backfill : [`interfaces/cli/backfill_source_authorships_identifiers.py`](../../interfaces/cli/backfill_source_authorships_identifiers.py)
+  - Cursor sur `sa.id` (clé primaire indexée), batches paramétrables (`--batch-size`, défaut 10 000)
+  - Logs de progression + ETA par batch
+  - Idempotent par défaut (skip rows où `identifiers IS NULL`), `--force` pour tout réécrire
+  - `--dry-run` pour compter sans UPDATE
+  - Mapping :
+    - `sp.orcid` → `identifiers.orcid`
+    - `sp.idref` → `identifiers.idref`
+    - `sp.source_ids->>'idhal'` → `identifiers.idhal`
+    - `sp.source_ids->>'hal_person_id'` → `identifiers.hal_person_id`
+    - `sp.source_ids->>'researcher_id'` → `identifiers.researcher_id`
+  - Rows où aucun identifiant n'est présent : `identifiers` reste NULL (via `jsonb_strip_nulls` + filtre `!= '{}'::jsonb`)
+  - Reprise après KeyboardInterrupt : commit du dernier batch terminé
+- [ ] Index GIN sur `identifiers` si les requêtes de matching cross-source en justifient le coût (à reconsidérer après les phases 2-3)
+- [ ] Application : `python -m infrastructure.db.migrate` puis `python -m interfaces.cli.backfill_source_authorships_identifiers`
 
 ### Phase 2 — Réécriture des normalizers concernés
 - [ ] OpenAlex : ne plus écrire `source_persons`, mettre les identifiants directement sur `source_authorships.identifiers`
