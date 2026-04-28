@@ -113,73 +113,35 @@ def upsert_scanr_source_person_by_idref(
     return row["id"] if isinstance(row, dict) else row[0]
 
 
-def find_scanr_source_person_by_name(
-    cur: Any, *, full_name: str, first_name: str | None
-) -> int | None:
-    """Cherche un `source_persons` ScanR (sans idref) par nom exact."""
-    cur.execute(
-        """
-        SELECT id FROM source_persons
-        WHERE source = 'scanr'
-          AND source_id LIKE 'scanr-%%'
-          AND full_name = %s
-          AND first_name IS NOT DISTINCT FROM %s
-        LIMIT 1
-        """,
-        (full_name, first_name),
-    )
-    row = cur.fetchone()
-    if row is None:
-        return None
-    return row["id"] if isinstance(row, dict) else row[0]
-
-
-def insert_scanr_source_person_new(
-    cur: Any,
-    *,
-    full_name: str,
-    last_name: str | None,
-    first_name: str | None,
-    orcid: str | None,
-) -> int:
-    """Crée un nouveau `source_persons` ScanR sans `idref`, avec `source_id` séquentiel."""
-    cur.execute("SELECT nextval('source_persons_id_seq')")
-    row = cur.fetchone()
-    next_id = row["nextval"] if isinstance(row, dict) else row[0]
-    source_id = f"scanr-{next_id}"
-    cur.execute(
-        """
-        INSERT INTO source_persons
-            (id, source, source_id, full_name, last_name, first_name, orcid)
-        VALUES (%s, 'scanr', %s, %s, %s, %s, %s)
-        RETURNING id
-        """,
-        (next_id, source_id, full_name, last_name, first_name, orcid),
-    )
-    inserted = cur.fetchone()
-    return inserted["id"] if isinstance(inserted, dict) else inserted[0]
-
-
 def upsert_scanr_source_authorship(
     cur: Any,
     *,
     source_publication_id: int,
-    source_person_id: int,
+    source_person_id: int | None,
     author_position: int,
     roles: list[str] | None,
     raw_author_name: str | None,
+    identifiers: Any,
 ) -> int:
-    """UPSERT d'une `source_authorships` ScanR. Retourne l'id."""
+    """UPSERT d'une `source_authorships` ScanR. Retourne l'id.
+
+    `source_person_id` peut être NULL : depuis le chantier source_persons,
+    seuls les auteurs avec idref génèrent un row dans `source_persons`.
+    Les autres écrivent uniquement la `source_authorships` avec
+    `identifiers={"orcid": ...}` (et éventuellement `idref` si présent
+    sans qu'on ait jugé utile de créer un source_persons).
+    """
     cur.execute(
         """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position, roles,
-             author_name_normalized, raw_author_name)
-        VALUES ('scanr', %s, %s, %s, %s, normalize_name_form(%s), %s)
+             author_name_normalized, raw_author_name, identifiers)
+        VALUES ('scanr', %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             author_name_normalized = EXCLUDED.author_name_normalized,
             roles = EXCLUDED.roles,
-            raw_author_name = EXCLUDED.raw_author_name
+            raw_author_name = EXCLUDED.raw_author_name,
+            identifiers = EXCLUDED.identifiers
         RETURNING id
         """,
         (
@@ -189,6 +151,7 @@ def upsert_scanr_source_authorship(
             roles,
             raw_author_name,
             raw_author_name,
+            identifiers,
         ),
     )
     row = cur.fetchone()
@@ -272,37 +235,16 @@ class PgScanrNormalizeQueries:
             orcid=orcid,
         )
 
-    def find_scanr_source_person_by_name(
-        self, cur: Any, *, full_name: str, first_name: str | None
-    ) -> int | None:
-        return find_scanr_source_person_by_name(cur, full_name=full_name, first_name=first_name)
-
-    def insert_scanr_source_person_new(
-        self,
-        cur: Any,
-        *,
-        full_name: str,
-        last_name: str | None,
-        first_name: str | None,
-        orcid: str | None,
-    ) -> int:
-        return insert_scanr_source_person_new(
-            cur,
-            full_name=full_name,
-            last_name=last_name,
-            first_name=first_name,
-            orcid=orcid,
-        )
-
     def upsert_scanr_source_authorship(
         self,
         cur: Any,
         *,
         source_publication_id: int,
-        source_person_id: int,
+        source_person_id: int | None,
         author_position: int,
         roles: list[str] | None,
         raw_author_name: str | None,
+        identifiers: Any,
     ) -> int:
         return upsert_scanr_source_authorship(
             cur,
@@ -311,6 +253,7 @@ class PgScanrNormalizeQueries:
             author_position=author_position,
             roles=roles,
             raw_author_name=raw_author_name,
+            identifiers=identifiers,
         )
 
     def get_scanr_publication_id(self, cur: Any, scanr_id: str) -> int | None:

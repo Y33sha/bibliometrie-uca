@@ -43,29 +43,16 @@ class ScanrNormalizeQueries(Protocol):
         orcid: str | None,
     ) -> int: ...
 
-    def find_scanr_source_person_by_name(
-        self, cur: Any, *, full_name: str, first_name: str | None
-    ) -> int | None: ...
-
-    def insert_scanr_source_person_new(
-        self,
-        cur: Any,
-        *,
-        full_name: str,
-        last_name: str | None,
-        first_name: str | None,
-        orcid: str | None,
-    ) -> int: ...
-
     def upsert_scanr_source_authorship(
         self,
         cur: Any,
         *,
         source_publication_id: int,
-        source_person_id: int,
+        source_person_id: int | None,
         author_position: int,
         roles: list[str] | None,
         raw_author_name: str | None,
+        identifiers: Any,
     ) -> int: ...
 
     def get_scanr_publication_id(self, cur: Any, scanr_id: str) -> int | None: ...
