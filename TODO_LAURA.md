@@ -1,8 +1,6 @@
 # A régler avant transmission
 ## Pipeline
-### Fix rapides
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
-### Chantiers plus importants
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation => oui, mais pas authorships canoniques. Pruning dans build_authorships?
@@ -10,7 +8,7 @@
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
-* [ ] authorships excluded: info perdue si réimport => grave?
+* [ ] cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
 * [ ] in perimeter: true, false, null? limiter les cross-imports à null et true?
