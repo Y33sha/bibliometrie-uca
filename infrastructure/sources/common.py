@@ -22,6 +22,10 @@ from domain.sources import ALL_SOURCES_SET as VALID_SOURCES
 def get_cross_import_dois(conn: Any, target: str, all_staged: bool = False) -> list[str]:
     """Retourne les DOI présents dans les autres sources staging mais absents de la cible.
 
+    Comparaison directe sur `doi` : tous les DOIs sont stockés en minuscules
+    (cf. `domain.publication._normalize_doi`), donc plus besoin d'un cas
+    spécial par source. Préserve l'utilisation de l'index btree `idx_staging_doi`.
+
     Args:
         conn: connexion psycopg3
         target: clé source cible (hal, openalex, wos, scanr)
@@ -32,25 +36,14 @@ def get_cross_import_dois(conn: Any, target: str, all_staged: bool = False) -> l
 
     processed_filter = "" if all_staged else " AND processed = FALSE"
 
-    # ScanR stocke les DOI en casse variable → comparaison case-insensitive
-    if target == "scanr":
-        query = f"""
-            SELECT DISTINCT doi FROM staging
-            WHERE source != %s AND doi IS NOT NULL{processed_filter}
-              AND lower(doi) NOT IN (
-                  SELECT lower(doi) FROM staging WHERE source = %s AND doi IS NOT NULL
-              )
-            ORDER BY doi
-        """
-    else:
-        query = f"""
-            SELECT DISTINCT doi FROM staging
-            WHERE source != %s AND doi IS NOT NULL{processed_filter}
-              AND doi NOT IN (
-                  SELECT doi FROM staging WHERE source = %s AND doi IS NOT NULL
-              )
-            ORDER BY doi
-        """
+    query = f"""
+        SELECT DISTINCT doi FROM staging
+        WHERE source != %s AND doi IS NOT NULL{processed_filter}
+          AND doi NOT IN (
+              SELECT doi FROM staging WHERE source = %s AND doi IS NOT NULL
+          )
+        ORDER BY doi
+    """
 
     with conn.cursor() as cur:
         cur.execute(query, (target, target))
