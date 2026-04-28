@@ -173,6 +173,8 @@ def phase_normalize(**kw: Any) -> Any:
     # lors de `refresh_from_sources`.
     if "theses" in sources:
         _run_normalize_theses()
+    if "crossref" in sources:
+        _run_normalize_crossref()
     if "scanr" in sources:
         _run_normalize_scanr()
     if "hal" in sources:
@@ -545,6 +547,32 @@ def _run_normalize_theses() -> None:
         address_linker=PgAddressLinker(),
     ).run([])
     log.info("✓ normalize_theses terminé en %.1fs", time.time() - t0)
+
+
+def _run_normalize_crossref() -> None:
+    from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.normalize_crossref import PgCrossrefNormalizeQueries
+    from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.repositories import (
+        journal_repository,
+        publication_repository,
+        publisher_repository,
+    )
+
+    log.info("▶ normalize_crossref")
+    t0 = time.time()
+    conn = get_connection()
+    CrossrefNormalizer(
+        conn,
+        log,
+        PgStagingQueries(),
+        PgCrossrefNormalizeQueries(),
+        journal_repo_factory=journal_repository,
+        publisher_repo_factory=publisher_repository,
+        pub_repo_factory=publication_repository,
+    ).run([])
+    log.info("✓ normalize_crossref terminé en %.1fs", time.time() - t0)
 
 
 def _run_enrich_oa_status() -> None:
