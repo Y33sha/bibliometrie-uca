@@ -252,26 +252,6 @@ def delete_wos_duplicate_authorships(cur: Any) -> int:
     return cur.rowcount
 
 
-def delete_wos_orphan_legacy_source_persons(cur: Any) -> int:
-    """Supprime les `source_persons` WoS legacy (``source_id`` ``wos-XXXX``,
-    sans ``daisng_id``) devenus orphelins après cleanup des doublons.
-
-    Ces rows provenaient d'un ancien code qui créait des identifiants
-    synthétiques quand l'API WoS ne renvoyait pas de daisng_id ; le code
-    actuel skip ce cas. Retourne le nombre de lignes supprimées.
-    """
-    cur.execute("""
-        DELETE FROM source_persons
-        WHERE source = 'wos'
-          AND source_id LIKE 'wos-%%'
-          AND NOT EXISTS (
-              SELECT 1 FROM source_authorships
-              WHERE source_person_id = source_persons.id
-          )
-    """)
-    return cur.rowcount
-
-
 class PgWosNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_wos.WosNormalizeQueries`."""
 
@@ -312,9 +292,6 @@ class PgWosNormalizeQueries:
 
     def delete_wos_duplicate_authorships(self, cur: Any) -> int:
         return delete_wos_duplicate_authorships(cur)
-
-    def delete_wos_orphan_legacy_source_persons(self, cur: Any) -> int:
-        return delete_wos_orphan_legacy_source_persons(cur)
 
     def clear_source_authorships_for_publication(
         self, cur: Any, source_publication_id: int
