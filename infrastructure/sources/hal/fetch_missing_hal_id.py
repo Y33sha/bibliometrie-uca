@@ -38,42 +38,51 @@ log = setup_logger("fetch_missing_hal_id", os.path.join(os.path.dirname(__file__
 
 def find_hal_primary_locations(cur: Any) -> list[dict]:
     """
-    Trouve les works OpenAlex dont la primary_location pointe vers HAL.
+    Trouve les HAL IDs référencés par OpenAlex mais absents de staging_hal.
 
     Deux sources :
     - staging non normalisé (raw_data.primary_location) — nouveaux docs du run en cours
     - source_publications déjà normalisés (external_ids->>'hal') — docs des runs précédents
 
-    Retourne [{openalex_id, hal_id, landing_url}, ...]
-    """
-    results = {}
+    Filtrage en SQL :
+    - extraction de l'URL via JSONB path (évite de remonter les raw_data
+      complets en Python — gain perf décisif sur les méga-papers OA)
+    - filtrage `LIKE '%hal.science%' / '%hal.archives-ouvertes.fr%'` côté SQL
+    - dédup `NOT EXISTS staging_hal` en batch après extraction des hal_ids
+      (l'extraction depuis l'URL passe par une regex Python pas trivialement
+      reproductible en SQL, donc ce filtre se fait en post-traitement).
 
-    # 1. Staging non normalisé (raw_data encore présent)
+    Retourne [{openalex_id, hal_id, landing_url}, ...] absents de staging_hal.
+    """
+    results: dict[str, dict] = {}
+
+    # 1. Staging OA non normalisé : extraire l'URL via JSONB path en SQL.
     cur.execute("""
-        SELECT source_id AS openalex_id, raw_data
+        SELECT source_id AS openalex_id,
+               raw_data->'primary_location'->>'landing_page_url' AS url
         FROM staging
-        WHERE source = 'openalex' AND processed = FALSE
+        WHERE source = 'openalex'
+          AND processed = FALSE
+          AND (
+              raw_data->'primary_location'->>'landing_page_url' ILIKE '%hal.science%'
+              OR raw_data->'primary_location'->>'landing_page_url' ILIKE '%hal.archives-ouvertes.fr%'
+          )
     """)
     for row in cur.fetchall():
-        raw = row["raw_data"]
-        loc = raw.get("primary_location") or {}
-        url = loc.get("landing_page_url") or ""
-        if "hal.science" not in url and "hal.archives-ouvertes.fr" not in url:
-            continue
-        hal_id = extract_hal_id_from_url(url)
+        hal_id = extract_hal_id_from_url(row["url"])
         if hal_id:
             results[hal_id] = {
                 "openalex_id": row["openalex_id"],
                 "hal_id": hal_id,
-                "landing_url": url,
+                "landing_url": row["url"],
             }
 
-    # 2. Source documents déjà normalisés (docs des runs précédents)
+    # 2. Source publications OA déjà normalisés.
     cur.execute("""
-        SELECT sd.source_id AS openalex_id, sd.external_ids->>'hal' AS hal_id
-        FROM source_publications sd
-        WHERE sd.source = 'openalex'
-          AND sd.external_ids->>'hal' IS NOT NULL
+        SELECT source_id AS openalex_id, external_ids->>'hal' AS hal_id
+        FROM source_publications
+        WHERE source = 'openalex'
+          AND external_ids->>'hal' IS NOT NULL
     """)
     for row in cur.fetchall():
         hal_id = row["hal_id"]
@@ -84,7 +93,15 @@ def find_hal_primary_locations(cur: Any) -> list[dict]:
                 "landing_url": None,
             }
 
-    return list(results.values())
+    # 3. Filtrer ceux déjà en staging_hal (batch NOT EXISTS).
+    if not results:
+        return []
+    cur.execute(
+        "SELECT source_id FROM staging WHERE source = 'hal' AND source_id = ANY(%s)",
+        (list(results.keys()),),
+    )
+    already_staged = {r["source_id"] for r in cur.fetchall()}
+    return [r for hal_id, r in results.items() if hal_id not in already_staged]
 
 
 def find_hal_ids_from_scanr(cur: Any) -> list[dict]:
@@ -195,21 +212,6 @@ def fetch_hal_by_nnt(nnt: str, *, base_url: str) -> dict | None:
         return None
 
 
-def find_missing_hal_ids(cur: Any, hal_refs: list[dict]) -> list[dict]:
-    """Filtre pour ne garder que les halId absents de staging_hal."""
-    if not hal_refs:
-        return []
-
-    hal_ids = [r["hal_id"] for r in hal_refs]
-    cur.execute(
-        "SELECT source_id FROM staging WHERE source = 'hal' AND source_id = ANY(%s)", (hal_ids,)
-    )
-    existing = {row["source_id"] for row in cur.fetchall()}
-
-    missing = [r for r in hal_refs if r["hal_id"] not in existing]
-    return missing
-
-
 def fetch_hal_document(hal_id: str, *, base_url: str) -> dict | None:
     """Télécharge un document depuis l'API HAL."""
     try:
@@ -297,11 +299,11 @@ def main() -> Any:
     # 1. Trouver les HAL IDs manquants depuis OpenAlex et ScanR
     log.info("Recherche des works OpenAlex avec primary_location HAL...")
     hal_refs_oa = find_hal_primary_locations(cur)
-    log.info(f"  {len(hal_refs_oa)} works OpenAlex pointent vers HAL")
+    log.info(f"  {len(hal_refs_oa)} halIds OpenAlex absents de staging_hal")
 
     log.info("Recherche des HAL IDs dans ScanR...")
     hal_refs_scanr = find_hal_ids_from_scanr(cur)
-    log.info(f"  {len(hal_refs_scanr)} HAL IDs ScanR absents de staging_hal")
+    log.info(f"  {len(hal_refs_scanr)} halIds ScanR absents de staging_hal")
 
     if args.mode == "full":
         log.info("Recherche des NNT sans document HAL...")
@@ -311,14 +313,10 @@ def main() -> Any:
         nnt_refs = []
         log.info("NNT ignoré en mode %s", args.mode)
 
-    # 2. Identifier ceux absents de staging_hal (OpenAlex)
-    missing_oa = find_missing_hal_ids(cur, hal_refs_oa)
-    log.info(f"  {len(missing_oa)} halIds OpenAlex absents de staging_hal")
-
     # Combiner et dédupliquer par hal_id
     seen_hal_ids = set()
     missing = []
-    for ref in missing_oa + hal_refs_scanr:
+    for ref in hal_refs_oa + hal_refs_scanr:
         if ref["hal_id"] not in seen_hal_ids:
             seen_hal_ids.add(ref["hal_id"])
             missing.append(ref)
@@ -326,11 +324,10 @@ def main() -> Any:
 
     if args.stats:
         log.info("--- Statistiques ---")
-        log.info(f"  Works OA → HAL : {len(hal_refs_oa)}")
-        log.info(f"  HAL IDs ScanR : {len(hal_refs_scanr)}")
+        log.info(f"  halIds OA absents de staging_hal : {len(hal_refs_oa)}")
+        log.info(f"  halIds ScanR absents de staging_hal : {len(hal_refs_scanr)}")
         log.info(f"  NNT sans HAL : {len(nnt_refs)}")
-        log.info(f"  Manquants OA : {len(missing_oa)}")
-        log.info(f"  Total manquants halId (dédupliqués) : {len(missing)}")
+        log.info(f"  Total halIds manquants (dédupliqués) : {len(missing)}")
         conn.close()
         return
 
