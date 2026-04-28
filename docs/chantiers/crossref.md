@@ -1,6 +1,6 @@
 # Chantier — Exploitation de l'API CrossRef
 Commencé le 2026-04-27
-Terminé le
+**En pause depuis 2026-04-28** — phases 1 et 2 livrées (ingestion + arbitrage `doc_type` avec gestion type / sous-type). Phases 3-5 (promotion ORCID, discovery, relations) reportées : sur l'échantillon CrossRef actuel (dominé par des méga-papers JAMA sans ORCID), l'utilité concrète est trop faible pour valider la logique. Reprise envisageable quand le corpus CrossRef sera plus représentatif (= cycles d'ingestion supplémentaires sur des DOIs non-mega) et qu'on pourra mesurer a priori l'impact de la promotion `pending → confirmed`.
 
 ## Contexte
 
@@ -100,26 +100,25 @@ Découpage proposé (chaque phase = chantier autonome mergeable indépendamment)
 - [x] Tests unit : `TestCrossRefDocTypeMap` (couverture taxonomie) + `TestFirstDocTypeArbitration` (5 cas d'arbitrage).
 - **Pas de migration nécessaire** : `refresh_from_sources` consomme déjà `_first_doc_type`, le changement est transparent au prochain refresh des publis CrossRef-touchées.
 
-### Phase 3 — Promotion d'ORCID `pending` → `confirmed`
-- Pour chaque `source_authorship` CrossRef portant un ORCID, matcher avec `person_identifiers` (id_type=orcid).
-- Si l'ORCID y figure en statut `pending` ET que la `source_authorship` CrossRef est rattachée à la même `person_id` que celle associée à l'ORCID dans `person_identifiers`, alors on dispose d'une **preuve article-level** côté éditeur que cet ORCID appartient bien à cette personne → promotion en `confirmed`.
-- Phase pipeline `crossref_promote_orcids`.
-- **Livrable** : ORCIDs `pending` accumulés via OA promus en `confirmed` quand CrossRef les corrobore.
+### Phase 3 — Promotion d'ORCID `pending` → `confirmed` ⏸ (en pause)
 
-### Phase 4 — Discovery via ORCID confirmé (conditionnelle)
-**Gate exploratoire avant toute implémentation.**
-- Pour un échantillon d'ORCIDs confirmés, interroger `filter=orcid:<ORCID>` sur CrossRef et confronter aux DOI déjà connus toutes sources confondues.
-- Mesurer combien de DOI **nouveaux** seraient remontés.
-- **Décision conditionnelle** :
-  - Si gain nul ou marginal → abandon de la phase 4.
-  - Si gain significatif → ré-ouvrir la décision sur la politique d'ingestion (auto vs. validation manuelle), puis implémenter.
-- **Livrable de la phase exploratoire** : note chiffrée (peut rejoindre `docs/chantiers/crossref-spike.md`) — go/no-go pour l'implémentation.
+Concept : pour chaque `source_authorship` CrossRef portant un ORCID, si cet ORCID figure dans `person_identifiers` en statut `pending` ET que l'authorship est rattachée à la même `person_id` (validée par cross-source ≠ tautologie via l'ORCID lui-même), alors on a une preuve article-level côté éditeur → promotion en `confirmed`.
 
-### Phase 5 — Relations entre publications
-- Migration : création de `publication_relations` (cross-source dès le départ)
-- Extraction du champ `relation` de CrossRef vers cette table
-- Affichage UI à concevoir séparément (chantier TODO_LAURA.md ligne 82)
-- **Livrable** : table peuplée, exploitable par le frontend dans un chantier ultérieur
+**Subtilité de logique identifiée** : le pipeline persons rattache via 4 étapes (HAL accounts, cross-source, IdRef/ORCID connu, name forms). Si l'ORCID pending est lui-même la clé de rattachement (Étape 2), la promotion devient circulaire. Pour valider la promotion il faut vérifier qu'une AUTRE source à la même position confirme la `person_id` indépendamment de l'ORCID. SQL d'exploration prêt (cf. discussion 2026-04-28).
+
+**Mise en pause** : sur l'échantillon CrossRef actuel, 0 ORCID candidat trouvé (échantillon dominé par des méga-papers JAMA sans ORCID). Reprise quand le corpus CrossRef sera plus représentatif et que la mesure a priori sera fiable.
+
+### Phase 4 — Discovery via ORCID confirmé ⏸ (en pause)
+
+Gate exploratoire avant toute implémentation : pour un échantillon d'ORCIDs confirmés, interroger `filter=orcid:<ORCID>` sur CrossRef et confronter aux DOI déjà connus toutes sources confondues. Décision go/no-go selon le gain en DOI nouveaux.
+
+**Mise en pause** : reportée en attendant un volume CrossRef représentatif et un set d'ORCIDs UCA confirmés stable.
+
+### Phase 5 — Relations entre publications ⏸ (en pause)
+
+Migration : création de `publication_relations` (cross-source) + extraction du champ `relation` de CrossRef. Affichage UI à concevoir séparément (TODO_LAURA.md ligne 82).
+
+**Mise en pause** : sur l'échantillon spike, ~2 % de couverture relations — bénéfice immédiat trop modeste pour prioriser. Reprise quand le corpus CrossRef sera plus volumineux ou si un besoin UI spécifique émerge.
 
 ## Considérations techniques
 
