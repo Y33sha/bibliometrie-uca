@@ -326,6 +326,93 @@ class TestWoSDocTypeMap:
             assert map_doc_type(t, "wos") != "other", f"{t} non mappé"
 
 
+# ── CrossRef ────────────────────────────────────────────────────
+
+
+class TestCrossRefDocTypeMap:
+    def test_covers_common_types(self):
+        for t in [
+            "journal-article",
+            "book-chapter",
+            "book",
+            "monograph",
+            "edited-book",
+            "proceedings-article",
+            "posted-content",
+            "dissertation",
+            "peer-review",
+            "report",
+        ]:
+            assert map_doc_type(t, "crossref") != "other", f"{t} non mappé"
+
+    def test_all_values_valid(self):
+        for v in _SOURCE_MAPS["crossref"].values():
+            assert v in VALID_DOC_TYPES_SET, f"Type inconnu : {v}"
+
+
+# ── _first_doc_type : arbitrage type vs sous-type ───────────────
+
+
+class TestFirstDocTypeArbitration:
+    """Arbitrage CrossRef (`journal-article`) vs sous-type plus précis."""
+
+    def _setup(self):
+        from application.publications import _first_doc_type
+
+        return _first_doc_type
+
+    def test_crossref_article_yields_to_hal_review(self):
+        """CrossRef `journal-article` ne doit pas écraser un sous-type
+        review fourni par HAL (priorité moindre)."""
+        first = self._setup()
+        rows = [
+            {"source": "crossref", "doc_type": "journal-article"},  # priorité 2
+            {"source": "hal", "doc_type": "art_artrev"},  # priorité 4 → review
+        ]
+        assert first(rows) == "review"
+
+    def test_crossref_book_chapter_kept(self):
+        """CrossRef `book-chapter` est mappé directement, pas un sous-type
+        d'article : la règle d'arbitrage ne s'applique pas."""
+        first = self._setup()
+        rows = [
+            {"source": "crossref", "doc_type": "book-chapter"},
+            {"source": "hal", "doc_type": "art_artrev"},
+        ]
+        assert first(rows) == "book_chapter"
+
+    def test_crossref_article_no_subtype_falls_back(self):
+        """CrossRef `journal-article` sans sous-type ailleurs → article."""
+        first = self._setup()
+        rows = [
+            {"source": "crossref", "doc_type": "journal-article"},
+            {"source": "hal", "doc_type": "art"},
+        ]
+        assert first(rows) == "article"
+
+    def test_subtype_in_priority_source_kept(self):
+        """Si la source prioritaire (theses) donne un type spécifique,
+        l'arbitrage n'intervient pas."""
+        first = self._setup()
+        rows = [
+            {"source": "theses", "doc_type": "thesis"},
+            {"source": "crossref", "doc_type": "journal-article"},
+        ]
+        assert first(rows) == "thesis"
+
+    def test_empty_rows_returns_other(self):
+        first = self._setup()
+        assert first([]) == "other"
+
+    def test_all_null_doc_type_returns_other(self):
+        first = self._setup()
+        rows = [
+            {"source": "crossref", "doc_type": None},
+            {"source": "hal", "doc_type": None},
+        ]
+        assert first(rows) == "other"
+
+
 # ── NNT ─────────────────────────────────────────────────────────
 
 from application.pipeline.normalize.openalex_parsing import (
