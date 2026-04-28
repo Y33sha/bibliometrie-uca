@@ -136,6 +136,11 @@
     onFilterChange();
   }
 
+  function exportCsvUrl(): string {
+    const params = buildFilterParams();
+    return `${base}/api/publications/export-theses.csv?${params}`;
+  }
+
   const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 
   function formatDate(iso: string | null): { month: string; year: string } | null {
@@ -176,14 +181,9 @@
 
 <svelte:head><title>Thèses — Bibliométrie UCA</title></svelte:head>
 
-<div class="page-header">
-  <h2>Thèses</h2>
-  <span class="result-count">{pubs.total} résultats</span>
-</div>
-
-<div class="toolbar">
+<div class="toolbar toolbar-card toolbar-sticky">
   <input
-    type="search"
+    type="text"
     placeholder="Rechercher par titre..."
     bind:value={search}
     oninput={onSearchInput}
@@ -194,21 +194,20 @@
       }
     }}
   />
-
-  <div class="facets">
-    <FacetDropdown label="Année" options={facets.options.years} bind:selected={selectedYears} onchange={() => onFilterChange()} />
-    <FacetDropdown label="Laboratoire" options={facets.options.labs} bind:selected={selectedLabs} onchange={(v: string[]) => onLabChange(v)} />
-    <FacetDropdown label="Statut" options={facets.options.status} bind:selected={selectedStatus} onchange={() => onFilterChange()} />
-    <FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={() => onFilterChange()} />
-    <SourceFilterToggle
-      sources={[
-        { key: 'hal', label: 'HAL' },
-        { key: 'oa', label: 'OpenAlex' },
-        { key: 'scanr', label: 'ScanR' },
-        { key: 'theses', label: 'theses.fr' },
-      ]}
-      bind:states={sourceStates} counts={facets.sourceCounts} onchange={() => onFilterChange()} />
-  </div>
+  <FacetDropdown label="Année" options={facets.options.years} bind:selected={selectedYears} onchange={() => onFilterChange()} />
+  <FacetDropdown label="Laboratoire" options={facets.options.labs} bind:selected={selectedLabs} onchange={(v: string[]) => onLabChange(v)} />
+  <FacetDropdown label="Statut" options={facets.options.status} bind:selected={selectedStatus} onchange={() => onFilterChange()} />
+  <FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={() => onFilterChange()} />
+  <SourceFilterToggle
+    sources={[
+      { key: 'hal', label: 'HAL' },
+      { key: 'oa', label: 'OpenAlex' },
+      { key: 'scanr', label: 'ScanR' },
+      { key: 'theses', label: 'theses.fr' },
+    ]}
+    bind:states={sourceStates} counts={facets.sourceCounts} onchange={() => onFilterChange()} />
+  <span class="count">{pubs.total} thèse{pubs.total > 1 ? 's' : ''}</span>
+  <a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 </div>
 
 <table class="data-table">
@@ -305,45 +304,7 @@
 />
 
 <style>
-  .page-header {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    margin-bottom: 8px;
-  }
-  .page-header h2 {
-    margin: 0;
-    font-size: 1.2rem;
-  }
-  .result-count {
-    font-size: 0.85rem;
-    color: var(--muted);
-  }
-
-  .toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-    position: sticky;
-    top: 46px;
-    background: var(--bg);
-    padding: 6px 0;
-  }
-  .toolbar input[type="search"] {
-    width: 280px;
-    padding: 5px 10px;
-    font-size: 0.9rem;
-    font-family: inherit;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-  }
-  .facets {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
+  .toolbar input[type="text"] { width: 280px; }
 
   .data-table {
     width: 100%;

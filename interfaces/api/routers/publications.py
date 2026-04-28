@@ -133,6 +133,38 @@ async def export_publications_csv(
     )
 
 
+@router.get("/api/publications/export-theses.csv")
+async def export_theses_csv(
+    search: str = Query(""),
+    lab_id: str = Query(""),
+    year: str = Query(""),
+    access: str = Query(""),
+    source_filter: str = Query(""),
+    doc_type: str = Query(""),
+    sort: str = Query("soutenance_desc"),
+) -> Response:
+    """Export CSV de la page thèses (filtres + tri identiques à la liste)."""
+    lab_ids, lab_none = _parse_lab_id(lab_id)
+    filters = ListFilters(
+        search=search,
+        lab_ids=lab_ids,
+        lab_none=lab_none,
+        years=parse_int_csv(year),
+        access=access,
+        source_values=parse_str_csv(source_filter),
+        doc_types=parse_str_csv(doc_type) or ["thesis", "ongoing_thesis"],
+    )
+    async with get_async_cursor() as (cur, _conn):
+        csv_content = await pub_queries.export_theses_csv(
+            cur, filters=filters, root_structure_id=await get_root_structure_id(), sort=sort
+        )
+    return Response(
+        content=csv_content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=theses.csv"},
+    )
+
+
 @router.get("/api/publications/{pub_id}", response_model=PublicationDetailResponse)
 async def get_publication(pub_id: int) -> Any:
     """Détail complet d'une publication."""

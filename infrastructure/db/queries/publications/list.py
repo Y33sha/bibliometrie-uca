@@ -22,6 +22,9 @@ from infrastructure.db.queries.filters import (
     apply_source_filter,
 )
 
+# Libellés des statuts thèse pour l'export CSV.
+_THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}
+
 
 @dataclass(frozen=True, slots=True)
 class ListFilters:
@@ -444,6 +447,109 @@ async def export_publications_csv(
                 hal_url,
                 oa_url,
                 wos_url,
+            ]
+        )
+
+    return "﻿" + buf.getvalue()
+
+
+def _build_theses_export_conditions(filters: ListFilters) -> tuple[list[str], list[Any]]:
+    """Conditions WHERE pour l'export CSV des thèses.
+
+    Diffère de `_build_export_conditions` :
+    - support des 4 sources (hal/oa/scanr/theses) via `apply_source_filter`
+    - support du filtre `access` (open/closed) — facette primaire de la page thèses.
+    """
+    conditions, params = _initial_conditions_for_export(filters)
+    _apply_inline_filters(conditions, params, filters)
+    if filters.lab_none and not filters.lab_ids:
+        apply_no_lab_filter(conditions, params)
+    elif filters.lab_ids:
+        apply_lab_filter(conditions, params, filters.lab_ids)
+    apply_source_filter(conditions, filters.source_values)
+    apply_access_filter(conditions, params, filters.access)
+    _apply_export_oa_filter(conditions, params, filters.oa_status)
+    return conditions, params
+
+
+async def export_theses_csv(
+    cur: Any, *, filters: ListFilters, root_structure_id: int, sort: str
+) -> str:
+    """Export CSV dédié à la page thèses.
+
+    Colonnes spécifiques (Inscription, Soutenance, Statut, theses.fr) au lieu
+    de Revue/Éditeur/WoS pertinents pour les publications. Tri par défaut
+    `soutenance_desc` (cohérent avec l'affichage).
+    """
+    await cur.execute("SET LOCAL jit = off")
+    conditions, params = _build_theses_export_conditions(filters)
+    where_clause = " AND ".join(conditions) if conditions else "TRUE"
+    order = _ORDER_MAP.get(sort, "p.meta->>'date_soutenance' DESC NULLS LAST, p.title")
+
+    await cur.execute(
+        f"""
+        SELECT
+            p.id, p.title, p.pub_year, p.doi, p.doc_type::text,
+            p.oa_status::text,
+            p.meta->>'date_soutenance' AS date_soutenance,
+            p.meta->>'date_inscription' AS date_inscription,
+            src_ids.hal_id, src_ids.openalex_id, src_ids.theses_id,
+            (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
+                     ORDER BY COALESCE(s.acronym, s.name))
+             FROM authorships a3
+             CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
+             JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
+             WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
+               AND a3.structure_ids IS NOT NULL
+            ) AS labs
+        FROM publications p
+        LEFT JOIN LATERAL (
+            SELECT
+                max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
+                max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
+                max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id
+            FROM source_publications sd WHERE sd.publication_id = p.id
+        ) src_ids ON TRUE
+        WHERE {where_clause}
+        ORDER BY {order}
+        """,
+        params,
+    )
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "Inscription",
+            "Soutenance",
+            "Année",
+            "Statut",
+            "Titre",
+            "DOI",
+            "Laboratoires",
+            "Voie OA",
+            "HAL",
+            "theses.fr",
+            "OpenAlex",
+        ]
+    )
+    for row in await cur.fetchall():
+        hal_url = f"https://hal.science/{row['hal_id']}" if row["hal_id"] else ""
+        oa_url = f"https://openalex.org/{row['openalex_id']}" if row["openalex_id"] else ""
+        theses_url = f"https://theses.fr/{row['theses_id']}" if row["theses_id"] else ""
+        writer.writerow(
+            [
+                row["date_inscription"] or "",
+                row["date_soutenance"] or "",
+                row["pub_year"] or "",
+                _THESES_STATUS_LABELS.get(row["doc_type"], row["doc_type"] or ""),
+                row["title"] or "",
+                row["doi"] or "",
+                row["labs"] or "",
+                row["oa_status"] or "",
+                hal_url,
+                theses_url,
+                oa_url,
             ]
         )
 
