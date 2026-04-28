@@ -315,29 +315,22 @@ def insert_source_document(
 
 
 def upsert_source_author(cur: Any, queries: ThesesNormalizeQueries, person: dict) -> int | None:
-    """Insère/retrouve un auteur theses.fr. Déduplique par PPN IdRef."""
+    """Crée un `source_persons` theses uniquement quand un PPN (idref stable)
+    est fourni. Sans PPN, retourne None : la `source_authorships` sera
+    insérée avec `source_person_id=NULL` (cf. chantier source_persons).
+    """
     nom = person.get("nom")
     prenom = person.get("prenom")
     if not nom:
         return None
 
-    full_name = f"{prenom} {nom}".strip() if prenom else nom
     ppn = person.get("ppn")
+    if not ppn:
+        return None
 
-    # Par PPN (clé fiable)
-    if ppn:
-        return queries.upsert_theses_source_person_by_ppn(
-            cur, ppn=ppn, full_name=full_name, last_name=nom, first_name=prenom
-        )
-
-    existing = queries.find_theses_source_person_by_name(
-        cur, full_name=full_name, first_name=prenom
-    )
-    if existing is not None:
-        return existing
-
-    return queries.insert_theses_source_person_new(
-        cur, full_name=full_name, last_name=nom, first_name=prenom
+    full_name = f"{prenom} {nom}".strip() if prenom else nom
+    return queries.upsert_theses_source_person_by_ppn(
+        cur, ppn=ppn, full_name=full_name, last_name=nom, first_name=prenom
     )
 
 
@@ -395,16 +388,25 @@ def process_persons(
     # Insérer les authorships avec rôles fusionnés
     position = 0
     for _key, info in person_roles.items():
-        source_person_id = upsert_source_author(cur, queries, info["person"])
-        if not source_person_id:
+        person = info["person"]
+        nom = person.get("nom")
+        if not nom:
             continue
+
+        # Avec PPN : crée le source_persons (cas légitime conservé)
+        # Sans PPN : source_person_id reste NULL (l'auteur sans idref est
+        # déjà désigné par son raw_author_name + author_position).
+        source_person_id = upsert_source_author(cur, queries, person)
 
         roles = merge_roles([info["roles"]])
         is_author = "author" in roles
 
         author_full_name = (
-            info["person"].get("prenom", "") + " " + info["person"].get("nom", "")
+            (person.get("prenom") or "") + " " + nom
         ).strip()
+
+        ppn = person.get("ppn")
+        identifiers = Json({"idref": ppn}) if ppn else None
 
         sa_id = queries.upsert_theses_source_authorship(
             cur,
@@ -413,6 +415,7 @@ def process_persons(
             author_position=position if is_author else None,
             roles=roles,
             raw_author_name=author_full_name,
+            identifiers=identifiers,
         )
 
         if addr_parts:

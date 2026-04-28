@@ -46,23 +46,16 @@ class ThesesNormalizeQueries(Protocol):
         first_name: str | None,
     ) -> int: ...
 
-    def find_theses_source_person_by_name(
-        self, cur: Any, *, full_name: str, first_name: str | None
-    ) -> int | None: ...
-
-    def insert_theses_source_person_new(
-        self, cur: Any, *, full_name: str, last_name: str, first_name: str | None
-    ) -> int: ...
-
     def upsert_theses_source_authorship(
         self,
         cur: Any,
         *,
         source_publication_id: int,
-        source_person_id: int,
+        source_person_id: int | None,
         author_position: int | None,
         roles: list[str],
         raw_author_name: str,
+        identifiers: Any,
     ) -> int: ...
 
     def get_theses_publication_id(self, cur: Any, theses_id: str) -> int | None: ...

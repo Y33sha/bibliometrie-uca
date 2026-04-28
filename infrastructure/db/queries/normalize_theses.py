@@ -137,65 +137,36 @@ def upsert_theses_source_person_by_ppn(
     return row["id"] if isinstance(row, dict) else row[0]
 
 
-def find_theses_source_person_by_name(
-    cur: Any, *, full_name: str, first_name: str | None
-) -> int | None:
-    """Cherche un `source_persons` theses.fr (sans PPN) par nom exact."""
-    cur.execute(
-        """
-        SELECT id FROM source_persons
-        WHERE source = 'theses'
-          AND source_id LIKE 'nokey-%%'
-          AND full_name = %s
-          AND first_name IS NOT DISTINCT FROM %s
-        LIMIT 1
-        """,
-        (full_name, first_name),
-    )
-    row = cur.fetchone()
-    if row is None:
-        return None
-    return row["id"] if isinstance(row, dict) else row[0]
-
-
-def insert_theses_source_person_new(
-    cur: Any, *, full_name: str, last_name: str, first_name: str | None
-) -> int:
-    """Crée un nouveau `source_persons` theses.fr sans PPN, `source_id = nokey-<seq>`."""
-    cur.execute(
-        """
-        INSERT INTO source_persons
-            (source, source_id, full_name, last_name, first_name)
-        VALUES ('theses', 'nokey-' || nextval('source_persons_id_seq'), %s, %s, %s)
-        RETURNING id
-        """,
-        (full_name, last_name, first_name),
-    )
-    row = cur.fetchone()
-    return row["id"] if isinstance(row, dict) else row[0]
-
-
 def upsert_theses_source_authorship(
     cur: Any,
     *,
     source_publication_id: int,
-    source_person_id: int,
+    source_person_id: int | None,
     author_position: int | None,
     roles: list[str],
     raw_author_name: str,
+    identifiers: Any,
 ) -> int:
-    """UPSERT d'une `source_authorships` theses.fr. `author_position` NULL pour les non-auteurs."""
+    """UPSERT d'une `source_authorships` theses.fr. `author_position` NULL pour les non-auteurs.
+
+    `source_person_id` peut être NULL : depuis le chantier source_persons,
+    seules les personnes avec PPN (= idref stable) génèrent un row dans
+    `source_persons`. Les auteurs/jury sans PPN écrivent uniquement la
+    `source_authorships` avec `identifiers` (vide en pratique pour
+    theses sans PPN, puisque le PPN était l'unique identifiant).
+    """
     cur.execute(
         """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              author_name_normalized, roles,
-             raw_author_name)
-        VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s)
+             raw_author_name, identifiers)
+        VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             roles = EXCLUDED.roles,
             author_name_normalized = EXCLUDED.author_name_normalized,
-            raw_author_name = EXCLUDED.raw_author_name
+            raw_author_name = EXCLUDED.raw_author_name,
+            identifiers = EXCLUDED.identifiers
         RETURNING id
         """,
         (
@@ -205,6 +176,7 @@ def upsert_theses_source_authorship(
             raw_author_name,
             roles,
             raw_author_name,
+            identifiers,
         ),
     )
     row = cur.fetchone()
@@ -284,27 +256,16 @@ class PgThesesNormalizeQueries:
             cur, ppn=ppn, full_name=full_name, last_name=last_name, first_name=first_name
         )
 
-    def find_theses_source_person_by_name(
-        self, cur: Any, *, full_name: str, first_name: str | None
-    ) -> int | None:
-        return find_theses_source_person_by_name(cur, full_name=full_name, first_name=first_name)
-
-    def insert_theses_source_person_new(
-        self, cur: Any, *, full_name: str, last_name: str, first_name: str | None
-    ) -> int:
-        return insert_theses_source_person_new(
-            cur, full_name=full_name, last_name=last_name, first_name=first_name
-        )
-
     def upsert_theses_source_authorship(
         self,
         cur: Any,
         *,
         source_publication_id: int,
-        source_person_id: int,
+        source_person_id: int | None,
         author_position: int | None,
         roles: list[str],
         raw_author_name: str,
+        identifiers: Any,
     ) -> int:
         return upsert_theses_source_authorship(
             cur,
@@ -313,6 +274,7 @@ class PgThesesNormalizeQueries:
             author_position=author_position,
             roles=roles,
             raw_author_name=raw_author_name,
+            identifiers=identifiers,
         )
 
     def get_theses_publication_id(self, cur: Any, theses_id: str) -> int | None:

@@ -5,7 +5,7 @@ Commencé le 2026-04-28
 
 La table `source_persons` est aujourd'hui peuplée par tous les normalizers, indépendamment de l'utilité réelle. Pour les sources sans identifiant auteur stable (OpenAlex, WoS, CrossRef, et le cas HAL « pas de compte HAL identifié »), on synthétise un `source_id` artificiel pour respecter la contrainte `UNIQUE(source, source_id)`. Conséquence pratique : on crée une ligne `source_persons` par `source_authorships` dans ces cas, sans bénéfice net.
 
-Ce doc audit l'usage existant et propose un découpage en chantier dédié.
+Ce doc audite l'usage existant et propose un découpage en chantiers dédiés.
 
 ## État actuel — résumé de l'audit
 
@@ -166,9 +166,9 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 - [x] **OpenAlex** : `upsert_openalex_source_person` supprimé ; le normalizer met `source_person_id=NULL` et `identifiers={"orcid": ...}` sur les `source_authorships`. `fetch_unlinked_authorships` adapté en LEFT JOIN avec lecture de `sa_auth.identifiers->>'orcid'` et `sa_auth.raw_author_name` pour OA.
 - [x] **WoS** : `upsert_wos_source_person` + `upsert_wos_source_persons_batch` + `fetch_wos_source_persons_with_daisng` supprimés ; `process_authorships` simplifié (plus de phase 1 batch source_persons). Identifiants WoS sur `source_authorships.identifiers` : `{"orcid": ..., "researcher_id": ...}`. Pivot des adresses sur `author_position` (au lieu de `source_person_id`). `fetch_unlinked_authorships` étend `oa_orcid`/`oa_full_name` aux WoS (CASE `IN ('openalex', 'wos')`). `fetch_linked_authorships_structured` passé en LEFT JOIN.
 - [x] **CrossRef** : `insert_crossref_source_person` supprimé (port + queries) ; `process_authors` posté `source_person_id=NULL` avec `identifiers={"orcid": ...}`. Affiliations brutes restent sur `source_data` comme avant. `fetch_unlinked_authorships` étendu pour inclure CrossRef dans le CASE `IN ('openalex', 'wos', 'crossref')`.
+- [x] **theses.fr** : `find_theses_source_person_by_name` + `insert_theses_source_person_new` supprimés. `upsert_source_author` retourne None sans PPN → la `source_authorships` est insérée avec `source_person_id=NULL` et `identifiers={"idref": ppn}` quand PPN. Migration 012 : contrainte UNIQUE relâchée à NULLS DISTINCT (= défaut SQL standard) pour permettre plusieurs `(pub, NULL, NULL)` rows = jurés/rapporteurs theses sans PPN sur une même thèse. Idempotence garantie par `clear_source_authorships_for_publication`, le `ON CONFLICT DO UPDATE` n'est qu'un filet jamais déclenché en pratique. Tests d'intégration adaptés.
 - [ ] HAL : ne créer `source_persons` qu'avec un `hal_person_id` ; pour les comptes anonymes, identifiants sur `source_authorships.identifiers`
 - [ ] ScanR : ne créer `source_persons` qu'avec un idref ; idem pour le reste
-- [ ] Theses : ne créer `source_persons` qu'avec un PPN ; idem pour le reste
 
 ### Phase 3 — Adapter les lecteurs
 - [ ] `fetch_unlinked_authorships()` : lit les identifiants depuis `source_authorships.identifiers` + JOIN `source_persons` seulement pour les sources éligibles
@@ -207,4 +207,4 @@ Le chantier CrossRef est **bloqué tant que ce chantier n'est pas terminé** : l
 La logique de matching de fond reste inchangée : elle s'appuie déjà sur `author_name_normalized` + `person_name_forms`. Seule l'Étape 0 (HAL accounts) dépend de `source_persons` — par construction, c'est le cas légitime qu'on conserve.
 
 ### Migration progressive
-Les phases 1 → 5 sont **indépendamment mergeable**. La phase 1 (ajout colonne + backfill) peut être déployée sans bouger les normalizers ; les sources basculent ensuite une à une.
+Les phases 1 → 5 sont **indépendamment mergeables**. La phase 1 (ajout colonne + backfill) peut être déployée sans bouger les normalizers ; les sources basculent ensuite une à une.
