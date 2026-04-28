@@ -12,7 +12,7 @@ indépendant du type de curseur (tuple ou dict_row).
 from typing import Any
 
 from application.audit import async_emit_event, emit_event
-from domain.doc_types import map_doc_type
+from domain.doc_types import ARTICLE_SUBTYPES, map_doc_type
 from domain.ports.publication_repository import (
     AsyncPublicationRepository,
     PublicationRepository,
@@ -250,9 +250,37 @@ def _topics_by_source(rows: list[dict[str, Any]]) -> dict | None:
 
 
 def _first_doc_type(rows: list[dict[str, Any]]) -> str:
+    """Choisit le `doc_type` canonique parmi les rows ordonnées par
+    `SOURCE_PRIORITY`.
+
+    Règle générale : on prend la valeur de la source la plus prioritaire
+    (premier row avec `doc_type` non-null).
+
+    Exception « sous-types d'article » : CrossRef (priorité 2) renvoie
+    `journal-article` indistinctement pour tous les types d'article (review,
+    book_review, data_paper, poster, conference_paper, editorial, letter,
+    erratum, retraction). Si une source moins prioritaire propose un de
+    ces sous-types plus précis, on le préfère pour ne pas perdre
+    l'information.
+    """
+    # Précalcul : sous-type d'article présent dans une row, peu importe la
+    # priorité de sa source.
+    article_subtype_present: str | None = None
     for r in rows:
-        if r["doc_type"]:
-            return map_doc_type(r["doc_type"], r["source"])
+        if not r["doc_type"]:
+            continue
+        mapped = map_doc_type(r["doc_type"], r["source"])
+        if mapped in ARTICLE_SUBTYPES:
+            article_subtype_present = mapped
+            break
+
+    for r in rows:
+        if not r["doc_type"]:
+            continue
+        mapped = map_doc_type(r["doc_type"], r["source"])
+        if mapped == "article" and article_subtype_present:
+            return article_subtype_present
+        return mapped
     return "other"
 
 

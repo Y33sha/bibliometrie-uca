@@ -140,7 +140,51 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "thesis": "thesis",
         "ongoing_thesis": "ongoing_thesis",
     },
+    "crossref": {
+        "journal-article": "article",
+        "book-chapter": "book_chapter",
+        "book": "book",
+        "monograph": "book",
+        "edited-book": "book",
+        "reference-book": "book",
+        "reference-entry": "other",
+        "dissertation": "thesis",
+        "proceedings-article": "conference_paper",
+        "proceedings": "proceedings",
+        "posted-content": "preprint",
+        "preprint": "preprint",
+        "peer-review": "peer_review",
+        "report": "report",
+        "report-component": "report",
+        "dataset": "dataset",
+        "journal-issue": "other",
+        "component": "other",
+        "grant": "other",
+        "standard": "other",
+        "other": "other",
+    },
 }
+
+# Sous-types qui priment sur "article" générique : si une source prioritaire
+# (typiquement CrossRef avec "journal-article") dit "article", mais qu'une
+# source moins prioritaire (HAL, OA…) reconnaît un sous-type plus précis,
+# on préfère le sous-type pour ne pas perdre l'information.
+#
+# CrossRef ne distingue pas ces sous-types (tout est "journal-article") ;
+# HAL fait la distinction via ses combinaisons type_sous-type
+# ("art_artrev" → "review", "art_bookreview" → "book_review", etc.).
+# Cette logique d'arbitrage vit dans `application.publications._first_doc_type`.
+ARTICLE_SUBTYPES: frozenset[str] = frozenset({
+    "review",
+    "book_review",
+    "data_paper",
+    "poster",
+    "conference_paper",
+    "editorial",
+    "letter",
+    "erratum",
+    "retraction",
+})
 
 # Valeurs valides de l'enum doc_type (pour le fallback identity)
 _VALID_DOC_TYPES = {

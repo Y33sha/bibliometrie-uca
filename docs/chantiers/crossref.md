@@ -1,4 +1,6 @@
 # Chantier — Exploitation de l'API CrossRef
+Commencé le 2026-04-27
+Terminé le
 
 ## Contexte
 
@@ -90,12 +92,13 @@ Découpage proposé (chaque phase = chantier autonome mergeable indépendamment)
 - [ ] Tests d'intégration sur un petit lot
 - **Livrable** : `source_publications` / `source_authorships` / `source_persons` alimentées avec `source='crossref'` pour les DOI déjà présents dans `publications`, idempotent
 
-### Phase 2 — Mapping `doc_type` & insertion dans `SOURCE_PRIORITY`
-- Ajouter une entrée `"crossref"` dans `_SOURCE_MAPS` de `domain/doc_types.py` (mapping de la taxonomie CrossRef → enum canonique : `journal-article` → `article`, `posted-content` → `preprint`, `book-chapter` → `book_chapter`, `proceedings-article` → `conference_paper`, etc.)
-- Insérer `"crossref"` en 2ᵉ position dans la constante `SOURCE_PRIORITY`
-- Tests de non-régression sur les `doc_type` actuels (pour vérifier qu'aucune publi non-CrossRef ne voit son `doc_type` changer)
-- **Aucune nouvelle phase pipeline n'est nécessaire** : `refresh_from_sources` (`application/publications.py`) prend automatiquement en compte les nouvelles `source_publications` CrossRef et applique l'ordre de priorité.
-- **Livrable** : `doc_type` canoniques mis à jour automatiquement, CrossRef prioritaire sur HAL/OA/WoS pour toutes les métadonnées canoniques.
+### Phase 2 — Mapping `doc_type` & arbitrage type / sous-type ✅
+- [x] `_SOURCE_MAPS["crossref"]` ajouté dans `domain/doc_types.py` (taxonomie CrossRef → enum canonique : `journal-article` → `article`, `book-chapter` → `book_chapter`, `monograph`/`edited-book`/`reference-book` → `book`, `posted-content`/`preprint` → `preprint`, `dissertation` → `thesis`, `proceedings-article` → `conference_paper`, `peer-review` → `peer_review`, etc.)
+- [x] `"crossref"` déjà inséré en 2ᵉ position dans `SOURCE_PRIORITY` (cf phase 1A).
+- [x] Modification de `_first_doc_type` dans `application/publications.py` : si la source prioritaire (CrossRef) renvoie `article` mais qu'une source moins prioritaire (HAL, OA…) connaît un sous-type plus précis (review, book_review, data_paper, poster, conference_paper, editorial, letter, erratum, retraction), on préfère le sous-type. Évite la régression identifiée dans le spike (~11 % des publis : `review`/`book_review`/`data_paper`/`poster` HAL écrasés en `article` par CrossRef).
+- [x] Liste `ARTICLE_SUBTYPES` définie côté `domain/doc_types.py` (cohérent avec le reste de la taxonomie). Sémantique « sous-type prime sur type générique » documentée dans le code.
+- [x] Tests unit : `TestCrossRefDocTypeMap` (couverture taxonomie) + `TestFirstDocTypeArbitration` (5 cas d'arbitrage).
+- **Pas de migration nécessaire** : `refresh_from_sources` consomme déjà `_first_doc_type`, le changement est transparent au prochain refresh des publis CrossRef-touchées.
 
 ### Phase 3 — Promotion d'ORCID `pending` → `confirmed`
 - Pour chaque `source_authorship` CrossRef portant un ORCID, matcher avec `person_identifiers` (id_type=orcid).
