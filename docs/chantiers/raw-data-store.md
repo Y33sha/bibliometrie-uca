@@ -32,9 +32,6 @@ Avant d'écrire du code, trancher :
 
 ## Phases
 
-### Phase 0 — Décisions (cf. section ci-dessus)
-Durée : discussion, pas de code.
-
 ### Phase 1 — Audit de pureté de la normalisation
 
 **Prérequis pour que la re-normalisation soit fiable.**
