@@ -32,21 +32,26 @@ def fetch_unlinked_authorships(cur: Any) -> list[dict[str, Any]]:
     `raw_author_name IS NULL` (pas de nom utilisable).
 
     LEFT JOIN sur `source_persons` : depuis le chantier source_persons,
-    OpenAlex (et à terme WoS/CrossRef) écrit `source_person_id=NULL` ; les
-    identifiants normalisés vivent sur `source_authorships.identifiers`.
-    Pour les sources qui alimentent toujours `source_persons` (HAL avec
-    `hal_person_id`, ScanR avec idref, theses avec PPN), le JOIN ramène
-    la row et les CASE continuent de fonctionner.
+    les sources non-structurées (OpenAlex, WoS, et à terme CrossRef)
+    écrivent `source_person_id=NULL` ; les identifiants normalisés
+    vivent sur `source_authorships.identifiers`. Pour les sources qui
+    alimentent toujours `source_persons` (HAL avec `hal_person_id`,
+    ScanR avec idref, theses avec PPN), le JOIN ramène la row et les
+    CASE continuent de fonctionner.
+
+    Les colonnes `oa_orcid` / `oa_full_name` (nom historique) couvrent
+    désormais OA + WoS — toutes les sources où le nom n'est pas
+    structuré et où l'ORCID vit sur `identifiers` côté authorship.
     """
     cur.execute("""
         SELECT sa_auth.id AS authorship_id,
                sa_auth.source AS source,
                sa_auth.raw_author_name AS full_name,
-               CASE WHEN sa_auth.source = 'openalex' THEN NULL::text
+               CASE WHEN sa_auth.source IN ('openalex', 'wos') THEN NULL::text
                     ELSE sa.last_name END AS last_name,
-               CASE WHEN sa_auth.source = 'openalex' THEN NULL::text
+               CASE WHEN sa_auth.source IN ('openalex', 'wos') THEN NULL::text
                     ELSE sa.first_name END AS first_name,
-               CASE WHEN sa_auth.source = 'openalex' THEN NULL::text
+               CASE WHEN sa_auth.source IN ('openalex', 'wos') THEN NULL::text
                     ELSE sa.orcid END AS orcid,
                CASE WHEN sa_auth.source = 'hal'
                     THEN sa.source_ids->>'idhal' ELSE NULL::text END AS idhal,
@@ -59,10 +64,10 @@ def fetch_unlinked_authorships(cur: Any) -> list[dict[str, Any]]:
                CASE WHEN sa_auth.source = 'hal'
                     THEN (sa.source_ids->>'hal_person_id')::int
                     ELSE NULL::int END AS hal_person_id,
-               CASE WHEN sa_auth.source = 'openalex'
+               CASE WHEN sa_auth.source IN ('openalex', 'wos')
                     THEN sa_auth.identifiers->>'orcid'
                     ELSE NULL::text END AS oa_orcid,
-               CASE WHEN sa_auth.source = 'openalex'
+               CASE WHEN sa_auth.source IN ('openalex', 'wos')
                     THEN sa_auth.raw_author_name
                     ELSE NULL::text END AS oa_full_name,
                CASE WHEN sa_auth.source = 'theses' THEN sa_auth.roles
@@ -76,21 +81,28 @@ def fetch_unlinked_authorships(cur: Any) -> list[dict[str, Any]]:
         WHERE sa_auth.person_id IS NULL
           AND sa_auth.in_perimeter = TRUE
           AND sd.publication_id IS NOT NULL
-          AND (sa_auth.source != 'openalex' OR sa_auth.raw_author_name IS NOT NULL)
+          AND (sa_auth.source NOT IN ('openalex', 'wos')
+               OR sa_auth.raw_author_name IS NOT NULL)
     """)
     return rows_as_dicts(cur)
 
 
 def fetch_linked_authorships_structured(cur: Any) -> list[dict[str, Any]]:
     """`source_authorships` rattachées pour les sources avec noms structurés
-    (HAL/WoS/ScanR/theses : `source_persons.last_name`/`first_name`)."""
+    (HAL/ScanR/theses : `source_persons.last_name`/`first_name`).
+
+    LEFT JOIN sur `source_persons` : pour les rows WoS post-chantier
+    source_persons, `source_person_id` est NULL ; le caller détecte
+    `last_name`/`first_name` NULL et bascule sur le parsing de
+    `raw_author_name`.
+    """
     cur.execute(f"""
         SELECT sa_auth.person_id, sa_auth.author_position,
                sd.publication_id,
                sa.last_name, sa.first_name, sa_auth.raw_author_name AS full_name,
                sa_auth.source
         FROM source_authorships sa_auth
-        JOIN source_persons sa ON sa.id = sa_auth.source_person_id
+        LEFT JOIN source_persons sa ON sa.id = sa_auth.source_person_id
         JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
         WHERE sa_auth.source IN {SOURCES_WITH_STRUCTURED_NAMES_SQL}
           AND sa_auth.person_id IS NOT NULL

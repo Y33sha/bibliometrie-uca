@@ -496,59 +496,23 @@ def insert_wos_document(
 
 
 # =============================================================
-# WOS AUTHORS (source_persons, source='wos')
+# WOS AUTHORSHIPS — identifiants normalisés sur source_authorships
 # =============================================================
-
-_wos_author_cache: dict[str, int] = {}
-
-
-def upsert_wos_author(
-    cur: Any, queries: WosNormalizeQueries, logger: Any, author: dict
-) -> int | None:
-    """Insère/retrouve un auteur WoS dans source_persons (source='wos').
-
-    Utilise le daisng_id comme clé unique (format API).
-    Cache en mémoire pour éviter les requêtes répétées.
-    Retourne source_persons.id.
-    """
-    full_name = author.get("full_name")
-    if not full_name:
-        return None
-
-    daisng_id = author.get("daisng_id")
-    if not daisng_id:
-        logger.warning(f"Auteur WoS sans daisng_id : {full_name}")
-        return None
-
-    if daisng_id in _wos_author_cache:
-        return _wos_author_cache[daisng_id]
-
-    last_name = author.get("last_name")
-    first_name = author.get("first_name")
-    orcid = author.get("orcid")
-    researcher_id = author.get("researcher_id")
-
-    source_ids = {}
-    if researcher_id:
-        source_ids["researcher_id"] = researcher_id
-    source_ids_json = Json(source_ids) if source_ids else None
-
-    result = queries.upsert_wos_source_person(
-        cur,
-        daisng_id=daisng_id,
-        full_name=full_name,
-        last_name=last_name,
-        first_name=first_name,
-        orcid=orcid,
-        source_ids_json=source_ids_json,
-    )
-    _wos_author_cache[daisng_id] = result
-    return result
+# Plus d'écriture dans source_persons côté WoS depuis le chantier
+# source_persons (cf. docs/chantiers/source-persons.md) : le `daisng_id`
+# est une entité algorithmique non fiable, et le `researcher_id`
+# (ResearcherID Clarivate) est un identifiant cross-source qui vit mieux
+# directement sur source_authorships.identifiers.
 
 
-# =============================================================
-# WOS AUTHORSHIPS
-# =============================================================
+def _build_wos_identifiers(author: dict) -> dict | None:
+    """Construit le dict d'identifiants normalisés pour une authorship WoS."""
+    ids: dict = {}
+    if author.get("orcid"):
+        ids["orcid"] = author["orcid"]
+    if author.get("researcher_id"):
+        ids["researcher_id"] = author["researcher_id"]
+    return ids or None
 
 
 def _resolve_addresses_batch(
@@ -583,7 +547,12 @@ def upsert_wos_institution(cur: Any, queries: WosNormalizeQueries, org: dict) ->
 def process_authorships(
     cur: Any, queries: WosNormalizeQueries, rec: dict, source_publication_id: int
 ) -> None:
-    """Traite les authorships d'un record WoS + crée les liens adresses et institutions."""
+    """Traite les authorships d'un record WoS + crée les liens adresses et institutions.
+
+    Plus d'écriture sur `source_persons` (cf. docs/chantiers/source-persons.md).
+    Chaque authorship est inséré avec `source_person_id=NULL` et un dict
+    `identifiers` (orcid + researcher_id) sur `source_authorships`.
+    """
     # Pré-nettoyage : re-traitement → table blanche pour cette publi.
     queries.clear_source_authorships_for_publication(cur, source_publication_id)
 
@@ -598,62 +567,25 @@ def process_authorships(
         if org_name not in _wos_institution_cache:
             upsert_wos_institution(cur, queries, {"name": org_name})
 
-    # Phase 1 : résoudre tous les auteurs (batch upsert source_persons)
-    authors_resolved = []  # [(author_dict, source_person_id)]
-    authors_to_insert = []  # [(author_dict, daisng_id, ...)]
-    for author in rec.get("authors", []):
-        daisng_id = author.get("daisng_id")
-        if not daisng_id or not author.get("full_name"):
-            continue
-        if daisng_id in _wos_author_cache:
-            authors_resolved.append((author, _wos_author_cache[daisng_id]))
-        else:
-            authors_to_insert.append(author)
-
-    # Batch INSERT les auteurs nouveaux
-    if authors_to_insert:
-        # Dédupliquer par daisng_id dans le batch
-        seen = set()
-        deduped = []
-        for a in authors_to_insert:
-            if a["daisng_id"] not in seen:
-                seen.add(a["daisng_id"])
-                source_ids = {}
-                if a.get("researcher_id"):
-                    source_ids["researcher_id"] = a["researcher_id"]
-                deduped.append(
-                    (
-                        "wos",
-                        a["daisng_id"],
-                        a["full_name"],
-                        a.get("last_name"),
-                        a.get("first_name"),
-                        a.get("orcid"),
-                        Json(source_ids) if source_ids else None,
-                    )
-                )
-
-        for pid, src_id in queries.upsert_wos_source_persons_batch(cur, deduped):
-            _wos_author_cache[src_id] = pid
-
-        # Résoudre les auteurs insérés
-        for a in authors_to_insert:
-            aid = _wos_author_cache.get(a["daisng_id"])
-            if aid:
-                authors_resolved.append((a, aid))
-
-    author_ids = authors_resolved
-    if not author_ids:
+    # Filtrer les auteurs exploitables (skip les sans nom ou sans daisng_id —
+    # daisng_id n'est plus une clé d'unicité côté DB mais reste un signal
+    # de qualité côté API : pas de daisng_id = parsing API douteux).
+    authors_kept = [
+        a
+        for a in rec.get("authors", [])
+        if a.get("daisng_id") and a.get("full_name")
+    ]
+    if not authors_kept:
         return
 
-    # Phase 2 : batch INSERT source_authorships
+    # Batch INSERT source_authorships (source_person_id=NULL, identifiers JSONB)
     from domain.normalize import normalize_name_form
 
-    values = {}  # clé = (source_publication_id, source_person_id), dédupliqué
-    for author, source_person_id in author_ids:
-        key = (source_publication_id, source_person_id)
-        if key in values:
-            continue  # même auteur déjà traité pour ce document
+    values = {}  # clé = author_position, dédupliqué (1 row par position)
+    for author in authors_kept:
+        position = author["position"]
+        if position in values:
+            continue  # même position déjà traitée
 
         institution_ids = []
         for org in author.get("organizations", []):
@@ -662,42 +594,42 @@ def process_authorships(
                 institution_ids.append(_wos_institution_cache[name])
 
         name_norm = normalize_name_form(author["full_name"])
+        ids = _build_wos_identifiers(author)
 
-        values[key] = (
+        values[position] = (
             "wos",
             source_publication_id,
-            source_person_id,
-            author["position"],
+            None,  # source_person_id : plus d'écriture dans source_persons
+            position,
             author["is_corresponding"],
             name_norm,
             institution_ids or None,
             author.get("roles"),
             author["full_name"],
+            Json(ids) if ids else None,
         )
 
     queries.upsert_wos_source_authorships_batch(cur, list(values.values()))
 
-    # Phase 3 : batch adresses (source_authorship_addresses)
-    authors_with_addrs = [(a, said) for a, said in author_ids if a.get("addresses")]
+    # Phase 3 : batch adresses — pivot par author_position (au lieu de
+    # source_person_id qui n'existe plus pour WoS).
+    authors_with_addrs = [a for a in authors_kept if a.get("addresses")]
     if authors_with_addrs:
         # Collecter toutes les adresses uniques du document
         all_addr_texts = set()
-        for author, _ in authors_with_addrs:
+        for author in authors_with_addrs:
             all_addr_texts.update(author["addresses"])
 
-        # Résoudre en batch (INSERT + SELECT)
         addr_id_map = _resolve_addresses_batch(cur, queries, all_addr_texts)
 
-        # Récupérer les sa_id
-        sa_ids_needed = [said for _, said in authors_with_addrs]
-        sa_id_map = queries.fetch_source_authorship_ids(
-            cur, source_publication_id=source_publication_id, source_person_ids=sa_ids_needed
+        positions_needed = [a["position"] for a in authors_with_addrs]
+        sa_id_map = queries.fetch_source_authorship_ids_by_position(
+            cur, source_publication_id=source_publication_id, positions=positions_needed
         )
 
-        # Construire les liens
         addr_values = []
-        for author, source_person_id in authors_with_addrs:
-            sa_id = sa_id_map.get(source_person_id)
+        for author in authors_with_addrs:
+            sa_id = sa_id_map.get(author["position"])
             if not sa_id:
                 continue
             for addr_text in author["addresses"]:
@@ -807,12 +739,7 @@ class WosNormalizer(SourceNormalizer):
         self._pub_repo = self._pub_repo_factory(cur)
         for src_id, pid in self._queries.fetch_wos_source_structures(cur):
             _wos_institution_cache[src_id] = pid
-        for src_id, pid in self._queries.fetch_wos_source_persons_with_daisng(cur):
-            _wos_author_cache[src_id] = pid
-        self.logger.info(
-            f"Cache WoS : {len(_wos_institution_cache)} institutions, "
-            f"{len(_wos_author_cache)} auteurs"
-        )
+        self.logger.info(f"Cache WoS : {len(_wos_institution_cache)} institutions")
 
     def process_work(self, cur: Any, row: Any) -> bool | None:
         assert (
@@ -841,13 +768,10 @@ class WosNormalizer(SourceNormalizer):
 
     def cleanup(self) -> None:
         _wos_institution_cache.clear()
-        _wos_author_cache.clear()
 
     def on_error(self) -> None:
-        # Les caches module-level peuvent contenir des IDs insérés dans
-        # la transaction qui vient d'être rollbackée (SAVEPOINT). On les
-        # vide entièrement : les prochains works re-populeront au fil de
-        # l'eau depuis la DB. Perd la part preload mais évite les FK
-        # violations.
+        # Le cache module-level peut contenir des IDs insérés dans la
+        # transaction qui vient d'être rollbackée (SAVEPOINT). On le vide
+        # entièrement : les prochains works re-populeront depuis la DB.
+        # Perd la part preload mais évite les FK violations.
         _wos_institution_cache.clear()
-        _wos_author_cache.clear()

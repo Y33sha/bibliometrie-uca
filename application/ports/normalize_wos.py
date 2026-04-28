@@ -33,22 +33,6 @@ class WosNormalizeQueries(Protocol):
         external_ids: Any,
     ) -> int: ...
 
-    def upsert_wos_source_person(
-        self,
-        cur: Any,
-        *,
-        daisng_id: str,
-        full_name: str,
-        last_name: str | None,
-        first_name: str | None,
-        orcid: str | None,
-        source_ids_json: Any,
-    ) -> int: ...
-
-    def upsert_wos_source_persons_batch(
-        self, cur: Any, values: list[tuple[Any, ...]]
-    ) -> list[tuple[int, str]]: ...
-
     def upsert_wos_source_structure(self, cur: Any, *, name: str, ror_id: str | None) -> int: ...
 
     def upsert_addresses_batch(self, cur: Any, values: list[tuple[str, str]]) -> None: ...
@@ -59,8 +43,8 @@ class WosNormalizeQueries(Protocol):
         self, cur: Any, values: list[tuple[Any, ...]]
     ) -> None: ...
 
-    def fetch_source_authorship_ids(
-        self, cur: Any, *, source_publication_id: int, source_person_ids: list[int]
+    def fetch_source_authorship_ids_by_position(
+        self, cur: Any, *, source_publication_id: int, positions: list[int]
     ) -> dict[int, int]: ...
 
     def insert_source_authorship_addresses_batch(
@@ -70,8 +54,6 @@ class WosNormalizeQueries(Protocol):
     def get_wos_publication_id(self, cur: Any, ut: str) -> int | None: ...
 
     def fetch_wos_source_structures(self, cur: Any) -> list[tuple[str, int]]: ...
-
-    def fetch_wos_source_persons_with_daisng(self, cur: Any) -> list[tuple[str, int]]: ...
 
     def delete_wos_duplicate_authorships(self, cur: Any) -> int: ...
 
