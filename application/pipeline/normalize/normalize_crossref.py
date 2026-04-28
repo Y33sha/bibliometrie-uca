@@ -284,12 +284,13 @@ def process_authors(
     doi: str,
     source_publication_id: int,
 ) -> None:
-    """Crée les ``source_persons`` + ``source_authorships`` pour la publi.
+    """Crée les ``source_authorships`` pour la publi (sans ``source_persons``).
 
-    Stratégie : un ``source_persons`` par paire (publi, position), pas
-    de matching transverse côté CrossRef. Le pipeline ``personnes``
-    (source-agnostique) consolide ensuite via les formes de noms et
-    les ORCIDs.
+    Depuis le chantier source_persons, CrossRef n'écrit plus dans
+    `source_persons` (les entités auteurs CrossRef synthétiques 1:1 avec
+    l'authorship n'apportaient rien). L'ORCID, seul identifiant
+    exploitable côté CrossRef, vit sur `source_authorships.identifiers`.
+    Les affiliations brutes (génériques tutelle) restent sur `source_data`.
     """
     queries.clear_source_authorships_for_publication(cur, source_publication_id)
 
@@ -304,19 +305,11 @@ def process_authors(
         full_name = _author_full_name(author)
         if not full_name:
             continue
-        family = (author.get("family") or "").strip() or None
-        given = (author.get("given") or "").strip() or None
-        orcid = _normalize_orcid(author.get("ORCID"))
 
-        source_person_id = queries.insert_crossref_source_person(
-            cur,
-            doi=doi,
-            position=position,
-            full_name=full_name,
-            last_name=family,
-            first_name=given,
-            orcid=orcid,
-        )
+        orcid = _normalize_orcid(author.get("ORCID"))
+        ids: dict[str, Any] = {}
+        if orcid:
+            ids["orcid"] = orcid
 
         affiliations = _author_affiliation_strings(author)
         sd: dict[str, Any] = {}
@@ -330,15 +323,14 @@ def process_authors(
             sd["authenticated_orcid"] = True
         if author.get("sequence"):
             sd["sequence"] = author["sequence"]
-        source_data = Json(sd) if sd else None
 
         queries.upsert_crossref_source_authorship(
             cur,
             source_publication_id=source_publication_id,
-            source_person_id=source_person_id,
             author_position=position,
             raw_author_name=full_name,
-            source_data=source_data,
+            source_data=Json(sd) if sd else None,
+            identifiers=Json(ids) if ids else None,
         )
 
 

@@ -31,27 +31,15 @@ class CrossrefNormalizeQueries(Protocol):
         meta: Any,
     ) -> int: ...
 
-    def insert_crossref_source_person(
-        self,
-        cur: Any,
-        *,
-        doi: str,
-        position: int,
-        full_name: str,
-        last_name: str | None,
-        first_name: str | None,
-        orcid: str | None,
-    ) -> int: ...
-
     def upsert_crossref_source_authorship(
         self,
         cur: Any,
         *,
         source_publication_id: int,
-        source_person_id: int,
         author_position: int,
         raw_author_name: str | None,
         source_data: Any,
+        identifiers: Any,
     ) -> int: ...
 
     def get_crossref_publication_id(self, cur: Any, doi: str) -> int | None: ...
