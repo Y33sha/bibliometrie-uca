@@ -35,7 +35,7 @@ La résolution des affiliations se fait pendant la [phase `affiliations` du pipe
 
 Chaque source contient ses propres identifiants internes pour les entités auteurs. Le traitement des auteurs correspond à la [phase `personnes`](pipeline#phase-7--persons--création-de-personnes) du pipeline.
 
-**`source_persons`** est restreinte aux sources avec un **identifiant auteur stable** (cf. [chantier source_persons](chantiers/source-persons.md)) :
+**`source_persons`** est restreinte aux sources avec un **identifiant auteur stable** (cf. [chantier source_persons](chantiers/2026-04-28_source-persons.md)) :
 - HAL avec `hal_person_id` (compte HAL identifié)
 - ScanR avec idref
 - Theses avec PPN

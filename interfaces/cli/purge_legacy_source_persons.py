@@ -1,5 +1,5 @@
 """Purge des `source_persons` synthétiques rendues inutiles par le chantier
-source_persons (cf. `docs/chantiers/source-persons.md`).
+source_persons (cf. `docs/chantiers/2026-04-28_source-persons.md`).
 
 Catégories purgées :
 - OpenAlex / WoS / CrossRef : intégralité (entités algorithmiques non

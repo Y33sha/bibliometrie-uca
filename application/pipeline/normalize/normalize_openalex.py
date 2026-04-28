@@ -410,7 +410,7 @@ def insert_openalex_document(
 # OPENALEX AUTHORS (identifiants normalisés sur source_authorships)
 # =============================================================
 # Plus d'écriture dans source_persons côté OA depuis le chantier
-# source_persons (cf. docs/chantiers/source-persons.md) : les entités
+# source_persons (cf. docs/chantiers/2026-04-28_source-persons.md) : les entités
 # auteurs OA sont algorithmiques et non fiables, on garde uniquement
 # l'ORCID quand présent, directement sur source_authorships.identifiers.
 
@@ -478,7 +478,7 @@ def process_authorships(
     - Extrait et insère les institutions dans source_structures (source='openalex')
     - Stocke les source_struct_ids (source_structures.id) sur chaque authorship
 
-    Plus d'écriture sur `source_persons` (cf. docs/chantiers/source-persons.md).
+    Plus d'écriture sur `source_persons` (cf. docs/chantiers/2026-04-28_source-persons.md).
     """
     authorships = work.get("authorships") or []
 
