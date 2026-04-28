@@ -5,6 +5,7 @@ Partage `ListFilters` et la construction des conditions SQL communes.
 
 import csv
 import io
+import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -444,21 +445,26 @@ async def export_publications_csv(
             "Éditeur",
             "Laboratoires",
             "Type",
-            "Voie OA",
-            "HAL",
-            "OpenAlex",
-            "WoS",
+            "Accès",
+            "Sources",
         ]
     )
     for row in await cur.fetchall():
         doi_url = f"https://doi.org/{row['doi']}" if row["doi"] else ""
-        hal_url = f"https://hal.science/{row['hal_id']}" if row["hal_id"] else ""
-        oa_url = f"https://openalex.org/{row['openalex_id']}" if row["openalex_id"] else ""
-        wos_url = (
-            f"https://www.webofscience.com/wos/woscc/full-record/{row['wos_id']}"
-            if row["wos_id"]
-            else ""
-        )
+        sources: dict[str, str] = {}
+        if row["hal_id"]:
+            sources["hal"] = f"https://hal.science/{row['hal_id']}"
+        if row["openalex_id"]:
+            sources["openalex"] = f"https://openalex.org/{row['openalex_id']}"
+        if row["wos_id"]:
+            sources["wos"] = f"https://www.webofscience.com/wos/woscc/full-record/{row['wos_id']}"
+        if row["scanr_id"]:
+            sources["scanr"] = (
+                f"https://scanr.enseignementsup-recherche.gouv.fr/publications/{row['scanr_id']}"
+            )
+        if row["theses_id"]:
+            sources["theses"] = f"https://theses.fr/{row['theses_id']}"
+        access = "ouvert" if row["oa_status"] in OA_OPEN_STATUSES else "fermé"
         writer.writerow(
             [
                 row["pub_year"] or "",
@@ -468,10 +474,8 @@ async def export_publications_csv(
                 row["publisher_name"] or "",
                 row["labs"] or "",
                 row["doc_type"] or "",
-                row["oa_status"] or "",
-                hal_url,
-                oa_url,
-                wos_url,
+                access,
+                json.dumps(sources, ensure_ascii=False) if sources else "",
             ]
         )
 
