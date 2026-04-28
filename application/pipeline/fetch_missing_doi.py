@@ -44,6 +44,7 @@ class AsyncFetchMissingDoiAdapter(Protocol):
     source_key: str  # "hal" | "openalex" | "wos" | "scanr"
     batch_size: int  # 1 pour un appel par DOI, >1 pour un appel groupé
     max_concurrent: int  # plafond asyncio.Semaphore — respect du rate-limit API
+    request_delay_s: float  # pause par worker après chaque fetch (0 = pas de pause)
 
     def configure(self, cur: Any) -> None:
         """Lit la config (URLs, credentials) depuis la base avant la boucle."""
@@ -118,6 +119,8 @@ async def run_async(
 
     async with httpx.AsyncClient() as client:
 
+        request_delay = getattr(adapter, "request_delay_s", 0.0)
+
         async def process_batch(batch: list[str], batch_idx: int) -> None:
             async with sem:
                 try:
@@ -125,6 +128,8 @@ async def run_async(
                 except Exception as e:
                     log.error("Erreur sur lot %d (%d DOI) : %s", batch_idx, len(batch), e)
                     records = []
+                if request_delay:
+                    await asyncio.sleep(request_delay)
 
             progress["fetched"] += len(records)
             for record in records:

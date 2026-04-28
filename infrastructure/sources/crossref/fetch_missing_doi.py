@@ -6,8 +6,8 @@ source mais absent du staging CrossRef, on interroge l'endpoint
 ``source='crossref'``.
 
 Polite pool obtenu via le header ``User-Agent`` qui inclut un mailto.
-Pas de seuil documenté côté CrossRef ; ``max_concurrent=5`` reste
-courtois et largement suffisant pour le volume UCA.
+Doc CrossRef : polite = 10 req/s + 3 concurrentes. On colle exactement à
+ces limites (max_concurrent=3, request_delay=0.1 s) pour éviter les 429.
 
 Les DOI introuvables (HTTP 404) sont stockés avec ``not_found=TRUE`` et
 ``processed=TRUE`` pour ne pas être réinterrogés à chaque run.
@@ -34,9 +34,11 @@ class CrossrefFetchMissingDoiAdapter:
 
     source_key = "crossref"
     batch_size = 1
-    # Polite pool CrossRef sans seuil documenté ; on reste à 5 concurrentes
-    # × ~10 req/s ≈ 50 req/s peak — largement en-dessous du raisonnable.
-    max_concurrent = 5
+    # Polite pool CrossRef : 10 req/s, 3 concurrentes max. Avec sem=3 et
+    # ~200 ms de latence par requête, request_delay=0.1 plafonne à
+    # 3 / (0.1 + 0.2) ≈ 10 req/s sustained, juste sous la limite.
+    max_concurrent = 3
+    request_delay_s = 0.1
 
     base_url: str
     headers: dict[str, str]
