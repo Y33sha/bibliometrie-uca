@@ -7,9 +7,7 @@ import pytest
 from infrastructure.db.queries.normalize_theses import (
     count_theses_table,
     fetch_thesis_primary_author,
-    find_theses_source_person_by_name,
     get_theses_publication_id,
-    insert_theses_source_person_new,
     merge_publication_meta,
     upsert_theses_source_authorship,
     upsert_theses_source_person_by_ppn,
@@ -107,24 +105,6 @@ class TestThesesSourcePersons:
         db.execute("SELECT full_name FROM source_persons WHERE id = %s", (a,))
         assert db.fetchone()["full_name"] == "Nouveau"
 
-    def test_find_by_name_returns_none_when_absent(self, db):
-        assert (
-            find_theses_source_person_by_name(db, full_name="Personne Inconnue", first_name=None)
-            is None
-        )
-
-    def test_find_by_name_returns_id_when_present(self, db):
-        new_id = insert_theses_source_person_new(
-            db, full_name="Sans PPN", last_name="Sans", first_name="PPN"
-        )
-        found = find_theses_source_person_by_name(db, full_name="Sans PPN", first_name="PPN")
-        assert found == new_id
-
-    def test_insert_new_generates_nokey_source_id(self, db):
-        sp_id = insert_theses_source_person_new(db, full_name="X", last_name="X", first_name=None)
-        db.execute("SELECT source_id FROM source_persons WHERE id = %s", (sp_id,))
-        assert db.fetchone()["source_id"].startswith("nokey-")
-
 
 class TestUpsertThesesSourceAuthorship:
     def test_inserts_and_upserts(self, db):
@@ -157,6 +137,7 @@ class TestUpsertThesesSourceAuthorship:
             author_position=0,
             roles=["author"],
             raw_author_name="A",
+            identifiers=None,
         )
         sa_2 = upsert_theses_source_authorship(
             db,
@@ -165,6 +146,7 @@ class TestUpsertThesesSourceAuthorship:
             author_position=0,
             roles=["author", "thesis_director"],
             raw_author_name="A",
+            identifiers=None,
         )
         assert sa_1 == sa_2
         db.execute("SELECT roles FROM source_authorships WHERE id = %s", (sa_1,))
@@ -207,6 +189,7 @@ class TestFetchThesisPrimaryAuthor:
             author_position=0,
             roles=["author"],
             raw_author_name="Dupond Jean",
+            identifiers=None,
         )
         assert fetch_thesis_primary_author(db, pub) == ("Dupond", "Jean")
 
