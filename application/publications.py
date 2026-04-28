@@ -303,7 +303,12 @@ def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) 
         doc_type=_first_doc_type(rows),
         pub_year=_first_non_null(rows, "pub_year"),
         journal_id=_first_non_null(rows, "journal_id"),
-        oa_status=best_oa_status(r["oa_status"] for r in rows),
+        # Fallback à 'unknown' (DEFAULT côté schema) si toutes les sources
+        # sont silencieuses : best_oa_status renvoie None quand aucune
+        # valeur exploitable, et on ne veut pas écrire NULL sur la
+        # colonne canonique (le modèle Pydantic /api/publications attend
+        # un string non-null).
+        oa_status=best_oa_status(r["oa_status"] for r in rows) or "unknown",
         container_title=_first_non_null(rows, "container_title"),
         language=_first_non_null(rows, "language"),
         abstract=_first_non_null(rows, "abstract"),
