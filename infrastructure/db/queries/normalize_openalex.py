@@ -105,32 +105,6 @@ def upsert_openalex_source_publication(
     return row["id"] if isinstance(row, dict) else row[0]
 
 
-def upsert_openalex_source_person(
-    cur: Any,
-    *,
-    source_id: str,
-    full_name: str,
-    last_name: str,
-    first_name: str | None,
-    orcid: str | None,
-) -> int:
-    """UPSERT d'un `source_persons` OpenAlex (dédup sur `source_id` = openalex_id)."""
-    cur.execute(
-        """
-        INSERT INTO source_persons
-            (source, source_id, full_name, last_name, first_name, orcid)
-        VALUES ('openalex', %s, %s, %s, %s, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
-            full_name = EXCLUDED.full_name
-        RETURNING id
-        """,
-        (source_id, full_name, last_name, first_name, orcid),
-    )
-    row = cur.fetchone()
-    return row["id"] if isinstance(row, dict) else row[0]
-
-
 def find_openalex_source_structure(cur: Any, openalex_id: str) -> int | None:
     """Cherche une `source_structures` OpenAlex par `source_id`."""
     cur.execute(
@@ -175,27 +149,35 @@ def upsert_openalex_source_authorship(
     cur: Any,
     *,
     source_publication_id: int,
-    source_person_id: int,
+    source_person_id: int | None,
     author_position: int,
     source_struct_ids: list[int] | None,
     raw_author_name: str | None,
     is_corresponding: bool,
+    identifiers: Any,
 ) -> int:
-    """UPSERT d'une `source_authorships` OpenAlex."""
+    """UPSERT d'une `source_authorships` OpenAlex.
+
+    `source_person_id` est NULL : depuis le chantier source_persons,
+    OpenAlex n'écrit plus dans `source_persons` (entités auteurs
+    algorithmiques non fiables). Les identifiants normalisés (orcid)
+    vivent sur `identifiers`.
+    """
     cur.execute(
         """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              source_struct_ids,
-             author_name_normalized, is_corresponding, raw_author_name)
-        VALUES ('openalex', %s, %s, %s, %s, normalize_name_form(%s), %s, %s)
+             author_name_normalized, is_corresponding, raw_author_name, identifiers)
+        VALUES ('openalex', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             author_name_normalized = COALESCE(
                 EXCLUDED.author_name_normalized,
                 source_authorships.author_name_normalized
             ),
             is_corresponding = EXCLUDED.is_corresponding,
-            raw_author_name = EXCLUDED.raw_author_name
+            raw_author_name = EXCLUDED.raw_author_name,
+            identifiers = EXCLUDED.identifiers
         RETURNING id
         """,
         (
@@ -206,6 +188,7 @@ def upsert_openalex_source_authorship(
             raw_author_name,
             is_corresponding,
             raw_author_name,
+            identifiers,
         ),
     )
     row = cur.fetchone()
@@ -243,9 +226,6 @@ class PgOpenalexNormalizeQueries:
     def upsert_openalex_source_publication(self, cur: Any, **kwargs: Any) -> int:
         return upsert_openalex_source_publication(cur, **kwargs)
 
-    def upsert_openalex_source_person(self, cur: Any, **kwargs: Any) -> int:
-        return upsert_openalex_source_person(cur, **kwargs)
-
     def find_openalex_source_structure(self, cur: Any, openalex_id: str) -> int | None:
         return find_openalex_source_structure(cur, openalex_id)
 
@@ -271,7 +251,11 @@ class PgOpenalexNormalizeQueries:
 
 
 def count_openalex_table(cur: Any, table: str) -> int:
-    """Compte les lignes d'une table avec `source = 'openalex'` (liste blanche)."""
+    """Compte les lignes d'une table avec `source = 'openalex'` (liste blanche).
+
+    `source_persons` reste accepté pour permettre de tracer les rows
+    legacy en attendant la phase 4 de purge (cf docs/chantiers/source-persons.md).
+    """
     if table not in ("source_publications", "source_persons", "source_structures"):
         raise ValueError(f"Table inattendue : {table!r}")
     cur.execute(f"SELECT COUNT(*) AS cnt FROM {table} WHERE source = 'openalex'")

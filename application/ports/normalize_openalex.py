@@ -36,17 +36,6 @@ class OpenalexNormalizeQueries(Protocol):
         topics_json: Any,
     ) -> int: ...
 
-    def upsert_openalex_source_person(
-        self,
-        cur: Any,
-        *,
-        source_id: str,
-        full_name: str,
-        last_name: str,
-        first_name: str | None,
-        orcid: str | None,
-    ) -> int: ...
-
     def find_openalex_source_structure(self, cur: Any, openalex_id: str) -> int | None: ...
 
     def upsert_openalex_source_structure(
@@ -65,11 +54,12 @@ class OpenalexNormalizeQueries(Protocol):
         cur: Any,
         *,
         source_publication_id: int,
-        source_person_id: int,
+        source_person_id: int | None,
         author_position: int,
         source_struct_ids: list[int] | None,
         raw_author_name: str | None,
         is_corresponding: bool,
+        identifiers: Any,
     ) -> int: ...
 
     def staging_has_openalex_doi(self, cur: Any, doi: str) -> bool: ...

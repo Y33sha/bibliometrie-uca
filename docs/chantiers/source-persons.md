@@ -157,8 +157,12 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 - [ ] Index GIN sur `identifiers` si les requêtes de matching cross-source en justifient le coût (à reconsidérer après les phases 2-3)
 - [ ] Application : `python -m infrastructure.db.migrate` puis `python -m interfaces.cli.backfill_source_authorships_identifiers`
 
+### Phase 1.5 — Préparation : nullable + suppression code mort ✅
+- [x] Migration `011_source_person_id_nullable.sql` : `ALTER TABLE source_authorships ALTER COLUMN source_person_id DROP NOT NULL`. Prérequis pour les normalizers qui n'écriront plus de `source_persons`.
+- [x] Suppression de l'endpoint admin authorships orphelin (cf. commit `f25f3b6`).
+
 ### Phase 2 — Réécriture des normalizers concernés
-- [ ] OpenAlex : ne plus écrire `source_persons`, mettre les identifiants directement sur `source_authorships.identifiers`
+- [x] **OpenAlex** : `upsert_openalex_source_person` supprimé ; le normalizer met `source_person_id=NULL` et `identifiers={"orcid": ...}` sur les `source_authorships`. `fetch_unlinked_authorships` adapté en LEFT JOIN avec lecture de `sa_auth.identifiers->>'orcid'` et `sa_auth.raw_author_name` pour OA.
 - [ ] WoS : idem (`orcid` + `researcher_id`)
 - [ ] CrossRef : idem (juste `orcid`)
 - [ ] HAL : ne créer `source_persons` qu'avec un `hal_person_id` ; pour les comptes anonymes, identifiants sur `source_authorships.identifiers`

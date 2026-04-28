@@ -407,54 +407,21 @@ def insert_openalex_document(
 
 
 # =============================================================
-# OPENALEX AUTHORS (source_persons, source='openalex')
+# OPENALEX AUTHORS (identifiants normalisés sur source_authorships)
 # =============================================================
+# Plus d'écriture dans source_persons côté OA depuis le chantier
+# source_persons (cf. docs/chantiers/source-persons.md) : les entités
+# auteurs OA sont algorithmiques et non fiables, on garde uniquement
+# l'ORCID quand présent, directement sur source_authorships.identifiers.
 
 
-def upsert_openalex_author(
-    cur: Any, queries: OpenalexNormalizeQueries, authorship: dict
-) -> int | None:
-    """
-    Insère/retrouve un auteur OpenAlex dans source_persons (source='openalex').
-    Déduplique par openalex_id (clé unique via source_id).
-    Retourne source_persons.id ou None.
-    """
-    author_data = authorship.get("author") or {}
-    display_name = author_data.get("display_name")
-    if not display_name:
+def _extract_openalex_orcid(authorship: dict) -> str | None:
+    """Extrait l'ORCID 16-chars de l'auteur OA (ou None)."""
+    orcid = (authorship.get("author") or {}).get("orcid")
+    if not isinstance(orcid, str):
         return None
-
-    openalex_id = extract_short_id(author_data.get("id") or "")
-    if not openalex_id:
-        return None
-
-    # source_id = COALESCE(openalex_id, 'nokey-{old_id}')
-    # Ici openalex_id est toujours présent (on retourne None sinon)
-    source_id = openalex_id
-
-    orcid = author_data.get("orcid")
-    if orcid:
-        orcid = orcid.replace("https://orcid.org/", "").strip()
-        if not orcid:
-            orcid = None
-
-    # Séparer nom/prénom (heuristique : dernier mot = nom)
-    parts = display_name.strip().split()
-    if len(parts) >= 2:
-        first_name = " ".join(parts[:-1])
-        last_name = parts[-1]
-    else:
-        first_name = None
-        last_name = display_name
-
-    return queries.upsert_openalex_source_person(
-        cur,
-        source_id=source_id,
-        full_name=display_name,
-        last_name=last_name,
-        first_name=first_name,
-        orcid=orcid,
-    )
+    cleaned = orcid.replace("https://orcid.org/", "").strip()
+    return cleaned or None
 
 
 # =============================================================
@@ -506,10 +473,12 @@ def process_authorships(
 ) -> None:
     """
     Traite les authorships d'un work OpenAlex :
-    - Insère/retrouve chaque auteur dans source_persons (source='openalex')
-    - Crée les liens source_authorships (source='openalex')
+    - Crée les liens source_authorships (source='openalex', source_person_id=NULL)
+    - Stocke l'ORCID dans source_authorships.identifiers quand présent
     - Extrait et insère les institutions dans source_structures (source='openalex')
     - Stocke les source_struct_ids (source_structures.id) sur chaque authorship
+
+    Plus d'écriture sur `source_persons` (cf. docs/chantiers/source-persons.md).
     """
     authorships = work.get("authorships") or []
 
@@ -518,12 +487,12 @@ def process_authorships(
     queries.clear_source_authorships_for_publication(cur, source_publication_id)
 
     for position, authorship in enumerate(authorships):
-        source_person_id = upsert_openalex_author(cur, queries, authorship)
-        if not source_person_id:
-            continue
-
         # Nom brut de l'auteur (fiable, contrairement à author.display_name)
         raw_author_name = authorship.get("raw_author_name")
+        if not raw_author_name:
+            # Sans nom, l'authorship est inexploitable pour le matching
+            # personnes — on skip.
+            continue
 
         # Corresponding author
         is_corresponding = authorship.get("is_corresponding", False)
@@ -557,14 +526,18 @@ def process_authorships(
             )
         )
 
+        orcid = _extract_openalex_orcid(authorship)
+        identifiers = Json({"orcid": orcid}) if orcid else None
+
         sa_id = queries.upsert_openalex_source_authorship(
             cur,
             source_publication_id=source_publication_id,
-            source_person_id=source_person_id,
+            source_person_id=None,
             author_position=position,
             source_struct_ids=source_struct_ids or None,
             raw_author_name=raw_author_name,
             is_corresponding=is_corresponding,
+            identifiers=identifiers,
         )
 
         if addr_parts:
