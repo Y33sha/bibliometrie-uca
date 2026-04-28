@@ -1,4 +1,5 @@
 # Chantier — Repenser `source_persons`
+Commencé le 2026-04-28
 
 ## Contexte
 
@@ -163,7 +164,7 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 
 ### Phase 2 — Réécriture des normalizers concernés
 - [x] **OpenAlex** : `upsert_openalex_source_person` supprimé ; le normalizer met `source_person_id=NULL` et `identifiers={"orcid": ...}` sur les `source_authorships`. `fetch_unlinked_authorships` adapté en LEFT JOIN avec lecture de `sa_auth.identifiers->>'orcid'` et `sa_auth.raw_author_name` pour OA.
-- [ ] WoS : idem (`orcid` + `researcher_id`)
+- [x] **WoS** : `upsert_wos_source_person` + `upsert_wos_source_persons_batch` + `fetch_wos_source_persons_with_daisng` supprimés ; `process_authorships` simplifié (plus de phase 1 batch source_persons). Identifiants WoS sur `source_authorships.identifiers` : `{"orcid": ..., "researcher_id": ...}`. Pivot des adresses sur `author_position` (au lieu de `source_person_id`). `fetch_unlinked_authorships` étend `oa_orcid`/`oa_full_name` aux WoS (CASE `IN ('openalex', 'wos')`). `fetch_linked_authorships_structured` passé en LEFT JOIN.
 - [ ] CrossRef : idem (juste `orcid`)
 - [ ] HAL : ne créer `source_persons` qu'avec un `hal_person_id` ; pour les comptes anonymes, identifiants sur `source_authorships.identifiers`
 - [ ] ScanR : ne créer `source_persons` qu'avec un idref ; idem pour le reste

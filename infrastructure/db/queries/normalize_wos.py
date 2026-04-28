@@ -91,58 +91,6 @@ def upsert_wos_source_publication(
     return row[0] if isinstance(row, tuple) else row["id"]
 
 
-def upsert_wos_source_person(
-    cur: Any,
-    *,
-    daisng_id: str,
-    full_name: str,
-    last_name: str | None,
-    first_name: str | None,
-    orcid: str | None,
-    source_ids_json: Any,
-) -> int:
-    """UPSERT d'un `source_persons` WoS (dédup sur daisng_id = source_id)."""
-    cur.execute(
-        """
-        INSERT INTO source_persons
-            (source, source_id, full_name, last_name, first_name, orcid, source_ids)
-        VALUES ('wos', %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
-            full_name = EXCLUDED.full_name,
-            source_ids = COALESCE(source_persons.source_ids, '{}') ||
-                         COALESCE(EXCLUDED.source_ids, '{}')
-        RETURNING id
-        """,
-        (daisng_id, full_name, last_name, first_name, orcid, source_ids_json),
-    )
-    row = cur.fetchone()
-    return row[0] if isinstance(row, tuple) else row["id"]
-
-
-def upsert_wos_source_persons_batch(
-    cur: Any, values: list[tuple[Any, ...]]
-) -> list[tuple[int, str]]:
-    """Batch UPSERT de `source_persons` WoS. Retourne `[(id, source_id), ...]`."""
-    if not values:
-        return []
-    cur.executemany(
-        """
-        INSERT INTO source_persons
-            (source, source_id, full_name, last_name, first_name, orcid, source_ids)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
-            full_name = EXCLUDED.full_name,
-            source_ids = COALESCE(source_persons.source_ids, '{}'::jsonb) ||
-                         COALESCE(EXCLUDED.source_ids, '{}'::jsonb)
-        RETURNING id, source_id
-        """,
-        values,
-    )
-    return list(cur.fetchall())
-
-
 def upsert_wos_source_structure(cur: Any, *, name: str, ror_id: str | None) -> int:
     """UPSERT d'une `source_structures` WoS (source_id = name)."""
     cur.execute(
@@ -183,7 +131,13 @@ def fetch_address_ids_by_raw_text(cur: Any, raw_texts: list[str]) -> dict[str, i
 
 
 def upsert_wos_source_authorships_batch(cur: Any, values: list[tuple[Any, ...]]) -> None:
-    """Batch UPSERT de `source_authorships` WoS."""
+    """Batch UPSERT de `source_authorships` WoS.
+
+    `source_person_id` est NULL : depuis le chantier source_persons, WoS
+    n'écrit plus dans `source_persons` (entité algorithmique non fiable
+    via `daisng_id`). Les identifiants normalisés (`orcid`, `researcher_id`)
+    vivent sur `identifiers`.
+    """
     if not values:
         return
     cur.executemany(
@@ -191,8 +145,8 @@ def upsert_wos_source_authorships_batch(cur: Any, values: list[tuple[Any, ...]])
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              is_corresponding, author_name_normalized,
-             source_struct_ids, roles, raw_author_name)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+             source_struct_ids, roles, raw_author_name, identifiers)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             is_corresponding = EXCLUDED.is_corresponding OR source_authorships.is_corresponding,
             author_name_normalized = COALESCE(
@@ -204,22 +158,29 @@ def upsert_wos_source_authorships_batch(cur: Any, values: list[tuple[Any, ...]])
                 source_authorships.source_struct_ids
             ),
             roles = EXCLUDED.roles,
-            raw_author_name = EXCLUDED.raw_author_name
+            raw_author_name = EXCLUDED.raw_author_name,
+            identifiers = EXCLUDED.identifiers
         """,
         values,
     )
 
 
-def fetch_source_authorship_ids(
-    cur: Any, *, source_publication_id: int, source_person_ids: list[int]
+def fetch_source_authorship_ids_by_position(
+    cur: Any, *, source_publication_id: int, positions: list[int]
 ) -> dict[int, int]:
-    """Retourne `{source_person_id: source_authorship_id}` pour un document donné."""
+    """Retourne `{author_position: source_authorship_id}` pour un document WoS.
+
+    Pivot par `author_position` (et non plus `source_person_id`) parce que
+    WoS n'alimente plus `source_persons` (cf. chantier source_persons).
+    """
     cur.execute(
         """
-        SELECT source_person_id, id FROM source_authorships
-        WHERE source_publication_id = %s AND source_person_id = ANY(%s)
+        SELECT author_position, id FROM source_authorships
+        WHERE source = 'wos'
+          AND source_publication_id = %s
+          AND author_position = ANY(%s)
         """,
-        (source_publication_id, source_person_ids),
+        (source_publication_id, positions),
     )
     return {r[0]: r[1] for r in cur.fetchall()}
 
@@ -254,18 +215,6 @@ def get_wos_publication_id(cur: Any, ut: str) -> int | None:
 def fetch_wos_source_structures(cur: Any) -> list[tuple[str, int]]:
     """Charge `(source_id, id)` des `source_structures` WoS (préchargement cache)."""
     cur.execute("SELECT source_id, id FROM source_structures WHERE source = 'wos'")
-    return [(r[0], r[1]) for r in cur.fetchall()]
-
-
-def fetch_wos_source_persons_with_daisng(cur: Any) -> list[tuple[str, int]]:
-    """Charge `(source_id, id)` des `source_persons` WoS avec un daisng_id (préchargement cache).
-
-    Exclut les `source_id LIKE 'wos-%'` (sans daisng_id — pas dans le cache).
-    """
-    cur.execute(
-        "SELECT source_id, id FROM source_persons WHERE source = 'wos' "
-        "AND source_id NOT LIKE 'wos-%%'"
-    )
     return [(r[0], r[1]) for r in cur.fetchall()]
 
 
@@ -329,14 +278,6 @@ class PgWosNormalizeQueries:
     def upsert_wos_source_publication(self, cur: Any, **kwargs: Any) -> int:
         return upsert_wos_source_publication(cur, **kwargs)
 
-    def upsert_wos_source_person(self, cur: Any, **kwargs: Any) -> int:
-        return upsert_wos_source_person(cur, **kwargs)
-
-    def upsert_wos_source_persons_batch(
-        self, cur: Any, values: list[tuple[Any, ...]]
-    ) -> list[tuple[int, str]]:
-        return upsert_wos_source_persons_batch(cur, values)
-
     def upsert_wos_source_structure(self, cur: Any, *, name: str, ror_id: str | None) -> int:
         return upsert_wos_source_structure(cur, name=name, ror_id=ror_id)
 
@@ -349,13 +290,13 @@ class PgWosNormalizeQueries:
     def upsert_wos_source_authorships_batch(self, cur: Any, values: list[tuple[Any, ...]]) -> None:
         upsert_wos_source_authorships_batch(cur, values)
 
-    def fetch_source_authorship_ids(
-        self, cur: Any, *, source_publication_id: int, source_person_ids: list[int]
+    def fetch_source_authorship_ids_by_position(
+        self, cur: Any, *, source_publication_id: int, positions: list[int]
     ) -> dict[int, int]:
-        return fetch_source_authorship_ids(
+        return fetch_source_authorship_ids_by_position(
             cur,
             source_publication_id=source_publication_id,
-            source_person_ids=source_person_ids,
+            positions=positions,
         )
 
     def insert_source_authorship_addresses_batch(
@@ -368,9 +309,6 @@ class PgWosNormalizeQueries:
 
     def fetch_wos_source_structures(self, cur: Any) -> list[tuple[str, int]]:
         return fetch_wos_source_structures(cur)
-
-    def fetch_wos_source_persons_with_daisng(self, cur: Any) -> list[tuple[str, int]]:
-        return fetch_wos_source_persons_with_daisng(cur)
 
     def delete_wos_duplicate_authorships(self, cur: Any) -> int:
         return delete_wos_duplicate_authorships(cur)
