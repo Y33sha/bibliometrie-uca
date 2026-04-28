@@ -355,19 +355,23 @@ def upsert_hal_author(
     orcid: str | None = None,
     idref: str | None = None,
 ) -> int | None:
-    """
-    Insère/retrouve un auteur HAL dans source_persons (source='hal').
-    Déduplique par :
-      1. hal_person_id (clé unique via source_id, auteurs avec compte HAL)
-      2. hal_form_id (clé unique via source_id, auteurs sans compte HAL)
-      3. nom exact (dernier recours)
-    Retourne source_persons.id ou None.
-    Utilise un cache mémoire pour éviter les SELECTs redondants.
+    """Crée un `source_persons` HAL uniquement quand un `hal_person_id` est
+    fourni (= compte HAL identifié, cas légitime conservé par le chantier
+    source_persons). Sans `hal_person_id`, retourne None : la
+    `source_authorships` sera insérée avec `source_person_id=NULL`,
+    et les éventuels orcid/idref/idhal vivront sur `identifiers`.
+
+    Cache mémoire par `hal_person_id` pour éviter les SELECTs redondants.
     """
     if not full_name:
         return None
+    if not (hal_person_id and hal_person_id > 0):
+        return None
 
-    # Séparer nom/prénom (heuristique HAL : souvent "Prénom Nom")
+    src_id = _hal_source_id(hal_person_id, hal_form_id)
+    if src_id in _hal_author_cache:
+        return _hal_author_cache[src_id]
+
     parts = full_name.strip().split()
     if len(parts) >= 2:
         first_name = " ".join(parts[:-1])
@@ -376,83 +380,23 @@ def upsert_hal_author(
         first_name = None
         last_name = full_name
 
-    # Construire le JSONB source_ids pour les IDs spécifiques HAL
-    source_ids: dict[str, Any] = {}
-    if hal_person_id and hal_person_id > 0:
-        source_ids["hal_person_id"] = hal_person_id
+    source_ids: dict[str, Any] = {"hal_person_id": hal_person_id}
     if idhal:
         source_ids["idhal"] = idhal
     if hal_form_id:
         source_ids["hal_form_id"] = hal_form_id
-    source_ids_json = Json(source_ids) if source_ids else None
 
-    # 1. Par hal_person_id (clé fiable) — 0 signifie non identifié
-    if hal_person_id and hal_person_id > 0:
-        src_id = _hal_source_id(hal_person_id, hal_form_id)
-        if src_id in _hal_author_cache:
-            return _hal_author_cache[src_id]
-        result = queries.upsert_hal_source_person(
-            cur,
-            source_id=src_id,
-            full_name=full_name,
-            last_name=last_name,
-            first_name=first_name,
-            orcid=orcid,
-            idref=idref,
-            source_ids_json=source_ids_json,
-        )
-        _hal_author_cache[src_id] = result
-        return result
-
-    # 2. Par hal_form_id (auteurs sans compte HAL mais avec form_id)
-    if hal_form_id:
-        src_id = _hal_source_id(None, hal_form_id)
-        if src_id in _hal_author_cache:
-            return _hal_author_cache[src_id]
-        result = queries.upsert_hal_source_person(
-            cur,
-            source_id=src_id,
-            full_name=full_name,
-            last_name=last_name,
-            first_name=first_name,
-            orcid=orcid,
-            idref=idref,
-            source_ids_json=source_ids_json,
-        )
-        _hal_author_cache[src_id] = result
-        return result
-
-    # 3. Pas de hal_person_id ni form_id → chercher par nom exact
-    cache_key = f"nokey:{full_name}:{first_name}"
-    if cache_key in _hal_author_cache:
-        return _hal_author_cache[cache_key]
-
-    existing_id = queries.find_hal_source_person_nokey(
-        cur, full_name=full_name, first_name=first_name
-    )
-    if existing_id is not None:
-        if orcid or idref or source_ids_json:
-            queries.enrich_hal_source_person(
-                cur,
-                source_person_id=existing_id,
-                orcid=orcid,
-                idref=idref,
-                source_ids_json=source_ids_json,
-            )
-        _hal_author_cache[cache_key] = existing_id
-        return existing_id
-
-    # 4. Nouveau sans identifiant — on génère un source_id séquentiel
-    result = queries.insert_hal_source_person_new(
+    result = queries.upsert_hal_source_person(
         cur,
+        source_id=src_id,
         full_name=full_name,
         last_name=last_name,
         first_name=first_name,
         orcid=orcid,
         idref=idref,
-        source_ids_json=source_ids_json,
+        source_ids_json=Json(source_ids),
     )
-    _hal_author_cache[cache_key] = result
+    _hal_author_cache[src_id] = result
     return result
 
 
@@ -628,11 +572,27 @@ def process_authors(
         roles, is_corresponding_from_role = map_role("hal", quality)
         is_corresponding = is_corresponding_from_role
 
+        # Avec hal_person_id : crée le source_persons (cas légitime conservé)
+        # Sans hal_person_id : source_person_id reste NULL, identifiants
+        # (orcid/idref/idhal) sur la source_authorships via identifiers.
         source_person_id = upsert_hal_author(
             cur, queries, name, hal_person_id, idhal, form_id, orcid=orcid, idref=idref
         )
-        if not source_person_id:
+
+        if not name:
             continue
+
+        # Identifiants normalisés cross-source pour cette authorship
+        ids: dict[str, Any] = {}
+        if orcid:
+            ids["orcid"] = orcid
+        if idref:
+            ids["idref"] = idref
+        if idhal:
+            ids["idhal"] = idhal
+        if hal_person_id and hal_person_id > 0:
+            ids["hal_person_id"] = hal_person_id
+        identifiers = Json(ids) if ids else None
 
         # Structures affiliées à cet auteur sur ce document (par form_id)
         # Résoudre les hal_struct_id bruts → source_structures.id
@@ -668,6 +628,7 @@ def process_authors(
             raw_author_name=name,
             is_corresponding=is_corresponding,
             roles=roles or None,
+            identifiers=identifiers,
         )
 
         if addr_parts:

@@ -52,10 +52,14 @@ def fetch_unlinked_authorships(cur: Any) -> list[dict[str, Any]]:
                CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref') THEN NULL::text
                     ELSE sa.first_name END AS first_name,
                CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref') THEN NULL::text
-                    ELSE sa.orcid END AS orcid,
+                    ELSE COALESCE(sa.orcid, sa_auth.identifiers->>'orcid') END AS orcid,
                CASE WHEN sa_auth.source = 'hal'
-                    THEN sa.source_ids->>'idhal' ELSE NULL::text END AS idhal,
-               sa.idref,
+                    THEN COALESCE(
+                            sa.source_ids->>'idhal',
+                            sa_auth.identifiers->>'idhal'
+                         )
+                    ELSE NULL::text END AS idhal,
+               COALESCE(sa.idref, sa_auth.identifiers->>'idref') AS idref,
                CASE WHEN sa_auth.source = 'hal' THEN sa.id
                     ELSE NULL::int END AS source_person_id,
                CASE WHEN sa_auth.source = 'hal'
