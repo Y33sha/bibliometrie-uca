@@ -1151,63 +1151,6 @@ class HalCollectionsResponse(BaseModel):
     count: int
 
 
-# ----- Authorships admin (output) -----
-
-
-class AuthorshipsStats(BaseModel):
-    """Compteurs auteurs UCA (total, liés, identifiés ORCID/idHAL)."""
-
-    total_uca_authors: int
-    linked_to_person: int
-    with_orcid: int
-    with_idhal: int
-
-
-class AuthorshipsFacets(BaseModel):
-    """Facettes pour la page admin authorships (réutilise LabBinaryFacet
-    et LabeledIntFacet définis plus haut)."""
-
-    linked: LabBinaryFacet
-    orcid: LabBinaryFacet
-    idhal: LabBinaryFacet
-    labs: list[LabeledIntFacet]
-
-
-class AuthorshipsAuthorPerson(BaseModel):
-    """Personne liée à un auteur source (sous-objet `person`)."""
-
-    id: int
-    last_name: str
-    first_name: str
-    department_name: str | None
-    role_title: str | None
-    has_rh: bool
-
-
-class AuthorshipsAuthorOut(BaseModel):
-    """Ligne de la liste paginée /api/authorships."""
-
-    id: int
-    source: str
-    full_name: str
-    last_name: str | None
-    first_name: str | None
-    orcid: str | None
-    idhal: str | None
-    openalex_id: str | None
-    person_id: int | None
-    uca_pub_count: int
-    person: AuthorshipsAuthorPerson | None
-
-
-class AuthorshipsListResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
-    authors: list[AuthorshipsAuthorOut]
-
-
 # ----- Admin duplicates (publications) (output) -----
 
 

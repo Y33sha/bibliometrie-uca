@@ -116,7 +116,7 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 | `fetch_hal_account_to_person_map` (`queries/persons/create.py`) | Read | oui | Inchangé (HAL+hal_person_id conservé) |
 | `person_profile` (`queries/persons/detail.py`) | Read | partiel | SQL HAL/WoS authors adapté pour `identifiers` |
 | `hal_duplicate_accounts` (`queries/persons/admin.py`) | Read | oui | Inchangé |
-| **`authorships_stats` / `authorships_facets` / `_uca_authors_cte` (`queries/authorships.py`)** | Read | non | **Réécrire** : itérer sur `source_authorships` au lieu de `source_persons`, lire `identifiers` JSONB |
+| ~~`authorships_stats` / `authorships_facets` / `list_authorships` (`queries/authorships.py`)~~ | ~~Read~~ | ~~non~~ | **Supprimé** : code mort (page admin frontend disparue, endpoints non consommés). Phase 1.5 du chantier — fichiers `queries/authorships.py`, `routers/authorships.py`, `tests/.../test_authorships_queries.py` deletés ; classes Pydantic associées retirées de `interfaces/api/models.py` ; `include_router` retiré de `app.py`. |
 | `link_authorship` dual-write (`person_repository/_authorships.py`) | Write | oui (HAL) | Inchangé |
 | `add_identifier` dual-write (`person_repository/_identifiers.py`) | Write | oui (idhal sur HAL) | Inchangé |
 | `merge_persons` (`person_repository/_core.py`) | Write | oui | Inchangé |
@@ -171,6 +171,7 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 - [ ] `person_profile()` : SQL HAL/WoS authors adapté pour lire `identifiers`
 - [ ] `hal_duplicate_accounts()` : reste inchangée
 - [ ] `repair_hal_nokey_source_persons.py` : devient inutile → suppression
+- [x] ~~Réécrire admin authorships endpoint~~ : code mort, supprimé en phase 1.5
 
 ### Phase 4 — Purge des données legacy
 - [ ] DELETE des `source_persons` orphelines (sources OA/WoS/CrossRef, HAL `nokey-*`, ScanR `scanr-*`, theses `nokey-*`)

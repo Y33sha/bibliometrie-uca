@@ -45,7 +45,6 @@ from interfaces.api.routers import (  # noqa: E402
     admin_person_duplicates,
     admin_pipeline,
     auth,
-    authorships,
     config,
     docs,
     hal_problems,
@@ -313,7 +312,6 @@ app.include_router(addresses.router)
 app.include_router(admin_feedback.router)
 app.include_router(laboratories.router)
 app.include_router(structures.router)
-app.include_router(authorships.router)
 app.include_router(persons.router)
 app.include_router(admin_person_duplicates.router)
 app.include_router(hal_problems.router)
