@@ -762,9 +762,6 @@ class WosNormalizer(SourceNormalizer):
         deleted_dups = self._queries.delete_wos_duplicate_authorships(cur)
         if deleted_dups:
             self.logger.info("Doublons de position supprimés : %d", deleted_dups)
-        orphans = self._queries.delete_wos_orphan_legacy_source_persons(cur)
-        if orphans:
-            self.logger.info("source_persons legacy orphelins supprimés : %d", orphans)
 
     def cleanup(self) -> None:
         _wos_institution_cache.clear()

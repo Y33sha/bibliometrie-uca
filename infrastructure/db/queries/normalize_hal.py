@@ -280,19 +280,6 @@ def delete_hal_duplicate_authorships(cur: Any) -> int:
     return cur.rowcount
 
 
-def delete_hal_orphan_source_persons(cur: Any) -> int:
-    """Supprime les `source_persons` HAL sans aucune `source_authorships` (orphelins)."""
-    cur.execute("""
-        DELETE FROM source_persons
-        WHERE source = 'hal'
-          AND NOT EXISTS (
-              SELECT 1 FROM source_authorships sa
-              WHERE sa.source_person_id = source_persons.id
-          )
-    """)
-    return cur.rowcount
-
-
 class PgHalNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_hal.HalNormalizeQueries`."""
 
@@ -325,9 +312,6 @@ class PgHalNormalizeQueries:
 
     def delete_hal_duplicate_authorships(self, cur: Any) -> int:
         return delete_hal_duplicate_authorships(cur)
-
-    def delete_hal_orphan_source_persons(self, cur: Any) -> int:
-        return delete_hal_orphan_source_persons(cur)
 
     def clear_source_authorships_for_publication(
         self, cur: Any, source_publication_id: int

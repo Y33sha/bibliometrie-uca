@@ -819,10 +819,6 @@ class HalNormalizer(SourceNormalizer):
         if deleted_dups:
             self.logger.info(f"Doublons de position supprimés : {deleted_dups}")
 
-        orphans = self._queries.delete_hal_orphan_source_persons(cur)
-        if orphans:
-            self.logger.info(f"Source_authors orphelins supprimés : {orphans}")
-
     def cleanup(self) -> None:
         self._struct_cache.clear()
         self._struct_name_cache.clear()
