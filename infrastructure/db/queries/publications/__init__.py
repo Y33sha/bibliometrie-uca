@@ -1,7 +1,7 @@
 """Query services autour des publications.
 
 Le package est organisé par thème :
-- `list` : `list_publications`, `export_publications_csv`, `ListFilters`
+- `list` : `list_publications`, `export_publications_csv`, `export_theses_csv`, `ListFilters`
 - `facets` : `publications_facets`, `FacetFilters`
 - `detail` : `all_years`, `get_publication_detail`
 - `create` : `PgPublicationsCreateQueries` (adapter du port
@@ -24,6 +24,7 @@ from infrastructure.db.queries.publications.facets import (
 from infrastructure.db.queries.publications.list import (
     ListFilters,
     export_publications_csv,
+    export_theses_csv,
     list_publications,
 )
 
@@ -33,6 +34,7 @@ __all__ = [
     "PgPublicationsCreateQueries",
     "all_years",
     "export_publications_csv",
+    "export_theses_csv",
     "get_publication_detail",
     "list_publications",
     "publications_facets",
