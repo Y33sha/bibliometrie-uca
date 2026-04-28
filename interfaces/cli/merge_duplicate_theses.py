@@ -16,7 +16,7 @@ import os
 from typing import Any
 
 from application.publications import merge_publications
-from domain.names import names_compatible
+from domain.names import names_compatible, parse_raw_author_name
 from domain.normalize import normalize_name
 from infrastructure.db.connection import get_connection
 from infrastructure.log import setup_logger
@@ -53,15 +53,18 @@ def find_duplicate_groups(cur: Any) -> Any:
 def get_thesis_author(cur: Any, pub_id: Any) -> Any:
     """Retourne (last_name, first_name) normalisés de l'auteur d'une thèse.
 
-    Cherche dans source_authorships le rôle 'author'.
-    Retourne None si pas d'auteur unique trouvé.
+    Cherche dans source_authorships le rôle 'author'. LEFT JOIN sur
+    source_persons : pour les thèses sans PPN (post-chantier
+    source_persons), pas de source_persons row → fallback sur le
+    parsing de raw_author_name.
+    Retourne None si pas d'auteur trouvé.
     """
     cur.execute(
         """
-        SELECT sa.last_name, sa.first_name
+        SELECT sa.last_name, sa.first_name, sas.raw_author_name
         FROM source_authorships sas
         JOIN source_publications sd ON sd.id = sas.source_publication_id
-        JOIN source_persons sa ON sa.id = sas.source_person_id
+        LEFT JOIN source_persons sa ON sa.id = sas.source_person_id
         WHERE sd.publication_id = %s
           AND 'author' = ANY(sas.roles)
         ORDER BY sd.id, sas.author_position
@@ -74,6 +77,9 @@ def get_thesis_author(cur: Any, pub_id: Any) -> Any:
         return None
     ln = normalize_name(row["last_name"] or "")
     fn = normalize_name(row["first_name"] or "")
+    if not ln and row["raw_author_name"]:
+        last, first = parse_raw_author_name(row["raw_author_name"])
+        ln, fn = normalize_name(last), normalize_name(first)
     return (ln, fn) if ln else None
 
 
