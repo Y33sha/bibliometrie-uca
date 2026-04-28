@@ -170,12 +170,15 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 - [x] **ScanR** : `find_scanr_source_person_by_name` + `insert_scanr_source_person_new` supprimés. `upsert_scanr_author` retourne None sans idref → la `source_authorships` est insérée avec `source_person_id=NULL` et `identifiers={"orcid": ..., "idref": ...}` (champs filtrés selon présence). Pas de migration supplémentaire nécessaire (ScanR pose toujours `author_position` non-null, pas de cas `(pub, NULL, NULL)`).
 - [x] **HAL** : `find_hal_source_person_nokey` + `enrich_hal_source_person` + `insert_hal_source_person_new` supprimés. `upsert_hal_author` retourne None si pas de `hal_person_id` (= comptes HAL identifiés uniquement) ; le cas `0_<form_id>` (auteurs HAL sans compte mais avec form_id, ~154k rows existantes) ainsi que les `nokey-*` sont laissés tomber côté nouvelle écriture, leurs `source_authorships` se rabattent sur `source_person_id=NULL` + `identifiers` (orcid/idref/idhal/hal_person_id selon présence). `fetch_unlinked_authorships` ajusté avec `COALESCE(sa.orcid, sa_auth.identifiers->>'orcid')` et idem pour idref/idhal pour absorber les rows HAL post-phase-2 sans `source_persons`. Le dual-write côté `link_authorship` et `add_identifier` reste pertinent (ne se déclenche que quand `source_person_id` non-null et `hal_person_id` présent → cas légitime conservé).
 
-### Phase 3 — Adapter les lecteurs
-- [ ] `fetch_unlinked_authorships()` : lit les identifiants depuis `source_authorships.identifiers` + JOIN `source_persons` seulement pour les sources éligibles
-- [ ] `fetch_hal_account_to_person_map()` : reste inchangée (HAL avec compte continue d'alimenter `source_persons`)
-- [ ] `person_profile()` : SQL HAL/WoS authors adapté pour lire `identifiers`
-- [ ] `hal_duplicate_accounts()` : reste inchangée
-- [ ] `repair_hal_nokey_source_persons.py` : devient inutile → suppression
+### Phase 3 — Adapter les lecteurs ✅
+- [x] `fetch_unlinked_authorships()` : LEFT JOIN sur `source_persons` + COALESCE(sa.orcid/idref/idhal, sa_auth.identifiers->>...) + CASE OA/WoS/CrossRef pour `oa_orcid`/`oa_full_name`. Adapté progressivement au fil des phases 2 OA, WoS, CrossRef et HAL.
+- [x] `fetch_linked_authorships_structured()` : passé en LEFT JOIN (cf. phase 2 WoS) — le caller fait déjà le fallback `parse_raw_author_name`.
+- [x] `fetch_hal_account_to_person_map()` : inchangée (HAL avec compte continue d'alimenter `source_persons`)
+- [x] `person_profile()` : section WoS migrée au pattern OpenAlex (GROUP BY raw_author_name, ORCID via identifiers). HAL reste sur INNER JOIN source_persons → ne retourne désormais que les comptes HAL identifiés (sémantiquement « comptes HAL liés »).
+- [x] `hal_duplicate_accounts()` : inchangée
+- [x] `merge_duplicate_theses.py` : LEFT JOIN + fallback `parse_raw_author_name` pour les thèses sans PPN.
+- [x] `merge_person_duplicates_by_lab.py` : compteur OA passe de `COUNT(DISTINCT source_person_id)` à `COUNT(DISTINCT raw_author_name)`. HAL reste sur source_person_id (= comptes).
+- [x] `repair_hal_nokey_source_persons.py` : supprimé (cas qui ne se reproduira plus).
 - [x] ~~Réécrire admin authorships endpoint~~ : code mort, supprimé en phase 1.5
 
 ### Phase 4 — Purge des données legacy
