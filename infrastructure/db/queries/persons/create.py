@@ -29,11 +29,14 @@ def fetch_unlinked_authorships(cur: Any) -> list[dict[str, Any]]:
       directeur de thèse).
 
     Filtre supplémentaire : OpenAlex exclu des lignes avec
-    `raw_author_name IS NULL` (pas de nom utilisable sans `source_persons`).
+    `raw_author_name IS NULL` (pas de nom utilisable).
 
-    Remplace 5 fonctions quasi-identiques (ancienne dette : copier-coller
-    par source). Les colonnes sont la réunion des SELECT par source — si
-    une colonne n'est pas significative pour la source, elle vaut NULL.
+    LEFT JOIN sur `source_persons` : depuis le chantier source_persons,
+    OpenAlex (et à terme WoS/CrossRef) écrit `source_person_id=NULL` ; les
+    identifiants normalisés vivent sur `source_authorships.identifiers`.
+    Pour les sources qui alimentent toujours `source_persons` (HAL avec
+    `hal_person_id`, ScanR avec idref, theses avec PPN), le JOIN ramène
+    la row et les CASE continuent de fonctionner.
     """
     cur.execute("""
         SELECT sa_auth.id AS authorship_id,
@@ -56,16 +59,18 @@ def fetch_unlinked_authorships(cur: Any) -> list[dict[str, Any]]:
                CASE WHEN sa_auth.source = 'hal'
                     THEN (sa.source_ids->>'hal_person_id')::int
                     ELSE NULL::int END AS hal_person_id,
-               CASE WHEN sa_auth.source = 'openalex' THEN sa.orcid
+               CASE WHEN sa_auth.source = 'openalex'
+                    THEN sa_auth.identifiers->>'orcid'
                     ELSE NULL::text END AS oa_orcid,
-               CASE WHEN sa_auth.source = 'openalex' THEN sa.full_name
+               CASE WHEN sa_auth.source = 'openalex'
+                    THEN sa_auth.raw_author_name
                     ELSE NULL::text END AS oa_full_name,
                CASE WHEN sa_auth.source = 'theses' THEN sa_auth.roles
                     ELSE NULL END AS roles,
                sd.publication_id,
                sa_auth.author_position
         FROM source_authorships sa_auth
-        JOIN source_persons sa ON sa.id = sa_auth.source_person_id
+        LEFT JOIN source_persons sa ON sa.id = sa_auth.source_person_id
         JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
         JOIN v_active_publications vap ON vap.id = sd.publication_id
         WHERE sa_auth.person_id IS NULL
