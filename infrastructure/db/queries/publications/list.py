@@ -427,6 +427,7 @@ async def export_publications_csv(
         ]
     )
     for row in await cur.fetchall():
+        doi_url = f"https://doi.org/{row['doi']}" if row["doi"] else ""
         hal_url = f"https://hal.science/{row['hal_id']}" if row["hal_id"] else ""
         oa_url = f"https://openalex.org/{row['openalex_id']}" if row["openalex_id"] else ""
         wos_url = (
@@ -438,7 +439,7 @@ async def export_publications_csv(
             [
                 row["pub_year"] or "",
                 row["title"] or "",
-                row["doi"] or "",
+                doi_url,
                 row["journal_title"] or "",
                 row["publisher_name"] or "",
                 row["labs"] or "",
@@ -534,6 +535,7 @@ async def export_theses_csv(
         ]
     )
     for row in await cur.fetchall():
+        doi_url = f"https://doi.org/{row['doi']}" if row["doi"] else ""
         hal_url = f"https://hal.science/{row['hal_id']}" if row["hal_id"] else ""
         oa_url = f"https://openalex.org/{row['openalex_id']}" if row["openalex_id"] else ""
         theses_url = f"https://theses.fr/{row['theses_id']}" if row["theses_id"] else ""
@@ -544,7 +546,7 @@ async def export_theses_csv(
                 row["pub_year"] or "",
                 _THESES_STATUS_LABELS.get(row["doc_type"], row["doc_type"] or ""),
                 row["title"] or "",
-                row["doi"] or "",
+                doi_url,
                 row["labs"] or "",
                 row["oa_status"] or "",
                 hal_url,
