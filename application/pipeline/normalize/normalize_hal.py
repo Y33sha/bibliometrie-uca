@@ -309,6 +309,7 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
         ids: dict[str, str] = {}
         for idno in author.findall("tei:idno", _TEI_NS):
             typ = (idno.get("type") or "").upper()
+            notation = (idno.get("notation") or "").lower()
             val = (idno.text or "").strip()
             if not val:
                 continue
@@ -321,6 +322,13 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
             elif typ == "IDREF":
                 ids["idref"] = val.rsplit("/", 1)[-1].strip()
             elif typ == "IDHAL":
+                # HAL emet souvent deux <idno type="idhal"> par auteur,
+                # distingués par notation="string" (slug `prenom-nom`, le vrai
+                # idhal) et notation="numeric" (le hal_person_id ré-étiqueté
+                # idhal). Seul le slug nous intéresse ici — le hal_person_id
+                # est capturé via le composite Solr.
+                if notation != "string":
+                    continue
                 ids["idhal"] = val
         out.append(ids)
     return out
