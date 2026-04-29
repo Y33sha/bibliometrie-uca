@@ -31,6 +31,7 @@ Phases (dans l'ordre d'execution):
     persons        Creation/mapping personnes + formes de noms
     authorships    Reconstruction authorships canoniques (table de verite) + propagation UCA
     countries      Detection pays des adresses + recalcul pays des publications
+    subjects       Ingestion des sujets/mots-cles depuis source_publications vers subjects + publication_subjects
     enrich         Enrichissements optionnels (statut OA via Unpaywall, APC revues)
 """
 
@@ -257,6 +258,17 @@ def phase_countries(**kw: Any) -> Any:
     run_python("interfaces/cli/detect_address_countries.py", "--direct", "--apply")
     run_python("interfaces/cli/suggest_address_countries.py")
     _run_refresh_publication_countries()
+
+
+def phase_subjects(**kw: Any) -> Any:
+    """Ingestion des sujets/mots-clés depuis source_publications.
+
+    Lit les colonnes `keywords` et `topics` déjà persistées par les
+    normalizers et alimente les tables canoniques `subjects` et
+    `publication_subjects`. Idempotent.
+    """
+    sources = kw.get("sources")
+    _run_ingest_subjects(sources if sources and sources != ALL_SOURCES_SET else None)
 
 
 def _run_create_publications() -> None:
@@ -668,6 +680,24 @@ def _run_refresh_publication_countries() -> None:
     log.info("✓ refresh_publication_countries terminé en %.1fs", time.time() - t0)
 
 
+def _run_ingest_subjects(sources: Any = None) -> None:
+    from application.pipeline.subjects.run import run
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.subjects import PgSubjectsQueries
+
+    log.info("▶ subjects %s", f"sources={sorted(sources)}" if sources else "")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        run(cur, PgSubjectsQueries(), log, sources=sorted(sources) if sources else None)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ subjects terminé en %.1fs", time.time() - t0)
+
+
 def phase_enrich(mode: Any = "full", **kw: Any) -> Any:
     """Enrichissements optionnels (Unpaywall, APC revues).
 
@@ -691,6 +721,7 @@ PHASES = [
     ("persons", phase_persons),
     ("authorships", phase_authorships),
     ("countries", phase_countries),
+    ("subjects", phase_subjects),
     ("enrich", phase_enrich),
 ]
 
