@@ -1,42 +1,33 @@
-"""Concept métier Sujet (mot-clé libre ou concept ontologique).
+"""Concept métier Sujet : libellé canonique + annotations multi-ontologies.
 
-Une publication est annotée par 0..N sujets, chacun étant soit :
-- un **mot-clé libre** (`kind='free'`) : forme observée dans une source, sans
-  ontologie de référence ; déduplication soft sur `(lower(label), language)`.
-- un **concept** (`kind='concept'`) : terme contrôlé d'une ontologie identifiée
-  (`ontology`) avec un identifiant stable (`ontology_id`) ; déduplication
-  stricte sur `(ontology, ontology_id)`.
+Un sujet = un libellé observé sur des publications, dédupliqué sur
+`lower(label)`. Les ontologies qui l'ont annoté sont listées dans
+`subjects.ontologies` (JSONB) au format :
 
-Pas d'ontologie pivot en première approche : chaque ontologie cohabite et
-on agrège côté UI. Voir docs/chantiers/sujets-mots-cles.md.
+    {"hal_domain": ["info"], "theses_discipline": ["informatique"]}
+
+Les valeurs sont des listes : on agrège les codes intra-ontologie quand
+plusieurs concepts source partagent le même libellé feuille (ex `info` et
+`scco.comp` chez HAL, tous deux libellés "Informatique").
+
+Un sujet sans aucune ontologie (`ontologies = {}`) correspond à un
+mot-clé libre observé tel quel sur une publication. Voir
+docs/chantiers/sujets-mots-cles.md.
 """
 
-from typing import Literal
-
-# ── Discriminant ────────────────────────────────────────────────
-
-SubjectKind = Literal["free", "concept"]
-
-SUBJECT_KINDS: frozenset[str] = frozenset({"free", "concept"})
-
-
 # ── Ontologies reconnues ────────────────────────────────────────
-# Chaque clé désigne un **vocabulaire** distinct ; l'`ontology_id` stocké
-# dans `subjects.ontology_id` doit être stable pour cette ontologie.
-#
 # Conventions par ontologie :
-# - openalex_topic    : `ontology_id` = identifiant OpenAlex (ex 'T10138').
-#                       Hiérarchie 4 niveaux exposée via `parent_id`/`level`.
-#                       Niveaux : 0=domain, 1=field, 2=subfield, 3=topic.
-# - openalex_keyword  : `ontology_id` = identifiant OpenAlex du keyword.
-# - hal_domain        : `ontology_id` = code HAL ('info.eea', 'sdv.bbm', …).
-# - wos_subject       : `ontology_id` = `lower(label)` (pas d'ID stable côté WoS).
-# - wos_heading       : idem.
-# - rameau            : `ontology_id` = `lower(label)` (PPN RAMEAU non exposé
-#                       systématiquement par theses.fr).
-# - theses_discipline : `ontology_id` = `lower(label)`.
-# - scanr_domain      : `ontology_id` = `lower(label)` (ScanR n'expose pas
-#                       d'ID ontologique stable côté API publique).
+# - openalex_topic    : id = lower(display_name) ; hiérarchie 4 niveaux
+#                       exposée via `parent_id`/`level`. 0=domain, 1=field,
+#                       2=subfield, 3=topic.
+# - openalex_keyword  : id = lower(display_name).
+# - hal_domain        : id = code HAL CCSD ('info', 'chim.anal', …) ;
+#                       label dérivé de `domain.hal_domains` (feuille).
+# - wos_subject       : id = lower(label).
+# - wos_heading       : id = lower(label).
+# - rameau            : id = lower(label).
+# - theses_discipline : id = lower(label).
+# - scanr_domain      : id = lower(label).
 
 ONTOLOGY_OPENALEX_TOPIC = "openalex_topic"
 ONTOLOGY_OPENALEX_KEYWORD = "openalex_keyword"
@@ -64,11 +55,11 @@ ONTOLOGIES: frozenset[str] = frozenset(
 # ── Helpers de normalisation ────────────────────────────────────
 
 
-def normalize_free_label(label: str) -> str:
-    """Trim + collapse interne pour les mots-clés libres avant insertion.
+def normalize_label(label: str) -> str:
+    """Trim + collapse interne pour les libellés de sujet avant insertion.
 
     On ne touche ni à la casse ni aux accents : la déduplication se fait
-    en SQL via `lower(label)` (index unique partiel). On préserve la forme
+    en SQL via `lower(label)` (index unique). On préserve la forme
     originale du premier insert dans `subjects.label`.
     """
     return " ".join(label.split())

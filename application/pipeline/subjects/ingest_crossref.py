@@ -24,6 +24,6 @@ def ingest(
 ) -> int:
     links: list[tuple[int, int, float | None]] = []
     for kw in dedup_strs(keywords):
-        sid = cache.get_or_upsert_free(cur, label=kw, language="en")
+        sid = cache.get_or_upsert(cur, label=kw)
         links.append((publication_id, sid, None))
     return cache.link_bulk(cur, source=SOURCE, rows=links)

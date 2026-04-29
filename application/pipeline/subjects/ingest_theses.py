@@ -27,29 +27,27 @@ def ingest(
     links: list[tuple[int, int, float | None]] = []
 
     for kw in dedup_strs(keywords):
-        sid = cache.get_or_upsert_free(cur, label=kw, language="fr")
+        sid = cache.get_or_upsert(cur, label=kw)
         links.append((publication_id, sid, None))
 
     if isinstance(topics, dict):
         discipline = topics.get("discipline")
         if isinstance(discipline, str) and discipline.strip():
             label = discipline.strip()
-            sid = cache.get_or_upsert_concept(
+            sid = cache.get_or_upsert(
                 cur,
-                ontology=ONTOLOGY_THESES_DISCIPLINE,
-                ontology_id=label.lower(),
                 label=label,
                 language="fr",
+                ontologies={ONTOLOGY_THESES_DISCIPLINE: {"codes": [label.lower()]}},
             )
             links.append((publication_id, sid, None))
 
         for label in dedup_strs(topics.get("rameau")):
-            sid = cache.get_or_upsert_concept(
+            sid = cache.get_or_upsert(
                 cur,
-                ontology=ONTOLOGY_RAMEAU,
-                ontology_id=label.lower(),
                 label=label,
                 language="fr",
+                ontologies={ONTOLOGY_RAMEAU: {"codes": [label.lower()]}},
             )
             links.append((publication_id, sid, None))
 
