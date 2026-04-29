@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { base } from "$app/paths";
   import type { Subject } from "./types";
 
   let { subjects }: { subjects: Subject[] } = $props();
@@ -40,7 +41,7 @@
     {#if generalConcepts.length > 0}
       <div class="general">
         {#each generalConcepts as s (s.id)}
-          <span class="chip" title={tooltip(s)}>{s.label}</span>
+          <a href="{base}/subjects/{s.id}" class="chip" title={tooltip(s)}>{s.label}</a>
         {/each}
       </div>
     {/if}
@@ -48,7 +49,7 @@
     {#if preciseConcepts.length > 0}
       <div class="badges">
         {#each preciseConcepts as s (s.id)}
-          <span class="badge concept" title={tooltip(s)}>{s.label}</span>
+          <a href="{base}/subjects/{s.id}" class="badge concept" title={tooltip(s)}>{s.label}</a>
         {/each}
       </div>
     {/if}
@@ -56,7 +57,7 @@
     {#if freeKeywords.length > 0}
       <div class="badges">
         {#each freeKeywords as s (s.id)}
-          <span class="badge free" title={tooltip(s)}>{s.label}</span>
+          <a href="{base}/subjects/{s.id}" class="badge free" title={tooltip(s)}>{s.label}</a>
         {/each}
       </div>
     {/if}
