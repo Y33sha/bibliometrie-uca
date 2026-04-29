@@ -27,6 +27,7 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 
 from __future__ import annotations
 
+import datetime
 import re
 from collections.abc import Callable
 from typing import Any
@@ -69,14 +70,25 @@ def get_title(msg: dict) -> str | None:
 
 
 def get_pub_year(msg: dict) -> int | None:
-    """Année de publication, dans l'ordre : issued > published > online > print."""
-    for field in ("issued", "published", "published-online", "published-print"):
+    """Année de publication, dans l'ordre : published > issued > online > print.
+
+    Sémantique CrossRef : `published` = min(published-online, published-print) ;
+    `issued` = date déclarée par l'éditeur (peut être prospective sur des
+    "futur numéro" 2030+ déposés avant publication réelle).
+
+    Borne supérieure à `current_year + 1` (un preprint daté de l'année
+    suivante reste plausible). Au-dessus, on considère la donnée polluée
+    et on retourne None — process_work skippera la normalisation, et
+    refresh_from_sources arbitrera depuis les autres sources.
+    """
+    max_year = datetime.date.today().year + 1
+    for field in ("published", "issued", "published-online", "published-print"):
         d = msg.get(field) or {}
         date_parts = d.get("date-parts") or []
         if date_parts and isinstance(date_parts[0], list) and date_parts[0]:
             try:
                 year = int(date_parts[0][0])
-                if 1500 <= year <= 9999:
+                if 1500 <= year <= max_year:
                     return year
             except (TypeError, ValueError):
                 continue
