@@ -20,22 +20,21 @@
   let container: HTMLDivElement | undefined = $state();
   let network: Network | undefined;
 
-  function isFree(s: { ontologies: Record<string, unknown> }): boolean {
-    return Object.keys(s.ontologies).length === 0;
+  /** Palette identique à SubjectsCloud, pour cohérence visuelle entre le
+   *  nuage et le graphe. Couleur stable par sujet via hash de l'id. */
+  const PALETTE = ["#075985", "#0369a1", "#7c3aed", "#9333ea", "#be123c", "#b45309"];
+  function colorFor(id: number): string {
+    return PALETTE[id % PALETTE.length];
   }
 
-  /** Taille de police adaptative au range du graphe en cours.
-   *  Interpolation log entre le min et le max des usage_count visibles,
-   *  vers [minSize, maxSize]. Quand tous les nœuds ont des fréquences
-   *  similaires, on évite ainsi des cercles tous écrasés sur la même taille
-   *  ou tous gigantesques par construction. */
+  /** Taille de police adaptative au range du graphe en cours. */
   function nodeFontSize(
     usageCount: number,
     minUsage: number,
     maxUsage: number,
   ): number {
-    const minSize = 14; // lisible au minimum
-    const maxSize = 30;
+    const minSize = 18;
+    const maxSize = 38;
     if (maxUsage === minUsage) return (minSize + maxSize) / 2;
     const t =
       (Math.log10(usageCount + 1) - Math.log10(minUsage + 1)) /
@@ -86,20 +85,6 @@
     return maxLen - (maxLen - minLen) * t;
   }
 
-  /** Style du nœud : jaune pour libre, bleu pour concept ; le nœud central
-   *  a une bordure plus marquée. */
-  function nodeStyle(s: { ontologies: Record<string, unknown> }, isCenter: boolean) {
-    const free = isFree(s);
-    return {
-      background: free ? "#fef3c7" : "#e0f2fe",
-      border: free ? "#fde68a" : "#bae6fd",
-      borderWidth: isCenter ? 4 : 1,
-      highlight: {
-        background: free ? "#fde68a" : "#bae6fd",
-        border: free ? "#92400e" : "#0369a1",
-      },
-    };
-  }
 
   function buildData(): { nodes: Node[]; edges: Edge[] } {
     // Min/max sur tous les nœuds visibles (centre + voisins) pour calibrer
@@ -107,18 +92,19 @@
     const allUsages = [subject.usage_count, ...neighbors.map((n) => n.usage_count)];
     const minUsage = Math.min(...allUsages);
     const maxUsage = Math.max(...allUsages);
-    const fontFor = (usageCount: number, isFreeNode: boolean) => ({
-      size: nodeFontSize(usageCount, minUsage, maxUsage),
-      color: isFreeNode ? "#92400e" : "#075985",
+    // Texte nu : la couleur vient de la palette stable par id (mêmes
+    // règles que SubjectsCloud) ; le centre est agrandi pour rester
+    // identifiable une fois la physique figée.
+    const fontFor = (id: number, usageCount: number, isCenter: boolean) => ({
+      size: nodeFontSize(usageCount, minUsage, maxUsage) + (isCenter ? 6 : 0),
+      color: colorFor(id),
       face: "system-ui, sans-serif",
     });
     const nodes: Node[] = [
       {
         id: subject.id,
         label: wrapLabel(subject.label),
-        color: nodeStyle(subject, true),
-        borderWidth: 4,
-        font: fontFor(subject.usage_count, isFree(subject)),
+        font: fontFor(subject.id, subject.usage_count, true),
       },
     ];
     const edges: Edge[] = [];
@@ -132,8 +118,7 @@
       nodes.push({
         id: n.id,
         label: wrapLabel(n.label),
-        color: nodeStyle(n, false),
-        font: fontFor(n.usage_count, isFree(n)),
+        font: fontFor(n.id, n.usage_count, false),
       });
       const spec = specificities[i];
       edges.push({
@@ -150,10 +135,10 @@
   function buildOptions(): Options {
     return {
       nodes: {
-        shape: "circle",
-        // Le wrap est précalculé dans `wrapLabel` (jamais de coupure en
-        // milieu de mot). vis-network respecte les `\n` des labels.
-        margin: { top: 8, right: 10, bottom: 8, left: 10 },
+        // Texte nu, sans cercle ni rectangle : aligne visuellement le
+        // graphe avec le nuage de mots du dashboard. Les arêtes
+        // connectent au centre du label.
+        shape: "text",
       },
       edges: {
         scaling: { min: 1, max: 8 },

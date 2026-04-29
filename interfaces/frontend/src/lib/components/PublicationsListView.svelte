@@ -31,13 +31,24 @@
 		urlSync = true,
 		basePath = '/publications',
 		showFilterBanner = true,
+		onTotalChange,
 	}: {
 		apiKey?: string;
 		externalFilters?: ExternalFilters;
 		urlSync?: boolean;
 		basePath?: string;
 		showFilterBanner?: boolean;
+		/** Notifie le parent du nombre total de publications après filtrage,
+		 *  pour que le titre d'onglet (TabNav) puisse refléter le tableau
+		 *  exactement (en tenant compte des doc_type exclus côté API et
+		 *  du `excluded_doc_type=ongoing_thesis` ajouté par défaut). */
+		onTotalChange?: (total: number) => void;
 	} = $props();
+
+	// Notifie le parent à chaque changement de `pubs.total`.
+	$effect(() => {
+		if (onTotalChange) onTotalChange(pubs.total);
+	});
 
 	// --- Column visibility ---
 	const cv = useColumnVisibility([
