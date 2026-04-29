@@ -30,13 +30,13 @@ def test_strips_orcid_and_idref_url_prefixes():
     xml = _tei("""
       <author>
         <persName><forename>Cédric</forename><surname>Delattre</surname></persName>
-        <idno type="idhal">16491</idno>
+        <idno type="idhal" notation="string">cedric-delattre</idno>
         <idno type="ORCID">https://orcid.org/0000-0003-3605-1929</idno>
         <idno type="IDREF">https://www.idref.fr/099757427</idno>
       </author>
     """)
     assert parse_tei_author_identifiers(xml) == [
-        {"idhal": "16491", "orcid": "0000-0003-3605-1929", "idref": "099757427"}
+        {"idhal": "cedric-delattre", "orcid": "0000-0003-3605-1929", "idref": "099757427"}
     ]
 
 
@@ -89,7 +89,36 @@ def test_empty_idno_values_are_skipped():
         <persName><forename>Z</forename><surname>Doe</surname></persName>
         <idno type="ORCID"></idno>
         <idno type="IDREF">   </idno>
-        <idno type="idhal">42</idno>
+        <idno type="idhal" notation="string">z-doe</idno>
       </author>
     """)
-    assert parse_tei_author_identifiers(xml) == [{"idhal": "42"}]
+    assert parse_tei_author_identifiers(xml) == [{"idhal": "z-doe"}]
+
+
+def test_idhal_keeps_only_string_notation():
+    """HAL emet souvent deux <idno type="idhal"> par auteur :
+    notation="string" (le slug `prenom-nom`, vrai idhal) et
+    notation="numeric" (le hal_person_id, ré-étiqueté idhal). Seul
+    notation="string" doit être capturé sous la clé `idhal`."""
+    xml = _tei("""
+      <author>
+        <persName><forename>Pascal</forename><surname>André</surname></persName>
+        <idno type="idhal" notation="string">pascal-andre</idno>
+        <idno type="idhal" notation="numeric">1195</idno>
+        <idno type="halauthorid" notation="string">1502-1195</idno>
+      </author>
+    """)
+    assert parse_tei_author_identifiers(xml) == [{"idhal": "pascal-andre"}]
+
+
+def test_idhal_without_notation_is_ignored():
+    """Un <idno type="idhal"> sans attribut `notation` est ignoré : on
+    ne sait pas si c'est un slug ou un hal_person_id mal étiqueté.
+    Le composite Solr fournit l'idhal en fallback de toute façon."""
+    xml = _tei("""
+      <author>
+        <persName><forename>Z</forename><surname>Doe</surname></persName>
+        <idno type="idhal">unknown</idno>
+      </author>
+    """)
+    assert parse_tei_author_identifiers(xml) == [{}]
