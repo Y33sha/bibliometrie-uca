@@ -78,8 +78,19 @@ def _apply_inline_filters(conditions: list[str], params: list[Any], filters: Lis
         conditions.append("p.doc_type::text != ALL(%s)")
         params.append(filters.excluded_types)
     if filters.search:
-        conditions.append("unaccent(p.title) ILIKE unaccent(%s)")
-        params.append(f"%{filters.search}%")
+        # Recherche sur titre OU label de sujet : permet de retrouver les
+        # publis annotées avec un mot-clé même quand le titre ne le contient
+        # pas. L'EXISTS court-circuite les colocations multiples.
+        conditions.append(
+            "(unaccent(p.title) ILIKE unaccent(%s) "
+            "OR EXISTS (SELECT 1 FROM publication_subjects ps "
+            "JOIN subjects s ON s.id = ps.subject_id "
+            "WHERE ps.publication_id = p.id "
+            "AND unaccent(s.label) ILIKE unaccent(%s)))"
+        )
+        pattern = f"%{filters.search}%"
+        params.append(pattern)
+        params.append(pattern)
     if filters.years:
         conditions.append("p.pub_year = ANY(%s)")
         params.append(filters.years)
