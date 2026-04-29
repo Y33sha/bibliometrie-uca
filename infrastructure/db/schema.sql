@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zkMgZp9UmmzYdt7Ac0wVcxyJbaQO1wdyPURsqXiKOrPbMBffaR3fRyIbtfPMqUg
+\restrict eoqd8MEHosjobDhnLuNRObKcKLQXUQJwmyqctVWcufDzca3YJcJGcSr7I14XoD1
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -777,6 +777,19 @@ ALTER SEQUENCE public.persons_rh_id_seq OWNED BY public.persons_rh.id;
 
 
 --
+-- Name: publication_subjects; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.publication_subjects (
+    publication_id integer NOT NULL,
+    subject_id integer NOT NULL,
+    source public.source_type NOT NULL,
+    score real,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
 -- Name: publications; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1257,6 +1270,45 @@ ALTER SEQUENCE public.structures_id_seq OWNED BY public.structures.id;
 
 
 --
+-- Name: subjects; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.subjects (
+    id integer NOT NULL,
+    kind text NOT NULL,
+    label text NOT NULL,
+    language text,
+    ontology text,
+    ontology_id text,
+    parent_id integer,
+    level integer,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT subjects_concept_has_ontology CHECK ((((kind = 'concept'::text) AND (ontology IS NOT NULL) AND (ontology_id IS NOT NULL)) OR ((kind = 'free'::text) AND (ontology IS NULL) AND (ontology_id IS NULL)))),
+    CONSTRAINT subjects_kind_check CHECK ((kind = ANY (ARRAY['free'::text, 'concept'::text])))
+);
+
+
+--
+-- Name: subjects_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.subjects_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: subjects_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.subjects_id_seq OWNED BY public.subjects.id;
+
+
+--
 -- Name: v_active_publications; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -1453,6 +1505,13 @@ ALTER TABLE ONLY public.structure_relations ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.structures ALTER COLUMN id SET DEFAULT nextval('public.structures_id_seq'::regclass);
+
+
+--
+-- Name: subjects id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subjects ALTER COLUMN id SET DEFAULT nextval('public.subjects_id_seq'::regclass);
 
 
 --
@@ -1680,6 +1739,14 @@ ALTER TABLE ONLY public.persons_rh
 
 
 --
+-- Name: publication_subjects publication_subjects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_subjects
+    ADD CONSTRAINT publication_subjects_pkey PRIMARY KEY (publication_id, subject_id, source);
+
+
+--
 -- Name: publications publications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1853,6 +1920,14 @@ ALTER TABLE ONLY public.structures
 
 ALTER TABLE ONLY public.structures
     ADD CONSTRAINT structures_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: subjects subjects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subjects
+    ADD CONSTRAINT subjects_pkey PRIMARY KEY (id);
 
 
 --
@@ -2397,10 +2472,38 @@ CREATE INDEX idx_structures_type ON public.structures USING btree (structure_typ
 
 
 --
+-- Name: publication_subjects_subject_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX publication_subjects_subject_idx ON public.publication_subjects USING btree (subject_id);
+
+
+--
 -- Name: publications_doi_lower_key; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX publications_doi_lower_key ON public.publications USING btree (lower(doi)) WHERE (doi IS NOT NULL);
+
+
+--
+-- Name: subjects_concept_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX subjects_concept_key ON public.subjects USING btree (ontology, ontology_id) WHERE (kind = 'concept'::text);
+
+
+--
+-- Name: subjects_free_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX subjects_free_key ON public.subjects USING btree (lower(label), COALESCE(language, ''::text)) WHERE (kind = 'free'::text);
+
+
+--
+-- Name: subjects_label_lower_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX subjects_label_lower_idx ON public.subjects USING btree (lower(label));
 
 
 --
@@ -2572,6 +2675,22 @@ ALTER TABLE ONLY public.persons_rh
 
 
 --
+-- Name: publication_subjects publication_subjects_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_subjects
+    ADD CONSTRAINT publication_subjects_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES public.publications(id) ON DELETE CASCADE;
+
+
+--
+-- Name: publication_subjects publication_subjects_subject_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_subjects
+    ADD CONSTRAINT publication_subjects_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id) ON DELETE CASCADE;
+
+
+--
 -- Name: publications publications_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2692,8 +2811,15 @@ ALTER TABLE ONLY public.structure_relations
 
 
 --
+-- Name: subjects subjects_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subjects
+    ADD CONSTRAINT subjects_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.subjects(id) ON DELETE SET NULL;
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zkMgZp9UmmzYdt7Ac0wVcxyJbaQO1wdyPURsqXiKOrPbMBffaR3fRyIbtfPMqUg
-
+\unrestrict eoqd8MEHosjobDhnLuNRObKcKLQXUQJwmyqctVWcufDzca3YJcJGcSr7I14XoD1
