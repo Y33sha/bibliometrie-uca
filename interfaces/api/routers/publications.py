@@ -54,6 +54,7 @@ async def publications_facets(
     country: str = Query(""),
     hal_status: str = Query(""),
     in_perimeter: str = Query(""),
+    subject_id: int | None = Query(None),
 ) -> Any:
     """Facettes dynamiques pour la page publications."""
     lab_ids, lab_none = _parse_lab_id(lab_id)
@@ -74,6 +75,7 @@ async def publications_facets(
         country_values=parse_str_csv(country),
         hal_status_values=parse_str_csv(hal_status),
         in_perimeter=in_perimeter,
+        subject_id=subject_id,
     )
     async with get_async_cursor() as (cur, _conn):
         return await pub_queries.publications_facets(
