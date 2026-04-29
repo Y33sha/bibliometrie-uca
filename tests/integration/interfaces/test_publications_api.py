@@ -88,6 +88,10 @@ class TestPublicationsList:
         r = client.get("/api/publications", params={"journal_id": 1})
         assert r.status_code == 200
 
+    def test_filter_by_subject(self, client):
+        r = client.get("/api/publications", params={"subject_id": 1})
+        assert r.status_code == 200
+
     def test_sort_by_year_desc(self, client):
         r = client.get("/api/publications", params={"sort": "year_desc"})
         assert r.status_code == 200

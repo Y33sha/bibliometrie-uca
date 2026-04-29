@@ -49,6 +49,7 @@ class ListFilters:
     country_values: list[str] = field(default_factory=list)
     hal_status_values: list[str] = field(default_factory=list)
     in_perimeter: str = ""
+    subject_id: int | None = None
 
 
 def _initial_conditions(filters: ListFilters) -> tuple[list[str], list[Any]]:
@@ -99,6 +100,12 @@ def _apply_inline_filters(conditions: list[str], params: list[Any], filters: Lis
     if filters.country_values:
         conditions.append("p.countries && %s::text[]")
         params.append(filters.country_values)
+    if filters.subject_id:
+        conditions.append(
+            "EXISTS (SELECT 1 FROM publication_subjects ps "
+            "WHERE ps.publication_id = p.id AND ps.subject_id = %s)"
+        )
+        params.append(filters.subject_id)
 
 
 async def _apply_hal_status(

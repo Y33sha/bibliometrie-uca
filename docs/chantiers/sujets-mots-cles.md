@@ -129,7 +129,8 @@ L'audit a révélé que `topics` n'est pas extrait pour CrossRef. Vérifier si C
     - `upsert_subject` fait merge JSONB enrichi : union des `codes` par ontologie, premier non-null gagne pour `level`/`parent`.
     - `SubjectCache` court-circuite si la demande `(codes, level, parent)` est déjà couverte (gros gain perf).
     - 5641 sujets après dédup vs 179031 avant (~×30 réduction des doublons UI).
-- [ ] **5c Page graphe** : route `/subjects/[id]` avec `vis-network`, voisinage immédiat (1 saut), navigation par clic vers les voisins.
+- [x] **5c Page graphe** : route `/subjects/[id]` avec `vis-network` (force-directed). Nœuds en cercles avec labels wrap, taille de police adaptative au range observé (14-30, log10 du `usage_count`), arêtes longueur log de la spécificité côté voisin (`cooc/usage_neighbor`) — les ubiquitous restent visibles mais relégués à la périphérie sans filtrage dur. Désactivation de la physique après stabilisation (drag manuel possible). Clic sur voisin → recentre. Sous le titre : badges des ontologies concernées ou "Mot-clé libre".
+- [x] **5e Onglet Publications associées** : composant `<PublicationsListView>` extrait depuis `/publications/+page.svelte` (qui devient un wrapper léger), réutilisé sur `/subjects/[id]?tab=publications` avec filtre `subject_id` fixe. Filtre `subject_id` ajouté à `/api/publications`. Le composant prend des props pour le mode autonome vs filtré-par-contexte (apiKey, externalFilters, urlSync, basePath, showFilterBanner). Migration de `/laboratories/[id]` et `/persons/[id]` vers le composant : suivi dans [docs/chantiers/dry-publications-tables.md](dry-publications-tables.md).
 
 ### Phase 5 — Agrégats personne et structure
 

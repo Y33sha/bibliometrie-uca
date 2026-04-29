@@ -215,6 +215,7 @@ async def list_publications(
     country: str = Query(""),
     hal_status: str = Query(""),
     in_perimeter: str = Query(""),
+    subject_id: int | None = Query(None),
 ) -> Any:
     """Liste paginée des publications avec sources, labos et journal rattachés.
 
@@ -222,7 +223,8 @@ async def list_publications(
     listes CSV ; `lab_id=none` = publications sans labo rattaché.
     `sort` : `year_desc` / `year_asc` / `title` / `cited_by`.
     `in_perimeter=yes|no|""` sélectionne les publications dont au
-    moins un auteur est in_perimeter.
+    moins un auteur est in_perimeter. `subject_id` filtre les
+    publications annotées par ce sujet.
     """
     lab_ids, lab_none = _parse_lab_id(lab_id)
     filters = ListFilters(
@@ -243,6 +245,7 @@ async def list_publications(
         country_values=parse_str_csv(country),
         hal_status_values=parse_str_csv(hal_status),
         in_perimeter=in_perimeter,
+        subject_id=subject_id,
     )
     async with get_async_cursor() as (cur, _conn):
         return await pub_queries.list_publications(
