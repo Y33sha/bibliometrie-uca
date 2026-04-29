@@ -129,25 +129,25 @@ L'audit a révélé que `topics` n'est pas extrait pour CrossRef. Vérifier si C
     - `upsert_subject` fait merge JSONB enrichi : union des `codes` par ontologie, premier non-null gagne pour `level`/`parent`.
     - `SubjectCache` court-circuite si la demande `(codes, level, parent)` est déjà couverte (gros gain perf).
     - 5641 sujets après dédup vs 179031 avant (~×30 réduction des doublons UI).
-- [x] **5c Page graphe** : route `/subjects/[id]` avec `vis-network` (force-directed). Nœuds en cercles avec labels wrap, taille de police adaptative au range observé (14-30, log10 du `usage_count`), arêtes longueur log de la spécificité côté voisin (`cooc/usage_neighbor`) — les ubiquitous restent visibles mais relégués à la périphérie sans filtrage dur. Désactivation de la physique après stabilisation (drag manuel possible). Clic sur voisin → recentre. Sous le titre : badges des ontologies concernées ou "Mot-clé libre".
+- [x] **5c Page graphe** : route `/subjects/[id]` avec `vis-network` (force-directed). Nœuds en `shape: "text"` (sans cercle/cadre, alignés visuellement avec `SubjectsCloud`), couleur stable par hash d'id sur la palette commune, taille de police adaptative au range observé (18-38, log10 du `usage_count`), centre agrandi de +6px. Arêtes longueur log de la spécificité côté voisin (`cooc/usage_neighbor`) — les ubiquitous restent visibles mais relégués à la périphérie sans filtrage dur. Désactivation de la physique après stabilisation (drag manuel possible). Clic sur voisin → recentre. Sous le titre : badges des ontologies concernées ou "Mot-clé libre".
 - [x] **5e Onglet Publications associées** : composant `<PublicationsListView>` extrait depuis `/publications/+page.svelte` (qui devient un wrapper léger), réutilisé sur `/subjects/[id]?tab=publications` avec filtre `subject_id` fixe. Filtre `subject_id` ajouté à `/api/publications`. Le composant prend des props pour le mode autonome vs filtré-par-contexte (apiKey, externalFilters, urlSync, basePath, showFilterBanner). Migration de `/laboratories/[id]` et `/persons/[id]` vers le composant : suivi dans [docs/chantiers/dry-publications-tables.md](dry-publications-tables.md).
 
-### Phase 5 — Agrégats personne et structure
+### Phase 6 — Nuages de sujets sur dashboards
 
-Endpoints et UI pour les nuages de sujets.
+Endpoints et UI pour les nuages de sujets sur les pages structure et personne.
 
-- [ ] Endpoint `GET /api/persons/{id}/subjects?limit=N` : top sujets de la personne, agrégats par fréquence (et score moyen si disponible) sur ses authorships → publis → subjects.
-- [ ] Endpoint `GET /api/structures/{id}/subjects?limit=N&perimeter=…` : idem, en respectant le périmètre UCA dual (restricted/wide).
-- [ ] Composant frontend `SubjectsCloud.svelte` (badges pondérés ou nuage, à arbitrer avec Laura sur le rendu).
-- [ ] Intégration dans pages personne et structure.
+- [x] Endpoint `GET /api/laboratories/{id}/subjects?limit=N` : top sujets des publis du labo, exclusion des `peer_review`/`memoir`/`ongoing_thesis`, retour `SubjectFrequency[]` (id, label, count). Tests d'intégration `test_laboratories.py::TestGetLaboratorySubjects`.
+- [x] Composant `SubjectsCloud.svelte` : SVG + d3-cloud, palette de 6 couleurs stable par hash d'id, font 11-32px (log10), texte horizontal uniquement, hauteur ratio 0.22 (compacte), `<a>` SVG natifs vers `/subjects/{id}`. Resize-observer pour relayout.
+- [x] Intégration dashboard `/laboratories/[id]` : nuage en haut du dashboard, top 30 sujets, exclut peer_review/memoir/thèses-en-cours.
+- [ ] Endpoint `GET /api/persons/{id}/subjects?limit=N` : top sujets de la personne, agrégats par fréquence sur ses authorships → publis → subjects. **Bloqué** par l'absence d'un dashboard `/persons/[id]` : à reprendre quand ce dashboard existera (l'API et l'intégration UI seront triviales en s'inspirant de la version labo).
 
-### Phase 6 — Recherche par sujet
+### Phase 7 — Recherche par sujet
 
 - [ ] Étendre la recherche publications côté backend : le champ texte fouille aussi dans `subjects.label`.
 - [ ] Index trigram sur `subjects.label` si la perf l'exige (à mesurer).
 - [ ] Aucune nouvelle UI : la recherche existante absorbe les sujets transparente.
 
-### Phase 7 — Tests de non-régression
+### Phase 8 — Tests de non-régression
 
 À chaque phase, ajouter les tests pertinents (pattern `feedback_regression_tests`). En particulier :
 
@@ -192,12 +192,24 @@ quand on construira les nuages personne/structure).
 - **Langue explicite des libres** : actuellement `language=null` pour tous les `kind='free'` afin de permettre la déduplication inter-sources sur `lower(label)` seul. On perd l'info de langue quand elle est explicite (HAL `en_keyword_s` / `fr_keyword_s`, theses systématiquement fr, OpenAlex/WoS/CrossRef ~en). Pour la conserver, deux pistes : (a) revenir au pattern `(lower(label), language)` avec convention 'en'/'fr'/null par source — implique des doublons artificiels à gérer aux frontières ; (b) ajouter une colonne `detected_languages text[]` qui agrège les langues observées sans entrer dans la dédup. À traiter avec le fix parenthèses HAL (même fichier `normalize_hal.py` impacté, et même besoin de repasse HAL pour propager).
 - **Hiérarchie OpenAlex écrasée par 15 doublons de `display_name`** : notre code utilise `lower(display_name)` comme `ontology_id`, donc les rares cas où OpenAlex a deux entités distinctes avec le même libellé sont fusionnés silencieusement à l'ingestion. Cas observés (avr 2026) sur 4783 entités OpenAlex : 6 paires topic/topic, 8 paires subfield/subfield, 1 paire field/domain (`Social Sciences`). Conséquence : `usage_count` gonflé (somme de deux niveaux) et `parent_id` ne pointe que vers un parent. Fix : basculer sur les IDs OpenAlex stables (ex `T10138`) à la place de `lower(display_name)`. Implique : (1) étendre `extract_topics` dans `normalize_openalex.py` pour conserver les IDs ; (2) re-fetch OpenAlex puisque le `raw_data` du staging est vidé ; (3) migration des `ontology_id` existants. À planifier en même temps qu'une repasse OpenAlex complète.
 
-## Ordre d'attaque proposé
+## État du chantier (2026-04-29)
+
+- Phases 1, 2, 4, 5 entièrement faites.
+- Phase 6 : nuage labo livré ; nuage personne en attente du dashboard `/persons/[id]` (non bloquant — reprise triviale en s'inspirant de la version labo lorsque ce dashboard existera).
+- Phases 7 (recherche par sujet) et 8 (tests de non-régression) restent à traiter avant clôture.
+
+Reportés hors chantier :
+
+- Phase 3 (CrossRef topics) — opportuniste, à caser si on étend `normalize_crossref`.
+- Points ouverts résiduels : repasse HAL pour le bug parenthèses, repasse OpenAlex pour passer aux IDs stables, langues explicites des libres, curation manuelle (cf. § Risques).
+
+## Ordre d'attaque historique
 
 1. Phase 1 (modélisation + migration) — bloquant.
 2. Phase 2 (ingestion pipeline) — débloque le reste.
 3. Phase 4 (API + page publi) — premier livrable visible.
-4. Phase 5 (nuages personne/structure) — gros gain UX.
-5. Phase 6 (recherche) — petit gain, peu coûteux.
-6. Phase 3 (CrossRef topics) — opportuniste, à caser quand le reste est stable.
-7. Phase 7 — en parallèle de chaque phase, pas en bloc final.
+4. Phase 5 (page sujets + co-occurrences + graphe) — gros livrable UX.
+5. Phase 6 (nuages dashboards) — gain UX dashboard.
+6. Phase 7 (recherche) — petit gain, peu coûteux.
+7. Phase 3 (CrossRef topics) — opportuniste, à caser quand le reste est stable.
+8. Phase 8 — en parallèle de chaque phase, pas en bloc final.

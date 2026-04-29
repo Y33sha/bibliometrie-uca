@@ -92,6 +92,10 @@
     color: var(--muted, #6b7280);
     background: var(--bg-muted, #f3f4f6);
     border-radius: 4px;
+    text-decoration: none;
+  }
+  .chip:hover {
+    text-decoration: none;
   }
   .badges {
     display: flex;
@@ -106,6 +110,10 @@
     padding: 3px 10px;
     font-size: 0.85rem;
     border-radius: 12px;
+    text-decoration: none;
+  }
+  .badge:hover {
+    text-decoration: none;
   }
   .badge.concept {
     background: #e0f2fe;

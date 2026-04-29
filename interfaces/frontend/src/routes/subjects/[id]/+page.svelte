@@ -24,6 +24,10 @@
   let data = $state<SubjectDetailResponse | null>(null);
   let loading = $state(false);
   let error = $state(false);
+  // Total publications du tableau (post-filtrage des doc_type exclus côté
+  // API), remonté par PublicationsListView via callback. Si null, on
+  // affiche `usage_count` par défaut (avant ouverture de l'onglet).
+  let pubsTotal = $state<number | null>(null);
   // Compteur incrémenté à chaque appel : on ignore les réponses obsolètes
   // si l'utilisateur a re-cliqué entre-temps.
   let requestId = 0;
@@ -51,6 +55,7 @@
   // Recharge à chaque changement d'id.
   $effect(() => {
     const id = subjectId;
+    pubsTotal = null; // reset pour ne pas afficher l'ancien compte
     loadFor(id, NEIGHBORS_LIMIT, MIN_COOCCURRENCE);
   });
 
@@ -83,27 +88,33 @@
   {:else if !data}
     <p class="loading">Chargement…</p>
   {:else}
-    <h1>{data.subject.label}</h1>
-    <div class="badges">
-      {#if Object.keys(data.subject.ontologies).length === 0}
-        <span class="badge free">Mot-clé libre</span>
-      {:else}
-        {#each Object.entries(data.subject.ontologies) as [ont, entry] (ont)}
-          {@const label = ONTOLOGY_LABELS[ont] ?? ont}
-          {@const codes = entry.codes ?? []}
-          <span
-            class="badge concept"
-            title={codes.length ? `Codes : ${codes.join(", ")}` : ont}
-          >
-            {label}
-          </span>
-        {/each}
-      {/if}
+    <div class="header">
+      <h1>{data.subject.label}</h1>
+      <div class="badges">
+        {#if Object.keys(data.subject.ontologies).length === 0}
+          <span class="badge free">Mot-clé libre</span>
+        {:else}
+          {#each Object.entries(data.subject.ontologies) as [ont, entry] (ont)}
+            {@const label = ONTOLOGY_LABELS[ont] ?? ont}
+            {@const codes = entry.codes ?? []}
+            <span
+              class="badge concept"
+              title={codes.length ? `Codes : ${codes.join(", ")}` : ont}
+            >
+              {label}
+            </span>
+          {/each}
+        {/if}
+      </div>
     </div>
     <TabNav
       tabs={[
         { id: "graph", label: "Graphe des co-occurrences" },
-        { id: "publications", label: "Publications", count: data.subject.usage_count },
+        {
+          id: "publications",
+          label: "Publications",
+          count: pubsTotal ?? data.subject.usage_count,
+        },
       ]}
     />
 
@@ -133,6 +144,7 @@
           }}
           urlSync={false}
           showFilterBanner={false}
+          onTotalChange={(t) => (pubsTotal = t)}
         />
       {/key}
     {/if}
@@ -154,15 +166,21 @@
   .back:hover {
     text-decoration: underline;
   }
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
   h1 {
-    margin: 0 0 4px;
+    margin: 0;
     font-size: 1.4rem;
   }
   .badges {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin: 4px 0;
   }
   .badge {
     display: inline-block;

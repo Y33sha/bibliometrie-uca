@@ -429,7 +429,8 @@ export interface paths {
          *     listes CSV ; `lab_id=none` = publications sans labo rattaché.
          *     `sort` : `year_desc` / `year_asc` / `title` / `cited_by`.
          *     `in_perimeter=yes|no|""` sélectionne les publications dont au
-         *     moins un auteur est in_perimeter.
+         *     moins un auteur est in_perimeter. `subject_id` filtre les
+         *     publications annotées par ce sujet.
          */
         get: operations["list_publications_api_publications_get"];
         put?: never;
@@ -937,6 +938,26 @@ export interface paths {
          * @description Dashboard labo : publications par an + répartition OA.
          */
         get: operations["get_laboratory_dashboard_api_laboratories__lab_id__dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/laboratories/{lab_id}/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Laboratory Subjects
+         * @description Top sujets des publications du labo (pour le nuage de mots dashboard).
+         */
+        get: operations["get_laboratory_subjects_api_laboratories__lab_id__subjects_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4967,6 +4988,23 @@ export interface components {
             neighbors: components["schemas"]["SubjectNeighborOut"][];
         };
         /**
+         * SubjectFrequency
+         * @description Sujet avec fréquence locale (count des publis du contexte parent :
+         *     labo ou personne). Utilisé pour les nuages de mots.
+         */
+        SubjectFrequency: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /** Ontologies */
+            ontologies: {
+                [key: string]: components["schemas"]["SubjectOntologyEntry"];
+            };
+            /** Count */
+            count: number;
+        };
+        /**
          * SubjectListItem
          * @description Sujet dans une liste paginée (page `/subjects`).
          */
@@ -5593,6 +5631,7 @@ export interface operations {
                 country?: string;
                 hal_status?: string;
                 in_perimeter?: string;
+                subject_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -5807,6 +5846,7 @@ export interface operations {
                 country?: string;
                 hal_status?: string;
                 in_perimeter?: string;
+                subject_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -6612,6 +6652,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LaboratoryDashboardResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_laboratory_subjects_api_laboratories__lab_id__subjects_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                lab_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectFrequency"][];
                 };
             };
             /** @description Validation Error */

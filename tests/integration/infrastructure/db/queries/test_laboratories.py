@@ -6,6 +6,7 @@ from infrastructure.db.queries.laboratories import (
     get_laboratory_addresses,
     get_laboratory_dashboard,
     get_laboratory_persons,
+    get_laboratory_subjects,
     list_laboratories,
 )
 
@@ -233,3 +234,92 @@ class TestGetLaboratoryDashboard:
         assert res["oa"]["open_access"] == 1
         assert res["collab"]["international"] == 1
         assert any(c["code"] == "us" for c in res["top_countries"])
+
+
+class TestGetLaboratorySubjects:
+    async def test_top_subjects_by_frequency(self, async_db):
+        from psycopg.types.json import Json
+
+        lab = await _create_structure(async_db, "L1")
+        await _setup_perimeter(async_db, [lab])
+
+        # 3 publications du labo avec sujets variables.
+        async def _create_pub(title="X", doc_type="article"):
+            await async_db.execute(
+                "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
+                "VALUES (%s, lower(%s), 2024, %s::doc_type) RETURNING id",
+                (title, title, doc_type),
+            )
+            return (await async_db.fetchone())["id"]
+
+        async def _create_subject(label, ontologies=None):
+            await async_db.execute(
+                "INSERT INTO subjects (label, ontologies) VALUES (%s, %s) RETURNING id",
+                (label, Json(ontologies or {})),
+            )
+            return (await async_db.fetchone())["id"]
+
+        async def _link(pub_id, sid):
+            await async_db.execute(
+                "INSERT INTO publication_subjects (publication_id, subject_id, source) "
+                "VALUES (%s, %s, 'hal')",
+                (pub_id, sid),
+            )
+
+        async def _attach(pub_id):
+            await async_db.execute(
+                "INSERT INTO authorships (publication_id, structure_ids, in_perimeter, roles) "
+                "VALUES (%s, %s, TRUE, ARRAY['author']::text[])",
+                (pub_id, [lab]),
+            )
+
+        p1 = await _create_pub("p1")
+        p2 = await _create_pub("p2")
+        p3 = await _create_pub("p3")
+        for p in (p1, p2, p3):
+            await _attach(p)
+
+        ai = await _create_subject("AI")
+        bio = await _create_subject("Biology")
+        # AI sur 3 publis ; Biology sur 1.
+        for p in (p1, p2, p3):
+            await _link(p, ai)
+        await _link(p1, bio)
+
+        res = await get_laboratory_subjects(async_db, lab, limit=10)
+        assert len(res) == 2
+        assert res[0]["label"] == "AI"
+        assert res[0]["count"] == 3
+        assert res[1]["label"] == "Biology"
+        assert res[1]["count"] == 1
+
+    async def test_excludes_peer_review_memoir_ongoing_thesis(self, async_db):
+        from psycopg.types.json import Json
+
+        lab = await _create_structure(async_db, "L1")
+        await _setup_perimeter(async_db, [lab])
+
+        # Publi peer_review : doit être exclue.
+        await async_db.execute(
+            "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
+            "VALUES ('X', 'x', 2024, 'peer_review'::doc_type) RETURNING id"
+        )
+        excluded_pub = (await async_db.fetchone())["id"]
+        await async_db.execute(
+            "INSERT INTO authorships (publication_id, structure_ids, in_perimeter, roles) "
+            "VALUES (%s, %s, TRUE, ARRAY['author']::text[])",
+            (excluded_pub, [lab]),
+        )
+        await async_db.execute(
+            "INSERT INTO subjects (label, ontologies) VALUES ('X', %s) RETURNING id",
+            (Json({}),),
+        )
+        sid = (await async_db.fetchone())["id"]
+        await async_db.execute(
+            "INSERT INTO publication_subjects (publication_id, subject_id, source) "
+            "VALUES (%s, %s, 'hal')",
+            (excluded_pub, sid),
+        )
+
+        res = await get_laboratory_subjects(async_db, lab, limit=10)
+        assert res == []

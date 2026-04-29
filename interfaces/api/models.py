@@ -688,6 +688,16 @@ class LaboratoryDashboardResponse(BaseModel):
     top_countries: list[LabTopCountry]
 
 
+class SubjectFrequency(BaseModel):
+    """Sujet avec fréquence locale (count des publis du contexte parent :
+    labo ou personne). Utilisé pour les nuages de mots."""
+
+    id: int
+    label: str
+    ontologies: dict[str, SubjectOntologyEntry]
+    count: int
+
+
 # ----- Addresses (output) -----
 
 
