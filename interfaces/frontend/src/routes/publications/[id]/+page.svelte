@@ -8,6 +8,7 @@
   import ThesisBlock from "./ThesisBlock.svelte";
   import TruthAuthorshipsTable from "./TruthAuthorshipsTable.svelte";
   import SourceComparison from "./SourceComparison.svelte";
+  import SubjectsBlock from "./SubjectsBlock.svelte";
 
   const pubId = $derived($page.params.id);
   let canGoBack = $state(false);
@@ -147,6 +148,8 @@
       structures={data!.structures}
     />
   {/if}
+
+  <SubjectsBlock subjects={data!.subjects} />
 
   {#if pub.abstract}
     <div class="section abstract-section">

@@ -26,27 +26,25 @@ def ingest(
     links: list[tuple[int, int, float | None]] = []
 
     for kw in dedup_strs(keywords):
-        sid = cache.get_or_upsert_free(cur, label=kw, language="en")
+        sid = cache.get_or_upsert(cur, label=kw)
         links.append((publication_id, sid, None))
 
     if isinstance(topics, dict):
         for label in dedup_strs(topics.get("subjects")):
-            sid = cache.get_or_upsert_concept(
+            sid = cache.get_or_upsert(
                 cur,
-                ontology=ONTOLOGY_WOS_SUBJECT,
-                ontology_id=label.lower(),
                 label=label,
                 language="en",
+                ontologies={ONTOLOGY_WOS_SUBJECT: {"codes": [label.lower()]}},
             )
             links.append((publication_id, sid, None))
 
         for label in dedup_strs(topics.get("headings")):
-            sid = cache.get_or_upsert_concept(
+            sid = cache.get_or_upsert(
                 cur,
-                ontology=ONTOLOGY_WOS_HEADING,
-                ontology_id=label.lower(),
                 label=label,
                 language="en",
+                ontologies={ONTOLOGY_WOS_HEADING: {"codes": [label.lower()]}},
             )
             links.append((publication_id, sid, None))
 

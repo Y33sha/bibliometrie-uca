@@ -2,7 +2,8 @@
 
 Source format (cf normalize_openalex.py:133-149, 370-377) :
 - `keywords` : list[str] (déjà extraits du dict `keyword`+`score`, score perdu
-  en l'état actuel — on traite donc comme libre EN, sans score).
+  en l'état actuel — on traite comme libre sans langue, pour permettre la
+  déduplication inter-sources sur lower(label)).
 - `topics`   : list[dict] avec keys `domain`, `field`, `subfield`, `topic` (chacune
   un display_name) + `score` (score du topic feuille).
 
@@ -41,7 +42,7 @@ def ingest(
     links: list[tuple[int, int, float | None]] = []
 
     for kw in dedup_strs(keywords):
-        sid = cache.get_or_upsert_free(cur, label=kw, language="en")
+        sid = cache.get_or_upsert(cur, label=kw)
         links.append((publication_id, sid, None))
 
     if isinstance(topics, list):
@@ -77,17 +78,20 @@ def _collect_topic_chain(
     if not levels_present:
         return
 
-    parent_id: int | None = None
+    parent_label: str | None = None
     deepest_idx = levels_present[-1][2]
     for _name, label, idx in levels_present:
-        sid = cache.get_or_upsert_concept(
+        ontology_entry: dict[str, Any] = {
+            "codes": [label.lower()],
+            "level": idx,
+        }
+        if parent_label is not None:
+            ontology_entry["parent"] = parent_label
+        sid = cache.get_or_upsert(
             cur,
-            ontology=ONTOLOGY_OPENALEX_TOPIC,
-            ontology_id=label.lower(),
             label=label,
             language="en",
-            parent_id=parent_id,
-            level=idx,
+            ontologies={ONTOLOGY_OPENALEX_TOPIC: ontology_entry},
         )
         links.append((publication_id, sid, score if idx == deepest_idx else None))
-        parent_id = sid
+        parent_label = label

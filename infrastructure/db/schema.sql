@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict eoqd8MEHosjobDhnLuNRObKcKLQXUQJwmyqctVWcufDzca3YJcJGcSr7I14XoD1
+\restrict i0M5KZLAtz5ETDrw5YoOjTtnk1OzfAKdOdkTCp7Mx5PiM5DSjEG4lwMbHWLhrUJ
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -1270,21 +1270,28 @@ ALTER SEQUENCE public.structures_id_seq OWNED BY public.structures.id;
 
 
 --
+-- Name: subject_cooccurrences; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.subject_cooccurrences (
+    subject_a_id integer NOT NULL,
+    subject_b_id integer NOT NULL,
+    count integer NOT NULL,
+    CONSTRAINT subject_cooccurrences_ordered CHECK ((subject_a_id < subject_b_id))
+);
+
+
+--
 -- Name: subjects; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.subjects (
     id integer NOT NULL,
-    kind text NOT NULL,
     label text NOT NULL,
     language text,
-    ontology text,
-    ontology_id text,
-    parent_id integer,
-    level integer,
     created_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT subjects_concept_has_ontology CHECK ((((kind = 'concept'::text) AND (ontology IS NOT NULL) AND (ontology_id IS NOT NULL)) OR ((kind = 'free'::text) AND (ontology IS NULL) AND (ontology_id IS NULL)))),
-    CONSTRAINT subjects_kind_check CHECK ((kind = ANY (ARRAY['free'::text, 'concept'::text])))
+    usage_count integer DEFAULT 0 NOT NULL,
+    ontologies jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -1923,6 +1930,14 @@ ALTER TABLE ONLY public.structures
 
 
 --
+-- Name: subject_cooccurrences subject_cooccurrences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_cooccurrences
+    ADD CONSTRAINT subject_cooccurrences_pkey PRIMARY KEY (subject_a_id, subject_b_id);
+
+
+--
 -- Name: subjects subjects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2486,24 +2501,31 @@ CREATE UNIQUE INDEX publications_doi_lower_key ON public.publications USING btre
 
 
 --
--- Name: subjects_concept_key; Type: INDEX; Schema: public; Owner: -
+-- Name: subject_cooccurrences_b_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX subjects_concept_key ON public.subjects USING btree (ontology, ontology_id) WHERE (kind = 'concept'::text);
-
-
---
--- Name: subjects_free_key; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX subjects_free_key ON public.subjects USING btree (lower(label), COALESCE(language, ''::text)) WHERE (kind = 'free'::text);
+CREATE INDEX subject_cooccurrences_b_idx ON public.subject_cooccurrences USING btree (subject_b_id);
 
 
 --
--- Name: subjects_label_lower_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: subject_cooccurrences_count_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX subjects_label_lower_idx ON public.subjects USING btree (lower(label));
+CREATE INDEX subject_cooccurrences_count_idx ON public.subject_cooccurrences USING btree (count DESC);
+
+
+--
+-- Name: subjects_label_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX subjects_label_key ON public.subjects USING btree (lower(label));
+
+
+--
+-- Name: subjects_usage_count_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX subjects_usage_count_idx ON public.subjects USING btree (usage_count DESC);
 
 
 --
@@ -2811,15 +2833,23 @@ ALTER TABLE ONLY public.structure_relations
 
 
 --
--- Name: subjects subjects_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: subject_cooccurrences subject_cooccurrences_subject_a_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.subjects
-    ADD CONSTRAINT subjects_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.subjects(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.subject_cooccurrences
+    ADD CONSTRAINT subject_cooccurrences_subject_a_id_fkey FOREIGN KEY (subject_a_id) REFERENCES public.subjects(id) ON DELETE CASCADE;
+
+
+--
+-- Name: subject_cooccurrences subject_cooccurrences_subject_b_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_cooccurrences
+    ADD CONSTRAINT subject_cooccurrences_subject_b_id_fkey FOREIGN KEY (subject_b_id) REFERENCES public.subjects(id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eoqd8MEHosjobDhnLuNRObKcKLQXUQJwmyqctVWcufDzca3YJcJGcSr7I14XoD1
+\unrestrict i0M5KZLAtz5ETDrw5YoOjTtnk1OzfAKdOdkTCp7Mx5PiM5DSjEG4lwMbHWLhrUJ

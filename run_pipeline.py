@@ -32,6 +32,7 @@ Phases (dans l'ordre d'execution):
     authorships    Reconstruction authorships canoniques (table de verite) + propagation UCA
     countries      Detection pays des adresses + recalcul pays des publications
     subjects       Ingestion des sujets/mots-cles depuis source_publications vers subjects + publication_subjects
+    cooccurrences  Recalcul de subjects.usage_count + table subject_cooccurrences (post-subjects)
     enrich         Enrichissements optionnels (statut OA via Unpaywall, APC revues)
 """
 
@@ -269,6 +270,14 @@ def phase_subjects(**kw: Any) -> Any:
     """
     sources = kw.get("sources")
     _run_ingest_subjects(sources if sources and sources != ALL_SOURCES_SET else None)
+
+
+def phase_cooccurrences(**kw: Any) -> Any:
+    """Recalcul de `subjects.usage_count` + table `subject_cooccurrences`.
+
+    Doit tourner après `subjects`. Idempotent.
+    """
+    _run_cooccurrences()
 
 
 def _run_create_publications() -> None:
@@ -698,6 +707,24 @@ def _run_ingest_subjects(sources: Any = None) -> None:
     log.info("✓ subjects terminé en %.1fs", time.time() - t0)
 
 
+def _run_cooccurrences() -> None:
+    from application.pipeline.cooccurrences.run import run
+    from infrastructure.db.connection import get_connection
+    from infrastructure.db.queries.subjects import PgSubjectsQueries
+
+    log.info("▶ cooccurrences")
+    t0 = time.time()
+    conn = get_connection()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        run(cur, PgSubjectsQueries(), log)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ cooccurrences terminé en %.1fs", time.time() - t0)
+
+
 def phase_enrich(mode: Any = "full", **kw: Any) -> Any:
     """Enrichissements optionnels (Unpaywall, APC revues).
 
@@ -722,6 +749,7 @@ PHASES = [
     ("authorships", phase_authorships),
     ("countries", phase_countries),
     ("subjects", phase_subjects),
+    ("cooccurrences", phase_cooccurrences),
     ("enrich", phase_enrich),
 ]
 

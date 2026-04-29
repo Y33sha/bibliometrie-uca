@@ -112,9 +112,24 @@ L'audit a révélé que `topics` n'est pas extrait pour CrossRef. Vérifier si C
 
 ### Phase 4 — Exposition API + page publication
 
-- [ ] Étendre la requête `detail.py` pour récupérer les sujets agrégés (déduplication par `subject_id`, agrégation des sources).
-- [ ] Modèle `SubjectOut` dans [models.py](../../interfaces/api/models.py) ; ajouter `subjects: list[SubjectOut]` à `PublicationDetailResponse`.
-- [ ] Page publication SvelteKit : section "Sujets", badges groupés par `kind` puis par `ontology`, label de la source au survol.
+- [x] Étendre `detail.py` : `get_publication_subjects` (GROUP BY subject, agrège les sources). 4 tests intégration.
+- [x] Modèle `SubjectOut` dans [models.py](../../interfaces/api/models.py) ; ajout `subjects: list[SubjectOut]` à `PublicationDetailResponse`.
+- [x] Composant `SubjectsBlock.svelte` : 3 niveaux plats sans sous-titres (général en chips gris, précis en cartouche bleu, libres en cartouche jaune), tooltip = source(s).
+- [x] Référentiel `domain/hal_domains.py` (393 entrées générées via `interfaces/cli/refresh_hal_domain_labels.py` depuis l'API CCSD) + helpers `hal_domain_label`, `hal_domain_path`. `ingest_hal` strippe le préfixe `<level>.` Solr (`0.phys` → `phys`) et utilise le label CCSD.
+- [x] Libres : `language=None` partout (au lieu de 'en'/'fr'/None selon source) pour permettre la déduplication inter-sources sur `lower(label)` seul.
+
+### Phase 5 — Page sujets + co-occurrences
+
+- [x] **5a Backend** : migration `015_subject_cooccurrences.sql` (colonne `subjects.usage_count`, table `subject_cooccurrences (a, b, count)` avec PK `(a, b)` et CHECK `a < b`). Phase pipeline `cooccurrences` (entre `subjects` et `enrich`) qui recalcule `usage_count` puis TRUNCATE+INSERT `subject_cooccurrences` avec seuil `count >= 2` par défaut. Routes API `GET /api/subjects` (liste paginée + recherche), `GET /api/subjects/{id}` (détail + voisins). Pipeline complet 6 sources + cooccurrences en ~18s.
+- [x] **5b Page liste** : route `/subjects` SvelteKit, recherche debounced 300ms, filtre `min_count` (défaut 3), pagination 50/page, badge ontologies. Lien "Sujets" dans la nav.
+- [x] **5d Refonte schéma** : un sujet = un libellé canonique (clé d'unicité = `lower(label)`). Migrations `016` puis `017` :
+    - `kind`, `ontology`, `ontology_id` retirés au profit d'un JSONB `ontologies` agrégeant les annotations multi-sources : `{"openalex_topic": {"codes": [...], "level": int|null, "parent": str|null}, "hal_domain": {"codes": [...]}, ...}`.
+    - `level` et `parent_id` retirés du top-level (ontology-dépendants) : absorbés dans le JSONB par ontologie. `parent` est désormais un libellé string (pas un FK Postgres).
+    - Un libre = `ontologies = {}`.
+    - `upsert_subject` fait merge JSONB enrichi : union des `codes` par ontologie, premier non-null gagne pour `level`/`parent`.
+    - `SubjectCache` court-circuite si la demande `(codes, level, parent)` est déjà couverte (gros gain perf).
+    - 5641 sujets après dédup vs 179031 avant (~×30 réduction des doublons UI).
+- [ ] **5c Page graphe** : route `/subjects/[id]` avec `vis-network`, voisinage immédiat (1 saut), navigation par clic vers les voisins.
 
 ### Phase 5 — Agrégats personne et structure
 
@@ -140,6 +155,28 @@ Endpoints et UI pour les nuages de sujets.
 - [ ] Test API : la page publication renvoie des sujets dédupliqués.
 - [ ] Test agrégat personne/structure : pondération correcte, périmètre UCA respecté.
 
+## Pistes pour la suite
+
+### Hiérarchie a posteriori des sujets
+
+Constat (avr 2026) : on ingère plat sans hiérarchie *a priori*. La distinction
+"général / précis" côté UI s'appuie sur des heuristiques par ontologie (OpenAlex
+level 0, HAL top-level, WoS heading) qui restent grossières. Pour aller plus
+loin, deux pistes (à explorer, ne pas suringénier) :
+
+- **Option co-occurrences** : compter les apparitions de chaque sujet et leurs
+  co-occurrences dans les publis. Un sujet rare qui apparaît systématiquement
+  avec un sujet fréquent est probablement son fils. Prérequis minimal : colonne
+  `usage_count` sur `subjects` (ou vue matérialisée). Co-occurrences via une
+  table dédiée ou query à la demande.
+- **Option vocabulaire normé** : mapper nos sujets vers un référentiel
+  hiérarchique existant (MeSH, OpenAlex topics complet, …). Hiérarchie clé en
+  main mais matching label imparfait pour les libres spécialisés. Couverture
+  partielle assumée.
+
+À arbitrer plus tard, quand le besoin sera plus clair (probablement Phase 5
+quand on construira les nuages personne/structure).
+
 ## Risques et points ouverts
 
 - **Volume** : la table `subjects` peut grossir vite côté libres (longue traîne, fautes, casse). À mesurer après Phase 2 sur le dataset complet.
@@ -150,6 +187,9 @@ Endpoints et UI pour les nuages de sujets.
 - **Recherche** : la fouille `LIKE/ILIKE` sur `subjects.label` peut être lente sans index. Trigram envisagé en Phase 6.
 - **Migrer rétroactivement** : Phase 2 doit pouvoir tourner sur tout l'historique `source_publications` existant, pas seulement sur les nouvelles publis. Vérifier que le pipeline accepte ce mode.
 - **Curation manuelle** : la phase d'ingestion fait `DELETE` total par source puis ré-INSERT. Toute édition manuelle des `subjects` ou `publication_subjects` serait écrasée au prochain run. À adresser avant d'introduire des outils de curation côté UI (séparation source/auto vs corrections, ou colonne `manually_edited` qui exclut du DELETE).
+- **Bug HAL — keywords sans parenthèses** : le champ Solr `keyword_s` de HAL est analysé/normalisé côté serveur et perd les parenthèses (et la ponctuation `[]`, `,`, etc. selon les analyseurs Solr). Exemple : "Particle tracking detectors (Solid-state detectors)" → "Particle tracking detectors Solid-state detectors". Le TEI XML (`label_xml`, déjà récupéré pour les ORCID) préserve les keywords tels quels via `<term xml:lang="…">`. Fix prévu : ajouter `parse_tei_keywords(label_xml)` dans `normalize_hal.py`, fallback sur `keyword_s` si TEI absent. Demande une re-normalisation HAL pour propager (dépend d'un re-fetch complet HAL puisque le `raw_data` du staging est vidé après normalize). À traiter quand on planifiera une repasse HAL complète.
+- **Langue explicite des libres** : actuellement `language=null` pour tous les `kind='free'` afin de permettre la déduplication inter-sources sur `lower(label)` seul. On perd l'info de langue quand elle est explicite (HAL `en_keyword_s` / `fr_keyword_s`, theses systématiquement fr, OpenAlex/WoS/CrossRef ~en). Pour la conserver, deux pistes : (a) revenir au pattern `(lower(label), language)` avec convention 'en'/'fr'/null par source — implique des doublons artificiels à gérer aux frontières ; (b) ajouter une colonne `detected_languages text[]` qui agrège les langues observées sans entrer dans la dédup. À traiter avec le fix parenthèses HAL (même fichier `normalize_hal.py` impacté, et même besoin de repasse HAL pour propager).
+- **Hiérarchie OpenAlex écrasée par 15 doublons de `display_name`** : notre code utilise `lower(display_name)` comme `ontology_id`, donc les rares cas où OpenAlex a deux entités distinctes avec le même libellé sont fusionnés silencieusement à l'ingestion. Cas observés (avr 2026) sur 4783 entités OpenAlex : 6 paires topic/topic, 8 paires subfield/subfield, 1 paire field/domain (`Social Sciences`). Conséquence : `usage_count` gonflé (somme de deux niveaux) et `parent_id` ne pointe que vers un parent. Fix : basculer sur les IDs OpenAlex stables (ex `T10138`) à la place de `lower(display_name)`. Implique : (1) étendre `extract_topics` dans `normalize_openalex.py` pour conserver les IDs ; (2) re-fetch OpenAlex puisque le `raw_data` du staging est vidé ; (3) migration des `ontology_id` existants. À planifier en même temps qu'une repasse OpenAlex complète.
 
 ## Ordre d'attaque proposé
 
