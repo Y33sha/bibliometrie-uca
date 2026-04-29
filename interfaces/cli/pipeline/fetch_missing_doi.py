@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+from typing import cast
 
 from application.pipeline.fetch_missing_doi import AsyncFetchMissingDoiAdapter, run_async
 from infrastructure.db.connection import get_connection
@@ -33,13 +34,20 @@ from infrastructure.sources.wos.fetch_missing_doi import WosFetchMissingDoiAdapt
 logger = setup_logger("fetch_missing_doi", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-ADAPTERS: dict[str, type[AsyncFetchMissingDoiAdapter]] = {
-    "hal": HalFetchMissingDoiAdapter,
-    "openalex": OpenalexFetchMissingDoiAdapter,
-    "wos": WosFetchMissingDoiAdapter,
-    "scanr": ScanrFetchMissingDoiAdapter,
-    "crossref": CrossrefFetchMissingDoiAdapter,
-}
+# Cast nécessaire : mypy ne reconnaît pas la conformité structurelle d'une
+# classe concrète à un Protocol pour `type[Protocol]` (il exigerait un
+# héritage explicite, qui violerait le contrat DDD application↔infrastructure).
+# Le duck typing du Protocol fonctionne normalement à l'usage des instances.
+ADAPTERS: dict[str, type[AsyncFetchMissingDoiAdapter]] = cast(
+    "dict[str, type[AsyncFetchMissingDoiAdapter]]",
+    {
+        "hal": HalFetchMissingDoiAdapter,
+        "openalex": OpenalexFetchMissingDoiAdapter,
+        "wos": WosFetchMissingDoiAdapter,
+        "scanr": ScanrFetchMissingDoiAdapter,
+        "crossref": CrossrefFetchMissingDoiAdapter,
+    },
+)
 
 
 def main() -> None:
