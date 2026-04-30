@@ -21,6 +21,12 @@
   const isAdmin = $derived($page.url.pathname.startsWith(base + "/admin"));
   const isPipeline = $derived($page.url.pathname === base + "/admin/pipeline" || $page.url.pathname === base + "/admin/config");
   const isAddresses = $derived($page.url.pathname === base + "/admin/addresses" || $page.url.pathname === base + "/admin/feedback" || $page.url.pathname === base + "/admin/countries");
+  const isReferentiels = $derived(
+    isActive("/admin/structures") ||
+      isActive("/admin/persons") ||
+      isActive("/admin/publishers") ||
+      isActive("/admin/journals"),
+  );
   const isDuplicates = $derived($page.url.pathname === base + "/admin/duplicates" || $page.url.pathname === base + "/admin/person-duplicates");
   const isHalProblems = $derived($page.url.pathname.startsWith(base + "/hal-problems"));
 
@@ -68,30 +74,29 @@
           </div>
         {/if}
       </div>
-      <a href="{base}/admin/structures" class="nav-link" class:active={isActive("/admin/structures")}>Structures</a>
+      <div
+        class="nav-dropdown"
+        role="navigation"
+        class:active={isReferentiels}
+        onmouseenter={() => (refDropdownOpen = true)}
+        onmouseleave={() => (refDropdownOpen = false)}
+      >
+        <button class="nav-link" class:active={isReferentiels}>Référentiels &#x25BE;</button>
+        {#if refDropdownOpen}
+          <div class="nav-dropdown-menu">
+            <a href="{base}/admin/structures" class:active={isActive("/admin/structures")}>Structures</a>
+            <a href="{base}/admin/persons" class:active={isActive("/admin/persons")}>Personnes</a>
+            <a href="{base}/admin/publishers" class:active={isActive("/admin/publishers")}>Éditeurs</a>
+            <a href="{base}/admin/journals" class:active={isActive("/admin/journals")}>Revues</a>
+          </div>
+        {/if}
+      </div>
       <div class="nav-dropdown" role="navigation" class:active={isAddresses} onmouseenter={() => (dropdownOpen = true)} onmouseleave={() => (dropdownOpen = false)}>
         <button class="nav-link" class:active={isAddresses}>Adresses &#x25BE;</button>
         {#if dropdownOpen}
           <div class="nav-dropdown-menu">
             <a href="{base}/admin/addresses" class:active={isActive("/admin/addresses")}>Affiliations</a>
             <a href="{base}/admin/countries" class:active={isActive("/admin/countries")}>Pays</a>
-          </div>
-        {/if}
-      </div>
-
-      <div
-        class="nav-dropdown"
-        role="navigation"
-        class:active={isActive("/admin/persons") || isActive("/admin/publishers") || isActive("/admin/journals")}
-        onmouseenter={() => (refDropdownOpen = true)}
-        onmouseleave={() => (refDropdownOpen = false)}
-      >
-        <button class="nav-link" class:active={isActive("/admin/persons") || isActive("/admin/publishers") || isActive("/admin/journals")}>Référentiels &#x25BE;</button>
-        {#if refDropdownOpen}
-          <div class="nav-dropdown-menu">
-            <a href="{base}/admin/persons" class:active={isActive("/admin/persons")}>Personnes</a>
-            <a href="{base}/admin/publishers" class:active={isActive("/admin/publishers")}>Éditeurs</a>
-            <a href="{base}/admin/journals" class:active={isActive("/admin/journals")}>Revues</a>
           </div>
         {/if}
       </div>
