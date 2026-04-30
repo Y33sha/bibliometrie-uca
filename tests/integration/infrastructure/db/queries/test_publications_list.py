@@ -136,3 +136,89 @@ class TestSearch:
         )
         ids = [p["id"] for p in res["publications"]]
         assert pub in ids
+
+
+class TestHalStatusMultipleHalEntries:
+    """Régression : une publi avec plusieurs entrées HAL (cas réel ~764 en
+    base) ne doit pas tomber dans le filtre `hors_collection` dès qu'au moins
+    une de ses entrées HAL contient la collection du labo. Et le champ
+    `hal_collections` renvoyé doit fusionner les collections des entrées."""
+
+    @staticmethod
+    async def _make_lab_with_collection(db, collection: str) -> int:
+        await db.execute(
+            "INSERT INTO structures (code, name, structure_type, hal_collection) "
+            "VALUES ('LAB', 'LAB', 'labo'::structure_type, %s) RETURNING id",
+            (collection,),
+        )
+        row = await db.fetchone()
+        return row["id"]
+
+    @staticmethod
+    async def _add_hal_source(db, pub_id: int, source_id: str, collections: list[str]) -> None:
+        await db.execute(
+            "INSERT INTO source_publications (publication_id, source, source_id, title, hal_collections) "
+            "VALUES (%s, 'hal', %s, 'T', %s)",
+            (pub_id, source_id, collections),
+        )
+
+    async def test_pub_in_collection_via_one_hal_entry_is_not_hors_collection(self, async_db):
+        """Publi avec 2 dépôts HAL : l'un dans la collection du labo, l'autre
+        non. Doit être exclue du filtre `hors_collection`."""
+        lab = await self._make_lab_with_collection(async_db, "CMH")
+        pub = await _create_pub(async_db, "Two HAL deposits")
+        await _attach(async_db, pub, lab)
+        await self._add_hal_source(async_db, pub, "hal-CMH", ["CMH", "AO-DROIT"])
+        await self._add_hal_source(async_db, pub, "hal-PAU", ["UPPA-DROIT", "SHS"])
+        await async_db.execute(
+            "UPDATE publications SET oa_status = 'gold'::oa_type WHERE id = %s",
+            (pub,),
+        )
+
+        res = await list_publications(
+            async_db,
+            filters=ListFilters(lab_ids=[lab], hal_status_values=["hors_collection"]),
+            root_structure_id=0,
+            page=1,
+            per_page=50,
+            sort="year_desc",
+        )
+        assert pub not in [p["id"] for p in res["publications"]]
+
+    async def test_hal_collections_unions_all_hal_entries(self, async_db):
+        """`hal_collections` renvoyé par l'API = union des collections des
+        entrées HAL (pas une entrée arbitraire prise au hasard)."""
+        lab = await self._make_lab_with_collection(async_db, "CMH")
+        pub = await _create_pub(async_db, "Two HAL deposits")
+        await _attach(async_db, pub, lab)
+        await self._add_hal_source(async_db, pub, "hal-CMH", ["CMH", "AO-DROIT"])
+        await self._add_hal_source(async_db, pub, "hal-PAU", ["UPPA-DROIT"])
+
+        res = await list_publications(
+            async_db,
+            filters=ListFilters(lab_ids=[lab]),
+            root_structure_id=0,
+            page=1,
+            per_page=50,
+            sort="year_desc",
+        )
+        match = next(p for p in res["publications"] if p["id"] == pub)
+        assert set(match["hal_collections"]) == {"CMH", "AO-DROIT", "UPPA-DROIT"}
+
+    async def test_pub_only_outside_collection_is_hors_collection(self, async_db):
+        """Cas symétrique : si aucune entrée HAL n'est dans la collection,
+        la publi tombe bien dans `hors_collection`."""
+        lab = await self._make_lab_with_collection(async_db, "CMH")
+        pub = await _create_pub(async_db, "Outside only")
+        await _attach(async_db, pub, lab)
+        await self._add_hal_source(async_db, pub, "hal-PAU", ["UPPA-DROIT"])
+
+        res = await list_publications(
+            async_db,
+            filters=ListFilters(lab_ids=[lab], hal_status_values=["hors_collection"]),
+            root_structure_id=0,
+            page=1,
+            per_page=50,
+            sort="year_desc",
+        )
+        assert pub in [p["id"] for p in res["publications"]]

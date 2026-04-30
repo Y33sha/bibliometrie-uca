@@ -177,11 +177,16 @@ def _build_hal_status_part(value: str, lab_hal_col: str | None, params: list) ->
     if value == "hors_collection":
         if lab_hal_col is None:
             return _SQL_HAS_HAL
+        # « hors_collection » = au moins une entrée HAL ET aucune dans la
+        # collection. Sans cette mutual exclusion, une publi avec plusieurs
+        # dépôts HAL (cas réel — ex publi 24447 / collection CMH) tomberait
+        # à la fois dans hors_collection et dans ok/notice.
         params.append(lab_hal_col)
         return (
-            "EXISTS (SELECT 1 FROM source_publications sd "
+            f"({_SQL_HAS_HAL} "
+            "AND NOT EXISTS (SELECT 1 FROM source_publications sd "
             "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
-            "AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s]))"
+            "AND sd.hal_collections @> ARRAY[%s]))"
         )
     if value == "notice" and lab_hal_col is not None:
         params.append(lab_hal_col)
