@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict i0M5KZLAtz5ETDrw5YoOjTtnk1OzfAKdOdkTCp7Mx5PiM5DSjEG4lwMbHWLhrUJ
+\restrict jWbOCwzXuPXiBEECdaF70Gdh2IiYjOueJKkX3cM2GJb8wx4qYly9WKSnlmK1Ea6
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -142,6 +142,7 @@ CREATE TYPE public.structure_type AS ENUM (
 
 CREATE FUNCTION public.normalize_name_form(text) RETURNS text
     LANGUAGE sql IMMUTABLE
+    SET search_path TO 'public', 'pg_temp'
     AS $_$
   SELECT trim(regexp_replace(
     unaccent(lower(trim(
@@ -2522,6 +2523,13 @@ CREATE UNIQUE INDEX subjects_label_key ON public.subjects USING btree (lower(lab
 
 
 --
+-- Name: subjects_label_norm_trgm_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX subjects_label_norm_trgm_idx ON public.subjects USING gin (public.normalize_name_form(label) public.gin_trgm_ops);
+
+
+--
 -- Name: subjects_usage_count_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2852,4 +2860,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict i0M5KZLAtz5ETDrw5YoOjTtnk1OzfAKdOdkTCp7Mx5PiM5DSjEG4lwMbHWLhrUJ
+\unrestrict jWbOCwzXuPXiBEECdaF70Gdh2IiYjOueJKkX3cM2GJb8wx4qYly9WKSnlmK1Ea6

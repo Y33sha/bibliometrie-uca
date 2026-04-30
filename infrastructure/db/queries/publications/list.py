@@ -9,6 +9,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+from domain.normalize import normalize_text
 from infrastructure.db.queries.filters import (
     OA_OPEN_STATUSES,
     PUB_IS_UCA,
@@ -80,15 +81,24 @@ def _apply_inline_filters(conditions: list[str], params: list[Any], filters: Lis
     if filters.search:
         # Recherche sur titre OU label de sujet : permet de retrouver les
         # publis annotées avec un mot-clé même quand le titre ne le contient
-        # pas. L'EXISTS court-circuite les colocations multiples.
+        # pas.
+        # Côté titre : on tape `title_normalized` (déjà normalisé à
+        # l'ingestion via `normalize_text`, indexé par `idx_pub_title_trgm`).
+        # Côté sujet : on liste les `publication_id` matchant via
+        # `normalize_name_form(label)` (index `subjects_label_norm_trgm_idx`,
+        # migration 018) puis on teste l'appartenance par `IN` — le planner
+        # hash la sous-requête (qui touche l'index trigram), ce qui évite
+        # l'EXISTS corrélé qu'il évalue par publi (~15s sur la base réelle
+        # vs ~150ms avec ce rewrite).
+        # `pattern` est normalisé côté Python pour rester aligné avec les
+        # deux index trigrams.
+        pattern = f"%{normalize_text(filters.search)}%"
         conditions.append(
-            "(unaccent(p.title) ILIKE unaccent(%s) "
-            "OR EXISTS (SELECT 1 FROM publication_subjects ps "
+            "(p.title_normalized ILIKE %s "
+            "OR p.id IN (SELECT ps.publication_id FROM publication_subjects ps "
             "JOIN subjects s ON s.id = ps.subject_id "
-            "WHERE ps.publication_id = p.id "
-            "AND unaccent(s.label) ILIKE unaccent(%s)))"
+            "WHERE normalize_name_form(s.label) ILIKE %s))"
         )
-        pattern = f"%{filters.search}%"
         params.append(pattern)
         params.append(pattern)
     if filters.years:
@@ -200,11 +210,13 @@ async def list_publications(
 
     # Quand la recherche match un sujet (cf. _apply_inline_filters), on remonte
     # d'abord les publis dont le *titre* match — les correspondances purement
-    # via sujet sont reléguées en deuxième.
+    # via sujet sont reléguées en deuxième. On reprend la même expression
+    # `title_normalized ILIKE %s` que dans le WHERE, pour bénéficier du même
+    # index trigram et garder la cohérence sémantique.
     order_params: list[Any] = []
     if filters.search:
-        order = "(CASE WHEN unaccent(p.title) ILIKE unaccent(%s) THEN 0 ELSE 1 END), " + order
-        order_params.append(f"%{filters.search}%")
+        order = "(CASE WHEN p.title_normalized ILIKE %s THEN 0 ELSE 1 END), " + order
+        order_params.append(f"%{normalize_text(filters.search)}%")
 
     await cur.execute(f"SELECT COUNT(*) FROM publications p WHERE {where_clause}", params)
     row = await cur.fetchone()
