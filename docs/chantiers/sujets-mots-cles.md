@@ -146,7 +146,8 @@ Endpoints et UI pour les nuages de sujets sur les pages structure et personne.
 - [x] Étendre la recherche publications côté backend : le champ texte fouille aussi dans `subjects.label` via EXISTS sur `publication_subjects → subjects` (OR sur le titre). 3 tests d'intégration `test_publications_list.py::TestSearch` (titre, sujet, accents).
 - [x] Aucune nouvelle UI : la recherche existante absorbe les sujets de façon transparente.
 - [x] Prioriser les matchs sur titre devant les matchs via sujet (CASE en tête de l'ORDER BY, n'affecte que la liste paginée — pas COUNT, pas l'export). Test `test_title_match_ranks_before_subject_only_match`.
-- [ ] **À faire ensuite** : index trigram sur `unaccent(lower(subjects.label))` pour accélérer la recherche (pg_trgm déjà actif sur la base).
+- [x] Index trigram sur `subjects.label` (migration `018`) : index `subjects_label_norm_trgm_idx` en GIN trigram sur `normalize_name_form(label)` (fonction SQL IMMUTABLE déjà présente dans le schéma, équivalente à `normalize_text` côté Python — ce qui unifie la normalisation côté `publications.title_normalized` et côté sujets).
+- [x] Côté requête : la recherche sur titre passe désormais par `p.title_normalized ILIKE %s` (touche `idx_pub_title_trgm` existant) et le pattern est lui-même normalisé via `normalize_text` côté Python pour rester aligné des deux côtés.
 
 ### Phase 8 — Tests de non-régression
 
