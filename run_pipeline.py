@@ -39,7 +39,6 @@ Phases (dans l'ordre d'execution):
 import argparse
 import atexit
 import datetime
-import logging
 import os
 import signal
 import subprocess
@@ -50,16 +49,17 @@ from typing import Any
 
 from domain.pipeline_modes import MODE_NAMES, MODES
 from domain.sources import ALL_SOURCES_SET
+from infrastructure.log import setup_logger
 from infrastructure.pipeline_status import clear_status, read_status, write_status
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-log = logging.getLogger("pipeline")
-
 BASE = Path(__file__).resolve().parent
+
+# `setup_logger` (au lieu d'un simple `getLogger`) attache un FileHandler
+# sur `logs/pipeline.log` quand `LOG_TO_FILE=true`. Sans ça, `read_new_logs`
+# (cf `infrastructure/pipeline_metrics.py`) ne capture rien pour les phases
+# qui réutilisent ce logger parent (subjects, cooccurrences, enrich) — les
+# rapports en /admin/pipeline avaient des titres de phase mais pas de logs.
+log = setup_logger("pipeline", str(BASE / "logs"))
 
 
 # Garantir le nettoyage même en cas de Ctrl+C ou crash
