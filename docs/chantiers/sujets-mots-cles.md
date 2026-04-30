@@ -145,7 +145,7 @@ Endpoints et UI pour les nuages de sujets sur les pages structure et personne.
 
 - [x] Étendre la recherche publications côté backend : le champ texte fouille aussi dans `subjects.label` via EXISTS sur `publication_subjects → subjects` (OR sur le titre). 3 tests d'intégration `test_publications_list.py::TestSearch` (titre, sujet, accents).
 - [x] Aucune nouvelle UI : la recherche existante absorbe les sujets de façon transparente.
-- [ ] **À faire ensuite** : prioriser les matchs sur titre devant les matchs via sujet (ORDER BY sur un score `title_match DESC, ...`).
+- [x] Prioriser les matchs sur titre devant les matchs via sujet (CASE en tête de l'ORDER BY, n'affecte que la liste paginée — pas COUNT, pas l'export). Test `test_title_match_ranks_before_subject_only_match`.
 - [ ] **À faire ensuite** : index trigram sur `unaccent(lower(subjects.label))` pour accélérer la recherche (pg_trgm déjà actif sur la base).
 
 ### Phase 8 — Tests de non-régression
