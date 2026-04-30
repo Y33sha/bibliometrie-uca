@@ -61,7 +61,7 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 		initialOptions[key] = [];
 	}
 	let options: Record<K, FacetOption[]> = $state(initialOptions);
-	let sourceCounts: Record<string, number> = $state({});
+	let sourceCounts: Record<string, { yes: number; no: number }> = $state({});
 
 	async function load() {
 		const params = config.buildParams();
@@ -117,7 +117,7 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 		}
 
 		if (config.sourceCountsKey && data[config.sourceCountsKey]) {
-			sourceCounts = data[config.sourceCountsKey] as Record<string, number>;
+			sourceCounts = data[config.sourceCountsKey] as Record<string, { yes: number; no: number }>;
 		}
 
 		config.afterLoad?.(data, newOpts);

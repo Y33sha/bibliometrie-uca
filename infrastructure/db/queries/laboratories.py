@@ -1,7 +1,7 @@
 """Query services async pour /api/laboratories/* (§2.12)."""
 
 import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from infrastructure.db.queries.filters import (
@@ -122,9 +122,12 @@ async def get_laboratory(cur: Any, lab_id: int) -> dict[str, Any] | None:
 @dataclass(frozen=True, slots=True)
 class LabPersonsFilters:
     search: str = ""
+    departments: list[str] = field(default_factory=list)
+    roles: list[str] = field(default_factory=list)
     has_rh: str = ""
     has_orcid: str = ""
     has_idhal: str = ""
+    has_idref: str = ""
 
 
 async def get_laboratory_persons(  # noqa: C901 (4 facettes × similar conditions)
@@ -143,9 +146,16 @@ async def get_laboratory_persons(  # noqa: C901 (4 facettes × similar condition
         )""")
         s = f"%{filters.search}%"
         extra_params.extend([s, s])
+    if filters.departments:
+        extra_conds.append("prh.department_name = ANY(%s)")
+        extra_params.append(filters.departments)
+    if filters.roles:
+        extra_conds.append("prh.role_title = ANY(%s)")
+        extra_params.append(filters.roles)
     apply_person_has_rh_filter(extra_conds, filters.has_rh)
     apply_person_has_identifier_filter(extra_conds, "orcid", filters.has_orcid)
     apply_person_has_identifier_filter(extra_conds, "idhal", filters.has_idhal)
+    apply_person_has_identifier_filter(extra_conds, "idref", filters.has_idref)
     extra_where = (" AND " + " AND ".join(extra_conds)) if extra_conds else ""
 
     await cur.execute(
@@ -177,7 +187,21 @@ async def get_laboratory_persons(  # noqa: C901 (4 facettes × similar condition
                 FROM person_identifiers pi
                 WHERE pi.person_id = p.id AND pi.id_type = 'orcid'
                   AND pi.status != 'rejected'
-               ) AS orcids
+               ) AS orcids,
+               (SELECT json_agg(json_build_object(
+                    'value', pi.id_value, 'confirmed', (pi.status = 'confirmed')
+                ) ORDER BY pi.id_value)
+                FROM person_identifiers pi
+                WHERE pi.person_id = p.id AND pi.id_type = 'idhal'
+                  AND pi.status != 'rejected'
+               ) AS idhals,
+               (SELECT json_agg(json_build_object(
+                    'value', pi.id_value, 'confirmed', (pi.status = 'confirmed')
+                ) ORDER BY pi.id_value)
+                FROM person_identifiers pi
+                WHERE pi.person_id = p.id AND pi.id_type = 'idref'
+                  AND pi.status != 'rejected'
+               ) AS idrefs
         FROM authorships a
         JOIN persons p ON p.id = a.person_id
         LEFT JOIN persons_rh prh ON prh.person_id = p.id
@@ -222,14 +246,23 @@ async def get_laboratory_persons(  # noqa: C901 (4 facettes × similar condition
             )
             s = f"%{filters.search}%"
             p.extend([s, s])
+        if skip != "departments" and filters.departments:
+            conds.append("prh.department_name = ANY(%s)")
+            p.append(filters.departments)
+        if skip != "roles" and filters.roles:
+            conds.append("prh.role_title = ANY(%s)")
+            p.append(filters.roles)
         if skip != "has_rh":
             if filters.has_rh == "yes":
                 conds.append("prh.id IS NOT NULL")
             elif filters.has_rh == "no":
                 conds.append("prh.id IS NULL")
-        for key, val in (("has_orcid", filters.has_orcid), ("has_idhal", filters.has_idhal)):
-            if skip != key:
-                id_type = "orcid" if key == "has_orcid" else "idhal"
+        if skip != "ids":
+            for id_type, val in (
+                ("orcid", filters.has_orcid),
+                ("idhal", filters.has_idhal),
+                ("idref", filters.has_idref),
+            ):
                 if val == "yes":
                     conds.append(
                         f"EXISTS (SELECT 1 FROM person_identifiers pi "
@@ -244,7 +277,7 @@ async def get_laboratory_persons(  # noqa: C901 (4 facettes × similar condition
                     )
         return " AND ".join(conds), p
 
-    async def run_facet(skip: str) -> dict[str, Any]:
+    async def run_yesno_facet(skip: str) -> dict[str, Any]:
         w, p = facet_base(skip=skip)
         await cur.execute(
             f"""
@@ -262,7 +295,13 @@ async def get_laboratory_persons(  # noqa: C901 (4 facettes × similar condition
                 )) AS idhal_yes,
                 COUNT(DISTINCT per.id) FILTER (WHERE NOT EXISTS (
                     SELECT 1 FROM person_identifiers pi WHERE pi.person_id = per.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
-                )) AS idhal_no
+                )) AS idhal_no,
+                COUNT(DISTINCT per.id) FILTER (WHERE EXISTS (
+                    SELECT 1 FROM person_identifiers pi WHERE pi.person_id = per.id AND pi.id_type = 'idref' AND pi.status != 'rejected'
+                )) AS idref_yes,
+                COUNT(DISTINCT per.id) FILTER (WHERE NOT EXISTS (
+                    SELECT 1 FROM person_identifiers pi WHERE pi.person_id = per.id AND pi.id_type = 'idref' AND pi.status != 'rejected'
+                )) AS idref_no
             FROM authorships a
             JOIN persons per ON per.id = a.person_id
             LEFT JOIN persons_rh prh ON prh.person_id = per.id
@@ -272,9 +311,26 @@ async def get_laboratory_persons(  # noqa: C901 (4 facettes × similar condition
         )
         return await cur.fetchone()
 
-    facet_rh = await run_facet("has_rh")
-    facet_orcid = await run_facet("has_orcid")
-    facet_idhal = await run_facet("has_idhal")
+    async def run_value_facet(*, skip: str, column: str) -> list[dict[str, Any]]:
+        w, p = facet_base(skip=skip)
+        await cur.execute(
+            f"""
+            SELECT prh.{column} AS value, COUNT(DISTINCT per.id) AS count
+            FROM authorships a
+            JOIN persons per ON per.id = a.person_id
+            LEFT JOIN persons_rh prh ON prh.person_id = per.id
+            WHERE {w} AND prh.{column} IS NOT NULL
+            GROUP BY prh.{column}
+            ORDER BY count DESC
+            """,
+            p,
+        )
+        return await cur.fetchall()
+
+    facet_rh = await run_yesno_facet("has_rh")
+    facet_ids = await run_yesno_facet("ids")
+    facet_depts = await run_value_facet(skip="departments", column="department_name")
+    facet_roles = await run_value_facet(skip="roles", column="role_title")
 
     return {
         "total_persons": total_persons,
@@ -284,9 +340,12 @@ async def get_laboratory_persons(  # noqa: C901 (4 facettes × similar condition
         "persons": persons,
         "orphan_authorships": {"total": orphan_total},
         "facets": {
+            "departments": facet_depts,
+            "roles": facet_roles,
             "rh": {"yes": facet_rh["rh_yes"], "no": facet_rh["rh_no"]},
-            "orcid": {"yes": facet_orcid["orcid_yes"], "no": facet_orcid["orcid_no"]},
-            "idhal": {"yes": facet_idhal["idhal_yes"], "no": facet_idhal["idhal_no"]},
+            "orcid": {"yes": facet_ids["orcid_yes"], "no": facet_ids["orcid_no"]},
+            "idhal": {"yes": facet_ids["idhal_yes"], "no": facet_ids["idhal_no"]},
+            "idref": {"yes": facet_ids["idref_yes"], "no": facet_ids["idref_no"]},
         },
     }
 
@@ -337,7 +396,8 @@ async def get_laboratory_subjects(
     """Top sujets des publications d'un labo, ordonnés par fréquence locale.
 
     Filtre `peer_review`, `memoir`, `ongoing_thesis` pour rester cohérent
-    avec ce qui est affiché dans l'onglet "Publications" de la page labo.
+    avec ce qui est affiché dans l'onglet "Publications" de la page labo, et
+    exclut les sujets trop génériques (`subjects.usage_count` > 5000).
     """
     await cur.execute(
         """
@@ -350,6 +410,7 @@ async def get_laboratory_subjects(
           AND a.roles && ARRAY['author']::text[]
           AND a.in_perimeter = TRUE
           AND p.doc_type NOT IN ('peer_review', 'memoir', 'ongoing_thesis')
+          AND s.usage_count <= 5000
         GROUP BY s.id, s.label, s.ontologies
         ORDER BY count DESC, lower(s.label)
         LIMIT %s

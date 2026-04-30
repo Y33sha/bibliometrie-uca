@@ -15,7 +15,9 @@ from infrastructure.db.queries.persons.create import PgPersonsCreateQueries
 from infrastructure.db.queries.persons.detail import (
     get_person,
     person_addresses,
+    person_dashboard,
     person_profile,
+    person_subjects,
     person_theses,
 )
 from infrastructure.db.queries.persons.facets import (
@@ -43,7 +45,9 @@ __all__ = [
     "list_persons",
     "list_roles",
     "person_addresses",
+    "person_dashboard",
     "person_profile",
+    "person_subjects",
     "person_theses",
     "persons_directory",
     "persons_facets",

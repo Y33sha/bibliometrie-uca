@@ -5,6 +5,19 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
+# ----- Shared facet primitives -----
+
+
+class FacetValueCount(BaseModel):
+    value: str
+    count: int
+
+
+class YesNoCount(BaseModel):
+    yes: int
+    no: int
+
+
 # ----- Auth -----
 
 
@@ -351,7 +364,7 @@ class PublicationsFacetsResponse(BaseModel):
     access: list[TextStrFacet]
     oa_statuses: list[StrValueFacet]
     corresponding: list[StrValueFacet]
-    source_counts: dict[str, int]
+    source_counts: dict[str, YesNoCount]
     apc: list[TextStrFacet]
     countries: list[TextStrFacet]
     hal_status: list[TextStrFacet]
@@ -598,7 +611,9 @@ class LaboratoryDetailResponse(BaseModel):
     theses_count: int
 
 
-class LabOrcidIdentifier(BaseModel):
+class ValueConfirmedOut(BaseModel):
+    """Identifiant sous forme condensée (annuaire public)."""
+
     value: str
     confirmed: bool
 
@@ -613,20 +628,18 @@ class LabPersonOut(BaseModel):
     department_name: str | None
     has_rh: bool
     pub_count: int
-    orcids: list[LabOrcidIdentifier] | None
-
-
-class LabBinaryFacet(BaseModel):
-    """Facette binaire yes/no (compteur pour chaque option)."""
-
-    yes: int
-    no: int
+    orcids: list[ValueConfirmedOut] | None
+    idhals: list[ValueConfirmedOut] | None
+    idrefs: list[ValueConfirmedOut] | None
 
 
 class LabPersonsFacets(BaseModel):
-    rh: LabBinaryFacet
-    orcid: LabBinaryFacet
-    idhal: LabBinaryFacet
+    departments: list[FacetValueCount]
+    roles: list[FacetValueCount]
+    rh: YesNoCount
+    orcid: YesNoCount
+    idhal: YesNoCount
+    idref: YesNoCount
 
 
 class LabOrphanAuthorships(BaseModel):
@@ -657,12 +670,12 @@ class LaboratoryAddressesResponse(BaseModel):
     addresses: list[LabAddressOut]
 
 
-class LabPubYearCount(BaseModel):
+class PubYearCount(BaseModel):
     year: int
     count: int
 
 
-class LabDashboardOa(BaseModel):
+class DashboardOa(BaseModel):
     open_access: int
     closed: int
     unknown: int
@@ -682,10 +695,15 @@ class LabTopCountry(BaseModel):
 
 
 class LaboratoryDashboardResponse(BaseModel):
-    pubs_by_year: list[LabPubYearCount]
-    oa: LabDashboardOa
+    pubs_by_year: list[PubYearCount]
+    oa: DashboardOa
     collab: LabDashboardCollab
     top_countries: list[LabTopCountry]
+
+
+class PersonDashboardResponse(BaseModel):
+    pubs_by_year: list[PubYearCount]
+    oa: DashboardOa
 
 
 class SubjectFrequency(BaseModel):
@@ -1379,13 +1397,6 @@ class NameFormSummaryOut(BaseModel):
     ambiguous: bool
 
 
-class ValueConfirmedOut(BaseModel):
-    """Identifiant sous forme condensée (annuaire public)."""
-
-    value: str
-    confirmed: bool
-
-
 class PersonDirectoryEntry(BaseModel):
     """Ligne de l'annuaire public `/api/persons/directory`."""
 
@@ -1395,8 +1406,10 @@ class PersonDirectoryEntry(BaseModel):
     role_title: str | None
     department_name: str | None
     has_rh: bool
+    pub_count: int
     orcids: list[ValueConfirmedOut] | None
     idhals: list[ValueConfirmedOut] | None
+    idrefs: list[ValueConfirmedOut] | None
 
 
 class PersonDirectoryResponse(BaseModel):
@@ -1445,16 +1458,6 @@ class PersonListResponse(BaseModel):
     persons: list[PersonOut]
 
 
-class FacetValueCount(BaseModel):
-    value: str
-    count: int
-
-
-class YesNoCount(BaseModel):
-    yes: int
-    no: int
-
-
 class PersonsFacetsResponse(BaseModel):
     """Réponse de `/api/persons/facets`."""
 
@@ -1462,6 +1465,7 @@ class PersonsFacetsResponse(BaseModel):
     roles: list[FacetValueCount]
     orcid: YesNoCount
     idhal: YesNoCount
+    idref: YesNoCount
     rh: YesNoCount
     linked: YesNoCount
 

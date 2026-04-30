@@ -11,6 +11,7 @@ from infrastructure.perimeter import (
     async_get_persons_structure_ids_list,
 )
 from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
     LaboratoryAddressesResponse,
     LaboratoryDashboardResponse,
@@ -50,16 +51,22 @@ async def get_laboratory_persons(
     per_page: int = Query(50, ge=10, le=200),
     sort: str = Query("name"),
     search: str = Query(""),
+    department: str = Query(""),
+    role: str = Query(""),
     has_rh: str = Query(""),
     has_orcid: str = Query(""),
     has_idhal: str = Query(""),
+    has_idref: str = Query(""),
 ) -> Any:
     """Personnes et authorships orphelines liées à un labo."""
     filters = lab_queries.LabPersonsFilters(
         search=search,
+        departments=parse_str_csv(department),
+        roles=parse_str_csv(role),
         has_rh=has_rh,
         has_orcid=has_orcid,
         has_idhal=has_idhal,
+        has_idref=has_idref,
     )
     async with get_async_cursor() as (cur, _conn):
         return await lab_queries.get_laboratory_persons(

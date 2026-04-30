@@ -1,17 +1,23 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { api, auth, authorships } from '$lib/api';
 	import { titleCase, formatDate, sanitizeTitle, halDocUrl, scanrPubUrl } from '$lib/utils';
 	import { typeLabels, docTypeLabelsMap, oaLabelsMap } from '$lib/labels';
+	import { Chart, registerables } from 'chart.js';
+	import ChartDataLabels from 'chartjs-plugin-datalabels';
+	Chart.register(...registerables, ChartDataLabels);
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useColumnVisibility } from '$lib/composables/useColumnVisibility.svelte';
 	import ColumnMenu from '$lib/components/ColumnMenu.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
+	import IdentifiersCell from '$lib/components/IdentifiersCell.svelte';
+	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
+	import { SOURCE_ITEMS } from '$lib/filterItems';
+	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
 	import TabNav from '$lib/components/TabNav.svelte';
 	import type { components } from '$lib/api/schema';
 
@@ -58,16 +64,16 @@
 	const activeTab = $derived(
 		(() => {
 			const t = $page.url.searchParams.get('tab');
-			return t === 'identities' || t === 'theses' || t === 'addresses' ? t : 'publications';
+			return t === 'publications' || t === 'theses' || t === 'addresses' ? t : 'dashboard';
 		})()
 	);
 
 	// --- Column visibility ---
 	const cv = useColumnVisibility([
-		{ key: 'title',   label: 'Titre',    fixed: true },
-		{ key: 'journal', label: 'Revue' },
 		{ key: 'type',    label: 'Type' },
 		{ key: 'year',    label: 'Année' },
+		{ key: 'title',   label: 'Titre',    fixed: true },
+		{ key: 'journal', label: 'Revue' },
 		{ key: 'labs',    label: 'Labo(s)' },
 		{ key: 'corr',    label: 'Corresp.' },
 		{ key: 'apc',     label: 'APC' },
@@ -165,6 +171,18 @@
 	let addrPages = $state(1);
 	let addrLoaded = $state(false);
 
+	// Dashboard tab
+	type DashboardResponse = components['schemas']['PersonDashboardResponse'];
+	type SubjectFrequency = components['schemas']['SubjectFrequency'];
+	let dashboardLoaded = $state(false);
+	let dashPubsByYear: { year: number; count: number }[] = $state([]);
+	let dashOa = $state({ open_access: 0, closed: 0, unknown: 0, total: 0 });
+	let dashSubjects: SubjectFrequency[] = $state([]);
+	let barCanvas = $state<HTMLCanvasElement | undefined>();
+	let pieCanvas = $state<HTMLCanvasElement | undefined>();
+	let barChart: Chart | null = null;
+	let pieChart: Chart | null = null;
+
 	const displayName = $derived(
 		profile
 			? `${titleCase(profile.first_name)} ${titleCase(profile.last_name)}`
@@ -224,6 +242,81 @@
 		addrLoaded = true;
 	}
 
+	async function loadDashboard() {
+		const [data, subjects] = await Promise.all([
+			api<DashboardResponse>(`/api/persons/${personId}/dashboard`, { key: 'person-detail-dashboard' }),
+			api<SubjectFrequency[]>(`/api/persons/${personId}/subjects?limit=30`, { key: 'person-detail-subjects' }),
+		]);
+		dashPubsByYear = data.pubs_by_year;
+		dashOa = data.oa;
+		dashSubjects = subjects;
+		dashboardLoaded = true;
+		// Le rendu Chart.js est piloté par le $effect en bas du script :
+		// il se déclenche quand le canvas est (re)monté.
+	}
+
+	function renderDashCharts() {
+		if (barChart) barChart.destroy();
+		if (pieChart) pieChart.destroy();
+		const cs = getComputedStyle(document.documentElement);
+
+		if (barCanvas) {
+			barChart = new Chart(barCanvas, {
+				type: 'bar',
+				data: {
+					labels: dashPubsByYear.map(d => String(d.year)),
+					datasets: [{
+						label: 'Publications',
+						data: dashPubsByYear.map(d => d.count),
+						backgroundColor: cs.getPropertyValue('--accent')?.trim() || '#3b6b9e',
+						borderRadius: 3,
+					}]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					plugins: {
+						legend: { display: false },
+						datalabels: { color: '#fff', font: { weight: 'bold', size: 12 } }
+					},
+					scales: {
+						y: { beginAtZero: true, ticks: { precision: 0 } },
+						x: { grid: { display: false } }
+					}
+				}
+			});
+		}
+
+		if (pieCanvas && dashOa.total > 0) {
+			pieChart = new Chart(pieCanvas, {
+				type: 'doughnut',
+				data: {
+					labels: ['Open Access', 'Closed', 'Indéterminé'],
+					datasets: [{
+						data: [dashOa.open_access, dashOa.closed, dashOa.unknown],
+						backgroundColor: ['#2a7d4f', '#c0392b', '#ccc'],
+					}]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					plugins: {
+						legend: { position: 'bottom' },
+						datalabels: {
+							color: '#fff',
+							font: { weight: 'bold', size: 13 },
+							formatter: (value: number, ctx: any) => {
+								const total = ctx.dataset.data.reduce((a: number, b: number) => a + b, 0);
+								const pct = total > 0 ? Math.round(value / total * 100) : 0;
+								return pct > 3 ? `${pct}%` : '';
+							}
+						}
+					}
+				}
+			});
+		}
+	}
+
 	function exportCsvUrl(): string {
 		const params = buildFilterParams();
 		params.set('sort', 'year_desc');
@@ -237,6 +330,7 @@
 	}
 
 	function onTabSwitch(tab: string) {
+		if (tab === 'dashboard' && !dashboardLoaded) loadDashboard();
 		if (tab === 'publications' && pubs.items.length === 0 && pubs.total === 0) { facets.load(); pubs.load(); }
 		if (tab === 'theses' && !thesesLoaded) loadTheses();
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
@@ -251,6 +345,7 @@
 		profile = null;
 		thesesLoaded = false;
 		addrLoaded = false;
+		dashboardLoaded = false;
 		try {
 			const profileData = await api<ProfileResponse>(`/api/persons/${id}/profile`);
 			profile = profileData.person;
@@ -261,7 +356,8 @@
 			error = true;
 			return;
 		}
-		if (activeTab === 'addresses') loadAddresses();
+		if (activeTab === 'dashboard') loadDashboard();
+		else if (activeTab === 'addresses') loadAddresses();
 		else if (activeTab === 'theses') loadTheses();
 		else if (activeTab === 'publications') { facets.load(); pubs.load(); }
 	}
@@ -275,6 +371,15 @@
 	// Recharger quand personId change (navigation client-side)
 	$effect(() => {
 		if (personId) loadProfile(personId);
+	});
+
+	// (Re)render des charts dès que le canvas est monté avec data dispo.
+	// Couvre à la fois le 1er affichage et les retours sur l'onglet après
+	// que le {#if} ait détruit/remonté le canvas.
+	$effect(() => {
+		if (activeTab === 'dashboard' && dashboardLoaded && barCanvas && pieCanvas) {
+			renderDashCharts();
+		}
 	});
 </script>
 
@@ -315,47 +420,68 @@
 					— {profile.end_date ? formatDate(profile.end_date) : 'en poste'}
 				</span>
 			{/if}
-			{#each allOrcids() as oid}
-				<span class="id-item">
-					<span class="id-label">ORCID</span>
-					<a href="https://orcid.org/{oid.value}" target="_blank" rel="noopener" class="id-badge" class:id-confirmed={oid.confirmed}>{oid.value}</a>
-					{#if oid.confirmed}<span class="confirmed-check" title="Vérifié manuellement">&#10003;</span>{/if}
-				</span>
-			{/each}
-			{#each allIdhals() as idh}
-				<span class="id-item">
-					<span class="id-label">idHAL</span>
-					<a href="https://hal.science/search/index/?q=%2A&authIdHal_s={idh.value}" target="_blank" rel="noopener" class="id-badge" class:id-confirmed={idh.confirmed}>{idh.value}</a>
-					{#if idh.confirmed}<span class="confirmed-check" title="Vérifié manuellement">&#10003;</span>{/if}
-				</span>
-			{/each}
-			{#each allIdrefs() as idr}
-				<span class="id-item">
-					<span class="id-label">IdRef</span>
-					<a href="https://www.idref.fr/{idr.value}" target="_blank" rel="noopener" class="id-badge" class:id-confirmed={idr.confirmed}>{idr.value}</a>
-					{#if idr.confirmed}<span class="confirmed-check" title="Vérifié manuellement">&#10003;</span>{/if}
-				</span>
-			{/each}
+			<IdentifiersCell
+				orcids={allOrcids()}
+				idhals={allIdhals()}
+				idrefs={allIdrefs()}
+			/>
 		</div>
 	</div>
 
 	<!-- Tabs -->
 	<TabNav
 		tabs={[
+			{ id: 'dashboard', label: 'Dashboard' },
 			{ id: 'publications', label: 'Publications', count: pubs.total },
 			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses', count: thesesCount }] : []),
-			{ id: 'identities', label: 'Identités', count: authors.length },
+			// TODO: onglet « Identités » désactivé — à déplacer côté admin
+			// ou à supprimer définitivement (cf. PersonProfileResponse.authors).
+			// { id: 'identities', label: 'Identités', count: authors.length },
 			{ id: 'addresses', label: 'Adresses', count: addrLoaded ? addrTotal : undefined },
 		]}
 		onswitch={onTabSwitch}
 	/>
 
+	<!-- Tab: Dashboard -->
+	{#if activeTab === 'dashboard'}
+		<div class="tab-content">
+			{#if !dashboardLoaded}
+				<div class="loading">Chargement...</div>
+			{:else}
+				<div class="dash-grid">
+					<div class="dash-card dash-card-wide">
+						<h3>Sujets principaux</h3>
+						<SubjectsCloud subjects={dashSubjects} />
+					</div>
+					<div class="dash-card">
+						<h3>Publications par année</h3>
+						<div class="chart-wrap">
+							<canvas bind:this={barCanvas}></canvas>
+						</div>
+					</div>
+					<div class="dash-card">
+						<h3>Open Access</h3>
+						<div class="chart-wrap">
+							<canvas bind:this={pieCanvas}></canvas>
+						</div>
+						{#if dashOa.total > 0}
+							<div class="oa-summary">
+								{Math.round(dashOa.open_access / dashOa.total * 100)} % Open Access
+								({dashOa.open_access.toLocaleString('fr-FR')} / {dashOa.total.toLocaleString('fr-FR')})
+							</div>
+						{/if}
+					</div>
+				</div>
+			{/if}
+		</div>
+	{/if}
+
 	<!-- Tab: Publications -->
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
 			<div class="toolbar">
-				{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
 				{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
+				{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
 				{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
 				{#if col('oa_path')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
 				{#if col('corr') && facets.options.corresponding.length}
@@ -365,7 +491,7 @@
 					<FacetDropdown label="UCA" options={facets.options.perimeter} bind:selected={selectedPerimeter} onchange={onFilterChange} />
 				{/if}
 				<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
-				<SourceFilterToggle bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
+				<PresenceFilterToggle label="Sources" items={SOURCE_ITEMS} bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
 				<span class="toolbar-spacer"></span>
 				<span class="count">{pubs.total} publication{pubs.total > 1 ? 's' : ''}</span>
 				<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
@@ -374,10 +500,10 @@
 				<thead>
 					<tr>
 						{#if isAdmin}<th style="width:28px"></th>{/if}
-						<th class="sortable" class:active={currentSort === 'title' || currentSort === 'title_desc'} onclick={toggleSortTitle}>Titre {currentSort === 'title' ? '↑' : currentSort === 'title_desc' ? '↓' : ''}</th>
-						{#if col('journal')}<th>Revue</th>{/if}
 						{#if col('type')}<th style="width:80px">Type</th>{/if}
 						{#if col('year')}<th style="width:40px" class="sortable" class:active={currentSort === 'year_desc' || currentSort === 'year_asc'} onclick={toggleSortYear}>An. {currentSort === 'year_asc' ? '↑' : '↓'}</th>{/if}
+						<th class="sortable pub-col-title" class:active={currentSort === 'title' || currentSort === 'title_desc'} onclick={toggleSortTitle}>Titre {currentSort === 'title' ? '↑' : currentSort === 'title_desc' ? '↓' : ''}</th>
+						{#if col('journal')}<th class="pub-col-journal">Revue</th>{/if}
 						{#if col('labs')}<th style="width:80px">Labo(s)</th>{/if}
 						{#if col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
 						{#if col('apc')}<th style="width:60px">APC</th>{/if}
@@ -406,12 +532,12 @@
 										{/if}
 									</td>
 								{/if}
-								<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
-								{#if col('journal')}<td class="journal-cell">{p.journal || ''}</td>{/if}
 								{#if col('type')}<td>
 									<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
 								</td>{/if}
 								{#if col('year')}<td>{p.pub_year || ''}</td>{/if}
+								<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
+								{#if col('journal')}<td class="journal-cell pub-col-journal"><span class="journal-clip">{p.journal || ''}</span></td>{/if}
 								{#if col('labs')}<td>
 									{#each p.lab_items || [] as lab}
 										<a href="{base}/laboratories/{lab.id}" class="lab-tag">{lab.label}</a>
@@ -458,14 +584,14 @@
 								<td class="links-cell">
 									{#if p.hal_id}
 										<a href={halDocUrl(p.hal_id, p.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
-											<img src="https://hal.science/favicon.ico" alt="HAL" />
+											<img src="{base}/icons/hal.ico" alt="HAL" />
 										</a>
 									{:else}
 										<span class="source-tag source-placeholder"></span>
 									{/if}
 									{#if p.openalex_id}
 										<a href="https://openalex.org/{p.openalex_id}" target="_blank" rel="noopener" class="source-tag source-oa" title="OpenAlex: {p.openalex_id}">
-											<img src="https://raw.githubusercontent.com/ourresearch/openalex-gui/refs/heads/master/public/favicon.png" alt="OA" />
+											<img src="{base}/icons/openalex.png" alt="OA" />
 										</a>
 									{:else}
 										<span class="source-tag source-placeholder"></span>
@@ -479,7 +605,7 @@
 									{/if}
 									{#if p.wos_id}
 										<a href="https://www.webofscience.com/wos/woscc/full-record/{p.wos_id}" target="_blank" rel="noopener" class="source-tag source-wos" title="WoS: {p.wos_id}">
-											<img src="https://www.webofscience.com/favicon.ico" alt="WoS" />
+											<img src="{base}/icons/wos.ico" alt="WoS" />
 										</a>
 									{:else}
 										<span class="source-tag source-placeholder"></span>
@@ -536,58 +662,14 @@
 		</div>
 	{/if}
 
-	<!-- Tab: Identités -->
-	{#if activeTab === 'identities'}
-		<div class="tab-content">
-			{#if authors.length > 0}
-				<table>
-					<thead>
-						<tr>
-							<th>Source</th>
-							<th>Nom complet</th>
-							<th>ORCID / idHAL</th>
-							<th>Identifiant source</th>
-							<th>Publis UCA</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each authors as a (a.id + '-' + a.source)}
-							<tr>
-								<td>
-									{#if a.source === 'hal'}
-										<span class="source-tag-label source-hal-label">HAL</span>
-									{:else if a.source === 'openalex'}
-										<span class="source-tag-label source-oa-label">OpenAlex</span>
-									{:else if a.source === 'wos'}
-										<span class="source-tag-label source-wos-label">WoS</span>
-									{/if}
-								</td>
-								<td>{a.full_name}</td>
-								<td>
-									{#if a.orcid}
-										<a href="https://orcid.org/{a.orcid}" target="_blank" rel="noopener" class="id-badge">{a.orcid}</a>
-									{/if}
-									{#if a.idhal}
-										<a href="https://hal.science/search/index/?q=%2A&authIdHal_s={a.idhal}" target="_blank" rel="noopener" class="id-badge">{a.idhal}</a>
-									{/if}
-								</td>
-								<td>
-									{#if a.source === 'hal' && a.hal_person_id}
-										<span class="id-badge">{a.hal_person_id}</span>
-									{:else if a.source === 'openalex' && a.openalex_id}
-										<a href="https://openalex.org/{a.openalex_id}" target="_blank" rel="noopener" class="id-badge">{a.openalex_id}</a>
-									{/if}
-								</td>
-								<td>{a.uca_pub_count}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			{:else}
-				<div class="no-results">Aucune identité liée</div>
-			{/if}
-		</div>
-	{/if}
+	<!--
+		TODO: l'onglet « Identités » a été désactivé (cf. tabs ci-dessus, le
+		HTML précédent est dans git). À ressortir côté admin si on a besoin du
+		diagnostic « auteurs sources liés à la personne » (entité par entité,
+		HAL / OpenAlex / WoS), sinon à supprimer définitivement avec
+		PersonProfileResponse.authors et les types associés.
+	-->
+
 
 	<!-- Tab: Adresses -->
 	{#if activeTab === 'addresses'}
@@ -626,6 +708,19 @@
 {/if}
 
 <style>
+	/* Dashboard */
+	.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+	.dash-card-wide { grid-column: 1 / -1; }
+	.dash-card {
+		background: var(--card);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 16px;
+	}
+	.dash-card h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 12px; }
+	.chart-wrap { position: relative; height: 280px; }
+	.oa-summary { text-align: center; font-size: 0.9rem; color: var(--muted); margin-top: 8px; }
+
 	.thesis-role-heading {
 		font-size: 1rem;
 		font-weight: 600;
@@ -658,23 +753,6 @@
 		font-size: 0.85rem;
 		color: var(--muted);
 	}
-	.id-item { display: flex; align-items: center; gap: 6px; font-size: 0.95rem; }
-	.id-label { font-weight: 500; color: var(--muted); font-size: 0.85rem; }
-	.confirmed-check {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 15px;
-		height: 15px;
-		border-radius: 50%;
-		background: var(--accent, #3b82f6);
-		color: white;
-		font-size: 0.7rem;
-		font-weight: 700;
-		margin-left: 2px;
-		vertical-align: middle;
-	}
-
 	/* Shared table styles */
 	.tab-content table {
 		width: 100%;

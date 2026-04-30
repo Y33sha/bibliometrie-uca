@@ -9,7 +9,9 @@
 	Chart.register(...registerables, ChartDataLabels);
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
-	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
+	import PersonsTable from '$lib/components/PersonsTable.svelte';
+	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
+	import { SOURCE_ITEMS, IDENTIFIER_ITEMS } from '$lib/filterItems';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import TabNav from '$lib/components/TabNav.svelte';
 	import { docTypeLabelsMap, oaLabelsMap, typeLabels } from '$lib/labels';
@@ -51,10 +53,10 @@
 
 	// --- Column visibility ---
 	const cv = useColumnVisibility([
-		{ key: 'title',      label: 'Titre',      fixed: true },
-		{ key: 'journal',    label: 'Revue' },
 		{ key: 'type',       label: 'Type' },
 		{ key: 'year',       label: 'Année' },
+		{ key: 'title',      label: 'Titre',      fixed: true },
+		{ key: 'journal',    label: 'Revue' },
 		{ key: 'apc',        label: 'APC' },
 		{ key: 'oa',         label: 'OA' },
 		{ key: 'oa_path',    label: 'Voie OA' },
@@ -108,12 +110,15 @@
 	let personsSort = $state('name');
 	let personsSearch = $state('');
 	let personsSearchTimer: ReturnType<typeof setTimeout>;
+	type IdState = 'all' | 'yes' | 'no';
+	let selectedDepts: string[] = $state([]);
+	let selectedRoles: string[] = $state([]);
 	let selectedRh: string[] = $state(['yes']);
-	let selectedOrcid: string[] = $state([]);
-	let selectedIdhal: string[] = $state([]);
+	let idStates = $state<Record<string, IdState>>({});
+	let deptOptions: FacetOption[] = $state([]);
+	let roleOptions: FacetOption[] = $state([]);
 	let rhOptions: FacetOption[] = $state([{ value: 'yes', text: 'Oui' }, { value: 'no', text: 'Non' }]);
-	let orcidOptions: FacetOption[] = $state([{ value: 'yes', text: 'Avec' }, { value: 'no', text: 'Sans' }]);
-	let idhalOptions: FacetOption[] = $state([{ value: 'yes', text: 'Avec' }, { value: 'no', text: 'Sans' }]);
+	let idCounts = $state<Record<string, { yes: number; no: number }>>({});
 	let orphanStats = $state({ total: 0 });
 	let personsLoaded = $state(false);
 
@@ -295,9 +300,10 @@
 			pubSort:          { type: 'single',        urlKey: 'sort', defaultValue: 'year_desc' },
 			currentPage:      { type: 'page',          urlKey: 'page' },
 			personsSort:      { type: 'single',        urlKey: 'psort', defaultValue: 'name' },
+			selectedDepts:    { type: 'string_array',  urlKey: 'pdept' },
+			selectedRoles:    { type: 'string_array',  urlKey: 'prole' },
 			hasRh:            { type: 'single',        urlKey: 'has_rh', defaultValue: 'yes' },
-			hasOrcid:         { type: 'single',        urlKey: 'has_orcid' },
-			hasIdhal:         { type: 'single',        urlKey: 'has_idhal' },
+			idStates:         { type: 'source_states', urlKey: 'id_filter' },
 			personsPage:      { type: 'page',          urlKey: 'ppage' },
 			addrPage:         { type: 'page',          urlKey: 'apage' },
 		},
@@ -311,9 +317,10 @@
 			selectedAccess, selectedOa, selectedApc, selectedCountries, selectedHalStatus, pubSearch, pubSort,
 			currentPage: pubs.page,
 			personsSort,
+			selectedDepts,
+			selectedRoles,
 			hasRh: selectedRh.length === 1 ? selectedRh[0] : 'all',
-			hasOrcid: selectedOrcid.length === 1 ? selectedOrcid[0] : undefined,
-			hasIdhal: selectedIdhal.length === 1 ? selectedIdhal[0] : undefined,
+			idStates,
 			personsPage,
 			addrPage,
 		}));
@@ -340,19 +347,11 @@
 		pubs.load();
 	});
 
-	function togglePersonsSort(col: string) {
-		if (personsSort === col) personsSort = '-' + col;
-		else if (personsSort === '-' + col) personsSort = col;
-		else personsSort = col;
+	function onPersonsSortChange(newSort: string) {
+		personsSort = newSort;
 		personsPage = 1;
-		loadPersons();
 		syncUrl();
-	}
-
-	function sortIndicator(col: string): string {
-		if (personsSort === col) return ' \u25B2';
-		if (personsSort === '-' + col) return ' \u25BC';
-		return '';
+		loadPersons();
 	}
 
 	async function loadPersons() {
@@ -362,9 +361,14 @@
 			sort: personsSort
 		});
 		if (personsSearch.trim()) params.set('search', personsSearch.trim());
+		if (selectedDepts.length) params.set('department', selectedDepts.join(','));
+		if (selectedRoles.length) params.set('role', selectedRoles.join(','));
 		params.set('has_rh', selectedRh.length === 1 ? selectedRh[0] : 'all');
-		if (selectedOrcid.length === 1) params.set('has_orcid', selectedOrcid[0]);
-		if (selectedIdhal.length === 1) params.set('has_idhal', selectedIdhal[0]);
+		const idQueryKey: Record<string, string> = { orcid: 'has_orcid', idhal: 'has_idhal', idref: 'has_idref' };
+		for (const [key, qk] of Object.entries(idQueryKey)) {
+			const v = idStates[key];
+			if (v === 'yes' || v === 'no') params.set(qk, v);
+		}
 		const data = await api<PersonsResponse>(
 			`/api/laboratories/${labId}/persons?${params}`, { key: 'lab-persons' }
 		);
@@ -374,18 +378,17 @@
 		personsPage = data.page;
 		orphanStats = data.orphan_authorships;
 		if (data.facets) {
+			deptOptions = data.facets.departments.map((d) => ({ value: d.value, text: d.value, count: d.count }));
+			roleOptions = data.facets.roles.map((r) => ({ value: r.value, text: r.value, count: r.count }));
 			rhOptions = [
 				{ value: 'yes', text: 'Oui', count: data.facets.rh.yes },
 				{ value: 'no', text: 'Non', count: data.facets.rh.no }
 			];
-			orcidOptions = [
-				{ value: 'yes', text: 'Avec', count: data.facets.orcid.yes },
-				{ value: 'no', text: 'Sans', count: data.facets.orcid.no }
-			];
-			idhalOptions = [
-				{ value: 'yes', text: 'Avec', count: data.facets.idhal.yes },
-				{ value: 'no', text: 'Sans', count: data.facets.idhal.no }
-			];
+			idCounts = {
+				orcid: { yes: data.facets.orcid.yes, no: data.facets.orcid.no },
+				idhal: { yes: data.facets.idhal.yes, no: data.facets.idhal.no },
+				idref: { yes: data.facets.idref.yes, no: data.facets.idref.no },
+			};
 		}
 		personsLoaded = true;
 	}
@@ -578,18 +581,13 @@
 		if (restored.pubSort) pubSort = restored.pubSort as string;
 		if (restored.currentPage) pubs.page = restored.currentPage as number;
 		if (restored.personsSort) personsSort = restored.personsSort as string;
+		if (restored.selectedDepts) selectedDepts = restored.selectedDepts as string[];
+		if (restored.selectedRoles) selectedRoles = restored.selectedRoles as string[];
 		if (restored.hasRh != null) {
 			const rh = restored.hasRh as string;
 			selectedRh = rh === 'all' ? [] : [rh];
 		}
-		if (restored.hasOrcid != null) {
-			const o = restored.hasOrcid as string;
-			selectedOrcid = o === 'all' ? [] : [o];
-		}
-		if (restored.hasIdhal != null) {
-			const h = restored.hasIdhal as string;
-			selectedIdhal = h === 'all' ? [] : [h];
-		}
+		if (restored.idStates) idStates = restored.idStates as Record<string, IdState>;
 		if (restored.personsPage) personsPage = restored.personsPage as number;
 		if (restored.addrPage) addrPage = restored.addrPage as number;
 
@@ -757,24 +755,24 @@
 		<div class="tab-content">
 			<div class="toolbar toolbar-card">
 				<input type="text" placeholder="Rechercher par titre..." bind:value={pubSearch} oninput={onSearchInput} />
-				{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
 				{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
+				{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
 				{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
 				{#if col('oa_path')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
 				{#if col('hal_status')}<FacetDropdown label="Statut HAL" options={facets.options.halStatus} bind:selected={selectedHalStatus} onchange={onFilterChange} />{/if}
 				{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />{/if}
 				<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
-				<SourceFilterToggle bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
+				<PresenceFilterToggle label="Sources" items={SOURCE_ITEMS} bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
 				<span class="count">{pubs.total} publication{pubs.total > 1 ? 's' : ''}</span>
 				<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 			</div>
 			<table class="pub-table">
 				<thead>
 					<tr>
-						<th class="sortable" class:active={pubSort === 'title' || pubSort === 'title_desc'} onclick={togglePubSortTitle}>Titre {pubSort === 'title' ? '↑' : pubSort === 'title_desc' ? '↓' : ''}</th>
-						{#if col('journal')}<th>Revue</th>{/if}
 						{#if col('type')}<th style="width:80px">Type</th>{/if}
 						{#if col('year')}<th style="width:40px" class="sortable" class:active={pubSort === 'year_desc' || pubSort === 'year_asc'} onclick={togglePubSortYear}>An. {pubSort === 'year_asc' ? '↑' : '↓'}</th>{/if}
+						<th class="sortable pub-col-title" class:active={pubSort === 'title' || pubSort === 'title_desc'} onclick={togglePubSortTitle}>Titre {pubSort === 'title' ? '↑' : pubSort === 'title_desc' ? '↓' : ''}</th>
+						{#if col('journal')}<th class="pub-col-journal">Revue</th>{/if}
 						{#if col('apc')}<th style="width:60px">APC</th>{/if}
 						{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
 						{#if col('oa_path')}<th style="width:60px">Voie OA</th>{/if}
@@ -794,12 +792,12 @@
 					{:else}
 						{#each pubs.items as p (p.id)}
 							<tr>
-								<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
-								{#if col('journal')}<td class="journal-cell">{p.journal || ''}</td>{/if}
 								{#if col('type')}<td>
 									<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
 								</td>{/if}
 								{#if col('year')}<td>{p.pub_year || ''}</td>{/if}
+								<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
+								{#if col('journal')}<td class="journal-cell pub-col-journal"><span class="journal-clip">{p.journal || ''}</span></td>{/if}
 								{#if col('apc')}<td class="apc-cell">
 									{#if p.apc}
 										{@const thisLabApc = p.apc.filter(a => a.lab_id === lab?.id)}
@@ -841,14 +839,14 @@
 								<td class="links-cell">
 									{#if p.hal_id}
 										<a href={halDocUrl(p.hal_id, p.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
-											<img src="https://hal.science/favicon.ico" alt="HAL" />
+											<img src="{base}/icons/hal.ico" alt="HAL" />
 										</a>
 									{:else}
 										<span class="source-tag source-placeholder"></span>
 									{/if}
 									{#if p.openalex_id}
 										<a href="https://openalex.org/{p.openalex_id}" target="_blank" rel="noopener" class="source-tag source-oa" title="OpenAlex: {p.openalex_id}">
-											<img src="https://raw.githubusercontent.com/ourresearch/openalex-gui/refs/heads/master/public/favicon.png" alt="OA" />
+											<img src="{base}/icons/openalex.png" alt="OA" />
 										</a>
 									{:else}
 										<span class="source-tag source-placeholder"></span>
@@ -862,7 +860,7 @@
 									{/if}
 									{#if p.wos_id}
 										<a href="https://www.webofscience.com/wos/woscc/full-record/{p.wos_id}" target="_blank" rel="noopener" class="source-tag source-wos" title="WoS: {p.wos_id}">
-											<img src="https://www.webofscience.com/favicon.ico" alt="WoS" />
+											<img src="{base}/icons/wos.ico" alt="WoS" />
 										</a>
 									{:else}
 										<span class="source-tag source-placeholder"></span>
@@ -949,14 +947,14 @@
 									{/if}
 									{#if t.hal_id}
 										<a href={halDocUrl(t.hal_id, t.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {t.hal_id}">
-											<img src="https://hal.science/favicon.ico" alt="HAL" />
+											<img src="{base}/icons/hal.ico" alt="HAL" />
 										</a>
 									{:else}
 										<span class="source-tag source-placeholder"></span>
 									{/if}
 									{#if t.openalex_id}
 										<a href="https://openalex.org/{t.openalex_id}" target="_blank" rel="noopener" class="source-tag source-oa" title="OpenAlex: {t.openalex_id}">
-											<img src="https://raw.githubusercontent.com/ourresearch/openalex-gui/refs/heads/master/public/favicon.png" alt="OA" />
+											<img src="{base}/icons/openalex.png" alt="OA" />
 										</a>
 									{:else}
 										<span class="source-tag source-placeholder"></span>
@@ -988,42 +986,13 @@
 			{/if}
 			<div class="toolbar toolbar-card">
 				<input type="text" placeholder="Rechercher..." bind:value={personsSearch} oninput={() => { clearTimeout(personsSearchTimer); personsSearchTimer = setTimeout(() => { personsPage = 1; loadPersons(); }, 300); }} />
+				<PresenceFilterToggle label="Identifiants" items={IDENTIFIER_ITEMS} bind:states={idStates} counts={idCounts} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
+				<FacetDropdown label="Fonction" options={roleOptions} searchable bind:selected={selectedRoles} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
+				<FacetDropdown label="Département" options={deptOptions} searchable bind:selected={selectedDepts} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
 				<FacetDropdown label="Base RH" options={rhOptions} bind:selected={selectedRh} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
-				<FacetDropdown label="ORCID" options={orcidOptions} bind:selected={selectedOrcid} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
-				<FacetDropdown label="idHAL" options={idhalOptions} bind:selected={selectedIdhal} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
 				<span class="count">{personsTotal} personne{personsTotal > 1 ? 's' : ''}</span>
 			</div>
-			<table>
-				<thead>
-					<tr>
-						<th class="sortable" onclick={() => togglePersonsSort('name')}>Nom{sortIndicator('name')}</th>
-						<th>ORCID</th>
-						<th class="sortable" onclick={() => togglePersonsSort('role')}>Fonction{sortIndicator('role')}</th>
-						<th class="sortable" onclick={() => togglePersonsSort('dept')}>Département{sortIndicator('dept')}</th>
-						<th class="sortable" style="width:80px" onclick={() => togglePersonsSort('pubs')}>Publications{sortIndicator('pubs')}</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#if persons.length === 0}
-						<tr><td colspan="5" class="no-results">Aucune personne trouvée</td></tr>
-					{:else}
-						{#each persons as p (p.id)}
-							<tr>
-								<td>
-									<a href="{base}/persons/{p.id}" class="person-link">
-										{p.first_name} <span class="person-last">{p.last_name}</span>
-									</a>
-									{#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
-								</td>
-								<td>{#each p.orcids || [] as oid}<a href="https://orcid.org/{oid.value}" target="_blank" rel="noopener" class="id-badge" class:id-confirmed={oid.confirmed}>{oid.value}</a>{/each}</td>
-								<td class="muted-cell">{p.role_title || ''}</td>
-								<td class="muted-cell">{p.department_name || ''}</td>
-								<td>{p.pub_count}</td>
-							</tr>
-						{/each}
-					{/if}
-				</tbody>
-			</table>
+			<PersonsTable persons={persons} sort={personsSort} onSortChange={onPersonsSortChange} />
 			<Pagination page={personsPage} pages={personsPages} onchange={(p) => { personsPage = p; syncUrl(); loadPersons(); }} />
 		</div>
 	{/if}

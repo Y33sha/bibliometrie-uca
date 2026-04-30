@@ -1,6 +1,9 @@
 """Détail d'une personne : profil, auteurs liés, thèses encadrées, adresses (§2.12 : async)."""
 
+import datetime
 from typing import Any
+
+from infrastructure.db.queries.filters import OA_CLOSED_SQL
 
 
 async def get_person(cur: Any, person_id: int) -> dict[str, Any] | None:
@@ -266,4 +269,76 @@ async def person_addresses(cur: Any, person_id: int, *, page: int, per_page: int
         "page": page,
         "pages": pages,
         "addresses": await cur.fetchall(),
+    }
+
+
+async def person_subjects(cur: Any, person_id: int, *, limit: int = 30) -> list[dict[str, Any]]:
+    """Top sujets des publications d'une personne, ordonnés par fréquence.
+
+    Exclut les sujets trop génériques (`subjects.usage_count` > 5000).
+    """
+    await cur.execute(
+        """
+        SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS count
+        FROM authorships a
+        JOIN publications p ON p.id = a.publication_id
+        JOIN publication_subjects ps ON ps.publication_id = p.id
+        JOIN subjects s ON s.id = ps.subject_id
+        WHERE a.person_id = %s
+          AND a.roles && ARRAY['author']::text[]
+          AND p.doc_type NOT IN ('peer_review', 'memoir', 'ongoing_thesis')
+          AND s.usage_count <= 5000
+        GROUP BY s.id, s.label, s.ontologies
+        ORDER BY count DESC, lower(s.label)
+        LIMIT %s
+        """,
+        (person_id, limit),
+    )
+    return [dict(r) for r in await cur.fetchall()]
+
+
+async def person_dashboard(cur: Any, person_id: int) -> dict[str, Any]:
+    """Dashboard personne : publis/an + répartition Open Access."""
+    current_year = datetime.date.today().year
+
+    await cur.execute(
+        """
+        SELECT p.pub_year, COUNT(DISTINCT p.id) AS count
+        FROM publications p
+        JOIN authorships a ON a.publication_id = p.id
+        WHERE a.person_id = %s
+          AND a.roles && ARRAY['author']::text[]
+          AND p.pub_year IS NOT NULL
+          AND p.pub_year >= %s
+        GROUP BY p.pub_year
+        ORDER BY p.pub_year
+        """,
+        (person_id, current_year - 6),
+    )
+    pubs_by_year = [{"year": r["pub_year"], "count": r["count"]} for r in await cur.fetchall()]
+
+    await cur.execute(
+        f"""
+        SELECT
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status NOT IN {OA_CLOSED_SQL} AND p.oa_status IS NOT NULL) AS open_access,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown' OR p.oa_status IS NULL) AS unknown,
+            COUNT(DISTINCT p.id) AS total
+        FROM publications p
+        JOIN authorships a ON a.publication_id = p.id
+        WHERE a.person_id = %s
+          AND a.roles && ARRAY['author']::text[]
+        """,
+        (person_id,),
+    )
+    oa = await cur.fetchone()
+
+    return {
+        "pubs_by_year": pubs_by_year,
+        "oa": {
+            "open_access": oa["open_access"],
+            "closed": oa["closed"],
+            "unknown": oa["unknown"],
+            "total": oa["total"],
+        },
     }

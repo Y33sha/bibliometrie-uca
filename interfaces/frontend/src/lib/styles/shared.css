@@ -250,6 +250,17 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 	margin-left: 4px;
 }
 
+/* ── Pub table column widths ── */
+/* width: 100% sur le th = idiome HTML table « cette colonne absorbe
+   tout le restant ». Combiné avec width: 1px sur Revue (shrink) et
+   widths fixes sur les autres, le titre prend la place résiduelle. */
+.pub-col-title { width: 100%; }
+/* width: 1px = idiome HTML table « shrink to content » : la colonne
+   se rétrécit à la largeur de son contenu (le span .journal-clip plafonné
+   à 200px), au lieu de prendre la largeur naturelle du texte non wrappé. */
+.pub-col-journal { font-size: 0.9em; width: 1px; }
+.journal-clip { display: inline-block; max-width: 200px; }
+
 /* ── ID badge ── */
 .id-badge {
 	display: inline-block;
@@ -264,6 +275,30 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 .id-badge:hover { background: #d4e4f3; color: var(--accent); text-decoration: none; }
 .id-badge.id-confirmed { background: #e6f4ec; color: #2a7d4f; }
 .id-badge.id-confirmed:hover { background: #d0eadb; color: #2a7d4f; }
+
+/* ── ID icons (round, ORCID/idHAL/IdRef) ── */
+.id-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	text-decoration: none;
+	vertical-align: middle;
+	transition: transform 0.1s;
+	flex-shrink: 0;
+}
+.id-icon:hover { transform: scale(1.15); }
+.id-icon img { width: 14px; height: 14px; display: block; }
+.id-orcid { background: #f0f7e0; }
+.id-orcid:hover { background: #e3ecc8; }
+.id-hal { background: #e8f0f8; }
+.id-hal:hover { background: #d0e3f4; }
+.id-idref { background: #fdeae5; }
+.id-idref:hover { background: #f9d4ca; }
+.id-icon:not(.id-confirmed) { opacity: 0.5; }
+.id-placeholder { visibility: hidden; }
 
 /* ── Source icon tags (round) ── */
 .source-tag {
@@ -529,9 +564,7 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 .pub-title {
 	font-weight: 500;
 	color: var(--accent);
-	max-width: 500px;
 	text-decoration: none;
-	display: inline-block;
 }
 .pub-title:hover { text-decoration: underline; }
 .journal-cell { font-size: 0.85rem; color: var(--muted); }

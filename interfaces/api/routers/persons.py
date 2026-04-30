@@ -78,6 +78,7 @@ from interfaces.api.models import (
     OrphanBatchAssignResponse,
     OrphanCountResponse,
     PersonAddressesResponse,
+    PersonDashboardResponse,
     PersonDetail,
     PersonDirectoryResponse,
     PersonListResponse,
@@ -90,6 +91,7 @@ from interfaces.api.models import (
     RejectPerson,
     RemovedResponse,
     RoleCount,
+    SubjectFrequency,
     UpdateIdentifierStatus,
     UpdatePersonName,
 )
@@ -110,6 +112,7 @@ async def persons_directory(
     role: str = Query(""),
     has_orcid: str = Query(""),
     has_idhal: str = Query(""),
+    has_idref: str = Query(""),
     has_rh: str = Query(""),
     sort: str = Query("name"),
 ) -> Any:
@@ -120,6 +123,7 @@ async def persons_directory(
         roles=parse_str_csv(role),
         has_orcid=has_orcid,
         has_idhal=has_idhal,
+        has_idref=has_idref,
         has_rh=has_rh,
     )
     async with get_async_cursor() as (cur, _conn):
@@ -172,6 +176,7 @@ async def persons_facets(
     role: str = Query(""),
     has_orcid: str = Query(""),
     has_idhal: str = Query(""),
+    has_idref: str = Query(""),
     has_rh: str = Query(""),
     linked: str = Query(""),
 ) -> Any:
@@ -181,6 +186,7 @@ async def persons_facets(
         roles=parse_str_csv(role),
         has_orcid=has_orcid,
         has_idhal=has_idhal,
+        has_idref=has_idref,
         has_rh=has_rh,
         linked=linked,
     )
@@ -245,6 +251,20 @@ async def person_addresses(
     """Adresses distinctes utilisées dans les authorships sources de cette personne."""
     async with get_async_cursor() as (cur, _conn):
         return await persons_queries.person_addresses(cur, person_id, page=page, per_page=per_page)
+
+
+@router.get("/api/persons/{person_id}/dashboard", response_model=PersonDashboardResponse)
+async def person_dashboard(person_id: int) -> Any:
+    """Dashboard personne : publis/an + Open Access."""
+    async with get_async_cursor() as (cur, _conn):
+        return await persons_queries.person_dashboard(cur, person_id)
+
+
+@router.get("/api/persons/{person_id}/subjects", response_model=list[SubjectFrequency])
+async def person_subjects(person_id: int, limit: int = Query(30, ge=1, le=100)) -> Any:
+    """Top sujets des publications de cette personne (nuage de mots)."""
+    async with get_async_cursor() as (cur, _conn):
+        return await persons_queries.person_subjects(cur, person_id, limit=limit)
 
 
 # ── Gestion des identifiants ─────────────────────────────────────

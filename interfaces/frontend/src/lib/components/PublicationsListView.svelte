@@ -4,7 +4,8 @@
 	import { base } from '$app/paths';
 	import { sanitizeTitle, halDocUrl, scanrPubUrl } from '$lib/utils';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import SourceFilterToggle from '$lib/components/SourceFilterToggle.svelte';
+	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
+	import { SOURCE_ITEMS } from '$lib/filterItems';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { docTypeLabelsMap, oaLabelsMap, typeLabels } from '$lib/labels';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
@@ -52,10 +53,10 @@
 
 	// --- Column visibility ---
 	const cv = useColumnVisibility([
-		{ key: 'title',   label: 'Titre',    fixed: true },
-		{ key: 'journal', label: 'Revue' },
 		{ key: 'type',    label: 'Type' },
 		{ key: 'year',    label: 'Année' },
+		{ key: 'title',   label: 'Titre',    fixed: true },
+		{ key: 'journal', label: 'Revue' },
 		{ key: 'labs',    label: 'Labo(s)' },
 		{ key: 'apc',     label: 'APC' },
 		{ key: 'oa',      label: 'OA' },
@@ -296,14 +297,14 @@
 
 <div class="toolbar toolbar-card toolbar-sticky">
 	<input type="text" placeholder="Rechercher par titre..." bind:value={search} oninput={onSearchInput} />
+	{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
 	{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
 	{#if col('labs')}<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />{/if}
-	{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
 	{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
 	{#if col('oa_path')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
 	{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />{/if}
 	<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
-	<SourceFilterToggle bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
+	<PresenceFilterToggle label="Sources" items={SOURCE_ITEMS} bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
 	<span class="count">{pubs.total} publication{pubs.total > 1 ? 's' : ''}</span>
 	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 </div>
@@ -311,14 +312,14 @@
 <table class="pub-table">
 	<thead>
 		<tr>
-			<th class="sortable pub-col-title" class:active={titleSortActive} onclick={toggleSortTitle}>
-				Titre <span class="sort-arrow">{titleSortArrow}</span>
-			</th>
-			{#if col('journal')}<th class="pub-col-journal">Revue</th>{/if}
 			{#if col('type')}<th style="width:80px">Type</th>{/if}
 			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSortActive} onclick={toggleSortYear}>
 				An. <span class="sort-arrow">{yearSortArrow}</span>
 			</th>{/if}
+			<th class="sortable pub-col-title" class:active={titleSortActive} onclick={toggleSortTitle}>
+				Titre <span class="sort-arrow">{titleSortArrow}</span>
+			</th>
+			{#if col('journal')}<th class="pub-col-journal">Revue</th>{/if}
 			{#if col('labs')}<th style="width:80px">Labo(s)</th>{/if}
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSortActive} onclick={toggleSortApc}>
 				APC <span class="sort-arrow">{apcSortArrow}</span>
@@ -340,12 +341,12 @@
 		{:else}
 			{#each pubs.items as p (p.id)}
 				<tr>
-					<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
-					{#if col('journal')}<td class="journal-cell pub-col-journal">{p.journal || ''}</td>{/if}
 					{#if col('type')}<td>
 						<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
 					</td>{/if}
 					{#if col('year')}<td>{p.pub_year || ''}</td>{/if}
+					<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
+					{#if col('journal')}<td class="journal-cell pub-col-journal"><span class="journal-clip">{p.journal || ''}</span></td>{/if}
 					{#if col('labs')}<td>
 						{#each p.lab_items || [] as lab}
 							<a href="{base}/laboratories/{lab.id}" class="lab-tag">{lab.label}</a>
@@ -386,14 +387,14 @@
 					<td class="links-cell">
 						{#if p.hal_id}
 							<a href={halDocUrl(p.hal_id, p.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
-								<img src="https://hal.science/favicon.ico" alt="HAL" />
+								<img src="{base}/icons/hal.ico" alt="HAL" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 						{#if p.openalex_id}
 							<a href="https://openalex.org/{p.openalex_id}" target="_blank" rel="noopener" class="source-tag source-oa" title="OpenAlex: {p.openalex_id}">
-								<img src="https://raw.githubusercontent.com/ourresearch/openalex-gui/refs/heads/master/public/favicon.png" alt="OA" />
+								<img src="{base}/icons/openalex.png" alt="OA" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
@@ -407,7 +408,7 @@
 						{/if}
 						{#if p.wos_id}
 							<a href="https://www.webofscience.com/wos/woscc/full-record/{p.wos_id}" target="_blank" rel="noopener" class="source-tag source-wos" title="WoS: {p.wos_id}">
-								<img src="https://www.webofscience.com/favicon.ico" alt="WoS" />
+								<img src="{base}/icons/wos.ico" alt="WoS" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
@@ -472,10 +473,4 @@
 	}
 	.pub-table tr:hover td { background: #fafaf8; }
 	.col-menu-th { position: relative; }
-	/* Titre : prend au moins 30 % de la largeur pour rester lisible
-	   quand plusieurs colonnes optionnelles sont affichées. */
-	.pub-col-title { min-width: 30%; }
-	/* Revue : texte plus petit (le titre de revue est secondaire par
-	   rapport au titre de publi). */
-	.pub-table td.pub-col-journal { font-size: 0.9em; }
 </style>

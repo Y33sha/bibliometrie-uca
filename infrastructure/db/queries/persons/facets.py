@@ -16,6 +16,7 @@ class FacetFilters:
     roles: list[str] = field(default_factory=list)
     has_orcid: str = ""
     has_idhal: str = ""
+    has_idref: str = ""
     has_rh: str = ""
     linked: str = ""
 
@@ -32,10 +33,10 @@ async def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
         if skip != "role" and filters.roles:
             conds.append("prh.role_title = ANY(%s)")
             params.append(filters.roles)
-        if skip != "has_orcid":
+        if skip != "ids":
             apply_person_has_identifier_filter(conds, "orcid", filters.has_orcid)
-        if skip != "has_idhal":
             apply_person_has_identifier_filter(conds, "idhal", filters.has_idhal)
+            apply_person_has_identifier_filter(conds, "idref", filters.has_idref)
         if skip != "has_rh":
             apply_person_has_rh_filter(conds, filters.has_rh)
         if skip != "linked":
@@ -73,7 +74,7 @@ async def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
     role_facets = await cur.fetchall()
 
     # ORCID
-    c, p = base_filters(skip="has_orcid")
+    c, p = base_filters(skip="ids")
     where = ("WHERE " + " AND ".join(c)) if c else ""
     await cur.execute(
         f"""
@@ -93,7 +94,7 @@ async def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
     orcid_counts = await cur.fetchone()
 
     # IDHAL
-    c, p = base_filters(skip="has_idhal")
+    c, p = base_filters(skip="ids")
     where = ("WHERE " + " AND ".join(c)) if c else ""
     await cur.execute(
         f"""
@@ -109,6 +110,24 @@ async def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
         p,
     )
     idhal_counts = await cur.fetchone()
+
+    # IDREF
+    c, p = base_filters(skip="ids")
+    where = ("WHERE " + " AND ".join(c)) if c else ""
+    await cur.execute(
+        f"""
+        SELECT
+            COUNT(*) FILTER (WHERE
+                EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idref' AND pi.status != 'rejected')
+            ) AS yes,
+            COUNT(*) FILTER (WHERE
+                NOT EXISTS (SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.id_type = 'idref' AND pi.status != 'rejected')
+            ) AS no
+        FROM {base_from} {where}
+        """,
+        p,
+    )
+    idref_counts = await cur.fetchone()
 
     # RH
     c, p = base_filters(skip="has_rh")
@@ -147,6 +166,7 @@ async def persons_facets(cur: Any, *, filters: FacetFilters) -> dict[str, Any]:
         "roles": role_facets,
         "orcid": {"yes": orcid_counts["yes"], "no": orcid_counts["no"]},
         "idhal": {"yes": idhal_counts["yes"], "no": idhal_counts["no"]},
+        "idref": {"yes": idref_counts["yes"], "no": idref_counts["no"]},
         "rh": {"yes": rh_counts["yes"], "no": rh_counts["no"]},
         "linked": {"yes": linked_counts["yes"], "no": linked_counts["no"]},
     }
