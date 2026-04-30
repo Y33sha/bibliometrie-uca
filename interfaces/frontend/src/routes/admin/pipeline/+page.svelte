@@ -6,6 +6,8 @@
   type Report = components["schemas"]["PipelineReportItem"];
   type PipelineStatus = components["schemas"]["PipelineStatus"];
 
+  const PAGE_SIZE = 30;
+
   let reports: Report[] = $state([]);
   let selectedReport: string | null = $state(null);
   let reportContent: string = $state("");
@@ -13,31 +15,15 @@
   let loading = $state(false);
   let pipelineStatus: PipelineStatus | null = $state(null);
   let statusInterval: ReturnType<typeof setInterval> | null = null;
-  let activeTab: "reports" | "logs" = $state("reports");
-  let cronLog: string = $state("");
-  let logInterval: ReturnType<typeof setInterval> | null = null;
+  let page = $state(1);
+
+  const totalPages = $derived(Math.max(1, Math.ceil(reports.length / PAGE_SIZE)));
+  const pagedReports = $derived(reports.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
 
   async function pollStatus() {
     try {
       pipelineStatus = await api<PipelineStatus | null>("/api/admin/pipeline/status");
     } catch { pipelineStatus = null; }
-  }
-
-  async function loadLogs() {
-    try {
-      const data = await api<{ content: string }>("/api/admin/pipeline/logs?lines=200");
-      cronLog = data.content;
-    } catch { cronLog = ""; }
-  }
-
-  function switchTab(tab: "reports" | "logs") {
-    activeTab = tab;
-    if (tab === "logs") {
-      loadLogs();
-      logInterval = setInterval(loadLogs, 5000);
-    } else {
-      if (logInterval) { clearInterval(logInterval); logInterval = null; }
-    }
   }
 
   function elapsed(isoDate: string): string {
@@ -167,18 +153,13 @@
 
   onDestroy(() => {
     if (statusInterval) clearInterval(statusInterval);
-    if (logInterval) clearInterval(logInterval);
   });
 </script>
 
 <svelte:head><title>Pipeline — Bibliométrie UCA</title></svelte:head>
 
 <div class="page-header">
-  <h2>Pipeline</h2>
-  <div class="tabs">
-    <button class="tab" class:active={activeTab === "reports"} onclick={() => switchTab("reports")}>Rapports</button>
-    <button class="tab" class:active={activeTab === "logs"} onclick={() => switchTab("logs")}>Logs</button>
-  </div>
+  <h2>Pipeline — rapports</h2>
 </div>
 
 {#if pipelineStatus?.running}
@@ -191,43 +172,48 @@
   </div>
 {/if}
 
-{#if activeTab === "reports"}
-  <div class="layout">
-    <div class="report-list">
-      {#if reports.length === 0}
-        <p class="empty">Aucun rapport disponible.</p>
-      {:else}
-        {#each reports as r (r.filename)}
-          <button
-            class="report-item"
-            class:active={selectedReport === r.filename}
-            onclick={() => selectReport(r.filename)}
-          >
-            {r.label}
-          </button>
-        {/each}
-      {/if}
-    </div>
-
-    <div class="report-content">
-      {#if loading}
-        <p class="loading">Chargement...</p>
-      {:else if renderedHtml}
-        {@html renderedHtml}
-      {:else}
-        <p class="empty">Sélectionner un rapport dans la liste.</p>
-      {/if}
-    </div>
-  </div>
-{:else}
-  <div class="log-container">
-    {#if cronLog}
-      <pre class="cron-log">{cronLog}</pre>
+<div class="layout">
+  <div class="report-list">
+    {#if reports.length === 0}
+      <p class="empty">Aucun rapport disponible.</p>
     {:else}
-      <p class="empty">Aucun log disponible.</p>
+      {#each pagedReports as r (r.filename)}
+        <button
+          class="report-item"
+          class:active={selectedReport === r.filename}
+          onclick={() => selectReport(r.filename)}
+        >
+          {r.label}
+        </button>
+      {/each}
+      {#if totalPages > 1}
+        <div class="pager">
+          <button
+            class="pager-btn"
+            disabled={page === 1}
+            onclick={() => (page = Math.max(1, page - 1))}
+          >‹ Préc.</button>
+          <span class="pager-info">{page} / {totalPages}</span>
+          <button
+            class="pager-btn"
+            disabled={page === totalPages}
+            onclick={() => (page = Math.min(totalPages, page + 1))}
+          >Suiv. ›</button>
+        </div>
+      {/if}
     {/if}
   </div>
-{/if}
+
+  <div class="report-content">
+    {#if loading}
+      <p class="loading">Chargement...</p>
+    {:else if renderedHtml}
+      {@html renderedHtml}
+    {:else}
+      <p class="empty">Sélectionner un rapport dans la liste.</p>
+    {/if}
+  </div>
+</div>
 
 <style>
   .page-header {
@@ -239,25 +225,6 @@
   .page-header h2 {
     font-size: 1.2rem;
     margin: 0;
-  }
-  .tabs {
-    display: flex;
-    gap: 4px;
-  }
-  .tab {
-    padding: 4px 12px;
-    font-size: 0.8rem;
-    font-family: inherit;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--card);
-    cursor: pointer;
-  }
-  .tab:hover { background: var(--hover); }
-  .tab.active {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
   }
   .layout {
     display: flex;
@@ -411,20 +378,35 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.3; }
   }
-  .log-container {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 12px;
-    min-height: 300px;
+  .pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
   }
-  .cron-log {
+  .pager-btn {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--card);
+    cursor: pointer;
+  }
+  .pager-btn:hover:not(:disabled) {
+    background: var(--hover);
+  }
+  .pager-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .pager-info {
+    font-size: 0.8rem;
+    color: var(--muted);
     font-family: "JetBrains Mono", monospace;
-    font-size: 0.75rem;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    word-break: break-all;
-    margin: 0;
   }
   .empty, .loading {
     color: var(--muted);
