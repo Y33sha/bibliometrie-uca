@@ -154,14 +154,22 @@ Endpoints et UI pour les nuages de sujets sur les pages structure et personne.
 - [x] Index trigram sur `subjects.label` (migration `018`) : index `subjects_label_norm_trgm_idx` en GIN trigram sur `normalize_name_form(label)` (fonction SQL IMMUTABLE déjà présente dans le schéma, équivalente à `normalize_text` côté Python — ce qui unifie la normalisation côté `publications.title_normalized` et côté sujets).
 - [x] Côté requête : la recherche sur titre passe désormais par `p.title_normalized ILIKE %s` (touche `idx_pub_title_trgm` existant) et le pattern est lui-même normalisé via `normalize_text` côté Python pour rester aligné des deux côtés.
 
-### Phase 8 — Tests de non-régression
+### Phase 8 — Tests de non-régression — couverte (audit final 2026-04-30)
 
-À chaque phase, ajouter les tests pertinents (pattern `feedback_regression_tests`). En particulier :
+À chaque phase, les tests pertinents ont été ajoutés au fil de l'eau (pattern `feedback_regression_tests`). Audit final :
 
-- [ ] Tests d'ingestion par source (échantillons fixtures pour chaque source).
-- [ ] Test d'idempotence : ingérer deux fois la même publi ne duplique pas les liens.
-- [ ] Test API : la page publication renvoie des sujets dédupliqués.
-- [ ] Test agrégat personne/structure : pondération correcte, périmètre UCA respecté.
+- [x] **Tests d'ingestion par source** — `tests/integration/pipeline/test_subjects_ingest.py` (15 tests, 6 sources : HAL, OpenAlex, WoS, CrossRef, Theses, ScanR).
+- [x] **Idempotence** : la duplication des liens est interdite par la PK `publication_subjects(publication_id, subject_id, source)` (constraint DB), confirmée fonctionnellement par `test_subjects_ingest.py::TestRunOrchestrator::test_clears_and_reingests` + `test_cooccurrences.py` (recompute appelé 2x).
+- [x] **Page publi : sujets dédupliqués** — `test_publications_detail.py::TestGetPublicationSubjects` (4 tests dont `test_dedup_aggregates_sources` et `test_orders_concepts_before_free`).
+- [x] **Agrégat structure** : `test_laboratories.py::TestGetLaboratorySubjects` (top par fréquence + exclusion peer_review/memoir/ongoing_thesis ; périmètre via `_setup_perimeter`).
+- [ ] Agrégat personne — sans objet tant que le dashboard `/persons/[id]` n'existe pas (cf Phase 6).
+
+Tests "bonus" présents au-delà du périmètre Phase 8 :
+
+- `test_subjects.py::TestUpsertSubject` (10 tests : merge JSONB, casse, dédup whitespace, idempotence, level/parent par ontologie) ;
+- `test_subjects.py::TestLinkAndClear` (5 tests sur `publication_subjects`) ;
+- `test_subjects_lookup.py` (liste/voisins/recherche par label) ;
+- `test_publications_list.py::TestSearch` (4 tests : matching titre, matching sujet, accents, priorisation titre>sujet).
 
 ## Pistes pour la suite
 
@@ -199,11 +207,10 @@ quand on construira les nuages personne/structure).
 - **Langue explicite des libres** : actuellement `language=null` pour tous les `kind='free'` afin de permettre la déduplication inter-sources sur `lower(label)` seul. On perd l'info de langue quand elle est explicite (HAL `en_keyword_s` / `fr_keyword_s`, theses systématiquement fr, OpenAlex/WoS/CrossRef ~en). Pour la conserver, deux pistes : (a) revenir au pattern `(lower(label), language)` avec convention 'en'/'fr'/null par source — implique des doublons artificiels à gérer aux frontières ; (b) ajouter une colonne `detected_languages text[]` qui agrège les langues observées sans entrer dans la dédup. À traiter avec le fix parenthèses HAL (même fichier `normalize_hal.py` impacté, et même besoin de repasse HAL pour propager).
 - **Hiérarchie OpenAlex écrasée par 15 doublons de `display_name`** : notre code utilise `lower(display_name)` comme `ontology_id`, donc les rares cas où OpenAlex a deux entités distinctes avec le même libellé sont fusionnés silencieusement à l'ingestion. Cas observés (avr 2026) sur 4783 entités OpenAlex : 6 paires topic/topic, 8 paires subfield/subfield, 1 paire field/domain (`Social Sciences`). Conséquence : `usage_count` gonflé (somme de deux niveaux) et `parent_id` ne pointe que vers un parent. Fix : basculer sur les IDs OpenAlex stables (ex `T10138`) à la place de `lower(display_name)`. Implique : (1) étendre `extract_topics` dans `normalize_openalex.py` pour conserver les IDs ; (2) re-fetch OpenAlex puisque le `raw_data` du staging est vidé ; (3) migration des `ontology_id` existants. À planifier en même temps qu'une repasse OpenAlex complète.
 
-## État du chantier (2026-04-30)
+## État du chantier (2026-04-30) — terminé
 
-- Phases 1, 2, 3, 4, 5, 7 entièrement faites. Phase 3 close sans suite après audit (CrossRef n'expose plus de sujets exploitables).
+- Phases 1, 2, 3, 4, 5, 7, 8 entièrement faites. Phase 3 close sans suite après audit (CrossRef n'expose plus de sujets exploitables) ; Phase 8 confirmée couverte par les tests écrits au fil des phases.
 - Phase 6 : nuage labo livré ; nuage personne en attente du dashboard `/persons/[id]` (non bloquant — reprise triviale en s'inspirant de la version labo lorsque ce dashboard existera).
-- Phase 8 (tests de non-régression) reste à traiter — devrait être surtout un audit confirmatoire des tests déjà écrits dans les phases précédentes.
 
 Points ouverts résiduels (hors chantier) : repasse HAL pour le bug parenthèses, repasse OpenAlex pour passer aux IDs stables, langues explicites des libres, curation manuelle (cf. § Risques).
 
