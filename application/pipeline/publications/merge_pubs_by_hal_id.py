@@ -30,33 +30,43 @@ def find_duplicates(
     Retourne deux listes :
       - `link_only` : HAL sans publication_id → lier à la publication source
       - `merge_needed` : publications distinctes à fusionner
-    """
-    src_by_halid: dict[str, dict[str, Any]] = {}
-    for r in queries.fetch_source_publications_with_hal_external_id(cur):
-        hid = r["hal_id"]
-        if hid not in src_by_halid:
-            src_by_halid[hid] = {
-                "source": r["source"],
-                "src_doc_id": r["src_doc_id"],
-                "src_id": r["src_id"],
-                "src_pub_id": r["src_pub_id"],
-            }
 
+    Itère sur **toutes** les lignes non-HAL : un même hal_id peut être porté par
+    plusieurs sources (OpenAlex + ScanR) pointant vers des publications distinctes,
+    et il faut traiter chacune.
+    """
     hal_by_id = {r["halid"]: r for r in queries.fetch_hal_source_publications(cur)}
 
     link_only: list[dict[str, Any]] = []
     merge_needed: list[dict[str, Any]] = []
+    seen_link: set[int] = set()
+    seen_merge: set[tuple[int, int]] = set()
 
-    for hid, src_info in src_by_halid.items():
+    for r in queries.fetch_source_publications_with_hal_external_id(cur):
+        hid = r["hal_id"]
         if hid not in hal_by_id:
             continue
         hal_info = hal_by_id[hid]
         hal_pub = hal_info["hal_pub_id"]
-        src_pub = src_info["src_pub_id"]
+        src_pub = r["src_pub_id"]
+        src_info = {
+            "source": r["source"],
+            "src_doc_id": r["src_doc_id"],
+            "src_id": r["src_id"],
+            "src_pub_id": src_pub,
+        }
 
         if hal_pub is None and src_pub is not None:
+            hal_doc_id = hal_info["hal_doc_id"]
+            if hal_doc_id in seen_link:
+                continue
+            seen_link.add(hal_doc_id)
             link_only.append({**src_info, **hal_info, "halid": hid})
         elif hal_pub is not None and src_pub is not None and hal_pub != src_pub:
+            pair = (src_pub, hal_pub)
+            if pair in seen_merge:
+                continue
+            seen_merge.add(pair)
             merge_needed.append({**src_info, **hal_info, "halid": hid})
 
     return link_only, merge_needed
