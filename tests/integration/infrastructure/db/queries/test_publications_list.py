@@ -94,6 +94,30 @@ class TestSearch:
         ids = [p["id"] for p in res["publications"]]
         assert pub in ids and unrelated not in ids
 
+    async def test_title_match_ranks_before_subject_only_match(self, async_db):
+        """Les publis dont le titre matche remontent avant celles qui ne
+        matchent que via un sujet — quitte à casser l'ordre par défaut."""
+        lab = await _create_lab(async_db)
+        # Titre contient "quantum"
+        title_match = await _create_pub(async_db, "Quantum entanglement basics")
+        # Titre ne contient pas "quantum", mais sujet associé oui
+        subject_match = await _create_pub(async_db, "Foo bar baz")
+        await _attach(async_db, title_match, lab)
+        await _attach(async_db, subject_match, lab)
+        sid = await _create_subject(async_db, "Quantum mechanics")
+        await _link_subject(async_db, subject_match, sid)
+
+        res = await list_publications(
+            async_db,
+            filters=ListFilters(search="quantum", lab_ids=[lab]),
+            root_structure_id=0,
+            page=1,
+            per_page=50,
+            sort="year_desc",
+        )
+        ids = [p["id"] for p in res["publications"]]
+        assert ids.index(title_match) < ids.index(subject_match)
+
     async def test_search_unaccented_matches_accented_label(self, async_db):
         """Les accents ne doivent pas bloquer le match (ILIKE + unaccent)."""
         lab = await _create_lab(async_db)

@@ -198,6 +198,14 @@ async def list_publications(
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
     order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
 
+    # Quand la recherche match un sujet (cf. _apply_inline_filters), on remonte
+    # d'abord les publis dont le *titre* match — les correspondances purement
+    # via sujet sont reléguées en deuxième.
+    order_params: list[Any] = []
+    if filters.search:
+        order = "(CASE WHEN unaccent(p.title) ILIKE unaccent(%s) THEN 0 ELSE 1 END), " + order
+        order_params.append(f"%{filters.search}%")
+
     await cur.execute(f"SELECT COUNT(*) FROM publications p WHERE {where_clause}", params)
     row = await cur.fetchone()
     total = row["count"]
@@ -283,7 +291,11 @@ async def list_publications(
         ORDER BY {order}
         LIMIT %s OFFSET %s
         """,
-        [filters.person_id, filters.person_id] + extra_lab_params + params + [per_page, offset],
+        [filters.person_id, filters.person_id]
+        + extra_lab_params
+        + params
+        + order_params
+        + [per_page, offset],
     )
 
     publications = [
