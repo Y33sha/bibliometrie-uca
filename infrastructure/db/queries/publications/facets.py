@@ -257,16 +257,22 @@ class _PublicationFacetsBuilder:
             {"value": "no", "count": row["no_count"]},
         ]
 
-    async def _facet_source_counts(self) -> dict[str, int]:
+    async def _facet_source_counts(self) -> dict[str, dict[str, int]]:
+        """Counts {yes, no} par source, ignorant en bloc tous les filtres source."""
         c, p = self._conds_skipping("source")
         await self.cur.execute(
             f"""
             SELECT
-                COUNT(*) FILTER (WHERE p.sources @> ARRAY['hal'::source_type]) AS hal_count,
-                COUNT(*) FILTER (WHERE p.sources @> ARRAY['openalex'::source_type]) AS oa_count,
-                COUNT(*) FILTER (WHERE p.sources @> ARRAY['scanr'::source_type]) AS scanr_count,
-                COUNT(*) FILTER (WHERE p.sources @> ARRAY['wos'::source_type]) AS wos_count,
-                COUNT(*) FILTER (WHERE p.sources @> ARRAY['theses'::source_type]) AS theses_count
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['hal'::source_type]) AS hal_yes,
+                COUNT(*) FILTER (WHERE NOT p.sources @> ARRAY['hal'::source_type]) AS hal_no,
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['openalex'::source_type]) AS oa_yes,
+                COUNT(*) FILTER (WHERE NOT p.sources @> ARRAY['openalex'::source_type]) AS oa_no,
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['scanr'::source_type]) AS scanr_yes,
+                COUNT(*) FILTER (WHERE NOT p.sources @> ARRAY['scanr'::source_type]) AS scanr_no,
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['wos'::source_type]) AS wos_yes,
+                COUNT(*) FILTER (WHERE NOT p.sources @> ARRAY['wos'::source_type]) AS wos_no,
+                COUNT(*) FILTER (WHERE p.sources @> ARRAY['theses'::source_type]) AS theses_yes,
+                COUNT(*) FILTER (WHERE NOT p.sources @> ARRAY['theses'::source_type]) AS theses_no
             FROM publications p
             WHERE {self._where_sql(c)}
             """,
@@ -274,11 +280,11 @@ class _PublicationFacetsBuilder:
         )
         row = await self.cur.fetchone()
         return {
-            "hal": row["hal_count"],
-            "oa": row["oa_count"],
-            "scanr": row["scanr_count"],
-            "wos": row["wos_count"],
-            "theses": row["theses_count"],
+            "hal": {"yes": row["hal_yes"], "no": row["hal_no"]},
+            "oa": {"yes": row["oa_yes"], "no": row["oa_no"]},
+            "scanr": {"yes": row["scanr_yes"], "no": row["scanr_no"]},
+            "wos": {"yes": row["wos_yes"], "no": row["wos_no"]},
+            "theses": {"yes": row["theses_yes"], "no": row["theses_no"]},
         }
 
     async def _facet_apc(self) -> list[dict[str, Any]]:
@@ -401,7 +407,10 @@ class _PublicationFacetsBuilder:
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM source_publications sd
                         WHERE sd.publication_id = p.id AND sd.source = 'hal'
-                          AND (sd.hal_collections IS NULL OR NOT sd.hal_collections @> ARRAY[%s])
+                    ) AND NOT EXISTS (
+                        SELECT 1 FROM source_publications sd
+                        WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                          AND sd.hal_collections @> ARRAY[%s]
                     )) AS hors_collection,
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM source_publications sd

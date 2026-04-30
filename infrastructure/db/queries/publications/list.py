@@ -294,9 +294,14 @@ async def list_publications(
                 max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
                 max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
                 max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id,
-                (SELECT sd2.hal_collections FROM source_publications sd2
-                 WHERE sd2.publication_id = p.id AND sd2.source = 'hal'
-                 LIMIT 1) AS hal_collections
+                -- Union des collections de toutes les entrées HAL : une
+                -- publication peut avoir plusieurs dépôts HAL (~764 cas en
+                -- base) et le frontend doit voir l'ensemble pour calculer
+                -- correctement le statut HAL par rapport à la collection
+                -- d'un labo.
+                (SELECT array_agg(DISTINCT col) FROM source_publications sd2,
+                        unnest(COALESCE(sd2.hal_collections, '{{}}'::text[])) AS col
+                 WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS hal_collections
             FROM source_publications sd WHERE sd.publication_id = p.id
         ) src_ids ON TRUE
         WHERE {where_clause}
