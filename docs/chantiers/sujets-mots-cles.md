@@ -103,12 +103,17 @@ Compromis pour la résolution de `ontology_id` :
 - OpenAlex : `lower(display_name)` faute d'ID extrait par normalize_openalex (à revoir si on étend la normalisation).
 - WoS / Theses (rameau, discipline) / ScanR : `lower(label)` faute d'ID exposé par la source.
 
-### Phase 3 — Combler CrossRef topics
+### Phase 3 — Combler CrossRef topics — clos sans suite (2026-04-30)
 
-L'audit a révélé que `topics` n'est pas extrait pour CrossRef. Vérifier si CrossRef expose des champs ontologiques exploitables (au-delà de `subject[]`) ; sinon documenter et clore.
+Audit réalisé sur 100 DOIs aléatoires CrossRef-sourcés via `interfaces/cli/audit_crossref_topics.py` (one-shot, conservé pour ré-audit éventuel) :
 
-- [ ] Audit ciblé du payload CrossRef.
-- [ ] Si un champ existe : étendre `normalize_crossref.py` puis l'ajouter à `ingest_crossref.py`.
+- `subject` est présent 100/100 fois mais **toujours vide** (`[]`). CrossRef a désactivé ce champ pour raisons de qualité et conserve la clé pour compatibilité.
+- Aucun autre champ ontologique dans le payload : pas de `topic`/`topics`, `keyword`/`keywords`, `concept`, `categories`, `discipline`, `tag`, `subject-category`, `scheme`. L'inventaire des clés top-level est limité aux métadonnées de publication (titre, auteurs, références, dates, ISSN, journal, funders…).
+
+Conclusion : rien à extraire au-delà de ce que tente déjà `normalize_crossref.py` (qui produit du vide). On garde l'extraction `subject` pour redémarrage automatique si CrossRef réactive la donnée, et on conserve le script d'audit pour ré-évaluation périodique.
+
+- [x] Audit ciblé du payload CrossRef → champ vide / pas d'alternative.
+- [x] Décision : pas d'extension de `normalize_crossref.py` ni d'`ingest_crossref.py`.
 
 ### Phase 4 — Exposition API + page publication
 
@@ -194,16 +199,13 @@ quand on construira les nuages personne/structure).
 - **Langue explicite des libres** : actuellement `language=null` pour tous les `kind='free'` afin de permettre la déduplication inter-sources sur `lower(label)` seul. On perd l'info de langue quand elle est explicite (HAL `en_keyword_s` / `fr_keyword_s`, theses systématiquement fr, OpenAlex/WoS/CrossRef ~en). Pour la conserver, deux pistes : (a) revenir au pattern `(lower(label), language)` avec convention 'en'/'fr'/null par source — implique des doublons artificiels à gérer aux frontières ; (b) ajouter une colonne `detected_languages text[]` qui agrège les langues observées sans entrer dans la dédup. À traiter avec le fix parenthèses HAL (même fichier `normalize_hal.py` impacté, et même besoin de repasse HAL pour propager).
 - **Hiérarchie OpenAlex écrasée par 15 doublons de `display_name`** : notre code utilise `lower(display_name)` comme `ontology_id`, donc les rares cas où OpenAlex a deux entités distinctes avec le même libellé sont fusionnés silencieusement à l'ingestion. Cas observés (avr 2026) sur 4783 entités OpenAlex : 6 paires topic/topic, 8 paires subfield/subfield, 1 paire field/domain (`Social Sciences`). Conséquence : `usage_count` gonflé (somme de deux niveaux) et `parent_id` ne pointe que vers un parent. Fix : basculer sur les IDs OpenAlex stables (ex `T10138`) à la place de `lower(display_name)`. Implique : (1) étendre `extract_topics` dans `normalize_openalex.py` pour conserver les IDs ; (2) re-fetch OpenAlex puisque le `raw_data` du staging est vidé ; (3) migration des `ontology_id` existants. À planifier en même temps qu'une repasse OpenAlex complète.
 
-## État du chantier (2026-04-29)
+## État du chantier (2026-04-30)
 
-- Phases 1, 2, 4, 5 entièrement faites.
+- Phases 1, 2, 3, 4, 5, 7 entièrement faites. Phase 3 close sans suite après audit (CrossRef n'expose plus de sujets exploitables).
 - Phase 6 : nuage labo livré ; nuage personne en attente du dashboard `/persons/[id]` (non bloquant — reprise triviale en s'inspirant de la version labo lorsque ce dashboard existera).
-- Phases 7 (recherche par sujet) et 8 (tests de non-régression) restent à traiter avant clôture.
+- Phase 8 (tests de non-régression) reste à traiter — devrait être surtout un audit confirmatoire des tests déjà écrits dans les phases précédentes.
 
-Reportés hors chantier :
-
-- Phase 3 (CrossRef topics) — opportuniste, à caser si on étend `normalize_crossref`.
-- Points ouverts résiduels : repasse HAL pour le bug parenthèses, repasse OpenAlex pour passer aux IDs stables, langues explicites des libres, curation manuelle (cf. § Risques).
+Points ouverts résiduels (hors chantier) : repasse HAL pour le bug parenthèses, repasse OpenAlex pour passer aux IDs stables, langues explicites des libres, curation manuelle (cf. § Risques).
 
 ## Ordre d'attaque historique
 
