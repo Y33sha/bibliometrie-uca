@@ -460,6 +460,66 @@ class StructureInfo(BaseModel):
     type: str
 
 
+class SubjectOntologyEntry(BaseModel):
+    """Annotation d'un sujet par une ontologie donnée :
+    - `codes` : codes intra-ontologie observés (ex 'info' pour HAL).
+    - `level` : niveau hiérarchique (0=racine), null si non applicable.
+    - `parent` : libellé du sujet parent dans la même ontologie, null si racine.
+    """
+
+    codes: list[str]
+    level: int | None = None
+    parent: str | None = None
+
+
+class SubjectOut(BaseModel):
+    """Sujet attaché à une publication, agrégé par `subject_id` sur les
+    différentes sources qui l'ont annoté.
+
+    `ontologies` : annotations multi-sources. Vide pour un libre.
+    """
+
+    id: int
+    label: str
+    language: str | None
+    ontologies: dict[str, SubjectOntologyEntry]
+    sources: list[str]  # publications sources qui ont annoté ce sujet
+
+
+class SubjectListItem(BaseModel):
+    """Sujet dans une liste paginée (page `/subjects`)."""
+
+    id: int
+    label: str
+    language: str | None
+    ontologies: dict[str, SubjectOntologyEntry]
+    usage_count: int
+
+
+class SubjectListResponse(BaseModel):
+    items: list[SubjectListItem]
+    total: int
+    page: int
+    per_page: int
+
+
+class SubjectNeighborOut(BaseModel):
+    """Voisin d'un sujet par co-occurrence."""
+
+    id: int
+    label: str
+    ontologies: dict[str, SubjectOntologyEntry]
+    usage_count: int
+    cooccurrence_count: int
+
+
+class SubjectDetailResponse(BaseModel):
+    """Détail d'un sujet + ses voisins par co-occurrence (page graphe)."""
+
+    subject: SubjectListItem
+    neighbors: list[SubjectNeighborOut]
+
+
 class PublicationDetailResponse(BaseModel):
     """Détail complet d'une publication : métadonnées + sources + authorships."""
 
@@ -472,6 +532,7 @@ class PublicationDetailResponse(BaseModel):
     theses_authorships: list[ThesesAuthorshipOut]
     thesis_meta: ThesisMeta | None
     structures: dict[str, StructureInfo]
+    subjects: list[SubjectOut]
 
 
 class ExcludeSourceAuthorshipResponse(BaseModel):
@@ -625,6 +686,16 @@ class LaboratoryDashboardResponse(BaseModel):
     oa: LabDashboardOa
     collab: LabDashboardCollab
     top_countries: list[LabTopCountry]
+
+
+class SubjectFrequency(BaseModel):
+    """Sujet avec fréquence locale (count des publis du contexte parent :
+    labo ou personne). Utilisé pour les nuages de mots."""
+
+    id: int
+    label: str
+    ontologies: dict[str, SubjectOntologyEntry]
+    count: int
 
 
 # ----- Addresses (output) -----

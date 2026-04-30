@@ -351,6 +351,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publications/export-theses.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Theses Csv
+         * @description Export CSV de la page thèses (filtres + tri identiques à la liste).
+         */
+        get: operations["export_theses_csv_api_publications_export_theses_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publications/{pub_id}": {
         parameters: {
             query?: never;
@@ -409,7 +429,8 @@ export interface paths {
          *     listes CSV ; `lab_id=none` = publications sans labo rattaché.
          *     `sort` : `year_desc` / `year_asc` / `title` / `cited_by`.
          *     `in_perimeter=yes|no|""` sélectionne les publications dont au
-         *     moins un auteur est in_perimeter.
+         *     moins un auteur est in_perimeter. `subject_id` filtre les
+         *     publications annotées par ce sujet.
          */
         get: operations["list_publications_api_publications_get"];
         put?: never;
@@ -925,6 +946,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/laboratories/{lab_id}/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Laboratory Subjects
+         * @description Top sujets des publications du labo (pour le nuage de mots dashboard).
+         */
+        get: operations["get_laboratory_subjects_api_laboratories__lab_id__subjects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/structures": {
         parameters: {
             query?: never;
@@ -1085,81 +1126,6 @@ export interface paths {
          *     elles-mêmes matcher l'adresse pour que cette forme active.
          */
         post: operations["create_name_form_api_name_forms_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/authorships/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Authorships Stats
-         * @description Compteurs globaux des authorships UCA (total, rattachées à une
-         *     personne, avec ORCID/idHAL).
-         *
-         *     `lab_id=0` (défaut) = périmètre UCA complet ; sinon restreint
-         *     au laboratoire donné.
-         */
-        get: operations["authorships_stats_api_authorships_stats_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/authorships/facets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Authorships Facets
-         * @description Facettes dynamiques (compteurs par valeur) pour la page admin authorships.
-         *
-         *     Chaque facette est calculée en « skip filter » : elle exclut le
-         *     filtre homonyme actif pour que l'utilisateur voie toujours les
-         *     autres valeurs disponibles. Paramètres `yes`/`no`/empty comme pour
-         *     le endpoint de liste.
-         */
-        get: operations["authorships_facets_api_authorships_facets_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/authorships": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Authorships
-         * @description Liste paginée des authorships UCA avec filtres admin.
-         *
-         *     `search` : portion de nom auteur (case/accent-insensible).
-         *     `linked=yes|no` : avec/sans person_id rattaché.
-         *     `has_orcid=yes|no`, `has_idhal=yes|no` : présence de ces
-         *     identifiants sur la personne liée. `lab_id=0` = pas de
-         *     restriction laboratoire.
-         */
-        get: operations["list_authorships_api_authorships_get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2304,6 +2270,9 @@ export interface paths {
         /**
          * Pipeline Status
          * @description Retourne le statut du pipeline en cours, ou null si aucun ne tourne.
+         *
+         *     Un status.json orphelin (PID mort) est traité comme "inactif" et
+         *     nettoyé par ``read_status``.
          */
         get: operations["pipeline_status_api_admin_pipeline_status_get"];
         put?: never;
@@ -2366,6 +2335,46 @@ export interface paths {
          * @description Retourne le contenu d'un rapport pipeline.
          */
         get: operations["get_report_api_admin_pipeline_reports__filename__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Subjects
+         * @description Liste paginée des sujets, ordonnée par `usage_count` décroissant.
+         */
+        get: operations["list_subjects_api_subjects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subjects/{subject_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Subject
+         * @description Détail d'un sujet + ses voisins par co-occurrence (top N).
+         */
+        get: operations["get_subject_api_subjects__subject_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2606,90 +2615,6 @@ export interface components {
             /** Excluded */
             excluded: boolean;
         };
-        /**
-         * AuthorshipsAuthorOut
-         * @description Ligne de la liste paginée /api/authorships.
-         */
-        AuthorshipsAuthorOut: {
-            /** Id */
-            id: number;
-            /** Source */
-            source: string;
-            /** Full Name */
-            full_name: string;
-            /** Last Name */
-            last_name: string | null;
-            /** First Name */
-            first_name: string | null;
-            /** Orcid */
-            orcid: string | null;
-            /** Idhal */
-            idhal: string | null;
-            /** Openalex Id */
-            openalex_id: string | null;
-            /** Person Id */
-            person_id: number | null;
-            /** Uca Pub Count */
-            uca_pub_count: number;
-            person: components["schemas"]["AuthorshipsAuthorPerson"] | null;
-        };
-        /**
-         * AuthorshipsAuthorPerson
-         * @description Personne liée à un auteur source (sous-objet `person`).
-         */
-        AuthorshipsAuthorPerson: {
-            /** Id */
-            id: number;
-            /** Last Name */
-            last_name: string;
-            /** First Name */
-            first_name: string;
-            /** Department Name */
-            department_name: string | null;
-            /** Role Title */
-            role_title: string | null;
-            /** Has Rh */
-            has_rh: boolean;
-        };
-        /**
-         * AuthorshipsFacets
-         * @description Facettes pour la page admin authorships (réutilise LabBinaryFacet
-         *     et LabeledIntFacet définis plus haut).
-         */
-        AuthorshipsFacets: {
-            linked: components["schemas"]["LabBinaryFacet"];
-            orcid: components["schemas"]["LabBinaryFacet"];
-            idhal: components["schemas"]["LabBinaryFacet"];
-            /** Labs */
-            labs: components["schemas"]["LabeledIntFacet"][];
-        };
-        /** AuthorshipsListResponse */
-        AuthorshipsListResponse: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Per Page */
-            per_page: number;
-            /** Pages */
-            pages: number;
-            /** Authors */
-            authors: components["schemas"]["AuthorshipsAuthorOut"][];
-        };
-        /**
-         * AuthorshipsStats
-         * @description Compteurs auteurs UCA (total, liés, identifiés ORCID/idHAL).
-         */
-        AuthorshipsStats: {
-            /** Total Uca Authors */
-            total_uca_authors: number;
-            /** Linked To Person */
-            linked_to_person: number;
-            /** With Orcid */
-            with_orcid: number;
-            /** With Idhal */
-            with_idhal: number;
-        };
         /** BatchAssignOrphanAuthorships */
         BatchAssignOrphanAuthorships: {
             /** Authorships */
@@ -2779,7 +2704,7 @@ export interface components {
          */
         ConsolidatedAuthorshipOut: {
             /** Author Position */
-            author_position: number;
+            author_position: number | null;
             /** In Perimeter */
             in_perimeter: boolean;
             /** Is Corresponding */
@@ -4223,7 +4148,7 @@ export interface components {
             /** Source */
             source: string;
             /** Full Name */
-            full_name: string;
+            full_name: string | null;
             /** Orcid */
             orcid: string | null;
             /** Idhal */
@@ -4558,6 +4483,8 @@ export interface components {
             structures: {
                 [key: string]: components["schemas"]["StructureInfo"];
             };
+            /** Subjects */
+            subjects: components["schemas"]["SubjectOut"][];
         };
         /**
          * PublicationListItem
@@ -4832,7 +4759,7 @@ export interface components {
             /** Author Position */
             author_position: number | null;
             /** Full Name */
-            full_name: string;
+            full_name: string | null;
             /** Person Id */
             person_id: number | null;
             /** In Perimeter */
@@ -5051,6 +4978,115 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /**
+         * SubjectDetailResponse
+         * @description Détail d'un sujet + ses voisins par co-occurrence (page graphe).
+         */
+        SubjectDetailResponse: {
+            subject: components["schemas"]["SubjectListItem"];
+            /** Neighbors */
+            neighbors: components["schemas"]["SubjectNeighborOut"][];
+        };
+        /**
+         * SubjectFrequency
+         * @description Sujet avec fréquence locale (count des publis du contexte parent :
+         *     labo ou personne). Utilisé pour les nuages de mots.
+         */
+        SubjectFrequency: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /** Ontologies */
+            ontologies: {
+                [key: string]: components["schemas"]["SubjectOntologyEntry"];
+            };
+            /** Count */
+            count: number;
+        };
+        /**
+         * SubjectListItem
+         * @description Sujet dans une liste paginée (page `/subjects`).
+         */
+        SubjectListItem: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /** Language */
+            language: string | null;
+            /** Ontologies */
+            ontologies: {
+                [key: string]: components["schemas"]["SubjectOntologyEntry"];
+            };
+            /** Usage Count */
+            usage_count: number;
+        };
+        /** SubjectListResponse */
+        SubjectListResponse: {
+            /** Items */
+            items: components["schemas"]["SubjectListItem"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+        };
+        /**
+         * SubjectNeighborOut
+         * @description Voisin d'un sujet par co-occurrence.
+         */
+        SubjectNeighborOut: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /** Ontologies */
+            ontologies: {
+                [key: string]: components["schemas"]["SubjectOntologyEntry"];
+            };
+            /** Usage Count */
+            usage_count: number;
+            /** Cooccurrence Count */
+            cooccurrence_count: number;
+        };
+        /**
+         * SubjectOntologyEntry
+         * @description Annotation d'un sujet par une ontologie donnée :
+         *     - `codes` : codes intra-ontologie observés (ex 'info' pour HAL).
+         *     - `level` : niveau hiérarchique (0=racine), null si non applicable.
+         *     - `parent` : libellé du sujet parent dans la même ontologie, null si racine.
+         */
+        SubjectOntologyEntry: {
+            /** Codes */
+            codes: string[];
+            /** Level */
+            level?: number | null;
+            /** Parent */
+            parent?: string | null;
+        };
+        /**
+         * SubjectOut
+         * @description Sujet attaché à une publication, agrégé par `subject_id` sur les
+         *     différentes sources qui l'ont annoté.
+         *
+         *     `ontologies` : annotations multi-sources. Vide pour un libre.
+         */
+        SubjectOut: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /** Language */
+            language: string | null;
+            /** Ontologies */
+            ontologies: {
+                [key: string]: components["schemas"]["SubjectOntologyEntry"];
+            };
+            /** Sources */
+            sources: string[];
+        };
         /** TextStrFacet */
         TextStrFacet: {
             /** Value */
@@ -5067,7 +5103,7 @@ export interface components {
             /** Author Position */
             author_position: number | null;
             /** Full Name */
-            full_name: string;
+            full_name: string | null;
             /** Person Id */
             person_id: number | null;
             /** Roles */
@@ -5595,6 +5631,7 @@ export interface operations {
                 country?: string;
                 hal_status?: string;
                 in_perimeter?: string;
+                subject_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -5656,6 +5693,43 @@ export interface operations {
                 sort?: string;
                 person_id?: number | null;
                 excluded_doc_type?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_theses_csv_api_publications_export_theses_csv_get: {
+        parameters: {
+            query?: {
+                search?: string;
+                lab_id?: string;
+                year?: string;
+                access?: string;
+                source_filter?: string;
+                doc_type?: string;
+                sort?: string;
             };
             header?: never;
             path?: never;
@@ -5772,6 +5846,7 @@ export interface operations {
                 country?: string;
                 hal_status?: string;
                 in_perimeter?: string;
+                subject_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -6590,6 +6665,39 @@ export interface operations {
             };
         };
     };
+    get_laboratory_subjects_api_laboratories__lab_id__subjects_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                lab_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectFrequency"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_structures_api_structures_get: {
         parameters: {
             query?: {
@@ -6933,108 +7041,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NameFormOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    authorships_stats_api_authorships_stats_get: {
-        parameters: {
-            query?: {
-                lab_id?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuthorshipsStats"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    authorships_facets_api_authorships_facets_get: {
-        parameters: {
-            query?: {
-                linked?: string;
-                has_orcid?: string;
-                has_idhal?: string;
-                lab_id?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuthorshipsFacets"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_authorships_api_authorships_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                per_page?: number;
-                search?: string;
-                linked?: string;
-                has_orcid?: string;
-                has_idhal?: string;
-                lab_id?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuthorshipsListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8888,6 +8894,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PipelineReportContent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_subjects_api_subjects_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+                /** @description Recherche insensible à la casse sur label */
+                q?: string | null;
+                /** @description Filtre usage_count >= min_count */
+                min_count?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_subject_api_subjects__subject_id__get: {
+        parameters: {
+            query?: {
+                neighbors_limit?: number;
+                min_cooccurrence?: number;
+            };
+            header?: never;
+            path: {
+                subject_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectDetailResponse"];
                 };
             };
             /** @description Validation Error */

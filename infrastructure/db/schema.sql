@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zkMgZp9UmmzYdt7Ac0wVcxyJbaQO1wdyPURsqXiKOrPbMBffaR3fRyIbtfPMqUg
+\restrict jWbOCwzXuPXiBEECdaF70Gdh2IiYjOueJKkX3cM2GJb8wx4qYly9WKSnlmK1Ea6
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -142,6 +142,7 @@ CREATE TYPE public.structure_type AS ENUM (
 
 CREATE FUNCTION public.normalize_name_form(text) RETURNS text
     LANGUAGE sql IMMUTABLE
+    SET search_path TO 'public', 'pg_temp'
     AS $_$
   SELECT trim(regexp_replace(
     unaccent(lower(trim(
@@ -777,6 +778,19 @@ ALTER SEQUENCE public.persons_rh_id_seq OWNED BY public.persons_rh.id;
 
 
 --
+-- Name: publication_subjects; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.publication_subjects (
+    publication_id integer NOT NULL,
+    subject_id integer NOT NULL,
+    source public.source_type NOT NULL,
+    score real,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
 -- Name: publications; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1257,6 +1271,52 @@ ALTER SEQUENCE public.structures_id_seq OWNED BY public.structures.id;
 
 
 --
+-- Name: subject_cooccurrences; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.subject_cooccurrences (
+    subject_a_id integer NOT NULL,
+    subject_b_id integer NOT NULL,
+    count integer NOT NULL,
+    CONSTRAINT subject_cooccurrences_ordered CHECK ((subject_a_id < subject_b_id))
+);
+
+
+--
+-- Name: subjects; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.subjects (
+    id integer NOT NULL,
+    label text NOT NULL,
+    language text,
+    created_at timestamp with time zone DEFAULT now(),
+    usage_count integer DEFAULT 0 NOT NULL,
+    ontologies jsonb DEFAULT '{}'::jsonb NOT NULL
+);
+
+
+--
+-- Name: subjects_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.subjects_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: subjects_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.subjects_id_seq OWNED BY public.subjects.id;
+
+
+--
 -- Name: v_active_publications; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -1453,6 +1513,13 @@ ALTER TABLE ONLY public.structure_relations ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.structures ALTER COLUMN id SET DEFAULT nextval('public.structures_id_seq'::regclass);
+
+
+--
+-- Name: subjects id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subjects ALTER COLUMN id SET DEFAULT nextval('public.subjects_id_seq'::regclass);
 
 
 --
@@ -1680,6 +1747,14 @@ ALTER TABLE ONLY public.persons_rh
 
 
 --
+-- Name: publication_subjects publication_subjects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_subjects
+    ADD CONSTRAINT publication_subjects_pkey PRIMARY KEY (publication_id, subject_id, source);
+
+
+--
 -- Name: publications publications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1853,6 +1928,22 @@ ALTER TABLE ONLY public.structures
 
 ALTER TABLE ONLY public.structures
     ADD CONSTRAINT structures_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: subject_cooccurrences subject_cooccurrences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_cooccurrences
+    ADD CONSTRAINT subject_cooccurrences_pkey PRIMARY KEY (subject_a_id, subject_b_id);
+
+
+--
+-- Name: subjects subjects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subjects
+    ADD CONSTRAINT subjects_pkey PRIMARY KEY (id);
 
 
 --
@@ -2397,10 +2488,52 @@ CREATE INDEX idx_structures_type ON public.structures USING btree (structure_typ
 
 
 --
+-- Name: publication_subjects_subject_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX publication_subjects_subject_idx ON public.publication_subjects USING btree (subject_id);
+
+
+--
 -- Name: publications_doi_lower_key; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX publications_doi_lower_key ON public.publications USING btree (lower(doi)) WHERE (doi IS NOT NULL);
+
+
+--
+-- Name: subject_cooccurrences_b_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX subject_cooccurrences_b_idx ON public.subject_cooccurrences USING btree (subject_b_id);
+
+
+--
+-- Name: subject_cooccurrences_count_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX subject_cooccurrences_count_idx ON public.subject_cooccurrences USING btree (count DESC);
+
+
+--
+-- Name: subjects_label_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX subjects_label_key ON public.subjects USING btree (lower(label));
+
+
+--
+-- Name: subjects_label_norm_trgm_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX subjects_label_norm_trgm_idx ON public.subjects USING gin (public.normalize_name_form(label) public.gin_trgm_ops);
+
+
+--
+-- Name: subjects_usage_count_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX subjects_usage_count_idx ON public.subjects USING btree (usage_count DESC);
 
 
 --
@@ -2572,6 +2705,22 @@ ALTER TABLE ONLY public.persons_rh
 
 
 --
+-- Name: publication_subjects publication_subjects_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_subjects
+    ADD CONSTRAINT publication_subjects_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES public.publications(id) ON DELETE CASCADE;
+
+
+--
+-- Name: publication_subjects publication_subjects_subject_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_subjects
+    ADD CONSTRAINT publication_subjects_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id) ON DELETE CASCADE;
+
+
+--
 -- Name: publications publications_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2692,8 +2841,23 @@ ALTER TABLE ONLY public.structure_relations
 
 
 --
+-- Name: subject_cooccurrences subject_cooccurrences_subject_a_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_cooccurrences
+    ADD CONSTRAINT subject_cooccurrences_subject_a_id_fkey FOREIGN KEY (subject_a_id) REFERENCES public.subjects(id) ON DELETE CASCADE;
+
+
+--
+-- Name: subject_cooccurrences subject_cooccurrences_subject_b_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subject_cooccurrences
+    ADD CONSTRAINT subject_cooccurrences_subject_b_id_fkey FOREIGN KEY (subject_b_id) REFERENCES public.subjects(id) ON DELETE CASCADE;
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zkMgZp9UmmzYdt7Ac0wVcxyJbaQO1wdyPURsqXiKOrPbMBffaR3fRyIbtfPMqUg
-
+\unrestrict jWbOCwzXuPXiBEECdaF70Gdh2IiYjOueJKkX3cM2GJb8wx4qYly9WKSnlmK1Ea6

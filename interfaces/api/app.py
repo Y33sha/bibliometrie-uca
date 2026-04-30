@@ -56,6 +56,7 @@ from interfaces.api.routers import (  # noqa: E402
     publishers,
     stats,
     structures,
+    subjects,
 )
 
 logger = logging.getLogger(__name__)
@@ -321,6 +322,7 @@ app.include_router(perimeters.router)
 app.include_router(publishers.router)
 app.include_router(journals.router)
 app.include_router(admin_pipeline.router)
+app.include_router(subjects.router)
 
 
 if __name__ == "__main__":

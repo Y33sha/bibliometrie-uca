@@ -5,6 +5,7 @@ import json
 from infrastructure.db.queries.publications.detail import (
     all_years,
     get_publication_detail,
+    get_publication_subjects,
 )
 
 
@@ -140,3 +141,67 @@ class TestGetPublicationDetail:
         assert str(lab_id) in detail["structures"]
         assert detail["structures"][str(lab_id)]["acronym"] is None
         assert detail["structures"][str(lab_id)]["name"] == "Labo X"
+
+
+class TestGetPublicationSubjects:
+    async def test_empty(self, async_db):
+        pub = await _create_pub(async_db)
+        assert await get_publication_subjects(async_db, pub) == []
+
+    async def test_dedup_aggregates_sources(self, async_db):
+        pub = await _create_pub(async_db)
+        # Un même libellé annoté par deux sources : 1 row, sources = ['hal', 'openalex'].
+        await async_db.execute("INSERT INTO subjects (label) VALUES ('AI') RETURNING id")
+        sid = (await async_db.fetchone())["id"]
+        for src in ("hal", "openalex"):
+            await async_db.execute(
+                "INSERT INTO publication_subjects (publication_id, subject_id, source) "
+                "VALUES (%s, %s, %s)",
+                (pub, sid, src),
+            )
+
+        subjects = await get_publication_subjects(async_db, pub)
+        assert len(subjects) == 1
+        assert subjects[0]["label"] == "AI"
+        assert subjects[0]["sources"] == ["hal", "openalex"]
+
+    async def test_orders_concepts_before_free(self, async_db):
+        pub = await _create_pub(async_db)
+        # Concept (avec ontologies) avant libre (ontologies vides).
+        import json
+
+        await async_db.execute(
+            "INSERT INTO subjects (label, ontologies) VALUES ('Sciences EEA', %s::jsonb) RETURNING id",
+            (json.dumps({"hal_domain": {"codes": ["info.eea"]}}),),
+        )
+        c_id = (await async_db.fetchone())["id"]
+        await async_db.execute("INSERT INTO subjects (label) VALUES ('physics') RETURNING id")
+        f_id = (await async_db.fetchone())["id"]
+        await async_db.execute(
+            "INSERT INTO publication_subjects (publication_id, subject_id, source) VALUES (%s, %s, 'hal')",
+            (pub, c_id),
+        )
+        await async_db.execute(
+            "INSERT INTO publication_subjects (publication_id, subject_id, source) VALUES (%s, %s, 'openalex')",
+            (pub, f_id),
+        )
+
+        subjects = await get_publication_subjects(async_db, pub)
+        # Concept (ontologies non vides) en premier, libre ensuite.
+        assert subjects[0]["ontologies"] != {}
+        assert subjects[1]["ontologies"] == {}
+
+    async def test_included_in_publication_detail(self, async_db):
+        pub = await _create_pub(async_db)
+        await async_db.execute("INSERT INTO subjects (label) VALUES ('genomics') RETURNING id")
+        sid = (await async_db.fetchone())["id"]
+        await async_db.execute(
+            "INSERT INTO publication_subjects (publication_id, subject_id, source) VALUES (%s, %s, 'wos')",
+            (pub, sid),
+        )
+
+        detail = await get_publication_detail(async_db, pub)
+        assert "subjects" in detail
+        assert len(detail["subjects"]) == 1
+        assert detail["subjects"][0]["label"] == "genomics"
+        assert detail["subjects"][0]["sources"] == ["wos"]
