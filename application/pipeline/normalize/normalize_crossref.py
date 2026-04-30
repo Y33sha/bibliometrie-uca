@@ -47,7 +47,6 @@ from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
 
-
 # =============================================================
 # EXTRACTEURS DE CHAMPS
 # =============================================================
@@ -225,9 +224,7 @@ def get_meta(msg: dict) -> dict | None:
 # =============================================================
 
 
-def upsert_publisher(
-    cur: Any, msg: dict, *, publisher_repo: PublisherRepository
-) -> int | None:
+def upsert_publisher(cur: Any, msg: dict, *, publisher_repo: PublisherRepository) -> int | None:
     name = get_publisher_name(msg)
     if not name:
         return None
@@ -419,9 +416,7 @@ def process_work(
     title = get_title(msg)
     pub_year = get_pub_year(msg)
     if not title or not pub_year:
-        logger.warning(
-            f"CrossRef {doi} sans titre ou année — pas de rattachement possible, skip"
-        )
+        logger.warning(f"CrossRef {doi} sans titre ou année — pas de rattachement possible, skip")
         staging_queries.mark_done(cur, staging_id)
         return None
 

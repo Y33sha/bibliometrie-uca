@@ -1,7 +1,6 @@
-2 trucs en attente dans conversation claude:
-- diff issued/published dans données crossref
-- idhal aberrants (1195): examiner label xml
-+ relancer pipeline à partir de affiliations
+- problème div sources: les authorships HAL ne sont plus reconnues
+- examiner cette publi: 21743 (authors openalex)
+- ajouter scanr aux sources (div auteurs UCA + div sources)
 
 # A régler avant transmission
 ## Pipeline
@@ -11,6 +10,7 @@
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation => oui, mais pas authorships canoniques. Pruning dans build_authorships?
 * [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?). + publis du cross-import: re-fetch régulier pour tenir les données à jour
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
+* [ ] suggest_countries extrêmement lent: auditer
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
 * [ ] cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
@@ -19,7 +19,7 @@
 ## Problèmes spécifiques HAL
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
 * [ ] embargos (HAL, theses.fr): afficher dates (existent-elles dans le retour api)?
-* [ ] https://hal.science/hal-03874894 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
+* [ ] https://hal.science/hal-03874894 , https://hal.science/hal-04111614 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
 * [ ] DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
 * [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis (authorship ok, author pas ok => vérifier que ce ne sera pas ré-écrasé)
 ## Code
@@ -29,13 +29,13 @@
 * [ ] problème page affiliation-conflicts: requête beaucoup trop lente
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
-## Entités supplémentaires
-* [ ] sujets / mots-clés: exploiter
+## Sujets
+* [ ] sujets openalex souvent hors sujet: auditer; créer circuit de curation des sujets? / ajouter seuil de score de pertinence?
 ## Explorer autres sources possibles
-* [ ] pour les publis: CrossRef, ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression)
+* [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); récupérer pmid dans api HAL
 * [ ] pour les jeux de données: DataCite, autres?
 * [ ] brevets? INPI?
-* [ ] divers: ORCID, IdRef, DOAJ, scraping sites éditeurs pour les adresses manquantes? (soyons fous)
+* [ ] divers: ORCID, IdRef, DOAJ
 ## Types de documents: fixer l'enum et le mapping, algo de résolution de conflits
 * [ ] types parfois non fiables sur OpenAlex: https://openalex.org/works/W4225722715 (utiliser Unpaywall aussi pour corriger type doc?)
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
@@ -72,11 +72,11 @@
 * [ ] Tri facettes
 ## Publique
 ### Personnes (public)
-* [ ] ajouter dashboard personne (signaler publis HAL non correctement reliées au compte HAL (dans la page problèmes-hal?))
+* [ ] signaler publis HAL non correctement reliées au compte HAL (dans la page problèmes-hal?)
 * [ ] publications: indiquer si premier/dernier auteur
 ### Publications
 * [ ] filtre langue? (y a-t-il un code langue unique trans-sources? sinon, faire une table langues)
-* [ ] ajouter DOI dans les facettes sources
+* [ ] ajouter DOI dans les facettes sources?
 * [ ] relations entre publications (est traduction de, est preprint de..., fait partie de..., data paper décrit dataset, dataset référencé dans...) => quasiment un nouveau chantier données à part entière
 * [ ] ajouter filtre corresponding_is_uca?
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
@@ -86,21 +86,22 @@
 * [ ] Rendre tous les tableaux triables
 * [ ] différencier interfaces à usage interne vs externe (users, roles)
 * [ ] responsivité minimale de l'interface
-* [ ] tableaux personnes: remplacer les identifiants par des icônes (hal orcid idref)
 * [ ] étoffer tests frontend
 ## Détails d'affichage
 * [ ] décomptes sur les onglets: ne pas tenir compte des facettes en place
 * [ ] ordre des sources pour les thèses: harmoniser page laboratoire avec page thèses
 * [ ] admin/personnes, formes de nom: modal authorships: source affichée: default wos (ajouter les autres sources, et mettre default None)
-* [ ] dropdown choix colonnes: toujours coupé par le bas du tableau Publications!
-* [ ] filtres RH sur page labo
 * [ ] colonne auteur sur la page thèses
+* [ ] sujets: layout différent des autres pages?
 ## Cas particuliers, bizarreries à élucider, à examiner plus tard
 * openalex répète des auteurs : publi 77832
 * [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
 * erreur de parsing OA: publication 113652
 * thèses CHELTER: 3 ou 4?
 * publi 20832: pourquoi pas d'affiliations
+* 2020CLFAC007 thèse du CROC, pas récupérée via theses.fr! (158960) => aurait dû être récupéré par API theses.fr ET par cross-import de scanR via le NNT
+* publi: 78307 affichage des caractères &amp;lt;i&amp;gt;
+* http://localhost/bibliometrie/laboratories/215?hal_status=hors_collection => affiche des trucs avec statut ok
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
