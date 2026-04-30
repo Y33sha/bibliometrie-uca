@@ -18,6 +18,7 @@
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 	import { useColumnVisibility } from '$lib/composables/useColumnVisibility.svelte';
 	import ColumnMenu from '$lib/components/ColumnMenu.svelte';
+	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
 
 	const labId = $derived($page.params.id);
 	let canGoBack = $state(false);
@@ -206,6 +207,8 @@
 	let dashOa: { open_access: number; closed: number; unknown: number; total: number } = $state({ open_access: 0, closed: 0, unknown: 0, total: 0 });
 	let dashCollab: { total_articles: number; international: number; domestic: number } = $state({ total_articles: 0, international: 0, domestic: 0 });
 	let dashTopCountries: { code: string; name: string; count: number }[] = $state([]);
+	type SubjectFrequency = components['schemas']['SubjectFrequency'];
+	let dashSubjects: SubjectFrequency[] = $state([]);
 	let barCanvas: HTMLCanvasElement;
 	let pieCanvas: HTMLCanvasElement;
 	let collabCanvas: HTMLCanvasElement;
@@ -403,16 +406,22 @@
 	}
 
 	async function loadDashboard() {
-		const data = await api<{
-			pubs_by_year: { year: number; count: number }[];
-			oa: { open_access: number; closed: number; unknown: number; total: number };
-			collab: { total_articles: number; international: number; domestic: number };
-			top_countries: { code: string; name: string; count: number }[];
-		}>(`/api/laboratories/${labId}/dashboard`, { key: 'lab-dashboard' });
+		const [data, subjects] = await Promise.all([
+			api<{
+				pubs_by_year: { year: number; count: number }[];
+				oa: { open_access: number; closed: number; unknown: number; total: number };
+				collab: { total_articles: number; international: number; domestic: number };
+				top_countries: { code: string; name: string; count: number }[];
+			}>(`/api/laboratories/${labId}/dashboard`, { key: 'lab-dashboard' }),
+			api<SubjectFrequency[]>(`/api/laboratories/${labId}/subjects?limit=30`, {
+				key: 'lab-subjects',
+			}),
+		]);
 		dashPubsByYear = data.pubs_by_year;
 		dashOa = data.oa;
 		dashCollab = data.collab;
 		dashTopCountries = data.top_countries;
+		dashSubjects = subjects;
 		dashboardLoaded = true;
 		await tick();
 		renderDashCharts();
@@ -698,6 +707,10 @@
 				<div class="loading">Chargement...</div>
 			{:else}
 				<div class="dash-grid">
+					<div class="dash-card dash-card-wide">
+						<h3>Sujets principaux</h3>
+						<SubjectsCloud subjects={dashSubjects} />
+					</div>
 					<div class="dash-card">
 						<h3>Publications par année</h3>
 						<div class="chart-wrap">
@@ -1078,6 +1091,7 @@
 
 	/* Dashboard */
 	.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+	.dash-card-wide { grid-column: 1 / -1; }
 	.dash-card {
 		background: var(--card);
 		border: 1px solid var(--border);

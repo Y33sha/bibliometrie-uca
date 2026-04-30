@@ -331,6 +331,34 @@ async def get_laboratory_addresses(
     }
 
 
+async def get_laboratory_subjects(
+    cur: Any, lab_id: int, *, limit: int = 30
+) -> list[dict[str, Any]]:
+    """Top sujets des publications d'un labo, ordonnés par fréquence locale.
+
+    Filtre `peer_review`, `memoir`, `ongoing_thesis` pour rester cohérent
+    avec ce qui est affiché dans l'onglet "Publications" de la page labo.
+    """
+    await cur.execute(
+        """
+        SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS count
+        FROM authorships a
+        JOIN publications p ON p.id = a.publication_id
+        JOIN publication_subjects ps ON ps.publication_id = p.id
+        JOIN subjects s ON s.id = ps.subject_id
+        WHERE a.structure_ids && %s::int[]
+          AND a.roles && ARRAY['author']::text[]
+          AND a.in_perimeter = TRUE
+          AND p.doc_type NOT IN ('peer_review', 'memoir', 'ongoing_thesis')
+        GROUP BY s.id, s.label, s.ontologies
+        ORDER BY count DESC, lower(s.label)
+        LIMIT %s
+        """,
+        ([lab_id], limit),
+    )
+    return [dict(r) for r in await cur.fetchall()]
+
+
 async def get_laboratory_dashboard(cur: Any, lab_id: int) -> dict[str, Any]:
     """Dashboard labo : publis/an, répartition OA, collab internationales, top pays."""
     lab_arr = [lab_id]

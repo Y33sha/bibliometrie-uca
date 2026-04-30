@@ -164,6 +164,8 @@ async def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None
                 or pub_meta.get("date_inscription"),
             }
 
+    subjects = await get_publication_subjects(cur, pub_id)
+
     all_struct_ids: set[int] = set()
     for row in authorships:
         if row["structure_ids"]:
@@ -204,4 +206,27 @@ async def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None
         "theses_authorships": [dict(a) for a in theses_authorships],
         "thesis_meta": thesis_meta,
         "structures": structures,
+        "subjects": subjects,
     }
+
+
+async def get_publication_subjects(cur: Any, pub_id: int) -> list[dict[str, Any]]:
+    """Sujets attachés à une publication, dédupliqués par `subject_id`.
+
+    Les sources qui ont annoté chaque sujet sont agrégées dans la colonne
+    `sources`. Tri : concepts (avec ontologies) avant libres (ontologies
+    vides), puis label alphabétique insensible à la casse.
+    """
+    await cur.execute(
+        """
+        SELECT s.id, s.label, s.language, s.ontologies,
+               array_agg(DISTINCT ps.source::text ORDER BY ps.source::text) AS sources
+        FROM publication_subjects ps
+        JOIN subjects s ON s.id = ps.subject_id
+        WHERE ps.publication_id = %s
+        GROUP BY s.id
+        ORDER BY (s.ontologies = '{}'::jsonb), lower(s.label)
+        """,
+        (pub_id,),
+    )
+    return [dict(r) for r in await cur.fetchall()]

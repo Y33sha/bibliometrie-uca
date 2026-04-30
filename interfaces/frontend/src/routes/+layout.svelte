@@ -118,6 +118,7 @@
       <a href="{base}/theses" class="nav-link" class:active={isActive("/theses")}>Thèses</a>
       <a href="{base}/laboratories" class="nav-link" class:active={isActive("/laboratories")}>Laboratoires</a>
       <a href="{base}/persons" class="nav-link" class:active={isActive("/persons")}>Personnes</a>
+      <a href="{base}/subjects" class="nav-link" class:active={isActive("/subjects")}>Sujets</a>
       <div class="nav-dropdown" role="navigation" class:active={isHalProblems} onmouseenter={() => (halDropdownOpen = true)} onmouseleave={() => (halDropdownOpen = false)}>
         <button class="nav-link" class:active={isHalProblems}>Problèmes HAL &#x25BE;</button>
         {#if halDropdownOpen}

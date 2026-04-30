@@ -48,6 +48,7 @@ class FacetFilters:
     country_values: list[str] = field(default_factory=list)
     hal_status_values: list[str] = field(default_factory=list)
     in_perimeter: str = ""
+    subject_id: int | None = None
 
 
 class _PublicationFacetsBuilder:
@@ -120,6 +121,12 @@ class _PublicationFacetsBuilder:
             apply_hal_status_filter(conds, params, f.hal_status_values, self.lab_hal_col)
         if skip != "in_perimeter":
             apply_in_perimeter_person_filter(conds, params, f.in_perimeter, f.person_id)
+        if skip != "subject" and f.subject_id:
+            conds.append(
+                "EXISTS (SELECT 1 FROM publication_subjects ps "
+                "WHERE ps.publication_id = p.id AND ps.subject_id = %s)"
+            )
+            params.append(f.subject_id)
         return conds, params
 
     @staticmethod

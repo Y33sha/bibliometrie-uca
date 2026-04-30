@@ -17,6 +17,7 @@ from interfaces.api.models import (
     LaboratoryDetailResponse,
     LaboratoryListItem,
     LaboratoryPersonsResponse,
+    SubjectFrequency,
 )
 
 router = APIRouter()
@@ -82,3 +83,13 @@ async def get_laboratory_dashboard(lab_id: int) -> Any:
     """Dashboard labo : publications par an + répartition OA."""
     async with get_async_cursor() as (cur, _conn):
         return await lab_queries.get_laboratory_dashboard(cur, lab_id)
+
+
+@router.get("/api/laboratories/{lab_id}/subjects", response_model=list[SubjectFrequency])
+async def get_laboratory_subjects(
+    lab_id: int,
+    limit: int = Query(30, ge=1, le=200),
+) -> Any:
+    """Top sujets des publications du labo (pour le nuage de mots dashboard)."""
+    async with get_async_cursor() as (cur, _conn):
+        return await lab_queries.get_laboratory_subjects(cur, lab_id, limit=limit)
