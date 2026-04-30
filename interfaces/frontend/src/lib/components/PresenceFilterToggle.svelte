@@ -1,41 +1,37 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 
-	type SourceState = 'all' | 'yes' | 'no';
+	type ToggleState = 'all' | 'yes' | 'no';
 
-	interface Source {
+	interface Item {
 		key: string;
 		label: string;
 	}
 
 	interface Props {
-		sources?: Source[];
-		states?: Record<string, SourceState>;
-		counts?: Record<string, number>;
-		onchange?: (states: Record<string, SourceState>) => void;
+		label: string;
+		items: Item[];
+		states?: Record<string, ToggleState>;
+		counts?: Record<string, { yes: number; no: number }>;
+		onchange?: (states: Record<string, ToggleState>) => void;
 	}
 
 	let {
-		sources = [
-			{ key: 'hal', label: 'HAL' },
-			{ key: 'oa', label: 'OpenAlex' },
-			{ key: 'scanr', label: 'ScanR' },
-			{ key: 'wos', label: 'WoS' }
-		],
+		label,
+		items,
 		states = $bindable({}),
 		counts = {},
-		onchange
+		onchange,
 	}: Props = $props();
 
 	let open = $state(false);
 	const instanceId = Symbol();
 
-	const hasFilter = $derived(Object.keys(states).length > 0);
 	const activeCount = $derived(Object.keys(states).length);
 
 	function cycle(key: string) {
 		const current = states[key] || 'all';
-		const next: SourceState = current === 'all' ? 'yes' : current === 'yes' ? 'no' : 'all';
+		const next: ToggleState = current === 'all' ? 'yes' : current === 'yes' ? 'no' : 'all';
 		if (next === 'all') {
 			const { [key]: _, ...rest } = states;
 			states = rest;
@@ -45,20 +41,28 @@
 		onchange?.(states);
 	}
 
-	function stateOf(key: string): SourceState {
+	function stateOf(key: string): ToggleState {
 		return states[key] || 'all';
 	}
 
-	function stateIcon(state: SourceState): string {
+	function stateIcon(state: ToggleState): string {
 		if (state === 'yes') return '✓';
 		if (state === 'no') return '✗';
 		return '—';
 	}
 
-	function tooltip(label: string, state: SourceState): string {
-		if (state === 'all') return `${label} : pas de filtre (cliquer pour filtrer)`;
-		if (state === 'yes') return `${label} : uniquement les publications présentes`;
-		return `${label} : uniquement les publications absentes`;
+	function tooltip(itemLabel: string, state: ToggleState): string {
+		if (state === 'all') return `${itemLabel} : pas de filtre (cliquer pour filtrer)`;
+		if (state === 'yes') return `${itemLabel} : uniquement les présents`;
+		return `${itemLabel} : uniquement les absents`;
+	}
+
+	function countFor(key: string, state: ToggleState): number | null {
+		const c = counts[key];
+		if (!c) return null;
+		if (state === 'yes') return c.yes;
+		if (state === 'no') return c.no;
+		return c.yes + c.no;
 	}
 
 	function handleClickOutside() {
@@ -85,15 +89,18 @@
 	<button
 		type="button"
 		class="facet-btn"
-		class:has-selection={hasFilter}
+		class:has-selection={activeCount > 0}
 		onclick={(e) => {
 			e.stopPropagation();
-			if (open) { open = false; return; }
+			if (open) {
+				open = false;
+				return;
+			}
 			window.dispatchEvent(new CustomEvent('facet-close', { detail: instanceId }));
 			open = true;
 		}}
 	>
-		<span class="facet-label">Sources</span>
+		<span class="facet-label">{label}</span>
 		{#if activeCount > 0}
 			<span class="facet-badge">{activeCount}</span>
 		{/if}
@@ -103,20 +110,25 @@
 	{#if open}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div class="facet-panel" onclick={(e) => e.stopPropagation()}>
-			{#each sources as src (src.key)}
-				{@const state = stateOf(src.key)}
+			{#each items as item (item.key)}
+				{@const state = stateOf(item.key)}
+				{@const c = countFor(item.key, state)}
 				<button
 					type="button"
-					class="source-row"
-					title={tooltip(src.label, state)}
-					onclick={() => cycle(src.key)}
+					class="item-row"
+					title={tooltip(item.label, state)}
+					onclick={() => cycle(item.key)}
 				>
-					<span class="state-icon" class:state-yes={state === 'yes'} class:state-no={state === 'no'}>
+					<span
+						class="state-icon"
+						class:state-yes={state === 'yes'}
+						class:state-no={state === 'no'}
+					>
 						{stateIcon(state)}
 					</span>
-					<span class="source-label">{src.label}</span>
-					{#if counts[src.key] != null}
-						<span class="source-count">{counts[src.key].toLocaleString('fr-FR')}</span>
+					<span class="item-label">{item.label}</span>
+					{#if c != null}
+						<span class="item-count">{c.toLocaleString('fr-FR')}</span>
 					{/if}
 				</button>
 			{/each}
@@ -180,7 +192,7 @@
 		z-index: 100;
 		padding: 4px 0;
 	}
-	.source-row {
+	.item-row {
 		display: flex;
 		align-items: center;
 		gap: 8px;
@@ -194,7 +206,7 @@
 		color: var(--text);
 		text-align: left;
 	}
-	.source-row:hover {
+	.item-row:hover {
 		background: #f5f5f2;
 	}
 	.state-icon {
@@ -218,11 +230,11 @@
 		background: #fde8e8;
 		color: #c0392b;
 	}
-	.source-label {
+	.item-label {
 		flex: 1;
 		font-weight: 500;
 	}
-	.source-count {
+	.item-count {
 		font-size: 0.8rem;
 		color: #888;
 		margin-left: auto;

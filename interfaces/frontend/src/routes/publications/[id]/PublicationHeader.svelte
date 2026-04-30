@@ -81,13 +81,13 @@
   <div class="pub-sources">
     {#if halSource}
       <a href={halDocUrl(halSource.source_id, pub.oa_status)} target="_blank" rel="noopener" class="source-link source-hal-link">
-        <img src="https://hal.science/favicon.ico" alt="" class="source-ico" />
+        <img src="{base}/icons/hal.ico" alt="" class="source-ico" />
         HAL : {halSource.source_id}
       </a>
     {/if}
     {#if oaSource}
       <a href="https://openalex.org/{oaSource.source_id}" target="_blank" rel="noopener" class="source-link source-oa-link">
-        <img src="https://raw.githubusercontent.com/ourresearch/openalex-gui/refs/heads/master/public/favicon.png" alt="" class="source-ico" />
+        <img src="{base}/icons/openalex.png" alt="" class="source-ico" />
         OpenAlex : {oaSource.source_id}
       </a>
     {/if}

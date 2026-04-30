@@ -4,7 +4,7 @@
   import { base } from "$app/paths";
   import { sanitizeTitle, halDocUrl, scanrPubUrl } from "$lib/utils";
   import FacetDropdown from "$lib/components/FacetDropdown.svelte";
-  import SourceFilterToggle from "$lib/components/SourceFilterToggle.svelte";
+  import PresenceFilterToggle from "$lib/components/PresenceFilterToggle.svelte";
   import Pagination from "$lib/components/Pagination.svelte";
   import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
   import { useFacets } from "$lib/composables/useFacets.svelte";
@@ -198,8 +198,9 @@
   <FacetDropdown label="Laboratoire" options={facets.options.labs} bind:selected={selectedLabs} onchange={(v: string[]) => onLabChange(v)} />
   <FacetDropdown label="Statut" options={facets.options.status} bind:selected={selectedStatus} onchange={() => onFilterChange()} />
   <FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={() => onFilterChange()} />
-  <SourceFilterToggle
-    sources={[
+  <PresenceFilterToggle
+    label="Sources"
+    items={[
       { key: 'hal', label: 'HAL' },
       { key: 'oa', label: 'OpenAlex' },
       { key: 'scanr', label: 'ScanR' },
@@ -261,14 +262,14 @@
         <td class="links-cell">
           {#if pub.hal_id}
             <a href={halDocUrl(pub.hal_id, pub.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {pub.hal_id}">
-              <img src="https://hal.science/favicon.ico" alt="HAL" />
+              <img src="{base}/icons/hal.ico" alt="HAL" />
             </a>
           {:else}
             <span class="source-tag source-placeholder"></span>
           {/if}
           {#if pub.openalex_id}
             <a href="https://openalex.org/{pub.openalex_id}" target="_blank" rel="noopener" class="source-tag source-oa" title="OpenAlex: {pub.openalex_id}">
-              <img src="https://raw.githubusercontent.com/ourresearch/openalex-gui/refs/heads/master/public/favicon.png" alt="OA" />
+              <img src="{base}/icons/openalex.png" alt="OA" />
             </a>
           {:else}
             <span class="source-tag source-placeholder"></span>

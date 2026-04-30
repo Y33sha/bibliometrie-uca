@@ -128,7 +128,7 @@
     background: white;
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 12px;
+    padding: 4px;
     overflow: hidden;
   }
   svg {

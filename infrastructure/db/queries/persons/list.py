@@ -7,6 +7,7 @@ from infrastructure.db.queries.filters import (
     apply_person_has_identifier_filter,
     apply_person_has_rh_filter,
     apply_person_linked_filter,
+    persons_sort_clause,
 )
 
 # ── Annuaire public ──────────────────────────────────────────────
@@ -19,13 +20,8 @@ class DirectoryFilters:
     roles: list[str] = field(default_factory=list)
     has_orcid: str = ""
     has_idhal: str = ""
+    has_idref: str = ""
     has_rh: str = ""
-
-
-_DIR_SORT_MAP = {
-    "name": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
-    "-name": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
-}
 
 
 async def persons_directory(
@@ -50,10 +46,11 @@ async def persons_directory(
         params.append(filters.roles)
     apply_person_has_identifier_filter(conditions, "orcid", filters.has_orcid)
     apply_person_has_identifier_filter(conditions, "idhal", filters.has_idhal)
+    apply_person_has_identifier_filter(conditions, "idref", filters.has_idref)
     apply_person_has_rh_filter(conditions, filters.has_rh)
 
     where = "WHERE " + " AND ".join(conditions)
-    order = _DIR_SORT_MAP.get(sort, _DIR_SORT_MAP["name"])
+    order = persons_sort_clause(sort)
 
     await cur.execute(
         f"SELECT COUNT(*) FROM persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id {where}",
@@ -68,6 +65,10 @@ async def persons_directory(
             p.id, p.last_name, p.first_name,
             prh.role_title, prh.department_name,
             (prh.id IS NOT NULL) AS has_rh,
+            (SELECT COUNT(DISTINCT a.publication_id)
+             FROM authorships a
+             WHERE a.person_id = p.id AND a.roles && ARRAY['author']::text[]
+            ) AS pub_count,
             (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
              FROM person_identifiers pi
              WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
@@ -75,7 +76,11 @@ async def persons_directory(
             (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
              FROM person_identifiers pi
              WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
-            ) AS idhals
+            ) AS idhals,
+            (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
+             FROM person_identifiers pi
+             WHERE pi.person_id = p.id AND pi.id_type = 'idref' AND pi.status != 'rejected'
+            ) AS idrefs
         FROM persons p
         LEFT JOIN persons_rh prh ON prh.person_id = p.id
         {where}

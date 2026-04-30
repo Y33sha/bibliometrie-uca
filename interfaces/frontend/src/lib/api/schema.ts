@@ -1352,6 +1352,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/persons/{person_id}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Person Dashboard
+         * @description Dashboard personne : publis/an + Open Access.
+         */
+        get: operations["person_dashboard_api_persons__person_id__dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/{person_id}/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Person Subjects
+         * @description Top sujets des publications de cette personne (nuage de mots).
+         */
+        get: operations["person_subjects_api_persons__person_id__subjects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/persons/{person_id}/identifiers": {
         parameters: {
             query?: never;
@@ -2766,6 +2806,17 @@ export interface components {
             /** Id */
             id: number;
         };
+        /** DashboardOa */
+        DashboardOa: {
+            /** Open Access */
+            open_access: number;
+            /** Closed */
+            closed: number;
+            /** Unknown */
+            unknown: number;
+            /** Total */
+            total: number;
+        };
         /** DeletedResponse */
         DeletedResponse: {
             /**
@@ -3325,16 +3376,6 @@ export interface components {
             /** Is Confirmed */
             is_confirmed: boolean | null;
         };
-        /**
-         * LabBinaryFacet
-         * @description Facette binaire yes/no (compteur pour chaque option).
-         */
-        LabBinaryFacet: {
-            /** Yes */
-            yes: number;
-            /** No */
-            no: number;
-        };
         /** LabDashboardCollab */
         LabDashboardCollab: {
             /** Total Articles */
@@ -3344,17 +3385,6 @@ export interface components {
             /** Domestic */
             domestic: number;
         };
-        /** LabDashboardOa */
-        LabDashboardOa: {
-            /** Open Access */
-            open_access: number;
-            /** Closed */
-            closed: number;
-            /** Unknown */
-            unknown: number;
-            /** Total */
-            total: number;
-        };
         /** LabFacet */
         LabFacet: {
             /** Value */
@@ -3363,13 +3393,6 @@ export interface components {
             label: string;
             /** Count */
             count: number;
-        };
-        /** LabOrcidIdentifier */
-        LabOrcidIdentifier: {
-            /** Value */
-            value: string;
-            /** Confirmed */
-            confirmed: boolean;
         };
         /** LabOrphanAuthorships */
         LabOrphanAuthorships: {
@@ -3396,20 +3419,22 @@ export interface components {
             /** Pub Count */
             pub_count: number;
             /** Orcids */
-            orcids: components["schemas"]["LabOrcidIdentifier"][] | null;
+            orcids: components["schemas"]["ValueConfirmedOut"][] | null;
+            /** Idhals */
+            idhals: components["schemas"]["ValueConfirmedOut"][] | null;
+            /** Idrefs */
+            idrefs: components["schemas"]["ValueConfirmedOut"][] | null;
         };
         /** LabPersonsFacets */
         LabPersonsFacets: {
-            rh: components["schemas"]["LabBinaryFacet"];
-            orcid: components["schemas"]["LabBinaryFacet"];
-            idhal: components["schemas"]["LabBinaryFacet"];
-        };
-        /** LabPubYearCount */
-        LabPubYearCount: {
-            /** Year */
-            year: number;
-            /** Count */
-            count: number;
+            /** Departments */
+            departments: components["schemas"]["FacetValueCount"][];
+            /** Roles */
+            roles: components["schemas"]["FacetValueCount"][];
+            rh: components["schemas"]["YesNoCount"];
+            orcid: components["schemas"]["YesNoCount"];
+            idhal: components["schemas"]["YesNoCount"];
+            idref: components["schemas"]["YesNoCount"];
         };
         /**
          * LabRelatedStructure
@@ -3540,8 +3565,8 @@ export interface components {
         /** LaboratoryDashboardResponse */
         LaboratoryDashboardResponse: {
             /** Pubs By Year */
-            pubs_by_year: components["schemas"]["LabPubYearCount"][];
-            oa: components["schemas"]["LabDashboardOa"];
+            pubs_by_year: components["schemas"]["PubYearCount"][];
+            oa: components["schemas"]["DashboardOa"];
             collab: components["schemas"]["LabDashboardCollab"];
             /** Top Countries */
             top_countries: components["schemas"]["LabTopCountry"][];
@@ -3929,6 +3954,12 @@ export interface components {
             /** Position */
             position: number;
         };
+        /** PersonDashboardResponse */
+        PersonDashboardResponse: {
+            /** Pubs By Year */
+            pubs_by_year: components["schemas"]["PubYearCount"][];
+            oa: components["schemas"]["DashboardOa"];
+        };
         /**
          * PersonDedupDetail
          * @description Profil d'une personne pour la page de déduplication.
@@ -4043,10 +4074,14 @@ export interface components {
             department_name: string | null;
             /** Has Rh */
             has_rh: boolean;
+            /** Pub Count */
+            pub_count: number;
             /** Orcids */
             orcids: components["schemas"]["ValueConfirmedOut"][] | null;
             /** Idhals */
             idhals: components["schemas"]["ValueConfirmedOut"][] | null;
+            /** Idrefs */
+            idrefs: components["schemas"]["ValueConfirmedOut"][] | null;
         };
         /** PersonDirectoryResponse */
         PersonDirectoryResponse: {
@@ -4254,6 +4289,7 @@ export interface components {
             roles: components["schemas"]["FacetValueCount"][];
             orcid: components["schemas"]["YesNoCount"];
             idhal: components["schemas"]["YesNoCount"];
+            idref: components["schemas"]["YesNoCount"];
             rh: components["schemas"]["YesNoCount"];
             linked: components["schemas"]["YesNoCount"];
         };
@@ -4414,6 +4450,13 @@ export interface components {
             /** Source Id */
             source_id: number;
         };
+        /** PubYearCount */
+        PubYearCount: {
+            /** Year */
+            year: number;
+            /** Count */
+            count: number;
+        };
         /**
          * PublicationDetailCore
          * @description Métadonnées de la publication (bloc `publication` du détail).
@@ -4573,7 +4616,7 @@ export interface components {
             corresponding: components["schemas"]["StrValueFacet"][];
             /** Source Counts */
             source_counts: {
-                [key: string]: number;
+                [key: string]: components["schemas"]["YesNoCount"];
             };
             /** Apc */
             apc: components["schemas"]["TextStrFacet"][];
@@ -6568,9 +6611,12 @@ export interface operations {
                 per_page?: number;
                 sort?: string;
                 search?: string;
+                department?: string;
+                role?: string;
                 has_rh?: string;
                 has_orcid?: string;
                 has_idhal?: string;
+                has_idref?: string;
             };
             header?: never;
             path: {
@@ -7064,6 +7110,7 @@ export interface operations {
                 role?: string;
                 has_orcid?: string;
                 has_idhal?: string;
+                has_idref?: string;
                 has_rh?: string;
                 sort?: string;
             };
@@ -7172,6 +7219,7 @@ export interface operations {
                 role?: string;
                 has_orcid?: string;
                 has_idhal?: string;
+                has_idref?: string;
                 has_rh?: string;
                 linked?: string;
             };
@@ -7375,6 +7423,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PersonAddressesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    person_dashboard_api_persons__person_id__dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDashboardResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    person_subjects_api_persons__person_id__subjects_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectFrequency"][];
                 };
             };
             /** @description Validation Error */
