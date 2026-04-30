@@ -6,7 +6,7 @@
   type Report = components["schemas"]["PipelineReportItem"];
   type PipelineStatus = components["schemas"]["PipelineStatus"];
 
-  const PAGE_SIZE = 30;
+  const PAGE_SIZE = 20;
 
   let reports: Report[] = $state([]);
   let selectedReport: string | null = $state(null);
