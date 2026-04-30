@@ -1,60 +1,17 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
-  import { api, ApiError, nameForms, structures as structuresApi } from "$lib/api";
-  import {
-    API_SOURCES,
-    halCollectionUrl,
-    rorFullUrl,
-    rorShortId,
-    type EditFormState,
-    type NameForm,
-    type Structure,
-    type StructureDetail,
-  } from "./types";
-  import StructureList from "./StructureList.svelte";
-  import RelationsSection from "./RelationsSection.svelte";
-  import NameFormsSection from "./NameFormsSection.svelte";
-  import EditFormModal from "./EditFormModal.svelte";
+  import { onMount } from "svelte";
+  import { base } from "$app/paths";
+  import { goto } from "$app/navigation";
+  import { api, ApiError, structures as structuresApi } from "$lib/api";
+  import { API_SOURCES, type Structure } from "./types";
   import StructureFormModal from "./StructureFormModal.svelte";
 
-  /* ── State ── */
-
-  let allStructures: Structure[] = $state([]);
-  let allStructuresCache: Structure[] = $state([]);
-  let selectedId: number | null = $state(null);
-
+  let structures: Structure[] = $state([]);
   let search = $state("");
   let typeFilter = $state("");
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  let detail = $state<StructureDetail | null>(null);
-
-  // Relation picker state
-  let relationPickerOpen = $state(false);
-  let relationPickerSearch = $state("");
-  let pickerRelType = $state("");
-  let pickerDirection = $state("");
-  let pickerStructId: number | null = $state(null);
-  let relationPickerEl: HTMLDivElement | undefined = $state();
-
-  // Context picker state
-  let ctxPickerOpen = $state(false);
-  let ctxPickerSearch = $state("");
-  let ctxPickerFormId: number | null = $state(null);
-  let ctxPickerCurrentCtx: (number | string)[] = $state([]);
-  let ctxPickerEl: HTMLDivElement | undefined = $state();
-
-  // New form state
-  let addFormText = $state("");
-  let addFormWordBoundary = $state(false);
-  let addFormExcluding = $state(false);
-  let editFormModal: EditFormState | null = $state(null);
-  let newFormCtx: (number | string)[] = $state([]);
-
-  let formsHelpOpen = $state(false);
-
-  // Create/Edit modal state
-  let editMode = $state(false);
+  // Création modal
   let createModalOpen = $state(false);
   let mCode = $state("");
   let mName = $state("");
@@ -64,283 +21,17 @@
   let mHal = $state("");
   let mApiIds: Record<string, string> = $state({});
 
-  // Forms data lookup (for context editing)
-  let formsData: Record<number, (number | string)[]> = $state({});
-
-  // Related IDs set for picker exclusion
-  let pickerExclude: Set<number> = $state(new Set());
-
-  /* ── Derived ── */
-
-  const structLookup = $derived.by(() => {
-    const lookup: Record<number, string> = {};
-    for (const s of allStructuresCache) {
-      lookup[s.id] = s.acronym || s.code || s.name;
-    }
-    return lookup;
-  });
-
-  const relationPickerResults = $derived.by(() => {
-    const q = relationPickerSearch.toLowerCase();
-    return allStructuresCache
-      .filter(
-        (s) =>
-          !pickerExclude.has(s.id) &&
-          (s.name.toLowerCase().includes(q) ||
-            (s.acronym || "").toLowerCase().includes(q) ||
-            s.code.toLowerCase().includes(q)),
-      )
-      .slice(0, 12);
-  });
-
-  const ctxPickerResults = $derived.by(() => {
-    const q = ctxPickerSearch.toLowerCase();
-    const existing = new Set(ctxPickerCurrentCtx.map((x) => String(x)));
-    return allStructuresCache
-      .filter(
-        (s) =>
-          !existing.has(String(s.id)) &&
-          (s.name.toLowerCase().includes(q) ||
-            (s.acronym || "").toLowerCase().includes(q) ||
-            s.code.toLowerCase().includes(q)),
-      )
-      .slice(0, 10);
-  });
-
-  const tutelles = $derived(
-    detail ? detail.parents.filter((p) => p.relation_type === "est_tutelle_de") : [],
-  );
-  const tutellesDe = $derived(
-    detail ? detail.children.filter((c) => c.relation_type === "est_tutelle_de") : [],
-  );
-  const partenaires = $derived.by(() => {
-    if (!detail) return [];
-    return [
-      ...detail.parents
-        .filter((p) => p.relation_type === "est_partenaire_de")
-        .map((p) => ({ ...p, id_struct: p.id })),
-      ...detail.children
-        .filter((c) => c.relation_type === "est_partenaire_de")
-        .map((c) => ({ ...c, id_struct: c.id })),
-    ];
-  });
-
-  /* ── Data loading ── */
-
   async function loadList() {
     const params = new URLSearchParams();
     if (typeFilter) params.set("type", typeFilter);
     if (search) params.set("search", search);
-    allStructures = await api<Structure[]>("/api/structures?" + params);
-  }
-
-  async function refreshCache() {
-    allStructuresCache = await api<Structure[]>("/api/structures");
-  }
-
-  async function selectStructure(id: number) {
-    selectedId = id;
-    localStorage.setItem("admin_structure_id", String(id));
-    const sp = new URLSearchParams(window.location.search);
-    sp.set("id", String(id));
-    history.replaceState(null, "", "?" + sp.toString());
-    const data = await api<StructureDetail>("/api/structures/" + id);
-    detail = data;
-
-    const fd: Record<number, (number | string)[]> = {};
-    for (const f of data.forms) {
-      fd[f.id] = f.requires_context_of || [];
-    }
-    formsData = fd;
-
-    const exclude = new Set<number>([
-      ...data.parents.map((p) => p.id),
-      ...data.children.map((c) => c.id),
-      data.structure.id,
-    ]);
-    pickerExclude = exclude;
-
-    relationPickerOpen = false;
-    ctxPickerOpen = false;
-    formsHelpOpen = false;
-    newFormCtx = [];
+    structures = await api<Structure[]>("/api/structures?" + params);
   }
 
   function handleSearch() {
     if (searchTimeout) clearTimeout(searchTimeout);
     searchTimeout = setTimeout(loadList, 300);
   }
-
-  /* ── Relation picker ── */
-
-  function openPicker(relType: string, direction: string, structId: number) {
-    pickerRelType = relType;
-    pickerDirection = direction;
-    pickerStructId = structId;
-    relationPickerSearch = "";
-    relationPickerOpen = true;
-    ctxPickerOpen = false;
-  }
-
-  async function pickStructure(otherId: number) {
-    const parentId = pickerDirection === "parent" ? otherId : pickerStructId!;
-    const childId = pickerDirection === "parent" ? pickerStructId! : otherId;
-    await structuresApi.createRelation({
-      parent_id: parentId,
-      child_id: childId,
-      relation_type: pickerRelType,
-    });
-    relationPickerOpen = false;
-    await selectStructure(pickerStructId!);
-    loadList();
-    refreshCache();
-  }
-
-  async function deleteRelation(relId: number) {
-    await structuresApi.deleteRelation(relId);
-    if (selectedId) await selectStructure(selectedId);
-    loadList();
-    refreshCache();
-  }
-
-  /* ── Forms ── */
-
-  async function addForm(structId: number) {
-    const text = addFormText.trim();
-    if (!text) return;
-    const ctx = newFormCtx.length ? newFormCtx : null;
-
-    try {
-      await nameForms.create({
-        structure_id: structId,
-        form_text: text,
-        is_word_boundary: addFormWordBoundary || text.length <= 6,
-        is_excluding: addFormExcluding,
-        requires_context_of: ctx,
-      });
-    } catch (e) {
-      if (e instanceof ApiError) {
-        const detail = (e.detail as { detail?: string })?.detail;
-        alert(detail || `Erreur ${e.status}`);
-        return;
-      }
-      alert((e as Error).message);
-      return;
-    }
-    addFormText = "";
-    addFormWordBoundary = false;
-    addFormExcluding = false;
-    newFormCtx = [];
-    await selectStructure(structId);
-    loadList();
-  }
-
-  async function deleteForm(formId: number) {
-    if (!confirm("Supprimer cette forme ?")) return;
-    try {
-      await nameForms.remove(formId);
-    } catch (e) {
-      const msg = e instanceof ApiError ? JSON.stringify(e.detail) : (e as Error).message;
-      alert("Erreur suppression: " + msg);
-      return;
-    }
-    if (selectedId) await selectStructure(selectedId);
-    loadList();
-  }
-
-  function openEditFormModal(f: NameForm) {
-    editFormModal = {
-      id: f.id,
-      form_text: f.form_text,
-      is_word_boundary: f.is_word_boundary,
-      is_excluding: f.is_excluding,
-    };
-  }
-
-  async function saveEditForm() {
-    if (!editFormModal) return;
-    const text = editFormModal.form_text.trim();
-    await nameForms.update(editFormModal.id, {
-      form_text: text,
-      is_word_boundary: editFormModal.is_word_boundary || text.length <= 6,
-      is_excluding: editFormModal.is_excluding,
-    });
-    editFormModal = null;
-    if (selectedId) await selectStructure(selectedId);
-  }
-
-  /* ── Context picker ── */
-
-  function openCtxPicker(formId: number | null) {
-    const currentCtx = formId === null ? [...newFormCtx] : [...(formsData[formId] || [])];
-    ctxPickerFormId = formId;
-    ctxPickerCurrentCtx = currentCtx;
-    ctxPickerSearch = "";
-    ctxPickerOpen = true;
-    relationPickerOpen = false;
-    requestAnimationFrame(() => {
-      ctxPickerEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
-  }
-
-  async function pickCtx(item: number | string) {
-    if (!ctxPickerCurrentCtx.includes(item)) {
-      ctxPickerCurrentCtx = [...ctxPickerCurrentCtx, item];
-    }
-    ctxPickerOpen = false;
-
-    if (ctxPickerFormId === null) {
-      newFormCtx = [...ctxPickerCurrentCtx];
-    } else {
-      await nameForms.update(ctxPickerFormId, {
-        requires_context_of: ctxPickerCurrentCtx,
-      });
-      if (selectedId) await selectStructure(selectedId);
-    }
-  }
-
-  async function pickCtxClear() {
-    ctxPickerOpen = false;
-
-    if (ctxPickerFormId === null) {
-      newFormCtx = [];
-    } else {
-      await nameForms.update(ctxPickerFormId, { requires_context_of: [] });
-      if (selectedId) await selectStructure(selectedId);
-    }
-  }
-
-  function pickCtxShortcutTutelles() {
-    for (const t of tutelles) pickCtx(t.id);
-  }
-
-  async function removeCtx(formId: number, itemToRemove: number | string) {
-    const currentCtx = formsData[formId] || [];
-    const newCtx = currentCtx.filter((x) => x !== itemToRemove);
-    await nameForms.update(formId, { requires_context_of: newCtx });
-    if (selectedId) await selectStructure(selectedId);
-  }
-
-  function removeNewCtx(item: number | string) {
-    newFormCtx = newFormCtx.filter((x) => x !== item);
-  }
-
-  function ctxLabel(x: number | string): string {
-    return structLookup[x as number] || "id:" + x;
-  }
-
-  /* ── Delete structure ── */
-
-  async function deleteStructure(id: number) {
-    if (!confirm("Supprimer cette structure et toutes ses formes/relations ?")) return;
-    await structuresApi.remove(id);
-    selectedId = null;
-    detail = null;
-    loadList();
-    refreshCache();
-  }
-
-  /* ── Structure edit/create modal ── */
 
   function normalizeRor(): boolean {
     let ror = mRor.trim();
@@ -354,23 +45,6 @@
     return true;
   }
 
-  function openEditModal() {
-    if (!detail) return;
-    const s = detail.structure;
-    mCode = s.code || "";
-    mName = s.name || "";
-    mAcronym = s.acronym || "";
-    mType = s.type || "labo";
-    mRor = s.ror_id || "";
-    mHal = s.hal_collection || "";
-    mApiIds = {};
-    for (const src of API_SOURCES) {
-      mApiIds[src] = (s.api_ids?.[src] || []).join(", ");
-    }
-    editMode = true;
-    createModalOpen = true;
-  }
-
   function buildApiIds(): Record<string, string[]> | null {
     const result: Record<string, string[]> = {};
     let hasAny = false;
@@ -379,7 +53,7 @@
       if (raw) {
         result[src] = raw
           .split(",")
-          .map((s: string) => s.trim())
+          .map((s) => s.trim())
           .filter(Boolean);
         hasAny = true;
       }
@@ -387,34 +61,7 @@
     return hasAny ? result : null;
   }
 
-  async function submitEdit() {
-    if (!selectedId) return;
-    if (!normalizeRor()) return;
-    const data: Record<string, any> = {};
-    if (mName.trim()) data.name = mName.trim();
-    if (mAcronym.trim() !== (detail?.structure.acronym || ""))
-      data.acronym = mAcronym.trim() || null;
-    if (mType) data.type = mType;
-    if (mRor.trim() !== (detail?.structure.ror_id || "")) data.ror_id = mRor.trim() || null;
-    if (mHal.trim() !== (detail?.structure.hal_collection || ""))
-      data.hal_collection = mHal.trim() || null;
-    data.api_ids = buildApiIds();
-
-    try {
-      await structuresApi.update(selectedId, data);
-      createModalOpen = false;
-      editMode = false;
-      await selectStructure(selectedId);
-      loadList();
-      refreshCache();
-    } catch (e: any) {
-      const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-      alert("Erreur: " + msg);
-    }
-  }
-
   function openCreateModal() {
-    editMode = false;
     mCode = "";
     mName = "";
     mAcronym = "";
@@ -441,81 +88,28 @@
       alert("Code et nom requis");
       return;
     }
-
     try {
       const created = (await structuresApi.create(data)) as { id: number };
       createModalOpen = false;
-      await loadList();
-      refreshCache();
-      selectStructure(created.id);
+      goto(`${base}/admin/structures/${created.id}`);
     } catch (e: any) {
       const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
       alert("Erreur: " + msg);
     }
   }
 
-  /* ── Click-outside handling ── */
-
-  function handleDocumentClick(e: MouseEvent) {
-    const target = e.target as HTMLElement;
-    if (
-      relationPickerOpen &&
-      relationPickerEl &&
-      !relationPickerEl.contains(target) &&
-      !target.classList.contains("btn-add")
-    ) {
-      relationPickerOpen = false;
-    }
-    if (
-      ctxPickerOpen &&
-      ctxPickerEl &&
-      !ctxPickerEl.contains(target) &&
-      !target.classList.contains("btn-add-tiny")
-    ) {
-      ctxPickerOpen = false;
-    }
-  }
-
-  /* ── Lifecycle ── */
-
-  onMount(() => {
-    document.querySelector(".container")?.classList.add("full-width");
-    loadList();
-    refreshCache();
-    document.addEventListener("click", handleDocumentClick);
-    const sp = new URLSearchParams(window.location.search);
-    const urlId = sp.get("id") || localStorage.getItem("admin_structure_id");
-    if (urlId) {
-      const id = parseInt(urlId);
-      if (id) selectStructure(id);
-    }
-    return () => document.removeEventListener("click", handleDocumentClick);
-  });
-
-  onDestroy(() => {
-    document.querySelector(".container")?.classList.remove("full-width");
-  });
+  onMount(loadList);
 </script>
 
 <svelte:window
   onkeydown={(e) => {
-    if (e.key === "Escape") {
-      if (editFormModal) {
-        editFormModal = null;
-        e.preventDefault();
-      } else if (createModalOpen) {
-        createModalOpen = false;
-        e.preventDefault();
-      }
+    if (e.key === "Escape" && createModalOpen) {
+      createModalOpen = false;
+      e.preventDefault();
     }
-    if (e.key === "Enter" && !e.shiftKey) {
-      if (editFormModal) {
-        e.preventDefault();
-        saveEditForm();
-      } else if (createModalOpen) {
-        e.preventDefault();
-        editMode ? submitEdit() : submitCreate();
-      }
+    if (e.key === "Enter" && !e.shiftKey && createModalOpen) {
+      e.preventDefault();
+      submitCreate();
     }
   }}
 />
@@ -524,134 +118,41 @@
   <title>Admin - Structures - Bibliométrie UCA</title>
 </svelte:head>
 
-<div class="layout">
-  <StructureList
-    structures={allStructures}
-    {selectedId}
-    bind:search
-    bind:typeFilter
-    onsearch={handleSearch}
-    ontypechange={loadList}
-    onselect={selectStructure}
-    oncreate={openCreateModal}
-  />
+<h2>Structures</h2>
 
-  <div class="detail-panel">
-    {#if !detail}
-      <div class="panel detail-empty">Sélectionnez une structure pour voir le détail.</div>
-    {:else}
-      {@const s = detail.structure}
-      <div class="panel">
-        <div class="detail-header">
-          <span class="type-badge type-{s.type}">{s.type}</span>
-          <h2>
-            {#if s.acronym}<strong>{s.acronym}</strong> · {s.name}{:else}{s.name}{/if}
-          </h2>
-          <button class="btn btn-sm" onclick={openEditModal}> Éditer </button>
-          <button class="btn btn-danger btn-sm" onclick={() => deleteStructure(s.id)}>
-            Supprimer
-          </button>
-        </div>
-
-        <h3 class="section-title">Détails</h3>
-        <div class="details-inline">
-          {#if s.ror_id}
-            <span class="detail-item">
-              <span class="detail-label">ROR</span>
-              <a
-                href={rorFullUrl(s.ror_id)}
-                target="_blank"
-                rel="noopener"
-                class="id-badge">{rorShortId(s.ror_id)}</a
-              >
-            </span>
-          {/if}
-          {#if s.rnsr_id}
-            <span class="detail-item">
-              <span class="detail-label">RNSR</span>
-              <span>{s.rnsr_id}</span>
-            </span>
-          {/if}
-          {#if s.hal_collection}
-            <span class="detail-item">
-              <span class="detail-label">Collection HAL</span>
-              <a
-                href={halCollectionUrl(s.hal_collection)}
-                target="_blank"
-                rel="noopener"
-                class="id-badge">{s.hal_collection}</a
-              >
-            </span>
-          {/if}
-        </div>
-        {#if s.api_ids && Object.keys(s.api_ids).length}
-          <div class="api-ids-display">
-            <span class="detail-label">Paramètres requête API :</span>
-            {#each Object.entries(s.api_ids) as [src, ids]}
-              <span class="api-id-item">
-                <span class="api-id-source">{src}</span>
-                {(ids as string[]).join(", ")}
-              </span>
-            {/each}
-          </div>
-        {/if}
-
-        <RelationsSection
-          structureId={s.id}
-          {tutelles}
-          {tutellesDe}
-          {partenaires}
-          {relationPickerOpen}
-          {relationPickerResults}
-          bind:relationPickerSearch
-          bind:relationPickerEl
-          onselect={selectStructure}
-          ondeleteRelation={deleteRelation}
-          onopenPicker={openPicker}
-          onpickStructure={pickStructure}
-        />
-
-        <NameFormsSection
-          structureId={s.id}
-          forms={detail.forms}
-          bind:formsHelpOpen
-          bind:addFormText
-          bind:addFormWordBoundary
-          bind:addFormExcluding
-          {newFormCtx}
-          {ctxPickerOpen}
-          {ctxPickerResults}
-          bind:ctxPickerSearch
-          bind:ctxPickerEl
-          {ctxLabel}
-          onaddForm={addForm}
-          oneditForm={openEditFormModal}
-          ondeleteForm={deleteForm}
-          onremoveCtx={removeCtx}
-          onremoveNewCtx={removeNewCtx}
-          onopenCtxPicker={openCtxPicker}
-          onpickCtx={pickCtx}
-          onpickCtxShortcutTutelles={pickCtxShortcutTutelles}
-          onpickCtxClear={pickCtxClear}
-        />
-      </div>
-    {/if}
-  </div>
+<div class="toolbar">
+  <input type="text" placeholder="Rechercher..." bind:value={search} oninput={handleSearch} />
+  <select bind:value={typeFilter} onchange={loadList}>
+    <option value="">Tous types</option>
+    <option value="labo">Laboratoires</option>
+    <option value="universite">Universités</option>
+    <option value="onr">ONR</option>
+    <option value="chu">CHU</option>
+    <option value="ecole">Écoles</option>
+    <option value="site">Sites</option>
+  </select>
+  <span class="count">{structures.length} structures</span>
+  <button class="btn btn-primary btn-sm" onclick={openCreateModal}>+ Nouvelle</button>
 </div>
 
-{#if editFormModal}
-  <EditFormModal
-    bind:state={editFormModal}
-    onsave={saveEditForm}
-    onclose={() => {
-      editFormModal = null;
-    }}
-  />
-{/if}
+<div class="list">
+  {#if structures.length === 0}
+    <div class="empty">Aucune structure</div>
+  {:else}
+    {#each structures as s (s.id)}
+      <a class="struct-item" href="{base}/admin/structures/{s.id}">
+        <span class="type-badge type-{s.type}">{s.type}</span>
+        <span class="name">
+          {#if s.acronym}<strong>{s.acronym}</strong> · {s.name}{:else}{s.name}{/if}
+        </span>
+      </a>
+    {/each}
+  {/if}
+</div>
 
 {#if createModalOpen}
   <StructureFormModal
-    {editMode}
+    editMode={false}
     bind:code={mCode}
     bind:name={mName}
     bind:acronym={mAcronym}
@@ -659,68 +160,70 @@
     bind:ror={mRor}
     bind:hal={mHal}
     bind:apiIds={mApiIds}
-    onclose={() => {
-      createModalOpen = false;
-    }}
-    onsubmit={editMode ? submitEdit : submitCreate}
+    onclose={() => (createModalOpen = false)}
+    onsubmit={submitCreate}
   />
 {/if}
 
 <style>
-  :global(.container.full-width) {
-    max-width: none;
-    padding: 0 !important;
+  h2 {
+    margin: 0 0 12px;
+    font-size: 1.2rem;
   }
-
-  .layout {
+  .toolbar {
     display: flex;
-    gap: 0;
-    min-height: calc(100vh - 120px);
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
   }
-  .detail-panel {
+  .toolbar input,
+  .toolbar select {
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.95rem;
+    background: white;
+    font-family: inherit;
+  }
+  .toolbar input {
     flex: 1;
-    min-width: 0;
-    padding: 16px 24px;
+    max-width: 360px;
   }
-
-  .panel {
+  .count {
+    margin-left: auto;
+    margin-right: 8px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .list {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 14px;
+    overflow: hidden;
   }
-  .panel h2 {
-    margin: 0 0 10px;
-    font-size: 1.05rem;
-    font-weight: 600;
+  .empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--muted);
   }
-
-  .section-title {
-    margin: 20px -14px 10px !important;
-    padding: 6px 14px !important;
-    background: #5b9ea0;
-    color: white !important;
-    font-size: 0.75rem !important;
-    border-radius: 3px;
-  }
-  .details-inline {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 8px;
-    font-size: 0.9rem;
-  }
-  .detail-item {
+  .struct-item {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0efec;
+    text-decoration: none;
+    color: inherit;
   }
-  .detail-label {
-    color: var(--muted);
-    font-weight: 500;
-    font-size: 0.8rem;
+  .struct-item:last-child {
+    border-bottom: none;
   }
-
+  .struct-item:hover {
+    background: #fafaf8;
+  }
+  .struct-item .name {
+    font-size: 0.95rem;
+  }
   .type-badge {
     font-size: 0.7rem;
     padding: 1px 6px;
@@ -757,41 +260,5 @@
   :global(.type-autre) {
     background: #f0f0f0;
     color: #555;
-  }
-
-  .detail-empty {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--text-muted);
-  }
-  .detail-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-  .detail-header h2 {
-    flex: 1;
-    margin: 0;
-    font-size: 1.3rem;
-  }
-
-  .api-ids-display {
-    margin-top: 8px;
-    font-size: 0.85rem;
-    color: var(--muted);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    align-items: baseline;
-  }
-  .api-id-item {
-    color: var(--text);
-  }
-  .api-id-source {
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    color: var(--muted);
   }
 </style>
