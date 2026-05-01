@@ -20,6 +20,7 @@
     halSource,
     oaSource,
     wosSource,
+    scanrSource,
     structures,
     isAdmin,
     onChange,
@@ -30,6 +31,7 @@
     halSource: Source | undefined;
     oaSource: Source | undefined;
     wosSource: Source | undefined;
+    scanrSource: Source | undefined;
     structures: Record<string, StructInfo>;
     isAdmin: boolean;
     onChange: () => void | Promise<void>;
@@ -44,21 +46,26 @@
   const sourceCount = $derived(
     (data.hal_authorships.length ? 1 : 0) +
       (data.openalex_authorships.length ? 1 : 0) +
-      (data.wos_authorships.length ? 1 : 0),
+      (data.wos_authorships.length ? 1 : 0) +
+      (data.scanr_authorships.length ? 1 : 0),
   );
 
-  const singleSource = $derived<"hal" | "openalex" | "wos">(
-    halSource ? "hal" : oaSource ? "openalex" : "wos",
+  const singleSource = $derived<"hal" | "openalex" | "wos" | "scanr">(
+    halSource ? "hal" : oaSource ? "openalex" : wosSource ? "wos" : "scanr",
   );
   const singleRows = $derived<SourceAuthorship[]>(
     halSource
       ? data.hal_authorships
       : oaSource
         ? data.openalex_authorships
-        : data.wos_authorships,
+        : wosSource
+          ? data.wos_authorships
+          : data.scanr_authorships,
   );
-  const singleLabel = $derived(halSource ? "HAL" : oaSource ? "OpenAlex" : "WoS");
-  const singleSourceData = $derived(halSource || oaSource || wosSource);
+  const singleLabel = $derived(
+    halSource ? "HAL" : oaSource ? "OpenAlex" : wosSource ? "WoS" : "ScanR",
+  );
+  const singleSourceData = $derived(halSource || oaSource || wosSource || scanrSource);
 </script>
 
 {#if sourceCount > 1}
@@ -74,7 +81,7 @@
       {/if}
       <span class="source-summary-count">
         ({sourceRows.length} auteurs &mdash;
-        {#if halSource}H{/if}{#if oaSource}{halSource ? "/" : ""}OA{/if}{#if wosSource}{halSource || oaSource ? "/" : ""}W{/if})
+        {#if halSource}H{/if}{#if oaSource}{halSource ? "/" : ""}OA{/if}{#if wosSource}{halSource || oaSource ? "/" : ""}W{/if}{#if scanrSource}{halSource || oaSource || wosSource ? "/" : ""}S{/if})
       </span>
     </summary>
     <div class="source-grid-wrap">
@@ -92,6 +99,10 @@
             {#if wosSource}
               <th class="sg-pos">#</th>
               <th class="sg-name">WoS</th>
+            {/if}
+            {#if scanrSource}
+              <th class="sg-pos">#</th>
+              <th class="sg-name">ScanR</th>
             {/if}
           </tr>
         </thead>
@@ -113,6 +124,12 @@
               <td class="sg-pos-cell"></td>
               <td class="sg-name-cell countries-cell"
                 >{(wosSource.countries || []).map((c) => c.toUpperCase()).join(" ")}</td
+              >
+            {/if}
+            {#if scanrSource}
+              <td class="sg-pos-cell"></td>
+              <td class="sg-name-cell countries-cell"
+                >{(scanrSource.countries || []).map((c) => c.toUpperCase()).join(" ")}</td
               >
             {/if}
           </tr>
@@ -221,6 +238,42 @@
                     {#if row.wos.countries}
                       <span class="author-countries"
                         >{row.wos.countries.map((c) => c.toUpperCase()).join(" ")}</span
+                      >
+                    {/if}
+                  {/if}
+                </td>
+              {/if}
+              {#if scanrSource}
+                <td class="sg-pos-cell">{#if row.scanr}{row.position + 1}{/if}</td>
+                <td class="sg-name-cell" class:sg-excluded={row.scanr?.excluded}>
+                  {#if row.scanr}
+                    {#if isAdmin}<button
+                        class="exclude-btn"
+                        title={row.scanr.excluded ? "Rétablir" : "Marquer comme faux"}
+                        onclick={() => toggleExclude("scanr", row.scanr!)}
+                        >{row.scanr.excluded ? "↩" : "×"}</button
+                      >{/if}
+                    {#if row.scanr.person_id}
+                      <a
+                        href="{base}/persons/{row.scanr.person_id}"
+                        class="sg-author-link"
+                        class:sg-uca={row.scanr.in_perimeter}
+                      >
+                        {row.scanr.full_name}
+                      </a>
+                    {:else}
+                      <span class="sg-author" class:sg-uca={row.scanr.in_perimeter}>
+                        {row.scanr.full_name}
+                      </span>
+                    {/if}
+                    {#if structsTooltip(row.scanr, structures)}
+                      <Tooltip text={structsTooltip(row.scanr, structures)}
+                        ><span class="info-icon">&#9432;</span></Tooltip
+                      >
+                    {/if}
+                    {#if row.scanr.countries}
+                      <span class="author-countries"
+                        >{row.scanr.countries.map((c) => c.toUpperCase()).join(" ")}</span
                       >
                     {/if}
                   {/if}

@@ -65,6 +65,9 @@
             {#if a.source_wos}
               <span class="source-tag-label source-wos-label">W</span>
             {/if}
+            {#if a.source_scanr}
+              <span class="source-tag-label source-scanr-label">S</span>
+            {/if}
           </td>
         </tr>
       {/each}

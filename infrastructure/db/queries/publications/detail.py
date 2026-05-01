@@ -14,7 +14,7 @@ async def all_years(cur: Any) -> list[int]:
 
 
 async def _fetch_biblio_source_authorships(cur: Any, source: str, pub_id: int) -> list[Any]:
-    """Authorships HAL / OpenAlex / WoS d'une publi, avec adresses agrégées.
+    """Authorships HAL / OpenAlex / WoS / ScanR d'une publi, avec adresses agrégées.
 
     `raw_affiliation` concatène les `addresses.raw_text` liées via
     `source_authorship_addresses`. `countries` retombe sur les pays
@@ -88,6 +88,7 @@ async def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None
                EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'hal') AS source_hal,
                EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'openalex') AS source_openalex,
                EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'wos') AS source_wos,
+               EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.authorship_id = a.id AND sa.source = 'scanr') AS source_scanr,
                pe.id AS person_id, pe.last_name, pe.first_name
         FROM authorships a
         JOIN persons pe ON pe.id = a.person_id
@@ -101,6 +102,7 @@ async def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None
     hal_authorships = await _fetch_biblio_source_authorships(cur, "hal", pub_id)
     oa_authorships = await _fetch_biblio_source_authorships(cur, "openalex", pub_id)
     wos_authorships = await _fetch_biblio_source_authorships(cur, "wos", pub_id)
+    scanr_authorships = await _fetch_biblio_source_authorships(cur, "scanr", pub_id)
 
     await cur.execute(
         """
@@ -144,18 +146,10 @@ async def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None
     subjects = await get_publication_subjects(cur, pub_id)
 
     all_struct_ids: set[int] = set()
-    for row in authorships:
-        if row["structure_ids"]:
-            all_struct_ids.update(row["structure_ids"])
-    for row in hal_authorships:
-        if row["structure_ids"]:
-            all_struct_ids.update(row["structure_ids"])
-    for row in oa_authorships:
-        if row["structure_ids"]:
-            all_struct_ids.update(row["structure_ids"])
-    for row in wos_authorships:
-        if row["structure_ids"]:
-            all_struct_ids.update(row["structure_ids"])
+    for rows in (authorships, hal_authorships, oa_authorships, wos_authorships, scanr_authorships):
+        for row in rows:
+            if row["structure_ids"]:
+                all_struct_ids.update(row["structure_ids"])
 
     structures: dict[str, Any] = {}
     if all_struct_ids:
@@ -180,6 +174,7 @@ async def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None
         "hal_authorships": [dict(a) for a in hal_authorships],
         "openalex_authorships": [dict(a) for a in oa_authorships],
         "wos_authorships": [dict(a) for a in wos_authorships],
+        "scanr_authorships": [dict(a) for a in scanr_authorships],
         "theses_authorships": [dict(a) for a in theses_authorships],
         "thesis_meta": thesis_meta,
         "structures": structures,

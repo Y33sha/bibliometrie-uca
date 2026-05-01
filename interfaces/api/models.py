@@ -417,13 +417,14 @@ class ConsolidatedAuthorshipOut(BaseModel):
     source_hal: bool
     source_openalex: bool
     source_wos: bool
+    source_scanr: bool
     person_id: int
     last_name: str
     first_name: str
 
 
 class SourceAuthorshipOut(BaseModel):
-    """Authorship source (HAL / OpenAlex / WoS).
+    """Authorship source (HAL / OpenAlex / WoS / ScanR).
 
     `raw_affiliation` agrège les adresses brutes liées à l'authorship via
     `source_authorship_addresses` ; `None` s'il n'y en a pas.
@@ -542,6 +543,7 @@ class PublicationDetailResponse(BaseModel):
     hal_authorships: list[SourceAuthorshipOut]
     openalex_authorships: list[SourceAuthorshipOut]
     wos_authorships: list[SourceAuthorshipOut]
+    scanr_authorships: list[SourceAuthorshipOut]
     theses_authorships: list[ThesesAuthorshipOut]
     thesis_meta: ThesisMeta | None
     structures: dict[str, StructureInfo]
