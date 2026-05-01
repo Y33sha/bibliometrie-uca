@@ -7,6 +7,11 @@ from fastapi import APIRouter, HTTPException, Query
 
 from application.journals import merge_journals
 from application.journals import update_journal as _update_journal
+from infrastructure.db.queries.journals import (
+    existing_journal_ids,
+    get_journal_async,
+    list_journals_async,
+)
 from infrastructure.repositories import async_journal_repository
 from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import JournalListResponse, JournalUpdate, MergeRequest
@@ -30,68 +35,22 @@ async def list_journals(
     `sort` : `title` / `-title` / `publisher` / `-publisher` /
     `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
     """
-    async with get_async_cursor() as (cur, conn):
-        conditions = []
-        params: list[Any] = []
-
-        if search and len(search) >= 2:
-            conditions.append("j.title_normalized LIKE '%%' || %s || '%%'")
-            params.append(search.lower())
-
-        if publisher_id:
-            conditions.append("j.publisher_id = %s")
-            params.append(publisher_id)
-
-        where = " AND ".join(conditions) if conditions else "TRUE"
-
-        # Count
-        await cur.execute(f"SELECT COUNT(*) FROM journals j WHERE {where}", params)
-        total = (await cur.fetchone())["count"]
-
-        # Sort
-        sort_map = {
-            "title": "j.title ASC",
-            "-title": "j.title DESC",
-            "publisher": "pub_name ASC NULLS LAST, j.title ASC",
-            "-publisher": "pub_name DESC NULLS LAST, j.title ASC",
-            "pubs": "pub_count ASC, j.title ASC",
-            "-pubs": "pub_count DESC, j.title ASC",
-        }
-        order = sort_map.get(sort, sort_map["title"])
-
-        offset = (page - 1) * per_page
-        await cur.execute(
-            f"""
-            SELECT j.id, j.title, j.issn, j.eissn, j.issnl,
-                   j.publisher_id, p.name AS pub_name,
-                   j.openalex_id, j.is_in_doaj, j.is_predatory,
-                   j.apc_amount, j.apc_currency, j.oa_model,
-                   j.journal_type, j.is_academic, j.doi_prefix, j.notes,
-                   (SELECT COUNT(*) FROM publications pub
-                    WHERE pub.journal_id = j.id) AS pub_count
-            FROM journals j
-            LEFT JOIN publishers p ON p.id = j.publisher_id
-            WHERE {where}
-            ORDER BY {order}
-            LIMIT %s OFFSET %s
-        """,
-            params + [per_page, offset],
+    async with get_async_cursor() as (cur, _conn):
+        return await list_journals_async(
+            cur,
+            search=search,
+            publisher_id=publisher_id,
+            sort=sort,
+            page=page,
+            per_page=per_page,
         )
-
-        return {
-            "total": total,
-            "page": page,
-            "pages": (total + per_page - 1) // per_page,
-            "journals": await cur.fetchall(),
-        }
 
 
 @router.get("/api/journals/{journal_id}")
 async def get_journal(journal_id: int) -> Any:
     """Récupère une revue par son id (titre uniquement). 404 si inconnue."""
-    async with get_async_cursor() as (cur, conn):
-        await cur.execute("SELECT id, title FROM journals WHERE id = %s", (journal_id,))
-        row = await cur.fetchone()
+    async with get_async_cursor() as (cur, _conn):
+        row = await get_journal_async(cur, journal_id)
         if not row:
             raise HTTPException(status_code=404, detail="Revue introuvable")
         return row
@@ -105,7 +64,7 @@ async def update_journal(journal_id: int, body: JournalUpdate) -> Any:
     (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
     """
     fields = body.model_dump(exclude_unset=True)
-    async with get_async_cursor() as (cur, conn):
+    async with get_async_cursor() as (cur, _conn):
         await _update_journal(cur, journal_id, fields=fields, repo=async_journal_repository(cur))
         return {"ok": True}
 
@@ -118,11 +77,8 @@ async def merge(journal_id: int, body: MergeRequest) -> Any:
     la cible ; la source est supprimée. 404 si l'une des deux est
     introuvable.
     """
-    async with get_async_cursor() as (cur, conn):
-        await cur.execute(
-            "SELECT id FROM journals WHERE id IN (%s, %s)", (journal_id, body.source_id)
-        )
-        found = {row["id"] for row in await cur.fetchall()}
+    async with get_async_cursor() as (cur, _conn):
+        found = await existing_journal_ids(cur, (journal_id, body.source_id))
         if journal_id not in found:
             raise HTTPException(status_code=404, detail="Revue cible introuvable")
         if body.source_id not in found:

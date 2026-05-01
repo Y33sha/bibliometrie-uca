@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import APIRouter
 
 from application import config as config_service
+from infrastructure.db.queries.config import list_config_async
 from infrastructure.repositories import async_config_repository
 from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import ConfigItem, ConfigValueUpdate, HalCollectionsResponse
@@ -28,8 +29,7 @@ async def list_config() -> Any:
     est documentée dans `docs/exploitation.md`.
     """
     async with get_async_cursor() as (cur, _conn):
-        await cur.execute("SELECT key, value, description, updated_at FROM config ORDER BY key")
-        return await cur.fetchall()
+        return await list_config_async(cur)
 
 
 @router.get("/api/config/hal-collections", response_model=HalCollectionsResponse)
