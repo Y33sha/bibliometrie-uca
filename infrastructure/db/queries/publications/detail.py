@@ -13,6 +13,40 @@ async def all_years(cur: Any) -> list[int]:
     return [r["pub_year"] for r in await cur.fetchall()]
 
 
+async def _fetch_biblio_source_authorships(cur: Any, source: str, pub_id: int) -> list[Any]:
+    """Authorships HAL / OpenAlex / WoS d'une publi, avec adresses agrégées.
+
+    `raw_affiliation` concatène les `addresses.raw_text` liées via
+    `source_authorship_addresses`. `countries` retombe sur les pays
+    extraits des adresses si `sa.countries` est NULL.
+    """
+    await cur.execute(
+        """
+        SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
+               sa.in_perimeter, sa.structure_ids,
+               (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id)
+                FROM source_authorship_addresses saa2
+                JOIN addresses addr ON addr.id = saa2.address_id
+                WHERE saa2.source_authorship_id = sa.id) AS raw_affiliation,
+               sa.excluded,
+               COALESCE(sa.countries,
+                   (SELECT array_agg(DISTINCT c ORDER BY c)
+                    FROM source_authorship_addresses saa
+                    JOIN addresses addr ON addr.id = saa.address_id,
+                         unnest(addr.countries) AS c
+                    WHERE saa.source_authorship_id = sa.id
+                      AND addr.countries IS NOT NULL)
+               ) AS countries
+        FROM source_authorships sa
+        JOIN source_publications sd ON sd.id = sa.source_publication_id
+        WHERE sa.source = %s AND sd.publication_id = %s
+        ORDER BY sa.author_position
+        """,
+        (source, pub_id),
+    )
+    return await cur.fetchall()
+
+
 async def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None:
     """Détail complet d'une publication : métadonnées, sources, authorships.
 
@@ -64,66 +98,9 @@ async def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None
     )
     authorships = await cur.fetchall()
 
-    await cur.execute(
-        """
-        SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
-               sa.in_perimeter, sa.structure_ids, sa.excluded, sa.countries
-        FROM source_authorships sa
-        JOIN source_publications sd ON sd.id = sa.source_publication_id
-        WHERE sa.source = 'hal' AND sd.publication_id = %s
-        ORDER BY sa.author_position
-        """,
-        (pub_id,),
-    )
-    hal_authorships = await cur.fetchall()
-
-    await cur.execute(
-        """
-        SELECT sa.id, sa.author_position,
-               sa.raw_author_name AS full_name,
-               sa.person_id,
-               sa.in_perimeter, sa.structure_ids,
-               (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id) FROM source_authorship_addresses saa2 JOIN addresses addr ON addr.id = saa2.address_id WHERE saa2.source_authorship_id = sa.id) AS raw_affiliation,
-               sa.excluded,
-               COALESCE(sa.countries,
-                   (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM source_authorship_addresses saa
-                    JOIN addresses addr ON addr.id = saa.address_id,
-                         unnest(addr.countries) AS c
-                    WHERE saa.source_authorship_id = sa.id
-                      AND addr.countries IS NOT NULL)
-               ) AS countries
-        FROM source_authorships sa
-        JOIN source_publications sd ON sd.id = sa.source_publication_id
-        WHERE sa.source = 'openalex' AND sd.publication_id = %s
-        ORDER BY sa.author_position
-        """,
-        (pub_id,),
-    )
-    oa_authorships = await cur.fetchall()
-
-    await cur.execute(
-        """
-        SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
-               sa.in_perimeter, sa.structure_ids,
-               (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id) FROM source_authorship_addresses saa2 JOIN addresses addr ON addr.id = saa2.address_id WHERE saa2.source_authorship_id = sa.id) AS raw_affiliation,
-               sa.excluded,
-               COALESCE(sa.countries,
-                   (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM source_authorship_addresses saa
-                    JOIN addresses addr ON addr.id = saa.address_id,
-                         unnest(addr.countries) AS c
-                    WHERE saa.source_authorship_id = sa.id
-                      AND addr.countries IS NOT NULL)
-               ) AS countries
-        FROM source_authorships sa
-        JOIN source_publications sd ON sd.id = sa.source_publication_id
-        WHERE sa.source = 'wos' AND sd.publication_id = %s
-        ORDER BY sa.author_position
-        """,
-        (pub_id,),
-    )
-    wos_authorships = await cur.fetchall()
+    hal_authorships = await _fetch_biblio_source_authorships(cur, "hal", pub_id)
+    oa_authorships = await _fetch_biblio_source_authorships(cur, "openalex", pub_id)
+    wos_authorships = await _fetch_biblio_source_authorships(cur, "wos", pub_id)
 
     await cur.execute(
         """
