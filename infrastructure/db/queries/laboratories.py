@@ -399,18 +399,25 @@ async def get_laboratory_subjects(
     avec ce qui est affiché dans l'onglet "Publications" de la page labo, et
     exclut les sujets trop génériques (`subjects.usage_count` > 5000).
     """
+    # EXISTS plutôt que JOIN authorships : chaque publi apparaît une fois,
+    # plutôt que dupliquée par auteur du labo. Le COUNT(DISTINCT p.id) reste
+    # nécessaire car publication_subjects peut avoir plusieurs rows par
+    # (pub_id, subject_id) (sources différentes).
     await cur.execute(
         """
         SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS count
-        FROM authorships a
-        JOIN publications p ON p.id = a.publication_id
-        JOIN publication_subjects ps ON ps.publication_id = p.id
+        FROM publication_subjects ps
+        JOIN publications p ON p.id = ps.publication_id
         JOIN subjects s ON s.id = ps.subject_id
-        WHERE a.structure_ids && %s::int[]
-          AND a.roles && ARRAY['author']::text[]
-          AND a.in_perimeter = TRUE
-          AND p.doc_type NOT IN ('peer_review', 'memoir', 'ongoing_thesis')
+        WHERE p.doc_type NOT IN ('peer_review', 'memoir', 'ongoing_thesis')
           AND s.usage_count <= 5000
+          AND EXISTS (
+              SELECT 1 FROM authorships a
+              WHERE a.publication_id = p.id
+                AND a.structure_ids && %s::int[]
+                AND a.roles && ARRAY['author']::text[]
+                AND a.in_perimeter = TRUE
+          )
         GROUP BY s.id, s.label, s.ontologies
         ORDER BY count DESC, lower(s.label)
         LIMIT %s
@@ -478,18 +485,26 @@ async def get_laboratory_dashboard(cur: Any, lab_id: int) -> dict[str, Any]:
     )
     collab = await cur.fetchone()
 
+    # EXISTS plutôt que JOIN authorships : évite la duplication de chaque
+    # publi par auteur du labo (× ~1.2) avant l'unnest des pays (× ~27),
+    # ce qui faisait déborder le sort sur disque.
     await cur.execute(
         """
-        SELECT co.code, co.name, COUNT(DISTINCT p.id) AS count
-        FROM publications p
-        JOIN authorships a ON a.publication_id = p.id,
-             unnest(p.countries) AS cc
-        JOIN countries co ON co.code = cc
-        WHERE a.in_perimeter = TRUE
-          AND a.structure_ids && %s::int[]
-          AND a.roles && ARRAY['author']::text[]
-          AND p.doc_type = 'article'
-          AND cc <> 'fr'
+        SELECT co.code, co.name, COUNT(*) AS count
+        FROM (
+            SELECT p.id, unnest(p.countries) AS cc
+            FROM publications p
+            WHERE p.doc_type = 'article'
+              AND EXISTS (
+                  SELECT 1 FROM authorships a
+                  WHERE a.publication_id = p.id
+                    AND a.in_perimeter = TRUE
+                    AND a.structure_ids && %s::int[]
+                    AND a.roles && ARRAY['author']::text[]
+              )
+        ) sub
+        JOIN countries co ON co.code = sub.cc
+        WHERE sub.cc <> 'fr'
         GROUP BY co.code, co.name
         ORDER BY count DESC
         LIMIT 5
