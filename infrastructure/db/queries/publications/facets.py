@@ -1,12 +1,17 @@
-"""Facettes dynamiques pour /api/publications/facets (§2.12 : async).
+"""Facettes dynamiques pour /api/publications/facets.
 
 Chaque facette exclut son propre filtre mais applique tous les autres.
-Décomposition : une méthode privée par facette + un orchestrateur `build()`.
+Les facettes sont calculées en parallèle, chacune sur sa propre connexion
+du pool async (les facettes sont indépendantes ; un même connecteur PG ne
+peut traiter qu'une query à la fois).
 """
 
+import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from infrastructure.db.async_connection import get_async_pool
 from infrastructure.db.queries.filters import (
     OA_CLOSED_SQL,
     OA_OPEN_SQL,
@@ -485,31 +490,69 @@ class _PublicationFacetsBuilder:
             {"value": "no", "text": "Hors périmètre", "count": r["no"]},
         ]
 
-    # ── Orchestrateur ──────────────────────────────────────────
-
-    async def build(self) -> dict[str, Any]:
-        await self._preload_lab_hal_col()
-        labs, no_lab_count = await self._facet_labs()
-        return {
-            "years": await self._facet_years(),
-            "labs": labs,
-            "no_lab_count": no_lab_count,
-            "doc_types": await self._facet_doc_types(),
-            "access": await self._facet_access(),
-            "oa_statuses": await self._facet_oa_statuses(),
-            "corresponding": await self._facet_corresponding(),
-            "source_counts": await self._facet_source_counts(),
-            "apc": await self._facet_apc(),
-            "countries": await self._facet_countries(),
-            "hal_status": await self._facet_hal_status(),
-            "in_perimeter": await self._facet_in_perimeter(),
-        }
-
 
 async def publications_facets(
     cur: Any, *, filters: FacetFilters, root_structure_id: int
 ) -> dict[str, Any]:
     """Facettes dynamiques : chaque facette exclut son propre filtre mais
-    applique tous les autres. Décomposé dans `_PublicationFacetsBuilder`."""
-    await cur.execute("SET LOCAL jit = off")
-    return await _PublicationFacetsBuilder(cur, filters, root_structure_id).build()
+    applique tous les autres.
+
+    Les facettes sont indépendantes — on les calcule en parallèle, chacune
+    sur sa propre connexion du pool. Le `cur` passé en argument sert
+    uniquement au préchargement de `lab_hal_col` (lookup unique).
+    """
+    # Préchargement (1 query, sur la conn courante)
+    preload = _PublicationFacetsBuilder(cur, filters, root_structure_id)
+    await preload._preload_lab_hal_col()
+    lab_hal_col = preload.lab_hal_col
+
+    pool = get_async_pool()
+
+    async def run(facet: Callable[[_PublicationFacetsBuilder], Awaitable[Any]]) -> Any:
+        async with pool.connection() as conn, conn.cursor() as new_cur:
+            await new_cur.execute("SET LOCAL jit = off")
+            b = _PublicationFacetsBuilder(new_cur, filters, root_structure_id)
+            b.lab_hal_col = lab_hal_col
+            return await facet(b)
+
+    (
+        years,
+        labs_pair,
+        doc_types,
+        access,
+        oa_statuses,
+        corresponding,
+        source_counts,
+        apc,
+        countries,
+        hal_status,
+        in_perimeter,
+    ) = await asyncio.gather(
+        run(lambda b: b._facet_years()),
+        run(lambda b: b._facet_labs()),
+        run(lambda b: b._facet_doc_types()),
+        run(lambda b: b._facet_access()),
+        run(lambda b: b._facet_oa_statuses()),
+        run(lambda b: b._facet_corresponding()),
+        run(lambda b: b._facet_source_counts()),
+        run(lambda b: b._facet_apc()),
+        run(lambda b: b._facet_countries()),
+        run(lambda b: b._facet_hal_status()),
+        run(lambda b: b._facet_in_perimeter()),
+    )
+    labs, no_lab_count = labs_pair
+
+    return {
+        "years": years,
+        "labs": labs,
+        "no_lab_count": no_lab_count,
+        "doc_types": doc_types,
+        "access": access,
+        "oa_statuses": oa_statuses,
+        "corresponding": corresponding,
+        "source_counts": source_counts,
+        "apc": apc,
+        "countries": countries,
+        "hal_status": hal_status,
+        "in_perimeter": in_perimeter,
+    }
