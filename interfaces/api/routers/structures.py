@@ -13,6 +13,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from application import structures as structures_service
+from infrastructure.db.queries.structures import (
+    get_name_form_async,
+    get_structure_detail_async,
+    list_structures_async,
+)
 from infrastructure.repositories import async_structure_repository
 from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import (
@@ -46,39 +51,8 @@ async def list_structures(
     type (labo > universite > onr > chu > ecole > site > autre) puis
     nom.
     """
-    async with get_async_cursor() as (cur, conn):
-        conditions = []
-        params = []
-
-        if type:
-            conditions.append("s.structure_type::text = %s")
-            params.append(type)
-        if search:
-            conditions.append(
-                "(unaccent(s.name) ILIKE unaccent(%s) OR s.acronym ILIKE %s OR s.code ILIKE %s)"
-            )
-            params.extend([f"%{search}%"] * 3)
-
-        where = " AND ".join(conditions) if conditions else "TRUE"
-
-        await cur.execute(
-            f"""
-            SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text AS type
-            FROM structures s
-            WHERE {where}
-            ORDER BY CASE s.structure_type::text
-                WHEN 'labo' THEN 1
-                WHEN 'universite' THEN 2
-                WHEN 'onr' THEN 3
-                WHEN 'chu' THEN 4
-                WHEN 'ecole' THEN 5
-                WHEN 'site' THEN 6
-                ELSE 7
-            END, s.name
-        """,
-            params,
-        )
-        return await cur.fetchall()
+    async with get_async_cursor() as (cur, _conn):
+        return await list_structures_async(cur, type_filter=type, search=search)
 
 
 @router.get("/api/structures/{structure_id}", response_model=StructureDetailResponse)
@@ -90,64 +64,11 @@ async def get_structure(structure_id: int) -> Any:
     dans `structure_relations` ; les enfants inversement. 404 si la
     structure n'existe pas.
     """
-    async with get_async_cursor() as (cur, conn):
-        await cur.execute(
-            """
-            SELECT id, code, name, acronym, structure_type::text AS type,
-                   ror_id, rnsr_id, hal_collection, api_ids
-            FROM structures WHERE id = %s
-        """,
-            (structure_id,),
-        )
-        structure = await cur.fetchone()
-        if not structure:
+    async with get_async_cursor() as (cur, _conn):
+        detail = await get_structure_detail_async(cur, structure_id)
+        if detail is None:
             raise HTTPException(status_code=404, detail="Structure not found")
-
-        # Relations : ses tutelles (parents)
-        await cur.execute(
-            """
-            SELECT sr.id AS relation_id, sr.relation_type::text,
-                   sp.id, sp.code, sp.name, sp.acronym, sp.structure_type::text AS type
-            FROM structure_relations sr
-            JOIN structures sp ON sp.id = sr.parent_id
-            WHERE sr.child_id = %s
-            ORDER BY sr.relation_type, sp.name
-        """,
-            (structure_id,),
-        )
-        parents = await cur.fetchall()
-
-        # Relations : ses enfants
-        await cur.execute(
-            """
-            SELECT sr.id AS relation_id, sr.relation_type::text,
-                   sc.id, sc.code, sc.name, sc.acronym, sc.structure_type::text AS type
-            FROM structure_relations sr
-            JOIN structures sc ON sc.id = sr.child_id
-            WHERE sr.parent_id = %s
-            ORDER BY sr.relation_type, sc.name
-        """,
-            (structure_id,),
-        )
-        children = await cur.fetchall()
-
-        # Formes de noms
-        await cur.execute(
-            """
-            SELECT * FROM structure_name_forms
-            WHERE structure_id = %s
-            ORDER BY form_text
-        """,
-            (structure_id,),
-        )
-        forms = await cur.fetchall()
-
-        return {
-            "structure": structure,
-            "parents": parents,
-            "children": children,
-            "forms": forms,
-        }
+        return detail
 
 
 @router.post("/api/structures", response_model=StructureOut)
@@ -227,9 +148,8 @@ async def delete_relation(relation_id: int) -> Any:
 @router.get("/api/name-forms/{form_id}", response_model=NameFormOut)
 async def get_name_form(form_id: int) -> Any:
     """Récupère une forme de nom par son id. 404 si inconnue."""
-    async with get_async_cursor() as (cur, conn):
-        await cur.execute("SELECT * FROM structure_name_forms WHERE id = %s", (form_id,))
-        row = await cur.fetchone()
+    async with get_async_cursor() as (cur, _conn):
+        row = await get_name_form_async(cur, form_id)
         if not row:
             raise HTTPException(status_code=404, detail="Form not found")
         return row

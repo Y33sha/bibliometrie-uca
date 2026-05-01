@@ -7,6 +7,11 @@ from fastapi import APIRouter, HTTPException, Query
 
 from application.publishers import merge_publishers
 from application.publishers import update_publisher as _update_publisher
+from infrastructure.db.queries.publishers import (
+    existing_publisher_ids,
+    get_publisher_async,
+    list_publishers_async,
+)
 from infrastructure.repositories import async_journal_repository, async_publisher_repository
 from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import (
@@ -35,62 +40,17 @@ async def list_publishers(
     caractères. `sort` : `name` / `-name` / `journals` / `-journals`
     / `pubs` / `-pubs` ; fallback sur `name` si inconnu.
     """
-    async with get_async_cursor() as (cur, conn):
-        conditions = []
-        params = []
-
-        if search and len(search) >= 2:
-            conditions.append("p.name_normalized LIKE '%%' || %s || '%%'")
-            params.append(search.lower())
-
-        where = " AND ".join(conditions) if conditions else "TRUE"
-
-        # Count
-        await cur.execute(f"SELECT COUNT(*) FROM publishers p WHERE {where}", params)
-        total = (await cur.fetchone())["count"]
-
-        # Sort
-        sort_map = {
-            "name": "p.name ASC",
-            "-name": "p.name DESC",
-            "journals": "journal_count ASC, p.name ASC",
-            "-journals": "journal_count DESC, p.name ASC",
-            "pubs": "pub_count ASC, p.name ASC",
-            "-pubs": "pub_count DESC, p.name ASC",
-        }
-        order = sort_map.get(sort, sort_map["name"])
-
-        offset = (page - 1) * per_page
-        await cur.execute(
-            f"""
-            SELECT p.id, p.name, p.openalex_id, p.country,
-                   p.doi_prefix, p.is_predatory,
-                   (SELECT COUNT(*) FROM journals j WHERE j.publisher_id = p.id) AS journal_count,
-                   (SELECT COUNT(*) FROM publications pub
-                    JOIN journals j2 ON j2.id = pub.journal_id
-                    WHERE j2.publisher_id = p.id) AS pub_count
-            FROM publishers p
-            WHERE {where}
-            ORDER BY {order}
-            LIMIT %s OFFSET %s
-        """,
-            params + [per_page, offset],
+    async with get_async_cursor() as (cur, _conn):
+        return await list_publishers_async(
+            cur, search=search, sort=sort, page=page, per_page=per_page
         )
-
-        return {
-            "total": total,
-            "page": page,
-            "pages": (total + per_page - 1) // per_page,
-            "publishers": await cur.fetchall(),
-        }
 
 
 @router.get("/api/publishers/{publisher_id}", response_model=PublisherBasic)
 async def get_publisher(publisher_id: int) -> Any:
     """Récupère un éditeur par son id (nom uniquement). 404 si inconnu."""
-    async with get_async_cursor() as (cur, conn):
-        await cur.execute("SELECT id, name FROM publishers WHERE id = %s", (publisher_id,))
-        row = await cur.fetchone()
+    async with get_async_cursor() as (cur, _conn):
+        row = await get_publisher_async(cur, publisher_id)
         if not row:
             raise HTTPException(status_code=404, detail="Éditeur introuvable")
         return row
@@ -104,7 +64,7 @@ async def update_publisher(publisher_id: int, body: PublisherUpdate) -> Any:
     (`exclude_unset=True`). Lève 404 si l'éditeur n'existe pas.
     """
     fields = body.model_dump(exclude_unset=True)
-    async with get_async_cursor() as (cur, conn):
+    async with get_async_cursor() as (cur, _conn):
         await _update_publisher(
             cur, publisher_id, fields=fields, repo=async_publisher_repository(cur)
         )
@@ -119,11 +79,8 @@ async def merge(publisher_id: int, body: MergeRequest) -> Any:
     transférées à la cible ; la source est supprimée. 404 si l'un
     des deux éditeurs est introuvable.
     """
-    async with get_async_cursor() as (cur, conn):
-        await cur.execute(
-            "SELECT id FROM publishers WHERE id IN (%s, %s)", (publisher_id, body.source_id)
-        )
-        found = {row["id"] for row in await cur.fetchall()}
+    async with get_async_cursor() as (cur, _conn):
+        found = await existing_publisher_ids(cur, (publisher_id, body.source_id))
         if publisher_id not in found:
             raise HTTPException(status_code=404, detail="Éditeur cible introuvable")
         if body.source_id not in found:

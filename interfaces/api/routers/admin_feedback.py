@@ -18,6 +18,12 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
+from infrastructure.db.queries.admin_feedback import (
+    feedback_false_negatives_async,
+    feedback_false_positives_async,
+    feedback_stats_async,
+    feedback_structures_async,
+)
 from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import (
     FeedbackAddressesResponse,
@@ -60,18 +66,8 @@ async def feedback_structures() -> Any:
     - la structure UCA (code = "uca") est sélectionnée par défaut si
       elle existe, sinon la première structure du premier type non vide.
     """
-    async with get_async_cursor() as (cur, conn):
-        await cur.execute(
-            """
-            SELECT s.id, s.code, s.name, s.acronym,
-                   s.structure_type::text AS type
-            FROM structures s
-            WHERE s.structure_type::text = ANY(%s)
-            ORDER BY s.name
-            """,
-            (list(_FEEDBACK_STRUCTURE_TYPES),),
-        )
-        rows = await cur.fetchall()
+    async with get_async_cursor() as (cur, _conn):
+        rows = await feedback_structures_async(cur, list(_FEEDBACK_STRUCTURE_TYPES))
 
     by_type: dict[str, list[dict[str, Any]]] = {}
     default_id: int | None = None
@@ -94,22 +90,8 @@ async def feedback_structures() -> Any:
 @router.get("/api/admin/feedback/stats", response_model=FeedbackStats)
 async def feedback_stats(structure_id: int = Query(...)) -> Any:
     """Statistiques de qualité de la détection pour une structure donnée."""
-    async with get_async_cursor() as (cur, conn):
-        await cur.execute(
-            """
-            SELECT
-                COUNT(*) FILTER (WHERE is_confirmed IS NOT NULL) AS total_reviewed,
-                COUNT(*) FILTER (WHERE is_confirmed = TRUE AND matched_form_id IS NOT NULL) AS concordant_valid,
-                COUNT(*) FILTER (WHERE is_confirmed = FALSE AND matched_form_id IS NULL) AS concordant_rejected,
-                COUNT(*) FILTER (WHERE is_confirmed = TRUE AND matched_form_id IS NULL) AS false_negatives,
-                COUNT(*) FILTER (WHERE is_confirmed = FALSE AND matched_form_id IS NOT NULL) AS false_positives,
-                COUNT(*) FILTER (WHERE is_confirmed IS NULL AND matched_form_id IS NOT NULL) AS pending
-            FROM address_structures
-            WHERE structure_id = %s
-        """,
-            (structure_id,),
-        )
-        row = await cur.fetchone()
+    async with get_async_cursor() as (cur, _conn):
+        row = await feedback_stats_async(cur, structure_id)
 
         reviewed = (
             (row["concordant_valid"] or 0)
@@ -137,62 +119,10 @@ async def feedback_false_negatives(
     search: str = Query(""),
 ) -> Any:
     """Adresses confirmées manuellement pour cette structure mais non détectées par le script."""
-    offset = (page - 1) * per_page
-
-    async with get_async_cursor() as (cur, conn):
-        conditions = [
-            "ast.structure_id = %s",
-            "ast.is_confirmed = TRUE",
-            "ast.matched_form_id IS NULL",
-        ]
-        params: list = [structure_id]
-
-        if search:
-            conditions.append("unaccent(a.raw_text) ILIKE unaccent(%s)")
-            params.append(f"%{search}%")
-
-        where = " AND ".join(conditions)
-
-        await cur.execute(
-            f"""
-            SELECT COUNT(*)
-            FROM address_structures ast
-            JOIN addresses a ON a.id = ast.address_id
-            WHERE {where}
-        """,
-            params,
+    async with get_async_cursor() as (cur, _conn):
+        return await feedback_false_negatives_async(
+            cur, structure_id=structure_id, page=page, per_page=per_page, search=search
         )
-        total = (await cur.fetchone())["count"]
-
-        await cur.execute(
-            f"""
-            SELECT
-                a.id, a.raw_text, a.pub_count,
-                (SELECT json_agg(json_build_object(
-                    'structure_id', s.id, 'acronym', s.acronym, 'name', s.name,
-                    'is_detected', (ast2.matched_form_id IS NOT NULL),
-                    'is_confirmed', ast2.is_confirmed
-                ))
-                FROM address_structures ast2
-                JOIN structures s ON s.id = ast2.structure_id
-                WHERE ast2.address_id = a.id AND s.structure_type != 'site'
-                ) AS labs
-            FROM address_structures ast
-            JOIN addresses a ON a.id = ast.address_id
-            WHERE {where}
-            ORDER BY a.pub_count DESC, a.id
-            LIMIT %s OFFSET %s
-        """,
-            params + [per_page, offset],
-        )
-
-        return {
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page,
-            "addresses": await cur.fetchall(),
-        }
 
 
 @router.get("/api/admin/feedback/false-positives", response_model=FeedbackAddressesResponse)
@@ -203,77 +133,10 @@ async def feedback_false_positives(
     search: str = Query(""),
 ) -> Any:
     """Adresses détectées pour cette structure mais rejetées manuellement."""
-    offset = (page - 1) * per_page
-
-    async with get_async_cursor() as (cur, conn):
-        conditions = [
-            "ast.structure_id = %s",
-            "ast.is_confirmed = FALSE",
-            "ast.matched_form_id IS NOT NULL",
-        ]
-        params: list = [structure_id]
-
-        if search:
-            conditions.append("unaccent(a.raw_text) ILIKE unaccent(%s)")
-            params.append(f"%{search}%")
-
-        where = " AND ".join(conditions)
-
-        await cur.execute(
-            f"""
-            SELECT COUNT(*)
-            FROM address_structures ast
-            JOIN addresses a ON a.id = ast.address_id
-            WHERE {where}
-        """,
-            params,
+    async with get_async_cursor() as (cur, _conn):
+        return await feedback_false_positives_async(
+            cur, structure_id=structure_id, page=page, per_page=per_page, search=search
         )
-        total = (await cur.fetchone())["count"]
-
-        await cur.execute(
-            f"""
-            SELECT
-                a.id, a.raw_text, a.pub_count,
-                (SELECT json_agg(json_build_object(
-                    'structure_id', s.id, 'acronym', s.acronym, 'name', s.name,
-                    'is_detected', (ast2.matched_form_id IS NOT NULL),
-                    'is_confirmed', ast2.is_confirmed
-                ))
-                FROM address_structures ast2
-                JOIN structures s ON s.id = ast2.structure_id
-                WHERE ast2.address_id = a.id AND s.structure_type != 'site'
-                ) AS labs,
-                (SELECT json_agg(json_build_object(
-                    'form_id', nf.id,
-                    'form_text', nf.form_text,
-                    'requires_context_of', nf.requires_context_of,
-                    'structure_name', COALESCE(s.acronym, s.name)
-                ))
-                FROM address_structures ast2
-                JOIN structure_name_forms nf ON nf.id = ast2.matched_form_id
-                JOIN structures s ON s.id = nf.structure_id
-                WHERE ast2.address_id = a.id
-                  AND ast2.structure_id = %s
-                  AND ast2.matched_form_id IS NOT NULL
-                ) AS matched_forms
-            FROM address_structures ast
-            JOIN addresses a ON a.id = ast.address_id
-            WHERE {where}
-            ORDER BY a.pub_count DESC, a.id
-            LIMIT %s OFFSET %s
-        """,
-            # Ordre texte des placeholders : matched_forms.structure_id
-            # (sous-requête en tête) > WHERE {where} > LIMIT/OFFSET.
-            [structure_id] + params + [per_page, offset],
-        )
-
-        return {
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page,
-            "addresses": await cur.fetchall(),
-        }
 
 
 @router.get("/api/admin/feedback/rerun")
