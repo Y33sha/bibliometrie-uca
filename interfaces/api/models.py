@@ -425,8 +425,8 @@ class ConsolidatedAuthorshipOut(BaseModel):
 class SourceAuthorshipOut(BaseModel):
     """Authorship source (HAL / OpenAlex / WoS).
 
-    `raw_affiliation` n'est calculé que pour OpenAlex et WoS ; absent
-    côté HAL (défaut None).
+    `raw_affiliation` agrège les adresses brutes liées à l'authorship via
+    `source_authorship_addresses` ; `None` s'il n'y en a pas.
     """
 
     id: int
