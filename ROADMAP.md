@@ -21,10 +21,10 @@ aggregate root à **ce moment-là**, pas avant.
 Extraction faite sur les 7 routers critiques (pub_stats, publications,
 persons, addresses, laboratories, duplicates, authorships) — SQL
 centralisé dans `infrastructure/db/queries/`.
-- [ ] **Reliquat** (petits routers — existence checks + lookups simples,
-  acceptables selon CQRS-lite) : feedback, structures, journals,
-  publishers, config, stats. ~30 `cur.execute` au total, la plupart
-  étant des `SELECT id WHERE id = %s`.
+- [x] **Reliquat** : `admin_feedback`, `structures`, `journals`,
+  `publishers`, `config`. 21 `cur.execute` migrés vers les modules
+  `infrastructure/db/queries/` correspondants. `stats.py` n'avait
+  déjà plus de SQL inline.
 
 ### 1.3 Module `facets`
 Audit fait : la duplication réelle inter-entités est marginale (~30-50
@@ -118,14 +118,14 @@ API + logique métier.
   faire au fil des prochaines touches sur ces composants, pas en
   bulk.
 
-#### 2.7.5 Tests frontend — nouveau
-Audit : 0 test frontend (ni unit ni e2e). `svelte-check` couvre les
-types mais pas le comportement. Un bug régressif sur un composant admin
-n'est détecté qu'en UI manuel.
-- [ ] Installer **Vitest** + `@testing-library/svelte` pour tester les
-  composables (`useDebouncedSearch`, `useFacets`, `useUrlFilters`,
-  `usePaginatedFetch`, `useColumnVisibility`) — ce sont les zones
-  métier et les plus réutilisées.
+#### 2.7.5 Tests frontend
+- [x] Vitest configuré, **5 composables testés** (`useDebouncedSearch`,
+  `useColumnVisibility`, `useUrlFilters`, `useFacets`,
+  `usePaginatedFetch`) — 52 tests couvrant timers, race conditions,
+  persistance `localStorage`, sérialisation URL, mappings de facettes,
+  pagination. `happy-dom` pour les tests qui touchent `localStorage`/
+  `window`. `@testing-library/svelte` non nécessaire (composables
+  non-DOM). 24 tests utils existants sur `src/lib/utils.ts`.
 - [ ] Installer **Playwright** pour 2-3 parcours e2e critiques :
   login admin, recherche publication, fusion de personnes.
 - [ ] Ajouter au pre-commit + CI une fois une baseline établie.
@@ -210,27 +210,8 @@ reste du pipeline reste sync.
 build_authorships, dédup). Async n'aide pas là-dessus.
 
 ---
-
-## Chantier fonctionnalités
-
-Le détail est dans `TODO_LAURA.md`. Grands axes :
-
-- **Pipeline** : déduplications avancées, phase de nettoyage des
-  hal-id erronés, stockage JSON brut externalisé, robustesse long terme
-- **Nouvelles sources** : CrossRef, ArXiv, PubMed, DataCite, brevets, etc.
-- **Qualité des données** : détection de publications disparues,
-  thèses hors-établissement, méga-authorships, chantier des types de
-  documents, chantier journals/publishers
-- **Interface admin** : audit trail, adresses, personnes, publishers/journals
-- **Interface publique** : dashboards, filtres, relations entre
-  publications, accessibilité, responsivité
-- **Cas particuliers** et bizarreries à élucider
-
----
 ## A explorer
 
 **SQLAlchemy Core** (pas ORM), pour la construction dynamique de requêtes. SQLAlchemy a deux couches : Core (query builder, paramétrage sûr, abstraction du dialecte) et ORM (mapping objets-tables). Tu peux utiliser Core sans ORM : tu écris des requêtes via son API Python (select(...).where(...).order_by(...)) qui génèrent du SQL sûr et paramétré, mais tu n'introduis pas de couche ORM. C'est particulièrement utile pour les requêtes dynamiques avec filtres variables. Tes requêtes "statiques" peuvent rester en SQL brut pour la clarté.
 
 **Alembic** pour les migrations. Indépendant de l'usage d'ORM. Tu continues à écrire ton schéma en SQL brut si tu veux, mais tu versionnes et orchestres les migrations avec Alembic. Gain de maintenance réel, coût d'adoption modéré.
-
-**environnement virtuel**?
