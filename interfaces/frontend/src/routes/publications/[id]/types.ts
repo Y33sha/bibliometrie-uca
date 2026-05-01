@@ -24,6 +24,7 @@ export interface SourceRow {
   hal: SourceAuthorship | null;
   oa: SourceAuthorship | null;
   wos: SourceAuthorship | null;
+  scanr: SourceAuthorship | null;
   conflict: boolean;
 }
 

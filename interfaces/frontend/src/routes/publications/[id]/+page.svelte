@@ -36,17 +36,25 @@
     const halMap = new Map<number, SourceAuthorship>();
     const oaMap = new Map<number, SourceAuthorship>();
     const wosMap = new Map<number, SourceAuthorship>();
+    const scanrMap = new Map<number, SourceAuthorship>();
     for (const a of data.hal_authorships) if (a.author_position != null) halMap.set(a.author_position, a);
     for (const a of data.openalex_authorships) if (a.author_position != null) oaMap.set(a.author_position, a);
     for (const a of data.wos_authorships) if (a.author_position != null) wosMap.set(a.author_position, a);
+    for (const a of data.scanr_authorships) if (a.author_position != null) scanrMap.set(a.author_position, a);
 
-    const allPos = new Set([...halMap.keys(), ...oaMap.keys(), ...wosMap.keys()]);
+    const allPos = new Set([
+      ...halMap.keys(),
+      ...oaMap.keys(),
+      ...wosMap.keys(),
+      ...scanrMap.keys(),
+    ]);
     const rows: SourceRow[] = [];
     for (const pos of [...allPos].sort((a, b) => a - b)) {
       const hal = halMap.get(pos) ?? null;
       const oa = oaMap.get(pos) ?? null;
       const wos = wosMap.get(pos) ?? null;
-      const entries = [hal, oa, wos].filter((x): x is SourceAuthorship => x !== null);
+      const scanr = scanrMap.get(pos) ?? null;
+      const entries = [hal, oa, wos, scanr].filter((x): x is SourceAuthorship => x !== null);
       const activeEntries = entries.filter((e) => !e.excluded);
 
       let conflict = false;
@@ -68,6 +76,11 @@
           data.wos_authorships.some((a) => !a.excluded)
         )
           conflict = true;
+        if (
+          (scanr === null || scanr.excluded) &&
+          data.scanr_authorships.some((a) => !a.excluded)
+        )
+          conflict = true;
       }
       // Conflit : deux personnes résolues différentes
       const personIds = activeEntries
@@ -81,7 +94,7 @@
       )
         conflict = true;
 
-      rows.push({ position: pos, hal, oa, wos, conflict });
+      rows.push({ position: pos, hal, oa, wos, scanr, conflict });
     }
     return rows;
   });
@@ -172,6 +185,7 @@
     {halSource}
     {oaSource}
     {wosSource}
+    {scanrSource}
     structures={data!.structures}
     {isAdmin}
     onChange={loadData}

@@ -2757,6 +2757,8 @@ export interface components {
             source_openalex: boolean;
             /** Source Wos */
             source_wos: boolean;
+            /** Source Scanr */
+            source_scanr: boolean;
             /** Person Id */
             person_id: number;
             /** Last Name */
@@ -4519,6 +4521,8 @@ export interface components {
             openalex_authorships: components["schemas"]["SourceAuthorshipOut"][];
             /** Wos Authorships */
             wos_authorships: components["schemas"]["SourceAuthorshipOut"][];
+            /** Scanr Authorships */
+            scanr_authorships: components["schemas"]["SourceAuthorshipOut"][];
             /** Theses Authorships */
             theses_authorships: components["schemas"]["ThesesAuthorshipOut"][];
             thesis_meta: components["schemas"]["ThesisMeta"] | null;
@@ -4791,10 +4795,10 @@ export interface components {
         };
         /**
          * SourceAuthorshipOut
-         * @description Authorship source (HAL / OpenAlex / WoS).
+         * @description Authorship source (HAL / OpenAlex / WoS / ScanR).
          *
-         *     `raw_affiliation` n'est calculé que pour OpenAlex et WoS ; absent
-         *     côté HAL (défaut None).
+         *     `raw_affiliation` agrège les adresses brutes liées à l'authorship via
+         *     `source_authorship_addresses` ; `None` s'il n'y en a pas.
          */
         SourceAuthorshipOut: {
             /** Id */

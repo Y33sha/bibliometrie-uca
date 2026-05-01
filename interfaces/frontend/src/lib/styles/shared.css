@@ -344,6 +344,7 @@ th.sorted .sort-arrow { color: var(--accent); opacity: 1; }
 .source-hal-label { background: #e8f0f8; color: #3b6b9e; }
 .source-oa-label { background: #fef3e0; color: #b8733e; }
 .source-wos-label { background: #e8e0f8; color: #5a3d8a; }
+.source-scanr-label { background: #e0edf5; color: #1b4f72; }
 
 /* ── Lab tag (pill) ── */
 .lab-tag {
