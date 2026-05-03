@@ -1,6 +1,4 @@
-- problème div sources: les authorships HAL ne sont plus reconnues
 - examiner cette publi: 21743 (authors openalex)
-- ajouter scanr aux sources (div auteurs UCA + div sources)
 
 # A régler avant transmission
 ## Pipeline
@@ -21,10 +19,8 @@
 * [ ] embargos (HAL, theses.fr): afficher dates (existent-elles dans le retour api)?
 * [ ] https://hal.science/hal-03874894 , https://hal.science/hal-04111614 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
 * [ ] DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
-* [ ] Publications rattachées au mauvais compte HAL: cf Marc Andre: trouver moyen de rejeter le compte et garder les publis (authorship ok, author pas ok => vérifier que ce ne sera pas ré-écrasé)
 ## Code
 * [ ] vérifier si certains ports ne seraient pas mieux placés dans application/ (critère: sont-ils importés par domain/ ou pas?)
-* [ ] faire le ménage dans db/queries: trop de choses mal rangées ou mal nommées
 * [ ] auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques): supprimer les requêtes vers source_authorships pouvant être remplacées par des requêtes vers les tables canoniques
 * [ ] problème page affiliation-conflicts: requête beaucoup trop lente
 
@@ -37,7 +33,6 @@
 * [ ] brevets? INPI?
 * [ ] divers: ORCID, IdRef, DOAJ
 ## Types de documents: fixer l'enum et le mapping, algo de résolution de conflits
-* [ ] types parfois non fiables sur OpenAlex: https://openalex.org/works/W4225722715 (utiliser Unpaywall aussi pour corriger type doc?)
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
 * [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou revue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); preprints en accès gold selon OpenAlex (?); data papers?
 * [ ] types wos composites: étudier, voir s'il s'agit de types/sous-types
@@ -93,15 +88,15 @@
 * [ ] admin/personnes, formes de nom: modal authorships: source affichée: default wos (ajouter les autres sources, et mettre default None)
 * [ ] colonne auteur sur la page thèses
 * [ ] sujets: layout différent des autres pages?
-## Cas particuliers, bizarreries à élucider, à examiner plus tard
+* [ ] affichage des caractères &amp;lt;i&amp;gt; (publi 78307)
+
+# Cas particuliers, bizarreries à élucider
 * openalex répète des auteurs : publi 77832
 * [ ] 79637: authorship source rejetée => la rejeter de l'authorship vérité
 * erreur de parsing OA: publication 113652
 * thèses CHELTER: 3 ou 4?
 * publi 20832: pourquoi pas d'affiliations
 * 2020CLFAC007 thèse du CROC, pas récupérée via theses.fr! (158960) => aurait dû être récupéré par API theses.fr ET par cross-import de scanR via le NNT
-* publi: 78307 affichage des caractères &amp;lt;i&amp;gt;
-* http://localhost/bibliometrie/laboratories/215?hal_status=hors_collection => affiche des trucs avec statut ok
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
