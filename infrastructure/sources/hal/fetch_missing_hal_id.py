@@ -140,30 +140,26 @@ def find_hal_ids_from_scanr(cur: Any) -> list[dict]:
         for row in cur.fetchall()
     }
 
-    # 2. Staging ScanR non normalisé (externalIds dans raw_data)
+    # 2. Staging ScanR non normalisé : extraction des externalIds en SQL
+    # (jsonb_array_elements côté DB) — éviter de matérialiser les raw_data
+    # ScanR complets en mémoire Python, comme pour OpenAlex ci-dessus.
     cur.execute("""
-        SELECT source_id AS scanr_id, raw_data
-        FROM staging
-        WHERE source = 'scanr' AND raw_data IS NOT NULL
+        SELECT s.source_id AS scanr_id, ext->>'id' AS hal_id
+        FROM staging s,
+             jsonb_array_elements(s.raw_data->'externalIds') ext
+        WHERE s.source = 'scanr'
+          AND s.raw_data ? 'externalIds'
+          AND ext->>'type' = 'hal'
+          AND ext->>'id' IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM staging sh
+              WHERE sh.source = 'hal' AND sh.source_id = ext->>'id'
+          )
     """)
-    candidates = {}
     for row in cur.fetchall():
-        for ext in (row["raw_data"] or {}).get("externalIds") or []:
-            if ext.get("type") == "hal":
-                hal_id = ext.get("id")
-                if hal_id and hal_id not in results and hal_id not in candidates:
-                    candidates[hal_id] = row["scanr_id"]
-
-    # Vérifier en batch quels hal_ids sont déjà en staging HAL
-    if candidates:
-        cur.execute(
-            "SELECT source_id FROM staging WHERE source = 'hal' AND source_id = ANY(%s)",
-            (list(candidates.keys()),),
-        )
-        already_staged = {r["source_id"] for r in cur.fetchall()}
-        for hal_id, scanr_id in candidates.items():
-            if hal_id not in already_staged:
-                results[hal_id] = {"source": "scanr", "hal_id": hal_id, "scanr_id": scanr_id}
+        hal_id = row["hal_id"]
+        if hal_id not in results:
+            results[hal_id] = {"source": "scanr", "hal_id": hal_id, "scanr_id": row["scanr_id"]}
 
     return list(results.values())
 
@@ -193,9 +189,7 @@ def find_nnt_without_hal(cur: Any) -> list[dict]:
     ]
 
 
-async def fetch_hal_by_nnt(
-    client: httpx.AsyncClient, nnt: str, *, base_url: str
-) -> dict | None:
+async def fetch_hal_by_nnt(client: httpx.AsyncClient, nnt: str, *, base_url: str) -> dict | None:
     """Télécharge un document depuis l'API HAL par NNT."""
     try:
         data = await http_request_with_retry_async(
@@ -318,9 +312,7 @@ def _insert_nnt_result(cur: Any, nnt: str, doc: dict | None) -> tuple[bool, bool
     hal_id = doc.get("halId_s")
     if not hal_id:
         return (True, False)
-    cur.execute(
-        "SELECT 1 FROM staging WHERE source = 'hal' AND source_id = %s", (hal_id,)
-    )
+    cur.execute("SELECT 1 FROM staging WHERE source = 'hal' AND source_id = %s", (hal_id,))
     if cur.fetchone():
         log.debug(f"  NNT={nnt} → {hal_id} déjà en staging")
         return (True, False)
@@ -358,9 +350,7 @@ async def _fetch_by_halid_async(
                 progress["done"] += 1
                 if progress["done"] % 50 == 0:
                     await asyncio.to_thread(conn.commit)
-                    log.info(
-                        f"  {progress['done']}/{total} — {progress['fetched']} récupérés"
-                    )
+                    log.info(f"  {progress['done']}/{total} — {progress['fetched']} récupérés")
 
         await asyncio.gather(*(process_one(r) for r in refs))
 
