@@ -1354,3 +1354,37 @@ class TestPopulateAffiliationsIdempotence:
         assert counts_2 == counts_1, (
             f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )
+
+    def test_run_populate_is_source_agnostic(self, db):
+        """Régression : run_populate doit traiter toutes les sources sans filtre.
+
+        Une weekly avec --sources=hal ne doit plus laisser les SAs OpenAlex
+        bloquées sans structure_ids quand leur adresse a été résolue entre
+        deux runs (cas observé sur pub 21743 : adresse UCA résolue mais
+        Marc Ruivard / Olivier Aumaître côté OA restés sans structure_ids
+        car la weekly run ne ciblait que hal+scanr).
+        """
+        import logging
+
+        from application.pipeline.affiliations.populate_affiliations import run_populate
+        from infrastructure.db.queries.affiliations import PgAffiliationsQueries
+        from infrastructure.perimeter import (
+            get_affiliations_structure_ids,
+            get_persons_structure_ids,
+        )
+
+        _setup_affiliations_test_data(db)
+
+        run_populate(
+            db,
+            db.connection,
+            PgAffiliationsQueries(),
+            logging.getLogger("test"),
+            get_persons_structure_ids(db),
+            get_affiliations_structure_ids(db),
+        )
+
+        db.execute("SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = 80002")
+        row = db.fetchone()
+        assert row["in_perimeter"] is True
+        assert row["structure_ids"] == [80001]
