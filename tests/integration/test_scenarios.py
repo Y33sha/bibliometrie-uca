@@ -192,6 +192,53 @@ class TestPublicationService:
         assert row["journal_id"] == journal_id
         assert row["oa_status"] == "gold"
 
+    def test_refresh_auto_merges_when_doi_already_taken(self, db, pub_repo):
+        """Régression : la promotion d'un DOI déjà occupé par une autre
+        publication doit déclencher une fusion automatique au lieu de
+        violer publications_doi_lower_key.
+
+        Cas réel : thèse 2020CLFAC037 dont le DOI ABES (10.70675/...)
+        a été créé par OpenAlex (sans NNT) sur une pub A, puis promu
+        depuis la source_publication theses.fr d'une pub B (créée par
+        NNT sans DOI). Avant fix : crash IntegrityError.
+        """
+        existing, _ = find_or_create(
+            db,
+            title="Thèse côté OpenAlex",
+            title_normalized="these cote openalex",
+            pub_year=2020,
+            doc_type="thesis",
+            doi="10.70675/regression-test",
+            repo=pub_repo,
+        )
+        current, _ = find_or_create(
+            db,
+            title="Thèse côté theses.fr",
+            title_normalized="these cote theses fr",
+            pub_year=2020,
+            doc_type="thesis",
+            repo=pub_repo,
+        )
+        db.execute(
+            """
+            INSERT INTO source_publications (source, source_id, title, pub_year,
+                                          publication_id, doi)
+            VALUES ('theses', '2020REGRESS', 'Thèse', 2020, %s, %s)
+            """,
+            (current, "10.70675/regression-test"),
+        )
+
+        refresh_from_sources(db, current, repo=pub_repo)
+
+        # current est vivant et a hérité du DOI
+        db.execute("SELECT doi FROM publications WHERE id = %s", (current,))
+        row = db.fetchone()
+        assert row is not None
+        assert row["doi"] == "10.70675/regression-test"
+        # existing a été absorbée
+        db.execute("SELECT id FROM publications WHERE id = %s", (existing,))
+        assert db.fetchone() is None
+
     def test_allow_create_false(self, db, pub_repo):
         pub_id, is_new = find_or_create(
             db,
