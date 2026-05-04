@@ -317,6 +317,12 @@ def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) 
 
     Ne touche PAS à : title, title_normalized, notes, sources (utiliser
     update_sources() séparément).
+
+    Auto-fusion sur conflit DOI :
+    Si la promotion du DOI agrégé entre en collision avec une autre
+    publication qui occupe déjà ce DOI, cette dernière est absorbée dans
+    `pub_id` avant l'UPDATE — au lieu de laisser remonter une violation
+    de contrainte unique. `pub_id` reste vivant pour le caller.
     """
     rows = repo.get_source_rows(pub_id)
     if not rows:
@@ -324,6 +330,23 @@ def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) 
 
     rank = {s: i for i, s in enumerate(SOURCE_PRIORITY)}
     rows.sort(key=lambda r: rank.get(r["source"], 99))
+
+    # Si le DOI à promouvoir est déjà occupé par une autre publication,
+    # fusionner d'abord pour éviter une violation de la contrainte unique
+    # `publications_doi_lower_key` au moment de l'UPDATE. Cas typique :
+    # une thèse avec un DOI ABES (10.70675/...) créée en double — une fois
+    # via OpenAlex (DOI seul, NNT inconnu) et une fois via theses.fr/HAL
+    # (NNT seul, DOI publié plus tard). Quand le DOI finit par apparaître
+    # dans une source_publication, sa promotion vers publications.doi
+    # collisionne avec la pub OpenAlex. La fusion absorbe l'autre dans
+    # `pub_id` (qui reste vivant pour le caller).
+    new_doi = _first_non_null(rows, "doi")
+    if new_doi:
+        existing = repo.find_by_doi(new_doi)
+        if existing and existing.id != pub_id:
+            merge_publications(cur, pub_id, existing.id, repo=repo)
+            rows = repo.get_source_rows(pub_id)
+            rows.sort(key=lambda r: rank.get(r["source"], 99))
 
     repo.update_aggregated(
         pub_id,
