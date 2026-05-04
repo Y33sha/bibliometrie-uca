@@ -662,7 +662,7 @@ def process_work(
     address_linker: AddressLinker,
     struct_cache: dict | None = None,
     struct_name_cache: dict | None = None,
-) -> bool:
+) -> bool | None:
     """Traite un work du staging HAL."""
     from application.pipeline.timings import StepTimer
 
@@ -691,7 +691,7 @@ def process_work(
                         f"version {version_doi} deja en staging, skip"
                     )
                     staging_queries.mark_done(cur, staging_id)
-                    return False
+                    return None
 
         publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
         publisher_id = (
