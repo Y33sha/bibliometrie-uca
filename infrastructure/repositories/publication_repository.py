@@ -335,15 +335,24 @@ class PgPublicationRepository:
         # 3. Enrichir la cible avec les métadonnées de la source.
         # Ordre : capturer les valeurs src → NULL-er doi src (libère
         # la contrainte UNIQUE lower(doi)) → enrichir target.
-        self._cur.execute(
-            """
-            SELECT doi, journal_id, oa_status::text AS oa_status,
-                   language, container_title, countries
-            FROM publications WHERE id = %s
-            """,
-            (source_id,),
-        )
-        src = self._cur.fetchone()
+        # Cursor dict_row interne : `self._cur` peut être tuple_row
+        # (ex: normalize_hal/wos avec USE_DICT_CURSOR=False) — on garantit
+        # ici l'accès par nom de colonne.
+        from psycopg.rows import dict_row
+
+        dict_cur = self._cur.connection.cursor(row_factory=dict_row)
+        try:
+            dict_cur.execute(
+                """
+                SELECT doi, journal_id, oa_status::text AS oa_status,
+                       language, container_title, countries
+                FROM publications WHERE id = %s
+                """,
+                (source_id,),
+            )
+            src = dict_cur.fetchone()
+        finally:
+            dict_cur.close()
         self._cur.execute("UPDATE publications SET doi = NULL WHERE id = %s", (source_id,))
         self._cur.execute(
             f"""

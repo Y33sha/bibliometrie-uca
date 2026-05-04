@@ -393,6 +393,32 @@ class TestMergePublications:
         db.execute("SELECT oa_status FROM publications WHERE id = %s", (target,))
         assert db.fetchone()["oa_status"] == "gold"
 
+    def test_works_with_tuple_row_cursor(self, db):
+        """Régression : merge_into doit fonctionner avec un curseur tuple_row.
+
+        Reproduit le contexte normalize_hal/wos (USE_DICT_CURSOR=False).
+        Avant fix, plantait avec « TypeError: tuple indices must be integers
+        or slices, not str » à l'étape d'enrichissement des métadonnées src.
+        """
+        from psycopg.rows import tuple_row
+
+        target = _insert_publication(db, title="Target", doi=None, oa_status="closed")
+        source = _insert_publication(
+            db, title="Source", doi="10.9999/regression", oa_status="diamond"
+        )
+
+        tuple_cur = db.connection.cursor(row_factory=tuple_row)
+        try:
+            tuple_repo = publication_repository(tuple_cur)
+            merge_publications(tuple_cur, target, source, repo=tuple_repo)
+        finally:
+            tuple_cur.close()
+
+        db.execute("SELECT doi, oa_status FROM publications WHERE id = %s", (target,))
+        row = db.fetchone()
+        assert row["doi"] == "10.9999/regression"
+        assert row["oa_status"] == "diamond"
+
 
 async def _a_insert_publication(db, title="Test", doi=None, oa_status="unknown"):
     await db.execute(
