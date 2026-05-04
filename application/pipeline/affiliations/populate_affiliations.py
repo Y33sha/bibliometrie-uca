@@ -84,24 +84,27 @@ def run_populate(
     perimeter_ids: set[int],
     wide_ids: set[int],
     *,
-    sources: set[str],
     mode: str = "full",
 ) -> None:
+    """Phase source-agnostique : traite toutes les sources systématiquement.
+
+    `resolve_addresses` (en amont) résout les adresses indépendamment des
+    sources, donc cette propagation doit l'être aussi — sinon les
+    `source_authorships` d'une source non listée restent bloquées sans
+    `structure_ids` malgré une adresse résolue.
+    """
     daily = mode == "daily"
 
     t0 = time.perf_counter()
 
     logger.info(f"Périmètre restreint : {len(perimeter_ids)} structures")
     logger.info(f"Périmètre large     : {len(wide_ids)} structures")
-    logger.info(f"Sources : {', '.join(sorted(sources))}")
     if daily:
         logger.info("Mode daily : traitement des authorships récentes uniquement")
 
     for source in BIBLIO_SOURCES:
-        if source in sources:
-            _step_address_source(cur, queries, logger, source, perimeter_ids, wide_ids, daily=daily)
-    if "theses" in sources:
-        step3d_theses(cur, queries, logger, wide_ids, daily=daily)
+        _step_address_source(cur, queries, logger, source, perimeter_ids, wide_ids, daily=daily)
+    step3d_theses(cur, queries, logger, wide_ids, daily=daily)
 
     conn.commit()
     elapsed = time.perf_counter() - t0

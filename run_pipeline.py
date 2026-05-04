@@ -212,12 +212,14 @@ def phase_affiliations(**kw: Any) -> Any:
 
     1. resolve_addresses : matche les adresses vers les structures connues
     2. populate_affiliations : propage in_perimeter et structure_ids
+
+    Phase source-agnostique : `--sources` n'est pas propagé. Sinon des
+    source_authorships d'une source non listée resteraient bloquées sans
+    `structure_ids` après la résolution d'une nouvelle adresse.
     """
-    sources = kw.get("sources", set(ALL_SOURCES_SET))
-    source_args = ",".join(sorted(sources))
     mode = kw.get("mode", "full")
     _run_resolve_addresses(mode)
-    _run_populate_affiliations(sources=set(source_args.split(",")), mode=mode)
+    _run_populate_affiliations(mode=mode)
 
 
 def phase_publications(**kw: Any) -> Any:
@@ -249,9 +251,13 @@ def phase_authorships(**kw: Any) -> Any:
     Consolide les source_authorships en authorships canoniques
     (une entree par couple publication x personne), avec in_perimeter
     et structure_ids propages.
+
+    Phase source-agnostique : `--sources` n'est pas propagé. Une
+    source_authorship peut etre touchee par d'autres voies que sa propre
+    normalisation (re-population d'affiliations, refresh_from_sources,
+    etc.) — toutes les sources doivent etre reconsolidees a chaque run.
     """
-    sources = kw.get("sources")
-    _run_build_authorships(sources if sources and sources != ALL_SOURCES_SET else None)
+    _run_build_authorships()
 
 
 def phase_countries(**kw: Any) -> Any:
@@ -267,9 +273,13 @@ def phase_subjects(**kw: Any) -> Any:
     Lit les colonnes `keywords` et `topics` déjà persistées par les
     normalizers et alimente les tables canoniques `subjects` et
     `publication_subjects`. Idempotent.
+
+    Phase source-agnostique : `--sources` n'est pas propagé. Les topics
+    peuvent évoluer côté `source_publications` par d'autres voies (re-
+    normalisation, refresh_from_sources) — toutes les sources doivent
+    être ré-ingérées à chaque run.
     """
-    sources = kw.get("sources")
-    _run_ingest_subjects(sources if sources and sources != ALL_SOURCES_SET else None)
+    _run_ingest_subjects()
 
 
 def phase_cooccurrences(**kw: Any) -> Any:
@@ -326,25 +336,25 @@ def _run_create_persons() -> None:
     log.info("✓ create_persons_from_source_authorships terminé en %.1fs", time.time() - t0)
 
 
-def _run_build_authorships(sources: Any = None) -> None:
+def _run_build_authorships() -> None:
     from application.pipeline.authorships.build_authorships import build
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.authorships_build import PgAuthorshipsBuildQueries
 
-    log.info("▶ build_authorships %s", f"sources={sorted(sources)}" if sources else "")
+    log.info("▶ build_authorships")
     t0 = time.time()
     conn = get_connection()
     conn.autocommit = False
     try:
         cur = conn.cursor()
-        build(cur, PgAuthorshipsBuildQueries(), log, sources=sources)
+        build(cur, PgAuthorshipsBuildQueries(), log)
         conn.commit()
     finally:
         conn.close()
     log.info("✓ build_authorships terminé en %.1fs", time.time() - t0)
 
 
-def _run_populate_affiliations(*, sources: set, mode: str) -> None:
+def _run_populate_affiliations(*, mode: str) -> None:
     from application.pipeline.affiliations.populate_affiliations import run_populate
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.affiliations import PgAffiliationsQueries
@@ -353,7 +363,7 @@ def _run_populate_affiliations(*, sources: set, mode: str) -> None:
         get_persons_structure_ids,
     )
 
-    log.info("▶ populate_affiliations --mode %s --sources %s", mode, ",".join(sorted(sources)))
+    log.info("▶ populate_affiliations --mode %s", mode)
     t0 = time.time()
     conn = get_connection()
     conn.autocommit = False
@@ -368,7 +378,6 @@ def _run_populate_affiliations(*, sources: set, mode: str) -> None:
             log,
             perimeter_ids,
             wide_ids,
-            sources=sources,
             mode=mode,
         )
     finally:
@@ -689,18 +698,18 @@ def _run_refresh_publication_countries() -> None:
     log.info("✓ refresh_publication_countries terminé en %.1fs", time.time() - t0)
 
 
-def _run_ingest_subjects(sources: Any = None) -> None:
+def _run_ingest_subjects() -> None:
     from application.pipeline.subjects.run import run
     from infrastructure.db.connection import get_connection
     from infrastructure.db.queries.subjects import PgSubjectsQueries
 
-    log.info("▶ subjects %s", f"sources={sorted(sources)}" if sources else "")
+    log.info("▶ subjects")
     t0 = time.time()
     conn = get_connection()
     conn.autocommit = False
     try:
         cur = conn.cursor()
-        run(cur, PgSubjectsQueries(), log, sources=sorted(sources) if sources else None)
+        run(cur, PgSubjectsQueries(), log)
         conn.commit()
     finally:
         conn.close()

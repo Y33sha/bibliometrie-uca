@@ -16,19 +16,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Peuplement in_perimeter et structure_ids")
     parser.add_argument("--stats", action="store_true", help="Stats uniquement")
     parser.add_argument(
-        "--sources",
-        default="hal,openalex,wos,scanr,theses",
-        help="Sources à traiter (défaut: toutes)",
-    )
-    parser.add_argument(
         "--mode",
         default="full",
         choices=["full", "weekly", "daily"],
         help="Mode d'exécution (daily: incrémental, autres: complet)",
     )
     args = parser.parse_args()
-
-    sources = set(s.strip() for s in args.sources.split(",") if s.strip())
 
     conn = get_connection()
     conn.autocommit = False
@@ -49,7 +42,6 @@ def main() -> None:
             logger,
             perimeter_ids,
             wide_ids,
-            sources=sources,
             mode=args.mode,
         )
     finally:
