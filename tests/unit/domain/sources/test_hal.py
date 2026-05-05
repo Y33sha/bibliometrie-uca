@@ -19,9 +19,11 @@ class TestDeriveHalOaStatus:
     def test_pubmedcentral_link_returns_green(self):
         assert derive_hal_oa_status(True, None, "pubmedcentral") == "green"
 
-    def test_openaccess_link_delegated(self):
-        # Lien éditeur, voie OA inconnue → on délègue
-        assert derive_hal_oa_status(True, None, "openaccess") is None
+    def test_openaccess_link_returns_hybrid(self):
+        # Lien éditeur sans signal de licence : hybrid par défaut conservatif
+        # (cohérent avec ScanR publisher+cc-*). best_oa_status promeut à gold
+        # si OpenAlex confirme un journal full-OA.
+        assert derive_hal_oa_status(True, None, "openaccess") == "hybrid"
 
     def test_istex_link_delegated(self):
         # Plateforme abonnement, statut OA réel ambigu → on délègue
