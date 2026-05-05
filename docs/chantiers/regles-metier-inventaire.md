@@ -279,7 +279,7 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/sources/openalex_signals.py` →
   `is_repository_source(work) -> bool`.
 
-### extract_pub_metadata — overrides doc_type theses.fr / dumas
+### ✅ extract_pub_metadata — overrides doc_type theses.fr / dumas
 - **localisation** : `application/pipeline/normalize/normalize_openalex.py:266-276`
 - **description** : Cascade :
   1. `is_theses_fr_source(work)` → `doc_type = "thesis"` + NNT extrait
@@ -288,8 +288,22 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
   La source canonique prime sur la nomenclature OpenAlex. **Cas
   motivant ce chantier**.
 - **classification** : (a).
-- **destination domain/** : `domain/doc_types.py` →
-  `override_doc_type_from_signals(raw, source, *, is_theses_fr, landing_page_url, doi, title_normalized) -> str`.
+- **destination domain/** : ~~`domain/doc_types.py` →
+  `override_doc_type_from_signals(...)`~~ → placement source-spécifique
+  pour cohérence :
+  [`domain/sources/openalex.py::correct_openalex_doc_type`](domain/sources/openalex.py)
+  qui prend `(raw_type, *, is_theses_fr, landing_page_url)` et renvoie
+  directement la valeur **canonique** (intègre `map_doc_type(raw, "openalex")`
+  pour les cas hors-override).
+
+  Effet de bord propre : la ligne
+  `meta["doc_type"] = map_doc_type(meta["doc_type"], "openalex")`
+  dans `find_publication` ([l. 304](application/pipeline/normalize/normalize_openalex.py#L304))
+  devient inutile et est supprimée. Une seule décision, une seule
+  conversion canonique.
+
+  À étendre dans un commit ultérieur du chantier (suppléments
+  figshare/Zenodo) : ajouter signaux DOI/title.
 
 ### Décision « ne pas chercher publisher/journal pour HAL/theses/repo »
 - **localisation** : `application/pipeline/normalize/normalize_openalex.py:595-600`
