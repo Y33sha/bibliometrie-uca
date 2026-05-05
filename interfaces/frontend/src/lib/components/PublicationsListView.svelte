@@ -15,23 +15,46 @@
 	import ColumnMenu from '$lib/components/ColumnMenu.svelte';
 
 	import type { components } from '$lib/api/schema';
-	type Publication = components['schemas']['PublicationListItem'];
+	type Publication = components['schemas']['PublicationListItem'] & {
+		// Champs présents quand l'API est appelée avec `person_id` (cf. routes
+		// /api/publications côté backend qui enrichit la réponse). Optionnels
+		// car non garantis hors contexte personne.
+		is_corresponding?: boolean | null;
+		authorship_id?: number | null;
+		hal_collections?: string[] | null;
+	};
 
 	// --- Props ---
-	// Composant de liste de publications réutilisable. Utilisé par la page
-	// `/publications` (mode autonome avec sync URL) et par d'autres routes
-	// qui veulent un filtre fixe imposé par la route (ex `/subjects/[id]`
-	// onglet "Publications" avec `subject_id`).
+	// Composant de liste de publications réutilisable. Utilisé par :
+	// - `/publications` (mode autonome avec sync URL)
+	// - `/subjects/[id]?tab=publications` (filtre `subject_id` fixe)
+	// - `/laboratories/[id]?tab=publications` (filtre `lab_id` fixe + colonne Statut HAL)
+	// - `/persons/[id]?tab=publications` (filtre `person_id` + facets Corresp./Périmètre)
 	interface ExternalFilters {
 		subjectId?: number;
 		subjectLabel?: string;
+		labId?: number;
+		labLabel?: string;
+		/** Collection HAL du laboratoire (ex 'lmbp'). Requis pour calculer
+		 *  la colonne « Statut HAL ». */
+		halCollection?: string;
+		personId?: number;
+		personLabel?: string;
 	}
+	type ApcMode = 'uca' | 'lab' | 'person-uca';
 	let {
 		apiKey = 'pub-list',
 		externalFilters,
 		urlSync = true,
 		basePath = '/publications',
 		showFilterBanner = true,
+		showHalStatusColumn = false,
+		showCorrespondingColumn = false,
+		showPerimeterFacet = false,
+		showAdminExclude = false,
+		apcMode = 'uca' as ApcMode,
+		perPage = 100,
+		onExcludeAuthorship,
 		onTotalChange,
 	}: {
 		apiKey?: string;
@@ -39,6 +62,24 @@
 		urlSync?: boolean;
 		basePath?: string;
 		showFilterBanner?: boolean;
+		/** Affiche la colonne et la facet « Statut HAL ». Requiert
+		 *  `externalFilters.halCollection` pour le calcul du badge. */
+		showHalStatusColumn?: boolean;
+		/** Affiche la colonne et la facet « Auteur correspondant ». */
+		showCorrespondingColumn?: boolean;
+		/** Affiche la facet « UCA » (in_perimeter). */
+		showPerimeterFacet?: boolean;
+		/** Affiche la 1ère colonne avec un bouton ✕ pour exclure l'authorship.
+		 *  Le parent gère l'auth check et passe le callback. */
+		showAdminExclude?: boolean;
+		/** Mode de rendu du tag APC :
+		 *  - 'uca' : filtre par budget_structure_id === 169 (défaut)
+		 *  - 'lab' : filtre par lab_id === externalFilters.labId
+		 *  - 'person-uca' : 'uca' + classe `apc-other` si !is_corresponding */
+		apcMode?: ApcMode;
+		/** Nombre d'éléments par page (50 pour les onglets, 100 pour /publications). */
+		perPage?: number;
+		onExcludeAuthorship?: (authorshipId: number, pubId: number) => void;
 		/** Notifie le parent du nombre total de publications après filtrage,
 		 *  pour que le titre d'onglet (TabNav) puisse refléter le tableau
 		 *  exactement (en tenant compte des doc_type exclus côté API et
@@ -46,23 +87,50 @@
 		onTotalChange?: (total: number) => void;
 	} = $props();
 
+	const hasFixedLab = $derived(externalFilters?.labId != null);
+	const hasFixedPerson = $derived(externalFilters?.personId != null);
+
+	type HalStatus = 'ok' | 'notice' | 'hors_collection' | 'hors_hal';
+	const HAL_STATUS_META: Record<HalStatus, { label: string; css: string }> = {
+		ok:              { label: 'OK',              css: 'hal-ok' },
+		notice:          { label: 'Notice',          css: 'hal-notice' },
+		hors_collection: { label: 'Hors collection', css: 'hal-hors-collection' },
+		hors_hal:        { label: 'Hors HAL',        css: 'hal-hors-hal' },
+	};
+	function computeHalStatus(p: Publication): HalStatus {
+		if (!p.hal_id) return 'hors_hal';
+		const labCol = externalFilters?.halCollection;
+		if (!labCol || !p.hal_collections || !p.hal_collections.includes(labCol)) return 'hors_collection';
+		if (!p.oa_status || ['closed', 'unknown'].includes(p.oa_status)) return 'notice';
+		return 'ok';
+	}
+
 	// Notifie le parent à chaque changement de `pubs.total`.
 	$effect(() => {
 		if (onTotalChange) onTotalChange(pubs.total);
 	});
 
 	// --- Column visibility ---
-	const cv = useColumnVisibility([
-		{ key: 'type',    label: 'Type' },
-		{ key: 'year',    label: 'Année' },
-		{ key: 'title',   label: 'Titre',    fixed: true },
-		{ key: 'journal', label: 'Revue' },
-		{ key: 'labs',    label: 'Labo(s)' },
-		{ key: 'apc',     label: 'APC' },
-		{ key: 'oa',      label: 'OA' },
-		{ key: 'oa_path', label: 'Voie OA' },
-		{ key: 'links',   label: 'Liens',    fixed: true },
-	], ['apc', 'oa_path']);
+	// Ordre des colonnes = ordre dans le tableau. Les colonnes optionnelles
+	// (hal_status, corr) ne sont incluses dans la liste que si la prop
+	// correspondante est activée — sinon l'utilisatrice n'a pas à les voir
+	// dans le menu de visibilité.
+	const columnDefs = [
+		{ key: 'type',       label: 'Type' },
+		{ key: 'year',       label: 'Année' },
+		{ key: 'title',      label: 'Titre',      fixed: true },
+		{ key: 'journal',    label: 'Revue' },
+		...(hasFixedLab ? [] : [{ key: 'labs', label: 'Labo(s)' }]),
+		...(showCorrespondingColumn ? [{ key: 'corr', label: 'Corresp.' }] : []),
+		{ key: 'apc',        label: 'APC' },
+		{ key: 'oa',         label: 'OA' },
+		{ key: 'oa_path',    label: 'Voie OA' },
+		...(showHalStatusColumn ? [{ key: 'hal_status', label: 'Statut HAL' }] : []),
+		{ key: 'links',      label: 'Liens',      fixed: true },
+	];
+	const initialHidden = ['apc', 'oa_path'];
+	if (showHalStatusColumn) initialHidden.push('hal_status');
+	const cv = useColumnVisibility(columnDefs, initialHidden);
 	const col = cv.col;
 
 	// --- Filter state ---
@@ -76,6 +144,9 @@
 	let selectedOa: string[] = $state([]);
 	let selectedApc: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
+	let selectedHalStatus: string[] = $state([]);
+	let selectedCorr: string[] = $state([]);
+	let selectedPerimeter: string[] = $state([]);
 
 	// External filters (from stats page)
 	let filterPublisherId: string | null = $state(null);
@@ -123,7 +194,15 @@
 		const params = new URLSearchParams();
 		params.set('excluded_doc_type', 'ongoing_thesis');
 		if (selectedYears.length) params.set('year', selectedYears.join(','));
-		if (selectedLabs.length) params.set('lab_id', selectedLabs.join(','));
+		// `lab_id` : soit imposé par la route (externalFilters.labId), soit
+		// choisi par l'utilisatrice via la facet "Laboratoires". Les deux
+		// modes sont exclusifs (la facet est masquée si labId est fixe).
+		if (externalFilters?.labId != null) {
+			params.set('lab_id', String(externalFilters.labId));
+		} else if (selectedLabs.length) {
+			params.set('lab_id', selectedLabs.join(','));
+		}
+		if (externalFilters?.personId != null) params.set('person_id', String(externalFilters.personId));
 		const sf = Object.entries(sourceStates).filter(([, v]) => v === 'yes' || v === 'no').map(([k, v]) => `${k}_${v}`).join(',');
 		if (sf) params.set('source_filter', sf);
 		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
@@ -131,6 +210,9 @@
 		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) params.set('has_apc', selectedApc.join(','));
 		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
+		if (selectedHalStatus.length) params.set('hal_status', selectedHalStatus.join(','));
+		if (selectedCorr.length) params.set('is_corresponding', selectedCorr.join(','));
+		if (selectedPerimeter.length) params.set('in_perimeter', selectedPerimeter.join(','));
 		if (filterPublisherId) params.set('publisher_id', filterPublisherId);
 		if (filterJournalId) params.set('journal_id', filterJournalId);
 		if (externalFilters?.subjectId) params.set('subject_id', String(externalFilters.subjectId));
@@ -141,7 +223,7 @@
 	const pubs = usePaginatedFetch<Publication>({
 		endpoint: '/api/publications',
 		itemsKey: 'publications',
-		perPage: 100,
+		perPage,
 		apiKey,
 		buildParams() {
 			const params = buildFilterParams();
@@ -158,13 +240,16 @@
 		buildParams: buildFilterParams,
 		sourceCountsKey: 'source_counts',
 		facets: {
-			years:     { type: 'simple',      apiKey: 'years' },
-			labs:      { type: 'labeled',     apiKey: 'labs' },
-			docTypes:  { type: 'label_map',   apiKey: 'doc_types',   labels: docTypeLabelsMap },
-			access:    { type: 'passthrough', apiKey: 'access' },
-			oa:        { type: 'label_map',   apiKey: 'oa_statuses', labels: oaLabelsMap },
-			apc:       { type: 'passthrough', apiKey: 'apc' },
-			countries: { type: 'passthrough', apiKey: 'countries',
+			years:         { type: 'simple',      apiKey: 'years' },
+			labs:          { type: 'labeled',     apiKey: 'labs' },
+			docTypes:      { type: 'label_map',   apiKey: 'doc_types',   labels: docTypeLabelsMap },
+			access:        { type: 'passthrough', apiKey: 'access' },
+			oa:            { type: 'label_map',   apiKey: 'oa_statuses', labels: oaLabelsMap },
+			apc:           { type: 'passthrough', apiKey: 'apc' },
+			halStatus:     { type: 'passthrough', apiKey: 'hal_status' },
+			corresponding: { type: 'boolean',     apiKey: 'corresponding', yesLabel: 'Oui', noLabel: 'Non' },
+			perimeter:     { type: 'passthrough', apiKey: 'in_perimeter' },
+			countries:     { type: 'passthrough', apiKey: 'countries',
 				transform: (c) => ({ value: c.value, text: `${c.text} (${c.value.toUpperCase()})`, count: c.count }) },
 		},
 		afterLoad(data, options) {
@@ -185,6 +270,10 @@
 			selectedAccess:    { type: 'string_array',  urlKey: 'access' },
 			selectedOa:        { type: 'string_array',  urlKey: 'oa_status' },
 			selectedApc:       { type: 'string_array',  urlKey: 'has_apc' },
+			selectedCountries: { type: 'string_array',  urlKey: 'country' },
+			selectedHalStatus: { type: 'string_array',  urlKey: 'hal_status' },
+			selectedCorr:      { type: 'string_array',  urlKey: 'is_corresponding' },
+			selectedPerimeter: { type: 'string_array',  urlKey: 'in_perimeter' },
 			search:            { type: 'single',        urlKey: 'search' },
 			currentSort:       { type: 'single',        urlKey: 'sort', defaultValue: 'year_desc' },
 			currentPage:       { type: 'page',          urlKey: 'page' },
@@ -197,9 +286,12 @@
 
 	// --- Handlers ---
 	function syncUrl() {
+		if (!urlSync) return;
 		url.syncUrl(() => ({
 			selectedYears, selectedLabs, sourceStates, selectedDocTypes,
-			selectedAccess, selectedOa, selectedApc, search, currentSort,
+			selectedAccess, selectedOa, selectedApc, selectedCountries,
+			selectedHalStatus, selectedCorr, selectedPerimeter,
+			search, currentSort,
 			currentPage: pubs.page,
 			filterPublisherId, filterJournalId, filterPublisherName, filterJournalName,
 		}));
@@ -260,6 +352,10 @@
 			if (restored.selectedAccess) selectedAccess = restored.selectedAccess as string[];
 			if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
 			if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
+			if (restored.selectedCountries) selectedCountries = restored.selectedCountries as string[];
+			if (restored.selectedHalStatus) selectedHalStatus = restored.selectedHalStatus as string[];
+			if (restored.selectedCorr) selectedCorr = restored.selectedCorr as string[];
+			if (restored.selectedPerimeter) selectedPerimeter = restored.selectedPerimeter as string[];
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
 			if (restored.currentPage) pubs.page = restored.currentPage as number;
@@ -275,6 +371,8 @@
 		if (selectedApc.length) needed.push('apc');
 		if (filterPublisherId || filterJournalId) needed.push('journal');
 		if (selectedDocTypes.length) needed.push('type');
+		if (showHalStatusColumn && selectedHalStatus.length) needed.push('hal_status');
+		if (showCorrespondingColumn && selectedCorr.length) needed.push('corr');
 		if (needed.length) cv.ensure(needed);
 
 		await facets.load();
@@ -299,9 +397,12 @@
 	<input type="text" placeholder="Rechercher par titre..." bind:value={search} oninput={onSearchInput} />
 	{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
 	{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
-	{#if col('labs')}<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />{/if}
+	{#if !hasFixedLab && col('labs')}<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />{/if}
 	{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
 	{#if col('oa_path')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
+	{#if showHalStatusColumn && col('hal_status')}<FacetDropdown label="Statut HAL" options={facets.options.halStatus} bind:selected={selectedHalStatus} onchange={onFilterChange} />{/if}
+	{#if showCorrespondingColumn && col('corr') && facets.options.corresponding.length}<FacetDropdown label="Corresp." options={facets.options.corresponding} bind:selected={selectedCorr} onchange={onFilterChange} />{/if}
+	{#if showPerimeterFacet && facets.options.perimeter.length}<FacetDropdown label="UCA" options={facets.options.perimeter} bind:selected={selectedPerimeter} onchange={onFilterChange} />{/if}
 	{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />{/if}
 	<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
 	<PresenceFilterToggle label="Sources" items={SOURCE_ITEMS} bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
@@ -312,6 +413,7 @@
 <table class="pub-table">
 	<thead>
 		<tr>
+			{#if showAdminExclude}<th style="width:28px"></th>{/if}
 			{#if col('type')}<th style="width:80px">Type</th>{/if}
 			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSortActive} onclick={toggleSortYear}>
 				An. <span class="sort-arrow">{yearSortArrow}</span>
@@ -320,12 +422,14 @@
 				Titre <span class="sort-arrow">{titleSortArrow}</span>
 			</th>
 			{#if col('journal')}<th class="pub-col-journal">Revue</th>{/if}
-			{#if col('labs')}<th style="width:80px">Labo(s)</th>{/if}
+			{#if !hasFixedLab && col('labs')}<th style="width:80px">Labo(s)</th>{/if}
+			{#if showCorrespondingColumn && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSortActive} onclick={toggleSortApc}>
 				APC <span class="sort-arrow">{apcSortArrow}</span>
 			</th>{/if}
 			{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
 			{#if col('oa_path')}<th style="width:60px">Voie OA</th>{/if}
+			{#if showHalStatusColumn && col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
 			<th style="width:80px" class="col-menu-th">
 				<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
 					showMenu={cv.showMenu}
@@ -337,32 +441,59 @@
 	</thead>
 	<tbody>
 		{#if pubs.items.length === 0}
-			<tr><td colspan={cv.visibleColumns.length} class="no-results">Aucune publication trouvée</td></tr>
+			<tr><td colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0)} class="no-results">Aucune publication trouvée</td></tr>
 		{:else}
 			{#each pubs.items as p (p.id)}
 				<tr>
+					{#if showAdminExclude}
+						<td class="exclude-cell">
+							{#if p.authorship_id != null}
+								<button class="exclude-btn" title="Exclure ce lien auteur–publication"
+									onclick={() => onExcludeAuthorship?.(p.authorship_id!, p.id)}>✕</button>
+							{/if}
+						</td>
+					{/if}
 					{#if col('type')}<td>
 						<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
 					</td>{/if}
 					{#if col('year')}<td>{p.pub_year || ''}</td>{/if}
 					<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
 					{#if col('journal')}<td class="journal-cell pub-col-journal"><span class="journal-clip">{p.journal || ''}</span></td>{/if}
-					{#if col('labs')}<td>
+					{#if !hasFixedLab && col('labs')}<td>
 						{#each p.lab_items || [] as lab}
 							<a href="{base}/laboratories/{lab.id}" class="lab-tag">{lab.label}</a>
 						{/each}
 					</td>{/if}
+					{#if showCorrespondingColumn && col('corr')}<td class="corr-cell">
+						{#if p.is_corresponding}<span title="Auteur correspondant">&#10003;</span>{/if}
+					</td>{/if}
 					{#if col('apc')}<td class="apc-cell">
 						{#if p.apc}
-							{@const ucaApc = p.apc.filter(a => a.budget_structure_id === 169)}
-							{#if ucaApc.length > 0}
-								<span class="apc-tag" title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || 'UCA'})`).join('\n')}>
-									{Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
-								</span>
+							{#if apcMode === 'lab'}
+								{@const thisLabApc = p.apc.filter(a => a.lab_id === externalFilters?.labId)}
+								{@const otherApc = p.apc.filter(a => a.lab_id !== externalFilters?.labId)}
+								{#if thisLabApc.length > 0}
+									<span class="apc-tag" title={thisLabApc.map(a => `${a.amount?.toLocaleString('fr-FR')} €`).join('\n')}>
+										{Math.round(thisLabApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+									</span>
+								{:else if otherApc.length > 0}
+									<span class="apc-tag apc-other" title={otherApc.map(a => `sur budget ${a.lab_acronym || a.institution || '?'}`).join('\n')}>
+										{Math.round(otherApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+									</span>
+								{/if}
 							{:else}
-								<span class="apc-tag apc-other" title={p.apc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.institution || '?'})`).join('\n')}>
-									{Math.round(p.apc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
-								</span>
+								{@const ucaApc = p.apc.filter(a => a.budget_structure_id === 169)}
+								{@const isPersonNonCorr = apcMode === 'person-uca' && !p.is_corresponding}
+								{#if ucaApc.length > 0}
+									<span class="apc-tag" class:apc-other={isPersonNonCorr}
+										title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || 'UCA'})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
+										{Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+									</span>
+								{:else}
+									<span class="apc-tag apc-other" title={p.apc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.institution || '?'})`).join('\n')}>
+										{Math.round(p.apc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+									</span>
+								{/if}
 							{/if}
 						{/if}
 					</td>{/if}
@@ -384,6 +515,11 @@
 							<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
 						{/if}
 					</td>{/if}
+					{#if showHalStatusColumn && col('hal_status')}
+						{@const hs = computeHalStatus(p)}
+						{@const meta = HAL_STATUS_META[hs]}
+						<td><span class="hal-badge {meta.css}">{meta.label}</span></td>
+					{/if}
 					<td class="links-cell">
 						{#if p.hal_id}
 							<a href={halDocUrl(p.hal_id, p.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
@@ -473,4 +609,30 @@
 	}
 	.pub-table tr:hover td { background: #fafaf8; }
 	.col-menu-th { position: relative; }
+
+	/* Statut HAL (lab) */
+	.hal-badge {
+		display: inline-block;
+		padding: 2px 7px;
+		border-radius: 3px;
+		font-size: 0.8rem;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+	.hal-ok              { background: #e6f4ec; color: #2a7d4f; }
+	.hal-notice          { background: #fff3e0; color: #c77c00; }
+	.hal-hors-collection { background: #ffe8d6; color: #d35400; }
+	.hal-hors-hal        { background: #fde8e8; color: #c0392b; }
+
+	/* Auteur correspondant (person) */
+	.corr-cell { text-align: center; color: var(--accent); font-size: 0.85rem; }
+
+	/* Bouton exclure (admin, person) */
+	.exclude-cell { padding: 0 2px !important; text-align: center; vertical-align: middle; }
+	.exclude-btn {
+		background: none; border: none; cursor: pointer;
+		color: #ccc; font-size: 0.85rem; padding: 2px 4px;
+		border-radius: 3px; line-height: 1; transition: color 0.15s, background 0.15s;
+	}
+	.exclude-btn:hover { color: #c0392b; background: #fdeaea; }
 </style>
