@@ -1,12 +1,8 @@
 """Tests de caractérisation pour le router publications.
 
-Visent à capturer le comportement actuel avant refactor (§1.1 : sortir
-le SQL des routers vers des repositories/query builders).
-
 Stratégie : pas de données seedées (la base est vide), on vérifie que
 chaque combinaison de filtres exerce le SQL sans crash et renvoie une
-réponse structurellement correcte. Les tests data-driven seront ajoutés
-au fur et à mesure que la refacto débloque la testabilité.
+réponse structurellement correcte.
 
 Chaque test exerce une branche différente des apply_*_filter et de la
 construction dynamique des WHERE/ORDER BY — si le refactor casse un
@@ -119,8 +115,7 @@ class TestPublicationsList:
 
 
 class TestPublicationsFacets:
-    """Exerce la construction des facettes — typiquement dupliquée entre
-    routers (cf. §1.3)."""
+    """Exerce la construction des facettes."""
 
     def test_facets_structure(self, client):
         r = client.get("/api/publications/facets")

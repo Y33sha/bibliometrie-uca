@@ -1,6 +1,6 @@
 """Adapter PostgreSQL pour l'agrégat Publisher.
 
-Séparé de `journal_repository.py` depuis §2.9.ISP. Même contrat que
+Séparé de `journal_repository.py` (principe ISP). Même contrat que
 les autres PgXxxRepository : curseur dans la transaction courante,
 exceptions du domaine, pas d'orchestration métier (qui reste dans
 `application/journals.py`).

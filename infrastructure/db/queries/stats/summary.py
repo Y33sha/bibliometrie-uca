@@ -1,4 +1,4 @@
-"""Résumé global, ventilation annuelle, années disponibles, facettes croisées (§2.12 : async)."""
+"""Résumé global, ventilation annuelle, années disponibles, facettes croisées (async)."""
 
 from typing import Any
 

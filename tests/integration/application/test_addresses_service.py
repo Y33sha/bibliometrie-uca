@@ -1,5 +1,5 @@
 """Tests de caractérisation pour application/addresses_structures.py
-et application/addresses_countries.py (split §2.9.SRP, §2.12 : async)."""
+et application/addresses_countries.py (async)."""
 
 import json
 
@@ -562,7 +562,7 @@ class TestPropagateCountriesToPublications:
         assert (await async_db.fetchone())["countries"] == ["FR"]
 
 
-# ── No-op skip (§2.14.bug : éviter les cascades massives inutiles) ──
+# ── No-op skip (éviter les cascades massives inutiles) ────────────
 
 
 class TestPropagationSkipsNoOp:

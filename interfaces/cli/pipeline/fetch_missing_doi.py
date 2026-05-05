@@ -3,9 +3,10 @@
 Composition root : sélectionne l'adapter async selon `--target`, ouvre
 la connexion, appelle `application.pipeline.fetch_missing_doi.run_async`.
 
-§2.14 : les 4 sources (hal, openalex, wos, scanr) utilisent le chemin
-async (`AsyncFetchMissingDoiAdapter` + `httpx.AsyncClient`). Gain mesuré
-sur OpenAlex : ~×3.6 vs sync (18 req/s vs ~5 req/s plafond sync).
+Les 4 sources (hal, openalex, wos, scanr) utilisent le chemin async
+(`AsyncFetchMissingDoiAdapter` + `httpx.AsyncClient`), avec un débit
+mesuré ~18 req/s sur OpenAlex (le polite pool autorise 10 req/s par
+client + bursts).
 
 Usage :
     python -m interfaces.cli.pipeline.fetch_missing_doi --target hal

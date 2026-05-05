@@ -1,9 +1,9 @@
 """Tests de caractérisation pour application/journals.py et
-application/publishers.py (split §2.9.SRP).
+application/publishers.py.
 
 Couvre les fonctions sync (find_or_create_*, update_journal_apc,
 reset_journal_apc — utilisées par le pipeline) et les fonctions async
-migrées §2.12 (update_journal, update_publisher, merge_*).
+(update_journal, update_publisher, merge_*).
 """
 
 import pytest
@@ -98,7 +98,7 @@ def _insert_publication(db, title="Pub", pub_year=2024, journal_id=None):
     return db.fetchone()["id"]
 
 
-# ── Helpers async (API tests, §2.12) ───────────────────────────────
+# ── Helpers async (API tests) ──────────────────────────────────────
 
 
 async def _ainsert_publisher(db, name="Elsevier", openalex_id=None):

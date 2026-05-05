@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour le router admin_feedback (§2.1 phase D).
+"""Tests de caractérisation pour le router admin_feedback.
 
 Couvre :
 - /api/admin/feedback/stats : cas vide + cas avec données (branches des COUNT FILTER)

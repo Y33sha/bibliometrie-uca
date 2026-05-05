@@ -1,4 +1,4 @@
-"""Adapter PostgreSQL async pour `config` et `perimeters` (§2.12).
+"""Adapter PostgreSQL async pour `config` et `perimeters`.
 
 Parallèle à infrastructure/repositories/config_repository.py — même
 contrat, curseur async.

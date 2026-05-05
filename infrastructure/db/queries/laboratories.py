@@ -1,4 +1,4 @@
-"""Query services async pour /api/laboratories/* (§2.12)."""
+"""Query services async pour /api/laboratories/*."""
 
 import datetime
 from dataclasses import dataclass, field

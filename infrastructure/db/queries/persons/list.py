@@ -1,4 +1,4 @@
-"""Annuaire public + autocomplete + liste admin des personnes (§2.12 : async)."""
+"""Annuaire public + autocomplete + liste admin des personnes (async)."""
 
 from dataclasses import dataclass, field
 from typing import Any

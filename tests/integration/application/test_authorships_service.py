@@ -740,7 +740,7 @@ class TestSyncPersonIdFromSource:
 class TestPropagateUcaForAddresses:
     """propagate_uca_for_addresses recalcule in_perimeter et structure_ids
     sur les source_authorships puis propage vers l'authorship vérité,
-    après une modification sur address_structures (§2.12 : async)."""
+    après une modification sur address_structures (async)."""
 
     async def _setup_uca(self, db):
         """Monte un périmètre UCA minimal + config perimeter_persons."""

@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour application/config.py (§2.12 : async)."""
+"""Tests de caractérisation pour application/config.py (async)."""
 
 import json
 

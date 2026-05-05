@@ -4,7 +4,7 @@ HAL fournit une API Solr ; on interroge par DOI (un appel par DOI).
 L'insertion gère la colonne `hal_collections` avec merge set-union
 sur conflit.
 
-§2.14 : adapter async (`AsyncFetchMissingDoiAdapter`), parallélisme
+Adapter async (`AsyncFetchMissingDoiAdapter`), parallélisme
 embarrassingly parallel par DOI via `httpx.AsyncClient`.
 """
 

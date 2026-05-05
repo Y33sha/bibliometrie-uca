@@ -6,7 +6,7 @@ lot de 50 DOI en un seul appel. Authentification basic.
 ScanR stocke les DOI en casse variable ; le matching est case-insensitive
 côté `get_cross_import_dois` (cf. `infrastructure.sources.common`).
 
-§2.14 : adapter async (`AsyncFetchMissingDoiAdapter`).
+Adapter async (`AsyncFetchMissingDoiAdapter`).
 """
 
 from __future__ import annotations

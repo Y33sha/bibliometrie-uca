@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `infrastructure.db.queries.laboratories` (§2.12 : async)."""
+"""Tests d'intégration pour `infrastructure.db.queries.laboratories` (async)."""
 
 from infrastructure.db.queries.laboratories import (
     LabPersonsFilters,

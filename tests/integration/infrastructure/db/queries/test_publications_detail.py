@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `infrastructure.db.queries.publications.detail` (§2.12 : async)."""
+"""Tests d'intégration pour `infrastructure.db.queries.publications.detail` (async)."""
 
 import json
 

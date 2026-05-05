@@ -1,4 +1,4 @@
-"""Base class pour les normaliseurs de sources (§1.2).
+"""Base class pour les normaliseurs de sources.
 
 Capture le boilerplate commun aux 5 normalizers existants :
 - parsing CLI (--limit, --reset, --batch-size)

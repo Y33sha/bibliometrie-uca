@@ -1,4 +1,4 @@
-"""Stats agrégées par laboratoire (§2.12 : async)."""
+"""Stats agrégées par laboratoire (async)."""
 
 from typing import Any
 

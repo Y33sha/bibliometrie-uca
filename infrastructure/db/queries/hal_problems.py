@@ -1,4 +1,4 @@
-"""Query services async pour le router `/api/hal-problems/*` (§2.12).
+"""Query services async pour le router `/api/hal-problems/*`.
 
 Contrôles qualité HAL au niveau des publications (doublons de dépôts,
 manques dans les collections, conflits d'affiliation).

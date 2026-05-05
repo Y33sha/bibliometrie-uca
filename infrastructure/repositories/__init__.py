@@ -72,7 +72,7 @@ def publisher_repository(cur: Any) -> PublisherRepository:
     return PgPublisherRepository(cur)
 
 
-# ── Factories async (§2.12) ────────────────────────────────────────
+# ── Factories async ────────────────────────────────────────────────
 
 
 def async_address_repository(cur: Any) -> AsyncAddressRepository:

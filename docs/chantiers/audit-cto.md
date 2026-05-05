@@ -1,4 +1,5 @@
 # Audit "DSI qui reprend le projet"
+Commencé le 2026-05-05
 
 Vue extérieure du projet, comme si une DSI d'université le récupérait
 sans contexte. Constats classés en 4 sections (confusion, scalabilité,
@@ -172,11 +173,13 @@ immédiat.
 - [x] **Documenter l'exclusion WoS du mode `weekly`** : commentaire
   dans `domain/pipeline_modes.py` (crédit API contractuel 50 000 full
   records/an) + note dans `docs/exploitation.md` (sous le tableau cron)
-- [ ] **Nettoyer les `# §X.Y` du code** : supprimer toutes les
-  références à la ROADMAP / aux phases de migration dans les
-  docstrings et commentaires (cf. `feedback_document_final_state.md`).
-  Cible : `infrastructure/db/async_connection.py`, `pyproject.toml`
-  (commentaires de section), partout où `grep -rn "§"` matche.
+- [x] **Nettoyer les `# §X.Y` du code** : toutes les références à la
+  ROADMAP / aux phases de migration retirées des docstrings et
+  commentaires Python + `pyproject.toml`. Reformulations intemporelles
+  (« Variante async de X » au lieu de « Variante async de X (§2.12) »,
+  « principe ISP » au lieu de « depuis §2.9.ISP », etc.).
+  Restent légitimement : `ROADMAP.md`, `docs/chantiers/audit-cto.md`,
+  `docs/architecture.md` (réécrit en Phase 4).
 
 ### Phase 1 — Décisions structurantes (à trancher avant de coder)
 

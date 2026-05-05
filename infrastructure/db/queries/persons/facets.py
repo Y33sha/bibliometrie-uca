@@ -1,4 +1,4 @@
-"""Facettes dynamiques + listes de référence (départements, rôles, stats) (§2.12 : async)."""
+"""Facettes dynamiques + listes de référence (départements, rôles, stats) — async."""
 
 from dataclasses import dataclass, field
 from typing import Any

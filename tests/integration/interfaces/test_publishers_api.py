@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour le router publishers (§2.1 phase D).
+"""Tests de caractérisation pour le router publishers.
 
 Couvre :
 - GET /api/publishers (liste + search + sort variants)

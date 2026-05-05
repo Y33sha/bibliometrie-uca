@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour le router persons (§1.1 / §2.1 phase D).
+"""Tests de caractérisation pour le router persons.
 
 Stratégie : exercer toutes les branches des endpoints (validation, 404,
 happy path) pour couvrir le router et verrouiller le comportement.

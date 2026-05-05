@@ -1,4 +1,4 @@
-"""Liste de toutes les années disponibles + détail d'une publication (§2.12 : async)."""
+"""Liste de toutes les années disponibles + détail d'une publication (async)."""
 
 from typing import Any
 

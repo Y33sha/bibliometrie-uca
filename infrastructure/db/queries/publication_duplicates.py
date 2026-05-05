@@ -1,4 +1,4 @@
-"""Query services async pour /api/admin/duplicates/* (§2.12)."""
+"""Query services async pour /api/admin/duplicates/*."""
 
 from typing import Any
 

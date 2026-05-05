@@ -1,4 +1,4 @@
-"""Adapter PostgreSQL async pour les authorships (vérité et sources) (§2.12).
+"""Adapter PostgreSQL async pour les authorships (vérité et sources).
 
 Parallèle à infrastructure/repositories/authorship_repository.py.
 """

@@ -2,5 +2,5 @@
 dans `source_publications` vers les tables canoniques `subjects` et
 `publication_subjects`.
 
-Voir docs/chantiers/sujets-mots-cles.md (Phase 2).
+Voir docs/chantiers/sujets-mots-cles.md.
 """

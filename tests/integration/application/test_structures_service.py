@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour application/structures.py (§2.12 : async).
+"""Tests de caractérisation pour application/structures.py (async).
 
 Couvre create/update/delete sur structures, structure_relations,
 structure_name_forms.

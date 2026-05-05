@@ -96,7 +96,7 @@ async def async_emit_event(
     aggregate_id: int | None = None,
     payload: dict[str, Any] | None = None,
 ) -> None:
-    """Variante async d'`emit_event` (§2.12). Même sémantique, curseur async."""
+    """Variante async d'`emit_event`. Même sémantique, curseur async."""
     user_id = get_current_user()
     if user_id is None:
         return

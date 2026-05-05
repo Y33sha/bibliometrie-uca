@@ -1,5 +1,5 @@
 """Query services admin async pour les personnes : orphan authorships,
-name-form authorships, HAL duplicate accounts (§2.12)."""
+name-form authorships, HAL duplicate accounts."""
 
 from typing import Any
 

@@ -17,9 +17,8 @@ source_authorships, ce qu'on ne veut pas.
 La FK ON DELETE SET NULL fait automatiquement passer
 `source_authorships.source_person_id` à NULL pour les rows qui
 référençaient un source_persons supprimé. Les source_authorships
-elles-mêmes restent intactes (les identifiants ORCID/idref/idhal
-ont déjà été migrés sur `source_authorships.identifiers` lors du
-backfill phase 1).
+elles-mêmes restent intactes : les identifiants ORCID/idref/idhal
+sont portés par `source_authorships.identifiers`.
 
 Traitement par batches via cursor sur sa.id, logs de progression.
 Idempotent : re-lancer reprend à zéro mais ne trouvera rien.
@@ -64,9 +63,7 @@ def count_category(cur: Any, where: str) -> int:
     return cur.fetchone()["n"]
 
 
-def purge_category(
-    cur: Any, where: str, batch_size: int, *, dry_run: bool, label: str
-) -> int:
+def purge_category(cur: Any, where: str, batch_size: int, *, dry_run: bool, label: str) -> int:
     """DELETE en batches. Retourne le nombre total de rows supprimées."""
     total_deleted = 0
     t0 = time.time()
@@ -100,10 +97,7 @@ def purge_category(
         elapsed = time.time() - t0
         rate = total_deleted / elapsed if elapsed > 0 else 0
         pct = 100 * total_deleted / initial_count if initial_count else 100
-        logger.info(
-            f"    {total_deleted}/{initial_count} ({pct:.1f}%), "
-            f"{rate:.0f} rows/s"
-        )
+        logger.info(f"    {total_deleted}/{initial_count} ({pct:.1f}%), {rate:.0f} rows/s")
 
     return total_deleted
 

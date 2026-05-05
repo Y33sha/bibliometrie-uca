@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `infrastructure.db.queries.addresses` (§2.12 : async)."""
+"""Tests d'intégration pour `infrastructure.db.queries.addresses` (async)."""
 
 from infrastructure.db.queries.addresses import (
     AddressCountriesFilters,

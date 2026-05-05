@@ -1,4 +1,4 @@
-"""Base class pour les extracteurs de sources (§1.2 phase B).
+"""Base class pour les extracteurs de sources.
 
 Capture le boilerplate commun aux 5 extractors :
 - parsing CLI

@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour le router structures (§2.1 phase D).
+"""Tests de caractérisation pour le router structures.
 
 Couvre :
 - GET /api/structures (list + filtres)

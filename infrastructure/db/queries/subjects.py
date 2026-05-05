@@ -1,9 +1,8 @@
 """Query service : SQL pour la table `subjects` et la liaison
 `publication_subjects`.
 
-Consommé par la phase `application/pipeline/subjects/` (Phase 2 du chantier)
-et par les routes API `/api/subjects/*` (Phase 5).
-Voir docs/chantiers/sujets-mots-cles.md.
+Consommé par la phase `application/pipeline/subjects/` et par les
+routes API `/api/subjects/*`. Voir docs/chantiers/sujets-mots-cles.md.
 
 Les fonctions sync alimentent le pipeline ; les fonctions `*_async`
 sont pour les routes FastAPI.
@@ -195,7 +194,7 @@ def select_source_publications_with_subjects(cur: Any, *, source: str) -> list[A
     return cur.fetchall()
 
 
-# ── Phase 5 : co-occurrences ─────────────────────────────────────
+# ── Co-occurrences ───────────────────────────────────────────────
 
 
 def recompute_usage_counts(cur: Any) -> int:

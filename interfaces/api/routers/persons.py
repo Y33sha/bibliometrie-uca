@@ -1,4 +1,4 @@
-"""Persons router: directory, search, list, profile, merge, identifiers, admin (§2.12 : async).
+"""Persons router (async) : directory, search, list, profile, merge, identifiers, admin.
 
 Toutes les queries SQL sont dans :
 - `infrastructure/db/queries/persons/` (lectures principales + admin)

@@ -18,7 +18,7 @@ from domain.ports.config_repository import AsyncConfigRepository
 async def update_config_value(
     cur: Any, key: str, value: Any, *, repo: AsyncConfigRepository
 ) -> dict:
-    """Met à jour la valeur d'un paramètre de config existant (§2.12).
+    """Met à jour la valeur d'un paramètre de config existant.
 
     `value` est sérialisé en JSON. Retourne la ligne mise à jour.
     Lève NotFoundError si la clé n'existe pas.

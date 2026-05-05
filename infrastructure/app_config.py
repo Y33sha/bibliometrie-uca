@@ -25,7 +25,7 @@ def _get_from_db(cur: Any, key: Any) -> Any:
 
 
 async def _async_get_from_db(cur: Any, key: Any) -> Any:
-    """Variante async de `_get_from_db` (§2.12)."""
+    """Variante async de `_get_from_db`."""
     try:
         await cur.execute("SELECT value FROM config WHERE key = %s", (key,))
         row = await cur.fetchone()
@@ -97,7 +97,7 @@ def get_hal_collections(cur: Any) -> dict[str, str]:
 
 
 async def async_get_hal_collections(cur: Any) -> dict[str, str]:
-    """Variante async de get_hal_collections (§2.12)."""
+    """Variante async de get_hal_collections."""
     try:
         from infrastructure.perimeter import async_get_perimeter_structure_ids
 
@@ -128,10 +128,6 @@ async def async_get_hal_collections(cur: Any) -> dict[str, str]:
         return val
 
     return {}
-
-
-# get_hal_portals supprimé — l'extraction par portail a été retirée,
-# seules les collections sont utilisées.
 
 
 def get_hal_extra_collections(cur: Any) -> list[str]:

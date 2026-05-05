@@ -1,4 +1,4 @@
-"""Tests pour `application.pipeline.fetch_missing_doi.run_async` (§2.14).
+"""Tests pour `application.pipeline.fetch_missing_doi.run_async`.
 
 Deux angles :
 1. **Orchestrateur** : via un fake adapter, vérifie la parallélisation,

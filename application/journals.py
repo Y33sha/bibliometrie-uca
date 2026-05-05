@@ -2,7 +2,7 @@
 Service Journaux — accès exclusif en écriture à la table `journals`.
 
 Les opérations sur l'agrégat Publisher vivent dans `application/publishers.py`
-depuis §2.9.SRP. Les deux agrégats restent liés par `journals.publisher_id`
+(principe SRP). Les deux agrégats restent liés par `journals.publisher_id`
 (FK) mais sont manipulés par des services distincts, chacun sur son
 propre port.
 """

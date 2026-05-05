@@ -1,4 +1,4 @@
-"""Liste paginée + export CSV des publications (§2.12 : async).
+"""Liste paginée + export CSV des publications (async).
 
 Partage `ListFilters` et la construction des conditions SQL communes.
 """

@@ -1,8 +1,8 @@
-"""Pool async psycopg3 pour la surface FastAPI (§2.12).
+"""Pool async psycopg3 pour la surface FastAPI.
 
-Parallèle au pool sync de `interfaces/api/deps.py` pendant la migration ;
-le pool sync reste en place pour le pipeline et les CLI. Le pool async
-est ouvert via le lifespan FastAPI (cf. `interfaces/api/app.py`).
+Parallèle au pool sync de `interfaces/api/deps.py` (utilisé par le
+pipeline et les CLI). Le pool async est ouvert via le lifespan
+FastAPI (cf. `interfaces/api/app.py`).
 """
 
 import os
