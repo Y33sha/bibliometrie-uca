@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     db_host: str = "localhost"
     db_port: int = 5432
     db_name: str = "bibliometrie"
-    db_user: str = "lalecoz"
+    db_user: str
     db_password: str
 
     # ----- Pool de connexions -----

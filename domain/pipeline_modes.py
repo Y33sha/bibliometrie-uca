@@ -29,8 +29,10 @@ class ModePolicy:
     run_enrich: bool
 
 
-# WoS est exclu des cross-imports DOI en daily/weekly (crédit API limité,
-# l'appel n'apporte rien sans nouvelle extraction).
+# WoS : crédit API contractuel limité à 50 000 full records/an. WoS est
+# donc réservé au mode `full` (extraction comme cross-imports DOI), et
+# exclu des modes daily/weekly où l'appel consommerait du crédit sans
+# rapporter d'information non couverte par le mode full.
 _FETCH_MISSING_DOI_LIGHT = BIBLIO_SOURCES_SET - {"wos"}
 
 
@@ -45,6 +47,8 @@ MODES: dict[str, ModePolicy] = {
         run_enrich=False,
     ),
     "weekly": ModePolicy(
+        # Pas de WoS (cf. note crédit API ci-dessus). Pas de theses :
+        # source mensuelle, couverte par le mode full.
         extract_sources=frozenset({"hal", "openalex", "scanr"}),
         year_selection="weekly",
         refetch_truncated_oa=True,

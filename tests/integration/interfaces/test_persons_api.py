@@ -17,7 +17,7 @@ from psycopg.rows import dict_row
 
 _DB_ARGS = {
     "dbname": "bibliometrie_test",
-    "user": os.environ.get("DB_USER", "lalecoz"),
+    "user": os.environ["DB_USER"],
     "host": os.environ.get("DB_HOST", "127.0.0.1"),
     "port": int(os.environ.get("DB_PORT", "5432")),
 }
