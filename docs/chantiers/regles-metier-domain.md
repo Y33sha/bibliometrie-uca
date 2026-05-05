@@ -44,10 +44,20 @@ Rassembler dans `domain/` la logique métier pure, indépendante des
 sources et de l'infrastructure, puis y greffer les nouvelles règles
 manquantes (suppléments figshare, Zenodo, DataCite suspects).
 
+**Définition de « pur »** : une fonction qui prend en arguments tout
+ce dont elle a besoin (y compris les résultats de lookups SQL faits
+par la couche application) et qui renvoie une décision (souvent un
+value object). Les algorithmes de matching personnes, de
+déduplication publications, d'arbitrage doc_type relèvent tous de ce
+modèle — l'arbre de décision est pur, ce sont les SELECT en amont et
+les INSERT/UPDATE en aval qui sont impurs et restent en
+`application/`. Pattern déjà éprouvé sur
+[`resolve_doi_conflict`](domain/publication.py#L553).
+
 Hypothèse de travail : les règles vivent dans `domain/` sous forme de
 fonctions pures + dataclasses immuables, testées en unit pur (sans
-BDD). Les normalizers consomment ces fonctions au lieu d'inliner les
-conditions.
+BDD). Les normalizers et services applicatifs consomment ces fonctions
+au lieu d'inliner les conditions.
 
 ## Périmètre fonctionnel
 
@@ -81,11 +91,15 @@ conditions.
 
 ### Exclus
 
-- Les règles **non pures** (rattachement persons qui demande un repo,
-  fusion de publications qui demande SQL transactionnel) restent dans
-  `application/`. Le chantier rapatrie dans `domain/` la **partie
-  décisionnelle** (la fonction qui dit quoi faire, sans le faire),
-  laissant la partie effets de bord en `application/`.
+- Les **effets de bord** (SELECT/INSERT/UPDATE, gestion de
+  transactions, appels API externes) restent en `application/` ou
+  `infrastructure/`. Mais les **algorithmes de décision** qui les
+  pilotent sont relocalisables : on extrait dans `domain/` la fonction
+  pure qui prend en entrée le résultat des lookups (déjà faits par la
+  couche application) et renvoie une décision (value object), puis
+  l'application applique l'effet. Pattern déjà en place pour
+  [`resolve_doi_conflict`](domain/publication.py#L553) ↔
+  [`application/publications.py::resolve_doi_conflict`](application/publications.py).
 - L'ingestion DataCite proprement dite : couverte par le chantier
   [doi-ra-datacite.md](docs/chantiers/doi-ra-datacite.md).
   Ce chantier-ci se contente d'ajouter au `domain/` les règles que
@@ -169,34 +183,98 @@ testables sans BDD.
 
 ### `domain/person_matching.py` (à créer)
 
-La logique de matching personne dispersée entre :
+L'**algorithme** de matching personne est pur — il prend les résultats
+de lookups (faits par la couche application) et renvoie une décision.
+Esquisse :
 
-- `application/persons.py` (matching par identifiers, gestion des
-  status pending/confirmed/rejected)
-- `application/pipeline/persons/build_authorships.py`
-- les normalizers HAL/OpenAlex/WoS/ScanR/theses (chacun écrit ses
-  `source_authorships` avec son propre `person_id` selon des règles
-  variables)
+```python
+from dataclasses import dataclass
+from typing import Literal
 
-À identifier :
-- Règles **pures** (ex. « si ORCID et idHAL convergent vers la même
-  person, on lie ; sinon on crée pending »)
-- Règles **non pures** (ex. transaction SQL qui mute
-  `person_identifiers`) → restent en `application/`
+@dataclass(frozen=True)
+class PersonMatchDecision:
+    action: Literal["match", "create", "skip"]
+    person_id: int | None = None
+    reason: str = ""  # 'hal_account' | 'orcid_or_idref' | 'single_name' | 'name_ambiguous' | …
 
-### `domain/publication_dedup.py` (à créer ?)
+def decide_person_match(
+    *,
+    hal_account_match: int | None,         # SELECT par compte HAL, fait par app layer
+    orcid_idref_matches: list[int],        # SELECT par identifier, fait par app layer
+    name_matches: list[int],               # SELECT par nom normalisé, fait par app layer
+) -> PersonMatchDecision:
+    """Étapes 1, 2, 3 du matching. Pure, testable sans BDD."""
+    if hal_account_match is not None:
+        return PersonMatchDecision("match", hal_account_match, "hal_account")
+    if len(orcid_idref_matches) == 1:
+        return PersonMatchDecision("match", orcid_idref_matches[0], "orcid_or_idref")
+    if len(orcid_idref_matches) > 1:
+        return PersonMatchDecision("skip", reason="orcid_idref_ambiguous")
+    if len(name_matches) == 1:
+        return PersonMatchDecision("match", name_matches[0], "single_name")
+    if len(name_matches) > 1:
+        return PersonMatchDecision("skip", reason="name_ambiguous")
+    return PersonMatchDecision("create")
+```
 
-La déduplication publications est répartie entre :
-- `application/publications.py::find_or_create`,
-  `try_merge_by_doi`, `merge_publications`,
-  `resolve_doi_conflict` (ce dernier est déjà pur en domain ✅)
-- `infrastructure/repositories/publication_repository.py::find_by_doi`,
-  `find_by_nnt`, `merge_into`
+Côté `application/` : `match_person_for_authorship(...)` orchestre les
+SELECT, appelle `decide_person_match`, applique l'effet selon la
+décision (INSERT person + identifiers, ou attache person_id existant,
+ou skip). C'est le pattern déjà utilisé par
+[`resolve_doi_conflict`](domain/publication.py#L553).
 
-À extraire : règles de matching (DOI > NNT > titre+année), règles
-d'arbitrage en cas de conflit, règles de fusion de métadonnées (déjà
-documentées dans `refresh_from_sources` mais le code est en
-`application/`).
+À rapatrier de `application/persons.py` et de
+`application/pipeline/persons/build_authorships.py` :
+- les règles d'arbitrage (ordre des sources d'identité, comportement
+  en cas d'ambiguïté, gestion des statuts `pending`/`confirmed`/
+  `rejected` côté `person_identifiers`)
+- les invariants métier (ex. « jamais de fusion automatique entre
+  deux persons ayant chacune un `persons_rh` distinct » — déjà
+  appliqué côté API et scripts, à formaliser comme fonction pure)
+
+### `domain/publication_dedup.py` (à créer)
+
+Même pattern que pour les personnes : l'algorithme de déduplication
+est pur, on extrait la fonction de décision.
+
+```python
+@dataclass(frozen=True)
+class PublicationMatchDecision:
+    action: Literal["match", "create"]
+    publication_id: int | None = None
+    reason: str = ""  # 'doi' | 'nnt' | 'title_year' | …
+
+def decide_publication_match(
+    *,
+    doi_match: int | None,                 # find_by_doi
+    nnt_match: int | None,                 # find_by_nnt
+    title_year_matches: list[int],         # find_by_title_year
+) -> PublicationMatchDecision:
+    """Cascade DOI > NNT > titre+année. Pure."""
+    if doi_match is not None:
+        return PublicationMatchDecision("match", doi_match, "doi")
+    if nnt_match is not None:
+        return PublicationMatchDecision("match", nnt_match, "nnt")
+    if len(title_year_matches) == 1:
+        return PublicationMatchDecision("match", title_year_matches[0], "title_year")
+    return PublicationMatchDecision("create")
+```
+
+Pour la **fusion** de publications, même approche : on extrait
+`decide_merge_strategy(target: PubMeta, source: PubMeta) -> MergeDecision`
+qui dit champ par champ quoi écraser, quoi garder, quoi fusionner
+(union pour les listes, max pour `oa_status` selon priorité, etc.).
+La logique est déjà documentée dans
+[`refresh_from_sources`](application/publications.py#L297) — il s'agit
+de la rendre testable comme fonction pure.
+
+À rapatrier :
+- la cascade DOI > NNT > titre+année dispersée dans
+  [`find_or_create`](application/publications.py)
+- les règles de fusion (priorité par source, OA "le plus ouvert
+  gagne", union de countries) embarquées dans `refresh_from_sources`
+- les invariants de fusion (jamais de fusion qui casserait
+  l'unicité DOI, déjà géré par `try_merge_by_doi` mais à formaliser)
 
 ## Architecture cible
 
@@ -281,9 +359,21 @@ def extract_pub_metadata(work, journal_id):
   données existantes.
 
 ### Phase 3 — Person matching / dedup publications
-- [ ] À cadrer **après** phase 1-2, en fonction de l'apprentissage.
-      Périmètre potentiellement plus large, à scinder éventuellement
-      en chantier dédié.
+- [ ] Créer `domain/person_matching.py` avec `decide_person_match` +
+      `PersonMatchDecision`. Tests unitaires sur les 5+ branches de
+      l'arbre.
+- [ ] Refactor `application/persons.py` (et le caller dans
+      `build_authorships`) pour : prefetch des 3 listes
+      (hal_account_match, orcid_idref_matches, name_matches), appel
+      `decide_person_match`, application de la décision.
+- [ ] Idem `domain/publication_dedup.py` :
+      `decide_publication_match` + `decide_merge_strategy`. Tests sur
+      cascade DOI/NNT/titre et règles de fusion.
+- [ ] Refactor `application/publications.py::find_or_create` et
+      `refresh_from_sources` pour consommer ces fonctions pures.
+- [ ] Vérifier que la couverture des règles métier en domain/ est
+      exhaustive : aucune règle décisionnelle restante en application/
+      hors prefetch + apply.
 
 ## Décisions à prendre
 
