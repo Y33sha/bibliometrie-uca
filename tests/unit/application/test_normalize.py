@@ -5,8 +5,6 @@
 
 from application.pipeline.normalize.normalize_openalex import (
     extract_short_id,
-    is_hal_primary_location,
-    is_repository_source,
 )
 from domain.doc_types import _SOURCE_MAPS, map_doc_type
 from domain.doc_types import _VALID_DOC_TYPES as VALID_DOC_TYPES_SET
@@ -27,59 +25,8 @@ class TestOAExtractShortId:
         assert extract_short_id("") == ""
 
 
-class TestOAIsHalPrimaryLocation:
-    def test_hal_url(self):
-        work = {
-            "primary_location": {
-                "landing_page_url": "https://hal.science/hal-04123456",
-                "source": {},
-            }
-        }
-        assert is_hal_primary_location(work) is True
-
-    def test_tel_url(self):
-        work = {
-            "primary_location": {
-                "landing_page_url": "https://theses.hal.science/tel-04123456",
-                "source": {},
-            }
-        }
-        assert is_hal_primary_location(work) is True
-
-    def test_halshs_url(self):
-        work = {
-            "primary_location": {
-                "landing_page_url": "https://shs.hal.science/halshs-01234567",
-                "source": {},
-            }
-        }
-        assert is_hal_primary_location(work) is True
-
-    def test_not_hal(self):
-        work = {
-            "primary_location": {
-                "landing_page_url": "https://doi.org/10.1234/test",
-                "source": {"type": "journal"},
-            }
-        }
-        assert is_hal_primary_location(work) is False
-
-    def test_hal_repository_source(self):
-        work = {
-            "primary_location": {
-                "landing_page_url": "https://example.com/something",
-                "source": {
-                    "type": "repository",
-                    "display_name": "HAL",
-                    "homepage_url": "https://hal.archives-ouvertes.fr",
-                },
-            }
-        }
-        assert is_hal_primary_location(work) is True
-
-    def test_no_location(self):
-        assert is_hal_primary_location({}) is False
-        assert is_hal_primary_location({"primary_location": None}) is False
+# is_hal_primary_location migré vers domain/sources/openalex.is_hal_location
+# (cf. tests/unit/domain/sources/test_openalex.py).
 
 
 class TestOAExtractHalIdFromUrl:
@@ -102,17 +49,8 @@ class TestOAExtractHalIdFromUrl:
         assert extract_hal_id_from_url(None) is None
 
 
-class TestOAIsRepositorySource:
-    def test_repository(self):
-        work = {"primary_location": {"source": {"type": "repository"}}}
-        assert is_repository_source(work) is True
-
-    def test_journal(self):
-        work = {"primary_location": {"source": {"type": "journal"}}}
-        assert is_repository_source(work) is False
-
-    def test_no_source(self):
-        assert is_repository_source({}) is False
+# is_repository_source migré vers domain/sources/openalex.is_repository_location
+# (cf. tests/unit/domain/sources/test_openalex.py).
 
 
 class TestOADocTypeMap:
@@ -423,11 +361,9 @@ class TestFirstDocTypeArbitration:
 
 
 # ── NNT ─────────────────────────────────────────────────────────
+# is_theses_fr_source / extract_nnt_from_openalex migrés vers
+# domain/sources/openalex.py — voir tests/unit/domain/sources/test_openalex.py.
 
-from application.pipeline.normalize.openalex_parsing import (
-    extract_nnt_from_openalex,
-    is_theses_fr_source,
-)
 from domain.publication import normalize_nnt
 
 
@@ -446,60 +382,6 @@ class TestNormalizeNnt:
 
     def test_empty(self):
         assert normalize_nnt("") is None
-
-
-class TestIsThesesFrSource:
-    def test_display_name(self):
-        work = {
-            "primary_location": {
-                "source": {"display_name": "theses.fr (ABES)"},
-                "landing_page_url": "",
-            }
-        }
-        assert is_theses_fr_source(work) is True
-
-    def test_url(self):
-        work = {
-            "primary_location": {
-                "source": {},
-                "landing_page_url": "http://www.theses.fr/2023UCFA0069/document",
-            }
-        }
-        assert is_theses_fr_source(work) is True
-
-    def test_not_theses(self):
-        work = {
-            "primary_location": {
-                "source": {"display_name": "Elsevier"},
-                "landing_page_url": "https://doi.org/10.1234",
-            }
-        }
-        assert is_theses_fr_source(work) is False
-
-    def test_no_location(self):
-        assert is_theses_fr_source({}) is False
-
-
-class TestExtractNntFromOpenalex:
-    def test_pmh_format(self):
-        work = {"primary_location": {"id": "pmh:2023UCFA0069", "landing_page_url": ""}}
-        assert extract_nnt_from_openalex(work) == "2023UCFA0069"
-
-    def test_url_format(self):
-        work = {
-            "primary_location": {
-                "id": "",
-                "landing_page_url": "http://www.theses.fr/2023UCFA0069/document",
-            }
-        }
-        assert extract_nnt_from_openalex(work) == "2023UCFA0069"
-
-    def test_no_nnt(self):
-        work = {"primary_location": {"id": "", "landing_page_url": "https://doi.org/10.1234"}}
-        assert extract_nnt_from_openalex(work) is None
-
-    def test_no_location(self):
-        assert extract_nnt_from_openalex({}) is None
 
 
 # ── theses.fr ────────────────────────────────────────────────────

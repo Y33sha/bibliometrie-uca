@@ -262,22 +262,25 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/publications/external_ids.py` →
   `extract_external_ids_from_urls(urls: list[str]) -> dict[str, str]`.
 
-### is_hal_primary_location
+### ✅ is_hal_primary_location
 - **localisation** : `application/pipeline/normalize/normalize_openalex.py:159-172`
 - **description** : Détecte si la primary_location pointe vers HAL.
   Trois signaux : URL contient préfixe HAL, source.type=repository +
   display_name contient "hal", source.homepage_url contient "hal".
 - **classification** : (a).
-- **destination domain/** : `domain/sources/openalex_signals.py` →
-  `is_hal_primary_location(work) -> bool`.
+- **destination domain/** :
+  [`domain/sources/openalex.is_hal_location(loc)`](domain/sources/openalex.py).
+  Renommé pour signaler qu'il opère sur une `OpenalexLocation` (primary
+  ou pas) et non sur le work directement.
 
-### is_repository_source
+### ✅ is_repository_source
 - **localisation** : `application/pipeline/normalize/normalize_openalex.py:185-189`
 - **description** : `primary_location.source.type == "repository"`.
   Utilisé pour décider de **ne pas** créer journal/publisher.
 - **classification** : (a).
-- **destination domain/** : `domain/sources/openalex_signals.py` →
-  `is_repository_source(work) -> bool`.
+- **destination domain/** :
+  [`domain/sources/openalex.is_repository_location(loc)`](domain/sources/openalex.py).
+  Renommé pour cohérence (opère sur une `OpenalexLocation`).
 
 ### ✅ extract_pub_metadata — overrides doc_type theses.fr / dumas
 - **localisation** : `application/pipeline/normalize/normalize_openalex.py:266-276`
@@ -305,13 +308,15 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
   À étendre dans un commit ultérieur du chantier (suppléments
   figshare/Zenodo) : ajouter signaux DOI/title.
 
-### Décision « ne pas chercher publisher/journal pour HAL/theses/repo »
+### ✅ Décision « ne pas chercher publisher/journal pour HAL/theses/repo »
 - **localisation** : `application/pipeline/normalize/normalize_openalex.py:595-600`
 - **description** : Quand primary_location est HAL/theses.fr/repository,
   pas de publisher ni journal. Ces locations ne sont pas des éditeurs.
 - **classification** : (a).
-- **destination domain/** : `domain/sources/openalex_signals.py` →
-  `should_skip_publisher_journal(work) -> bool`.
+- **destination domain/** :
+  [`domain/sources/openalex.should_skip_publisher_journal(loc)`](domain/sources/openalex.py).
+  Composition logique des trois prédicats `is_hal_location`,
+  `is_theses_fr_location`, `is_repository_location` sur la primary.
 
 ### find_publication — cascade priorisée HAL > NNT > openalex_id > title
 - **localisation** : `application/pipeline/normalize/normalize_openalex.py:604-618`
@@ -600,23 +605,27 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ---
 
-## `application/pipeline/normalize/openalex_parsing.py`
+## ~~`application/pipeline/normalize/openalex_parsing.py`~~ (fichier supprimé)
 
-### is_theses_fr_source
+### ✅ is_theses_fr_source
 - **localisation** : `application/pipeline/normalize/openalex_parsing.py:13-23`
 - **description** : Détection theses.fr via `display_name` ou
   `landing_page_url`.
 - **classification** : (a).
-- **destination domain/** : `domain/sources/openalex_signals.py` →
-  `is_theses_fr_source(work) -> bool`.
+- **destination domain/** :
+  [`domain/sources/openalex.is_theses_fr_location(loc)`](domain/sources/openalex.py).
+  Renommé pour signaler qu'il opère sur une `OpenalexLocation`.
 
-### extract_nnt_from_openalex
+### ✅ extract_nnt_from_openalex
 - **localisation** : `application/pipeline/normalize/openalex_parsing.py:31-52`
 - **description** : Cascade `primary_location.id == pmh:{NNT}`, sinon
   URL `theses.fr/{NNT}`.
 - **classification** : (a).
-- **destination domain/** : `domain/sources/openalex_signals.py` →
-  `extract_nnt_from_openalex(work) -> str | None`.
+- **destination domain/** :
+  [`domain/sources/openalex.extract_nnt_from_location(loc)`](domain/sources/openalex.py).
+  Le fichier `openalex_parsing.py` (52 lignes) a été supprimé : ses
+  deux fonctions sont migrées dans `domain/sources/openalex.py` (avec
+  la nouvelle dataclass `OpenalexLocation`).
 
 ---
 
