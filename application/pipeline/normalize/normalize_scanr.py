@@ -34,6 +34,7 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
+from domain.sources.scanr import derive_scanr_oa_status
 
 # =============================================================
 # UTILITAIRES
@@ -111,7 +112,7 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
     title = get_title(doc)
     pub_year = doc.get("year")
     doc_type = doc.get("type") or "other"
-    oa_status = "green" if doc.get("isOa") else "closed"
+    oa_status = derive_scanr_oa_status(doc.get("isOa"), doc.get("oaEvidence"))
     container_title = None
     if not journal_id:
         source = doc.get("source") or {}
