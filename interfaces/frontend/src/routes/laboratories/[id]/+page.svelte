@@ -11,16 +11,14 @@
 	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
 	import PersonsTable from '$lib/components/PersonsTable.svelte';
 	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
-	import { SOURCE_ITEMS, IDENTIFIER_ITEMS } from '$lib/filterItems';
+	import { IDENTIFIER_ITEMS } from '$lib/filterItems';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import TabNav from '$lib/components/TabNav.svelte';
-	import { docTypeLabelsMap, oaLabelsMap, typeLabels } from '$lib/labels';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
-	import { useColumnVisibility } from '$lib/composables/useColumnVisibility.svelte';
-	import ColumnMenu from '$lib/components/ColumnMenu.svelte';
 	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
+	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
 
 	const labId = $derived($page.params.id);
 	let canGoBack = $state(false);
@@ -30,7 +28,6 @@
 	type Structure = components['schemas']['LabStructureCore'];
 	type RelatedStructure = components['schemas']['LabRelatedStructure'];
 	type LabProfile = components['schemas']['LaboratoryDetailResponse'];
-	type Publication = components['schemas']['PublicationListItem'];
 	type LabPerson = components['schemas']['LabPersonOut'];
 	type PersonsResponse = components['schemas']['LaboratoryPersonsResponse'];
 	type LabAddress = components['schemas']['LabAddressOut'];
@@ -51,56 +48,9 @@
 		})()
 	);
 
-	// --- Column visibility ---
-	const cv = useColumnVisibility([
-		{ key: 'type',       label: 'Type' },
-		{ key: 'year',       label: 'Année' },
-		{ key: 'title',      label: 'Titre',      fixed: true },
-		{ key: 'journal',    label: 'Revue' },
-		{ key: 'apc',        label: 'APC' },
-		{ key: 'oa',         label: 'OA' },
-		{ key: 'oa_path',    label: 'Voie OA' },
-		{ key: 'hal_status', label: 'Statut HAL' },
-		{ key: 'links',      label: 'Liens',      fixed: true },
-	], ['apc', 'oa_path', 'hal_status']);
-	const col = cv.col;
-
-	type HalStatus = 'ok' | 'notice' | 'hors_collection' | 'hors_hal';
-	const HAL_STATUS_META: Record<HalStatus, { label: string; css: string }> = {
-		ok:              { label: 'OK',              css: 'hal-ok' },
-		notice:          { label: 'Notice',          css: 'hal-notice' },
-		hors_collection: { label: 'Hors collection', css: 'hal-hors-collection' },
-		hors_hal:        { label: 'Hors HAL',        css: 'hal-hors-hal' },
-	};
-
-	function computeHalStatus(p: Publication): HalStatus {
-		if (!p.hal_id) return 'hors_hal';
-		const labCol = lab?.hal_collection;
-		if (!labCol || !p.hal_collections || !p.hal_collections.includes(labCol)) return 'hors_collection';
-		if (!p.oa_status || ['closed', 'unknown'].includes(p.oa_status)) return 'notice';
-		return 'ok';
-	}
-
-	// --- Publication filters ---
-	let pubSearch = $state('');
-	let selectedYears: string[] = $state([]);
-	let sourceStates = $state<Record<string, 'all' | 'yes' | 'no'>>({});
-	let selectedDocTypes: string[] = $state([]);
-	let selectedAccess: string[] = $state([]);
-	let selectedOa: string[] = $state([]);
-	let selectedApc: string[] = $state([]);
-	let selectedCountries: string[] = $state([]);
-	let selectedHalStatus: string[] = $state([]);
-	let pubSort = $state('year_desc');
-
-	function togglePubSortYear() {
-		pubSort = pubSort === 'year_desc' ? 'year_asc' : 'year_desc';
-		pubs.page = 1; syncUrl(); pubs.load();
-	}
-	function togglePubSortTitle() {
-		pubSort = pubSort === 'title' ? 'title_desc' : 'title';
-		pubs.page = 1; syncUrl(); pubs.load();
-	}
+	// Total des publications après filtrage, remonté par PublicationsListView
+	// pour que le titre de l'onglet (TabNav) reflète le tableau.
+	let pubsTotal = $state(0);
 
 	// --- Persons tab (manual state: API returns total_persons, not total, + inline facets) ---
 	let persons: LabPerson[] = $state([]);
@@ -237,68 +187,13 @@
 		return rorId.replace('https://ror.org/', '');
 	}
 
-	// --- Shared filter params builder (bridge between filter state and composables) ---
-	function buildPubFilterParams(): URLSearchParams {
-		const params = new URLSearchParams({ lab_id: labId ?? '' });
-		if (selectedYears.length) params.set('year', selectedYears.join(','));
-		const sf = Object.entries(sourceStates).filter(([, v]) => v === 'yes' || v === 'no').map(([k, v]) => `${k}_${v}`).join(',');
-		if (sf) params.set('source_filter', sf);
-		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
-		if (selectedAccess.length) params.set('access', selectedAccess.join(','));
-		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
-		if (selectedApc.length) params.set('has_apc', selectedApc.join(','));
-		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
-		if (selectedHalStatus.length) params.set('hal_status', selectedHalStatus.join(','));
-		return params;
-	}
-
-	// --- Composables: Publications ---
-	const pubs = usePaginatedFetch<Publication>({
-		endpoint: '/api/publications',
-		itemsKey: 'publications',
-		perPage: 50,
-		apiKey: 'lab-pubs',
-		buildParams() {
-			const params = buildPubFilterParams();
-			params.set('sort', pubSort);
-			const q = pubSearch.trim();
-			if (q) params.set('search', q);
-			return params;
-		},
-	});
-
-	const facets = useFacets({
-		endpoint: '/api/publications/facets',
-		apiKey: 'lab-pub-facets',
-		buildParams: buildPubFilterParams,
-		sourceCountsKey: 'source_counts',
-		facets: {
-			years:     { type: 'simple',      apiKey: 'years' },
-			docTypes:  { type: 'label_map',   apiKey: 'doc_types',   labels: docTypeLabelsMap },
-			access:    { type: 'passthrough', apiKey: 'access' },
-			oa:        { type: 'label_map',   apiKey: 'oa_statuses', labels: oaLabelsMap },
-			apc:       { type: 'passthrough', apiKey: 'apc' },
-			halStatus: { type: 'passthrough', apiKey: 'hal_status' },
-			countries: { type: 'passthrough', apiKey: 'countries',
-				transform: (c) => ({ value: c.value, text: `${c.text} (${c.value.toUpperCase()})`, count: c.count }) },
-		},
-	});
-
+	// `useUrlFilters` ne gère ici que les keys cross-onglets (tab, persons,
+	// addresses). Les keys de filtres publications sont gérées par
+	// `<PublicationsListView>` lui-même grâce à l'additivité de syncUrl.
 	const url = useUrlFilters({
 		basePath: `/laboratories/${labId}`,
 		filters: {
 			tab:              { type: 'single',        urlKey: 'tab', defaultValue: 'publications' },
-			selectedYears:    { type: 'string_array',  urlKey: 'year' },
-			sourceStates:     { type: 'source_states', urlKey: 'source_filter' },
-			selectedDocTypes: { type: 'string_array',  urlKey: 'doc_type' },
-			selectedAccess:   { type: 'string_array',  urlKey: 'access' },
-			selectedOa:       { type: 'string_array',  urlKey: 'oa_status' },
-			selectedApc:      { type: 'string_array',  urlKey: 'has_apc' },
-			selectedCountries:{ type: 'string_array',  urlKey: 'country' },
-			selectedHalStatus:{ type: 'string_array',  urlKey: 'hal_status' },
-			pubSearch:        { type: 'single',        urlKey: 'search' },
-			pubSort:          { type: 'single',        urlKey: 'sort', defaultValue: 'year_desc' },
-			currentPage:      { type: 'page',          urlKey: 'page' },
 			personsSort:      { type: 'single',        urlKey: 'psort', defaultValue: 'name' },
 			selectedDepts:    { type: 'string_array',  urlKey: 'pdept' },
 			selectedRoles:    { type: 'string_array',  urlKey: 'prole' },
@@ -313,9 +208,6 @@
 	function syncUrl() {
 		url.syncUrl(() => ({
 			tab: activeTab,
-			selectedYears, sourceStates, selectedDocTypes,
-			selectedAccess, selectedOa, selectedApc, selectedCountries, selectedHalStatus, pubSearch, pubSort,
-			currentPage: pubs.page,
 			personsSort,
 			selectedDepts,
 			selectedRoles,
@@ -325,27 +217,6 @@
 			addrPage,
 		}));
 	}
-
-	function onFilterChange() {
-		pubs.page = 1;
-		syncUrl();
-		pubs.load();
-		facets.load();
-	}
-
-	function exportCsvUrl(): string {
-		const params = buildPubFilterParams();
-		params.set('sort', 'year_desc');
-		const q = pubSearch.trim();
-		if (q) params.set('search', q);
-		return `${base}/api/publications/export.csv?${params}`;
-	}
-
-	const onSearchInput = url.debouncedSearch(() => {
-		pubs.page = 1;
-		syncUrl();
-		pubs.load();
-	});
 
 	function onPersonsSortChange(newSort: string) {
 		personsSort = newSort;
@@ -557,8 +428,9 @@
 	}
 
 	function onTabSwitch(tab: string) {
+		// L'onglet "publications" est géré par <PublicationsListView> qui
+		// charge ses données dans son propre onMount à chaque (re)montage.
 		if (tab === 'dashboard') loadDashboard();
-		if (tab === 'publications' && !pubs.loaded) { facets.load(); pubs.load(); }
 		if (tab === 'theses' && !theses.loaded) { thesesFacets.load(); theses.load(); }
 		if (tab === 'persons' && !personsLoaded) loadPersons();
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
@@ -567,19 +439,9 @@
 	onMount(async () => {
 		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
 
-		// Restore filters from URL
+		// Restore cross-tab state from URL (les filtres publications sont
+		// restaurés par PublicationsListView lui-même).
 		const restored = url.restoreFromUrl($page.url.searchParams);
-		if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
-		if (restored.sourceStates) sourceStates = restored.sourceStates as Record<string, 'all' | 'yes' | 'no'>;
-		if (restored.selectedDocTypes) selectedDocTypes = restored.selectedDocTypes as string[];
-		if (restored.selectedAccess) selectedAccess = restored.selectedAccess as string[];
-		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
-		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
-		if (restored.selectedCountries) selectedCountries = restored.selectedCountries as string[];
-		if (restored.selectedHalStatus) selectedHalStatus = restored.selectedHalStatus as string[];
-		if (restored.pubSearch) pubSearch = restored.pubSearch as string;
-		if (restored.pubSort) pubSort = restored.pubSort as string;
-		if (restored.currentPage) pubs.page = restored.currentPage as number;
 		if (restored.personsSort) personsSort = restored.personsSort as string;
 		if (restored.selectedDepts) selectedDepts = restored.selectedDepts as string[];
 		if (restored.selectedRoles) selectedRoles = restored.selectedRoles as string[];
@@ -601,12 +463,9 @@
 			error = true;
 			return;
 		}
-		// Load data for the active tab (from URL)
+		// Load data for the active tab (publications est auto-géré).
 		if (activeTab === 'dashboard') {
 			loadDashboard();
-		} else if (activeTab === 'publications') {
-			facets.load();
-			pubs.load();
 		} else if (activeTab === 'theses') {
 			thesesFacets.load();
 			theses.load();
@@ -689,7 +548,7 @@
 	<TabNav
 		tabs={[
 			{ id: 'dashboard', label: 'Dashboard', showCount: false },
-			{ id: 'publications', label: 'Publications', count: pubs.total },
+			{ id: 'publications', label: 'Publications', count: pubsTotal },
 			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses', count: thesesCount }] : []),
 			{ id: 'persons', label: 'Personnes', count: personsLoaded ? personsTotal : undefined },
 			{ id: 'addresses', label: 'Adresses', count: addrLoaded ? addrTotal : undefined },
@@ -753,132 +612,20 @@
 	<!-- Tab: Publications -->
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
-			<div class="toolbar toolbar-card">
-				<input type="text" placeholder="Rechercher par titre..." bind:value={pubSearch} oninput={onSearchInput} />
-				{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
-				{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
-				{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
-				{#if col('oa_path')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
-				{#if col('hal_status')}<FacetDropdown label="Statut HAL" options={facets.options.halStatus} bind:selected={selectedHalStatus} onchange={onFilterChange} />{/if}
-				{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />{/if}
-				<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
-				<PresenceFilterToggle label="Sources" items={SOURCE_ITEMS} bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
-				<span class="count">{pubs.total} publication{pubs.total > 1 ? 's' : ''}</span>
-				<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
-			</div>
-			<table class="pub-table">
-				<thead>
-					<tr>
-						{#if col('type')}<th style="width:80px">Type</th>{/if}
-						{#if col('year')}<th style="width:40px" class="sortable" class:active={pubSort === 'year_desc' || pubSort === 'year_asc'} onclick={togglePubSortYear}>An. {pubSort === 'year_asc' ? '↑' : '↓'}</th>{/if}
-						<th class="sortable pub-col-title" class:active={pubSort === 'title' || pubSort === 'title_desc'} onclick={togglePubSortTitle}>Titre {pubSort === 'title' ? '↑' : pubSort === 'title_desc' ? '↓' : ''}</th>
-						{#if col('journal')}<th class="pub-col-journal">Revue</th>{/if}
-						{#if col('apc')}<th style="width:60px">APC</th>{/if}
-						{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
-						{#if col('oa_path')}<th style="width:60px">Voie OA</th>{/if}
-						{#if col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
-						<th style="width:80px" class="col-menu-th">
-							<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
-								showMenu={cv.showMenu}
-								onToggle={cv.toggle}
-								onClose={() => cv.showMenu = false}
-								onOpen={() => cv.showMenu = !cv.showMenu} />
-						</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#if pubs.items.length === 0}
-						<tr><td colspan={cv.visibleColumns.length} class="no-results">Aucune publication</td></tr>
-					{:else}
-						{#each pubs.items as p (p.id)}
-							<tr>
-								{#if col('type')}<td>
-									<span class="type-label">{typeLabels[p.doc_type || ''] || p.doc_type || ''}</span>
-								</td>{/if}
-								{#if col('year')}<td>{p.pub_year || ''}</td>{/if}
-								<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
-								{#if col('journal')}<td class="journal-cell pub-col-journal"><span class="journal-clip">{p.journal || ''}</span></td>{/if}
-								{#if col('apc')}<td class="apc-cell">
-									{#if p.apc}
-										{@const thisLabApc = p.apc.filter(a => a.lab_id === lab?.id)}
-										{@const otherApc = p.apc.filter(a => a.lab_id !== lab?.id)}
-										{#if thisLabApc.length > 0}
-											<span class="apc-tag" title={thisLabApc.map(a => `${a.amount?.toLocaleString('fr-FR')} €`).join('\n')}>
-												{Math.round(thisLabApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
-											</span>
-										{:else if otherApc.length > 0}
-											<span class="apc-tag apc-other" title={otherApc.map(a => `sur budget ${a.lab_acronym || a.institution || '?'}`).join('\n')}>
-												{Math.round(otherApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
-											</span>
-										{/if}
-									{/if}
-								</td>{/if}
-								{#if col('oa')}<td class="oa-lock-cell">
-									{#if p.oa_status && !['unknown', 'closed'].includes(p.oa_status)}
-										<span class="oa-lock-badge oa-lock-open">
-											<img src="{base}/lock-open.svg" alt="Open Access" class="oa-lock" title="Open Access ({p.oa_status})" />
-											<span class="oa-lock-label">ouvert</span>
-										</span>
-									{:else}
-										<span class="oa-lock-badge oa-lock-closed">
-											<img src="{base}/lock-closed.svg" alt="Closed" class="oa-lock" title="Accès fermé" />
-											<span class="oa-lock-label">fermé</span>
-										</span>
-									{/if}
-								</td>{/if}
-								{#if col('oa_path')}<td>
-									{#if p.oa_status && p.oa_status !== 'unknown'}
-										<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
-									{/if}
-								</td>{/if}
-								{#if col('hal_status')}
-									{@const hs = computeHalStatus(p)}
-									{@const meta = HAL_STATUS_META[hs]}
-									<td><span class="hal-badge {meta.css}">{meta.label}</span></td>
-								{/if}
-								<td class="links-cell">
-									{#if p.hal_id}
-										<a href={halDocUrl(p.hal_id, p.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
-											<img src="{base}/icons/hal.ico" alt="HAL" />
-										</a>
-									{:else}
-										<span class="source-tag source-placeholder"></span>
-									{/if}
-									{#if p.openalex_id}
-										<a href="https://openalex.org/{p.openalex_id}" target="_blank" rel="noopener" class="source-tag source-oa" title="OpenAlex: {p.openalex_id}">
-											<img src="{base}/icons/openalex.png" alt="OA" />
-										</a>
-									{:else}
-										<span class="source-tag source-placeholder"></span>
-									{/if}
-									{#if p.scanr_id}
-										<a href={scanrPubUrl(p.scanr_id)} target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {p.scanr_id}">
-											<img src="{base}/scanr-icon.svg" alt="ScanR" />
-										</a>
-									{:else}
-										<span class="source-tag source-placeholder"></span>
-									{/if}
-									{#if p.wos_id}
-										<a href="https://www.webofscience.com/wos/woscc/full-record/{p.wos_id}" target="_blank" rel="noopener" class="source-tag source-wos" title="WoS: {p.wos_id}">
-											<img src="{base}/icons/wos.ico" alt="WoS" />
-										</a>
-									{:else}
-										<span class="source-tag source-placeholder"></span>
-									{/if}
-									{#if p.doi}
-										<a href="https://doi.org/{p.doi}" target="_blank" rel="noopener" class="source-tag source-doi" title={p.doi}>
-											<svg viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-										</a>
-									{:else}
-										<span class="source-tag source-placeholder"></span>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					{/if}
-				</tbody>
-			</table>
-			<Pagination page={pubs.page} pages={pubs.pages} onchange={(p) => { pubs.goToPage(p); syncUrl(); }} />
+			<PublicationsListView
+				apiKey={`lab-${lab.id}-pubs`}
+				externalFilters={{
+					labId: lab.id,
+					labLabel: lab.acronym || lab.name,
+					halCollection: lab.hal_collection ?? undefined,
+				}}
+				basePath={`/laboratories/${labId}`}
+				showFilterBanner={false}
+				showHalStatusColumn
+				apcMode="lab"
+				perPage={50}
+				onTotalChange={(t) => (pubsTotal = t)}
+			/>
 		</div>
 	{/if}
 
@@ -1132,21 +879,7 @@
 	}
 	.status-tag.confirmed { background: #e6f4ec; color: #2a7d4f; }
 	.status-tag.pending { background: #f0efec; color: var(--muted); }
-	/* HAL status badges */
-	.hal-badge {
-		display: inline-block;
-		padding: 2px 7px;
-		border-radius: 3px;
-		font-size: 0.8rem;
-		font-weight: 500;
-		white-space: nowrap;
-	}
-	.hal-ok              { background: #e6f4ec; color: #2a7d4f; }
-	.hal-notice          { background: #fff3e0; color: #c77c00; }
-	.hal-hors-collection { background: #ffe8d6; color: #d35400; }
-	.hal-hors-hal        { background: #fde8e8; color: #c0392b; }
 
-	.col-menu-th { position: relative; }
 	.date-cell { font-size: 0.85rem; white-space: nowrap; color: var(--muted); }
 	.status-badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 8px; }
 	.status-badge.soutenue { background: #e8f5e9; color: #2e7d32; }
