@@ -8,7 +8,7 @@ personnes et laboratoires.
 ## Stack technique
 
 - **Frontend** : SvelteKit (Svelte 5) — `interfaces/frontend/`
-- **Backend** : FastAPI + PostgreSQL 18 (psycopg2) — `interfaces/api/`
+- **Backend** : FastAPI + PostgreSQL 18 (psycopg3) — `interfaces/api/`
 - **Pipeline** : Python — `application/pipeline/` (orchestrateur
   `run_pipeline.py`), extracteurs dans `infrastructure/sources/`
 - **Architecture** : DDD en 4 couches (`domain/`, `application/`,
@@ -51,7 +51,7 @@ Le code est monté en volume : hot reload backend + frontend.
 
 ```bash
 docker cp bibliometrie.dump bibliometrie-uca-db-1:/tmp/
-docker compose exec db bash -c "pg_restore -U lalecoz -d bibliometrie --no-owner -j 4 /tmp/bibliometrie.dump"
+docker compose exec db bash -c 'pg_restore -U "$POSTGRES_USER" -d bibliometrie --no-owner -j 4 /tmp/bibliometrie.dump'
 ```
 
 Ou créer une base vide :
@@ -96,7 +96,7 @@ Deux options pour initialiser les données :
 
 **Option A — Restaurer un dump complet** :
 ```bash
-pg_restore -U lalecoz -d bibliometrie --clean --if-exists bibliometrie.dump
+pg_restore -U "$DB_USER" -d bibliometrie --clean --if-exists bibliometrie.dump
 ```
 
 **Option B — Démarrer de zéro** :
@@ -180,7 +180,7 @@ export DB_PASSWORD=...                      # Requis pour les tests d'intégrati
 python -m pytest tests/ -v                  # Tout
 python -m pytest tests/unit/ -q             # Unitaires seuls (~1s)
 python -m pytest tests/integration/ -q      # Intégration (~10s, base bibliometrie_test)
-python -m pytest tests/ --cov               # Avec couverture (seuil 49%)
+python -m pytest tests/ --cov               # Avec couverture (seuil 62%)
 ```
 
 Les tests d'intégration utilisent une base `bibliometrie_test` créée
