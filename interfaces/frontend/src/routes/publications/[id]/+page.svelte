@@ -146,11 +146,7 @@
 {:else}
   <PublicationHeader
     {pub}
-    {halSource}
-    {oaSource}
-    {scanrSource}
-    {wosSource}
-    {thesesSource}
+    sources={data!.sources}
   />
 
   {#if thesesAuth.length || thesisMeta}

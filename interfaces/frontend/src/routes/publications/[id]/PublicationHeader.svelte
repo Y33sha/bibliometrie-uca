@@ -4,21 +4,26 @@
   import { typeLabels as baseTypeLabels } from "$lib/labels";
   import type { PubDetail, Source } from "./types";
 
+  // `sources` peut contenir plusieurs rows pour une même source (ex: deux
+  // Work IDs OpenAlex partageant un DOI). On affiche un lien par row. La
+  // 1ère collection HAL listée correspond à la `source_publications` la
+  // plus récente (l'API trie par `created_at DESC`).
   const {
     pub,
-    halSource,
-    oaSource,
-    scanrSource,
-    wosSource,
-    thesesSource,
+    sources,
   }: {
     pub: PubDetail;
-    halSource: Source | undefined;
-    oaSource: Source | undefined;
-    scanrSource: Source | undefined;
-    wosSource: Source | undefined;
-    thesesSource: Source | undefined;
+    sources: Source[];
   } = $props();
+
+  const halSources = $derived(sources.filter((s) => s.source === "hal"));
+  const oaSources = $derived(sources.filter((s) => s.source === "openalex"));
+  const scanrSources = $derived(sources.filter((s) => s.source === "scanr"));
+  const wosSources = $derived(sources.filter((s) => s.source === "wos"));
+  const thesesSources = $derived(sources.filter((s) => s.source === "theses"));
+  // Collections HAL : on prend celles de la `source_publications` HAL la
+  // plus récente (la 1ère grâce au tri DESC côté API).
+  const halCollections = $derived(halSources[0]?.hal_collections ?? []);
 
   const typeLabels: Record<string, string> = {
     ...baseTypeLabels,
@@ -79,41 +84,41 @@
   {/if}
 
   <div class="pub-sources">
-    {#if halSource}
-      <a href={halDocUrl(halSource.source_id, pub.oa_status)} target="_blank" rel="noopener" class="source-link source-hal-link">
+    {#each halSources as s}
+      <a href={halDocUrl(s.source_id, pub.oa_status)} target="_blank" rel="noopener" class="source-link source-hal-link">
         <img src="{base}/icons/hal.ico" alt="" class="source-ico" />
-        HAL : {halSource.source_id}
+        HAL : {s.source_id}
       </a>
-    {/if}
-    {#if oaSource}
-      <a href="https://openalex.org/{oaSource.source_id}" target="_blank" rel="noopener" class="source-link source-oa-link">
+    {/each}
+    {#each oaSources as s}
+      <a href="https://openalex.org/{s.source_id}" target="_blank" rel="noopener" class="source-link source-oa-link">
         <img src="{base}/icons/openalex.png" alt="" class="source-ico" />
-        OpenAlex : {oaSource.source_id}
+        OpenAlex : {s.source_id}
       </a>
-    {/if}
-    {#if scanrSource}
-      <a href={scanrPubUrl(scanrSource.source_id)} target="_blank" rel="noopener" class="source-link source-scanr-link">
+    {/each}
+    {#each scanrSources as s}
+      <a href={scanrPubUrl(s.source_id)} target="_blank" rel="noopener" class="source-link source-scanr-link">
         <img src="{base}/scanr-icon.svg" alt="" class="source-ico" />
-        ScanR : {scanrSource.source_id}
+        ScanR : {s.source_id}
       </a>
-    {/if}
-    {#if wosSource}
-      <a href="https://www.webofscience.com/wos/woscc/full-record/{wosSource.source_id}" target="_blank" rel="noopener" class="source-link source-wos-link">
-        WoS : {wosSource.source_id}
+    {/each}
+    {#each wosSources as s}
+      <a href="https://www.webofscience.com/wos/woscc/full-record/{s.source_id}" target="_blank" rel="noopener" class="source-link source-wos-link">
+        WoS : {s.source_id}
       </a>
-    {/if}
-    {#if thesesSource}
-      <a href="https://theses.fr/{thesesSource.source_id}" target="_blank" rel="noopener" class="source-link source-theses-link">
+    {/each}
+    {#each thesesSources as s}
+      <a href="https://theses.fr/{s.source_id}" target="_blank" rel="noopener" class="source-link source-theses-link">
         <img src="https://theses.fr/favicon.ico" alt="" class="source-ico" />
-        theses.fr : {thesesSource.source_id}
+        theses.fr : {s.source_id}
       </a>
-    {/if}
+    {/each}
   </div>
 
-  {#if halSource?.hal_collections && halSource.hal_collections.length > 0}
+  {#if halCollections.length > 0}
     <div class="collections-line">
       <span class="collections-label">Collections HAL :</span>
-      {#each halSource.hal_collections as col}
+      {#each halCollections as col}
         <span class="collection-tag">{col}</span>
       {/each}
     </div>
