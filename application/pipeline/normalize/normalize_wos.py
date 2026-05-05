@@ -38,6 +38,7 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
+from domain.sources.wos import derive_wos_api_oa_status
 
 # =============================================================
 # UTILITAIRES
@@ -234,11 +235,7 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
     # Journal
     journal_title = _get_api_title(static, "source")
 
-    # OA — API format n'a pas toujours un champ OA simple
-    oa_gold = pub_info.get("journal_oas_gold")
-    oa_status = "unknown"
-    if oa_gold == "Y":
-        oa_status = "gold"
+    oa_status = derive_wos_api_oa_status(pub_info.get("journal_oas_gold"))
 
     # Language
     lang_data = static.get("fullrecord_metadata", {}).get("languages", {})

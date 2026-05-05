@@ -318,28 +318,35 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_wos.py`
 
-### map_doc_type (shim)
+### ✅ map_doc_type (shim)
 - **localisation** : `application/pipeline/normalize/normalize_wos.py:53-61`
-- **description** : Shim sur `domain.doc_types.map_doc_type`.
+- **description** : Shim sur `domain.doc_types.map_doc_type` qui forçait
+  la source à `'wos'`.
 - **classification** : (a).
-- **destination domain/** : n/a.
+- **destination domain/** : supprimé. Appel direct à
+  [`domain.doc_types.map_doc_type(raw, "wos")`](domain/doc_types.py).
 
-### map_oa_status — extraction multi-valeurs WoS
+### ✅ map_oa_status — extraction multi-valeurs WoS
 - **localisation** : `application/pipeline/normalize/normalize_wos.py:64-80`
-- **description** : Le champ OA WoS peut contenir plusieurs valeurs
-  concaténées (ex. `"Green Published, gold"`). Prendre le statut le
-  plus ouvert : diamond > gold > hybrid > bronze > green.
-- **classification** : (a).
-- **destination domain/** : `domain/publications/oa.py` →
-  `parse_wos_oa_status(raw) -> str`.
+- **description** : Parsing du champ OA TSV WoS (multi-valeurs concaténées).
+  Code mort — l'extracteur WoS n'utilise plus que le format API.
+- **classification** : (a) ; legacy à supprimer plutôt qu'à migrer.
+- **destination domain/** : ~~`domain/publications/oa.py` →
+  `parse_wos_oa_status`~~ → fonction et tests **supprimés** (TSV ne
+  sera plus jamais réimporté).
 
-### extract_from_api — règle « gold si journal_oas_gold == 'Y' »
+### ✅ extract_from_api — règle « gold si journal_oas_gold == 'Y' »
 - **localisation** : `application/pipeline/normalize/normalize_wos.py:274-277`
 - **description** : Pour le format API WoS, seul signal OA disponible :
   `pub_info.journal_oas_gold`. Si == "Y" → gold, sinon unknown.
 - **classification** : (a).
-- **destination domain/** : `domain/publications/oa.py` →
-  `derive_wos_api_oa_status(journal_oas_gold) -> str`.
+- **destination domain/** : ~~`domain/publications/oa.py`~~ → placement
+  source-spécifique pour cohérence :
+  [`domain/sources/wos.py::derive_wos_api_oa_status`](domain/sources/wos.py).
+  Renvoie `'gold'` si `'Y'`, `None` sinon (vs `'unknown'` avant —
+  WoS ne connaît pas vraiment la voie OA, on délègue plutôt qu'asserter).
+  TODO : règle vouée à disparaître quand le chantier `journals` comme
+  source complémentaire arrivera (signal OA WoS trop pauvre).
 
 ### authors_kept — filtre daisng_id
 - **localisation** : `application/pipeline/normalize/normalize_wos.py:573-577`
