@@ -70,7 +70,10 @@
 		/** Affiche la facet « UCA » (in_perimeter). */
 		showPerimeterFacet?: boolean;
 		/** Affiche la 1ère colonne avec un bouton ✕ pour exclure l'authorship.
-		 *  Le parent gère l'auth check et passe le callback. */
+		 *  Le parent gère l'auth check et passe le callback. Si le callback
+		 *  retourne `true` (ou void), la ligne est retirée du tableau ;
+		 *  retourne `false` pour annuler (ex. user a cliqué Annuler dans un
+		 *  confirm). */
 		showAdminExclude?: boolean;
 		/** Mode de rendu du tag APC :
 		 *  - 'uca' : filtre par budget_structure_id === 169 (défaut)
@@ -79,7 +82,7 @@
 		apcMode?: ApcMode;
 		/** Nombre d'éléments par page (50 pour les onglets, 100 pour /publications). */
 		perPage?: number;
-		onExcludeAuthorship?: (authorshipId: number, pubId: number) => void;
+		onExcludeAuthorship?: (authorshipId: number, pubId: number) => void | boolean | Promise<void | boolean>;
 		/** Notifie le parent du nombre total de publications après filtrage,
 		 *  pour que le titre d'onglet (TabNav) puisse refléter le tableau
 		 *  exactement (en tenant compte des doc_type exclus côté API et
@@ -342,6 +345,15 @@
 		return `${base}/api/publications/export.csv?${params}`;
 	}
 
+	async function onExcludeClick(p: Publication) {
+		if (!onExcludeAuthorship || p.authorship_id == null) return;
+		const result = await onExcludeAuthorship(p.authorship_id, p.id);
+		// `false` = annulé par le parent (ex. user a cliqué Annuler) ;
+		// `true` ou `undefined` = succès → on retire la ligne du tableau.
+		if (result === false) return;
+		pubs.items = pubs.items.filter((item) => item.id !== p.id);
+	}
+
 	onMount(async () => {
 		if (urlSync) {
 			const restored = url.restoreFromUrl($page.url.searchParams);
@@ -449,7 +461,7 @@
 						<td class="exclude-cell">
 							{#if p.authorship_id != null}
 								<button class="exclude-btn" title="Exclure ce lien auteur–publication"
-									onclick={() => onExcludeAuthorship?.(p.authorship_id!, p.id)}>✕</button>
+									onclick={() => onExcludeClick(p)}>✕</button>
 							{/if}
 						</td>
 					{/if}
