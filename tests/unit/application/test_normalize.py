@@ -218,6 +218,56 @@ class TestHALParseAuthorStructures:
         doc = {"authIdHasStructure_fs": ["abc-def_FacetSep_Nom_JoinSep_xyz_FacetSep_Lab"]}
         assert parse_author_structures(doc) == {}
 
+    def test_prefers_primary_structure(self):
+        """authIdHasPrimaryStructure_fs (labos feuilles) prime sur
+        authIdHasStructure_fs (arbre tutelles aplati). Évite de gonfler la
+        table addresses avec les tutelles parentes."""
+        doc = {
+            "authIdHasPrimaryStructure_fs": [
+                "100-200_FacetSep_Mouchet_JoinSep_1063691_FacetSep_IHRIM",
+            ],
+            "authIdHasStructure_fs": [
+                "100-200_FacetSep_Mouchet_JoinSep_1063691_FacetSep_IHRIM",
+                "100-200_FacetSep_Mouchet_JoinSep_6818_FacetSep_ENS Lyon",
+                "100-200_FacetSep_Mouchet_JoinSep_441569_FacetSep_CNRS",
+            ],
+        }
+        assert parse_author_structures(doc) == {100: {1063691}}
+
+    def test_falls_back_to_all_structures_when_primary_empty(self):
+        """Si Primary est vide (ancien doc HAL), fallback sur l'arbre complet
+        plutôt que de perdre l'info d'affiliation."""
+        doc = {
+            "authIdHasPrimaryStructure_fs": [],
+            "authIdHasStructure_fs": [
+                "100-200_FacetSep_Nom_JoinSep_1_FacetSep_Lab",
+            ],
+        }
+        assert parse_author_structures(doc) == {100: {1}}
+
+
+class TestScanrSelectLaboAffiliations:
+    def test_filters_to_labo(self):
+        """ScanR : seule l'affiliation labo (champ `id_name_author_labo`)
+        est conservée ; les pures tutelles sont jetées."""
+        from application.pipeline.normalize.normalize_scanr import select_labo_affiliations
+
+        labo = {"name": "IHRIM blob", "id_name_author_labo": "idref###X###RNSR###IHRIM"}
+        tutelle = {"name": "ENS Lyon, ..."}
+        assert select_labo_affiliations([labo, tutelle]) == [labo]
+
+    def test_falls_back_when_none_marked(self):
+        from application.pipeline.normalize.normalize_scanr import select_labo_affiliations
+
+        a = {"name": "Org A"}
+        b = {"name": "Org B"}
+        assert select_labo_affiliations([a, b]) == [a, b]
+
+    def test_empty(self):
+        from application.pipeline.normalize.normalize_scanr import select_labo_affiliations
+
+        assert select_labo_affiliations([]) == []
+
 
 class TestHALDocTypeMap:
     def test_covers_common_types(self):

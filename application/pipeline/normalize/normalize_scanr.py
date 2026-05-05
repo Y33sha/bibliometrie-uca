@@ -47,6 +47,19 @@ def extract_doi(doc: dict) -> str | None:
     return None
 
 
+def select_labo_affiliations(affiliations: list[dict]) -> list[dict]:
+    """Filtre les affiliations ScanR à celles marquées labo.
+
+    ScanR renvoie côte à côte l'affiliation labo (champ `id_name_author_labo`
+    rempli, c'est la seule affichée publiquement) et les pures tutelles
+    (mêmes infos déjà dérivables via `structures_parents`). On ne garde que
+    la labo ; fallback sur la liste complète si aucune n'est marquée labo
+    (auteur non rattaché à un labo identifié côté ScanR).
+    """
+    labo = [a for a in affiliations if a.get("id_name_author_labo")]
+    return labo or affiliations
+
+
 def extract_hal_id(doc: dict) -> str | None:
     for ext in doc.get("externalIds") or []:
         if ext.get("type") == "hal":
@@ -312,10 +325,12 @@ def process_authors(
         roles, _ = map_role("scanr", raw_role)
 
         author_affiliations = author_data.get("affiliations") or []
+        kept_affiliations = select_labo_affiliations(author_affiliations)
+
         addr_parts = []
         detected_countries: list[str] = []
 
-        for aff in author_affiliations:
+        for aff in kept_affiliations:
             name = (aff.get("name") or "").strip()
             if name:
                 addr_parts.append(name)
