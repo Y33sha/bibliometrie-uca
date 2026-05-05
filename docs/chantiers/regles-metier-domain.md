@@ -1,4 +1,5 @@
 # Chantier — Formalisation des règles métier dans `domain/`
+Commencé le 2026-05-05
 
 ## Contexte
 
@@ -183,7 +184,21 @@ testables sans BDD.
 
 L'**algorithme** de matching personne est pur — il prend les résultats
 de lookups (faits par la couche application) et renvoie une décision.
-Esquisse :
+
+Hiérarchie de fiabilité retenue (de la plus fiable à la moins) :
+
+1. **ORCID Crossref** : un ORCID dans Crossref vient de l'éditeur
+   donc directement de l'auteur lors de la soumission. Le plus fiable.
+2. **Compte HAL** (`hal_person_id`) : identifie un compte créé par
+   l'auteur ou par un curateur ; quelques erreurs de rattachement
+   possibles mais globalement fiable.
+3. **Idref / ORCID provenant d'autres sources** (HAL hors compte,
+   OpenAlex, WoS) : les ORCID OpenAlex/WoS viennent souvent d'un
+   matching par nom côté éditeur de la source, donc régulièrement
+   fautifs. À surveiller — voire à retirer si l'analyse confirme un
+   ratio bruit/signal défavorable.
+4. **Matching par nom** : dernier recours, avec arbitrage sur l'unicité
+   du résultat.
 
 ```python
 from dataclasses import dataclass
@@ -193,20 +208,27 @@ from typing import Literal
 class PersonMatchDecision:
     action: Literal["match", "create", "skip"]
     person_id: int | None = None
-    reason: str = ""  # 'hal_account' | 'orcid_or_idref' | 'single_name' | 'name_ambiguous' | …
+    reason: str = ""
+    # 'orcid_crossref' | 'hal_account' | 'orcid_or_idref_other_source'
+    # | 'single_name' | 'name_ambiguous' | …
 
 def decide_person_match(
     *,
-    hal_account_match: int | None,         # SELECT par compte HAL, fait par app layer
-    orcid_idref_matches: list[int],        # SELECT par identifier, fait par app layer
-    name_matches: list[int],               # SELECT par nom normalisé, fait par app layer
+    orcid_crossref_match: int | None,      # ORCID issu de Crossref
+    hal_account_match: int | None,         # hal_person_id
+    orcid_idref_other_matches: list[int],  # ORCID/idref de HAL hors compte, OA, WoS
+    name_matches: list[int],               # matching par nom normalisé
 ) -> PersonMatchDecision:
-    """Étapes 1, 2, 3 du matching. Pure, testable sans BDD."""
+    """Cascade de matching, du signal le plus fiable au moins fiable.
+    Pure, testable sans BDD."""
+    if orcid_crossref_match is not None:
+        return PersonMatchDecision("match", orcid_crossref_match, "orcid_crossref")
     if hal_account_match is not None:
         return PersonMatchDecision("match", hal_account_match, "hal_account")
-    if len(orcid_idref_matches) == 1:
-        return PersonMatchDecision("match", orcid_idref_matches[0], "orcid_or_idref")
-    if len(orcid_idref_matches) > 1:
+    if len(orcid_idref_other_matches) == 1:
+        return PersonMatchDecision("match", orcid_idref_other_matches[0],
+                                   "orcid_or_idref_other_source")
+    if len(orcid_idref_other_matches) > 1:
         return PersonMatchDecision("skip", reason="orcid_idref_ambiguous")
     if len(name_matches) == 1:
         return PersonMatchDecision("match", name_matches[0], "single_name")
@@ -229,6 +251,16 @@ ou skip). C'est le pattern déjà utilisé par
 - les invariants métier (ex. « jamais de fusion automatique entre
   deux persons ayant chacune un `persons_rh` distinct » — déjà
   appliqué côté API et scripts, à formaliser comme fonction pure)
+
+**Question ouverte — matching par co-publication** : actuellement
+utilisé en complément du matching par nom pour désambiguïser (« on
+relie cette signature à la person X parce qu'elle a déjà co-signé une
+publi avec Y, et Y est aussi auteur ici »). Pose problème sur les
+méga-papers (consortiums, papers à 100+ auteurs) avec des
+désalignements fréquents. À réexaminer pendant ce chantier :
+maintien tel quel, restriction à un seuil max d'auteurs (ex.
+≤ 30 auteurs), ou suppression. Décision à prendre après mesure du
+ratio matchings utiles / faux positifs sur les cas méga-paper.
 
 ### `domain/publication_dedup.py` (à créer)
 
@@ -405,28 +437,50 @@ def extract_pub_metadata(work, journal_id):
       exhaustive : aucune règle décisionnelle restante en application/
       hors prefetch + apply.
 
-## Décisions à prendre
+## Décisions actées
 
-1. **Granularité du module `domain/publication.py`** : il commence à
-   être gros (~600 lignes). Faut-il scinder en `domain/publication.py`
-   (VOs, métadonnées) + `domain/publication_rules.py` (règles
-   décisionnelles) ? Plutôt oui pour la lisibilité.
-2. **Stratégie pour les cas figshare existants** : reclassement
-   one-shot ou attendre le prochain refresh ? Le one-shot est plus
-   propre côté UI immédiate, le refresh est plus cohérent avec le
-   pipeline. Hypothèse : one-shot SQL qui s'aligne sur la nouvelle
-   règle, suivi d'une vérification au prochain run que le pipeline
-   produit le même résultat.
-3. **Suppléments orphelins** : que faire des 145 figshare suppléments
-   dont le parent n'est pas en BDD ? Options : (a) les garder mais
-   marqués `other`, (b) les exclure du périmètre UCA (les retirer du
-   reporting), (c) les filtrer à l'extraction OpenAlex (ne pas les
-   ingérer du tout). À arbitrer en concertation avec la cliente.
-4. **DataCite vs CrossRef pour la détection** : avant le chantier
-   doi-ra-datacite, on peut détecter via préfixe DOI hardcodé
-   (Zenodo = 10.5281, figshare = 10.6084). Après, via la table
-   `doi_prefixes`. Faut-il maintenir les deux paths (fallback) ou
-   migrer entièrement quand `doi_prefixes` existe ?
+1. **Granularité = dossier `domain/publications/` plutôt que fichiers
+   plats à la racine de `domain/`**. Une fois qu'on aura ajouté
+   `dedup.py`, `merge.py`, `rules.py` (règles suspects), `doi_conflict.py`
+   et qu'on aura scindé l'actuel `publication.py` (VOs vs Pydantic
+   biblio/meta vs topics), on aura ~6-7 fichiers : la lisibilité
+   s'effondre à plat. Le dossier offre un préfixe d'import explicite
+   (`from domain.publications.dedup import …`) qui rend le rôle de
+   chaque module immédiat à la lecture, et permet d'évoluer (sous-
+   modules `domain/persons/`, `domain/structures/`) sans refactor
+   plus tard. Coût : un `__init__.py` par dossier, c'est négligeable.
+2. **Reclassement one-shot des cas existants** en fin de chantier.
+   SQL aligné sur la nouvelle règle, suivi d'une passe de vérification
+   au prochain run pipeline pour s'assurer que la cascade en `domain/`
+   produirait le même résultat.
+4. **Détection figshare/Zenodo : hardcoded au démarrage, via
+   `doi_prefixes` quand le chantier doi-ra-datacite aura abouti**.
+   On démarre avec des helpers `is_figshare_doi`/`is_zenodo_doi` à
+   préfixe en dur (suffisant pour les patterns connus). Si après
+   doi-ra-datacite on constate que `doi_prefixes` couvre l'intégralité
+   des cas réels, on migrera entièrement et on retirera les helpers
+   préfixe. Pas de double path à maintenir intentionnellement — la
+   migration est un objectif, pas un fallback permanent.
+
+## Open questions (à examiner pendant ou après le chantier)
+
+3. **Suppléments orphelins** (145 cas figshare au 2026-05-05 dont le
+   parent n'est pas en BDD) : à sonder au cas par cas en fin de
+   chantier. Hypothèses à tester : (a) parent présent avec un titre
+   légèrement différent (matching à raffiner), (b) parent réellement
+   absent et c'est correct (publi non-UCA), (c) parent réellement
+   absent à tort (à retrouver). Cette question rejoint un futur
+   chantier de modélisation des **relations entre publications**
+   (parent ↔ supplément, ouvrage ↔ chapitre, version ↔ révision,
+   …) — à n'ouvrir qu'une fois ce chantier-ci abouti.
+5. **Matching par co-publication** : maintien, restriction (seuil
+   max d'auteurs), ou suppression. À mesurer pendant la phase 3
+   (rapatriement person matching) — quantifier le ratio matchings
+   utiles / faux positifs sur les cas méga-paper avant d'arbitrer.
+6. **ORCID OpenAlex/WoS sources fautives** : à mesurer pendant le
+   rapatriement. Si le bruit dépasse le signal, on les sortira de
+   la cascade et la décision se limitera à : ORCID Crossref →
+   compte HAL → idref → nom.
 
 ## Risques & open questions
 
