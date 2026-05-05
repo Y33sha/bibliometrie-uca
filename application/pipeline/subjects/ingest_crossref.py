@@ -4,7 +4,7 @@ Source format (cf normalize_crossref.py:140-146) :
 - `keywords` : list[str] (champ `subject` de CrossRef), libres EN. Souvent
   très génériques ('Computer Science', 'Medicine'…). On les ingère malgré tout —
   un seuil de bruit pourra être ajouté plus tard si besoin.
-- `topics`   : pas extrait par CrossRef en l'état (Phase 3 du chantier).
+- `topics`   : pas extrait par CrossRef en l'état (cf. docs/chantiers/sujets-mots-cles.md).
 """
 
 from typing import Any
@@ -19,7 +19,7 @@ def ingest(
     *,
     publication_id: int,
     keywords: list[str] | None,
-    topics: Any,  # noqa: ARG001 — pas exploité tant que Phase 3 n'a pas tranché
+    topics: Any,  # noqa: ARG001 — non exploité côté CrossRef (cf. docs/chantiers/sujets-mots-cles.md)
     cache: SubjectCache,
 ) -> int:
     links: list[tuple[int, int, float | None]] = []

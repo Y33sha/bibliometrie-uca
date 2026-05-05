@@ -1,4 +1,4 @@
-"""Détail d'une personne : profil, auteurs liés, thèses encadrées, adresses (§2.12 : async)."""
+"""Détail d'une personne (async) : profil, auteurs liés, thèses encadrées, adresses."""
 
 import datetime
 from typing import Any

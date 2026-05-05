@@ -1,4 +1,4 @@
-"""Adapter PostgreSQL async pour les 3 tables du concept Structure (§2.12).
+"""Adapter PostgreSQL async pour les 3 tables du concept Structure.
 
 Parallèle à infrastructure/repositories/structure_repository.py.
 """

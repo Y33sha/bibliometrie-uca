@@ -1,7 +1,7 @@
 """
 Service Éditeurs — accès exclusif en écriture à la table `publishers`.
 
-Séparé de `application/journals.py` depuis §2.9.SRP : publishers et
+Séparé de `application/journals.py` (principe SRP) : publishers et
 journals sont deux agrégats distincts, servis par deux ports distincts
 (`PublisherRepository`, `JournalRepository`). Un caller qui ne touche
 qu'aux éditeurs (ex. `update_publisher` d'un router admin) n'a pas à

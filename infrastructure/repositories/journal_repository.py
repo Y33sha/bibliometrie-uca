@@ -1,6 +1,6 @@
 """Adapter PostgreSQL pour l'agrégat Journal.
 
-L'agrégat Publisher est dans `publisher_repository.py` depuis §2.9.ISP.
+L'agrégat Publisher est dans `publisher_repository.py` (principe ISP).
 
 Même contrat que les autres PgXxxRepository : curseur dans la
 transaction courante, exceptions du domaine, pas d'orchestration

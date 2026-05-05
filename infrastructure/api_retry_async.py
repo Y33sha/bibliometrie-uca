@@ -3,7 +3,7 @@ Helper générique pour les requêtes HTTP async avec retry + backoff exponentie
 
 Variante async de `infrastructure.api_retry.http_request_with_retry`,
 utilisée par les extracteurs et scripts du pipeline qui lancent plusieurs
-requêtes en parallèle via `asyncio.gather` (§2.14 du ROADMAP).
+requêtes en parallèle via `asyncio.gather`.
 
 Stratégie identique à la variante sync :
   - retry sur HTTP 429 (Too Many Requests)

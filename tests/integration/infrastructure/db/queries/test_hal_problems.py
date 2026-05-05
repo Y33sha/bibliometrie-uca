@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `infrastructure.db.queries.hal_problems` (§2.12 : async)."""
+"""Tests d'intégration pour `infrastructure.db.queries.hal_problems` (async)."""
 
 from infrastructure.db.queries.hal_problems import (
     hal_affiliation_conflicts,

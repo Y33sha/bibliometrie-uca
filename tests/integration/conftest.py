@@ -106,7 +106,7 @@ def db():
 
 @pytest.fixture
 async def async_db():
-    """Variante async de `db` (§2.12). Transaction rollbackée à la fin."""
+    """Variante async de `db`. Transaction rollbackée à la fin."""
     conn = await psycopg.AsyncConnection.connect(**_db_connect_args(), row_factory=dict_row)
     await conn.set_autocommit(False)
     async with conn.cursor() as cur:

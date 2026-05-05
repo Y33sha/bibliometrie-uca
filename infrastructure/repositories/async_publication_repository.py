@@ -1,4 +1,4 @@
-"""Adapter PostgreSQL async pour les publications (§2.12).
+"""Adapter PostgreSQL async pour les publications.
 
 Parallèle à infrastructure/repositories/publication_repository.py.
 """

@@ -2,7 +2,7 @@
 Service Liens adresse ↔ structure — validation manuelle des
 détections de périmètre.
 
-Séparé de `application/addresses.py` depuis §2.9.SRP : la validation
+Séparé de `application/addresses.py` (principe SRP) : la validation
 adresse↔structure (confirm / reject / reset / batch) et l'attribution
 des pays sont deux responsabilités distinctes, orchestrées par des
 routers différents. La gestion des pays vit dans

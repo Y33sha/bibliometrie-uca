@@ -1,6 +1,6 @@
 """Port JournalRepository — contrat d'accès à l'agrégat Journal.
 
-L'agrégat Publisher est dans `publisher_repository.py` depuis §2.9.ISP.
+L'agrégat Publisher est dans `publisher_repository.py` (principe ISP).
 Les deux agrégats sont liés par `journals.publisher_id` (FK) mais
 manipulés par des opérations distinctes — séparer les ports réduit la
 surface sur laquelle chaque call site s'engage.
@@ -94,7 +94,7 @@ class JournalRepository(Protocol):
 
 
 class AsyncJournalRepository(Protocol):
-    """Variante async de JournalRepository (§2.12)."""
+    """Variante async de JournalRepository."""
 
     # ── journal_name_forms ─────────────────────────────────────────
 

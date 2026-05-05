@@ -1,7 +1,7 @@
-"""Adapter PostgreSQL async pour l'agrégat Publisher (§2.12).
+"""Adapter PostgreSQL async pour l'agrégat Publisher.
 
 Parallèle à `publisher_repository.py`. Séparé de `async_journal_repository.py`
-depuis §2.9.ISP.
+(principe ISP).
 """
 
 from typing import Any

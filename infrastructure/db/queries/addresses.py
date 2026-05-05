@@ -1,4 +1,4 @@
-"""Query services async pour /api/addresses/* et /api/countries (§2.12)."""
+"""Query services async pour /api/addresses/* et /api/countries."""
 
 from dataclasses import dataclass
 from typing import Any

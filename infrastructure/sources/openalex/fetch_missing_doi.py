@@ -2,10 +2,9 @@
 
 Un appel par DOI sur le filtre `doi:...` de l'API Works.
 
-§2.14 : migre vers le chemin async (`run_async`). La boucle
-embarrassingly parallel des DOIs manquants exploite le polite pool
-OpenAlex (10 req/s) via un sémaphore, gain attendu ×8 à ×10 vs la
-variante sync.
+Chemin async (`run_async`). La boucle embarrassingly parallel des
+DOIs manquants exploite le polite pool OpenAlex (10 req/s) via un
+sémaphore.
 """
 
 from __future__ import annotations

@@ -109,7 +109,7 @@ class PersonRepository(Protocol):
 
 
 class AsyncPersonRepository(Protocol):
-    """Variante async de PersonRepository (§2.12).
+    """Variante async de PersonRepository.
 
     Implémentée par infrastructure/repositories/async_person_repository/.
     """

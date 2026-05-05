@@ -8,7 +8,7 @@ version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
     "requests==2.33.0",          # CVE-2024-35195, CVE-2024-47081, CVE-2026-25645 fixed
-    "httpx==0.27.2",             # §2.14 : extractions HTTP async dans le pipeline
+    "httpx==0.27.2",             # extractions HTTP async dans le pipeline
     "psycopg[binary]==3.3.3",
     "psycopg-pool==3.3.0",
     "fastapi==0.128.2",
@@ -23,9 +23,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest==9.0.3",                   # CVE-2025-71176 fixed
-    "pytest-asyncio==1.3.0",           # §2.12 : tests async pour migration FastAPI
+    "pytest-asyncio==1.3.0",           # tests async des endpoints FastAPI et adapters
     "pytest-cov==7.1.0",
-    "respx==0.22.0",                   # §2.14 : mocking httpx pour tests async
+    "respx==0.22.0",                   # mocking httpx pour tests async
     "ruff==0.15.11",
     "mypy==1.20.1",
     "types-requests==2.33.0.20260408",
@@ -55,12 +55,6 @@ optional_dependencies_dev_groups = ["dev"]
 # ----------------------------------------------------------------------
 # import-linter : vérifie les règles de dépendance entre couches DDD.
 # Lancement : `lint-imports`
-#
-# Les contrats actuels verrouillent les invariants DDD qui sont DÉJÀ en
-# place. Quand §1.1 (sortir le SQL des routers) et §1.6 (DI complète via
-# FastAPI Depends) de la ROADMAP seront faits, on pourra durcir :
-# - ajouter un contrat layered strict interfaces > infrastructure > application > domain
-# - interdire les imports `infrastructure.*` depuis `interfaces.api.routers.*`
 # ----------------------------------------------------------------------
 [tool.importlinter]
 root_packages = ["domain", "application", "infrastructure", "interfaces"]
@@ -69,8 +63,8 @@ root_packages = ["domain", "application", "infrastructure", "interfaces"]
 name = "Couches DDD (layered)"
 type = "layers"
 layers = ["interfaces", "infrastructure | application", "domain"]
-# §1.7b clôturé : plus aucune violation application → infrastructure.
-# Toute nouvelle dépendance doit passer par un port.
+# `application` n'importe pas `infrastructure` : toute nouvelle
+# dépendance doit passer par un port.
 
 [tool.deptry.per_rule_ignores]
 # python-dotenv n'est pas importé directement, mais pydantic-settings
@@ -142,7 +136,7 @@ max-complexity = 15
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
-# §2.12 : pytest-asyncio mode auto — les fonctions `async def test_*` sont
+# pytest-asyncio mode auto — les fonctions `async def test_*` sont
 # reconnues automatiquement sans décorateur. Loop scope par fonction
 # (défaut) : chaque test async a sa propre boucle.
 asyncio_mode = "auto"

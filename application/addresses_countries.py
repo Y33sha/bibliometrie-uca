@@ -3,7 +3,7 @@ Service Pays des adresses — attribution, propagation horizontale
 (adresses similaires) et verticale (vers source_publications /
 publications).
 
-Séparé de `application/addresses.py` depuis §2.9.SRP : la validation
+Séparé de `application/addresses.py` (principe SRP) : la validation
 des liens adresse↔structure vit dans
 `application/addresses_structures.py`. Les deux surfaces partagent
 l'agrégat Address mais n'interagissent pas entre elles.

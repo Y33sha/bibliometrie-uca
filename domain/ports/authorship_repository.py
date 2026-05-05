@@ -79,7 +79,7 @@ class AuthorshipRepository(Protocol):
 
 
 class AsyncAuthorshipRepository(Protocol):
-    """Variante async de AuthorshipRepository (§2.12).
+    """Variante async de AuthorshipRepository.
 
     Implémentée par infrastructure/repositories/async_authorship_repository.py.
     """

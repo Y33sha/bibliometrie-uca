@@ -80,7 +80,7 @@ def get_persons_structure_ids_list(cur: Any) -> list[int]:
     return list(get_persons_structure_ids(cur))
 
 
-# ── Variantes async (§2.12) — utilisées par la surface FastAPI ────
+# ── Variantes async — utilisées par la surface FastAPI ────────────
 
 
 async def async_get_perimeter_structure_ids(cur: Any, perimeter_code: str) -> set[int]:

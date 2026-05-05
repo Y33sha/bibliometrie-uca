@@ -2,12 +2,10 @@
 
 Ces fonctions construisent les conditions WHERE à partir des paramètres
 de requête. Elles mutent les listes `conditions` et `params` passées en
-argument — contrat historique conservé pour minimiser la diff lors de
-l'extraction §1.1.
+argument.
 
 Vit dans `infrastructure/` parce que ces fonctions génèrent du SQL
-(infrastructure technique) — elles étaient précédemment dans
-`interfaces/api/filters.py`, mais l'appartenance réelle est ici.
+(infrastructure technique).
 """
 
 OA_OPEN_STATUSES = ("gold", "hybrid", "bronze", "green", "diamond")

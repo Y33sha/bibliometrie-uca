@@ -55,10 +55,10 @@ from infrastructure.pipeline_status import clear_status, read_status, write_stat
 BASE = Path(__file__).resolve().parent
 
 # `setup_logger` (au lieu d'un simple `getLogger`) attache un FileHandler
-# sur `logs/pipeline.log` quand `LOG_TO_FILE=true`. Sans ça, `read_new_logs`
-# (cf `infrastructure/pipeline_metrics.py`) ne capture rien pour les phases
-# qui réutilisent ce logger parent (subjects, cooccurrences, enrich) — les
-# rapports en /admin/pipeline avaient des titres de phase mais pas de logs.
+# sur `logs/pipeline.log` quand `LOG_TO_FILE=true`. Indispensable pour
+# que `read_new_logs` (cf. `infrastructure/pipeline_metrics.py`) capture
+# les logs des phases qui réutilisent ce logger parent (subjects,
+# cooccurrences, enrich) et les remonte dans /admin/pipeline.
 log = setup_logger("pipeline", str(BASE / "logs"))
 
 

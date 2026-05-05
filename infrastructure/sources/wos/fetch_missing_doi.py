@@ -8,9 +8,9 @@ Certains DOI (preprints Zenodo, arXiv, SSRN, Research Square...) sont
 systématiquement absents de WoS : on les filtre côté client pour éviter
 les appels inutiles.
 
-§2.14 : adapter async (`AsyncFetchMissingDoiAdapter`). L'instabilité
-historique de WoS était liée aux pages larges ; en requêtes DOI
-individuelles (via batch de 20 et WOS_PER_PAGE=10) l'API est stable.
+Adapter async (`AsyncFetchMissingDoiAdapter`). Les requêtes DOI
+individuelles (via batch de 20 et WOS_PER_PAGE=10) sont stables ;
+les pages larges de l'API WoS le sont moins.
 """
 
 from __future__ import annotations

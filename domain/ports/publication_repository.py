@@ -106,7 +106,7 @@ class PublicationRepository(Protocol):
 
 
 class AsyncPublicationRepository(Protocol):
-    """Variante async de PublicationRepository (§2.12).
+    """Variante async de PublicationRepository.
 
     Implémentée par infrastructure/repositories/async_publication_repository.py.
     """

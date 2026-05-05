@@ -17,8 +17,9 @@ Particularités CrossRef :
 - Affiliations purement textuelles et génériques (tutelles), pas de
   structures détaillées → stockées dans ``source_authorships.source_data``
   pour traçabilité, pas d'``addresses`` ni de ``source_authorship_addresses``.
-- ``doc_type`` stocké comme ``NULL`` en phase 1 ; le mapping
-  taxonomie CrossRef → enum canonique vit en phase 2 (``_SOURCE_MAPS``).
+- ``doc_type`` stocké comme ``NULL`` à la normalisation ; le mapping
+  taxonomie CrossRef → enum canonique est appliqué plus tard via
+  ``_SOURCE_MAPS``.
 - ``oa_status`` non dérivé de CrossRef (pas fiable) ; laissé à NULL
   pour que les autres sources arbitrent via ``refresh_from_sources``.
 
@@ -199,9 +200,9 @@ def get_biblio(msg: dict) -> dict | None:
 def get_meta(msg: dict) -> dict | None:
     """Champs CrossRef-spécifiques stockés en jsonb (cf. décision actée plan).
 
-    Pour l'instant on stocke license/funder/relation/references_count/
-    indexed_timestamp tels quels — la phase 5 (relations) lira
-    ``meta->'relation'``.
+    On stocke license/funder/relation/references_count/indexed_timestamp
+    tels quels ; le sous-objet ``meta->'relation'`` est consommé par
+    l'étape « relations » de l'ingestion des sujets.
     """
     meta: dict[str, Any] = {}
     for key in ("license", "funder", "relation"):
@@ -358,8 +359,9 @@ def find_publication(
     """Cherche la publi canonique pour un record CrossRef, sans la créer.
 
     Le matching est en pratique presque toujours par DOI (CrossRef = DOI-driven).
-    En phase 1, on passe ``doc_type='other'`` à ``find_or_create`` (le mapping
-    CrossRef → enum canonique vit en phase 2), suffisant pour le matching DOI.
+    On passe ``doc_type='other'`` à ``find_or_create`` (le mapping
+    CrossRef → enum canonique est appliqué plus tard) : c'est suffisant
+    pour le matching DOI.
     """
     title = get_title(msg)
     pub_year = get_pub_year(msg)
@@ -438,7 +440,7 @@ def process_work(
         doi=doi,
         title=title,
         pub_year=pub_year,
-        doc_type=None,  # phase 2 fera le mapping (cf. docs/chantiers/crossref.md)
+        doc_type=None,  # mapping CrossRef → enum canonique appliqué plus tard (cf. docs/chantiers/crossref.md)
         publication_id=publication_id,
         staging_id=staging_id,
         external_ids=Json(external_ids) if external_ids else None,

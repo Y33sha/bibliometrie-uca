@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `infrastructure.db.queries.person_duplicates` (§2.12 : async)."""
+"""Tests d'intégration pour `infrastructure.db.queries.person_duplicates` (async)."""
 
 from infrastructure.db.queries.person_duplicates import (
     count_person_conflict_pairs,

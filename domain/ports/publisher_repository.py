@@ -1,9 +1,9 @@
 """Port PublisherRepository — contrat d'accès à l'agrégat Publisher.
 
-Séparé de `JournalRepository` depuis §2.9.ISP : publishers et journals
+Séparé de `JournalRepository` (principe ISP) : publishers et journals
 sont deux agrégats distincts, bien que liés par une FK. Les pipelines
-qui ne créent que des publishers n'ont plus à dépendre du contrat
-journaux, et inversement.
+qui ne créent que des publishers ne dépendent pas du contrat journaux,
+et inversement.
 
 La fusion d'éditeurs (`merge_publisher_into`) reste ici : sémantiquement
 c'est une opération atomique sur un éditeur qui touche par effet de
@@ -61,7 +61,7 @@ class PublisherRepository(Protocol):
 
 
 class AsyncPublisherRepository(Protocol):
-    """Variante async de PublisherRepository (§2.12)."""
+    """Variante async de PublisherRepository."""
 
     # ── publisher_name_forms ───────────────────────────────────────
 

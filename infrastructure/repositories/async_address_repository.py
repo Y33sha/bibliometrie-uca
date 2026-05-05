@@ -1,4 +1,4 @@
-"""Adapter PostgreSQL async pour `addresses` et ses propagations (§2.12).
+"""Adapter PostgreSQL async pour `addresses` et ses propagations.
 
 Parallèle à infrastructure/repositories/address_repository.py.
 """

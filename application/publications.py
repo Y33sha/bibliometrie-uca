@@ -427,7 +427,7 @@ def merge_publications(
 async def async_merge_publications(
     cur: Any, target_id: int, source_id: int, *, repo: AsyncPublicationRepository
 ) -> None:
-    """Variante async de `merge_publications` (§2.12, API admin_duplicates)."""
+    """Variante async de `merge_publications` (utilisée par l'API admin_duplicates)."""
     await repo.merge_into(target_id, source_id)
     await repo.update_sources(target_id)
     await async_emit_event(

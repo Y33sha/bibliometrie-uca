@@ -1,6 +1,6 @@
-"""Adapter PostgreSQL async pour l'agrégat Journal (§2.12).
+"""Adapter PostgreSQL async pour l'agrégat Journal.
 
-L'agrégat Publisher est dans `async_publisher_repository.py` depuis §2.9.ISP.
+L'agrégat Publisher est dans `async_publisher_repository.py` (principe ISP).
 Parallèle à `journal_repository.py`.
 """
 

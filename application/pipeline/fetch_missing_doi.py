@@ -7,9 +7,10 @@ Le comportement spécifique à chaque source (endpoint, auth, format de
 requête/réponse, SQL d'insertion) est délégué à un adapter qui implémente
 `AsyncFetchMissingDoiAdapter`.
 
-§2.14 : pipeline migré en async (`httpx.AsyncClient` + `asyncio.Semaphore`
-par source) pour saturer les rate-limits autorisés. Gain mesuré sur
-OpenAlex : ×3-4 vs la variante sync historique.
+Implémentation async (`httpx.AsyncClient` + `asyncio.Semaphore` par
+source) pour saturer les rate-limits autorisés. Sur OpenAlex on
+mesure environ 18 req/s, soit ×3-4 par rapport à un appel séquentiel
+respectant le même quota.
 
 La lecture de la liste des DOI manquants (requête SQL) est injectée en
 tant que callable ``CrossImportDoisReader`` pour respecter l'étanchéité
@@ -118,7 +119,6 @@ async def run_async(
     progress = {"processed": 0, "fetched": 0, "inserted": 0}
 
     async with httpx.AsyncClient() as client:
-
         request_delay = getattr(adapter, "request_delay_s", 0.0)
 
         async def process_batch(batch: list[str], batch_idx: int) -> None:

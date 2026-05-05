@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `infrastructure.db.queries.publication_duplicates` (§2.12 : async)."""
+"""Tests d'intégration pour `infrastructure.db.queries.publication_duplicates` (async)."""
 
 from infrastructure.db.queries.publication_duplicates import (
     get_publications_basic,

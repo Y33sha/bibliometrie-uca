@@ -1,4 +1,4 @@
-"""Adapter PostgreSQL async pour l'agrégat Person (§2.12).
+"""Adapter PostgreSQL async pour l'agrégat Person.
 
 Miroir async de infrastructure/repositories/person_repository/. Même
 découpage par thème dans les sous-modules ; la classe
