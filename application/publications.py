@@ -13,16 +13,19 @@ from typing import Any
 
 from application.audit import async_emit_event, emit_event
 from domain.doc_types import ARTICLE_SUBTYPES, map_doc_type
+from domain.normalize import normalize_text
 from domain.ports.publication_repository import (
     AsyncPublicationRepository,
     PublicationRepository,
 )
 from domain.publication import (
+    OA_STATUS_UNKNOWN_DEFAULT,
     PubByDoi,
     PubByNnt,
     PubByTitle,
     PubThesisCandidate,
     best_oa_status,
+    clean_publication_title,
 )
 from domain.publication import resolve_doi_conflict as _domain_resolve_doi_conflict
 from domain.sources import SOURCE_PRIORITY
@@ -151,6 +154,14 @@ def find_or_create(
     """
     if not pub_year or not title:
         return None, False
+
+    # Décode un éventuel titre double-encodé (OpenAlex / ScanR remontent
+    # parfois "&amp;lt;i&amp;gt;...") avant toute comparaison ou écriture,
+    # pour que `publications.title` reste propre côté couche canonique.
+    cleaned_title = clean_publication_title(title) or ""
+    if cleaned_title != title:
+        title = cleaned_title
+        title_normalized = normalize_text(title)
 
     # 1. Chercher par DOI
     if doi:
@@ -359,7 +370,7 @@ def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) 
         # valeur exploitable, et on ne veut pas écrire NULL sur la
         # colonne canonique (le modèle Pydantic /api/publications attend
         # un string non-null).
-        oa_status=best_oa_status(r["oa_status"] for r in rows) or "unknown",
+        oa_status=best_oa_status(r["oa_status"] for r in rows) or OA_STATUS_UNKNOWN_DEFAULT,
         container_title=_first_non_null(rows, "container_title"),
         language=_first_non_null(rows, "language"),
         abstract=_first_non_null(rows, "abstract"),
