@@ -136,13 +136,18 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_hal.py`
 
-### _map_hal_doc_type
+### ✅ _map_hal_doc_type
 - **localisation** : `application/pipeline/normalize/normalize_hal.py:110-121`
 - **description** : Mapping HAL : essaie d'abord la combinaison
   `TYPE_SOUS-TYPE` (ex. `art_artrev` → `review`), puis le type seul.
 - **classification** : (a).
-- **destination domain/** : `domain/doc_types.py` →
-  `map_hal_doc_type_with_subtype(raw_type, raw_sub) -> str`.
+- **destination domain/** : ~~`domain/doc_types.py`~~ → placement
+  source-spécifique pour cohérence (la cascade type/sous-type est
+  HAL-only) :
+  [`domain/sources/hal.py::derive_hal_doc_type`](domain/sources/hal.py)
+  qui prend `(doc_type, sub_type)` bruts et applique la cascade.
+  La table de mapping HAL (clés combinées + clés simples) reste dans
+  `domain/doc_types._SOURCE_MAPS["hal"]`.
 
 ### ✅ oa_status HAL — règle binaire
 - **localisation** : `application/pipeline/normalize/normalize_hal.py:138`

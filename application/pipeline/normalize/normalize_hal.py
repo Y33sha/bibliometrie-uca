@@ -35,13 +35,12 @@ from application.publications import find_or_create as find_or_create_publicatio
 from application.publications import refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
-from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi, normalize_nnt
-from domain.sources.hal import derive_hal_oa_status
+from domain.sources.hal import derive_hal_doc_type, derive_hal_oa_status
 from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
 
 # =============================================================
@@ -108,20 +107,6 @@ def upsert_journal(
 # =============================================================
 
 
-def _map_hal_doc_type(doc: dict) -> str:
-    """Mappe le type HAL vers le type canonique.
-    Teste d'abord la combinaison TYPE_SOUS-TYPE, puis le type seul.
-    """
-    raw_type = doc.get("docType_s", "OTHER")
-    raw_sub = doc.get("docSubType_s") or ""
-    combo = f"{raw_type}_{raw_sub}" if raw_sub else ""
-    if combo:
-        result = map_doc_type(combo, "hal")
-        if result != "other":
-            return result
-    return map_doc_type(raw_type, "hal")
-
-
 def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
     """Extrait les metadonnees de publication d'un document HAL.
 
@@ -131,7 +116,7 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
     title = get_title(doc)
     pub_year = doc.get("producedDateY_i")
 
-    doc_type = _map_hal_doc_type(doc)
+    doc_type = derive_hal_doc_type(doc.get("docType_s"), doc.get("docSubType_s"))
 
     language_list = doc.get("language_s")
     language = language_list[0] if isinstance(language_list, list) and language_list else None
