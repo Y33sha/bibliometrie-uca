@@ -146,14 +146,23 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ### oa_status HAL — règle binaire
 - **localisation** : `application/pipeline/normalize/normalize_hal.py:138`
-- **description** : `"green" if doc.get("openAccess_bool") else "closed"`.
-  HAL ne distingue pas les nuances ; tout dépôt accessible est `green`.
-- **classification** : (a).
-- **destination domain/** : ~~`domain/publications/oa.py` →
-  `derive_binary_oa_status` (mutualisé HAL/ScanR)~~ → arbitré
-  source-spécifique : règle déplacée dans
-  [`domain/sources/hal.py::derive_hal_oa_status`](domain/sources/hal.py).
-  Renvoie aussi `None` si le champ est absent (vs `"closed"` avant).
+- **description** : ancienne règle `"green" if doc.get("openAccess_bool") else "closed"`,
+  sémantiquement fausse — `openAccess_bool=true` couvre 4 cas distincts en
+  HAL (dépôt local, lien arxiv, lien PMC, lien éditeur, plateforme istex)
+  qui n'ont pas tous le même statut OA réel.
+- **classification** : (a) (initialement marquée binaire, finalement règle
+  composée à 3 inputs après examen des données HAL).
+- **destination domain/** :
+  [`domain/sources/hal.py::derive_hal_oa_status`](domain/sources/hal.py)
+  qui consomme `(open_access_bool, file_main, link_ext_id)` :
+  - file_main présent OU link_ext_id ∈ {arxiv, pubmedcentral} → `green`
+  - open_access=False → `closed`
+  - open_access=True + lien éditeur / istex / inconnu → `None` (délégation
+    aux autres sources via `best_oa_status`)
+  - open_access=None → `None`
+
+  Ajout de `fileMain_s` et `linkExtId_s` à
+  [`infrastructure/hal.HAL_FIELDS`](infrastructure/hal.py).
 - **statut** : ✅ migré.
 
 ### parse_tei_author_identifiers — règle idHAL string vs numeric

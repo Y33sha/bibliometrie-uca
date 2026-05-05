@@ -2,11 +2,39 @@ from domain.sources.hal import derive_hal_oa_status
 
 
 class TestDeriveHalOaStatus:
-    def test_true_returns_green(self):
-        assert derive_hal_oa_status(True) == "green"
+    def test_file_main_present_returns_green(self):
+        # Cas vrai dépôt HAL : fileMain_s pointe vers /document
+        assert derive_hal_oa_status(True, "https://hal.science/hal-12345/document", None) == "green"
 
-    def test_false_returns_closed(self):
-        assert derive_hal_oa_status(False) == "closed"
+    def test_file_main_present_overrides_open_access_false(self):
+        # Cas limite : fichier déposé même si openAccess_bool serait False
+        # (ne devrait pas arriver mais on tranche en faveur du fichier)
+        assert (
+            derive_hal_oa_status(False, "https://hal.science/hal-12345/document", None) == "green"
+        )
 
-    def test_none_returns_none(self):
-        assert derive_hal_oa_status(None) is None
+    def test_arxiv_link_returns_green(self):
+        assert derive_hal_oa_status(True, None, "arxiv") == "green"
+
+    def test_pubmedcentral_link_returns_green(self):
+        assert derive_hal_oa_status(True, None, "pubmedcentral") == "green"
+
+    def test_openaccess_link_delegated(self):
+        # Lien éditeur, voie OA inconnue → on délègue
+        assert derive_hal_oa_status(True, None, "openaccess") is None
+
+    def test_istex_link_delegated(self):
+        # Plateforme abonnement, statut OA réel ambigu → on délègue
+        assert derive_hal_oa_status(True, None, "istex") is None
+
+    def test_open_access_false_no_signal_returns_closed(self):
+        assert derive_hal_oa_status(False, None, None) == "closed"
+        assert derive_hal_oa_status(False, "", None) == "closed"
+
+    def test_open_access_true_no_signal_returns_none(self):
+        # Cas openAccess=True mais ni file_main ni link_ext_id : on délègue
+        assert derive_hal_oa_status(True, None, None) is None
+        assert derive_hal_oa_status(True, "", None) is None
+
+    def test_open_access_none_returns_none(self):
+        assert derive_hal_oa_status(None, None, None) is None

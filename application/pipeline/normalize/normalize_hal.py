@@ -136,7 +136,11 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
     language_list = doc.get("language_s")
     language = language_list[0] if isinstance(language_list, list) and language_list else None
 
-    oa_status = derive_hal_oa_status(doc.get("openAccess_bool"))
+    oa_status = derive_hal_oa_status(
+        doc.get("openAccess_bool"),
+        doc.get("fileMain_s"),
+        doc.get("linkExtId_s"),
+    )
 
     container_title = None
     if not journal_id:
