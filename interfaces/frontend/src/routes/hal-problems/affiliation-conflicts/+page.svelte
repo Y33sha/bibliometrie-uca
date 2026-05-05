@@ -54,7 +54,7 @@
 <h1>Conflits d'affiliations HAL</h1>
 
 <div class="info-box">
-	Publications affiliées UCA dans HAL mais pas dans les autres sources (OpenAlex, WoS). La publication est présente dans au moins une autre source avec des adresses, mais sans signature UCA.
+	Publications affiliées UCA dans HAL mais pas dans une autre source. La publication est présente dans au moins une source non-HAL avec des adresses, mais sans signature UCA à la même position d'auteur.
 </div>
 
 <div class="toolbar">
