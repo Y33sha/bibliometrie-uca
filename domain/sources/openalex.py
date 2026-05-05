@@ -67,6 +67,15 @@ def correct_openalex_doc_type(
 
     À étendre avec le chantier suppléments : ajouter signaux DOI/title
     pour reclasser les figshare/Zenodo « Additional file… » en `'other'`.
+
+    Note d'architecture : ces règles sont **conceptuellement
+    source-agnostiques** (« theses.fr fait toujours autorité sur les
+    thèses », « dumas → mémoire », « Zenodo supplément → other »).
+    En pratique seul OpenAlex provoque ces erreurs de doc_type
+    aujourd'hui (parce qu'il moissonne ces sources sans en respecter
+    la nomenclature), donc on garde la fonction ici. Si un jour une
+    autre source produit le même type d'imprécisions, on pourra
+    promouvoir la fonction (ou ses helpers) dans `domain/doc_types.py`.
     """
     if is_theses_fr:
         return "thesis"
