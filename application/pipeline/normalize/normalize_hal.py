@@ -41,6 +41,7 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi, normalize_nnt
+from domain.sources.hal import derive_hal_oa_status
 from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
 
 # =============================================================
@@ -135,7 +136,7 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
     language_list = doc.get("language_s")
     language = language_list[0] if isinstance(language_list, list) and language_list else None
 
-    oa_status = "green" if doc.get("openAccess_bool") else "closed"
+    oa_status = derive_hal_oa_status(doc.get("openAccess_bool"))
 
     container_title = None
     if not journal_id:

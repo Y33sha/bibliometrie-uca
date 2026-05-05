@@ -149,9 +149,12 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **description** : `"green" if doc.get("openAccess_bool") else "closed"`.
   HAL ne distingue pas les nuances ; tout dépôt accessible est `green`.
 - **classification** : (a).
-- **destination domain/** : `domain/publications/oa.py` →
-  `derive_binary_oa_status(open_access: bool) -> str` (mutualisé
-  HAL/ScanR).
+- **destination domain/** : ~~`domain/publications/oa.py` →
+  `derive_binary_oa_status` (mutualisé HAL/ScanR)~~ → arbitré
+  source-spécifique : règle déplacée dans
+  [`domain/sources/hal.py::derive_hal_oa_status`](domain/sources/hal.py).
+  Renvoie aussi `None` si le champ est absent (vs `"closed"` avant).
+- **statut** : ✅ migré.
 
 ### parse_tei_author_identifiers — règle idHAL string vs numeric
 - **localisation** : `application/pipeline/normalize/normalize_hal.py:285-334` (cœur l. 324-332)
@@ -357,11 +360,19 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ### oa_status — green si isOa
 - **localisation** : `application/pipeline/normalize/normalize_scanr.py:114`
-- **description** : `"green" if doc.get("isOa") else "closed"`.
-  Identique HAL.
-- **classification** : (a), dupliquée.
-- **destination domain/** : `domain/publications/oa.py` →
-  `derive_binary_oa_status(open_access: bool)` (mutualisé HAL/ScanR).
+- **description** : ancienne règle `"green" if doc.get("isOa") else "closed"`
+  qui était sémantiquement fausse (`isOa=True` ne signifie pas `green` —
+  ScanR détecte aussi gold/hybrid/bronze chez l'éditeur, et `isOa=None`
+  était mappé sur `"closed"` à tort).
+- **classification** : (a) (initialement marquée comme dupliquée HAL,
+  finalement règle propre à ScanR avec sémantique distincte).
+- **destination domain/** :
+  [`domain/sources/scanr.py::derive_scanr_oa_status`](domain/sources/scanr.py)
+  qui consomme `(is_oa, oa_evidence)` et renvoie l'enum ou `None`
+  selon `oaEvidence.hostType` + `oaEvidence.license` (cf. docstring).
+  Approximation `hybrid` documentée pour publisher+CC-* ; chantier
+  ultérieur prévu pour distinguer gold/hybrid via `journals.oa_model`.
+- **statut** : ✅ migré.
 
 ### _extract_nnt_from_scanr_id
 - **localisation** : `application/pipeline/normalize/normalize_scanr.py:103-106`
@@ -874,9 +885,15 @@ Aucune règle métier identifiée. Module purement orchestrationnel
    (`PPN`). À unifier dans
    `domain/persons/sourcing.should_create_source_person`.
 
-4. **Règle `oa_status = green if open_access else closed`** —
-   dupliquée dans HAL (l. 138) et ScanR (l. 114). À unifier dans
-   `domain/publications/oa.derive_binary_oa_status`.
+4. ✅ **Règle `oa_status = green if open_access else closed`** —
+   apparaissait dupliquée HAL/ScanR mais après examen, sémantiques
+   distinctes : HAL `openAccess_bool` vaut bien `green` (= dépôt en
+   archive) ; ScanR `isOa` couvre gold/hybrid/bronze/green sans le dire.
+   Migré en deux fonctions source-spécifiques :
+   [`domain/sources/hal.derive_hal_oa_status`](domain/sources/hal.py)
+   et
+   [`domain/sources/scanr.derive_scanr_oa_status`](domain/sources/scanr.py)
+   (cette dernière consomme aussi `oaEvidence.hostType`/`license`).
 
 5. **Règle `doc_type theses` (`thesis` vs `ongoing_thesis`)** —
    dupliquée dans `normalize_theses.py:88` et `:247`. À unifier dans
@@ -973,8 +990,10 @@ def rank_publications_by_merge_priority(pubs: list[PubMergeCandidate]) -> list[i
 
 def resolve_merge_redirect(pub_id: int, redirects: Mapping[int, int]) -> int: ...
 
-# domain/publications/oa.py
-def derive_binary_oa_status(open_access: bool) -> str: ...
+# domain/publications/oa.py — règles OA agnostiques (à concevoir si besoin)
+# Pas de fonction prévue pour l'instant. Les règles OA HAL/ScanR sont
+# source-spécifiques (cf. domain/sources/hal.py et domain/sources/scanr.py
+# déjà migrés). Restent à examiner : OpenAlex, WoS (TSV + API).
 def map_openalex_oa_status(raw: str | None) -> str: ...
 def parse_wos_oa_status(raw: str | None) -> str: ...
 def derive_wos_api_oa_status(journal_oas_gold: str | None) -> str: ...

@@ -6,6 +6,9 @@ ordres de priorité entre sources.
 Si une source est ajoutée ou supprimée, modifier ce fichier ET
 l'enum source_type en base (via une migration).
 Le test test_normalize.py::TestSourcesEnum vérifie la cohérence.
+
+Sous-modules : règles métier source-spécifiques (interprétation des
+schémas par source). Ex : `domain.sources.scanr.derive_scanr_oa_status`.
 """
 
 # Toutes les sources, dans l'ordre conventionnel (chronologique d'intégration)
@@ -71,7 +74,7 @@ def source_case_sql(priorities: tuple[str, ...], col: str = "sa.source") -> str:
     à partir d'un tuple de sources, pour poser une priorité dans un
     `ORDER BY` ou un `array_agg(... ORDER BY ...)`.
 
-    Utilisé pour que les ordres de priorité vivent dans `domain/sources.py`
+    Utilisé pour que les ordres de priorité vivent dans `domain/sources/`
     comme constantes Python plutôt que dupliqués en SQL.
     """
     whens = " ".join(f"WHEN '{s}' THEN {i + 1}" for i, s in enumerate(priorities))
