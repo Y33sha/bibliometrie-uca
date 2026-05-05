@@ -47,22 +47,12 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi, extract_hal_id_from_url
+from domain.sources.openalex import map_openalex_oa_status
 from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
 
 # =============================================================
 # MAPPINGS
 # =============================================================
-
-
-# OpenAlex OA status → notre enum oa_type
-OA_MAP = {
-    "gold": "gold",
-    "diamond": "diamond",
-    "hybrid": "hybrid",
-    "bronze": "bronze",
-    "green": "green",
-    "closed": "closed",
-}
 
 
 # =============================================================
@@ -276,7 +266,7 @@ def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
             doc_type = "memoir"
 
     oa_info = work.get("open_access") or {}
-    oa_status = OA_MAP.get(oa_info.get("oa_status") or "closed", "unknown")
+    oa_status = map_openalex_oa_status(oa_info.get("oa_status"))
     language = work.get("language")
 
     container_title = None
