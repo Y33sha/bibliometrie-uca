@@ -284,48 +284,7 @@ class TestHALDocTypeMap:
 from application.pipeline.normalize.normalize_wos import (
     _get_api_title,
     _safe_list,
-    map_oa_status,
 )
-from application.pipeline.normalize.normalize_wos import (
-    map_doc_type as wos_map_doc_type,
-)
-
-
-class TestWoSMapDocType:
-    def test_simple(self):
-        assert wos_map_doc_type("Article") == "article"
-        assert wos_map_doc_type("Review") == "review"
-
-    def test_composite(self):
-        assert wos_map_doc_type("Article; Proceedings Paper") == "article"
-
-    def test_composite_other_first(self):
-        """Si le premier type est 'erratum', cherche un type plus significatif."""
-        assert wos_map_doc_type("Correction; Article") == "erratum"
-
-    def test_none(self):
-        assert wos_map_doc_type(None) == "other"
-
-    def test_unknown(self):
-        assert wos_map_doc_type("Unknown Type XYZ") == "other"
-
-    def test_case_insensitive(self):
-        assert wos_map_doc_type("ARTICLE") == "article"
-
-
-class TestWoSMapOaStatus:
-    def test_gold(self):
-        assert map_oa_status("gold") == "gold"
-
-    def test_priority(self):
-        assert map_oa_status("gold, green") == "gold"
-        assert map_oa_status("green, hybrid") == "hybrid"
-
-    def test_none(self):
-        assert map_oa_status(None) == "unknown"
-
-    def test_empty(self):
-        assert map_oa_status("") == "unknown"
 
 
 class TestWoSSafeList:

@@ -12,9 +12,9 @@ Tables peuplées :
     source_persons                          (auteurs unifiés, source='wos')
     source_authorships                      (lien document × auteur, source='wos')
 
-Gère deux formats de raw_data :
-    - TSV (fichiers téléchargés) : clés 2 lettres (TI, AU, AF, SO, PU, etc.)
-    - API (WoS Expanded API) : structure imbriquée (static_data, dynamic_data)
+Format raw_data : structure WoS Expanded API (static_data, dynamic_data
+imbriqués). L'ancien format TSV (fichiers téléchargés, clés 2 lettres
+TI/AU/AF/SO/PU) n'est plus supporté.
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
@@ -32,6 +32,7 @@ from application.publications import find_or_create as find_or_create_publicatio
 from application.publications import refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
+from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
@@ -39,45 +40,8 @@ from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
 
 # =============================================================
-# MAPPINGS
-# =============================================================
-
-# WoS document type → notre enum doc_type
-
-
-# =============================================================
 # UTILITAIRES
 # =============================================================
-
-
-def map_doc_type(raw_type: str | None) -> str:
-    """Mappe un type de document WoS vers notre enum.
-
-    Délègue à utils.doc_types.map_doc_type qui gère les types
-    composites (séparés par ';') et le mapping WoS.
-    """
-    from domain.doc_types import map_doc_type as _map
-
-    return _map(raw_type, "wos")
-
-
-def map_oa_status(raw_oa: str | None) -> str:
-    """Extrait le statut OA depuis le champ WoS (potentiellement multi-valeurs)."""
-    if not raw_oa:
-        return "unknown"
-    raw_lower = raw_oa.lower()
-    # Priorité : diamond > gold > hybrid > bronze > green
-    if "diamond" in raw_lower:
-        return "diamond"
-    if "gold" in raw_lower:
-        return "gold"
-    if "hybrid" in raw_lower:
-        return "hybrid"
-    if "bronze" in raw_lower:
-        return "bronze"
-    if "green" in raw_lower:
-        return "green"
-    return "unknown"
 
 
 def _safe_list(obj: Any) -> list:
@@ -440,7 +404,7 @@ def find_publication(
     if not meta["pub_year"] or not meta["title"] or meta["title"] == "(sans titre)":
         return None
     # Mapper le doc_type pour find_or_create (resolve_doi_conflict a besoin du type canonique)
-    meta["doc_type"] = map_doc_type(meta["doc_type"])
+    meta["doc_type"] = map_doc_type(meta["doc_type"], "wos")
     pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False, repo=pub_repo)
     return pub_id
 
@@ -570,11 +534,7 @@ def process_authorships(
     # Filtrer les auteurs exploitables (skip les sans nom ou sans daisng_id —
     # daisng_id n'est plus une clé d'unicité côté DB mais reste un signal
     # de qualité côté API : pas de daisng_id = parsing API douteux).
-    authors_kept = [
-        a
-        for a in rec.get("authors", [])
-        if a.get("daisng_id") and a.get("full_name")
-    ]
+    authors_kept = [a for a in rec.get("authors", []) if a.get("daisng_id") and a.get("full_name")]
     if not authors_kept:
         return
 
