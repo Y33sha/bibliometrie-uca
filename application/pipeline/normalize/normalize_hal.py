@@ -14,7 +14,7 @@ Tables peuplées :
 
 La résolution UCA (source_authorships.structure_ids, in_perimeter) se fait en post-traitement
 via populate_affiliations.py, pas ici. Ce script ne fait que stocker les source_struct_ids
-(source_structures.id) extraits de authIdHasStructure_fs.
+(source_structures.id) extraits de authIdHasPrimaryStructure_fs.
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
@@ -421,14 +421,20 @@ def parse_author_structures(
     struct_name_cache: dict | None = None,
 ) -> dict[int, set[int]]:
     """
-    Parse authIdHasStructure_fs pour extraire le mapping
+    Parse les structures d'affiliation pour extraire le mapping
     form_id → {hal_struct_id bruts (entiers HAL, résolus en source_struct_ids ensuite)}.
 
     Format : "formId-personId_FacetSep_Nom_JoinSep_structId_FacetSep_StructNom"
 
+    Préfère `authIdHasPrimaryStructure_fs` (uniquement la/les structure(s)
+    primaire(s), càd labos feuilles), avec fallback sur `authIdHasStructure_fs`
+    qui aplatit aussi l'arbre des tutelles. Évite de polluer la table `addresses`
+    avec une entrée par tutelle parente alors que la résolution
+    structure→tutelle se fait déjà via `structures_parents`.
+
     Crée les source_structures HAL à la volée si elles n'existent pas encore.
     """
-    entries = doc.get("authIdHasStructure_fs") or []
+    entries = doc.get("authIdHasPrimaryStructure_fs") or doc.get("authIdHasStructure_fs") or []
     form_structs: dict[int, set[int]] = {}
 
     for entry in entries:
@@ -493,7 +499,7 @@ def process_authors(
     """
     Traite les auteurs d'un document HAL :
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
-    - Parse authIdHasStructure_fs pour les affiliations (clé = form_id)
+    - Parse authIdHasPrimaryStructure_fs pour les affiliations (clé = form_id)
     - Crée/retrouve chaque auteur dans source_persons (source='hal')
     - Crée les source_authorships (source='hal') avec source_struct_ids (source_structures.id)
     """
@@ -554,7 +560,7 @@ def process_authors(
                 except ValueError:
                     pass
 
-    # authIdHasStructure_fs → {form_id: set of hal_struct_id bruts}
+    # authIdHasPrimaryStructure_fs → {form_id: set of hal_struct_id bruts}
     form_struct_map = parse_author_structures(
         doc,
         cur=cur,
