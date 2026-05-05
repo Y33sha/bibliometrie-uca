@@ -437,6 +437,50 @@ def normalize_nnt(nnt: str | None) -> str | None:
     return _normalize_nnt(nnt)
 
 
+# ── Décodage des titres double-encodés HTML ────────────────────────
+#
+# OpenAlex et ScanR remontent parfois des titres avec un encodage HTML
+# appliqué deux fois — par exemple "<i>Candida</i>" arrive en base sous
+# la forme "&amp;lt;i&amp;gt;Candida&amp;lt;/i&amp;gt;". On corrige au
+# moment d'écrire dans `publications.title` pour que la couche canonique
+# reste propre, indépendamment de la qualité du flux source.
+
+_HTML_ENTITY_NAMED = {"amp": "&", "lt": "<", "gt": ">", "quot": '"', "apos": "'"}
+_HTML_ENTITY_RE = re.compile(r"&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);")
+_DOUBLE_ENCODED_RE = re.compile(r"&amp;(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);")
+
+
+def _decode_html_entities_once(s: str) -> str:
+    def repl(m: re.Match[str]) -> str:
+        name = m.group(1)
+        if name.startswith("#"):
+            try:
+                code = int(name[2:], 16) if name[1] in "xX" else int(name[1:])
+                return chr(code)
+            except (ValueError, OverflowError):
+                return m.group(0)
+        return _HTML_ENTITY_NAMED.get(name, m.group(0))
+
+    return _HTML_ENTITY_RE.sub(repl, s)
+
+
+def clean_publication_title(title: str | None) -> str | None:
+    """Décode un titre double-encodé HTML, sinon le retourne tel quel.
+
+    Détection : présence d'`&amp;` immédiatement suivi d'une entité connue
+    (`lt`, `gt`, `amp`, `quot`, `apos`, `#NNN`, `#xHH`). Ce motif est la
+    signature du double-encodage et ne se rencontre pas dans un titre
+    normal (un `&amp;` isolé légitime style "Smith &amp; Jones" n'est pas
+    suivi d'un nom d'entité, donc reste inchangé).
+
+    Quand détecté, on décode deux niveaux pour retomber sur le HTML
+    d'origine. Idempotent : un second appel sur le résultat ne change rien.
+    """
+    if not title or not _DOUBLE_ENCODED_RE.search(title):
+        return title
+    return _decode_html_entities_once(_decode_html_entities_once(title))
+
+
 def extract_hal_id_from_url(url: str | None) -> str | None:
     """Extrait le HAL ID canonique d'une URL HAL ou d'un ID brut.
 
@@ -463,6 +507,15 @@ OA_RANK: dict[str, int] = {
     "closed": 2,
     "unknown": 1,
 }
+
+# Valeur canonique de `publications.oa_status` quand aucune source n'a
+# de signal exploitable. Convention : `source_publications.oa_status`
+# accepte NULL (= la source ne s'est pas prononcée), mais au niveau
+# canonique on matérialise l'absence de signal par 'unknown' (vraie
+# valeur de l'enum, classée en queue d'`OA_RANK`). À utiliser comme
+# fallback après `best_oa_status(...)` ou pour défaut sur
+# `source_publications.oa_status` orphelin.
+OA_STATUS_UNKNOWN_DEFAULT = "unknown"
 
 
 def best_oa_status(statuses: Iterable[str | None]) -> str | None:

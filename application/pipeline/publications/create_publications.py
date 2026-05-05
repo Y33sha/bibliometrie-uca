@@ -26,7 +26,7 @@ from application.publications import (
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.ports.publication_repository import PublicationRepository
-from domain.publication import normalize_nnt
+from domain.publication import OA_STATUS_UNKNOWN_DEFAULT, normalize_nnt
 
 
 def process_document(
@@ -47,7 +47,7 @@ def process_document(
     source = doc["source"]
     doc_type = map_doc_type(doc["doc_type"], source)
     journal_id = doc["journal_id"]
-    oa_status = doc["oa_status"] or "unknown"
+    oa_status = doc["oa_status"] or OA_STATUS_UNKNOWN_DEFAULT
     language = doc["language"]
     container_title = doc["container_title"]
 

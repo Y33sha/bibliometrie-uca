@@ -750,12 +750,20 @@ Aucune règle métier identifiée. Module purement orchestrationnel
 - **destination domain/** : `domain/publications/dedup.py` →
   `decide_publication_match` (même fonction).
 
-### oa_status par défaut unknown
+### ✅ oa_status par défaut unknown
 - **localisation** : `application/pipeline/publications/create_publications.py:50`
-- **description** : Si `oa_status` absent côté source → `"unknown"`.
+  + `application/publications.py:372` (refresh_from_sources)
+- **description** : `value or "unknown"`. Convention canonique
+  `publications.oa_status = 'unknown'` quand aucune `source_publications`
+  n'a de signal exploitable (NULL au niveau source). Pas un algorithme,
+  juste une expression d'enum-default appliquée à la frontière source ↔
+  canonique.
 - **classification** : (a).
-- **destination domain/** : `domain/publications/oa.py` →
-  `default_oa_status(value) -> str` (ou constante).
+- **destination domain/** : constante nommée
+  [`domain.publication.OA_STATUS_UNKNOWN_DEFAULT`](domain/publication.py)
+  = `"unknown"`, à utiliser en suffixe `or OA_STATUS_UNKNOWN_DEFAULT`
+  au lieu du littéral. Documente la convention sans introduire de
+  fonction triviale.
 
 ---
 
@@ -1010,14 +1018,11 @@ def rank_publications_by_merge_priority(pubs: list[PubMergeCandidate]) -> list[i
 
 def resolve_merge_redirect(pub_id: int, redirects: Mapping[int, int]) -> int: ...
 
-# domain/publications/oa.py — règles OA agnostiques (à concevoir si besoin)
-# Pas de fonction prévue pour l'instant. Les règles OA HAL/ScanR sont
-# source-spécifiques (cf. domain/sources/hal.py et domain/sources/scanr.py
-# déjà migrés). Restent à examiner : OpenAlex, WoS (TSV + API).
-def map_openalex_oa_status(raw: str | None) -> str: ...
-def parse_wos_oa_status(raw: str | None) -> str: ...
-def derive_wos_api_oa_status(journal_oas_gold: str | None) -> str: ...
-def default_oa_status(value: str | None) -> str: ...
+# Règles OA migrées source par source dans domain/sources/{hal,scanr,openalex,wos}.py
+# Pas de domain/publications/oa.py créé (la mutualisation envisagée
+# ne s'est pas matérialisée — sémantiques sources distinctes).
+# Constante de fallback canonique :
+#   domain.publication.OA_STATUS_UNKNOWN_DEFAULT = "unknown"
 
 # domain/publications/theses.py
 def theses_doc_type(date_soutenance: str | None) -> str: ...
