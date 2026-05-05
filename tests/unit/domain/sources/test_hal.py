@@ -1,4 +1,32 @@
-from domain.sources.hal import derive_hal_oa_status
+from domain.sources.hal import derive_hal_doc_type, derive_hal_oa_status
+
+
+class TestDeriveHalDocType:
+    def test_combined_key_wins_when_mapped(self):
+        # ART + ARTREV → review (clé combinée mappée)
+        assert derive_hal_doc_type("ART", "ARTREV") == "review"
+        # ART + DATAPAPER → data_paper
+        assert derive_hal_doc_type("ART", "DATAPAPER") == "data_paper"
+        # UNDEFINED + PREPRINT → preprint
+        assert derive_hal_doc_type("UNDEFINED", "PREPRINT") == "preprint"
+
+    def test_combined_key_falls_back_to_type_when_unmapped(self):
+        # ART + INCONNU → fallback sur ART → article
+        assert derive_hal_doc_type("ART", "INCONNU_SUBTYPE") == "article"
+
+    def test_no_subtype_uses_type_directly(self):
+        assert derive_hal_doc_type("ART", None) == "article"
+        assert derive_hal_doc_type("ART", "") == "article"
+        assert derive_hal_doc_type("THESE", None) == "thesis"
+
+    def test_unknown_type_returns_other(self):
+        assert derive_hal_doc_type("INCONNU", None) == "other"
+        assert derive_hal_doc_type(None, None) == "other"
+
+    def test_case_insensitive(self):
+        # map_doc_type lowercase la clé en interne
+        assert derive_hal_doc_type("art", "artrev") == "review"
+        assert derive_hal_doc_type("Art", "ArtRev") == "review"
 
 
 class TestDeriveHalOaStatus:
