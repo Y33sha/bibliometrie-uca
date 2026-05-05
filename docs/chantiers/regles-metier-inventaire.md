@@ -450,20 +450,23 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_theses.py`
 
-### extract_pub_metadata — règle thesis vs ongoing_thesis
+### ✅ extract_pub_metadata — règle thesis vs ongoing_thesis
 - **localisation** : `application/pipeline/normalize/normalize_theses.py:88`
 - **description** : `"thesis" if dateSoutenance else "ongoing_thesis"`.
   **Dupliquée l. 247**.
 - **classification** : (a), dupliquée.
-- **destination domain/** : `domain/doc_types.py` →
-  `theses_doc_type(date_soutenance: str | None) -> str`.
+- **destination domain/** : ~~`domain/doc_types.py`~~ → placement
+  source-spécifique cohérent :
+  [`domain/sources/theses.py::derive_theses_doc_type`](domain/sources/theses.py).
+  Une seule fonction couvre les 2 call sites.
 
-### insert_source_document — duplication thesis vs ongoing_thesis
+### ✅ insert_source_document — duplication thesis vs ongoing_thesis
 - **localisation** : `application/pipeline/normalize/normalize_theses.py:247`
 - **description** : Même règle, dupliquée verbatim.
 - **classification** : (a), dupliquée.
-- **destination domain/** : `domain/doc_types.py` →
-  `theses_doc_type` (même fonction).
+- **destination domain/** :
+  [`domain/sources/theses.py::derive_theses_doc_type`](domain/sources/theses.py)
+  (même fonction que la règle précédente — duplication éliminée).
 
 ### pub_year — fallback dateSoutenance > datePremiereInscription
 - **localisation** : `application/pipeline/normalize/normalize_theses.py:90-102` (+ dupliqué `:249-261`)
