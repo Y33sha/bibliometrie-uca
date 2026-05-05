@@ -86,6 +86,6 @@ async def hal_affiliation_conflicts(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
 ) -> Any:
-    """Publications affiliées UCA dans HAL mais pas dans OA/WoS."""
+    """Publications affiliées UCA dans HAL mais pas dans une autre source."""
     async with get_async_cursor() as (cur, _conn):
         return await hal_queries.hal_affiliation_conflicts(cur, page=page, per_page=per_page)

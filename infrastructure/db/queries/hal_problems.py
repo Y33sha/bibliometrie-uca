@@ -205,16 +205,15 @@ async def hal_missing_collections(
 
 
 async def hal_affiliation_conflicts(cur: Any, *, page: int, per_page: int) -> dict[str, Any]:
-    """Publications affiliées UCA dans HAL mais pas dans OA/WoS."""
+    """Publications affiliées UCA dans HAL mais pas dans une autre source."""
     offset = (page - 1) * per_page
-    # CTE en 3 passes :
-    # 1. `hal_uca`     : authorships UCA attestés HAL + rattachés à un labo.
-    # 2. `conflicting` : source_authorships OA/WoS hors-UCA avec adresse
-    #                    (preuve que la source a bien examiné l'affiliation).
-    # 3. `conflict_pubs` : publications où HAL-UCA et OA/WoS-hors-UCA
-    #                     coexistent à la MÊME position d'auteur.
-    # Remplace les EXISTS corrélés imbriqués (ré-évalués à chaque ligne de
-    # `authorships`) par des scans hachés évalués une seule fois.
+    # On cherche les positions d'auteur où HAL atteste l'UCA et où au moins
+    # une autre source (non-HAL) a examiné la même position et conclu hors-UCA.
+    # `EXISTS source_authorship_addresses` sert de preuve que la source a
+    # examiné l'affiliation (crossref n'en produit pas, donc exclu de fait).
+    #
+    # Le drive part du petit set `hal_uca` (~17K positions) puis probe les
+    # autres sources via l'index `idx_sa_nonhal_outscope` (migration 021).
     base_cte = """
     WITH hal_uca AS (
         SELECT a.publication_id, a.author_position
@@ -225,21 +224,19 @@ async def hal_affiliation_conflicts(cur: Any, *, page: int, per_page: int) -> di
           AND EXISTS (SELECT 1 FROM structures s
                       WHERE s.id = ANY(a.structure_ids) AND s.structure_type = 'labo')
     ),
-    conflicting AS (
-        SELECT DISTINCT sd.publication_id, sa.author_position
-        FROM source_authorships sa
-        JOIN source_publications sd ON sd.id = sa.source_publication_id
-        WHERE sa.source IN ('openalex', 'wos')
-          AND sa.in_perimeter = FALSE
-          AND EXISTS (SELECT 1 FROM source_authorship_addresses saa
-                      WHERE saa.source_authorship_id = sa.id)
-    ),
     conflict_pubs AS (
         SELECT DISTINCT h.publication_id
         FROM hal_uca h
-        JOIN conflicting c
-          ON c.publication_id = h.publication_id
-         AND c.author_position = h.author_position
+        JOIN source_publications sd
+          ON sd.publication_id = h.publication_id
+         AND sd.source <> 'hal'
+        JOIN source_authorships sa
+          ON sa.source_publication_id = sd.id
+         AND sa.author_position = h.author_position
+        WHERE sa.source <> 'hal'
+          AND sa.in_perimeter = FALSE
+          AND EXISTS (SELECT 1 FROM source_authorship_addresses saa
+                      WHERE saa.source_authorship_id = sa.id)
     )
     """
 
