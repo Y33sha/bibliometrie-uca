@@ -33,11 +33,14 @@ def derive_scanr_oa_status(is_oa: bool | None, oa_evidence: dict | None) -> str 
     OpenAlex/Unpaywall remontera 'gold' et `best_oa_status` arbitre
     `gold > hybrid` côté `refresh_from_sources`, donc la valeur
     canonique sera correcte. À l'inverse, partir de 'gold' nous ferait
-    surestimer dans les cas hybrid.
+    surestimer dans les cas hybrid. Choix symétrique côté HAL pour
+    `linkExtId_s='openaccess'`.
 
-    TODO (chantier ultérieur) : exploiter `journals.oa_model` au moment
-    du normalize pour distinguer gold de hybrid à la source plutôt que
-    de s'en remettre à OpenAlex.
+    TODO (chantier ultérieur) : quand on aura le lookup
+    `journals.oa_model` au moment du normalize, on pourra remonter
+    le défaut publisher de 'hybrid' à 'gold' (la voie la plus fréquente)
+    et rétrograder à 'hybrid' uniquement quand le journal n'est pas
+    full-OA. Même TODO côté HAL.
     """
     if is_oa is None:
         return None

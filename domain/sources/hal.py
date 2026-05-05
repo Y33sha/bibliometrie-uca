@@ -38,31 +38,41 @@ def derive_hal_oa_status(
     1. **Dépôt effectif en HAL** → `fileMain_s` populé. Vrai green OA.
     2. **Lien vers repository ouvert** → `linkExtId_s` ∈ {arxiv,
        pubmedcentral}. Repos canoniques, traités comme green.
-    3. **Lien éditeur ou plateforme par abonnement** → `linkExtId_s`
-       ∈ {`openaccess` (DOI éditeur, gold/hybrid/bronze indéterminé),
-       `istex` (plateforme par abonnement)}. HAL ne nuance pas la
-       voie OA réelle, on renvoie `None` et le statut canonique sera
-       déterminé par `best_oa_status` côté `refresh_from_sources` à
-       partir des autres sources (OpenAlex/Unpaywall sait nuancer).
+    3. **Lien éditeur** → `linkExtId_s='openaccess'` (lien vers le DOI
+       éditeur). HAL atteste de l'OA chez l'éditeur mais ne nuance pas
+       la voie (gold/hybrid/bronze). On renvoie 'hybrid' comme défaut
+       conservatif — symétrique au choix ScanR pour `hostType=publisher`
+       avec licence CC-*. Si le journal est en réalité full-OA, OpenAlex
+       remontera 'gold' et `best_oa_status` arbitre `gold > hybrid` côté
+       `refresh_from_sources`. À l'inverse, partir de 'gold' nous ferait
+       surestimer dans les cas hybrid.
+    4. **Plateforme par abonnement** → `linkExtId_s='istex'` (plateforme
+       CNRS, accès institutionnel restreint). Pas vraiment OA. Empirique-
+       ment ces docs ont aussi un `fileMain_s` (capturés en green par la
+       règle ci-dessus) ; pour les rares cas sans fileMain on délègue
+       (None) plutôt que de tagger faussement OA.
 
     Sémantique :
-      - file_main présent → 'green' (fichier déposé en HAL)
-      - link_ext_id ∈ GREEN_LINK_EXT_IDS → 'green' (arxiv aujourd'hui)
-      - open_access=False → 'closed' (assertion explicite : ni dépôt
-        HAL ni repo ouvert canonique)
-      - open_access=True + lien ambigu → None (accès externe signalé
-        mais voie OA réelle inconnue, on s'abstient pour laisser
-        OpenAlex/Unpaywall décider via best_oa_status)
-      - open_access=None → None (cas limite, pas d'assertion HAL)
+      - file_main présent → 'green'
+      - link_ext_id ∈ GREEN_LINK_EXT_IDS (arxiv, pubmedcentral) → 'green'
+      - link_ext_id == 'openaccess' → 'hybrid' (cf. note conservatif)
+      - open_access=False → 'closed'
+      - open_access=True + autre cas (istex, ou aucun signal additionnel)
+        → None (délégation à OpenAlex/Unpaywall via best_oa_status)
+      - open_access=None → None
 
-    TODO (chantier ultérieur) : pour les liens éditeur (`openaccess`),
-    si on récupère plus tard une licence depuis l'éditeur (DOI), on
-    pourrait remonter hybrid/gold/bronze comme on le fait côté ScanR.
+    TODO (chantier ultérieur) : quand on aura le lookup `journals.oa_model`
+    au moment du normalize, on pourra remonter le défaut publisher de
+    'hybrid' à 'gold' (la voie la plus fréquente) et rétrograder à
+    'hybrid' uniquement quand le journal n'est pas full-OA. Même TODO
+    côté ScanR.
     """
     if file_main:
         return "green"
     if link_ext_id in GREEN_LINK_EXT_IDS:
         return "green"
+    if link_ext_id == "openaccess":
+        return "hybrid"
     if open_access_bool is None:
         return None
     if not open_access_bool:

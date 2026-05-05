@@ -156,9 +156,11 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
   [`domain/sources/hal.py::derive_hal_oa_status`](domain/sources/hal.py)
   qui consomme `(open_access_bool, file_main, link_ext_id)` :
   - file_main présent OU link_ext_id ∈ {arxiv, pubmedcentral} → `green`
+  - link_ext_id == 'openaccess' (lien DOI éditeur) → `hybrid` (défaut
+    conservatif symétrique à ScanR ; promu à gold par best_oa_status si
+    OpenAlex confirme journal full-OA)
   - open_access=False → `closed`
-  - open_access=True + lien éditeur / istex / inconnu → `None` (délégation
-    aux autres sources via `best_oa_status`)
+  - open_access=True + istex / aucun signal → `None` (délégation)
   - open_access=None → `None`
 
   Ajout de `fileMain_s` et `linkExtId_s` à
