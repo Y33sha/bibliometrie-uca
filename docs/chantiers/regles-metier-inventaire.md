@@ -144,7 +144,7 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/doc_types.py` →
   `map_hal_doc_type_with_subtype(raw_type, raw_sub) -> str`.
 
-### oa_status HAL — règle binaire
+### ✅ oa_status HAL — règle binaire
 - **localisation** : `application/pipeline/normalize/normalize_hal.py:138`
 - **description** : ancienne règle `"green" if doc.get("openAccess_bool") else "closed"`,
   sémantiquement fausse — `openAccess_bool=true` couvre 4 cas distincts en
@@ -165,7 +165,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
   Ajout de `fileMain_s` et `linkExtId_s` à
   [`infrastructure/hal.HAL_FIELDS`](infrastructure/hal.py).
-- **statut** : ✅ migré.
 
 ### parse_tei_author_identifiers — règle idHAL string vs numeric
 - **localisation** : `application/pipeline/normalize/normalize_hal.py:285-334` (cœur l. 324-332)
@@ -236,13 +235,17 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_openalex.py`
 
-### OA_MAP — mapping OA OpenAlex → enum canonique
+### ✅ OA_MAP — mapping OA OpenAlex → enum canonique
 - **localisation** : `application/pipeline/normalize/normalize_openalex.py:58-65, :279`
 - **description** : Mapping identitaire (gold→gold…) avec fallback
-  `closed` puis `unknown`.
+  `closed` puis `unknown`. Sémantiquement faux sur le défaut `closed`
+  quand OpenAlex ne s'est pas prononcé (cf. correction ScanR/HAL).
 - **classification** : (a).
-- **destination domain/** : `domain/publications/oa.py` →
-  `map_openalex_oa_status(raw) -> str`.
+- **destination domain/** : ~~`domain/publications/oa.py`~~ → placement
+  source-spécifique pour cohérence avec HAL/ScanR :
+  [`domain/sources/openalex.py::map_openalex_oa_status`](domain/sources/openalex.py).
+  Mapping identitaire pour les statuts connus, `None` pour valeur
+  vide/absente (vs `"closed"` avant), `"unknown"` pour catch-all.
 
 ### extract_locations_data — extraction d'identifiants depuis URLs
 - **localisation** : `application/pipeline/normalize/normalize_openalex.py:73-114`
@@ -369,7 +372,7 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/sources/scanr_signals.py` →
   `select_leaf_affiliations(affiliations) -> list[dict]`.
 
-### oa_status — green si isOa
+### ✅ oa_status — green si isOa
 - **localisation** : `application/pipeline/normalize/normalize_scanr.py:114`
 - **description** : ancienne règle `"green" if doc.get("isOa") else "closed"`
   qui était sémantiquement fausse (`isOa=True` ne signifie pas `green` —
@@ -383,7 +386,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
   selon `oaEvidence.hostType` + `oaEvidence.license` (cf. docstring).
   Approximation `hybrid` documentée pour publisher+CC-* ; chantier
   ultérieur prévu pour distinguer gold/hybrid via `journals.oa_model`.
-- **statut** : ✅ migré.
 
 ### _extract_nnt_from_scanr_id
 - **localisation** : `application/pipeline/normalize/normalize_scanr.py:103-106`
