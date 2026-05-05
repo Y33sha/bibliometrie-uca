@@ -1,89 +1,75 @@
 # Chantier — DRY publications tables
 
-## Contexte
+## État : terminé ✅
+
+Migration de `/laboratories/[id]` et `/persons/[id]` vers
+`<PublicationsListView>` réalisée. Les quatre points d'usage du tableau
+de publications partagent désormais le même composant :
+
+- `/publications` (mode autonome, sync URL complète)
+- `/subjects/[id]?tab=publications` (filtre `subject_id` fixe)
+- `/laboratories/[id]?tab=publications` (filtre `lab_id` + Statut HAL)
+- `/persons/[id]?tab=publications` (filtre `person_id` + Corresp./UCA)
+
+Bilan code : ~570 lignes de duplication retirées (lab + person), tableau,
+toolbar, facets, composables et handlers tous mutualisés.
+
+## Contexte initial
 
 Le tableau de publications avec ses filtres facets (années, labos, types,
-accès, OA, APC, pays, sources) et son tri (titre, année, APC) est répété à
-plusieurs endroits du frontend :
+accès, OA, APC, pays, sources) et son tri (titre, année, APC) était répété
+à plusieurs endroits du frontend, chaque implémentation re-déclarant le
+markup, les composables et les handlers avec des variations mineures.
 
-- `interfaces/frontend/src/routes/publications/+page.svelte` — page autonome
-  (~440 lignes avant refacto Phase 5e du chantier sujets/mots-clés).
-- `interfaces/frontend/src/routes/laboratories/[id]/+page.svelte` — onglet
-  "Publications" parmi d'autres onglets (~1170 lignes au total).
-- `interfaces/frontend/src/routes/persons/[id]/+page.svelte` — onglet
-  "Publications" parmi d'autres onglets (~750 lignes au total).
+## Travail réalisé
 
-Chaque implémentation re-déclare le markup des colonnes, les composables
-de pagination/facets/colonnes, les handlers de tri, etc., avec quelques
-variations mineures (filtres pré-positionnés, libellés, colonnes par défaut).
+### Phase 1 — `useUrlFilters` additif (commit 8291720)
 
-## Travail déjà fait (Phase 5e du chantier sujets/mots-clés)
+`syncUrl` préserve désormais les keys URL non gérées par l'instance.
+Pré-requis pour faire cohabiter plusieurs `useUrlFilters` sur une même
+page (ex : la page parent gère `?tab=`, le composant gère ses filtres).
 
-Lors de l'ajout de l'onglet "Publications" sur `/subjects/[id]`, on a
-extrait `<PublicationsListView>` dans
-`interfaces/frontend/src/lib/components/PublicationsListView.svelte`,
-réutilisé par :
+### Phase 2 — Extension du composant (commit 4580afe)
 
-- `/publications` (mode autonome avec sync URL).
-- `/subjects/[id]?tab=publications` (filtre `subject_id` fixe imposé par
-  la route, pas de sync URL, pas de banner).
+Nouveaux props sur `<PublicationsListView>` :
 
-Le composant accepte les props :
+- `externalFilters` étendu : `labId, labLabel, halCollection, personId,
+  personLabel`.
+- `showHalStatusColumn` (lab) : ajoute la colonne et la facet « Statut
+  HAL », avec calcul client-side basé sur `halCollection`.
+- `showCorrespondingColumn` (person) : colonne ✉ et facet « Corresp. ».
+- `showPerimeterFacet` (person) : facet « UCA » (`in_perimeter`).
+- `showAdminExclude` + `onExcludeAuthorship` (person, admin) : 1ère
+  colonne avec bouton ✕, callback async (parent gère confirm + API,
+  retourne `false` pour annuler).
+- `apcMode: 'uca' | 'lab' | 'person-uca'` : mode de rendu du tag APC.
+- `perPage` : 50 pour les onglets, 100 pour `/publications`.
 
-- `apiKey: string` — clé pour le cache de `usePaginatedFetch`/`useFacets`.
-- `externalFilters?: { subjectId?, subjectLabel? }` — filtres fixes du
-  contexte parent, ajoutés au backend via `subject_id` (paramètre déjà
-  présent dans `/api/publications`).
-- `urlSync?: boolean` — true pour `/publications`, false sinon.
-- `basePath?: string` — utilisé par `useUrlFilters` et `cleanFilterUrl`.
-- `showFilterBanner?: boolean` — banner publisher/journal/subject avec
-  lien "Supprimer le filtre".
+### Phase 3 — Migration `/laboratories/[id]` (commit 6282560)
 
-`/publications/+page.svelte` est devenue un wrapper léger.
+-267 lignes net. La page utilise `<PublicationsListView>` configuré avec
+`labId, halCollection, showHalStatusColumn, apcMode='lab'`. Son
+`useUrlFilters` ne gère plus que les keys cross-onglets (`tab`,
+`persons`, `addresses`).
 
-## Reste à faire
+### Phase 4 — Migration `/persons/[id]` (commit 3ec23cc)
 
-Migrer `/laboratories/[id]` et `/persons/[id]` vers `<PublicationsListView>`
-pour leur onglet "Publications" respectif.
+-257 lignes net. Configure `personId, showCorrespondingColumn,
+showPerimeterFacet, showAdminExclude, apcMode='person-uca'`. La page
+fournit `excludeAuthorship` (avec confirm + API) au composant.
 
-### Variations à supporter (à confirmer par lecture du code)
+### Bonus — Pre-commit svelte-check (commit 1b0680f)
 
-- Filtres pré-positionnés (lab_id pour `/laboratories/[id]`, person_id pour
-  `/persons/[id]`) : à passer via `externalFilters` enrichi (ajouter
-  `labId`, `personId` au type) ou via un mécanisme dédié.
-- Colonnes par défaut différentes (ex la colonne "Labo(s)" est probablement
-  cachée par défaut sur `/laboratories/[id]` puisque le labo est connu).
-- Boutons d'export CSV éventuellement spécifiques (`export.csv` vs
-  `export-theses.csv`).
-- Liens vers la page (sync URL avec `?tab=` au lieu de query params bruts).
+Ajout de `svelte-check` au pre-commit, déclenché uniquement quand des
+fichiers frontend sont staged. Bloque sur les vraies erreurs (pas les
+warnings).
 
-### Risques
+## Idées pour plus tard
 
-`/laboratories/[id]` et `/persons/[id]` sont des pages très utilisées par
-le client (Laura). Toute régression sur l'onglet Publications est
-particulièrement gênante. À tester soigneusement après migration :
-
-- Filtres facets fonctionnent (toutes les combinaisons).
-- Pagination, tri, recherche.
-- Filtres pré-positionnés (lab_id / person_id) appliqués correctement.
-- Liens vers les détails publication, retour fonctionnel.
-- Export CSV si applicable.
-- Persistence URL avec les autres onglets de la page (`?tab=publications`
-  vs autres onglets `dashboard`, `theses`, `addresses`, etc.).
-
-### Étapes proposées
-
-1. Lire `/laboratories/[id]` et `/persons/[id]` pour identifier les écarts
-   précis avec `PublicationsListView`.
-2. Étendre les props du composant si nécessaire (ex `labId`, `personId`,
-   colonnes initiales custom).
-3. Migrer une page à la fois, en validant exhaustivement chaque cas avant
-   de passer à la suivante.
-4. Garder un `git diff` lisible (commits séparés par page).
-
-## À faire après cleanup éventuel
-
-Si la migration révèle qu'aucune variation utile ne nécessite plus de
-filtres externes hors `subject_id`/`publisher_id`/`journal_id`/`labId`/
-`personId`, on peut envisager de simplifier `ExternalFilters` en un type
-plus contraint (union discriminée plutôt que tous les champs optionnels).
+- `ExternalFilters` est devenu une grosse interface plate. Si on a la
+  certitude qu'aucun appelant ne combine jamais plusieurs catégories
+  (subject + lab + person), on pourrait le passer en union discriminée
+  (`{ kind: 'subject' | 'lab' | 'person', ... }`) plus typée. Pas urgent.
+- Si on extrait demain l'onglet « Personnes » de `/laboratories/[id]`
+  en composant réutilisable, l'additivité de `useUrlFilters` (phase 1)
+  permettra une migration symétrique sans douleur.
