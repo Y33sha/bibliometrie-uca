@@ -119,6 +119,51 @@ class TestGetPublicationDetail:
         detail = await get_publication_detail(async_db, pub)
         assert detail["thesis_meta"] is None
 
+    async def test_multiple_source_publications_same_source(self, async_db):
+        """Plusieurs `source_publications` d'une même source pour une publi
+        canonique (ex: deux Work IDs OpenAlex partageant un DOI) :
+
+        - `detail["sources"]` renvoie tous les rows, tri DESC par created_at.
+        - `detail["openalex_authorships"]` ne renvoie que les auteurs de la
+          row la plus récente (= rendu unique côté UI).
+        """
+        pub = await _create_pub(async_db, title="Multi-OA")
+        # Row OpenAlex la plus ancienne, avec 1 auteur "Alice"
+        sd_old = await _create_sd(async_db, pub, source="openalex", source_id="W1-OLD")
+        await async_db.execute(
+            "UPDATE source_publications SET created_at = '2026-01-01'::timestamptz WHERE id = %s",
+            (sd_old,),
+        )
+        await async_db.execute(
+            """
+            INSERT INTO source_authorships
+                (source, source_publication_id, author_position, raw_author_name)
+            VALUES ('openalex', %s, 0, 'Alice')
+            """,
+            (sd_old,),
+        )
+        # Row OpenAlex la plus récente, avec 1 auteur "Bob"
+        sd_new = await _create_sd(async_db, pub, source="openalex", source_id="W2-NEW")
+        await async_db.execute(
+            "UPDATE source_publications SET created_at = '2026-05-01'::timestamptz WHERE id = %s",
+            (sd_new,),
+        )
+        await async_db.execute(
+            """
+            INSERT INTO source_authorships
+                (source, source_publication_id, author_position, raw_author_name)
+            VALUES ('openalex', %s, 0, 'Bob')
+            """,
+            (sd_new,),
+        )
+
+        detail = await get_publication_detail(async_db, pub)
+        # Header : les 2 source_publications sont remontées, plus récente en 1er.
+        oa_sources = [s for s in detail["sources"] if s["source"] == "openalex"]
+        assert [s["source_id"] for s in oa_sources] == ["W2-NEW", "W1-OLD"]
+        # Comparaison sources : seul l'auteur de la plus récente est exposé.
+        assert [a["full_name"] for a in detail["openalex_authorships"]] == ["Bob"]
+
     async def test_aggregates_structures(self, async_db):
         await async_db.execute(
             "INSERT INTO structures (code, name, structure_type) "

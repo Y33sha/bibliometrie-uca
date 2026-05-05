@@ -16,6 +16,12 @@ async def all_years(cur: Any) -> list[int]:
 async def _fetch_biblio_source_authorships(cur: Any, source: str, pub_id: int) -> list[Any]:
     """Authorships HAL / OpenAlex / WoS / ScanR d'une publi, avec adresses agrégées.
 
+    Quand plusieurs `source_publications` de la même source pointent sur la
+    même publi canonique (ex: deux Work IDs OpenAlex pour un même DOI), on
+    affiche les auteurs de l'**import le plus récent** (`created_at DESC`).
+    Les liens vers les sources, eux, sont multiples côté header — cf
+    `PublicationHeader.svelte`.
+
     `raw_affiliation` concatène les `addresses.raw_text` liées via
     `source_authorship_addresses`. `countries` retombe sur les pays
     extraits des adresses si `sa.countries` est NULL.
@@ -38,8 +44,12 @@ async def _fetch_biblio_source_authorships(cur: Any, source: str, pub_id: int) -
                       AND addr.countries IS NOT NULL)
                ) AS countries
         FROM source_authorships sa
-        JOIN source_publications sd ON sd.id = sa.source_publication_id
-        WHERE sa.source = %s AND sd.publication_id = %s
+        WHERE sa.source_publication_id = (
+            SELECT id FROM source_publications
+            WHERE source = %s AND publication_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+        )
         ORDER BY sa.author_position
         """,
         (source, pub_id),
@@ -72,10 +82,17 @@ async def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None
     if not pub:
         return None
 
+    # ORDER BY created_at DESC : une publi canonique peut avoir plusieurs
+    # `source_publications` pour une même source (cas typique : deux Work
+    # IDs OpenAlex partageant un DOI figshare). Le frontend affiche tous
+    # les liens, mais `find(s => s.source === 'X')` retombe sur le plus
+    # récent — cohérent avec le filtre dans `_fetch_biblio_source_authorships`.
     await cur.execute(
         """
         SELECT sd.source, sd.source_id, sd.doi, sd.hal_collections, sd.countries
-        FROM source_publications sd WHERE sd.publication_id = %s
+        FROM source_publications sd
+        WHERE sd.publication_id = %s
+        ORDER BY sd.created_at DESC
         """,
         (pub_id,),
     )
@@ -104,13 +121,20 @@ async def get_publication_detail(cur: Any, pub_id: int) -> dict[str, Any] | None
     wos_authorships = await _fetch_biblio_source_authorships(cur, "wos", pub_id)
     scanr_authorships = await _fetch_biblio_source_authorships(cur, "scanr", pub_id)
 
+    # Même règle que `_fetch_biblio_source_authorships` : si plusieurs
+    # `source_publications` theses.fr pointent sur la même publi, on
+    # affiche les auteurs/jury de la plus récente.
     await cur.execute(
         """
         SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                sa.roles, sa.in_perimeter
         FROM source_authorships sa
-        JOIN source_publications sd ON sd.id = sa.source_publication_id
-        WHERE sa.source = 'theses' AND sd.publication_id = %s
+        WHERE sa.source_publication_id = (
+            SELECT id FROM source_publications
+            WHERE source = 'theses' AND publication_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+        )
         ORDER BY sa.author_position NULLS LAST, sa.raw_author_name
         """,
         (pub_id,),
