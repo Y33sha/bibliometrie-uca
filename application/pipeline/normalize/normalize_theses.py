@@ -42,6 +42,7 @@ from domain.names import names_compatible
 from domain.normalize import normalize_name, normalize_text
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
+from domain.sources.theses import derive_theses_doc_type
 
 # =============================================================
 # PUBLICATIONS
@@ -85,7 +86,7 @@ def extract_pub_metadata(these: dict) -> dict:
     Retourne un dict utilisable par find_or_create et par insert_source_document.
     """
     title = these.get("titrePrincipal")
-    doc_type = "thesis" if these.get("dateSoutenance") else "ongoing_thesis"
+    doc_type = derive_theses_doc_type(these.get("dateSoutenance"))
 
     pub_year = None
     date_sout = these.get("dateSoutenance")
@@ -244,7 +245,7 @@ def insert_source_document(
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour theses.fr."""
     title = these.get("titrePrincipal") or ""
-    doc_type = "thesis" if these.get("dateSoutenance") else "ongoing_thesis"
+    doc_type = derive_theses_doc_type(these.get("dateSoutenance"))
 
     pub_year = None
     date_sout = these.get("dateSoutenance")
@@ -401,9 +402,7 @@ def process_persons(
         roles = merge_roles([info["roles"]])
         is_author = "author" in roles
 
-        author_full_name = (
-            (person.get("prenom") or "") + " " + nom
-        ).strip()
+        author_full_name = ((person.get("prenom") or "") + " " + nom).strip()
 
         ppn = person.get("ppn")
         identifiers = Json({"idref": ppn}) if ppn else None
