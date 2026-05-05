@@ -24,10 +24,6 @@ from psycopg.types.json import Jsonb as Json
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
-from application.pipeline.normalize.openalex_parsing import (
-    extract_nnt_from_openalex,
-    is_theses_fr_source,
-)
 from application.ports.address_linker import AddressLinker
 from application.ports.normalize_openalex import OpenalexNormalizeQueries
 from application.ports.staging import StagingQueries
@@ -46,7 +42,15 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi, extract_hal_id_from_url
-from domain.sources.openalex import correct_openalex_doc_type, map_openalex_oa_status
+from domain.sources.openalex import (
+    correct_openalex_doc_type,
+    extract_nnt_from_location,
+    is_hal_location,
+    is_theses_fr_location,
+    map_openalex_oa_status,
+    parse_primary_location,
+    should_skip_publisher_journal,
+)
 from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
 
 # =============================================================
@@ -145,22 +149,6 @@ def extract_short_id(url: str, prefix: str = "https://openalex.org/") -> str:
     return url or ""
 
 
-def is_hal_primary_location(work: dict) -> bool:
-    """Vérifie si la primary_location d'un work OpenAlex pointe vers HAL."""
-    location = work.get("primary_location") or {}
-    url = location.get("landing_page_url") or ""
-    source = location.get("source") or {}
-    source_url = source.get("homepage_url") or ""
-    source_type = source.get("type") or ""
-    if re.search(r"/(?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+", url):
-        return True
-    if source_type == "repository" and (
-        "hal" in source_url.lower() or "hal" in (source.get("display_name") or "").lower()
-    ):
-        return True
-    return False
-
-
 def find_hal_publication_id(cur: Any, queries: OpenalexNormalizeQueries, work: dict) -> int | None:
     """Si le work OpenAlex pointe vers un document HAL existant, retourne le publication_id."""
     location = work.get("primary_location") or {}
@@ -169,13 +157,6 @@ def find_hal_publication_id(cur: Any, queries: OpenalexNormalizeQueries, work: d
     if not hal_id:
         return None
     return queries.fetch_publication_id_for_hal_source(cur, hal_id)
-
-
-def is_repository_source(work: dict) -> bool:
-    """Vérifie si la primary_location est un repository (SPIRE, Zenodo, etc.)."""
-    location = work.get("primary_location") or {}
-    source = location.get("source") or {}
-    return source.get("type") == "repository"
 
 
 # =============================================================
@@ -253,24 +234,20 @@ def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
     pub_year = work.get("publication_year")
 
     raw_type = work.get("type") or "other"
-    theses_fr = is_theses_fr_source(work)
-    nnt = extract_nnt_from_openalex(work) if theses_fr else None
-    landing_page_url = (work.get("primary_location") or {}).get("landing_page_url")
+    primary = parse_primary_location(work)
+    theses_fr = primary is not None and is_theses_fr_location(primary)
+    nnt = extract_nnt_from_location(primary) if theses_fr and primary else None
     doc_type = correct_openalex_doc_type(
         raw_type,
         is_theses_fr=theses_fr,
-        landing_page_url=landing_page_url,
+        landing_page_url=primary.landing_page_url if primary else None,
     )
 
     oa_info = work.get("open_access") or {}
     oa_status = map_openalex_oa_status(oa_info.get("oa_status"))
     language = work.get("language")
 
-    container_title = None
-    if not journal_id:
-        location = work.get("primary_location") or {}
-        source = location.get("source") or {}
-        container_title = source.get("display_name")
+    container_title = primary.source_display_name if (primary and not journal_id) else None
 
     return dict(
         title=title,
@@ -328,8 +305,9 @@ def insert_openalex_document(
     urls, location_ids = extract_locations_data(work)
 
     # NNT depuis la structure du work (prioritaire sur celui extrait des URLs)
-    if is_theses_fr_source(work):
-        nnt = extract_nnt_from_openalex(work)
+    primary = parse_primary_location(work)
+    if primary and is_theses_fr_location(primary):
+        nnt = extract_nnt_from_location(primary)
         if nnt:
             location_ids["nnt"] = nnt
 
@@ -573,11 +551,9 @@ def process_work(
                     staging_queries.mark_done(cur, staging_id)
                     return None
 
-        hal_location = is_hal_primary_location(work)
-        theses_fr = is_theses_fr_source(work)
-        repo_location = is_repository_source(work)
+        primary = parse_primary_location(work)
 
-        if hal_location or theses_fr or repo_location:
+        if should_skip_publisher_journal(primary):
             publisher_id = None
             journal_id = None
         else:
@@ -587,10 +563,10 @@ def process_work(
         pub_meta = extract_pub_metadata(work, journal_id)
 
         publication_id = None
-        if hal_location:
+        if primary and is_hal_location(primary):
             publication_id = find_hal_publication_id(cur, queries, work)
-        if not publication_id and theses_fr:
-            nnt = extract_nnt_from_openalex(work)
+        if not publication_id and primary and is_theses_fr_location(primary):
+            nnt = extract_nnt_from_location(primary)
             if nnt:
                 existing = find_by_nnt(cur, nnt, repo=pub_repo)
                 if existing:
