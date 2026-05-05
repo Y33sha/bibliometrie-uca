@@ -194,15 +194,57 @@ immédiat.
 Ces choix dimensionnent les chantiers suivants. Tant qu'ils ne sont
 pas tranchés, toute évolution amplifie la dette.
 
-- [ ] **Pipeline : `subprocess` ou imports ?**
-  - Option A : garder `subprocess` (pour l'isolation mémoire et
-    crash-safety) → l'assumer dans la doc et figer le format des
-    logs
-  - Option B : passer en imports + appels de fonction → réécrire
-    `run_pipeline.py` (~500 lignes), gain perf + transactions
-    transverses possibles
-  - **Décision attendue** : trancher dans `docs/chantiers/`,
-    document court 1 page
+- [ ] **Pipeline : `subprocess`, imports, ou hybride ?**
+
+  Trois options identifiées après discussion :
+
+  - **A — Statu quo** : `run_pipeline.py` lance les phases via
+    `subprocess.run`. Simple à comprendre (1 phase = 1 commande
+    shell), isolation mémoire totale entre phases, robuste aux
+    crashes. Inconvénient principal : `pipeline_metrics.py` parse
+    les logs des subprocess avec des regex pour reconstituer les
+    rapports `/admin/pipeline` — un changement de format de log
+    casse les rapports silencieusement.
+
+  - **A' — Subprocess + métriques structurées** *(recommandation
+    actuelle)* : on garde `subprocess` (donc tous les avantages
+    d'isolation et de simplicité d'A), mais chaque phase écrit en
+    fin de run un fichier JSON de métriques à un chemin connu de
+    l'orchestrateur (ex. `logs/metrics/<phase>.json`). L'orchestrateur
+    lit ces JSON au lieu de parser les logs. Helper unique
+    `write_metrics({phase, duration_s, inserted, updated, errors})`
+    appelé en fin de chaque phase. Si une phase ne produit pas son
+    JSON, c'est une erreur explicite. Estimation : ~50 lignes pour
+    le helper + 1 appel par phase. Migration incrémentale possible
+    (1 phase à la fois).
+
+  - **B — Imports + appels de fonction** : `run_pipeline.py`
+    importe les fonctions `run()` des phases et les appelle
+    directement, dans un seul process Python. Les CLI dans
+    `interfaces/cli/pipeline/*` restent comme entry points fins
+    (parse argparse + appelle `run()`), donc lancer une phase
+    isolément reste possible. Gains : exceptions Python typées,
+    debugging cross-phase au pdb, testabilité directe. Pertes :
+    isolation mémoire (un parsing TEI HAL lourd peut grever la
+    suite), discipline à tenir (pas de `sys.exit()` dans les
+    phases, gestion propre des connexions DB partagées).
+
+  **Pourquoi A' plutôt que B aujourd'hui** : les vrais bénéfices
+  de B (perf, transactions cross-phase) sont marginaux pour ce
+  pipeline (idempotence par phase déjà acquise, durée totale en
+  minutes). Le seul vrai pain point d'A est le parsing fragile
+  des logs, et A' le règle sans toucher à la structure
+  d'exécution. B reste compatible avec une migration future si
+  un besoin émerge (testabilité poussée, debugging récurrent).
+
+  **Indépendance vis-à-vis du chantier sync/async** : oui, les
+  deux décisions sont orthogonales. A et A' sont neutres
+  vis-à-vis du sync/async. B s'intègre naturellement avec une
+  migration async, mais n'en dépend pas.
+
+  **Décision attendue** : confirmer A' et lister les phases à
+  migrer (1 par 1), ou rouvrir le débat. Document court à écrire
+  dans `docs/chantiers/` quand le chantier sera lancé.
 - [ ] **Sync + async dupliqué : industrialiser ou unifier ?**
   - Option A : tout passer en async (le pipeline aussi) → simplifie
     mais alourdit les scripts CLI
