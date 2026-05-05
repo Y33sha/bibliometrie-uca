@@ -108,8 +108,6 @@ au lieu d'inliner les conditions.
   business pure, pas sur la persistance. Les règles peuvent suggérer
   d'ajouter une colonne (ex. `publications.doc_type_overridden`) ;
   ces décisions seront prises au cas par cas.
-- Règles de scoring / ranking de fusion HAL × OpenAlex × WoS : sujet
-  distinct (cf. `merge_pubs_by_hal_id.py`).
 
 ## État des lieux — règles déjà en `domain/`
 
@@ -275,6 +273,38 @@ de la rendre testable comme fonction pure.
   gagne", union de countries) embarquées dans `refresh_from_sources`
 - les invariants de fusion (jamais de fusion qui casserait
   l'unicité DOI, déjà géré par `try_merge_by_doi` mais à formaliser)
+- la **liste des identifiants candidats à la déduplication** et leurs
+  exceptions, exprimée comme donnée métier plutôt qu'en dur dans
+  l'algorithme :
+  ```python
+  @dataclass(frozen=True)
+  class DedupIdentifier:
+      name: str                        # 'doi', 'hal_id', 'nnt', 'pmid', …
+      priority: int                    # ordre de la cascade
+      blocks_merge_when: tuple[str, ...] = ()  # ex. ('doc_type_mismatch_chapter_book',)
+
+  DEDUP_IDENTIFIERS = (
+      DedupIdentifier("doi",    priority=1, blocks_merge_when=("chapter_vs_book",)),
+      DedupIdentifier("nnt",    priority=2),
+      DedupIdentifier("hal_id", priority=3),
+      # DedupIdentifier("pmid",  priority=4),  # le jour où on en aura
+  )
+  ```
+  Exceptions concrètes à formaliser :
+  - **DOI chapitre vs ouvrage** : un même DOI peut identifier un
+    chapitre (`book_chapter`) ET l'ouvrage entier (`book`) chez
+    certains éditeurs. Pas de fusion automatique entre les deux.
+  - **DOI dataset vs article** (cf. trigger figshare) : un DOI Zenodo/
+    figshare peut être lié à un article par `relatedIdentifier` mais
+    n'EST pas l'article. Pas de match par DOI dans ce sens.
+  - **NNT vs DOI** : la priorité actuelle (DOI > NNT) suppose que
+    quand deux thèses partagent un NNT mais ont des DOI différents,
+    elles sont distinctes. À documenter explicitement.
+
+  Le scoring / ranking de fusion HAL × OpenAlex × WoS (déjà partiellement
+  dans [`merge_pubs_by_hal_id.py`](application/pipeline/publications/merge_pubs_by_hal_id.py))
+  rentre dans ce cadre : les règles deviennent une fonction pure qui
+  consomme `DEDUP_IDENTIFIERS` + les exceptions.
 
 ## Architecture cible
 
