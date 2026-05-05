@@ -180,6 +180,14 @@ immédiat.
   « principe ISP » au lieu de « depuis §2.9.ISP », etc.).
   Restent légitimement : `ROADMAP.md`, `docs/chantiers/audit-cto.md`,
   `docs/architecture.md` (réécrit en Phase 4).
+- [x] **Décorréler `schema.sql` du flow de migration** : `migrate.py`
+  ne régénère plus automatiquement `schema.sql` à chaque migration. Le
+  fichier reste versionné comme snapshot descriptif (lecture humaine),
+  pas comme source de vérité ni pour bootstrap. Sur une base vide,
+  `migrate.py` applique toutes les migrations dans l'ordre. Nouvelle
+  commande `--dump-schema` pour rafraîchir le snapshot manuellement
+  (à faire après une série de migrations significatives ou au moment
+  d'un squash). README et docs/exploitation.md adaptés.
 
 ### Phase 1 — Décisions structurantes (à trancher avant de coder)
 

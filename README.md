@@ -54,10 +54,9 @@ docker cp bibliometrie.dump bibliometrie-uca-db-1:/tmp/
 docker compose exec db bash -c 'pg_restore -U "$POSTGRES_USER" -d bibliometrie --no-owner -j 4 /tmp/bibliometrie.dump'
 ```
 
-Ou créer une base vide :
+Ou créer une base vide (le pipeline applique toutes les migrations) :
 
 ```bash
-docker compose exec db psql -U postgres -d bibliometrie -f /app/infrastructure/db/schema.sql
 docker compose exec backend python -m infrastructure.db.migrate
 ```
 
@@ -88,9 +87,14 @@ docker compose exec backend bash   # Shell dans le conteneur backend
 
 ```bash
 createdb bibliometrie
-psql -d bibliometrie -f infrastructure/db/schema.sql
-python -m infrastructure.db.migrate
+python -m infrastructure.db.migrate     # applique toutes les migrations
 ```
+
+`schema.sql` est un snapshot descriptif (utile pour relire la
+structure d'un coup d'œil), pas la source de vérité — la vérité, ce
+sont les migrations dans `infrastructure/db/migrations/`. Pour
+rafraîchir le snapshot après une série de migrations :
+`python -m infrastructure.db.migrate --dump-schema`.
 
 Deux options pour initialiser les données :
 
