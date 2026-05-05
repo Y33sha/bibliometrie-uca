@@ -42,14 +42,38 @@ interface UrlFiltersConfig {
 	basePath: string;
 	filters: Record<string, FilterDef>;
 	debounceMs?: number;
+	/**
+	 * Source des params URL actuellement présents. Utilisé pour préserver les
+	 * keys non gérées par cette instance lors d'un `syncUrl` (additivité, cf.
+	 * cas où plusieurs `useUrlFilters` cohabitent sur une même page).
+	 * Par défaut lit `window.location.search`.
+	 */
+	getCurrentParams?: () => URLSearchParams;
 }
 
 export function useUrlFilters(config: UrlFiltersConfig) {
 	let debounceTimer: ReturnType<typeof setTimeout>;
 
+	const managedKeys = new Set<string>(
+		Object.values(config.filters).map((def) => def.urlKey),
+	);
+
+	function readCurrentParams(): URLSearchParams {
+		if (config.getCurrentParams) return config.getCurrentParams();
+		if (typeof window !== 'undefined') return new URLSearchParams(window.location.search);
+		return new URLSearchParams();
+	}
+
 	function syncUrl(getState: () => Record<string, unknown>) {
 		const state = getState();
 		const p = new URLSearchParams();
+
+		// Préserve les keys de l'URL courante qui ne sont pas gérées par
+		// cette instance (permet la cohabitation de plusieurs `useUrlFilters`
+		// ou la coexistence avec d'autres écritures URL).
+		for (const [k, v] of readCurrentParams()) {
+			if (!managedKeys.has(k)) p.append(k, v);
+		}
 
 		for (const [key, def] of Object.entries(config.filters)) {
 			const val = state[key];

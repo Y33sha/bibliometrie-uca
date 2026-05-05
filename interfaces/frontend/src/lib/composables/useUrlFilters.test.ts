@@ -90,6 +90,44 @@ describe('useUrlFilters', () => {
 			f.syncUrl(() => ({ currentPage: 3 }));
 			expect(replaceStateSpy).toHaveBeenCalledWith('/bibliometrie/p?page=3', {});
 		});
+
+		it('préserve les keys URL non gérées par cette instance', () => {
+			const f = useUrlFilters({
+				basePath: '/p',
+				filters: { years: { type: 'string_array', urlKey: 'year' } },
+				getCurrentParams: () => new URLSearchParams('tab=publications&foo=bar'),
+			});
+			f.syncUrl(() => ({ years: ['2024'] }));
+			const call = replaceStateSpy.mock.calls[0][0] as string;
+			expect(call).toContain('tab=publications');
+			expect(call).toContain('foo=bar');
+			expect(call).toContain('year=2024');
+		});
+
+		it('écrase une key gérée déjà présente dans l\'URL courante', () => {
+			const f = useUrlFilters({
+				basePath: '/p',
+				filters: { years: { type: 'string_array', urlKey: 'year' } },
+				getCurrentParams: () => new URLSearchParams('year=2020&keep=me'),
+			});
+			f.syncUrl(() => ({ years: ['2024'] }));
+			const call = replaceStateSpy.mock.calls[0][0] as string;
+			expect(call).toContain('year=2024');
+			expect(call).not.toContain('year=2020');
+			expect(call).toContain('keep=me');
+		});
+
+		it('retire une key gérée si son state est vide, même si elle est dans l\'URL courante', () => {
+			const f = useUrlFilters({
+				basePath: '/p',
+				filters: { years: { type: 'string_array', urlKey: 'year' } },
+				getCurrentParams: () => new URLSearchParams('year=2020&keep=me'),
+			});
+			f.syncUrl(() => ({ years: [] }));
+			const call = replaceStateSpy.mock.calls[0][0] as string;
+			expect(call).not.toContain('year');
+			expect(call).toContain('keep=me');
+		});
 	});
 
 	describe('restoreFromUrl', () => {
