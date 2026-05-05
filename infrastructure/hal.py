@@ -36,6 +36,8 @@ HAL_FIELDS = [
     "publisher_s",
     "conferenceTitle_s",
     "openAccess_bool",
+    "fileMain_s",
+    "linkExtId_s",
     "linkExtUrl_s",
     "uri_s",
     "label_s",
