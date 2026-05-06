@@ -253,9 +253,15 @@ pas tranchés, toute évolution amplifie la dette.
   cadré, plan d'implémentation en 4 phases, points de vigilance,
   réversibilité). À planifier après les autres décisions Phase 1
   pour ne pas mélanger les chantiers.
-- [ ] **Position des "ports"** : `application/ports/` vs
-  `domain/ports/`, critère final ? Décider une bonne fois et figer
-  la convention dans `docs/architecture.md`.
+- [x] **Position des "ports" : décision actée** — règle des 3
+  critères figée dans `docs/architecture.md` (section "Règle de
+  placement des ports"). Audit complet effectué : la situation
+  actuelle est cohérente avec le critère, deux ports nécessitent un
+  ajustement mineur. Voir
+  [`docs/chantiers/ports-cleanup.md`](ports-cleanup.md) pour le
+  chantier de correction (refactoring de `structure_repository` qui
+  expose des fragments SQL + clarification du docstring de
+  `config_repository`). Reste à exécuter.
 - [ ] **SQLAlchemy Core : on adopte ou on ferme la porte ?**
   - Si oui : démarrer un chantier de migration des queries (~30
     fichiers) avec un plan de découpage
