@@ -1,4 +1,5 @@
 # Chantier — DRY publications tables
+Commencé et terminé le 2026-05-05
 
 ## État : terminé ✅
 
