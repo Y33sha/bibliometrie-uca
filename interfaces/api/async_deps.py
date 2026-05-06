@@ -3,14 +3,24 @@ et câblage des adapters sortants vers leurs ports (composition root API).
 
 `pool.connection()` gère automatiquement commit (succès) / rollback
 (exception) et la restitution au pool, cf. psycopg_pool.
+
+`get_sa_connection()` est l'équivalent SQLAlchemy : ouvre une
+AsyncConnection sur l'AsyncEngine, dans une transaction commit
+(succès) / rollback (exception). À utiliser par les modules migrés
+en SQLAlchemy Core (chantier sqlalchemy-core-adoption). Cohabite
+avec `get_async_cursor()` pendant la migration ; le pool psycopg
+disparaîtra en Phase 4.
 """
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncConnection
+
 from application.ports.perimeter import AsyncPerimeterQueries
 from infrastructure.db.async_connection import get_async_pool
+from infrastructure.db.engine import get_async_engine
 from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
 
 
@@ -20,6 +30,19 @@ async def get_async_cursor() -> AsyncIterator[tuple[Any, Any]]:
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             yield cur, conn
+
+
+@asynccontextmanager
+async def get_sa_connection() -> AsyncIterator[AsyncConnection]:
+    """AsyncConnection SQLAlchemy en transaction commit/rollback auto.
+
+    Pour les modules migrés en SQLAlchemy Core. Le `engine.begin()`
+    ouvre une transaction qui commit si pas d'exception, rollback
+    sinon — équivalent au pattern de `pool.connection()` côté psycopg.
+    """
+    engine = get_async_engine()
+    async with engine.begin() as conn:
+        yield conn
 
 
 # ── Câblage des adapters sortants ──

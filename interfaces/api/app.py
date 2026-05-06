@@ -30,6 +30,7 @@ from domain.errors import (
     ValidationError,
 )
 from infrastructure.db.async_connection import build_async_pool, get_async_pool, set_async_pool
+from infrastructure.db.engine import build_async_engine, set_async_engine
 from infrastructure.log import configure_root_logging
 from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.deps import _verify_token
@@ -69,12 +70,19 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> Any:
+    # Pool psycopg legacy (modules pas encore migrés en SQLAlchemy Core)
+    # et AsyncEngine SA (modules migrés) cohabitent pendant le chantier
+    # sqlalchemy-core-adoption. Phase 4 supprimera le pool psycopg.
     pool = build_async_pool()
     await pool.open()
     set_async_pool(pool)
+    engine = build_async_engine()
+    set_async_engine(engine)
     try:
         yield
     finally:
+        await engine.dispose()
+        set_async_engine(None)
         await pool.close()
         set_async_pool(None)
 

@@ -18,7 +18,6 @@ au fur et à mesure des phases suivantes.
 """
 
 from sqlalchemy import (
-    ARRAY,
     BigInteger,
     Column,
     DateTime,
@@ -28,8 +27,8 @@ from sqlalchemy import (
     Text,
     func,
 )
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import ENUM as PgEnum
-from sqlalchemy.dialects.postgresql import JSONB
 
 metadata = MetaData()
 
