@@ -25,6 +25,7 @@ from typing import Any
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from application.ports.addresses_queries import AsyncAddressesQueries
 from application.ports.config import AsyncConfigStore
 from application.ports.journals_queries import AsyncJournalQueries
 from application.ports.perimeter import AsyncPerimeterQueries
@@ -40,6 +41,7 @@ from domain.ports.publisher_repository import AsyncPublisherRepository
 from domain.ports.structure_repository import AsyncStructureRepository
 from infrastructure.db.async_connection import get_async_pool
 from infrastructure.db.engine import get_async_engine
+from infrastructure.db.queries.addresses import PgAsyncAddressesQueries
 from infrastructure.db.queries.journals import PgAsyncJournalQueries
 from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
 from infrastructure.db.queries.publishers import PgAsyncPublisherQueries
@@ -160,6 +162,33 @@ def subjects_queries(
     conn: AsyncConnection = Depends(db_conn),
 ) -> AsyncSubjectsQueries:
     return PgAsyncSubjectsQueries(conn)
+
+
+def addresses_queries(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncAddressesQueries:
+    return PgAsyncAddressesQueries(conn)
+
+
+async def bg_propagate_countries(address_ids: list[int]) -> None:
+    """Tâche de fond : propager les pays d'adresses → publications.
+
+    Lancée hors cycle de requête (`BackgroundTasks`), donc les `Depends`
+    ne s'appliquent pas — composition manuelle ici (composition root
+    légitime).
+    """
+    import logging
+
+    from application import addresses_countries as countries_service  # noqa: PLC0415
+
+    logger = logging.getLogger(__name__)
+    try:
+        async with get_sa_connection() as conn:
+            await countries_service.propagate_countries_to_publications(
+                conn, address_ids, repo=async_address_repository(conn)
+            )
+    except Exception:
+        logger.exception("Erreur propagation pays en background")
 
 
 # ── Câblage des adapters sortants ──

@@ -91,6 +91,7 @@
 * publi 20832: pourquoi pas d'affiliations
 * 2020CLFAC007 thèse du CROC, pas récupérée via theses.fr! (158960) => aurait dû être récupéré par API theses.fr ET par cross-import de scanR via le NNT
 * Eric Beyssac pas reconnu par nom dans les authorships de thèses: voir où est le problème
+* Daniel Roux: 1 authorship hal, zéro publication sur sa page (ce n'est pas le seul)
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
