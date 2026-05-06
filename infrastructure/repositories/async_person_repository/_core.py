@@ -10,8 +10,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from domain.errors import NotFoundError
+from domain.names import compute_person_name_forms
 from domain.normalize import normalize_name
-from domain.person import compute_person_name_forms
 from infrastructure.db_helpers import row_val as _val
 from infrastructure.repositories.async_person_repository import _name_forms
 

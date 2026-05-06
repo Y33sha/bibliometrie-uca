@@ -1,7 +1,7 @@
 """Tests unitaires — fonctions pures, sans base de données."""
 
-from application.persons import compute_person_name_forms
 from domain.names import (
+    compute_person_name_forms,
     first_names_compatible,
     last_names_compatible,
     names_compatible,
