@@ -15,16 +15,11 @@ import os
 import sys
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from infrastructure.db.queries.admin_feedback import (
-    feedback_false_negatives_async,
-    feedback_false_positives_async,
-    feedback_stats_async,
-    feedback_structures_async,
-)
-from interfaces.api.async_deps import get_async_cursor
+from application.ports.admin_feedback_queries import AsyncAdminFeedbackQueries
+from interfaces.api.async_deps import admin_feedback_queries
 from interfaces.api.models import (
     FeedbackAddressesResponse,
     FeedbackStats,
@@ -57,7 +52,9 @@ _RESOLVE_ADDRESSES_SCRIPT = os.path.join(
 
 
 @router.get("/api/admin/feedback/structures", response_model=FeedbackStructuresResponse)
-async def feedback_structures() -> Any:
+async def feedback_structures(
+    queries: AsyncAdminFeedbackQueries = Depends(admin_feedback_queries),
+) -> Any:
     """Structures éligibles au tableau de bord feedback, groupées par type.
 
     Encode deux règles métier :
@@ -66,8 +63,7 @@ async def feedback_structures() -> Any:
     - la structure UCA (code = "uca") est sélectionnée par défaut si
       elle existe, sinon la première structure du premier type non vide.
     """
-    async with get_async_cursor() as (cur, _conn):
-        rows = await feedback_structures_async(cur, list(_FEEDBACK_STRUCTURE_TYPES))
+    rows = await queries.feedback_structures(list(_FEEDBACK_STRUCTURE_TYPES))
 
     by_type: dict[str, list[dict[str, Any]]] = {}
     default_id: int | None = None
@@ -88,27 +84,29 @@ async def feedback_structures() -> Any:
 
 
 @router.get("/api/admin/feedback/stats", response_model=FeedbackStats)
-async def feedback_stats(structure_id: int = Query(...)) -> Any:
+async def feedback_stats(
+    structure_id: int = Query(...),
+    queries: AsyncAdminFeedbackQueries = Depends(admin_feedback_queries),
+) -> Any:
     """Statistiques de qualité de la détection pour une structure donnée."""
-    async with get_async_cursor() as (cur, _conn):
-        row = await feedback_stats_async(cur, structure_id)
+    row = await queries.feedback_stats(structure_id)
 
-        reviewed = (
-            (row["concordant_valid"] or 0)
-            + (row["concordant_rejected"] or 0)
-            + (row["false_negatives"] or 0)
-            + (row["false_positives"] or 0)
-        )
-        concordant = (row["concordant_valid"] or 0) + (row["concordant_rejected"] or 0)
+    reviewed = (
+        (row["concordant_valid"] or 0)
+        + (row["concordant_rejected"] or 0)
+        + (row["false_negatives"] or 0)
+        + (row["false_positives"] or 0)
+    )
+    concordant = (row["concordant_valid"] or 0) + (row["concordant_rejected"] or 0)
 
-        return {
-            "total_reviewed": reviewed,
-            "detection_rate": round(concordant / reviewed * 100, 1) if reviewed else None,
-            "false_negatives": row["false_negatives"] or 0,
-            "false_positives": row["false_positives"] or 0,
-            "concordant_valid": row["concordant_valid"] or 0,
-            "pending": row["pending"] or 0,
-        }
+    return {
+        "total_reviewed": reviewed,
+        "detection_rate": round(concordant / reviewed * 100, 1) if reviewed else None,
+        "false_negatives": row["false_negatives"] or 0,
+        "false_positives": row["false_positives"] or 0,
+        "concordant_valid": row["concordant_valid"] or 0,
+        "pending": row["pending"] or 0,
+    }
 
 
 @router.get("/api/admin/feedback/false-negatives", response_model=FeedbackAddressesResponse)
@@ -117,12 +115,12 @@ async def feedback_false_negatives(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
+    queries: AsyncAdminFeedbackQueries = Depends(admin_feedback_queries),
 ) -> Any:
     """Adresses confirmées manuellement pour cette structure mais non détectées par le script."""
-    async with get_async_cursor() as (cur, _conn):
-        return await feedback_false_negatives_async(
-            cur, structure_id=structure_id, page=page, per_page=per_page, search=search
-        )
+    return await queries.feedback_false_negatives(
+        structure_id=structure_id, page=page, per_page=per_page, search=search
+    )
 
 
 @router.get("/api/admin/feedback/false-positives", response_model=FeedbackAddressesResponse)
@@ -131,12 +129,12 @@ async def feedback_false_positives(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
+    queries: AsyncAdminFeedbackQueries = Depends(admin_feedback_queries),
 ) -> Any:
     """Adresses détectées pour cette structure mais rejetées manuellement."""
-    async with get_async_cursor() as (cur, _conn):
-        return await feedback_false_positives_async(
-            cur, structure_id=structure_id, page=page, per_page=per_page, search=search
-        )
+    return await queries.feedback_false_positives(
+        structure_id=structure_id, page=page, per_page=per_page, search=search
+    )
 
 
 @router.get("/api/admin/feedback/rerun")
