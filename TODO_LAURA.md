@@ -6,7 +6,8 @@
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation => oui, mais pas authorships canoniques. Pruning dans build_authorships?
 * [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?). + publis du cross-import: re-fetch régulier pour tenir les données à jour
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
-* [ ] DOI terminés par /pdf: doublons!
+* [ ] DOI terminés par /pdf: doublons! ; DOI terminés par .1
+* [ ] création erronée d'idhal numériques par normalize-hal
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
 * [ ] cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
@@ -18,7 +19,6 @@
 * [ ] https://hal.science/hal-03874894 , https://hal.science/hal-04111614 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
 * [ ] DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
 ## Code
-* [ ] vérifier si certains ports ne seraient pas mieux placés dans application/ (critère: sont-ils importés par domain/ ou pas?)
 * [ ] auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques): supprimer les requêtes vers source_authorships pouvant être remplacées par des requêtes vers les tables canoniques
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
@@ -70,6 +70,7 @@
 * [ ] relations entre publications (est traduction de, est preprint de..., fait partie de..., data paper décrit dataset, dataset référencé dans...) => quasiment un nouveau chantier données à part entière
 * [ ] ajouter filtre corresponding_is_uca?
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
+* [ ] afficher mémoires master et thèses en cours sur liste publications de la page personnes/id
 ## Général (interface)
 * [ ] Toujours mémoriser filtres et les rétablir au rechargement
 * [ ] Rendre tous les filtres sticky

@@ -15,7 +15,7 @@ from application.authorships import (
 from infrastructure.db.queries import publications as pub_queries
 from infrastructure.db.queries.publications import FacetFilters, ListFilters
 from infrastructure.repositories import async_authorship_repository
-from interfaces.api.async_deps import get_async_cursor, get_root_structure_id, get_sa_connection
+from interfaces.api.async_deps import get_root_structure_id, get_sa_connection
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 from interfaces.api.models import (
     ExcludeSourceAuthorship,
@@ -77,9 +77,9 @@ async def publications_facets(
         in_perimeter=in_perimeter,
         subject_id=subject_id,
     )
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         return await pub_queries.publications_facets(
-            cur, filters=filters, root_structure_id=await get_root_structure_id()
+            conn, filters=filters, root_structure_id=await get_root_structure_id()
         )
 
 
@@ -91,8 +91,8 @@ async def all_years() -> Any:
     cet endpoint remonte l'intégralité des `pub_year` distincts pour
     alimenter le filtre « année » côté admin.
     """
-    async with get_async_cursor() as (cur, _conn):
-        return await pub_queries.all_years(cur)
+    async with get_sa_connection() as conn:
+        return await pub_queries.all_years(conn)
 
 
 @router.get("/api/publications/export.csv")
@@ -170,8 +170,8 @@ async def export_theses_csv(
 @router.get("/api/publications/{pub_id}", response_model=PublicationDetailResponse)
 async def get_publication(pub_id: int) -> Any:
     """Détail complet d'une publication."""
-    async with get_async_cursor() as (cur, _conn):
-        detail = await pub_queries.get_publication_detail(cur, pub_id)
+    async with get_sa_connection() as conn:
+        detail = await pub_queries.get_publication_detail(conn, pub_id)
         if detail is None:
             raise HTTPException(status_code=404, detail="Publication not found")
         return detail

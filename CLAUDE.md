@@ -7,6 +7,8 @@
 - Ne pas proposer de pauses ou demander si l'utilisatrice veut continuer — elle le dira d'elle-même.
 - Ne pas qualifier les tâches de "pas urgentes" — prioriser en fonction de l'impact sur le code, pas sur les données.
 - Avant toute proposition de modification du schéma de données: consulter le schéma existant.
+- Ne jamais écrire de commentaires faisant référence à des fichiers transitoires (todo, roadmap) ou à un état passé du code.
+- Si des tests échouent sans être liés au chantier en cours: au prochain commit, interrompre le chantier et s'occuper du problème.
 
 ## Conventions du projet
 
