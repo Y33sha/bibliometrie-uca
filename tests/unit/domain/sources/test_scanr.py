@@ -1,4 +1,27 @@
-from domain.sources.scanr import derive_scanr_oa_status
+from domain.sources.scanr import derive_scanr_oa_status, extract_nnt_from_scanr_id
+
+
+class TestExtractNntFromScanrId:
+    def test_none_returns_none(self):
+        assert extract_nnt_from_scanr_id(None) is None
+
+    def test_empty_returns_none(self):
+        assert extract_nnt_from_scanr_id("") is None
+
+    def test_thesis_prefix_extracts_uppercase_nnt(self):
+        assert extract_nnt_from_scanr_id("these2021CLFAC030") == "2021CLFAC030"
+
+    def test_thesis_prefix_uppercases_nnt(self):
+        assert extract_nnt_from_scanr_id("these2021clfac030") == "2021CLFAC030"
+
+    def test_other_prefix_returns_none(self):
+        assert extract_nnt_from_scanr_id("hal2021abcd") is None
+        assert extract_nnt_from_scanr_id("doi:10.1234/foo") is None
+
+    def test_uppercase_prefix_does_not_match(self):
+        # ScanR émet le préfixe en minuscules ; un input non conforme
+        # n'est pas une thèse au sens ScanR.
+        assert extract_nnt_from_scanr_id("THESE2021CLFAC030") is None
 
 
 class TestDeriveScanrOaStatus:

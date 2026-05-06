@@ -6,6 +6,18 @@ de la sémantique ScanR pour le reste du pipeline.
 """
 
 
+def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
+    """Extrait le NNT d'un `scanr_id` quand celui-ci encode une thèse.
+
+    ScanR encode les thèses sous la forme `these<NNT>` (ex.
+    `these2021CLFAC030` → NNT `2021CLFAC030`). Tout autre format =
+    pas une thèse, on retourne None.
+    """
+    if scanr_id and scanr_id.startswith("these"):
+        return scanr_id[len("these") :].upper()
+    return None
+
+
 def derive_scanr_oa_status(is_oa: bool | None, oa_evidence: dict | None) -> str | None:
     """Mapping (isOa, oaEvidence) ScanR → enum oa_status canonique.
 

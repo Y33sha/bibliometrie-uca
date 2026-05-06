@@ -35,7 +35,7 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
-from domain.sources.scanr import derive_scanr_oa_status
+from domain.sources.scanr import derive_scanr_oa_status, extract_nnt_from_scanr_id
 
 # =============================================================
 # UTILITAIRES
@@ -102,12 +102,6 @@ def upsert_journal(
     )
 
 
-def _extract_nnt_from_scanr_id(scanr_id: str) -> str | None:
-    if scanr_id and scanr_id.startswith("these"):
-        return scanr_id[5:].upper()
-    return None
-
-
 def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None = None) -> dict:
     doi = extract_doi(doc)
     title = get_title(doc)
@@ -118,7 +112,7 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
     if not journal_id:
         source = doc.get("source") or {}
         container_title = source.get("title")
-    nnt = _extract_nnt_from_scanr_id(scanr_id) if scanr_id else None
+    nnt = extract_nnt_from_scanr_id(scanr_id)
     return dict(
         title=title,
         title_normalized=normalize_text(title) if title else None,
@@ -173,7 +167,7 @@ def insert_scanr_document(
     ext: dict[str, Any] = {}
     if hal_id:
         ext["hal"] = hal_id
-    nnt = _extract_nnt_from_scanr_id(scanr_id)
+    nnt = extract_nnt_from_scanr_id(scanr_id)
     if nnt:
         ext["nnt"] = nnt
     for eid in doc.get("externalIds") or []:
