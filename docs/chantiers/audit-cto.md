@@ -262,10 +262,15 @@ pas tranchés, toute évolution amplifie la dette.
   `config_repository` a été scindé en `domain/ports/perimeter_repository`
   (agrégat) + `application/ports/config` (port AsyncConfigStore pour
   la table clé/valeur).
-- [ ] **SQLAlchemy Core : on adopte ou on ferme la porte ?**
-  - Si oui : démarrer un chantier de migration des queries (~30
-    fichiers) avec un plan de découpage
-  - Si non : retirer la mention "à explorer" de la ROADMAP
+- [ ] **SQLAlchemy Core : décision actée (adoption), chantier
+  démarré le 2026-05-06** — adoption retenue après reformulation
+  « si on partait de zéro aujourd'hui, est-ce qu'on l'adopterait ? ».
+  Voir [`docs/chantiers/sqlalchemy-core-adoption.md`](sqlalchemy-core-adoption.md)
+  pour le périmètre, le phasage (5 phases, démarrer par un POC sur
+  un module pilote) et les décisions de cadrage (Core only, pas
+  d'ORM ; AsyncEngine de bout en bout ; MetaData explicite à
+  valider en phase 0). La porte vers Alembic reste ouverte et sera
+  réévaluée à la fin du chantier en coût-bénéfice.
 - [ ] **Règle "routers ⊥ infrastructure" : on l'applique ou on la
   retire ?**
   - Si on l'applique : §1.6 ROADMAP (factories FastAPI `Depends`)
