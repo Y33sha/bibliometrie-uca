@@ -452,6 +452,12 @@ relocalisées en `domain/`.
   comparabilité avec `person_identifiers`. Suppression au passage
   de `interfaces/cli/crossref_spike.py` (one-shot phase 0
   crossref, livrable terminé).
+- **`extract_nnt_from_scanr_id` rapatriée** : de
+  `application/pipeline/normalize/normalize_scanr.py` (helper privé
+  `_extract_nnt_from_scanr_id`) vers `domain/sources/scanr.py`. Convention
+  ScanR : un `scanr_id` qui commence par `these` encode un NNT
+  (ex. `these2021CLFAC030`). Tests unitaires ajoutés dans
+  `tests/unit/domain/sources/test_scanr.py`.
 - **`compute_person_name_forms` déplacée** : de `domain/person.py`
   vers `domain/names.py` (homogène avec `parse_raw_author_name` et
   les autres helpers de format de nom). Le réexport
