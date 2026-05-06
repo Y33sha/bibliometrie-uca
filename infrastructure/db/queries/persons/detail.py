@@ -3,136 +3,153 @@
 import datetime
 from typing import Any
 
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncConnection
+
 from infrastructure.db.queries.filters import OA_CLOSED_SQL
 
 
-async def get_person(cur: Any, person_id: int) -> dict[str, Any] | None:
+async def get_person(conn: AsyncConnection, person_id: int) -> dict[str, Any] | None:
     """Détail d'une personne avec auteurs liés (admin)."""
-    await cur.execute(
-        """
-        SELECT p.id, p.last_name, p.first_name,
-            p.last_name_normalized, p.first_name_normalized,
-            prh.role_title, prh.department_name, prh.start_date, prh.end_date,
-            (prh.id IS NOT NULL) AS has_rh,
-            (SELECT json_agg(x) FROM (
-                SELECT DISTINCT ON (sa.source, sa.source_person_id)
-                       sa.source_person_id AS id, sa.source,
-                       sa.raw_author_name AS full_name
-                FROM source_authorships sa
-                WHERE sa.person_id = p.id AND NOT sa.excluded
-                ORDER BY sa.source, sa.source_person_id
-            ) x) AS linked_authors,
-            (SELECT json_agg(json_build_object(
-                'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
-                'source', pi.source, 'status', pi.status
-            ) ORDER BY pi.id_type, pi.id_value) FROM person_identifiers pi WHERE pi.person_id = p.id
-            ) AS identifiers
-        FROM persons p
-        LEFT JOIN persons_rh prh ON prh.person_id = p.id
-        WHERE p.id = %s
-        """,
-        (person_id,),
-    )
-    return await cur.fetchone()
+    row = (
+        await conn.execute(
+            text("""
+                SELECT p.id, p.last_name, p.first_name,
+                    p.last_name_normalized, p.first_name_normalized,
+                    prh.role_title, prh.department_name, prh.start_date, prh.end_date,
+                    (prh.id IS NOT NULL) AS has_rh,
+                    (SELECT json_agg(x) FROM (
+                        SELECT DISTINCT ON (sa.source, sa.source_person_id)
+                               sa.source_person_id AS id, sa.source,
+                               sa.raw_author_name AS full_name
+                        FROM source_authorships sa
+                        WHERE sa.person_id = p.id AND NOT sa.excluded
+                        ORDER BY sa.source, sa.source_person_id
+                    ) x) AS linked_authors,
+                    (SELECT json_agg(json_build_object(
+                        'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
+                        'source', pi.source, 'status', pi.status
+                    ) ORDER BY pi.id_type, pi.id_value)
+                     FROM person_identifiers pi WHERE pi.person_id = p.id
+                    ) AS identifiers
+                FROM persons p
+                LEFT JOIN persons_rh prh ON prh.person_id = p.id
+                WHERE p.id = :pid
+            """),
+            {"pid": person_id},
+        )
+    ).one_or_none()
+    return dict(row._mapping) if row else None
 
 
-async def person_profile(cur: Any, person_id: int) -> dict[str, Any] | None:
+async def person_profile(conn: AsyncConnection, person_id: int) -> dict[str, Any] | None:
     """Profil public : infos + identifiants + auteurs liés."""
-    await cur.execute(
-        """
-        SELECT p.id, p.last_name, p.first_name,
-               prh.role_title, prh.department_name,
-               prh.start_date, prh.end_date
-        FROM persons p
-        LEFT JOIN persons_rh prh ON prh.person_id = p.id
-        WHERE p.id = %s
-        """,
-        (person_id,),
-    )
-    person = await cur.fetchone()
-    if not person:
+    person_row = (
+        await conn.execute(
+            text("""
+                SELECT p.id, p.last_name, p.first_name,
+                       prh.role_title, prh.department_name,
+                       prh.start_date, prh.end_date
+                FROM persons p
+                LEFT JOIN persons_rh prh ON prh.person_id = p.id
+                WHERE p.id = :pid
+            """),
+            {"pid": person_id},
+        )
+    ).one_or_none()
+    if not person_row:
         return None
+    person = dict(person_row._mapping)
 
-    await cur.execute(
-        """
-        SELECT id, id_type, id_value, source, status
-        FROM person_identifiers WHERE person_id = %s
-        """,
-        (person_id,),
-    )
-    identifiers = await cur.fetchall()
+    id_rows = (
+        await conn.execute(
+            text("""
+                SELECT id, id_type, id_value, source, status
+                FROM person_identifiers WHERE person_id = :pid
+            """),
+            {"pid": person_id},
+        )
+    ).all()
+    identifiers = [dict(r._mapping) for r in id_rows]
 
-    await cur.execute(
-        """
-        SELECT DISTINCT sauth.id, 'hal' AS source, sauth.full_name, sauth.orcid,
-               sauth.source_ids->>'idhal' AS idhal,
-               (sauth.source_ids->>'hal_person_id')::int AS hal_person_id,
-               NULL::text AS openalex_id,
-               (SELECT COUNT(*) FROM source_authorships sa2
-                WHERE sa2.source = 'hal' AND sa2.source_person_id = sauth.id
-                  AND sa2.in_perimeter = TRUE AND NOT sa2.excluded) AS uca_pub_count
-        FROM source_persons sauth
-        JOIN source_authorships sa ON sa.source = 'hal' AND sa.source_person_id = sauth.id
-        WHERE sa.person_id = %s AND NOT sa.excluded
-        """,
-        (person_id,),
-    )
-    hal_authors = await cur.fetchall()
+    hal_rows = (
+        await conn.execute(
+            text("""
+                SELECT DISTINCT sauth.id, 'hal' AS source, sauth.full_name, sauth.orcid,
+                       sauth.source_ids->>'idhal' AS idhal,
+                       (sauth.source_ids->>'hal_person_id')::int AS hal_person_id,
+                       NULL::text AS openalex_id,
+                       (SELECT COUNT(*) FROM source_authorships sa2
+                        WHERE sa2.source = 'hal' AND sa2.source_person_id = sauth.id
+                          AND sa2.in_perimeter = TRUE AND NOT sa2.excluded) AS uca_pub_count
+                FROM source_persons sauth
+                JOIN source_authorships sa
+                  ON sa.source = 'hal' AND sa.source_person_id = sauth.id
+                WHERE sa.person_id = :pid AND NOT sa.excluded
+            """),
+            {"pid": person_id},
+        )
+    ).all()
+    hal_authors = [dict(r._mapping) for r in hal_rows]
 
-    await cur.execute(
-        """
-        SELECT MIN(sa.id) AS id,
-               sa.raw_author_name AS full_name,
-               'openalex' AS source,
-               NULL::text AS orcid, NULL::text AS idhal, NULL::text AS openalex_id,
-               COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
-        FROM source_authorships sa
-        WHERE sa.source = 'openalex' AND sa.person_id = %s
-        GROUP BY sa.raw_author_name
-        """,
-        (person_id,),
-    )
-    oa_authors = await cur.fetchall()
+    oa_rows = (
+        await conn.execute(
+            text("""
+                SELECT MIN(sa.id) AS id,
+                       sa.raw_author_name AS full_name,
+                       'openalex' AS source,
+                       NULL::text AS orcid, NULL::text AS idhal, NULL::text AS openalex_id,
+                       COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
+                FROM source_authorships sa
+                WHERE sa.source = 'openalex' AND sa.person_id = :pid
+                GROUP BY sa.raw_author_name
+            """),
+            {"pid": person_id},
+        )
+    ).all()
+    oa_authors = [dict(r._mapping) for r in oa_rows]
 
     # WoS post-chantier source_persons : plus de source_persons WoS,
     # group by raw_author_name comme OpenAlex. ORCID lu depuis
     # source_authorships.identifiers.
-    await cur.execute(
-        """
-        SELECT MIN(sa.id) AS id,
-               sa.raw_author_name AS full_name,
-               'wos' AS source,
-               MAX(sa.identifiers->>'orcid') AS orcid,
-               NULL::text AS idhal, NULL::text AS openalex_id,
-               COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
-        FROM source_authorships sa
-        WHERE sa.source = 'wos' AND sa.person_id = %s
-        GROUP BY sa.raw_author_name
-        """,
-        (person_id,),
-    )
-    wos_authors = await cur.fetchall()
+    wos_rows = (
+        await conn.execute(
+            text("""
+                SELECT MIN(sa.id) AS id,
+                       sa.raw_author_name AS full_name,
+                       'wos' AS source,
+                       MAX(sa.identifiers->>'orcid') AS orcid,
+                       NULL::text AS idhal, NULL::text AS openalex_id,
+                       COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
+                FROM source_authorships sa
+                WHERE sa.source = 'wos' AND sa.person_id = :pid
+                GROUP BY sa.raw_author_name
+            """),
+            {"pid": person_id},
+        )
+    ).all()
+    wos_authors = [dict(r._mapping) for r in wos_rows]
 
-    await cur.execute(
-        """
-        SELECT COUNT(*) AS count
-        FROM source_authorships sa
-        JOIN source_publications sd ON sd.id = sa.source_publication_id
-        WHERE sa.person_id = %s
-          AND sa.source = 'theses'
-          AND NOT (sa.roles && ARRAY['author']::text[])
-          AND sd.publication_id IS NOT NULL
-        """,
-        (person_id,),
-    )
-    row = await cur.fetchone()
-    theses_count = row["count"]
+    theses_count_row = (
+        await conn.execute(
+            text("""
+                SELECT COUNT(*) AS count
+                FROM source_authorships sa
+                JOIN source_publications sd ON sd.id = sa.source_publication_id
+                WHERE sa.person_id = :pid
+                  AND sa.source = 'theses'
+                  AND NOT (sa.roles && ARRAY['author']::text[])
+                  AND sd.publication_id IS NOT NULL
+            """),
+            {"pid": person_id},
+        )
+    ).one()
 
     return {
         "person": person,
         "identifiers": identifiers,
         "authors": hal_authors + oa_authors + wos_authors,
-        "theses_count": theses_count,
+        "theses_count": theses_count_row.count,
     }
 
 
@@ -148,62 +165,65 @@ _THESIS_ROLE_LABELS = {
 }
 
 
-async def person_theses(cur: Any, person_id: int) -> dict[str, Any]:
+async def person_theses(conn: AsyncConnection, person_id: int) -> dict[str, Any]:
     """Thèses liées à cette personne avec un rôle non-auteur."""
-    await cur.execute(
-        """
-        SELECT p.id, p.title, p.pub_year, p.doi,
-               sa.roles,
-               (SELECT sa2.raw_author_name
-                FROM source_authorships sa2
-                WHERE sa2.source_publication_id = sd.id
-                  AND sa2.source = 'theses'
-                  AND sa2.roles && ARRAY['author']::text[]
-                LIMIT 1
-               ) AS author_name,
-               (SELECT sa2.person_id
-                FROM source_authorships sa2
-                WHERE sa2.source_publication_id = sd.id
-                  AND sa2.source = 'theses'
-                  AND sa2.roles && ARRAY['author']::text[]
-                LIMIT 1
-               ) AS author_person_id,
-               (SELECT ARRAY_AGG(DISTINCT sid)
-                FROM authorships a,
-                     UNNEST(a.structure_ids) AS sid
-                JOIN structures st ON st.id = sid
-                WHERE a.publication_id = p.id AND a.in_perimeter
-                  AND st.structure_type = 'labo'
-               ) AS structure_ids
-        FROM source_authorships sa
-        JOIN source_publications sd ON sd.id = sa.source_publication_id
-        JOIN publications p ON p.id = sd.publication_id
-        WHERE sa.person_id = %s
-          AND sa.source = 'theses'
-          AND NOT (sa.roles && ARRAY['author']::text[])
-        ORDER BY p.pub_year DESC NULLS LAST, p.title
-        """,
-        (person_id,),
-    )
-    rows = await cur.fetchall()
+    rows = (
+        await conn.execute(
+            text("""
+                SELECT p.id, p.title, p.pub_year, p.doi,
+                       sa.roles,
+                       (SELECT sa2.raw_author_name
+                        FROM source_authorships sa2
+                        WHERE sa2.source_publication_id = sd.id
+                          AND sa2.source = 'theses'
+                          AND sa2.roles && ARRAY['author']::text[]
+                        LIMIT 1
+                       ) AS author_name,
+                       (SELECT sa2.person_id
+                        FROM source_authorships sa2
+                        WHERE sa2.source_publication_id = sd.id
+                          AND sa2.source = 'theses'
+                          AND sa2.roles && ARRAY['author']::text[]
+                        LIMIT 1
+                       ) AS author_person_id,
+                       (SELECT ARRAY_AGG(DISTINCT sid)
+                        FROM authorships a,
+                             UNNEST(a.structure_ids) AS sid
+                        JOIN structures st ON st.id = sid
+                        WHERE a.publication_id = p.id AND a.in_perimeter
+                          AND st.structure_type = 'labo'
+                       ) AS structure_ids
+                FROM source_authorships sa
+                JOIN source_publications sd ON sd.id = sa.source_publication_id
+                JOIN publications p ON p.id = sd.publication_id
+                WHERE sa.person_id = :pid
+                  AND sa.source = 'theses'
+                  AND NOT (sa.roles && ARRAY['author']::text[])
+                ORDER BY p.pub_year DESC NULLS LAST, p.title
+            """),
+            {"pid": person_id},
+        )
+    ).all()
 
     all_struct_ids: set[int] = set()
     for row in rows:
-        for sid in row["structure_ids"] or []:
+        for sid in row.structure_ids or []:
             all_struct_ids.add(sid)
 
     structures: dict[int, Any] = {}
     if all_struct_ids:
-        await cur.execute(
-            "SELECT id, acronym, name FROM structures WHERE id = ANY(%s)",
-            (list(all_struct_ids),),
-        )
-        for s in await cur.fetchall():
-            structures[s["id"]] = {"acronym": s["acronym"], "name": s["name"]}
+        struct_rows = (
+            await conn.execute(
+                text("SELECT id, acronym, name FROM structures WHERE id = ANY(:ids)"),
+                {"ids": list(all_struct_ids)},
+            )
+        ).all()
+        for s in struct_rows:
+            structures[s.id] = {"acronym": s.acronym, "name": s.name}
 
     by_role: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
-        roles = row["roles"] or []
+        roles = row.roles or []
         role = "jury_member"
         for r in _THESIS_ROLES:
             if r in roles:
@@ -211,13 +231,13 @@ async def person_theses(cur: Any, person_id: int) -> dict[str, Any]:
                 break
         by_role.setdefault(role, []).append(
             {
-                "id": row["id"],
-                "title": row["title"],
-                "pub_year": row["pub_year"],
-                "doi": row["doi"],
-                "author_name": row["author_name"],
-                "author_person_id": row["author_person_id"],
-                "structure_ids": row["structure_ids"] or [],
+                "id": row.id,
+                "title": row.title,
+                "pub_year": row.pub_year,
+                "doi": row.doi,
+                "author_name": row.author_name,
+                "author_person_id": row.author_person_id,
+                "structure_ids": row.structure_ids or [],
             }
         )
 
@@ -232,113 +252,132 @@ async def person_theses(cur: Any, person_id: int) -> dict[str, Any]:
 # ── Adresses ─────────────────────────────────────────────────────
 
 
-async def person_addresses(cur: Any, person_id: int, *, page: int, per_page: int) -> dict[str, Any]:
+async def person_addresses(
+    conn: AsyncConnection, person_id: int, *, page: int, per_page: int
+) -> dict[str, Any]:
     """Adresses distinctes utilisées dans les authorships sources de cette personne."""
     base_where = """a.id IN (
             SELECT DISTINCT saa.address_id
             FROM source_authorship_addresses saa
             JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-            WHERE sa.person_id = %s
+            WHERE sa.person_id = :pid
         )"""
-    await cur.execute(f"SELECT COUNT(*) AS total FROM addresses a WHERE {base_where}", (person_id,))
-    row = await cur.fetchone()
-    total = row["total"]
+    count_row = (
+        await conn.execute(
+            text(f"SELECT COUNT(*) AS total FROM addresses a WHERE {base_where}"),
+            {"pid": person_id},
+        )
+    ).one()
+    total = count_row.total
     pages = max(1, (total + per_page - 1) // per_page)
     page = min(page, pages)
     offset = (page - 1) * per_page
 
-    await cur.execute(
-        f"""
-        SELECT a.id, a.raw_text,
-               (SELECT jsonb_agg(jsonb_build_object(
-                    'id', s.id, 'acronym', s.acronym, 'name', s.name))
-                FROM address_structures ast
-                JOIN structures s ON s.id = ast.structure_id
-                WHERE ast.address_id = a.id AND s.structure_type != 'site'
-                  AND ast.is_confirmed IS DISTINCT FROM FALSE
-               ) AS structures
-        FROM addresses a
-        WHERE {base_where}
-        ORDER BY a.raw_text
-        LIMIT %s OFFSET %s
-        """,
-        (person_id, per_page, offset),
-    )
+    rows = (
+        await conn.execute(
+            text(f"""
+                SELECT a.id, a.raw_text,
+                       (SELECT jsonb_agg(jsonb_build_object(
+                            'id', s.id, 'acronym', s.acronym, 'name', s.name))
+                        FROM address_structures ast
+                        JOIN structures s ON s.id = ast.structure_id
+                        WHERE ast.address_id = a.id AND s.structure_type != 'site'
+                          AND ast.is_confirmed IS DISTINCT FROM FALSE
+                       ) AS structures
+                FROM addresses a
+                WHERE {base_where}
+                ORDER BY a.raw_text
+                LIMIT :pg_limit OFFSET :pg_offset
+            """),
+            {"pid": person_id, "pg_limit": per_page, "pg_offset": offset},
+        )
+    ).all()
     return {
         "total": total,
         "page": page,
         "pages": pages,
-        "addresses": await cur.fetchall(),
+        "addresses": [dict(r._mapping) for r in rows],
     }
 
 
-async def person_subjects(cur: Any, person_id: int, *, limit: int = 30) -> list[dict[str, Any]]:
+async def person_subjects(
+    conn: AsyncConnection, person_id: int, *, limit: int = 30
+) -> list[dict[str, Any]]:
     """Top sujets des publications d'une personne, ordonnés par fréquence.
 
     Exclut les sujets trop génériques (`subjects.usage_count` > 5000).
     """
-    await cur.execute(
-        """
-        SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS count
-        FROM authorships a
-        JOIN publications p ON p.id = a.publication_id
-        JOIN publication_subjects ps ON ps.publication_id = p.id
-        JOIN subjects s ON s.id = ps.subject_id
-        WHERE a.person_id = %s
-          AND a.roles && ARRAY['author']::text[]
-          AND p.doc_type NOT IN ('peer_review', 'memoir', 'ongoing_thesis')
-          AND s.usage_count <= 5000
-        GROUP BY s.id, s.label, s.ontologies
-        ORDER BY count DESC, lower(s.label)
-        LIMIT %s
-        """,
-        (person_id, limit),
-    )
-    return [dict(r) for r in await cur.fetchall()]
+    rows = (
+        await conn.execute(
+            text("""
+                SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS count
+                FROM authorships a
+                JOIN publications p ON p.id = a.publication_id
+                JOIN publication_subjects ps ON ps.publication_id = p.id
+                JOIN subjects s ON s.id = ps.subject_id
+                WHERE a.person_id = :pid
+                  AND a.roles && ARRAY['author']::text[]
+                  AND p.doc_type NOT IN ('peer_review', 'memoir', 'ongoing_thesis')
+                  AND s.usage_count <= 5000
+                GROUP BY s.id, s.label, s.ontologies
+                ORDER BY count DESC, lower(s.label)
+                LIMIT :lim
+            """),
+            {"pid": person_id, "lim": limit},
+        )
+    ).all()
+    return [dict(r._mapping) for r in rows]
 
 
-async def person_dashboard(cur: Any, person_id: int) -> dict[str, Any]:
+async def person_dashboard(conn: AsyncConnection, person_id: int) -> dict[str, Any]:
     """Dashboard personne : publis/an + répartition Open Access."""
     current_year = datetime.date.today().year
 
-    await cur.execute(
-        """
-        SELECT p.pub_year, COUNT(DISTINCT p.id) AS count
-        FROM publications p
-        JOIN authorships a ON a.publication_id = p.id
-        WHERE a.person_id = %s
-          AND a.roles && ARRAY['author']::text[]
-          AND p.pub_year IS NOT NULL
-          AND p.pub_year >= %s
-        GROUP BY p.pub_year
-        ORDER BY p.pub_year
-        """,
-        (person_id, current_year - 6),
-    )
-    pubs_by_year = [{"year": r["pub_year"], "count": r["count"]} for r in await cur.fetchall()]
+    pubs_year_rows = (
+        await conn.execute(
+            text("""
+                SELECT p.pub_year, COUNT(DISTINCT p.id) AS count
+                FROM publications p
+                JOIN authorships a ON a.publication_id = p.id
+                WHERE a.person_id = :pid
+                  AND a.roles && ARRAY['author']::text[]
+                  AND p.pub_year IS NOT NULL
+                  AND p.pub_year >= :min_year
+                GROUP BY p.pub_year
+                ORDER BY p.pub_year
+            """),
+            {"pid": person_id, "min_year": current_year - 6},
+        )
+    ).all()
+    pubs_by_year = [{"year": r.pub_year, "count": r.count} for r in pubs_year_rows]
 
-    await cur.execute(
-        f"""
-        SELECT
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status NOT IN {OA_CLOSED_SQL} AND p.oa_status IS NOT NULL) AS open_access,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown' OR p.oa_status IS NULL) AS unknown,
-            COUNT(DISTINCT p.id) AS total
-        FROM publications p
-        JOIN authorships a ON a.publication_id = p.id
-        WHERE a.person_id = %s
-          AND a.roles && ARRAY['author']::text[]
-        """,
-        (person_id,),
-    )
-    oa = await cur.fetchone()
+    oa = (
+        await conn.execute(
+            text(f"""
+                SELECT
+                    COUNT(DISTINCT p.id) FILTER (
+                        WHERE p.oa_status NOT IN {OA_CLOSED_SQL} AND p.oa_status IS NOT NULL
+                    ) AS open_access,
+                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
+                    COUNT(DISTINCT p.id) FILTER (
+                        WHERE p.oa_status = 'unknown' OR p.oa_status IS NULL
+                    ) AS unknown,
+                    COUNT(DISTINCT p.id) AS total
+                FROM publications p
+                JOIN authorships a ON a.publication_id = p.id
+                WHERE a.person_id = :pid
+                  AND a.roles && ARRAY['author']::text[]
+            """),
+            {"pid": person_id},
+        )
+    ).one()
 
     return {
         "pubs_by_year": pubs_by_year,
         "oa": {
-            "open_access": oa["open_access"],
-            "closed": oa["closed"],
-            "unknown": oa["unknown"],
-            "total": oa["total"],
+            "open_access": oa.open_access,
+            "closed": oa.closed,
+            "unknown": oa.unknown,
+            "total": oa.total,
         },
     }
