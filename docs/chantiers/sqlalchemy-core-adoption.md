@@ -342,14 +342,25 @@ fiche).
   `get_sa_connection()`. Helpers tests en `text()`. Exception
   cross-aggregate `address ↔ publications.countries` préservée.
   Tests : 34/34 service + suite complète 1322/1322.
-- [ ] **Sous-phase 2.5** — Module `authorships` (le repo est déjà en
-  dispatch, il reste à migrer en SA Core complet et à supprimer la
-  branche psycopg) + `application/authorships.py` async fonctions
-  + router `persons.py` endpoint `toggle_authorship_excluded`.
-- [ ] **Sous-phase 2.6** — Module `persons`
-  (`async_person_repository/` multi-fichiers, le plus gros).
+- [x] **Sous-phase 2.5 — Routers authorships en SA**
+  *(commit `2645140`)* : 2 endpoints
+  (`PATCH /api/authorships/{id}/exclude` côté router persons,
+  `PATCH /api/source-authorships/{src}/{id}/exclude` côté router
+  publications) basculés sur `get_sa_connection()`. Les autres
+  fonctions de `application/authorships.py` continuent d'accepter
+  le dispatch (signatures `cur: Any`).
+- [x] **Préalable 2.6 — `async_person_repository/` en mode dispatch**
+  *(commit `789e688`)* : les 4 sous-modules `_core.py`,
+  `_identifiers.py`, `_name_forms.py`, `_authorships.py` migrés en
+  dispatch (pattern interne aux fonctions, cohérent avec
+  `infrastructure/perimeter.py`). `__init__.py` non touché.
+- [ ] **Sous-phase 2.6 — Services + routers persons en SA** :
+  `application/persons.py` async fonctions (~20 fonctions),
+  `interfaces/api/routers/persons.py` (les ~15 endpoints qui passent
+  par `async_person_repository`), tests.
 - [ ] **Sous-phase 2.7** — Module `publications`
-  (`async_publication_repository.py`).
+  (`async_publication_repository.py` à mettre en dispatch d'abord,
+  puis services + routers).
 
 ### Phase 3 — Migration des queries statiques restantes
 
