@@ -1,4 +1,4 @@
-"""Router /api/publications/* — délègue les queries à infrastructure/db/queries/publications.
+"""Router /api/publications/* — délègue au port `AsyncPublicationsQueries`.
 
 Seul le endpoint POST /api/source-authorships/.../exclude contient encore
 du comportement applicatif (invocation d'un use case), pas une query pure.
@@ -7,15 +7,24 @@ du comportement applicatif (invocation d'un use case), pas une query pure.
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from application.authorships import (
     set_source_authorship_excluded as _set_source_authorship_excluded,
 )
-from infrastructure.db.queries import publications as pub_queries
-from infrastructure.db.queries.publications import FacetFilters, ListFilters
-from infrastructure.repositories import async_authorship_repository
-from interfaces.api.async_deps import get_root_structure_id, get_sa_connection
+from application.ports.publications_queries import (
+    AsyncPublicationsQueries,
+    FacetFilters,
+    ListFilters,
+)
+from domain.ports.authorship_repository import AsyncAuthorshipRepository
+from interfaces.api.async_deps import (
+    authorship_repo,
+    db_conn,
+    get_root_structure_id,
+    publications_queries,
+)
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 from interfaces.api.models import (
     ExcludeSourceAuthorship,
@@ -55,6 +64,7 @@ async def publications_facets(
     hal_status: str = Query(""),
     in_perimeter: str = Query(""),
     subject_id: int | None = Query(None),
+    queries: AsyncPublicationsQueries = Depends(publications_queries),
 ) -> Any:
     """Facettes dynamiques pour la page publications."""
     lab_ids, lab_none = _parse_lab_id(lab_id)
@@ -77,22 +87,22 @@ async def publications_facets(
         in_perimeter=in_perimeter,
         subject_id=subject_id,
     )
-    async with get_sa_connection() as conn:
-        return await pub_queries.publications_facets(
-            conn, filters=filters, root_structure_id=await get_root_structure_id()
-        )
+    return await queries.publications_facets(
+        filters=filters, root_structure_id=await get_root_structure_id()
+    )
 
 
 @router.get("/api/publications/years", response_model=list[int])
-async def all_years() -> Any:
+async def all_years(
+    queries: AsyncPublicationsQueries = Depends(publications_queries),
+) -> Any:
     """Liste de toutes les années présentes en base (validées ou non).
 
     Contrairement à `/stats/years` qui restreint aux années validées,
     cet endpoint remonte l'intégralité des `pub_year` distincts pour
     alimenter le filtre « année » côté admin.
     """
-    async with get_sa_connection() as conn:
-        return await pub_queries.all_years(conn)
+    return await queries.all_years()
 
 
 @router.get("/api/publications/export.csv")
@@ -108,6 +118,7 @@ async def export_publications_csv(
     sort: str = Query("year_desc"),
     person_id: int | None = Query(None),
     excluded_doc_type: str = Query(""),
+    queries: AsyncPublicationsQueries = Depends(publications_queries),
 ) -> Response:
     """Export CSV des publications (mêmes filtres que list_publications)."""
     lab_ids, lab_none = _parse_lab_id(lab_id)
@@ -124,10 +135,9 @@ async def export_publications_csv(
         excluded_types=parse_str_csv(excluded_doc_type),
         person_id=person_id,
     )
-    async with get_sa_connection() as conn:
-        csv_content = await pub_queries.export_publications_csv(
-            conn, filters=filters, root_structure_id=await get_root_structure_id(), sort=sort
-        )
+    csv_content = await queries.export_publications_csv(
+        filters=filters, root_structure_id=await get_root_structure_id(), sort=sort
+    )
     return Response(
         content=csv_content,
         media_type="text/csv; charset=utf-8",
@@ -144,6 +154,7 @@ async def export_theses_csv(
     source_filter: str = Query(""),
     doc_type: str = Query(""),
     sort: str = Query("soutenance_desc"),
+    queries: AsyncPublicationsQueries = Depends(publications_queries),
 ) -> Response:
     """Export CSV de la page thèses (filtres + tri identiques à la liste)."""
     lab_ids, lab_none = _parse_lab_id(lab_id)
@@ -156,10 +167,9 @@ async def export_theses_csv(
         source_values=parse_str_csv(source_filter),
         doc_types=parse_str_csv(doc_type) or ["thesis", "ongoing_thesis"],
     )
-    async with get_sa_connection() as conn:
-        csv_content = await pub_queries.export_theses_csv(
-            conn, filters=filters, root_structure_id=await get_root_structure_id(), sort=sort
-        )
+    csv_content = await queries.export_theses_csv(
+        filters=filters, root_structure_id=await get_root_structure_id(), sort=sort
+    )
     return Response(
         content=csv_content,
         media_type="text/csv; charset=utf-8",
@@ -168,13 +178,15 @@ async def export_theses_csv(
 
 
 @router.get("/api/publications/{pub_id}", response_model=PublicationDetailResponse)
-async def get_publication(pub_id: int) -> Any:
+async def get_publication(
+    pub_id: int,
+    queries: AsyncPublicationsQueries = Depends(publications_queries),
+) -> Any:
     """Détail complet d'une publication."""
-    async with get_sa_connection() as conn:
-        detail = await pub_queries.get_publication_detail(conn, pub_id)
-        if detail is None:
-            raise HTTPException(status_code=404, detail="Publication not found")
-        return detail
+    detail = await queries.get_publication_detail(pub_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Publication not found")
+    return detail
 
 
 @router.post(
@@ -182,18 +194,19 @@ async def get_publication(pub_id: int) -> Any:
     response_model=ExcludeSourceAuthorshipResponse,
 )
 async def exclude_source_authorship(
-    source: str, authorship_id: int, body: ExcludeSourceAuthorship = ExcludeSourceAuthorship()
+    source: str,
+    authorship_id: int,
+    body: ExcludeSourceAuthorship = ExcludeSourceAuthorship(),
+    conn: AsyncConnection = Depends(db_conn),
+    repo: AsyncAuthorshipRepository = Depends(authorship_repo),
 ) -> Any:
     """Marque/démarque une authorship source comme fausse.
 
     Si aucune source non exclue n'atteste plus l'authorship consolidée,
     celle-ci est supprimée.
     """
-    async with get_sa_connection() as conn:
-        await _set_source_authorship_excluded(
-            conn, authorship_id, source, body.excluded, repo=async_authorship_repository(conn)
-        )
-        return {"ok": True, "excluded": body.excluded}
+    await _set_source_authorship_excluded(conn, authorship_id, source, body.excluded, repo=repo)
+    return {"ok": True, "excluded": body.excluded}
 
 
 @router.get("/api/publications", response_model=PublicationListResponse)
@@ -218,6 +231,7 @@ async def list_publications(
     hal_status: str = Query(""),
     in_perimeter: str = Query(""),
     subject_id: int | None = Query(None),
+    queries: AsyncPublicationsQueries = Depends(publications_queries),
 ) -> Any:
     """Liste paginée des publications avec sources, labos et journal rattachés.
 
@@ -249,12 +263,10 @@ async def list_publications(
         in_perimeter=in_perimeter,
         subject_id=subject_id,
     )
-    async with get_sa_connection() as conn:
-        return await pub_queries.list_publications(
-            conn,
-            filters=filters,
-            root_structure_id=await get_root_structure_id(),
-            page=page,
-            per_page=per_page,
-            sort=sort,
-        )
+    return await queries.list_publications(
+        filters=filters,
+        root_structure_id=await get_root_structure_id(),
+        page=page,
+        per_page=per_page,
+        sort=sort,
+    )

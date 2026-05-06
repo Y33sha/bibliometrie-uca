@@ -8,7 +8,6 @@ qu'une query à la fois).
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import text
@@ -41,30 +40,6 @@ from infrastructure.db.queries.filters import (
 )
 
 
-@dataclass(frozen=True, slots=True)
-class FacetFilters:
-    """Bundle spécifique aux facettes (similaire à ListFilters mais sans
-    pagination/sort)."""
-
-    years: list[int] = field(default_factory=list)
-    lab_ids: list[int] = field(default_factory=list)
-    lab_none: bool = False
-    doc_types: list[str] = field(default_factory=list)
-    excluded_types: list[str] = field(default_factory=list)
-    access: str = ""
-    oa_status: str = ""
-    source_values: list[str] = field(default_factory=list)
-    publisher_id: int | None = None
-    journal_id: int | None = None
-    person_id: int | None = None
-    is_corresponding: str = ""
-    has_apc: str = ""
-    country_values: list[str] = field(default_factory=list)
-    hal_status_values: list[str] = field(default_factory=list)
-    in_perimeter: str = ""
-    subject_id: int | None = None
-
-
 class _PublicationFacetsBuilder:
     """Construit les facettes dynamiques pour /api/publications/facets.
 
@@ -72,9 +47,7 @@ class _PublicationFacetsBuilder:
     Décomposition : une méthode privée par facette + un orchestrateur `build()`.
     """
 
-    def __init__(
-        self, conn: AsyncConnection, filters: FacetFilters, root_structure_id: int
-    ) -> None:
+    def __init__(self, conn: AsyncConnection, filters: Any, root_structure_id: int) -> None:
         self.conn = conn
         self.filters = filters
         self.root_structure_id = root_structure_id
@@ -528,7 +501,7 @@ class _PublicationFacetsBuilder:
 
 
 async def publications_facets(
-    conn: AsyncConnection, *, filters: FacetFilters, root_structure_id: int
+    conn: AsyncConnection, *, filters: Any, root_structure_id: int
 ) -> dict[str, Any]:
     """Facettes dynamiques : chaque facette exclut son propre filtre mais
     applique tous les autres.

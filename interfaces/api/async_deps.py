@@ -36,6 +36,7 @@ from application.ports.perimeter import AsyncPerimeterQueries
 from application.ports.perimeters_queries import AsyncPerimetersAdminQueries
 from application.ports.person_duplicates_queries import AsyncPersonDuplicatesQueries
 from application.ports.publication_duplicates_queries import AsyncPublicationDuplicatesQueries
+from application.ports.publications_queries import AsyncPublicationsQueries
 from application.ports.publishers_queries import AsyncPublisherQueries
 from application.ports.stats_queries import AsyncStatsQueries
 from application.ports.structures_queries import AsyncStructuresQueries
@@ -62,6 +63,7 @@ from infrastructure.db.queries.perimeter import (
 )
 from infrastructure.db.queries.person_duplicates import PgAsyncPersonDuplicatesQueries
 from infrastructure.db.queries.publication_duplicates import PgAsyncPublicationDuplicatesQueries
+from infrastructure.db.queries.publications import PgAsyncPublicationsQueries
 from infrastructure.db.queries.publishers import PgAsyncPublisherQueries
 from infrastructure.db.queries.stats import PgAsyncStatsQueries
 from infrastructure.db.queries.structures import PgAsyncStructuresQueries
@@ -242,6 +244,12 @@ def publication_duplicates_queries(
     conn: AsyncConnection = Depends(db_conn),
 ) -> AsyncPublicationDuplicatesQueries:
     return PgAsyncPublicationDuplicatesQueries(conn)
+
+
+def publications_queries(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncPublicationsQueries:
+    return PgAsyncPublicationsQueries(conn)
 
 
 async def bg_propagate_countries(address_ids: list[int]) -> None:

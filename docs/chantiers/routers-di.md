@@ -109,7 +109,7 @@ pattern progressivement :
 - [x] `structures.py` *(commit `291cbe3`)*
 - [x] `stats.py` *(commit `c882221`)*
 - [x] `laboratories.py` *(commit `48e618e`)*
-- [ ] `publications.py`
+- [x] `publications.py` *(commit à venir)*
 - [ ] `persons.py` (le plus gros — ~30 endpoints)
 
 ### Phase 3 — Query services manquants
@@ -128,7 +128,7 @@ Certains routers utilisent des query modules qui n'ont pas de port.
 - [x] `addresses` query service *(commit `1bdb3dd`)*
 - [x] `laboratories` query service *(commit `48e618e`)*
 - [x] `stats` query service *(commit `c882221` — agrège les 7 fonctions des 4 modules `stats/*` derrière `PgAsyncStatsQueries`)*
-- [ ] `publications` query service (list, facets, detail, all_years)
+- [x] `publications` query service (list, facets, detail, all_years) *(commit à venir)*
 - [ ] `persons` query service (list, facets, directory, detail, admin)
 - [x] `config` query service *(commit `59a4181`, inclut `get_hal_collections` migré depuis app_config.py)*
 

@@ -4,7 +4,8 @@ import json
 
 from sqlalchemy import text
 
-from infrastructure.db.queries.publications.list import ListFilters, list_publications
+from application.ports.publications_queries import ListFilters
+from infrastructure.db.queries.publications.list import list_publications
 
 
 async def _create_pub(conn, title="T"):
