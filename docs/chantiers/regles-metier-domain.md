@@ -372,14 +372,14 @@ def extract_pub_metadata(work, journal_id):
 ## Phases d'implémentation
 
 ### Phase 0 — Inventaire complet
-- [ ] Lister toutes les fonctions/blocs `application/pipeline/normalize/*`
+- [x] Lister toutes les fonctions/blocs `application/pipeline/normalize/*`
       et `application/{persons,publications}.py` qui contiennent une
       règle métier (≠ orchestration).
-- [ ] Pour chaque règle, classer : (a) déjà pure → relocalisable
+- [x] Pour chaque règle, classer : (a) déjà pure → relocalisable
       directement, (b) non pure → décomposable en partie pure +
       effets, (c) intrinsèquement liée à la transaction → reste en
       `application/`.
-- [ ] Note de synthèse listant les fonctions à créer côté `domain/`.
+- [x] Note de synthèse listant les fonctions à créer côté `domain/`.
 - **Livrable** : fichier `docs/chantiers/regles-metier-inventaire.md`
   (ou section ajoutée à ce doc).
 

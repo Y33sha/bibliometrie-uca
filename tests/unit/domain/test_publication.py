@@ -22,6 +22,7 @@ from domain.publication import (
     PublicationTopics,
     ThesesTopics,
     best_oa_status,
+    clean_publication_title,
     resolve_doi_conflict,
 )
 
@@ -519,3 +520,49 @@ class TestResolveDoiConflictPure:
                 existing_id=1,
             )
             assert res.accepted_doi is None, f"alias {alias} non reconnu"
+
+
+# ── clean_publication_title (décodage double-encodage HTML) ────────
+
+
+class TestCleanPublicationTitle:
+    def test_decodes_double_encoded_html_tags(self):
+        """Cas observé OpenAlex / ScanR : <i>...</i> arrive double-échappé."""
+        result = clean_publication_title(
+            "Detection of &amp;lt;i&amp;gt;Candida&amp;lt;/i&amp;gt; species"
+        )
+        assert result == "Detection of <i>Candida</i> species"
+
+    def test_decodes_double_encoded_numeric_entities(self):
+        """Entités numériques double-encodées (ex: &amp;#233; → é)."""
+        assert clean_publication_title("Gagn&amp;#233; et al.") == "Gagné et al."
+
+    def test_decodes_double_encoded_hex_entities(self):
+        """Entités hexadécimales double-encodées (ex: &amp;#xE9; → é)."""
+        assert clean_publication_title("Gagn&amp;#xE9; et al.") == "Gagné et al."
+
+    def test_preserves_legitimate_single_amp(self):
+        """Un &amp; isolé (encodage simple légitime) ne doit pas être touché —
+        sinon on sur-décode "Smith & Jones" et on casse l'affichage."""
+        assert clean_publication_title("Smith &amp; Jones") == "Smith &amp; Jones"
+
+    def test_preserves_plain_text(self):
+        assert clean_publication_title("Plain title without entities") == (
+            "Plain title without entities"
+        )
+
+    def test_preserves_already_decoded_html(self):
+        """Un titre avec balises HTML déjà propres est laissé tel quel."""
+        assert clean_publication_title("<i>Candida</i> species") == ("<i>Candida</i> species")
+
+    def test_idempotent(self):
+        """Appliquer deux fois ne change rien (sécurité re-traitement)."""
+        once = clean_publication_title("&amp;lt;i&amp;gt;Candida&amp;lt;/i&amp;gt;")
+        twice = clean_publication_title(once)
+        assert once == twice == "<i>Candida</i>"
+
+    def test_returns_none_for_none(self):
+        assert clean_publication_title(None) is None
+
+    def test_returns_empty_for_empty(self):
+        assert clean_publication_title("") == ""
