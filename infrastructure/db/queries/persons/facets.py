@@ -1,6 +1,5 @@
 """Facettes dynamiques + listes de référence (départements, rôles, stats) — async."""
 
-from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import text
@@ -14,22 +13,10 @@ from infrastructure.db.queries.filters import (
     person_linked_clause,
 )
 
-
-@dataclass(frozen=True, slots=True)
-class FacetFilters:
-    departments: list[str] = field(default_factory=list)
-    roles: list[str] = field(default_factory=list)
-    has_orcid: str = ""
-    has_idhal: str = ""
-    has_idref: str = ""
-    has_rh: str = ""
-    linked: str = ""
-
-
 _BASE_FROM = "persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id"
 
 
-async def persons_facets(conn: AsyncConnection, *, filters: FacetFilters) -> dict[str, Any]:
+async def persons_facets(conn: AsyncConnection, *, filters: Any) -> dict[str, Any]:
     """Facettes dynamiques (chaque facette exclut son propre filtre)."""
 
     def base_clauses(*, skip: str) -> list[WhereClause | None]:
