@@ -2,10 +2,11 @@
 
 Lookups par clé pour l'application (extraction, OA email, etc.) restent
 dans `infrastructure/app_config.py` ; ce module héberge les queries
-servies par le router admin (listing complet pour édition) ainsi que
-l'adapter du port `application.ports.config.AsyncConfigStore`.
+servies par le router admin (listing complet, dérivation HAL) ainsi
+que l'adapter du port `application.ports.config.AsyncConfigStore`.
 """
 
+import logging
 from typing import Any
 
 from sqlalchemy import func, select, text, update
@@ -13,15 +14,73 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from infrastructure.db.tables import config
 
+logger = logging.getLogger(__name__)
 
-async def list_config_async(conn: AsyncConnection) -> list[dict[str, Any]]:
-    """Tous les paramètres applicatifs triés par clé."""
-    result = await conn.execute(
-        select(config.c.key, config.c.value, config.c.description, config.c.updated_at).order_by(
-            config.c.key
+
+class PgAsyncConfigQueries:
+    """Adapter SA pour `application.ports.config_queries.AsyncConfigQueries`."""
+
+    def __init__(self, conn: AsyncConnection) -> None:
+        self._conn = conn
+
+    async def list_config(self) -> list[dict[str, Any]]:
+        """Tous les paramètres applicatifs triés par clé."""
+        result = await self._conn.execute(
+            select(
+                config.c.key, config.c.value, config.c.description, config.c.updated_at
+            ).order_by(config.c.key)
         )
-    )
-    return [dict(r._mapping) for r in result]
+        return [dict(r._mapping) for r in result]
+
+    async def get_hal_collections(self) -> dict[str, str]:
+        """Collections HAL {code: label} dérivées des structures du périmètre.
+
+        Lit `config.perimeter_extraction` (défaut "uca_wide"), résout les
+        structures du périmètre, retourne leurs `hal_collection`. Fallback
+        sur la clé `hal_collections` de la table config si aucune dérivation
+        possible.
+        """
+        from infrastructure.perimeter import async_get_perimeter_structure_ids
+
+        try:
+            perim_row = (
+                await self._conn.execute(
+                    text("SELECT value #>> '{}' AS code FROM config WHERE key = :key"),
+                    {"key": "perimeter_extraction"},
+                )
+            ).one_or_none()
+            perim_code = perim_row.code if perim_row else None
+            perim_code = perim_code or "uca_wide"
+
+            perimeter_ids = await async_get_perimeter_structure_ids(self._conn, perim_code)
+            if perimeter_ids:
+                rows = (
+                    await self._conn.execute(
+                        text("""
+                            SELECT hal_collection, COALESCE(acronym, name) AS label
+                            FROM structures
+                            WHERE id = ANY(:ids)
+                              AND hal_collection IS NOT NULL
+                              AND hal_collection != ''
+                        """),
+                        {"ids": list(perimeter_ids)},
+                    )
+                ).all()
+                if rows:
+                    return {r.hal_collection: r.label for r in rows}
+        except Exception as e:
+            logger.warning(f"Impossible de dériver les collections HAL depuis le périmètre : {e}")
+
+        # Fallback : config.hal_collections (manuel)
+        fallback_row = (
+            await self._conn.execute(
+                text("SELECT value FROM config WHERE key = :key"),
+                {"key": "hal_collections"},
+            )
+        ).one_or_none()
+        if fallback_row and isinstance(fallback_row.value, dict):
+            return fallback_row.value
+        return {}
 
 
 class PgAsyncConfig:

@@ -104,7 +104,7 @@ pattern progressivement :
 - [x] `admin_person_duplicates.py` *(commit `af657f9`)*
 - [x] `admin_duplicates.py` *(commit `536122b`)*
 - [x] `hal_problems.py` *(commit en cours)*
-- [ ] `config.py`
+- [x] `config.py` *(commit en cours)*
 - [ ] `perimeters.py`
 - [ ] `structures.py`
 - [ ] `stats.py`
@@ -130,7 +130,7 @@ Certains routers utilisent des query modules qui n'ont pas de port.
 - [ ] `stats` query service (publishers, journals, labs, summary, facets)
 - [ ] `publications` query service (list, facets, detail, all_years)
 - [ ] `persons` query service (list, facets, directory, detail, admin)
-- [ ] `config` query service (`list_config_async`)
+- [x] `config` query service *(commit en cours, inclut `get_hal_collections` migré depuis app_config.py)*
 
 Chaque port = `Protocol` dans `application/ports/`. Implémentation =
 classe wrapper dans `infrastructure/db/queries/` qui délègue aux
