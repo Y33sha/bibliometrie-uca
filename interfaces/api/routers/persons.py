@@ -190,29 +190,29 @@ async def persons_facets(
         has_rh=has_rh,
         linked=linked,
     )
-    async with get_async_cursor() as (cur, _conn):
-        return await persons_queries.persons_facets(cur, filters=filters)
+    async with get_sa_connection() as conn:
+        return await persons_queries.persons_facets(conn, filters=filters)
 
 
 @router.get("/api/persons/departments", response_model=list[DepartmentCount])
 async def list_departments() -> Any:
     """Liste des départements distincts."""
-    async with get_async_cursor() as (cur, _conn):
-        return await persons_queries.list_departments(cur)
+    async with get_sa_connection() as conn:
+        return await persons_queries.list_departments(conn)
 
 
 @router.get("/api/persons/roles", response_model=list[RoleCount])
 async def list_roles() -> Any:
     """Liste des rôles distincts."""
-    async with get_async_cursor() as (cur, _conn):
-        return await persons_queries.list_roles(cur)
+    async with get_sa_connection() as conn:
+        return await persons_queries.list_roles(conn)
 
 
 @router.get("/api/persons/stats", response_model=PersonsStatsResponse)
 async def persons_stats() -> Any:
     """Statistiques sur les personnes et l'alignement."""
-    async with get_async_cursor() as (cur, _conn):
-        return await persons_queries.persons_stats(cur)
+    async with get_sa_connection() as conn:
+        return await persons_queries.persons_stats(conn)
 
 
 @router.get("/api/persons/{person_id}", response_model=PersonDetail)
