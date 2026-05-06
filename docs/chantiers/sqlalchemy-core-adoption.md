@@ -244,13 +244,18 @@ qui justifierait une session.
 Ce sont les queries qui justifient le chantier (le gain est
 maximal là).
 
-- [ ] **Sous-phase 1.0 (préalable) — Audit en cohabitation** :
-  ajouter `audit_log` à `tables.py`, adapter `async_emit_event`
-  pour accepter une union `AsyncCursor | AsyncConnection` SA et
-  dispatcher en interne. Aucun call site touché — chaque module
-  bascule individuellement vers la branche SA quand il est migré.
-  Évite toute fenêtre d'indisponibilité des opérations
-  destructives.
+- [x] **Sous-phase 1.0 (préalable) — Audit en cohabitation** :
+  `audit_log` ajouté à `tables.py`, `async_emit_event` accepte
+  union `AsyncCursor | AsyncConnection` SA, dispatch interne via
+  `text(...)` côté SA (pas d'import MetaData depuis application/,
+  contrainte DDD). Aucun call site touché — chaque module bascule
+  individuellement vers la branche SA quand il est migré. Aucune
+  fenêtre d'indisponibilité côté API admin.
+  - Test d'intégration `TestAsyncEmitEventViaSAConnection` couvre
+    la branche SA (3 cas).
+  - Note : passage à un `AuditRepository` propre (`application/`
+    via port + adapter `infrastructure/`) reste prévu en Phase 3
+    du chantier audit-cto.
 - [ ] Module pilote `config` : adapter `PgAsyncConfig` et le
   router pour utiliser AsyncEngine SA (option B). Bascule de
   `delete_perimeter` vers la branche SA de `async_emit_event`.
