@@ -12,10 +12,11 @@ Chaque opération propage automatiquement l'UCA via
 `propagate_uca_for_addresses` (recalcul `in_perimeter` sur
 `source_authorships`).
 
-Le SQL vit dans `infrastructure/repositories/address_repository.py`.
+Module migré en SQLAlchemy Core (sous-phase 2.4 du chantier
+sqlalchemy-core-adoption).
 """
 
-from typing import Any
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from application.authorships import propagate_uca_for_addresses
 from application.ports.perimeter import AsyncPerimeterQueries
@@ -24,7 +25,7 @@ from domain.ports.authorship_repository import AsyncAuthorshipRepository
 
 
 async def review_structure_link(
-    cur: Any,
+    conn: AsyncConnection,
     address_id: int,
     structure_id: int,
     is_confirmed: bool | None,
@@ -56,12 +57,12 @@ async def review_structure_link(
 
     if before != after:
         await propagate_uca_for_addresses(
-            cur, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
+            conn, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
         )
 
 
 async def batch_review_structure_link(
-    cur: Any,
+    conn: AsyncConnection,
     address_ids: list[int],
     structure_id: int,
     is_confirmed: bool | None,
@@ -94,13 +95,13 @@ async def batch_review_structure_link(
     changed = list(before ^ after)
     if changed:
         await propagate_uca_for_addresses(
-            cur, changed, repo=authorship_repo, perimeter_queries=perimeter_queries
+            conn, changed, repo=authorship_repo, perimeter_queries=perimeter_queries
         )
     return updated
 
 
 async def unassign_manual_structure(
-    cur: Any,
+    conn: AsyncConnection,
     address_id: int,
     structure_id: int,
     *,
@@ -122,6 +123,6 @@ async def unassign_manual_structure(
 
     if before != after:
         await propagate_uca_for_addresses(
-            cur, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
+            conn, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
         )
     return deleted

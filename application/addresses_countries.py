@@ -8,11 +8,13 @@ des liens adresse↔structure vit dans
 `application/addresses_structures.py`. Les deux surfaces partagent
 l'agrégat Address mais n'interagissent pas entre elles.
 
-Le SQL vit dans `infrastructure/repositories/address_repository.py`.
+Module migré en SQLAlchemy Core (sous-phase 2.4 du chantier
+sqlalchemy-core-adoption) : reçoit une `AsyncConnection` SA.
 """
 
 import logging
-from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from domain.ports.address_repository import AsyncAddressRepository
 
@@ -20,7 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 async def set_country(
-    cur: Any, address_id: int, countries: list[str] | None, *, repo: AsyncAddressRepository
+    conn: AsyncConnection,
+    address_id: int,
+    countries: list[str] | None,
+    *,
+    repo: AsyncAddressRepository,
 ) -> list[int]:
     """Attribue une liste de pays à une adresse.
 
@@ -38,7 +44,11 @@ async def set_country(
 
 
 async def batch_set_country_by_ids(
-    cur: Any, country_code: str, address_ids: list[int], *, repo: AsyncAddressRepository
+    conn: AsyncConnection,
+    country_code: str,
+    address_ids: list[int],
+    *,
+    repo: AsyncAddressRepository,
 ) -> list[int]:
     """Ajoute `country_code` à `addresses.countries` pour la liste d'IDs donnée.
 
@@ -52,7 +62,7 @@ async def batch_set_country_by_ids(
 
 
 async def batch_set_country_by_filter(
-    cur: Any,
+    conn: AsyncConnection,
     country_code: str,
     *,
     search: str | None = None,
@@ -92,7 +102,9 @@ async def batch_set_country_by_filter(
     )
 
 
-async def propagate_countries_to_similar(cur: Any, *, repo: AsyncAddressRepository) -> list[int]:
+async def propagate_countries_to_similar(
+    conn: AsyncConnection, *, repo: AsyncAddressRepository
+) -> list[int]:
     """Propage addresses.countries vers toutes les adresses partageant le même
     normalized_text, quand l'autre adresse a des countries différents.
 
@@ -103,7 +115,7 @@ async def propagate_countries_to_similar(cur: Any, *, repo: AsyncAddressReposito
 
 
 async def propagate_countries_to_publications(
-    cur: Any, address_ids: list[int], *, repo: AsyncAddressRepository
+    conn: AsyncConnection, address_ids: list[int], *, repo: AsyncAddressRepository
 ) -> None:
     """Propage addresses.countries → source_publications.countries → publications.countries.
 
