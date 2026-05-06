@@ -123,16 +123,32 @@ def _insert_oa_authorship(
     in_perimeter=True,
     person_id=None,
     raw_author_name=None,
+    identifiers=None,
 ):
-    """Crée une source_authorship OpenAlex."""
+    """Crée une source_authorship OpenAlex.
+
+    Pour OpenAlex/WoS/CrossRef, les identifiants (orcid, idref, ...) vivent
+    sur `source_authorships.identifiers` (JSONB), pas sur `source_persons`
+    — le pipeline de dédup-personnes lit `sa.identifiers->>'orcid'`.
+    """
+    import json
+
     db.execute(
         """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
-             in_perimeter, person_id, raw_author_name)
-        VALUES ('openalex', %s, %s, %s, %s, %s, %s) RETURNING id
+             in_perimeter, person_id, raw_author_name, identifiers)
+        VALUES ('openalex', %s, %s, %s, %s, %s, %s, %s) RETURNING id
     """,
-        (oa_document_id, oa_author_id, position, in_perimeter, person_id, raw_author_name),
+        (
+            oa_document_id,
+            oa_author_id,
+            position,
+            in_perimeter,
+            person_id,
+            raw_author_name,
+            json.dumps(identifiers) if identifiers else None,
+        ),
     )
     return db.fetchone()["id"]
 
@@ -329,10 +345,19 @@ class TestStep1CrossSource:
         hd = _insert_hal_document(db, "hal-id-test", pub)
         _insert_hal_authorship(db, hd, ha, position=0, person_id=person_id)
 
-        # OA authorship avec ORCID, même publi, même position
-        oa_author = _insert_oa_author(db, "J Dupont", "A-id1", orcid="0000-0001-9999-8888")
+        # OA authorship avec ORCID porté par identifiers (cf. chantier
+        # source_persons : pour OA/WoS/CrossRef, l'ORCID vit sur
+        # source_authorships.identifiers, pas sur source_persons).
+        oa_author = _insert_oa_author(db, "J Dupont", "A-id1")
         oa_doc = _insert_oa_document(db, "W-id1", pub)
-        _insert_oa_authorship(db, oa_doc, oa_author, position=0, raw_author_name="J Dupont")
+        _insert_oa_authorship(
+            db,
+            oa_doc,
+            oa_author,
+            position=0,
+            raw_author_name="J Dupont",
+            identifiers={"orcid": "0000-0001-9999-8888"},
+        )
 
         all_as = get_all_unlinked_authorships(db, _queries)
         linked_ids = set()
@@ -408,7 +433,7 @@ class TestStep2Orcid:
             repo=person_repository(db),
         )
 
-        oa_author = _insert_oa_author(db, "J Dupont", "A333", orcid="0000-0001-2345-6789")
+        oa_author = _insert_oa_author(db, "J Dupont", "A333")
         oa_doc = _insert_oa_document(db, "W333", pub)
         oa_as = _insert_oa_authorship(
             db,
@@ -416,6 +441,7 @@ class TestStep2Orcid:
             oa_author,
             position=0,
             raw_author_name="J Dupont",
+            identifiers={"orcid": "0000-0001-2345-6789"},
         )
 
         all_as = get_all_unlinked_authorships(db, _queries)
