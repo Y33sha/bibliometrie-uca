@@ -38,9 +38,10 @@ Extraction SQL pipeline → `infrastructure/db/queries/` faite.
 Orchestrateurs `application/pipeline/*` dépendent de ports
 (`application/ports/*`) ; adapters PostgreSQL injectés via les
 composition roots (`interfaces/cli/pipeline/*`, `run_pipeline.py`).
-- [ ] Reste côté API : factories FastAPI `Depends` pour injecter les
-  query services dans les routers (équivalent unit-of-work). Mécanique
-  si la couverture de tests devient un objectif.
+Côté API : factories FastAPI `Depends` câblent query services et
+repos dans tous les routers (chantier `docs/chantiers/routers-di.md`,
+terminé). Le contract `import-linter` "Routers : pas d'import direct
+de infrastructure" verrouille la règle.
 
 
 ## Chantier qualité du code : maintenabilité, auditabilité, scalabilité

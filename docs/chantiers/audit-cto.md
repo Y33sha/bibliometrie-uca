@@ -285,8 +285,13 @@ chacun mérite son fichier dans `docs/chantiers/`.
 - [ ] **Refonte pipeline** selon décision Phase 1 (subprocess vs
   imports)
 - [ ] **Convergence sync/async** selon décision Phase 1
-- [ ] **§1.6 ROADMAP — DI complète FastAPI** si décision = router ⊥
-  infrastructure
+- [x] **§1.6 ROADMAP — DI complète FastAPI** : chantier
+  [`routers-di.md`](routers-di.md) bouclé. Tous les routers admin
+  reçoivent leurs dépendances via `Depends(...)` (factories dans
+  `interfaces.api.async_deps`). Contract `import-linter` "Routers :
+  pas d'import direct de infrastructure" verrouille la règle 4 côté
+  API. Exceptions documentées : `auth` (settings), `admin_pipeline`
+  (status filesystem), `docs` (PROJECT_ROOT) — pas de query/repo.
 - [ ] **Migration SQLAlchemy Core** si décision = adoption
 
 ### Phase 3 — Dette technique en continu

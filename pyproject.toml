@@ -67,6 +67,31 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 # `application` n'importe pas `infrastructure` : toute nouvelle
 # dépendance doit passer par un port.
 
+[[tool.importlinter.contracts]]
+name = "Routers : pas d'import direct de infrastructure"
+type = "forbidden"
+source_modules = ["interfaces.api.routers"]
+forbidden_modules = ["infrastructure"]
+# Les routers FastAPI pilotent des use-cases applicatifs et reçoivent
+# leurs dépendances via `Depends(...)` (factories dans
+# `interfaces.api.async_deps`, composition root). La construction des
+# adapters et l'accès direct à l'infra (queries, repos, pool, engine)
+# y sont interdits. Cf. règle 4 de docs/architecture.md et chantier
+# docs/chantiers/routers-di.md.
+#
+# Imports transitifs autorisés : `routers → async_deps → infrastructure`
+# est le chemin attendu (composition root), donc on n'interdit que les
+# imports directs.
+allow_indirect_imports = "true"
+ignore_imports = [
+    # Hors périmètre du chantier routers-di : settings statique,
+    # status filesystem, chemin projet. Ces 3 cas ne sont pas des
+    # queries / repos et ne dépendent pas d'une connexion DB.
+    "interfaces.api.routers.auth -> infrastructure.settings",
+    "interfaces.api.routers.admin_pipeline -> infrastructure.pipeline_status",
+    "interfaces.api.routers.docs -> infrastructure",
+]
+
 [tool.deptry.per_rule_ignores]
 # python-dotenv n'est pas importé directement, mais pydantic-settings
 # l'appelle en interne dès qu'on utilise `env_file=...`.
