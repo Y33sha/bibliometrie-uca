@@ -99,9 +99,50 @@ Contenu :
 - **Ports repositories** (`domain/ports/*`) : interfaces Protocol pour
   `PersonRepository`, `PublicationRepository`, `JournalRepository`,
   `StructureRepository`, `AuthorshipRepository`, `AddressRepository`,
-  `ConfigRepository`
+  `ConfigRepository`, `PublisherRepository`
 
 Le domaine est testé en unit sans DB.
+
+#### Règle de placement des ports : `domain/ports/` vs `application/ports/`
+
+Un port va dans **`domain/ports/`** ssi les **trois critères** sont
+remplis simultanément :
+
+1. **Le port représente la persistance d'un agrégat du domaine**
+   (entité racine identifiable au cœur du modèle métier : `Person`,
+   `Publication`, `Structure`, `Authorship`, `Journal`, `Publisher`,
+   `Address`, `Perimeter`).
+2. **La signature ne référence que des types `domain/`, stdlib, ou
+   primitives Python** (`int`, `str`, `dict`, `list`, etc.). Aucun
+   type d'`infrastructure/`, aucun `cur: Cursor`, aucun fragment SQL.
+3. **Les méthodes sont nommées en termes métier** (`find_by_doi`,
+   `create`, `merge_into`), pas en termes techniques (`execute_query`,
+   `fetch_batch`, `count_table`).
+
+Sinon, le port va dans **`application/ports/`** : c'est un query
+service ou un wrapper d'opération orchestrationnelle, propre à un
+workflow applicatif (phase pipeline, etc.) plutôt qu'à un agrégat.
+Les ports `application/` peuvent légitimement avoir `cur: Any` dans
+leurs signatures — c'est un signal qu'on est dans l'orchestration
+technique, pas dans le langage du domaine.
+
+**Le critère est conceptuel, pas mécanique** (« est-ce que ce port
+parle du domaine ? »), pas (« est-ce que ce port est utilisé par
+`domain/` ? ») : ce dernier critère, appliqué strictement, viderait
+`domain/ports/` puisque le domaine ne fait pas d'I/O et n'utilise donc
+jamais directement un port. C'est `application/` qui consomme les
+ports `domain/` dans les use cases.
+
+**Exceptions assumées** :
+- `address_repository` expose des méthodes de propagation
+  cross-aggregate (ex. `refresh_publications_countries_for_addresses`)
+  qui touchent `publications.countries`. Pattern accepté en DDD quand
+  les agrégats sont étroitement liés et que la propagation fait
+  partie de la cohérence métier.
+- `config_repository` couvre à la fois la table `config` (qui n'est
+  pas un agrégat — clé/valeur applicative) et l'agrégat `Perimeter`.
+  Mélange pragmatique assumé : ces deux concepts sont manipulés
+  ensemble par les routers admin (`/api/config`).
 
 ### `application/` — services et orchestrateurs
 
