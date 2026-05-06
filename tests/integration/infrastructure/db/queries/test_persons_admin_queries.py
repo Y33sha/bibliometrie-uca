@@ -3,7 +3,6 @@
 import json
 
 from infrastructure.db.queries.persons.admin import (
-    hal_duplicate_accounts,
     list_orphan_authorships,
     name_form_authorships,
     name_form_remaining_authorships,
@@ -204,24 +203,6 @@ class TestNameFormRemainingAuthorships:
         assert await name_form_remaining_authorships(async_db, pid, "autre") == 0
 
 
-class TestHalDuplicateAccounts:
-    async def test_detects_person_with_two_hal_accounts(self, async_db):
-        pid = await _create_person(async_db)
-        await _create_sp(
-            async_db, source_id="hal-1", person_id=pid, hal_person_id=42, full_name="A"
-        )
-        await _create_sp(
-            async_db, source_id="hal-2", person_id=pid, hal_person_id=43, full_name="B"
-        )
-
-        res = await hal_duplicate_accounts(async_db, page=1, per_page=50)
-        assert res["total"] >= 1
-        ours = next((p for p in res["persons"] if p["person_id"] == pid), None)
-        assert ours is not None
-        assert len(ours["hal_accounts"]) == 2
-
-    async def test_ignores_single_account(self, async_db):
-        pid = await _create_person(async_db)
-        await _create_sp(async_db, source_id="hal-1", person_id=pid, hal_person_id=42)
-        res = await hal_duplicate_accounts(async_db, page=1, per_page=50)
-        assert not any(p["person_id"] == pid for p in res["persons"])
+# Tests pour `hal_duplicate_accounts` déplacés vers
+# `tests/integration/infrastructure/db/queries/test_hal_problems.py` —
+# la query est maintenant exposée par PgAsyncHalProblemsQueries.
