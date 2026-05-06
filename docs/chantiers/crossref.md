@@ -79,7 +79,7 @@ Découpage proposé (chaque phase = chantier autonome mergeable indépendamment)
 - [x] Mesurer la couverture réelle ORCID par tranche d'année
 - [x] Mesurer la couverture des relations (preprint, etc.)
 - [x] Valider le format JSON et identifier les champs réellement exploitables
-- [x] **Livrable** : `docs/chantiers/crossref-spike.md` + script `interfaces/cli/crossref_spike.py`
+- [x] **Livrable** : `docs/chantiers/crossref-spike.md` + script `interfaces/cli/crossref_spike.py` (script supprimé après le spike, le rapport reste).
 
 ### Phase 1 — Extracteur + normalizer DOI-driven
 - [x] Migration SQL : ajout de `'crossref'` à l'enum `source_type` (migration 009)

@@ -38,6 +38,7 @@ from application.publications import (
 from application.publications import find_or_create as find_or_create_publication
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
+from domain.person import normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
@@ -379,12 +380,8 @@ def insert_openalex_document(
 
 
 def _extract_openalex_orcid(authorship: dict) -> str | None:
-    """Extrait l'ORCID 16-chars de l'auteur OA (ou None)."""
-    orcid = (authorship.get("author") or {}).get("orcid")
-    if not isinstance(orcid, str):
-        return None
-    cleaned = orcid.replace("https://orcid.org/", "").strip()
-    return cleaned or None
+    """Extrait l'ORCID canonique de l'auteur OA (ou None)."""
+    return normalize_orcid((authorship.get("author") or {}).get("orcid"))
 
 
 # =============================================================

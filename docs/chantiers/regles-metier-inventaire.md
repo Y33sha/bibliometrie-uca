@@ -136,41 +136,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_hal.py`
 
-### ✅ _map_hal_doc_type
-- **localisation** : `application/pipeline/normalize/normalize_hal.py:110-121`
-- **description** : Mapping HAL : essaie d'abord la combinaison
-  `TYPE_SOUS-TYPE` (ex. `art_artrev` → `review`), puis le type seul.
-- **classification** : (a).
-- **destination domain/** : ~~`domain/doc_types.py`~~ → placement
-  source-spécifique pour cohérence (la cascade type/sous-type est
-  HAL-only) :
-  [`domain/sources/hal.py::derive_hal_doc_type`](domain/sources/hal.py)
-  qui prend `(doc_type, sub_type)` bruts et applique la cascade.
-  La table de mapping HAL (clés combinées + clés simples) reste dans
-  `domain/doc_types._SOURCE_MAPS["hal"]`.
-
-### ✅ oa_status HAL — règle binaire
-- **localisation** : `application/pipeline/normalize/normalize_hal.py:138`
-- **description** : ancienne règle `"green" if doc.get("openAccess_bool") else "closed"`,
-  sémantiquement fausse — `openAccess_bool=true` couvre 4 cas distincts en
-  HAL (dépôt local, lien arxiv, lien PMC, lien éditeur, plateforme istex)
-  qui n'ont pas tous le même statut OA réel.
-- **classification** : (a) (initialement marquée binaire, finalement règle
-  composée à 3 inputs après examen des données HAL).
-- **destination domain/** :
-  [`domain/sources/hal.py::derive_hal_oa_status`](domain/sources/hal.py)
-  qui consomme `(open_access_bool, file_main, link_ext_id)` :
-  - file_main présent OU link_ext_id ∈ {arxiv, pubmedcentral} → `green`
-  - link_ext_id == 'openaccess' (lien DOI éditeur) → `hybrid` (défaut
-    conservatif symétrique à ScanR ; promu à gold par best_oa_status si
-    OpenAlex confirme journal full-OA)
-  - open_access=False → `closed`
-  - open_access=True + istex / aucun signal → `None` (délégation)
-  - open_access=None → `None`
-
-  Ajout de `fileMain_s` et `linkExtId_s` à
-  [`infrastructure/hal.HAL_FIELDS`](infrastructure/hal.py).
-
 ### parse_tei_author_identifiers — règle idHAL string vs numeric
 - **localisation** : `application/pipeline/normalize/normalize_hal.py:285-334` (cœur l. 324-332)
 - **description** : Le TEI HAL produit deux `<idno type="idhal">` par
@@ -240,18 +205,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_openalex.py`
 
-### ✅ OA_MAP — mapping OA OpenAlex → enum canonique
-- **localisation** : `application/pipeline/normalize/normalize_openalex.py:58-65, :279`
-- **description** : Mapping identitaire (gold→gold…) avec fallback
-  `closed` puis `unknown`. Sémantiquement faux sur le défaut `closed`
-  quand OpenAlex ne s'est pas prononcé (cf. correction ScanR/HAL).
-- **classification** : (a).
-- **destination domain/** : ~~`domain/publications/oa.py`~~ → placement
-  source-spécifique pour cohérence avec HAL/ScanR :
-  [`domain/sources/openalex.py::map_openalex_oa_status`](domain/sources/openalex.py).
-  Mapping identitaire pour les statuts connus, `None` pour valeur
-  vide/absente (vs `"closed"` avant), `"unknown"` pour catch-all.
-
 ### extract_locations_data — extraction d'identifiants depuis URLs
 - **localisation** : `application/pipeline/normalize/normalize_openalex.py:73-114`
 - **description** : « Premier non-null parmi les URLs de locations,
@@ -261,62 +214,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
   parsing.
 - **destination domain/** : `domain/publications/external_ids.py` →
   `extract_external_ids_from_urls(urls: list[str]) -> dict[str, str]`.
-
-### ✅ is_hal_primary_location
-- **localisation** : `application/pipeline/normalize/normalize_openalex.py:159-172`
-- **description** : Détecte si la primary_location pointe vers HAL.
-  Trois signaux : URL contient préfixe HAL, source.type=repository +
-  display_name contient "hal", source.homepage_url contient "hal".
-- **classification** : (a).
-- **destination domain/** :
-  [`domain/sources/openalex.is_hal_location(loc)`](domain/sources/openalex.py).
-  Renommé pour signaler qu'il opère sur une `OpenalexLocation` (primary
-  ou pas) et non sur le work directement.
-
-### ✅ is_repository_source
-- **localisation** : `application/pipeline/normalize/normalize_openalex.py:185-189`
-- **description** : `primary_location.source.type == "repository"`.
-  Utilisé pour décider de **ne pas** créer journal/publisher.
-- **classification** : (a).
-- **destination domain/** :
-  [`domain/sources/openalex.is_repository_location(loc)`](domain/sources/openalex.py).
-  Renommé pour cohérence (opère sur une `OpenalexLocation`).
-
-### ✅ extract_pub_metadata — overrides doc_type theses.fr / dumas
-- **localisation** : `application/pipeline/normalize/normalize_openalex.py:266-276`
-- **description** : Cascade :
-  1. `is_theses_fr_source(work)` → `doc_type = "thesis"` + NNT extrait
-  2. Sinon `raw_type == "dissertation"` + URL `dumas.` → `doc_type = "memoir"`
-
-  La source canonique prime sur la nomenclature OpenAlex. **Cas
-  motivant ce chantier**.
-- **classification** : (a).
-- **destination domain/** : ~~`domain/doc_types.py` →
-  `override_doc_type_from_signals(...)`~~ → placement source-spécifique
-  pour cohérence :
-  [`domain/sources/openalex.py::correct_openalex_doc_type`](domain/sources/openalex.py)
-  qui prend `(raw_type, *, is_theses_fr, landing_page_url)` et renvoie
-  directement la valeur **canonique** (intègre `map_doc_type(raw, "openalex")`
-  pour les cas hors-override).
-
-  Effet de bord propre : la ligne
-  `meta["doc_type"] = map_doc_type(meta["doc_type"], "openalex")`
-  dans `find_publication` ([l. 304](application/pipeline/normalize/normalize_openalex.py#L304))
-  devient inutile et est supprimée. Une seule décision, une seule
-  conversion canonique.
-
-  À étendre dans un commit ultérieur du chantier (suppléments
-  figshare/Zenodo) : ajouter signaux DOI/title.
-
-### ✅ Décision « ne pas chercher publisher/journal pour HAL/theses/repo »
-- **localisation** : `application/pipeline/normalize/normalize_openalex.py:595-600`
-- **description** : Quand primary_location est HAL/theses.fr/repository,
-  pas de publisher ni journal. Ces locations ne sont pas des éditeurs.
-- **classification** : (a).
-- **destination domain/** :
-  [`domain/sources/openalex.should_skip_publisher_journal(loc)`](domain/sources/openalex.py).
-  Composition logique des trois prédicats `is_hal_location`,
-  `is_theses_fr_location`, `is_repository_location` sur la primary.
 
 ### find_publication — cascade priorisée HAL > NNT > openalex_id > title
 - **localisation** : `application/pipeline/normalize/normalize_openalex.py:604-618`
@@ -341,36 +238,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 ---
 
 ## `application/pipeline/normalize/normalize_wos.py`
-
-### ✅ map_doc_type (shim)
-- **localisation** : `application/pipeline/normalize/normalize_wos.py:53-61`
-- **description** : Shim sur `domain.doc_types.map_doc_type` qui forçait
-  la source à `'wos'`.
-- **classification** : (a).
-- **destination domain/** : supprimé. Appel direct à
-  [`domain.doc_types.map_doc_type(raw, "wos")`](domain/doc_types.py).
-
-### ✅ map_oa_status — extraction multi-valeurs WoS
-- **localisation** : `application/pipeline/normalize/normalize_wos.py:64-80`
-- **description** : Parsing du champ OA TSV WoS (multi-valeurs concaténées).
-  Code mort — l'extracteur WoS n'utilise plus que le format API.
-- **classification** : (a) ; legacy à supprimer plutôt qu'à migrer.
-- **destination domain/** : ~~`domain/publications/oa.py` →
-  `parse_wos_oa_status`~~ → fonction et tests **supprimés** (TSV ne
-  sera plus jamais réimporté).
-
-### ✅ extract_from_api — règle « gold si journal_oas_gold == 'Y' »
-- **localisation** : `application/pipeline/normalize/normalize_wos.py:274-277`
-- **description** : Pour le format API WoS, seul signal OA disponible :
-  `pub_info.journal_oas_gold`. Si == "Y" → gold, sinon unknown.
-- **classification** : (a).
-- **destination domain/** : ~~`domain/publications/oa.py`~~ → placement
-  source-spécifique pour cohérence :
-  [`domain/sources/wos.py::derive_wos_api_oa_status`](domain/sources/wos.py).
-  Renvoie `'gold'` si `'Y'`, `None` sinon (vs `'unknown'` avant —
-  WoS ne connaît pas vraiment la voie OA, on délègue plutôt qu'asserter).
-  TODO : règle vouée à disparaître quand le chantier `journals` comme
-  source complémentaire arrivera (signal OA WoS trop pauvre).
 
 ### authors_kept — filtre daisng_id
 - **localisation** : `application/pipeline/normalize/normalize_wos.py:573-577`
@@ -402,21 +269,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **classification** : (a).
 - **destination domain/** : `domain/sources/scanr_signals.py` →
   `select_leaf_affiliations(affiliations) -> list[dict]`.
-
-### ✅ oa_status — green si isOa
-- **localisation** : `application/pipeline/normalize/normalize_scanr.py:114`
-- **description** : ancienne règle `"green" if doc.get("isOa") else "closed"`
-  qui était sémantiquement fausse (`isOa=True` ne signifie pas `green` —
-  ScanR détecte aussi gold/hybrid/bronze chez l'éditeur, et `isOa=None`
-  était mappé sur `"closed"` à tort).
-- **classification** : (a) (initialement marquée comme dupliquée HAL,
-  finalement règle propre à ScanR avec sémantique distincte).
-- **destination domain/** :
-  [`domain/sources/scanr.py::derive_scanr_oa_status`](domain/sources/scanr.py)
-  qui consomme `(is_oa, oa_evidence)` et renvoie l'enum ou `None`
-  selon `oaEvidence.hostType` + `oaEvidence.license` (cf. docstring).
-  Approximation `hybrid` documentée pour publisher+CC-* ; chantier
-  ultérieur prévu pour distinguer gold/hybrid via `journals.oa_model`.
 
 ### _extract_nnt_from_scanr_id
 - **localisation** : `application/pipeline/normalize/normalize_scanr.py:103-106`
@@ -454,24 +306,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 ---
 
 ## `application/pipeline/normalize/normalize_theses.py`
-
-### ✅ extract_pub_metadata — règle thesis vs ongoing_thesis
-- **localisation** : `application/pipeline/normalize/normalize_theses.py:88`
-- **description** : `"thesis" if dateSoutenance else "ongoing_thesis"`.
-  **Dupliquée l. 247**.
-- **classification** : (a), dupliquée.
-- **destination domain/** : ~~`domain/doc_types.py`~~ → placement
-  source-spécifique cohérent :
-  [`domain/sources/theses.py::derive_theses_doc_type`](domain/sources/theses.py).
-  Une seule fonction couvre les 2 call sites.
-
-### ✅ insert_source_document — duplication thesis vs ongoing_thesis
-- **localisation** : `application/pipeline/normalize/normalize_theses.py:247`
-- **description** : Même règle, dupliquée verbatim.
-- **classification** : (a), dupliquée.
-- **destination domain/** :
-  [`domain/sources/theses.py::derive_theses_doc_type`](domain/sources/theses.py)
-  (même fonction que la règle précédente — duplication éliminée).
 
 ### pub_year — fallback dateSoutenance > datePremiereInscription
 - **localisation** : `application/pipeline/normalize/normalize_theses.py:90-102` (+ dupliqué `:249-261`)
@@ -577,15 +411,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/sources/crossref_signals.py` →
   `extract_crossref_meta(msg) -> dict | None`.
 
-### _normalize_orcid Crossref
-- **localisation** : `application/pipeline/normalize/normalize_crossref.py:269-274`
-- **description** : Strip URL Crossref `https://orcid.org/...` → ORCID
-  16 chars. **Dupliqué 3×** : HAL TEI (l. 316-321), OpenAlex
-  (l. 422-424), Crossref (l. 269-274).
-- **classification** : (a), dupliquée.
-- **destination domain/** : `domain/persons/identifiers.py` →
-  `normalize_orcid(raw) -> str | None`.
-
 ### authenticated-orcid : « stocker mais ne pas l'utiliser comme filtre »
 - **localisation** : `application/pipeline/normalize/normalize_crossref.py:331-332`
 - **description** : Malgré le nom, ce flag CrossRef est non fiable (les
@@ -602,37 +427,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **classification** : (c) — supplantée par le fait qu'on n'écrit plus
   `source_persons` Crossref.
 - **destination domain/** : n/a.
-
----
-
-## ~~`application/pipeline/normalize/openalex_parsing.py`~~ (fichier supprimé)
-
-### ✅ is_theses_fr_source
-- **localisation** : `application/pipeline/normalize/openalex_parsing.py:13-23`
-- **description** : Détection theses.fr via `display_name` ou
-  `landing_page_url`.
-- **classification** : (a).
-- **destination domain/** :
-  [`domain/sources/openalex.is_theses_fr_location(loc)`](domain/sources/openalex.py).
-  Renommé pour signaler qu'il opère sur une `OpenalexLocation`.
-
-### ✅ extract_nnt_from_openalex
-- **localisation** : `application/pipeline/normalize/openalex_parsing.py:31-52`
-- **description** : Cascade `primary_location.id == pmh:{NNT}`, sinon
-  URL `theses.fr/{NNT}`.
-- **classification** : (a).
-- **destination domain/** :
-  [`domain/sources/openalex.extract_nnt_from_location(loc)`](domain/sources/openalex.py).
-  Le fichier `openalex_parsing.py` (52 lignes) a été supprimé : ses
-  deux fonctions sont migrées dans `domain/sources/openalex.py` (avec
-  la nouvelle dataclass `OpenalexLocation`).
-
----
-
-## `application/pipeline/normalize/base.py`
-
-Aucune règle métier identifiée. Module purement orchestrationnel
-(SAVEPOINT, cycle de connexion, parsing CLI, batching, on_error/cleanup).
 
 ---
 
@@ -781,21 +575,6 @@ Aucune règle métier identifiée. Module purement orchestrationnel
 - **destination domain/** : `domain/publications/dedup.py` →
   `decide_publication_match` (même fonction).
 
-### ✅ oa_status par défaut unknown
-- **localisation** : `application/pipeline/publications/create_publications.py:50`
-  + `application/publications.py:372` (refresh_from_sources)
-- **description** : `value or "unknown"`. Convention canonique
-  `publications.oa_status = 'unknown'` quand aucune `source_publications`
-  n'a de signal exploitable (NULL au niveau source). Pas un algorithme,
-  juste une expression d'enum-default appliquée à la frontière source ↔
-  canonique.
-- **classification** : (a).
-- **destination domain/** : constante nommée
-  [`domain.publication.OA_STATUS_UNKNOWN_DEFAULT`](domain/publication.py)
-  = `"unknown"`, à utiliser en suffixe `or OA_STATUS_UNKNOWN_DEFAULT`
-  au lieu du littéral. Documente la convention sans introduire de
-  fonction triviale.
-
 ---
 
 ## `application/pipeline/publications/merge_pubs_by_hal_id.py`
@@ -934,25 +713,10 @@ Aucune règle métier identifiée. Module purement orchestrationnel
    dans `normalize_hal.py:383-389` et `normalize_scanr.py:270-276`.
    À unifier dans `domain/names.split_full_name_naive`.
 
-2. **Normalisation ORCID** (strip URL `https://orcid.org/...`) —
-   dupliqué 3× : HAL TEI (l. 316-321), OpenAlex (l. 422-424), Crossref
-   (l. 269-274). À unifier dans
-   `domain/persons/identifiers.normalize_orcid`.
-
 3. **Invariant « source_persons créé seulement si identifiant fort »**
    — répété dans HAL (`hal_person_id`), ScanR (`idref`), theses
    (`PPN`). À unifier dans
    `domain/persons/sourcing.should_create_source_person`.
-
-4. ✅ **Règle `oa_status = green if open_access else closed`** —
-   apparaissait dupliquée HAL/ScanR mais après examen, sémantiques
-   distinctes : HAL `openAccess_bool` vaut bien `green` (= dépôt en
-   archive) ; ScanR `isOa` couvre gold/hybrid/bronze/green sans le dire.
-   Migré en deux fonctions source-spécifiques :
-   [`domain/sources/hal.derive_hal_oa_status`](domain/sources/hal.py)
-   et
-   [`domain/sources/scanr.derive_scanr_oa_status`](domain/sources/scanr.py)
-   (cette dernière consomme aussi `oaEvidence.hostType`/`license`).
 
 5. **Règle `doc_type theses` (`thesis` vs `ongoing_thesis`)** —
    dupliquée dans `normalize_theses.py:88` et `:247`. À unifier dans
@@ -1062,7 +826,6 @@ def thesis_authors_compatible(candidate, claimed) -> bool: ...
 def aggregate_thesis_persons(these: dict) -> list[ThesisAuthorship]: ...
 
 # domain/persons/identifiers.py
-def normalize_orcid(raw: str | None) -> str | None: ...
 def build_authorship_identifiers(source: str, **fields) -> dict | None: ...
 def iter_identifier_writes(authorships) -> Iterable[IdentifierWrite]: ...
 def pick_idhal_from_tei_idnos(idnos: list) -> dict[str, str]: ...

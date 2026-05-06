@@ -30,6 +30,7 @@ from application.publications import refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
+from domain.person import normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
@@ -276,7 +277,7 @@ def upsert_scanr_author(cur: Any, queries: ScanrNormalizeQueries, author: dict) 
         first_name = None
         last_name = full_name
 
-    orcid = denorm.get("orcid")
+    orcid = normalize_orcid(denorm.get("orcid"))
     return queries.upsert_scanr_source_person_by_idref(
         cur,
         idref=idref,
@@ -316,8 +317,9 @@ def process_authors(
 
         denorm = author_data.get("denormalized") or {}
         ids: dict = {}
-        if denorm.get("orcid"):
-            ids["orcid"] = denorm["orcid"]
+        orcid = normalize_orcid(denorm.get("orcid"))
+        if orcid:
+            ids["orcid"] = orcid
         if denorm.get("idref"):
             ids["idref"] = denorm["idref"]
         identifiers = Json(ids) if ids else None
