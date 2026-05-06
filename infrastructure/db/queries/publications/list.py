@@ -1,12 +1,8 @@
-"""Liste paginée + export CSV des publications (async).
-
-Partage `ListFilters` et la construction des conditions SQL communes.
-"""
+"""Liste paginée + export CSV des publications (async)."""
 
 import csv
 import io
 import json
-from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import text
@@ -41,32 +37,7 @@ from infrastructure.db.queries.filters import (
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}
 
 
-@dataclass(frozen=True, slots=True)
-class ListFilters:
-    """Bundle des filtres pour list_publications / export_publications.
-    Tous les champs ont un défaut — facilite les appels partiels."""
-
-    search: str = ""
-    lab_ids: list[int] = field(default_factory=list)
-    lab_none: bool = False
-    years: list[int] = field(default_factory=list)
-    publisher_id: int | None = None
-    journal_id: int | None = None
-    access: str = ""
-    oa_status: str = ""
-    source_values: list[str] = field(default_factory=list)
-    doc_types: list[str] = field(default_factory=list)
-    excluded_types: list[str] = field(default_factory=list)
-    person_id: int | None = None
-    is_corresponding: str = ""
-    has_apc: str = ""
-    country_values: list[str] = field(default_factory=list)
-    hal_status_values: list[str] = field(default_factory=list)
-    in_perimeter: str = ""
-    subject_id: int | None = None
-
-
-def _initial_clauses(filters: ListFilters) -> list[WhereClause]:
+def _initial_clauses(filters: Any) -> list[WhereClause]:
     """Initialise les conditions de base selon le scope (person, labs, UCA)."""
     if filters.person_id:
         return [person_clause(filters.person_id)]
@@ -90,7 +61,7 @@ def _search_clause(search: str) -> WhereClause | None:
     )
 
 
-def _inline_clauses(filters: ListFilters) -> list[WhereClause | None]:
+def _inline_clauses(filters: Any) -> list[WhereClause | None]:
     """Filtres simples partagés entre list/export."""
     out: list[WhereClause | None] = [
         WhereClause("p.doc_type NOT IN ('peer_review', 'memoir')", {}),
@@ -106,9 +77,7 @@ def _inline_clauses(filters: ListFilters) -> list[WhereClause | None]:
     return out
 
 
-async def _hal_status_clause_async(
-    conn: AsyncConnection, filters: ListFilters
-) -> WhereClause | None:
+async def _hal_status_clause_async(conn: AsyncConnection, filters: Any) -> WhereClause | None:
     """Charge la collection HAL du labo unique pour le filtre hal_status."""
     if filters.hal_status_values and len(filters.lab_ids) == 1:
         row = (
@@ -123,7 +92,7 @@ async def _hal_status_clause_async(
 
 
 async def _build_list_clauses(
-    conn: AsyncConnection, filters: ListFilters, root_structure_id: int
+    conn: AsyncConnection, filters: Any, root_structure_id: int
 ) -> tuple[str, dict[str, Any]]:
     """Construit le WHERE complet pour list_publications."""
     clauses: list[WhereClause | None] = list(_initial_clauses(filters))
@@ -171,7 +140,7 @@ _ORDER_MAP = {
 async def list_publications(
     conn: AsyncConnection,
     *,
-    filters: ListFilters,
+    filters: Any,
     root_structure_id: int,
     page: int,
     per_page: int,
@@ -326,7 +295,7 @@ async def list_publications(
 # ── Export CSV ────────────────────────────────────────────────────
 
 
-def _initial_clauses_for_export(filters: ListFilters) -> list[WhereClause]:
+def _initial_clauses_for_export(filters: Any) -> list[WhereClause]:
     """Variante export : le filtre person passe par `source_authorships`
     directement (comportement historique différent de list_publications).
     """
@@ -382,7 +351,7 @@ def _export_oa_clause(oa_status: str) -> WhereClause | None:
     )
 
 
-def _build_export_clauses(filters: ListFilters) -> tuple[str, dict[str, Any]]:
+def _build_export_clauses(filters: Any) -> tuple[str, dict[str, Any]]:
     """Conditions WHERE pour l'export CSV publications (pas de hal_status,
     pas d'in_perimeter — comportement historique)."""
     clauses: list[WhereClause | None] = list(_initial_clauses_for_export(filters))
@@ -397,7 +366,7 @@ def _build_export_clauses(filters: ListFilters) -> tuple[str, dict[str, Any]]:
 
 
 async def export_publications_csv(
-    conn: AsyncConnection, *, filters: ListFilters, root_structure_id: int, sort: str
+    conn: AsyncConnection, *, filters: Any, root_structure_id: int, sort: str
 ) -> str:
     """Export CSV (sans pagination) avec les mêmes filtres que list_publications.
 
@@ -502,7 +471,7 @@ async def export_publications_csv(
     return "﻿" + buf.getvalue()
 
 
-def _build_theses_export_clauses(filters: ListFilters) -> tuple[str, dict[str, Any]]:
+def _build_theses_export_clauses(filters: Any) -> tuple[str, dict[str, Any]]:
     """Conditions WHERE pour l'export CSV des thèses.
 
     Diffère de `_build_export_clauses` :
@@ -522,7 +491,7 @@ def _build_theses_export_clauses(filters: ListFilters) -> tuple[str, dict[str, A
 
 
 async def export_theses_csv(
-    conn: AsyncConnection, *, filters: ListFilters, root_structure_id: int, sort: str
+    conn: AsyncConnection, *, filters: Any, root_structure_id: int, sort: str
 ) -> str:
     """Export CSV dédié à la page thèses.
 
