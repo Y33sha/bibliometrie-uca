@@ -103,11 +103,11 @@ pattern progressivement :
 - [x] `admin_feedback.py` *(commit `4a19525`)*
 - [x] `admin_person_duplicates.py` *(commit `af657f9`)*
 - [x] `admin_duplicates.py` *(commit `536122b`)*
-- [x] `hal_problems.py` *(commit en cours)*
-- [x] `config.py` *(commit en cours)*
-- [x] `perimeters.py` *(commit en cours)*
+- [x] `hal_problems.py` *(commit `e0cf5d6`)*
+- [x] `config.py` *(commit `59a4181`)*
+- [x] `perimeters.py` *(commit `b930093`)*
 - [ ] `structures.py`
-- [ ] `stats.py`
+- [x] `stats.py` *(commit à venir)*
 - [ ] `laboratories.py`
 - [ ] `publications.py`
 - [ ] `persons.py` (le plus gros — ~30 endpoints)
@@ -119,7 +119,7 @@ Certains routers utilisent des query modules qui n'ont pas de port.
 
 - [x] `subjects` query service *(commit `a210947`)*
 - [x] `admin_feedback` query service *(commit `4a19525`)*
-- [x] `hal_problems` query service *(commit en cours, inclut `hal_duplicate_accounts` déplacée depuis persons/admin)*
+- [x] `hal_problems` query service *(commit `e0cf5d6`, inclut `hal_duplicate_accounts` déplacée depuis persons/admin)*
 - [x] `publication_duplicates` query service *(commit `536122b`)*
 - [x] `person_duplicates` query service *(commit `af657f9`)*
 - [x] `publishers` query service *(commit `b617757`)*
@@ -127,10 +127,10 @@ Certains routers utilisent des query modules qui n'ont pas de port.
 - [ ] `structures` query service (lectures)
 - [x] `addresses` query service *(commit `1bdb3dd`)*
 - [ ] `laboratories` query service
-- [ ] `stats` query service (publishers, journals, labs, summary, facets)
+- [x] `stats` query service *(commit à venir — agrège les 7 fonctions des 4 modules `stats/*` derrière `PgAsyncStatsQueries`)*
 - [ ] `publications` query service (list, facets, detail, all_years)
 - [ ] `persons` query service (list, facets, directory, detail, admin)
-- [x] `config` query service *(commit en cours, inclut `get_hal_collections` migré depuis app_config.py)*
+- [x] `config` query service *(commit `59a4181`, inclut `get_hal_collections` migré depuis app_config.py)*
 
 Chaque port = `Protocol` dans `application/ports/`. Implémentation =
 classe wrapper dans `infrastructure/db/queries/` qui délègue aux
