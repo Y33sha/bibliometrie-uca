@@ -84,11 +84,10 @@ actuelle de `async with get_sa_connection() as conn:` est préservée.
 ### Phase 1 — Fondation
 
 - [x] Décision actée (cf. `audit-cto.md`)
-- [ ] Factories `Depends` dans `async_deps.py` pour les repos qui ont
-  déjà un port (auth, person, publication, structure, journal,
-  publisher, address, perimeter, config)
-- [ ] Helper `get_db_conn` (pour les routers qui font du SQL ad-hoc
-  via `text()` — ex: `admin_pipeline`)
+- [x] Factories `Depends` dans `async_deps.py` pour les 9 repos qui
+  ont déjà un port *(commit `d522b5f`)* + helper `db_conn` (Async
+  Connection partagée par toutes les deps de la requête, FastAPI
+  cache → même transaction).
 
 ### Phase 2 — Migration des routers, par lot
 
@@ -97,8 +96,8 @@ Chaque router = 1 commit. Indépendants entre eux.
 Routers triés par taille (du plus petit au plus gros) pour valider le
 pattern progressivement :
 
-- [ ] `publishers.py` (pilote — petit, repo + query service)
-- [ ] `journals.py` (similaire à publishers)
+- [x] `publishers.py` *(commit `b617757`, pilote)*
+- [x] `journals.py` *(commit `9ce5ee8`)*
 - [ ] `subjects.py` (1 fichier query, pas de repo write)
 - [ ] `addresses.py`
 - [ ] `admin_feedback.py`
@@ -123,8 +122,8 @@ Certains routers utilisent des query modules qui n'ont pas de port.
 - [ ] `hal_problems` query service
 - [ ] `publication_duplicates` query service
 - [ ] `person_duplicates` query service
-- [ ] `publishers` query service (lectures listings)
-- [ ] `journals` query service
+- [x] `publishers` query service *(commit `b617757`)*
+- [x] `journals` query service *(commit `9ce5ee8`)*
 - [ ] `structures` query service (lectures)
 - [ ] `addresses` query service (lectures)
 - [ ] `laboratories` query service
