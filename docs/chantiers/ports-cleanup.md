@@ -1,11 +1,11 @@
 # Chantier — Nettoyage des ports `domain/ports/`
-Commencé le 2026-05-06
+Commencé le 2026-05-06, terminé le 2026-05-06.
 
-## État : à exécuter
+## État : terminé
 
-Audit fait, règle actée dans `docs/architecture.md`. Reste à corriger
-deux ports qui ne respectent pas cette règle. Plus une décision
-pragmatique à confirmer sur un troisième.
+Issues 1 et 2 exécutées. Issue 3 confirmée sans action (exception
+documentée dans `docs/architecture.md`). Voir l'historique git pour
+les commits de mise en œuvre.
 
 ## Pour l'instance Claude qui exécute ce chantier
 
