@@ -484,6 +484,265 @@ def oa_clause(oa_status: str | None) -> WhereClause | None:
     return WhereClause("p.oa_status::text = ANY(:flt_oa_status)", {"flt_oa_status": expanded})
 
 
+def access_clause(access: str | None) -> WhereClause | None:
+    if not access:
+        return None
+    if access == "open":
+        return WhereClause(
+            "p.oa_status::text = ANY(:flt_oa_open)", {"flt_oa_open": list(OA_OPEN_STATUSES)}
+        )
+    if access == "closed":
+        return WhereClause(f"(p.oa_status::text IN {OA_CLOSED_SQL} OR p.oa_status IS NULL)", {})
+    return None
+
+
+def doc_type_clause(doc_types: list[str]) -> WhereClause | None:
+    if not doc_types:
+        return None
+    return WhereClause("p.doc_type::text = ANY(:flt_doc_types)", {"flt_doc_types": doc_types})
+
+
+def excluded_doc_type_clause(excluded_types: list[str]) -> WhereClause | None:
+    if not excluded_types:
+        return None
+    return WhereClause(
+        "p.doc_type::text != ALL(:flt_excluded_types)", {"flt_excluded_types": excluded_types}
+    )
+
+
+def source_clause(source_values: list[str]) -> WhereClause | None:
+    """Filtre source via publications.sources (GIN). `source_values` = liste
+    `{prefix}_{yes|no}` (constantes côté front, sans bind nécessaire)."""
+    SOURCE_MAP = {
+        "hal": "hal",
+        "oa": "openalex",
+        "scanr": "scanr",
+        "wos": "wos",
+        "theses": "theses",
+    }
+    parts: list[str] = []
+    for sv in source_values:
+        bits = sv.rsplit("_", 1)
+        if len(bits) != 2:
+            continue
+        prefix, mode = bits
+        source = SOURCE_MAP.get(prefix)
+        if not source or mode not in ("yes", "no"):
+            continue
+        if mode == "yes":
+            parts.append(f"p.sources @> ARRAY['{source}'::source_type]")
+        else:
+            parts.append(f"NOT p.sources @> ARRAY['{source}'::source_type]")
+    if not parts:
+        return None
+    return WhereClause(" AND ".join(parts), {})
+
+
+def person_clause(person_id: int) -> WhereClause:
+    """Filtre : la personne donnée est auteur (rôle 'author') de la publication."""
+    return WhereClause(
+        """EXISTS (SELECT 1 FROM authorships a
+                JOIN source_authorships sa ON sa.authorship_id = a.id
+                WHERE a.publication_id = p.id AND a.person_id = :flt_person_id
+                  AND NOT a.excluded
+                  AND sa.roles && ARRAY['author']::text[])""",
+        {"flt_person_id": person_id},
+    )
+
+
+def corresponding_clause(person_id: int, corr_filter: str) -> WhereClause | None:
+    if not corr_filter or not person_id:
+        return None
+    if corr_filter == "yes":
+        return WhereClause(
+            """EXISTS (SELECT 1 FROM authorships a
+                    WHERE a.publication_id = p.id AND a.person_id = :flt_corr_person
+                      AND a.is_corresponding = TRUE AND NOT a.excluded)""",
+            {"flt_corr_person": person_id},
+        )
+    if corr_filter == "no":
+        return WhereClause(
+            """NOT EXISTS (SELECT 1 FROM authorships a
+                    WHERE a.publication_id = p.id AND a.person_id = :flt_corr_person
+                      AND a.is_corresponding = TRUE AND NOT a.excluded)""",
+            {"flt_corr_person": person_id},
+        )
+    return None
+
+
+_SQL_HAS_HAL_SA = (
+    "EXISTS (SELECT 1 FROM source_publications sd "
+    "WHERE sd.publication_id = p.id AND sd.source = 'hal')"
+)
+_SQL_IN_COLLECTION_SA = (
+    "EXISTS (SELECT 1 FROM source_publications sd "
+    "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
+    "AND sd.hal_collections @> ARRAY[:flt_hal_collection])"
+)
+
+
+def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause | None:
+    """Variante SA de `apply_hal_status_filter`. `:flt_hal_collection` est
+    partagé entre les sous-clauses qui en ont besoin (valeur unique par
+    requête)."""
+    if not values:
+        return None
+    parts: list[str] = []
+    needs_collection = False
+    for v in values:
+        if v == "hors_hal":
+            parts.append(f"NOT {_SQL_HAS_HAL_SA}")
+        elif v == "hors_collection":
+            if lab_hal_col is None:
+                parts.append(_SQL_HAS_HAL_SA)
+            else:
+                parts.append(
+                    f"({_SQL_HAS_HAL_SA} "
+                    "AND NOT EXISTS (SELECT 1 FROM source_publications sd "
+                    "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
+                    "AND sd.hal_collections @> ARRAY[:flt_hal_collection]))"
+                )
+                needs_collection = True
+        elif v == "notice" and lab_hal_col is not None:
+            parts.append(
+                f"({_SQL_IN_COLLECTION_SA} "
+                f"AND (p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL}))"
+            )
+            needs_collection = True
+        elif v == "ok" and lab_hal_col is not None:
+            parts.append(
+                f"({_SQL_IN_COLLECTION_SA} "
+                f"AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN {OA_CLOSED_SQL})"
+            )
+            needs_collection = True
+    if not parts:
+        return None
+    binds: dict[str, Any] = {"flt_hal_collection": lab_hal_col} if needs_collection else {}
+    if len(parts) == 1:
+        return WhereClause(parts[0], binds)
+    return WhereClause("(" + " OR ".join(parts) + ")", binds)
+
+
+def apc_clause(
+    has_apc: str, root_structure_id: int, lab_ids: list[int] | None = None
+) -> WhereClause | None:
+    """Variante SA de `apply_apc_filter`. Tous les usages de root_structure_id
+    partagent le bind `:flt_apc_root` ; ceux de lab_ids partagent
+    `:flt_apc_lab_ids`."""
+    if not has_apc:
+        return None
+    lab_ids = lab_ids or []
+    parts: list[str] = []
+    needs_root = False
+    needs_lab = False
+    for v in [x.strip() for x in has_apc.split(",") if x.strip()]:
+        if v == "uca":
+            parts.append(
+                "EXISTS (SELECT 1 FROM apc_payments ap "
+                "WHERE ap.publication_id = p.id AND ap.budget_structure_id = :flt_apc_root)"
+            )
+            needs_root = True
+        elif v in ("other", "non_uca"):
+            parts.append(
+                "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) "
+                "AND NOT EXISTS (SELECT 1 FROM apc_payments ap "
+                "WHERE ap.publication_id = p.id AND ap.budget_structure_id = :flt_apc_root))"
+            )
+            needs_root = True
+        elif v == "none":
+            parts.append(
+                "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)"
+            )
+        elif v == "this_lab" and lab_ids:
+            parts.append(
+                "EXISTS (SELECT 1 FROM apc_payments ap "
+                "WHERE ap.publication_id = p.id "
+                "AND ap.lab_structure_id = ANY(CAST(:flt_apc_lab_ids AS int[])))"
+            )
+            needs_lab = True
+        elif v == "other_uca" and lab_ids:
+            parts.append(
+                "(EXISTS (SELECT 1 FROM apc_payments ap "
+                "WHERE ap.publication_id = p.id AND ap.budget_structure_id = :flt_apc_root) "
+                "AND NOT EXISTS (SELECT 1 FROM apc_payments ap "
+                "WHERE ap.publication_id = p.id "
+                "AND ap.lab_structure_id = ANY(CAST(:flt_apc_lab_ids AS int[]))))"
+            )
+            needs_root = True
+            needs_lab = True
+    if not parts:
+        return None
+    binds: dict[str, Any] = {}
+    if needs_root:
+        binds["flt_apc_root"] = root_structure_id
+    if needs_lab:
+        binds["flt_apc_lab_ids"] = lab_ids
+    if len(parts) == 1:
+        return WhereClause(parts[0], binds)
+    return WhereClause("(" + " OR ".join(parts) + ")", binds)
+
+
+def in_perimeter_person_clause(in_perimeter: str, person_id: int | None) -> WhereClause | None:
+    if not in_perimeter or not person_id:
+        return None
+    negate = "" if in_perimeter == "yes" else "NOT "
+    return WhereClause(
+        f"""{negate}EXISTS (SELECT 1 FROM authorships a
+                WHERE a.publication_id = p.id AND a.person_id = :flt_in_per_person
+                  AND a.in_perimeter = TRUE AND NOT a.excluded)""",
+        {"flt_in_per_person": person_id},
+    )
+
+
+def no_lab_clause() -> WhereClause:
+    return WhereClause(
+        """NOT EXISTS (
+            SELECT 1 FROM authorships a
+            JOIN structures s ON s.id = ANY(a.structure_ids)
+            WHERE a.publication_id = p.id
+              AND NOT a.excluded
+              AND s.structure_type = 'labo'
+        )""",
+        {},
+    )
+
+
+def country_clause(country_values: list[str]) -> WhereClause | None:
+    if not country_values:
+        return None
+    return WhereClause(
+        "p.countries && CAST(:flt_countries AS text[])", {"flt_countries": country_values}
+    )
+
+
+def subject_clause(subject_id: int | None) -> WhereClause | None:
+    if not subject_id:
+        return None
+    return WhereClause(
+        "EXISTS (SELECT 1 FROM publication_subjects ps "
+        "WHERE ps.publication_id = p.id AND ps.subject_id = :flt_subject_id)",
+        {"flt_subject_id": subject_id},
+    )
+
+
+def publisher_id_clause(publisher_id: int | None) -> WhereClause | None:
+    if not publisher_id:
+        return None
+    return WhereClause(
+        """EXISTS (
+            SELECT 1 FROM journals j2
+            WHERE j2.id = p.journal_id AND j2.publisher_id = :flt_publisher_id
+        )""",
+        {"flt_publisher_id": publisher_id},
+    )
+
+
+def journal_id_clause(journal_id: int | None) -> WhereClause | None:
+    if not journal_id:
+        return None
+    return WhereClause("p.journal_id = :flt_journal_id", {"flt_journal_id": journal_id})
+
+
 def person_has_identifier_clause(id_type: str, value: str) -> WhereClause | None:
     """Variante SA de `apply_person_has_identifier_filter`.
 

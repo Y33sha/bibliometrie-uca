@@ -124,9 +124,9 @@ async def export_publications_csv(
         excluded_types=parse_str_csv(excluded_doc_type),
         person_id=person_id,
     )
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         csv_content = await pub_queries.export_publications_csv(
-            cur, filters=filters, root_structure_id=await get_root_structure_id(), sort=sort
+            conn, filters=filters, root_structure_id=await get_root_structure_id(), sort=sort
         )
     return Response(
         content=csv_content,
@@ -156,9 +156,9 @@ async def export_theses_csv(
         source_values=parse_str_csv(source_filter),
         doc_types=parse_str_csv(doc_type) or ["thesis", "ongoing_thesis"],
     )
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         csv_content = await pub_queries.export_theses_csv(
-            cur, filters=filters, root_structure_id=await get_root_structure_id(), sort=sort
+            conn, filters=filters, root_structure_id=await get_root_structure_id(), sort=sort
         )
     return Response(
         content=csv_content,
@@ -249,9 +249,9 @@ async def list_publications(
         in_perimeter=in_perimeter,
         subject_id=subject_id,
     )
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         return await pub_queries.list_publications(
-            cur,
+            conn,
             filters=filters,
             root_structure_id=await get_root_structure_id(),
             page=page,
