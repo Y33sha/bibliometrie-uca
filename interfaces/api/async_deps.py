@@ -31,6 +31,7 @@ from application.ports.config import AsyncConfigStore
 from application.ports.journals_queries import AsyncJournalQueries
 from application.ports.perimeter import AsyncPerimeterQueries
 from application.ports.person_duplicates_queries import AsyncPersonDuplicatesQueries
+from application.ports.publication_duplicates_queries import AsyncPublicationDuplicatesQueries
 from application.ports.publishers_queries import AsyncPublisherQueries
 from application.ports.subjects_queries import AsyncSubjectsQueries
 from domain.ports.address_repository import AsyncAddressRepository
@@ -48,6 +49,7 @@ from infrastructure.db.queries.admin_feedback import PgAsyncAdminFeedbackQueries
 from infrastructure.db.queries.journals import PgAsyncJournalQueries
 from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
 from infrastructure.db.queries.person_duplicates import PgAsyncPersonDuplicatesQueries
+from infrastructure.db.queries.publication_duplicates import PgAsyncPublicationDuplicatesQueries
 from infrastructure.db.queries.publishers import PgAsyncPublisherQueries
 from infrastructure.db.queries.subjects import PgAsyncSubjectsQueries
 from infrastructure.repositories import (
@@ -184,6 +186,12 @@ def person_duplicates_queries(
     conn: AsyncConnection = Depends(db_conn),
 ) -> AsyncPersonDuplicatesQueries:
     return PgAsyncPersonDuplicatesQueries(conn)
+
+
+def publication_duplicates_queries(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncPublicationDuplicatesQueries:
+    return PgAsyncPublicationDuplicatesQueries(conn)
 
 
 async def bg_propagate_countries(address_ids: list[int]) -> None:
