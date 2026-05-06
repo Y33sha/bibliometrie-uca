@@ -245,14 +245,14 @@ pas tranchés, toute évolution amplifie la dette.
   **Décision attendue** : confirmer A' et lister les phases à
   migrer (1 par 1), ou rouvrir le débat. Document court à écrire
   dans `docs/chantiers/` quand le chantier sera lancé.
-- [ ] **Sync + async dupliqué : industrialiser ou unifier ?**
-  - Option A : tout passer en async (le pipeline aussi) → simplifie
-    mais alourdit les scripts CLI
-  - Option B : unifier via une seule classe générique paramétrée par
-    `cur` ou via codegen → garde les deux, supprime la duplication
-  - Option C : assumer la duplication, ajouter un test qui vérifie
-    le parallélisme des deux familles de repos
-  - **Décision attendue** : 1 page comparant les 3 options
+- [x] **Sync + async dupliqué : décision actée** — option D retenue
+  (tout sync + threadpool FastAPI), implémentation reportée au
+  chantier dédié. Voir
+  [`docs/chantiers/sync-async-deduplication.md`](sync-async-deduplication.md)
+  pour le raisonnement complet (4 options évaluées, profil d'usage
+  cadré, plan d'implémentation en 4 phases, points de vigilance,
+  réversibilité). À planifier après les autres décisions Phase 1
+  pour ne pas mélanger les chantiers.
 - [ ] **Position des "ports"** : `application/ports/` vs
   `domain/ports/`, critère final ? Décider une bonne fois et figer
   la convention dans `docs/architecture.md`.
