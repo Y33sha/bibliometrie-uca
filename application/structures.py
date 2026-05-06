@@ -85,23 +85,20 @@ async def update_structure(
     if not await repo.structure_exists(structure_id):
         raise NotFoundError(f"Structure {structure_id} introuvable")
 
-    sql_fragments: list[str] = []
-    params: list = []
+    update_fields: dict = {}
     for field_name, col_name in _STRUCTURE_FIELD_MAP.items():
         val = fields.get(field_name)
         if val is not None:
-            sql_fragments.append(f"{col_name} = %s")
-            params.append(val)
+            update_fields[col_name] = val
 
     if "api_ids" in fields and fields["api_ids"] is not None:
         validated = _validate_api_ids(fields["api_ids"])
-        sql_fragments.append("api_ids = %s")
-        params.append(Json(validated) if validated else None)
+        update_fields["api_ids"] = Json(validated) if validated else None
 
-    if not sql_fragments:
+    if not update_fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    return await repo.update_structure_fields(structure_id, sql_fragments, params)
+    return await repo.update_structure_fields(structure_id, update_fields)
 
 
 async def delete_structure(cur: Any, structure_id: int, *, repo: AsyncStructureRepository) -> None:
@@ -190,26 +187,21 @@ async def update_name_form(
     if not await repo.name_form_exists(form_id):
         raise NotFoundError(f"Forme {form_id} introuvable")
 
-    sql_fragments: list[str] = []
-    params: list = []
+    update_fields: dict = {}
 
     if fields.get("form_text") is not None:
-        sql_fragments.append("form_text = %s")
-        params.append(normalize_text(fields["form_text"]))
+        update_fields["form_text"] = normalize_text(fields["form_text"])
     if fields.get("is_word_boundary") is not None:
-        sql_fragments.append("is_word_boundary = %s")
-        params.append(fields["is_word_boundary"])
+        update_fields["is_word_boundary"] = fields["is_word_boundary"]
     if fields.get("is_excluding") is not None:
-        sql_fragments.append("is_excluding = %s")
-        params.append(fields["is_excluding"])
+        update_fields["is_excluding"] = fields["is_excluding"]
     if fields.get("requires_context_of") is not None:
-        sql_fragments.append("requires_context_of = %s")
-        params.append(fields["requires_context_of"] or None)
+        update_fields["requires_context_of"] = fields["requires_context_of"] or None
 
-    if not sql_fragments:
+    if not update_fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    return await repo.update_name_form_fields(form_id, sql_fragments, params)
+    return await repo.update_name_form_fields(form_id, update_fields)
 
 
 async def delete_name_form(cur: Any, form_id: int, *, repo: AsyncStructureRepository) -> None:

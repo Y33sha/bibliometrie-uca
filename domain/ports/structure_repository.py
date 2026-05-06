@@ -30,8 +30,7 @@ class AsyncStructureRepository(Protocol):
     async def update_structure_fields(
         self,
         structure_id: int,
-        sql_fragments: list[str],
-        params: list,
+        fields: dict,
     ) -> dict: ...
 
     async def delete_structure(self, structure_id: int) -> dict | None: ...
@@ -65,8 +64,7 @@ class AsyncStructureRepository(Protocol):
     async def update_name_form_fields(
         self,
         form_id: int,
-        sql_fragments: list[str],
-        params: list,
+        fields: dict,
     ) -> dict: ...
 
     async def delete_name_form(self, form_id: int) -> dict | None: ...

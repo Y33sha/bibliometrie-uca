@@ -59,17 +59,16 @@ class PgAsyncStructureRepository:
     async def update_structure_fields(
         self,
         structure_id: int,
-        sql_fragments: list[str],
-        params: list,
+        fields: dict,
     ) -> dict:
-        sets = ", ".join(sql_fragments)
+        sets = ", ".join(f"{k} = %s" for k in fields)
         await self._cur.execute(
             f"""
             UPDATE structures SET {sets} WHERE id = %s
             RETURNING id, code, name, acronym, structure_type::text AS type,
                       ror_id, rnsr_id, hal_collection, api_ids
             """,
-            params + [structure_id],
+            list(fields.values()) + [structure_id],
         )
         return await self._cur.fetchone()
 
@@ -149,16 +148,15 @@ class PgAsyncStructureRepository:
     async def update_name_form_fields(
         self,
         form_id: int,
-        sql_fragments: list[str],
-        params: list,
+        fields: dict,
     ) -> dict:
-        sets = ", ".join(sql_fragments)
+        sets = ", ".join(f"{k} = %s" for k in fields)
         await self._cur.execute(
             f"""
             UPDATE structure_name_forms SET {sets}
             WHERE id = %s RETURNING *
             """,
-            params + [form_id],
+            list(fields.values()) + [form_id],
         )
         return await self._cur.fetchone()
 
