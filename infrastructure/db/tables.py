@@ -19,6 +19,7 @@ au fur et à mesure des phases suivantes.
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Column,
     DateTime,
     Integer,
@@ -104,4 +105,27 @@ structures = Table(
     Column("hal_collection", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("api_ids", JSONB),
+)
+
+
+structure_relations = Table(
+    "structure_relations",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("parent_id", Integer, nullable=False),
+    Column("child_id", Integer, nullable=False),
+    Column("relation_type", Text, nullable=False),
+)
+
+
+structure_name_forms = Table(
+    "structure_name_forms",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("structure_id", Integer, nullable=False),
+    Column("form_text", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column("is_word_boundary", Boolean, nullable=False, server_default="false"),
+    Column("requires_context_of", ARRAY(Integer)),
+    Column("is_excluding", Boolean, nullable=False, server_default="false"),
 )

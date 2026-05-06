@@ -1,27 +1,47 @@
-"""Adapter PostgreSQL async pour les 3 tables du concept Structure.
+"""Adapter PostgreSQL async pour les 3 tables du concept Structure."""
 
-Parallèle à infrastructure/repositories/structure_repository.py.
-"""
+from sqlalchemy import Text, cast, delete, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncConnection
 
-from typing import Any
+from infrastructure.db.tables import (
+    structure_name_forms,
+    structure_relations,
+    structures,
+)
 
-from psycopg.types.json import Jsonb as Json
+
+def _structure_returning_columns() -> list:
+    """Colonnes RETURNING pour les opérations create/update sur structures.
+
+    `structure_type` est un enum PG, exposé en str (clé `type`) côté API.
+    """
+    return [
+        structures.c.id,
+        structures.c.code,
+        structures.c.name,
+        structures.c.acronym,
+        cast(structures.c.structure_type, Text).label("type"),
+        structures.c.ror_id,
+        structures.c.rnsr_id,
+        structures.c.hal_collection,
+        structures.c.api_ids,
+    ]
 
 
 class PgAsyncStructureRepository:
     """Accès PostgreSQL async à l'agrégat Structure."""
 
-    def __init__(self, cur: Any) -> None:
-        self._cur = cur
+    def __init__(self, conn: AsyncConnection) -> None:
+        self._conn = conn
 
     # ── structures ─────────────────────────────────────────────────
 
     async def structure_exists(self, structure_id: int) -> bool:
-        await self._cur.execute(
-            "SELECT id FROM structures WHERE id = %s",
-            (structure_id,),
+        result = await self._conn.execute(
+            select(structures.c.id).where(structures.c.id == structure_id)
         )
-        return (await self._cur.fetchone()) is not None
+        return result.first() is not None
 
     async def create_structure(
         self,
@@ -35,49 +55,46 @@ class PgAsyncStructureRepository:
         hal_collection: str | None,
         api_ids: dict | None,
     ) -> dict:
-        await self._cur.execute(
-            """
-            INSERT INTO structures (code, name, acronym, structure_type, ror_id,
-                                    rnsr_id, hal_collection, api_ids)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id, code, name, acronym, structure_type::text AS type,
-                      ror_id, rnsr_id, hal_collection, api_ids
-            """,
-            (
-                code,
-                name,
-                acronym,
-                type,
-                ror_id,
-                rnsr_id,
-                hal_collection,
-                Json(api_ids) if api_ids else None,
-            ),
+        stmt = (
+            structures.insert()
+            .values(
+                code=code,
+                name=name,
+                acronym=acronym,
+                structure_type=type,
+                ror_id=ror_id,
+                rnsr_id=rnsr_id,
+                hal_collection=hal_collection,
+                api_ids=api_ids,
+            )
+            .returning(*_structure_returning_columns())
         )
-        return await self._cur.fetchone()
+        result = await self._conn.execute(stmt)
+        return dict(result.one()._mapping)
 
     async def update_structure_fields(
         self,
         structure_id: int,
         fields: dict,
     ) -> dict:
-        sets = ", ".join(f"{k} = %s" for k in fields)
-        await self._cur.execute(
-            f"""
-            UPDATE structures SET {sets} WHERE id = %s
-            RETURNING id, code, name, acronym, structure_type::text AS type,
-                      ror_id, rnsr_id, hal_collection, api_ids
-            """,
-            list(fields.values()) + [structure_id],
+        stmt = (
+            update(structures)
+            .where(structures.c.id == structure_id)
+            .values(**fields)
+            .returning(*_structure_returning_columns())
         )
-        return await self._cur.fetchone()
+        result = await self._conn.execute(stmt)
+        return dict(result.one()._mapping)
 
     async def delete_structure(self, structure_id: int) -> dict | None:
-        await self._cur.execute(
-            "DELETE FROM structures WHERE id = %s RETURNING code, name",
-            (structure_id,),
+        stmt = (
+            delete(structures)
+            .where(structures.c.id == structure_id)
+            .returning(structures.c.code, structures.c.name)
         )
-        return await self._cur.fetchone()
+        result = await self._conn.execute(stmt)
+        row = result.first()
+        return dict(row._mapping) if row else None
 
     # ── structure_relations ────────────────────────────────────────
 
@@ -88,35 +105,42 @@ class PgAsyncStructureRepository:
         child_id: int,
         relation_type: str,
     ) -> dict | None:
-        await self._cur.execute(
-            """
-            INSERT INTO structure_relations (parent_id, child_id, relation_type)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (parent_id, child_id, relation_type) DO NOTHING
-            RETURNING *
-            """,
-            (parent_id, child_id, relation_type),
+        stmt = (
+            pg_insert(structure_relations)
+            .values(parent_id=parent_id, child_id=child_id, relation_type=relation_type)
+            .on_conflict_do_nothing(index_elements=["parent_id", "child_id", "relation_type"])
+            .returning(
+                structure_relations.c.id,
+                structure_relations.c.parent_id,
+                structure_relations.c.child_id,
+                structure_relations.c.relation_type,
+            )
         )
-        return await self._cur.fetchone()
+        result = await self._conn.execute(stmt)
+        row = result.first()
+        return dict(row._mapping) if row else None
 
     async def delete_relation(self, relation_id: int) -> dict | None:
-        await self._cur.execute(
-            """
-            DELETE FROM structure_relations WHERE id = %s
-            RETURNING parent_id, child_id, relation_type::text AS relation_type
-            """,
-            (relation_id,),
+        stmt = (
+            delete(structure_relations)
+            .where(structure_relations.c.id == relation_id)
+            .returning(
+                structure_relations.c.parent_id,
+                structure_relations.c.child_id,
+                structure_relations.c.relation_type,
+            )
         )
-        return await self._cur.fetchone()
+        result = await self._conn.execute(stmt)
+        row = result.first()
+        return dict(row._mapping) if row else None
 
     # ── structure_name_forms ───────────────────────────────────────
 
     async def name_form_exists(self, form_id: int) -> bool:
-        await self._cur.execute(
-            "SELECT id FROM structure_name_forms WHERE id = %s",
-            (form_id,),
+        result = await self._conn.execute(
+            select(structure_name_forms.c.id).where(structure_name_forms.c.id == form_id)
         )
-        return (await self._cur.fetchone()) is not None
+        return result.first() is not None
 
     async def create_name_form(
         self,
@@ -127,45 +151,59 @@ class PgAsyncStructureRepository:
         is_excluding: bool,
         requires_context_of: list | None,
     ) -> dict:
-        await self._cur.execute(
-            """
-            INSERT INTO structure_name_forms (structure_id, form_text,
-                                    is_word_boundary, is_excluding,
-                                    requires_context_of)
-            VALUES (%s, %s, %s, %s, %s)
-            RETURNING *
-            """,
-            (
-                structure_id,
-                form_text_normalized,
-                is_word_boundary,
-                is_excluding,
-                requires_context_of or None,
-            ),
+        stmt = (
+            structure_name_forms.insert()
+            .values(
+                structure_id=structure_id,
+                form_text=form_text_normalized,
+                is_word_boundary=is_word_boundary,
+                is_excluding=is_excluding,
+                requires_context_of=requires_context_of or None,
+            )
+            .returning(
+                structure_name_forms.c.id,
+                structure_name_forms.c.structure_id,
+                structure_name_forms.c.form_text,
+                structure_name_forms.c.created_at,
+                structure_name_forms.c.is_word_boundary,
+                structure_name_forms.c.requires_context_of,
+                structure_name_forms.c.is_excluding,
+            )
         )
-        return await self._cur.fetchone()
+        result = await self._conn.execute(stmt)
+        return dict(result.one()._mapping)
 
     async def update_name_form_fields(
         self,
         form_id: int,
         fields: dict,
     ) -> dict:
-        sets = ", ".join(f"{k} = %s" for k in fields)
-        await self._cur.execute(
-            f"""
-            UPDATE structure_name_forms SET {sets}
-            WHERE id = %s RETURNING *
-            """,
-            list(fields.values()) + [form_id],
+        stmt = (
+            update(structure_name_forms)
+            .where(structure_name_forms.c.id == form_id)
+            .values(**fields)
+            .returning(
+                structure_name_forms.c.id,
+                structure_name_forms.c.structure_id,
+                structure_name_forms.c.form_text,
+                structure_name_forms.c.created_at,
+                structure_name_forms.c.is_word_boundary,
+                structure_name_forms.c.requires_context_of,
+                structure_name_forms.c.is_excluding,
+            )
         )
-        return await self._cur.fetchone()
+        result = await self._conn.execute(stmt)
+        return dict(result.one()._mapping)
 
     async def delete_name_form(self, form_id: int) -> dict | None:
-        await self._cur.execute(
-            """
-            DELETE FROM structure_name_forms WHERE id = %s
-            RETURNING structure_id, form_text
-            """,
-            (form_id,),
+        stmt = (
+            delete(structure_name_forms)
+            .where(structure_name_forms.c.id == form_id)
+            .returning(
+                structure_name_forms.c.structure_id,
+                structure_name_forms.c.form_text,
+            )
         )
-        return await self._cur.fetchone()
+        result = await self._conn.execute(stmt)
+        row = result.first()
+        return dict(row._mapping) if row else None

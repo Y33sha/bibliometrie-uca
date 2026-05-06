@@ -300,7 +300,14 @@ principalement en cohérence et en futur-proofing pour Alembic.
   du pattern).
 - [ ] `async_config_repository.py` → la partie config dans
   `infrastructure/db/queries/config.py` (PgAsyncConfig).
-- [ ] `async_structure_repository.py`.
+- [x] **Sous-phase 1.2 — `async_structure_repository.py` + `application/structures.py` + router writes** :
+  3 tables ajoutées à MetaData (`structures`, `structure_relations`,
+  `structure_name_forms`). Repo réécrit en SA Core (delete/select/update/insert/pg_insert
+  pour `ON CONFLICT DO NOTHING`). Service migré en `AsyncConnection`, `Json()`
+  wrapper retiré (SA gère JSONB). Routers writes basculés sur
+  `get_sa_connection()`. Conftest API étendu pour patcher
+  `build_async_engine` (sinon les tests tombaient sur la base prod).
+  Tests : 23/23 service + 32/32 API + suite complète 1322/1322.
 - [ ] `async_journal_repository.py`.
 - [ ] `async_publisher_repository.py`.
 - [ ] `async_address_repository.py`.
