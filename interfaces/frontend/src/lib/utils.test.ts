@@ -51,6 +51,26 @@ describe('sanitizeTitle', () => {
 		expect(sanitizeTitle(null)).toBe('');
 		expect(sanitizeTitle(undefined)).toBe('');
 	});
+
+	it('décode les titres double-encodés (&amp;lt;i&amp;gt; → <i>)', () => {
+		const result = sanitizeTitle(
+			'Detection of &amp;lt;i&amp;gt;Candida&amp;lt;/i&amp;gt; species'
+		);
+		expect(result).toContain('<i>Candida</i>');
+		expect(result).not.toContain('&amp;');
+	});
+
+	it('décode les entités numériques double-encodées (&amp;#233; → é)', () => {
+		const result = sanitizeTitle('Gagn&amp;#233; et al.');
+		expect(result).toContain('Gagné');
+	});
+
+	it('ne décode pas un &amp; isolé légitime', () => {
+		// "Smith & Jones" stocké comme "Smith &amp; Jones" (encodage simple)
+		// ne doit PAS être décodé : le & affiché vient de l'échappement final.
+		const result = sanitizeTitle('Smith &amp; Jones');
+		expect(result).toBe('Smith &amp;amp; Jones');
+	});
 });
 
 // ── titleCase ──────────────────────────────────────────────────

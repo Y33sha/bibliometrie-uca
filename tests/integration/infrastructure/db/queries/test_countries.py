@@ -4,6 +4,7 @@ from infrastructure.db.queries.countries import (
     refresh_address_source_countries,
     refresh_hal_source_countries,
     refresh_publication_countries,
+    suggest_addresses_countries_batch,
 )
 
 
@@ -165,3 +166,90 @@ class TestRefreshPublicationCountries:
 
         updated = refresh_publication_countries(db)
         assert updated == 0
+
+
+def _create_address_full(db, raw_text, normalized_text=None, countries=None, pub_count=0):
+    db.execute(
+        """
+        INSERT INTO addresses (raw_text, normalized_text, countries, pub_count)
+        VALUES (%s, %s, %s, %s) RETURNING id
+        """,
+        (raw_text, normalized_text or raw_text.lower(), countries, pub_count),
+    )
+    return db.fetchone()["id"]
+
+
+class TestSuggestAddressesCountriesBatch:
+    """Régression : la version bulk SQL doit produire les mêmes suggestions
+    que l'ancienne boucle Python (pour chaque cible : pays majoritaire dans
+    le pool d'adresses dont normalized_text contient celui de la cible)."""
+
+    def test_picks_majority_country_from_substring_matches(self, db):
+        # Pool : 3 adresses avec FR contenant "lab foo", 1 avec US contenant "lab foo"
+        _create_address_full(db, "Lab Foo, Univ A", "lab foo univ a", countries=["FR"])
+        _create_address_full(db, "Lab Foo, Univ B", "lab foo univ b", countries=["FR"])
+        _create_address_full(db, "Lab Foo, Univ C", "lab foo univ c", countries=["FR"])
+        _create_address_full(db, "Lab Foo, Univ D", "lab foo univ d", countries=["US"])
+        target = _create_address_full(db, "Lab Foo seul", "lab foo")
+
+        n_done, n_found = suggest_addresses_countries_batch(db, batch_size=10)
+
+        assert n_done == 1
+        assert n_found == 1
+        db.execute("SELECT suggested_countries FROM addresses WHERE id = %s", (target,))
+        assert db.fetchone()["suggested_countries"] == ["FR"]
+
+    def test_returns_all_tied_countries_sorted(self, db):
+        # Égalité parfaite : 1 FR, 1 US, 1 DE → suggestion = ['DE', 'FR', 'US']
+        _create_address_full(db, "Foo bar A", "foo bar a", countries=["FR"])
+        _create_address_full(db, "Foo bar B", "foo bar b", countries=["US"])
+        _create_address_full(db, "Foo bar C", "foo bar c", countries=["DE"])
+        target = _create_address_full(db, "Foo bar seul", "foo bar")
+
+        suggest_addresses_countries_batch(db, batch_size=10)
+
+        db.execute("SELECT suggested_countries FROM addresses WHERE id = %s", (target,))
+        assert db.fetchone()["suggested_countries"] == ["DE", "FR", "US"]
+
+    def test_marks_no_match_with_empty_array_to_skip_next_batch(self, db):
+        # Pas de pool → cible reçoit array vide (et non NULL) pour ne pas
+        # être retraitée à la passe suivante.
+        target = _create_address_full(db, "Truc inconnu", "truc inconnu")
+
+        n_done, n_found = suggest_addresses_countries_batch(db, batch_size=10)
+
+        assert n_done == 1
+        assert n_found == 0
+        db.execute("SELECT suggested_countries FROM addresses WHERE id = %s", (target,))
+        assert db.fetchone()["suggested_countries"] == []
+
+    def test_skips_addresses_already_with_countries(self, db):
+        _create_address_full(db, "Already done", "already done", countries=["FR"])
+
+        n_done, _ = suggest_addresses_countries_batch(db, batch_size=10)
+        assert n_done == 0
+
+    def test_skips_short_normalized_text(self, db):
+        # length < 5 → exclu de la requête (filtre identique à l'ancienne version)
+        _create_address_full(db, "Pool A", "pool", countries=["FR"])  # 4 chars : ignoré
+        _create_address_full(db, "Pool B", "pools", countries=["FR"])  # 5 chars : ok
+
+        n_done, _ = suggest_addresses_countries_batch(db, batch_size=10)
+        assert n_done == 0  # tous sont avec countries
+
+    def test_direct_mode_writes_to_countries(self, db):
+        _create_address_full(db, "Lab X UCA, FR", "lab x uca fr", countries=["FR"])
+        target = _create_address_full(db, "Lab X UCA", "lab x uca")
+
+        suggest_addresses_countries_batch(db, batch_size=10, target_column="countries")
+
+        db.execute("SELECT countries, suggested_countries FROM addresses WHERE id = %s", (target,))
+        row = db.fetchone()
+        assert row["countries"] == ["FR"]
+        assert row["suggested_countries"] is None
+
+    def test_invalid_target_column_raises(self, db):
+        import pytest
+
+        with pytest.raises(ValueError):
+            suggest_addresses_countries_batch(db, batch_size=10, target_column="bogus")

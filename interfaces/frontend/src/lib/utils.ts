@@ -97,14 +97,47 @@ function sanitizeMathML(s: string): string {
 
 const HAS_LATEX = /\$\$[\s\S]+?\$\$|\$[^$]+?\$/;
 const HAS_MATHML = /<\/?mml:/;
+const DOUBLE_ENCODED = /&amp;(lt|gt|amp|quot|apos|#\d+|#x[0-9a-f]+);/i;
+
+const ENTITY_MAP: Record<string, string> = {
+	amp: '&', lt: '<', gt: '>', quot: '"', apos: "'"
+};
+
+/* Decode one layer of HTML entities (named + numeric). */
+function decodeEntitiesOnce(s: string): string {
+	return s.replace(
+		/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);/gi,
+		(full, entity: string) => {
+			if (entity[0] === '#') {
+				const code = entity[1] === 'x' || entity[1] === 'X'
+					? parseInt(entity.slice(2), 16)
+					: parseInt(entity.slice(1), 10);
+				return Number.isFinite(code) ? String.fromCodePoint(code) : full;
+			}
+			return ENTITY_MAP[entity.toLowerCase()] ?? full;
+		}
+	);
+}
+
+/* Some titres arrivent avec un encodage HTML appliqué deux fois
+ * (ex. "&amp;lt;i&amp;gt;Candida&amp;lt;/i&amp;gt;" pour "<i>Candida</i>").
+ * On détecte ce cas (présence de &amp; immédiatement suivi d'une entité
+ * connue) et on décode deux niveaux pour retomber sur du HTML normal,
+ * que la suite du pipeline sanitize comme d'habitude. */
+function unwrapDoubleEncoded(s: string): string {
+	if (!DOUBLE_ENCODED.test(s)) return s;
+	return decodeEntitiesOnce(decodeEntitiesOnce(s));
+}
 
 export function sanitizeTitle(s: string | null | undefined): string {
 	if (!s) return '';
 
-	if (HAS_LATEX.test(s)) return renderLatex(s);
-	if (HAS_MATHML.test(s) || /<\/?[a-z]/i.test(s)) return sanitizeMathML(s);
+	const input = unwrapDoubleEncoded(s);
 
-	return escapeHtml(s);
+	if (HAS_LATEX.test(input)) return renderLatex(input);
+	if (HAS_MATHML.test(input) || /<\/?[a-z]/i.test(input)) return sanitizeMathML(input);
+
+	return escapeHtml(input);
 }
 
 export function titleCase(s: string | null | undefined): string {

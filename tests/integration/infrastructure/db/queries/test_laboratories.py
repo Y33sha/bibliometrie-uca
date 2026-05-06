@@ -235,6 +235,34 @@ class TestGetLaboratoryDashboard:
         assert res["collab"]["international"] == 1
         assert any(c["code"] == "us" for c in res["top_countries"])
 
+    async def test_excludes_non_applicable_country(self, async_db):
+        """`xx` (Non applicable) ne doit ni gonfler le compte international
+        ni apparaître dans le top pays."""
+        lab = await _create_structure(async_db, code="LAB")
+        pid = await _create_person(async_db)
+        await async_db.execute(
+            """
+            INSERT INTO publications (title, title_normalized, pub_year, doc_type, oa_status, countries)
+            VALUES ('Y', 'y', 2024, 'article', 'closed', ARRAY['fr', 'xx'])
+            RETURNING id
+            """
+        )
+        row = await async_db.fetchone()
+        pub_id = row["id"]
+        await async_db.execute(
+            """
+            INSERT INTO authorships (publication_id, person_id, structure_ids, in_perimeter, roles)
+            VALUES (%s, %s, %s, TRUE, ARRAY['author']::text[])
+            """,
+            (pub_id, pid, [lab]),
+        )
+
+        res = await get_laboratory_dashboard(async_db, lab)
+        assert res["collab"]["total_articles"] == 1
+        assert res["collab"]["international"] == 0
+        assert res["collab"]["domestic"] == 1
+        assert not any(c["code"] == "xx" for c in res["top_countries"])
+
 
 class TestGetLaboratorySubjects:
     async def test_top_subjects_by_frequency(self, async_db):
