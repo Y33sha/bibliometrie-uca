@@ -37,6 +37,7 @@ from application.ports.person_duplicates_queries import AsyncPersonDuplicatesQue
 from application.ports.publication_duplicates_queries import AsyncPublicationDuplicatesQueries
 from application.ports.publishers_queries import AsyncPublisherQueries
 from application.ports.stats_queries import AsyncStatsQueries
+from application.ports.structures_queries import AsyncStructuresQueries
 from application.ports.subjects_queries import AsyncSubjectsQueries
 from domain.ports.address_repository import AsyncAddressRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository
@@ -61,6 +62,7 @@ from infrastructure.db.queries.person_duplicates import PgAsyncPersonDuplicatesQ
 from infrastructure.db.queries.publication_duplicates import PgAsyncPublicationDuplicatesQueries
 from infrastructure.db.queries.publishers import PgAsyncPublisherQueries
 from infrastructure.db.queries.stats import PgAsyncStatsQueries
+from infrastructure.db.queries.structures import PgAsyncStructuresQueries
 from infrastructure.db.queries.subjects import PgAsyncSubjectsQueries
 from infrastructure.repositories import (
     async_address_repository,
@@ -214,6 +216,12 @@ def stats_queries(
     conn: AsyncConnection = Depends(db_conn),
 ) -> AsyncStatsQueries:
     return PgAsyncStatsQueries(conn)
+
+
+def structures_queries(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncStructuresQueries:
+    return PgAsyncStructuresQueries(conn)
 
 
 def person_duplicates_queries(
