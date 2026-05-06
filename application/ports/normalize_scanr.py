@@ -38,8 +38,6 @@ class ScanrNormalizeQueries(Protocol):
         *,
         idref: str,
         full_name: str,
-        last_name: str | None,
-        first_name: str | None,
         orcid: str | None,
     ) -> int: ...
 

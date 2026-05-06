@@ -91,23 +91,21 @@ def upsert_scanr_source_person_by_idref(
     *,
     idref: str,
     full_name: str,
-    last_name: str | None,
-    first_name: str | None,
     orcid: str | None,
 ) -> int:
     """UPSERT d'un `source_persons` ScanR dédupliqué sur `idref`."""
     cur.execute(
         """
         INSERT INTO source_persons
-            (source, source_id, full_name, last_name, first_name, orcid, idref)
-        VALUES ('scanr', %s, %s, %s, %s, %s, %s)
+            (source, source_id, full_name, orcid, idref)
+        VALUES ('scanr', %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
             full_name = EXCLUDED.full_name,
             idref = COALESCE(source_persons.idref, EXCLUDED.idref)
         RETURNING id
         """,
-        (idref, full_name, last_name, first_name, orcid, idref),
+        (idref, full_name, orcid, idref),
     )
     row = cur.fetchone()
     return row["id"] if isinstance(row, dict) else row[0]
@@ -222,16 +220,12 @@ class PgScanrNormalizeQueries:
         *,
         idref: str,
         full_name: str,
-        last_name: str | None,
-        first_name: str | None,
         orcid: str | None,
     ) -> int:
         return upsert_scanr_source_person_by_idref(
             cur,
             idref=idref,
             full_name=full_name,
-            last_name=last_name,
-            first_name=first_name,
             orcid=orcid,
         )
 

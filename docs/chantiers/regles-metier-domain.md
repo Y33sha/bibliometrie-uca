@@ -452,6 +452,23 @@ relocalisées en `domain/`.
   comparabilité avec `person_identifiers`. Suppression au passage
   de `interfaces/cli/crossref_spike.py` (one-shot phase 0
   crossref, livrable terminé).
+- **Découpage `last_name`/`first_name` — colonnes supprimées** :
+  les colonnes `source_persons.last_name` et
+  `source_persons.first_name` sont droppées (migration 022). Le
+  parsing du nom est désormais fait à la lecture par
+  `domain.names.parse_raw_author_name(raw_author_name)`,
+  uniformément pour toutes les sources (auparavant : asymétrie
+  HAL/ScanR/theses lisaient les colonnes, OA/WoS/Crossref parsaient
+  déjà). Effets de bord : suppression des splits inlinés HAL et
+  ScanR ; fusion de `fetch_linked_authorships_structured` +
+  `fetch_linked_authorships_openalex` en une seule
+  `fetch_linked_authorships` (l'asymétrie disparaît) ;
+  `fetch_thesis_primary_author` réécrite pour lire
+  `source_authorships.raw_author_name` ; suppression de la
+  constante `SOURCES_WITH_STRUCTURED_NAMES` (plus de sens).
+  Bonus : la règle « Nom, Prénom » (avec virgule) est désormais
+  correctement parsée pour HAL/ScanR/theses — leur split inline
+  ne la gérait pas.
 
 ## Décisions actées
 

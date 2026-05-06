@@ -42,8 +42,6 @@ class ThesesNormalizeQueries(Protocol):
         *,
         ppn: str,
         full_name: str,
-        last_name: str,
-        first_name: str | None,
     ) -> int: ...
 
     def upsert_theses_source_authorship(

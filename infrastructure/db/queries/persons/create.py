@@ -7,7 +7,6 @@ Regroupe les SELECT nécessaires aux 4 passes de rattachement
 
 from typing import Any
 
-from domain.sources import SOURCES_WITH_STRUCTURED_NAMES_SQL
 from infrastructure.db_helpers import rows_as_dicts
 
 
@@ -18,39 +17,28 @@ def fetch_unlinked_authorships(cur: Any) -> list[dict[str, Any]]:
     Une seule requête (un seul round-trip DB) — les différences sémantiques
     entre sources sont portées par des CASE expressions :
 
-    - `last_name` / `first_name` / `orcid` : NULL pour OpenAlex (entités OA
-      non fiables, cf. MEMORY — le caller applique `parse_raw_author_name`).
+    - `orcid` : NULL pour OpenAlex/WoS/CrossRef (l'ORCID vit sur
+      `identifiers` côté authorship pour ces sources, cf. chantier
+      source_persons).
     - `idhal`, `source_person_id`, `has_hal_person_id`, `hal_person_id` :
       renseignés uniquement pour HAL (dual-write sur `hal_authorships.person_id`).
     - `idref` : renseigné pour ScanR et theses.
-    - `oa_orcid` / `oa_full_name` : exposés pour OpenAlex uniquement, pour
-      permettre au caller la vérification de compatibilité des noms.
+    - `oa_orcid` / `oa_full_name` : exposés pour OpenAlex/WoS/CrossRef
+      pour permettre au caller la vérification de compatibilité des noms.
     - `roles` : renseigné pour theses uniquement (distingue auteur vs
       directeur de thèse).
 
-    Filtre supplémentaire : OpenAlex exclu des lignes avec
+    Le nom (last/first) est parsé côté caller via
+    `domain.names.parse_raw_author_name(full_name)` — uniformément pour
+    toutes les sources.
+
+    Filtre supplémentaire : OpenAlex/WoS/CrossRef exclus des lignes avec
     `raw_author_name IS NULL` (pas de nom utilisable).
-
-    LEFT JOIN sur `source_persons` : depuis le chantier source_persons,
-    les sources non-structurées (OpenAlex, WoS, CrossRef) écrivent
-    `source_person_id=NULL` ; les identifiants normalisés vivent sur
-    `source_authorships.identifiers`. Pour les sources qui alimentent
-    toujours `source_persons` (HAL avec `hal_person_id`, ScanR avec
-    idref, theses avec PPN), le JOIN ramène la row et les CASE
-    continuent de fonctionner.
-
-    Les colonnes `oa_orcid` / `oa_full_name` (nom historique) couvrent
-    désormais OA + WoS + CrossRef — toutes les sources où le nom n'est
-    pas structuré et où l'ORCID vit sur `identifiers` côté authorship.
     """
     cur.execute("""
         SELECT sa_auth.id AS authorship_id,
                sa_auth.source AS source,
                sa_auth.raw_author_name AS full_name,
-               CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref') THEN NULL::text
-                    ELSE sa.last_name END AS last_name,
-               CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref') THEN NULL::text
-                    ELSE sa.first_name END AS first_name,
                CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref') THEN NULL::text
                     ELSE COALESCE(sa.orcid, sa_auth.identifiers->>'orcid') END AS orcid,
                CASE WHEN sa_auth.source = 'hal'
@@ -91,41 +79,22 @@ def fetch_unlinked_authorships(cur: Any) -> list[dict[str, Any]]:
     return rows_as_dicts(cur)
 
 
-def fetch_linked_authorships_structured(cur: Any) -> list[dict[str, Any]]:
-    """`source_authorships` rattachées pour les sources avec noms structurés
-    (HAL/ScanR/theses : `source_persons.last_name`/`first_name`).
+def fetch_linked_authorships(cur: Any) -> list[dict[str, Any]]:
+    """`source_authorships` déjà rattachées (toutes sources confondues).
 
-    LEFT JOIN sur `source_persons` : pour les rows WoS post-chantier
-    source_persons, `source_person_id` est NULL ; le caller détecte
-    `last_name`/`first_name` NULL et bascule sur le parsing de
-    `raw_author_name`.
+    Ramène `raw_author_name` ; le caller parse via
+    `domain.names.parse_raw_author_name` pour toutes les sources
+    uniformément. Ne touche pas à `source_persons` — pas de JOIN
+    nécessaire.
     """
-    cur.execute(f"""
-        SELECT sa_auth.person_id, sa_auth.author_position,
-               sd.publication_id,
-               sa.last_name, sa.first_name, sa_auth.raw_author_name AS full_name,
-               sa_auth.source
-        FROM source_authorships sa_auth
-        LEFT JOIN source_persons sa ON sa.id = sa_auth.source_person_id
-        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-        WHERE sa_auth.source IN {SOURCES_WITH_STRUCTURED_NAMES_SQL}
-          AND sa_auth.person_id IS NOT NULL
-          AND sd.publication_id IS NOT NULL
-    """)
-    return rows_as_dicts(cur)
-
-
-def fetch_linked_authorships_openalex(cur: Any) -> list[dict[str, Any]]:
-    """`source_authorships` rattachées pour OpenAlex (nom via raw_author_name)."""
     cur.execute("""
         SELECT sa_auth.person_id, sa_auth.author_position,
                sd.publication_id,
                sa_auth.raw_author_name AS full_name,
-               'openalex' AS source
+               sa_auth.source
         FROM source_authorships sa_auth
         JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-        WHERE sa_auth.source = 'openalex'
-          AND sa_auth.person_id IS NOT NULL
+        WHERE sa_auth.person_id IS NOT NULL
           AND sd.publication_id IS NOT NULL
     """)
     return rows_as_dicts(cur)
@@ -177,11 +146,8 @@ class PgPersonsCreateQueries:
     def fetch_unlinked_authorships(self, cur: Any) -> list[dict[str, Any]]:
         return fetch_unlinked_authorships(cur)
 
-    def fetch_linked_authorships_structured(self, cur: Any) -> list[dict[str, Any]]:
-        return fetch_linked_authorships_structured(cur)
-
-    def fetch_linked_authorships_openalex(self, cur: Any) -> list[dict[str, Any]]:
-        return fetch_linked_authorships_openalex(cur)
+    def fetch_linked_authorships(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_linked_authorships(cur)
 
     def fetch_hal_account_to_person_map(self, cur: Any) -> dict[int, int]:
         return fetch_hal_account_to_person_map(cur)

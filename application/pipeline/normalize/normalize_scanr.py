@@ -269,21 +269,11 @@ def upsert_scanr_author(cur: Any, queries: ScanrNormalizeQueries, author: dict) 
     if not idref:
         return None
 
-    parts = full_name.strip().split()
-    if len(parts) >= 2:
-        first_name = " ".join(parts[:-1])
-        last_name = parts[-1]
-    else:
-        first_name = None
-        last_name = full_name
-
     orcid = normalize_orcid(denorm.get("orcid"))
     return queries.upsert_scanr_source_person_by_idref(
         cur,
         idref=idref,
         full_name=full_name,
-        last_name=last_name,
-        first_name=first_name,
         orcid=orcid,
     )
 

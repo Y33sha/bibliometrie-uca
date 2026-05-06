@@ -1031,22 +1031,25 @@ def _setup_persons_test_data(db):
 
     # HAL authors (source_persons, avec hal_person_id dans source_ids pour l'étape 0)
     db.execute("""
-        INSERT INTO source_persons (id, source, source_id, full_name, last_name, first_name, orcid, source_ids)
-        VALUES (90001, 'hal', 'hal-author-90001', 'Eve Leroy', 'Leroy', 'Eve', '0000-0001-9999-0001', '{"hal_person_id": 900001}'),
-               (90002, 'hal', 'hal-author-90002', 'Frank Moreau', 'Moreau', 'Frank', NULL, '{"hal_person_id": 900002}'),
-               (90003, 'hal', 'hal-author-90003', 'Grace Petit', 'Petit', 'Grace', NULL, NULL)
+        INSERT INTO source_persons (id, source, source_id, full_name, orcid, source_ids)
+        VALUES (90001, 'hal', 'hal-author-90001', 'Eve Leroy', '0000-0001-9999-0001', '{"hal_person_id": 900001}'),
+               (90002, 'hal', 'hal-author-90002', 'Frank Moreau', NULL, '{"hal_person_id": 900002}'),
+               (90003, 'hal', 'hal-author-90003', 'Grace Petit', NULL, NULL)
     """)
 
-    # HAL authorships (in_perimeter=TRUE, person_id=NULL)
+    # HAL authorships (in_perimeter=TRUE, person_id=NULL).
+    # `raw_author_name` est obligatoire depuis la suppression de
+    # `source_persons.{last_name,first_name}` : c'est la source du parsing
+    # de noms côté pipeline (parse_raw_author_name).
     db.execute("""
         INSERT INTO source_authorships
             (id, source, source_publication_id, source_person_id, author_position, in_perimeter,
-             person_id, author_name_normalized)
+             person_id, author_name_normalized, raw_author_name)
         VALUES
-            (90001, 'hal', 90001, 90001, 0, TRUE, NULL, 'eve leroy'),
-            (90002, 'hal', 90001, 90002, 1, TRUE, NULL, 'frank moreau'),
-            (90003, 'hal', 90002, 90001, 0, TRUE, NULL, 'eve leroy'),
-            (90004, 'hal', 90002, 90003, 1, TRUE, NULL, 'grace petit')
+            (90001, 'hal', 90001, 90001, 0, TRUE, NULL, 'eve leroy', 'Eve Leroy'),
+            (90002, 'hal', 90001, 90002, 1, TRUE, NULL, 'frank moreau', 'Frank Moreau'),
+            (90003, 'hal', 90002, 90001, 0, TRUE, NULL, 'eve leroy', 'Eve Leroy'),
+            (90004, 'hal', 90002, 90003, 1, TRUE, NULL, 'grace petit', 'Grace Petit')
     """)
 
 
@@ -1281,9 +1284,9 @@ def _setup_affiliations_test_data(db):
 
     # Source authors
     db.execute("""
-        INSERT INTO source_persons (id, source, source_id, full_name, last_name, first_name)
-        VALUES (80001, 'hal', 'hal-author-80001', 'Alice Dupont', 'Dupont', 'Alice'),
-               (80002, 'openalex', 'A80001', 'Alice Dupont', 'Dupont', 'Alice')
+        INSERT INTO source_persons (id, source, source_id, full_name)
+        VALUES (80001, 'hal', 'hal-author-80001', 'Alice Dupont'),
+               (80002, 'openalex', 'A80001', 'Alice Dupont')
     """)
 
     # HAL authorship (avec source_struct_ids pointant vers source_structures)

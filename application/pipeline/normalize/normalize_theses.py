@@ -330,9 +330,7 @@ def upsert_source_author(cur: Any, queries: ThesesNormalizeQueries, person: dict
         return None
 
     full_name = f"{prenom} {nom}".strip() if prenom else nom
-    return queries.upsert_theses_source_person_by_ppn(
-        cur, ppn=ppn, full_name=full_name, last_name=nom, first_name=prenom
-    )
+    return queries.upsert_theses_source_person_by_ppn(cur, ppn=ppn, full_name=full_name)
 
 
 # =============================================================

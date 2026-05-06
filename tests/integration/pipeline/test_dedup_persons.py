@@ -33,9 +33,6 @@ def _insert_publication(db, title="Test Pub", pub_year=2024):
 
 def _insert_hal_author(db, full_name, hal_person_id=None, orcid=None, idhal=None):
     """Crée un source_author HAL minimal."""
-    parts = full_name.strip().split()
-    last = parts[-1] if len(parts) >= 2 else full_name
-    first = " ".join(parts[:-1]) if len(parts) >= 2 else None
     import json
 
     source_ids = {}
@@ -45,15 +42,12 @@ def _insert_hal_author(db, full_name, hal_person_id=None, orcid=None, idhal=None
         source_ids["idhal"] = idhal
     db.execute(
         """
-        INSERT INTO source_persons (source, source_id, full_name, last_name, first_name,
-                                    orcid, source_ids)
-        VALUES ('hal', %s, %s, %s, %s, %s, %s) RETURNING id
+        INSERT INTO source_persons (source, source_id, full_name, orcid, source_ids)
+        VALUES ('hal', %s, %s, %s, %s) RETURNING id
     """,
         (
             f"hal-{full_name}",
             full_name,
-            last,
-            first,
             orcid,
             json.dumps(source_ids) if source_ids else None,
         ),
@@ -74,31 +68,51 @@ def _insert_hal_document(db, halid, publication_id):
 
 
 def _insert_hal_authorship(
-    db, source_publication_id, source_person_id, position=0, in_perimeter=True, person_id=None
+    db,
+    source_publication_id,
+    source_person_id,
+    position=0,
+    in_perimeter=True,
+    person_id=None,
+    raw_author_name=None,
 ):
-    """Crée une source_authorship HAL."""
+    """Crée une source_authorship HAL.
+
+    `raw_author_name` est lu depuis `source_persons.full_name` par défaut
+    (parse côté caller via `parse_raw_author_name`) — c'est ce qui se
+    passe en prod aussi.
+    """
+    if raw_author_name is None:
+        db.execute("SELECT full_name FROM source_persons WHERE id = %s", (source_person_id,))
+        row = db.fetchone()
+        raw_author_name = row["full_name"] if row else None
     db.execute(
         """
         INSERT INTO source_authorships
-            (source, source_publication_id, source_person_id, author_position, in_perimeter, person_id)
-        VALUES ('hal', %s, %s, %s, %s, %s) RETURNING id
+            (source, source_publication_id, source_person_id, author_position,
+             in_perimeter, person_id, raw_author_name)
+        VALUES ('hal', %s, %s, %s, %s, %s, %s) RETURNING id
     """,
-        (source_publication_id, source_person_id, position, in_perimeter, person_id),
+        (
+            source_publication_id,
+            source_person_id,
+            position,
+            in_perimeter,
+            person_id,
+            raw_author_name,
+        ),
     )
     return db.fetchone()["id"]
 
 
 def _insert_oa_author(db, full_name, openalex_id, orcid=None):
     """Crée un source_author OpenAlex minimal."""
-    parts = full_name.strip().split()
-    last = parts[-1] if len(parts) >= 2 else full_name
-    first = " ".join(parts[:-1]) if len(parts) >= 2 else None
     db.execute(
         """
-        INSERT INTO source_persons (source, source_id, full_name, last_name, first_name, orcid)
-        VALUES ('openalex', %s, %s, %s, %s, %s) RETURNING id
+        INSERT INTO source_persons (source, source_id, full_name, orcid)
+        VALUES ('openalex', %s, %s, %s) RETURNING id
     """,
-        (openalex_id, full_name, last, first, orcid),
+        (openalex_id, full_name, orcid),
     )
     return db.fetchone()["id"]
 
