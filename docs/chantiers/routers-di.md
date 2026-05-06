@@ -106,7 +106,7 @@ pattern progressivement :
 - [x] `hal_problems.py` *(commit `e0cf5d6`)*
 - [x] `config.py` *(commit `59a4181`)*
 - [x] `perimeters.py` *(commit `b930093`)*
-- [x] `structures.py` *(commit à venir)*
+- [x] `structures.py` *(commit `291cbe3`)*
 - [x] `stats.py` *(commit `c882221`)*
 - [ ] `laboratories.py`
 - [ ] `publications.py`
@@ -124,7 +124,7 @@ Certains routers utilisent des query modules qui n'ont pas de port.
 - [x] `person_duplicates` query service *(commit `af657f9`)*
 - [x] `publishers` query service *(commit `b617757`)*
 - [x] `journals` query service *(commit `9ce5ee8`)*
-- [x] `structures` query service *(commit à venir)*
+- [x] `structures` query service *(commit `291cbe3`)*
 - [x] `addresses` query service *(commit `1bdb3dd`)*
 - [ ] `laboratories` query service
 - [x] `stats` query service *(commit `c882221` — agrège les 7 fonctions des 4 modules `stats/*` derrière `PgAsyncStatsQueries`)*
