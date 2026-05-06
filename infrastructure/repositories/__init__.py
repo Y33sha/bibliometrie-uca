@@ -15,27 +15,29 @@ Usage :
     def set_rejected(cur, person_id, rejected):
         person_repository(cur).set_rejected(person_id, rejected)
 
-Les agrégats Address, Config et Structure ne sont exposés qu'en async
-(seuls consommateurs = routers API). Authorship, Journal, Person et
-Publication existent dans les deux variantes (sync pour pipeline/CLI,
-async pour API).
+Les agrégats Address, Perimeter et Structure ne sont exposés qu'en
+async (seuls consommateurs = routers API), de même que la table
+clé/valeur Config (port `application.ports.config.AsyncConfigStore`).
+Authorship, Journal, Person et Publication existent dans les deux
+variantes (sync pour pipeline/CLI, async pour API).
 """
 
 from typing import Any
 
 from domain.ports.address_repository import AsyncAddressRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository, AuthorshipRepository
-from domain.ports.config_repository import AsyncConfigRepository
 from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
+from domain.ports.perimeter_repository import AsyncPerimeterRepository
 from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
 from domain.ports.publication_repository import AsyncPublicationRepository, PublicationRepository
 from domain.ports.publisher_repository import AsyncPublisherRepository, PublisherRepository
 from domain.ports.structure_repository import AsyncStructureRepository
+from infrastructure.db.queries.config import PgAsyncConfig
 
 from .async_address_repository import PgAsyncAddressRepository
 from .async_authorship_repository import PgAsyncAuthorshipRepository
-from .async_config_repository import PgAsyncConfigRepository
 from .async_journal_repository import PgAsyncJournalRepository
+from .async_perimeter_repository import PgAsyncPerimeterRepository
 from .async_person_repository import PgAsyncPersonRepository
 from .async_publication_repository import PgAsyncPublicationRepository
 from .async_publisher_repository import PgAsyncPublisherRepository
@@ -83,12 +85,23 @@ def async_authorship_repository(cur: Any) -> AsyncAuthorshipRepository:
     return PgAsyncAuthorshipRepository(cur)
 
 
-def async_config_repository(cur: Any) -> AsyncConfigRepository:
-    return PgAsyncConfigRepository(cur)
+def async_config_store(cur: Any) -> PgAsyncConfig:
+    """Retourne un AsyncConfigStore (port défini dans application/ports/config.py).
+
+    Le type de retour est annoté avec la classe concrète pour respecter
+    la règle DDD `infrastructure ⊥ application` ; les call sites côté
+    application/ typent leur paramètre via le Protocol AsyncConfigStore
+    (duck typing structurel).
+    """
+    return PgAsyncConfig(cur)
 
 
 def async_journal_repository(cur: Any) -> AsyncJournalRepository:
     return PgAsyncJournalRepository(cur)
+
+
+def async_perimeter_repository(cur: Any) -> AsyncPerimeterRepository:
+    return PgAsyncPerimeterRepository(cur)
 
 
 def async_person_repository(cur: Any) -> AsyncPersonRepository:

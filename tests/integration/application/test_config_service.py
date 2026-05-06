@@ -13,12 +13,17 @@ from application.config import (
     update_perimeter,
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from infrastructure.repositories import async_config_repository
+from infrastructure.repositories import async_config_store, async_perimeter_repository
 
 
 @pytest.fixture
 def repo(async_db):
-    return async_config_repository(async_db)
+    return async_perimeter_repository(async_db)
+
+
+@pytest.fixture
+def config(async_db):
+    return async_config_store(async_db)
 
 
 # ── Helpers ────────────────────────────────────────────────────────
@@ -54,19 +59,19 @@ async def _create_struct(db, code="UCA"):
 
 
 class TestUpdateConfigValue:
-    async def test_raises_not_found(self, async_db, repo):
+    async def test_raises_not_found(self, async_db, config):
         with pytest.raises(NotFoundError):
-            await update_config_value(async_db, "nonexistent", "x", repo=repo)
+            await update_config_value(async_db, "nonexistent", "x", config=config)
 
-    async def test_updates_existing(self, async_db, repo):
+    async def test_updates_existing(self, async_db, config):
         await _insert_config(async_db, "test_key", "old")
-        row = await update_config_value(async_db, "test_key", "new", repo=repo)
+        row = await update_config_value(async_db, "test_key", "new", config=config)
         assert row is not None
         assert row["value"] == "new"
 
-    async def test_updates_with_dict_value(self, async_db, repo):
+    async def test_updates_with_dict_value(self, async_db, config):
         await _insert_config(async_db, "test_key", {})
-        row = await update_config_value(async_db, "test_key", {"a": 1, "b": 2}, repo=repo)
+        row = await update_config_value(async_db, "test_key", {"a": 1, "b": 2}, config=config)
         assert row["value"] == {"a": 1, "b": 2}
 
 
@@ -177,23 +182,23 @@ class TestUpdatePerimeter:
 
 
 class TestDeletePerimeter:
-    async def test_raises_not_found(self, async_db, repo):
+    async def test_raises_not_found(self, async_db, repo, config):
         with pytest.raises(NotFoundError):
-            await delete_perimeter(async_db, 999999, repo=repo)
+            await delete_perimeter(async_db, 999999, repo=repo, config=config)
 
-    async def test_deletes(self, async_db, repo):
+    async def test_deletes(self, async_db, repo, config):
         p = await _insert_perimeter(async_db, code="disposable")
-        await delete_perimeter(async_db, p, repo=repo)
+        await delete_perimeter(async_db, p, repo=repo, config=config)
         await async_db.execute("SELECT id FROM perimeters WHERE id = %s", (p,))
         assert await async_db.fetchone() is None
 
-    async def test_raises_if_used_by_config(self, async_db, repo):
+    async def test_raises_if_used_by_config(self, async_db, repo, config):
         """Si le périmètre est référencé dans config (perimeter_*), refus."""
         p = await _insert_perimeter(async_db, code="used_perim")
         await _insert_config(async_db, "perimeter_extraction", "used_perim")
 
         with pytest.raises(ConflictError, match="utilisé par"):
-            await delete_perimeter(async_db, p, repo=repo)
+            await delete_perimeter(async_db, p, repo=repo, config=config)
 
         # Le périmètre existe toujours
         await async_db.execute("SELECT id FROM perimeters WHERE id = %s", (p,))
