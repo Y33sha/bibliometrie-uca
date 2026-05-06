@@ -254,20 +254,37 @@ maximal là).
   - Note : passage à un `AuditRepository` propre (`application/`
     via port + adapter `infrastructure/`) reste prévu en Phase 3
     du chantier audit-cto.
-- [ ] `infrastructure/db/queries/filters.py` — refondre l'API en
-  retournant des fragments SQLAlchemy composables au lieu de muter
-  `(conditions, params)`.
-- [ ] `infrastructure/db/queries/publications/facets.py`
-  (`_PublicationFacetsBuilder`) — le plus complexe ; vérifier que
-  la lisibilité gagne réellement.
-- [ ] Listings paginés : `addresses.py`, `persons/list.py`,
-  `publications/list.py`, `journals.py`, `publishers.py`,
-  `structures.py`.
-- [ ] `subjects.py` — partiellement (queries dynamiques uniquement,
-  les opérations JSON spécifiques restent en SQL brut).
-
-À chaque étape : commit séparé, tests d'intégration verts, pas de
-mélange ancien/nouveau pattern dans un même fichier.
+- [x] **`filters.py` refondu** : `WhereClause(sql, binds)` +
+  `assemble_where(clauses)` (binds nommés `:name`, syntaxe SA `text()`).
+  ~17 fonctions `*_clause` remplacent les anciens `apply_*` mutateurs
+  de `(conditions, params)`. Branche legacy supprimée à la fin de la
+  Phase 1.
+- [x] **Pilote stats/publishers** *(commit `aa1d5be`)* — premier
+  consommateur sur l'API SA (4 filtres + APC_SUM_SA en bind nommé).
+- [x] **stats/{journals,labs,summary}** *(commit `60d1c48`)* —
+  3 fichiers + 6 endpoints. Helper `_common_clauses(... skip=)` pour
+  les facettes croisées de stats_summary.
+- [x] **persons/list** *(commit `c507a0b`)* — 3 endpoints (directory,
+  search, list admin) + variantes SA `person_*_clause`.
+- [x] **publications/list** *(commit `8b7e0f7`)* — 3 endpoints (list,
+  export.csv, export-theses.csv) avec ~10 nouvelles `*_clause`
+  (access, doc_type, source, person, corresponding, hal_status, apc,
+  no_lab, country, subject, publisher_id, journal_id).
+- [x] **laboratories** *(commit `edeab5a`)* — 6 endpoints. Bonus :
+  `infrastructure/perimeter.async_get_persons_perimeter_root_ids`
+  passé en mode dispatch.
+- [x] **publications/facets** *(commit `5565d06`)* — le plus
+  complexe : `_PublicationFacetsBuilder` réécrit, parallélisme
+  préservé via `engine.begin()` (une AsyncConnection SA par facette).
+  Bonus : persons/facets, publications/detail (all_years,
+  get_publication_detail, get_publication_subjects).
+- [x] **persons/detail** *(commit `9c2a672`)* — 6 endpoints
+  (id/profile/theses/addresses/dashboard/subjects).
+- [x] **Nettoyage `apply_*` legacy** : tous les apply_* supprimés
+  une fois plus aucun consommateur. `apply_stats_apc_filter` aussi.
+- [ ] **subjects.py** — partiellement (queries dynamiques uniquement,
+  les opérations JSON spécifiques restent en SQL brut). À traiter
+  en Phase 3 au fil de l'eau.
 
 ### Phase 2 — Migration des modules (repos d'écriture + services + routers writes)
 
