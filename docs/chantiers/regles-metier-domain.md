@@ -452,6 +452,13 @@ relocalisées en `domain/`.
   comparabilité avec `person_identifiers`. Suppression au passage
   de `interfaces/cli/crossref_spike.py` (one-shot phase 0
   crossref, livrable terminé).
+- **`extract_thesis_year` rapatriée + déduplication** : règle
+  « pub_year = soutenance, sinon première inscription » dupliquée
+  verbatim dans `extract_pub_metadata` et `insert_source_document`
+  de `normalize_theses.py`. Fonction unique
+  `extract_thesis_year(date_soutenance, date_inscription)` ajoutée
+  dans `domain/sources/theses.py`. Format `JJ/MM/AAAA` géré par un
+  helper privé `_year_from_theses_date`. Tests unitaires (5 cas).
 - **`extract_nnt_from_scanr_id` rapatriée** : de
   `application/pipeline/normalize/normalize_scanr.py` (helper privé
   `_extract_nnt_from_scanr_id`) vers `domain/sources/scanr.py`. Convention

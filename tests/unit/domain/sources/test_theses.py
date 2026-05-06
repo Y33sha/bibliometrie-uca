@@ -1,4 +1,4 @@
-from domain.sources.theses import derive_theses_doc_type
+from domain.sources.theses import derive_theses_doc_type, extract_thesis_year
 
 
 class TestDeriveThesesDocType:
@@ -9,3 +9,25 @@ class TestDeriveThesesDocType:
     def test_without_date_soutenance_returns_ongoing_thesis(self):
         assert derive_theses_doc_type(None) == "ongoing_thesis"
         assert derive_theses_doc_type("") == "ongoing_thesis"
+
+
+class TestExtractThesisYear:
+    def test_soutenance_present_wins(self):
+        # Format theses.fr : JJ/MM/AAAA. Année = dernier segment.
+        assert extract_thesis_year("15/06/2023", "01/09/2020") == 2023
+
+    def test_falls_back_on_inscription_when_soutenance_absent(self):
+        assert extract_thesis_year(None, "01/09/2020") == 2020
+        assert extract_thesis_year("", "01/09/2020") == 2020
+
+    def test_returns_none_when_both_absent(self):
+        assert extract_thesis_year(None, None) is None
+        assert extract_thesis_year("", "") is None
+
+    def test_returns_none_when_dates_malformed(self):
+        # Pas de séparateur '/' interprétable en int
+        assert extract_thesis_year("not-a-date", None) is None
+        assert extract_thesis_year("not-a-date", "also-bad") is None
+
+    def test_falls_back_when_soutenance_malformed_but_inscription_ok(self):
+        assert extract_thesis_year("not-a-date", "01/09/2020") == 2020
