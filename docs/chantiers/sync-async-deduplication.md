@@ -29,7 +29,7 @@ L'API actuelle (`interfaces/api/`) sert :
 - aujourd'hui : Laura, utilisatrice unique, depuis le frontend admin
   (~1 utilisateur concurrent)
 - à terme proche : quelques admins UCA pour la curation
-- à terme long (~2-3 ans) : reprise par la DSI qui réécrira
+- à terme long (~1 an) : reprise par la DSI qui réécrira
   probablement sa propre API publique en surcouche. L'API actuelle
   reste alors **outil de gestion interne** (quelques utilisateurs
   concurrents max)

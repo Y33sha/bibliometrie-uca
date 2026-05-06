@@ -33,17 +33,6 @@ dynamique (SQLAlchemy Core, cf. "À explorer"), il remplacera
 naturellement cette surface — autant éviter d'inventer une
 abstraction intermédiaire à jeter ensuite.
 
-### 1.6 Inversion de dépendance
-Extraction SQL pipeline → `infrastructure/db/queries/` faite.
-Orchestrateurs `application/pipeline/*` dépendent de ports
-(`application/ports/*`) ; adapters PostgreSQL injectés via les
-composition roots (`interfaces/cli/pipeline/*`, `run_pipeline.py`).
-Côté API : factories FastAPI `Depends` câblent query services et
-repos dans tous les routers (chantier `docs/chantiers/routers-di.md`,
-terminé). Le contract `import-linter` "Routers : pas d'import direct
-de infrastructure" verrouille la règle.
-
-
 ## Chantier qualité du code : maintenabilité, auditabilité, scalabilité
 
 ### 2.7 Frontend
