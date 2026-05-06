@@ -271,13 +271,11 @@ pas tranchés, toute évolution amplifie la dette.
   d'ORM ; AsyncEngine de bout en bout ; MetaData explicite à
   valider en phase 0). La porte vers Alembic reste ouverte et sera
   réévaluée à la fin du chantier en coût-bénéfice.
-- [ ] **Règle "routers ⊥ infrastructure" : on l'applique ou on la
-  retire ?**
-  - Si on l'applique : §1.6 ROADMAP (factories FastAPI `Depends`)
-    devient prioritaire et `import-linter` doit être durci pour
-    l'imposer
-  - Si on la retire : virer la règle 4 de `docs/architecture.md` et
-    assumer que les routers sont des composition roots
+- [x] **Règle "routers ⊥ infrastructure" : on l'applique** —
+  décision actée le 2026-05-06. Voir
+  [`docs/chantiers/routers-di.md`](routers-di.md) pour le phasage
+  (factories `Depends`, migration router par router, durcissement
+  `import-linter` à la fin).
 
 ### Phase 2 — Implémenter les décisions structurantes
 
