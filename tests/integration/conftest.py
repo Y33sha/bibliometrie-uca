@@ -14,7 +14,14 @@ import pathlib
 
 import psycopg
 import pytest
+from dotenv import load_dotenv
 from psycopg.rows import dict_row
+
+# Charge .env avant lecture de os.environ — cohérent avec
+# infrastructure/__init__.py côté code applicatif. Sinon les commandes
+# `pytest` lancées depuis un shell qui n'a pas exporté DB_USER échouent
+# avec KeyError, alors que l'info est disponible dans le .env du projet.
+load_dotenv(pathlib.Path(__file__).resolve().parent.parent.parent / ".env")
 
 DB_NAME = "bibliometrie_test"
 DB_USER = os.environ["DB_USER"]
@@ -113,3 +120,32 @@ async def async_db():
         yield cur
     await conn.rollback()
     await conn.close()
+
+
+@pytest.fixture
+async def sa_conn():
+    """AsyncConnection SQLAlchemy sur la base test, transaction rollbackée.
+
+    Utilisée par les modules migrés en SQLAlchemy Core pendant le chantier
+    sqlalchemy-core-adoption. Cohabite avec `async_db` (cur psycopg)
+    pendant la phase de migration.
+    """
+    from sqlalchemy import URL
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    url = URL.create(
+        drivername="postgresql+psycopg",
+        username=DB_USER,
+        password=DB_PASSWORD or None,
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME,
+    )
+    engine = create_async_engine(url)
+    async with engine.connect() as conn:
+        trans = await conn.begin()
+        try:
+            yield conn
+        finally:
+            await trans.rollback()
+    await engine.dispose()
