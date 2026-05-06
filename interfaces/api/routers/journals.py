@@ -13,7 +13,7 @@ from infrastructure.db.queries.journals import (
     list_journals_async,
 )
 from infrastructure.repositories import async_journal_repository
-from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.async_deps import get_async_cursor, get_sa_connection
 from interfaces.api.models import JournalListResponse, JournalUpdate, MergeRequest
 
 router = APIRouter()
@@ -64,8 +64,8 @@ async def update_journal(journal_id: int, body: JournalUpdate) -> Any:
     (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
     """
     fields = body.model_dump(exclude_unset=True)
-    async with get_async_cursor() as (cur, _conn):
-        await _update_journal(cur, journal_id, fields=fields, repo=async_journal_repository(cur))
+    async with get_sa_connection() as conn:
+        await _update_journal(conn, journal_id, fields=fields, repo=async_journal_repository(conn))
         return {"ok": True}
 
 
@@ -77,12 +77,12 @@ async def merge(journal_id: int, body: MergeRequest) -> Any:
     la cible ; la source est supprimée. 404 si l'une des deux est
     introuvable.
     """
-    async with get_async_cursor() as (cur, _conn):
-        found = await existing_journal_ids(cur, (journal_id, body.source_id))
+    async with get_sa_connection() as conn:
+        found = await existing_journal_ids(conn, (journal_id, body.source_id))
         if journal_id not in found:
             raise HTTPException(status_code=404, detail="Revue cible introuvable")
         if body.source_id not in found:
             raise HTTPException(status_code=404, detail="Revue source introuvable")
 
-        await merge_journals(cur, journal_id, body.source_id, repo=async_journal_repository(cur))
+        await merge_journals(conn, journal_id, body.source_id, repo=async_journal_repository(conn))
         return {"merged": True, "source_id": body.source_id, "target_id": journal_id}

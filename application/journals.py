@@ -5,9 +5,17 @@ Les opérations sur l'agrégat Publisher vivent dans `application/publishers.py`
 (principe SRP). Les deux agrégats restent liés par `journals.publisher_id`
 (FK) mais sont manipulés par des services distincts, chacun sur son
 propre port.
+
+Variantes async migrées en SQLAlchemy Core (chantier sqlalchemy-core-adoption,
+sous-phase 1.3) : `update_journal`, `merge_journals` reçoivent une
+`AsyncConnection` SA. La face sync (`find_or_create_journal`,
+`update_journal_apc`, `reset_journal_apc`) reste sur curseur psycopg —
+sera migrée en Phase 4 du chantier.
 """
 
 from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from application.audit import async_emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
@@ -105,7 +113,7 @@ def find_or_create_journal(
 
 
 async def update_journal(
-    cur: Any, journal_id: int, *, fields: dict, repo: AsyncJournalRepository
+    conn: AsyncConnection, journal_id: int, *, fields: dict, repo: AsyncJournalRepository
 ) -> None:
     """Met à jour une revue. Le `title` est automatiquement normalisé en
     `title_normalized`.
@@ -149,11 +157,11 @@ def reset_journal_apc(cur: Any, *, repo: JournalRepository) -> int:
 
 
 async def merge_journals(
-    cur: Any, target_id: int, source_id: int, *, repo: AsyncJournalRepository
+    conn: AsyncConnection, target_id: int, source_id: int, *, repo: AsyncJournalRepository
 ) -> None:
     """Fusionne le journal source dans le journal cible."""
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un journal avec lui-même")
 
     await repo.merge_journal_into(target_id, source_id)
-    await async_emit_event(cur, "journal.merged", "journal", target_id, {"source_id": source_id})
+    await async_emit_event(conn, "journal.merged", "journal", target_id, {"source_id": source_id})

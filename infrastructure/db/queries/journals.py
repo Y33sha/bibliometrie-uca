@@ -72,13 +72,18 @@ async def get_journal_async(cur: Any, journal_id: int) -> dict[str, Any] | None:
     return await cur.fetchone()
 
 
-async def existing_journal_ids(cur: Any, journal_ids: tuple[int, ...]) -> set[int]:
-    """IDs de revues existant en base parmi ceux passés."""
+async def existing_journal_ids(conn: Any, journal_ids: tuple[int, ...]) -> set[int]:
+    """IDs de revues existant en base parmi ceux passés.
+
+    Migrée en SQLAlchemy Core (sous-phase 1.3) : accepte une
+    AsyncConnection SA pour rester dans la même transaction que le
+    merge qui suit côté router.
+    """
     if not journal_ids:
         return set()
-    placeholders = ", ".join(["%s"] * len(journal_ids))
-    await cur.execute(
-        f"SELECT id FROM journals WHERE id IN ({placeholders})",
-        journal_ids,
-    )
-    return {row["id"] for row in await cur.fetchall()}
+    from sqlalchemy import select
+
+    from infrastructure.db.tables import journals
+
+    result = await conn.execute(select(journals.c.id).where(journals.c.id.in_(journal_ids)))
+    return {row.id for row in result}
