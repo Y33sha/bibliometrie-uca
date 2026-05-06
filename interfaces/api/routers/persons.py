@@ -54,7 +54,7 @@ from domain.sources import ALL_SOURCES_SET
 from infrastructure.db.queries import persons as persons_queries
 from infrastructure.db.queries.persons import admin as admin_queries
 from infrastructure.repositories import async_authorship_repository, async_person_repository
-from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.async_deps import get_async_cursor, get_sa_connection
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
     AddIdentifier,
@@ -363,8 +363,8 @@ async def reassign_identifier(ident_id: int, body: ReassignIdentifier) -> Any:
 @router.patch("/api/authorships/{authorship_id}/exclude", response_model=AuthorshipExcludeResponse)
 async def toggle_authorship_excluded(authorship_id: int) -> Any:
     """Marque un authorship comme exclu."""
-    async with get_async_cursor() as (cur, _conn):
-        row = await _exclude_authorship(cur, authorship_id, repo=async_authorship_repository(cur))
+    async with get_sa_connection() as conn:
+        row = await _exclude_authorship(conn, authorship_id, repo=async_authorship_repository(conn))
         return {"id": row["id"], "excluded": row["excluded"]}
 
 

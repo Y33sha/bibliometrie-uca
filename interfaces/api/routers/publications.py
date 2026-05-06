@@ -15,7 +15,7 @@ from application.authorships import (
 from infrastructure.db.queries import publications as pub_queries
 from infrastructure.db.queries.publications import FacetFilters, ListFilters
 from infrastructure.repositories import async_authorship_repository
-from interfaces.api.async_deps import get_async_cursor, get_root_structure_id
+from interfaces.api.async_deps import get_async_cursor, get_root_structure_id, get_sa_connection
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 from interfaces.api.models import (
     ExcludeSourceAuthorship,
@@ -189,9 +189,9 @@ async def exclude_source_authorship(
     Si aucune source non exclue n'atteste plus l'authorship consolidée,
     celle-ci est supprimée.
     """
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         await _set_source_authorship_excluded(
-            cur, authorship_id, source, body.excluded, repo=async_authorship_repository(cur)
+            conn, authorship_id, source, body.excluded, repo=async_authorship_repository(conn)
         )
         return {"ok": True, "excluded": body.excluded}
 
