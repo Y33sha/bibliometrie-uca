@@ -66,13 +66,18 @@ async def get_publisher_async(cur: Any, publisher_id: int) -> dict[str, Any] | N
     return await cur.fetchone()
 
 
-async def existing_publisher_ids(cur: Any, publisher_ids: tuple[int, ...]) -> set[int]:
-    """IDs d'éditeurs existant en base parmi ceux passés."""
+async def existing_publisher_ids(conn: Any, publisher_ids: tuple[int, ...]) -> set[int]:
+    """IDs d'éditeurs existant en base parmi ceux passés.
+
+    Migrée en SQLAlchemy Core (sous-phase 1.3) : accepte une
+    AsyncConnection SA pour rester dans la même transaction que le
+    merge qui suit côté router.
+    """
     if not publisher_ids:
         return set()
-    placeholders = ", ".join(["%s"] * len(publisher_ids))
-    await cur.execute(
-        f"SELECT id FROM publishers WHERE id IN ({placeholders})",
-        publisher_ids,
-    )
-    return {row["id"] for row in await cur.fetchall()}
+    from sqlalchemy import select
+
+    from infrastructure.db.tables import publishers
+
+    result = await conn.execute(select(publishers.c.id).where(publishers.c.id.in_(publisher_ids)))
+    return {row.id for row in result}

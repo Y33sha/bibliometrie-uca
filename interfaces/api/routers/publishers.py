@@ -13,7 +13,7 @@ from infrastructure.db.queries.publishers import (
     list_publishers_async,
 )
 from infrastructure.repositories import async_journal_repository, async_publisher_repository
-from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.async_deps import get_async_cursor, get_sa_connection
 from interfaces.api.models import (
     MergeRequest,
     MergeResponse,
@@ -64,9 +64,9 @@ async def update_publisher(publisher_id: int, body: PublisherUpdate) -> Any:
     (`exclude_unset=True`). Lève 404 si l'éditeur n'existe pas.
     """
     fields = body.model_dump(exclude_unset=True)
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         await _update_publisher(
-            cur, publisher_id, fields=fields, repo=async_publisher_repository(cur)
+            conn, publisher_id, fields=fields, repo=async_publisher_repository(conn)
         )
         return {"ok": True}
 
@@ -79,18 +79,18 @@ async def merge(publisher_id: int, body: MergeRequest) -> Any:
     transférées à la cible ; la source est supprimée. 404 si l'un
     des deux éditeurs est introuvable.
     """
-    async with get_async_cursor() as (cur, _conn):
-        found = await existing_publisher_ids(cur, (publisher_id, body.source_id))
+    async with get_sa_connection() as conn:
+        found = await existing_publisher_ids(conn, (publisher_id, body.source_id))
         if publisher_id not in found:
             raise HTTPException(status_code=404, detail="Éditeur cible introuvable")
         if body.source_id not in found:
             raise HTTPException(status_code=404, detail="Éditeur source introuvable")
 
         await merge_publishers(
-            cur,
+            conn,
             publisher_id,
             body.source_id,
-            publisher_repo=async_publisher_repository(cur),
-            journal_repo=async_journal_repository(cur),
+            publisher_repo=async_publisher_repository(conn),
+            journal_repo=async_journal_repository(conn),
         )
         return {"merged": True, "source_id": body.source_id, "target_id": publisher_id}

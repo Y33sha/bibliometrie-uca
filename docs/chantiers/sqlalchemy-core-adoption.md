@@ -308,8 +308,18 @@ principalement en cohérence et en futur-proofing pour Alembic.
   `get_sa_connection()`. Conftest API étendu pour patcher
   `build_async_engine` (sinon les tests tombaient sur la base prod).
   Tests : 23/23 service + 32/32 API + suite complète 1322/1322.
-- [ ] `async_journal_repository.py`.
-- [ ] `async_publisher_repository.py`.
+- [x] **Sous-phase 1.3 — `async_journal_repository.py` + `async_publisher_repository.py`** :
+  4 tables ajoutées (`journals`, `journal_name_forms`, `publishers`,
+  `publisher_name_forms`). Numeric importé. Repo journal + publisher
+  réécrits en SA Core ; cross-table updates (publications,
+  source_publications, apc_payments) en `text()` (pattern accepté).
+  `find_shared_title_journal_pairs` en SA aliases. `merge_journal_into` :
+  SELECT-puis-UPDATE pour éviter le warning "cartesian product".
+  `application/journals.py` et `application/publishers.py` fonctions
+  async migrées en `AsyncConnection`. Routers writes basculés sur
+  `get_sa_connection()`. `existing_journal_ids` et `existing_publisher_ids`
+  en SA pour partager la transaction du merge. Tests : 34/34 service
+  + suite complète 1322/1322.
 - [ ] `async_address_repository.py`.
 - [ ] `async_authorship_repository.py`.
 - [ ] `async_person_repository/` (multi-fichiers).

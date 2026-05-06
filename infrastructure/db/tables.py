@@ -24,6 +24,7 @@ from sqlalchemy import (
     DateTime,
     Integer,
     MetaData,
+    Numeric,
     Table,
     Text,
     func,
@@ -128,4 +129,66 @@ structure_name_forms = Table(
     Column("is_word_boundary", Boolean, nullable=False, server_default="false"),
     Column("requires_context_of", ARRAY(Integer)),
     Column("is_excluding", Boolean, nullable=False, server_default="false"),
+)
+
+
+journals = Table(
+    "journals",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("title", Text, nullable=False),
+    Column("title_normalized", Text, nullable=False),
+    Column("issn", Text),
+    Column("eissn", Text),
+    Column("issnl", Text),
+    Column("publisher_id", Integer),
+    Column("openalex_id", Text),
+    Column("is_in_doaj", Boolean, server_default="false"),
+    Column("is_predatory", Boolean, server_default="false"),
+    Column("apc_amount", Numeric(10, 2)),
+    Column("apc_currency", Text, server_default="EUR"),
+    Column("oa_model", Text),
+    Column("notes", Text),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now()),
+    Column("journal_type", Text, server_default="journal"),
+    Column("is_academic", Boolean, server_default="true"),
+    Column("doi_prefix", Text),
+)
+
+
+journal_name_forms = Table(
+    "journal_name_forms",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("journal_id", Integer, nullable=False),
+    Column("form_normalized", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column("publisher_id", Integer),
+)
+
+
+publishers = Table(
+    "publishers",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("name", Text, nullable=False),
+    Column("name_normalized", Text, nullable=False),
+    Column("openalex_id", Text),
+    Column("country", Text),
+    Column("is_predatory", Boolean, server_default="false"),
+    Column("notes", Text),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now()),
+    Column("doi_prefix", Text),
+)
+
+
+publisher_name_forms = Table(
+    "publisher_name_forms",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("publisher_id", Integer, nullable=False),
+    Column("form_normalized", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
 )

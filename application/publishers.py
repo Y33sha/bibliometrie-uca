@@ -16,6 +16,8 @@ déléguer les transferts SQL.
 
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncConnection
+
 from application.audit import async_emit_event
 from application.journals import merge_journals
 from domain.errors import ConflictError, NotFoundError, ValidationError
@@ -72,7 +74,7 @@ def find_or_create_publisher(
 
 
 async def update_publisher(
-    cur: Any, publisher_id: int, *, fields: dict, repo: AsyncPublisherRepository
+    conn: AsyncConnection, publisher_id: int, *, fields: dict, repo: AsyncPublisherRepository
 ) -> None:
     """Met à jour un éditeur. Le `name` est automatiquement normalisé en
     `name_normalized`.
@@ -93,7 +95,7 @@ async def update_publisher(
 
 
 async def merge_publishers(
-    cur: Any,
+    conn: AsyncConnection,
     target_id: int,
     source_id: int,
     *,
@@ -127,12 +129,12 @@ async def merge_publishers(
                     f"Fusionner les revues manuellement d'abord."
                 )
         await merge_journals(
-            cur, pair["target_journal_id"], pair["source_journal_id"], repo=journal_repo
+            conn, pair["target_journal_id"], pair["source_journal_id"], repo=journal_repo
         )
 
     # 2-6. Le reste de la fusion (transferts, enrichissement, delete).
     await publisher_repo.merge_publisher_into(target_id, source_id)
 
     await async_emit_event(
-        cur, "publisher.merged", "publisher", target_id, {"source_id": source_id}
+        conn, "publisher.merged", "publisher", target_id, {"source_id": source_id}
     )

@@ -7,6 +7,7 @@ reset_journal_apc — utilisées par le pipeline) et les fonctions async
 """
 
 import pytest
+from sqlalchemy import text
 
 from application.journals import (
     find_or_create_journal,
@@ -40,13 +41,22 @@ def pub_repo(db):
 
 
 @pytest.fixture
-def async_repo(async_db):
-    return async_journal_repository(async_db)
+def async_repo(sa_conn):
+    return async_journal_repository(sa_conn)
 
 
 @pytest.fixture
-def async_pub_repo(async_db):
-    return async_publisher_repository(async_db)
+def async_pub_repo(sa_conn):
+    return async_publisher_repository(sa_conn)
+
+
+# Helpers SA pour les SELECTs en dur dans les tests async (ré-écrits depuis
+# le pattern psycopg `cur.execute("... %s ...", (...))` vers SA Core).
+
+
+async def _afetch_one(conn, sql_text: str, **params):
+    """Exécute un text() SELECT et retourne result.first() (Row ou None)."""
+    return (await conn.execute(text(sql_text), params)).first()
 
 
 # ── Helpers sync (pipeline tests) ──────────────────────────────────
@@ -101,53 +111,52 @@ def _insert_publication(db, title="Pub", pub_year=2024, journal_id=None):
 # ── Helpers async (API tests) ──────────────────────────────────────
 
 
-async def _ainsert_publisher(db, name="Elsevier", openalex_id=None):
-    await db.execute(
-        """
-        INSERT INTO publishers (name, name_normalized, openalex_id)
-        VALUES (%s, lower(%s), %s)
-        RETURNING id
-        """,
-        (name, name, openalex_id),
-    )
-    row = await db.fetchone()
-    return row["id"]
-
-
-async def _ainsert_journal(db, title="Nature", publisher_id=None, **kwargs):
-    await db.execute(
-        """
-        INSERT INTO journals (title, title_normalized, issn, eissn, issnl,
-                              publisher_id, openalex_id, apc_amount, apc_currency,
-                              is_in_doaj, oa_model)
-        VALUES (%s, lower(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-        """,
-        (
-            title,
-            title,
-            kwargs.get("issn"),
-            kwargs.get("eissn"),
-            kwargs.get("issnl"),
-            publisher_id,
-            kwargs.get("openalex_id"),
-            kwargs.get("apc_amount"),
-            kwargs.get("apc_currency"),
-            kwargs.get("is_in_doaj", False),
-            kwargs.get("oa_model"),
+async def _ainsert_publisher(conn, name="Elsevier", openalex_id=None):
+    result = await conn.execute(
+        text(
+            "INSERT INTO publishers (name, name_normalized, openalex_id) "
+            "VALUES (:name, lower(:name), :oa_id) RETURNING id"
         ),
+        {"name": name, "oa_id": openalex_id},
     )
-    row = await db.fetchone()
-    return row["id"]
+    return result.scalar_one()
 
 
-async def _ainsert_publication(db, title="Pub", pub_year=2024, journal_id=None):
-    await db.execute(
-        "INSERT INTO publications (title, pub_year, journal_id) VALUES (%s, %s, %s) RETURNING id",
-        (title, pub_year, journal_id),
+async def _ainsert_journal(conn, title="Nature", publisher_id=None, **kwargs):
+    result = await conn.execute(
+        text(
+            "INSERT INTO journals (title, title_normalized, issn, eissn, issnl, "
+            "                      publisher_id, openalex_id, apc_amount, apc_currency, "
+            "                      is_in_doaj, oa_model) "
+            "VALUES (:title, lower(:title), :issn, :eissn, :issnl, "
+            "        :pub_id, :oa_id, :apc_amount, :apc_currency, "
+            "        :is_in_doaj, :oa_model) RETURNING id"
+        ),
+        {
+            "title": title,
+            "issn": kwargs.get("issn"),
+            "eissn": kwargs.get("eissn"),
+            "issnl": kwargs.get("issnl"),
+            "pub_id": publisher_id,
+            "oa_id": kwargs.get("openalex_id"),
+            "apc_amount": kwargs.get("apc_amount"),
+            "apc_currency": kwargs.get("apc_currency"),
+            "is_in_doaj": kwargs.get("is_in_doaj", False),
+            "oa_model": kwargs.get("oa_model"),
+        },
     )
-    row = await db.fetchone()
-    return row["id"]
+    return result.scalar_one()
+
+
+async def _ainsert_publication(conn, title="Pub", pub_year=2024, journal_id=None):
+    result = await conn.execute(
+        text(
+            "INSERT INTO publications (title, pub_year, journal_id) "
+            "VALUES (:title, :year, :j_id) RETURNING id"
+        ),
+        {"title": title, "year": pub_year, "j_id": journal_id},
+    )
+    return result.scalar_one()
 
 
 # ── find_or_create_publisher ───────────────────────────────────────
@@ -276,49 +285,50 @@ class TestUpdateJournalApc:
 
 
 class TestUpdateJournal:
-    async def test_raises_not_found(self, async_db, async_repo):
+    async def test_raises_not_found(self, sa_conn, async_repo):
         with pytest.raises(NotFoundError):
-            await update_journal(async_db, 999999, fields={"title": "X"}, repo=async_repo)
+            await update_journal(sa_conn, 999999, fields={"title": "X"}, repo=async_repo)
 
-    async def test_raises_on_empty_fields(self, async_db, async_repo):
-        j = await _ainsert_journal(async_db, "Nature")
+    async def test_raises_on_empty_fields(self, sa_conn, async_repo):
+        j = await _ainsert_journal(sa_conn, "Nature")
         with pytest.raises(ValidationError):
-            await update_journal(async_db, j, fields={}, repo=async_repo)
+            await update_journal(sa_conn, j, fields={}, repo=async_repo)
 
-    async def test_updates_title_and_normalizes(self, async_db, async_repo):
-        j = await _ainsert_journal(async_db, "Old Title")
-        await update_journal(async_db, j, fields={"title": "Nature Medicine"}, repo=async_repo)
-        await async_db.execute("SELECT title, title_normalized FROM journals WHERE id = %s", (j,))
-        row = await async_db.fetchone()
-        assert row["title"] == "Nature Medicine"
-        assert row["title_normalized"] == "nature medicine"
+    async def test_updates_title_and_normalizes(self, sa_conn, async_repo):
+        j = await _ainsert_journal(sa_conn, "Old Title")
+        await update_journal(sa_conn, j, fields={"title": "Nature Medicine"}, repo=async_repo)
+        row = await _afetch_one(
+            sa_conn, "SELECT title, title_normalized FROM journals WHERE id = :id", id=j
+        )
+        assert row.title == "Nature Medicine"
+        assert row.title_normalized == "nature medicine"
 
-    async def test_partial_update(self, async_db, async_repo):
-        j = await _ainsert_journal(async_db, "Nature", issn="0028-0836")
-        await update_journal(async_db, j, fields={"eissn": "1476-4687"}, repo=async_repo)
-        await async_db.execute("SELECT issn, eissn FROM journals WHERE id = %s", (j,))
-        row = await async_db.fetchone()
-        assert row["issn"] == "0028-0836"  # inchangé
-        assert row["eissn"] == "1476-4687"
+    async def test_partial_update(self, sa_conn, async_repo):
+        j = await _ainsert_journal(sa_conn, "Nature", issn="0028-0836")
+        await update_journal(sa_conn, j, fields={"eissn": "1476-4687"}, repo=async_repo)
+        row = await _afetch_one(sa_conn, "SELECT issn, eissn FROM journals WHERE id = :id", id=j)
+        assert row.issn == "0028-0836"  # inchangé
+        assert row.eissn == "1476-4687"
 
 
 class TestUpdatePublisher:
-    async def test_raises_not_found(self, async_db, async_pub_repo):
+    async def test_raises_not_found(self, sa_conn, async_pub_repo):
         with pytest.raises(NotFoundError):
-            await update_publisher(async_db, 999999, fields={"name": "X"}, repo=async_pub_repo)
+            await update_publisher(sa_conn, 999999, fields={"name": "X"}, repo=async_pub_repo)
 
-    async def test_raises_on_empty_fields(self, async_db, async_pub_repo):
-        p = await _ainsert_publisher(async_db, "Elsevier")
+    async def test_raises_on_empty_fields(self, sa_conn, async_pub_repo):
+        p = await _ainsert_publisher(sa_conn, "Elsevier")
         with pytest.raises(ValidationError):
-            await update_publisher(async_db, p, fields={}, repo=async_pub_repo)
+            await update_publisher(sa_conn, p, fields={}, repo=async_pub_repo)
 
-    async def test_updates_name_and_normalizes(self, async_db, async_pub_repo):
-        p = await _ainsert_publisher(async_db, "Old Name")
-        await update_publisher(async_db, p, fields={"name": "Springer Nature"}, repo=async_pub_repo)
-        await async_db.execute("SELECT name, name_normalized FROM publishers WHERE id = %s", (p,))
-        row = await async_db.fetchone()
-        assert row["name"] == "Springer Nature"
-        assert row["name_normalized"] == "springer nature"
+    async def test_updates_name_and_normalizes(self, sa_conn, async_pub_repo):
+        p = await _ainsert_publisher(sa_conn, "Old Name")
+        await update_publisher(sa_conn, p, fields={"name": "Springer Nature"}, repo=async_pub_repo)
+        row = await _afetch_one(
+            sa_conn, "SELECT name, name_normalized FROM publishers WHERE id = :id", id=p
+        )
+        assert row.name == "Springer Nature"
+        assert row.name_normalized == "springer nature"
 
 
 class TestResetJournalApc:
@@ -344,154 +354,154 @@ class TestResetJournalApc:
 
 
 class TestMergePublishers:
-    async def test_raises_on_self_merge(self, async_db, async_repo, async_pub_repo):
-        p_id = await _ainsert_publisher(async_db, "Elsevier")
+    async def test_raises_on_self_merge(self, sa_conn, async_repo, async_pub_repo):
+        p_id = await _ainsert_publisher(sa_conn, "Elsevier")
         with pytest.raises(ConflictError, match="lui-même"):
             await merge_publishers(
-                async_db,
+                sa_conn,
                 p_id,
                 p_id,
                 publisher_repo=async_pub_repo,
                 journal_repo=async_repo,
             )
 
-    async def test_transfers_journals_and_deletes_source(
-        self, async_db, async_repo, async_pub_repo
-    ):
-        target = await _ainsert_publisher(async_db, "Target")
-        source = await _ainsert_publisher(async_db, "Source")
-        j1 = await _ainsert_journal(async_db, "Journal 1", publisher_id=source)
+    async def test_transfers_journals_and_deletes_source(self, sa_conn, async_repo, async_pub_repo):
+        target = await _ainsert_publisher(sa_conn, "Target")
+        source = await _ainsert_publisher(sa_conn, "Source")
+        j1 = await _ainsert_journal(sa_conn, "Journal 1", publisher_id=source)
 
         await merge_publishers(
-            async_db, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+            sa_conn, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
         )
 
-        await async_db.execute("SELECT id FROM publishers WHERE id = %s", (source,))
-        assert await async_db.fetchone() is None  # source supprimée
-        await async_db.execute("SELECT publisher_id FROM journals WHERE id = %s", (j1,))
-        row = await async_db.fetchone()
-        assert row["publisher_id"] == target
+        assert (
+            await _afetch_one(sa_conn, "SELECT id FROM publishers WHERE id = :id", id=source)
+        ) is None  # source supprimée
+        row = await _afetch_one(sa_conn, "SELECT publisher_id FROM journals WHERE id = :id", id=j1)
+        assert row.publisher_id == target
 
-    async def test_merges_same_title_journals(self, async_db, async_repo, async_pub_repo):
+    async def test_merges_same_title_journals(self, sa_conn, async_repo, async_pub_repo):
         """Si cible et source ont un journal de même titre, ils sont fusionnés."""
-        target = await _ainsert_publisher(async_db, "Target")
-        source = await _ainsert_publisher(async_db, "Source")
-        jt = await _ainsert_journal(async_db, "Nature", publisher_id=target, issn="0028-0836")
-        js = await _ainsert_journal(async_db, "Nature", publisher_id=source, eissn="1476-4687")
-        await _ainsert_publication(async_db, journal_id=js)
+        target = await _ainsert_publisher(sa_conn, "Target")
+        source = await _ainsert_publisher(sa_conn, "Source")
+        jt = await _ainsert_journal(sa_conn, "Nature", publisher_id=target, issn="0028-0836")
+        js = await _ainsert_journal(sa_conn, "Nature", publisher_id=source, eissn="1476-4687")
+        await _ainsert_publication(sa_conn, journal_id=js)
 
         await merge_publishers(
-            async_db, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+            sa_conn, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
         )
 
         # Journal source supprimé
-        await async_db.execute("SELECT id FROM journals WHERE id = %s", (js,))
-        assert await async_db.fetchone() is None
+        assert (await _afetch_one(sa_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
         # Journal cible enrichi
-        await async_db.execute("SELECT issn, eissn FROM journals WHERE id = %s", (jt,))
-        row = await async_db.fetchone()
-        assert row["issn"] == "0028-0836"
-        assert row["eissn"] == "1476-4687"
+        row = await _afetch_one(sa_conn, "SELECT issn, eissn FROM journals WHERE id = :id", id=jt)
+        assert row.issn == "0028-0836"
+        assert row.eissn == "1476-4687"
 
-    async def test_raises_on_issn_conflict(self, async_db, async_repo, async_pub_repo):
-        target = await _ainsert_publisher(async_db, "Target")
-        source = await _ainsert_publisher(async_db, "Source")
-        await _ainsert_journal(async_db, "Nature", publisher_id=target, issn="0028-0836")
-        await _ainsert_journal(async_db, "Nature", publisher_id=source, issn="9999-9999")
+    async def test_raises_on_issn_conflict(self, sa_conn, async_repo, async_pub_repo):
+        target = await _ainsert_publisher(sa_conn, "Target")
+        source = await _ainsert_publisher(sa_conn, "Source")
+        await _ainsert_journal(sa_conn, "Nature", publisher_id=target, issn="0028-0836")
+        await _ainsert_journal(sa_conn, "Nature", publisher_id=source, issn="9999-9999")
 
         with pytest.raises(ConflictError, match="Conflit issn"):
             await merge_publishers(
-                async_db, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+                sa_conn, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
             )
 
-    async def test_enriches_target_flags(self, async_db, async_repo, async_pub_repo):
+    async def test_enriches_target_flags(self, sa_conn, async_repo, async_pub_repo):
         """is_predatory = OR logique : vrai si l'une des sources l'était."""
-        target = await _ainsert_publisher(async_db, "Target")
-        source = await _ainsert_publisher(async_db, "Source")
-        await async_db.execute("UPDATE publishers SET is_predatory = TRUE WHERE id = %s", (source,))
-
-        await merge_publishers(
-            async_db, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+        target = await _ainsert_publisher(sa_conn, "Target")
+        source = await _ainsert_publisher(sa_conn, "Source")
+        await sa_conn.execute(
+            text("UPDATE publishers SET is_predatory = TRUE WHERE id = :id"), {"id": source}
         )
 
-        await async_db.execute("SELECT is_predatory FROM publishers WHERE id = %s", (target,))
-        row = await async_db.fetchone()
-        assert row["is_predatory"] is True
+        await merge_publishers(
+            sa_conn, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+        )
+
+        row = await _afetch_one(
+            sa_conn, "SELECT is_predatory FROM publishers WHERE id = :id", id=target
+        )
+        assert row.is_predatory is True
 
     async def test_transfers_openalex_id_when_target_has_none(
-        self, async_db, async_repo, async_pub_repo
+        self, sa_conn, async_repo, async_pub_repo
     ):
         """Target sans openalex_id, source avec : la cible reçoit celui de la source."""
-        target = await _ainsert_publisher(async_db, "Target", openalex_id=None)
-        source = await _ainsert_publisher(async_db, "Source", openalex_id="P999")
+        target = await _ainsert_publisher(sa_conn, "Target", openalex_id=None)
+        source = await _ainsert_publisher(sa_conn, "Source", openalex_id="P999")
         await merge_publishers(
-            async_db, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+            sa_conn, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
         )
-        await async_db.execute("SELECT openalex_id FROM publishers WHERE id = %s", (target,))
-        row = await async_db.fetchone()
-        assert row["openalex_id"] == "P999"
+        row = await _afetch_one(
+            sa_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
+        )
+        assert row.openalex_id == "P999"
 
     async def test_keeps_target_openalex_id_when_both_set(
-        self, async_db, async_repo, async_pub_repo
+        self, sa_conn, async_repo, async_pub_repo
     ):
         """Si les deux ont un openalex_id, celui de la cible est conservé."""
-        target = await _ainsert_publisher(async_db, "Target", openalex_id="P_TARGET")
-        source = await _ainsert_publisher(async_db, "Source", openalex_id="P_SOURCE")
+        target = await _ainsert_publisher(sa_conn, "Target", openalex_id="P_TARGET")
+        source = await _ainsert_publisher(sa_conn, "Source", openalex_id="P_SOURCE")
         await merge_publishers(
-            async_db, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
+            sa_conn, target, source, publisher_repo=async_pub_repo, journal_repo=async_repo
         )
-        await async_db.execute("SELECT openalex_id FROM publishers WHERE id = %s", (target,))
-        row = await async_db.fetchone()
-        assert row["openalex_id"] == "P_TARGET"
+        row = await _afetch_one(
+            sa_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
+        )
+        assert row.openalex_id == "P_TARGET"
 
 
 # ── merge_journals ─────────────────────────────────────────────────
 
 
 class TestMergeJournals:
-    async def test_raises_on_self_merge(self, async_db, async_repo):
-        j_id = await _ainsert_journal(async_db, "Nature")
+    async def test_raises_on_self_merge(self, sa_conn, async_repo):
+        j_id = await _ainsert_journal(sa_conn, "Nature")
         with pytest.raises(ConflictError, match="lui-même"):
-            await merge_journals(async_db, j_id, j_id, repo=async_repo)
+            await merge_journals(sa_conn, j_id, j_id, repo=async_repo)
 
-    async def test_transfers_publications(self, async_db, async_repo):
-        target = await _ainsert_journal(async_db, "Target")
-        source = await _ainsert_journal(async_db, "Source")
-        pub_id = await _ainsert_publication(async_db, journal_id=source)
+    async def test_transfers_publications(self, sa_conn, async_repo):
+        target = await _ainsert_journal(sa_conn, "Target")
+        source = await _ainsert_journal(sa_conn, "Source")
+        pub_id = await _ainsert_publication(sa_conn, journal_id=source)
 
-        await merge_journals(async_db, target, source, repo=async_repo)
+        await merge_journals(sa_conn, target, source, repo=async_repo)
 
-        await async_db.execute("SELECT journal_id FROM publications WHERE id = %s", (pub_id,))
-        row = await async_db.fetchone()
-        assert row["journal_id"] == target
-        await async_db.execute("SELECT id FROM journals WHERE id = %s", (source,))
-        assert await async_db.fetchone() is None
+        row = await _afetch_one(
+            sa_conn, "SELECT journal_id FROM publications WHERE id = :id", id=pub_id
+        )
+        assert row.journal_id == target
+        assert (
+            await _afetch_one(sa_conn, "SELECT id FROM journals WHERE id = :id", id=source)
+        ) is None
 
-    async def test_enriches_target_metadata(self, async_db, async_repo):
-        target = await _ainsert_journal(async_db, "Target")  # pas d'ISSN
+    async def test_enriches_target_metadata(self, sa_conn, async_repo):
+        target = await _ainsert_journal(sa_conn, "Target")  # pas d'ISSN
         source = await _ainsert_journal(
-            async_db, "Source", issn="1234-5678", eissn="9999-0000", is_in_doaj=True
+            sa_conn, "Source", issn="1234-5678", eissn="9999-0000", is_in_doaj=True
         )
 
-        await merge_journals(async_db, target, source, repo=async_repo)
+        await merge_journals(sa_conn, target, source, repo=async_repo)
 
-        await async_db.execute(
-            "SELECT issn, eissn, is_in_doaj FROM journals WHERE id = %s",
-            (target,),
+        row = await _afetch_one(
+            sa_conn, "SELECT issn, eissn, is_in_doaj FROM journals WHERE id = :id", id=target
         )
-        row = await async_db.fetchone()
-        assert row["issn"] == "1234-5678"
-        assert row["eissn"] == "9999-0000"
-        assert row["is_in_doaj"] is True
+        assert row.issn == "1234-5678"
+        assert row.eissn == "9999-0000"
+        assert row.is_in_doaj is True
 
-    async def test_does_not_overwrite_existing_fields(self, async_db, async_repo):
+    async def test_does_not_overwrite_existing_fields(self, sa_conn, async_repo):
         """COALESCE : les champs renseignés dans la cible sont préservés."""
-        target = await _ainsert_journal(async_db, "Target", issn="0028-0836")
-        source = await _ainsert_journal(async_db, "Source", issn="1234-5678")
+        target = await _ainsert_journal(sa_conn, "Target", issn="0028-0836")
+        source = await _ainsert_journal(sa_conn, "Source", issn="1234-5678")
 
         # ISSN cible existe déjà → COALESCE le garde
-        await merge_journals(async_db, target, source, repo=async_repo)
+        await merge_journals(sa_conn, target, source, repo=async_repo)
 
-        await async_db.execute("SELECT issn FROM journals WHERE id = %s", (target,))
-        row = await async_db.fetchone()
-        assert row["issn"] == "0028-0836"
+        row = await _afetch_one(sa_conn, "SELECT issn FROM journals WHERE id = :id", id=target)
+        assert row.issn == "0028-0836"
