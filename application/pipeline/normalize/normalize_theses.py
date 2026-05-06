@@ -42,7 +42,7 @@ from domain.names import names_compatible
 from domain.normalize import normalize_name, normalize_text
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
-from domain.sources.theses import derive_theses_doc_type
+from domain.sources.theses import derive_theses_doc_type, extract_thesis_year
 
 # =============================================================
 # PUBLICATIONS
@@ -88,19 +88,9 @@ def extract_pub_metadata(these: dict) -> dict:
     title = these.get("titrePrincipal")
     doc_type = derive_theses_doc_type(these.get("dateSoutenance"))
 
-    pub_year = None
-    date_sout = these.get("dateSoutenance")
-    date_insc = these.get("datePremiereInscriptionDoctorat")
-    if date_sout:
-        try:
-            pub_year = int(date_sout.split("/")[-1])
-        except (ValueError, IndexError):
-            pass
-    if not pub_year and date_insc:
-        try:
-            pub_year = int(date_insc.split("/")[-1])
-        except (ValueError, IndexError):
-            pass
+    pub_year = extract_thesis_year(
+        these.get("dateSoutenance"), these.get("datePremiereInscriptionDoctorat")
+    )
 
     doi = these.get("doi")
     nnt_clean = normalize_nnt(these.get("nnt"))
@@ -247,19 +237,9 @@ def insert_source_document(
     title = these.get("titrePrincipal") or ""
     doc_type = derive_theses_doc_type(these.get("dateSoutenance"))
 
-    pub_year = None
-    date_sout = these.get("dateSoutenance")
-    date_insc = these.get("datePremiereInscriptionDoctorat")
-    if date_sout:
-        try:
-            pub_year = int(date_sout.split("/")[-1])
-        except (ValueError, IndexError):
-            pass
-    if not pub_year and date_insc:
-        try:
-            pub_year = int(date_insc.split("/")[-1])
-        except (ValueError, IndexError):
-            pass
+    pub_year = extract_thesis_year(
+        these.get("dateSoutenance"), these.get("datePremiereInscriptionDoctorat")
+    )
 
     doi = these.get("doi")
     nnt = normalize_nnt(these.get("nnt"))
