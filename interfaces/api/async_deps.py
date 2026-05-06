@@ -31,6 +31,7 @@ from application.ports.config import AsyncConfigStore
 from application.ports.config_queries import AsyncConfigQueries
 from application.ports.hal_problems_queries import AsyncHalProblemsQueries
 from application.ports.journals_queries import AsyncJournalQueries
+from application.ports.laboratories_queries import AsyncLaboratoriesQueries
 from application.ports.perimeter import AsyncPerimeterQueries
 from application.ports.perimeters_queries import AsyncPerimetersAdminQueries
 from application.ports.person_duplicates_queries import AsyncPersonDuplicatesQueries
@@ -54,6 +55,7 @@ from infrastructure.db.queries.admin_feedback import PgAsyncAdminFeedbackQueries
 from infrastructure.db.queries.config import PgAsyncConfigQueries
 from infrastructure.db.queries.hal_problems import PgAsyncHalProblemsQueries
 from infrastructure.db.queries.journals import PgAsyncJournalQueries
+from infrastructure.db.queries.laboratories import PgAsyncLaboratoriesQueries
 from infrastructure.db.queries.perimeter import (
     PgAsyncPerimeterQueries,
     PgAsyncPerimetersAdminQueries,
@@ -174,6 +176,12 @@ def journal_queries(
     conn: AsyncConnection = Depends(db_conn),
 ) -> AsyncJournalQueries:
     return PgAsyncJournalQueries(conn)
+
+
+def laboratories_queries(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncLaboratoriesQueries:
+    return PgAsyncLaboratoriesQueries(conn)
 
 
 def subjects_queries(

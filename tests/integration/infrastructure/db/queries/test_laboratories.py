@@ -4,15 +4,8 @@ import json
 
 from sqlalchemy import text
 
-from infrastructure.db.queries.laboratories import (
-    LabPersonsFilters,
-    get_laboratory,
-    get_laboratory_addresses,
-    get_laboratory_dashboard,
-    get_laboratory_persons,
-    get_laboratory_subjects,
-    list_laboratories,
-)
+from application.ports.laboratories_queries import LabPersonsFilters
+from infrastructure.db.queries.laboratories import PgAsyncLaboratoriesQueries
 
 
 async def _create_structure(conn, code, name=None, type_="labo", hal_collection=None):
@@ -92,15 +85,15 @@ async def _create_pub_with_authorship(
 class TestListLaboratories:
     async def test_lists_labos_in_perimeter(self, sa_conn):
         lab = await _create_structure(sa_conn, code="LAB-1", name="Lab 1")
-        root = await _setup_perimeter(sa_conn, [lab])
-        labs = await list_laboratories(sa_conn, [root, lab], [root])
+        await _setup_perimeter(sa_conn, [lab])
+        labs = await PgAsyncLaboratoriesQueries(sa_conn).list_laboratories()
         ids = [lab_["id"] for lab_ in labs]
         assert lab in ids
 
     async def test_excludes_root_as_tutelle(self, sa_conn):
         lab = await _create_structure(sa_conn, code="LAB-2")
         root = await _setup_perimeter(sa_conn, [lab])
-        labs = await list_laboratories(sa_conn, [root, lab], [root])
+        labs = await PgAsyncLaboratoriesQueries(sa_conn).list_laboratories()
         for lab_ in labs:
             if lab_["id"] == lab:
                 # La racine est filtrée des tutelles
@@ -110,11 +103,11 @@ class TestListLaboratories:
 
 class TestGetLaboratory:
     async def test_returns_none_for_missing(self, sa_conn):
-        assert await get_laboratory(sa_conn, 999_999) is None
+        assert await PgAsyncLaboratoriesQueries(sa_conn).get_laboratory(999_999) is None
 
     async def test_returns_full_profile(self, sa_conn):
         lab = await _create_structure(sa_conn, code="LAB", name="Le labo", hal_collection="LAB-COL")
-        res = await get_laboratory(sa_conn, lab)
+        res = await PgAsyncLaboratoriesQueries(sa_conn).get_laboratory(lab)
         assert res is not None
         assert res["structure"]["code"] == "LAB"
         assert res["structure"]["hal_collection"] == "LAB-COL"
@@ -129,8 +122,8 @@ class TestGetLaboratoryPersons:
         pid = await _create_person(sa_conn)
         await _create_pub_with_authorship(sa_conn, pid, lab)
 
-        res = await get_laboratory_persons(
-            sa_conn, lab, filters=LabPersonsFilters(), page=1, per_page=50, sort="name"
+        res = await PgAsyncLaboratoriesQueries(sa_conn).get_laboratory_persons(
+            lab, filters=LabPersonsFilters(), page=1, per_page=50, sort="name"
         )
         assert res["total_persons"] == 1
         assert res["persons"][0]["id"] == pid
@@ -142,8 +135,7 @@ class TestGetLaboratoryPersons:
         await _create_pub_with_authorship(sa_conn, p_match, lab)
         await _create_pub_with_authorship(sa_conn, p_other, lab)
 
-        res = await get_laboratory_persons(
-            sa_conn,
+        res = await PgAsyncLaboratoriesQueries(sa_conn).get_laboratory_persons(
             lab,
             filters=LabPersonsFilters(search="Dupond"),
             page=1,
@@ -172,8 +164,8 @@ class TestGetLaboratoryPersons:
             {"pid": pub, "sids": [lab]},
         )
 
-        res = await get_laboratory_persons(
-            sa_conn, lab, filters=LabPersonsFilters(), page=1, per_page=50, sort="name"
+        res = await PgAsyncLaboratoriesQueries(sa_conn).get_laboratory_persons(
+            lab, filters=LabPersonsFilters(), page=1, per_page=50, sort="name"
         )
         assert res["orphan_authorships"]["total"] == 1
 
@@ -198,7 +190,9 @@ class TestGetLaboratoryAddresses:
             {"a": addr, "s": lab},
         )
 
-        res = await get_laboratory_addresses(sa_conn, lab, page=1, per_page=50)
+        res = await PgAsyncLaboratoriesQueries(sa_conn).get_laboratory_addresses(
+            lab, page=1, per_page=50
+        )
         ids = [a["id"] for a in res["addresses"]]
         assert addr in ids
 
@@ -220,7 +214,9 @@ class TestGetLaboratoryAddresses:
             ),
             {"a": addr, "s": lab},
         )
-        res = await get_laboratory_addresses(sa_conn, lab, page=1, per_page=50)
+        res = await PgAsyncLaboratoriesQueries(sa_conn).get_laboratory_addresses(
+            lab, page=1, per_page=50
+        )
         ids = [a["id"] for a in res["addresses"]]
         assert addr not in ids
 
@@ -228,7 +224,7 @@ class TestGetLaboratoryAddresses:
 class TestGetLaboratoryDashboard:
     async def test_returns_structure_even_when_empty(self, sa_conn):
         lab = await _create_structure(sa_conn, code="LAB")
-        res = await get_laboratory_dashboard(sa_conn, lab)
+        res = await PgAsyncLaboratoriesQueries(sa_conn).get_laboratory_dashboard(lab)
         assert "pubs_by_year" in res
         assert "oa" in res
         assert "collab" in res
@@ -259,7 +255,7 @@ class TestGetLaboratoryDashboard:
             {"pid": pub_id, "perid": pid, "sids": [lab]},
         )
 
-        res = await get_laboratory_dashboard(sa_conn, lab)
+        res = await PgAsyncLaboratoriesQueries(sa_conn).get_laboratory_dashboard(lab)
         assert res["oa"]["open_access"] == 1
         assert res["collab"]["international"] == 1
         assert any(c["code"] == "us" for c in res["top_countries"])
@@ -287,7 +283,7 @@ class TestGetLaboratoryDashboard:
             {"pid": pub_id, "perid": pid, "sids": [lab]},
         )
 
-        res = await get_laboratory_dashboard(sa_conn, lab)
+        res = await PgAsyncLaboratoriesQueries(sa_conn).get_laboratory_dashboard(lab)
         assert res["collab"]["total_articles"] == 1
         assert res["collab"]["international"] == 0
         assert res["collab"]["domestic"] == 1
@@ -352,7 +348,7 @@ class TestGetLaboratorySubjects:
             await _link(p, ai)
         await _link(p1, bio)
 
-        res = await get_laboratory_subjects(sa_conn, lab, limit=10)
+        res = await PgAsyncLaboratoriesQueries(sa_conn).get_laboratory_subjects(lab, limit=10)
         assert len(res) == 2
         assert res[0]["label"] == "AI"
         assert res[0]["count"] == 3
@@ -395,5 +391,5 @@ class TestGetLaboratorySubjects:
             {"p": excluded_pub, "s": sid},
         )
 
-        res = await get_laboratory_subjects(sa_conn, lab, limit=10)
+        res = await PgAsyncLaboratoriesQueries(sa_conn).get_laboratory_subjects(lab, limit=10)
         assert res == []
