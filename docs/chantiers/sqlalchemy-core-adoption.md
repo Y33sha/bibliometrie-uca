@@ -324,11 +324,28 @@ fiche).
   `get_sa_connection()`. `existing_journal_ids` et
   `existing_publisher_ids` en SA pour partager la transaction du
   merge. Tests : 34/34 service + suite complète 1322/1322.
-- [ ] **Sous-phase 2.4** — Module `addresses` (`async_address_repository.py`).
-  Note : exception cross-aggregate `address_repository ↔ publications.countries`
-  documentée dans `docs/architecture.md`, à préserver.
-- [ ] **Sous-phase 2.5** — Module `authorships`
-  (`async_authorship_repository.py`).
+- [x] **Préalable bloc 2.4-2.7** *(commit `cf29b2e`)* — `tables.py`
+  étendu avec toutes les tables nécessaires (addresses, authorships,
+  source_authorships, persons*, publications*, etc.) et 4 enums
+  Postgres (identifier_status, source_type, oa_type, doc_type).
+  `infrastructure/perimeter.py` : helpers async dispatch-aware.
+- [x] **Préalable bloc 2.4-2.7** *(commit `d7c0031`)* —
+  `async_authorship_repository.py` en mode dispatch (cur psycopg |
+  AsyncConnection SA), pour cohabiter avec les modules en cours de
+  migration. Branche psycopg supprimée en Phase 4.
+- [x] **Sous-phase 2.4 — Module `addresses`** *(commit `b9f74a9`)* :
+  `async_address_repository.py` migré SA Core (insert/update/delete/
+  select via tables, `pg_insert.on_conflict_do_update`, `text()` pour
+  les CTE cross-aggregate sur `source_publications`/`publications`).
+  `application/addresses_countries.py` et `addresses_structures.py`
+  signatures `cur → conn`. Router `addresses` writes basculés sur
+  `get_sa_connection()`. Helpers tests en `text()`. Exception
+  cross-aggregate `address ↔ publications.countries` préservée.
+  Tests : 34/34 service + suite complète 1322/1322.
+- [ ] **Sous-phase 2.5** — Module `authorships` (le repo est déjà en
+  dispatch, il reste à migrer en SA Core complet et à supprimer la
+  branche psycopg) + `application/authorships.py` async fonctions
+  + router `persons.py` endpoint `toggle_authorship_excluded`.
 - [ ] **Sous-phase 2.6** — Module `persons`
   (`async_person_repository/` multi-fichiers, le plus gros).
 - [ ] **Sous-phase 2.7** — Module `publications`
