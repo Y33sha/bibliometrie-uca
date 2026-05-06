@@ -484,6 +484,45 @@ def oa_clause(oa_status: str | None) -> WhereClause | None:
     return WhereClause("p.oa_status::text = ANY(:flt_oa_status)", {"flt_oa_status": expanded})
 
 
+def person_has_identifier_clause(id_type: str, value: str) -> WhereClause | None:
+    """Variante SA de `apply_person_has_identifier_filter`.
+
+    `id_type` est une constante d'appel (orcid/idhal/idref) — interpolée
+    en SQL. `value` est l'input utilisateur (yes/no), mais mappé vers
+    une présence/absence d'EXISTS, donc pas de bind.
+    """
+    if value not in ("yes", "no"):
+        return None
+    negate = "NOT " if value == "no" else ""
+    return WhereClause(
+        f"""{negate}EXISTS (
+            SELECT 1 FROM person_identifiers pi
+            WHERE pi.person_id = p.id
+              AND pi.id_type = '{id_type}'
+              AND pi.status != 'rejected'
+        )""",
+        {},
+    )
+
+
+def person_linked_clause(value: str) -> WhereClause | None:
+    if value not in ("yes", "no"):
+        return None
+    negate = "NOT " if value == "no" else ""
+    return WhereClause(
+        f"{negate}EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)",
+        {},
+    )
+
+
+def person_has_rh_clause(value: str) -> WhereClause | None:
+    if value == "yes":
+        return WhereClause("prh.id IS NOT NULL", {})
+    if value == "no":
+        return WhereClause("prh.id IS NULL", {})
+    return None
+
+
 def persons_sort_clause(sort: str) -> str:
     """Return an ORDER BY clause for the persons query."""
     SORT_MAP = {

@@ -126,9 +126,9 @@ async def persons_directory(
         has_idref=has_idref,
         has_rh=has_rh,
     )
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         return await persons_queries.persons_directory(
-            cur, filters=filters, page=page, per_page=per_page, sort=sort
+            conn, filters=filters, page=page, per_page=per_page, sort=sort
         )
 
 
@@ -137,8 +137,8 @@ async def search_persons(
     q: str = Query("", min_length=2), limit: int = Query(10, ge=1, le=30)
 ) -> Any:
     """Recherche rapide de personnes (autocomplete)."""
-    async with get_async_cursor() as (cur, _conn):
-        return await persons_queries.search_persons(cur, q=q, limit=limit)
+    async with get_sa_connection() as conn:
+        return await persons_queries.search_persons(conn, q=q, limit=limit)
 
 
 @router.get("/api/persons", response_model=PersonListResponse)
@@ -164,9 +164,9 @@ async def list_persons(
         has_idhal=has_idhal,
         has_rh=has_rh,
     )
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         return await persons_queries.list_persons(
-            cur, filters=filters, page=page, per_page=per_page, sort=sort
+            conn, filters=filters, page=page, per_page=per_page, sort=sort
         )
 
 
