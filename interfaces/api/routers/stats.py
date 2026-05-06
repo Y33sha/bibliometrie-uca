@@ -6,7 +6,11 @@ from typing import Any
 from fastapi import APIRouter, Query
 
 from infrastructure.db.queries import stats as stats_queries
-from interfaces.api.async_deps import get_async_cursor, get_root_structure_id
+from interfaces.api.async_deps import (
+    get_async_cursor,
+    get_root_structure_id,
+    get_sa_connection,
+)
 from interfaces.api.filters import parse_int_csv
 from interfaces.api.models import (
     JournalStatsResponse,
@@ -39,9 +43,9 @@ async def publisher_stats(
     `has_apc=yes|no|""` : filtre sur la présence d'un paiement APC
     connu.
     """
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         return await stats_queries.publisher_stats(
-            cur,
+            conn,
             root_structure_id=await get_root_structure_id(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),

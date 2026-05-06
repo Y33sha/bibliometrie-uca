@@ -1,12 +1,24 @@
 """Fragments SQL et constructeurs de filtres pour les requêtes de lecture.
 
-Ces fonctions construisent les conditions WHERE à partir des paramètres
-de requête. Elles mutent les listes `conditions` et `params` passées en
-argument.
+Ce module expose deux API en cohabitation pendant le chantier
+sqlalchemy-core-adoption :
+
+- **API legacy `apply_*`** : mute des listes `(conditions, params)` en
+  parallèle, à exécuter via un curseur psycopg avec `%s` positionnels.
+- **API SA `*_clause`** : retourne un `WhereClause | None`, composable
+  via `assemble_where(...)`. Les fragments utilisent la syntaxe nommée
+  SQLAlchemy `:nom` et s'exécutent uniquement via une `AsyncConnection`
+  SA (incompatible avec psycopg cur).
+
+Les call sites migrent un par un vers l'API SA. La branche legacy
+disparaîtra en Phase 4.
 
 Vit dans `infrastructure/` parce que ces fonctions génèrent du SQL
 (infrastructure technique).
 """
+
+from dataclasses import dataclass
+from typing import Any
 
 OA_OPEN_STATUSES = ("gold", "hybrid", "bronze", "green", "diamond")
 OA_CLOSED_STATUSES = ("closed", "unknown")
@@ -401,6 +413,75 @@ def apply_publisher_journal_filter(
     if journal_id:
         conditions.append("p.journal_id = %s")
         params.append(journal_id)
+
+
+# ── API SA Core composable (chantier sqlalchemy-core, Phase 1) ────
+
+
+@dataclass(frozen=True)
+class WhereClause:
+    """Fragment SQL avec ses bind params nommés (syntaxe `:nom`).
+
+    À assembler via `assemble_where(...)` puis exécuter via une
+    `AsyncConnection` SA. Incompatible avec un curseur psycopg.
+    """
+
+    sql: str
+    binds: dict[str, Any]
+
+
+def assemble_where(clauses: list[WhereClause | None]) -> tuple[str, dict[str, Any]]:
+    """Assemble les fragments en un `WHERE ...` SQL + dict de binds.
+
+    Retourne `("TRUE", {})` si aucune clause valide, ce qui permet au
+    caller d'écrire `f"WHERE {where_sql}"` sans cas particulier.
+    """
+    valid = [c for c in clauses if c is not None]
+    if not valid:
+        return "TRUE", {}
+    sql = " AND ".join(c.sql for c in valid)
+    binds: dict[str, Any] = {}
+    for c in valid:
+        binds.update(c.binds)
+    return sql, binds
+
+
+def year_clause(years: list[int]) -> WhereClause | None:
+    if not years:
+        return None
+    return WhereClause("p.pub_year = ANY(:flt_years)", {"flt_years": years})
+
+
+def lab_clause(lab_ids: list[int]) -> WhereClause | None:
+    if not lab_ids:
+        return None
+    return WhereClause(
+        """EXISTS (
+            SELECT 1 FROM authorships a
+            WHERE a.publication_id = p.id
+              AND a.structure_ids && :flt_lab_ids::int[]
+              AND NOT a.excluded
+        )""",
+        {"flt_lab_ids": lab_ids},
+    )
+
+
+def oa_clause(oa_status: str | None) -> WhereClause | None:
+    if not oa_status:
+        return None
+    values = [v.strip() for v in oa_status.split(",") if v.strip()]
+    if not values:
+        return None
+    expanded: list[str] = []
+    for v in values:
+        if v == "oa":
+            expanded.extend(OA_OPEN_STATUSES)
+        else:
+            expanded.append(v)
+    expanded = list(set(expanded))
+    if len(expanded) == 1:
+        return WhereClause("p.oa_status::text = :flt_oa_status", {"flt_oa_status": expanded[0]})
+    return WhereClause("p.oa_status::text = ANY(:flt_oa_status)", {"flt_oa_status": expanded})
 
 
 def persons_sort_clause(sort: str) -> str:
