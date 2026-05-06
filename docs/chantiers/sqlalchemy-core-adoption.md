@@ -354,13 +354,19 @@ fiche).
   `_identifiers.py`, `_name_forms.py`, `_authorships.py` migrés en
   dispatch (pattern interne aux fonctions, cohérent avec
   `infrastructure/perimeter.py`). `__init__.py` non touché.
-- [ ] **Sous-phase 2.6 — Services + routers persons en SA** :
-  `application/persons.py` async fonctions (~20 fonctions),
-  `interfaces/api/routers/persons.py` (les ~15 endpoints qui passent
-  par `async_person_repository`), tests.
-- [ ] **Sous-phase 2.7** — Module `publications`
-  (`async_publication_repository.py` à mettre en dispatch d'abord,
-  puis services + routers).
+- [x] **Sous-phase 2.6 — Services + routers persons en SA**
+  *(commit `727371b`)* : `application/persons.py` async fonctions
+  signatures `cur → conn`. Router persons : ~10 endpoints write
+  basculés sur `get_sa_connection()`. Tests : suite complète OK.
+- [x] **Préalable 2.7 — `async_publication_repository.py` en dispatch**
+  *(commit `4ca4c5f`)* : 14 méthodes en dispatch (find_by_doi/nnt/title,
+  update_*, create, merge_into, mark_distinct), helpers `_json_dumps_or_none`
+  et `_merge_into_sa` pour la branche SA.
+- [x] **Sous-phase 2.7 — Routers admin_duplicates en SA**
+  *(commit `cf2389d`)* : `mark_distinct` et `async_merge_publications`
+  signature `cur → conn`. `publication_duplicates.get_publications_basic`
+  en dispatch. Routers `merge` + `mark-distinct` basculés sur
+  `get_sa_connection()` ; SAVEPOINT via `conn.begin_nested()`.
 
 ### Phase 3 — Migration des queries statiques restantes
 
