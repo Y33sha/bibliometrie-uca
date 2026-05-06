@@ -12,7 +12,7 @@ from fastapi import APIRouter
 
 from application import config as config_service
 from infrastructure.db.queries.config import list_config_async
-from infrastructure.repositories import async_config_repository
+from infrastructure.repositories import async_config_store
 from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import ConfigItem, ConfigValueUpdate, HalCollectionsResponse
 
@@ -52,5 +52,5 @@ async def update_config(key: str, body: ConfigValueUpdate) -> Any:
     """
     async with get_async_cursor() as (cur, _conn):
         return await config_service.update_config_value(
-            cur, key, body.value, repo=async_config_repository(cur)
+            cur, key, body.value, config=async_config_store(cur)
         )

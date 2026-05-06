@@ -1,38 +1,39 @@
 """
 Service Config — orchestrateur des opérations sur `config` et `perimeters`.
 
-Le SQL vit dans `infrastructure/repositories/config_repository.py`.
-Les routers passent par ces fonctions pour toute écriture. Les lectures
-restent autorisées dans les routers (convention du projet).
+Le SQL vit dans `infrastructure/repositories/async_perimeter_repository.py`
+(agrégat Perimeter) et `infrastructure/db/queries/config.py` (table
+`config` clé/valeur). Les routers passent par ces fonctions pour toute
+écriture. Les lectures restent autorisées dans les routers (convention
+du projet).
 """
 
 from typing import Any
 
 from application.audit import async_emit_event
+from application.ports.config import AsyncConfigStore
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from domain.ports.config_repository import AsyncConfigRepository
+from domain.ports.perimeter_repository import AsyncPerimeterRepository
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
 
-async def update_config_value(
-    cur: Any, key: str, value: Any, *, repo: AsyncConfigRepository
-) -> dict:
+async def update_config_value(cur: Any, key: str, value: Any, *, config: AsyncConfigStore) -> dict:
     """Met à jour la valeur d'un paramètre de config existant.
 
     `value` est sérialisé en JSON. Retourne la ligne mise à jour.
     Lève NotFoundError si la clé n'existe pas.
     """
-    if not await repo.config_key_exists(key):
+    if not await config.config_key_exists(key):
         raise NotFoundError(f"Paramètre '{key}' introuvable")
-    return await repo.update_config_value(key, value)
+    return await config.update_config_value(key, value)
 
 
 # ── Perimeters — structures membres ──────────────────────────────
 
 
 async def add_perimeter_structure(
-    cur: Any, perimeter_id: int, structure_id: int, *, repo: AsyncConfigRepository
+    cur: Any, perimeter_id: int, structure_id: int, *, repo: AsyncPerimeterRepository
 ) -> str:
     """Ajoute une structure au périmètre (idempotent).
 
@@ -52,7 +53,7 @@ async def add_perimeter_structure(
 
 
 async def remove_perimeter_structure(
-    cur: Any, perimeter_id: int, structure_id: int, *, repo: AsyncConfigRepository
+    cur: Any, perimeter_id: int, structure_id: int, *, repo: AsyncPerimeterRepository
 ) -> None:
     """Retire une structure d'un périmètre (idempotent).
 
@@ -71,7 +72,7 @@ async def create_perimeter(
     code: str,
     name: str,
     description: str | None = None,
-    repo: AsyncConfigRepository,
+    repo: AsyncPerimeterRepository,
 ) -> int:
     """Crée un nouveau périmètre. Retourne l'id créé.
 
@@ -87,7 +88,7 @@ async def create_perimeter(
 
 
 async def update_perimeter(
-    cur: Any, perimeter_id: int, *, fields: dict, repo: AsyncConfigRepository
+    cur: Any, perimeter_id: int, *, fields: dict, repo: AsyncPerimeterRepository
 ) -> None:
     """Met à jour un périmètre (name, description, structure_ids).
 
@@ -105,7 +106,13 @@ async def update_perimeter(
     await repo.update_perimeter_fields(perimeter_id, clean)
 
 
-async def delete_perimeter(cur: Any, perimeter_id: int, *, repo: AsyncConfigRepository) -> None:
+async def delete_perimeter(
+    cur: Any,
+    perimeter_id: int,
+    *,
+    repo: AsyncPerimeterRepository,
+    config: AsyncConfigStore,
+) -> None:
     """Supprime un périmètre.
 
     Lève NotFoundError si le périmètre n'existe pas.
@@ -116,7 +123,7 @@ async def delete_perimeter(cur: Any, perimeter_id: int, *, repo: AsyncConfigRepo
     if code is None:
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
-    used_by = await repo.config_keys_referencing_perimeter(code)
+    used_by = await config.config_keys_referencing_perimeter(code)
     if used_by:
         raise ConflictError(f"Ce périmètre est utilisé par : {', '.join(used_by)}")
 

@@ -1,48 +1,15 @@
-"""Adapter PostgreSQL async pour `config` et `perimeters`.
+"""Adapter PostgreSQL async pour l'agrégat Perimeter."""
 
-Parallèle à infrastructure/repositories/config_repository.py — même
-contrat, curseur async.
-"""
-
-import json
 from typing import Any
 
 
-class PgAsyncConfigRepository:
-    """Accès PostgreSQL async aux agrégats Config et Perimeter."""
+class PgAsyncPerimeterRepository:
+    """Accès PostgreSQL async à la table `perimeters`."""
 
     def __init__(self, cur: Any) -> None:
         self._cur = cur
 
-    # ── Table config (clé / valeur JSON) ───────────────────────────
-
-    async def config_key_exists(self, key: str) -> bool:
-        await self._cur.execute("SELECT key FROM config WHERE key = %s", (key,))
-        return (await self._cur.fetchone()) is not None
-
-    async def update_config_value(self, key: str, value: Any) -> dict:
-        await self._cur.execute(
-            """
-            UPDATE config SET value = %s::jsonb, updated_at = now()
-            WHERE key = %s
-            RETURNING key, value, description, updated_at
-            """,
-            (json.dumps(value), key),
-        )
-        return await self._cur.fetchone()
-
-    async def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]:
-        await self._cur.execute(
-            """
-            SELECT key FROM config
-            WHERE key LIKE 'perimeter_%%' AND value #>> '{}' = %s
-            """,
-            (perimeter_code,),
-        )
-        rows = await self._cur.fetchall()
-        return [r["key"] for r in rows]
-
-    # ── Perimeters — structures membres ────────────────────────────
+    # ── Liens structure ↔ perimeter ────────────────────────────────
 
     async def add_structure_to_perimeter(
         self,
@@ -76,7 +43,7 @@ class PgAsyncConfigRepository:
         )
         return (await self._cur.fetchone()) is not None
 
-    # ── Perimeters — CRUD ──────────────────────────────────────────
+    # ── CRUD ───────────────────────────────────────────────────────
 
     async def perimeter_exists(self, perimeter_id: int) -> bool:
         await self._cur.execute(

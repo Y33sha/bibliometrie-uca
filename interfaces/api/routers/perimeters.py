@@ -13,7 +13,7 @@ from fastapi import APIRouter
 
 from application import config as config_service
 from infrastructure.perimeter import async_get_perimeter_structure_ids
-from infrastructure.repositories import async_config_repository
+from infrastructure.repositories import async_config_store, async_perimeter_repository
 from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.models import (
     AddPerimeterStructure,
@@ -69,7 +69,7 @@ async def create_perimeter(body: PerimeterCreate) -> Any:
     description = (body.description or "").strip() or None
     async with get_async_cursor() as (cur, _conn):
         pid = await config_service.create_perimeter(
-            cur, code=code, name=name, description=description, repo=async_config_repository(cur)
+            cur, code=code, name=name, description=description, repo=async_perimeter_repository(cur)
         )
         return {"id": pid}
 
@@ -85,7 +85,7 @@ async def update_perimeter(perimeter_id: int, body: PerimeterUpdate) -> Any:
         fields["description"] = fields["description"].strip() or None
     async with get_async_cursor() as (cur, _conn):
         await config_service.update_perimeter(
-            cur, perimeter_id, fields=fields, repo=async_config_repository(cur)
+            cur, perimeter_id, fields=fields, repo=async_perimeter_repository(cur)
         )
         return {"ok": True}
 
@@ -94,7 +94,12 @@ async def update_perimeter(perimeter_id: int, body: PerimeterUpdate) -> Any:
 async def delete_perimeter(perimeter_id: int) -> Any:
     """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
     async with get_async_cursor() as (cur, _conn):
-        await config_service.delete_perimeter(cur, perimeter_id, repo=async_config_repository(cur))
+        await config_service.delete_perimeter(
+            cur,
+            perimeter_id,
+            repo=async_perimeter_repository(cur),
+            config=async_config_store(cur),
+        )
         return {"ok": True}
 
 
@@ -107,7 +112,7 @@ async def add_perimeter_structure(perimeter_id: int, body: AddPerimeterStructure
     """
     async with get_async_cursor() as (cur, _conn):
         status = await config_service.add_perimeter_structure(
-            cur, perimeter_id, body.structure_id, repo=async_config_repository(cur)
+            cur, perimeter_id, body.structure_id, repo=async_perimeter_repository(cur)
         )
         return {"status": status}
 
@@ -120,6 +125,6 @@ async def remove_perimeter_structure(perimeter_id: int, structure_id: int) -> An
     sous-structures tant qu'elles sont rattachées à d'autres racines."""
     async with get_async_cursor() as (cur, _conn):
         await config_service.remove_perimeter_structure(
-            cur, perimeter_id, structure_id, repo=async_config_repository(cur)
+            cur, perimeter_id, structure_id, repo=async_perimeter_repository(cur)
         )
         return {"status": "removed"}

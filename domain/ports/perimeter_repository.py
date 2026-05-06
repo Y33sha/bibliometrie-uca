@@ -1,21 +1,13 @@
-"""Port AsyncConfigRepository — contrat d'accès aux agrégats Config et Perimeter.
+"""Port AsyncPerimeterRepository — contrat d'accès à l'agrégat Perimeter.
 
-Implémenté par infrastructure/repositories/async_config_repository.py.
+Implémenté par infrastructure/repositories/async_perimeter_repository.py.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
 
 
-class AsyncConfigRepository(Protocol):
-    """Contrat async d'accès aux tables config et perimeters."""
-
-    # ── config (clé / valeur JSON) ─────────────────────────────────
-
-    async def config_key_exists(self, key: str) -> bool: ...
-
-    async def update_config_value(self, key: str, value: Any) -> dict: ...
-
-    async def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]: ...
+class AsyncPerimeterRepository(Protocol):
+    """Contrat async d'accès à la table `perimeters`."""
 
     # ── Liens structure ↔ perimeter ────────────────────────────────
 
@@ -31,7 +23,7 @@ class AsyncConfigRepository(Protocol):
         structure_id: int,
     ) -> bool: ...
 
-    # ── Perimeter CRUD ─────────────────────────────────────────────
+    # ── CRUD ───────────────────────────────────────────────────────
 
     async def perimeter_exists(self, perimeter_id: int) -> bool: ...
 
