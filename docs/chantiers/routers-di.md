@@ -108,7 +108,7 @@ pattern progressivement :
 - [x] `perimeters.py` *(commit `b930093`)*
 - [x] `structures.py` *(commit `291cbe3`)*
 - [x] `stats.py` *(commit `c882221`)*
-- [ ] `laboratories.py`
+- [x] `laboratories.py` *(commit à venir)*
 - [ ] `publications.py`
 - [ ] `persons.py` (le plus gros — ~30 endpoints)
 
@@ -126,7 +126,7 @@ Certains routers utilisent des query modules qui n'ont pas de port.
 - [x] `journals` query service *(commit `9ce5ee8`)*
 - [x] `structures` query service *(commit `291cbe3`)*
 - [x] `addresses` query service *(commit `1bdb3dd`)*
-- [ ] `laboratories` query service
+- [x] `laboratories` query service *(commit à venir)*
 - [x] `stats` query service *(commit `c882221` — agrège les 7 fonctions des 4 modules `stats/*` derrière `PgAsyncStatsQueries`)*
 - [ ] `publications` query service (list, facets, detail, all_years)
 - [ ] `persons` query service (list, facets, directory, detail, admin)
