@@ -29,6 +29,7 @@ from application.ports.config import AsyncConfigStore
 from application.ports.journals_queries import AsyncJournalQueries
 from application.ports.perimeter import AsyncPerimeterQueries
 from application.ports.publishers_queries import AsyncPublisherQueries
+from application.ports.subjects_queries import AsyncSubjectsQueries
 from domain.ports.address_repository import AsyncAddressRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from domain.ports.journal_repository import AsyncJournalRepository
@@ -42,6 +43,7 @@ from infrastructure.db.engine import get_async_engine
 from infrastructure.db.queries.journals import PgAsyncJournalQueries
 from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
 from infrastructure.db.queries.publishers import PgAsyncPublisherQueries
+from infrastructure.db.queries.subjects import PgAsyncSubjectsQueries
 from infrastructure.repositories import (
     async_address_repository,
     async_authorship_repository,
@@ -152,6 +154,12 @@ def journal_queries(
     conn: AsyncConnection = Depends(db_conn),
 ) -> AsyncJournalQueries:
     return PgAsyncJournalQueries(conn)
+
+
+def subjects_queries(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncSubjectsQueries:
+    return PgAsyncSubjectsQueries(conn)
 
 
 # ── Câblage des adapters sortants ──

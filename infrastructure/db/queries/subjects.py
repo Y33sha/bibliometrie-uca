@@ -1,16 +1,17 @@
 """Query service : SQL pour la table `subjects` et la liaison
 `publication_subjects`.
 
-Consommé par la phase `application/pipeline/subjects/` et par les
-routes API `/api/subjects/*`. Voir docs/chantiers/sujets-mots-cles.md.
-
-Les fonctions sync alimentent le pipeline ; les fonctions `*_async`
-sont pour les routes FastAPI.
+Consommé par la phase `application/pipeline/subjects/` (fonctions sync)
+et par les routes API `/api/subjects/*` (classe `PgAsyncSubjectsQueries`,
+implémentation du port `application.ports.subjects_queries`).
+Voir docs/chantiers/sujets-mots-cles.md.
 """
 
 from typing import Any
 
 from psycopg.types.json import Json
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from domain.subject import normalize_label
 
@@ -245,92 +246,85 @@ def recompute_cooccurrences(cur: Any, *, min_count: int = 2) -> int:
 # ── Lectures async (consommées par les routes API) ───────────────
 
 
-async def list_subjects_async(
-    cur: Any,
-    *,
-    q: str | None = None,
-    limit: int = 50,
-    offset: int = 0,
-    min_count: int = 1,
-) -> list[dict[str, Any]]:
-    """Liste paginée de sujets, ordonnée par `usage_count` desc puis label."""
-    where_clauses = ["usage_count >= %s"]
-    params: list[Any] = [min_count]
-    if q:
-        where_clauses.append("lower(label) LIKE %s")
-        params.append(f"%{q.lower()}%")
-    where_sql = " AND ".join(where_clauses)
-    await cur.execute(
-        f"""
-        SELECT id, label, language, ontologies, usage_count
-        FROM subjects
-        WHERE {where_sql}
-        ORDER BY usage_count DESC, lower(label)
-        LIMIT %s OFFSET %s
-        """,
-        [*params, limit, offset],
-    )
-    return [dict(r) for r in await cur.fetchall()]
+class PgAsyncSubjectsQueries:
+    """Adapter SA pour `application.ports.subjects_queries.AsyncSubjectsQueries`."""
 
+    def __init__(self, conn: AsyncConnection) -> None:
+        self._conn = conn
 
-async def count_subjects_async(
-    cur: Any,
-    *,
-    q: str | None = None,
-    min_count: int = 1,
-) -> int:
-    """Cardinalité totale (pour la pagination)."""
-    where_clauses = ["usage_count >= %s"]
-    params: list[Any] = [min_count]
-    if q:
-        where_clauses.append("lower(label) LIKE %s")
-        params.append(f"%{q.lower()}%")
-    where_sql = " AND ".join(where_clauses)
-    await cur.execute(f"SELECT COUNT(*) AS n FROM subjects WHERE {where_sql}", params)
-    row = await cur.fetchone()
-    return row["n"] if isinstance(row, dict) else row[0]
+    async def list_subjects(
+        self, *, q: str | None, limit: int, offset: int, min_count: int
+    ) -> list[dict[str, Any]]:
+        binds: dict[str, Any] = {"min_count": min_count, "lim": limit, "off": offset}
+        where = "usage_count >= :min_count"
+        if q:
+            where += " AND lower(label) LIKE :q"
+            binds["q"] = f"%{q.lower()}%"
+        rows = (
+            await self._conn.execute(
+                text(f"""
+                    SELECT id, label, language, ontologies, usage_count
+                    FROM subjects
+                    WHERE {where}
+                    ORDER BY usage_count DESC, lower(label)
+                    LIMIT :lim OFFSET :off
+                """),
+                binds,
+            )
+        ).all()
+        return [dict(r._mapping) for r in rows]
 
+    async def count_subjects(self, *, q: str | None, min_count: int) -> int:
+        binds: dict[str, Any] = {"min_count": min_count}
+        where = "usage_count >= :min_count"
+        if q:
+            where += " AND lower(label) LIKE :q"
+            binds["q"] = f"%{q.lower()}%"
+        row = (
+            await self._conn.execute(
+                text(f"SELECT COUNT(*) AS n FROM subjects WHERE {where}"),
+                binds,
+            )
+        ).one()
+        return row.n
 
-async def get_subject_async(cur: Any, subject_id: int) -> dict[str, Any] | None:
-    """Détail d'un sujet (None si absent)."""
-    await cur.execute(
-        """
-        SELECT id, label, language, ontologies, usage_count
-        FROM subjects
-        WHERE id = %s
-        """,
-        (subject_id,),
-    )
-    row = await cur.fetchone()
-    return dict(row) if row else None
+    async def get_subject(self, subject_id: int) -> dict[str, Any] | None:
+        row = (
+            await self._conn.execute(
+                text("""
+                    SELECT id, label, language, ontologies, usage_count
+                    FROM subjects
+                    WHERE id = :id
+                """),
+                {"id": subject_id},
+            )
+        ).one_or_none()
+        return dict(row._mapping) if row else None
 
-
-async def get_subject_neighbors_async(
-    cur: Any,
-    subject_id: int,
-    *,
-    limit: int = 20,
-    min_count: int = 2,
-) -> list[dict[str, Any]]:
-    """Top voisins par count de co-occurrence, agrégé bidirectionnellement."""
-    await cur.execute(
-        """
-        SELECT s.id, s.label, s.ontologies, s.usage_count, c.n AS cooccurrence_count
-        FROM (
-            SELECT subject_b_id AS other, count AS n
-            FROM subject_cooccurrences WHERE subject_a_id = %s
-            UNION ALL
-            SELECT subject_a_id AS other, count AS n
-            FROM subject_cooccurrences WHERE subject_b_id = %s
-        ) c
-        JOIN subjects s ON s.id = c.other
-        WHERE c.n >= %s
-        ORDER BY c.n DESC, lower(s.label)
-        LIMIT %s
-        """,
-        (subject_id, subject_id, min_count, limit),
-    )
-    return [dict(r) for r in await cur.fetchall()]
+    async def get_subject_neighbors(
+        self, subject_id: int, *, limit: int, min_count: int
+    ) -> list[dict[str, Any]]:
+        rows = (
+            await self._conn.execute(
+                text("""
+                    SELECT s.id, s.label, s.ontologies, s.usage_count,
+                           c.n AS cooccurrence_count
+                    FROM (
+                        SELECT subject_b_id AS other, count AS n
+                        FROM subject_cooccurrences WHERE subject_a_id = :sid
+                        UNION ALL
+                        SELECT subject_a_id AS other, count AS n
+                        FROM subject_cooccurrences WHERE subject_b_id = :sid
+                    ) c
+                    JOIN subjects s ON s.id = c.other
+                    WHERE c.n >= :min_count
+                    ORDER BY c.n DESC, lower(s.label)
+                    LIMIT :lim
+                """),
+                {"sid": subject_id, "min_count": min_count, "lim": limit},
+            )
+        ).all()
+        return [dict(r._mapping) for r in rows]
 
 
 class PgSubjectsQueries:
