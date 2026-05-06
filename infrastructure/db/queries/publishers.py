@@ -2,6 +2,11 @@
 
 from typing import Any
 
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncConnection
+
+from infrastructure.db.tables import publishers as t_publishers
+
 _SORT_MAP = {
     "name": "p.name ASC",
     "-name": "p.name DESC",
@@ -12,72 +17,69 @@ _SORT_MAP = {
 }
 
 
-async def list_publishers_async(
-    cur: Any,
-    *,
-    search: str | None,
-    sort: str,
-    page: int,
-    per_page: int,
-) -> dict[str, Any]:
-    """Liste paginée des éditeurs avec comptage revues + publications.
+class PgAsyncPublisherQueries:
+    """Adapter SA pour `application.ports.publishers_queries.AsyncPublisherQueries`."""
 
-    `search` est ignoré si < 2 caractères. `sort` retombe sur `name` si
-    inconnu. Retourne `{total, page, pages, publishers}`.
-    """
-    conditions: list[str] = []
-    params: list[Any] = []
-    if search and len(search) >= 2:
-        conditions.append("p.name_normalized LIKE '%%' || %s || '%%'")
-        params.append(search.lower())
-    where = " AND ".join(conditions) if conditions else "TRUE"
+    def __init__(self, conn: AsyncConnection) -> None:
+        self._conn = conn
 
-    await cur.execute(f"SELECT COUNT(*) FROM publishers p WHERE {where}", params)
-    total = (await cur.fetchone())["count"]
+    async def list_publishers(
+        self, *, search: str | None, sort: str, page: int, per_page: int
+    ) -> dict[str, Any]:
+        binds: dict[str, Any] = {}
+        where = "TRUE"
+        if search and len(search) >= 2:
+            where = "p.name_normalized LIKE '%' || :search || '%'"
+            binds["search"] = search.lower()
 
-    order = _SORT_MAP.get(sort, _SORT_MAP["name"])
-    offset = (page - 1) * per_page
-    await cur.execute(
-        f"""
-        SELECT p.id, p.name, p.openalex_id, p.country,
-               p.doi_prefix, p.is_predatory,
-               (SELECT COUNT(*) FROM journals j WHERE j.publisher_id = p.id) AS journal_count,
-               (SELECT COUNT(*) FROM publications pub
-                JOIN journals j2 ON j2.id = pub.journal_id
-                WHERE j2.publisher_id = p.id) AS pub_count
-        FROM publishers p
-        WHERE {where}
-        ORDER BY {order}
-        LIMIT %s OFFSET %s
-        """,
-        params + [per_page, offset],
-    )
-    return {
-        "total": total,
-        "page": page,
-        "pages": (total + per_page - 1) // per_page,
-        "publishers": await cur.fetchall(),
-    }
+        total_row = (
+            await self._conn.execute(
+                text(f"SELECT COUNT(*) AS total FROM publishers p WHERE {where}"),
+                binds,
+            )
+        ).one()
+        total = total_row.total
 
+        order = _SORT_MAP.get(sort, _SORT_MAP["name"])
+        offset = (page - 1) * per_page
+        rows = (
+            await self._conn.execute(
+                text(f"""
+                    SELECT p.id, p.name, p.openalex_id, p.country,
+                           p.doi_prefix, p.is_predatory,
+                           (SELECT COUNT(*) FROM journals j
+                            WHERE j.publisher_id = p.id) AS journal_count,
+                           (SELECT COUNT(*) FROM publications pub
+                            JOIN journals j2 ON j2.id = pub.journal_id
+                            WHERE j2.publisher_id = p.id) AS pub_count
+                    FROM publishers p
+                    WHERE {where}
+                    ORDER BY {order}
+                    LIMIT :pg_limit OFFSET :pg_offset
+                """),
+                {**binds, "pg_limit": per_page, "pg_offset": offset},
+            )
+        ).all()
+        return {
+            "total": total,
+            "page": page,
+            "pages": (total + per_page - 1) // per_page,
+            "publishers": [dict(r._mapping) for r in rows],
+        }
 
-async def get_publisher_async(cur: Any, publisher_id: int) -> dict[str, Any] | None:
-    """Éditeur par id (nom uniquement). None si absent."""
-    await cur.execute("SELECT id, name FROM publishers WHERE id = %s", (publisher_id,))
-    return await cur.fetchone()
+    async def get_publisher(self, publisher_id: int) -> dict[str, Any] | None:
+        row = (
+            await self._conn.execute(
+                text("SELECT id, name FROM publishers WHERE id = :id"),
+                {"id": publisher_id},
+            )
+        ).one_or_none()
+        return dict(row._mapping) if row else None
 
-
-async def existing_publisher_ids(conn: Any, publisher_ids: tuple[int, ...]) -> set[int]:
-    """IDs d'éditeurs existant en base parmi ceux passés.
-
-    Migrée en SQLAlchemy Core (sous-phase 1.3) : accepte une
-    AsyncConnection SA pour rester dans la même transaction que le
-    merge qui suit côté router.
-    """
-    if not publisher_ids:
-        return set()
-    from sqlalchemy import select
-
-    from infrastructure.db.tables import publishers
-
-    result = await conn.execute(select(publishers.c.id).where(publishers.c.id.in_(publisher_ids)))
-    return {row.id for row in result}
+    async def existing_publisher_ids(self, publisher_ids: tuple[int, ...]) -> set[int]:
+        if not publisher_ids:
+            return set()
+        result = await self._conn.execute(
+            select(t_publishers.c.id).where(t_publishers.c.id.in_(publisher_ids))
+        )
+        return {row.id for row in result}
