@@ -17,7 +17,7 @@ from application import addresses_countries as countries_service
 from application import addresses_structures as structures_service
 from infrastructure.db.queries import addresses as addr_queries
 from infrastructure.repositories import async_address_repository, async_authorship_repository
-from interfaces.api.async_deps import get_async_cursor, get_perimeter_queries
+from interfaces.api.async_deps import get_async_cursor, get_perimeter_queries, get_sa_connection
 from interfaces.api.deps import require_admin
 from interfaces.api.models import (
     AddressesCountriesResponse,
@@ -46,9 +46,9 @@ logger = logging.getLogger(__name__)
 async def _bg_propagate_countries(address_ids: list[int]) -> None:
     """Propagation pays en tâche de fond (sur le pool async FastAPI)."""
     try:
-        async with get_async_cursor() as (cur, _conn):
+        async with get_sa_connection() as conn:
             await countries_service.propagate_countries_to_publications(
-                cur, address_ids, repo=async_address_repository(cur)
+                conn, address_ids, repo=async_address_repository(conn)
             )
     except Exception:
         logger.exception("Erreur propagation pays en background")
@@ -111,16 +111,18 @@ async def get_address_publications(addr_id: int, limit: int = Query(20)) -> Any:
 @router.post("/api/addresses/{addr_id}/review", response_model=AddressReviewResponse)
 async def review_address(addr_id: int, action: ReviewAction) -> Any:
     """Confirme, rejette ou reset le lien adresse ↔ structure."""
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         await structures_service.review_structure_link(
-            cur,
+            conn,
             addr_id,
             action.structure_id,
             action.is_confirmed,
-            repo=async_address_repository(cur),
-            authorship_repo=async_authorship_repository(cur),
+            repo=async_address_repository(conn),
+            authorship_repo=async_authorship_repository(conn),
             perimeter_queries=get_perimeter_queries(),
         )
+    # Lecture après commit : pool psycopg legacy (queries non encore migrées).
+    async with get_async_cursor() as (cur, _conn):
         structures = await addr_queries.get_address_structures(cur, addr_id)
         link = await addr_queries.get_structure_link(cur, addr_id, action.structure_id)
         return {
@@ -134,14 +136,14 @@ async def review_address(addr_id: int, action: ReviewAction) -> Any:
 @router.post("/api/addresses/batch-review", response_model=BatchUpdatedResponse)
 async def batch_review(data: BatchReviewAction) -> Any:
     """Confirme/rejette/reset en batch."""
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         updated = await structures_service.batch_review_structure_link(
-            cur,
+            conn,
             data.address_ids,
             data.structure_id,
             data.is_confirmed,
-            repo=async_address_repository(cur),
-            authorship_repo=async_authorship_repository(cur),
+            repo=async_address_repository(conn),
+            authorship_repo=async_authorship_repository(conn),
             perimeter_queries=get_perimeter_queries(),
         )
         return {"updated": updated}
@@ -193,14 +195,16 @@ async def set_address_country(
     addr_id: int, body: SetCountry, bg: BackgroundTasks, _: Any = Depends(require_admin)
 ) -> Any:
     """Attribue des pays à une adresse."""
+    # Validation préalable côté queries (lectures, pool psycopg legacy).
     async with get_async_cursor() as (cur, _conn):
         if not await addr_queries.address_exists(cur, addr_id):
             raise HTTPException(status_code=404, detail="Adresse introuvable")
         for c in body.countries or []:
             if not await addr_queries.country_exists(cur, c):
                 raise HTTPException(status_code=400, detail=f"Code pays inconnu: {c}")
+    async with get_sa_connection() as conn:
         affected = await countries_service.set_country(
-            cur, addr_id, body.countries, repo=async_address_repository(cur)
+            conn, addr_id, body.countries, repo=async_address_repository(conn)
         )
     bg.add_task(_bg_propagate_countries, affected)
     return {"ok": True}
@@ -219,14 +223,15 @@ async def batch_set_country(
         if not await addr_queries.country_exists(cur, country_code):
             raise HTTPException(status_code=400, detail=f"Code pays inconnu: {country_code}")
 
-        addr_repo = async_address_repository(cur)
+    async with get_sa_connection() as conn:
+        addr_repo = async_address_repository(conn)
         if body.address_ids:
             modified_ids = await countries_service.batch_set_country_by_ids(
-                cur, country_code, body.address_ids, repo=addr_repo
+                conn, country_code, body.address_ids, repo=addr_repo
             )
         else:
             modified_ids = await countries_service.batch_set_country_by_filter(
-                cur,
+                conn,
                 country_code,
                 search=body.search,
                 has_country=body.has_country,
@@ -236,7 +241,9 @@ async def batch_set_country(
             )
         updated = len(modified_ids)
 
-        propagated_ids = await countries_service.propagate_countries_to_similar(cur, repo=addr_repo)
+        propagated_ids = await countries_service.propagate_countries_to_similar(
+            conn, repo=addr_repo
+        )
         propagated = len(propagated_ids)
         all_ids = modified_ids + propagated_ids
 
@@ -256,13 +263,14 @@ async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
         if not await cur.fetchone():
             raise HTTPException(status_code=404, detail="Structure not found")
 
+    async with get_sa_connection() as conn:
         await structures_service.review_structure_link(
-            cur,
+            conn,
             addr_id,
             action.structure_id,
             True,
-            repo=async_address_repository(cur),
-            authorship_repo=async_authorship_repository(cur),
+            repo=async_address_repository(conn),
+            authorship_repo=async_authorship_repository(conn),
             perimeter_queries=get_perimeter_queries(),
         )
         return {"id": addr_id, "structure_id": action.structure_id, "status": "assigned"}
@@ -273,13 +281,13 @@ async def assign_structure(addr_id: int, action: AssignStructureAction) -> Any:
 )
 async def unassign_structure(addr_id: int, structure_id: int = Query(...)) -> Any:
     """Supprime l'assignation manuelle d'une structure."""
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         deleted = await structures_service.unassign_manual_structure(
-            cur,
+            conn,
             addr_id,
             structure_id,
-            repo=async_address_repository(cur),
-            authorship_repo=async_authorship_repository(cur),
+            repo=async_address_repository(conn),
+            authorship_repo=async_authorship_repository(conn),
             perimeter_queries=get_perimeter_queries(),
         )
         return {"deleted": deleted}
