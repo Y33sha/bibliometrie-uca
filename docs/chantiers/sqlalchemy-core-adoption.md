@@ -1,12 +1,6 @@
 # Chantier — Adoption SQLAlchemy Core
 Commencé le 2026-05-06.
 
-## État : phase 0 terminée — phases 1+ à exécuter
-
-Décision actée : on adopte SQLAlchemy Core. La porte vers Alembic
-reste ouverte et sera réévaluée à la fin du chantier en
-coût-bénéfice (cf. section dédiée).
-
 ## Contexte
 
 Le projet utilise psycopg3 directement, avec deux familles de

@@ -20,6 +20,7 @@
 * [ ] DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
 ## Code
 * [ ] auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques): supprimer les requêtes vers source_authorships pouvant être remplacées par des requêtes vers les tables canoniques
+* [ ] nommage des routers pas totalement cohérent
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 ## Sujets
