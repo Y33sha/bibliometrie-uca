@@ -1,4 +1,5 @@
 # Chantier — Nettoyage des ports `domain/ports/`
+Commencé le 2026-05-06
 
 ## État : à exécuter
 
@@ -138,7 +139,7 @@ Après la modification :
 
 ---
 
-## Issue 2 (DÉCISION À CONFIRMER) — `config_repository` mélange Config + Perimeter
+## Issue 2 (OBLIGATOIRE) — `config_repository` mélange Config + Perimeter
 
 ### Problème
 
@@ -158,58 +159,60 @@ Après la modification :
 Le mélange est historique : les deux sont manipulés ensemble par les
 routers admin `/api/config` et `/api/perimeters`.
 
-### Décision retenue : **option β — garder le mélange, le documenter**
+### Décision retenue : **option α — scinder**
 
-Raisonnement : les deux concepts sont étroitement liés en pratique
-(les valeurs de config référencent souvent un perimeter par son
-`code`), et scinder créerait deux ports utilisés systématiquement
-ensemble. Coût/bénéfice défavorable.
+Raisonnement : `Perimeter` est un agrégat métier au sens strict
+(entité racine identifiable, invariants propres) ; il a sa place dans
+`domain/ports/`. La table `config` est de la configuration applicative
+clé/valeur — pas un agrégat — et a sa place dans `application/ports/`
+(query service, `cur: Any` accepté). Le mélange historique brouille
+la frontière de placement énoncée dans `docs/architecture.md`.
+Scinder clarifie la sémantique : les deux ports peuvent être injectés
+en parallèle dans les call sites qui en ont besoin.
 
-### Action (option β retenue)
+### Action (option α retenue)
 
-1. **Mettre à jour le docstring du fichier**
-   `domain/ports/config_repository.py` pour expliciter le mélange :
+1. **Créer `domain/ports/perimeter_repository.py`** avec les méthodes
+   Perimeter (version async, suivre le pattern des autres ports
+   `domain/ports/`). Aucune référence à `cur`, signatures uniquement
+   en types domaine/stdlib/primitifs.
 
-   ```python
-   """Port AsyncConfigRepository — contrat d'accès à l'agrégat
-   Perimeter et à la table config (clé/valeur applicative).
+2. **Créer `application/ports/config.py`** (query service) avec les
+   méthodes config restantes : `config_key_exists`,
+   `update_config_value`, `config_keys_referencing_perimeter`.
+   `cur: Any` accepté ici puisqu'on est côté `application/ports/`.
 
-   Mélange pragmatique assumé : la table `config` n'est pas un
-   agrégat au sens DDD strict (c'est de la configuration en
-   clé/valeur), mais ses entrées référencent souvent un perimeter
-   par code, et les deux sont manipulés ensemble par les routers
-   admin `/api/config` et `/api/perimeters`. Scinder créerait deux
-   ports systématiquement utilisés conjointement.
+3. **Supprimer `domain/ports/config_repository.py`** une fois les
+   call sites migrés.
 
-   Voir `docs/architecture.md` (section "Règle de placement des
-   ports", paragraphe "Exceptions assumées") pour le contexte
-   complet.
+4. **Créer `infrastructure/repositories/async_perimeter_repository.py`**
+   qui implémente le nouveau port Perimeter.
 
-   Implémenté par infrastructure/repositories/async_config_repository.py.
-   """
-   ```
+5. **Adapter `infrastructure/repositories/async_config_repository.py`**
+   pour ne garder que la partie config (ou la déplacer en
+   `infrastructure/db/queries/config.py` selon le pattern habituel
+   des adapters de `application/ports/`).
 
-2. **Aucune modification de code** au-delà du docstring.
+6. **Adapter `application/config.py`** : injecter les deux ports
+   (`AsyncPerimeterRepository` + query service `Config`).
 
-### Option alternative non retenue : α — scinder
+7. **Adapter les routers `/api/config` et `/api/perimeters`** :
+   factories de dépendances FastAPI pour les deux ports.
 
-Si plus tard la décision est reprise, l'option α consisterait à :
-- Créer `domain/ports/perimeter_repository.py` avec les méthodes
-  Perimeter
-- Garder `config_repository.py` ou le déplacer en
-  `application/ports/config_queries.py` (selon vue)
-- Créer `infrastructure/repositories/perimeter_repository.py`
-- Adapter `application/config.py` pour utiliser deux ports
-- Adapter les routers `/api/config` et `/api/perimeters`
+8. **Mettre à jour `docs/architecture.md`** : retirer
+   `config_repository` de la liste des "Exceptions assumées" (la
+   règle des 3 critères s'applique sans exception après ce
+   chantier).
 
-C'est ~1h-2h de travail au lieu de 5 min pour β. **Ne pas faire α**
-sauf demande explicite ultérieure.
+9. **Lancer les tests** : `pytest tests/integration/application/test_config_service.py` + tests des routers admin/config et admin/perimeters.
 
 ### Validation
 
-- Le docstring doit refléter le contenu réel du port et pointer
-  vers `docs/architecture.md`.
-- Aucun test ne doit casser (pas de modification de code).
+- `domain/ports/config_repository.py` n'existe plus.
+- `domain/ports/perimeter_repository.py` ne contient que des
+  méthodes Perimeter (pas de `config_*`).
+- `application/ports/config.py` ne contient que des méthodes config.
+- `lint-imports`, `mypy`, et la suite de tests passent.
 
 ---
 
