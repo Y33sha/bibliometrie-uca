@@ -19,7 +19,7 @@ from infrastructure.db.queries.structures import (
     list_structures_async,
 )
 from infrastructure.repositories import async_structure_repository
-from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.async_deps import get_async_cursor, get_sa_connection
 from interfaces.api.models import (
     DeletedResponse,
     NameFormCreate,
@@ -74,9 +74,9 @@ async def get_structure(structure_id: int) -> Any:
 @router.post("/api/structures", response_model=StructureOut)
 async def create_structure(data: StructureCreate) -> Any:
     """Crée une structure. Lève 409 si le `code` est déjà utilisé."""
-    async with get_async_cursor() as (cur, conn):
+    async with get_sa_connection() as conn:
         return await structures_service.create_structure(
-            cur,
+            conn,
             code=data.code,
             name=data.name,
             acronym=data.acronym,
@@ -85,7 +85,7 @@ async def create_structure(data: StructureCreate) -> Any:
             rnsr_id=data.rnsr_id,
             hal_collection=data.hal_collection,
             api_ids=data.api_ids,
-            repo=async_structure_repository(cur),
+            repo=async_structure_repository(conn),
         )
 
 
@@ -97,9 +97,9 @@ async def update_structure(structure_id: int, data: StructureUpdate) -> Any:
     404 si la structure n'existe pas.
     """
     fields = data.model_dump(exclude_unset=True)
-    async with get_async_cursor() as (cur, conn):
+    async with get_sa_connection() as conn:
         return await structures_service.update_structure(
-            cur, structure_id, fields=fields, repo=async_structure_repository(cur)
+            conn, structure_id, fields=fields, repo=async_structure_repository(conn)
         )
 
 
@@ -107,9 +107,9 @@ async def update_structure(structure_id: int, data: StructureUpdate) -> Any:
 async def delete_structure(structure_id: int) -> Any:
     """Supprime une structure. Cascade sur les relations et formes de
     noms liées. 404 si inconnue."""
-    async with get_async_cursor() as (cur, conn):
+    async with get_sa_connection() as conn:
         await structures_service.delete_structure(
-            cur, structure_id, repo=async_structure_repository(cur)
+            conn, structure_id, repo=async_structure_repository(conn)
         )
         return {"deleted": True}
 
@@ -122,13 +122,13 @@ async def create_relation(data: RelationCreate) -> Any:
     existe, renvoie `{"status": "already_exists"}` au lieu de la
     recréer.
     """
-    async with get_async_cursor() as (cur, conn):
+    async with get_sa_connection() as conn:
         row = await structures_service.create_relation(
-            cur,
+            conn,
             parent_id=data.parent_id,
             child_id=data.child_id,
             relation_type=data.relation_type,
-            repo=async_structure_repository(cur),
+            repo=async_structure_repository(conn),
         )
         if row is None:
             return {"status": "already_exists"}
@@ -138,9 +138,9 @@ async def create_relation(data: RelationCreate) -> Any:
 @router.delete("/api/structure-relations/{relation_id}", response_model=DeletedResponse)
 async def delete_relation(relation_id: int) -> Any:
     """Supprime une relation structure. 404 si l'id n'existe pas."""
-    async with get_async_cursor() as (cur, conn):
+    async with get_sa_connection() as conn:
         await structures_service.delete_relation(
-            cur, relation_id, repo=async_structure_repository(cur)
+            conn, relation_id, repo=async_structure_repository(conn)
         )
         return {"deleted": True}
 
@@ -166,15 +166,15 @@ async def create_name_form(data: NameFormCreate) -> Any:
     `requires_context_of` : liste d'ids de structures qui doivent
     elles-mêmes matcher l'adresse pour que cette forme active.
     """
-    async with get_async_cursor() as (cur, conn):
+    async with get_sa_connection() as conn:
         return await structures_service.create_name_form(
-            cur,
+            conn,
             structure_id=data.structure_id,
             form_text=data.form_text,
             is_word_boundary=data.is_word_boundary,
             is_excluding=data.is_excluding,
             requires_context_of=data.requires_context_of,
-            repo=async_structure_repository(cur),
+            repo=async_structure_repository(conn),
         )
 
 
@@ -182,17 +182,17 @@ async def create_name_form(data: NameFormCreate) -> Any:
 async def update_name_form(form_id: int, data: NameFormUpdate) -> Any:
     """Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue."""
     fields = data.model_dump(exclude_unset=True)
-    async with get_async_cursor() as (cur, conn):
+    async with get_sa_connection() as conn:
         return await structures_service.update_name_form(
-            cur, form_id, fields=fields, repo=async_structure_repository(cur)
+            conn, form_id, fields=fields, repo=async_structure_repository(conn)
         )
 
 
 @router.delete("/api/name-forms/{form_id}", response_model=DeletedResponse)
 async def delete_name_form(form_id: int) -> Any:
     """Supprime une forme de nom. 404 si inconnue."""
-    async with get_async_cursor() as (cur, conn):
+    async with get_sa_connection() as conn:
         await structures_service.delete_name_form(
-            cur, form_id, repo=async_structure_repository(cur)
+            conn, form_id, repo=async_structure_repository(conn)
         )
         return {"deleted": True}

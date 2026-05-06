@@ -2,15 +2,17 @@
 Service Structures — orchestrateur des opérations sur `structures`,
 `structure_relations`, `structure_name_forms`.
 
-Le SQL vit dans `infrastructure/repositories/structure_repository.py`.
+Le SQL vit dans `infrastructure/repositories/async_structure_repository.py`.
 Les routers passent par ces fonctions pour toute écriture. Les lectures
 restent autorisées dans les routers (convention du projet).
+
+Module migré en SQLAlchemy Core (chantier sqlalchemy-core-adoption,
+sous-phase 1.2) : les fonctions reçoivent une `AsyncConnection` SA
+au lieu d'un curseur psycopg.
 """
 
-from typing import Any
-
-from psycopg.types.json import Jsonb as Json
 from pydantic import ValidationError as PydanticValidationError
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from application.audit import async_emit_event
 from domain.errors import NotFoundError, ValidationError
@@ -49,7 +51,7 @@ _STRUCTURE_FIELD_MAP = {
 
 
 async def create_structure(
-    cur: Any,
+    conn: AsyncConnection,
     *,
     code: str,
     name: str,
@@ -75,7 +77,7 @@ async def create_structure(
 
 
 async def update_structure(
-    cur: Any, structure_id: int, *, fields: dict, repo: AsyncStructureRepository
+    conn: AsyncConnection, structure_id: int, *, fields: dict, repo: AsyncStructureRepository
 ) -> dict:
     """Met à jour une structure. Retourne la ligne modifiée.
 
@@ -92,8 +94,8 @@ async def update_structure(
             update_fields[col_name] = val
 
     if "api_ids" in fields and fields["api_ids"] is not None:
-        validated = _validate_api_ids(fields["api_ids"])
-        update_fields["api_ids"] = Json(validated) if validated else None
+        # SA sérialise auto en JSONB depuis un dict Python ; pas de Json() wrap.
+        update_fields["api_ids"] = _validate_api_ids(fields["api_ids"])
 
     if not update_fields:
         raise ValidationError("Aucun champ à mettre à jour")
@@ -101,13 +103,15 @@ async def update_structure(
     return await repo.update_structure_fields(structure_id, update_fields)
 
 
-async def delete_structure(cur: Any, structure_id: int, *, repo: AsyncStructureRepository) -> None:
+async def delete_structure(
+    conn: AsyncConnection, structure_id: int, *, repo: AsyncStructureRepository
+) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas."""
     row = await repo.delete_structure(structure_id)
     if not row:
         raise NotFoundError(f"Structure {structure_id} introuvable")
     await async_emit_event(
-        cur,
+        conn,
         "structure.deleted",
         "structure",
         structure_id,
@@ -119,7 +123,7 @@ async def delete_structure(cur: Any, structure_id: int, *, repo: AsyncStructureR
 
 
 async def create_relation(
-    cur: Any,
+    conn: AsyncConnection,
     *,
     parent_id: int,
     child_id: int,
@@ -134,13 +138,15 @@ async def create_relation(
     )
 
 
-async def delete_relation(cur: Any, relation_id: int, *, repo: AsyncStructureRepository) -> None:
+async def delete_relation(
+    conn: AsyncConnection, relation_id: int, *, repo: AsyncStructureRepository
+) -> None:
     """Supprime une relation. Lève NotFoundError si elle n'existe pas."""
     row = await repo.delete_relation(relation_id)
     if not row:
         raise NotFoundError(f"Relation {relation_id} introuvable")
     await async_emit_event(
-        cur,
+        conn,
         "structure_relation.deleted",
         "structure",
         row["parent_id"],
@@ -157,7 +163,7 @@ async def delete_relation(cur: Any, relation_id: int, *, repo: AsyncStructureRep
 
 
 async def create_name_form(
-    cur: Any,
+    conn: AsyncConnection,
     *,
     structure_id: int,
     form_text: str,
@@ -177,7 +183,7 @@ async def create_name_form(
 
 
 async def update_name_form(
-    cur: Any, form_id: int, *, fields: dict, repo: AsyncStructureRepository
+    conn: AsyncConnection, form_id: int, *, fields: dict, repo: AsyncStructureRepository
 ) -> dict:
     """Met à jour une forme de nom. Retourne la ligne modifiée.
 
@@ -204,13 +210,15 @@ async def update_name_form(
     return await repo.update_name_form_fields(form_id, update_fields)
 
 
-async def delete_name_form(cur: Any, form_id: int, *, repo: AsyncStructureRepository) -> None:
+async def delete_name_form(
+    conn: AsyncConnection, form_id: int, *, repo: AsyncStructureRepository
+) -> None:
     """Supprime une forme de nom. Lève NotFoundError si elle n'existe pas."""
     row = await repo.delete_name_form(form_id)
     if not row:
         raise NotFoundError(f"Forme {form_id} introuvable")
     await async_emit_event(
-        cur,
+        conn,
         "structure_name_form.deleted",
         "structure",
         row["structure_id"],
