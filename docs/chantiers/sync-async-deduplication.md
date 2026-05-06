@@ -1,0 +1,236 @@
+# Chantier — Convergence sync/async (suppression de la duplication)
+
+## État : à instruire
+
+Décision actée (option **D** ci-dessous), implémentation à dérouler
+quand le chantier sera lancé. Estimation : 2-4 jours répartis,
+migration progressive 1 router à la fois.
+
+## Contexte
+
+L'API FastAPI et le pipeline maintiennent **deux familles de
+repositories quasi identiques** : variantes sync (utilisées par le
+pipeline et les CLI) et variantes async (utilisées par les routes
+FastAPI). Pour le seul agrégat `Person`, la duplication représente
+~1425 lignes (sync 743 + async 682).
+
+7 agrégats × 2 variantes = 14 fichiers de repositories qui
+parallèlent presque ligne pour ligne. Tout ajout de méthode ou
+modification de signature doit être fait dans les deux variantes,
+avec un risque de drift silencieux.
+
+L'origine historique est une migration FastAPI sync → async (ancien
+chantier §2.12) appliquée par réflexe « FastAPI moderne = async » sans
+interroger le profil d'usage réel de l'application.
+
+## Cadrage du besoin réel
+
+L'API actuelle (`interfaces/api/`) sert :
+- aujourd'hui : Laura, utilisatrice unique, depuis le frontend admin
+  (~1 utilisateur concurrent)
+- à terme proche : quelques admins UCA pour la curation
+- à terme long (~2-3 ans) : reprise par la DSI qui réécrira
+  probablement sa propre API publique en surcouche. L'API actuelle
+  reste alors **outil de gestion interne** (quelques utilisateurs
+  concurrents max)
+
+Volume de concurrence anticipé : **inférieur à 10 requêtes
+simultanées en pic**. Largement dans le domaine du threadpool sync.
+
+Streaming temps réel (logs pipeline en direct, notifs push) :
+intéressant à terme mais **non prioritaire**.
+
+Opérations longues (attribution pays par batch, propagation massive)
+: à traiter via **background jobs** (chantier déjà identifié dans
+TODO_CLAUDE), problème **orthogonal** au choix sync/async.
+
+## Options évaluées
+
+### Option A — Tout async (le pipeline aussi)
+
+Migrer le pipeline entièrement en async (`asyncio.run()` au top
+level, `await` partout, conversion des ~50 fichiers sync vers
+async).
+
+- **Pour** : une seule famille de code, cohérence avec FastAPI.
+- **Contre** : chantier **énorme et risqué** (pipeline en prod,
+  régressions probables), pour zéro bénéfice fonctionnel (pipeline
+  séquentiel par nature).
+
+**Écartée** : coût/bénéfice catastrophique pour un pipeline batch
+mono-thread.
+
+### Option B — Codegen ou abstraction générique
+
+Écrire une seule définition de chaque repository, générer les deux
+variantes via codegen ou via une abstraction qui paramètre `await`.
+
+- **Pour** : single source of truth, garde les deux modes.
+- **Contre** :
+  - Pas de framework standard Python pour ce codegen → outillage maison
+    à maintenir
+  - Le code lu (template) ≠ le code exécuté (généré) → debugging
+    complique
+  - Variante « abstraction » quasi impossible en Python parce que
+    `await` n'est pas un opérateur conditionnel
+
+**Écartée** : ajoute de la complexité d'outillage pour résoudre un
+problème qui peut être résolu en supprimant simplement une moitié.
+
+### Option C — Statu quo + test de parallélisme
+
+Garder les deux familles, ajouter un test qui vérifie la parité
+sync/async.
+
+- **Pour** : aucun coût de migration.
+- **Contre** : ne résout rien, accumule la dette, le test ne fait
+  que constater la duplication.
+
+**Écartée** : Laura veut résoudre la dette, pas la documenter.
+
+### Option D — Tout sync, FastAPI exécute les routes en threadpool *(retenue)*
+
+FastAPI accepte indifféremment `def route(...)` et `async def
+route(...)`. Les routes `def` sont exécutées dans un threadpool
+Starlette (~40 workers par défaut). Conséquences :
+
+- Toutes les routes deviennent `def` (sans `await`)
+- Les ~14 fichiers `async_*_repository.py` sont supprimés
+- Les routes utilisent les **mêmes** repositories sync que le pipeline
+- Le pool DB async (`build_async_pool`) est supprimé, on garde
+  uniquement le pool sync
+- Les middlewares actuellement `async def` (auth, timing) peuvent
+  rester tels quels — FastAPI s'en arrange
+
+**Pour** :
+- Une seule famille de repositories, plus de drift possible
+- Suppression nette de code (~14 fichiers + variantes Person + pool
+  async + dépendances `async_deps.py`)
+- Migration **incrémentale** (1 router à la fois, pas de big bang)
+- Risque de régression faible (suppression de code, pas réécriture)
+- Simplifie le mental model : un seul cursor, un seul style
+
+**Contre** :
+- Perte théorique de la concurrence asyncio « pure » (event loop)
+- Plafond de concurrence ~40 requêtes simultanées (taille du
+  threadpool Starlette par défaut, ajustable)
+- Si streaming/SSE est introduit plus tard, il faudra repasser ces
+  endpoints précis en `async def` (cohabitation possible)
+
+## Décision retenue : D
+
+Pour les raisons suivantes :
+
+1. **Volume de concurrence anticipé largement inférieur au plafond
+   threadpool** : 5-10 simultanés vs ~40 dispo. Aucun risque de
+   saturation pratique.
+2. **Pas de besoin actuel ou planifié de streaming temps réel**.
+3. **Opérations longues seront gérées par background jobs**, pas
+   par async (problème orthogonal).
+4. **API actuelle restera probablement interne** après reprise DSI
+   (qui fera sa propre API publique).
+5. **Réversibilité** : si une route précise a un jour besoin
+   d'async (streaming SSE par exemple), on la repasse en `async def`
+   sans toucher au reste. La cohabitation est supportée par
+   FastAPI.
+
+## Plan d'implémentation
+
+### Phase 1 — Préparation (non destructif)
+
+- [ ] Bumper `db_pool_max` dans `.env.example` et la doc à 30-40
+  (préparer le pool sync à absorber la concurrence threadpool).
+  Faire le bump avant la migration pour mesurer l'impact.
+- [ ] Vérifier qu'aucune route async actuelle n'utilise un pattern
+  `async def` qui serait fonctionnellement obligatoire (pas trouvé
+  à ce stade — toutes les routes sont du CRUD HTTP classique).
+- [ ] Recenser les middlewares `async def` actuels (auth, timing,
+  strip_prefix) — confirmer qu'ils peuvent rester async (oui, FastAPI
+  les supporte tels quels même avec des routes sync).
+
+### Phase 2 — Migration progressive, 1 router à la fois
+
+Pour chaque router dans `interfaces/api/routers/` :
+
+1. Convertir les `async def route` en `def route`
+2. Retirer les `await` sur les appels aux repositories
+3. Remplacer les `async_*_repository(cur)` par leurs équivalents sync
+4. Remplacer le `get_async_cursor()` par un curseur sync (créer
+   `get_sync_cursor()` côté `interfaces/api/deps.py` si pas déjà là)
+5. Lancer la suite de tests d'intégration de ce router
+6. Vérifier manuellement le comportement dans le frontend
+7. Commit séparé par router (rollback granulaire possible)
+
+Ordre suggéré : commencer par les routers les plus simples (`auth`,
+`docs`, `config`) puis les CRUD admin, puis les gros (`publications`,
+`persons`, `laboratories`).
+
+### Phase 3 — Suppression du code async devenu mort
+
+Une fois tous les routers migrés :
+
+- [ ] Supprimer les 8 fichiers `infrastructure/repositories/async_*.py`
+  (et le sous-package `async_person_repository/`)
+- [ ] Supprimer les factories `async_*_repository` dans
+  `infrastructure/repositories/__init__.py`
+- [ ] Supprimer les classes `Async*Repository` dans `domain/ports/*`
+- [ ] Supprimer `infrastructure/db/async_connection.py` et le
+  lifespan async de `interfaces/api/app.py`
+- [ ] Supprimer `interfaces/api/async_deps.py`
+- [ ] Supprimer les query services async dans
+  `infrastructure/db/queries/` (renvoyer toutes les routes vers les
+  variantes sync)
+- [ ] Retirer `pytest-asyncio` de `pyproject.toml` (sauf si encore
+  utile pour des tests pipeline async ponctuels comme
+  `fetch_missing_doi`)
+- [ ] Retirer `psycopg-pool` async path s'il n'est plus utilisé
+
+### Phase 4 — Doc
+
+- [ ] Mettre à jour `docs/architecture.md` (section "Patterns
+  d'injection") : retirer la mention de la cohabitation sync/async,
+  expliquer que l'API utilise les mêmes repositories que le pipeline,
+  via threadpool.
+- [ ] Documenter la valeur de `db_pool_max` recommandée et le
+  raisonnement (concurrence threadpool × marge).
+- [ ] Mettre à jour `infrastructure/repositories/__init__.py`
+  docstring (plus de mention sync/async).
+
+## Points de vigilance
+
+- **Pool DB sous-dimensionné** : avec un threadpool à 40 workers et un
+  pool DB à `max=10`, certaines requêtes attendront leur tour.
+  Bumper le pool DB **avant** la migration pour éviter une dégradation
+  perceptible.
+- **Tests d'intégration asyncio** : les fixtures `async_db` et les
+  tests `async def test_*` doivent être convertis ou supprimés au fur
+  et à mesure de la migration des routers concernés.
+- **Pipeline d'extraction async restant** : `fetch_missing_doi.run_async`
+  utilise httpx + asyncio.Semaphore pour saturer les rate-limits
+  d'API. Ce code reste async et n'est pas concerné par le chantier
+  (c'est de l'async « ponctuel » dans un contexte sync via
+  `asyncio.run()`).
+- **Audit logging via ContextVar** : l'audit log utilise
+  `contextvars` pour propager le user courant. Les ContextVar sont
+  thread-safe et fonctionnent identiquement en async et en threadpool
+  (chaque requête a son contexte). Pas de modification nécessaire.
+
+## Réversibilité
+
+Forte. À tout moment, on peut :
+- Repasser une route en `async def` si un besoin spécifique émerge
+  (ex : SSE pour les logs pipeline).
+- Recréer un repository async pour un agrégat précis si nécessaire.
+- Cohabiter sync et async dans la même API sans friction.
+
+La décision n'est pas un point de non-retour.
+
+## Lien avec d'autres chantiers
+
+- **Background jobs** (TODO_CLAUDE) : indépendant, mais
+  complémentaire. Une fois D fait, les background jobs seront plus
+  simples à implémenter (pas de double pattern à supporter).
+- **Pipeline subprocess vs imports** : indépendant (chantier
+  pipeline isolé du choix API).
+- **Réécriture doc Phase 4 audit-cto** : intègrera la nouvelle
+  architecture sans la couche async.
