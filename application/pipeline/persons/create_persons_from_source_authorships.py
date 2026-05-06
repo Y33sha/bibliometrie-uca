@@ -60,8 +60,7 @@ def get_all_unlinked_authorships(cur: Any, queries: PersonsCreateQueries) -> lis
     (parsing noms, filtrage ORCID OpenAlex, flag allow_create)."""
     all_rows = []
     for r in queries.fetch_unlinked_authorships(cur):
-        if not r.get("last_name"):
-            r["last_name"], r["first_name"] = parse_raw_author_name(r["full_name"])
+        r["last_name"], r["first_name"] = parse_raw_author_name(r["full_name"])
         r["last_norm"] = normalize_name(r["last_name"])
         r["first_norm"] = normalize_name(r["first_name"])
 
@@ -93,17 +92,7 @@ def load_linked_authorships_by_pub(
     """Index des authorships rattachées par (publication_id, author_position)."""
     index: dict[tuple[int, int], list[tuple[int, str, str, str]]] = defaultdict(list)
 
-    for r in queries.fetch_linked_authorships_structured(cur):
-        ln = normalize_name(r["last_name"] or "")
-        fn = normalize_name(r["first_name"] or "")
-        if not ln and r["full_name"]:
-            last, first = parse_raw_author_name(r["full_name"])
-            ln, fn = normalize_name(last), normalize_name(first)
-        index[(r["publication_id"], r["author_position"])].append(
-            (r["person_id"], ln, fn, r["source"])
-        )
-
-    for r in queries.fetch_linked_authorships_openalex(cur):
+    for r in queries.fetch_linked_authorships(cur):
         last, first = parse_raw_author_name(r["full_name"])
         ln, fn = normalize_name(last), normalize_name(first)
         index[(r["publication_id"], r["author_position"])].append(

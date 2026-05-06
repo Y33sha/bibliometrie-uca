@@ -39,8 +39,6 @@ class HalNormalizeQueries(Protocol):
         *,
         source_id: str,
         full_name: str,
-        last_name: str,
-        first_name: str | None,
         orcid: str | None,
         idref: str | None,
         source_ids_json: Any,
@@ -77,4 +75,3 @@ class HalNormalizeQueries(Protocol):
     def delete_hal_duplicate_authorship_addresses(self, cur: Any) -> None: ...
 
     def delete_hal_duplicate_authorships(self, cur: Any) -> int: ...
-

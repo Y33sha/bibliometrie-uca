@@ -7,6 +7,7 @@ ainsi que les lectures utiles à l'idempotence et au matching auteurs.
 
 from typing import Any
 
+from domain.names import parse_raw_author_name
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
 )
@@ -16,13 +17,15 @@ def fetch_thesis_primary_author(cur: Any, publication_id: int) -> tuple[str, str
     """Retourne `(last_name, first_name)` de l'auteur principal d'une thèse existante.
 
     Rôle `author`, tri par (source_publication_id, author_position), 1 ligne max.
+    Lit `source_authorships.raw_author_name` et le parse via
+    `domain.names.parse_raw_author_name` (gère « Nom, Prénom » comme
+    « Prénom Nom »).
     """
     cur.execute(
         """
-        SELECT sa.last_name, sa.first_name
+        SELECT sas.raw_author_name
         FROM source_authorships sas
         JOIN source_publications sd ON sd.id = sas.source_publication_id
-        JOIN source_persons sa ON sa.id = sas.source_person_id
         WHERE sd.publication_id = %s
           AND 'author' = ANY(sas.roles)
         ORDER BY sd.id, sas.author_position
@@ -33,9 +36,11 @@ def fetch_thesis_primary_author(cur: Any, publication_id: int) -> tuple[str, str
     row = cur.fetchone()
     if row is None:
         return None
-    if isinstance(row, dict):
-        return row["last_name"] or "", row["first_name"] or ""
-    return row[0] or "", row[1] or ""
+    raw = row["raw_author_name"] if isinstance(row, dict) else row[0]
+    if not raw:
+        return None
+    last, first = parse_raw_author_name(raw)
+    return (last, first) if last else None
 
 
 def merge_publication_meta(cur: Any, publication_id: int, meta_json: Any) -> None:
@@ -117,21 +122,19 @@ def upsert_theses_source_publication(
     return row["id"] if isinstance(row, dict) else row[0]
 
 
-def upsert_theses_source_person_by_ppn(
-    cur: Any, *, ppn: str, full_name: str, last_name: str, first_name: str | None
-) -> int:
+def upsert_theses_source_person_by_ppn(cur: Any, *, ppn: str, full_name: str) -> int:
     """UPSERT d'un `source_persons` theses.fr dédupliqué sur PPN (idref)."""
     cur.execute(
         """
         INSERT INTO source_persons
-            (source, source_id, full_name, last_name, first_name, idref)
-        VALUES ('theses', %s, %s, %s, %s, %s)
+            (source, source_id, full_name, idref)
+        VALUES ('theses', %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             full_name = EXCLUDED.full_name,
             idref = COALESCE(source_persons.idref, EXCLUDED.idref)
         RETURNING id
         """,
-        (ppn, full_name, last_name, first_name, ppn),
+        (ppn, full_name, ppn),
     )
     row = cur.fetchone()
     return row["id"] if isinstance(row, dict) else row[0]
@@ -249,12 +252,8 @@ class PgThesesNormalizeQueries:
         *,
         ppn: str,
         full_name: str,
-        last_name: str,
-        first_name: str | None,
     ) -> int:
-        return upsert_theses_source_person_by_ppn(
-            cur, ppn=ppn, full_name=full_name, last_name=last_name, first_name=first_name
-        )
+        return upsert_theses_source_person_by_ppn(cur, ppn=ppn, full_name=full_name)
 
     def upsert_theses_source_authorship(
         self,

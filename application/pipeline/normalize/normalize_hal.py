@@ -369,14 +369,6 @@ def upsert_hal_author(
     if src_id in _hal_author_cache:
         return _hal_author_cache[src_id]
 
-    parts = full_name.strip().split()
-    if len(parts) >= 2:
-        first_name = " ".join(parts[:-1])
-        last_name = parts[-1]
-    else:
-        first_name = None
-        last_name = full_name
-
     source_ids: dict[str, Any] = {"hal_person_id": hal_person_id}
     if idhal:
         source_ids["idhal"] = idhal
@@ -387,8 +379,6 @@ def upsert_hal_author(
         cur,
         source_id=src_id,
         full_name=full_name,
-        last_name=last_name,
-        first_name=first_name,
         orcid=orcid,
         idref=idref,
         source_ids_json=Json(source_ids),

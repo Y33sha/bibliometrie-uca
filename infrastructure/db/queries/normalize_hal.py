@@ -101,8 +101,6 @@ def upsert_hal_source_person(
     *,
     source_id: str,
     full_name: str,
-    last_name: str,
-    first_name: str | None,
     orcid: str | None,
     idref: str | None,
     source_ids_json: Any,
@@ -111,9 +109,8 @@ def upsert_hal_source_person(
     cur.execute(
         """
         INSERT INTO source_persons
-            (source, source_id, full_name, last_name, first_name, orcid, idref,
-             source_ids)
-        VALUES ('hal', %s, %s, %s, %s, %s, %s, %s)
+            (source, source_id, full_name, orcid, idref, source_ids)
+        VALUES ('hal', %s, %s, %s, %s, %s)
         ON CONFLICT (source, source_id) DO UPDATE SET
             orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
             idref = COALESCE(source_persons.idref, EXCLUDED.idref),
@@ -122,7 +119,7 @@ def upsert_hal_source_person(
                          COALESCE(EXCLUDED.source_ids, '{}')
         RETURNING id
         """,
-        (source_id, full_name, last_name, first_name, orcid, idref, source_ids_json),
+        (source_id, full_name, orcid, idref, source_ids_json),
     )
     row = cur.fetchone()
     return row[0] if isinstance(row, tuple) else row["id"]
@@ -239,9 +236,7 @@ def fetch_hal_source_structures_for_cache(cur: Any) -> list[tuple[str, int, str]
         FROM source_structures WHERE source = 'hal'
     """)
     return [
-        (r[0], r[1], r[2])
-        if isinstance(r, tuple)
-        else (r["source_id"], r["id"], r["name"])
+        (r[0], r[1], r[2]) if isinstance(r, tuple) else (r["source_id"], r["id"], r["name"])
         for r in cur.fetchall()
     ]
 

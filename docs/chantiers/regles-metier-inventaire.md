@@ -172,15 +172,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **classification** : (a) — déjà domain.
 - **destination domain/** : n/a.
 
-### Découpage `last_name` / `first_name` HAL
-- **localisation** : `application/pipeline/normalize/normalize_hal.py:383-389`
-- **description** : « tout sauf le dernier token = first_name, dernier
-  token = last_name ». Heuristique faible, dupliquée verbatim dans
-  ScanR.
-- **classification** : (a), dupliquée.
-- **destination domain/** : `domain/names.py` →
-  `split_full_name_naive(full_name) -> tuple[str | None, str]`.
-
 ### parse_author_structures — préférence primary > flat
 - **localisation** : `application/pipeline/normalize/normalize_hal.py:416-486` (règle l. 437)
 - **description** : Préférence `authIdHasPrimaryStructure_fs` (labos
@@ -285,13 +276,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **classification** : (b).
 - **destination domain/** : `domain/persons/sourcing.py` →
   `should_create_source_person` (unifié).
-
-### Découpage last_name/first_name (duplication)
-- **localisation** : `application/pipeline/normalize/normalize_scanr.py:270-276`
-- **description** : Heuristique identique à HAL.
-- **classification** : (a), dupliquée.
-- **destination domain/** : `domain/names.py` →
-  `split_full_name_naive`.
 
 ### detected_countries — propagation
 - **localisation** : `application/pipeline/normalize/normalize_scanr.py:330-339`
@@ -709,10 +693,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ### Patterns dupliqués majeurs
 
-1. **Découpage naïf last_name/first_name** sur full_name — verbatim
-   dans `normalize_hal.py:383-389` et `normalize_scanr.py:270-276`.
-   À unifier dans `domain/names.split_full_name_naive`.
-
 3. **Invariant « source_persons créé seulement si identifiant fort »**
    — répété dans HAL (`hal_person_id`), ScanR (`idref`), theses
    (`PPN`). À unifier dans
@@ -770,10 +750,6 @@ domain/sources/
 - `theses_doc_type(date_soutenance) -> str`
 - `map_hal_doc_type_with_subtype(raw_type, raw_sub) -> str`
 - `override_doc_type_from_signals(...)` (signature dans doc chantier)
-
-À enrichir dans `domain/names.py` :
-
-- `split_full_name_naive(full_name) -> tuple[str | None, str]`
 
 ### Signatures principales suggérées
 
@@ -885,9 +861,6 @@ def is_wos_author_exploitable(author: dict) -> bool: ...
 
 # domain/sources/hal_signals.py
 def pick_hal_structure_field(doc: dict) -> Literal["primary", "flat"]: ...
-
-# domain/names.py (existant, à enrichir)
-def split_full_name_naive(full_name: str) -> tuple[str | None, str]: ...
 
 # domain/publications/external_ids.py
 def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str]: ...

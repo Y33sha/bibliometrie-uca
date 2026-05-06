@@ -53,18 +53,16 @@ def find_duplicate_groups(cur: Any) -> Any:
 def get_thesis_author(cur: Any, pub_id: Any) -> Any:
     """Retourne (last_name, first_name) normalisés de l'auteur d'une thèse.
 
-    Cherche dans source_authorships le rôle 'author'. LEFT JOIN sur
-    source_persons : pour les thèses sans PPN (post-chantier
-    source_persons), pas de source_persons row → fallback sur le
-    parsing de raw_author_name.
-    Retourne None si pas d'auteur trouvé.
+    Cherche dans source_authorships le rôle 'author' et parse
+    `raw_author_name` via `domain.names.parse_raw_author_name` (gère
+    « Nom, Prénom » comme « Prénom Nom »). Retourne None si pas
+    d'auteur trouvé.
     """
     cur.execute(
         """
-        SELECT sa.last_name, sa.first_name, sas.raw_author_name
+        SELECT sas.raw_author_name
         FROM source_authorships sas
         JOIN source_publications sd ON sd.id = sas.source_publication_id
-        LEFT JOIN source_persons sa ON sa.id = sas.source_person_id
         WHERE sd.publication_id = %s
           AND 'author' = ANY(sas.roles)
         ORDER BY sd.id, sas.author_position
@@ -73,13 +71,10 @@ def get_thesis_author(cur: Any, pub_id: Any) -> Any:
         (pub_id,),
     )
     row = cur.fetchone()
-    if not row:
+    if not row or not row["raw_author_name"]:
         return None
-    ln = normalize_name(row["last_name"] or "")
-    fn = normalize_name(row["first_name"] or "")
-    if not ln and row["raw_author_name"]:
-        last, first = parse_raw_author_name(row["raw_author_name"])
-        ln, fn = normalize_name(last), normalize_name(first)
+    last, first = parse_raw_author_name(row["raw_author_name"])
+    ln, fn = normalize_name(last), normalize_name(first)
     return (ln, fn) if ln else None
 
 

@@ -86,21 +86,15 @@ class TestUpsertThesesSourcePublication:
 
 class TestThesesSourcePersons:
     def test_upsert_by_ppn_inserts_new(self, db):
-        sp_id = upsert_theses_source_person_by_ppn(
-            db, ppn="PPN1", full_name="Dupond Jean", last_name="Dupond", first_name="Jean"
-        )
+        sp_id = upsert_theses_source_person_by_ppn(db, ppn="PPN1", full_name="Dupond Jean")
         db.execute("SELECT idref, source_id FROM source_persons WHERE id = %s", (sp_id,))
         row = db.fetchone()
         assert row["idref"] == "PPN1"
         assert row["source_id"] == "PPN1"
 
     def test_upsert_by_ppn_reuses_existing(self, db):
-        a = upsert_theses_source_person_by_ppn(
-            db, ppn="PPN2", full_name="Ancien", last_name="A", first_name=None
-        )
-        b = upsert_theses_source_person_by_ppn(
-            db, ppn="PPN2", full_name="Nouveau", last_name="A", first_name=None
-        )
+        a = upsert_theses_source_person_by_ppn(db, ppn="PPN2", full_name="Ancien")
+        b = upsert_theses_source_person_by_ppn(db, ppn="PPN2", full_name="Nouveau")
         assert a == b
         db.execute("SELECT full_name FROM source_persons WHERE id = %s", (a,))
         assert db.fetchone()["full_name"] == "Nouveau"
@@ -127,9 +121,7 @@ class TestUpsertThesesSourceAuthorship:
             topics_json=None,
             source_meta_json=None,
         )
-        sp = upsert_theses_source_person_by_ppn(
-            db, ppn="PPN", full_name="A", last_name="A", first_name=None
-        )
+        sp = upsert_theses_source_person_by_ppn(db, ppn="PPN", full_name="A")
         sa_1 = upsert_theses_source_authorship(
             db,
             source_publication_id=sd,
@@ -179,16 +171,14 @@ class TestFetchThesisPrimaryAuthor:
             topics_json=None,
             source_meta_json=None,
         )
-        sp = upsert_theses_source_person_by_ppn(
-            db, ppn="PPN-X", full_name="Dupond Jean", last_name="Dupond", first_name="Jean"
-        )
+        sp = upsert_theses_source_person_by_ppn(db, ppn="PPN-X", full_name="Jean Dupond")
         upsert_theses_source_authorship(
             db,
             source_publication_id=sd,
             source_person_id=sp,
             author_position=0,
             roles=["author"],
-            raw_author_name="Dupond Jean",
+            raw_author_name="Jean Dupond",
             identifiers=None,
         )
         assert fetch_thesis_primary_author(db, pub) == ("Dupond", "Jean")
