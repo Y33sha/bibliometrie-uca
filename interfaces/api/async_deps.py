@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from application.ports.addresses_queries import AsyncAddressesQueries
 from application.ports.admin_feedback_queries import AsyncAdminFeedbackQueries
 from application.ports.config import AsyncConfigStore
+from application.ports.hal_problems_queries import AsyncHalProblemsQueries
 from application.ports.journals_queries import AsyncJournalQueries
 from application.ports.perimeter import AsyncPerimeterQueries
 from application.ports.person_duplicates_queries import AsyncPersonDuplicatesQueries
@@ -46,6 +47,7 @@ from infrastructure.db.async_connection import get_async_pool
 from infrastructure.db.engine import get_async_engine
 from infrastructure.db.queries.addresses import PgAsyncAddressesQueries
 from infrastructure.db.queries.admin_feedback import PgAsyncAdminFeedbackQueries
+from infrastructure.db.queries.hal_problems import PgAsyncHalProblemsQueries
 from infrastructure.db.queries.journals import PgAsyncJournalQueries
 from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
 from infrastructure.db.queries.person_duplicates import PgAsyncPersonDuplicatesQueries
@@ -180,6 +182,12 @@ def admin_feedback_queries(
     conn: AsyncConnection = Depends(db_conn),
 ) -> AsyncAdminFeedbackQueries:
     return PgAsyncAdminFeedbackQueries(conn)
+
+
+def hal_problems_queries(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncHalProblemsQueries:
+    return PgAsyncHalProblemsQueries(conn)
 
 
 def person_duplicates_queries(

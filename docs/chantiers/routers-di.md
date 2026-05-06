@@ -98,12 +98,12 @@ pattern progressivement :
 
 - [x] `publishers.py` *(commit `b617757`, pilote)*
 - [x] `journals.py` *(commit `9ce5ee8`)*
-- [ ] `subjects.py` (1 fichier query, pas de repo write)
-- [ ] `addresses.py`
-- [ ] `admin_feedback.py`
-- [ ] `admin_person_duplicates.py`
-- [ ] `admin_duplicates.py`
-- [ ] `hal_problems.py`
+- [x] `subjects.py` *(commit `a210947`)*
+- [x] `addresses.py` *(commit `1bdb3dd`)*
+- [x] `admin_feedback.py` *(commit `4a19525`)*
+- [x] `admin_person_duplicates.py` *(commit `af657f9`)*
+- [x] `admin_duplicates.py` *(commit `536122b`)*
+- [x] `hal_problems.py` *(commit en cours)*
 - [ ] `config.py`
 - [ ] `perimeters.py`
 - [ ] `structures.py`
@@ -117,15 +117,15 @@ pattern progressivement :
 Certains routers utilisent des query modules qui n'ont pas de port.
 À créer au fur et à mesure de la migration des routers :
 
-- [ ] `subjects` query service (queries dynamiques + statiques sur sujets)
-- [ ] `admin_feedback` query service
-- [ ] `hal_problems` query service
-- [ ] `publication_duplicates` query service
-- [ ] `person_duplicates` query service
+- [x] `subjects` query service *(commit `a210947`)*
+- [x] `admin_feedback` query service *(commit `4a19525`)*
+- [x] `hal_problems` query service *(commit en cours, inclut `hal_duplicate_accounts` déplacée depuis persons/admin)*
+- [x] `publication_duplicates` query service *(commit `536122b`)*
+- [x] `person_duplicates` query service *(commit `af657f9`)*
 - [x] `publishers` query service *(commit `b617757`)*
 - [x] `journals` query service *(commit `9ce5ee8`)*
 - [ ] `structures` query service (lectures)
-- [ ] `addresses` query service (lectures)
+- [x] `addresses` query service *(commit `1bdb3dd`)*
 - [ ] `laboratories` query service
 - [ ] `stats` query service (publishers, journals, labs, summary, facets)
 - [ ] `publications` query service (list, facets, detail, all_years)
