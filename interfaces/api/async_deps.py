@@ -26,6 +26,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from application.ports.config import AsyncConfigStore
+from application.ports.journals_queries import AsyncJournalQueries
 from application.ports.perimeter import AsyncPerimeterQueries
 from application.ports.publishers_queries import AsyncPublisherQueries
 from domain.ports.address_repository import AsyncAddressRepository
@@ -38,6 +39,7 @@ from domain.ports.publisher_repository import AsyncPublisherRepository
 from domain.ports.structure_repository import AsyncStructureRepository
 from infrastructure.db.async_connection import get_async_pool
 from infrastructure.db.engine import get_async_engine
+from infrastructure.db.queries.journals import PgAsyncJournalQueries
 from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
 from infrastructure.db.queries.publishers import PgAsyncPublisherQueries
 from infrastructure.repositories import (
@@ -144,6 +146,12 @@ def publisher_queries(
     conn: AsyncConnection = Depends(db_conn),
 ) -> AsyncPublisherQueries:
     return PgAsyncPublisherQueries(conn)
+
+
+def journal_queries(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncJournalQueries:
+    return PgAsyncJournalQueries(conn)
 
 
 # ── Câblage des adapters sortants ──
