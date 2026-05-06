@@ -3,13 +3,18 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncConnection
 
+from application.ports.publication_duplicates_queries import AsyncPublicationDuplicatesQueries
 from application.publications import async_merge_publications
 from application.publications import mark_distinct as _mark_pubs_distinct
-from infrastructure.db.queries import publication_duplicates as dup_queries
-from infrastructure.repositories import async_publication_repository
-from interfaces.api.async_deps import get_async_cursor, get_sa_connection
+from domain.ports.publication_repository import AsyncPublicationRepository
+from interfaces.api.async_deps import (
+    db_conn,
+    publication_duplicates_queries,
+    publication_repo,
+)
 from interfaces.api.models import (
     MarkDistinctPublications,
     MergePublications,
@@ -26,6 +31,7 @@ logger = logging.getLogger(__name__)
 async def next_duplicate_candidate(
     min_title_len: int = Query(30, ge=10),
     offset: int = Query(0, ge=0),
+    queries: AsyncPublicationDuplicatesQueries = Depends(publication_duplicates_queries),
 ) -> Any:
     """Renvoie la paire de publications candidate au dédoublonnage à l'offset donné.
 
@@ -34,12 +40,16 @@ async def next_duplicate_candidate(
     `min_title_len` filtre les titres trop courts pour être
     discriminants. Permet au front d'itérer pair par pair via offset.
     """
-    async with get_async_cursor() as (cur, _conn):
-        return await dup_queries.next_pub_duplicate(cur, min_title_len=min_title_len, offset=offset)
+    return await queries.next_pub_duplicate(min_title_len=min_title_len, offset=offset)
 
 
 @router.post("/api/admin/duplicates/merge", response_model=PubMergeResponse)
-async def merge_duplicate_publications(body: MergePublications) -> Any:
+async def merge_duplicate_publications(
+    body: MergePublications,
+    conn: AsyncConnection = Depends(db_conn),
+    queries: AsyncPublicationDuplicatesQueries = Depends(publication_duplicates_queries),
+    repo: AsyncPublicationRepository = Depends(publication_repo),
+) -> Any:
     """Fusionne la publication `source_id` dans `target_id`.
 
     Les authorships, sources, adresses et métadonnées de la source
@@ -53,26 +63,27 @@ async def merge_duplicate_publications(body: MergePublications) -> Any:
             status_code=400, detail="target_id et source_id doivent être différents"
         )
 
-    async with get_sa_connection() as conn:
-        pubs = await dup_queries.get_publications_basic(conn, [body.target_id, body.source_id])
-        if body.target_id not in pubs or body.source_id not in pubs:
-            raise HTTPException(status_code=404, detail="Publication introuvable")
+    pubs = await queries.get_publications_basic([body.target_id, body.source_id])
+    if body.target_id not in pubs or body.source_id not in pubs:
+        raise HTTPException(status_code=404, detail="Publication introuvable")
 
-        savepoint = await conn.begin_nested()
-        try:
-            await async_merge_publications(
-                conn, body.target_id, body.source_id, repo=async_publication_repository(conn)
-            )
-            await savepoint.commit()
-        except Exception as e:
-            await savepoint.rollback()
-            raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}") from e
+    savepoint = await conn.begin_nested()
+    try:
+        await async_merge_publications(conn, body.target_id, body.source_id, repo=repo)
+        await savepoint.commit()
+    except Exception as e:
+        await savepoint.rollback()
+        raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}") from e
 
-        return {"ok": True, "target_id": body.target_id, "source_id": body.source_id}
+    return {"ok": True, "target_id": body.target_id, "source_id": body.source_id}
 
 
 @router.post("/api/admin/duplicates/mark-distinct", response_model=OkResponse)
-async def mark_publications_distinct(body: MarkDistinctPublications) -> Any:
+async def mark_publications_distinct(
+    body: MarkDistinctPublications,
+    conn: AsyncConnection = Depends(db_conn),
+    repo: AsyncPublicationRepository = Depends(publication_repo),
+) -> Any:
     """Marque deux publications comme distinctes (non-doublon confirmé).
 
     Persiste l'annotation dans `publication_distinctions` : la paire
@@ -81,8 +92,5 @@ async def mark_publications_distinct(body: MarkDistinctPublications) -> Any:
     """
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
-    async with get_sa_connection() as conn:
-        await _mark_pubs_distinct(
-            conn, body.pub_id_a, body.pub_id_b, repo=async_publication_repository(conn)
-        )
-        return {"ok": True}
+    await _mark_pubs_distinct(conn, body.pub_id_a, body.pub_id_b, repo=repo)
+    return {"ok": True}
