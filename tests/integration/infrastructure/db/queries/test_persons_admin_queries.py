@@ -2,6 +2,8 @@
 
 import json
 
+from sqlalchemy import text
+
 from infrastructure.db.queries.persons.admin import (
     list_orphan_authorships,
     name_form_authorships,
@@ -11,38 +13,48 @@ from infrastructure.db.queries.persons.admin import (
 )
 
 
-async def _create_person(db, last="A", first="Z", rejected=False):
-    await db.execute(
-        "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized, rejected) "
-        "VALUES (%s, %s, lower(%s), lower(%s), %s) RETURNING id",
-        (last, first, last, first, rejected),
-    )
-    row = await db.fetchone()
-    return row["id"]
+async def _create_person(conn, last="A", first="Z", rejected=False):
+    row = (
+        await conn.execute(
+            text(
+                "INSERT INTO persons "
+                "(last_name, first_name, last_name_normalized, first_name_normalized, rejected) "
+                "VALUES (:l, :f, lower(:l), lower(:f), :r) RETURNING id"
+            ),
+            {"l": last, "f": first, "r": rejected},
+        )
+    ).one()
+    return row.id
 
 
-async def _create_pub(db, doc_type="article"):
-    await db.execute(
-        "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-        "VALUES ('X', 'x', 2024, %s::doc_type) RETURNING id",
-        (doc_type,),
-    )
-    row = await db.fetchone()
-    return row["id"]
+async def _create_pub(conn, doc_type="article"):
+    row = (
+        await conn.execute(
+            text(
+                "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
+                "VALUES ('X', 'x', 2024, CAST(:dt AS doc_type)) RETURNING id"
+            ),
+            {"dt": doc_type},
+        )
+    ).one()
+    return row.id
 
 
-async def _create_sd(db, pub_id, source="hal", source_id="h1"):
-    await db.execute(
-        "INSERT INTO source_publications (source, source_id, title, publication_id) "
-        "VALUES (%s, %s, 'X', %s) RETURNING id",
-        (source, source_id, pub_id),
-    )
-    row = await db.fetchone()
-    return row["id"]
+async def _create_sd(conn, pub_id, source="hal", source_id="h1"):
+    row = (
+        await conn.execute(
+            text(
+                "INSERT INTO source_publications (source, source_id, title, publication_id) "
+                "VALUES (:src, :sid, 'X', :pid) RETURNING id"
+            ),
+            {"src": source, "sid": source_id, "pid": pub_id},
+        )
+    ).one()
+    return row.id
 
 
 async def _create_sp(
-    db,
+    conn,
     source="hal",
     source_id="sp1",
     person_id=None,
@@ -51,31 +63,33 @@ async def _create_sp(
     idhal=None,
     orcid=None,
 ):
-    source_ids = {}
+    source_ids: dict = {}
     if hal_person_id is not None:
         source_ids["hal_person_id"] = hal_person_id
     if idhal:
         source_ids["idhal"] = idhal
-    await db.execute(
-        """
-        INSERT INTO source_persons (source, source_id, full_name, person_id, source_ids, orcid)
-        VALUES (%s, %s, %s, %s, %s::jsonb, %s) RETURNING id
-        """,
-        (
-            source,
-            source_id,
-            full_name,
-            person_id,
-            json.dumps(source_ids) if source_ids else None,
-            orcid,
-        ),
-    )
-    row = await db.fetchone()
-    return row["id"]
+    row = (
+        await conn.execute(
+            text(
+                "INSERT INTO source_persons "
+                "(source, source_id, full_name, person_id, source_ids, orcid) "
+                "VALUES (:src, :sid, :fn, :pid, CAST(:ids AS jsonb), :orcid) RETURNING id"
+            ),
+            {
+                "src": source,
+                "sid": source_id,
+                "fn": full_name,
+                "pid": person_id,
+                "ids": json.dumps(source_ids) if source_ids else None,
+                "orcid": orcid,
+            },
+        )
+    ).one()
+    return row.id
 
 
 async def _create_sa(
-    db,
+    conn,
     sd,
     sp,
     *,
@@ -86,121 +100,120 @@ async def _create_sa(
     author_name_normalized=None,
     raw_author_name="X",
 ):
-    await db.execute(
-        """
-        INSERT INTO source_authorships
-            (source, source_publication_id, source_person_id, author_position,
-             person_id, in_perimeter, excluded, author_name_normalized, raw_author_name)
-        VALUES (%s, %s, %s, 0, %s, %s, %s, %s, %s) RETURNING id
-        """,
-        (
-            source,
-            sd,
-            sp,
-            person_id,
-            in_perimeter,
-            excluded,
-            author_name_normalized,
-            raw_author_name,
-        ),
-    )
-    row = await db.fetchone()
-    return row["id"]
+    row = (
+        await conn.execute(
+            text("""
+                INSERT INTO source_authorships
+                    (source, source_publication_id, source_person_id, author_position,
+                     person_id, in_perimeter, excluded, author_name_normalized, raw_author_name)
+                VALUES (:src, :sd, :sp, 0, :pid, :inp, :excl, :anf, :raw) RETURNING id
+            """),
+            {
+                "src": source,
+                "sd": sd,
+                "sp": sp,
+                "pid": person_id,
+                "inp": in_perimeter,
+                "excl": excluded,
+                "anf": author_name_normalized,
+                "raw": raw_author_name,
+            },
+        )
+    ).one()
+    return row.id
 
 
 class TestOrphanAuthorshipsCount:
-    async def test_counts_orphans(self, async_db):
-        pub = await _create_pub(async_db)
-        sd = await _create_sd(async_db, pub)
-        sp = await _create_sp(async_db)
-        await _create_sa(async_db, sd, sp, person_id=None)  # orpheline
-        sp2 = await _create_sp(async_db, source_id="sp2")
-        pid = await _create_person(async_db)
-        await _create_sa(async_db, sd, sp2, person_id=pid)  # attribuée
+    async def test_counts_orphans(self, sa_conn):
+        pub = await _create_pub(sa_conn)
+        sd = await _create_sd(sa_conn, pub)
+        sp = await _create_sp(sa_conn)
+        await _create_sa(sa_conn, sd, sp, person_id=None)  # orpheline
+        sp2 = await _create_sp(sa_conn, source_id="sp2")
+        pid = await _create_person(sa_conn)
+        await _create_sa(sa_conn, sd, sp2, person_id=pid)  # attribuée
 
-        count = await orphan_authorships_count(async_db)
+        count = await orphan_authorships_count(sa_conn)
         assert count["total"] >= 1
 
-    async def test_excludes_non_uca(self, async_db):
-        pub = await _create_pub(async_db)
-        sd = await _create_sd(async_db, pub)
-        sp = await _create_sp(async_db)
-        await _create_sa(async_db, sd, sp, person_id=None, in_perimeter=False)
-        count = await orphan_authorships_count(async_db)
+    async def test_excludes_non_uca(self, sa_conn):
+        pub = await _create_pub(sa_conn)
+        sd = await _create_sd(sa_conn, pub)
+        sp = await _create_sp(sa_conn)
+        await _create_sa(sa_conn, sd, sp, person_id=None, in_perimeter=False)
+        count = await orphan_authorships_count(sa_conn)
         assert count["total"] == 0
 
-    async def test_excludes_memoir(self, async_db):
-        pub = await _create_pub(async_db, doc_type="memoir")
-        sd = await _create_sd(async_db, pub)
-        sp = await _create_sp(async_db)
-        await _create_sa(async_db, sd, sp, person_id=None)
-        count = await orphan_authorships_count(async_db)
+    async def test_excludes_memoir(self, sa_conn):
+        pub = await _create_pub(sa_conn, doc_type="memoir")
+        sd = await _create_sd(sa_conn, pub)
+        sp = await _create_sp(sa_conn)
+        await _create_sa(sa_conn, sd, sp, person_id=None)
+        count = await orphan_authorships_count(sa_conn)
         assert count["total"] == 0
 
 
 class TestListOrphanAuthorships:
-    async def test_lists_orphan_authorships(self, async_db):
-        pub = await _create_pub(async_db)
-        sd = await _create_sd(async_db, pub)
-        sp = await _create_sp(async_db, full_name="Dupond Jean")
-        sa = await _create_sa(async_db, sd, sp, person_id=None, raw_author_name="Dupond Jean")
+    async def test_lists_orphan_authorships(self, sa_conn):
+        pub = await _create_pub(sa_conn)
+        sd = await _create_sd(sa_conn, pub)
+        sp = await _create_sp(sa_conn, full_name="Dupond Jean")
+        sa = await _create_sa(sa_conn, sd, sp, person_id=None, raw_author_name="Dupond Jean")
 
-        res = await list_orphan_authorships(async_db, search="", page=1, per_page=50)
+        res = await list_orphan_authorships(sa_conn, search="", page=1, per_page=50)
         assert res["total"] >= 1
         assert any(a["authorship_id"] == sa for a in res["authorships"])
 
-    async def test_filters_by_search(self, async_db):
-        pub = await _create_pub(async_db)
-        sd = await _create_sd(async_db, pub)
-        sp1 = await _create_sp(async_db, source_id="sp-m", full_name="SpecialName")
-        sp2 = await _create_sp(async_db, source_id="sp-o", full_name="Autre")
-        sa_match = await _create_sa(
-            async_db, sd, sp1, person_id=None, raw_author_name="SpecialName"
-        )
-        await _create_sa(async_db, sd, sp2, person_id=None, raw_author_name="Autre")
+    async def test_filters_by_search(self, sa_conn):
+        pub = await _create_pub(sa_conn)
+        sd = await _create_sd(sa_conn, pub)
+        sp1 = await _create_sp(sa_conn, source_id="sp-m", full_name="SpecialName")
+        sp2 = await _create_sp(sa_conn, source_id="sp-o", full_name="Autre")
+        sa_match = await _create_sa(sa_conn, sd, sp1, person_id=None, raw_author_name="SpecialName")
+        await _create_sa(sa_conn, sd, sp2, person_id=None, raw_author_name="Autre")
 
-        res = await list_orphan_authorships(async_db, search="Special", page=1, per_page=50)
+        res = await list_orphan_authorships(sa_conn, search="Special", page=1, per_page=50)
         ids = [a["authorship_id"] for a in res["authorships"]]
         assert sa_match in ids
 
 
 class TestPersonExists:
-    async def test_true_when_exists(self, async_db):
-        pid = await _create_person(async_db)
-        assert await person_exists(async_db, pid) is True
+    async def test_true_when_exists(self, sa_conn):
+        pid = await _create_person(sa_conn)
+        assert await person_exists(sa_conn, pid) is True
 
-    async def test_false_when_missing(self, async_db):
-        assert await person_exists(async_db, 999_999) is False
+    async def test_false_when_missing(self, sa_conn):
+        assert await person_exists(sa_conn, 999_999) is False
 
 
 class TestNameFormAuthorships:
-    async def test_returns_authorships_and_other_persons(self, async_db):
-        pid = await _create_person(async_db, last="Dupond")
-        other = await _create_person(async_db, last="Martin")
-        pub = await _create_pub(async_db)
-        sd = await _create_sd(async_db, pub)
-        sp = await _create_sp(async_db)
-        await _create_sa(async_db, sd, sp, person_id=pid, author_name_normalized="dupond j")
-        await async_db.execute(
-            "INSERT INTO person_name_forms (name_form, person_ids) VALUES ('dupond j', %s)",
-            ([pid, other],),
+    async def test_returns_authorships_and_other_persons(self, sa_conn):
+        pid = await _create_person(sa_conn, last="Dupond")
+        other = await _create_person(sa_conn, last="Martin")
+        pub = await _create_pub(sa_conn)
+        sd = await _create_sd(sa_conn, pub)
+        sp = await _create_sp(sa_conn)
+        await _create_sa(sa_conn, sd, sp, person_id=pid, author_name_normalized="dupond j")
+        await sa_conn.execute(
+            text("INSERT INTO person_name_forms (name_form, person_ids) VALUES ('dupond j', :ids)"),
+            {"ids": [pid, other]},
         )
 
-        res = await name_form_authorships(async_db, pid, "dupond j")
+        res = await name_form_authorships(sa_conn, pid, "dupond j")
         assert len(res["authorships"]) >= 1
         other_ids = [p["id"] for p in res["other_persons"]]
         assert other in other_ids
 
 
 class TestNameFormRemainingAuthorships:
-    async def test_counts_remaining(self, async_db):
-        pid = await _create_person(async_db)
-        pub = await _create_pub(async_db)
-        sd = await _create_sd(async_db, pub)
-        sp = await _create_sp(async_db)
-        await _create_sa(async_db, sd, sp, person_id=pid, author_name_normalized="x")
-        assert await name_form_remaining_authorships(async_db, pid, "x") == 1
-        assert await name_form_remaining_authorships(async_db, pid, "autre") == 0
+    async def test_counts_remaining(self, sa_conn):
+        pid = await _create_person(sa_conn)
+        pub = await _create_pub(sa_conn)
+        sd = await _create_sd(sa_conn, pub)
+        sp = await _create_sp(sa_conn)
+        await _create_sa(sa_conn, sd, sp, person_id=pid, author_name_normalized="x")
+        assert await name_form_remaining_authorships(sa_conn, pid, "x") == 1
+        assert await name_form_remaining_authorships(sa_conn, pid, "autre") == 0
 
 
 # Tests pour `hal_duplicate_accounts` déplacés vers

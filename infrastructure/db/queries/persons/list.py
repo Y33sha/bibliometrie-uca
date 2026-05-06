@@ -1,6 +1,5 @@
 """Annuaire public + autocomplete + liste admin des personnes (async)."""
 
-from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import text
@@ -18,19 +17,8 @@ from infrastructure.db.queries.filters import (
 # ── Annuaire public ──────────────────────────────────────────────
 
 
-@dataclass(frozen=True, slots=True)
-class DirectoryFilters:
-    search: str = ""
-    departments: list[str] = field(default_factory=list)
-    roles: list[str] = field(default_factory=list)
-    has_orcid: str = ""
-    has_idhal: str = ""
-    has_idref: str = ""
-    has_rh: str = ""
-
-
 async def persons_directory(
-    conn: AsyncConnection, *, filters: DirectoryFilters, page: int, per_page: int, sort: str
+    conn: AsyncConnection, *, filters: Any, page: int, per_page: int, sort: str
 ) -> dict[str, Any]:
     """Annuaire public des personnes avec ORCID et idHAL."""
     offset = (page - 1) * per_page
@@ -153,17 +141,6 @@ async def search_persons(conn: AsyncConnection, *, q: str, limit: int) -> list[d
 # ── Liste admin ──────────────────────────────────────────────────
 
 
-@dataclass(frozen=True, slots=True)
-class ListFilters:
-    search: str = ""
-    department: str = ""
-    role: str = ""
-    linked: str = ""
-    has_orcid: str = ""
-    has_idhal: str = ""
-    has_rh: str = ""
-
-
 _LIST_SORT_MAP = {
     "name": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
     "-name": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
@@ -175,7 +152,7 @@ _LIST_SORT_MAP = {
 
 
 async def list_persons(
-    conn: AsyncConnection, *, filters: ListFilters, page: int, per_page: int, sort: str
+    conn: AsyncConnection, *, filters: Any, page: int, per_page: int, sort: str
 ) -> dict[str, Any]:
     """Liste des personnes avec filtres (admin)."""
     offset = (page - 1) * per_page
