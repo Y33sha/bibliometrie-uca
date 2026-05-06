@@ -9,7 +9,7 @@ from application.publications import async_merge_publications
 from application.publications import mark_distinct as _mark_pubs_distinct
 from infrastructure.db.queries import publication_duplicates as dup_queries
 from infrastructure.repositories import async_publication_repository
-from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.async_deps import get_async_cursor, get_sa_connection
 from interfaces.api.models import (
     MarkDistinctPublications,
     MergePublications,
@@ -53,19 +53,19 @@ async def merge_duplicate_publications(body: MergePublications) -> Any:
             status_code=400, detail="target_id et source_id doivent être différents"
         )
 
-    async with get_async_cursor() as (cur, _conn):
-        pubs = await dup_queries.get_publications_basic(cur, [body.target_id, body.source_id])
+    async with get_sa_connection() as conn:
+        pubs = await dup_queries.get_publications_basic(conn, [body.target_id, body.source_id])
         if body.target_id not in pubs or body.source_id not in pubs:
             raise HTTPException(status_code=404, detail="Publication introuvable")
 
-        await cur.execute("SAVEPOINT merge_dup")
+        savepoint = await conn.begin_nested()
         try:
             await async_merge_publications(
-                cur, body.target_id, body.source_id, repo=async_publication_repository(cur)
+                conn, body.target_id, body.source_id, repo=async_publication_repository(conn)
             )
-            await cur.execute("RELEASE SAVEPOINT merge_dup")
+            await savepoint.commit()
         except Exception as e:
-            await cur.execute("ROLLBACK TO SAVEPOINT merge_dup")
+            await savepoint.rollback()
             raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}") from e
 
         return {"ok": True, "target_id": body.target_id, "source_id": body.source_id}
@@ -81,8 +81,8 @@ async def mark_publications_distinct(body: MarkDistinctPublications) -> Any:
     """
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         await _mark_pubs_distinct(
-            cur, body.pub_id_a, body.pub_id_b, repo=async_publication_repository(cur)
+            conn, body.pub_id_a, body.pub_id_b, repo=async_publication_repository(conn)
         )
         return {"ok": True}

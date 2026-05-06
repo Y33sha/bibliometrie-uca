@@ -385,7 +385,7 @@ def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) 
 
 
 async def mark_distinct(
-    cur: Any, pub_id_a: int, pub_id_b: int, *, repo: AsyncPublicationRepository
+    conn: Any, pub_id_a: int, pub_id_b: int, *, repo: AsyncPublicationRepository
 ) -> None:
     """Marque deux publications comme distinctes (non-doublon) dans
     `distinct_publications`. Idempotent.
@@ -395,7 +395,7 @@ async def mark_distinct(
     inserted = await repo.mark_distinct(pub_id_a, pub_id_b)
     if inserted:
         await async_emit_event(
-            cur,
+            conn,
             "publication.marked_distinct",
             "publication",
             inserted[0],
@@ -425,13 +425,13 @@ def merge_publications(
 
 
 async def async_merge_publications(
-    cur: Any, target_id: int, source_id: int, *, repo: AsyncPublicationRepository
+    conn: Any, target_id: int, source_id: int, *, repo: AsyncPublicationRepository
 ) -> None:
     """Variante async de `merge_publications` (utilisée par l'API admin_duplicates)."""
     await repo.merge_into(target_id, source_id)
     await repo.update_sources(target_id)
     await async_emit_event(
-        cur,
+        conn,
         "publication.merged",
         "publication",
         target_id,

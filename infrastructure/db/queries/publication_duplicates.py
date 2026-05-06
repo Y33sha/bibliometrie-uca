@@ -2,6 +2,9 @@
 
 from typing import Any
 
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncConnection
+
 _PUB_CANDIDATE_WHERE = """
     FROM publications p1
     JOIN publications p2
@@ -117,11 +120,21 @@ async def next_pub_duplicate(cur: Any, *, min_title_len: int, offset: int) -> di
     }
 
 
-async def get_publications_basic(cur: Any, pub_ids: list[int]) -> dict[int, Any]:
+async def get_publications_basic(conn_or_cur: Any, pub_ids: list[int]) -> dict[int, Any]:
     """Résout un lot de publications (existence check + métadonnées de base)."""
-    await cur.execute(
+    if isinstance(conn_or_cur, AsyncConnection):
+        result = await conn_or_cur.execute(
+            text(
+                "SELECT id, doi, journal_id, oa_status::text AS oa_status, "
+                "language, container_title "
+                "FROM publications WHERE id = ANY(:ids)"
+            ),
+            {"ids": list(pub_ids)},
+        )
+        return {row.id: dict(row._mapping) for row in result}
+    await conn_or_cur.execute(
         "SELECT id, doi, journal_id, oa_status::text, language, container_title "
         "FROM publications WHERE id = ANY(%s)",
         (list(pub_ids),),
     )
-    return {r["id"]: r for r in await cur.fetchall()}
+    return {r["id"]: r for r in await conn_or_cur.fetchall()}
