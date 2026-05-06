@@ -105,7 +105,7 @@ pattern progressivement :
 - [x] `admin_duplicates.py` *(commit `536122b`)*
 - [x] `hal_problems.py` *(commit en cours)*
 - [x] `config.py` *(commit en cours)*
-- [ ] `perimeters.py`
+- [x] `perimeters.py` *(commit en cours)*
 - [ ] `structures.py`
 - [ ] `stats.py`
 - [ ] `laboratories.py`
