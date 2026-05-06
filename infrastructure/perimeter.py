@@ -187,18 +187,27 @@ async def async_get_persons_structure_ids_list(cur: Any) -> list[int]:
     return list(await async_get_persons_structure_ids(cur))
 
 
-async def async_get_persons_perimeter_root_ids(cur: Any) -> list[int]:
+async def async_get_persons_perimeter_root_ids(conn_or_cur: Any) -> list[int]:
     """Racines (entrées déclaratives de `perimeters.structure_ids`) du périmètre
     "persons", sans expansion par `est_tutelle_de`.
 
-    À distinguer de `async_get_persons_structure_ids(cur)` qui retourne la
+    À distinguer de `async_get_persons_structure_ids(...)` qui retourne la
     clôture transitive : les racines + tous les labos descendants. Utilisé
     quand un code appelant veut filtrer explicitement les racines du périmètre
     (ex. exclure l'UCA des tutelles affichées pour un labo).
     """
-    code = await _async_config_perimeter_code(cur, "perimeter_persons", "uca")
-    await cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (code,))
-    row = await cur.fetchone()
+    code = await _async_config_perimeter_code(conn_or_cur, "perimeter_persons", "uca")
+    if isinstance(conn_or_cur, AsyncConnection):
+        result = await conn_or_cur.execute(
+            text("SELECT structure_ids FROM perimeters WHERE code = :code"),
+            {"code": code},
+        )
+        row = result.one_or_none()
+        if not row:
+            return []
+        return list(row.structure_ids) if row.structure_ids else []
+    await conn_or_cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (code,))
+    row = await conn_or_cur.fetchone()
     if not row:
         return []
     ids = row["structure_ids"] if isinstance(row, dict) else row[0]

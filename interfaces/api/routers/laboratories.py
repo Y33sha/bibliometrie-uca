@@ -10,7 +10,7 @@ from infrastructure.perimeter import (
     async_get_persons_perimeter_root_ids,
     async_get_persons_structure_ids_list,
 )
-from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.async_deps import get_sa_connection
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
     LaboratoryAddressesResponse,
@@ -28,17 +28,17 @@ logger = logging.getLogger(__name__)
 @router.get("/api/laboratories", response_model=list[LaboratoryListItem])
 async def list_laboratories() -> Any:
     """Liste des labos du périmètre."""
-    async with get_async_cursor() as (cur, _conn):
-        perimeter_ids = await async_get_persons_structure_ids_list(cur)
-        root_ids = await async_get_persons_perimeter_root_ids(cur)
-        return await lab_queries.list_laboratories(cur, perimeter_ids, root_ids)
+    async with get_sa_connection() as conn:
+        perimeter_ids = await async_get_persons_structure_ids_list(conn)
+        root_ids = await async_get_persons_perimeter_root_ids(conn)
+        return await lab_queries.list_laboratories(conn, perimeter_ids, root_ids)
 
 
 @router.get("/api/laboratories/{lab_id}", response_model=LaboratoryDetailResponse)
 async def get_laboratory(lab_id: int) -> Any:
     """Profil public d'un laboratoire."""
-    async with get_async_cursor() as (cur, _conn):
-        result = await lab_queries.get_laboratory(cur, lab_id)
+    async with get_sa_connection() as conn:
+        result = await lab_queries.get_laboratory(conn, lab_id)
         if not result:
             raise HTTPException(404, "Laboratory not found")
         return result
@@ -68,9 +68,9 @@ async def get_laboratory_persons(
         has_idhal=has_idhal,
         has_idref=has_idref,
     )
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         return await lab_queries.get_laboratory_persons(
-            cur, lab_id, filters=filters, page=page, per_page=per_page, sort=sort
+            conn, lab_id, filters=filters, page=page, per_page=per_page, sort=sort
         )
 
 
@@ -81,15 +81,17 @@ async def get_laboratory_addresses(
     per_page: int = Query(50, ge=10, le=200),
 ) -> Any:
     """Adresses liées à un laboratoire."""
-    async with get_async_cursor() as (cur, _conn):
-        return await lab_queries.get_laboratory_addresses(cur, lab_id, page=page, per_page=per_page)
+    async with get_sa_connection() as conn:
+        return await lab_queries.get_laboratory_addresses(
+            conn, lab_id, page=page, per_page=per_page
+        )
 
 
 @router.get("/api/laboratories/{lab_id}/dashboard", response_model=LaboratoryDashboardResponse)
 async def get_laboratory_dashboard(lab_id: int) -> Any:
     """Dashboard labo : publications par an + répartition OA."""
-    async with get_async_cursor() as (cur, _conn):
-        return await lab_queries.get_laboratory_dashboard(cur, lab_id)
+    async with get_sa_connection() as conn:
+        return await lab_queries.get_laboratory_dashboard(conn, lab_id)
 
 
 @router.get("/api/laboratories/{lab_id}/subjects", response_model=list[SubjectFrequency])
@@ -98,5 +100,5 @@ async def get_laboratory_subjects(
     limit: int = Query(30, ge=1, le=200),
 ) -> Any:
     """Top sujets des publications du labo (pour le nuage de mots dashboard)."""
-    async with get_async_cursor() as (cur, _conn):
-        return await lab_queries.get_laboratory_subjects(cur, lab_id, limit=limit)
+    async with get_sa_connection() as conn:
+        return await lab_queries.get_laboratory_subjects(conn, lab_id, limit=limit)
