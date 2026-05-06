@@ -2,16 +2,20 @@
 
 from typing import Any
 
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncConnection
+
 from infrastructure.db.queries.filters import (
     PUB_IS_UCA,
-    apply_lab_filter,
-    apply_oa_filter,
-    apply_year_filter,
+    assemble_where,
+    lab_clause,
+    oa_clause,
+    year_clause,
 )
 from infrastructure.db.queries.stats._shared import (
-    APC_SUM,
-    apply_stats_apc_filter,
+    APC_SUM_SA,
     paginated,
+    stats_apc_clause,
 )
 
 _JOURNAL_SORT_MAP = {
@@ -25,7 +29,7 @@ _JOURNAL_SORT_MAP = {
 
 
 async def journal_stats(
-    cur: Any,
+    conn: AsyncConnection,
     *,
     root_structure_id: int,
     lab_ids: list[int],
@@ -40,67 +44,80 @@ async def journal_stats(
 ) -> dict[str, Any]:
     """Stats agrégées par revue, paginées."""
     offset = (page - 1) * per_page
-    await cur.execute("SET LOCAL jit = off")
+    await conn.execute(text("SET LOCAL jit = off"))
 
-    conditions = [
-        PUB_IS_UCA,
-        "j.id IS NOT NULL",
-        "p.doc_type IN ('article', 'review')",
-        "j.oa_model IS DISTINCT FROM 'repository'",
-    ]
-    params: list[Any] = []
-    apply_lab_filter(conditions, params, lab_ids)
-    apply_year_filter(conditions, params, years)
-    if publisher_id:
-        conditions.append("j.publisher_id = %s")
-        params.append(publisher_id)
-    if search:
-        conditions.append("unaccent(j.title) ILIKE unaccent(%s)")
-        params.append(f"%{search}%")
-    apply_oa_filter(conditions, params, oa_status)
-    apply_stats_apc_filter(conditions, params, has_apc, root_structure_id)
-    where = " AND ".join(conditions)
-
-    await cur.execute(
-        f"""
-        SELECT COUNT(DISTINCT j.id) AS total
-        FROM publications p
-        JOIN journals j ON j.id = p.journal_id
-        WHERE {where}
-        """,
-        params,
+    static_clauses = " AND ".join(
+        [
+            PUB_IS_UCA,
+            "j.id IS NOT NULL",
+            "p.doc_type IN ('article', 'review')",
+            "j.oa_model IS DISTINCT FROM 'repository'",
+        ]
     )
-    row = await cur.fetchone()
-    total = row["total"]
+    dyn_where, where_binds = assemble_where(
+        [
+            lab_clause(lab_ids),
+            year_clause(years),
+            oa_clause(oa_status),
+            stats_apc_clause(has_apc, root_structure_id),
+        ]
+    )
+    where = f"{static_clauses} AND {dyn_where}"
+    if publisher_id:
+        where += " AND j.publisher_id = :flt_publisher_id"
+        where_binds["flt_publisher_id"] = publisher_id
+    if search:
+        where += " AND unaccent(j.title) ILIKE unaccent(:search_pat)"
+        where_binds["search_pat"] = f"%{search}%"
+
+    count_row = (
+        await conn.execute(
+            text(f"""
+                SELECT COUNT(DISTINCT j.id) AS total
+                FROM publications p
+                JOIN journals j ON j.id = p.journal_id
+                WHERE {where}
+            """),
+            where_binds,
+        )
+    ).one()
+    total = count_row.total
 
     order = _JOURNAL_SORT_MAP.get(sort, "COUNT(DISTINCT p.id) DESC")
-    await cur.execute(
-        f"""
-        SELECT
-            j.id AS journal_id,
-            j.title AS journal_title,
-            j.issn,
-            j.eissn,
-            pub.name AS publisher_name,
-            j.is_predatory,
-            j.apc_amount,
-            COUNT(DISTINCT p.id) AS pub_count,
-            SUM({APC_SUM})::numeric(12,2) AS apc_uca,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown') AS unknown
-        FROM publications p
-        JOIN journals j ON j.id = p.journal_id
-        LEFT JOIN publishers pub ON pub.id = j.publisher_id
-        WHERE {where}
-        GROUP BY j.id, j.title, j.issn, j.eissn, pub.name, j.is_predatory, j.apc_amount
-        ORDER BY {order}
-        LIMIT %s OFFSET %s
-        """,
-        [root_structure_id] + params + [per_page, offset],
-    )
-    return paginated(total, page, per_page, "journals", await cur.fetchall())
+    rows = (
+        await conn.execute(
+            text(f"""
+                SELECT
+                    j.id AS journal_id,
+                    j.title AS journal_title,
+                    j.issn,
+                    j.eissn,
+                    pub.name AS publisher_name,
+                    j.is_predatory,
+                    j.apc_amount,
+                    COUNT(DISTINCT p.id) AS pub_count,
+                    SUM({APC_SUM_SA})::numeric(12,2) AS apc_uca,
+                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
+                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
+                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
+                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
+                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
+                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
+                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown') AS unknown
+                FROM publications p
+                JOIN journals j ON j.id = p.journal_id
+                LEFT JOIN publishers pub ON pub.id = j.publisher_id
+                WHERE {where}
+                GROUP BY j.id, j.title, j.issn, j.eissn, pub.name, j.is_predatory, j.apc_amount
+                ORDER BY {order}
+                LIMIT :pg_limit OFFSET :pg_offset
+            """),
+            {
+                **where_binds,
+                "apc_root": root_structure_id,
+                "pg_limit": per_page,
+                "pg_offset": offset,
+            },
+        )
+    ).all()
+    return paginated(total, page, per_page, "journals", [dict(r._mapping) for r in rows])

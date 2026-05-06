@@ -459,7 +459,7 @@ def lab_clause(lab_ids: list[int]) -> WhereClause | None:
         """EXISTS (
             SELECT 1 FROM authorships a
             WHERE a.publication_id = p.id
-              AND a.structure_ids && :flt_lab_ids::int[]
+              AND a.structure_ids && CAST(:flt_lab_ids AS int[])
               AND NOT a.excluded
         )""",
         {"flt_lab_ids": lab_ids},
