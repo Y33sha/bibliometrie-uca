@@ -10,18 +10,45 @@ AsyncConnection sur l'AsyncEngine, dans une transaction commit
 en SQLAlchemy Core (chantier sqlalchemy-core-adoption). Cohabite
 avec `get_async_cursor()` pendant la migration ; le pool psycopg
 disparaîtra en Phase 4.
+
+Factories `Depends(...)` (chantier routers-di) : `db_conn` ouvre une
+AsyncConnection partagée par toutes les deps de la requête (FastAPI
+cache les Depends par requête → même transaction). Les `*_repo`
+dérivent de `db_conn`, donc plusieurs repos dans un même endpoint
+partagent la transaction sans config supplémentaire.
 """
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from application.ports.config import AsyncConfigStore
 from application.ports.perimeter import AsyncPerimeterQueries
+from domain.ports.address_repository import AsyncAddressRepository
+from domain.ports.authorship_repository import AsyncAuthorshipRepository
+from domain.ports.journal_repository import AsyncJournalRepository
+from domain.ports.perimeter_repository import AsyncPerimeterRepository
+from domain.ports.person_repository import AsyncPersonRepository
+from domain.ports.publication_repository import AsyncPublicationRepository
+from domain.ports.publisher_repository import AsyncPublisherRepository
+from domain.ports.structure_repository import AsyncStructureRepository
 from infrastructure.db.async_connection import get_async_pool
 from infrastructure.db.engine import get_async_engine
 from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
+from infrastructure.repositories import (
+    async_address_repository,
+    async_authorship_repository,
+    async_config_store,
+    async_journal_repository,
+    async_perimeter_repository,
+    async_person_repository,
+    async_publication_repository,
+    async_publisher_repository,
+    async_structure_repository,
+)
 
 
 @asynccontextmanager
@@ -43,6 +70,72 @@ async def get_sa_connection() -> AsyncIterator[AsyncConnection]:
     engine = get_async_engine()
     async with engine.begin() as conn:
         yield conn
+
+
+# ── Factories `Depends` pour les routers (chantier routers-di) ────
+
+
+async def db_conn() -> AsyncIterator[AsyncConnection]:
+    """AsyncConnection partagée par toutes les deps d'une même requête.
+
+    À utiliser via `Depends(db_conn)`. Toute dépendance qui en dérive
+    (`*_repo` ci-dessous) partage la même connexion → même transaction.
+    """
+    engine = get_async_engine()
+    async with engine.begin() as conn:
+        yield conn
+
+
+def address_repo(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncAddressRepository:
+    return async_address_repository(conn)
+
+
+def authorship_repo(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncAuthorshipRepository:
+    return async_authorship_repository(conn)
+
+
+def config_store(conn: AsyncConnection = Depends(db_conn)) -> AsyncConfigStore:
+    return async_config_store(conn)
+
+
+def journal_repo(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncJournalRepository:
+    return async_journal_repository(conn)
+
+
+def perimeter_repo(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncPerimeterRepository:
+    return async_perimeter_repository(conn)
+
+
+def person_repo(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncPersonRepository:
+    return async_person_repository(conn)
+
+
+def publication_repo(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncPublicationRepository:
+    return async_publication_repository(conn)
+
+
+def publisher_repo(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncPublisherRepository:
+    return async_publisher_repository(conn)
+
+
+def structure_repo(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncStructureRepository:
+    return async_structure_repository(conn)
 
 
 # ── Câblage des adapters sortants ──
