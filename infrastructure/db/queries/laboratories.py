@@ -472,7 +472,7 @@ async def get_laboratory_dashboard(cur: Any, lab_id: int) -> dict[str, Any]:
             COUNT(DISTINCT p.id) AS total_articles,
             COUNT(DISTINCT p.id) FILTER (
                 WHERE p.countries IS NOT NULL
-                  AND EXISTS (SELECT 1 FROM unnest(p.countries) c WHERE c <> 'fr')
+                  AND EXISTS (SELECT 1 FROM unnest(p.countries) c WHERE c NOT IN ('fr', 'xx'))
             ) AS international
         FROM publications p
         JOIN authorships a ON a.publication_id = p.id
@@ -504,7 +504,7 @@ async def get_laboratory_dashboard(cur: Any, lab_id: int) -> dict[str, Any]:
               )
         ) sub
         JOIN countries co ON co.code = sub.cc
-        WHERE sub.cc <> 'fr'
+        WHERE sub.cc NOT IN ('fr', 'xx')
         GROUP BY co.code, co.name
         ORDER BY count DESC
         LIMIT 5
