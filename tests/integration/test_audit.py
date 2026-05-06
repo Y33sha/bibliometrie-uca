@@ -3,14 +3,22 @@
 Vérifie deux comportements essentiels :
 1. Hors contexte utilisateur (pipeline, scripts) → emit_event est no-op.
 2. Dans un contexte utilisateur (requête HTTP) → l'événement est persisté.
+
+Le dernier bloc valide la branche SQLAlchemy de `async_emit_event`
+(cohabitation pendant le chantier sqlalchemy-core-adoption).
 """
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncConnection
+
 from application.audit import (
+    async_emit_event,
     emit_event,
     get_current_user,
     reset_current_user,
     set_current_user,
 )
+from infrastructure.db.tables import audit_log
 from infrastructure.repositories import async_person_repository
 
 
@@ -162,3 +170,51 @@ class TestEndToEndServiceIntegration:
             "SELECT COUNT(*) AS n FROM audit_log WHERE event_type = 'person.marked_distinct'"
         )
         assert (await async_db.fetchone())["n"] == 1
+
+
+class TestAsyncEmitEventViaSAConnection:
+    """Vérifie la branche SA de `async_emit_event` (chantier
+    sqlalchemy-core-adoption — cohabitation pendant la phase 1)."""
+
+    async def test_persists_via_sa_connection(self, sa_conn: AsyncConnection):
+        token = set_current_user("admin")
+        try:
+            await async_emit_event(sa_conn, "person.merged", "person", 42, {"source_id": 7})
+            result = await sa_conn.execute(
+                select(
+                    audit_log.c.event_type,
+                    audit_log.c.aggregate_type,
+                    audit_log.c.aggregate_id,
+                    audit_log.c.payload,
+                    audit_log.c.user_id,
+                )
+                .order_by(audit_log.c.id.desc())
+                .limit(1)
+            )
+            row = result.one()
+        finally:
+            reset_current_user(token)
+
+        assert row.event_type == "person.merged"
+        assert row.aggregate_type == "person"
+        assert row.aggregate_id == 42
+        assert row.payload == {"source_id": 7}
+        assert row.user_id == "admin"
+
+    async def test_no_user_no_event_via_sa(self, sa_conn: AsyncConnection):
+        await async_emit_event(sa_conn, "person.merged", "person", 1, {})
+        result = await sa_conn.execute(
+            select(audit_log.c.id).where(audit_log.c.event_type == "person.merged")
+        )
+        assert result.first() is None
+
+    async def test_default_payload_via_sa(self, sa_conn: AsyncConnection):
+        token = set_current_user("admin")
+        try:
+            await async_emit_event(sa_conn, "person.rejected", "person", 99)
+            result = await sa_conn.execute(
+                select(audit_log.c.payload).order_by(audit_log.c.id.desc()).limit(1)
+            )
+            assert result.scalar_one() == {}
+        finally:
+            reset_current_user(token)

@@ -84,6 +84,14 @@ unifie le typage des Result et il évite un mode hybride bancal. Le
 driver reste psycopg3 (`postgresql+psycopg://`), donc aucune
 régression de perf/feature côté DB.
 
+**Cohérence transactionnelle pendant la migration incrémentale** :
+le risque qu'un module migré (en B) appelle un service ancien (en
+psycopg cur) avec une connexion différente est traité en
+sous-phase 1.0 (audit en cohabitation : `async_emit_event` accepte
+les deux signatures via dispatch interne). Cohabitation transitoire
+jusqu'en Phase 4, où la branche psycopg disparaît. Aucune fenêtre
+d'indisponibilité côté API admin pendant le chantier.
+
 ### 2. Coexistence Core / SQL brut
 
 Règle : **Core par défaut, SQL brut quand il est strictement plus
@@ -236,11 +244,16 @@ qui justifierait une session.
 Ce sont les queries qui justifient le chantier (le gain est
 maximal là).
 
-- [ ] Module pilote `config` : adapter `PgAsyncConfig` pour utiliser
-  SQLAlchemy Core (sérialisation JSONB auto, plus de `json.dumps`
-  manuel). Trancher l'option A vs B sur ce module en fonction de
-  la complexité de cohabitation avec `async_emit_event` dans
-  `delete_perimeter`.
+- [ ] **Sous-phase 1.0 (préalable) — Audit en cohabitation** :
+  ajouter `audit_log` à `tables.py`, adapter `async_emit_event`
+  pour accepter une union `AsyncCursor | AsyncConnection` SA et
+  dispatcher en interne. Aucun call site touché — chaque module
+  bascule individuellement vers la branche SA quand il est migré.
+  Évite toute fenêtre d'indisponibilité des opérations
+  destructives.
+- [ ] Module pilote `config` : adapter `PgAsyncConfig` et le
+  router pour utiliser AsyncEngine SA (option B). Bascule de
+  `delete_perimeter` vers la branche SA de `async_emit_event`.
 - [ ] `infrastructure/db/queries/filters.py` — refondre l'API en
   retournant des fragments SQLAlchemy composables au lieu de muter
   `(conditions, params)`.

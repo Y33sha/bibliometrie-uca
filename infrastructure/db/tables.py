@@ -19,6 +19,7 @@ au fur et à mesure des phases suivantes.
 
 from sqlalchemy import (
     ARRAY,
+    BigInteger,
     Column,
     DateTime,
     Integer,
@@ -31,6 +32,19 @@ from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.dialects.postgresql import JSONB
 
 metadata = MetaData()
+
+
+audit_log = Table(
+    "audit_log",
+    metadata,
+    Column("id", BigInteger, primary_key=True),
+    Column("event_type", Text, nullable=False),
+    Column("aggregate_type", Text, nullable=False),
+    Column("aggregate_id", Integer),
+    Column("payload", JSONB, nullable=False, server_default="{}"),
+    Column("user_id", Text),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
 
 
 config = Table(

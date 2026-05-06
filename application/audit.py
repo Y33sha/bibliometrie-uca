@@ -13,13 +13,21 @@ Pourquoi un ContextVar : pour propager le user_id à travers ~15 fonctions de
 services sans ajouter `user_id: str | None = None` à toutes leurs signatures.
 Les ContextVar sont async-local — chaque requête HTTP a son propre contexte,
 pas de fuite entre requêtes.
+
+Cohabitation pendant le chantier sqlalchemy-core-adoption (Phase 1) :
+`async_emit_event` accepte les deux signatures (curseur psycopg legacy ou
+AsyncConnection SQLAlchemy) et dispatche en interne. Branche psycopg à
+supprimer en Phase 4 quand tous les call sites auront basculé en SA.
 """
 
 import contextvars
+import json
 import logging
 from typing import Any
 
 from psycopg.types.json import Jsonb as Json
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 logger = logging.getLogger(__name__)
 
@@ -90,22 +98,50 @@ def emit_event(
 
 
 async def async_emit_event(
-    cur: Any,
+    conn: Any,
     event_type: str,
     aggregate_type: str,
     aggregate_id: int | None = None,
     payload: dict[str, Any] | None = None,
 ) -> None:
-    """Variante async d'`emit_event`. Même sémantique, curseur async."""
+    """Variante async d'`emit_event`.
+
+    Accepte deux types de connexion pendant le chantier
+    sqlalchemy-core-adoption (Phase 1) :
+    - `AsyncConnection` SQLAlchemy : nouveau pattern, branche cible.
+    - `psycopg.AsyncCursor` : ancien pattern, conservé tant que tous
+      les call sites n'ont pas basculé en SA.
+    """
     user_id = get_current_user()
     if user_id is None:
         return
 
-    await cur.execute(
-        """
-        INSERT INTO audit_log (event_type, aggregate_type, aggregate_id,
-                               payload, user_id)
-        VALUES (%s, %s, %s, %s, %s)
-        """,
-        (event_type, aggregate_type, aggregate_id, Json(payload or {}), user_id),
-    )
+    if isinstance(conn, AsyncConnection):
+        # SQL brut via text() : on ne peut pas importer la MetaData
+        # de infrastructure/db/tables.py depuis application/ (couches
+        # DDD). Le passage à un AuditRepository propre est prévu en
+        # Phase 3 du chantier audit-cto.
+        await conn.execute(
+            text(
+                "INSERT INTO audit_log "
+                "(event_type, aggregate_type, aggregate_id, payload, user_id) "
+                "VALUES (:event_type, :aggregate_type, :aggregate_id, "
+                "        CAST(:payload AS jsonb), :user_id)"
+            ),
+            {
+                "event_type": event_type,
+                "aggregate_type": aggregate_type,
+                "aggregate_id": aggregate_id,
+                "payload": json.dumps(payload or {}),
+                "user_id": user_id,
+            },
+        )
+    else:
+        await conn.execute(
+            """
+            INSERT INTO audit_log (event_type, aggregate_type, aggregate_id,
+                                   payload, user_id)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (event_type, aggregate_type, aggregate_id, Json(payload or {}), user_id),
+        )

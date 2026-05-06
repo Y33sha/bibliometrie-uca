@@ -9,38 +9,10 @@ tables : ils servent de filet contre le drift (colonne ajoutée en
 migration mais oubliée dans tables.py, ou vice-versa).
 """
 
-import os
-
-import pytest
-from sqlalchemy import URL, inspect, select, update
-from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
+from sqlalchemy import inspect, select, update
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from infrastructure.db.tables import config, metadata, perimeters, structures
-
-
-def _test_db_url() -> URL:
-    return URL.create(
-        drivername="postgresql+psycopg",
-        username=os.environ["DB_USER"],
-        password=os.environ.get("DB_PASSWORD", ""),
-        host=os.environ.get("DB_HOST", "127.0.0.1"),
-        port=int(os.environ.get("DB_PORT", "5432")),
-        database="bibliometrie_test",
-    )
-
-
-@pytest.fixture
-async def sa_conn():
-    """AsyncConnection SQLAlchemy sur la base test, transaction rollbackée."""
-    engine = create_async_engine(_test_db_url())
-    async with engine.connect() as conn:
-        trans = await conn.begin()
-        try:
-            yield conn
-        finally:
-            await trans.rollback()
-    await engine.dispose()
-
 
 # ── Smoke : round-trip SQLAlchemy Core sur la table config ────────
 
