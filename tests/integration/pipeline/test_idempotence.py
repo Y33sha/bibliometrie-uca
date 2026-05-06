@@ -282,7 +282,11 @@ class TestNormalizeScanrIdempotence:
 
         assert processed_1 == 3, f"Première passe : {processed_1} traités (attendu 3)"
         assert counts_1["scanr_documents"] == 3
-        assert counts_1["source_persons"] >= 3  # Alice apparaît 2 fois mais dédupliquée par idref
+        # Depuis le chantier source_persons : seuls les auteurs ScanR avec
+        # idref génèrent un source_persons (Alice + Bob = 2). Charlie et
+        # Diana, sans idref, n'apparaissent que dans source_authorships
+        # (source_person_id NULL).
+        assert counts_1["source_persons"] >= 2
         assert counts_1["publications"] >= 3
 
         # Reset processed flags
@@ -311,13 +315,32 @@ class TestNormalizeScanrIdempotence:
         assert db.fetchone()["cnt"] == 2, "Alice devrait avoir 2 authorships (article + chapitre)"
 
     def test_author_without_idref(self, db):
-        """Un auteur sans idref est créé sans doublon."""
+        """Un auteur sans idref ScanR ne crée pas de source_persons.
+
+        Depuis le chantier source_persons : ScanR ne crée plus de
+        `source_persons` pour les auteurs sans idref ; ils n'apparaissent
+        que dans `source_authorships` (source_person_id NULL). L'identité
+        sera reconstruite au pipeline `personnes` via les name_forms.
+        """
         _insert_staging(db, SCANR_STAGING_DOCS)
         _run_normalize_scanr(db)
 
-        db.execute("SELECT count(*) AS cnt FROM source_persons WHERE idref IS NULL")
-        count = db.fetchone()["cnt"]
-        assert count >= 2, "Charlie Noid et Diana Durand n'ont pas d'idref"
+        # Aucun source_persons sans idref côté ScanR.
+        db.execute(
+            "SELECT count(*) AS cnt FROM source_persons WHERE source = 'scanr' AND idref IS NULL"
+        )
+        assert db.fetchone()["cnt"] == 0
+
+        # Charlie Noid et Diana Durand sont bien dans source_authorships
+        # avec source_person_id NULL.
+        db.execute(
+            """
+            SELECT count(*) AS cnt FROM source_authorships
+            WHERE source = 'scanr' AND source_person_id IS NULL
+              AND raw_author_name IN ('Charlie Noid', 'Diana Durand')
+            """
+        )
+        assert db.fetchone()["cnt"] == 2
 
     def test_publication_dedup_by_doi(self, db):
         """Deux documents ScanR avec le même DOI → une seule publication."""

@@ -188,32 +188,38 @@ class TestHalReprocessingUpdatesOaStatus:
 
         assert _get_pub_oa_status(db, hal_id) == "closed"
 
-        # 2. Re-traitement : openAccess_bool passe à true
+        # 2. Re-traitement : un fileMain_s apparaît (dépôt effectif en HAL)
+        #    → green. `openAccess_bool=True` seul ne suffit plus depuis la
+        #    refonte de derive_hal_oa_status (003a4bc, 16a5b14).
         updated_doc = copy.deepcopy(HAL_DOC_CLOSED)
         updated_doc["openAccess_bool"] = True
+        updated_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
         _insert_hal_staging(db, updated_doc)  # remet processed = FALSE
         _run_normalize_hal(db)
 
         assert _get_pub_oa_status(db, hal_id) == "green"
 
     def test_closed_replaces_green_on_reprocessing(self, db):
-        """Un re-traitement avec openAccess_bool=false met à jour le statut.
+        """Un re-traitement où le dépôt HAL disparaît met à jour le statut.
 
         Avec refresh_from_sources, le statut est recalculé depuis les
-        source_publications : si HAL dit maintenant 'closed', c'est closed.
+        source_publications : si HAL n'a plus de fileMain_s et que
+        openAccess_bool passe à false, c'est closed.
         """
         hal_id = HAL_DOC_CLOSED["halId_s"]
 
-        # 1. Premier traitement avec green
+        # 1. Premier traitement avec green : fileMain_s présent → green
         open_doc = copy.deepcopy(HAL_DOC_CLOSED)
         open_doc["openAccess_bool"] = True
+        open_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
         _insert_hal_staging(db, open_doc)
         _run_normalize_hal(db)
         _create_all_publications(db)
 
         assert _get_pub_oa_status(db, hal_id) == "green"
 
-        # 2. Re-traitement avec false → refresh_from_sources recalcule
+        # 2. Re-traitement : fileMain_s retiré, openAccess_bool = false
+        #    → refresh_from_sources recalcule en closed.
         _insert_hal_staging(db, HAL_DOC_CLOSED)
         _run_normalize_hal(db)
 
