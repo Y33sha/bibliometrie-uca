@@ -86,15 +86,6 @@ composition roots (`interfaces/cli/pipeline/*`, `run_pipeline.py`).
 
 ## Chantier qualité du code : maintenabilité, auditabilité, scalabilité
 
-### 2.4 Migrations BDD
-- [x] **Évaluation Alembic** : ne pas migrer. Système maison
-  `migrate.py` (~120 lignes) lisible en 2 min, 70+ migrations gérées
-  sans downgrade utilisé. Alembic nécessiterait SQLAlchemy (chantier
-  disproportionné). Décision à revisiter si downgrades deviennent
-  récurrents ou si la DSI l'exige.
-- [ ] Si downgrades deviennent utiles : convention `NNN_down.sql`
-  optionnelle, ~10 lignes à ajouter dans `migrate.py`.
-
 ### 2.7 Frontend
 
 #### 2.7.1 Séparation logique métier / composants — partiel
@@ -141,13 +132,6 @@ API + logique métier.
   partiellement en place, à consolider
 
 ### 2.9 Audits transversaux périodiques
-À faire passer périodiquement — non commencés à ce jour.
-- [x] **12-factor app** : confronter le projet aux pointeurs de
-  *Beyond the Twelve-Factor App* (Kevin Hoffman, 2016) qui revisite
-  les 12 facteurs originaux et en ajoute 3 à l'ère Kubernetes.
-- [x] **SOLID** sur le code existant : détecter les violations
-  (surtout ISP et DIP, les plus courantes quand on vient d'une base
-  procédurale). SRP, OCP, LSP, ISP, DIP
 - [ ] **Revue code dupliqué / uniformisation** : ex. les fonctions de
   compatibilité de noms existent en deux versions (Python dans
   `domain/names.py`, SQL dans `admin_person_duplicates.py`) — à

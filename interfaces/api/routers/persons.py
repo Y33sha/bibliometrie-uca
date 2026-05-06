@@ -218,8 +218,8 @@ async def persons_stats() -> Any:
 @router.get("/api/persons/{person_id}", response_model=PersonDetail)
 async def get_person(person_id: int) -> Any:
     """Détail d'une personne avec auteurs liés."""
-    async with get_async_cursor() as (cur, _conn):
-        person = await persons_queries.get_person(cur, person_id)
+    async with get_sa_connection() as conn:
+        person = await persons_queries.get_person(conn, person_id)
         if not person:
             raise HTTPException(status_code=404, detail="Person not found")
         return person
@@ -228,8 +228,8 @@ async def get_person(person_id: int) -> Any:
 @router.get("/api/persons/{person_id}/profile", response_model=PersonProfileResponse)
 async def person_profile(person_id: int) -> Any:
     """Profil public complet d'une personne."""
-    async with get_async_cursor() as (cur, _conn):
-        profile = await persons_queries.person_profile(cur, person_id)
+    async with get_sa_connection() as conn:
+        profile = await persons_queries.person_profile(conn, person_id)
         if not profile:
             raise HTTPException(status_code=404, detail="Person not found")
         return profile
@@ -238,8 +238,8 @@ async def person_profile(person_id: int) -> Any:
 @router.get("/api/persons/{person_id}/theses", response_model=PersonThesesResponse)
 async def person_theses(person_id: int) -> Any:
     """Thèses liées à cette personne avec un rôle non-auteur."""
-    async with get_async_cursor() as (cur, _conn):
-        return await persons_queries.person_theses(cur, person_id)
+    async with get_sa_connection() as conn:
+        return await persons_queries.person_theses(conn, person_id)
 
 
 @router.get("/api/persons/{person_id}/addresses", response_model=PersonAddressesResponse)
@@ -249,22 +249,22 @@ async def person_addresses(
     per_page: int = Query(50, ge=1, le=200),
 ) -> Any:
     """Adresses distinctes utilisées dans les authorships sources de cette personne."""
-    async with get_async_cursor() as (cur, _conn):
-        return await persons_queries.person_addresses(cur, person_id, page=page, per_page=per_page)
+    async with get_sa_connection() as conn:
+        return await persons_queries.person_addresses(conn, person_id, page=page, per_page=per_page)
 
 
 @router.get("/api/persons/{person_id}/dashboard", response_model=PersonDashboardResponse)
 async def person_dashboard(person_id: int) -> Any:
     """Dashboard personne : publis/an + Open Access."""
-    async with get_async_cursor() as (cur, _conn):
-        return await persons_queries.person_dashboard(cur, person_id)
+    async with get_sa_connection() as conn:
+        return await persons_queries.person_dashboard(conn, person_id)
 
 
 @router.get("/api/persons/{person_id}/subjects", response_model=list[SubjectFrequency])
 async def person_subjects(person_id: int, limit: int = Query(30, ge=1, le=100)) -> Any:
     """Top sujets des publications de cette personne (nuage de mots)."""
-    async with get_async_cursor() as (cur, _conn):
-        return await persons_queries.person_subjects(cur, person_id, limit=limit)
+    async with get_sa_connection() as conn:
+        return await persons_queries.person_subjects(conn, person_id, limit=limit)
 
 
 # ── Gestion des identifiants ─────────────────────────────────────
