@@ -34,6 +34,7 @@ from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
+from domain.person import normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
@@ -120,7 +121,7 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
         di_list = _safe_list(di_ids.get("data-item-id"))
         for di in di_list:
             if isinstance(di, dict) and di.get("id-type") == "PreferredORCID":
-                orcid = di.get("content")
+                orcid = normalize_orcid(di.get("content"))
                 break
 
         is_corresponding = name_obj.get("reprint") == "Y"

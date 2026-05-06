@@ -437,6 +437,22 @@ def extract_pub_metadata(work, journal_id):
       exhaustive : aucune règle décisionnelle restante en application/
       hors prefetch + apply.
 
+## Journal des relocations
+
+Trace minimale des items rapatriés au fil de l'eau (entrée
+correspondante supprimée de `regles-metier-inventaire.md` au même
+moment). Le détail métier vit dans les docstrings des fonctions
+relocalisées en `domain/`.
+
+- **ORCID — normalisation unifiée** : `_normalize_orcid` de
+  `domain/person.py` rendue publique (`normalize_orcid`). Appliquée
+  dans les 5 normalizers (HAL, OpenAlex, Crossref, WoS, ScanR), qui
+  abandonnent leurs versions inlinées. Durcissement : ORCID malformé
+  → `None` au lieu d'être stocké tel quel — préférable côté
+  comparabilité avec `person_identifiers`. Suppression au passage
+  de `interfaces/cli/crossref_spike.py` (one-shot phase 0
+  crossref, livrable terminé).
+
 ## Décisions actées
 
 1. **Granularité = dossier `domain/publications/` plutôt que fichiers

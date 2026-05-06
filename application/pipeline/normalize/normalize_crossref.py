@@ -43,6 +43,7 @@ from application.publications import find_or_create as find_or_create_publicatio
 from application.publications import refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
+from domain.person import normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
@@ -267,14 +268,6 @@ def _author_full_name(author: dict) -> str:
     return family or given or ""
 
 
-def _normalize_orcid(raw: str | None) -> str | None:
-    """Extrait l'ORCID 16 chars depuis une URL CrossRef (https://orcid.org/...)."""
-    if not isinstance(raw, str) or not raw.strip():
-        return None
-    extracted = raw.rstrip("/").split("/")[-1].strip()
-    return extracted or None
-
-
 def _author_affiliation_strings(author: dict) -> list[str]:
     affs = author.get("affiliation") or []
     out: list[str] = []
@@ -316,7 +309,7 @@ def process_authors(
         if not full_name:
             continue
 
-        orcid = _normalize_orcid(author.get("ORCID"))
+        orcid = normalize_orcid(author.get("ORCID"))
         ids: dict[str, Any] = {}
         if orcid:
             ids["orcid"] = orcid

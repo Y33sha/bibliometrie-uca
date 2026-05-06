@@ -86,7 +86,7 @@ _ORCID_URL_PREFIXES = ("https://orcid.org/", "http://orcid.org/", "orcid.org/")
 _ORCID_CANONICAL = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
 
 
-def _normalize_orcid(raw: str | None) -> str | None:
+def normalize_orcid(raw: str | None) -> str | None:
     """Normalise un ORCID : supprime le préfixe URL, met les hyphens en forme.
 
     Accepte les variantes avec ou sans URL, avec ou sans hyphens.
@@ -121,7 +121,7 @@ class ORCID:
     value: str
 
     def __post_init__(self) -> None:
-        cleaned = _normalize_orcid(self.value)
+        cleaned = normalize_orcid(self.value)
         if not cleaned:
             raise ValidationError(f"ORCID invalide : {self.value!r}")
         object.__setattr__(self, "value", cleaned)
