@@ -139,10 +139,6 @@ ports `domain/` dans les use cases.
   qui touchent `publications.countries`. Pattern accepté en DDD quand
   les agrégats sont étroitement liés et que la propagation fait
   partie de la cohérence métier.
-- `config_repository` couvre à la fois la table `config` (qui n'est
-  pas un agrégat — clé/valeur applicative) et l'agrégat `Perimeter`.
-  Mélange pragmatique assumé : ces deux concepts sont manipulés
-  ensemble par les routers admin (`/api/config`).
 
 ### `application/` — services et orchestrateurs
 
