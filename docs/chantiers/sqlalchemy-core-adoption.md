@@ -256,7 +256,34 @@ maximal là).
   - Note : passage à un `AuditRepository` propre (`application/`
     via port + adapter `infrastructure/`) reste prévu en Phase 3
     du chantier audit-cto.
-- [x] **Sous-phase 1.1 — Module pilote `config` + `perimeters`** :
+- [ ] `infrastructure/db/queries/filters.py` — refondre l'API en
+  retournant des fragments SQLAlchemy composables au lieu de muter
+  `(conditions, params)`.
+- [ ] `infrastructure/db/queries/publications/facets.py`
+  (`_PublicationFacetsBuilder`) — le plus complexe ; vérifier que
+  la lisibilité gagne réellement.
+- [ ] Listings paginés : `addresses.py`, `persons/list.py`,
+  `publications/list.py`, `journals.py`, `publishers.py`,
+  `structures.py`.
+- [ ] `subjects.py` — partiellement (queries dynamiques uniquement,
+  les opérations JSON spécifiques restent en SQL brut).
+
+À chaque étape : commit séparé, tests d'intégration verts, pas de
+mélange ancien/nouveau pattern dans un même fichier.
+
+### Phase 2 — Migration des modules (repos d'écriture + services + routers writes)
+
+Migration par module complet : repository d'écriture
+(`infrastructure/repositories/async_*_repository.py`), service
+correspondant (`application/*.py` côté async), et routers writes
+(`POST/PUT/DELETE` basculés sur `get_sa_connection()`). C'est
+principalement mécanique ; gain en cohérence et en futur-proofing
+pour Alembic. Les sous-phases historiquement nommées 1.1/1.2/1.3
+dans les commits sont en réalité ici (cf. note de refactor de la
+fiche).
+
+- [x] **Sous-phase 2.1 — Module pilote `config` + `perimeters`**
+  *(commit `ef817a3`, marqué "sous-phase 1.1" dans l'historique git)* :
   `PgAsyncConfig`, `PgAsyncPerimeterRepository`, `application/config.py`
   et les écritures des routers `config` et `perimeters` migrés en
   AsyncConnection SA (option B). `delete_perimeter` bascule
@@ -274,56 +301,38 @@ maximal là).
   - Endpoint `GET /api/perimeters` (lecture) reste en psycopg pour
     cette sous-phase : il dépend de la CTE récursive
     `infrastructure.perimeter`, à migrer avec ce module.
-- [ ] `infrastructure/db/queries/filters.py` — refondre l'API en
-  retournant des fragments SQLAlchemy composables au lieu de muter
-  `(conditions, params)`.
-- [ ] `infrastructure/db/queries/publications/facets.py`
-  (`_PublicationFacetsBuilder`) — le plus complexe ; vérifier que
-  la lisibilité gagne réellement.
-- [ ] Listings paginés : `addresses.py`, `persons/list.py`,
-  `publications/list.py`, `journals.py`, `publishers.py`,
-  `structures.py`.
-- [ ] `subjects.py` — partiellement (queries dynamiques uniquement,
-  les opérations JSON spécifiques restent en SQL brut).
-
-À chaque étape : commit séparé, tests d'intégration verts, pas de
-mélange ancien/nouveau pattern dans un même fichier.
-
-### Phase 2 — Migration des repositories d'écriture
-
-Repositories `infrastructure/repositories/async_*_repository.py` :
-les méthodes d'écriture (`update_*_fields`, `create_*`,
-`delete_*`, etc.). C'est mécanique, aucun pattern dynamique : gain
-principalement en cohérence et en futur-proofing pour Alembic.
-
-- [ ] `async_perimeter_repository.py` (le plus simple, validation
-  du pattern).
-- [ ] `async_config_repository.py` → la partie config dans
-  `infrastructure/db/queries/config.py` (PgAsyncConfig).
-- [x] **Sous-phase 1.2 — `async_structure_repository.py` + `application/structures.py` + router writes** :
+- [x] **Sous-phase 2.2 — Module `structures`**
+  *(commit `5287818`, marqué "sous-phase 1.2" dans l'historique git)* :
   3 tables ajoutées à MetaData (`structures`, `structure_relations`,
   `structure_name_forms`). Repo réécrit en SA Core (delete/select/update/insert/pg_insert
-  pour `ON CONFLICT DO NOTHING`). Service migré en `AsyncConnection`, `Json()`
-  wrapper retiré (SA gère JSONB). Routers writes basculés sur
-  `get_sa_connection()`. Conftest API étendu pour patcher
+  pour `ON CONFLICT DO NOTHING`). Service migré en `AsyncConnection`,
+  `Json()` wrapper retiré (SA gère JSONB). Routers writes basculés
+  sur `get_sa_connection()`. Conftest API étendu pour patcher
   `build_async_engine` (sinon les tests tombaient sur la base prod).
   Tests : 23/23 service + 32/32 API + suite complète 1322/1322.
-- [x] **Sous-phase 1.3 — `async_journal_repository.py` + `async_publisher_repository.py`** :
+- [x] **Sous-phase 2.3 — Modules `journals` + `publishers`**
+  *(commit `d10b3f5`, marqué "sous-phase 1.3" dans l'historique git)* :
   4 tables ajoutées (`journals`, `journal_name_forms`, `publishers`,
-  `publisher_name_forms`). Numeric importé. Repo journal + publisher
-  réécrits en SA Core ; cross-table updates (publications,
-  source_publications, apc_payments) en `text()` (pattern accepté).
-  `find_shared_title_journal_pairs` en SA aliases. `merge_journal_into` :
-  SELECT-puis-UPDATE pour éviter le warning "cartesian product".
-  `application/journals.py` et `application/publishers.py` fonctions
-  async migrées en `AsyncConnection`. Routers writes basculés sur
-  `get_sa_connection()`. `existing_journal_ids` et `existing_publisher_ids`
-  en SA pour partager la transaction du merge. Tests : 34/34 service
-  + suite complète 1322/1322.
-- [ ] `async_address_repository.py`.
-- [ ] `async_authorship_repository.py`.
-- [ ] `async_person_repository/` (multi-fichiers).
-- [ ] `async_publication_repository.py`.
+  `publisher_name_forms`). `Numeric` importé. Repo journal +
+  publisher réécrits en SA Core ; cross-table updates
+  (publications, source_publications, apc_payments) en `text()`
+  (pattern accepté). `find_shared_title_journal_pairs` en SA
+  aliases. `merge_journal_into` : SELECT-puis-UPDATE pour éviter le
+  warning "cartesian product". `application/journals.py` et
+  `application/publishers.py` fonctions async migrées en
+  `AsyncConnection`. Routers writes basculés sur
+  `get_sa_connection()`. `existing_journal_ids` et
+  `existing_publisher_ids` en SA pour partager la transaction du
+  merge. Tests : 34/34 service + suite complète 1322/1322.
+- [ ] **Sous-phase 2.4** — Module `addresses` (`async_address_repository.py`).
+  Note : exception cross-aggregate `address_repository ↔ publications.countries`
+  documentée dans `docs/architecture.md`, à préserver.
+- [ ] **Sous-phase 2.5** — Module `authorships`
+  (`async_authorship_repository.py`).
+- [ ] **Sous-phase 2.6** — Module `persons`
+  (`async_person_repository/` multi-fichiers, le plus gros).
+- [ ] **Sous-phase 2.7** — Module `publications`
+  (`async_publication_repository.py`).
 
 ### Phase 3 — Migration des queries statiques restantes
 
