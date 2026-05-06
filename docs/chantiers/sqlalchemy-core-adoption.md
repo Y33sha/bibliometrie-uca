@@ -231,12 +231,10 @@ qui justifierait une session.
 - [x] **Cohabitation pool psycopg / AsyncEngine SA validée** : les
   deux ouvrent leurs propres connexions sans conflit, ce qui permet
   une migration incrémentale.
-- [ ] **Décision option A vs B** (SA comme query builder pur vs
-  AsyncEngine de bout en bout) : reportée à la Phase 1, à trancher
-  sur le module config réel. Le POC démontre que B est viable ;
-  l'arbitrage final dépendra de la complexité de cohabitation avec
-  `async_emit_event` (qui attend un cur psycopg) dans
-  `delete_perimeter`.
+- [x] **Décision option A vs B : option B retenue** (AsyncEngine de
+  bout en bout). Tranchée à la sous-phase 2.1 sur le module config
+  réel. Cohabitation avec `async_emit_event` résolue par dispatch
+  interne (sous-phase 1.0).
 
 
 ### Phase 1 — Migration des queries dynamiques
