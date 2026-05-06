@@ -1,7 +1,7 @@
 # Chantier — Adoption SQLAlchemy Core
 Commencé le 2026-05-06.
 
-## État : à exécuter (phase 0 de cadrage à faire en premier)
+## État : phase 0 terminée — phases 1+ à exécuter
 
 Décision actée : on adopte SQLAlchemy Core. La porte vers Alembic
 reste ouverte et sera réévaluée à la fin du chantier en
@@ -194,84 +194,123 @@ qui justifierait une session.
 
 ## Phasage proposé
 
-### Phase 0 — Cadrage et POC (avant tout commit massif)
+### Phase 0 — Cadrage et POC
 
-- Mise en place de `infrastructure/db/engine.py` (AsyncEngine basé
-  sur `postgresql+psycopg://`, paramètres pool équivalents à
-  l'actuel : `pool_size=db_pool_min`, `max_overflow`,
-  `pool_pre_ping`, etc.). Ne pas brancher encore.
-- Création de `infrastructure/db/tables.py` avec MetaData et
-  **2-3 tables pilotes** seulement : ex. `perimeters`, `config`,
-  `structures`. Vérifier que l'autocomplete IDE fonctionne et que
-  les types ressortent correctement.
-- POC sur **un seul module pilote** : `application/ports/config.py`
-  + `infrastructure/db/queries/config.py` + `application/config.py`
-  → tout le flux `update_config_value` re-câblé en SQLAlchemy Core,
-  AsyncEngine en parallèle de l'ancien pool. Tests d'intégration du
-  module pilote doivent passer.
-- Décision finale sur MetaData explicite vs reflection.
-- Décision finale sur la stratégie de remplacement du pool
-  (basculer brutal ou cohabiter pendant la migration ?).
-
-**Livrable phase 0** : un patch isolé qui prouve que la chaîne
-fonctionne sur un module pilote, plus une mise à jour de cette
-fiche avec les décisions tranchées.
+- [x] Ajouter `sqlalchemy==2.0.43` dans `pyproject.toml` et `uv sync`
+- [x] Créer `infrastructure/db/engine.py` — AsyncEngine SA basé sur
+  `postgresql+psycopg://`, paramètres pool alignés sur
+  l'AsyncConnectionPool psycopg actuel. Pas branché au lifespan
+  FastAPI à ce stade : cohabitera quand Phase 1 commencera.
+- [x] Créer `infrastructure/db/tables.py` — MetaData avec 3 tables
+  pilotes (`config`, `perimeters`, `structures`). Autres tables
+  ajoutées au fur et à mesure.
+- [x] POC `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py`
+  — INSERT/SELECT/UPDATE/RETURNING sur les 3 tables + 3 tests de
+  cohérence MetaData ↔ schéma DB. 7/7 verts.
+- [x] **Décision finale MetaData explicite vs reflection : explicite**
+  (option a). Le test de cohérence MetaData/DB s'avère léger ; risque
+  de drift gérable.
+- [x] **Découverte : enums PostgreSQL** doivent être déclarés via
+  `sqlalchemy.dialects.postgresql.ENUM(..., create_type=False)`. Si
+  on les déclare en `Text`, Postgres rejette les INSERT car SA cast
+  vers `VARCHAR` (et `VARCHAR ↛ enum_type` est interdit). Pattern à
+  reproduire pour `doc_type`, `oa_status`, etc. en étendant la
+  MetaData.
+- [x] **Découverte : JSONB** est sérialisé automatiquement par SA
+  (passer la valeur Python brute à `.values(...)`, ne pas faire de
+  `json.dumps()` manuel comme le code legacy psycopg). À adapter
+  dans `PgAsyncConfig.update_config_value` en Phase 1.
+- [x] **Cohabitation pool psycopg / AsyncEngine SA validée** : les
+  deux ouvrent leurs propres connexions sans conflit, ce qui permet
+  une migration incrémentale.
+- [ ] **Décision option A vs B** (SA comme query builder pur vs
+  AsyncEngine de bout en bout) : reportée à la Phase 1, à trancher
+  sur le module config réel. Le POC démontre que B est viable ;
+  l'arbitrage final dépendra de la complexité de cohabitation avec
+  `async_emit_event` (qui attend un cur psycopg) dans
+  `delete_perimeter`.
 
 
 ### Phase 1 — Migration des queries dynamiques
 
 Ce sont les queries qui justifient le chantier (le gain est
-maximal là). Ordre d'attaque :
+maximal là).
 
-1. `infrastructure/db/queries/filters.py` — refondre l'API en
-   retournant des fragments SQLAlchemy composables au lieu de
-   muter `(conditions, params)`.
-2. `infrastructure/db/queries/publications/facets.py`
-   (`_PublicationFacetsBuilder`) — le plus complexe ; vérifier que
-   la lisibilité gagne réellement.
-3. Listings paginés : `addresses.py`, `persons/list.py`,
-   `publications/list.py`, `journals.py`, `publishers.py`,
-   `structures.py`.
-4. `subjects.py` — partiellement (queries dynamiques uniquement,
-   les opérations JSON spécifiques restent en SQL brut).
+- [ ] Module pilote `config` : adapter `PgAsyncConfig` pour utiliser
+  SQLAlchemy Core (sérialisation JSONB auto, plus de `json.dumps`
+  manuel). Trancher l'option A vs B sur ce module en fonction de
+  la complexité de cohabitation avec `async_emit_event` dans
+  `delete_perimeter`.
+- [ ] `infrastructure/db/queries/filters.py` — refondre l'API en
+  retournant des fragments SQLAlchemy composables au lieu de muter
+  `(conditions, params)`.
+- [ ] `infrastructure/db/queries/publications/facets.py`
+  (`_PublicationFacetsBuilder`) — le plus complexe ; vérifier que
+  la lisibilité gagne réellement.
+- [ ] Listings paginés : `addresses.py`, `persons/list.py`,
+  `publications/list.py`, `journals.py`, `publishers.py`,
+  `structures.py`.
+- [ ] `subjects.py` — partiellement (queries dynamiques uniquement,
+  les opérations JSON spécifiques restent en SQL brut).
 
-**À chaque étape** : commit séparé, tests d'intégration verts, pas
-de mélange ancien/nouveau pattern dans un même fichier.
+À chaque étape : commit séparé, tests d'intégration verts, pas de
+mélange ancien/nouveau pattern dans un même fichier.
 
 ### Phase 2 — Migration des repositories d'écriture
 
 Repositories `infrastructure/repositories/async_*_repository.py` :
 les méthodes d'écriture (`update_*_fields`, `create_*`,
-`delete_*`, etc.). C'est mécanique, aucun pattern dynamique :
-gain principalement en cohérence et en futur-proofing pour
-Alembic.
+`delete_*`, etc.). C'est mécanique, aucun pattern dynamique : gain
+principalement en cohérence et en futur-proofing pour Alembic.
 
-Ordre suggéré : par agrégat (un repo = un commit), en commençant
-par les plus simples (Perimeter, Config) pour valider le pattern.
+- [ ] `async_perimeter_repository.py` (le plus simple, validation
+  du pattern).
+- [ ] `async_config_repository.py` → la partie config dans
+  `infrastructure/db/queries/config.py` (PgAsyncConfig).
+- [ ] `async_structure_repository.py`.
+- [ ] `async_journal_repository.py`.
+- [ ] `async_publisher_repository.py`.
+- [ ] `async_address_repository.py`.
+- [ ] `async_authorship_repository.py`.
+- [ ] `async_person_repository/` (multi-fichiers).
+- [ ] `async_publication_repository.py`.
 
 ### Phase 3 — Migration des queries statiques restantes
 
 Queries SELECT/INSERT/UPDATE/DELETE statiques sans construction
-dynamique. Gain principal : uniformité du codebase. À faire au
-fil de l'eau, pas en bloc.
+dynamique. Gain principal : uniformité du codebase.
 
-Critère d'arrêt : si un fichier reste plus lisible en SQL brut
-(CTE complexe, JSON ops avancés), on le laisse en `text()` et on
-documente le choix dans une note locale.
+- [ ] À faire au fil de l'eau, pas en bloc — quand on touche un
+  fichier pour autre chose, on le migre tant qu'on y est.
+- [ ] Critère d'arrêt : si un fichier reste plus lisible en SQL
+  brut (CTE complexe, JSON ops avancés), on le laisse en `text()`
+  et on documente le choix dans une note locale.
 
 ### Phase 4 — Bascule du pool psycopg vers AsyncEngine
 
 Une fois toutes les queries migrées, remplacer définitivement
-`AsyncConnectionPool` psycopg par AsyncEngine SQLAlchemy. Côté
-sync (pipeline) : `Engine` SQLAlchemy synchrone, en remplacement
-de l'usage actuel.
+`AsyncConnectionPool` psycopg par AsyncEngine SQLAlchemy.
 
-À ce stade, plus aucun `cur.execute(...)` ne devrait subsister.
+- [ ] Brancher l'AsyncEngine dans le lifespan FastAPI (en
+  remplacement du pool psycopg async).
+- [ ] Côté sync (pipeline) : créer un `Engine` SA sync, en
+  remplacement de l'usage actuel de `psycopg.connect()`.
+- [ ] Vérifier qu'il ne reste plus aucun `cur.execute(...)` direct
+  dans le code applicatif.
+- [ ] Supprimer `infrastructure/db/async_connection.py` et toute
+  référence au pool psycopg.
 
 ### Phase 5 — Décision Alembic
 
-Voir section dédiée ci-dessous. À traiter une fois Phase 4
-terminée (avant, c'est prématuré).
+À traiter une fois Phase 4 terminée (avant, c'est prématuré).
+
+- [ ] Évaluer le coût de migration des 21+ migrations existantes
+  vers Alembic.
+- [ ] Décider : adopter Alembic (auto-génération des diffs MetaData)
+  ou conserver `migrate.py` actuel.
+- [ ] Si adoption : créer un chantier dédié (`docs/chantiers/`).
+- [ ] Si statu quo : retirer la mention « Alembic à explorer » de
+  ROADMAP.md.
 
 ## Alembic — porte ouverte
 
