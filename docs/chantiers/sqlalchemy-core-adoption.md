@@ -7,24 +7,6 @@ Décision actée : on adopte SQLAlchemy Core. La porte vers Alembic
 reste ouverte et sera réévaluée à la fin du chantier en
 coût-bénéfice (cf. section dédiée).
 
-## Pour l'instance Claude qui exécute ce chantier
-
-Tu n'as pas le contexte de la session qui a produit ce chantier. Lis
-cette fiche en entier avant de commencer. Trois entrées utiles :
-
-- `docs/architecture.md` — couches DDD, règle de placement des ports,
-  exception cross-aggregate `address_repository`. C'est la grille
-  qui ne bouge pas.
-- `docs/chantiers/audit-cto.md` — origine de la décision, mention en
-  Phase 1 (« SQLAlchemy Core : on adopte ou on ferme la porte »).
-  Item à cocher avec pointeur vers cette fiche en fin de chantier.
-- `ROADMAP.md` §1.4 (« Pas de mini-framework maison ») et §X (ligne
-  ~215, mention « SQLAlchemy Core à explorer »). Cette mention sera
-  retirée / réécrite en fin de chantier.
-
-Le chantier est à phaser dans le temps : **ne pas tout migrer d'un
-seul commit**. Voir « Phasage proposé » plus bas.
-
 ## Contexte
 
 Le projet utilise psycopg3 directement, avec deux familles de
@@ -118,22 +100,81 @@ Dans tous les cas, l'exécution passe par
 `AsyncConnection.execute(text(sql), params)` (bind paramétré),
 jamais par interpolation string.
 
-### 3. Description des tables (MetaData)
+### 3. Description des tables (MetaData) — explicite vs reflection
 
-Recommandation initiale : MetaData déclaré à la main dans
-`infrastructure/db/tables.py`. Avantages :
-- Autocomplete IDE (`Person.c.id`, `Person.c.name`).
-- Typage statique des colonnes.
-- Pas de couplage runtime au schéma (pas de reflection au
-  démarrage).
+Pour construire une requête, SQLAlchemy a besoin de connaître la
+structure des tables (noms de colonnes, types, contraintes). Sans
+ça, `select(perimeters.c.code).where(perimeters.c.id == 5)` ne sait
+pas quelle colonne `code` désigne ni si elle existe. Cette
+description s'appelle la **MetaData** et il y a deux façons de la
+fournir :
 
-Inconvénient assumé : duplication entre `schema.sql` et
-`tables.py`. Mitigé par la revue manuelle à chaque migration
-(rythme : ~1/mois) et par un test d'intégration qui vérifie la
-cohérence (cf. validation).
+**Option a — MetaData explicite** : on déclare en Python la
+structure de chaque table dans un fichier `infrastructure/db/tables.py` :
 
-À confirmer en phase 0 — option fallback si jugée trop lourde :
-reflection au démarrage avec cache.
+```python
+from sqlalchemy import MetaData, Table, Column, Integer, String, ARRAY
+
+metadata = MetaData()
+
+perimeters = Table(
+    "perimeters", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("code", String, nullable=False, unique=True),
+    Column("name", String, nullable=False),
+    Column("description", String),
+    Column("structure_ids", ARRAY(Integer), nullable=False),
+)
+```
+
+Ensuite dans les queries : `select(perimeters.c.code).where(perimeters.c.id == 5)`.
+
+- Avantages : autocomplete IDE (`perimeters.c.` propose les colonnes),
+  erreur statique si on tape une colonne inexistante, pas de coût au
+  démarrage, lecture claire (un seul fichier liste toutes les tables).
+- Inconvénient : duplication. Le schéma vit à la fois dans
+  `schema.sql` (source réelle, alimentée par les migrations) et
+  dans `tables.py` (copie Python). Si on ajoute une colonne via
+  migration sans toucher `tables.py`, le code ne la voit pas.
+
+**Option b — Reflection** : on dit à SQLAlchemy d'aller interroger
+la base au démarrage pour découvrir le schéma :
+
+```python
+metadata = MetaData()
+metadata.reflect(bind=engine)
+perimeters = metadata.tables["perimeters"]
+```
+
+- Avantages : pas de duplication, toujours synchro avec la DB.
+- Inconvénients : couplage runtime (impossible d'exécuter le code
+  sans accès DB, gênant pour les tests unitaires), pas
+  d'autocomplete IDE (les colonnes ne sont connues qu'au runtime),
+  coût léger au démarrage de l'app.
+
+Note importante : la MetaData décrit la **structure des tables**
+(quelles colonnes existent), pas la façon dont SQLAlchemy convertit
+les valeurs Python ↔ SQL — cette conversion est gérée
+automatiquement par les types SQLAlchemy (`Integer`, `String`,
+`ARRAY(Integer)`, etc.). Les deux concepts sont déclarés ensemble
+dans `Table(...)` mais sont conceptuellement distincts.
+
+**Recommandation initiale : option a (MetaData explicite)**.
+
+Raisons :
+- Autocomplete IDE et typage statique sont des gains réels au
+  quotidien.
+- Permet de tester du code sans DB (utile pour mypy / introspection).
+- Le risque de drift est mitigé par : (1) un test d'intégration
+  qui compare la MetaData à la DB réelle et alerte si divergence,
+  (2) les migrations sont peu fréquentes (~1/mois).
+- Naturel si on décide ensuite d'adopter Alembic
+  (`alembic --autogenerate` lit la MetaData explicite pour
+  proposer le diff de migration ; en reflection, ce gain disparaît).
+
+À confirmer en phase 0 sur le module pilote — si l'écriture
+manuelle de la MetaData s'avère trop lourde dans la pratique,
+fallback vers reflection.
 
 ### 4. Le domaine reste pur
 
@@ -175,6 +216,7 @@ qui justifierait une session.
 **Livrable phase 0** : un patch isolé qui prouve que la chaîne
 fonctionne sur un module pilote, plus une mise à jour de cette
 fiche avec les décisions tranchées.
+
 
 ### Phase 1 — Migration des queries dynamiques
 
