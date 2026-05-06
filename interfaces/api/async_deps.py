@@ -26,6 +26,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from application.ports.addresses_queries import AsyncAddressesQueries
+from application.ports.admin_feedback_queries import AsyncAdminFeedbackQueries
 from application.ports.config import AsyncConfigStore
 from application.ports.journals_queries import AsyncJournalQueries
 from application.ports.perimeter import AsyncPerimeterQueries
@@ -42,6 +43,7 @@ from domain.ports.structure_repository import AsyncStructureRepository
 from infrastructure.db.async_connection import get_async_pool
 from infrastructure.db.engine import get_async_engine
 from infrastructure.db.queries.addresses import PgAsyncAddressesQueries
+from infrastructure.db.queries.admin_feedback import PgAsyncAdminFeedbackQueries
 from infrastructure.db.queries.journals import PgAsyncJournalQueries
 from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
 from infrastructure.db.queries.publishers import PgAsyncPublisherQueries
@@ -168,6 +170,12 @@ def addresses_queries(
     conn: AsyncConnection = Depends(db_conn),
 ) -> AsyncAddressesQueries:
     return PgAsyncAddressesQueries(conn)
+
+
+def admin_feedback_queries(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncAdminFeedbackQueries:
+    return PgAsyncAdminFeedbackQueries(conn)
 
 
 async def bg_propagate_countries(address_ids: list[int]) -> None:
