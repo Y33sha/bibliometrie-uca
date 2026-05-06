@@ -13,7 +13,7 @@ from fastapi import APIRouter
 from application import config as config_service
 from infrastructure.db.queries.config import list_config_async
 from infrastructure.repositories import async_config_store
-from interfaces.api.async_deps import get_async_cursor
+from interfaces.api.async_deps import get_async_cursor, get_sa_connection
 from interfaces.api.models import ConfigItem, ConfigValueUpdate, HalCollectionsResponse
 
 router = APIRouter()
@@ -28,13 +28,16 @@ async def list_config() -> Any:
     renvoyées telles quelles (jsonb) — la sémantique de chaque clé
     est documentée dans `docs/exploitation.md`.
     """
-    async with get_async_cursor() as (cur, _conn):
-        return await list_config_async(cur)
+    async with get_sa_connection() as conn:
+        return await list_config_async(conn)
 
 
 @router.get("/api/config/hal-collections", response_model=HalCollectionsResponse)
 async def get_hal_collections() -> Any:
     """Retourne les collections HAL dérivées des structures du périmètre UCA."""
+    # Pas migré en SA pour l'instant : `async_get_hal_collections` vit dans
+    # infrastructure/app_config.py et utilise un cur psycopg. À migrer
+    # quand on touche app_config.py dans une phase ultérieure.
     async with get_async_cursor() as (cur, _conn):
         from infrastructure.app_config import async_get_hal_collections
 
@@ -50,7 +53,7 @@ async def update_config(key: str, body: ConfigValueUpdate) -> Any:
     clés sont déclarées dans les migrations). 404 si la clé est
     inconnue.
     """
-    async with get_async_cursor() as (cur, _conn):
+    async with get_sa_connection() as conn:
         return await config_service.update_config_value(
-            cur, key, body.value, config=async_config_store(cur)
+            conn, key, body.value, config=async_config_store(conn)
         )

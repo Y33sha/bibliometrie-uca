@@ -256,9 +256,24 @@ maximal là).
   - Note : passage à un `AuditRepository` propre (`application/`
     via port + adapter `infrastructure/`) reste prévu en Phase 3
     du chantier audit-cto.
-- [ ] Module pilote `config` : adapter `PgAsyncConfig` et le
-  router pour utiliser AsyncEngine SA (option B). Bascule de
-  `delete_perimeter` vers la branche SA de `async_emit_event`.
+- [x] **Sous-phase 1.1 — Module pilote `config` + `perimeters`** :
+  `PgAsyncConfig`, `PgAsyncPerimeterRepository`, `application/config.py`
+  et les écritures des routers `config` et `perimeters` migrés en
+  AsyncConnection SA (option B). `delete_perimeter` bascule
+  naturellement vers la branche SA de `async_emit_event`.
+  - Helper `get_sa_connection()` ajouté dans
+    `interfaces/api/async_deps.py` (parallèle à `get_async_cursor`).
+  - Lifespan FastAPI initialise l'AsyncEngine SA à côté du pool
+    psycopg.
+  - Tests `test_config_service` (20/20) ré-écrits sur la fixture
+    `sa_conn`, helpers SA (`text()` paramétré).
+  - **Découverte** : `ARRAY` doit être importé depuis
+    `sqlalchemy.dialects.postgresql` (pas `sqlalchemy`) pour avoir
+    `.contains()`. Idem pour `JSONB`. Pattern à reproduire sur les
+    autres tables.
+  - Endpoint `GET /api/perimeters` (lecture) reste en psycopg pour
+    cette sous-phase : il dépend de la CTE récursive
+    `infrastructure.perimeter`, à migrer avec ce module.
 - [ ] `infrastructure/db/queries/filters.py` — refondre l'API en
   retournant des fragments SQLAlchemy composables au lieu de muter
   `(conditions, params)`.

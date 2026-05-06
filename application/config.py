@@ -6,9 +6,15 @@ Le SQL vit dans `infrastructure/repositories/async_perimeter_repository.py`
 `config` clé/valeur). Les routers passent par ces fonctions pour toute
 écriture. Les lectures restent autorisées dans les routers (convention
 du projet).
+
+Module migré en SQLAlchemy Core (chantier sqlalchemy-core-adoption,
+sous-phase 1.1) : les fonctions reçoivent une `AsyncConnection` SA
+au lieu d'un curseur psycopg.
 """
 
 from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from application.audit import async_emit_event
 from application.ports.config import AsyncConfigStore
@@ -18,7 +24,9 @@ from domain.ports.perimeter_repository import AsyncPerimeterRepository
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
 
-async def update_config_value(cur: Any, key: str, value: Any, *, config: AsyncConfigStore) -> dict:
+async def update_config_value(
+    conn: AsyncConnection, key: str, value: Any, *, config: AsyncConfigStore
+) -> dict:
     """Met à jour la valeur d'un paramètre de config existant.
 
     `value` est sérialisé en JSON. Retourne la ligne mise à jour.
@@ -33,7 +41,11 @@ async def update_config_value(cur: Any, key: str, value: Any, *, config: AsyncCo
 
 
 async def add_perimeter_structure(
-    cur: Any, perimeter_id: int, structure_id: int, *, repo: AsyncPerimeterRepository
+    conn: AsyncConnection,
+    perimeter_id: int,
+    structure_id: int,
+    *,
+    repo: AsyncPerimeterRepository,
 ) -> str:
     """Ajoute une structure au périmètre (idempotent).
 
@@ -53,7 +65,11 @@ async def add_perimeter_structure(
 
 
 async def remove_perimeter_structure(
-    cur: Any, perimeter_id: int, structure_id: int, *, repo: AsyncPerimeterRepository
+    conn: AsyncConnection,
+    perimeter_id: int,
+    structure_id: int,
+    *,
+    repo: AsyncPerimeterRepository,
 ) -> None:
     """Retire une structure d'un périmètre (idempotent).
 
@@ -67,7 +83,7 @@ async def remove_perimeter_structure(
 
 
 async def create_perimeter(
-    cur: Any,
+    conn: AsyncConnection,
     *,
     code: str,
     name: str,
@@ -88,7 +104,11 @@ async def create_perimeter(
 
 
 async def update_perimeter(
-    cur: Any, perimeter_id: int, *, fields: dict, repo: AsyncPerimeterRepository
+    conn: AsyncConnection,
+    perimeter_id: int,
+    *,
+    fields: dict,
+    repo: AsyncPerimeterRepository,
 ) -> None:
     """Met à jour un périmètre (name, description, structure_ids).
 
@@ -107,7 +127,7 @@ async def update_perimeter(
 
 
 async def delete_perimeter(
-    cur: Any,
+    conn: AsyncConnection,
     perimeter_id: int,
     *,
     repo: AsyncPerimeterRepository,
@@ -129,7 +149,7 @@ async def delete_perimeter(
 
     await repo.delete_perimeter(perimeter_id)
     await async_emit_event(
-        cur,
+        conn,
         "perimeter.deleted",
         "perimeter",
         perimeter_id,
