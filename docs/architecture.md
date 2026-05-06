@@ -60,10 +60,15 @@ qui forment une zone neutre dont dépendent tous les autres modules.
    scripts CLI (`interfaces/api/routers/*`, `interfaces/cli/*` hors
    composition root) **ne doivent pas** importer `infrastructure/`
    directement. Ils pilotent des use-cases applicatifs et reçoivent
-   leurs dépendances ; ils ne les construisent pas. *État actuel :
-   cible non encore atteinte, cf. ROADMAP §1.6 — les routers
-   instancient encore directement certaines factories de
-   repositories.*
+   leurs dépendances via `Depends(...)` (factories dans
+   `interfaces.api.async_deps`) ; ils ne les construisent pas.
+   Verrouillé côté API par le contrat `import-linter` "Routers : pas
+   d'import direct de infrastructure" (chantier
+   `docs/chantiers/routers-di.md`). Trois exceptions documentées :
+   `auth.py` lit `infrastructure.settings` (config statique),
+   `admin_pipeline.py` appelle `infrastructure.pipeline_status`
+   (status filesystem), `docs.py` utilise `infrastructure.PROJECT_ROOT`
+   (chemin projet) — aucune ne touche à la DB.
 
 5. **Le composition root est un endroit précis.** L'instanciation
    concrète des adapters et leur câblage aux use-cases se fait
@@ -80,10 +85,10 @@ qui forment une zone neutre dont dépendent tous les autres modules.
    port.
 
 Le contrat `layers` d'`import-linter` (voir `pyproject.toml`,
-section `[tool.importlinter]`) vérifie aujourd'hui les règles 1 à 3.
-Les règles 4 et 5 seront verrouillables quand §1.6 de la ROADMAP
-sera clôturé (durcissement prévu du contrat pour interdire
-`interfaces.api.routers.* → infrastructure.*`).
+section `[tool.importlinter]`) vérifie les règles 1 à 3. Le contrat
+`forbidden` "Routers : pas d'import direct de infrastructure" applique
+la règle 4 côté API. La règle 5 reste discipline-only (les CLI
+scripts ne sont pas verrouillés).
 
 ## Les 4 couches en détail
 

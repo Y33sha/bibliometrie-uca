@@ -1,6 +1,6 @@
 # Chantier — Inversion de dépendance dans les routers
 
-Commencé le 2026-05-06.
+Commencé et terminé le 2026-05-06.
 
 ## État
 
@@ -138,11 +138,18 @@ fonctions libres existantes (pas de réécriture du SQL).
 
 ### Phase 4 — Verrouillage
 
-- [ ] Durcir `import-linter` : interdire
-  `interfaces.api.routers.* → infrastructure.*`
-- [ ] Mettre à jour `architecture.md` : règle 4 passe en "appliquée et
-  verrouillée"
-- [ ] Cocher dans `audit-cto.md` et retirer de ROADMAP §1.6
+- [x] Durcir `import-linter` : contrat `forbidden` "Routers : pas
+  d'import direct de infrastructure" ajouté dans `pyproject.toml` avec
+  `allow_indirect_imports = "true"` (le chemin légitime
+  `routers → async_deps → infrastructure` est préservé). Trois
+  exceptions documentées : `auth.py → infrastructure.settings`,
+  `admin_pipeline.py → infrastructure.pipeline_status`,
+  `docs.py → infrastructure` (chemin projet) — aucune n'est une
+  query/repo.
+- [x] Mettre à jour `architecture.md` : règle 4 reformulée en
+  "verrouillée par import-linter côté API" + liste des 3 exceptions.
+- [x] Cocher dans `audit-cto.md` (Phase 2, item §1.6) et reformuler
+  ROADMAP §1.6 en "terminé".
 
 ## Hors scope
 
