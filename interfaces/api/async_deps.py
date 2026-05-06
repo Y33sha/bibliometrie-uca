@@ -32,6 +32,7 @@ from application.ports.config_queries import AsyncConfigQueries
 from application.ports.hal_problems_queries import AsyncHalProblemsQueries
 from application.ports.journals_queries import AsyncJournalQueries
 from application.ports.perimeter import AsyncPerimeterQueries
+from application.ports.perimeters_queries import AsyncPerimetersAdminQueries
 from application.ports.person_duplicates_queries import AsyncPersonDuplicatesQueries
 from application.ports.publication_duplicates_queries import AsyncPublicationDuplicatesQueries
 from application.ports.publishers_queries import AsyncPublisherQueries
@@ -51,7 +52,10 @@ from infrastructure.db.queries.admin_feedback import PgAsyncAdminFeedbackQueries
 from infrastructure.db.queries.config import PgAsyncConfigQueries
 from infrastructure.db.queries.hal_problems import PgAsyncHalProblemsQueries
 from infrastructure.db.queries.journals import PgAsyncJournalQueries
-from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
+from infrastructure.db.queries.perimeter import (
+    PgAsyncPerimeterQueries,
+    PgAsyncPerimetersAdminQueries,
+)
 from infrastructure.db.queries.person_duplicates import PgAsyncPersonDuplicatesQueries
 from infrastructure.db.queries.publication_duplicates import PgAsyncPublicationDuplicatesQueries
 from infrastructure.db.queries.publishers import PgAsyncPublisherQueries
@@ -196,6 +200,12 @@ def config_queries(
     conn: AsyncConnection = Depends(db_conn),
 ) -> AsyncConfigQueries:
     return PgAsyncConfigQueries(conn)
+
+
+def perimeters_admin_queries(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncPerimetersAdminQueries:
+    return PgAsyncPerimetersAdminQueries(conn)
 
 
 def person_duplicates_queries(
