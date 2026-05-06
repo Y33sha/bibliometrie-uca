@@ -452,6 +452,14 @@ relocalisées en `domain/`.
   comparabilité avec `person_identifiers`. Suppression au passage
   de `interfaces/cli/crossref_spike.py` (one-shot phase 0
   crossref, livrable terminé).
+- **`compute_person_name_forms` déplacée** : de `domain/person.py`
+  vers `domain/names.py` (homogène avec `parse_raw_author_name` et
+  les autres helpers de format de nom). Le réexport
+  `application.persons.compute_person_name_forms` est supprimé ;
+  les 7 call sites (pipeline, repos sync/async, tests) importent
+  désormais directement depuis `domain.names`. La fonction elle-même
+  était déjà en domain — l'item d'inventaire portait sur
+  l'organisation, pas sur la migration.
 - **Découpage `last_name`/`first_name` — colonnes supprimées** :
   les colonnes `source_persons.last_name` et
   `source_persons.first_name` sont droppées (migration 022). Le

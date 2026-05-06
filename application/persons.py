@@ -22,14 +22,13 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from application.audit import async_emit_event, emit_event
 from application.authorships import async_delete_orphan_authorships
 from domain.errors import ValidationError
-from domain.person import check_can_merge_persons, compute_person_name_forms
+from domain.names import compute_person_name_forms
+from domain.person import check_can_merge_persons
 from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
 from domain.sources import ALL_SOURCES_SET
 
 __all__ = [
-    # Domain re-export pour les callers existants (scripts, tests)
-    "compute_person_name_forms",
     # Fonctions utilisées par le pipeline/CLI (+ variante async pour l'API)
     "create_person",
     "async_create_person",

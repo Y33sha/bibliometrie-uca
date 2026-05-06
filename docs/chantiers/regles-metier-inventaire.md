@@ -518,16 +518,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
   `decide_name_form_diff(new, old) -> Literal["insert","update","noop"]`
   (à ne rapatrier que si on veut les tests dédiés).
 
-### compute_person_name_forms
-- **localisation** : `application/pipeline/persons/populate_person_name_forms.py:36`
-  (consomme `application.persons.compute_person_name_forms`)
-- **description** : Génération des deux variantes "prénom nom" /
-  "nom prénom". Pure dépendant uniquement de `last_name`/`first_name`.
-- **classification** : (a) — pure mais hébergée en `application/`.
-- **destination domain/** : `domain/persons/sourcing.py` →
-  `compute_person_name_forms(last_name, first_name) -> list[str]` (à
-  rapatrier).
-
 ---
 
 ## `application/pipeline/publications/create_publications.py`
@@ -810,7 +800,6 @@ IDENTIFIER_FIELDS_BY_SOURCE: dict[str, IdentifierConfig]
 # domain/persons/sourcing.py
 def should_create_source_person(source: str, *, strong_id) -> bool: ...
 def allow_person_creation_from_authorship(source: str, roles: list[str]) -> bool: ...
-def compute_person_name_forms(last_name: str, first_name: str | None) -> list[str]: ...
 def merge_name_form_provenance(existing, additional_pid, additional_source) -> NameFormEntry: ...
 def can_delete_obsolete_name_form(sources: set[str]) -> bool: ...
 def aggregate_authorship_perimeter(source_rows) -> tuple[bool, list[int]]: ...

@@ -19,8 +19,8 @@ est dans `interfaces/cli/pipeline/populate_person_name_forms.py`.
 
 from typing import Any
 
-from application.persons import compute_person_name_forms
 from application.ports.name_forms import NameFormsQueries
+from domain.names import compute_person_name_forms
 from domain.sources import BIBLIO_SOURCES_SET as BIBLIO_SOURCES
 
 BATCH_SIZE = 5000
