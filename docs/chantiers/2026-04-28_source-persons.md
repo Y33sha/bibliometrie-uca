@@ -99,7 +99,7 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 2. **DELETE** des `source_persons` synthétiques existants après bascule.
 3. **Stockage des identifiants normalisés** : nouvelle colonne `source_authorships.identifiers JSONB` dédiée, séparée de `source_data` qui reste pour les extras spécifiques par source.
    - Schéma type : `{"orcid": "0000-...", "idref": "...", "idhal": "...", "researcher_id": "..."}`
-   - **Pourquoi pas réutiliser `source_data`** : la colonne est déjà occupée par ScanR (~79 k lignes : `affiliation_ids`, `detected_countries`) et par CrossRef (`affiliations`, `sequence`, `authenticated_orcid`). Mélanger « extras métier par source » et « identifiants normalisés cross-source » dans un même jsonb créerait de la confusion et compliquerait les queries de matching.
+   - **Pourquoi pas réutiliser `source_data`** : la colonne est déjà occupée par ScanR (~79 k lignes : `affiliation_ids`, `detected_countries`) et par CrossRef (`affiliations`, `sequence`). Mélanger « extras métier par source » et « identifiants normalisés cross-source » dans un même jsonb créerait de la confusion et compliquerait les queries de matching.
 4. **Ordre de bascule** : indifférent — toutes les sources doivent être migrées avant de débloquer le chantier CrossRef.
 
 ## Phasage proposé
