@@ -121,7 +121,6 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 | `link_authorship` dual-write (`person_repository/_authorships.py`) | Write | oui (HAL) | Inchangé |
 | `add_identifier` dual-write (`person_repository/_identifiers.py`) | Write | oui (idhal sur HAL) | Inchangé |
 | `merge_persons` (`person_repository/_core.py`) | Write | oui | Inchangé |
-| `_SOURCE_CONFIG` (`application/persons.py`) | Config | partiel | Retirer entries OA/WoS/CrossRef (et HAL/ScanR/theses sans ID stable) |
 | `repair_hal_nokey_source_persons.py` (CLI) | Write | non | Suppression (cas qui ne se produira plus) |
 | `backfill_idhal_person_identifiers.py` (CLI) | Read | oui (HAL) | Inchangé |
 | `merge_duplicate_theses.py` (CLI) | Read | partiel | Adapter — JOIN conditionnel selon présence PPN |

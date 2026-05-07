@@ -47,18 +47,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
   fonction application orchestre SELECT + UPDATE + audit.
 - **destination domain/** : n/a (déjà fait, modèle de référence).
 
-### _SOURCE_CONFIG (mapping ORCID/idref/idhal par source)
-- **localisation** : `application/persons.py:313-344`
-- **description** : Table par source : pour chaque source, quels
-  identifiants sont attachables (`orcid`, `idref`), quels champs de
-  `source_ids` (`idhal` côté HAL). Encodage de la fiabilité par
-  source — HAL a `idhal`, ScanR/theses ont `idref`,
-  OpenAlex/WoS/Crossref n'ont qu'ORCID.
-- **classification** : (a) — constante module-level pure mais
-  mal localisée.
-- **destination domain/** : `domain/persons/identifiers.py` → constante
-  `IDENTIFIER_FIELDS_BY_SOURCE`.
-
 ---
 
 ## `application/publications.py`
@@ -627,9 +615,6 @@ def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str]: ...
 - `domain/zenodo.is_zenodo_doi` est utilisé par HAL et OpenAlex pour
   skip les concept DOIs Zenodo. La résolution
   (`zenodo_resolver.resolve`) reste un effet (port `ZenodoResolver`).
-- `application/persons.py:_SOURCE_CONFIG` (l. 313) n'est utilisé
-  nulle part dans le fichier scanné — vraisemblablement consommé
-  ailleurs. À confirmer hors périmètre.
 - L'invariant `check_can_merge_persons` dans `domain/person.py` est le
   pattern de référence à reproduire pour les autres règles
   décisionnelles (déjà cité dans le doc chantier aux côtés de
