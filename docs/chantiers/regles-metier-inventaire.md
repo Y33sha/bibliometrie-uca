@@ -189,16 +189,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_openalex.py`
 
-### extract_locations_data — extraction d'identifiants depuis URLs
-- **localisation** : `application/pipeline/normalize/normalize_openalex.py:73-114`
-- **description** : « Premier non-null parmi les URLs de locations,
-  dans l'ordre listé ». Patterns regex pour HAL, NNT (theses.fr),
-  PMID, PMC.
-- **classification** : (b) — patterns + ordre = pure ; boucle reste
-  parsing.
-- **destination domain/** : `domain/publications/external_ids.py` →
-  `extract_external_ids_from_urls(urls: list[str]) -> dict[str, str]`.
-
 ### find_publication — cascade priorisée HAL > NNT > openalex_id > title
 - **localisation** : `application/pipeline/normalize/normalize_openalex.py:604-618`
 - **description** : (1) si HAL location → `find_hal_publication_id`,
@@ -592,9 +582,9 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
 | **(a) déjà pure** | 16 | 14 | **30** |
-| **(b) décomposable** | 11 | 10 | **21** |
+| **(b) décomposable** | 10 | 10 | **20** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 29 | 27 | **56** |
+| **Total** | 28 | 27 | **55** |
 
 ### Patterns dupliqués majeurs
 

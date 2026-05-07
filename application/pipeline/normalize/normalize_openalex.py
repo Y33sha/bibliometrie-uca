@@ -16,7 +16,6 @@ Tables peuplées :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
-import re
 from collections.abc import Callable
 from typing import Any
 
@@ -45,6 +44,7 @@ from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi, extract_hal_id_from_url
 from domain.sources.openalex import (
     correct_openalex_doc_type,
+    extract_external_ids_from_urls,
     extract_nnt_from_location,
     is_hal_location,
     is_theses_fr_location,
@@ -73,39 +73,13 @@ def extract_locations_data(work: dict) -> tuple[list[str], dict]:
     """
     urls = []
     seen = set()
-    external_ids: dict[str, str] = {}
-
     for loc in work.get("locations") or []:
         for key in ("landing_page_url", "pdf_url"):
             url = loc.get(key)
             if url and url not in seen:
                 seen.add(url)
                 urls.append(url)
-
-    # Extraire les identifiants des URLs
-    for url in urls:
-        # HAL
-        if not external_ids.get("hal"):
-            hal_id = extract_hal_id_from_url(url)
-            if hal_id:
-                external_ids["hal"] = hal_id
-        # theses.fr / NNT
-        if not external_ids.get("nnt"):
-            m = re.search(r"theses\.fr/([A-Za-z0-9]+)", url)
-            if m:
-                external_ids["nnt"] = m.group(1)
-        # PubMed
-        if not external_ids.get("pmid"):
-            m = re.search(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)", url)
-            if m:
-                external_ids["pmid"] = m.group(1)
-        # PMC
-        if not external_ids.get("pmc"):
-            m = re.search(r"ncbi\.nlm\.nih\.gov/pmc/articles/(?:PMC)?(\d+)", url)
-            if m:
-                external_ids["pmc"] = f"PMC{m.group(1)}"
-
-    return urls, external_ids
+    return urls, extract_external_ids_from_urls(urls)
 
 
 def reconstruct_abstract(inverted_index: dict | None) -> str | None:
