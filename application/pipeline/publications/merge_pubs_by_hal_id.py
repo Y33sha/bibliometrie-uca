@@ -18,7 +18,7 @@ from typing import Any
 
 from application.ports.merge import MergeQueries
 from application.publications import merge_publications as _merge_pub
-from application.publications import update_sources
+from application.publications import refresh_from_sources, update_sources
 from domain.ports.publication_repository import PublicationRepository
 
 
@@ -138,6 +138,7 @@ def merge_publications(
         try:
             cur.execute("SAVEPOINT merge_pub")
             _merge_pub(cur, hal_pub_id, src_pub_id, repo=pub_repo)
+            refresh_from_sources(cur, hal_pub_id, repo=pub_repo)
             cur.execute("RELEASE SAVEPOINT merge_pub")
             merged_into[src_pub_id] = hal_pub_id
             merged += 1

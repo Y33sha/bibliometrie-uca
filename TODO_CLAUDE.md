@@ -147,39 +147,63 @@ Coût : ajout d'un argument `total_author_count` à
 `decide_cross_source_match` + compute du count côté caller (depuis
 le prefetch ou une query supplémentaire).
 
-## Unifier la règle de choix de cible de fusion
+## Simplifier la fusion de publications (cible + refresh)
 
-Trois fusions de publications coexistent dans le pipeline avec **trois
-règles ad hoc** pour décider laquelle des deux publis survit :
+**Constat métier** : le choix de la publication cible (laquelle des
+deux IDs survit) **n'a aucun impact métier** — les métadonnées
+canoniques sont triangulées par `refresh_from_sources` selon
+`SOURCE_PRIORITY` après chaque normalize. N'importe quelle publi peut
+survivre, du moment que `refresh_from_sources(target)` est appelé
+ensuite. Vaut pour les fusions par DOI, NNT, hal_id, etc.
+
+État actuel — trois règles ad hoc pour rien :
 
 - `merge_pubs_by_hal_id` : « HAL gagne » (ordre des arguments fixé
   dans `_merge_pub(cur, hal_pub_id, src_pub_id, ...)`).
-- `merge_pubs_by_nnt` : ranking SQL via
-  `queries.rank_publications_by_merge_priority` (priorité sources +
-  ancienneté + complétude).
+- `merge_pubs_by_nnt` : ranking SQL `rank_publications_by_merge_priority`
+  (DOI shape + complétude + id ASC).
 - `try_merge_by_doi` (`application/publications.py`) : sa propre
   cascade.
 
-Sans impact métier réel (les métadonnées canoniques sont triangulées
-par `refresh_from_sources` selon `SOURCE_PRIORITY` après la fusion)
-mais incohérence de code. La règle « HAL gagne » est en plus
-discutable sur le fond : une publi avec hal_id peut venir d'OA/ScanR
-qui moissonnent HAL (HAL canonique) ou d'un article CrossRef avec
-métadonnées éditeur déposé en parallèle sur HAL (HAL non canonique).
+**Préalable [fait] : `refresh_from_sources(target)` après chaque
+fusion**. Les 3 sites sont désormais homogènes :
 
-À unifier : un seul `rank_publications_by_merge_priority` (porté en
-`domain/publications/merge.py` lors du chantier
-`identification des doublons par hal_id` (b)) appelé par les trois
-sites de fusion.
+- `try_merge_by_doi` (en cours de normalize) : ✅ refresh implicite
+  via `process_work` du normalizer en fin de traitement.
+- `merge_pubs_by_hal_id` : ✅ refresh ajouté dans le savepoint après
+  `_merge_pub`.
+- `merge_pubs_by_nnt` : ✅ refresh ajouté dans le savepoint après
+  `_merge_pub`.
 
-**Sous-point** : `merge_pubs_by_nnt` ne gère pas les redirections en
-chaîne (contrairement à `merge_pubs_by_hal_id` qui a un `resolve()`
-local pour suivre les redirections accumulées dans le batch). Si dans
-un même run une fusion produit `pub_A → pub_B` puis qu'une autre
-demande `pub_X → pub_A`, on tente de fusionner vers `pub_A` déjà
-disparu → erreur capturée par le savepoint, fusion perdue. Bug
-potentiel ou cas qui ne se produit jamais — à mesurer. Le résolveur
-serait à porter dans le helper unifié des 3 sites de fusion.
+Bug latent fixé : avant ce changement, après une fusion via les
+phases dédiées, les métadonnées canoniques de la cible restaient
+figées sur ce qu'elles étaient avant absorption (les normalizers
+ne retraitent que les staging documents `processed=False`, donc
+rien ne re-déclenchait `refresh_from_sources` sur la cible).
+L'existence de `interfaces/cli/refresh_publications_year_mismatch.py`
+témoignait du symptôme.
+
+**Sous-point connexe** : `refresh_from_sources` ne touche pas à
+`title` / `title_normalized` (cf. docstring l. 330). Si la cible a
+un mauvais titre et la publi absorbée avait un meilleur titre, le
+titre canonique reste celui de la cible. Limitation orthogonale à
+la fusion mais à signaler.
+
+**Plan de chantier** :
+
+1. [x] Ajouter `refresh_from_sources(target)` à la fin de chaque
+   fusion dans les phases dédiées (`merge_pubs_by_hal_id`,
+   `merge_pubs_by_nnt`).
+2. [ ] Remplacer `rank_publications_by_merge_priority` par un choix
+   trivial (`min(pub_ids)` par exemple) appelé partout — suppression
+   de la query SQL, du port, des tests dédiés.
+3. [ ] Conserver le **résolveur de chaîne** (présent dans
+   `merge_pubs_by_hal_id`, absent dans `merge_pubs_by_nnt`) pour
+   suivre les redirections accumulées dans le batch
+   (`pub_A → pub_B` puis `pub_X → pub_A`). Le porter dans le helper
+   unifié.
+4. [ ] Unifier les 3 sites en un seul appel à un helper commun
+   `merge_publications_by_key(...)`.
 
 ## Crossref absent de `build_authorships.all_sources`
 
