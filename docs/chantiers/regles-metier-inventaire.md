@@ -182,14 +182,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/publications/theses.py` →
   `aggregate_thesis_persons(these: dict) -> list[ThesisAuthorship]`.
 
-### _parse_date_iso JJ/MM/AAAA → YYYY-MM-DD
-- **localisation** : `application/pipeline/normalize/normalize_theses.py:175-183`
-- **description** : Conversion format theses.fr vers ISO.
-- **classification** : (a).
-- **destination domain/** : `domain/publications/theses.py` →
-  `parse_theses_date_iso(s) -> str | None` (limite : peut rester
-  inline).
-
 ### _build_source_meta
 - **localisation** : `application/pipeline/normalize/normalize_theses.py:207-233`
 - **description** : Construction du dict `meta` JSONB pour

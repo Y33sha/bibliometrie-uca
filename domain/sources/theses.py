@@ -64,22 +64,3 @@ def derive_theses_doc_type(date_soutenance: str | None) -> str:
       - dateSoutenance absent → 'ongoing_thesis' (en cours)
     """
     return "thesis" if date_soutenance else "ongoing_thesis"
-
-
-def extract_thesis_year(date_soutenance: str | None, date_inscription: str | None) -> int | None:
-    """Année de référence d'une thèse : soutenance > première inscription.
-
-    theses.fr fournit les deux dates au format `JJ/MM/AAAA`. La date de
-    soutenance fait foi quand elle existe (thèse soutenue) ; sinon on
-    se rabat sur la première inscription en doctorat (thèse en cours,
-    encadrement encore actif). Renvoie None si les deux sont absents
-    ou malformés.
-    """
-    for raw in (date_soutenance, date_inscription):
-        if not raw:
-            continue
-        try:
-            return int(raw.split("/")[-1])
-        except (ValueError, IndexError):
-            continue
-    return None

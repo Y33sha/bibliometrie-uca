@@ -366,7 +366,6 @@ class TestNormalizeNnt:
 from application.pipeline.normalize.normalize_theses import (
     _build_source_meta,
     _extract_thesis_author,
-    _parse_date_iso,
     extract_pub_metadata,
 )
 
@@ -392,25 +391,6 @@ class TestThesesExtractAuthor:
     def test_missing_first_name(self):
         these = {"auteurs": [{"nom": "Dupont"}]}
         assert _extract_thesis_author(these) == ("dupont", "")
-
-
-class TestThesesParseDateIso:
-    def test_standard(self):
-        assert _parse_date_iso("15/03/2023") == "2023-03-15"
-
-    def test_leading_spaces(self):
-        assert _parse_date_iso("  15/03/2023  ") == "2023-03-15"
-
-    def test_none(self):
-        assert _parse_date_iso(None) is None
-
-    def test_empty(self):
-        assert _parse_date_iso("") is None
-
-    def test_malformed(self):
-        """Moins de 3 parties → IndexError capturée → None."""
-        assert _parse_date_iso("2023") is None
-        assert _parse_date_iso("15/03") is None
 
 
 class TestThesesExtractPubMetadata:
