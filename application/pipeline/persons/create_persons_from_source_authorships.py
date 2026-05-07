@@ -46,10 +46,14 @@ from application.persons import (
     link_authorships as link_to_person,
 )
 from application.ports.persons_create import PersonsCreateQueries
-from domain.names import names_compatible, parse_raw_author_name
+from domain.names import parse_raw_author_name
 from domain.normalize import normalize_name
 from domain.persons.creation import allow_person_creation
-from domain.persons.matching import decide_match_by_identifier, decide_name_form_outcome
+from domain.persons.matching import (
+    decide_cross_source_match,
+    decide_match_by_identifier,
+    decide_name_form_outcome,
+)
 from domain.ports.person_repository import PersonRepository
 from domain.sources.openalex import keep_orcid_if_name_matches
 
@@ -172,15 +176,12 @@ def step1_cross_source(
         if not candidates:
             continue
 
-        matched_pid = None
-        for pid, ln, fn, src in candidates:
-            if src == a["source"]:
-                continue
-            if names_compatible(a["last_norm"], a["first_norm"], ln, fn):
-                if matched_pid is not None and matched_pid != pid:
-                    matched_pid = None
-                    break
-                matched_pid = pid
+        matched_pid = decide_cross_source_match(
+            authorship_source=a["source"],
+            last_norm=a["last_norm"],
+            first_norm=a["first_norm"],
+            candidates=candidates,
+        )
 
         if matched_pid:
             if not dry_run:

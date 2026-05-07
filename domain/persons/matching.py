@@ -12,6 +12,61 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
+from domain.names import names_compatible
+
+
+def decide_cross_source_match(
+    authorship_source: str,
+    last_norm: str,
+    first_norm: str,
+    candidates: list[tuple[int, str, str, str]],
+) -> int | None:
+    """Décide si une authorship peut être rattachée à une ``person`` déjà
+    associée à la même publication × position auteur via une autre source.
+
+    Le pipeline ingère chaque publi par 1+ sources. Quand par exemple
+    HAL a déjà rattaché l'auteur en position 3 à person 42, et qu'on
+    rencontre l'authorship OpenAlex en position 3 de la même publi non
+    encore rattachée, on peut transmettre le rattachement — à condition
+    que le nom soit compatible (garde-fou contre les désalignements de
+    position entre sources).
+
+    Paramètres :
+
+    - ``authorship_source`` : source de l'authorship qu'on cherche à
+      rattacher. Sert à exclure les candidats de la même source (qui
+      ne porteraient aucun signal nouveau).
+    - ``last_norm``, ``first_norm`` : nom normalisé de l'authorship.
+    - ``candidates`` : liste de tuples
+      ``(person_id, last_norm, first_norm, source)`` — les authorships
+      déjà rattachées à la même ``(publication_id, author_position)``,
+      à fournir via prefetch (typiquement
+      ``linked_index[(pub_id, position)]``).
+
+    Cascade :
+
+    - Aucun candidat compatible → ``None``.
+    - Candidats compatibles convergent tous vers la même ``person_id``
+      → cette ``person_id``.
+    - Candidats compatibles divergent (≥ 2 ``person_id`` distincts)
+      → ``None`` (conflit, pas de match safe).
+
+    Limitation connue : sur les méga-papers (consortiums >50 auteurs),
+    les positions peuvent diverger entre sources et provoquer de faux
+    conflits — un seuil basé sur le nombre d'auteurs total est noté
+    en follow-up dans ``TODO_CLAUDE.md`` (cf. ``MAX_AUTHORS_CONFLICT``
+    de ``TODO_LAURA.md``).
+    """
+    matched_pid: int | None = None
+    for pid, ln, fn, src in candidates:
+        if src == authorship_source:
+            continue
+        if names_compatible(last_norm, first_norm, ln, fn):
+            if matched_pid is not None and matched_pid != pid:
+                return None
+            matched_pid = pid
+    return matched_pid
+
 
 @dataclass(frozen=True)
 class NameFormDecision:

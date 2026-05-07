@@ -560,6 +560,16 @@ relocalisées en `domain/`.
 
   L'item est **retiré de l'inventaire** plutôt que rapatrié — c'était
   une mauvaise modélisation initiale.
+- **`decide_cross_source_match` ajouté à `domain/persons/matching.py`** :
+  factorisation de l'étape 1 du pipeline persons (rattachement par
+  `(publication_id, author_position)` à une `person_id` connue d'une
+  autre source, avec garde-fou `names_compatible`). Décision pure :
+  prend la liste des candidats prefetchée et renvoie la `person_id`
+  unique compatible, ou `None` (aucun match ou conflit ≥2 person_ids
+  distincts). TODO follow-up dans `TODO_CLAUDE.md` : seuil sur le
+  nombre d'auteurs total pour éviter les faux conflits sur les
+  méga-papers (cohérent avec `MAX_AUTHORS_CONFLICT` de
+  `TODO_LAURA.md`).
 - **`decide_name_form_outcome` ajouté à `domain/persons/matching.py`** :
   factorisation de l'arbitrage du résultat de lookup name_form en
   décision pure. Trois actions cohérentes (`match`, `create`, `skip`)

@@ -284,16 +284,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/persons/create_persons_from_source_authorships.py`
 
-### décision de match par cross-source
-- **localisation** : `application/pipeline/persons/create_persons_from_source_authorships.py:189-198`
-- **description** : Pour une authorship sans `person_id`, parcourt les
-  candidats déjà rattachés à la même publication+position venus
-  d'autres sources, choisit la `person_id` unique dont le nom est
-  compatible. None si conflit (>1 person_id distincts).
-- **classification** : (b) — prefetch `linked_index[(pub_id, position)]`.
-- **destination domain/** : `domain/persons/matching.py` →
-  `decide_cross_source_match(authorship_source, last_norm, first_norm, candidates) -> int | None`.
-
 ### contrat de la cascade globale
 - **localisation** : `application/pipeline/persons/create_persons_from_source_authorships.py:1-33` (docstring) + `:389-420` (orchestrateur)
 - **description** : Hiérarchie de fiabilité (compte HAL > cross-source
@@ -476,9 +466,9 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
 | **(a) déjà pure** | 15 | 9 | **24** |
-| **(b) décomposable** | 7 | 8 | **15** |
+| **(b) décomposable** | 7 | 7 | **14** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 24 | 20 | **44** |
+| **Total** | 24 | 19 | **43** |
 
 ### Patterns dupliqués majeurs
 
