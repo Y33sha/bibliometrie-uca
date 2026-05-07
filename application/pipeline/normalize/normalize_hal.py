@@ -325,22 +325,6 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
     return out
 
 
-def _hal_source_id(
-    hal_person_id: int | None, hal_form_id: int | None, old_id: int | None = None
-) -> str:
-    """
-    Calcule le source_id HAL :
-    - hal_person_id seul si non null (un seul source_author par personne HAL)
-    - 0_hal_form_id si hal_person_id est null (auteur sans compte HAL)
-    - nokey-{old_id} si les deux sont null
-    """
-    if hal_person_id and hal_person_id > 0:
-        return str(hal_person_id)
-    if hal_form_id:
-        return f"0_{hal_form_id}"
-    return f"nokey-{old_id}" if old_id else "_"
-
-
 _hal_author_cache: dict[str, int] = {}
 
 
@@ -367,7 +351,10 @@ def upsert_hal_author(
     if not should_create_source_person(source="hal", strong_id_value=hal_person_id):
         return None
 
-    src_id = _hal_source_id(hal_person_id, hal_form_id)
+    # source_persons.source_id est text (colonne partagée cross-sources) ;
+    # hal_person_id > 0 ici, garanti par should_create_source_person ci-dessus.
+    assert hal_person_id is not None
+    src_id = str(hal_person_id)
     if src_id in _hal_author_cache:
         return _hal_author_cache[src_id]
 
