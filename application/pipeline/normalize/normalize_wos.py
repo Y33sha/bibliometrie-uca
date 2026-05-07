@@ -34,7 +34,7 @@ from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
-from domain.person import normalize_orcid
+from domain.persons.identifiers import normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository

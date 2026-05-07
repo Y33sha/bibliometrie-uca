@@ -1,42 +1,20 @@
-"""Concept métier Personne — value objects, règles de composition,
-modèles de données JSONB, et (à terme) entités.
+"""Value objects et helpers de normalisation des identifiants personne.
 
-Regroupe ici tout ce qui est propre à une personne : identifiants
-(ORCID, IdHAL login, IdRef/PPN SUDOC), règles de composition des
-formes de nom, modèles de colonnes JSONB (`source_ids`), puis plus
-tard les entités `Person`, les règles de dédoublonnage, etc.
+ORCID, IdHAL (login HAL en forme slug), IdRef (PPN SUDOC). Trois VOs
+immuables et auto-validés au même contrat que ``domain/publication.py`` :
 
-Les value objects sont immuables et auto-validés (même contrat que
-domain/publication.py : `X("...")` strict, `X.try_parse(...)` tolérant).
+- ``X("...")`` strict : lève ``ValidationError`` si malformé
+- ``X.try_parse(...)`` tolérant : renvoie None si malformé
+
+Les helpers ``normalize_*`` sont exposés indépendamment pour les call
+sites qui veulent juste normaliser sans construire un VO (typiquement
+les normalizers de pipeline qui stockent la forme texte en base).
 """
 
 import re
 from dataclasses import dataclass
-from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_validator
-
-from domain.errors import ConflictError, ValidationError
-
-# ── Règles métier de fusion ────────────────────────────────────────
-
-
-def check_can_merge_persons(has_distinct_rh: bool, target_id: int, source_id: int) -> None:
-    """Valide qu'une fusion de personnes est autorisée.
-
-    Invariant : refus si les deux personnes ont chacune une fiche RH
-    distincte (risque de perdre de l'information humaine).
-
-    Lève `ConflictError` avec le message standardisé si l'invariant est
-    violé. L'appelant reste responsable de fournir l'information
-    `has_distinct_rh` (typiquement via le repository).
-    """
-    if has_distinct_rh:
-        raise ConflictError(
-            f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
-            f"ont chacune une fiche RH distincte."
-        )
-
+from domain.errors import ValidationError
 
 # ── ORCID ──────────────────────────────────────────────────────────
 
@@ -192,45 +170,3 @@ class IdRef:
 
     def __str__(self) -> str:
         return self.value
-
-
-# ── PersonSourceIds : colonne source_persons.source_ids ────────────
-
-
-class PersonSourceIds(BaseModel):
-    """Modèle de la colonne JSONB `source_ids` de `source_persons`.
-
-    Identifiants **bruts** lus depuis les API sources (principalement
-    HAL). Distinct de la table `person_identifiers` qui stocke le
-    référentiel canonique (ORCID/idHAL/IdRef confirmés ou en attente,
-    attachés à une personne consolidée).
-
-    Ici on a par exemple :
-    - `hal_person_id` : entier interne HAL (>0 = compte confirmé)
-    - `idhal` : login slug HAL (validé via VO IdHAL)
-    - `hal_form_id` : ID du formulaire HAL (structure interne)
-
-    extra="allow" pour accepter d'autres clés que d'autres sources
-    (ScanR, WoS, …) pourraient introduire à l'avenir.
-    """
-
-    model_config = ConfigDict(extra="allow")
-
-    hal_person_id: int | None = None
-    idhal: str | None = None
-    hal_form_id: int | None = None
-
-    @field_validator("idhal", mode="before")
-    @classmethod
-    def _normalize_idhal(cls, v: Any) -> str | None:
-        """Normalise via le VO IdHAL : trim, lowercase, validation du slug."""
-        if v is None or v == "":
-            return None
-        normalized = IdHAL.try_parse(v)
-        if normalized is None:
-            raise ValueError(f"IdHAL invalide : {v!r}")
-        return normalized.value
-
-    def to_dict(self) -> dict:
-        """Sérialise pour écriture en base (JSONB). Omet les clés None."""
-        return self.model_dump(exclude_none=True)
