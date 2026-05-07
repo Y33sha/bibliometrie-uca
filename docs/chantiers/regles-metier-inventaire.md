@@ -95,13 +95,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
   `shallow_merge_jsonb`, `topics_by_source`,
   `arbitrate_doc_type_with_article_subtype`.
 
-### merge_publications (orchestration)
-- **localisation** : `application/publications.py:405-423`
-- **description** : Séquence : repo.merge_into → repo.update_sources →
-  emit_event. Pas de décision.
-- **classification** : (c).
-- **destination domain/** : n/a.
-
 ---
 
 ## `application/pipeline/normalize/normalize_hal.py`
@@ -224,14 +217,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/publications/merge_pubs_by_nnt.py`
 
-### détection des doublons par NNT
-- **localisation** : `application/pipeline/publications/merge_pubs_by_nnt.py:29`
-- **description** : Trouve les NNT pour lesquels plusieurs `publication_id`
-  distincts existent. Invariant cible : un NNT identifie une thèse
-  unique.
-- **classification** : (c) — détection en SQL.
-- **destination domain/** : n/a (invariant déjà porté par le VO `NNT`).
-
 ### choix de la publication cible de fusion
 - **localisation** : `application/pipeline/publications/merge_pubs_by_nnt.py:44-48`
   (délégué à `queries.rank_publications_by_merge_priority`)
@@ -242,14 +227,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
   dates, complétude.
 - **destination domain/** : `domain/publications/merge.py` →
   `rank_publications_by_merge_priority(pubs: list[PubMergeCandidate]) -> list[int]`.
-
-### invariant idempotence chaîne de fusions
-- **localisation** : `application/pipeline/publications/merge_pubs_by_nnt.py:60-67`
-- **description** : Chaque fusion encadrée par savepoint, l'erreur d'une
-  fusion ne fait pas tomber le batch. Pas de logique de redirection
-  ici (contrairement à hal_id) — opportunité de durcir.
-- **classification** : (c).
-- **destination domain/** : n/a.
 
 ---
 
@@ -268,14 +245,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
   `aggregate_authorship_perimeter(source_rows) -> tuple[bool, list[int]]`
   (utile pour les tests).
 
-### étapes de construction de la table authorships
-- **localisation** : `application/pipeline/authorships/build_authorships.py:1-11, :37-49`
-- **description** : Séquence ordonnée des 4 étapes (insertion, FK,
-  position/corresponding, perimeter/structures). Chaque étape suppose
-  la précédente faite.
-- **classification** : (c).
-- **destination domain/** : n/a.
-
 ---
 
 ## Synthèse globale
@@ -286,8 +255,8 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 |---|---:|---:|---:|
 | **(a) déjà pure** | 0 | 0 | **0** |
 | **(b) décomposable** | 9 | 6 | **15** |
-| **(c) intrinsèque transaction** | 1 | 3 | **4** |
-| **Total** | 10 | 9 | **19** |
+| **(c) intrinsèque transaction** | 0 | 0 | **0** |
+| **Total** | 9 | 6 | **15** |
 
 ### Patterns dupliqués majeurs
 
