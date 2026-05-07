@@ -38,13 +38,13 @@ from application.publications import (
     try_merge_by_doi,
 )
 from domain.authorship_roles import THESES_FIELD_ROLES, merge_roles
+from domain.dates import french_date_to_iso
 from domain.normalize import normalize_name, normalize_text
 from domain.persons.creation import should_create_source_person
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
 from domain.sources.theses import (
     derive_theses_doc_type,
-    extract_thesis_year,
     thesis_authors_compatible,
 )
 
@@ -77,11 +77,12 @@ def extract_pub_metadata(these: dict) -> dict:
     Retourne un dict utilisable par find_or_create et par insert_source_document.
     """
     title = these.get("titrePrincipal")
-    doc_type = derive_theses_doc_type(these.get("dateSoutenance"))
+    date_soutenance = french_date_to_iso(these.get("dateSoutenance"))
+    date_inscription = french_date_to_iso(these.get("datePremiereInscriptionDoctorat"))
 
-    pub_year = extract_thesis_year(
-        these.get("dateSoutenance"), these.get("datePremiereInscriptionDoctorat")
-    )
+    # pub_year = soutenance > première inscription (cascade theses.fr)
+    year_source = date_soutenance or date_inscription
+    pub_year = int(year_source[:4]) if year_source else None
 
     doi = these.get("doi")
     nnt_clean = normalize_nnt(these.get("nnt"))
@@ -91,7 +92,7 @@ def extract_pub_metadata(these: dict) -> dict:
         title=title,
         title_normalized=title_norm,
         pub_year=pub_year,
-        doc_type=doc_type,
+        doc_type=derive_theses_doc_type(date_soutenance),
         doi=doi,
         nnt=nnt_clean,
         oa_status="closed",
@@ -154,24 +155,13 @@ def find_publication(
     return None
 
 
-def _parse_date_iso(date_str: str | None) -> str | None:
-    """Convertit JJ/MM/AAAA → YYYY-MM-DD."""
-    if not date_str:
-        return None
-    try:
-        parts = date_str.strip().split("/")
-        return f"{parts[2]}-{parts[1]}-{parts[0]}"
-    except (IndexError, ValueError):
-        return None
-
-
 def _update_thesis_meta(
     cur: Any, queries: ThesesNormalizeQueries, pub_id: int, these: dict
 ) -> None:
     """Met à jour publications.meta avec les dates de thèse."""
     meta = {}
-    ds = _parse_date_iso(these.get("dateSoutenance"))
-    di = _parse_date_iso(these.get("datePremiereInscriptionDoctorat"))
+    ds = french_date_to_iso(these.get("dateSoutenance"))
+    di = french_date_to_iso(these.get("datePremiereInscriptionDoctorat"))
     if ds:
         meta["date_soutenance"] = ds
     if di:
@@ -189,8 +179,8 @@ def _update_thesis_meta(
 def _build_source_meta(these: dict) -> dict | None:
     """Construit le meta jsonb pour source_publications à partir des données brutes."""
     meta: dict[str, Any] = {}
-    ds = _parse_date_iso(these.get("dateSoutenance"))
-    di = _parse_date_iso(these.get("datePremiereInscriptionDoctorat"))
+    ds = french_date_to_iso(these.get("dateSoutenance"))
+    di = french_date_to_iso(these.get("datePremiereInscriptionDoctorat"))
     if ds:
         meta["date_soutenance"] = ds
     if di:
@@ -222,18 +212,17 @@ def insert_source_document(
     staging_id: int,
     theses_id: str,
     publication_id: int | None,
-    pub_meta: dict | None = None,
+    pub_meta: dict,
 ) -> int:
-    """Crée/retrouve l'entrée source_publications pour theses.fr."""
-    title = these.get("titrePrincipal") or ""
-    doc_type = derive_theses_doc_type(these.get("dateSoutenance"))
+    """Crée/retrouve l'entrée source_publications pour theses.fr.
 
-    pub_year = extract_thesis_year(
-        these.get("dateSoutenance"), these.get("datePremiereInscriptionDoctorat")
-    )
-
-    doi = these.get("doi")
-    nnt = normalize_nnt(these.get("nnt"))
+    Les métadonnées canoniques (titre, doc_type, pub_year, doi, nnt, journal,
+    oa_status, language, container_title) viennent toutes de ``pub_meta``,
+    construit en amont par ``extract_pub_metadata``. ``these`` ne sert ici
+    que pour les extras theses-spécifiques (sujets, sujetsRameau, discipline,
+    écoles doctorales, partenaires, dates).
+    """
+    nnt = pub_meta["nnt"]
     external_ids = Json({"nnt": nnt}) if nnt else None
 
     # Keywords : sujets (mots-cles auteur)
@@ -255,26 +244,20 @@ def insert_source_document(
     source_meta = _build_source_meta(these)
     source_meta_json = Json(source_meta) if source_meta else None
 
-    # Metadonnees de publication (pour creation differee)
-    journal_id = pub_meta.get("journal_id") if pub_meta else None
-    oa_status = pub_meta.get("oa_status") if pub_meta else None
-    language = pub_meta.get("language") if pub_meta else None
-    container_title = pub_meta.get("container_title") if pub_meta else None
-
     return queries.upsert_theses_source_publication(
         cur,
         theses_id=theses_id,
-        doi=doi,
-        title=title,
-        pub_year=pub_year,
-        doc_type=doc_type,
+        doi=pub_meta["doi"],
+        title=pub_meta["title"] or "",
+        pub_year=pub_meta["pub_year"],
+        doc_type=pub_meta["doc_type"],
         publication_id=publication_id,
         staging_id=staging_id,
         external_ids=external_ids,
-        journal_id=journal_id,
-        oa_status=oa_status,
-        language=language,
-        container_title=container_title,
+        journal_id=pub_meta["journal_id"],
+        oa_status=pub_meta["oa_status"],
+        language=pub_meta["language"],
+        container_title=pub_meta["container_title"],
         keywords=keywords,
         topics_json=topics_json,
         source_meta_json=source_meta_json,

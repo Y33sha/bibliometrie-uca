@@ -672,8 +672,7 @@ relocalisées en `domain/`.
     `test_source_ids.py`, `test_merge.py`.
   - Cleanup d'inventaire au passage : item HAL `parse_tei_author_identifiers`
     retiré (règle technique de parsing XML, mieux conservée à côté de
-    la marche TEI qui la consomme — symétrique à `_parse_date_iso`
-    déjà classé « limite »).
+    la marche TEI qui la consomme).
 - **Découpage `last_name`/`first_name` — colonnes supprimées** :
   les colonnes `source_persons.last_name` et
   `source_persons.first_name` sont droppées (migration 022). Le
@@ -712,6 +711,30 @@ relocalisées en `domain/`.
   `old_id` jamais passé. Reste `src_id = str(hal_person_id)` inline
   (la colonne `source_persons.source_id` est `text` cross-sources).
   Item retiré de l'inventaire.
+- **`domain/dates.py` ouvert + `french_date_to_iso`** : helper unique
+  qui convertit `JJ/MM/AAAA` → `YYYY-MM-DD` via `datetime.strptime`
+  (validation des composants en cadeau : rejette `32/01/2023`,
+  `29/02` non bissextile…). Utilisé par les 3 sites `_parse_date_iso`
+  de `normalize_theses.py` (helper privé supprimé) et par
+  `extract_pub_metadata` qui normalise les dates en amont. En aval,
+  `derive_theses_doc_type` et le calcul de `pub_year` reçoivent de
+  l'ISO — plus besoin d'un parser de format français côté domain.
+- **Suppression `extract_thesis_year` (mono-call après fix duplication)** :
+  passe préalable de fix d'une duplication structurelle dans
+  `normalize_theses.py` (`extract_pub_metadata` et `insert_source_document`
+  recalculaient tous deux title/doc_type/pub_year/doi/nnt depuis
+  `these`, alors que `pub_meta` était déjà passé en argument à
+  `insert_source_document` mais consommé partiellement). Désormais
+  `insert_source_document` lit tout depuis `pub_meta`, et
+  `extract_pub_metadata` est l'unique site qui calcule. La cascade
+  « soutenance > inscription » se réduit à 2 lignes inline (dates en
+  ISO, `int(year_source[:4])`) ; la fonction nommée et son helper
+  privé `_year_from_theses_date` disparaissent du domain. Tests
+  dédiés (`TestExtractThesisYear`, 5 cas) supprimés.
+  Effet de bord assumé : `derive_theses_doc_type` reçoit désormais
+  une date ISO normalisée (ou None si malformée), donc une date
+  malformée donne `ongoing_thesis` au lieu de `thesis` — sémantiquement
+  plus juste (string truthy ≠ preuve de soutenance).
 
 ## Décisions actées
 
