@@ -307,16 +307,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/persons/populate_person_name_forms.py`
 
-### règle de préservation des formes non bibliographiques
-- **localisation** : `application/pipeline/persons/populate_person_name_forms.py:99-106`
-- **description** : Une forme obsolète n'est supprimée que si toutes
-  ses sources actuelles sont biblio (`hal`, `openalex`, `wos`, …) ;
-  les formes portées par `persons` ou `manual` sont préservées (saisie
-  RH ou intervention humaine = vérité).
-- **classification** : (a).
-- **destination domain/** : `domain/persons/sourcing.py` →
-  `can_delete_obsolete_name_form(sources: set[str]) -> bool`.
-
 ### enrichissement d'une forme par fusion de sources
 - **localisation** : `application/pipeline/persons/populate_person_name_forms.py:61-75`
 - **description** : Quand une forme apparaît à la fois en source
@@ -495,10 +485,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 15 | 11 | **26** |
+| **(a) déjà pure** | 15 | 10 | **25** |
 | **(b) décomposable** | 7 | 8 | **15** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 24 | 22 | **46** |
+| **Total** | 24 | 21 | **45** |
 
 ### Patterns dupliqués majeurs
 
