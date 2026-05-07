@@ -523,6 +523,35 @@ relocalisées en `domain/`.
   mauvaises assignations auteur×signature côté OpenAlex (qui hériteraient
   un ORCID erroné). Le call site dans `create_persons_from_source_authorships`
   passe de 9 lignes à 5.
+- **Suppression de la règle de préservation dans `populate_person_name_forms`** :
+  l'item d'inventaire « règle de préservation des formes non
+  bibliographiques » s'est révélé être un effet pervers d'un autre choix
+  (le filtre `rejected = FALSE` dans `fetch_active_persons_names`) plutôt
+  qu'une règle métier.
+
+  Investigation : la règle préservait défensivement les formes avec
+  `source = persons` ou `manual` quand la recalculation ne les
+  produisait plus. `manual` est dead code (aucun INSERT ne l'écrit).
+  Pour `persons`, la cause d'orphelin était presque exclusivement les
+  rejected — qui sont les artefacts de parsing source / noms
+  d'organisations / chaînes mal parsées. Or ces formes DOIVENT rester
+  pour servir d'ancre de matching et empêcher la re-création en boucle
+  au prochain run pipeline.
+
+  Refactor : retirer `AND rejected = FALSE` dans `fetch_active_persons_names`
+  (renommée `fetch_persons_names`) → les rejected entrent dans la
+  recalculation, leurs forms restent dans `expected_forms` et survivent
+  naturellement au diff. Plus besoin de règle de préservation : toute
+  forme dans `existing - expected_forms` est supprimée par construction
+  (plus aucune source ne la soutient). Variable `new_forms` renommée
+  `expected_forms` au passage (le nom précédent était trompeur).
+
+  Aucun changement comportemental : les 82 formes préservées en BDD
+  aujourd'hui restent en place, mais portées par la cohérence de la
+  recalculation plutôt que par une règle défensive cachée.
+
+  L'item est **retiré de l'inventaire** plutôt que rapatrié — c'était
+  une mauvaise modélisation initiale.
 - **`decide_name_form_outcome` ajouté à `domain/persons/matching.py`** :
   factorisation de l'arbitrage du résultat de lookup name_form en
   décision pure. Trois actions cohérentes (`match`, `create`, `skip`)

@@ -4,9 +4,9 @@ from infrastructure.db.queries.name_forms import (
     create_temp_raw_forms_table,
     delete_name_form,
     drop_temp_raw_forms_table,
-    fetch_active_persons_names,
     fetch_existing_name_forms,
     fetch_normalized_forms_from_temp,
+    fetch_persons_names,
     fetch_source_authorship_name_forms,
     insert_name_form_with_merge,
     insert_raw_forms_batch,
@@ -67,19 +67,22 @@ def _insert_name_form(db, name_form, person_ids, sources=None):
     return db.fetchone()["id"]
 
 
-class TestFetchActivePersonsNames:
-    def test_excludes_rejected(self, db):
+class TestFetchPersonsNames:
+    def test_includes_rejected(self, db):
+        """Les rejected sont conservés pour servir d'ancre de matching
+        (entités douteuses, artefacts de parsing) et empêcher la
+        re-création en boucle au prochain run pipeline."""
         active = _create_person(db, last="A")
-        _create_person(db, last="B", rejected=True)
+        rejected = _create_person(db, last="B", rejected=True)
 
-        rows = fetch_active_persons_names(db)
+        rows = fetch_persons_names(db)
         ids = [r["id"] for r in rows]
         assert active in ids
-        assert all(r["last_name"] != "B" for r in rows)
+        assert rejected in ids
 
     def test_trims_names(self, db):
         pid = _create_person(db, last="  Dupond", first="Jean  ")
-        rows = fetch_active_persons_names(db)
+        rows = fetch_persons_names(db)
         row = next(r for r in rows if r["id"] == pid)
         assert row["last_name"] == "Dupond"
         assert row["first_name"] == "Jean"

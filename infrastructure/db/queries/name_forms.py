@@ -11,15 +11,21 @@ from typing import Any
 from infrastructure.db_helpers import rows_as_dicts
 
 
-def fetch_active_persons_names(cur: Any) -> list[dict[str, Any]]:
-    """`(id, first_name, last_name)` des personnes actives avec un nom."""
+def fetch_persons_names(cur: Any) -> list[dict[str, Any]]:
+    """`(id, first_name, last_name)` de toutes les personnes avec un nom.
+
+    Inclut les ``rejected = TRUE`` : leurs name_forms doivent rester
+    présentes dans ``person_name_forms`` pour servir d'ancre au matching
+    et empêcher la re-création en boucle des entités douteuses
+    (artefacts de parsing source, noms d'organisations, etc.) à chaque
+    run pipeline.
+    """
     cur.execute("""
         SELECT id,
                trim(first_name) AS first_name,
                trim(last_name) AS last_name
         FROM persons
         WHERE last_name IS NOT NULL AND last_name != ''
-          AND rejected = FALSE
     """)
     return rows_as_dicts(cur)
 
@@ -111,8 +117,8 @@ def delete_name_form(cur: Any, form_id: int) -> None:
 class PgNameFormsQueries:
     """Adapter PostgreSQL pour `application.ports.name_forms.NameFormsQueries`."""
 
-    def fetch_active_persons_names(self, cur: Any) -> list[dict[str, Any]]:
-        return fetch_active_persons_names(cur)
+    def fetch_persons_names(self, cur: Any) -> list[dict[str, Any]]:
+        return fetch_persons_names(cur)
 
     def fetch_source_authorship_name_forms(self, cur: Any) -> list[dict[str, Any]]:
         return fetch_source_authorship_name_forms(cur)
