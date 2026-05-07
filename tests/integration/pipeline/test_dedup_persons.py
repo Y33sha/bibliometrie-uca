@@ -90,8 +90,8 @@ def _insert_hal_authorship(
         """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
-             in_perimeter, person_id, raw_author_name)
-        VALUES ('hal', %s, %s, %s, %s, %s, %s) RETURNING id
+             in_perimeter, person_id, raw_author_name, author_name_normalized)
+        VALUES ('hal', %s, %s, %s, %s, %s, %s, normalize_name_form(%s)) RETURNING id
     """,
         (
             source_publication_id,
@@ -99,6 +99,7 @@ def _insert_hal_authorship(
             position,
             in_perimeter,
             person_id,
+            raw_author_name,
             raw_author_name,
         ),
     )
@@ -151,8 +152,8 @@ def _insert_oa_authorship(
         """
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
-             in_perimeter, person_id, raw_author_name, identifiers)
-        VALUES ('openalex', %s, %s, %s, %s, %s, %s, %s) RETURNING id
+             in_perimeter, person_id, raw_author_name, identifiers, author_name_normalized)
+        VALUES ('openalex', %s, %s, %s, %s, %s, %s, %s, normalize_name_form(%s)) RETURNING id
     """,
         (
             oa_document_id,
@@ -162,6 +163,7 @@ def _insert_oa_authorship(
             person_id,
             raw_author_name,
             json.dumps(identifiers) if identifiers else None,
+            raw_author_name,
         ),
     )
     return db.fetchone()["id"]
