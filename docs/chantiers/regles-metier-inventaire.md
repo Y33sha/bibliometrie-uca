@@ -124,14 +124,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_hal.py`
 
-### _hal_source_id — convention de clé HAL
-- **localisation** : `application/pipeline/normalize/normalize_hal.py:337-350`
-- **description** : `source_id` côté HAL = `hal_person_id` si compte
-  HAL, sinon `0_{form_id}`, sinon `nokey-{old_id}`.
-- **classification** : (a).
-- **destination domain/** : limite — convention de clé d'infra. À
-  laisser en place ou `domain/persons/identifiers.py`.
-
 ### parse_author_structures — préférence primary > flat
 - **localisation** : `application/pipeline/normalize/normalize_hal.py:416-486` (règle l. 437)
 - **description** : Préférence `authIdHasPrimaryStructure_fs` (labos

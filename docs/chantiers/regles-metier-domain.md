@@ -252,15 +252,7 @@ ou skip). C'est le pattern déjà utilisé par
   deux persons ayant chacune un `persons_rh` distinct » — déjà
   appliqué côté API et scripts, à formaliser comme fonction pure)
 
-**Question ouverte — matching par co-publication** : actuellement
-utilisé en complément du matching par nom pour désambiguïser (« on
-relie cette signature à la person X parce qu'elle a déjà co-signé une
-publi avec Y, et Y est aussi auteur ici »). Pose problème sur les
-méga-papers (consortiums, papers à 100+ auteurs) avec des
-désalignements fréquents. À réexaminer pendant ce chantier :
-maintien tel quel, restriction à un seuil max d'auteurs (ex.
-≤ 30 auteurs), ou suppression. Décision à prendre après mesure du
-ratio matchings utiles / faux positifs sur les cas méga-paper.
+**Question ouverte — matching par publication cross-source** : actuellement utilisé en complément du matching par nom pour désambiguïser (« on relie cette signature à la person X parce qu'elle est déjà reliée à la même publication, en même position auteur, dans une autre source »). Pose problème sur les méga-papers (consortiums, papers à 100+ auteurs) avec des désalignements + homonymes "initiale+nom" fréquents. À réexaminer pendant ce chantier : maintien tel quel, restriction à un seuil max d'auteurs (ex. ≤ 30 auteurs), ou suppression. Décision à prendre après mesure du ratio matchings utiles / faux positifs sur les cas méga-paper.
 
 ### `domain/publication_dedup.py` (à créer)
 
@@ -680,8 +672,8 @@ relocalisées en `domain/`.
     `test_source_ids.py`, `test_merge.py`.
   - Cleanup d'inventaire au passage : item HAL `parse_tei_author_identifiers`
     retiré (règle technique de parsing XML, mieux conservée à côté de
-    la marche TEI qui la consomme — symétrique à `_hal_source_id`,
-    `detected_countries`, `_parse_date_iso` déjà classés « limite »).
+    la marche TEI qui la consomme — symétrique à `detected_countries`,
+    `_parse_date_iso` déjà classés « limite »).
 - **Découpage `last_name`/`first_name` — colonnes supprimées** :
   les colonnes `source_persons.last_name` et
   `source_persons.first_name` sont droppées (migration 022). Le
@@ -712,6 +704,14 @@ relocalisées en `domain/`.
   `build_authorship_identifiers_for_source` et `IDENTIFIER_FIELDS_BY_SOURCE`
   retirées de la synthèse car elles auraient figé le couplage par source
   dans domain.
+- **Inline de `_hal_source_id`** : la cascade `hal_person_id`/
+  `0_{hal_form_id}`/`nokey-{old_id}` s'effondre depuis le chantier
+  source-persons. `upsert_hal_author` filtre désormais via
+  `should_create_source_person` qui garantit `hal_person_id > 0` au
+  moment de l'appel — branches 2 et 3 jamais atteintes, paramètre
+  `old_id` jamais passé. Reste `src_id = str(hal_person_id)` inline
+  (la colonne `source_persons.source_id` est `text` cross-sources).
+  Item retiré de l'inventaire.
 
 ## Décisions actées
 
