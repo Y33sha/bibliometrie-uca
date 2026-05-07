@@ -237,15 +237,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_scanr.py`
 
-### select_labo_affiliations — préférence labo sur tutelles
-- **localisation** : `application/pipeline/normalize/normalize_scanr.py:50-60`
-- **description** : Symétrique HAL `primary_structure` : ne garder
-  que les affiliations labo (`id_name_author_labo` non vide), fallback
-  sur la liste complète. ScanR aplatit les tutelles.
-- **classification** : (a).
-- **destination domain/** : `domain/sources/scanr_signals.py` →
-  `select_leaf_affiliations(affiliations) -> list[dict]`.
-
 ### upsert_scanr_author — invariant « idref ou rien »
 - **localisation** : `application/pipeline/normalize/normalize_scanr.py:254-286`
 - **description** : Crée la `source_persons` que si `idref` (PPN)
@@ -610,10 +601,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 17 | 14 | **31** |
+| **(a) déjà pure** | 16 | 14 | **30** |
 | **(b) décomposable** | 12 | 10 | **22** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 31 | 27 | **58** |
+| **Total** | 30 | 27 | **57** |
 
 ### Patterns dupliqués majeurs
 

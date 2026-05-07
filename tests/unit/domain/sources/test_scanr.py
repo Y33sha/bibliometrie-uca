@@ -1,4 +1,25 @@
-from domain.sources.scanr import derive_scanr_oa_status, extract_nnt_from_scanr_id
+from domain.sources.scanr import (
+    derive_scanr_oa_status,
+    extract_nnt_from_scanr_id,
+    select_leaf_affiliations,
+)
+
+
+class TestSelectLeafAffiliations:
+    def test_filters_to_labo(self):
+        """ScanR : seule l'affiliation labo (champ `id_name_author_labo`)
+        est conservée ; les pures tutelles sont jetées."""
+        labo = {"name": "IHRIM blob", "id_name_author_labo": "idref###X###RNSR###IHRIM"}
+        tutelle = {"name": "ENS Lyon, ..."}
+        assert select_leaf_affiliations([labo, tutelle]) == [labo]
+
+    def test_falls_back_when_none_marked(self):
+        a = {"name": "Org A"}
+        b = {"name": "Org B"}
+        assert select_leaf_affiliations([a, b]) == [a, b]
+
+    def test_empty(self):
+        assert select_leaf_affiliations([]) == []
 
 
 class TestExtractNntFromScanrId:

@@ -184,29 +184,6 @@ class TestHALParseAuthorStructures:
         assert parse_author_structures(doc) == {100: {1}}
 
 
-class TestScanrSelectLaboAffiliations:
-    def test_filters_to_labo(self):
-        """ScanR : seule l'affiliation labo (champ `id_name_author_labo`)
-        est conservée ; les pures tutelles sont jetées."""
-        from application.pipeline.normalize.normalize_scanr import select_labo_affiliations
-
-        labo = {"name": "IHRIM blob", "id_name_author_labo": "idref###X###RNSR###IHRIM"}
-        tutelle = {"name": "ENS Lyon, ..."}
-        assert select_labo_affiliations([labo, tutelle]) == [labo]
-
-    def test_falls_back_when_none_marked(self):
-        from application.pipeline.normalize.normalize_scanr import select_labo_affiliations
-
-        a = {"name": "Org A"}
-        b = {"name": "Org B"}
-        assert select_labo_affiliations([a, b]) == [a, b]
-
-    def test_empty(self):
-        from application.pipeline.normalize.normalize_scanr import select_labo_affiliations
-
-        assert select_labo_affiliations([]) == []
-
-
 class TestHALDocTypeMap:
     def test_covers_common_types(self):
         for t in ["ART", "COMM", "OUV", "COUV", "THESE", "HDR"]:
