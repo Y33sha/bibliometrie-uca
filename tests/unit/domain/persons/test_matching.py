@@ -1,6 +1,39 @@
 """Tests des règles pures de matching d'authorships à des personnes."""
 
-from domain.persons.matching import decide_match_by_identifier
+from domain.persons.matching import (
+    NameFormDecision,
+    decide_match_by_identifier,
+    decide_name_form_outcome,
+)
+
+
+class TestDecideNameFormOutcome:
+    def test_single_person_id_matches(self):
+        decision = decide_name_form_outcome([42], allow_create=True)
+        assert decision == NameFormDecision(action="match", person_id=42)
+
+    def test_multiple_person_ids_skip_ambiguous(self):
+        decision = decide_name_form_outcome([42, 17], allow_create=True)
+        assert decision.action == "skip"
+        assert decision.reason == "ambiguous_name_form"
+        assert decision.person_id is None
+
+    def test_no_match_with_allow_create(self):
+        decision = decide_name_form_outcome(None, allow_create=True)
+        assert decision == NameFormDecision(action="create")
+
+    def test_no_match_without_allow_create_skips(self):
+        """Cas typique : rôle non-auteur d'une thèse, person inconnue."""
+        decision = decide_name_form_outcome(None, allow_create=False)
+        assert decision.action == "skip"
+        assert decision.reason == "creation_not_allowed"
+
+    def test_multiple_person_ids_overrides_allow_create(self):
+        """Ambiguïté de nom → skip même si la création est autorisée
+        (on ne crée pas une personne quand des homonymes existent)."""
+        decision = decide_name_form_outcome([42, 17], allow_create=False)
+        assert decision.action == "skip"
+        assert decision.reason == "ambiguous_name_form"
 
 
 class TestDecideMatchByIdentifier:

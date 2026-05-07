@@ -49,7 +49,7 @@ from application.ports.persons_create import PersonsCreateQueries
 from domain.names import names_compatible, parse_raw_author_name
 from domain.normalize import normalize_name
 from domain.persons.creation import allow_person_creation
-from domain.persons.matching import decide_match_by_identifier
+from domain.persons.matching import decide_match_by_identifier, decide_name_form_outcome
 from domain.ports.person_repository import PersonRepository
 from domain.sources.openalex import keep_orcid_if_name_matches
 
@@ -297,7 +297,7 @@ def step3_name_forms(
     """
     linked = 0
     created = 0
-    ambiguous = 0
+    skipped = 0
 
     for a in all_authorships:
         if (a["source"], a["authorship_id"]) in linked_ids:
@@ -307,22 +307,19 @@ def step3_name_forms(
         if not norm:
             continue
 
-        person_ids = name_form_map.get(norm)
+        decision = decide_name_form_outcome(name_form_map.get(norm), a.get("allow_create", True))
 
-        if person_ids is not None:
-            if len(person_ids) == 1:
-                pid = person_ids[0]
-                if not dry_run:
-                    link_to_person(cur, pid, [a], repo=person_repo)
-                    add_name_form(cur, pid, a["full_name"], repo=person_repo)
-                linked_ids.add((a["source"], a["authorship_id"]))
-                linked += 1
-            else:
-                ambiguous += 1
-        else:
-            if not a.get("allow_create", True):
-                ambiguous += 1
-                continue
+        if decision.action == "match":
+            pid = decision.person_id
+            assert pid is not None  # narrowing : garanti par decide_name_form_outcome
+            if not dry_run:
+                link_to_person(cur, pid, [a], repo=person_repo)
+                add_name_form(cur, pid, a["full_name"], repo=person_repo)
+            linked_ids.add((a["source"], a["authorship_id"]))
+            linked += 1
+        elif decision.action == "skip":
+            skipped += 1
+        else:  # create
             last = a["last_name"] or a["full_name"] or "?"
             first = a["first_name"] or ""
             # On pré-popule la map en mémoire avec les deux ordres normalisés
@@ -346,9 +343,9 @@ def step3_name_forms(
             created += 1
 
     logger.info(
-        f"  {created} personnes créées, {linked} rattachées, {ambiguous} ambiguës (orphelines)"
+        f"  {created} personnes créées, {linked} rattachées, {skipped} skippées (ambiguës ou création interdite)"
     )
-    return created, linked, ambiguous
+    return created, linked, skipped
 
 
 # ---------------------------------------------------------------------------
@@ -397,7 +394,7 @@ def run(
 
     logger.info("\n--- Étape 3 : person_name_forms ---")
     name_form_map = queries.fetch_name_form_map(cur)
-    s3_created, s3_linked, s3_ambiguous = step3_name_forms(
+    s3_created, s3_linked, s3_skipped = step3_name_forms(
         cur,
         logger,
         all_authorships,
@@ -417,7 +414,7 @@ def run(
     logger.info(f"  Étape 2 (ORCID connu)    : {s2} rattachées")
     logger.info(
         f"  Étape 3 (name_forms)     : {s3_created} créées, {s3_linked} rattachées, "
-        f"{s3_ambiguous} ambiguës"
+        f"{s3_skipped} skippées"
     )
     logger.info(f"  Non résolues             : {unlinked}")
 

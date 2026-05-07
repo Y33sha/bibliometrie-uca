@@ -523,6 +523,15 @@ relocalisées en `domain/`.
   mauvaises assignations auteur×signature côté OpenAlex (qui hériteraient
   un ORCID erroné). Le call site dans `create_persons_from_source_authorships`
   passe de 9 lignes à 5.
+- **`decide_name_form_outcome` ajouté à `domain/persons/matching.py`** :
+  factorisation de l'arbitrage du résultat de lookup name_form en
+  décision pure. Trois actions cohérentes (`match`, `create`, `skip`)
+  remplaçant le mélange état/action de la version inline (`match`,
+  `ambiguous`, `create`). Le `reason` du `skip` capture la nuance
+  (`ambiguous_name_form` vs `creation_not_allowed`) pour les logs.
+  Compteur local côté `step3_name_forms` renommé `ambiguous` → `skipped`
+  pour cohérence avec le vocabulaire domain. Pattern symétrique à
+  `resolve_doi_conflict` côté publication.
 - **Simplification de `step3_name_forms` — drop de la cascade redondante** :
   l'item d'inventaire « cascade de lookup par name_form » s'est révélé
   être une duplication de logique plutôt qu'une règle à factoriser. Le
