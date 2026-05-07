@@ -516,6 +516,13 @@ relocalisées en `domain/`.
   `landing_page_url` + `pdf_url` dédupliqués) puis délégation. Pas de
   `normalize_nnt` côté extracteur — c'est un extracteur opportuniste,
   la normalisation est laissée au caller.
+- **OpenAlex `keep_orcid_if_name_matches` rapatriée** : la règle qui
+  filtre l'ORCID porté par une entité auteur OpenAlex selon la
+  compatibilité du nom avec le `raw_author_name` de l'authorship
+  descend dans `domain/sources/openalex.py`. Garde-fou contre les
+  mauvaises assignations auteur×signature côté OpenAlex (qui hériteraient
+  un ORCID erroné). Le call site dans `create_persons_from_source_authorships`
+  passe de 9 lignes à 5.
 - **Découpage `last_name`/`first_name` — colonnes supprimées** :
   les colonnes `source_persons.last_name` et
   `source_persons.first_name` sont droppées (migration 022). Le

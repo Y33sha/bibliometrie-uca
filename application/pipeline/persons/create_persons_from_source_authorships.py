@@ -49,6 +49,7 @@ from application.ports.persons_create import PersonsCreateQueries
 from domain.names import names_compatible, parse_raw_author_name
 from domain.normalize import normalize_name
 from domain.ports.person_repository import PersonRepository
+from domain.sources.openalex import keep_orcid_if_name_matches
 
 # ---------------------------------------------------------------------------
 # Data loading
@@ -68,16 +69,12 @@ def get_all_unlinked_authorships(cur: Any, queries: PersonsCreateQueries) -> lis
         roles = r.get("roles") or []
         r["allow_create"] = not (r["source"] == "theses" and "author" not in roles)
 
-        # ORCID OpenAlex : ne garder que si le nom de l'entité auteur OA
-        # est compatible avec le raw_author_name de l'authorship
         if r.get("oa_orcid"):
-            oa_ln, oa_fn = parse_raw_author_name(r.get("oa_full_name", ""))
-            if names_compatible(
-                r["last_norm"], r["first_norm"], normalize_name(oa_ln), normalize_name(oa_fn)
-            ):
-                r["orcid"] = r["oa_orcid"]
-            else:
-                r["orcid"] = None
+            r["orcid"] = keep_orcid_if_name_matches(
+                raw_full_name=r["full_name"],
+                oa_full_name=r.get("oa_full_name", ""),
+                oa_orcid=r["oa_orcid"],
+            )
             r.pop("oa_orcid", None)
             r.pop("oa_full_name", None)
 
