@@ -255,17 +255,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/authorships/build_authorships.py`
 
-### ordre canonique des sources pour propagation
-- **localisation** : `application/pipeline/authorships/build_authorships.py:20-26`
-- **description** : Liste ordonnée
-  `[HAL, OpenAlex, WoS, ScanR, theses.fr]` qui définit l'ordre dans
-  lequel `in_perimeter` et `structure_ids` sont propagés vers la table
-  `authorships` (table de vérité).
-- **classification** : (a).
-- **destination domain/** : `domain/sources.py` (déjà existant) →
-  exposer `BUILD_AUTHORSHIP_SOURCE_ORDER` (ou réutiliser
-  `SOURCES_BY_PRIORITY` si déjà en place).
-
 ### règle du full run pour reset
 - **localisation** : `application/pipeline/authorships/build_authorships.py:31-32, 51-56`
 - **description** : Le reset du périmètre+structures n'a lieu que si
@@ -305,10 +294,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 0 | 2 | **2** |
+| **(a) déjà pure** | 0 | 1 | **1** |
 | **(b) décomposable** | 9 | 6 | **15** |
 | **(c) intrinsèque transaction** | 1 | 3 | **4** |
-| **Total** | 10 | 11 | **21** |
+| **Total** | 10 | 10 | **20** |
 
 ### Patterns dupliqués majeurs
 
