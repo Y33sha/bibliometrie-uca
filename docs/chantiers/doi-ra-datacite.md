@@ -154,7 +154,7 @@ extract → resolve_doi_prefixes → fetch_missing_doi (par cible : crossref, da
 - **Couverture DataCite UCA inconnue avant spike**. Si l'apport métadonnées s'avère négligeable (la plupart des DOIs DataCite sont déjà dans HAL avec métadonnées équivalentes), la phase 2 peut être abandonnée et seul le filtre CrossRef sera retenu — gain immédiat sans coût.
 - **Rate limits doi.org/ra** non documentés explicitement. À mesurer en phase 0. Volume négligeable de toute façon (un appel par nouveau préfixe).
 - **Évolutivité du mapping doc_types DataCite** : `resourceTypeGeneral` est une enum officielle stable, mais `resourceType` libre (texte) côté éditeur. Privilégier le general, fallback sur le libre.
-- **Compatibilité avec le chantier `source-persons` (en cours)** : DataCite n'a pas d'identifiant auteur stable côté creator → cas équivalent à OpenAlex/WoS, source synthétisée non écrite dans `source_persons` (cf. décision 2026-04-28). À refléter dans `_SOURCE_CONFIG` de `application/persons.py` lors de la phase 2.
+- **Compatibilité avec le chantier `source-persons` (en cours)** : DataCite n'a pas d'identifiant auteur stable côté creator → cas équivalent à OpenAlex/WoS, source synthétisée non écrite dans `source_persons` (cf. décision 2026-04-28).
 - **Préfixe nouveau pendant un run** : si un nouveau préfixe DOI apparaît entre la phase `resolve_doi_prefixes` et `fetch_missing_doi`, il sera traité avec `ra IS NULL` (best-effort, on tente CrossRef). Une seconde passe le résoudra. Acceptable.
 - **Migration `publishers.doi_prefix` → `doi_prefixes`** : couverture des données existantes incomplète si la colonne n'a pas été remplie systématiquement (la user indique qu'elle n'avait pas commencé). Migration ne portera que sur les rows non-NULL.
 

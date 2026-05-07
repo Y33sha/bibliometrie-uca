@@ -315,41 +315,6 @@ async def detach_name_form(
 # ou détachent TOUTES les authorships d'un auteur source, propagent vers
 # les authorships vérité, et gèrent les identifiants.
 
-# Config par source
-_SOURCE_CONFIG = {
-    "hal": {
-        "author_fk": "source_person_id",
-        "id_fields": ["orcid"],
-        "source_ids_fields": {"idhal": "idhal"},
-    },
-    "openalex": {
-        "author_fk": "source_person_id",
-        "id_fields": ["orcid"],
-        "source_ids_fields": {},
-    },
-    "wos": {
-        "author_fk": "source_person_id",
-        "id_fields": ["orcid"],
-        "source_ids_fields": {},
-    },
-    "scanr": {
-        "author_fk": "source_person_id",
-        "id_fields": ["orcid", "idref"],
-        "source_ids_fields": {},
-    },
-    "theses": {
-        "author_fk": "source_person_id",
-        "id_fields": ["orcid", "idref"],
-        "source_ids_fields": {},
-    },
-    "crossref": {
-        "author_fk": "source_person_id",
-        "id_fields": ["orcid"],
-        "source_ids_fields": {},
-    },
-}
-
-
 # ── Attribution d'authorships orphelines ──
 
 
@@ -370,7 +335,7 @@ async def assign_orphan_authorship(
 
     Retourne True si l'authorship a été attribuée, False sinon.
     """
-    if source not in _SOURCE_CONFIG:
+    if source not in ALL_SOURCES_SET:
         raise ValidationError(f"Source inconnue : {source}")
 
     row = await repo.assign_orphan_sa(person_id, source, authorship_id)
