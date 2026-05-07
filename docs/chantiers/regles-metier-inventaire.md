@@ -37,16 +37,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/persons/identifiers.py` →
   `iter_identifier_writes(authorships) -> Iterable[IdentifierWrite]`
 
-### merge_person / async_merge_person — invariant RH
-- **localisation** : `application/persons.py:452-463` + `:466-472`
-- **description** : Refus de fusion entre deux `persons` ayant chacune
-  une fiche RH distincte (perte d'info humaine). Invariant déjà
-  déporté dans `domain/person.check_can_merge_persons` qui prend le
-  booléen `has_distinct_rh` en argument.
-- **classification** : (a) — décision pure dans `domain/person.py`,
-  fonction application orchestre SELECT + UPDATE + audit.
-- **destination domain/** : n/a (déjà fait, modèle de référence).
-
 ---
 
 ## `application/publications.py`
@@ -62,14 +52,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
   `find_by_nnt`. Prefetch : `doi_match`, `nnt_match`.
 - **destination domain/** : `domain/publications/dedup.py` →
   `decide_publication_match(*, doi_match, nnt_match) -> PublicationMatchDecision`.
-
-### resolve_doi_conflict (orchestration)
-- **localisation** : `application/publications.py:99-125`
-- **description** : Orchestrateur : appelle la règle pure
-  `domain.publication.resolve_doi_conflict` puis applique l'effet
-  `clear_doi`.
-- **classification** : (a) — décision déjà pure.
-- **destination domain/** : n/a (modèle de référence).
 
 ### try_merge_by_doi
 - **localisation** : `application/publications.py:76-96`
@@ -181,16 +163,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **classification** : (b).
 - **destination domain/** : `domain/publications/theses.py` →
   `aggregate_thesis_persons(these: dict) -> list[ThesisAuthorship]`.
-
-### _build_source_meta
-- **localisation** : `application/pipeline/normalize/normalize_theses.py:207-233`
-- **description** : Construction du dict `meta` JSONB pour
-  source_publications theses : dates, discipline, écoles doctorales,
-  partenaires (filtré sur nom non vide).
-- **classification** : (a).
-- **destination domain/** : `domain/publications/theses.py` →
-  `build_thesis_source_meta(these) -> dict | None` (limite : plus du
-  parsing).
 
 ---
 
@@ -368,10 +340,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 15 | 8 | **23** |
-| **(b) décomposable** | 7 | 7 | **14** |
-| **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 24 | 18 | **42** |
+| **(a) déjà pure** | 0 | 6 | **6** |
+| **(b) décomposable** | 9 | 6 | **15** |
+| **(c) intrinsèque transaction** | 1 | 3 | **4** |
+| **Total** | 10 | 15 | **25** |
 
 ### Patterns dupliqués majeurs
 
