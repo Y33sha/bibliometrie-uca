@@ -672,8 +672,8 @@ relocalisées en `domain/`.
     `test_source_ids.py`, `test_merge.py`.
   - Cleanup d'inventaire au passage : item HAL `parse_tei_author_identifiers`
     retiré (règle technique de parsing XML, mieux conservée à côté de
-    la marche TEI qui la consomme — symétrique à `detected_countries`,
-    `_parse_date_iso` déjà classés « limite »).
+    la marche TEI qui la consomme — symétrique à `_parse_date_iso`
+    déjà classé « limite »).
 - **Découpage `last_name`/`first_name` — colonnes supprimées** :
   les colonnes `source_persons.last_name` et
   `source_persons.first_name` sont droppées (migration 022). Le

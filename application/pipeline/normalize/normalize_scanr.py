@@ -307,15 +307,13 @@ def process_authors(
         kept_affiliations = select_leaf_affiliations(author_affiliations)
 
         addr_parts = []
-        detected_countries: list[str] = []
+        detected_countries: set[str] = set()
 
         for aff in kept_affiliations:
             name = (aff.get("name") or "").strip()
             if name:
                 addr_parts.append(name)
-            for c in aff.get("detected_countries") or []:
-                if c not in detected_countries:
-                    detected_countries.append(c)
+            detected_countries.update(aff.get("detected_countries") or [])
 
         sa_id = queries.upsert_scanr_source_authorship(
             cur,
@@ -328,7 +326,7 @@ def process_authors(
         )
 
         if addr_parts:
-            address_linker.link(cur, sa_id, addr_parts, countries=detected_countries or None)
+            address_linker.link(cur, sa_id, addr_parts, countries=list(detected_countries) or None)
 
 
 # =============================================================
