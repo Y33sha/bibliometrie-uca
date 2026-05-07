@@ -56,7 +56,7 @@ def backfill_identifier(cur: Any, conn: Any, id_type: Any, column: Any, source_f
 
     inserted = 0
     for person_id, id_value in rows:
-        add_identifier(cur, person_id, id_type, id_value, source="hal", repo=person_repository(cur))
+        add_identifier(cur, person_id, id_type, id_value, repo=person_repository(cur))
         inserted += 1
 
     conn.commit()

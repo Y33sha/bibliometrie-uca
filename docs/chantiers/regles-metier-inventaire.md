@@ -21,24 +21,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ---
 
-## `application/persons.py`
-
-### add_identifiers_from_authorships
-- **localisation** : `application/persons.py:250-265`
-- **description** : Règle de provenance idref — quand on ingère un
-  identifiant idref depuis un groupe d'authorships, la `source`
-  enregistrée sur `person_identifiers` est celle de l'authorship qui le
-  porte (défaut `"hal"`). L'ORCID et l'idHAL n'ont pas cette logique
-  de provenance variable. Déduplique aussi les couples
-  `(id_type, id_value)` à l'intérieur du lot.
-- **classification** : (b) — décision « quels (type, value, source)
-  émettre depuis une liste d'authorships, sans doublon » est pure ;
-  les `add_identifier(...)` qui suivent sont des effets.
-- **destination domain/** : `domain/persons/identifiers.py` →
-  `iter_identifier_writes(authorships) -> Iterable[IdentifierWrite]`
-
----
-
 ## `application/publications.py`
 
 ### find_or_create — cascade de déduplication
@@ -172,81 +154,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ---
 
-## `application/pipeline/persons/populate_person_name_forms.py`
-
-### diff existant vs recalculé
-- **localisation** : `application/pipeline/persons/populate_person_name_forms.py:87-97`
-- **description** : Compare l'ensemble actuel à celui recalculé pour
-  décider INSERT / UPDATE silencieux / no-op.
-- **classification** : (b) — décision pure si on prefetch la map.
-  Marginal.
-- **destination domain/** : `domain/persons/sourcing.py` →
-  `decide_name_form_diff(new, old) -> Literal["insert","update","noop"]`
-  (à ne rapatrier que si on veut les tests dédiés).
-
----
-
-## `application/pipeline/publications/create_publications.py`
-
-### cascade dedup DOI > NNT > titre+année+journal
-- **localisation** : `application/pipeline/publications/create_publications.py:62-76`
-  (délégué à `application.publications.find_or_create`)
-- **description** : Recherche en cascade DOI > NNT > (titre normalisé +
-  année + journal). **Règle centrale de déduplication**.
-- **classification** : (b) — décomposable (déjà couvert par
-  `find_or_create` ci-dessus).
-- **destination domain/** : `domain/publications/dedup.py` →
-  `decide_publication_match` (même fonction).
-
----
-
-## `application/pipeline/publications/merge_pubs_by_hal_id.py`
-
-### identification des doublons par hal_id
-- **localisation** : `application/pipeline/publications/merge_pubs_by_hal_id.py:25-72`
-- **description** : Croise `source_publications` HAL et celles
-  d'autres sources portant un `hal_id` dans `external_ids` ; classe
-  chaque correspondance en `link_only` (HAL non rattaché) vs
-  `merge_needed` (deux `publication_id` distincts à fusionner).
-- **classification** : (b) — décision pure si on lui passe les deux
-  listes de rows.
-- **destination domain/** : `domain/publications/dedup.py` →
-  `classify_hal_id_duplicates(hal_rows, other_source_rows) -> tuple[list[LinkAction], list[MergeAction]]`.
-
----
-
-## `application/pipeline/publications/merge_pubs_by_nnt.py`
-
-### choix de la publication cible de fusion
-- **localisation** : `application/pipeline/publications/merge_pubs_by_nnt.py:44-48`
-  (délégué à `queries.rank_publications_by_merge_priority`)
-- **description** : Parmi N publications partageant un NNT, choisit
-  la cible par tri par priorité (sources, ancienneté, complétude).
-  Tri aujourd'hui en SQL.
-- **classification** : (b) — prefetch des publis avec leurs sources,
-  dates, complétude.
-- **destination domain/** : `domain/publications/merge.py` →
-  `rank_publications_by_merge_priority(pubs: list[PubMergeCandidate]) -> list[int]`.
-
----
-
-## `application/pipeline/authorships/build_authorships.py`
-
-### invariant union des structures par source
-- **localisation** : `application/pipeline/authorships/build_authorships.py:58-63`
-- **description** : `authorships.in_perimeter` est un OR logique sur
-  les sources et `structure_ids` est l'union des `structure_ids`
-  portés par les `source_authorships` rattachées. Invariant de la
-  table de vérité.
-- **classification** : (b) — règle pure mais aujourd'hui exécutée en
-  SQL côté query (perf). À garder en SQL pour la prod, formaliser
-  l'invariant en domain comme contrat testé.
-- **destination domain/** : `domain/persons/sourcing.py` →
-  `aggregate_authorship_perimeter(source_rows) -> tuple[bool, list[int]]`
-  (utile pour les tests).
-
----
-
 ## Synthèse globale
 
 ### Comptage par classification
@@ -254,9 +161,9 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
 | **(a) déjà pure** | 0 | 0 | **0** |
-| **(b) décomposable** | 9 | 6 | **15** |
+| **(b) décomposable** | 8 | 1 | **9** |
 | **(c) intrinsèque transaction** | 0 | 0 | **0** |
-| **Total** | 9 | 6 | **15** |
+| **Total** | 8 | 1 | **9** |
 
 ### Patterns dupliqués majeurs
 
