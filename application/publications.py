@@ -28,6 +28,7 @@ from domain.publication import (
     clean_publication_title,
 )
 from domain.publication import resolve_doi_conflict as _domain_resolve_doi_conflict
+from domain.publications.dedup import has_minimal_publication_metadata
 from domain.sources import SOURCE_PRIORITY
 
 # Re-export des namedtuples pour les call sites historiques (scripts,
@@ -152,7 +153,7 @@ def find_or_create(
     Retourne (publication_id, is_new).
     Si allow_create=False et aucune publication trouvee, retourne (None, False).
     """
-    if not pub_year or not title:
+    if not has_minimal_publication_metadata(title, pub_year):
         return None, False
 
     # Décode un éventuel titre double-encodé (OpenAlex / ScanR remontent

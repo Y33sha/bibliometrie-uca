@@ -47,6 +47,7 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
+from domain.publications.dedup import has_minimal_publication_metadata
 from domain.sources.crossref import (
     extract_crossref_meta,
     extract_crossref_pub_year,
@@ -298,8 +299,9 @@ def find_publication(
     title = get_title(msg)
     pub_year = get_pub_year(msg)
     doi = get_doi(msg)
-    if not doi or not title or not pub_year:
+    if not doi or not has_minimal_publication_metadata(title, pub_year):
         return None
+    assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
     pub_id, _ = find_or_create_publication(
         cur,
         title=title,
@@ -349,10 +351,11 @@ def process_work(
 
     title = get_title(msg)
     pub_year = get_pub_year(msg)
-    if not title or not pub_year:
+    if not has_minimal_publication_metadata(title, pub_year):
         logger.warning(f"CrossRef {doi} sans titre ou année — pas de rattachement possible, skip")
         staging_queries.mark_done(cur, staging_id)
         return None
+    assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
 
     publisher_id = upsert_publisher(cur, msg, publisher_repo=publisher_repo)
     journal_id = upsert_journal(cur, msg, publisher_id, journal_repo=journal_repo)

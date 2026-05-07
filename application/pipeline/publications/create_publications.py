@@ -27,6 +27,7 @@ from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import OA_STATUS_UNKNOWN_DEFAULT, normalize_nnt
+from domain.publications.dedup import has_minimal_publication_metadata
 
 
 def process_document(
@@ -40,7 +41,7 @@ def process_document(
     """Crée ou rattache une publication pour un source_document orphelin."""
     title = doc["title"] or ""
     pub_year = doc["pub_year"]
-    if not title or not pub_year:
+    if not has_minimal_publication_metadata(title, pub_year):
         return False
 
     doi = doc["doi"]

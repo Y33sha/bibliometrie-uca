@@ -42,6 +42,7 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi, normalize_nnt
+from domain.publications.dedup import has_minimal_publication_metadata
 from domain.sources.hal import derive_hal_doc_type, derive_hal_oa_status
 from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
 
@@ -659,7 +660,7 @@ def process_work(
         t = StepTimer()
         title = get_title(doc)
         pub_year = doc.get("producedDateY_i")
-        if not title or not pub_year:
+        if not has_minimal_publication_metadata(title, pub_year):
             logger.warning(f"Impossible d'insérer {hal_id} — titre ou année manquant")
             return False
 
