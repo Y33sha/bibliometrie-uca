@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.db.engine import get_async_engine
 from infrastructure.db.queries.filters import (
     OA_CLOSED_SQL,
@@ -71,7 +72,7 @@ class _PublicationFacetsBuilder:
         f = self.filters
         out: list[WhereClause | None] = []
         if f.person_id:
-            out.append(WhereClause("p.doc_type NOT IN ('peer_review', 'memoir')", {}))
+            out.append(WhereClause(f"p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}", {}))
             out.append(person_clause(f.person_id))
         else:
             out.append(WhereClause(PUB_IS_UCA, {}))

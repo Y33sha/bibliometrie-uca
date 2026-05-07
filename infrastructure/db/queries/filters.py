@@ -11,6 +11,8 @@ Vit dans `infrastructure/` parce que ces fonctions génèrent du SQL
 from dataclasses import dataclass
 from typing import Any
 
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
+
 OA_OPEN_STATUSES = ("gold", "hybrid", "bronze", "green", "diamond")
 OA_CLOSED_STATUSES = ("closed", "unknown")
 
@@ -28,12 +30,13 @@ OA_OPEN_SQL = _sql_list(OA_OPEN_STATUSES)
 OA_CLOSED_SQL = _sql_list(OA_CLOSED_STATUSES)
 
 # Filtre SQL : la publication a au moins un authorship dans le périmètre.
-# Exclut les peer_review et les personnes rejetées (fausses entités).
-PUB_IS_UCA = """(
+# Exclut les doc_types out-of-scope et les personnes rejetées (fausses
+# entités).
+PUB_IS_UCA = f"""(
     EXISTS (SELECT 1 FROM authorships a
             JOIN persons pe ON pe.id = a.person_id AND pe.rejected = FALSE
             WHERE a.publication_id = p.id AND a.in_perimeter = TRUE)
-    AND p.doc_type NOT IN ('peer_review', 'memoir')
+    AND p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
 )"""
 
 

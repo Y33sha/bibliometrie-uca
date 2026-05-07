@@ -523,6 +523,21 @@ relocalisées en `domain/`.
   mauvaises assignations auteur×signature côté OpenAlex (qui hériteraient
   un ORCID erroné). Le call site dans `create_persons_from_source_authorships`
   passe de 9 lignes à 5.
+- **`domain/publications/` ouvert + scope.py expliciter la règle SQL
+  implicite** : la vue SQL `v_active_publications` cachait la règle
+  « doc_types out-of-scope » (peer_review, memoir : pas de matching
+  person, pas d'authorship canonique, invisibles dans listings/stats)
+  sans la documenter. Création de `domain/publications/scope.py` :
+  `OUT_OF_SCOPE_DOC_TYPES` (frozenset) + `OUT_OF_SCOPE_DOC_TYPES_SQL`
+  (forme SQL pour `NOT IN`). Refactor des 6 sites SQL qui hardcodaient
+  la liste. La vue elle-même reste figée dans la migration (Postgres
+  ne peut pas importer Python), mais un test d'intégration
+  (`tests/integration/infrastructure/db/test_active_publications_view.py`)
+  parse `pg_views` et garantit que la vue reflète bien la constante
+  Python — garde-fou contre la divergence silencieuse. Pour les 2 sites
+  qui étendent avec `ongoing_thesis` (stats de contribution effective),
+  construction locale documentée à partir de `OUT_OF_SCOPE_DOC_TYPES`.
+  Aucun changement comportemental — uniquement de l'explicitation.
 - **`domain/persons/` ouvert et `domain/person.py` scindé** : le
   fichier plat à la racine est éclaté en trois sous-modules thématiques
   (cf. décision n°1 du chantier — granularité = dossier).

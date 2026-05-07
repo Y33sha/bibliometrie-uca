@@ -7,16 +7,17 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from domain.names import parse_raw_author_name
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from domain.sources import AUTHOR_SOURCES_SQL
 
 # ── Orphan authorships ───────────────────────────────────────────
 
 # Filtre commun : in_perimeter, sans person_id, sources principales,
-# hors mémoires, hors personnes rejetées
+# hors doc_types out-of-scope, hors personnes rejetées
 _ORPHAN_BASE = f"""
     sa.person_id IS NULL AND sa.in_perimeter = TRUE
     AND sa.source IN {AUTHOR_SOURCES_SQL}
-    AND p.doc_type NOT IN ('memoir', 'peer_review')
+    AND p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
     AND NOT EXISTS (
         SELECT 1 FROM source_authorships sa2
         JOIN persons pe ON pe.id = sa2.person_id AND pe.rejected = TRUE
