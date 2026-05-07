@@ -294,16 +294,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/persons/matching.py` →
   `decide_cross_source_match(authorship_source, last_norm, first_norm, candidates) -> int | None`.
 
-### décision de match par identifiant unique (IdRef, ORCID)
-- **localisation** : `application/pipeline/persons/create_persons_from_source_authorships.py:232-247` (idref) + `:272-287` (orcid)
-- **description** : Si l'authorship porte un IdRef/ORCID présent dans
-  la map identifier → person_id (statut non rejeté), rattacher.
-  **Dupliqué structurellement** entre les deux types.
-- **classification** : (b) — prefetch `idref_map`/`orcid_map`.
-- **destination domain/** : `domain/persons/matching.py` →
-  `decide_match_by_identifier(value, identifier_map) -> int | None`
-  (générique, mutualise les deux).
-
 ### cascade de lookup par name_form
 - **localisation** : `application/pipeline/persons/create_persons_from_source_authorships.py:317-327`
 - **description** : Construit l'ordre des formes de nom à essayer
@@ -526,9 +516,9 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
 | **(a) déjà pure** | 15 | 12 | **27** |
-| **(b) décomposable** | 7 | 10 | **17** |
+| **(b) décomposable** | 7 | 9 | **16** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 24 | 25 | **49** |
+| **Total** | 24 | 24 | **48** |
 
 ### Patterns dupliqués majeurs
 
@@ -540,12 +530,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
    — implémentée 5 fois, une par source : HAL, OpenAlex, WoS, ScanR,
    theses, Crossref. Toutes variantes de `decide_publication_match`.
    À unifier dans `domain/publications/dedup.py`.
-
-7. **Match par identifiant unique → person_id** — trois clones
-   structurellement identiques (cross-source, IdRef, ORCID) qui ne
-   diffèrent que par la map de prefetch. À mutualiser en
-   `decide_match_by_identifier(value, identifier_map)` dans
-   `domain/persons/matching.py`.
 
 8. **Choix de canonicité par source** — la règle « HAL gagne en cas
    de doublon » (`merge_pubs_by_hal_id`) et le ranking NNT

@@ -49,6 +49,7 @@ from application.ports.persons_create import PersonsCreateQueries
 from domain.names import names_compatible, parse_raw_author_name
 from domain.normalize import normalize_name
 from domain.persons.creation import allow_person_creation
+from domain.persons.matching import decide_match_by_identifier
 from domain.ports.person_repository import PersonRepository
 from domain.sources.openalex import keep_orcid_if_name_matches
 
@@ -218,11 +219,7 @@ def step1b_idref(
         if (a["source"], a["authorship_id"]) in linked_ids:
             continue
 
-        idref = a.get("idref")
-        if not idref:
-            continue
-
-        pid = idref_map.get(idref)
+        pid = decide_match_by_identifier(a.get("idref"), idref_map)
         if pid:
             if not dry_run:
                 link_to_person(cur, pid, [a], repo=person_repo)
@@ -258,11 +255,7 @@ def step2_orcid(
         if (a["source"], a["authorship_id"]) in linked_ids:
             continue
 
-        orcid = a.get("orcid")
-        if not orcid:
-            continue
-
-        pid = orcid_map.get(orcid)
+        pid = decide_match_by_identifier(a.get("orcid"), orcid_map)
         if pid:
             if not dry_run:
                 link_to_person(cur, pid, [a], repo=person_repo)

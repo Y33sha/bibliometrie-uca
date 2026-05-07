@@ -12,7 +12,7 @@ def check_can_merge_persons(has_distinct_rh: bool, target_id: int, source_id: in
     """Valide qu'une fusion de personnes est autorisée.
 
     Invariant : refus si les deux personnes ont chacune une fiche RH
-    distincte (risque de perdre de l'information humaine).
+    distincte (risque de perdre de l'information RH).
 
     Lève `ConflictError` avec le message standardisé si l'invariant est
     violé. L'appelant reste responsable de fournir l'information
