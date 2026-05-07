@@ -311,15 +311,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/persons/create_persons_from_source_authorships.py`
 
-### règle allow_create pour rôles thèse
-- **localisation** : `application/pipeline/persons/create_persons_from_source_authorships.py:68-70`
-- **description** : Invariant « les rôles non-auteur des thèses
-  (directeurs, rapporteurs, jury) ne déclenchent jamais la création
-  d'une nouvelle personne ». `allow_create = not (source == 'theses' and 'author' not in roles)`.
-- **classification** : (a).
-- **destination domain/** : `domain/persons/sourcing.py` →
-  `allow_person_creation_from_authorship(source: str, roles: list[str]) -> bool`.
-
 ### décision de match par cross-source
 - **localisation** : `application/pipeline/persons/create_persons_from_source_authorships.py:189-198`
 - **description** : Pour une authorship sans `person_id`, parcourt les
@@ -561,10 +552,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 15 | 13 | **28** |
+| **(a) déjà pure** | 15 | 12 | **27** |
 | **(b) décomposable** | 10 | 10 | **20** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 27 | 26 | **53** |
+| **Total** | 27 | 25 | **52** |
 
 ### Patterns dupliqués majeurs
 

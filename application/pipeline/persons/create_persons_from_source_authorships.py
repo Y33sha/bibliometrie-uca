@@ -48,6 +48,7 @@ from application.persons import (
 from application.ports.persons_create import PersonsCreateQueries
 from domain.names import names_compatible, parse_raw_author_name
 from domain.normalize import normalize_name
+from domain.persons.creation import allow_person_creation
 from domain.ports.person_repository import PersonRepository
 from domain.sources.openalex import keep_orcid_if_name_matches
 
@@ -65,9 +66,7 @@ def get_all_unlinked_authorships(cur: Any, queries: PersonsCreateQueries) -> lis
         r["last_norm"] = normalize_name(r["last_name"])
         r["first_norm"] = normalize_name(r["first_name"])
 
-        # Les rôles non-auteur des thèses ne créent pas de personne
-        roles = r.get("roles") or []
-        r["allow_create"] = not (r["source"] == "theses" and "author" not in roles)
+        r["allow_create"] = allow_person_creation(r["source"], r.get("roles") or [])
 
         if r.get("oa_orcid"):
             r["orcid"] = keep_orcid_if_name_matches(
