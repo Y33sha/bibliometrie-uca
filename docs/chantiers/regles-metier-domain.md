@@ -560,6 +560,15 @@ relocalisées en `domain/`.
 
   L'item est **retiré de l'inventaire** plutôt que rapatrié — c'était
   une mauvaise modélisation initiale.
+- **`has_minimal_publication_metadata` ajouté à `domain/publications/dedup.py`** :
+  invariant « titre non vide + année renseignée requis pour
+  créer/dédupliquer une publication » factorisé depuis 6 sites
+  dupliqués (`application/publications.py:155`,
+  `pipeline/publications/create_publications.py:43`, et 4 normalizers
+  HAL/ScanR/Crossref). Nouveau fichier `dedup.py` dans le dossier
+  `domain/publications/` ouvert précédemment, qui accueillera la
+  cascade de matching DOI/NNT/title+year+journal et les invariants
+  associés.
 - **`decide_cross_source_match` ajouté à `domain/persons/matching.py`** :
   factorisation de l'étape 1 du pipeline persons (rattachement par
   `(publication_id, author_position)` à une `person_id` connue d'une

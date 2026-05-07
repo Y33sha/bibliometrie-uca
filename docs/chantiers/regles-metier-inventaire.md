@@ -311,15 +311,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/publications/create_publications.py`
 
-### prérequis de création d'une publication
-- **localisation** : `application/pipeline/publications/create_publications.py:42-44`
-- **description** : Une publication ne peut être créée que si elle a
-  au minimum titre + année. Invariant métier.
-- **classification** : (a).
-- **destination domain/** : `domain/publications/dedup.py` →
-  `has_minimal_publication_metadata(title, pub_year) -> bool` (ou
-  invariant documenté en haut de `decide_publication_match`).
-
 ### normalisation pre-lookup
 - **localisation** : `application/pipeline/publications/create_publications.py:48,57,68,69`
 - **description** : Avant lookup, canonicalise `doc_type` (via
@@ -465,10 +456,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 15 | 9 | **24** |
+| **(a) déjà pure** | 15 | 8 | **23** |
 | **(b) décomposable** | 7 | 7 | **14** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 24 | 19 | **43** |
+| **Total** | 24 | 18 | **42** |
 
 ### Patterns dupliqués majeurs
 

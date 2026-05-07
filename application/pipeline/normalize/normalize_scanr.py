@@ -36,6 +36,7 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
+from domain.publications.dedup import has_minimal_publication_metadata
 from domain.sources.scanr import (
     derive_scanr_oa_status,
     extract_nnt_from_scanr_id,
@@ -358,7 +359,7 @@ def process_work(
     try:
         title = get_title(doc)
         pub_year = doc.get("year")
-        if not title or not pub_year:
+        if not has_minimal_publication_metadata(title, pub_year):
             logger.warning(f"Impossible d'insérer {scanr_id} — titre ou année manquant")
             return False
 
