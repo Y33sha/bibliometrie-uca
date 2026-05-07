@@ -172,6 +172,15 @@ métadonnées éditeur déposé en parallèle sur HAL (HAL non canonique).
 `identification des doublons par hal_id` (b)) appelé par les trois
 sites de fusion.
 
+**Sous-point** : `merge_pubs_by_nnt` ne gère pas les redirections en
+chaîne (contrairement à `merge_pubs_by_hal_id` qui a un `resolve()`
+local pour suivre les redirections accumulées dans le batch). Si dans
+un même run une fusion produit `pub_A → pub_B` puis qu'une autre
+demande `pub_X → pub_A`, on tente de fusionner vers `pub_A` déjà
+disparu → erreur capturée par le savepoint, fusion perdue. Bug
+potentiel ou cas qui ne se produit jamais — à mesurer. Le résolveur
+serait à porter dans le helper unifié des 3 sites de fusion.
+
 ## Crossref absent de `build_authorships.all_sources`
 
 [`build_authorships.py:20-26`](application/pipeline/authorships/build_authorships.py#L20)
