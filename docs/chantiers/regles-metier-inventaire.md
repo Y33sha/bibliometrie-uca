@@ -220,33 +220,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/publications/dedup.py` →
   `classify_hal_id_duplicates(hal_rows, other_source_rows) -> tuple[list[LinkAction], list[MergeAction]]`.
 
-### règle de préservation de la publication HAL
-- **localisation** : `application/pipeline/publications/merge_pubs_by_hal_id.py:99-110, :138-143`
-- **description** : Quand deux publications partagent un hal_id, on
-  conserve celle portée par HAL et on fusionne l'autre dedans. HAL
-  prime comme entité de référence.
-- **classification** : (a).
-- **destination domain/** : `domain/publications/merge.py` →
-  `pick_canonical_publication_by_source_priority(target_source_priority, candidates) -> int`.
-
-### résolveur de chaînes de fusion
-- **localisation** : `application/pipeline/publications/merge_pubs_by_hal_id.py:115-122`
-- **description** : Pendant un batch, suit les redirections
-  `pub_id → pub_id_cible` accumulées pour ne pas fusionner vers une
-  publication elle-même déjà fusionnée (avec garde anti-cycle). La
-  cible finale doit toujours être l'entité encore vivante.
-- **classification** : (a).
-- **destination domain/** : `domain/publications/merge.py` →
-  `resolve_merge_redirect(pub_id, redirects) -> int`.
-
-### déduplication des paires à fusionner
-- **localisation** : `application/pipeline/publications/merge_pubs_by_hal_id.py:42-43, 60-69`
-- **description** : Pour un même `hal_doc_id`, ignorer les link_only
-  redondants ; pour une même paire `(src_pub, hal_pub)`, ne demander
-  qu'une seule fusion.
-- **classification** : (a).
-- **destination domain/** : intégré dans `classify_hal_id_duplicates`.
-
 ---
 
 ## `application/pipeline/publications/merge_pubs_by_nnt.py`
@@ -332,10 +305,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 0 | 5 | **5** |
+| **(a) déjà pure** | 0 | 2 | **2** |
 | **(b) décomposable** | 9 | 6 | **15** |
 | **(c) intrinsèque transaction** | 1 | 3 | **4** |
-| **Total** | 10 | 14 | **24** |
+| **Total** | 10 | 11 | **21** |
 
 ### Patterns dupliqués majeurs
 

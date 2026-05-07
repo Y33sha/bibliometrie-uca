@@ -146,3 +146,28 @@ auteurs (constante `MAX_AUTHORS_CROSS_SOURCE`, à harmoniser avec
 Coût : ajout d'un argument `total_author_count` à
 `decide_cross_source_match` + compute du count côté caller (depuis
 le prefetch ou une query supplémentaire).
+
+## Unifier la règle de choix de cible de fusion
+
+Trois fusions de publications coexistent dans le pipeline avec **trois
+règles ad hoc** pour décider laquelle des deux publis survit :
+
+- `merge_pubs_by_hal_id` : « HAL gagne » (ordre des arguments fixé
+  dans `_merge_pub(cur, hal_pub_id, src_pub_id, ...)`).
+- `merge_pubs_by_nnt` : ranking SQL via
+  `queries.rank_publications_by_merge_priority` (priorité sources +
+  ancienneté + complétude).
+- `try_merge_by_doi` (`application/publications.py`) : sa propre
+  cascade.
+
+Sans impact métier réel (les métadonnées canoniques sont triangulées
+par `refresh_from_sources` selon `SOURCE_PRIORITY` après la fusion)
+mais incohérence de code. La règle « HAL gagne » est en plus
+discutable sur le fond : une publi avec hal_id peut venir d'OA/ScanR
+qui moissonnent HAL (HAL canonique) ou d'un article CrossRef avec
+métadonnées éditeur déposé en parallèle sur HAL (HAL non canonique).
+
+À unifier : un seul `rank_publications_by_merge_priority` (porté en
+`domain/publications/merge.py` lors du chantier
+`identification des doublons par hal_id` (b)) appelé par les trois
+sites de fusion.
