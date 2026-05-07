@@ -452,6 +452,12 @@ relocalisées en `domain/`.
   comparabilité avec `person_identifiers`. Suppression au passage
   de `interfaces/cli/crossref_spike.py` (one-shot phase 0
   crossref, livrable terminé).
+- **`is_wos_author_exploitable` rapatriée** : filtre WoS « auteur
+  exploitable = `daisng_id` + `full_name` non vides » sorti de
+  `normalize_wos.py` vers `domain/sources/wos.py`. Le `daisng_id` n'est
+  plus une clé d'unicité côté DB depuis le chantier source_persons,
+  mais reste un signal de qualité du parsing API WoS — son absence
+  signale un enregistrement douteux à écarter. 4 tests unitaires.
 - **`extract_thesis_year` rapatriée + déduplication** : règle
   « pub_year = soutenance, sinon première inscription » dupliquée
   verbatim dans `extract_pub_metadata` et `insert_source_document`

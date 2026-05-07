@@ -39,7 +39,7 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
-from domain.sources.wos import derive_wos_api_oa_status
+from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
 
 # =============================================================
 # UTILITAIRES
@@ -529,10 +529,9 @@ def process_authorships(
         if org_name not in _wos_institution_cache:
             upsert_wos_institution(cur, queries, {"name": org_name})
 
-    # Filtrer les auteurs exploitables (skip les sans nom ou sans daisng_id —
-    # daisng_id n'est plus une clé d'unicité côté DB mais reste un signal
-    # de qualité côté API : pas de daisng_id = parsing API douteux).
-    authors_kept = [a for a in rec.get("authors", []) if a.get("daisng_id") and a.get("full_name")]
+    # Filtrer les auteurs exploitables (cf. `is_wos_author_exploitable`
+    # pour la sémantique du filtre).
+    authors_kept = [a for a in rec.get("authors", []) if is_wos_author_exploitable(a)]
     if not authors_kept:
         return
 
