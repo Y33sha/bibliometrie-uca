@@ -479,6 +479,20 @@ relocalisées en `domain/`.
   désormais directement depuis `domain.names`. La fonction elle-même
   était déjà en domain — l'item d'inventaire portait sur
   l'organisation, pas sur la migration.
+- **CrossRef — 4 helpers purs rapatriés** : nouveau module
+  `domain/sources/crossref.py` regroupant `strip_jats_tags(s)`
+  (retire les balises XML JATS de l'abstract), `extract_crossref_pub_year(msg, *, max_year)`
+  (cascade `published > issued > published-online > published-print`,
+  clamp `[1500, max_year]`), `parse_crossref_issns(msg)` (sépare
+  ISSN print et eissn via `issn-type`, fallback sur le premier `ISSN`
+  brut) et `extract_crossref_meta(msg)` (whitelist
+  `license`/`funder`/`relation`/`references_count`/`indexed.timestamp`).
+  `max_year` est désormais un paramètre injecté (testabilité), le
+  caller passe `datetime.date.today().year + 1`. Les fonctions
+  `get_pub_year`/`get_issns`/`get_abstract`/`get_meta` du normalizer
+  deviennent de fines adaptatrices locales (1-4 lignes) qui injectent
+  le contexte calendrier ou le None-handling autour de la fonction
+  domain. Tests déplacés dans `tests/unit/domain/sources/test_crossref.py`.
 - **Découpage `last_name`/`first_name` — colonnes supprimées** :
   les colonnes `source_persons.last_name` et
   `source_persons.first_name` sont droppées (migration 022). Le

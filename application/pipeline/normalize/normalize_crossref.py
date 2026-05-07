@@ -29,7 +29,6 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 from __future__ import annotations
 
 import datetime
-import re
 from collections.abc import Callable
 from typing import Any
 
@@ -48,6 +47,12 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
+from domain.sources.crossref import (
+    extract_crossref_meta,
+    extract_crossref_pub_year,
+    parse_crossref_issns,
+    strip_jats_tags,
+)
 
 # =============================================================
 # EXTRACTEURS DE CHAMPS
@@ -71,29 +76,7 @@ def get_title(msg: dict) -> str | None:
 
 
 def get_pub_year(msg: dict) -> int | None:
-    """Année de publication, dans l'ordre : published > issued > online > print.
-
-    Sémantique CrossRef : `published` = min(published-online, published-print) ;
-    `issued` = date déclarée par l'éditeur (peut être prospective sur des
-    "futur numéro" 2030+ déposés avant publication réelle).
-
-    Borne supérieure à `current_year + 1` (un preprint daté de l'année
-    suivante reste plausible). Au-dessus, on considère la donnée polluée
-    et on retourne None — process_work skippera la normalisation, et
-    refresh_from_sources arbitrera depuis les autres sources.
-    """
-    max_year = datetime.date.today().year + 1
-    for field in ("published", "issued", "published-online", "published-print"):
-        d = msg.get(field) or {}
-        date_parts = d.get("date-parts") or []
-        if date_parts and isinstance(date_parts[0], list) and date_parts[0]:
-            try:
-                year = int(date_parts[0][0])
-                if 1500 <= year <= max_year:
-                    return year
-            except (TypeError, ValueError):
-                continue
-    return None
+    return extract_crossref_pub_year(msg, max_year=datetime.date.today().year + 1)
 
 
 def get_container_title(msg: dict) -> str | None:
@@ -108,28 +91,7 @@ def get_container_title(msg: dict) -> str | None:
 
 
 def get_issns(msg: dict) -> tuple[str | None, str | None]:
-    """Retourne (issn print, eissn) si distinguables, sinon (premier ISSN, None)."""
-    issn_print: str | None = None
-    eissn: str | None = None
-    for issn_obj in msg.get("issn-type") or []:
-        if not isinstance(issn_obj, dict):
-            continue
-        t = issn_obj.get("type")
-        v = issn_obj.get("value")
-        if not isinstance(v, str) or not v.strip():
-            continue
-        if t == "electronic" and not eissn:
-            eissn = v.strip()
-        elif t == "print" and not issn_print:
-            issn_print = v.strip()
-    if issn_print or eissn:
-        return issn_print, eissn
-    issns = msg.get("ISSN") or []
-    if isinstance(issns, list) and issns:
-        first = issns[0]
-        if isinstance(first, str) and first.strip():
-            return first.strip(), None
-    return None, None
+    return parse_crossref_issns(msg)
 
 
 def get_publisher_name(msg: dict) -> str | None:
@@ -147,15 +109,11 @@ def get_keywords(msg: dict) -> list[str] | None:
     return cleaned or None
 
 
-_JATS_TAG_RE = re.compile(r"<[^>]+>")
-
-
 def get_abstract(msg: dict) -> str | None:
-    """CrossRef stocke l'abstract en JATS XML ; on retire les tags."""
     abstract = msg.get("abstract")
     if not isinstance(abstract, str) or not abstract.strip():
         return None
-    cleaned = _JATS_TAG_RE.sub("", abstract).strip()
+    cleaned = strip_jats_tags(abstract).strip()
     return cleaned or None
 
 
@@ -199,26 +157,7 @@ def get_biblio(msg: dict) -> dict | None:
 
 
 def get_meta(msg: dict) -> dict | None:
-    """Champs CrossRef-spécifiques stockés en jsonb (cf. décision actée plan).
-
-    On stocke license/funder/relation/references_count/indexed_timestamp
-    tels quels ; le sous-objet ``meta->'relation'`` est consommé par
-    l'étape « relations » de l'ingestion des sujets.
-    """
-    meta: dict[str, Any] = {}
-    for key in ("license", "funder", "relation"):
-        val = msg.get(key)
-        if val:
-            meta[key] = val
-    refs_count = msg.get("references-count")
-    if isinstance(refs_count, int) and refs_count > 0:
-        meta["references_count"] = refs_count
-    indexed = msg.get("indexed") or {}
-    if isinstance(indexed, dict):
-        ts = indexed.get("timestamp") or indexed.get("date-time")
-        if ts:
-            meta["indexed"] = ts
-    return meta or None
+    return extract_crossref_meta(msg)
 
 
 # =============================================================
