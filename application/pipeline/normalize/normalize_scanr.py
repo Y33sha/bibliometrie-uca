@@ -31,7 +31,7 @@ from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
 from domain.persons.creation import should_create_source_person
-from domain.persons.identifiers import normalize_orcid
+from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
@@ -294,12 +294,10 @@ def process_authors(
         source_person_id = upsert_scanr_author(cur, queries, author_data)
 
         denorm = author_data.get("denormalized") or {}
-        ids: dict = {}
-        orcid = normalize_orcid(denorm.get("orcid"))
-        if orcid:
-            ids["orcid"] = orcid
-        if denorm.get("idref"):
-            ids["idref"] = denorm["idref"]
+        ids = compact_identifiers(
+            orcid=normalize_orcid(denorm.get("orcid")),
+            idref=denorm.get("idref"),
+        )
         identifiers = Json(ids) if ids else None
 
         raw_role = author_data.get("role")

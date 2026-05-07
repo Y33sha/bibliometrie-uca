@@ -34,7 +34,7 @@ from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
-from domain.persons.identifiers import normalize_orcid
+from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
@@ -467,16 +467,6 @@ def insert_wos_document(
 # directement sur source_authorships.identifiers.
 
 
-def _build_wos_identifiers(author: dict) -> dict | None:
-    """Construit le dict d'identifiants normalisés pour une authorship WoS."""
-    ids: dict = {}
-    if author.get("orcid"):
-        ids["orcid"] = author["orcid"]
-    if author.get("researcher_id"):
-        ids["researcher_id"] = author["researcher_id"]
-    return ids or None
-
-
 def _resolve_addresses_batch(
     cur: Any, queries: WosNormalizeQueries, raw_texts: set
 ) -> dict[str, int]:
@@ -551,7 +541,10 @@ def process_authorships(
                 institution_ids.append(_wos_institution_cache[name])
 
         name_norm = normalize_name_form(author["full_name"])
-        ids = _build_wos_identifiers(author)
+        ids = compact_identifiers(
+            orcid=author.get("orcid"),
+            researcher_id=author.get("researcher_id"),
+        )
 
         values[position] = (
             "wos",

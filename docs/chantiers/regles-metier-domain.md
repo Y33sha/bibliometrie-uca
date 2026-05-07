@@ -699,6 +699,19 @@ relocalisées en `domain/`.
   Bonus : la règle « Nom, Prénom » (avec virgule) est désormais
   correctement parsée pour HAL/ScanR/theses — leur split inline
   ne la gérait pas.
+- **`compact_identifiers` ajouté à `domain/persons/identifiers.py`** :
+  helper générique kwargs → `dict | None` qui filtre les valeurs falsy,
+  utilisé par les 5 normalizers (HAL, OpenAlex, WoS, ScanR, Crossref) pour
+  construire `source_authorships.identifiers`. Le helper privé WoS
+  `_build_wos_identifiers` est supprimé. La logique reste sans dispatch
+  par source : chaque caller passe ses propres kwargs (orcid, idref,
+  idhal, hal_person_id, researcher_id selon la source) et garde ses
+  gardes spécifiques en amont — notamment HAL qui passe `None` pour les
+  sentinelles `hal_person_id <= 0`. Suppression de l'item correspondant
+  dans l'inventaire ; les suggestions associées
+  `build_authorship_identifiers_for_source` et `IDENTIFIER_FIELDS_BY_SOURCE`
+  retirées de la synthèse car elles auraient figé le couplage par source
+  dans domain.
 
 ## Décisions actées
 

@@ -37,7 +37,7 @@ from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
 from domain.persons.creation import should_create_source_person
-from domain.persons.identifiers import normalize_orcid
+from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
@@ -577,16 +577,15 @@ def process_authors(
         if not name:
             continue
 
-        # Identifiants normalisés cross-source pour cette authorship
-        ids: dict[str, Any] = {}
-        if orcid:
-            ids["orcid"] = orcid
-        if idref:
-            ids["idref"] = idref
-        if idhal:
-            ids["idhal"] = idhal
-        if hal_person_id and hal_person_id > 0:
-            ids["hal_person_id"] = hal_person_id
+        # Identifiants normalisés cross-source pour cette authorship.
+        # `hal_person_id <= 0` est une sentinelle HAL "auteur non identifié"
+        # à ne pas stocker (cf. domain.persons.creation).
+        ids = compact_identifiers(
+            orcid=orcid,
+            idref=idref,
+            idhal=idhal,
+            hal_person_id=hal_person_id if hal_person_id and hal_person_id > 0 else None,
+        )
         identifiers = Json(ids) if ids else None
 
         # Structures affiliées à cet auteur sur ce document (par form_id)
