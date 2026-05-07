@@ -195,14 +195,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/publications/create_publications.py`
 
-### normalisation pre-lookup
-- **localisation** : `application/pipeline/publications/create_publications.py:48,57,68,69`
-- **description** : Avant lookup, canonicalise `doc_type` (via
-  `map_doc_type`), `nnt` (via `normalize_nnt`), `title_normalized`
-  (via `normalize_text`).
-- **classification** : (a) — déjà domain.
-- **destination domain/** : n/a.
-
 ### cascade dedup DOI > NNT > titre+année+journal
 - **localisation** : `application/pipeline/publications/create_publications.py:62-76`
   (délégué à `application.publications.find_or_create`)
@@ -340,10 +332,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 0 | 6 | **6** |
+| **(a) déjà pure** | 0 | 5 | **5** |
 | **(b) décomposable** | 9 | 6 | **15** |
 | **(c) intrinsèque transaction** | 1 | 3 | **4** |
-| **Total** | 10 | 15 | **25** |
+| **Total** | 10 | 14 | **24** |
 
 ### Patterns dupliqués majeurs
 
