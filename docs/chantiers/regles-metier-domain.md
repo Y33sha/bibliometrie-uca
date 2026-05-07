@@ -523,6 +523,34 @@ relocalisées en `domain/`.
   mauvaises assignations auteur×signature côté OpenAlex (qui hériteraient
   un ORCID erroné). Le call site dans `create_persons_from_source_authorships`
   passe de 9 lignes à 5.
+- **Simplification de `step3_name_forms` — drop de la cascade redondante** :
+  l'item d'inventaire « cascade de lookup par name_form » s'est révélé
+  être une duplication de logique plutôt qu'une règle à factoriser. Le
+  code construisait à la volée 3 candidats (`"prenom nom"`,
+  `"nom prenom"`, `nom seul`) à partir de `(last_norm, first_norm)`
+  reparsés depuis `raw_author_name` côté Python — alors que
+  `source_authorships.author_name_normalized` (peuplée à l'ingestion
+  par la fonction SQL `normalize_name_form`) contient déjà cette forme
+  normalisée, et que `compute_person_name_forms` génère toutes les
+  variantes (ordres + initiales) au moment de la création de personne,
+  variantes qui finissent dans `person_name_forms`. Donc lookup direct
+  par `author_name_normalized` matche par construction.
+
+  Effets de bord assumés :
+  - Drop du fallback « nom seul » (matchait sur le seul nom de famille
+    quand prénom absent — créait des faux positifs en pelle pour les
+    homonymes).
+  - Le code reste fonctionnellement plus strict mais sémantiquement
+    identique pour les cas légitimes (les deux ordres `"fn ln"` et
+    `"ln fn"` sont déjà dans `person_name_forms` côté création).
+
+  Cache en mémoire des authorships créées au sein du run préservé
+  (insertion des deux ordres) — utile pour matcher dans le même run
+  une autre authorship de la personne qu'on vient de créer avec
+  l'ordre inverse.
+
+  L'item est **retiré de l'inventaire** plutôt que rapatrié — c'était
+  une mauvaise modélisation initiale.
 - **`domain/persons/matching.py` ouvert + `decide_match_by_identifier`** :
   factorisation des 2 clones IdRef/ORCID dans `step1b_idref` et
   `step2_orcid` de `create_persons_from_source_authorships.py`. Pattern

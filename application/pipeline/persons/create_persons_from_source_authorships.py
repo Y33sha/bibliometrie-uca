@@ -283,7 +283,18 @@ def step3_name_forms(
     *,
     person_repo: PersonRepository,
 ) -> tuple[int, int, int]:
-    """Lookup par author_name_normalized dans person_name_forms."""
+    """Lookup direct par `source_authorships.author_name_normalized` dans
+    `person_name_forms`.
+
+    Sémantique : la forme normalisée stockée à l'ingestion (via la fonction
+    SQL `normalize_name_form`) est utilisée directement comme clé de
+    lookup. La table `person_name_forms` contient déjà toutes les
+    variantes (ordres prénom/nom, initiales) générées par
+    `domain.names.compute_person_name_forms` à la création des personnes
+    et alimentées par `populate_person_name_forms` pour les authorships
+    rattachées — donc une seule clé de lookup suffit, n'importe laquelle
+    des variantes matchera.
+    """
     linked = 0
     created = 0
     ambiguous = 0
@@ -292,16 +303,11 @@ def step3_name_forms(
         if (a["source"], a["authorship_id"]) in linked_ids:
             continue
 
-        ln, fn = a["last_norm"], a["first_norm"]
-        if not ln:
+        norm = a.get("author_name_normalized")
+        if not norm:
             continue
 
-        person_ids = None
-        forms_to_try = [f for f in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip(), ln] if f]
-        for form in forms_to_try:
-            if form in name_form_map:
-                person_ids = name_form_map[form]
-                break
+        person_ids = name_form_map.get(norm)
 
         if person_ids is not None:
             if len(person_ids) == 1:
@@ -319,18 +325,22 @@ def step3_name_forms(
                 continue
             last = a["last_name"] or a["full_name"] or "?"
             first = a["first_name"] or ""
+            # On pré-popule la map en mémoire avec les deux ordres normalisés
+            # pour qu'une autre authorship du même run avec l'ordre inverse
+            # match cette personne nouvellement créée. La forme déjà
+            # cherchée (norm) est forcément l'un des deux ordres.
+            ln, fn = a["last_norm"], a["first_norm"]
+            cache_forms = [f for f in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip()] if f]
             if not dry_run:
                 pid = create_person(cur, last, first, repo=person_repo)
                 link_to_person(cur, pid, [a], repo=person_repo)
                 add_identifiers(cur, pid, [a], repo=person_repo)
                 add_name_form(cur, pid, a["full_name"], repo=person_repo)
-                for form in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip()]:
-                    if form:
-                        name_form_map[form] = [pid]
+                for form in cache_forms:
+                    name_form_map[form] = [pid]
             else:
-                for form in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip()]:
-                    if form:
-                        name_form_map[form] = [-1]
+                for form in cache_forms:
+                    name_form_map[form] = [-1]
 
             linked_ids.add((a["source"], a["authorship_id"]))
             created += 1
