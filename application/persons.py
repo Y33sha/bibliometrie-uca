@@ -256,19 +256,22 @@ async def reassign_identifier(
 def add_identifiers_from_authorships(
     cur: Any, person_id: int, authorships: list[dict], *, repo: PersonRepository
 ) -> None:
-    """Ajoute les ORCID, idHAL et IdRef trouvés dans un groupe d'authorships."""
+    """Ajoute les ORCID, idHAL et IdRef trouvés dans un groupe d'authorships.
+
+    La ``source`` enregistrée sur ``person_identifiers`` reste à sa valeur
+    par défaut (``'auto'``) pour les 3 types : tracer la source d'origine
+    n'apporte rien d'exploitable (la valeur n'est pas mise à jour quand
+    une autre source confirme plus tard l'identifiant) et la priorité
+    Crossref pour les ORCID se gérera côté cascade de matching, pas via
+    ce champ.
+    """
     seen = set()
     for a in authorships:
-        if a.get("orcid") and ("orcid", a["orcid"]) not in seen:
-            add_identifier(cur, person_id, "orcid", a["orcid"], repo=repo)
-            seen.add(("orcid", a["orcid"]))
-        if a.get("idhal") and ("idhal", a["idhal"]) not in seen:
-            add_identifier(cur, person_id, "idhal", a["idhal"], repo=repo)
-            seen.add(("idhal", a["idhal"]))
-        if a.get("idref") and ("idref", a["idref"]) not in seen:
-            idref_source = a.get("source", "hal")
-            add_identifier(cur, person_id, "idref", a["idref"], source=idref_source, repo=repo)
-            seen.add(("idref", a["idref"]))
+        for id_type in ("orcid", "idhal", "idref"):
+            value = a.get(id_type)
+            if value and (id_type, value) not in seen:
+                add_identifier(cur, person_id, id_type, value, repo=repo)
+                seen.add((id_type, value))
 
 
 # ── Formes de noms ──
