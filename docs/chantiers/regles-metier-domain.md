@@ -523,6 +523,14 @@ relocalisées en `domain/`.
   mauvaises assignations auteur×signature côté OpenAlex (qui hériteraient
   un ORCID erroné). Le call site dans `create_persons_from_source_authorships`
   passe de 9 lignes à 5.
+- **`domain/persons/matching.py` ouvert + `decide_match_by_identifier`** :
+  factorisation des 2 clones IdRef/ORCID dans `step1b_idref` et
+  `step2_orcid` de `create_persons_from_source_authorships.py`. Pattern
+  identique « si la valeur est présente dans la map identifiant →
+  person_id, rattacher » mutualisé en une fonction pure générique
+  (marche pour n'importe quel id_type indexé sur `person_identifiers`).
+  Module pensé pour accueillir progressivement la cascade contractuelle
+  hal_account → cross_source → idref → orcid → name_forms.
 - **`should_create_source_person` ajoutée à `domain/persons/creation.py`** :
   factorisation de l'invariant dupliqué 3 fois (HAL `upsert_hal_author`,
   ScanR `upsert_scanr_author`, theses `upsert_source_author`) « ne créer
