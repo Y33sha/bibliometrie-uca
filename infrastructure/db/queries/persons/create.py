@@ -39,6 +39,7 @@ def fetch_unlinked_authorships(cur: Any) -> list[dict[str, Any]]:
         SELECT sa_auth.id AS authorship_id,
                sa_auth.source AS source,
                sa_auth.raw_author_name AS full_name,
+               sa_auth.author_name_normalized,
                CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref') THEN NULL::text
                     ELSE COALESCE(sa.orcid, sa_auth.identifiers->>'orcid') END AS orcid,
                CASE WHEN sa_auth.source = 'hal'

@@ -294,16 +294,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/persons/matching.py` →
   `decide_cross_source_match(authorship_source, last_norm, first_norm, candidates) -> int | None`.
 
-### cascade de lookup par name_form
-- **localisation** : `application/pipeline/persons/create_persons_from_source_authorships.py:317-327`
-- **description** : Construit l'ordre des formes de nom à essayer
-  (`"prenom nom"`, `"nom prenom"`, `nom seul`) et renvoie la première
-  trouvée dans `name_form_map`. Choix d'ordre = règle métier
-  (prénom-nom prime).
-- **classification** : (a).
-- **destination domain/** : `domain/persons/matching.py` →
-  `lookup_name_forms(last_norm, first_norm, name_form_map) -> list[int] | None`.
-
 ### arbitrage name_forms
 - **localisation** : `application/pipeline/persons/create_persons_from_source_authorships.py:328-358`
 - **description** : Étape 3 : 1 person_id → match, plusieurs →
@@ -515,10 +505,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 15 | 12 | **27** |
+| **(a) déjà pure** | 15 | 11 | **26** |
 | **(b) décomposable** | 7 | 9 | **16** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 24 | 24 | **48** |
+| **Total** | 24 | 23 | **47** |
 
 ### Patterns dupliqués majeurs
 
