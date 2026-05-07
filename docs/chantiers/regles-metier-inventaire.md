@@ -294,16 +294,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/persons/matching.py` →
   `decide_cross_source_match(authorship_source, last_norm, first_norm, candidates) -> int | None`.
 
-### arbitrage name_forms
-- **localisation** : `application/pipeline/persons/create_persons_from_source_authorships.py:328-358`
-- **description** : Étape 3 : 1 person_id → match, plusieurs →
-  ambigu, aucune forme connue + `allow_create` → créer, sinon ambigu.
-  **Règle centrale du matching par nom**.
-- **classification** : (b).
-- **destination domain/** : `domain/persons/matching.py` →
-  `decide_name_form_outcome(person_ids, allow_create) -> NameFormDecision`
-  (`action ∈ {"match", "ambiguous", "create"}`).
-
 ### contrat de la cascade globale
 - **localisation** : `application/pipeline/persons/create_persons_from_source_authorships.py:1-33` (docstring) + `:389-420` (orchestrateur)
 - **description** : Hiérarchie de fiabilité (compte HAL > cross-source
@@ -506,9 +496,9 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
 | **(a) déjà pure** | 15 | 11 | **26** |
-| **(b) décomposable** | 7 | 9 | **16** |
+| **(b) décomposable** | 7 | 8 | **15** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 24 | 23 | **47** |
+| **Total** | 24 | 22 | **46** |
 
 ### Patterns dupliqués majeurs
 
