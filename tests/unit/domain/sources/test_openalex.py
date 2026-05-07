@@ -1,6 +1,7 @@
 from domain.sources.openalex import (
     OpenalexLocation,
     correct_openalex_doc_type,
+    extract_external_ids_from_urls,
     extract_nnt_from_location,
     is_hal_location,
     is_repository_location,
@@ -10,6 +11,56 @@ from domain.sources.openalex import (
     parse_primary_location,
     should_skip_publisher_journal,
 )
+
+
+class TestExtractExternalIdsFromUrls:
+    def test_hal(self):
+        urls = ["https://hal.science/hal-04123456v2"]
+        assert extract_external_ids_from_urls(urls) == {"hal": "hal-04123456"}
+
+    def test_nnt(self):
+        urls = ["https://www.theses.fr/2021CLFAC030"]
+        assert extract_external_ids_from_urls(urls) == {"nnt": "2021CLFAC030"}
+
+    def test_pmid(self):
+        urls = ["https://pubmed.ncbi.nlm.nih.gov/12345678"]
+        assert extract_external_ids_from_urls(urls) == {"pmid": "12345678"}
+
+    def test_pmc_with_prefix(self):
+        urls = ["https://www.ncbi.nlm.nih.gov/pmc/articles/PMC987654"]
+        assert extract_external_ids_from_urls(urls) == {"pmc": "PMC987654"}
+
+    def test_pmc_without_prefix(self):
+        """Le préfixe PMC est ajouté même si l'URL ne le contient pas."""
+        urls = ["https://www.ncbi.nlm.nih.gov/pmc/articles/987654"]
+        assert extract_external_ids_from_urls(urls) == {"pmc": "PMC987654"}
+
+    def test_first_match_wins_per_type(self):
+        """Pour un même type d'ID, la première URL qui matche gagne."""
+        urls = [
+            "https://hal.science/hal-04111111",
+            "https://hal.science/hal-04222222",
+        ]
+        assert extract_external_ids_from_urls(urls) == {"hal": "hal-04111111"}
+
+    def test_multiple_types_combined(self):
+        urls = [
+            "https://hal.science/hal-04123456",
+            "https://www.theses.fr/2021CLFAC030",
+            "https://pubmed.ncbi.nlm.nih.gov/12345678",
+        ]
+        assert extract_external_ids_from_urls(urls) == {
+            "hal": "hal-04123456",
+            "nnt": "2021CLFAC030",
+            "pmid": "12345678",
+        }
+
+    def test_no_match_returns_empty(self):
+        urls = ["https://example.com/foo", "https://random.org/bar"]
+        assert extract_external_ids_from_urls(urls) == {}
+
+    def test_empty_input(self):
+        assert extract_external_ids_from_urls([]) == {}
 
 
 def _loc(**kwargs) -> OpenalexLocation:

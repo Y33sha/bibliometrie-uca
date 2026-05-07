@@ -508,6 +508,14 @@ relocalisées en `domain/`.
   `fetch_thesis_primary_author` puis délègue. Tests rapatriés dans
   `tests/unit/domain/sources/test_theses.py` (plus besoin de stub
   `queries`, on appelle la fonction pure directement).
+- **OpenAlex `extract_external_ids_from_urls` rapatriée** : la décision
+  pure « URL → quelles IDs en sortir » (regex HAL/NNT/PMID/PMC, premier
+  match par type gagnant) descend dans `domain/sources/openalex.py`. Le
+  wrapper application `extract_locations_data` se réduit à la
+  construction de la liste d'URLs (parsing dict OpenAlex
+  `landing_page_url` + `pdf_url` dédupliqués) puis délégation. Pas de
+  `normalize_nnt` côté extracteur — c'est un extracteur opportuniste,
+  la normalisation est laissée au caller.
 - **Découpage `last_name`/`first_name` — colonnes supprimées** :
   les colonnes `source_persons.last_name` et
   `source_persons.first_name` sont droppées (migration 022). Le
