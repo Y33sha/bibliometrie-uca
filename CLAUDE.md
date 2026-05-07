@@ -7,6 +7,7 @@
 - Avant toute proposition de modification du schéma de données: consulter le schéma existant.
 - Ne jamais écrire de commentaires faisant référence à des fichiers transitoires (todo, roadmap) ou à un état passé du code.
 - Si des tests échouent sans être liés au chantier en cours: au prochain commit, interrompre le chantier et s'occuper du problème.
+- Ne jamais proposer de faire une pause.
 
 ## Conventions du projet
 
