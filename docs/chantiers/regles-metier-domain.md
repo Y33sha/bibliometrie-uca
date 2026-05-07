@@ -523,6 +523,17 @@ relocalisées en `domain/`.
   mauvaises assignations auteur×signature côté OpenAlex (qui hériteraient
   un ORCID erroné). Le call site dans `create_persons_from_source_authorships`
   passe de 9 lignes à 5.
+- **`domain/persons/creation.py` ouvert + `allow_person_creation` rapatriée** :
+  la règle « les rôles non-auteur des thèses (directeurs, rapporteurs,
+  jury) n'autorisent pas la création d'une personne » descend dans
+  `domain/persons/creation.py`. Le matching à une personne existante
+  reste autorisé — c'est uniquement la décision « créer si pas de
+  match » qui est filtrée. Module pensé pour s'étendre aux autres
+  invariants de création (notamment `should_create_source_person`
+  unifié HAL/ScanR/theses, dupliqué 3 fois aujourd'hui dans les
+  normalizers). Distincte de la règle `OUT_OF_SCOPE_DOC_TYPES`
+  (publications.scope) qui exclut entièrement memoir/peer_review du
+  pipeline persons.
 - **`domain/publications/` ouvert + scope.py expliciter la règle SQL
   implicite** : la vue SQL `v_active_publications` cachait la règle
   « doc_types out-of-scope » (peer_review, memoir : pas de matching
