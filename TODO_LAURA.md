@@ -21,6 +21,7 @@
 ## Code
 * [ ] auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques): supprimer les requêtes vers source_authorships pouvant être remplacées par des requêtes vers les tables canoniques
 * [ ] nommage des routers pas totalement cohérent
+* is_wos_author_exploitable, authors_kept: à quoi ça sert? auditer
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 ## Sujets
