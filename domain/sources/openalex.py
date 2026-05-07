@@ -9,6 +9,8 @@ import re
 from dataclasses import dataclass
 
 from domain.doc_types import map_doc_type
+from domain.names import names_compatible, parse_raw_author_name
+from domain.normalize import normalize_name
 from domain.publication import extract_hal_id_from_url, normalize_nnt
 
 # =============================================================
@@ -229,6 +231,42 @@ def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str]:
             if m:
                 external_ids["pmc"] = f"PMC{m.group(1)}"
     return external_ids
+
+
+def keep_orcid_if_name_matches(
+    raw_full_name: str,
+    oa_full_name: str,
+    oa_orcid: str | None,
+) -> str | None:
+    """Filtre l'ORCID porté par une entité auteur OpenAlex.
+
+    OpenAlex assigne à chaque ``authorship`` du work une entité auteur
+    (``author.id`` côté OpenAlex) à laquelle est rattaché un ORCID.
+    Cette assignation passe par leur propre matching nom × affiliation
+    et est régulièrement fautive : un mauvais auteur attribué à la
+    signature → on hérite de l'ORCID d'une autre personne.
+
+    Garde-fou : on ne conserve l'ORCID OpenAlex que si le nom de
+    l'entité auteur OpenAlex (``oa_full_name``) est compatible (au
+    sens de ``names_compatible``) avec le ``raw_author_name`` que
+    l'authorship porte côté source. Sinon ``None`` — l'ORCID n'est
+    pas remonté en ``person_identifiers``.
+
+    Renvoie ``oa_orcid`` si compatible, ``None`` sinon (ou si
+    ``oa_orcid`` est déjà ``None``).
+    """
+    if not oa_orcid:
+        return None
+    src_ln, src_fn = parse_raw_author_name(raw_full_name)
+    oa_ln, oa_fn = parse_raw_author_name(oa_full_name)
+    if names_compatible(
+        normalize_name(src_ln),
+        normalize_name(src_fn),
+        normalize_name(oa_ln),
+        normalize_name(oa_fn),
+    ):
+        return oa_orcid
+    return None
 
 
 def correct_openalex_doc_type(

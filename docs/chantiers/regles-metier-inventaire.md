@@ -321,16 +321,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/persons/create_persons_from_source_authorships.py`
 
-### filtre_orcid_openalex_par_compatibilité_de_nom
-- **localisation** : `application/pipeline/persons/create_persons_from_source_authorships.py:74-83`
-- **description** : Conserve un ORCID OpenAlex uniquement si le nom de
-  l'entité auteur OpenAlex est compatible (`names_compatible`) avec
-  le `raw_author_name` de l'authorship. Élimine les ORCID hérités d'un
-  mismatch côté OpenAlex.
-- **classification** : (a) — opère sur des champs déjà présents.
-- **destination domain/** : `domain/sources/openalex_signals.py` →
-  `keep_orcid_if_name_matches(raw_full_name, oa_full_name, oa_orcid) -> str | None`.
-
 ### règle allow_create pour rôles thèse
 - **localisation** : `application/pipeline/persons/create_persons_from_source_authorships.py:68-70`
 - **description** : Invariant « les rôles non-auteur des thèses
@@ -581,10 +571,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 16 | 14 | **30** |
+| **(a) déjà pure** | 16 | 13 | **29** |
 | **(b) décomposable** | 10 | 10 | **20** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 28 | 27 | **55** |
+| **Total** | 28 | 26 | **54** |
 
 ### Patterns dupliqués majeurs
 
