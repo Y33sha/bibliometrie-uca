@@ -45,15 +45,13 @@ CrossRef s'intègre dans l'architecture source-agnostique existante en tant que 
 
 - **`source_publications`** (existante) : insertion avec `source = 'crossref'`, `source_id = doi`. Les champs canoniques sont mappés directement (`doi`, `title`, `pub_year`, `doc_type`, `language`, `container_title`, `cited_by_count`, `oa_status`, `is_retracted`, `keywords`, `journal_id`, `external_ids`). Les spécificités CrossRef (license, funders, dates multiples issued/online/print, indexed-date pour l'idempotence) vont dans `meta jsonb`. La référence ISSN va dans `external_ids` ou `biblio` selon la convention en vigueur (à vérifier sur les autres extracteurs).
 - **`source_authorships`** (existante) : un row par auteur de la publi CrossRef, `source = 'crossref'`. Les chaînes d'affiliation brutes (déjà connues comme génériques/tronquées côté CrossRef) vont dans `source_data jsonb`. **À noter** : pas de `source_authorship_addresses` à alimenter pour CrossRef puisque les affiliations sont des chaînes plates sans adresse exploitable.
-- **`source_persons`** (existante) : un row par auteur unique CrossRef, `source = 'crossref'`, `source_id` synthétique (DOI:position ou hash) faute d'identifiant CrossRef stable côté auteur. `orcid` rempli quand présent dans les métadonnées CrossRef. Le champ `meta`/`source_data` peut tracer le flag `authenticated-orcid` (voir note ci-dessous), à titre informatif uniquement.
+- **`source_persons`** : pas d'écriture CrossRef (pas d'identifiant auteur stable côté CrossRef). L'ORCID éventuel vit sur `source_authorships.identifiers`.
 - **`publication_relations`** (**à créer**) : `from_publication_id`, `to_publication_id` (ou DOI si la publi cible n'est pas connue), `relation_type` (preprint, version, translation, has-dataset…), `source` (crossref pour l'instant, extensible). C'est le seul vrai ajout de table — cross-source dès le départ pour ne pas refaire la migration plus tard.
-
-> Note sur `authenticated-orcid` : champ non fiable de l'avis même de CrossRef (la quasi-totalité des ORCIDs sont à `false` parce que les éditeurs n'utilisent pas le workflow OAuth, pas parce que la vérif a échoué). On peut le stocker dans `source_data` pour traçabilité mais on ne s'en sert pas comme filtre de confiance.
 
 ### Code
 
 - **`infrastructure/sources/crossref/`** : client API (polite pool avec mailto, gestion 429, retry exponentiel), pagination cursor.
-- **`application/pipeline/normalize/normalize_crossref.py`** + ports + queries : normalizer CrossRef, sur le modèle des autres (cf. `normalize_scanr`, `normalize_theses`, etc.) — alimente `source_publications` / `source_authorships` / `source_persons` avec `source='crossref'`.
+- **`application/pipeline/normalize/normalize_crossref.py`** + ports + queries : normalizer CrossRef, sur le modèle des autres (cf. `normalize_scanr`, `normalize_theses`, etc.) — alimente `source_publications` / `source_authorships` avec `source='crossref'`.
 - **`application/pipeline/crossref_promote_orcids.py`** : phase de promotion d'ORCID `pending` → `confirmed`.
 - **Modifications dans `domain/`** :
   - `domain/sources.py` : ajouter `"crossref"` à `ALL_SOURCES` et à `SOURCE_PRIORITY` (2ᵉ position) ; ajout à l'enum `source_type` côté SQL via migration.
@@ -64,7 +62,7 @@ CrossRef s'intègre dans l'architecture source-agnostique existante en tant que 
 
 CrossRef s'insère comme **une nouvelle source au même titre que ScanR et theses.fr** :
 - **Phase d'extraction CrossRef** dans le pipeline d'imports (sur le modèle de l'extracteur theses.fr).
-- **Phase `normalize_crossref`** alimente `source_publications` / `source_authorships` / `source_persons`.
+- **Phase `normalize_crossref`** alimente `source_publications` / `source_authorships`.
 - **Phases existantes** (`build_authorships`, `refresh_from_sources` indirectement, etc.) consomment automatiquement la nouvelle source via `SOURCE_PRIORITY`.
 - **Phase additionnelle `crossref_promote_orcids`** spécifique à CrossRef (cf. phase 3).
 
@@ -86,10 +84,10 @@ Découpage proposé (chaque phase = chantier autonome mergeable indépendamment)
 - [x] Ajout de `"crossref"` à `ALL_SOURCES`, `BIBLIO_SOURCES` et `SOURCE_PRIORITY` (2ᵉ position) dans `domain/sources.py`
 - [x] Client API `infrastructure/sources/crossref/fetch_missing_doi.py` (polite pool via mailto, retry, gestion 404 → `not_found=TRUE`)
 - [x] Wiring dans `run_pipeline.py` + dispatcher CLI `interfaces/cli/pipeline/fetch_missing_doi.py`
-- [x] Normalizer CrossRef : ports (`application/ports/normalize_crossref.py`) + queries (`infrastructure/db/queries/normalize_crossref.py`) + orchestrator (`application/pipeline/normalize/normalize_crossref.py`) + CLI (`interfaces/cli/pipeline/normalize_crossref.py`) — alimentation de `source_publications` / `source_authorships` / `source_persons` (colonnes canoniques + `meta`/`source_data`/`biblio` pour le reste). `doc_type` stocké NULL en attendant la phase 2.
+- [x] Normalizer CrossRef : ports (`application/ports/normalize_crossref.py`) + queries (`infrastructure/db/queries/normalize_crossref.py`) + orchestrator (`application/pipeline/normalize/normalize_crossref.py`) + CLI (`interfaces/cli/pipeline/normalize_crossref.py`) — alimentation de `source_publications` / `source_authorships` (colonnes canoniques + `meta`/`source_data`/`biblio` pour le reste). `doc_type` stocké NULL en attendant la phase 2.
 - [x] Wiring du normalizer dans `run_pipeline.phase_normalize` (avant scanr/hal/oa/wos, après theses)
 - [ ] Tests d'intégration sur un petit lot
-- **Livrable** : `source_publications` / `source_authorships` / `source_persons` alimentées avec `source='crossref'` pour les DOI déjà présents dans `publications`, idempotent
+- **Livrable** : `source_publications` / `source_authorships` alimentées avec `source='crossref'` pour les DOI déjà présents dans `publications`, idempotent
 
 ### Phase 2 — Mapping `doc_type` & arbitrage type / sous-type ✅
 - [x] `_SOURCE_MAPS["crossref"]` ajouté dans `domain/doc_types.py` (taxonomie CrossRef → enum canonique : `journal-article` → `article`, `book-chapter` → `book_chapter`, `monograph`/`edited-book`/`reference-book` → `book`, `posted-content`/`preprint` → `preprint`, `dissertation` → `thesis`, `proceedings-article` → `conference_paper`, `peer-review` → `peer_review`, etc.)

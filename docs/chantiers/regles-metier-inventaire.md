@@ -235,27 +235,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ---
 
-## `application/pipeline/normalize/normalize_crossref.py`
-
-### authenticated-orcid : « stocker mais ne pas l'utiliser comme filtre »
-- **localisation** : `application/pipeline/normalize/normalize_crossref.py:331-332`
-- **description** : Malgré le nom, ce flag CrossRef est non fiable (les
-  éditeurs n'utilisent pas le workflow OAuth), on le stocke en
-  `source_data` pour traçabilité mais on ne s'en sert PAS pour filtrer.
-- **classification** : (a) (convention plus que calcul).
-- **destination domain/** : à documenter en constante/note dans
-  `domain/sources/crossref_signals.py`.
-
-### Convention `source_id` Crossref = `<DOI>:<position>`
-- **localisation** : `application/pipeline/normalize/normalize_crossref.py:13-19`
-- **description** : Pas d'identifiant stable côté auteur Crossref →
-  convention de génération.
-- **classification** : (c) — supplantée par le fait qu'on n'écrit plus
-  `source_persons` Crossref.
-- **destination domain/** : n/a.
-
----
-
 ## `application/pipeline/persons/create_persons_from_source_authorships.py`
 
 ### contrat de la cascade globale

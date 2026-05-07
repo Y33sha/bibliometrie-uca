@@ -7,13 +7,12 @@ CLI est dans ``interfaces/cli/pipeline/normalize_crossref.py``.
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_publications                     (lien staging ↔ publication, source='crossref')
-    source_persons                          (auteurs synthétiques DOI:position, source='crossref')
     source_authorships                      (lien document × auteur, source='crossref')
 
+Pas d'écriture dans ``source_persons`` : les auteurs CrossRef n'ont pas
+d'identifiant stable, l'ORCID éventuel vit sur ``source_authorships.identifiers``.
+
 Particularités CrossRef :
-- Pas d'identifiant stable côté auteur → ``source_id = '<DOI>:<position>'``
-  pour les ``source_persons``, déduplication transverse au pipeline
-  ``personnes`` (source-agnostique).
 - Affiliations purement textuelles et génériques (tutelles), pas de
   structures détaillées → stockées dans ``source_authorships.source_data``
   pour traçabilité, pas d'``addresses`` ni de ``source_authorship_addresses``.
@@ -256,12 +255,6 @@ def process_authors(
         sd: dict[str, Any] = {}
         if affiliations:
             sd["affiliations"] = affiliations
-        # `authenticated-orcid` n'est pas fiable côté CrossRef (la quasi
-        # totalité des ORCIDs sont à False parce que les éditeurs n'utilisent
-        # pas le workflow OAuth) — on le stocke pour traçabilité mais on ne
-        # s'en sert pas comme filtre de confiance.
-        if author.get("authenticated-orcid") is True:
-            sd["authenticated_orcid"] = True
         if author.get("sequence"):
             sd["sequence"] = author["sequence"]
 
