@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from domain.normalize import normalize_text
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.db.queries.filters import (
     OA_OPEN_STATUSES,
     PUB_IS_UCA,
@@ -64,7 +65,7 @@ def _search_clause(search: str) -> WhereClause | None:
 def _inline_clauses(filters: Any) -> list[WhereClause | None]:
     """Filtres simples partagés entre list/export."""
     out: list[WhereClause | None] = [
-        WhereClause("p.doc_type NOT IN ('peer_review', 'memoir')", {}),
+        WhereClause(f"p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}", {}),
         excluded_doc_type_clause(filters.excluded_types),
         _search_clause(filters.search),
         year_clause(filters.years),

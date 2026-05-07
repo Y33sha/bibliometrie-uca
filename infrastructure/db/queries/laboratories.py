@@ -15,6 +15,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from infrastructure.db.queries.filters import (
     OA_CLOSED_SQL,
     WhereClause,
@@ -26,6 +27,14 @@ from infrastructure.db.queries.filters import (
 from infrastructure.perimeter import (
     async_get_persons_perimeter_root_ids,
     async_get_persons_structure_ids_list,
+)
+
+# Filtre étendu pour les stats de contribution effective d'un labo :
+# OUT_OF_SCOPE (peer_review, memoir) + ongoing_thesis (les thèses en
+# cours ne comptent pas comme contribution finalisée).
+_DOC_TYPES_EXCLUDED_FROM_LAB_CONTRIBUTIONS = sorted(OUT_OF_SCOPE_DOC_TYPES | {"ongoing_thesis"})
+_DOC_TYPES_EXCLUDED_FROM_LAB_CONTRIBUTIONS_SQL = (
+    "(" + ", ".join(f"'{t}'" for t in _DOC_TYPES_EXCLUDED_FROM_LAB_CONTRIBUTIONS) + ")"
 )
 
 
@@ -412,12 +421,12 @@ class PgAsyncLaboratoriesQueries:
         # (pub_id, subject_id) (sources différentes).
         rows = (
             await self._conn.execute(
-                text("""
+                text(f"""
                     SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS count
                     FROM publication_subjects ps
                     JOIN publications p ON p.id = ps.publication_id
                     JOIN subjects s ON s.id = ps.subject_id
-                    WHERE p.doc_type NOT IN ('peer_review', 'memoir', 'ongoing_thesis')
+                    WHERE p.doc_type NOT IN {_DOC_TYPES_EXCLUDED_FROM_LAB_CONTRIBUTIONS_SQL}
                       AND s.usage_count <= 5000
                       AND EXISTS (
                           SELECT 1 FROM authorships a
