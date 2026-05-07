@@ -136,16 +136,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_hal.py`
 
-### parse_tei_author_identifiers — règle idHAL string vs numeric
-- **localisation** : `application/pipeline/normalize/normalize_hal.py:285-334` (cœur l. 324-332)
-- **description** : Le TEI HAL produit deux `<idno type="idhal">` par
-  auteur (un slug `string`, un id numérique). On ne garde que le slug
-  `string`. Le numérique est en réalité le `hal_person_id` ré-étiqueté.
-- **classification** : (a) — pure mais embarquée dans un parsing XML.
-  Décomposable parser XML (sans règle) + sélecteur (avec règle).
-- **destination domain/** : `domain/persons/identifiers.py` →
-  `pick_idhal_from_tei_idnos(idnos) -> dict[str, str]`.
-
 ### _hal_source_id — convention de clé HAL
 - **localisation** : `application/pipeline/normalize/normalize_hal.py:337-350`
 - **description** : `source_id` côté HAL = `hal_person_id` si compte
@@ -571,10 +561,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 16 | 13 | **29** |
+| **(a) déjà pure** | 15 | 13 | **28** |
 | **(b) décomposable** | 10 | 10 | **20** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 28 | 26 | **54** |
+| **Total** | 27 | 26 | **53** |
 
 ### Patterns dupliqués majeurs
 

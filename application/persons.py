@@ -23,7 +23,7 @@ from application.audit import async_emit_event, emit_event
 from application.authorships import async_delete_orphan_authorships
 from domain.errors import ValidationError
 from domain.names import compute_person_name_forms
-from domain.person import check_can_merge_persons
+from domain.persons.merge import check_can_merge_persons
 from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
 from domain.sources import ALL_SOURCES_SET

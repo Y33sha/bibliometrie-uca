@@ -523,6 +523,29 @@ relocalisées en `domain/`.
   mauvaises assignations auteur×signature côté OpenAlex (qui hériteraient
   un ORCID erroné). Le call site dans `create_persons_from_source_authorships`
   passe de 9 lignes à 5.
+- **`domain/persons/` ouvert et `domain/person.py` scindé** : le
+  fichier plat à la racine est éclaté en trois sous-modules thématiques
+  (cf. décision n°1 du chantier — granularité = dossier).
+  - `domain/persons/identifiers.py` : VOs `ORCID`, `IdHAL`, `IdRef` +
+    helper public `normalize_orcid` (les `_normalize_idhal` /
+    `_normalize_idref` restent privés tant qu'aucun call site externe
+    n'en a besoin).
+  - `domain/persons/source_ids.py` : modèle Pydantic `PersonSourceIds`
+    de la colonne JSONB `source_persons.source_ids`. Stand-alone : c'est
+    un schéma de données, pas un identifiant — mélanger avec les VOs
+    masquerait la nature.
+  - `domain/persons/merge.py` : `check_can_merge_persons` (refus de
+    fusion si deux fiches RH distinctes). Module pensé pour s'étendre
+    aux règles de matching/déduplication/création quand on rapatriera
+    les items inventaire correspondants.
+  - 7 call sites mis à jour : `from domain.person import …` →
+    `from domain.persons.<sous-module> import …`.
+  - Tests scindés en miroir : `tests/unit/domain/persons/test_identifiers.py`,
+    `test_source_ids.py`, `test_merge.py`.
+  - Cleanup d'inventaire au passage : item HAL `parse_tei_author_identifiers`
+    retiré (règle technique de parsing XML, mieux conservée à côté de
+    la marche TEI qui la consomme — symétrique à `_hal_source_id`,
+    `detected_countries`, `_parse_date_iso` déjà classés « limite »).
 - **Découpage `last_name`/`first_name` — colonnes supprimées** :
   les colonnes `source_persons.last_name` et
   `source_persons.first_name` sont droppées (migration 022). Le
