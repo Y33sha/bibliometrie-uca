@@ -523,6 +523,15 @@ relocalisées en `domain/`.
   mauvaises assignations auteur×signature côté OpenAlex (qui hériteraient
   un ORCID erroné). Le call site dans `create_persons_from_source_authorships`
   passe de 9 lignes à 5.
+- **`should_create_source_person` ajoutée à `domain/persons/creation.py`** :
+  factorisation de l'invariant dupliqué 3 fois (HAL `upsert_hal_author`,
+  ScanR `upsert_scanr_author`, theses `upsert_source_author`) « ne créer
+  `source_persons` que si un identifiant fort est attaché ». Encapsule
+  la nuance HAL (rejet explicite des `hal_person_id <= 0` qui sont des
+  sentinelles internes) — les autres sources se contentent d'une
+  vérification truthy. Sans identifiant fort, l'authorship reste
+  exploitable via `raw_author_name + author_position` côté
+  `source_authorships`.
 - **`domain/persons/creation.py` ouvert + `allow_person_creation` rapatriée** :
   la règle « les rôles non-auteur des thèses (directeurs, rapporteurs,
   jury) n'autorisent pas la création d'une personne » descend dans

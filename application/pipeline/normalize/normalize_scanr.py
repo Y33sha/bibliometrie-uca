@@ -30,6 +30,7 @@ from application.publications import refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
+from domain.persons.creation import should_create_source_person
 from domain.persons.identifiers import normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
@@ -251,8 +252,9 @@ def upsert_scanr_author(cur: Any, queries: ScanrNormalizeQueries, author: dict) 
 
     denorm = author.get("denormalized") or {}
     idref = denorm.get("idref")
-    if not idref:
+    if not should_create_source_person(source="scanr", strong_id_value=idref):
         return None
+    assert isinstance(idref, str)  # narrowing : garanti par le check ci-dessus
 
     orcid = normalize_orcid(denorm.get("orcid"))
     return queries.upsert_scanr_source_person_by_idref(

@@ -39,6 +39,7 @@ from application.publications import (
 )
 from domain.authorship_roles import THESES_FIELD_ROLES, merge_roles
 from domain.normalize import normalize_name, normalize_text
+from domain.persons.creation import should_create_source_person
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
 from domain.sources.theses import (
@@ -296,8 +297,9 @@ def upsert_source_author(cur: Any, queries: ThesesNormalizeQueries, person: dict
         return None
 
     ppn = person.get("ppn")
-    if not ppn:
+    if not should_create_source_person(source="theses", strong_id_value=ppn):
         return None
+    assert isinstance(ppn, str)  # narrowing : garanti par le check ci-dessus
 
     full_name = f"{prenom} {nom}".strip() if prenom else nom
     return queries.upsert_theses_source_person_by_ppn(cur, ppn=ppn, full_name=full_name)

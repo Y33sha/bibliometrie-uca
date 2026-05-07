@@ -36,6 +36,7 @@ from application.publications import refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
+from domain.persons.creation import should_create_source_person
 from domain.persons.identifiers import normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
@@ -362,7 +363,7 @@ def upsert_hal_author(
     """
     if not full_name:
         return None
-    if not (hal_person_id and hal_person_id > 0):
+    if not should_create_source_person(source="hal", strong_id_value=hal_person_id):
         return None
 
     src_id = _hal_source_id(hal_person_id, hal_form_id)

@@ -144,17 +144,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : limite — convention de clé d'infra. À
   laisser en place ou `domain/persons/identifiers.py`.
 
-### upsert_hal_author — invariant « source_persons HAL = compte HAL »
-- **localisation** : `application/pipeline/normalize/normalize_hal.py:356-408` (cœur l. 374-377)
-- **description** : Règle source_persons : on n'écrit que si
-  `hal_person_id` fourni. Sinon `source_person_id=NULL` côté
-  authorship et identifiants vivent sur `source_authorships.identifiers`.
-- **classification** : (b) — décision booléenne pure étant donné
-  `hal_person_id`.
-- **destination domain/** : `domain/persons/sourcing.py` →
-  `should_create_source_person(source, *, strong_id) -> bool` (unifié
-  HAL/ScanR/theses).
-
 ### parse_author_structures — préférence primary > flat
 - **localisation** : `application/pipeline/normalize/normalize_hal.py:416-486` (règle l. 437)
 - **description** : Préférence `authIdHasPrimaryStructure_fs` (labos
@@ -217,14 +206,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_scanr.py`
 
-### upsert_scanr_author — invariant « idref ou rien »
-- **localisation** : `application/pipeline/normalize/normalize_scanr.py:254-286`
-- **description** : Crée la `source_persons` que si `idref` (PPN)
-  présent. Symétrique HAL et theses.
-- **classification** : (b).
-- **destination domain/** : `domain/persons/sourcing.py` →
-  `should_create_source_person` (unifié).
-
 ### detected_countries — propagation
 - **localisation** : `application/pipeline/normalize/normalize_scanr.py:330-339`
 - **description** : Pour chaque affiliation ScanR, accumulation
@@ -247,14 +228,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **classification** : (b).
 - **destination domain/** : `domain/publications/dedup.py` →
   `decide_thesis_match(*, doi_nnt_match, title_year_candidates, claimed_author) -> PublicationMatchDecision`.
-
-### upsert_source_author — invariant « PPN ou rien »
-- **localisation** : `application/pipeline/normalize/normalize_theses.py:317-334`
-- **description** : Comme HAL/ScanR, écrit `source_persons` que si
-  PPN présent.
-- **classification** : (b).
-- **destination domain/** : `domain/persons/sourcing.py` →
-  `should_create_source_person` (unifié).
 
 ### process_persons — agrégation rôles par personne
 - **localisation** : `application/pipeline/normalize/normalize_theses.py:358-424`
@@ -553,16 +526,11 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
 | **(a) déjà pure** | 15 | 12 | **27** |
-| **(b) décomposable** | 10 | 10 | **20** |
+| **(b) décomposable** | 7 | 10 | **17** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 27 | 25 | **52** |
+| **Total** | 24 | 25 | **49** |
 
 ### Patterns dupliqués majeurs
-
-3. **Invariant « source_persons créé seulement si identifiant fort »**
-   — répété dans HAL (`hal_person_id`), ScanR (`idref`), theses
-   (`PPN`). À unifier dans
-   `domain/persons/sourcing.should_create_source_person`.
 
 5. **Règle `doc_type theses` (`thesis` vs `ongoing_thesis`)** —
    dupliquée dans `normalize_theses.py:88` et `:247`. À unifier dans

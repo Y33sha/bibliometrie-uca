@@ -8,6 +8,37 @@ granularité « merge + dedup + create » du chantier
 """
 
 
+def should_create_source_person(*, source: str, strong_id_value: object) -> bool:
+    """Indique si une ligne ``source_persons`` doit être créée pour une
+    authorship donnée.
+
+    Invariant : on ne crée ``source_persons`` que pour les auteurs ayant
+    un identifiant fort attaché. Sans identifiant fort, l'authorship
+    reste exploitable via ``raw_author_name + author_position`` dans
+    ``source_authorships``, mais on ne tente pas de la résoudre vers
+    une entité auteur stable côté source.
+
+    Signaux par source (ce qu'on considère « fort ») :
+
+    - **HAL** : ``hal_person_id`` (entier > 0). Compte HAL identifié,
+      créé par l'auteur ou un curateur. Un ``hal_person_id <= 0`` est
+      une sentinelle interne ("auteur non identifié" côté HAL) qu'on
+      rejette explicitement — ces signatures sont traitées comme les
+      sources sans identifiant.
+    - **ScanR** : ``idref`` (PPN SUDOC, identifiant national stable).
+    - **theses** : ``ppn`` (PPN SUDOC, idem ScanR).
+
+    Les autres sources (OpenAlex, WoS, Crossref) ne créent pas de
+    ``source_persons`` du tout aujourd'hui — leurs entités auteur
+    propres sont algorithmiques et trop bruitées pour servir de pivot
+    stable. Cette fonction n'est donc appelée que par les normalizers
+    HAL/ScanR/theses.
+    """
+    if source == "hal":
+        return isinstance(strong_id_value, int) and strong_id_value > 0
+    return bool(strong_id_value)
+
+
 def allow_person_creation(source: str, roles: list[str]) -> bool:
     """Indique si la cascade de matching peut créer une personne pour
     cette authorship, à défaut d'avoir trouvé un match.

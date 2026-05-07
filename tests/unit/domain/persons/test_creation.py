@@ -1,6 +1,39 @@
 """Tests des règles de politique de création de personnes."""
 
-from domain.persons.creation import allow_person_creation
+from domain.persons.creation import allow_person_creation, should_create_source_person
+
+
+class TestShouldCreateSourcePerson:
+    def test_hal_with_positive_id(self):
+        assert should_create_source_person(source="hal", strong_id_value=12345) is True
+
+    def test_hal_with_zero_rejected(self):
+        """hal_person_id=0 est une sentinelle interne 'auteur non identifié'."""
+        assert should_create_source_person(source="hal", strong_id_value=0) is False
+
+    def test_hal_with_negative_rejected(self):
+        assert should_create_source_person(source="hal", strong_id_value=-1) is False
+
+    def test_hal_with_none_rejected(self):
+        assert should_create_source_person(source="hal", strong_id_value=None) is False
+
+    def test_hal_with_string_rejected(self):
+        """Type-strict côté HAL : un string n'est pas un id HAL valide."""
+        assert should_create_source_person(source="hal", strong_id_value="12345") is False
+
+    def test_scanr_with_idref(self):
+        assert should_create_source_person(source="scanr", strong_id_value="252404955") is True
+
+    def test_scanr_without_idref(self):
+        assert should_create_source_person(source="scanr", strong_id_value=None) is False
+        assert should_create_source_person(source="scanr", strong_id_value="") is False
+
+    def test_theses_with_ppn(self):
+        assert should_create_source_person(source="theses", strong_id_value="252404955") is True
+
+    def test_theses_without_ppn(self):
+        assert should_create_source_person(source="theses", strong_id_value=None) is False
+        assert should_create_source_person(source="theses", strong_id_value="") is False
 
 
 class TestAllowPersonCreation:
