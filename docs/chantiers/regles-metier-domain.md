@@ -523,6 +523,14 @@ relocalisées en `domain/`.
   mauvaises assignations auteur×signature côté OpenAlex (qui hériteraient
   un ORCID erroné). Le call site dans `create_persons_from_source_authorships`
   passe de 9 lignes à 5.
+- **Item « enrichissement d'une forme par fusion de sources » retiré de
+  l'inventaire** : la fusion d'arrays `person_ids ∪ sources` dans
+  `populate_person_name_forms` n'est qu'un symptôme du schéma denormalisé
+  `person_name_forms(name_form, person_ids[], sources[])`. La
+  factorisation gagne peu (single call site, logique triviale) et la
+  boucle entière disparaîtra avec le chantier de normalisation noté
+  dans `TODO_CLAUDE.md` (schéma cible : row-per-triple). Pas de
+  rapatriement domain.
 - **Suppression de la règle de préservation dans `populate_person_name_forms`** :
   l'item d'inventaire « règle de préservation des formes non
   bibliographiques » s'est révélé être un effet pervers d'un autre choix

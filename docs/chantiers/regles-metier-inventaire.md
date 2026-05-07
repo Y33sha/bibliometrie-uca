@@ -307,16 +307,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/persons/populate_person_name_forms.py`
 
-### enrichissement d'une forme par fusion de sources
-- **localisation** : `application/pipeline/persons/populate_person_name_forms.py:61-75`
-- **description** : Quand une forme apparaît à la fois en source
-  `persons` et en source biblio, fusionne `person_ids` (union triée)
-  et `sources` (union triée). Invariant « une forme = ensemble de
-  person_ids candidats × ensemble de sources qui l'ont vue ».
-- **classification** : (a).
-- **destination domain/** : `domain/persons/sourcing.py` →
-  `merge_name_form_provenance(existing, additional_pid, additional_source) -> NameFormEntry`.
-
 ### diff existant vs recalculé
 - **localisation** : `application/pipeline/persons/populate_person_name_forms.py:87-97`
 - **description** : Compare l'ensemble actuel à celui recalculé pour
@@ -485,10 +475,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 15 | 10 | **25** |
+| **(a) déjà pure** | 15 | 9 | **24** |
 | **(b) décomposable** | 7 | 8 | **15** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 24 | 21 | **45** |
+| **Total** | 24 | 20 | **44** |
 
 ### Patterns dupliqués majeurs
 
