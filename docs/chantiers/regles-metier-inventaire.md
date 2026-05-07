@@ -259,16 +259,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_theses.py`
 
-### _thesis_author_compatible — règle de matching auteur thèse
-- **localisation** : `application/pipeline/normalize/normalize_theses.py:62-79`
-- **description** : Pour matcher une thèse par titre+année, vérifier
-  compatibilité auteur principal : (1) si auteur DB inconnu, accepter ;
-  (2) sinon `names_compatible` ; (3) fallback « tokens identiques »
-  pour les particules (Le, Da, Ben).
-- **classification** : (b).
-- **destination domain/** : `domain/publications/theses.py` →
-  `thesis_authors_compatible(candidate, claimed) -> bool`.
-
 ### find_publication theses — cascade DOI/NNT puis title+author
 - **localisation** : `application/pipeline/normalize/normalize_theses.py:122-172`
 - **description** : Cascade : DOI/NNT (via find_or_create), puis
@@ -602,9 +592,9 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
 | **(a) déjà pure** | 16 | 14 | **30** |
-| **(b) décomposable** | 12 | 10 | **22** |
+| **(b) décomposable** | 11 | 10 | **21** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 30 | 27 | **57** |
+| **Total** | 29 | 27 | **56** |
 
 ### Patterns dupliqués majeurs
 

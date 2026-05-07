@@ -367,7 +367,6 @@ from application.pipeline.normalize.normalize_theses import (
     _build_source_meta,
     _extract_thesis_author,
     _parse_date_iso,
-    _thesis_author_compatible,
     extract_pub_metadata,
 )
 
@@ -497,39 +496,6 @@ class TestThesesBuildSourceMeta:
             "partenairesDeRecherche": [{"type": "lab"}],
         }
         assert _build_source_meta(these) is None
-
-
-class TestThesesAuthorCompatible:
-    """_thesis_author_compatible accepte des variations d'ordre/particules."""
-
-    class _StubQueries:
-        def __init__(self, primary):
-            self._primary = primary
-
-        def fetch_thesis_primary_author(self, cur, pub_id):
-            return self._primary
-
-    def test_exact_match(self):
-        q = self._StubQueries(("Dupont", "Jean"))
-        assert _thesis_author_compatible(None, q, 1, ("dupont", "jean")) is True
-
-    def test_no_primary_author_accepts(self):
-        """Pas d'auteur connu → on accepte le match (titre+année suffisent)."""
-        q = self._StubQueries(None)
-        assert _thesis_author_compatible(None, q, 1, ("dupont", "jean")) is True
-
-    def test_empty_primary_last_name_accepts(self):
-        q = self._StubQueries(("", ""))
-        assert _thesis_author_compatible(None, q, 1, ("dupont", "jean")) is True
-
-    def test_incompatible_names(self):
-        q = self._StubQueries(("Martin", "Paul"))
-        assert _thesis_author_compatible(None, q, 1, ("dupont", "jean")) is False
-
-    def test_token_fallback_particule(self):
-        """Gère les particules (Ben, Le…) via set des tokens identiques."""
-        q = self._StubQueries(("Ben Ali", "Mohammed"))
-        assert _thesis_author_compatible(None, q, 1, ("mohammed", "ben ali")) is True
 
 
 # ── authorship_roles ─────────────────────────────────────────────

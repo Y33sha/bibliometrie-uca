@@ -38,11 +38,14 @@ from application.publications import (
     try_merge_by_doi,
 )
 from domain.authorship_roles import THESES_FIELD_ROLES, merge_roles
-from domain.names import names_compatible
 from domain.normalize import normalize_name, normalize_text
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
-from domain.sources.theses import derive_theses_doc_type, extract_thesis_year
+from domain.sources.theses import (
+    derive_theses_doc_type,
+    extract_thesis_year,
+    thesis_authors_compatible,
+)
 
 # =============================================================
 # PUBLICATIONS
@@ -63,21 +66,8 @@ def _extract_thesis_author(these: dict) -> tuple[str, str] | None:
 def _thesis_author_compatible(
     cur: Any, queries: ThesesNormalizeQueries, pub_id: int, author: tuple[str, str]
 ) -> bool:
-    """Vérifie si l'auteur d'une thèse existante est compatible avec author."""
     primary = queries.fetch_thesis_primary_author(cur, pub_id)
-    if primary is None:
-        # Pas d'auteur connu → on accepte le match (titre+année suffisent)
-        return True
-    ln = normalize_name(primary[0])
-    fn = normalize_name(primary[1])
-    if not ln:
-        return True
-    if names_compatible(author[0], author[1], ln, fn):
-        return True
-    # Fallback : tokens identiques (gère les particules type Ben, Le, Da)
-    tokens_a = set(f"{author[0]} {author[1]}".split())
-    tokens_b = set(f"{ln} {fn}".split())
-    return tokens_a == tokens_b and len(tokens_a) >= 2
+    return thesis_authors_compatible(primary, author)
 
 
 def extract_pub_metadata(these: dict) -> dict:

@@ -500,6 +500,14 @@ relocalisées en `domain/`.
   laboratoires sur l'arbre aplati incluant les tutelles parentes).
   Sémantique inchangée : ne conserve que les affiliations marquées
   `id_name_author_labo`, fallback sur la liste complète sinon.
+- **Theses `thesis_authors_compatible` rapatriée** : la décision pure
+  de compatibilité auteur (cascade `names_compatible` → fallback tokens
+  identiques pour particules type « Le », « Ben », « Da ») descend dans
+  `domain/sources/theses.py`. Le wrapper application
+  `_thesis_author_compatible` ne fait plus que le SELECT
+  `fetch_thesis_primary_author` puis délègue. Tests rapatriés dans
+  `tests/unit/domain/sources/test_theses.py` (plus besoin de stub
+  `queries`, on appelle la fonction pure directement).
 - **Découpage `last_name`/`first_name` — colonnes supprimées** :
   les colonnes `source_persons.last_name` et
   `source_persons.first_name` sont droppées (migration 022). Le
