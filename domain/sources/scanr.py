@@ -6,6 +6,27 @@ de la sémantique ScanR pour le reste du pipeline.
 """
 
 
+def select_leaf_affiliations(affiliations: list[dict]) -> list[dict]:
+    """Filtre les affiliations ScanR aux entrées marquées labo.
+
+    ScanR renvoie côte à côte l'affiliation labo (champ
+    ``id_name_author_labo`` rempli, c'est la seule affichée
+    publiquement côté ScanR) et les pures tutelles, déjà dérivables
+    via ``structures_parents``. Ne garder que la labo évite la
+    double-comptabilisation des tutelles parentes en aval.
+
+    Symétrique côté HAL de la préférence
+    ``authIdHasPrimaryStructure_fs`` (labos feuilles) sur
+    ``authIdHasStructure_fs`` (arbre aplati incluant les tutelles).
+
+    Fallback sur la liste complète si aucune entrée n'est marquée labo
+    (auteur non rattaché à un labo identifié côté ScanR) — sinon on
+    perdrait toute affiliation pour cet auteur.
+    """
+    labo = [a for a in affiliations if a.get("id_name_author_labo")]
+    return labo or affiliations
+
+
 def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
     """Extrait le NNT d'un `scanr_id` quand celui-ci encode une thèse.
 

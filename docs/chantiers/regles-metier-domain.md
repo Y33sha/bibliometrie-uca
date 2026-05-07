@@ -493,6 +493,13 @@ relocalisées en `domain/`.
   deviennent de fines adaptatrices locales (1-4 lignes) qui injectent
   le contexte calendrier ou le None-handling autour de la fonction
   domain. Tests déplacés dans `tests/unit/domain/sources/test_crossref.py`.
+- **ScanR `select_leaf_affiliations` rapatriée** : `select_labo_affiliations`
+  de `normalize_scanr.py` migrée vers `domain/sources/scanr.py` et
+  renommée en `select_leaf_affiliations` (symétrie avec
+  `authIdHasPrimaryStructure_fs` côté HAL — préférence des feuilles
+  laboratoires sur l'arbre aplati incluant les tutelles parentes).
+  Sémantique inchangée : ne conserve que les affiliations marquées
+  `id_name_author_labo`, fallback sur la liste complète sinon.
 - **Découpage `last_name`/`first_name` — colonnes supprimées** :
   les colonnes `source_persons.last_name` et
   `source_persons.first_name` sont droppées (migration 022). Le
