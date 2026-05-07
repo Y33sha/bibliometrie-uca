@@ -157,17 +157,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/publications/dedup.py` →
   `decide_openalex_pub_match(*, hal_match, nnt_match, openalex_id_match, title_doi_match) -> PublicationMatchDecision`.
 
-### Conflit DOI au moment de l'enrichissement
-- **localisation** : `application/pipeline/normalize/normalize_openalex.py:620-636`
-- **description** : Si nouveau DOI X collisionne, délègue à
-  `resolve_doi_conflict` (déjà domain) avec mémorisation du
-  `source_doi` original sur `external_ids` quand le DOI a été retiré
-  (chapitre vs ouvrage).
-- **classification** : (a) — décision déjà pure ; reste la convention
-  `source_doi`.
-- **destination domain/** : à exposer comme effet retourné par
-  `DoiConflictResolution.original_doi_to_preserve`.
-
 ---
 
 ## `application/pipeline/normalize/normalize_scanr.py`
