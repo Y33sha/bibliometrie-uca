@@ -178,20 +178,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ---
 
-## `application/pipeline/normalize/normalize_wos.py`
-
-### _build_wos_identifiers
-- **localisation** : `application/pipeline/normalize/normalize_wos.py:508-515`
-- **description** : Mapping dict identifiants WoS → JSONB normalisé
-  `{orcid, researcher_id}`. None si rien. `daisng_id` n'est pas
-  cross-source, ResearcherID l'est.
-- **classification** : (a).
-- **destination domain/** : `domain/persons/identifiers.py` →
-  `build_authorship_identifiers_for_source(source, author_dict) -> dict | None`
-  (dispatch par source, pattern dupliqué cf. synthèse).
-
----
-
 ## `application/pipeline/normalize/normalize_scanr.py`
 
 ### detected_countries — propagation
@@ -548,10 +534,8 @@ def thesis_authors_compatible(candidate, claimed) -> bool: ...
 def aggregate_thesis_persons(these: dict) -> list[ThesisAuthorship]: ...
 
 # domain/persons/identifiers.py
-def build_authorship_identifiers(source: str, **fields) -> dict | None: ...
 def iter_identifier_writes(authorships) -> Iterable[IdentifierWrite]: ...
 def pick_idhal_from_tei_idnos(idnos: list) -> dict[str, str]: ...
-IDENTIFIER_FIELDS_BY_SOURCE: dict[str, IdentifierConfig]
 
 # domain/persons/sourcing.py
 def should_create_source_person(source: str, *, strong_id) -> bool: ...

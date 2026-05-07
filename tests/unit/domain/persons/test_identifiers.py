@@ -3,7 +3,7 @@
 import pytest
 
 from domain.errors import ValidationError
-from domain.persons.identifiers import ORCID, IdHAL, IdRef
+from domain.persons.identifiers import ORCID, IdHAL, IdRef, compact_identifiers
 
 # ── ORCID ──────────────────────────────────────────────────────────
 
@@ -150,3 +150,32 @@ class TestIdRefInvalid:
     def test_raises_on_letters_in_body(self):
         with pytest.raises(ValidationError):
             IdRef("12A456789")
+
+
+# ── compact_identifiers ─────────────────────────────────────────────
+
+
+class TestCompactIdentifiers:
+    def test_empty_returns_none(self):
+        assert compact_identifiers() is None
+
+    def test_all_none_returns_none(self):
+        assert compact_identifiers(orcid=None, idref=None) is None
+
+    def test_keeps_truthy_strips_falsy(self):
+        result = compact_identifiers(
+            orcid="0000-0001-2345-6789",
+            idref=None,
+            idhal="",
+            researcher_id="ABC-1234",
+        )
+        assert result == {"orcid": "0000-0001-2345-6789", "researcher_id": "ABC-1234"}
+
+    def test_strips_zero_int(self):
+        """hal_person_id=0 (sentinelle HAL) doit être filtré comme falsy."""
+        assert compact_identifiers(orcid="0000-0001-2345-6789", hal_person_id=0) == {
+            "orcid": "0000-0001-2345-6789"
+        }
+
+    def test_keeps_int(self):
+        assert compact_identifiers(hal_person_id=42) == {"hal_person_id": 42}

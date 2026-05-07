@@ -37,7 +37,7 @@ from application.publications import (
 from application.publications import find_or_create as find_or_create_publication
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
-from domain.persons.identifiers import normalize_orcid
+from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
@@ -461,7 +461,8 @@ def process_authorships(
         )
 
         orcid = _extract_openalex_orcid(authorship)
-        identifiers = Json({"orcid": orcid}) if orcid else None
+        ids = compact_identifiers(orcid=orcid)
+        identifiers = Json(ids) if ids else None
 
         sa_id = queries.upsert_openalex_source_authorship(
             cur,

@@ -170,3 +170,19 @@ class IdRef:
 
     def __str__(self) -> str:
         return self.value
+
+
+# ── Construction du dict JSONB `source_authorships.identifiers` ────
+
+
+def compact_identifiers(**ids: object) -> dict[str, object] | None:
+    """Construit le dict d'identifiants pour ``source_authorships.identifiers``.
+
+    Convention : valeur falsy (None, 0, "", …) → clé absente du dict, dict
+    vide → None. Le caller gère ses propres gardes spécifiques (ex. pour
+    HAL, ``hal_person_id <= 0`` est une sentinelle interne « auteur non
+    identifié » qu'on ne stocke pas) en passant ``None`` plutôt qu'une
+    valeur sentinelle.
+    """
+    out = {k: v for k, v in ids.items() if v}
+    return out or None

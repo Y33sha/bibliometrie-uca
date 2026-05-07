@@ -42,7 +42,7 @@ from application.publications import find_or_create as find_or_create_publicatio
 from application.publications import refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
-from domain.persons.identifiers import normalize_orcid
+from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
@@ -250,9 +250,7 @@ def process_authors(
             continue
 
         orcid = normalize_orcid(author.get("ORCID"))
-        ids: dict[str, Any] = {}
-        if orcid:
-            ids["orcid"] = orcid
+        ids = compact_identifiers(orcid=orcid)
 
         affiliations = _author_affiliation_strings(author)
         sd: dict[str, Any] = {}
