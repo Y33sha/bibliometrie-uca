@@ -165,13 +165,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
   `should_create_source_person(source, *, strong_id) -> bool` (unifié
   HAL/ScanR/theses).
 
-### Mapping authQuality_s
-- **localisation** : `application/pipeline/normalize/normalize_hal.py:584-586`
-- **description** : `aut/crp/dir/edt` → roles + flag corresponding via
-  `domain.authorship_roles.map_role`.
-- **classification** : (a) — déjà domain.
-- **destination domain/** : n/a.
-
 ### parse_author_structures — préférence primary > flat
 - **localisation** : `application/pipeline/normalize/normalize_hal.py:416-486` (règle l. 437)
 - **description** : Préférence `authIdHasPrimaryStructure_fs` (labos
@@ -230,14 +223,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_wos.py`
 
-### authors_kept — filtre daisng_id
-- **localisation** : `application/pipeline/normalize/normalize_wos.py:573-577`
-- **description** : Skip auteurs sans `daisng_id` ni `full_name` (=
-  parsing API douteux).
-- **classification** : (a).
-- **destination domain/** : `domain/sources/wos_signals.py` →
-  `is_wos_author_exploitable(author) -> bool`.
-
 ### _build_wos_identifiers
 - **localisation** : `application/pipeline/normalize/normalize_wos.py:508-515`
 - **description** : Mapping dict identifiants WoS → JSONB normalisé
@@ -261,14 +246,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/sources/scanr_signals.py` →
   `select_leaf_affiliations(affiliations) -> list[dict]`.
 
-### _extract_nnt_from_scanr_id
-- **localisation** : `application/pipeline/normalize/normalize_scanr.py:103-106`
-- **description** : `scanr_id` qui commence par `these` encode un NNT
-  (ex. `these2021CLFAC030`).
-- **classification** : (a).
-- **destination domain/** : `domain/sources/scanr_signals.py` →
-  `extract_nnt_from_scanr_id(scanr_id) -> str | None`.
-
 ### upsert_scanr_author — invariant « idref ou rien »
 - **localisation** : `application/pipeline/normalize/normalize_scanr.py:254-286`
 - **description** : Crée la `source_persons` que si `idref` (PPN)
@@ -290,14 +267,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 ---
 
 ## `application/pipeline/normalize/normalize_theses.py`
-
-### pub_year — fallback dateSoutenance > datePremiereInscription
-- **localisation** : `application/pipeline/normalize/normalize_theses.py:90-102` (+ dupliqué `:249-261`)
-- **description** : Année = soutenance, sinon première inscription.
-  Pour thèses en cours, l'inscription fait foi.
-- **classification** : (a), dupliquée.
-- **destination domain/** : `domain/publications/theses.py` →
-  `extract_thesis_year(date_soutenance, date_inscription) -> int | None`.
 
 ### _thesis_author_compatible — règle de matching auteur thèse
 - **localisation** : `application/pipeline/normalize/normalize_theses.py:62-79`
@@ -359,41 +328,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 ---
 
 ## `application/pipeline/normalize/normalize_crossref.py`
-
-### get_pub_year — cascade published > issued > online > print + clamp
-- **localisation** : `application/pipeline/normalize/normalize_crossref.py:71-94`
-- **description** : Année = première date valide dans
-  `published > issued > published-online > published-print`, **borne
-  supérieure year+1**, borne inférieure 1500. Un preprint daté de
-  l'année prochaine reste plausible, au-dessus c'est pollué.
-- **classification** : (a) (paramétrer `max_year` pour testabilité).
-- **destination domain/** : `domain/sources/crossref_signals.py` →
-  `extract_crossref_pub_year(msg, *, max_year) -> int | None`.
-
-### get_issns — eissn vs print via issn-type
-- **localisation** : `application/pipeline/normalize/normalize_crossref.py:108-130`
-- **description** : Si CrossRef expose `issn-type`, séparer par `type`
-  (electronic vs print) ; sinon premier `ISSN`.
-- **classification** : (a).
-- **destination domain/** : `domain/sources/crossref_signals.py` →
-  `parse_crossref_issns(msg) -> tuple[str | None, str | None]`.
-
-### get_abstract — strip JATS XML
-- **localisation** : `application/pipeline/normalize/normalize_crossref.py:148-157`
-- **description** : Abstract en JATS XML, retirer les tags.
-- **classification** : (a).
-- **destination domain/** : `domain/sources/crossref_signals.py` →
-  `strip_jats_tags(s) -> str` (limite : helper text-cleaning
-  générique possible).
-
-### get_meta — sélection champs CrossRef à conserver
-- **localisation** : `application/pipeline/normalize/normalize_crossref.py:199-219`
-- **description** : Liste blanche : `license`, `funder`, `relation`,
-  `references_count` (si > 0), `indexed.timestamp`. Décision « ces
-  champs ont une valeur, les autres on jette ».
-- **classification** : (a).
-- **destination domain/** : `domain/sources/crossref_signals.py` →
-  `extract_crossref_meta(msg) -> dict | None`.
 
 ### authenticated-orcid : « stocker mais ne pas l'utiliser comme filtre »
 - **localisation** : `application/pipeline/normalize/normalize_crossref.py:331-332`
@@ -676,10 +610,10 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
-| **(a) déjà pure** | 25 | 14 | **39** |
+| **(a) déjà pure** | 17 | 14 | **31** |
 | **(b) décomposable** | 12 | 10 | **22** |
 | **(c) intrinsèque transaction** | 2 | 3 | **5** |
-| **Total** | 39 | 27 | **66** |
+| **Total** | 31 | 27 | **58** |
 
 ### Patterns dupliqués majeurs
 
