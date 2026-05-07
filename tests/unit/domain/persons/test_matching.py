@@ -2,9 +2,94 @@
 
 from domain.persons.matching import (
     NameFormDecision,
+    decide_cross_source_match,
     decide_match_by_identifier,
     decide_name_form_outcome,
 )
+
+
+class TestDecideCrossSourceMatch:
+    def test_no_candidates_returns_none(self):
+        assert (
+            decide_cross_source_match(
+                authorship_source="openalex",
+                last_norm="dupont",
+                first_norm="jean",
+                candidates=[],
+            )
+            is None
+        )
+
+    def test_single_compatible_candidate(self):
+        candidates = [(42, "dupont", "jean", "hal")]
+        assert (
+            decide_cross_source_match(
+                authorship_source="openalex",
+                last_norm="dupont",
+                first_norm="jean",
+                candidates=candidates,
+            )
+            == 42
+        )
+
+    def test_same_source_candidates_skipped(self):
+        """Les candidats portant la même source que l'authorship sont
+        ignorés (ils ne portent aucun signal nouveau)."""
+        candidates = [(42, "dupont", "jean", "openalex")]
+        assert (
+            decide_cross_source_match(
+                authorship_source="openalex",
+                last_norm="dupont",
+                first_norm="jean",
+                candidates=candidates,
+            )
+            is None
+        )
+
+    def test_incompatible_name_skipped(self):
+        candidates = [(42, "martin", "paul", "hal")]
+        assert (
+            decide_cross_source_match(
+                authorship_source="openalex",
+                last_norm="dupont",
+                first_norm="jean",
+                candidates=candidates,
+            )
+            is None
+        )
+
+    def test_multiple_compatible_same_pid_returns_pid(self):
+        """Plusieurs candidats compatibles qui pointent tous vers la même
+        person_id → match safe."""
+        candidates = [
+            (42, "dupont", "jean", "hal"),
+            (42, "dupont", "j", "wos"),
+        ]
+        assert (
+            decide_cross_source_match(
+                authorship_source="openalex",
+                last_norm="dupont",
+                first_norm="jean",
+                candidates=candidates,
+            )
+            == 42
+        )
+
+    def test_multiple_compatible_different_pids_returns_none(self):
+        """Conflit : >1 person_id distincts compatibles → pas de match."""
+        candidates = [
+            (42, "dupont", "jean", "hal"),
+            (17, "dupont", "j", "wos"),
+        ]
+        assert (
+            decide_cross_source_match(
+                authorship_source="openalex",
+                last_norm="dupont",
+                first_norm="jean",
+                candidates=candidates,
+            )
+            is None
+        )
 
 
 class TestDecideNameFormOutcome:
