@@ -159,20 +159,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ---
 
-## `application/pipeline/normalize/normalize_scanr.py`
-
-### detected_countries — propagation
-- **localisation** : `application/pipeline/normalize/normalize_scanr.py:330-339`
-- **description** : Pour chaque affiliation ScanR, accumulation
-  dédupliquée des `detected_countries` au niveau document. Premier vu,
-  ordre préservé.
-- **classification** : (a).
-- **destination domain/** : `domain/sources/scanr_signals.py` →
-  `collect_detected_countries(affiliations) -> list[str]` (limite :
-  trivial, peut rester inline).
-
----
-
 ## `application/pipeline/normalize/normalize_theses.py`
 
 ### find_publication theses — cascade DOI/NNT puis title+author
