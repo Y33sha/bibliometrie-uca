@@ -118,7 +118,12 @@ def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **k
                 "infrastructure/sources/scanr/extract_scanr.py", "--mode", sub_mode, *year_args
             )
         if "theses" in effective:
-            run_python("infrastructure/sources/theses/extract_theses.py")
+            run_python(
+                "infrastructure/sources/theses/extract_theses.py",
+                "--mode",
+                sub_mode,
+                *year_args,
+            )
 
     if policy.refetch_truncated_oa and "openalex" in effective:
         run_python("infrastructure/sources/openalex/refetch_truncated.py")

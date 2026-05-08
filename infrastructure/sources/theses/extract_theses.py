@@ -5,6 +5,12 @@ Usage:
     python extract_theses.py              # extraction complète (soutenues + en cours)
     python extract_theses.py --soutenues  # thèses soutenues uniquement
     python extract_theses.py --en-cours   # thèses en cours uniquement
+    python extract_theses.py --year 2024  # filtre par année (NNT préfixé YYYY ;
+                                          # ne s'applique qu'aux thèses soutenues,
+                                          # les en-cours n'ont pas d'année dans leur id)
+    python extract_theses.py --mode weekly  # accepté pour cohérence CLI mais sans
+                                            # effet : theses.fr a un volume bas, le
+                                            # weekly ferait la même chose qu'un full
     python extract_theses.py --dry-run    # compter sans insérer
 
 L'API est interrogée via etabSoutenancePpn (identifiants IdRef de l'établissement).
@@ -86,9 +92,14 @@ def extract_ppn(
     existing_ids: set,
     base_url: str,
     status: str | None = None,
+    year: int | None = None,
     dry_run: bool = False,
 ) -> tuple[int, int, int]:
     """Extrait toutes les thèses d'un établissement (par PPN).
+
+    Si `year` est fourni, ne conserve que les thèses dont le NNT commence
+    par cette année (filtre post-fetch ; ne ramène pas les en-cours qui
+    n'ont pas d'année dans leur id).
 
     Retourne (total, insérés, mis à jour).
     """
@@ -119,6 +130,9 @@ def extract_ppn(
             for these in theses:
                 theses_id = extract_theses_id(these)
                 if not theses_id:
+                    continue
+
+                if year is not None and not theses_id.startswith(str(year)):
                     continue
 
                 doi = extract_doi(these)
@@ -185,6 +199,17 @@ class ThesesExtractor(SourceExtractor):
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--soutenues", action="store_true", help="Thèses soutenues uniquement")
         parser.add_argument("--en-cours", action="store_true", help="Thèses en cours uniquement")
+        parser.add_argument(
+            "--year",
+            type=int,
+            help="Filtre post-fetch par année (NNT préfixé YYYY ; ne ramène que les soutenues)",
+        )
+        parser.add_argument(
+            "--mode",
+            choices=["full", "weekly"],
+            default="full",
+            help="Accepté pour cohérence CLI ; sans effet (theses.fr a un volume bas)",
+        )
 
     def load_config(self, cur: Any) -> dict[str, Any]:
         ppns = get_extraction_api_ids(cur, "theses")
@@ -203,6 +228,8 @@ class ThesesExtractor(SourceExtractor):
     def setup_logging(self, args: argparse.Namespace, config: dict[str, Any]) -> None:
         self.logger.info(f"Établissements PPN : {config['ppns']}")
         self.logger.info(f"Statuts : {_resolve_statuses(args)}")
+        if args.year is not None:
+            self.logger.info(f"Filtre année (NNT préfixe) : {args.year}")
 
     def extract_all(
         self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
@@ -216,6 +243,7 @@ class ThesesExtractor(SourceExtractor):
                     existing_ids,
                     config["base_url"],
                     status=status,
+                    year=args.year,
                     dry_run=args.dry_run,
                 )
                 stats.add(new=inserted, updated=updated, total=total)

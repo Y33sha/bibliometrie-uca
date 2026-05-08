@@ -43,7 +43,7 @@ complet dans [`docs/pipeline.md`](docs/pipeline.md).
 Exemple : intégrer CrossRef, ArXiv, PubMed, DataCite.
 
 Une source couvre 3 étapes du pipeline : **extract** (API → staging),
-**cross_imports** (hydrate les DOIs manquants détectés par d'autres
+**fetch_missing_doi** (hydrate les DOIs manquants détectés par d'autres
 sources), **normalize** (staging → tables structurées `source_*`).
 
 ### 1. Enregistrer la source
@@ -92,14 +92,16 @@ if __name__ == "__main__":
 Modèle à copier : [`infrastructure/sources/theses/extract_theses.py`](infrastructure/sources/theses/extract_theses.py)
 (structure simple, pas de spécificité HAL).
 
-### 3. Cross-import : hydratation des DOIs
+### 3. Fetch missing DOI : hydratation des DOIs
 
-Script autonome `infrastructure/sources/<source>/cross_import_<source>.py`
-qui, pour chaque DOI présent dans d'autres sources mais absent de la
-nôtre, va chercher les métadonnées et les ajoute en staging.
+Adapter `infrastructure/sources/<source>/fetch_missing_doi.py` qui,
+pour chaque DOI présent dans d'autres sources mais absent de la
+nôtre, va chercher les métadonnées et les ajoute en staging. Le
+dispatcher CLI unique [`interfaces/cli/pipeline/fetch_missing_doi.py`](interfaces/cli/pipeline/fetch_missing_doi.py)
+appelle l'adapter de la source demandée.
 
-Pas de base class ici — s'inspirer de
-[`infrastructure/sources/openalex/cross_import_openalex.py`](infrastructure/sources/openalex/cross_import_openalex.py).
+S'inspirer de
+[`infrastructure/sources/openalex/fetch_missing_doi.py`](infrastructure/sources/openalex/fetch_missing_doi.py).
 
 ### 4. Normalizer : staging → tables structurées
 
@@ -118,7 +120,7 @@ Modèle : [`interfaces/cli/pipeline/normalize_theses.py`](interfaces/cli/pipelin
 ### 5. Brancher dans le pipeline
 
 Dans [`run_pipeline.py`](run_pipeline.py), ajouter les appels dans
-`phase_extract()`, `phase_cross_imports()`, et
+`phase_extract()`, `phase_fetch_missing_doi()`, et
 `_run_normalize_<source>()`. Pas de nouvelle entrée dans `PHASES` —
 une source s'intègre aux phases existantes, ce n'est **pas** une phase.
 
