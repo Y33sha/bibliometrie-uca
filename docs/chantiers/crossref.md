@@ -159,6 +159,27 @@ Aucune pour l'instant — toutes les décisions structurantes ont été tranché
 - **Promotion d'ORCID erronée** (phase 3) : risque qu'un ORCID CrossRef incorrect (cas rare mais pas nul, surtout sur les vieilles publis où l'éditeur a pu rentrer un ORCID sans vérif) déclenche une promotion `pending → confirmed` injustifiée. Politique conservatrice : exiger que l'ORCID soit déjà connu côté UCA en `pending` ET attaché à la même personne que la `source_authorship` CrossRef.
 - **Volume requêtes** : à mesurer en phase 0 pour calibrer parallélisme et fréquence.
 
+## Crossref absent de `build_authorships.all_sources`
+
+[`build_authorships.py:20-26`](application/pipeline/authorships/build_authorships.py#L20)
+hardcode 5 sources (HAL, OpenAlex, WoS, ScanR, theses.fr) — Crossref
+manque. La liste sert à plusieurs étapes :
+
+- **Étape 2** (link FK `source_authorships.authorship_id` →
+  `authorships.id` via `link_source_authorships_to_authorship_for`) :
+  Crossref insère bien des `source_authorships`, donc devrait y figurer
+  pour que ses authorships soient reliées à la table de vérité. **Bug
+  potentiel** ou décision non documentée.
+- **Étape 4** (propagation `in_perimeter` + `structure_ids`) :
+  Crossref n'a pas de `structure_ids` (affiliations brutes texte uniquement)
+  → exclusion légitime à ce niveau.
+
+À investiguer : vérifier si les `source_authorships` Crossref sont
+correctement reliées à `authorships` aujourd'hui. Si non → ajouter
+Crossref à la liste mais avec gestion différenciée selon l'étape, ou
+scinder en deux constantes (`AUTHORSHIPS_LINK_SOURCES` vs
+`STRUCTURE_PROPAGATION_SOURCES`).
+
 ## Liens
 
 - API doc : <https://api.crossref.org/swagger-ui/index.html>
