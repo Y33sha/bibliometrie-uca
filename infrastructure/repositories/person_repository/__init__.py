@@ -5,6 +5,10 @@ Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`,
 `_authorships`, `_name_forms` — la classe `PgPersonRepository` n'est qu'un
 point d'agrégation qui borne le curseur et délègue.
 
+Mode dispatch : accepte un curseur psycopg ou une Connection SA. Les
+sous-modules dispatchent en interne via `isinstance`. Phase 4 supprimera
+la branche psycopg.
+
 Usage :
     with get_cursor() as (cur, conn):
         repo = PgPersonRepository(cur)
@@ -22,11 +26,13 @@ from infrastructure.repositories.person_repository import (
 
 
 class PgPersonRepository:
-    """Accès PostgreSQL à l'agrégat Person."""
+    """Accès PostgreSQL à l'agrégat Person.
 
-    def __init__(self, cur: Any) -> None:
-        """cur : curseur psycopg3 dans la transaction courante."""
-        self._cur = cur
+    Accepte un curseur psycopg ou une Connection SQLAlchemy.
+    """
+
+    def __init__(self, conn_or_cur: Any) -> None:
+        self._cur = conn_or_cur
 
     # ── persons ────────────────────────────────────────────────────
 

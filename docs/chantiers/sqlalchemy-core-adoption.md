@@ -405,23 +405,39 @@ choix dans une note locale.
 #### Lot 3.A — Repositories sync (~113 `cur.execute`, 8 fichiers)
 
 Pendants synchrones des `async_*_repository.py` déjà migrés en
-Phase 2. Migration mécanique en se calquant sur les async (mêmes
-queries, signatures `cur → conn`, `Engine` SA sync).
+Phase 2. Migration en mode dispatch (cur psycopg | Connection SA),
+calquée sur les async qui cohabitent avec un caller psycopg encore
+non migré (cf. `async_authorship_repository.py`). La branche psycopg
+disparaîtra en Phase 4 quand l'orchestrateur pipeline basculera.
 
-**Préalable** : instancier un `Engine` SA sync (`infrastructure/db/engine.py`
-en parallèle de l'AsyncEngine existant). C'est le 2ᵉ item de
-Phase 4 — à anticiper ici puisqu'il conditionne tout le lot.
+**Préalable** : `Engine` SA sync dans `infrastructure/db/engine.py`
+(anticipé du 2ᵉ item de Phase 4 puisqu'il conditionne tout le lot).
 
-- [ ] `Engine` SA sync ajouté dans `infrastructure/db/engine.py`
-- [ ] `publication_repository.py` (22 occ.)
-- [ ] `journal_repository.py` (18 occ.)
-- [ ] `publisher_repository.py` (17 occ.)
-- [ ] `person_repository/_core.py` + `_authorships.py` +
-  `_name_forms.py` + `_identifiers.py` (42 occ. au total)
-- [ ] `authorship_repository.py` (14 occ.)
-- [ ] Tests d'intégration sync correspondants (devraient passer
-  sans modification ; sinon adapter les fixtures comme `sa_conn`
-  pour les async).
+- [x] `Engine` SA sync ajouté dans `infrastructure/db/engine.py`
+  (factory `get_sync_engine`, fixture test `sa_sync_conn`).
+- [x] `publication_repository.py` (22 occ.) — dispatch (13 méthodes
+  + merge_into / `_merge_into_sa` helper). SA branche en `text()` :
+  les queries publications sont trop intriquées en casts enum
+  (oa_type, doc_type, source_type) et opérations array pour gagner
+  à passer par la MetaData.
+- [x] `journal_repository.py` (18 occ.) — dispatch (10 méthodes +
+  merge_journal_into).
+- [x] `publisher_repository.py` (17 occ.) — dispatch (7 méthodes +
+  merge_publisher_into).
+- [x] `person_repository/_core.py` + `_authorships.py` +
+  `_name_forms.py` + `_identifiers.py` (42 occ. au total) — dispatch
+  par sous-module (chaque fonction bascule sur `isinstance(conn, Connection)`).
+  Pattern calqué sur `async_person_repository/*` qui était déjà en
+  dispatch.
+- [x] `authorship_repository.py` (14 occ.) — **supprimé** : code
+  mort en prod (les 3 fonctions sync de `application/authorships.py`
+  n'avaient aucun caller hors tests, scripts cités dans les
+  docstrings — `split_bad_merges`, `fix_oa_person_conflicts` —
+  disparus). `TestDeleteOrphanAuthorships` converti en async pour
+  préserver la couverture du SQL utilisé via `async_delete_orphan_authorships`.
+- [ ] Tests d'intégration sync : passent en mode cur sans
+  modification ; tests SA-branche à ajouter quand un caller
+  basculera (smoke `sa_sync_conn`).
 
 #### Lot 3.B — Queries pipeline (`infrastructure/db/queries/`, ~120 occ.)
 

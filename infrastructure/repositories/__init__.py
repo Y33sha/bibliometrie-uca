@@ -15,17 +15,17 @@ Usage :
     def set_rejected(cur, person_id, rejected):
         person_repository(cur).set_rejected(person_id, rejected)
 
-Les agrégats Address, Perimeter et Structure ne sont exposés qu'en
-async (seuls consommateurs = routers API), de même que la table
-clé/valeur Config (port `application.ports.config.AsyncConfigStore`).
-Authorship, Journal, Person et Publication existent dans les deux
-variantes (sync pour pipeline/CLI, async pour API).
+Les agrégats Address, Authorship, Perimeter et Structure ne sont
+exposés qu'en async (seuls consommateurs = routers API), de même que
+la table clé/valeur Config (port `application.ports.config.AsyncConfigStore`).
+Journal, Person et Publication existent dans les deux variantes
+(sync pour pipeline/CLI, async pour API).
 """
 
 from typing import Any
 
 from domain.ports.address_repository import AsyncAddressRepository
-from domain.ports.authorship_repository import AsyncAuthorshipRepository, AuthorshipRepository
+from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
 from domain.ports.perimeter_repository import AsyncPerimeterRepository
 from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
@@ -42,36 +42,30 @@ from .async_person_repository import PgAsyncPersonRepository
 from .async_publication_repository import PgAsyncPublicationRepository
 from .async_publisher_repository import PgAsyncPublisherRepository
 from .async_structure_repository import PgAsyncStructureRepository
-from .authorship_repository import PgAuthorshipRepository
 from .journal_repository import PgJournalRepository
 from .person_repository import PgPersonRepository
 from .publication_repository import PgPublicationRepository
 from .publisher_repository import PgPublisherRepository
 
 
-def authorship_repository(cur: Any) -> AuthorshipRepository:
-    """Retourne un AuthorshipRepository lié au curseur donné."""
-    return PgAuthorshipRepository(cur)
+def journal_repository(conn_or_cur: Any) -> JournalRepository:
+    """Retourne un JournalRepository lié au cur psycopg ou Connection SA donné."""
+    return PgJournalRepository(conn_or_cur)
 
 
-def journal_repository(cur: Any) -> JournalRepository:
-    """Retourne un JournalRepository lié au curseur donné."""
-    return PgJournalRepository(cur)
+def person_repository(conn_or_cur: Any) -> PersonRepository:
+    """Retourne un PersonRepository lié au cur psycopg ou Connection SA donné."""
+    return PgPersonRepository(conn_or_cur)
 
 
-def person_repository(cur: Any) -> PersonRepository:
-    """Retourne un PersonRepository lié au curseur donné."""
-    return PgPersonRepository(cur)
+def publication_repository(conn_or_cur: Any) -> PublicationRepository:
+    """Retourne un PublicationRepository lié au cur psycopg ou Connection SA donné."""
+    return PgPublicationRepository(conn_or_cur)
 
 
-def publication_repository(cur: Any) -> PublicationRepository:
-    """Retourne un PublicationRepository lié au curseur donné."""
-    return PgPublicationRepository(cur)
-
-
-def publisher_repository(cur: Any) -> PublisherRepository:
-    """Retourne un PublisherRepository lié au curseur donné."""
-    return PgPublisherRepository(cur)
+def publisher_repository(conn_or_cur: Any) -> PublisherRepository:
+    """Retourne un PublisherRepository lié au cur psycopg ou Connection SA donné."""
+    return PgPublisherRepository(conn_or_cur)
 
 
 # ── Factories async ────────────────────────────────────────────────

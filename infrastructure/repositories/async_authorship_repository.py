@@ -1,7 +1,5 @@
 """Adapter PostgreSQL async pour les authorships (vérité et sources).
 
-Parallèle à infrastructure/repositories/authorship_repository.py.
-
 Mode dispatch (cur psycopg | AsyncConnection SA) pour cohabiter avec le
 chantier sqlalchemy-core-adoption (sous-phases 2.4-2.7). La branche SA
 utilise `text()` paramétré ; la branche psycopg conserve le code
@@ -118,76 +116,6 @@ class PgAsyncAuthorshipRepository:
               )
             """,
             (person_id, person_id),
-        )
-        return self._conn.rowcount
-
-    async def move_authorships_for_source_authorship(
-        self,
-        source_authorship_id: int,
-        from_pub_id: int,
-        to_pub_id: int,
-    ) -> None:
-        if self._is_sa:
-            await self._conn.execute(
-                text("""
-                    UPDATE authorships a
-                    SET publication_id = :to_pub, updated_at = now()
-                    FROM source_authorships sa
-                    WHERE sa.authorship_id = a.id
-                      AND sa.id = :sa_id AND a.publication_id = :from_pub
-                """),
-                {"to_pub": to_pub_id, "sa_id": source_authorship_id, "from_pub": from_pub_id},
-            )
-            return
-        await self._conn.execute(
-            """
-            UPDATE authorships a
-            SET publication_id = %s, updated_at = now()
-            FROM source_authorships sa
-            WHERE sa.authorship_id = a.id
-              AND sa.id = %s AND a.publication_id = %s
-            """,
-            (to_pub_id, source_authorship_id, from_pub_id),
-        )
-
-    async def sync_person_id_from_sources(self, source_authorship_ids: list[int]) -> int:
-        if self._is_sa:
-            result = await self._conn.execute(
-                text("""
-                    UPDATE authorships a
-                    SET person_id = src.person_id, updated_at = now()
-                    FROM source_authorships src
-                    WHERE src.authorship_id = a.id
-                      AND a.person_id IS DISTINCT FROM src.person_id
-                      AND src.person_id IS NOT NULL
-                      AND src.id = ANY(:ids)
-                      AND NOT EXISTS (
-                          SELECT 1 FROM authorships a2
-                          WHERE a2.publication_id = a.publication_id
-                            AND a2.person_id = src.person_id
-                            AND a2.id <> a.id
-                      )
-                """),
-                {"ids": source_authorship_ids},
-            )
-            return result.rowcount
-        await self._conn.execute(
-            """
-            UPDATE authorships a
-            SET person_id = src.person_id, updated_at = now()
-            FROM source_authorships src
-            WHERE src.authorship_id = a.id
-              AND a.person_id IS DISTINCT FROM src.person_id
-              AND src.person_id IS NOT NULL
-              AND src.id = ANY(%s)
-              AND NOT EXISTS (
-                  SELECT 1 FROM authorships a2
-                  WHERE a2.publication_id = a.publication_id
-                    AND a2.person_id = src.person_id
-                    AND a2.id <> a.id
-              )
-            """,
-            (source_authorship_ids,),
         )
         return self._conn.rowcount
 
