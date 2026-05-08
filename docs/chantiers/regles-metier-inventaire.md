@@ -81,26 +81,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 
 ## `application/pipeline/normalize/normalize_hal.py`
 
-### parse_author_structures — préférence primary > flat
-- **localisation** : `application/pipeline/normalize/normalize_hal.py:416-486` (règle l. 437)
-- **description** : Préférence `authIdHasPrimaryStructure_fs` (labos
-  feuilles) sur `authIdHasStructure_fs` (arbre aplati incluant tutelles
-  parentes). Évite la pollution `addresses` par les tutelles parentes.
-- **classification** : (b) — choix de liste source = pure ; parsing
-  TSV-like reste.
-- **destination domain/** : `domain/sources/hal_signals.py` →
-  `pick_hal_structure_field(doc) -> Literal["primary", "flat"]`.
-
-### process_work — fusion HAL deux pubs (DOI/NNT)
-- **localisation** : `application/pipeline/normalize/normalize_hal.py:713-723`
-- **description** : Si le hal_id pointait sur `old_pub_id` mais
-  `find_publication` (matche par DOI/NNT) trouve `publication_id`
-  différent → fusion auto. Invariant « un hal_id ne peut pointer
-  qu'un seul DOI/NNT ».
-- **classification** : (b).
-- **destination domain/** : `domain/publications/dedup.py` →
-  `decide_hal_id_repointing(old_pub_id, new_pub_id) -> RepointDecision`.
-
 ---
 
 ## `application/pipeline/normalize/normalize_openalex.py`
@@ -127,18 +107,6 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 - **destination domain/** : `domain/publications/dedup.py` →
   `decide_thesis_match(*, doi_nnt_match, title_year_candidates, claimed_author) -> PublicationMatchDecision`.
 
-### process_persons — agrégation rôles par personne
-- **localisation** : `application/pipeline/normalize/normalize_theses.py:358-424`
-- **description** : Une même personne peut apparaître dans plusieurs
-  champs (auteur+jury, directeur+rapporteur). Regrouper par PPN, ou à
-  défaut par `(nom, prenom)`, fusionner les rôles via `merge_roles`.
-  Convention `position` incrémentée seulement pour les `author`. Plus
-  convention « partenaires de recherche → addr_parts pour TOUTES les
-  personnes du doc ».
-- **classification** : (b).
-- **destination domain/** : `domain/publications/theses.py` →
-  `aggregate_thesis_persons(these: dict) -> list[ThesisAuthorship]`.
-
 ---
 
 ## `application/pipeline/persons/create_persons_from_source_authorships.py`
@@ -161,9 +129,9 @@ helpers, les fichiers `pipeline/persons/`, `pipeline/publications/` et
 | Classification | Périmètre 1<br>(normalize/* + persons.py + publications.py) | Périmètre 2<br>(pipeline/persons + pipeline/publications + pipeline/authorships) | **Total** |
 |---|---:|---:|---:|
 | **(a) déjà pure** | 0 | 0 | **0** |
-| **(b) décomposable** | 8 | 1 | **9** |
+| **(b) décomposable** | 5 | 1 | **6** |
 | **(c) intrinsèque transaction** | 0 | 0 | **0** |
-| **Total** | 8 | 1 | **9** |
+| **Total** | 5 | 1 | **6** |
 
 ### Patterns dupliqués majeurs
 
