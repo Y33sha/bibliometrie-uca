@@ -186,18 +186,32 @@ migrés utilisent `Connection` SA sync, pas un curseur psycopg.
 
 Pour chaque router dans `interfaces/api/routers/` :
 
-1. Convertir les `async def route` en `def route`
-2. Retirer les `await` sur les appels aux repositories
-3. Remplacer les `async_*_repository(cur)` par leurs équivalents sync
-4. Remplacer le `get_async_cursor()` par un curseur sync (créer
-   `get_sync_cursor()` côté `interfaces/api/deps.py` si pas déjà là)
-5. Lancer la suite de tests d'intégration de ce router
-6. Vérifier manuellement le comportement dans le frontend
-7. Commit séparé par router (rollback granulaire possible)
+1. Si le port async (`AsyncXxxQueries`) n'a pas d'équivalent sync :
+   ajouter un Protocol sync `XxxAdminQueries` dans
+   `application/ports/xxx_queries.py` (à côté de l'async).
+2. Si l'adapter sync n'existe pas dans `infrastructure/db/queries/xxx.py` :
+   ajouter une classe `PgXxxAdminQueries` (Connection SA sync). Mêmes
+   requêtes que la version async, juste sans `await`.
+3. Ajouter une factory `xxx_admin_queries` dans
+   `interfaces/api/deps.py` qui injecte `db_conn_sync`.
+4. Convertir les routes du router : `async def` → `def`, retirer les
+   `await`, remplacer la dépendance async par la sync.
+5. Lancer la suite de tests d'intégration.
+6. Vérifier manuellement le comportement dans le frontend (au moins
+   en spot-check).
+7. Commit séparé par router (rollback granulaire possible).
 
-Ordre suggéré : commencer par les routers les plus simples (`auth`,
-`docs`, `config`) puis les CRUD admin, puis les gros (`publications`,
-`persons`, `laboratories`).
+Routers déjà sync nativement (rien à migrer) : `auth.py`, `docs.py`.
+
+Ordre suggéré : commencer par les petits (`subjects`, `config`, etc.)
+puis les CRUD admin, puis les gros (`publications`, `persons`,
+`laboratories`).
+
+**Routers migrés** :
+- [x] `subjects.py` — pilote (commit à venir). 2 routes, 1 nouveau
+  Protocol `SubjectsAdminQueries`, 1 nouvelle classe
+  `PgSubjectsAdminQueries`, 1 factory `subjects_admin_queries`.
+  Sert de modèle pour les suivants.
 
 ### Phase 3 — Suppression du code async devenu mort
 

@@ -15,11 +15,13 @@ from collections.abc import Iterator
 from typing import Any
 
 import bcrypt
-from fastapi import Cookie, HTTPException
+from fastapi import Cookie, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Connection
 
+from application.ports.subjects_queries import SubjectsAdminQueries
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.queries.subjects import PgSubjectsAdminQueries
 from infrastructure.settings import settings
 
 # ----- SPA Static Files -----
@@ -95,3 +97,9 @@ def db_conn_sync() -> Iterator[Connection]:
     engine = get_sync_engine()
     with engine.begin() as conn:
         yield conn
+
+
+def subjects_admin_queries(
+    conn: Connection = Depends(db_conn_sync),
+) -> SubjectsAdminQueries:
+    return PgSubjectsAdminQueries(conn)
