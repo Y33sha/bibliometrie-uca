@@ -37,13 +37,13 @@ from application.publications import (
     refresh_from_sources,
     try_merge_by_doi,
 )
-from domain.authorship_roles import THESES_FIELD_ROLES, merge_roles
 from domain.dates import french_date_to_iso
 from domain.normalize import normalize_name, normalize_text
 from domain.persons.creation import should_create_source_person
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
 from domain.sources.theses import (
+    aggregate_thesis_persons,
     derive_theses_doc_type,
     thesis_authors_compatible,
 )
@@ -301,79 +301,34 @@ def process_persons(
     *,
     address_linker: AddressLinker,
 ) -> None:
-    """Traite tous les rôles d'une thèse : auteurs, directeurs, rapporteurs, etc.
-
-    Une même personne peut apparaître dans plusieurs champs (ex: directeur + jury).
-    On regroupe les rôles par personne (via PPN ou nom).
-    """
-    # Pré-nettoyage : re-traitement → table blanche pour cette publi.
+    """Traite tous les rôles d'une thèse (auteurs, directeurs, rapporteurs,
+    jury, président) en consommant ``aggregate_thesis_persons`` côté domain
+    pour la dédup multi-rôles + fusion + assignation de position."""
     queries.clear_source_authorships_for_publication(cur, source_publication_id)
 
-    # Collecter tous les (personne, rôles) par clé de dédup
-    person_roles: dict[str, dict] = {}  # clé → {"person": dict, "roles": list[str]}
+    authorships = aggregate_thesis_persons(these)
 
-    for field, roles in THESES_FIELD_ROLES.items():
-        if field == "president":
-            # Champ singulier (pas un array)
-            president = these.get("president")
-            if president and president.get("nom"):
-                persons = [president]
-            else:
-                continue
-        else:
-            persons = these.get(field) or []
-
-        for person in persons:
-            ppn = person.get("ppn")
-            nom = person.get("nom")
-            if not nom:
-                continue
-
-            key = ppn if ppn else f"name:{nom}:{person.get('prenom', '')}"
-
-            if key not in person_roles:
-                person_roles[key] = {"person": person, "roles": []}
-            person_roles[key]["roles"].extend(roles)
-
-    # Affiliations auteur : partenaires de recherche (labos)
+    # Affiliations auteur : partenaires de recherche (labos), partagées
+    # par toutes les personnes du document.
     partenaires = these.get("partenairesDeRecherche") or []
     addr_parts = [p["nom"] for p in partenaires if p.get("nom")] or []
 
-    # Insérer les authorships avec rôles fusionnés
-    position = 0
-    for _key, info in person_roles.items():
-        person = info["person"]
-        nom = person.get("nom")
-        if not nom:
-            continue
-
+    for a in authorships:
         # Avec PPN : crée le source_persons (cas légitime conservé)
         # Sans PPN : source_person_id reste NULL (l'auteur sans idref est
         # déjà désigné par son raw_author_name + author_position).
-        source_person_id = upsert_source_author(cur, queries, person)
-
-        roles = merge_roles([info["roles"]])
-        is_author = "author" in roles
-
-        author_full_name = ((person.get("prenom") or "") + " " + nom).strip()
-
-        ppn = person.get("ppn")
-        identifiers = Json({"idref": ppn}) if ppn else None
-
+        source_person_id = upsert_source_author(cur, queries, a.person)
         sa_id = queries.upsert_theses_source_authorship(
             cur,
             source_publication_id=source_publication_id,
             source_person_id=source_person_id,
-            author_position=position if is_author else None,
-            roles=roles,
-            raw_author_name=author_full_name,
-            identifiers=identifiers,
+            author_position=a.author_position,
+            roles=a.roles,
+            raw_author_name=a.raw_author_name,
+            identifiers=Json(a.identifiers) if a.identifiers else None,
         )
-
         if addr_parts:
             address_linker.link(cur, sa_id, addr_parts)
-        if is_author:
-            position += 1
 
 
 # =============================================================

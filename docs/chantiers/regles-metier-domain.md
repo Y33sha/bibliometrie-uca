@@ -735,6 +735,21 @@ relocalisées en `domain/`.
   une date ISO normalisée (ou None si malformée), donc une date
   malformée donne `ongoing_thesis` au lieu de `thesis` — sémantiquement
   plus juste (string truthy ≠ preuve de soutenance).
+- **`aggregate_thesis_persons` + `ThesisAuthorship` ajoutés à
+  `domain/sources/theses.py`** : décision pure d'agrégation des personnes
+  d'une thèse depuis le dict `these` (theses.fr). Itère sur
+  `THESES_FIELD_ROLES` (auteurs/directeurs/rapporteurs/examinateurs/
+  président), dédup par PPN ou `(nom, prénom)`, fusionne les rôles via
+  `merge_roles`, assigne `author_position` uniquement aux personnes
+  ayant le rôle `'author'`. Renvoie une `list[ThesisAuthorship]` (dataclass
+  immuable) consommée par `process_persons` côté application qui
+  enchaîne les effets (`upsert_source_author`, `upsert_theses_source_authorship`,
+  `address_linker.link`). Mesure préalable en BDD au 2026-05-08 :
+  ~1 % des authorships theses ont des rôles multiples (`jury_president +
+  rapporteur` quasi exclusivement) — la dédup sert vraiment ces cas.
+  9 tests unitaires (dédup PPN/nom, position cohérente, président
+  singulier, identifiers, etc.) ; `process_persons` passe de ~70 lignes
+  à ~20.
 
 ## Décisions actées
 

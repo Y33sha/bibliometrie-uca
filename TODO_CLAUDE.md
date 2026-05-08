@@ -156,7 +156,7 @@ canoniques sont triangulées par `refresh_from_sources` selon
 survivre, du moment que `refresh_from_sources(target)` est appelé
 ensuite. Vaut pour les fusions par DOI, NNT, hal_id, etc.
 
-État actuel — trois règles ad hoc pour rien :
+État actuel — quatre règles ad hoc pour rien :
 
 - `merge_pubs_by_hal_id` : « HAL gagne » (ordre des arguments fixé
   dans `_merge_pub(cur, hal_pub_id, src_pub_id, ...)`).
@@ -164,6 +164,10 @@ ensuite. Vaut pour les fusions par DOI, NNT, hal_id, etc.
   (DOI shape + complétude + id ASC).
 - `try_merge_by_doi` (`application/publications.py`) : sa propre
   cascade.
+- `process_work` HAL (`normalize_hal.py:681-693`) : si `old_pub_id`
+  rattaché au `hal_id` diffère de la publi trouvée par DOI/NNT,
+  fusion `old → new` (la nouvelle DOI/NNT survit). 4ᵉ site, à
+  intégrer dans le helper unifié.
 
 **Préalable [fait] : `refresh_from_sources(target)` après chaque
 fusion**. Les 3 sites sont désormais homogènes :
