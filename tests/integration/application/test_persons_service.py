@@ -28,14 +28,8 @@ from domain.errors import NotFoundError, ValidationError
 from infrastructure.repositories import (
     async_authorship_repository,
     async_person_repository,
-    authorship_repository,
     person_repository,
 )
-
-
-@pytest.fixture
-def authorship_repo(db):
-    return authorship_repository(db)
 
 
 @pytest.fixture

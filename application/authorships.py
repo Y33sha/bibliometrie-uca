@@ -6,7 +6,7 @@ Opérations unitaires sur les authorships consolidées. Le script batch
 `build_authorships.py` reste le constructeur principal (reconstruction
 complète), et `webapp/uca.py` gère le recalcul UCA incrémental.
 
-Le SQL vit dans `infrastructure/repositories/authorship_repository.py`.
+Le SQL vit dans `infrastructure/repositories/async_authorship_repository.py`.
 """
 
 from typing import Any
@@ -14,7 +14,7 @@ from typing import Any
 from application.audit import async_emit_event
 from application.ports.perimeter import AsyncPerimeterQueries
 from domain.errors import NotFoundError, ValidationError
-from domain.ports.authorship_repository import AsyncAuthorshipRepository, AuthorshipRepository
+from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
 
 
@@ -106,58 +106,14 @@ async def detach_source(
     return False
 
 
-def delete_orphan_authorships(cur: Any, person_id: int, *, repo: AuthorshipRepository) -> int:
+async def async_delete_orphan_authorships(
+    cur: Any, person_id: int, *, repo: AsyncAuthorshipRepository
+) -> int:
     """Supprime les authorships vérité d'une personne qui ne sont plus attestées
     par aucune authorship source.
     Retourne le nombre d'authorships supprimées.
     """
-    return repo.delete_orphan_authorships_for_person(person_id)
-
-
-async def async_delete_orphan_authorships(
-    cur: Any, person_id: int, *, repo: AsyncAuthorshipRepository
-) -> int:
-    """Variante async de `delete_orphan_authorships`."""
     return await repo.delete_orphan_authorships_for_person(person_id)
-
-
-def move_authorships_for_source(
-    cur: Any,
-    source: str,
-    source_authorship_ids: list[int],
-    from_pub_id: int,
-    to_pub_id: int,
-    *,
-    repo: AuthorshipRepository,
-) -> None:
-    """Déplace des authorships vérité d'une publication à une autre,
-    pour les authorships liées aux source_authorship_ids donnés.
-    Utilisé par split_bad_merges.
-    Lève ValidationError si la source n'est pas reconnue.
-    """
-    if source not in VALID_SOURCES:
-        raise ValidationError(f"Source inconnue : {source}")
-
-    for sa_id in source_authorship_ids:
-        repo.move_authorships_for_source_authorship(sa_id, from_pub_id, to_pub_id)
-
-
-def sync_person_id_from_source(
-    cur: Any,
-    source: str,
-    source_authorship_ids: list[int],
-    *,
-    repo: AuthorshipRepository,
-) -> int:
-    """Propage le person_id des authorships sources vers les authorships vérité.
-    Évite les doublons (publication_id, person_id).
-    Utilisé par fix_oa_person_conflicts.
-    Lève ValidationError si la source n'est pas reconnue.
-    """
-    if source not in VALID_SOURCES:
-        raise ValidationError(f"Source inconnue : {source}")
-
-    return repo.sync_person_id_from_sources(source_authorship_ids)
 
 
 async def propagate_uca_for_addresses(
