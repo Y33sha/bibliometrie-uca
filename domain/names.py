@@ -1,8 +1,18 @@
-"""Fonctions de compatibilité de noms pour la déduplication de personnes.
+"""Fonctions de compatibilité de noms pour le matching de personnes.
 
-Utilisées par :
-- create_persons_from_source_authorships.py (pipeline)
-- admin_person_duplicates (backend)
+Utilisées par le pipeline (matching cross-source dans
+`domain/persons/matching.py`, création de personnes dans
+`application/pipeline/persons/create.py`) — contexte où un faux
+positif coûte cher (rattachement définitif sans validation).
+
+**Divergence assumée** avec les règles de pré-sélection des paires
+candidates côté admin (`infrastructure/db/queries/person_duplicates.py`,
+`PERSON_DUP_QUERIES` + `_tokens_match`) : ces dernières sont plus
+larges (gèrent par exemple « Jean Michel » vs « JM » via
+tokenization) parce qu'elles présentent une liste à valider
+manuellement — recall important, faux positifs filtrés à l'œil.
+Conserver les deux ensembles de règles séparés ; toute évolution de
+l'un doit considérer si l'autre doit suivre.
 """
 
 from domain.normalize import normalize_name

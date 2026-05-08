@@ -3,6 +3,16 @@
 Implémente le port `application.ports.person_duplicates_queries.
 AsyncPersonDuplicatesQueries` via `PgAsyncPersonDuplicatesQueries`
 (duck typing — pas d'import depuis `application/`).
+
+**Divergence assumée** avec `domain/names.py:names_compatible`
+(matching pipeline). Les 4 `PERSON_DUP_QUERIES` + `_tokens_match`
+ici sont plus larges : ils servent à présenter des candidats à la
+validation manuelle dans l'interface admin (recall important, faux
+positifs filtrés à l'œil par Laura). En particulier, `_tokens_match`
+gère « Jean Michel Dupont » vs « JM Dupont » (initiales jointes/
+séparées), cas rejeté par `names_compatible`. Ne pas tenter
+d'unifier : les deux contextes (pipeline strict vs admin lâche)
+ont des exigences opposées sur le compromis precision/recall.
 """
 
 from typing import Any
