@@ -151,6 +151,31 @@ def step0_hal_accounts(
 # ---------------------------------------------------------------------------
 
 
+def _max_authors_per_pub(
+    all_authorships: Any,
+    linked_index: dict,
+) -> dict[int, int]:
+    """Max d'auteurs sur une publication par source (linked + unlinked).
+
+    Sur les méga-papers (consortiums), le matching cross-source par
+    position est désactivé via `MAX_AUTHORS_CROSS_SOURCE` car les
+    positions divergent trop entre sources. Pour appliquer ce seuil,
+    on calcule pour chaque publi le max d'auteurs trouvés sur une
+    même source — cohérent avec le filtre `MAX_AUTHORS_CONFLICT`
+    côté admin (`infrastructure/db/queries/person_duplicates.py`).
+    """
+    counts: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for a in all_authorships:
+        pub_id = a.get("publication_id")
+        if pub_id is None:
+            continue
+        counts[pub_id][a["source"]] += 1
+    for (pub_id, _pos), candidates in linked_index.items():
+        for _pid, _ln, _fn, src in candidates:
+            counts[pub_id][src] += 1
+    return {pub_id: max(per_source.values()) for pub_id, per_source in counts.items()}
+
+
 def step1_cross_source(
     cur: Any,
     logger: Any,
@@ -161,7 +186,14 @@ def step1_cross_source(
     *,
     person_repo: PersonRepository,
 ) -> int:
-    """Match par (publication, position) avec nom compatible d'une autre source."""
+    """Match par (publication, position) avec nom compatible d'une autre source.
+
+    Court-circuit sur les méga-papers (cf. `MAX_AUTHORS_CROSS_SOURCE`)
+    où les positions divergent trop entre sources pour qu'un match par
+    position soit fiable.
+    """
+    pub_max_authors = _max_authors_per_pub(all_authorships, linked_index)
+
     linked = 0
     for a in all_authorships:
         if (a["source"], a["authorship_id"]) in linked_ids:
@@ -181,6 +213,7 @@ def step1_cross_source(
             last_norm=a["last_norm"],
             first_norm=a["first_norm"],
             candidates=candidates,
+            total_author_count=pub_max_authors.get(pub_id),
         )
 
         if matched_pid:
