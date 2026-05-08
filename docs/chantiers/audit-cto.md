@@ -144,8 +144,10 @@ Ces points sortent donc du périmètre des chantiers ci-dessous.
 
 Phasage pensé pour un seul dev (Laura). Phase 0 et 1 = priorités
 hautes, à faire avant de toucher à la dette. Phase 2 = gros
-chantiers, à instruire après décisions de Phase 1. Phase 3 = dette en
-continu, au fil de l'eau. Phase 4 = avant transmission DSI.
+chantiers, à instruire après décisions de Phase 1. Phase 3 = items
+hétérogènes (quick-wins ciblés ou exports vers chantiers dédiés ;
+pas de catégorie fourre-tout « en continu »). Phase 4 = avant
+transmission DSI.
 
 ---
 
@@ -298,10 +300,13 @@ chacun mérite son fichier dans `docs/chantiers/`.
   (status filesystem), `docs` (PROJECT_ROOT) — pas de query/repo.
 - [ ] **Migration SQLAlchemy Core** si décision = adoption
 
-### Phase 3 — Dette technique en continu
+### Phase 3 — Dette technique
 
-Pas un sprint, à traiter au fil de l'eau quand on touche aux
-fichiers concernés.
+Items hétérogènes : certains sont des quick-wins (typer un module,
+mettre à jour une doc), d'autres méritent un chantier dédié (typage
+généralisé, background tasks). Pas de catégorie « au fil de l'eau »
+— cf. règle projet : soit quick-win actionnable maintenant, soit
+chantier dédié avec fiche.
 
 - [x] **`application/audit.py` doit passer par un repository** :
   port `AuditRepository`/`AsyncAuditRepository` dans
@@ -324,19 +329,29 @@ fichiers concernés.
   `merge_pubs_by_nnt.py`. Les 7 `cur.execute("SAVEPOINT ...")` /
   RELEASE / ROLLBACK inline ont disparu. Helper côté application
   (pas infrastructure) pour respecter `application ⊥ infrastructure`.
-- [ ] **Chasser les `Any`** : par fichier modifié, typer
-  progressivement les `cur: Any` (créer un alias `Cursor`/
-  `AsyncCursor` à l'entrée des modules)
+- [ ] **Chasser les `Any`** — chantier dédié à créer. `cur: Any`,
+  `**kw: Any`, `-> Any` neutralisent mypy strict sur ~40-50 fichiers
+  applicatifs. Touche : couches application + infrastructure +
+  interfaces. Nécessite un alias `Cursor`/`AsyncCursor` central et
+  passage par module. Hors scope quick-win.
 - [x] **Pool DB** : `db_pool_max` passé à 30 (default `settings.py` +
   `.env.example`). Note opérationnelle ajoutée (ratio recommandé ~1:15,
   bumper à 50+ si TimeoutError côté pool, surveiller `pg_stat_activity`
   Postgres en parallèle). Pas de benchmark préalable — usage mono-utilisateur
   en dev, le 30 est défensif (cf. TODO_CLAUDE : « max=10 trop étroit dès
   que la SPA admin chargera plusieurs facettes en parallèle »).
-- [ ] **`prepare_threshold`** : auditer les query builders
-  dynamiques (`_PublicationFacetsBuilder`, `filters.py`), passer à
-  `prepare_threshold=5` (défaut) si memory leak observé, ou
-  désactiver le prepare sur les requêtes dynamiques
+- [x] **`prepare_threshold`** : retiré la valeur explicite `1` du
+  pool async (`infrastructure/db/async_connection.py`) et de la
+  fixture test (`tests/integration/interfaces/conftest.py`), retombé
+  sur le défaut psycopg3 (= 5). Les builders dynamiques
+  (`_PublicationFacetsBuilder`, `filters.py`) génèrent du SQL à
+  haute cardinalité — chaque combinaison de filtres = entry
+  prepared distincte côté Postgres, jamais évincée tant que la
+  connexion vit, croissance non bornée. À 5, seules les requêtes
+  vraiment répétées entrent dans le cache : hot paths (`find_by_doi`,
+  `list publications`) atteignent 5 appels en quelques secondes,
+  les variantes rares ne s'accumulent pas. Risque non observé en
+  dev mono-utilisateur, fix défensif avant prod.
 - [x] **Inventaire `interfaces/cli/`** : audit script par script
   réalisé le 2026-05-08. Racine vidée, 4 sous-dossiers organisés :
   `pipeline/` (phases pipeline), `dev/` (outils dev — `dump_openapi`,
@@ -349,17 +364,18 @@ fichiers concernés.
   chantiers achevés). Migration SA Core des scripts conservés
   effectuée pour ceux qui ne dépendent pas des repos sync (les autres
   reportés au Lot 3.A du chantier sqla).
-- [ ] **Référencer `processing/*` retiré dans `docs/donnees.md`** :
-  remplacer par `application/pipeline/normalize/*` (à intégrer dans
-  le chantier "réécriture doc" final)
-- [ ] **Background tasks pour endpoints longs** (TODO_CLAUDE déjà
-  cadré) : implémenter le seuil + 202, prévoir le swap vers une vraie
-  queue (pg-boss ?) en notation interne
+- [ ] **Référencer `processing/*` retiré dans `docs/donnees.md`** —
+  rattaché au chantier de réécriture doc final (Phase 4 ci-dessous,
+  pas un quick-win indépendant).
+- [ ] **Background tasks pour endpoints longs** — chantier dédié à
+  créer. Plan déjà cadré dans TODO_CLAUDE (« Background jobs pour
+  endpoints de propagation massive » + 2 audits associés : endpoints
+  long-running, sync I/O dans coroutines). Impl + seuil + 202 +
+  handling frontend du 202. Hors scope quick-win.
 
 ### Phase 4 — Avant transmission DSI
 
-Dernière passe avant de remettre le dossier. Plusieurs items déjà
-prévus hors audit ; rappel ici pour exhaustivité.
+Dernière passe avant de remettre le dossier.
 
 - [ ] **Réécriture intégrale de la doc** (déjà prévu) — intégrer
   les corrections de chemins morts (`processing/*`,
@@ -367,23 +383,9 @@ prévus hors audit ; rappel ici pour exhaustivité.
   `monthly` → `full`, etc.)
 - [ ] **Backlog unifié** (déjà prévu par Laura) — fusionner
   TODO_LAURA + TODO_CLAUDE + ROADMAP en un seul fichier catégorisé
-  (qualité données / dette technique / DSI-blockers / nice-to-have)
-- [ ] **Auth : préparer le terrain pour le CAS DSI** sans
-  surinvestir
-  - [ ] Documenter dans un fichier dédié l'attendu côté DSI (CAS,
-    multi-user, rôles), pour qu'ils sachent quoi remplacer
-  - [ ] S'assurer que `audit_log.user_id` accepte une string opaque
-    (ce qui sera vrai du `eppn` CAS)
-  - [ ] Ne PAS faire de POC mock CAS : Laura est la seule
-    utilisatrice, le bcrypt actuel suffit jusqu'à la transmission
-- [ ] **README explicite sur le devenir du frontend** : "outil de
-  gestion interne, restera maintenu en parallèle du futur frontend
-  public DSI"
+  (qualité données / dette technique / nice-to-have)
 - [ ] **Tests E2E Playwright** sur 2-3 parcours critiques (déjà dans
-  ROADMAP §2.7.5) — utile puisque le frontend est gardé
-- [ ] **Owner explicite** : ajouter un fichier `MAINTAINERS.md`
-  (ou équivalent) avec le contact unique (Laura) et l'historique de
-  reprise prévu côté DSI
+  ROADMAP §2.7.5)
 
 ---
 
