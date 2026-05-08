@@ -92,24 +92,6 @@ Coût : migration SQL non-triviale + adaptation des consommateurs (il
 y en a peu : matching cascade + queries admin). Bénéfice : suppression
 de la phase de recalculation batch + traçabilité.
 
-## Seuil d'auteurs pour le matching cross-source
-
-`domain.persons.matching.decide_cross_source_match` (étape 1 du
-pipeline persons) rattache une authorship à la `person_id` connue
-d'une autre source à la même `(publication_id, author_position)`,
-avec garde-fou `names_compatible`. Sur les méga-papers (consortiums
->50 auteurs), les positions divergent souvent entre HAL/OpenAlex/WoS
-→ faux conflits ou faux matchings.
-
-À ajouter : court-circuit si le `source_publication` a plus de N
-auteurs (constante `MAX_AUTHORS_CROSS_SOURCE`, à harmoniser avec
-`MAX_AUTHORS_CONFLICT` côté `TODO_LAURA.md`). Renvoie `None` direct
-(pas de cross-source) au-delà du seuil.
-
-Coût : ajout d'un argument `total_author_count` à
-`decide_cross_source_match` + compute du count côté caller (depuis
-le prefetch ou une query supplémentaire).
-
 ## Crossref absent de `build_authorships.all_sources`
 
 [`build_authorships.py:20-26`](application/pipeline/authorships/build_authorships.py#L20)
