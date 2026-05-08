@@ -1,185 +1,154 @@
-# Chantier — Règles métier dans `domain/` : suppléments, doc_type suspects
-
-Démarré le 2026-05-05.
-
-## État
-
-- **Phase 0** (inventaire) : ✅ terminée. L'inventaire a été nettoyé puis
-  supprimé une fois ses items soit migrés, soit dispatchés vers les
-  fiches dédiées ci-dessous.
-- **Phase 1** (relocations sans changement de comportement) : ✅ terminée.
-  Les helpers déjà identifiés ont été migrés au fil de l'eau dans
-  `domain/sources/{openalex,scanr,theses,wos,hal,crossref}.py`,
-  `domain/persons/{identifiers,creation,matching,merge,source_ids}.py`,
-  `domain/publications/{dedup,scope}.py`, `domain/dates.py`.
-- **Phase 2** (nouvelles règles « suspects » — figshare / Zenodo /
-  DataCite + suppléments) : ⏳ ce chantier — c'est ce qui reste à
-  faire ici.
-- **Phase 3** (cascades de matching publications + cascade de matching
-  personnes) : → fiches dédiées
-  [`dedup-fusion-publications.md`](dedup-fusion-publications.md) et
-  [`decide-person-match.md`](decide-person-match.md). Refactors
-  structurels avec dimension métier (changement de logique), à
-  démarrer en sessions dédiées.
+# Chantier — Formalisation des règles métier dans `domain/`
+Commencé le 2026-05-05
 
 ## Contexte
 
-Trigger initial : sondage 2026-05-05 sur les ~300 publis avec DOI
-figshare. **229 sont des « Additional file X of … »** (suppléments PDF
-figures/tableaux), classées « article » par OpenAlex donc remontées
-comme telles dans la BDD UCA. La règle qui aurait dû les écarter
-n'existe nulle part — il faut un endroit propre où l'écrire et la
-tester.
+Plusieurs règles métier étaient dispersées dans les scripts du pipeline
+(`application/pipeline/normalize/*.py`), parfois dupliquées, parfois
+conditionnelles à un détail d'extraction d'une source précise.
+Exemples :
 
-Plusieurs autres règles métier sont aujourd'hui dispersées ou absentes
-sur les variantes : figshare collection (`10.6084/m9.figshare.c.*`)
-qui sont des bundles non canoniques, DOI Zenodo + titre suspect
-(« Supplementary materials… »), DOI DataCite + `doc_type=article` mais
-titre suspect.
+- `doc_type = "thesis"` si la `source = theses.fr`, indépendamment du
+  type prétendu par OpenAlex
+- `doc_type = "memoir"` si OpenAlex annonce `dissertation` et l'URL
+  est `dumas.*`
+- `doc_type = "thesis" if dateSoutenance else "ongoing_thesis"` —
+  dupliqué deux fois dans `normalize_theses.py`
+- Détection de la source figshare/Zenodo via DOI : éparpillée
+- Logique de rattachement personnes (matching ORCID/idHAL/idref →
+  persons, gestion des conflits) : éclatée entre `application/persons.py`,
+  les normalizers et les queries
+- Règles de déduplication publications (matching DOI / NNT / titre) :
+  partagées entre `find_or_create_publication`, `try_merge_by_doi` et
+  les normalizers source par source
+
+Le risque : règles invisibles aux tests unitaires de domaine (qui ne
+voient que les fonctions pures relocalisées), divergences silencieuses
+entre sources (ex. règle de doc_type différente selon le normalizer qui
+écrit la publi en premier), évolutions difficiles (ajouter une règle
+oblige à toucher N normalizers).
 
 ## Objectif
 
-Greffer dans `domain/` les nouvelles règles manquantes pour reclasser
-les suppléments en `doc_type='other'` au lieu de `'article'`/
-`'dataset'`, en restant cohérent avec le pattern « décision pure +
-effets séparés » déjà éprouvé sur
+Rassembler dans `domain/` la logique métier pure existante,
+indépendante des sources et de l'infrastructure. L'enrichissement
+de la logique métier par de nouvelles règles (suppléments figshare,
+Zenodo, DataCite suspects, révision de l'enum `doc_type`, etc.)
+fait l'objet d'un chantier dédié [doc-types.md](doc-types.md).
+
+**Définition de « pur »** : une fonction qui prend en arguments tout
+ce dont elle a besoin (y compris les résultats de lookups SQL faits
+par la couche application) et qui renvoie une décision (souvent un
+value object). Les algorithmes de matching personnes, de
+déduplication publications, d'arbitrage doc_type relèvent tous de ce
+modèle — l'arbre de décision est pur, ce sont les SELECT en amont et
+les INSERT/UPDATE en aval qui sont impurs et restent en
+`application/`. Pattern déjà éprouvé sur
 [`resolve_doi_conflict`](../../domain/publication.py).
 
-## Périmètre
+Hypothèse de travail : les règles vivent dans `domain/` sous forme de
+fonctions pures + dataclasses immuables, testées en unit pur (sans
+BDD). Les normalizers et services applicatifs consomment ces fonctions
+au lieu d'inliner les conditions.
+
+## Périmètre fonctionnel
 
 ### Inclus
 
-- **Helpers de détection** par préfixe DOI / pattern titre :
-  - `is_figshare_doi(doi)` (préfixe `10.6084/m9.figshare.*` et collections
-    `10.6084/m9.figshare.c.*`)
-  - `is_datacite_doi(doi)` (par préfixe — partiellement couvert par
-    `doi_prefixes` après chantier
-    [doi-ra-datacite](doi-ra-datacite.md), mais une fonction pure de
-    détection prefix → RA reste utile pour les règles qui s'appliquent
-    avant la table `doi_prefixes`).
-  - `is_supplement_title(title)` : pattern « Additional file X of … »,
-    « Supplementary material(s) for … », « Données supplémentaires
-    de … », « Supporting information for … ». Multi-langue (FR + EN),
-    regex compilées en module-level.
-- **Politique « doc_type suspect »** : règle décisionnelle qui prend
-  doc_type + DOI + titre + sources et renvoie un doc_type ajusté.
-  Composée des helpers ci-dessus.
-- **Extension** de `correct_openalex_doc_type`
-  ([`domain/sources/openalex.py`](../../domain/sources/openalex.py))
-  pour intégrer la cascade « DOI figshare/Zenodo/DataCite + titre
-  supplément → doc_type = 'other' » en plus des règles theses.fr +
-  dumas déjà en place.
-- **Détection des suppléments orphelins** (le parent article n'est
-  pas en BDD, cf. 145/229 cas figshare au 2026-05-05) → règle
-  d'élimination ou marqueur explicite (à arbitrer).
-- **Reclassement one-shot** des cas existants en fin de chantier (SQL
-  aligné sur la nouvelle règle, suivi d'une passe de vérification au
-  prochain run pipeline).
+- **Inventaire** des règles métier inlinées dans
+  `application/pipeline/normalize/*.py`,
+  `application/persons.py`,
+  `application/publications.py` et identification de celles qui sont
+  pures (pas d'I/O, pas de cur, pas de repo).
+- **Relocation** dans `domain/` des fonctions pures identifiées,
+  regroupées par concept.
+- **Tests unitaires purs** pour chaque règle relocalisée.
+- **Refactor** des normalizers pour consommer les fonctions de
+  `domain/` au lieu de leurs versions inlinées.
 
 ### Exclus
 
-- Les **effets de bord** (SELECT/INSERT/UPDATE) restent en
-  `application/` ou `infrastructure/`. Les algorithmes de décision
-  qui les pilotent sont relocalisables — pattern déjà en place pour
-  [`resolve_doi_conflict`](../../domain/publication.py) ↔
-  `application/publications.py::resolve_doi_conflict`.
-- L'ingestion DataCite proprement dite : couverte par
-  [doi-ra-datacite.md](doi-ra-datacite.md). Ce chantier-ci se contente
-  d'ajouter au `domain/` les règles que consommera DataCite quand il
-  sera intégré.
-- Refactors des cascades publications (find_or_create, merge, etc.) :
-  fiche [`dedup-fusion-publications.md`](dedup-fusion-publications.md).
-- Refactor de la cascade matching personnes : fiche
-  [`decide-person-match.md`](decide-person-match.md).
+- Les **effets de bord** (SELECT/INSERT/UPDATE, gestion de
+  transactions, appels API externes) restent en `application/` ou
+  `infrastructure/`. Mais les **algorithmes de décision** qui les
+  pilotent sont relocalisables : on extrait dans `domain/` la fonction
+  pure qui prend en entrée le résultat des lookups (déjà faits par la
+  couche application) et renvoie une décision (value object), puis
+  l'application applique l'effet. Pattern de référence :
+  [`resolve_doi_conflict`](../../domain/publication.py).
+- **L'enrichissement de la logique métier par de nouvelles règles**
+  (suppléments figshare, doc_types suspects, révision de l'enum…) :
+  chantier dédié [doc-types.md](doc-types.md).
+- **Refactor structurel des cascades** (matching personnes,
+  déduplication / fusion publications) : 2 chantiers dédiés
+  [decide-person-match.md](decide-person-match.md) et
+  [dedup-fusion-publications.md](dedup-fusion-publications.md).
 
-## Plan d'implémentation
+## Phases d'implémentation
 
-### Phase 2.A — helpers de détection
+### Phase 0 — Inventaire complet
+- [x] Lister toutes les fonctions/blocs `application/pipeline/normalize/*`
+      et `application/{persons,publications}.py` qui contiennent une
+      règle métier (≠ orchestration).
+- [x] Pour chaque règle, classer : (a) déjà pure → relocalisable
+      directement, (b) non pure → décomposable en partie pure +
+      effets, (c) intrinsèquement liée à la transaction → reste en
+      `application/`.
+- [x] Note de synthèse listant les fonctions à créer côté `domain/`.
+- **Livrable** : fichier `docs/chantiers/regles-metier-inventaire.md`
+  (ou section ajoutée à ce doc).
 
-- [ ] `is_figshare_doi(doi)`, `is_datacite_doi(doi)` (sur préfixe) en
-      `domain/publication.py` ou
-      `domain/publications/identifiers.py` (à arbitrer).
-- [ ] `is_supplement_title(title)` en
-      `domain/publications/scope.py` ou un module dédié — patterns
-      FR + EN, table de regex compilées en haut du module.
-- [ ] Tests unitaires (positifs + faux positifs).
+### Phase 1 — Relocations sans changement de comportement ✅
+- [x] Déplacer `is_theses_fr_source` vers `domain/` (renommé
+      `is_theses_fr_location` dans
+      [`domain/sources/openalex.py`](../../domain/sources/openalex.py)).
+- [x] Créer `theses_doc_type(date_soutenance)` (`derive_theses_doc_type`
+      dans [`domain/sources/theses.py`](../../domain/sources/theses.py)),
+      remplacer les 2 occurrences inlinées dans `normalize_theses.py`.
+- [x] Créer la cascade d'override (`correct_openalex_doc_type` dans
+      [`domain/sources/openalex.py`](../../domain/sources/openalex.py)),
+      intégrant theses.fr → thesis et dissertation+dumas → memoir.
+- [x] Tests unitaires purs (cf. `tests/unit/domain/sources/`).
+- **Livrable** : fonctions relocalisées, comportement inchangé,
+  tests verts. Phase achevée — plus de quarante items rapatriés au
+  fil de l'eau dans `domain/{publications,persons,sources,dates,…}`.
 
-### Phase 2.B — politique doc_type suspect
+### Phase 2 — Enrichissement par nouvelles règles → chantier dédié
 
-- [ ] Étendre `correct_openalex_doc_type`
-      ([`domain/sources/openalex.py`](../../domain/sources/openalex.py))
-      pour intégrer la cascade « DOI figshare/Zenodo/DataCite + titre
-      supplément → doc_type = 'other' ».
-- [ ] Tests sur les ~300 cas figshare connus (snapshot avant/après).
+Sort du périmètre de cette roadmap (qui est un pur rapatriement de
+règles existantes). Repris dans [doc-types.md](doc-types.md) :
+helpers de détection (`is_figshare_doi`, `is_datacite_doi`,
+`is_supplement_title`), extension de `correct_openalex_doc_type`,
+révision de l'enum `doc_type`, suppléments orphelins, reclassement
+one-shot des cas existants.
 
-### Phase 2.C — migration
+### Phase 3 — Refactors structurels des cascades → 2 chantiers dédiés
 
-- [ ] Lancer en dry-run sur la BDD existante : combien de publis
-      seraient reclassées ? Comparer avec attendu (≥229 cas figshare
-      « Additional file… »).
-- [ ] Décider de la stratégie de migration :
-      (a) UPDATE one-shot via SQL pour les publis existantes,
-      (b) attendre le prochain run de pipeline qui réécrira les
-      `source_publications` (mais `publications.doc_type` est calculé
-      dans `refresh_from_sources` à partir des sources — il faudra
-      relancer la phase de refresh).
+Sortent également du périmètre du rapatriement pur — ce sont des
+refactors de structure d'exécution avec dimension métier
+(changements de logique). Repris dans :
+
+- [decide-person-match.md](decide-person-match.md) — cascade unifiée
+  de matching personnes (5 boucles → 1 boucle prefetch +
+  `decide_person_match`).
+- [dedup-fusion-publications.md](dedup-fusion-publications.md) —
+  5 cascades de matching publications + règles de fusion multi-source
+  + simplification du choix de cible de fusion.
 
 ## Décisions actées
 
 1. **Granularité = dossier `domain/publications/` plutôt que fichiers
-   plats à la racine de `domain/`**. Préfixe d'import explicite, rôle
-   de chaque module immédiat à la lecture, évolution naturelle (sous-
-   modules `domain/persons/`, `domain/structures/`).
-2. **Reclassement one-shot des cas existants** en fin de chantier
-   (SQL aligné + vérification au prochain run pipeline).
-3. **Détection figshare/Zenodo : hardcoded au démarrage, via
-   `doi_prefixes` quand le chantier
-   [doi-ra-datacite](doi-ra-datacite.md) aura abouti**. Helpers
-   `is_figshare_doi`/`is_zenodo_doi` à préfixe en dur (suffisant pour
-   les patterns connus). Si après doi-ra-datacite on constate que
-   `doi_prefixes` couvre l'intégralité des cas réels, on migrera
-   entièrement et on retirera les helpers préfixe. Pas de double
-   path à maintenir.
-
-## Open questions
-
-- **Suppléments orphelins** (145 cas figshare au 2026-05-05 dont le
-  parent n'est pas en BDD) : à sonder au cas par cas en fin de
-  chantier. Hypothèses à tester : (a) parent présent avec un titre
-  légèrement différent (matching à raffiner), (b) parent réellement
-  absent et c'est correct (publi non-UCA), (c) parent réellement
-  absent à tort (à retrouver). Cette question rejoint un futur
-  chantier de modélisation des **relations entre publications**
-  (parent ↔ supplément, ouvrage ↔ chapitre, version ↔ révision, …)
-  — à n'ouvrir qu'une fois ce chantier-ci abouti.
-
-## Risques
-
-- **Performance** : les regex de `is_supplement_title` doivent rester
-  O(1) par titre — patterns compilés en module-level.
-- **Coordination avec [doi-ra-datacite](doi-ra-datacite.md)** : la
-  Phase 2.A peut bénéficier de `doi_prefixes` pour détecter
-  `ra='DataCite'` plutôt que de hardcoder Zenodo + figshare. À
-  séquencer après doi-ra-datacite phase 1, ou à mener en parallèle
-  avec un fallback hardcodé.
-- **Compatibilité avec
-  [`refresh_from_sources`](../../application/publications.py)** :
-  cette fonction recalcule le `doc_type` canonique depuis les sources
-  (priorité theses.fr > ScanR > HAL > OpenAlex > WoS). Une nouvelle
-  règle « doc_type suspect → other » doit s'appliquer **après** la
-  sélection de la source prioritaire, ou être encodée dans le mapping
-  de chaque source. À choisir : règle au niveau source (chaque
-  normalizer corrige son propre `source_publications.doc_type`) ou
-  règle au niveau canonique (`refresh_from_sources` applique
-  l'override). Plus propre = au niveau source pour ne pas perdre
-  l'info brute.
+   plats à la racine de `domain/`**. Préfixe d'import explicite
+   (`from domain.publications.dedup import …`) qui rend le rôle de
+   chaque module immédiat à la lecture, et permet d'évoluer (sous-
+   modules `domain/persons/`, `domain/structures/`) sans refactor
+   plus tard. Coût : un `__init__.py` par dossier, négligeable.
 
 ## Liens
 
-- [doi-ra-datacite.md](doi-ra-datacite.md) — chantier jumeau,
-  prérequis pour Phase 2.A (détection RA via préfixe)
-- [crossref.md](crossref.md) — architecture CrossRef ingest
+- [doc-types.md](doc-types.md) — chantier enfant : nouvelles règles
+  doc_types (suppléments, suspects, révision enum)
+- [decide-person-match.md](decide-person-match.md) — chantier enfant :
+  cascade unifiée de matching personnes
 - [dedup-fusion-publications.md](dedup-fusion-publications.md) —
-  cascade de déduplication / fusion publications (chantier dédié)
-- [decide-person-match.md](decide-person-match.md) — cascade unifiée
-  de matching personnes (chantier dédié)
+  chantier enfant : déduplication / fusion publications
