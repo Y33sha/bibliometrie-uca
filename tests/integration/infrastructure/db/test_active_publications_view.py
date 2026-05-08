@@ -36,7 +36,10 @@ class TestActivePublicationsViewMatchesDomain:
 
         import re
 
-        literals_in_view = set(re.findall(r"'([a-z_]+)'::public\.doc_type", definition))
+        # Postgres normalise la définition stockée et retire le préfixe
+        # `public.` (puisque `public` est dans le search_path par défaut)
+        # même si schema.sql écrit `::public.doc_type` à l'origine.
+        literals_in_view = set(re.findall(r"'([a-z_]+)'::(?:public\.)?doc_type", definition))
         assert literals_in_view == set(OUT_OF_SCOPE_DOC_TYPES), (
             f"Drift entre v_active_publications ({sorted(literals_in_view)}) "
             f"et OUT_OF_SCOPE_DOC_TYPES ({sorted(OUT_OF_SCOPE_DOC_TYPES)}). "
