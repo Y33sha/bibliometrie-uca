@@ -245,6 +245,7 @@ pas tranchés, toute évolution amplifie la dette.
   **Décision attendue** : confirmer A' et lister les phases à
   migrer (1 par 1), ou rouvrir le débat. Document court à écrire
   dans `docs/chantiers/` quand le chantier sera lancé.
+
 - [x] **Sync + async dupliqué : décision actée** — option D retenue
   (tout sync + threadpool FastAPI), implémentation reportée au
   chantier dédié. Voir
@@ -253,6 +254,7 @@ pas tranchés, toute évolution amplifie la dette.
   cadré, plan d'implémentation en 4 phases, points de vigilance,
   réversibilité). À planifier après les autres décisions Phase 1
   pour ne pas mélanger les chantiers.
+
 - [x] **Position des "ports" : décision actée et exécutée
   (2026-05-06)** — règle des 3 critères figée dans
   `docs/architecture.md` (section "Règle de placement des ports").
@@ -262,6 +264,7 @@ pas tranchés, toute évolution amplifie la dette.
   `config_repository` a été scindé en `domain/ports/perimeter_repository`
   (agrégat) + `application/ports/config` (port AsyncConfigStore pour
   la table clé/valeur).
+
 - [ ] **SQLAlchemy Core : décision actée (adoption), chantier
   démarré le 2026-05-06** — adoption retenue après reformulation
   « si on partait de zéro aujourd'hui, est-ce qu'on l'adopterait ? ».
@@ -271,6 +274,7 @@ pas tranchés, toute évolution amplifie la dette.
   d'ORM ; AsyncEngine de bout en bout ; MetaData explicite à
   valider en phase 0). La porte vers Alembic reste ouverte et sera
   réévaluée à la fin du chantier en coût-bénéfice.
+
 - [x] **Règle "routers ⊥ infrastructure" : on l'applique** —
   décision actée le 2026-05-06. Voir
   [`docs/chantiers/routers-di.md`](routers-di.md) pour le phasage
