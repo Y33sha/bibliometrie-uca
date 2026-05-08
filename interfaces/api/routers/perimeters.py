@@ -15,8 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from application import config as config_service
 from application.ports.config import AsyncConfigStore
 from application.ports.perimeters_queries import AsyncPerimetersAdminQueries
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.perimeter_repository import AsyncPerimeterRepository
 from interfaces.api.async_deps import (
+    audit_repo,
     config_store,
     db_conn,
     perimeter_repo,
@@ -94,9 +96,12 @@ async def delete_perimeter(
     conn: AsyncConnection = Depends(db_conn),
     repo: AsyncPerimeterRepository = Depends(perimeter_repo),
     config_repo: AsyncConfigStore = Depends(config_store),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
-    await config_service.delete_perimeter(conn, perimeter_id, repo=repo, config=config_repo)
+    await config_service.delete_perimeter(
+        conn, perimeter_id, repo=repo, config=config_repo, audit_repo=audit
+    )
     return {"ok": True}
 
 

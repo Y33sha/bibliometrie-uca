@@ -19,7 +19,11 @@ from application.audit import (
     set_current_user,
 )
 from infrastructure.db.tables import audit_log
-from infrastructure.repositories import async_person_repository
+from infrastructure.repositories import (
+    async_audit_repository,
+    async_person_repository,
+    audit_repository,
+)
 
 
 class TestCurrentUserContext:
@@ -51,14 +55,14 @@ class TestCurrentUserContext:
 class TestEmitEvent:
     def test_no_user_no_event(self, db):
         """Hors contexte utilisateur : emit_event ne persiste rien."""
-        emit_event(db, "person.merged", "person", 1, {"source_id": 2})
+        emit_event(audit_repository(db), "person.merged", "person", 1, {"source_id": 2})
         db.execute("SELECT COUNT(*) AS n FROM audit_log")
         assert db.fetchone()["n"] == 0
 
     def test_with_user_persists(self, db):
         token = set_current_user("admin")
         try:
-            emit_event(db, "person.merged", "person", 1, {"source_id": 2})
+            emit_event(audit_repository(db), "person.merged", "person", 1, {"source_id": 2})
             db.execute(
                 "SELECT event_type, aggregate_type, aggregate_id, payload, user_id "
                 "FROM audit_log ORDER BY id DESC LIMIT 1"
@@ -77,7 +81,7 @@ class TestEmitEvent:
         """Cas d'une entité supprimée sans équivalent survivant."""
         token = set_current_user("admin")
         try:
-            emit_event(db, "structure.deleted", "structure", None, {"name": "X"})
+            emit_event(audit_repository(db), "structure.deleted", "structure", None, {"name": "X"})
             db.execute("SELECT aggregate_id FROM audit_log ORDER BY id DESC LIMIT 1")
             assert db.fetchone()["aggregate_id"] is None
         finally:
@@ -86,7 +90,7 @@ class TestEmitEvent:
     def test_default_payload_is_empty_object(self, db):
         token = set_current_user("admin")
         try:
-            emit_event(db, "person.rejected", "person", 42)
+            emit_event(audit_repository(db), "person.rejected", "person", 42)
             db.execute("SELECT payload FROM audit_log ORDER BY id DESC LIMIT 1")
             assert db.fetchone()["payload"] == {}
         finally:
@@ -95,8 +99,9 @@ class TestEmitEvent:
     def test_multiple_events_in_order(self, db):
         token = set_current_user("admin")
         try:
-            emit_event(db, "a.b", "person", 1)
-            emit_event(db, "c.d", "person", 2)
+            repo = audit_repository(db)
+            emit_event(repo, "a.b", "person", 1)
+            emit_event(repo, "c.d", "person", 2)
             db.execute("SELECT event_type FROM audit_log ORDER BY id")
             rows = db.fetchall()
         finally:
@@ -125,7 +130,13 @@ class TestEndToEndServiceIntegration:
         person_id = await self._a_create_person(async_db)
         token = set_current_user("admin")
         try:
-            await set_rejected(async_db, person_id, True, repo=async_person_repository(async_db))
+            await set_rejected(
+                async_db,
+                person_id,
+                True,
+                repo=async_person_repository(async_db),
+                audit_repo=async_audit_repository(async_db),
+            )
         finally:
             reset_current_user(token)
 
@@ -145,7 +156,13 @@ class TestEndToEndServiceIntegration:
         from application.persons import set_rejected
 
         person_id = await self._a_create_person(async_db)
-        await set_rejected(async_db, person_id, True, repo=async_person_repository(async_db))
+        await set_rejected(
+            async_db,
+            person_id,
+            True,
+            repo=async_person_repository(async_db),
+            audit_repo=async_audit_repository(async_db),
+        )
 
         await async_db.execute("SELECT COUNT(*) AS n FROM audit_log")
         assert (await async_db.fetchone())["n"] == 0
@@ -158,11 +175,12 @@ class TestEndToEndServiceIntegration:
         p1 = await self._a_create_person(async_db, "A", "A")
         p2 = await self._a_create_person(async_db, "B", "B")
         repo = async_person_repository(async_db)
+        audit_repo_ = async_audit_repository(async_db)
         token = set_current_user("admin")
         try:
-            await mark_distinct(async_db, p1, p2, repo=repo)
-            await mark_distinct(async_db, p1, p2, repo=repo)  # doublon → no-op
-            await mark_distinct(async_db, p2, p1, repo=repo)  # même paire dans l'autre sens → no-op
+            await mark_distinct(async_db, p1, p2, repo=repo, audit_repo=audit_repo_)
+            await mark_distinct(async_db, p1, p2, repo=repo, audit_repo=audit_repo_)  # doublon
+            await mark_distinct(async_db, p2, p1, repo=repo, audit_repo=audit_repo_)  # autre sens
         finally:
             reset_current_user(token)
 
@@ -173,13 +191,19 @@ class TestEndToEndServiceIntegration:
 
 
 class TestAsyncEmitEventViaSAConnection:
-    """Vérifie la branche SA de `async_emit_event` (chantier
+    """Vérifie la branche SA de `PgAsyncAuditRepository` (chantier
     sqlalchemy-core-adoption — cohabitation pendant la phase 1)."""
 
     async def test_persists_via_sa_connection(self, sa_conn: AsyncConnection):
         token = set_current_user("admin")
         try:
-            await async_emit_event(sa_conn, "person.merged", "person", 42, {"source_id": 7})
+            await async_emit_event(
+                async_audit_repository(sa_conn),
+                "person.merged",
+                "person",
+                42,
+                {"source_id": 7},
+            )
             result = await sa_conn.execute(
                 select(
                     audit_log.c.event_type,
@@ -202,7 +226,7 @@ class TestAsyncEmitEventViaSAConnection:
         assert row.user_id == "admin"
 
     async def test_no_user_no_event_via_sa(self, sa_conn: AsyncConnection):
-        await async_emit_event(sa_conn, "person.merged", "person", 1, {})
+        await async_emit_event(async_audit_repository(sa_conn), "person.merged", "person", 1, {})
         result = await sa_conn.execute(
             select(audit_log.c.id).where(audit_log.c.event_type == "person.merged")
         )
@@ -211,7 +235,7 @@ class TestAsyncEmitEventViaSAConnection:
     async def test_default_payload_via_sa(self, sa_conn: AsyncConnection):
         token = set_current_user("admin")
         try:
-            await async_emit_event(sa_conn, "person.rejected", "person", 99)
+            await async_emit_event(async_audit_repository(sa_conn), "person.rejected", "person", 99)
             result = await sa_conn.execute(
                 select(audit_log.c.payload).order_by(audit_log.c.id.desc()).limit(1)
             )

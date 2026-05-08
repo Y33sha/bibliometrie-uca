@@ -9,8 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from application.ports.publication_duplicates_queries import AsyncPublicationDuplicatesQueries
 from application.publications import async_merge_publications
 from application.publications import mark_distinct as _mark_pubs_distinct
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.publication_repository import AsyncPublicationRepository
 from interfaces.api.async_deps import (
+    audit_repo,
     db_conn,
     publication_duplicates_queries,
     publication_repo,
@@ -49,6 +51,7 @@ async def merge_duplicate_publications(
     conn: AsyncConnection = Depends(db_conn),
     queries: AsyncPublicationDuplicatesQueries = Depends(publication_duplicates_queries),
     repo: AsyncPublicationRepository = Depends(publication_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Fusionne la publication `source_id` dans `target_id`.
 
@@ -69,7 +72,9 @@ async def merge_duplicate_publications(
 
     savepoint = await conn.begin_nested()
     try:
-        await async_merge_publications(conn, body.target_id, body.source_id, repo=repo)
+        await async_merge_publications(
+            conn, body.target_id, body.source_id, repo=repo, audit_repo=audit
+        )
         await savepoint.commit()
     except Exception as e:
         await savepoint.rollback()
@@ -83,6 +88,7 @@ async def mark_publications_distinct(
     body: MarkDistinctPublications,
     conn: AsyncConnection = Depends(db_conn),
     repo: AsyncPublicationRepository = Depends(publication_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Marque deux publications comme distinctes (non-doublon confirmé).
 
@@ -92,5 +98,5 @@ async def mark_publications_distinct(
     """
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
-    await _mark_pubs_distinct(conn, body.pub_id_a, body.pub_id_b, repo=repo)
+    await _mark_pubs_distinct(conn, body.pub_id_a, body.pub_id_b, repo=repo, audit_repo=audit)
     return {"ok": True}

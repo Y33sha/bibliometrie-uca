@@ -16,6 +16,7 @@ dans `interfaces/cli/pipeline/merge_pubs_by_hal_id.py`.
 
 from typing import Any
 
+from application.pipeline._savepoint import savepoint
 from application.ports.merge import MergeQueries
 from application.publications import merge_publications as _merge_pub
 from application.publications import refresh_from_sources, update_sources
@@ -136,15 +137,13 @@ def merge_publications(
             continue
 
         try:
-            cur.execute("SAVEPOINT merge_pub")
-            _merge_pub(cur, hal_pub_id, src_pub_id, repo=pub_repo)
-            refresh_from_sources(cur, hal_pub_id, repo=pub_repo)
-            cur.execute("RELEASE SAVEPOINT merge_pub")
+            with savepoint(cur, "merge_pub"):
+                _merge_pub(cur, hal_pub_id, src_pub_id, repo=pub_repo)
+                refresh_from_sources(cur, hal_pub_id, repo=pub_repo)
             merged_into[src_pub_id] = hal_pub_id
             merged += 1
 
         except Exception as e:
-            cur.execute("ROLLBACK TO SAVEPOINT merge_pub")
             logger.warning(f"  Échec fusion {item['src_id']}: {e}")
             errors += 1
 

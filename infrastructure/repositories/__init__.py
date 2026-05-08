@@ -25,6 +25,7 @@ Journal, Person et Publication existent dans les deux variantes
 from typing import Any
 
 from domain.ports.address_repository import AsyncAddressRepository
+from domain.ports.audit_repository import AsyncAuditRepository, AuditRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
 from domain.ports.perimeter_repository import AsyncPerimeterRepository
@@ -35,6 +36,7 @@ from domain.ports.structure_repository import AsyncStructureRepository
 from infrastructure.db.queries.config import PgAsyncConfig
 
 from .async_address_repository import PgAsyncAddressRepository
+from .async_audit_repository import PgAsyncAuditRepository
 from .async_authorship_repository import PgAsyncAuthorshipRepository
 from .async_journal_repository import PgAsyncJournalRepository
 from .async_perimeter_repository import PgAsyncPerimeterRepository
@@ -42,10 +44,16 @@ from .async_person_repository import PgAsyncPersonRepository
 from .async_publication_repository import PgAsyncPublicationRepository
 from .async_publisher_repository import PgAsyncPublisherRepository
 from .async_structure_repository import PgAsyncStructureRepository
+from .audit_repository import PgAuditRepository
 from .journal_repository import PgJournalRepository
 from .person_repository import PgPersonRepository
 from .publication_repository import PgPublicationRepository
 from .publisher_repository import PgPublisherRepository
+
+
+def audit_repository(conn_or_cur: Any) -> AuditRepository:
+    """Retourne un AuditRepository lié au cur psycopg ou Connection SA donné."""
+    return PgAuditRepository(conn_or_cur)
 
 
 def journal_repository(conn_or_cur: Any) -> JournalRepository:
@@ -73,6 +81,10 @@ def publisher_repository(conn_or_cur: Any) -> PublisherRepository:
 
 def async_address_repository(cur: Any) -> AsyncAddressRepository:
     return PgAsyncAddressRepository(cur)
+
+
+def async_audit_repository(cur: Any) -> AsyncAuditRepository:
+    return PgAsyncAuditRepository(cur)
 
 
 def async_authorship_repository(cur: Any) -> AsyncAuthorshipRepository:

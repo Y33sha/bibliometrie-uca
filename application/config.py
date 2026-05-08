@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from application.audit import async_emit_event
 from application.ports.config import AsyncConfigStore
 from domain.errors import ConflictError, NotFoundError, ValidationError
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.perimeter_repository import AsyncPerimeterRepository
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
@@ -132,6 +133,7 @@ async def delete_perimeter(
     *,
     repo: AsyncPerimeterRepository,
     config: AsyncConfigStore,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> None:
     """Supprime un périmètre.
 
@@ -149,7 +151,7 @@ async def delete_perimeter(
 
     await repo.delete_perimeter(perimeter_id)
     await async_emit_event(
-        conn,
+        audit_repo,
         "perimeter.deleted",
         "perimeter",
         perimeter_id,

@@ -22,6 +22,7 @@ from application.audit import async_emit_event
 from application.journals import merge_journals
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.journal_repository import AsyncJournalRepository
 from domain.ports.publisher_repository import AsyncPublisherRepository, PublisherRepository
 
@@ -101,6 +102,7 @@ async def merge_publishers(
     *,
     publisher_repo: AsyncPublisherRepository,
     journal_repo: AsyncJournalRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible.
 
@@ -129,12 +131,16 @@ async def merge_publishers(
                     f"Fusionner les revues manuellement d'abord."
                 )
         await merge_journals(
-            conn, pair["target_journal_id"], pair["source_journal_id"], repo=journal_repo
+            conn,
+            pair["target_journal_id"],
+            pair["source_journal_id"],
+            repo=journal_repo,
+            audit_repo=audit_repo,
         )
 
     # 2-6. Le reste de la fusion (transferts, enrichissement, delete).
     await publisher_repo.merge_publisher_into(target_id, source_id)
 
     await async_emit_event(
-        conn, "publisher.merged", "publisher", target_id, {"source_id": source_id}
+        audit_repo, "publisher.merged", "publisher", target_id, {"source_id": source_id}
     )

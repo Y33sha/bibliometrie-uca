@@ -265,7 +265,7 @@ pas tranchés, toute évolution amplifie la dette.
   (agrégat) + `application/ports/config` (port AsyncConfigStore pour
   la table clé/valeur).
 
-- [ ] **SQLAlchemy Core : décision actée (adoption), chantier
+- [x] **SQLAlchemy Core : décision actée (adoption), chantier
   démarré le 2026-05-06** — adoption retenue après reformulation
   « si on partait de zéro aujourd'hui, est-ce qu'on l'adopterait ? ».
   Voir [`docs/chantiers/sqlalchemy-core-adoption.md`](sqlalchemy-core-adoption.md)
@@ -303,13 +303,27 @@ chacun mérite son fichier dans `docs/chantiers/`.
 Pas un sprint, à traiter au fil de l'eau quand on touche aux
 fichiers concernés.
 
-- [ ] **`application/audit.py` doit passer par un repository** :
-  créer un `AuditRepository` (port + adapter Pg) au lieu du
-  `cur.execute` direct, pour rétablir la règle DDD
-- [ ] **Encapsuler les `SAVEPOINT`** : ajouter une méthode
-  `with_savepoint(name)` aux ports concernés (ou un context manager
-  séparé), supprimer les 7 `cur.execute("SAVEPOINT ...")` inline
-  dans `application/pipeline/`
+- [x] **`application/audit.py` doit passer par un repository** :
+  port `AuditRepository`/`AsyncAuditRepository` dans
+  `domain/ports/audit_repository.py` (méthode `record_event`),
+  adapters `infrastructure/repositories/audit_repository.py` et
+  `async_audit_repository.py` (dispatch cur | Connection / AsyncConnection),
+  factories dans `infrastructure/repositories/__init__.py`. Les 7
+  services applicatifs émetteurs (`authorships`, `config`, `journals`,
+  `persons`, `publishers`, `structures`, `publications`) reçoivent
+  désormais un kwarg `audit_repo` optionnel (défaut `None`, no-op
+  pour pipeline/CLI où `user_id` est absent de toute façon). Les
+  routers admin câblent un vrai repo via `Depends(audit_repo)` dans
+  `interfaces/api/async_deps.py`. `application/audit.py` n'a plus
+  aucun SQL direct — règle DDD `application ⊥ infrastructure`
+  rétablie.
+- [x] **Encapsuler les `SAVEPOINT`** : context manager
+  `application.pipeline._savepoint.savepoint(cur, name, *, on_rollback_failure=None)`.
+  Appliqué aux 3 sites : `pipeline/normalize/base.py` (passe
+  `self.conn.rollback` en fallback), `merge_pubs_by_hal_id.py`,
+  `merge_pubs_by_nnt.py`. Les 7 `cur.execute("SAVEPOINT ...")` /
+  RELEASE / ROLLBACK inline ont disparu. Helper côté application
+  (pas infrastructure) pour respecter `application ⊥ infrastructure`.
 - [ ] **Chasser les `Any`** : par fichier modifié, typer
   progressivement les `cur: Any` (créer un alias `Cursor`/
   `AsyncCursor` à l'entrée des modules)

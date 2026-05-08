@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from application.audit import async_emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
 
 
@@ -157,11 +158,18 @@ def reset_journal_apc(cur: Any, *, repo: JournalRepository) -> int:
 
 
 async def merge_journals(
-    conn: AsyncConnection, target_id: int, source_id: int, *, repo: AsyncJournalRepository
+    conn: AsyncConnection,
+    target_id: int,
+    source_id: int,
+    *,
+    repo: AsyncJournalRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> None:
     """Fusionne le journal source dans le journal cible."""
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un journal avec lui-même")
 
     await repo.merge_journal_into(target_id, source_id)
-    await async_emit_event(conn, "journal.merged", "journal", target_id, {"source_id": source_id})
+    await async_emit_event(
+        audit_repo, "journal.merged", "journal", target_id, {"source_id": source_id}
+    )

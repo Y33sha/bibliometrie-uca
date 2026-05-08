@@ -24,6 +24,7 @@ from application.authorships import async_delete_orphan_authorships
 from domain.errors import ValidationError
 from domain.names import compute_person_name_forms
 from domain.persons.merge import check_can_merge_persons
+from domain.ports.audit_repository import AsyncAuditRepository, AuditRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
 from domain.sources import ALL_SOURCES_SET
@@ -76,14 +77,21 @@ async def async_create_person(
 
 
 async def set_rejected(
-    conn: AsyncConnection, person_id: int, rejected: bool, *, repo: AsyncPersonRepository
+    conn: AsyncConnection,
+    person_id: int,
+    rejected: bool,
+    *,
+    repo: AsyncPersonRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> None:
     """Marque ou démarque une personne comme rejetée (fausse entité).
 
     Lève NotFoundError si la personne n'existe pas.
     """
     await repo.set_rejected(person_id, rejected)
-    await async_emit_event(conn, "person.rejected", "person", person_id, {"rejected": rejected})
+    await async_emit_event(
+        audit_repo, "person.rejected", "person", person_id, {"rejected": rejected}
+    )
 
 
 async def update_name(
@@ -202,6 +210,7 @@ async def remove_identifier(
     id_value: str,
     *,
     repo: AsyncPersonRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> None:
     """Supprime un identifiant d'une personne.
 
@@ -209,7 +218,7 @@ async def remove_identifier(
     """
     await repo.remove_identifier(person_id, id_type, id_value)
     await async_emit_event(
-        conn,
+        audit_repo,
         "person_identifier.removed",
         "person",
         person_id,
@@ -218,7 +227,12 @@ async def remove_identifier(
 
 
 async def update_identifier_status(
-    conn: AsyncConnection, ident_id: int, status: str, *, repo: AsyncPersonRepository
+    conn: AsyncConnection,
+    ident_id: int,
+    status: str,
+    *,
+    repo: AsyncPersonRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> dict:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
@@ -227,7 +241,7 @@ async def update_identifier_status(
     """
     row = await repo.update_identifier_status(ident_id, status)
     await async_emit_event(
-        conn,
+        audit_repo,
         "person_identifier.status_changed",
         "person",
         row["person_id"],
@@ -237,7 +251,12 @@ async def update_identifier_status(
 
 
 async def reassign_identifier(
-    conn: AsyncConnection, ident_id: int, target_person_id: int, *, repo: AsyncPersonRepository
+    conn: AsyncConnection,
+    ident_id: int,
+    target_person_id: int,
+    *,
+    repo: AsyncPersonRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> None:
     """Réattribue un identifiant à une autre personne (status → pending).
 
@@ -245,7 +264,7 @@ async def reassign_identifier(
     """
     await repo.reassign_identifier(ident_id, target_person_id)
     await async_emit_event(
-        conn,
+        audit_repo,
         "person_identifier.reassigned",
         "person",
         target_person_id,
@@ -404,7 +423,12 @@ async def detach_authorships(
 
 
 async def mark_distinct(
-    conn: AsyncConnection, person_id_a: int, person_id_b: int, *, repo: AsyncPersonRepository
+    conn: AsyncConnection,
+    person_id_a: int,
+    person_id_b: int,
+    *,
+    repo: AsyncPersonRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> None:
     """Marque deux personnes comme distinctes (non-doublon) dans
     `distinct_persons`. Idempotent.
@@ -415,7 +439,7 @@ async def mark_distinct(
     # Audit seulement si une ligne a été insérée (la paire n'existait pas déjà)
     if inserted:
         await async_emit_event(
-            conn,
+            audit_repo,
             "person.marked_distinct",
             "person",
             inserted[0],
@@ -423,7 +447,14 @@ async def mark_distinct(
         )
 
 
-def merge_person(cur: Any, target_id: int, source_id: int, *, repo: PersonRepository) -> None:
+def merge_person(
+    cur: Any,
+    target_id: int,
+    source_id: int,
+    *,
+    repo: PersonRepository,
+    audit_repo: AuditRepository | None = None,
+) -> None:
     """Fusionne la personne `source_id` dans `target_id`.
 
     Invariant métier : refus si les deux personnes ont chacune une
@@ -434,13 +465,20 @@ def merge_person(cur: Any, target_id: int, source_id: int, *, repo: PersonReposi
     """
     check_can_merge_persons(repo.has_distinct_rh(target_id, source_id), target_id, source_id)
     repo.merge_into(target_id, source_id)
-    emit_event(cur, "person.merged", "person", target_id, {"source_id": source_id})
+    emit_event(audit_repo, "person.merged", "person", target_id, {"source_id": source_id})
 
 
 async def async_merge_person(
-    conn: AsyncConnection, target_id: int, source_id: int, *, repo: AsyncPersonRepository
+    conn: AsyncConnection,
+    target_id: int,
+    source_id: int,
+    *,
+    repo: AsyncPersonRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> None:
     """Variante async de `merge_person`."""
     check_can_merge_persons(await repo.has_distinct_rh(target_id, source_id), target_id, source_id)
     await repo.merge_into(target_id, source_id)
-    await async_emit_event(conn, "person.merged", "person", target_id, {"source_id": source_id})
+    await async_emit_event(
+        audit_repo, "person.merged", "person", target_id, {"source_id": source_id}
+    )
