@@ -138,15 +138,49 @@ Pour les raisons suivantes :
 
 ### Phase 1 — Préparation (non destructif)
 
-- [ ] Bumper `db_pool_max` dans `.env.example` et la doc à 30-40
-  (préparer le pool sync à absorber la concurrence threadpool).
-  Faire le bump avant la migration pour mesurer l'impact.
-- [ ] Vérifier qu'aucune route async actuelle n'utilise un pattern
-  `async def` qui serait fonctionnellement obligatoire (pas trouvé
-  à ce stade — toutes les routes sont du CRUD HTTP classique).
-- [ ] Recenser les middlewares `async def` actuels (auth, timing,
-  strip_prefix) — confirmer qu'ils peuvent rester async (oui, FastAPI
-  les supporte tels quels même avec des routes sync).
+- [x] Bumper `db_pool_max` dans `.env.example` et la doc à 30
+  (audit-cto Phase 3, commit `1275236`). Préparation du pool sync
+  à absorber la concurrence threadpool.
+- [x] Vérifier qu'aucune route async actuelle n'utilise un pattern
+  `async def` fonctionnellement obligatoire. Audit fait :
+  - **1 route async-only identifiée** : `admin_feedback.py:140`
+    `feedback_rerun` — endpoint SSE qui streame stdout d'un
+    subprocess (`asyncio.create_subprocess_exec` +
+    `StreamingResponse text/event-stream`). Reste légitimement
+    en `async def` (cohabitation FastAPI). N'utilise **aucune
+    connexion DB** → pas de blocker pour la suppression de l'infra
+    async DB.
+  - **2 routes utilisent `BackgroundTasks`** (`addresses.py`
+    `set_address_country` / `batch_set_country`) : compatible avec
+    routes sync, FastAPI exécute les tasks dans un thread peu
+    importe la nature de la route.
+  - **Aucun WebSocket, long-polling, autre pattern bloquant.**
+- [x] Recenser les middlewares `async def` actuels — 3 middlewares
+  `@app.middleware("http")` dans `interfaces/api/app.py` :
+  `auth_middleware` (l. 151), `strip_prefix` (l. 196),
+  `timing_middleware` (l. 208). Plus `lifespan` (l. 72) et 6
+  exception handlers async. Tous peuvent rester async : FastAPI/
+  Starlette gèrent l'orchestration indépendamment de la nature
+  (sync/async) des routes elles-mêmes.
+
+### Phase 1.5 — Préparation Phase 2 : infra sync côté API
+
+Avant de migrer le premier router, poser les briques DB sync utilisables
+depuis les `Depends` FastAPI :
+
+- [x] `interfaces/api/deps.py` : ajouter `db_conn_sync()` qui yield un
+  `Connection` SA sync ouvert via `engine.begin()` (commit/rollback
+  auto). Pendant la migration, cohabite avec `db_conn` (async) côté
+  `async_deps.py`.
+- [x] `interfaces/api/app.py` lifespan : instancier le sync Engine SA
+  via `build_sync_engine()` + `set_sync_engine()`, dispose au shutdown.
+  Les trois (pool psycopg async, AsyncEngine SA, Engine SA sync)
+  cohabitent ; Phase 3 supprime les deux premiers.
+
+Pas besoin d'un pool psycopg sync séparé : on bascule directement
+les routers vers SA Core (cohérent avec le travail SQLA Lot 3.A
+sur les repos sync, dispatch cur | Connection). Les routers
+migrés utilisent `Connection` SA sync, pas un curseur psycopg.
 
 ### Phase 2 — Migration progressive, 1 router à la fois
 

@@ -30,7 +30,12 @@ from domain.errors import (
     ValidationError,
 )
 from infrastructure.db.async_connection import build_async_pool, get_async_pool, set_async_pool
-from infrastructure.db.engine import build_async_engine, set_async_engine
+from infrastructure.db.engine import (
+    build_async_engine,
+    build_sync_engine,
+    set_async_engine,
+    set_sync_engine,
+)
 from infrastructure.log import configure_root_logging
 from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.deps import _verify_token
@@ -70,17 +75,23 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> Any:
-    # Pool psycopg legacy (modules pas encore migrés en SQLAlchemy Core)
-    # et AsyncEngine SA (modules migrés) cohabitent pendant le chantier
-    # sqlalchemy-core-adoption. Phase 4 supprimera le pool psycopg.
+    # Pool psycopg async + AsyncEngine SA pour les routers async (encore
+    # majoritaires pendant le chantier sync-async-deduplication).
+    # Engine SA sync pour les routers déjà migrés en `def` (option D).
+    # Les trois cohabitent ; Phase 3 du chantier supprime les deux
+    # premiers une fois tous les routers basculés.
     pool = build_async_pool()
     await pool.open()
     set_async_pool(pool)
     engine = build_async_engine()
     set_async_engine(engine)
+    sync_engine = build_sync_engine()
+    set_sync_engine(sync_engine)
     try:
         yield
     finally:
+        sync_engine.dispose()
+        set_sync_engine(None)
         await engine.dispose()
         set_async_engine(None)
         await pool.close()

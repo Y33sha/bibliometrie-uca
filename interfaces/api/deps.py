@@ -1,15 +1,25 @@
-"""Shared dependencies: SPA static files, auth helpers."""
+"""Shared dependencies: SPA static files, auth helpers, sync DB factories.
+
+Les factories DB sync (`db_conn_sync`) sont utilisées par les routers
+migrés en `def` (chantier `docs/chantiers/sync-async-deduplication.md`,
+option D). Pendant la migration progressive, elles cohabitent avec les
+factories async dans `interfaces/api/async_deps.py`. Phase 3 du
+chantier supprimera la moitié async une fois tous les routers basculés.
+"""
 
 import hashlib
 import hmac
 import os
 import time
+from collections.abc import Iterator
 from typing import Any
 
 import bcrypt
 from fastapi import Cookie, HTTPException
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import Connection
 
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.settings import settings
 
 # ----- SPA Static Files -----
@@ -67,3 +77,21 @@ def require_admin(session: str | None = Cookie(None, alias="session")) -> Any:
     """Dépendance FastAPI : vérifie que l'utilisateur est authentifié."""
     if not session or not _verify_token(session):
         raise HTTPException(status_code=401, detail="Non authentifié")
+
+
+# ----- Sync DB factories (chantier sync-async-deduplication option D) -----
+
+
+def db_conn_sync() -> Iterator[Connection]:
+    """Connection SA sync ouverte en transaction, pour les routers `def`.
+
+    À utiliser via `Depends(db_conn_sync)`. Ouvre `engine.begin()` :
+    commit auto en sortie sans exception, rollback sinon — équivalent
+    sync de `db_conn` côté async (`interfaces/api/async_deps.py`).
+
+    Toute dépendance qui en dérive (`*_repo` sync, query adapters
+    sync) doit partager la même connexion → même transaction.
+    """
+    engine = get_sync_engine()
+    with engine.begin() as conn:
+        yield conn
