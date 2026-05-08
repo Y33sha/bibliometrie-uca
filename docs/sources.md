@@ -6,7 +6,7 @@ Le système intègre 6 sources bibliographiques principales, complétées par de
 
 | Source | Type | Couverture | API |
 |--------|------|-----------|-----|
-| HAL | Archive ouverte | Publications déposées par les chercheurs UCA | Solr (search) + ref/author + ref/structure |
+| HAL | Archive ouverte | Publications déposées par les chercheurs UCA | Solr (search) + ref/structure |
 | OpenAlex | Base bibliométrique ouverte | Publications mondiales, rattachement institutionnel par affiliation | REST (works, sources) |
 | Web of Science | Base bibliométrique commerciale | Publications indexées WoS, affiliation OG | REST (Expanded API, quota annuel) |
 | ScanR | Portail officiel du MESRE | Publications de l'écosystème français de la recherche | Elasticsearch (DataESR) |
@@ -62,10 +62,7 @@ Pour les autres cas (OpenAlex, WoS, CrossRef, et les comptes HAL non identifiés
 - Requête par collection labo (27 collections UCA) + portail global `clermont-univ`
 - Champs Solr récupérés : voir `utils/hal.py` (`HAL_FIELDS`)
 - Pagination par offset, 500 résultats/page, 0.5s de délai entre requêtes
-
-**ref/author API** (`https://api.archives-ouvertes.fr/ref/author/`) — identifiants auteurs.
-- Récupération ORCID et IdRef par `hal_person_id`
-- Requête par batch (100 IDs par requête)
+- Les identifiants ORCID/IdRef des auteurs sont extraits depuis le TEI `label_xml` retourné par la search API ; aucun appel séparé à `ref/author` n'est nécessaire.
 
 **ref/structure API** (`https://api.archives-ouvertes.fr/ref/structure/`) — métadonnées structures.
 - Enrichissement des structures HAL (dates, parents, pays, identifiants externes)

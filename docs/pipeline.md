@@ -6,7 +6,8 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 
 ### Moissonnage
 - [Moissonnage](#extract): Récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
-- [Cross-imports](#cross_imports): Tente de combler les lacunes par des imports croisés ciblés (documents HAL référencés par OpenAlex ou ScanR mais absents de notre import HAL; recherche ciblée des DOI manquant dans chaque source)
+- [Fetch missing HAL id](#fetch_missing_hal_id): Récupère depuis HAL les documents référencés par d'autres sources mais absents de notre staging HAL.
+- [Fetch missing DOI](#fetch_missing_doi): Recherche ciblée par DOI dans chaque source des records manquants.
 ### Normalisation
 - [Normalisation](#normalize): Transforme les données brutes (*staging*) en tables structurées *par source*: `*_publications`, `*_authors`, `*_authorships`, `*_structures`.
 ### Repérage des affiliations
@@ -44,9 +45,9 @@ python run_pipeline.py --list
 ```
 
 **Modes :**
-- `full` : pipeline complet avec cross-imports et enrichissements
-- `monthly` : pipeline complet (cross-imports inclus)
-- `weekly` : incrémental (années récentes, pas de cross-imports ni enrichissements)
+- `full` : pipeline complet (toutes années, fetch_missing inclus, enrichissements)
+- `weekly` : incrémental (années récentes, pas de WoS, pas de fetch_missing_doi, pas d'enrichissements)
+- `daily` : HAL uniquement, depuis le dernier run (idéal cron quotidien)
 
 
 ## Phases détaillées
@@ -67,7 +68,7 @@ flowchart LR
 ```
 
 **Critères de requête**:
-- **années** de publication (2 modes, configurables dans admin/config: *weekly*: années n et n-1; *monthly*: repasse complète sur les années n-5 à n);
+- **années** de publication (configurables dans admin/config : *weekly* couvre les années n et n-1, *full* fait une repasse complète sur les années n-5 à n);
 - **affiliation** des publications (UCA, CHU, INP). Il s'agit des affiliations *telles qu'elles sont renseignées dans chaque source*. Elles peuvent varier d'une source à l'autre et être incomplètes ou erronées. Ce point est géré dans les étapes ultérieures.
 
 **Gestion des changements**:
@@ -83,12 +84,13 @@ L'API OpenAlex limite les authorships à 100 par publication. Un *refetch* cibl�
 Pour éviter d'écraser ces publications lors de l'import suivant, un *hash* est calculé en faisant abstraction des authorships.
 <!-- TODO: Tester que le meta_hash fonctionne effectivement et que les publis de >100 auteurs ne sont pas écrasées au réimport. -->
 
-### <span id="cross_imports"></span>Phase 2 — `cross_imports` : Re-moissonnages croisés
+### <span id="fetch_missing_hal_id"></span>Phase 2a — `fetch_missing_hal_id` : HAL ids manquants
 
-Comble certaines lacunes dans les données moissonnées.
+**`interfaces/cli/pipeline/fetch_missing_hal_id.py`** — télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'autres sources mais absents de notre staging HAL. Auto-borné, tourne dans tous les modes.
 
-1. **`fetch_missing_hal.py`** — télécharge depuis HAL les documents référencés comme source par des works OpenAlex ou ScanR mais absents de notre staging.
-2. **`cross_import_openalex.py`, `cross_import_hal.py`, `cross_import_wos.py`, `cross_import_scanr.py`** — cherche dans chaque source les DOI trouvés dans les autres mais non trouvés dans cette source; la plupart sont effectivement absents, mais beaucoup sont repêchés (cause: affiliations différentes selon source).
+### <span id="fetch_missing_doi"></span>Phase 2b — `fetch_missing_doi` : DOI manquants par source
+
+**`interfaces/cli/pipeline/fetch_missing_doi.py`** — dispatcher unique qui, pour chaque source cible (OpenAlex, HAL, WoS, ScanR), recherche par DOI les records trouvés dans les autres sources mais absents de celle-ci. La plupart sont effectivement absents ; certains sont repêchés (cause : affiliations différentes selon source). Adapter par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Exécuté en mode `full` uniquement (scope policy).
 
 ### <span id="normalize"></span>Phase 3 — `normalize` : Normalisation
 
@@ -223,16 +225,16 @@ Trois scripts enchaînés :
 
 2. **`interfaces/cli/suggest_address_countries.py`** : pour les adresses restantes (pays absent du dernier segment), cherche une adresse similaire avec pays connu via LIKE sur le texte normalisé. Plus lent, résultats stockés dans `suggested_countries` (validation manuelle via l'interface admin).
 
-3. **`processing/refresh_publication_countries.py`** : recalcule `publications.countries` en faisant l'union des pays des 4 sources (HAL via structures, OpenAlex/WoS/ScanR via adresses résolues).
+3. **`interfaces/cli/pipeline/refresh_publication_countries.py`** : recalcule `publications.countries` en faisant l'union des pays des 4 sources (HAL via structures, OpenAlex/WoS/ScanR via adresses résolues).
 
 ### <span id="enrich"></span>Phase 10 — `enrich` : Enrichissements optionnels
 
-Exécutée uniquement en mode `full` et `monthly` :
+Exécutée uniquement en mode `full` :
 
 | Script | Rôle |
 |--------|------|
-| `processing/enrich_oa_unpaywall.py` | Statut *open access* via API [Unpaywall](glossaire#unpaywall) => souvent plus à jour que le statut renseigné dans les sources |
-| `processing/enrich_journal_apc.py` | Montant APC par revue via API OpenAlex Sources => **ne sert à rien pour l'instant**, voir si on garde ou pas |
+| `interfaces/cli/pipeline/enrich_oa_status.py` | Statut *open access* via API [Unpaywall](glossaire#unpaywall) => souvent plus à jour que le statut renseigné dans les sources |
+| `interfaces/cli/pipeline/enrich_journal_apc.py` | Montant APC par revue via API OpenAlex Sources => **ne sert à rien pour l'instant**, voir si on garde ou pas |
 
 ## <span id='tables-canoniques'></span>Peuplement des tables canoniques
 

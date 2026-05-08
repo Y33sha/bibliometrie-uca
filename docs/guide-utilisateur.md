@@ -76,7 +76,7 @@ Pages dédiées aux problèmes de qualité spécifiques à HAL :
 Paramètres des imports:
 - email (polite pool);
 - clé API WOS;
-- années interrogées (modes weekly et monthly);
+- années interrogées (modes weekly et full);
 - paramètres de requête par source;
 - définition des périmètres (`uca`, `uca_wide`); (CRUD pas encore mis en place <!--TODO: mettre en place le CRUD des périmètres dans admin/config-->)
 - périmètres utilisés à différentes étapes du pipeline.
