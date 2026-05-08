@@ -9,9 +9,17 @@ Trois étapes (write-only) appelées par l'orchestrateur pipeline
 
 Fonctions module-level pour compat avec le code existant ;
 `PgCountryQueries` est l'adapter qui implémente `application.ports.countries.CountryQueries`.
+
+Note migration SQLA : `suggest_addresses_countries_batch` est consommée
+par `interfaces/cli/pipeline/suggest_address_countries.py` migré en SA Core
+sync (Connection SA). Les 3 fonctions `refresh_*_countries` restent en
+psycopg ``cur`` pour cette session — relèvent du Lot 3.B (queries
+pipeline) du chantier sqlalchemy-core-adoption.
 """
 
 from typing import Any
+
+from sqlalchemy import Connection, text
 
 
 def refresh_hal_source_countries(cur: Any) -> int:
@@ -91,7 +99,7 @@ def refresh_publication_countries(cur: Any) -> int:
 
 
 def suggest_addresses_countries_batch(
-    cur: Any, *, batch_size: int, target_column: str = "suggested_countries"
+    conn: Connection, *, batch_size: int, target_column: str = "suggested_countries"
 ) -> tuple[int, int]:
     """Suggère un pays pour les adresses sans pays via substring match.
 
@@ -100,8 +108,11 @@ def suggest_addresses_countries_batch(
     dont le `normalized_text` la contient comme sous-chaîne. Le ou les pays
     les plus fréquents parmi ces matches deviennent la suggestion.
 
-    Tout est fait en une seule requête SQL bulk (CTE + UPDATE) qui exploite
-    l'index trigramme `idx_addresses_normalized_text_trgm` (cf migration 020).
+    Tout est fait en une seule requête SQL bulk (CTE + UPDATE + window function)
+    qui exploite l'index trigramme `idx_addresses_normalized_text_trgm`
+    (cf migration 020). CTE complexe : reste en SQL brut via ``text()`` (cf.
+    règles du chantier sqlalchemy-core-adoption).
+
     Les cibles sans match reçoivent un array vide (et non NULL) — c'est ce
     marquage qui permet à la passe suivante de les sauter via le filtre
     `WHERE suggested_countries IS NULL`.
@@ -116,50 +127,50 @@ def suggest_addresses_countries_batch(
     if target_column not in ("suggested_countries", "countries"):
         raise ValueError(f"target_column invalide : {target_column!r}")
 
-    cur.execute(
-        f"""
-        WITH targets AS (
-            SELECT id, normalized_text
-            FROM addresses
-            WHERE countries IS NULL
-              AND suggested_countries IS NULL
-              AND length(normalized_text) >= 5
-            ORDER BY pub_count DESC, id
-            LIMIT %s
-        ),
-        matches AS (
-            SELECT t.id AS target_id, c, count(*) AS cnt
+    result = conn.execute(
+        text(f"""
+            WITH targets AS (
+                SELECT id, normalized_text
+                FROM addresses
+                WHERE countries IS NULL
+                  AND suggested_countries IS NULL
+                  AND length(normalized_text) >= 5
+                ORDER BY pub_count DESC, id
+                LIMIT :batch_size
+            ),
+            matches AS (
+                SELECT t.id AS target_id, c, count(*) AS cnt
+                FROM targets t
+                JOIN addresses a2
+                    ON a2.normalized_text LIKE '%' || t.normalized_text || '%'
+                CROSS JOIN LATERAL unnest(a2.countries) AS c
+                WHERE a2.countries IS NOT NULL
+                GROUP BY t.id, c
+            ),
+            ranked AS (
+                SELECT target_id, c, cnt,
+                       max(cnt) OVER (PARTITION BY target_id) AS max_cnt
+                FROM matches
+            ),
+            top_per_target AS (
+                SELECT target_id,
+                       array_agg(DISTINCT trim(c) ORDER BY trim(c)) AS suggested
+                FROM ranked
+                WHERE cnt = max_cnt
+                GROUP BY target_id
+            )
+            UPDATE addresses a
+            SET {target_column} = COALESCE(tp.suggested, ARRAY[]::char(2)[])
             FROM targets t
-            JOIN addresses a2
-                ON a2.normalized_text LIKE '%%' || t.normalized_text || '%%'
-            CROSS JOIN LATERAL unnest(a2.countries) AS c
-            WHERE a2.countries IS NOT NULL
-            GROUP BY t.id, c
-        ),
-        ranked AS (
-            SELECT target_id, c, cnt,
-                   max(cnt) OVER (PARTITION BY target_id) AS max_cnt
-            FROM matches
-        ),
-        top_per_target AS (
-            SELECT target_id,
-                   array_agg(DISTINCT trim(c) ORDER BY trim(c)) AS suggested
-            FROM ranked
-            WHERE cnt = max_cnt
-            GROUP BY target_id
-        )
-        UPDATE addresses a
-        SET {target_column} = COALESCE(tp.suggested, ARRAY[]::char(2)[])
-        FROM targets t
-        LEFT JOIN top_per_target tp ON tp.target_id = t.id
-        WHERE a.id = t.id
-        RETURNING (tp.suggested IS NOT NULL) AS had_match
-        """,
-        (batch_size,),
+            LEFT JOIN top_per_target tp ON tp.target_id = t.id
+            WHERE a.id = t.id
+            RETURNING (tp.suggested IS NOT NULL) AS had_match
+        """),
+        {"batch_size": batch_size},
     )
-    rows = cur.fetchall()
+    rows = result.all()
     n_processed = len(rows)
-    n_with_suggestion = sum(1 for r in rows if (r["had_match"] if isinstance(r, dict) else r[0]))
+    n_with_suggestion = sum(1 for r in rows if r.had_match)
     return n_processed, n_with_suggestion
 
 

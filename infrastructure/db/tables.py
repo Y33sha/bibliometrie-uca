@@ -278,6 +278,16 @@ addresses = Table(
 )
 
 
+country_name_forms = Table(
+    "country_name_forms",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("iso_code", Text, nullable=False),
+    Column("form_normalized", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+)
+
+
 address_structures = Table(
     "address_structures",
     metadata,

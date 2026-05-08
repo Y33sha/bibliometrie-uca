@@ -262,8 +262,8 @@ def phase_authorships(**kw: Any) -> Any:
 
 def phase_countries(**kw: Any) -> Any:
     """Detection des pays des adresses et recalcul sur les publications."""
-    run_python("interfaces/cli/detect_address_countries.py", "--direct", "--apply")
-    run_python("interfaces/cli/suggest_address_countries.py")
+    run_python("interfaces/cli/pipeline/detect_address_countries.py", "--direct", "--apply")
+    run_python("interfaces/cli/pipeline/suggest_address_countries.py")
     _run_refresh_publication_countries()
 
 

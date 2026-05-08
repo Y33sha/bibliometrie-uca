@@ -122,6 +122,19 @@ async def async_db():
     await conn.close()
 
 
+def _sa_url():
+    from sqlalchemy import URL
+
+    return URL.create(
+        drivername="postgresql+psycopg",
+        username=DB_USER,
+        password=DB_PASSWORD or None,
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME,
+    )
+
+
 @pytest.fixture
 async def sa_conn():
     """AsyncConnection SQLAlchemy sur la base test, transaction rollbackée.
@@ -130,18 +143,9 @@ async def sa_conn():
     sqlalchemy-core-adoption. Cohabite avec `async_db` (cur psycopg)
     pendant la phase de migration.
     """
-    from sqlalchemy import URL
     from sqlalchemy.ext.asyncio import create_async_engine
 
-    url = URL.create(
-        drivername="postgresql+psycopg",
-        username=DB_USER,
-        password=DB_PASSWORD or None,
-        host=DB_HOST,
-        port=DB_PORT,
-        database=DB_NAME,
-    )
-    engine = create_async_engine(url)
+    engine = create_async_engine(_sa_url())
     async with engine.connect() as conn:
         trans = await conn.begin()
         try:
@@ -149,3 +153,23 @@ async def sa_conn():
         finally:
             await trans.rollback()
     await engine.dispose()
+
+
+@pytest.fixture
+def sa_sync_conn():
+    """Connection SQLAlchemy synchrone sur la base test, transaction rollbackée.
+
+    Pendant Phase 3 (migration des repos sync et des queries pipeline),
+    cohabite avec `db` (cur psycopg). Les modules migrés en SA Core sync
+    consomment cette fixture.
+    """
+    from sqlalchemy import create_engine
+
+    engine = create_engine(_sa_url())
+    with engine.connect() as conn:
+        trans = conn.begin()
+        try:
+            yield conn
+        finally:
+            trans.rollback()
+    engine.dispose()

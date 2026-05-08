@@ -379,14 +379,85 @@ fiche).
 
 ### Phase 3 — Migration des queries statiques restantes
 
-Queries SELECT/INSERT/UPDATE/DELETE statiques sans construction
-dynamique. Gain principal : uniformité du codebase.
+Queries SELECT/INSERT/UPDATE/DELETE statiques. Gain : uniformité
+du codebase, suppression complète de `cur.execute` côté code
+applicatif (préalable à la Phase 4).
 
-- [ ] À faire au fil de l'eau, pas en bloc — quand on touche un
-  fichier pour autre chose, on le migre tant qu'on y est.
-- [ ] Critère d'arrêt : si un fichier reste plus lisible en SQL
-  brut (CTE complexe, JSON ops avancés), on le laisse en `text()`
-  et on documente le choix dans une note locale.
+**État au démarrage de la Phase 3** (grep) : ~448 `cur.execute`
+restants au total. Hors Phase 3 :
+
+- `interfaces/cli/*` (~145) : audit deprecated/one-shot/recurring
+  préalable nécessaire (cf. audit-cto Phase 3) ; chantier dédié
+  après réorganisation, ne migrer que les scripts conservés.
+- `infrastructure/perimeter.py` (~11) : CTE récursive, reste en
+  `text()`.
+- `infrastructure/sources/*` (~28) : extracteurs API, à examiner
+  au passage (probablement staging/raw, peu de logique métier).
+- Repos async en mode dispatch : la branche psycopg disparaît en
+  Phase 4 (suppression du `cur.execute` résiduel des méthodes en
+  dispatch dans `async_publication_repository.py` notamment).
+
+**Critère d'arrêt par fichier** : si un module reste plus lisible
+en SQL brut (CTE complexe, opérations JSON avancées type `jsonb_set`,
+window functions complexes), on garde `text()` et on documente le
+choix dans une note locale.
+
+#### Lot 3.A — Repositories sync (~113 `cur.execute`, 8 fichiers)
+
+Pendants synchrones des `async_*_repository.py` déjà migrés en
+Phase 2. Migration mécanique en se calquant sur les async (mêmes
+queries, signatures `cur → conn`, `Engine` SA sync).
+
+**Préalable** : instancier un `Engine` SA sync (`infrastructure/db/engine.py`
+en parallèle de l'AsyncEngine existant). C'est le 2ᵉ item de
+Phase 4 — à anticiper ici puisqu'il conditionne tout le lot.
+
+- [ ] `Engine` SA sync ajouté dans `infrastructure/db/engine.py`
+- [ ] `publication_repository.py` (22 occ.)
+- [ ] `journal_repository.py` (18 occ.)
+- [ ] `publisher_repository.py` (17 occ.)
+- [ ] `person_repository/_core.py` + `_authorships.py` +
+  `_name_forms.py` + `_identifiers.py` (42 occ. au total)
+- [ ] `authorship_repository.py` (14 occ.)
+- [ ] Tests d'intégration sync correspondants (devraient passer
+  sans modification ; sinon adapter les fixtures comme `sa_conn`
+  pour les async).
+
+#### Lot 3.B — Queries pipeline (`infrastructure/db/queries/`, ~120 occ.)
+
+Code appelé par le pipeline (sync). Bénéficie du même `Engine` SA
+sync que le Lot 3.A.
+
+Sous-lots, par étape du pipeline :
+
+- [ ] **Normalizers** (HAL/OA/WoS/ScanR/theses/Crossref) — 6 fichiers,
+  ~43 occ.
+- [ ] **Pipeline publications/staging/merge** (`merge.py`, `enrich.py`,
+  `publications/create.py`, `staging.py`) — 4 fichiers, ~16 occ.
+- [ ] **Pipeline persons/authorships** (`name_forms.py`, `persons/create.py`,
+  `authorships_build.py`, `source_authorships.py`) — 4 fichiers, ~25 occ.
+- [ ] **Pipeline addresses/structures** (`address_resolution.py`,
+  `affiliations.py`, `countries.py`) — 3 fichiers, ~24 occ.
+- [ ] **`subjects.py`** (10 occ.) — à examiner : opérations JSON
+  spécifiques susceptibles de rester en `text()`.
+
+#### Lot 3.C — Reste du code applicatif
+
+- [ ] `application/pipeline/*` (~9 occ.)
+- [ ] `application/audit.py`, `application/addresses_countries.py`,
+  etc. (~5 occ.)
+- [ ] `infrastructure/{app_config,addresses,db_helpers}.py` (~10 occ.)
+- [ ] `interfaces/api/*` (~3 occ., sans doute des endpoints
+  exotiques)
+- [ ] `run_pipeline.py:206` (`VACUUM`) — `text()` simple
+
+#### Critère de complétion Phase 3
+
+Plus aucun `cur.execute` dans le code applicatif **hors** :
+- `interfaces/cli/` (en attente de l'audit dédié)
+- `infrastructure/perimeter.py` (CTE récursive, choix assumé)
+- `infrastructure/sources/*` (à confirmer — sans doute hors scope BDD canonique)
+- Branches dispatch des repos async (Phase 4 les nettoie)
 
 ### Phase 4 — Bascule du pool psycopg vers AsyncEngine
 
