@@ -112,7 +112,7 @@ config). Les credentials API sont des placeholders : à renseigner dans
 la table `config` avant le pipeline.
 
 Pour régénérer le seed depuis une base existante :
-`python interfaces/cli/generate_seed.py`.
+`python -m interfaces.cli.dev.generate_seed`.
 
 ### Backend
 

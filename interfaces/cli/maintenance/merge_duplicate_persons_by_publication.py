@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# STATUS: oneshot (2026-05-08)
 """
 Fusionne automatiquement les paires de personnes qui sont à la fois :
 - Candidats doublons par nom (même last_name_normalized, first_name compatible)
@@ -9,9 +10,13 @@ Règles de choix du target :
 2. Si même patronyme, garder le prénom le plus long
 3. Sinon, prompter l'utilisateur
 
+Outil ad-hoc de maintenance — relancer occasionnellement après ingestion
+(une nouvelle vague de doublons peut apparaître). Migration SA Core
+reportée au Lot 3.A du chantier sqlalchemy-core-adoption.
+
 Usage:
-    python auto_merge_name_conflict_pairs.py              # exécuter
-    python auto_merge_name_conflict_pairs.py --dry-run    # simuler
+    python -m interfaces.cli.maintenance.merge_duplicate_persons_by_publication              # exécuter
+    python -m interfaces.cli.maintenance.merge_duplicate_persons_by_publication --dry-run    # simuler
 """
 
 import argparse

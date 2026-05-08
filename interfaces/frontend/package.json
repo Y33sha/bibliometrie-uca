@@ -12,7 +12,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"types:gen": "cd ../.. && python -m interfaces.cli.dump_openapi && cd interfaces/frontend && openapi-typescript openapi.json -o src/lib/api/schema.ts && rm openapi.json"
+		"types:gen": "cd ../.. && python -m interfaces.cli.dev.dump_openapi && cd interfaces/frontend && openapi-typescript openapi.json -o src/lib/api/schema.ts && rm openapi.json"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.0",

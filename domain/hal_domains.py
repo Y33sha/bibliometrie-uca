@@ -1,7 +1,7 @@
 """Référentiel des domaines HAL : code stable → libellé human-readable.
 
 Le dict `HAL_DOMAINS` est généré depuis l'API officielle CCSD via
-`interfaces/cli/refresh_hal_domain_labels.py`. La hiérarchie n'est pas
+`interfaces/cli/dev/refresh_hal_domain_labels.py`. La hiérarchie n'est pas
 stockée explicitement : elle se reconstitue à partir du code lui-même
 (séparateur `.`), évitant la duplication de l'arborescence.
 

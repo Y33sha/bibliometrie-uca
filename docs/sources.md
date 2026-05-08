@@ -180,7 +180,7 @@ La FK sur la table `person_rh` permet:
 
 Données fournies par la Bibliothèque numérique le 11/03/2026.
 
-Fichier CSV importé via `interfaces/cli/import_apc.py` → table `apc_payments`.
+Fichier CSV importé via `python -m interfaces.cli.imports.import_apc` → table `apc_payments`.
 - Contient : DOI, montant en €, éditeur, labo payeur, année
 - Rattaché aux publications par DOI et aux structures par nom
 

@@ -1,3 +1,4 @@
+# STATUS: recurring (dev) — 2026-05-08
 """Régénère `domain/hal_domains.py` depuis l'API HAL.
 
 L'API CCSD `https://api.archives-ouvertes.fr/ref/domain/` expose les ~400
@@ -5,7 +6,7 @@ domaines HAL au format `<code> = <chemin>/<hiérarchique>`, avec parfois
 des annotations `[clé]` (PACS, codes math…) à retirer.
 
 Usage :
-    python -m interfaces.cli.refresh_hal_domain_labels
+    python -m interfaces.cli.dev.refresh_hal_domain_labels
 
 À relancer ponctuellement quand HAL ajoute des domaines (rare). Pas dans
 le pipeline régulier.
@@ -71,7 +72,7 @@ def fetch_domains() -> list[tuple[str, str]]:
 HEADER = '''"""Référentiel des domaines HAL : code stable → libellé human-readable.
 
 Le dict `HAL_DOMAINS` est généré depuis l'API officielle CCSD via
-`interfaces/cli/refresh_hal_domain_labels.py`. La hiérarchie n'est pas
+`interfaces/cli/dev/refresh_hal_domain_labels.py`. La hiérarchie n'est pas
 stockée explicitement : elle se reconstitue à partir du code lui-même
 (séparateur `.`), évitant la duplication de l'arborescence.
 

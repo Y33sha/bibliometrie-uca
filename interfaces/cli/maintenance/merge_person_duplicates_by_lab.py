@@ -1,3 +1,4 @@
+# STATUS: oneshot (2026-05-08)
 """
 Fusionne les personnes homonymes au sein d'un même laboratoire.
 
@@ -7,9 +8,12 @@ affiche les doublons et demande confirmation avant de fusionner.
 La personne cible (celle qui absorbe les autres) est celle avec le plus de
 publications, ou celle qui a des données RH.
 
+Outil ad-hoc de maintenance — relancer occasionnellement après ingestion.
+Migration SA Core reportée au Lot 3.A du chantier sqlalchemy-core-adoption.
+
 Usage:
-    python merge_lab_duplicates.py              # appliquer les fusions confirmées
-    python merge_lab_duplicates.py --dry-run    # dry-run interactif
+    python -m interfaces.cli.maintenance.merge_person_duplicates_by_lab              # appliquer les fusions confirmées
+    python -m interfaces.cli.maintenance.merge_person_duplicates_by_lab --dry-run    # dry-run interactif
 """
 
 import argparse

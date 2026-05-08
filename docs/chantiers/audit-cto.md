@@ -319,11 +319,18 @@ fichiers concernés.
   dynamiques (`_PublicationFacetsBuilder`, `filters.py`), passer à
   `prepare_threshold=5` (défaut) si memory leak observé, ou
   désactiver le prepare sur les requêtes dynamiques
-- [ ] **Inventaire `interfaces/cli/`** : ajouter en tête de chaque
-  script un commentaire `# STATUS: oneshot | recurring | deprecated`
-  + date. Déplacer en `interfaces/cli/oneshots/` les `oneshot`,
-  garder les `recurring` à la racine, supprimer les `deprecated`
-  trimestriellement
+- [x] **Inventaire `interfaces/cli/`** : audit script par script
+  réalisé le 2026-05-08. Racine vidée, 4 sous-dossiers organisés :
+  `pipeline/` (phases pipeline), `dev/` (outils dev — `dump_openapi`,
+  `generate_seed`, `refresh_hal_domain_labels`), `imports/` (RH +
+  APC + Open APC), `maintenance/` (outils ad-hoc — fusions
+  publications, merges manuels). Marqueur `# STATUS:` ajouté sur les
+  scripts conservés (`recurring (dev)` / `recurring (imports)` /
+  `oneshot` pour les ad-hoc). Une vingtaine de scripts deprecated
+  supprimés (rattrapages historiques couverts par la pipeline ou les
+  chantiers achevés). Migration SA Core des scripts conservés
+  effectuée pour ceux qui ne dépendent pas des repos sync (les autres
+  reportés au Lot 3.A du chantier sqla).
 - [ ] **Référencer `processing/*` retiré dans `docs/donnees.md`** :
   remplacer par `application/pipeline/normalize/*` (à intégrer dans
   le chantier "réécriture doc" final)
