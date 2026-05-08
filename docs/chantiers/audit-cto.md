@@ -313,8 +313,12 @@ fichiers concernés.
 - [ ] **Chasser les `Any`** : par fichier modifié, typer
   progressivement les `cur: Any` (créer un alias `Cursor`/
   `AsyncCursor` à l'entrée des modules)
-- [ ] **Pool DB** : porter `db_pool_max` à 20 ou 30 en prod (selon
-  benchmark), documenter le ratio max/min recommandé
+- [x] **Pool DB** : `db_pool_max` passé à 30 (default `settings.py` +
+  `.env.example`). Note opérationnelle ajoutée (ratio recommandé ~1:15,
+  bumper à 50+ si TimeoutError côté pool, surveiller `pg_stat_activity`
+  Postgres en parallèle). Pas de benchmark préalable — usage mono-utilisateur
+  en dev, le 30 est défensif (cf. TODO_CLAUDE : « max=10 trop étroit dès
+  que la SPA admin chargera plusieurs facettes en parallèle »).
 - [ ] **`prepare_threshold`** : auditer les query builders
   dynamiques (`_PublicationFacetsBuilder`, `filters.py`), passer à
   `prepare_threshold=5` (défaut) si memory leak observé, ou
