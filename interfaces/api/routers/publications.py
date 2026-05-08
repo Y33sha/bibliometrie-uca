@@ -18,8 +18,10 @@ from application.ports.publications_queries import (
     FacetFilters,
     ListFilters,
 )
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from interfaces.api.async_deps import (
+    audit_repo,
     authorship_repo,
     db_conn,
     get_root_structure_id,
@@ -199,13 +201,16 @@ async def exclude_source_authorship(
     body: ExcludeSourceAuthorship = ExcludeSourceAuthorship(),
     conn: AsyncConnection = Depends(db_conn),
     repo: AsyncAuthorshipRepository = Depends(authorship_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Marque/démarque une authorship source comme fausse.
 
     Si aucune source non exclue n'atteste plus l'authorship consolidée,
     celle-ci est supprimée.
     """
-    await _set_source_authorship_excluded(conn, authorship_id, source, body.excluded, repo=repo)
+    await _set_source_authorship_excluded(
+        conn, authorship_id, source, body.excluded, repo=repo, audit_repo=audit
+    )
     return {"ok": True, "excluded": body.excluded}
 
 

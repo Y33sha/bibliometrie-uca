@@ -15,8 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from application import structures as structures_service
 from application.ports.structures_queries import AsyncStructuresQueries
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.structure_repository import AsyncStructureRepository
-from interfaces.api.async_deps import db_conn, structure_repo, structures_queries
+from interfaces.api.async_deps import audit_repo, db_conn, structure_repo, structures_queries
 from interfaces.api.models import (
     DeletedResponse,
     NameFormCreate,
@@ -112,10 +113,11 @@ async def delete_structure(
     structure_id: int,
     conn: AsyncConnection = Depends(db_conn),
     repo: AsyncStructureRepository = Depends(structure_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Supprime une structure. Cascade sur les relations et formes de
     noms liées. 404 si inconnue."""
-    await structures_service.delete_structure(conn, structure_id, repo=repo)
+    await structures_service.delete_structure(conn, structure_id, repo=repo, audit_repo=audit)
     return {"deleted": True}
 
 
@@ -148,9 +150,10 @@ async def delete_relation(
     relation_id: int,
     conn: AsyncConnection = Depends(db_conn),
     repo: AsyncStructureRepository = Depends(structure_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Supprime une relation structure. 404 si l'id n'existe pas."""
-    await structures_service.delete_relation(conn, relation_id, repo=repo)
+    await structures_service.delete_relation(conn, relation_id, repo=repo, audit_repo=audit)
     return {"deleted": True}
 
 
@@ -209,7 +212,8 @@ async def delete_name_form(
     form_id: int,
     conn: AsyncConnection = Depends(db_conn),
     repo: AsyncStructureRepository = Depends(structure_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Supprime une forme de nom. 404 si inconnue."""
-    await structures_service.delete_name_form(conn, form_id, repo=repo)
+    await structures_service.delete_name_form(conn, form_id, repo=repo, audit_repo=audit)
     return {"deleted": True}

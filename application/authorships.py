@@ -14,12 +14,17 @@ from typing import Any
 from application.audit import async_emit_event
 from application.ports.perimeter import AsyncPerimeterQueries
 from domain.errors import NotFoundError, ValidationError
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
 
 
 async def exclude_authorship(
-    cur: Any, authorship_id: int, *, repo: AsyncAuthorshipRepository
+    cur: Any,
+    authorship_id: int,
+    *,
+    repo: AsyncAuthorshipRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> dict:
     """Marque une authorship vérité comme exclue et détache les authorships sources.
 
@@ -39,7 +44,7 @@ async def exclude_authorship(
         await repo.detach_source_authorships_for_person(authorship_id, person_id)
 
     await async_emit_event(
-        cur,
+        audit_repo,
         "authorship.excluded",
         "authorship",
         authorship_id,
@@ -55,6 +60,7 @@ async def set_source_authorship_excluded(
     excluded: bool,
     *,
     repo: AsyncAuthorshipRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> None:
     """Marque ou démarque une authorship source comme exclue.
 
@@ -74,7 +80,7 @@ async def set_source_authorship_excluded(
         await detach_source(cur, source_authorship_id, source, repo=repo)
 
     await async_emit_event(
-        cur,
+        audit_repo,
         "source_authorship.excluded",
         "source_authorship",
         source_authorship_id,

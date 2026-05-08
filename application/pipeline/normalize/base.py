@@ -21,6 +21,7 @@ from typing import Any, ClassVar
 
 from psycopg.rows import dict_row, tuple_row
 
+from application.pipeline._savepoint import savepoint
 from application.ports.staging import StagingQueries
 
 
@@ -127,21 +128,18 @@ class SourceNormalizer(ABC):
 
     def _process_one(self, cur: Any, row: Any) -> bool | None:
         """Enveloppe process_work avec SAVEPOINT optionnel."""
-        if self.USE_SAVEPOINT:
-            sp_name = f"normalize_{self.SOURCE}_work"
-            cur.execute(f"SAVEPOINT {sp_name}")
-            try:
-                result = self.process_work(cur, row)
-                cur.execute(f"RELEASE SAVEPOINT {sp_name}")
-                return result
-            except Exception:
-                try:
-                    cur.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
-                except Exception:
-                    self.conn.rollback()
-                self.on_error()
-                raise
-        return self.process_work(cur, row)
+        if not self.USE_SAVEPOINT:
+            return self.process_work(cur, row)
+        try:
+            with savepoint(
+                cur,
+                f"normalize_{self.SOURCE}_work",
+                on_rollback_failure=self.conn.rollback,
+            ):
+                return self.process_work(cur, row)
+        except Exception:
+            self.on_error()
+            raise
 
     def run(self, argv: list[str] | None = None) -> None:
         """Entry point : parse args, drive the normalization loop."""

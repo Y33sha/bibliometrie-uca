@@ -56,10 +56,12 @@ from application.ports.persons_queries import (
     FacetFilters,
     ListFilters,
 )
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from domain.ports.person_repository import AsyncPersonRepository
 from domain.sources import ALL_SOURCES_SET
 from interfaces.api.async_deps import (
+    audit_repo,
     authorship_repo,
     db_conn,
     person_repo,
@@ -360,9 +362,10 @@ async def remove_person_identifier(
     id_value: str,
     conn: AsyncConnection = Depends(db_conn),
     repo: AsyncPersonRepository = Depends(person_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Supprime un identifiant d'une personne."""
-    await _remove_identifier(conn, person_id, id_type, id_value, repo=repo)
+    await _remove_identifier(conn, person_id, id_type, id_value, repo=repo, audit_repo=audit)
     return {"removed": True}
 
 
@@ -372,9 +375,10 @@ async def update_identifier_status(
     body: UpdateIdentifierStatus,
     conn: AsyncConnection = Depends(db_conn),
     repo: AsyncPersonRepository = Depends(person_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
-    row = await _update_identifier_status(conn, ident_id, body.status, repo=repo)
+    row = await _update_identifier_status(conn, ident_id, body.status, repo=repo, audit_repo=audit)
     return {"id": row["id"], "status": row["status"]}
 
 
@@ -387,11 +391,12 @@ async def reassign_identifier(
     conn: AsyncConnection = Depends(db_conn),
     queries: AsyncPersonsQueries = Depends(persons_queries),
     repo: AsyncPersonRepository = Depends(person_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
     if not await queries.person_exists(body.person_id):
         raise HTTPException(status_code=404, detail="Personne cible introuvable")
-    await _reassign_identifier(conn, ident_id, body.person_id, repo=repo)
+    await _reassign_identifier(conn, ident_id, body.person_id, repo=repo, audit_repo=audit)
     return {"id": ident_id, "person_id": body.person_id, "status": "pending"}
 
 
@@ -400,9 +405,10 @@ async def toggle_authorship_excluded(
     authorship_id: int,
     conn: AsyncConnection = Depends(db_conn),
     repo: AsyncAuthorshipRepository = Depends(authorship_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Marque un authorship comme exclu."""
-    row = await _exclude_authorship(conn, authorship_id, repo=repo)
+    row = await _exclude_authorship(conn, authorship_id, repo=repo, audit_repo=audit)
     return {"id": row["id"], "excluded": row["excluded"]}
 
 
@@ -412,9 +418,10 @@ async def reject_person(
     body: RejectPerson,
     conn: AsyncConnection = Depends(db_conn),
     repo: AsyncPersonRepository = Depends(person_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Marque/démarque une personne comme rejetée."""
-    await _set_rejected(conn, person_id, body.rejected, repo=repo)
+    await _set_rejected(conn, person_id, body.rejected, repo=repo, audit_repo=audit)
     return {"ok": True}
 
 
@@ -440,6 +447,7 @@ async def merge_persons(
     body: MergePersons,
     conn: AsyncConnection = Depends(db_conn),
     repo: AsyncPersonRepository = Depends(person_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Fusionne une autre personne (source) dans celle-ci (target)."""
     source_id = body.source_id
@@ -456,7 +464,7 @@ async def merge_persons(
     if source_id not in found:
         raise HTTPException(status_code=404, detail="Personne source introuvable")
 
-    await _merge_person(conn, person_id, source_id, repo=repo)
+    await _merge_person(conn, person_id, source_id, repo=repo, audit_repo=audit)
     return {"merged": True, "source_id": source_id, "target_id": person_id}
 
 

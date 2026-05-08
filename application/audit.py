@@ -2,7 +2,7 @@
 
 Usage :
     # Depuis un service métier, après une opération destructive :
-    emit_event(cur, "person.merged", "person", target_id,
+    emit_event(audit_repo, "person.merged", "person", target_id,
                {"source_id": source_id})
 
 Le user_id est récupéré automatiquement depuis le contexte d'authentification
@@ -14,20 +14,16 @@ services sans ajouter `user_id: str | None = None` à toutes leurs signatures.
 Les ContextVar sont async-local — chaque requête HTTP a son propre contexte,
 pas de fuite entre requêtes.
 
-Cohabitation pendant le chantier sqlalchemy-core-adoption (Phase 1) :
-`async_emit_event` accepte les deux signatures (curseur psycopg legacy ou
-AsyncConnection SQLAlchemy) et dispatche en interne. Branche psycopg à
-supprimer en Phase 4 quand tous les call sites auront basculé en SA.
+L'écriture SQL elle-même passe par le port `AuditRepository` (cf.
+`domain/ports/audit_repository.py`), pas par un `cur.execute` inline :
+règle DDD `application ⊥ infrastructure`.
 """
 
 import contextvars
-import json
 import logging
 from typing import Any
 
-from psycopg.types.json import Jsonb as Json
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection
+from domain.ports.audit_repository import AsyncAuditRepository, AuditRepository
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +56,7 @@ def get_current_user() -> str | None:
 
 
 def emit_event(
-    cur: Any,
+    repo: AuditRepository | None,
     event_type: str,
     aggregate_type: str,
     aggregate_id: int | None = None,
@@ -68,12 +64,17 @@ def emit_event(
 ) -> None:
     """Enregistre un événement d'audit dans audit_log.
 
-    Silencieusement no-op si aucun utilisateur n'est défini dans le
-    contexte (pipeline, scripts, tests) : on ne veut auditer que les
-    actions admin explicites.
+    Silencieusement no-op si :
+    - aucun utilisateur n'est défini dans le contexte (pipeline,
+      scripts, tests qui n'auditent pas) ;
+    - `repo` est None (caller hors HTTP qui n'a pas de repo audit
+      câblé — typiquement le pipeline).
 
     Args:
-        cur: curseur DB (psycopg3) dans la transaction courante.
+        repo: AuditRepository lié à la transaction courante. None
+            accepté pour les callers pipeline/CLI qui ne sont pas en
+            contexte HTTP : l'audit est de toute façon no-op (user_id
+            absent), aucun intérêt à câbler un repo.
         event_type: notation pointée, ex. "person.merged",
             "publication.excluded", "structure.deleted".
         aggregate_type: type de l'entité affectée
@@ -84,64 +85,20 @@ def emit_event(
             (source_id d'une fusion, champs modifiés, raison, etc.).
     """
     user_id = get_current_user()
-    if user_id is None:
+    if user_id is None or repo is None:
         return
-
-    cur.execute(
-        """
-        INSERT INTO audit_log (event_type, aggregate_type, aggregate_id,
-                               payload, user_id)
-        VALUES (%s, %s, %s, %s, %s)
-        """,
-        (event_type, aggregate_type, aggregate_id, Json(payload or {}), user_id),
-    )
+    repo.record_event(event_type, aggregate_type, aggregate_id, payload or {}, user_id)
 
 
 async def async_emit_event(
-    conn: Any,
+    repo: AsyncAuditRepository | None,
     event_type: str,
     aggregate_type: str,
     aggregate_id: int | None = None,
     payload: dict[str, Any] | None = None,
 ) -> None:
-    """Variante async d'`emit_event`.
-
-    Accepte deux types de connexion pendant le chantier
-    sqlalchemy-core-adoption (Phase 1) :
-    - `AsyncConnection` SQLAlchemy : nouveau pattern, branche cible.
-    - `psycopg.AsyncCursor` : ancien pattern, conservé tant que tous
-      les call sites n'ont pas basculé en SA.
-    """
+    """Variante async d'`emit_event`."""
     user_id = get_current_user()
-    if user_id is None:
+    if user_id is None or repo is None:
         return
-
-    if isinstance(conn, AsyncConnection):
-        # SQL brut via text() : on ne peut pas importer la MetaData
-        # de infrastructure/db/tables.py depuis application/ (couches
-        # DDD). Le passage à un AuditRepository propre est prévu en
-        # Phase 3 du chantier audit-cto.
-        await conn.execute(
-            text(
-                "INSERT INTO audit_log "
-                "(event_type, aggregate_type, aggregate_id, payload, user_id) "
-                "VALUES (:event_type, :aggregate_type, :aggregate_id, "
-                "        CAST(:payload AS jsonb), :user_id)"
-            ),
-            {
-                "event_type": event_type,
-                "aggregate_type": aggregate_type,
-                "aggregate_id": aggregate_id,
-                "payload": json.dumps(payload or {}),
-                "user_id": user_id,
-            },
-        )
-    else:
-        await conn.execute(
-            """
-            INSERT INTO audit_log (event_type, aggregate_type, aggregate_id,
-                                   payload, user_id)
-            VALUES (%s, %s, %s, %s, %s)
-            """,
-            (event_type, aggregate_type, aggregate_id, Json(payload or {}), user_id),
-        )
+    await repo.record_event(event_type, aggregate_type, aggregate_id, payload or {}, user_id)

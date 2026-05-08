@@ -11,6 +11,7 @@ dans `interfaces/cli/pipeline/merge_pubs_by_nnt.py`.
 
 from typing import Any
 
+from application.pipeline._savepoint import savepoint
 from application.ports.merge import MergeQueries
 from application.publications import merge_publications as _merge_pub
 from application.publications import refresh_from_sources
@@ -58,14 +59,12 @@ def run_merge(
                     continue
 
                 try:
-                    cur.execute("SAVEPOINT merge_nnt")
-                    _merge_pub(cur, target["id"], source["id"], repo=pub_repo)
-                    refresh_from_sources(cur, target["id"], repo=pub_repo)
-                    cur.execute("RELEASE SAVEPOINT merge_nnt")
+                    with savepoint(cur, "merge_nnt"):
+                        _merge_pub(cur, target["id"], source["id"], repo=pub_repo)
+                        refresh_from_sources(cur, target["id"], repo=pub_repo)
                     logger.info(f"  [MERGE] {label}")
                     merged += 1
                 except Exception as e:
-                    cur.execute("ROLLBACK TO SAVEPOINT merge_nnt")
                     logger.warning(f"  Échec {label}: {e}")
                     errors += 1
 

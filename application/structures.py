@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from application.audit import async_emit_event
 from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.structure_repository import AsyncStructureRepository
 from domain.structure import StructureApiIds
 
@@ -104,14 +105,18 @@ async def update_structure(
 
 
 async def delete_structure(
-    conn: AsyncConnection, structure_id: int, *, repo: AsyncStructureRepository
+    conn: AsyncConnection,
+    structure_id: int,
+    *,
+    repo: AsyncStructureRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas."""
     row = await repo.delete_structure(structure_id)
     if not row:
         raise NotFoundError(f"Structure {structure_id} introuvable")
     await async_emit_event(
-        conn,
+        audit_repo,
         "structure.deleted",
         "structure",
         structure_id,
@@ -139,14 +144,18 @@ async def create_relation(
 
 
 async def delete_relation(
-    conn: AsyncConnection, relation_id: int, *, repo: AsyncStructureRepository
+    conn: AsyncConnection,
+    relation_id: int,
+    *,
+    repo: AsyncStructureRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> None:
     """Supprime une relation. Lève NotFoundError si elle n'existe pas."""
     row = await repo.delete_relation(relation_id)
     if not row:
         raise NotFoundError(f"Relation {relation_id} introuvable")
     await async_emit_event(
-        conn,
+        audit_repo,
         "structure_relation.deleted",
         "structure",
         row["parent_id"],
@@ -211,14 +220,18 @@ async def update_name_form(
 
 
 async def delete_name_form(
-    conn: AsyncConnection, form_id: int, *, repo: AsyncStructureRepository
+    conn: AsyncConnection,
+    form_id: int,
+    *,
+    repo: AsyncStructureRepository,
+    audit_repo: AsyncAuditRepository | None = None,
 ) -> None:
     """Supprime une forme de nom. Lève NotFoundError si elle n'existe pas."""
     row = await repo.delete_name_form(form_id)
     if not row:
         raise NotFoundError(f"Forme {form_id} introuvable")
     await async_emit_event(
-        conn,
+        audit_repo,
         "structure_name_form.deleted",
         "structure",
         row["structure_id"],

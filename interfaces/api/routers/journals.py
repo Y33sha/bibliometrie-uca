@@ -9,8 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from application.journals import merge_journals
 from application.journals import update_journal as _update_journal
 from application.ports.journals_queries import AsyncJournalQueries
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.journal_repository import AsyncJournalRepository
 from interfaces.api.async_deps import (
+    audit_repo,
     db_conn,
     journal_queries,
     journal_repo,
@@ -82,6 +84,7 @@ async def merge(
     conn: AsyncConnection = Depends(db_conn),
     queries: AsyncJournalQueries = Depends(journal_queries),
     repo: AsyncJournalRepository = Depends(journal_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Fusionne la revue `source_id` dans la revue `journal_id`.
 
@@ -95,5 +98,5 @@ async def merge(
     if body.source_id not in found:
         raise HTTPException(status_code=404, detail="Revue source introuvable")
 
-    await merge_journals(conn, journal_id, body.source_id, repo=repo)
+    await merge_journals(conn, journal_id, body.source_id, repo=repo, audit_repo=audit)
     return {"merged": True, "source_id": body.source_id, "target_id": journal_id}

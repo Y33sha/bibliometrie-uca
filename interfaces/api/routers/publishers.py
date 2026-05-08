@@ -9,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from application.ports.publishers_queries import AsyncPublisherQueries
 from application.publishers import merge_publishers
 from application.publishers import update_publisher as _update_publisher
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.journal_repository import AsyncJournalRepository
 from domain.ports.publisher_repository import AsyncPublisherRepository
 from interfaces.api.async_deps import (
+    audit_repo,
     db_conn,
     journal_repo,
     publisher_queries,
@@ -84,6 +86,7 @@ async def merge(
     queries: AsyncPublisherQueries = Depends(publisher_queries),
     pub_repo: AsyncPublisherRepository = Depends(publisher_repo),
     j_repo: AsyncJournalRepository = Depends(journal_repo),
+    audit: AsyncAuditRepository = Depends(audit_repo),
 ) -> Any:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
@@ -103,5 +106,6 @@ async def merge(
         body.source_id,
         publisher_repo=pub_repo,
         journal_repo=j_repo,
+        audit_repo=audit,
     )
     return {"merged": True, "source_id": body.source_id, "target_id": publisher_id}

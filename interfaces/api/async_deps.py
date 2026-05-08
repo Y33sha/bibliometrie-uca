@@ -43,6 +43,7 @@ from application.ports.stats_queries import AsyncStatsQueries
 from application.ports.structures_queries import AsyncStructuresQueries
 from application.ports.subjects_queries import AsyncSubjectsQueries
 from domain.ports.address_repository import AsyncAddressRepository
+from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from domain.ports.journal_repository import AsyncJournalRepository
 from domain.ports.perimeter_repository import AsyncPerimeterRepository
@@ -72,6 +73,7 @@ from infrastructure.db.queries.structures import PgAsyncStructuresQueries
 from infrastructure.db.queries.subjects import PgAsyncSubjectsQueries
 from infrastructure.repositories import (
     async_address_repository,
+    async_audit_repository,
     async_authorship_repository,
     async_config_store,
     async_journal_repository,
@@ -122,6 +124,12 @@ def address_repo(
     conn: AsyncConnection = Depends(db_conn),
 ) -> AsyncAddressRepository:
     return async_address_repository(conn)
+
+
+def audit_repo(
+    conn: AsyncConnection = Depends(db_conn),
+) -> AsyncAuditRepository:
+    return async_audit_repository(conn)
 
 
 def authorship_repo(
