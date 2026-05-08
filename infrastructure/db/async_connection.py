@@ -18,11 +18,15 @@ _async_pool: AsyncConnectionPool | None = None
 def build_async_pool() -> AsyncConnectionPool:
     """Construit le pool async (non ouvert). `await pool.open()` dans le lifespan.
 
-    `prepare_threshold=1` : chaque requête est préparée dès le 1er appel
-    (défaut psycopg3 = 5). L'API ré-exécute constamment les mêmes
-    requêtes type `find_by_doi`, `list publications`, etc. → bénéfice
-    immédiat sur le plan d'exécution PostgreSQL et ~20-30 µs économisées
-    par requête.
+    `prepare_threshold` laissé au défaut psycopg3 (= 5). Une valeur plus
+    agressive (1) cache le plan dès le 1er appel mais fait croître le
+    cache des prepared statements sans borne sur les requêtes dynamiques
+    (facettes/filtres publications, listings paginés) — chaque
+    combinaison de filtres = string SQL distincte = entry distincte côté
+    Postgres, jamais évincée tant que la connexion vit. À 5, seules les
+    requêtes vraiment répétées entrent dans le cache : les hot paths
+    (`find_by_doi`, `list publications`) atteignent 5 appels en quelques
+    secondes, les variantes rares ne s'accumulent pas.
     """
     db_args = settings.db_args
     if os.environ.get("BIBLIOMETRIE_SANDBOX") == "1":
@@ -31,7 +35,7 @@ def build_async_pool() -> AsyncConnectionPool:
         conninfo="",
         min_size=settings.db_pool_min,
         max_size=settings.db_pool_max,
-        kwargs={**db_args, "row_factory": dict_row, "prepare_threshold": 1},
+        kwargs={**db_args, "row_factory": dict_row},
         open=False,
     )
 
