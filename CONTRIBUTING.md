@@ -301,7 +301,7 @@ npm run types:gen
 ```
 
 Le script dump l'OpenAPI offline
-([`interfaces/cli/dump_openapi.py`](interfaces/cli/dump_openapi.py)),
+([`interfaces/cli/dev/dump_openapi.py`](interfaces/cli/dev/dump_openapi.py)),
 le convertit en TypeScript via `openapi-typescript` et écrit dans
 `src/lib/api/schema.ts` (source de vérité côté front). Committer
 `schema.ts` dans le même PR.
