@@ -1,38 +1,34 @@
-"""Tests d'intégration pour `infrastructure.db.queries.person_duplicates` (async)."""
+"""Tests d'intégration pour `infrastructure.db.queries.person_duplicates`."""
 
 from sqlalchemy import text
 
 from application.ports.person_duplicates_queries import parse_skip_pairs
-from infrastructure.db.queries.person_duplicates import PgAsyncPersonDuplicatesQueries
+from infrastructure.db.queries.person_duplicates import PgPersonDuplicatesQueries
 
 
-def _q(conn) -> PgAsyncPersonDuplicatesQueries:
-    return PgAsyncPersonDuplicatesQueries(conn)
+def _q(conn) -> PgPersonDuplicatesQueries:
+    return PgPersonDuplicatesQueries(conn)
 
 
-async def _create_person(conn, last="Dupond", first="Jean"):
-    row = (
-        await conn.execute(
-            text("""
-                INSERT INTO persons
-                    (last_name, first_name, last_name_normalized, first_name_normalized)
-                VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id
-            """),
-            {"l": last, "f": first},
-        )
+def _create_person(conn, last="Dupond", first="Jean"):
+    row = conn.execute(
+        text("""
+            INSERT INTO persons
+                (last_name, first_name, last_name_normalized, first_name_normalized)
+            VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id
+        """),
+        {"l": last, "f": first},
     ).one()
     return row.id
 
 
-async def _create_pub(conn, title="Test Article For Dedup Testing", pub_year=2024, doi=None):
-    row = (
-        await conn.execute(
-            text("""
-                INSERT INTO publications (title, title_normalized, pub_year, doc_type, doi)
-                VALUES (:t, lower(:t), :y, 'article', :doi) RETURNING id
-            """),
-            {"t": title, "y": pub_year, "doi": doi},
-        )
+def _create_pub(conn, title="Test Article For Dedup Testing", pub_year=2024, doi=None):
+    row = conn.execute(
+        text("""
+            INSERT INTO publications (title, title_normalized, pub_year, doc_type, doi)
+            VALUES (:t, lower(:t), :y, 'article', :doi) RETURNING id
+        """),
+        {"t": title, "y": pub_year, "doi": doi},
     ).one()
     return row.id
 
@@ -54,31 +50,31 @@ class TestParseSkipPairs:
 
 
 class TestCountPersonDuplicates:
-    async def test_counts_same_initial(self, sa_conn):
-        await _create_person(sa_conn, last="Dupond", first="Jean")
-        await _create_person(sa_conn, last="Dupond", first="J")
+    def test_counts_same_initial(self, sa_sync_conn):
+        _create_person(sa_sync_conn, last="Dupond", first="Jean")
+        _create_person(sa_sync_conn, last="Dupond", first="J")
 
-        total = await _q(sa_conn).count_person_duplicates()
+        total = _q(sa_sync_conn).count_person_duplicates()
         assert total >= 1
 
 
 class TestNextPersonDuplicate:
-    async def test_returns_candidate_pair(self, sa_conn):
-        p1 = await _create_person(sa_conn, last="Dupond", first="Jean")
-        p2 = await _create_person(sa_conn, last="Dupond", first="J")
+    def test_returns_candidate_pair(self, sa_sync_conn):
+        p1 = _create_person(sa_sync_conn, last="Dupond", first="Jean")
+        p2 = _create_person(sa_sync_conn, last="Dupond", first="J")
 
-        res = await _q(sa_conn).next_person_duplicate(skip_pairs=None, offset=0)
+        res = _q(sa_sync_conn).next_person_duplicate(skip_pairs=None, offset=0)
         assert res is not None
         ids = {res["person_a"]["id"], res["person_b"]["id"]}
         assert ids == {p1, p2}
 
-    async def test_skips_specified_pairs(self, sa_conn):
-        p1 = await _create_person(sa_conn, last="Martin", first="Alice")
-        p2 = await _create_person(sa_conn, last="Martin", first="A")
+    def test_skips_specified_pairs(self, sa_sync_conn):
+        p1 = _create_person(sa_sync_conn, last="Martin", first="Alice")
+        p2 = _create_person(sa_sync_conn, last="Martin", first="A")
 
         # On skippe la paire → pas d'autre candidat → None
         skip = {(min(p1, p2), max(p1, p2))}
-        res = await _q(sa_conn).next_person_duplicate(skip_pairs=skip, offset=0)
+        res = _q(sa_sync_conn).next_person_duplicate(skip_pairs=skip, offset=0)
         # Peut matcher d'autres paires dans le fixture global — on vérifie juste
         # que celle skippée n'apparaît pas
         if res is not None:
@@ -87,40 +83,31 @@ class TestNextPersonDuplicate:
 
 
 class TestCountPersonConflictPairs:
-    async def test_counts_conflicts(self, sa_conn):
+    def test_counts_conflicts(self, sa_sync_conn):
         """Deux personnes distinctes référencées à la même position sur la même pub."""
-        p1 = await _create_person(sa_conn, last="A")
-        p2 = await _create_person(sa_conn, last="B")
-        pub = await _create_pub(sa_conn)
-        sd_row = (
-            await sa_conn.execute(
-                text(
-                    "INSERT INTO source_publications (source, source_id, title, publication_id) "
-                    "VALUES ('hal', 'h-1', 'X', :p) RETURNING id"
-                ),
-                {"p": pub},
+        p1 = _create_person(sa_sync_conn, last="A")
+        p2 = _create_person(sa_sync_conn, last="B")
+        pub = _create_pub(sa_sync_conn)
+        sd = sa_sync_conn.execute(
+            text(
+                "INSERT INTO source_publications (source, source_id, title, publication_id) "
+                "VALUES ('hal', 'h-1', 'X', :p) RETURNING id"
+            ),
+            {"p": pub},
+        ).scalar_one()
+        sp_a = sa_sync_conn.execute(
+            text(
+                "INSERT INTO source_persons (source, source_id, full_name) "
+                "VALUES ('hal', 'sp-a', 'A') RETURNING id"
             )
-        ).one()
-        sd = sd_row.id
-        sp_a_row = (
-            await sa_conn.execute(
-                text(
-                    "INSERT INTO source_persons (source, source_id, full_name) "
-                    "VALUES ('hal', 'sp-a', 'A') RETURNING id"
-                )
+        ).scalar_one()
+        sp_b = sa_sync_conn.execute(
+            text(
+                "INSERT INTO source_persons (source, source_id, full_name) "
+                "VALUES ('openalex', 'sp-b', 'B') RETURNING id"
             )
-        ).one()
-        sp_a = sp_a_row.id
-        sp_b_row = (
-            await sa_conn.execute(
-                text(
-                    "INSERT INTO source_persons (source, source_id, full_name) "
-                    "VALUES ('openalex', 'sp-b', 'B') RETURNING id"
-                )
-            )
-        ).one()
-        sp_b = sp_b_row.id
-        await sa_conn.execute(
+        ).scalar_one()
+        sa_sync_conn.execute(
             text("""
                 INSERT INTO source_authorships
                     (source, source_publication_id, source_person_id, author_position, person_id)
@@ -128,7 +115,7 @@ class TestCountPersonConflictPairs:
             """),
             {"sd": sd, "sp": sp_a, "pid": p1},
         )
-        await sa_conn.execute(
+        sa_sync_conn.execute(
             text("""
                 INSERT INTO source_authorships
                     (source, source_publication_id, source_person_id, author_position, person_id)
@@ -137,12 +124,12 @@ class TestCountPersonConflictPairs:
             {"sd": sd, "sp": sp_b, "pid": p2},
         )
 
-        count = await _q(sa_conn).count_person_conflict_pairs()
+        count = _q(sa_sync_conn).count_person_conflict_pairs()
         assert count >= 1
 
 
 class TestNextPersonConflict:
-    async def test_returns_none_when_no_conflict(self, sa_conn):
+    def test_returns_none_when_no_conflict(self, sa_sync_conn):
         # Pas de données → pas de conflit
-        res = await _q(sa_conn).next_person_conflict(skip_pairs=set(), offset=0)
+        res = _q(sa_sync_conn).next_person_conflict(skip_pairs=set(), offset=0)
         assert res is None

@@ -419,20 +419,6 @@ class TestMergePublications:
         assert row["oa_status"] == "diamond"
 
 
-async def _a_insert_publication(db, title="Test", doi=None, oa_status="unknown"):
-    await db.execute(
-        """
-        INSERT INTO publications (title, title_normalized, pub_year, doi,
-                                  doc_type, oa_status)
-        VALUES (%s, lower(%s), 2024, %s, 'article'::doc_type, %s::oa_type)
-        RETURNING id
-        """,
-        (title, title, doi, oa_status),
-    )
-    row = await db.fetchone()
-    return row["id"]
-
-
 class TestMarkDistinct:
     def test_inserts_ordered_pair(self, db):
         repo = publication_repository(db)
