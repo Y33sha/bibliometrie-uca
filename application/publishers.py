@@ -12,19 +12,22 @@ sémantiquement c'est une opération sur l'agrégat Publisher ; elle a
 besoin du port `JournalRepository` en complément pour détecter les
 journaux à conflit entre les deux éditeurs à fusionner avant de
 déléguer les transferts SQL.
+
+Toutes les fonctions sont sync (chantier sync-async-deduplication
+option D).
 """
 
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection
 
-from application.audit import async_emit_event
+from application.audit import emit_event
 from application.journals import merge_journals
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
-from domain.ports.audit_repository import AsyncAuditRepository
-from domain.ports.journal_repository import AsyncJournalRepository
-from domain.ports.publisher_repository import AsyncPublisherRepository, PublisherRepository
+from domain.ports.audit_repository import AuditRepository
+from domain.ports.journal_repository import JournalRepository
+from domain.ports.publisher_repository import PublisherRepository
 
 
 def find_or_create_publisher(
@@ -74,8 +77,8 @@ def find_or_create_publisher(
     return pub_id
 
 
-async def update_publisher(
-    conn: AsyncConnection, publisher_id: int, *, fields: dict, repo: AsyncPublisherRepository
+def update_publisher(
+    conn: Connection, publisher_id: int, *, fields: dict, repo: PublisherRepository
 ) -> None:
     """Met à jour un éditeur. Le `name` est automatiquement normalisé en
     `name_normalized`.
@@ -86,23 +89,23 @@ async def update_publisher(
     if not fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    if not await repo.publisher_exists(publisher_id):
+    if not repo.publisher_exists(publisher_id):
         raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
     fields = dict(fields)
     if "name" in fields:
         fields["name_normalized"] = normalize_text(fields["name"])
-    await repo.update_publisher_fields(publisher_id, fields)
+    repo.update_publisher_fields(publisher_id, fields)
 
 
-async def merge_publishers(
-    conn: AsyncConnection,
+def merge_publishers(
+    conn: Connection,
     target_id: int,
     source_id: int,
     *,
-    publisher_repo: AsyncPublisherRepository,
-    journal_repo: AsyncJournalRepository,
-    audit_repo: AsyncAuditRepository | None = None,
+    publisher_repo: PublisherRepository,
+    journal_repo: JournalRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible.
 
@@ -119,7 +122,7 @@ async def merge_publishers(
 
     # 1. Détecter les journaux partageant un titre entre les deux éditeurs,
     #    vérifier les conflits ISSN, puis les fusionner.
-    for pair in await journal_repo.find_shared_title_journal_pairs(target_id, source_id):
+    for pair in journal_repo.find_shared_title_journal_pairs(target_id, source_id):
         for field in ("issn", "eissn", "issnl"):
             tv = pair[f"t_{field}"]
             sv = pair[f"s_{field}"]
@@ -130,7 +133,7 @@ async def merge_publishers(
                     f"source #{pair['source_journal_id']}: {sv}). "
                     f"Fusionner les revues manuellement d'abord."
                 )
-        await merge_journals(
+        merge_journals(
             conn,
             pair["target_journal_id"],
             pair["source_journal_id"],
@@ -139,8 +142,6 @@ async def merge_publishers(
         )
 
     # 2-6. Le reste de la fusion (transferts, enrichissement, delete).
-    await publisher_repo.merge_publisher_into(target_id, source_id)
+    publisher_repo.merge_publisher_into(target_id, source_id)
 
-    await async_emit_event(
-        audit_repo, "publisher.merged", "publisher", target_id, {"source_id": source_id}
-    )
+    emit_event(audit_repo, "publisher.merged", "publisher", target_id, {"source_id": source_id})

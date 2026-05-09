@@ -84,11 +84,24 @@ def get_perimeter_structure_ids(conn_or_cur: Any, perimeter_code: str) -> set[in
 # ── Fonctions par rôle (lisent la config) ──
 
 
-def _config_perimeter_code(cur: Any, config_key: str, default: str) -> str:
-    """Lit un code périmètre depuis la table config."""
+def _config_perimeter_code(conn_or_cur: Any, config_key: str, default: str) -> str:
+    """Lit un code périmètre depuis la table config.
+
+    Accepte cur psycopg ou Connection SA (dispatch interne).
+    """
     try:
-        cur.execute("SELECT value FROM config WHERE key = %s", (config_key,))
-        row = cur.fetchone()
+        if isinstance(conn_or_cur, Connection):
+            result = conn_or_cur.execute(
+                text("SELECT value FROM config WHERE key = :key"),
+                {"key": config_key},
+            )
+            row = result.first()
+            if row:
+                val = row.value
+                return val if isinstance(val, str) else default
+            return default
+        conn_or_cur.execute("SELECT value FROM config WHERE key = %s", (config_key,))
+        row = conn_or_cur.fetchone()
         if row:
             val = row["value"] if isinstance(row, dict) else row[0]
             # value est du JSONB, donc déjà désérialisé (str)
@@ -98,21 +111,45 @@ def _config_perimeter_code(cur: Any, config_key: str, default: str) -> str:
     return default
 
 
-def get_affiliations_structure_ids(cur: Any) -> set[int]:
+def get_affiliations_structure_ids(conn_or_cur: Any) -> set[int]:
     """Périmètre pour la résolution des affiliations (structure_ids)."""
-    code = _config_perimeter_code(cur, "perimeter_affiliations", "uca_wide")
-    return get_perimeter_structure_ids(cur, code)
+    code = _config_perimeter_code(conn_or_cur, "perimeter_affiliations", "uca_wide")
+    return get_perimeter_structure_ids(conn_or_cur, code)
 
 
-def get_persons_structure_ids(cur: Any) -> set[int]:
+def get_persons_structure_ids(conn_or_cur: Any) -> set[int]:
     """Périmètre pour la création des personnes (in_perimeter)."""
-    code = _config_perimeter_code(cur, "perimeter_persons", "uca")
-    return get_perimeter_structure_ids(cur, code)
+    code = _config_perimeter_code(conn_or_cur, "perimeter_persons", "uca")
+    return get_perimeter_structure_ids(conn_or_cur, code)
 
 
-def get_persons_structure_ids_list(cur: Any) -> list[int]:
+def get_persons_structure_ids_list(conn_or_cur: Any) -> list[int]:
     """Variante liste (pour usage dans les requêtes SQL ANY(%s))."""
-    return list(get_persons_structure_ids(cur))
+    return list(get_persons_structure_ids(conn_or_cur))
+
+
+def get_persons_perimeter_root_ids(conn_or_cur: Any) -> list[int]:
+    """Racines du périmètre "persons" (sans expansion par `est_tutelle_de`).
+
+    Pendant sur l'async `async_get_persons_perimeter_root_ids`. Accepte
+    cur psycopg ou Connection SA (dispatch interne).
+    """
+    code = _config_perimeter_code(conn_or_cur, "perimeter_persons", "uca")
+    if isinstance(conn_or_cur, Connection):
+        result = conn_or_cur.execute(
+            text("SELECT structure_ids FROM perimeters WHERE code = :code"),
+            {"code": code},
+        )
+        row = result.one_or_none()
+        if not row:
+            return []
+        return list(row.structure_ids) if row.structure_ids else []
+    conn_or_cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (code,))
+    row = conn_or_cur.fetchone()
+    if not row:
+        return []
+    ids = row["structure_ids"] if isinstance(row, dict) else row[0]
+    return list(ids) if ids else []
 
 
 # ── Variantes async — utilisées par la surface FastAPI ────────────

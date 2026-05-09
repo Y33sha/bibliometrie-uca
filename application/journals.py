@@ -6,22 +6,20 @@ Les opérations sur l'agrégat Publisher vivent dans `application/publishers.py`
 (FK) mais sont manipulés par des services distincts, chacun sur son
 propre port.
 
-Variantes async migrées en SQLAlchemy Core (chantier sqlalchemy-core-adoption,
-sous-phase 1.3) : `update_journal`, `merge_journals` reçoivent une
-`AsyncConnection` SA. La face sync (`find_or_create_journal`,
-`update_journal_apc`, `reset_journal_apc`) reste sur curseur psycopg —
-sera migrée en Phase 4 du chantier.
+Toutes les fonctions sont sync. Les routers FastAPI utilisent les
+mêmes repos sync que le pipeline (chantier sync-async-deduplication
+option D, FastAPI exécute les routes `def` dans un threadpool).
 """
 
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection
 
-from application.audit import async_emit_event
+from application.audit import emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
-from domain.ports.audit_repository import AsyncAuditRepository
-from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
+from domain.ports.audit_repository import AuditRepository
+from domain.ports.journal_repository import JournalRepository
 
 
 def find_or_create_journal(
@@ -113,8 +111,8 @@ def find_or_create_journal(
     return journal_id
 
 
-async def update_journal(
-    conn: AsyncConnection, journal_id: int, *, fields: dict, repo: AsyncJournalRepository
+def update_journal(
+    conn: Connection, journal_id: int, *, fields: dict, repo: JournalRepository
 ) -> None:
     """Met à jour une revue. Le `title` est automatiquement normalisé en
     `title_normalized`.
@@ -125,13 +123,13 @@ async def update_journal(
     if not fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    if not await repo.journal_exists(journal_id):
+    if not repo.journal_exists(journal_id):
         raise NotFoundError(f"Revue {journal_id} introuvable")
 
     fields = dict(fields)
     if "title" in fields:
         fields["title_normalized"] = normalize_text(fields["title"])
-    await repo.update_journal_fields(journal_id, fields)
+    repo.update_journal_fields(journal_id, fields)
 
 
 def update_journal_apc(
@@ -157,19 +155,17 @@ def reset_journal_apc(cur: Any, *, repo: JournalRepository) -> int:
     return repo.reset_journal_apc()
 
 
-async def merge_journals(
-    conn: AsyncConnection,
+def merge_journals(
+    conn: Connection,
     target_id: int,
     source_id: int,
     *,
-    repo: AsyncJournalRepository,
-    audit_repo: AsyncAuditRepository | None = None,
+    repo: JournalRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne le journal source dans le journal cible."""
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un journal avec lui-même")
 
-    await repo.merge_journal_into(target_id, source_id)
-    await async_emit_event(
-        audit_repo, "journal.merged", "journal", target_id, {"source_id": source_id}
-    )
+    repo.merge_journal_into(target_id, source_id)
+    emit_event(audit_repo, "journal.merged", "journal", target_id, {"source_id": source_id})

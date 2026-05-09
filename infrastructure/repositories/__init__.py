@@ -28,7 +28,7 @@ from domain.ports.address_repository import AsyncAddressRepository
 from domain.ports.audit_repository import AsyncAuditRepository, AuditRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository
 from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
-from domain.ports.perimeter_repository import AsyncPerimeterRepository
+from domain.ports.perimeter_repository import AsyncPerimeterRepository, PerimeterRepository
 from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
 from domain.ports.publication_repository import AsyncPublicationRepository, PublicationRepository
 from domain.ports.publisher_repository import AsyncPublisherRepository, PublisherRepository
@@ -46,6 +46,7 @@ from .async_publisher_repository import PgAsyncPublisherRepository
 from .async_structure_repository import PgAsyncStructureRepository
 from .audit_repository import PgAuditRepository
 from .journal_repository import PgJournalRepository
+from .perimeter_repository import PgPerimeterRepository
 from .person_repository import PgPersonRepository
 from .publication_repository import PgPublicationRepository
 from .publisher_repository import PgPublisherRepository
@@ -68,6 +69,11 @@ def config_store(conn: Any) -> PgConfig:
 def journal_repository(conn_or_cur: Any) -> JournalRepository:
     """Retourne un JournalRepository lié au cur psycopg ou Connection SA donné."""
     return PgJournalRepository(conn_or_cur)
+
+
+def perimeter_repository(conn: Any) -> PerimeterRepository:
+    """Retourne un PerimeterRepository lié à la Connection SA donnée."""
+    return PgPerimeterRepository(conn)
 
 
 def person_repository(conn_or_cur: Any) -> PersonRepository:
